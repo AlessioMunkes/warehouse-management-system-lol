@@ -1,0 +1,775 @@
+/* ============================================================
+   src/css/index.css
+   Ladles of Love — WMS Design System
+   Tailwind v4 + custom component classes
+
+   HOW TO USE IN A COMPONENT:
+     Replace inline style objects with these class names.
+     Example:
+       Before: <button style={{ background: '#7A1A1A', color: '#fff', ... }}>
+       After:  <button className="btn-primary">
+
+   SETUP (run once in your client folder):
+     npm install tailwindcss @tailwindcss/vite
+   Then replace vite.config.js with the one provided.
+   ============================================================ */
+
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────────────────────────
+   DESIGN TOKENS
+   Your brand colours and values defined once here.
+   Use them in your own CSS as var(--lol-maroon) etc.
+   ───────────────────────────────────────────────────────────── */
+@theme {
+  --color-maroon:     #7A1A1A;
+  --color-accent:     #E31E24;
+  --color-lol-bg:     #F3F2F1;
+  --color-lol-white:  #FFFFFF;
+  --color-border:     #D2D0CE;
+  --color-text:       #201F1E;
+  --color-text-sub:   #605E5C;
+  --color-text-meta:  #A19F9D;
+  --color-danger:     #A4262C;
+  --color-danger-bg:  #FDE7E9;
+
+  --font-family-sans: 'Segoe UI', Tahoma, Geneva, sans-serif;
+
+  --radius-none: 0px;   /* your UI uses sharp corners throughout */
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   BASE
+   ───────────────────────────────────────────────────────────── */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: var(--font-family-sans);
+    background-color: var(--color-lol-bg);
+    color: var(--color-text);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Sharp corners everywhere — matches your design language */
+  button, input, select, textarea {
+    border-radius: 0;
+    font-family: inherit;
+  }
+}
+
+
+/* ─────────────────────────────────────────────────────────────
+   COMPONENT CLASSES
+   Use these className values directly in your JSX.
+   ───────────────────────────────────────────────────────────── */
+@layer components {
+
+  /* ── Page layouts ─────────────────────────────────────────── */
+
+  /* Full-screen maroon background (login page, programme select) */
+  .page-maroon {
+    min-height: 100vh;
+    background-color: var(--color-maroon);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  /* Full-screen light background (dashboard, task select) */
+  .page-light {
+    min-height: 100vh;
+    background-color: var(--color-lol-bg);
+    display: flex;
+    flex-direction: column;
+  }
+
+
+  /* ── Cards ────────────────────────────────────────────────── */
+
+  /* White card with top accent stripe — used for login */
+  .card {
+    width: 100%;
+    max-width: 340px;
+    background-color: var(--color-lol-white);
+    border: 1px solid var(--color-border);
+    border-top: 3px solid var(--color-accent);
+  }
+
+  /* Generic white content card (delivery records, PO items) */
+  .card-content {
+    background-color: var(--color-lol-white);
+    border: 1px solid var(--color-border);
+    padding: 12px 16px;
+  }
+
+  /* Delivery record row card */
+  .card-row {
+    background-color: var(--color-lol-white);
+    border: 1px solid var(--color-border);
+    border-left: 3px solid var(--color-border);
+    padding: 10px 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+    transition: background-color 0.15s;
+  }
+
+  .card-row:hover {
+    background-color: var(--color-lol-bg);
+  }
+
+  .card-row.is-flagged {
+    border-left-color: var(--color-danger);
+  }
+
+
+  /* ── Header bar (top of dashboard/screens) ────────────────── */
+
+  .header-bar {
+    background-color: var(--color-maroon);
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    flex-shrink: 0;
+  }
+
+  .header-logo-text {
+    color: var(--color-lol-white);
+    font-size: 9px;
+    font-weight: 900;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+  }
+
+  .header-username {
+    color: var(--color-lol-white);
+    font-size: 9px;
+    font-weight: 700;
+    text-align: right;
+  }
+
+  .header-role {
+    color: var(--color-text-meta);
+    font-size: 7px;
+    text-transform: uppercase;
+  }
+
+
+  /* ── Card header (maroon top section of login card) ───────── */
+
+  .card-header {
+    padding: 12px 16px;
+    text-align: center;
+    background-color: var(--color-maroon);
+  }
+
+  .card-header-title {
+    color: var(--color-lol-white);
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin: 0;
+  }
+
+  .card-header-sub {
+    color: var(--color-text-meta);
+    font-size: 7px;
+    font-weight: 700;
+    margin-top: 2px;
+  }
+
+
+  /* ── Breadcrumb bar ───────────────────────────────────────── */
+
+  .breadcrumb-bar {
+    background-color: var(--color-lol-white);
+    border-bottom: 1px solid var(--color-border);
+    padding: 4px 12px;
+  }
+
+  .breadcrumb-text {
+    font-size: 8px;
+    color: var(--color-text-meta);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  .breadcrumb-text span {
+    color: var(--color-maroon);
+  }
+
+
+  /* ── Section title (inside card body, above form) ─────────── */
+
+  .section-title {
+    font-size: 9px;
+    font-weight: 900;
+    color: var(--color-maroon);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+
+  /* ── Form elements ────────────────────────────────────────── */
+
+  .form-body {
+    padding: 16px;
+  }
+
+  .form-group {
+    margin-bottom: 12px;
+  }
+
+  .form-label {
+    display: block;
+    font-size: 8px;
+    font-weight: 900;
+    color: var(--color-text-meta);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    letter-spacing: 0.3px;
+  }
+
+  .form-input {
+    width: 100%;
+    height: 32px;
+    padding: 0 8px;
+    background-color: var(--color-lol-bg);
+    border: 1px solid var(--color-border);
+    font-size: 11px;
+    color: var(--color-text);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .form-input:focus {
+    border-color: var(--color-maroon);
+  }
+
+  .form-input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  /* Password field wrapper (input + show/hide button together) */
+  .form-input-group {
+    display: flex;
+    align-items: center;
+    background-color: var(--color-lol-bg);
+    border: 1px solid var(--color-border);
+  }
+
+  .form-input-group:focus-within {
+    border-color: var(--color-maroon);
+  }
+
+  .form-input-group .form-input {
+    border: none;
+    background: transparent;
+    flex: 1;
+  }
+
+  .form-input-group .form-input:focus {
+    border: none;
+    box-shadow: none;
+  }
+
+  .form-select {
+    width: 100%;
+    height: 32px;
+    padding: 0 8px;
+    background-color: var(--color-lol-bg);
+    border: 1px solid var(--color-border);
+    font-size: 11px;
+    color: var(--color-text);
+    outline: none;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23A19F9D' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 28px;
+  }
+
+  .form-select:focus {
+    border-color: var(--color-maroon);
+  }
+
+  /* Inline error text below a field */
+  .form-error {
+    font-size: 8px;
+    font-weight: 700;
+    color: var(--color-danger);
+    margin-top: 3px;
+  }
+
+
+  /* ── Buttons ──────────────────────────────────────────────── */
+
+  /* Maroon filled — primary action */
+  .btn-primary {
+    height: 32px;
+    padding: 0 16px;
+    background-color: var(--color-maroon);
+    border: none;
+    color: var(--color-lol-white);
+    font-size: 9px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: background-color 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background-color: var(--color-accent);
+  }
+
+  .btn-primary:disabled {
+    background-color: var(--color-text-meta);
+    cursor: not-allowed;
+  }
+
+  /* Full-width primary — login submit */
+  .btn-primary-full {
+    width: 100%;
+    height: 32px;
+    background-color: var(--color-maroon);
+    border: none;
+    color: var(--color-lol-white);
+    font-size: 9px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: background-color 0.15s;
+  }
+
+  .btn-primary-full:hover:not(:disabled) {
+    background-color: var(--color-accent);
+  }
+
+  .btn-primary-full:disabled {
+    background-color: var(--color-text-meta);
+    cursor: not-allowed;
+  }
+
+  /* White outlined — secondary action */
+  .btn-secondary {
+    height: 32px;
+    padding: 0 16px;
+    background-color: var(--color-lol-white);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: background-color 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn-secondary:hover {
+    background-color: var(--color-lol-bg);
+  }
+
+  /* Ghost — used in the maroon header bar */
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid #aaa;
+    padding: 3px 10px;
+    color: #ddd;
+    font-size: 8px;
+    font-weight: 700;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: background-color 0.15s;
+  }
+
+  .btn-ghost:hover {
+    background-color: rgba(255, 255, 255, 0.12);
+  }
+
+  /* Text-only link button — forgot password etc */
+  .btn-link {
+    background: none;
+    border: none;
+    color: var(--color-text-meta);
+    font-size: 8px;
+    font-weight: 700;
+    cursor: pointer;
+    text-decoration: underline;
+    text-transform: uppercase;
+    padding: 0;
+    transition: color 0.15s;
+  }
+
+  .btn-link:hover {
+    color: var(--color-text);
+  }
+
+  /* Show/hide password toggle inside input group */
+  .btn-toggle-password {
+    height: 32px;
+    padding: 0 10px;
+    background: transparent;
+    border: none;
+    font-size: 8px;
+    font-weight: 700;
+    color: var(--color-text-meta);
+    cursor: pointer;
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+
+
+  /* ── Alerts ───────────────────────────────────────────────── */
+
+  /* Red error banner (invalid login, API error) */
+  .alert-error {
+    background-color: var(--color-danger-bg);
+    border: 1px solid var(--color-danger);
+    padding: 6px 8px;
+    margin-bottom: 12px;
+  }
+
+  .alert-error p {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--color-danger);
+    margin: 0;
+  }
+
+
+  /* ── Status badges ────────────────────────────────────────── */
+
+  .badge {
+    display: inline-block;
+    font-size: 7px;
+    font-weight: 900;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    letter-spacing: 0.3px;
+  }
+
+  .badge-recorded {
+    background-color: #E8F5E9;
+    color: #2E7D32;
+    border: 1px solid #A5D6A7;
+  }
+
+  .badge-pending {
+    background-color: #FFF8E1;
+    color: #F57F17;
+    border: 1px solid #FFE082;
+  }
+
+  .badge-deleted {
+    background-color: var(--color-danger-bg);
+    color: var(--color-danger);
+    border: 1px solid #F1998E;
+  }
+
+  .badge-inactive {
+    background-color: var(--color-lol-bg);
+    color: var(--color-text-meta);
+    border: 1px solid var(--color-border);
+  }
+
+  .badge-complete {
+    background-color: #E3F2FD;
+    color: #1565C0;
+    border: 1px solid #90CAF9;
+  }
+
+
+  /* ── Sidebar (dashboard left nav) ─────────────────────────── */
+
+  .sidebar {
+    width: 160px;
+    background-color: var(--color-lol-white);
+    border-right: 1px solid var(--color-border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 10px;
+    background: transparent;
+    border: none;
+    border-left: 3px solid transparent;
+    cursor: pointer;
+    text-align: left;
+    font-size: 9px;
+    font-weight: 900;
+    color: var(--color-text);
+    text-transform: uppercase;
+    transition: background-color 0.15s;
+  }
+
+  .sidebar-item:hover:not(:disabled) {
+    background-color: var(--color-lol-bg);
+  }
+
+  .sidebar-item.active {
+    background-color: var(--color-maroon);
+    border-left-color: var(--color-accent);
+    color: var(--color-lol-white);
+  }
+
+  .sidebar-item:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+
+  /* ── Programme / Task selection cards ─────────────────────── */
+
+  .prog-card {
+    background-color: var(--color-lol-white);
+    border: 1px solid var(--color-border);
+    padding: 16px 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background-color 0.15s;
+  }
+
+  .prog-card:hover:not(:disabled) {
+    border-color: var(--color-maroon);
+  }
+
+  .prog-card:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .prog-card-icon {
+    width: 40px;
+    height: 40px;
+    margin: 0 auto 10px;
+    background-color: var(--color-lol-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 900;
+    color: var(--color-maroon);
+    transition: background-color 0.15s, color 0.15s;
+  }
+
+  .prog-card:hover:not(:disabled) .prog-card-icon {
+    background-color: var(--color-maroon);
+    color: var(--color-lol-white);
+  }
+
+  .prog-card-title {
+    font-size: 9px;
+    font-weight: 900;
+    color: var(--color-text);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  /* Task select row (NourishSelect list items) */
+  .task-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background-color: var(--color-lol-white);
+    border: 1px solid var(--color-border);
+    border-left: 1px solid var(--color-border);
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+    transition: border-color 0.15s, background-color 0.15s;
+  }
+
+  .task-row.selected {
+    background-color: rgba(122, 26, 26, 0.04);
+    border-color: var(--color-maroon);
+    border-left: 3px solid var(--color-accent);
+  }
+
+  .task-row:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .task-row-icon {
+    width: 32px;
+    height: 32px;
+    background-color: var(--color-lol-bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--color-maroon);
+    flex-shrink: 0;
+    transition: background-color 0.15s, color 0.15s;
+  }
+
+  .task-row:hover:not(:disabled) .task-row-icon {
+    background-color: var(--color-maroon);
+    color: var(--color-lol-white);
+  }
+
+  .task-row-label {
+    font-size: 10px;
+    font-weight: 900;
+    color: var(--color-text);
+    text-transform: uppercase;
+  }
+
+  .task-row-desc {
+    font-size: 8px;
+    color: var(--color-text-sub);
+    margin-top: 2px;
+  }
+
+
+  /* ── Modal overlay ────────────────────────────────────────── */
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 50;
+  }
+
+  .modal-card {
+    background-color: var(--color-lol-white);
+    border: 1px solid var(--color-border);
+    border-top: 3px solid var(--color-accent);
+    padding: 20px;
+    max-width: 320px;
+    width: 100%;
+  }
+
+  .modal-title {
+    font-size: 10px;
+    font-weight: 900;
+    color: var(--color-maroon);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .modal-body {
+    font-size: 9px;
+    color: var(--color-text);
+    line-height: 1.6;
+    margin-bottom: 16px;
+  }
+
+
+  /* ── Table ────────────────────────────────────────────────── */
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10px;
+  }
+
+  .data-table th {
+    background-color: var(--color-lol-bg);
+    border: 1px solid var(--color-border);
+    padding: 6px 10px;
+    font-size: 8px;
+    font-weight: 900;
+    color: var(--color-text-meta);
+    text-transform: uppercase;
+    text-align: left;
+    letter-spacing: 0.3px;
+  }
+
+  .data-table td {
+    border: 1px solid var(--color-border);
+    padding: 6px 10px;
+    color: var(--color-text);
+    vertical-align: middle;
+  }
+
+  .data-table tr:nth-child(even) td {
+    background-color: rgba(243, 242, 241, 0.5);
+  }
+
+  .data-table tr:hover td {
+    background-color: rgba(122, 26, 26, 0.04);
+  }
+
+
+  /* ── Footer / tech noise bar ──────────────────────────────── */
+
+  .footer-meta {
+    margin-top: 16px;
+    padding-top: 8px;
+    border-top: 1px solid var(--color-border);
+    text-align: center;
+    font-size: 7px;
+    color: var(--color-text-meta);
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  /* ── Divider ──────────────────────────────────────────────── */
+
+  .divider {
+    height: 1px;
+    background-color: var(--color-border);
+    margin: 12px 0;
+  }
+
+  /* ── Search bar ───────────────────────────────────────────── */
+
+  .search-bar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .search-input {
+    width: 240px;
+    height: 30px;
+    padding: 0 8px;
+    border: 1px solid var(--color-border);
+    font-size: 10px;
+    font-family: inherit;
+    background-color: var(--color-lol-white);
+    outline: none;
+    text-transform: uppercase;
+  }
+
+  .search-input:focus {
+    border-color: var(--color-maroon);
+  }
+}
