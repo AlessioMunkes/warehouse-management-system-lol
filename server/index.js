@@ -1,5 +1,4 @@
-import dotenv from 'dotenv'
-dotenv.config()        
+import 'dotenv/config'
 import express from "express";
 import jwt from 'jsonwebtoken'
 import auth from './src/middleware/auth.middleware.js'
