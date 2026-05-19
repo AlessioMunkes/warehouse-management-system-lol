@@ -1,0 +1,210 @@
+// ─────────────────────────────────────────────────────────────
+// server/src/models/delivery.model.js
+//
+// All SQL for the procurement dashboard.
+// No business logic here — only database queries.
+// ─────────────────────────────────────────────────────────────
+import pool from '../config/db.js';
+
+// ── Get all deliveries with optional date range ───────────────
+// range: 'today' | 'week' | 'month' | 'all'
+const getDeliveries = async (range = 'all') => {
+  let dateFilter = '';
+
+  if (range === 'today') {
+    dateFilter = `AND dn.delivery_date = CURRENT_DATE`;
+  } else if (range === 'week') {
+    dateFilter = `AND dn.delivery_date >= CURRENT_DATE - INTERVAL '7 days'`;
+  } else if (range === 'month') {
+    dateFilter = `AND dn.delivery_date >= CURRENT_DATE - INTERVAL '30 days'`;
+  }
+
+  const result = await pool.query(
+    `SELECT
+       dn.id,
+       dn.delivery_date,
+       dn.status,
+       dn.created_at,
+       s.name        AS supplier_name,
+       d.name        AS driver_name,
+       d.license_number AS driver_id_number,
+       u.first_name  AS received_by_name
+     FROM delivery_notes dn
+     JOIN suppliers s ON s.id = dn.supplier_id
+     LEFT JOIN drivers d ON d.id = dn.driver_id
+     LEFT JOIN users u ON u.id = dn.received_by
+     WHERE 1=1 ${dateFilter}
+     ORDER BY dn.created_at DESC`
+  );
+
+  return result.rows;
+};
+
+// ── Get a single delivery with all its line items ─────────────
+const getDeliveryById = async (id) => {
+  const deliveryResult = await pool.query(
+    `SELECT
+       dn.id,
+       dn.delivery_date,
+       dn.status,
+       dn.created_at,
+       s.name        AS supplier_name,
+       d.name        AS driver_name,
+       d.license_number AS driver_id_number,
+       u.first_name  AS received_by_name
+     FROM delivery_notes dn
+     JOIN suppliers s ON s.id = dn.supplier_id
+     LEFT JOIN drivers d ON d.id = dn.driver_id
+     LEFT JOIN users u ON u.id = dn.received_by
+     WHERE dn.id = $1`,
+    [id]
+  );
+
+  const itemsResult = await pool.query(
+    `SELECT
+       dnc.id,
+       p.name        AS product_name,
+       dnc.expected_quantity,
+       dnc.actual_quantity,
+       dnc.expected_weight_kg,
+       dnc.actual_weight_kg,
+       dnc.weight_discrepancy_kg,
+       dnc.is_flagged,
+       dnc.notes
+     FROM delivery_note_cross_check dnc
+     JOIN products p ON p.id = dnc.product_id
+     WHERE dnc.delivery_note_id = $1`,
+    [id]
+  );
+
+  return {
+    ...deliveryResult.rows[0],
+    items: itemsResult.rows,
+  };
+};
+
+// ── Create a new delivery note + line items ───────────────────
+// Uses a transaction so if any insert fails, everything rolls back
+const createDelivery = async ({ supplierId, driverId, deliveryDate, receivedBy, lineItems }) => {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // 1. Insert the delivery note header
+    const noteResult = await client.query(
+      `INSERT INTO delivery_notes
+         (supplier_id, driver_id, delivery_date, received_by, status, created_at)
+       VALUES ($1, $2, $3, $4, 'recorded', NOW())
+       RETURNING *`,
+      [supplierId, driverId, deliveryDate, receivedBy]
+    );
+
+    const deliveryNote = noteResult.rows[0];
+
+    // 2. Insert each line item into delivery_note_cross_check
+    for (const item of lineItems) {
+      const discrepancy = (item.actualWeightKg || 0) - (item.expectedWeightKg || 0);
+      const isFlagged   = item.actualQuantity !== item.expectedQuantity || discrepancy !== 0;
+
+    }
+
+    await client.query('COMMIT');
+    return deliveryNote;
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+// ── Get all active suppliers ──────────────────────────────────
+const getSuppliers = async () => {
+  const result = await pool.query(
+    `SELECT id, name, contact_email FROM suppliers ORDER BY name ASC`
+  );
+  return result.rows;
+};
+
+// ── Get drivers — optionally filtered by supplier ─────────────
+const getDrivers = async (supplierId = null) => {
+  if (supplierId) {
+    const result = await pool.query(
+      `SELECT id, name, license_number, supplier_id
+       FROM drivers
+       WHERE supplier_id = $1
+       ORDER BY name ASC`,
+      [supplierId]
+    );
+    return result.rows;
+  }
+
+  const result = await pool.query(
+    `SELECT id, name, license_number, supplier_id FROM drivers ORDER BY name ASC`
+  );
+  return result.rows;
+};
+
+// ── Get all active products ───────────────────────────────────
+const getProducts = async () => {
+  const result = await pool.query(
+    `SELECT id, name, stock_keeping_unit AS sku, weight_kg
+     FROM products
+     WHERE is_active = true
+     ORDER BY name ASC`
+  );
+  return result.rows;
+};
+
+// ── Get purchase orders for a supplier ───────────────────────
+// Only returns approved POs — can't receive against a pending one
+const getPurchaseOrdersBySupplier = async (supplierId) => {
+  const result = await pool.query(
+    `SELECT
+         po.id,
+         po.supplier_id,
+         po.expected_delivery_date,
+         po.status
+       FROM purchase_orders po
+       WHERE po.supplier_id = $1 AND po.status = 'Pending'
+       ORDER BY po.expected_delivery_date ASC`,
+    [supplierId]
+  );
+  return result.rows;
+};
+
+// ── Get line items for a specific purchase order ──────────────
+// Returns product name, expected quantity and weight so the
+// form can auto-populate without the worker typing anything
+const getPurchaseOrderItems = async (purchaseOrderId) => {
+  const result = await pool.query(
+    `SELECT
+       poi.id                  AS purchase_order_item_id,
+       poi.product_id,
+       poi.expected_weight_kg,
+       poi.expected_quantity,
+       poi.unit_price,
+       p.name                  AS product_name,
+       p.stock_keeping_unit    AS sku,
+       p.weight_kg             AS product_weight_kg
+     FROM purchase_order_items poi
+     JOIN products p ON p.id = poi.product_id
+     WHERE poi.purchase_order_id = $1
+     ORDER BY p.name ASC`,
+    [purchaseOrderId]
+  );
+  return result.rows;
+};
+
+export default {
+  getDeliveries,
+  getDeliveryById,
+  createDelivery,
+  getSuppliers,
+  getDrivers,
+  getProducts,
+  getPurchaseOrdersBySupplier,
+  getPurchaseOrderItems,
+};

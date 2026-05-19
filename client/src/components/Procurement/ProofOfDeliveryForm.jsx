@@ -1,175 +1,360 @@
-import React, { useState } from 'react';
-import { Plus } from 'lucide-react';
-import FormCard from '../Shared/FormCard';
-import FormInput from '../Shared/FormInput';
-import FormSelect from '../Shared/FormSelect';
-import FormButton from '../Shared/FormButton';
-import LineItemRow from '../Shared/LineItemRow';
-import SignatureCanvas from '../Shared/SignatureCanvas';
+import React, { useState, useEffect } from 'react';
+import { Trash2 } from 'lucide-react';
+import { apiGet } from '../../services/api';
+
+// ─────────────────────────────────────────────────────────────
+// src/components/Procurement/ProofOfDeliveryForm.jsx
+//
+// Workflow:
+//   1. Worker selects supplier
+//   2. Approved purchase orders for that supplier load automatically
+//   3. Worker selects a PO — line items auto-populate from PO items
+//   4. Expected qty and product are read-only (from the PO)
+//   5. Worker fills in actual qty and actual weight only
+//   6. Submit calls POST /api/deliveries
+//
+// No inline styles — all classes from src/css/index.css
+// ─────────────────────────────────────────────────────────────
 
 const ProofOfDeliveryForm = ({
   onSubmit,
-  stockItems = [],
-  suppliers = [],
-  drivers = [],
-  purchaseOrders = [],
   onCancel,
+  isSubmitting = false,
+  suppliers    = [],
+  drivers      = [],
 }) => {
-  const [formData, setFormData] = useState({
-    supplierId: '',
-    driverId: '',
-    purchaseOrderId: '',
-    deliveryDate: new Date().toISOString().split('T')[0],
-    programme: 'NOC',
-    lineItems: [{ stockItemId: '', quantity: '' }],
-    signatureData: '',
-  });
+  const [supplierId,   setSupplierId]   = useState('');
+  const [driverId,     setDriverId]     = useState('');
+  const [deliveryDate, setDeliveryDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedPoId, setSelectedPoId] = useState('');
+  const [lineItems,    setLineItems]    = useState([]);
 
-  const [errors, setErrors] = useState({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [filteredDrivers,  setFilteredDrivers]  = useState([]);
+  const [purchaseOrders,   setPurchaseOrders]   = useState([]);
+  const [errors,           setErrors]           = useState({});
+  const [loadingPOs,       setLoadingPOs]       = useState(false);
+  const [loadingItems,     setLoadingItems]     = useState(false);
+  const [poError,          setPoError]          = useState('');
 
-  const programmeOptions = [
-    { value: 'NOC', label: 'Nourish Our Children' },
-    { value: 'FTS', label: 'Feed the Soil' },
-    { value: 'LOVE_ACTIVISM', label: 'Love Activism' },
-  ];
+  // ── When supplier changes: filter drivers, fetch POs ─────────
+  useEffect(() => {
+    setDriverId('');
+    setSelectedPoId('');
+    setLineItems([]);
+    setPurchaseOrders([]);
+    setPoError('');
 
-  const filteredDrivers = formData.supplierId
-    ? drivers.filter(driver => driver.supplierId === parseInt(formData.supplierId))
-    : [];
-
-  const supplierOptions = suppliers.map(sup => ({ value: sup.id.toString(), label: sup.name }));
-  const driverOptions = filteredDrivers.map(drv => ({ value: drv.id.toString(), label: drv.name }));
-
-  const filteredPurchaseOrders = formData.supplierId
-    ? purchaseOrders.filter(po => po.supplierId === parseInt(formData.supplierId))
-    : [];
-  const purchaseOrderOptions = filteredPurchaseOrders.map(po => ({ value: po.id.toString(), label: po.poNumber }));
-
-  const validateForm = () => {
-    const newErrors = {};
-
-    if (!formData.supplierId) newErrors.supplierId = 'Please select a supplier';
-    if (!formData.driverId) newErrors.driverId = 'Please select a driver';
-    if (!formData.purchaseOrderId) newErrors.purchaseOrderId = 'Please select a Purchase Order ID';
-    if (!formData.deliveryDate) newErrors.deliveryDate = 'Delivery date is required';
-    else if (new Date(formData.deliveryDate) > new Date()) newErrors.deliveryDate = 'Delivery date cannot be in the future';
-    if (!formData.programme) newErrors.programme = 'Programme selection is required';
-    if (!formData.signatureData) newErrors.signatureData = 'Digital signature is required';
-
-    if (formData.lineItems.length === 0) {
-      newErrors.lineItems = 'At least one line item is required';
-    } else {
-      const lineItemErrors = [];
-      formData.lineItems.forEach((item, index) => {
-        const itemError = {};
-        if (!item.stockItemId) itemError.stockItemId = 'Select an item';
-        if (!item.quantity || parseFloat(item.quantity) <= 0) itemError.quantity = 'Quantity must be > 0';
-        if (Object.keys(itemError).length > 0) lineItemErrors[index] = itemError;
-      });
-      if (lineItemErrors.length > 0) newErrors.lineItems = lineItemErrors;
+    if (!supplierId) {
+      setFilteredDrivers([]);
+      return;
     }
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+    // Filter drivers client-side
+    setFilteredDrivers(
+      drivers.filter((d) => d.supplier_id === parseInt(supplierId))
+    );
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validateForm()) return;
-    setIsSubmitting(true);
+    // Fetch approved POs for this supplier
+    const fetchPOs = async () => {
+      setLoadingPOs(true);
+      setPoError('');
+      try {
+        const res = await apiGet(`/api/deliveries/purchase-orders?supplierId=${supplierId}`);
+        setPurchaseOrders(res.data);
+        if (res.data.length === 0) {
+          setPoError('No approved purchase orders found for this supplier.');
+        }
+      } catch (err) {
+        setPoError('Failed to load purchase orders.');
+      } finally {
+        setLoadingPOs(false);
+      }
+    };
+
+    fetchPOs();
+  }, [supplierId, drivers]);
+
+  // ── When PO is selected: fetch items and auto-populate ───────
+  const handlePoSelect = async (poId) => {
+    setSelectedPoId(poId);
+    setLineItems([]);
+    setLoadingItems(true);
     try {
-      const selectedSupplier = suppliers.find(s => s.id.toString() === formData.supplierId);
-      const selectedDriver = drivers.find(d => d.id.toString() === formData.driverId);
-      const selectedPO = purchaseOrders.find(po => po.id.toString() === formData.purchaseOrderId);
-      const submissionData = {
-        ...formData,
-        supplierName: selectedSupplier ? selectedSupplier.name : '',
-        driverName: selectedDriver ? selectedDriver.name : '',
-        purchaseOrderNumber: selectedPO ? selectedPO.poNumber : '',
-      };
-      await onSubmit(submissionData);
-      setIsSubmitting(false);
-    } catch (error) {
-      setErrors({ general: error.message || 'Failed to submit delivery note' });
-      setIsSubmitting(false);
+      const res = await apiGet(`/api/deliveries/purchase-orders/${poId}/items`);
+      // Map PO items into line items — expected values pre-filled, actual blank
+      setLineItems(
+        res.data.map((item) => ({
+          purchaseOrderItemId: item.purchase_order_item_id,
+          productId:           item.product_id,
+          productName:         item.product_name,
+          expectedQuantity:    item.expected_quantity,
+          expectedWeightKg:    item.expected_weight_kg || '',
+        }))
+      );
+    } catch (err) {
+      setPoError('Failed to load purchase order items.');
+    } finally {
+      setLoadingItems(false);
+    }
+  };
+    
+
+
+  // ── Validation ───────────────────────────────────────────────
+  const validate = () => {
+    const e = {};
+    if (!supplierId)   e.supplierId   = 'Supplier is required';
+    if (!driverId)     e.driverId     = 'Driver is required';
+    if (!deliveryDate) e.deliveryDate = 'Date is required';
+    if (!selectedPoId) e.selectedPoId = 'Select a purchase order';
+    if (new Date(deliveryDate) > new Date()) e.deliveryDate = 'Date cannot be in the future';
+    if (!lineItems.length) e.lineItems = 'No items loaded — select a purchase order';
+
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  // ── Submit ───────────────────────────────────────────────────
+  const handleSubmit = async (evt) => {
+    evt.preventDefault();
+    if (!validate()) return;
+    try {
+      await onSubmit({
+        supplierId,
+        driverId,
+        deliveryDate,
+        purchaseOrderId: selectedPoId,
+        lineItems: lineItems.map((item) => ({
+          purchaseOrderItemId: item.purchaseOrderItemId,
+          productId:           item.productId,
+          expectedQuantity:    Number(item.expectedQuantity),
+          expectedWeightKg:    Number(item.expectedWeightKg || 0),
+        })),
+      });
+    } catch (err) {
+      setErrors((p) => ({ ...p, general: err.message }));
     }
   };
 
-  const addLineItem = () => setFormData({ ...formData, lineItems: [...formData.lineItems, { stockItemId: '', quantity: '' }] });
-  const updateLineItem = (index, updatedItem) => {
-    const newLineItems = [...formData.lineItems];
-    newLineItems[index] = updatedItem;
-    setFormData({ ...formData, lineItems: newLineItems });
-  };
-  const removeLineItem = (index) => {
-    if (formData.lineItems.length === 1) return;
-    setFormData({ ...formData, lineItems: formData.lineItems.filter((_, i) => i !== index) });
-  };
+  const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-ZA') : '—';
 
-  // Force re-render of driver and PO dropdowns when supplier changes
-  const dropdownKey = formData.supplierId || 'no-supplier';
-
+  // ── Render ───────────────────────────────────────────────────
   return (
-    <FormCard title="Record New Delivery" width="550px">
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-        <FormSelect label="Supplier Company" value={formData.supplierId}
-          onChange={(e) => {
-            setFormData({
-              ...formData,
-              supplierId: e.target.value,
-              driverId: '',
-              purchaseOrderId: ''
-            });
-          }}
-          options={supplierOptions} placeholder="Select supplier..." required error={errors.supplierId} />
+    <div className="form-modal">
 
-        <FormSelect key={`driver-${dropdownKey}`} label="Driver Name" value={formData.driverId}
-          onChange={(e) => setFormData({ ...formData, driverId: e.target.value })}
-          options={driverOptions} placeholder="Select driver..." disabled={!formData.supplierId} required error={errors.driverId} />
+      {/* Header */}
+      <div className="form-modal-header">
+        <div>
+          <h2 className="form-modal-title">RECORD DELIVERY NOTE</h2>
+          <p className="form-modal-subtitle">LOL-NOC · PROCUREMENT · NEW DELIVERY</p>
+        </div>
+        <button type="button" onClick={onCancel} className="btn-ghost">
+          ✕ CANCEL
+        </button>
+      </div>
 
-        <FormSelect key={`po-${dropdownKey}`} label="Purchase Order ID" value={formData.purchaseOrderId}
-          onChange={(e) => setFormData({ ...formData, purchaseOrderId: e.target.value })}
-          options={purchaseOrderOptions} placeholder="Select PO..." disabled={!formData.supplierId} required error={errors.purchaseOrderId} />
+      <form onSubmit={handleSubmit}>
+        <div className="form-modal-body">
 
-        <FormInput label="Delivery Date" type="date" value={formData.deliveryDate}
-          onChange={(e) => setFormData({ ...formData, deliveryDate: e.target.value })} required error={errors.deliveryDate} />
+          {/* General error */}
+          {errors.general && (
+            <div className="alert-error">
+              <p>⚠ {errors.general.toUpperCase()}</p>
+            </div>
+          )}
 
-        <FormSelect label="Programme" value={formData.programme}
-          onChange={(e) => setFormData({ ...formData, programme: e.target.value })}
-          options={programmeOptions} required error={errors.programme} />
+          {/* ── Step 1: Supplier & Driver ───────────────────── */}
+          <div className="form-section">
+            <p className="form-section-label">STEP 1 — SUPPLIER & DRIVER</p>
 
-        {/* Line Items Section */}
-        <div style={{ marginTop: '8px', marginBottom: '16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <label style={{ fontSize: '15px', fontWeight: 600, color: 'rgba(255,255,255,0.85)' }}>Items Received <span style={{ color: '#ef4444' }}>*</span></label>
-            <button type="button" onClick={addLineItem} style={{ padding: '6px 12px', background: 'rgba(59,130,246,0.2)', border: '1px solid rgba(59,130,246,0.4)', borderRadius: '8px', color: '#3b82f6', fontSize: '13px', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Plus size={14} /> Add Item
-            </button>
+            <div className="form-grid-2">
+
+              <div className="form-group">
+                <label className="form-label">
+                  SUPPLIER <span className="form-required">*</span>
+                </label>
+                <select
+                  className="form-select"
+                  value={supplierId}
+                  onChange={(e) => setSupplierId(e.target.value)}
+                >
+                  <option value="">Select supplier...</option>
+                  {suppliers.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+                {errors.supplierId && <p className="form-error">⚠ {errors.supplierId}</p>}
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">
+                  DRIVER <span className="form-required">*</span>
+                </label>
+                <select
+                  className="form-select"
+                  value={driverId}
+                  onChange={(e) => setDriverId(e.target.value)}
+                  disabled={!supplierId || filteredDrivers.length === 0}
+                >
+                  <option value="">
+                    {supplierId ? 'Select driver...' : 'Select supplier first'}
+                  </option>
+                  {filteredDrivers.map((d) => (
+                    <option key={d.id} value={d.id}>{d.name} · {d.license_number}</option>
+                  ))}
+                </select>
+                {errors.driverId && <p className="form-error">⚠ {errors.driverId}</p>}
+              </div>
+
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">
+                DELIVERY DATE <span className="form-required">*</span>
+              </label>
+              <input
+                type="date"
+                className="form-input-half"
+                value={deliveryDate}
+                onChange={(e) => setDeliveryDate(e.target.value)}
+              />
+              {errors.deliveryDate && <p className="form-error">⚠ {errors.deliveryDate}</p>}
+            </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px 32px', gap: '8px', marginBottom: '8px', paddingLeft: '2px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase' }}>Stock Item</span>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.55)', textTransform: 'uppercase', textAlign: 'center' }}>Quantity</span>
-            <span></span>
-          </div>
-          {formData.lineItems.map((item, index) => (
-            <LineItemRow key={index} item={item} onChange={(updatedItem) => updateLineItem(index, updatedItem)}
-              onRemove={() => removeLineItem(index)} stockItems={stockItems} error={errors.lineItems?.[index]} />
-          ))}
-          {typeof errors.lineItems === 'string' && <p style={{ color: '#fca5a5', fontSize: '12px', marginTop: '4px' }}>{errors.lineItems}</p>}
+
+          {/* ── Step 2: Select Purchase Order ──────────────── */}
+          {supplierId && (
+            <div className="form-section">
+              <p className="form-section-label">STEP 2 — SELECT PURCHASE ORDER</p>
+
+              {loadingPOs && (
+                <p className="form-section-label">LOADING PURCHASE ORDERS...</p>
+              )}
+
+              {poError && !loadingPOs && (
+                <div className="alert-error">
+                  <p>⚠ {poError.toUpperCase()}</p>
+                </div>
+              )}
+
+              {!loadingPOs && purchaseOrders.length > 0 && (
+                <>
+                  {purchaseOrders.map((po) => (
+                    <button
+                      key={po.id}
+                      type="button"
+                      onClick={() => handlePoSelect(po.id)}
+                      className={`po-card${selectedPoId == po.id ? ' selected' : ''}`}
+                    >
+                      <div>
+                        <p className="po-card-id">PURCHASE ORDER #{po.id}</p>
+                        <p className="po-card-meta">
+                          EXPECTED: {formatDate(po.expected_delivery_date)} · BY: {po.created_by_name}
+                        </p>
+                      </div>
+                      {selectedPoId == po.id && (
+                        <span className="badge badge-recorded">SELECTED ✓</span>
+                      )}
+                    </button>
+                  ))}
+                  {errors.selectedPoId && (
+                    <p className="form-error">⚠ {errors.selectedPoId}</p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* ── Step 3: Record Actual Quantities ───────────── */}
+          {selectedPoId && (
+            <div>
+              <p className="form-section-label">ITEM SUMMARY: QUANTITIES EXPECTED</p>
+
+              {loadingItems ? (
+                <p className="form-section-label">LOADING ITEMS...</p>
+              ) : (
+                <>
+                  {/* Column headers */}
+                  <div className="line-item-cols" style={{ gridTemplateColumns: '2fr 110px 55px' }}>
+                    <span>PRODUCT</span>
+                    <span className="line-item-col-center">EXP KG</span>
+                    <span className="line-item-col-center">EXP UNITS</span>
+                  </div>
+
+                  {lineItems.map((item, i) => {
+                    const ie = Array.isArray(errors.lineItems) ? errors.lineItems[i] || {} : {};
+                    const isDiscrepancy =
+                      item.actualQuantity !== '' &&
+                      Number(item.actualQuantity) !== Number(item.expectedQuantity);
+
+                    return (
+                      <div
+                        key={item.purchaseOrderItemId}
+                        className={`line-item-row${isDiscrepancy ? ' has-discrepancy' : ''}`}
+                        style={{ gridTemplateColumns: '2fr 85px 50px' }}
+                      >
+                        {/* Product name — read only, from PO */}
+                        <span className="note-line-product">{item.productName}</span>
+
+                        {/* Expected weight — read only, from PO */}
+                        <input
+                          type="number"
+                          className="line-item-input-readonly"
+                          value={item.expectedWeightKg || ''}
+                          readOnly
+                          tabIndex={-1}
+                          placeholder="—"
+                        />
+
+                        {/* Expected units amount — read only, from PO */}
+                        <input
+                          type="number"
+                          className="line-item-input-readonly"
+                          value={item.expectedQuantity|| ''}
+                          readOnly
+                          tabIndex={-1}
+                          placeholder="—"
+                        />
+
+
+                      </div>
+                    );
+                  })}
+
+                  {/* Auto-populate info notice */}
+                  <div className="info-notice">
+                    <p>ℹ PRODUCTS AND EXPECTED QUANTITIES ARE FROM THE PURCHASE ORDER</p>
+                  </div>
+
+                  {typeof errors.lineItems === 'string' && (
+                    <p className="form-error">⚠ {errors.lineItems}</p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
 
-        <SignatureCanvas onSave={(dataURL) => setFormData({ ...formData, signatureData: dataURL })} onClear={() => setFormData({ ...formData, signatureData: '' })} />
-        {errors.signatureData && <p style={{ color: '#fca5a5', fontSize: '12px', marginTop: '4px' }}>{errors.signatureData}</p>}
-
-        {errors.general && <div style={{ padding: '10px 14px', background: 'rgba(220,38,38,0.2)', borderLeft: '4px solid #ef4444', color: '#fca5a5', fontSize: '14px', fontWeight: 700, borderRadius: '6px', marginBottom: '16px' }}>{errors.general}</div>}
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '8px' }}>
-          <FormButton variant="secondary" onClick={onCancel} disabled={isSubmitting}>Cancel</FormButton>
-          <FormButton type="submit" variant="primary" isLoading={isSubmitting}>Submit</FormButton>
+        {/* Footer */}
+        <div className="form-modal-footer">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isSubmitting}
+            className="btn-secondary"
+          >
+            CANCEL
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting || !lineItems.length}
+            className="btn-primary"
+          >
+            {isSubmitting ? 'RECORDING...' : 'RECORD DELIVERY'}
+          </button>
         </div>
       </form>
-    </FormCard>
+    </div>
   );
 };
 

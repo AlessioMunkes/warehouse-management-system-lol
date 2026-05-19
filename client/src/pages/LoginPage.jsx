@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import logo from '../assets/LOL Logo.jpg';
+import logo from '../assets/LOL_Logo.jpg';
 
 const LoginPage = ({ onLoginSuccess }) => {
   const { login } = useAuth();
@@ -45,7 +45,7 @@ const LoginPage = ({ onLoginSuccess }) => {
 
         {/* Form body */}
         <div className="form-body">
-          <h2 className="section-title">AGENT SIGN IN</h2>
+          <h2 className="section-title">EMPLOYEE SIGN IN</h2>
 
           {error && (
             <div className="alert-error">
@@ -61,7 +61,7 @@ const LoginPage = ({ onLoginSuccess }) => {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="e.g. LMTABK001"
+                placeholder="e.g. WORKER123"
                 autoComplete="username"
                 disabled={isLoading}
                 className="form-input"

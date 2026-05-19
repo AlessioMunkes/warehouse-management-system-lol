@@ -1,231 +1,160 @@
 import React from 'react';
-import { X, Calendar, Package, FileText } from 'lucide-react';
-import FormCard from '../shared/FormCard';
-import FormButton from '../shared/FormButton';
+import { Calendar, Package, FileText, User, AlertTriangle, CheckCircle } from 'lucide-react';
 
-const DeliveryNoteView = ({ deliveryNote, onClose }) => {
-  if (!deliveryNote) return null;
+// ─────────────────────────────────────────────────────────────
+// src/components/Procurement/DeliveryNoteView.jsx
+//
+// No inline styles — all classes come from src/css/index.css
+// Receives the full delivery object from GET /api/deliveries/:id
+// ─────────────────────────────────────────────────────────────
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-ZA', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-  };
+const formatDate = (dateString) => {
+  if (!dateString) return '—';
+  return new Date(dateString).toLocaleDateString('en-ZA', {
+    year: 'numeric', month: 'long', day: 'numeric',
+  });
+};
 
-  const getTotalItems = () => {
-    return deliveryNote.lineItems.reduce((sum, item) => sum + parseFloat(item.quantity || 0), 0);
-  };
+const MetaBlock = ({ icon: Icon, label, value }) => (
+  <div className="note-meta-block">
+    <p>{label}</p>
+    <div className="note-meta-value">
+      {Icon && <Icon size={12} />}
+      <span>{value || '—'}</span>
+    </div>
+  </div>
+);
+
+const DeliveryNoteView = ({ delivery, onClose }) => {
+  if (!delivery) return null;
+
+  const totalExpected  = delivery.items?.reduce((s, i) => s + Number(i.expected_quantity || 0), 0) ?? 0;
+  const totalActual    = delivery.items?.reduce((s, i) => s + Number(i.actual_quantity   || 0), 0) ?? 0;
+  const flaggedCount   = delivery.items?.filter((i) => i.is_flagged).length ?? 0;
+  const hasFlagged     = flaggedCount > 0;
+
+  const SUMMARY_STATS = [
+    { label: 'TOTAL ITEMS',   value: delivery.items?.length ?? 0 },
+    { label: 'EXPECTED UNITS', value: totalExpected },
+    { label: 'ACTUAL UNITS',   value: totalActual   },
+    { label: 'DISCREPANCIES',  value: flaggedCount  },
+  ];
 
   return (
-    <FormCard title="Delivery Note" width="550px">
-      <div style={{ position: 'relative' }}>
-        {/* Close Button */}
-        <button
-          onClick={onClose}
-          style={{
-            position: 'absolute',
-            top: '-50px',
-            right: '0',
-            width: '32px',
-            height: '32px',
-            background: 'rgba(255,255,255,0.1)',
-            border: '1px solid rgba(255,255,255,0.2)',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <X size={16} color="rgba(255,255,255,0.7)" />
-        </button>
+    <div className="form-modal-wide">
 
-        {/* Reference Number Badge */}
-        <div style={{
-          display: 'inline-block',
-          padding: '8px 16px',
-          background: 'rgba(59,130,246,0.15)',
-          borderRadius: '8px',
-          marginBottom: '20px',
-        }}>
-          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.55)', marginBottom: '2px' }}>
-            REFERENCE
-          </div>
-          <div style={{ fontSize: '16px', fontWeight: 700, color: '#3b82f6' }}>
-            {deliveryNote.referenceNumber}
-          </div>
-        </div>
-
-        {/* Delivery Details Grid */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap: '16px',
-          marginBottom: '24px',
-        }}>
-          <div>
-            <div style={{
-              fontSize: '11px',
-              fontWeight: 700,
-              color: 'rgba(255,255,255,0.55)',
-              letterSpacing: '0.05em',
-              textTransform: 'uppercase',
-              marginBottom: '6px',
-            }}>
-              Supplier
-            </div>
-            <div style={{
-              fontSize: '15px',
-              fontWeight: 600,
-              color: '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-            }}>
-              <Package size={16} color="rgba(255,255,255,0.55)" />
-              {deliveryNote.supplierName}
-            </div>
-          </div>
-
-          <div>
-            <div style={{
-              fontSize: '11px',
-              fontWeight: 700,
-              color: 'rgba(255,255,255,0.55)',
-              letterSpacing: '0.05em',
-              textTransform: 'uppercase',
-              marginBottom: '6px',
-            }}>
-              Delivery Date
-            </div>
-            <div style={{
-              fontSize: '15px',
-              fontWeight: 600,
-              color: '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-            }}>
-              <Calendar size={16} color="rgba(255,255,255,0.55)" />
-              {formatDate(deliveryNote.deliveryDate)}
-            </div>
-          </div>
-
-          <div>
-            <div style={{
-              fontSize: '11px',
-              fontWeight: 700,
-              color: 'rgba(255,255,255,0.55)',
-              letterSpacing: '0.05em',
-              textTransform: 'uppercase',
-              marginBottom: '6px',
-            }}>
-              Programme
-            </div>
-            <div style={{
-              fontSize: '15px',
-              fontWeight: 600,
-              color: '#fff',
-            }}>
-              {deliveryNote.programme === 'NOC' && 'Nourish Our Children'}
-              {deliveryNote.programme === 'FTS' && 'Feed the Soil'}
-              {deliveryNote.programme === 'LOVE_ACTIVISM' && 'Love Activism'}
-            </div>
-          </div>
-
-          <div>
-            <div style={{
-              fontSize: '11px',
-              fontWeight: 700,
-              color: 'rgba(255,255,255,0.55)',
-              letterSpacing: '0.05em',
-              textTransform: 'uppercase',
-              marginBottom: '6px',
-            }}>
-              Total Items
-            </div>
-            <div style={{
-              fontSize: '15px',
-              fontWeight: 600,
-              color: '#fff',
-            }}>
-              {getTotalItems()} units
-            </div>
-          </div>
-        </div>
-
-        {/* Divider */}
-        <div style={{ height: '1px', background: 'rgba(255,255,255,0.12)', marginBottom: '20px' }} />
-
-        {/* Line Items Table */}
+      {/* Header */}
+      <div className="form-modal-header">
         <div>
-          <div style={{
-            fontSize: '11px',
-            fontWeight: 700,
-            color: 'rgba(255,255,255,0.55)',
-            letterSpacing: '0.05em',
-            textTransform: 'uppercase',
-            marginBottom: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-          }}>
-            <FileText size={14} />
-            Items Received
-          </div>
-
-          {/* Table Header */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '2fr 1fr 1fr',
-            gap: '12px',
-            padding: '10px 12px',
-            background: 'rgba(255,255,255,0.05)',
-            borderRadius: '8px 8px 0 0',
-            fontSize: '12px',
-            fontWeight: 700,
-            color: 'rgba(255,255,255,0.55)',
-          }}>
-            <div>ITEM</div>
-            <div style={{ textAlign: 'right' }}>QUANTITY</div>
-            <div style={{ textAlign: 'right' }}>UNIT</div>
-          </div>
-
-          {/* Table Rows */}
-          {deliveryNote.lineItems.map((item, index) => (
-            <div
-              key={index}
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '2fr 1fr 1fr',
-                gap: '12px',
-                padding: '12px',
-                background: index % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent',
-                borderBottom: index === deliveryNote.lineItems.length - 1 ? 'none' : '1px solid rgba(255,255,255,0.08)',
-                fontSize: '14px',
-                color: '#fff',
-              }}
-            >
-              <div style={{ fontWeight: 500 }}>{item.itemName}</div>
-              <div style={{ textAlign: 'right', fontWeight: 600 }}>{item.quantity}</div>
-              <div style={{ textAlign: 'right', color: 'rgba(255,255,255,0.65)' }}>{item.unit}</div>
+          <h2 className="form-modal-title">DELIVERY NOTE</h2>
+          <p className="form-modal-subtitle">
+            LOL-NOC · PROCUREMENT · RECORD #{delivery.id}
+          </p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {hasFlagged ? (
+            <div className="note-status-chip is-discrepancy">
+              <AlertTriangle size={10} />
+              DISCREPANCY
             </div>
-          ))}
+          ) : (
+            <div className="note-status-chip is-ok">
+              <CheckCircle size={10} />
+              MATCHED
+            </div>
+          )}
+          <button onClick={onClose} className="btn-ghost">✕ CLOSE</button>
+        </div>
+      </div>
+
+      {/* Meta grid */}
+      <div className="note-meta-grid">
+        <MetaBlock icon={Package}  label="SUPPLIER"      value={delivery.supplier_name}    />
+        <MetaBlock icon={User}     label="DRIVER"        value={delivery.driver_name}       />
+        <MetaBlock icon={Calendar} label="DELIVERY DATE" value={formatDate(delivery.delivery_date)} />
+        <MetaBlock icon={User}     label="RECEIVED BY"   value={delivery.received_by_name}  />
+      </div>
+
+      {/* Summary stats */}
+      <div className="note-summary-row">
+        {SUMMARY_STATS.map((stat) => (
+          <div key={stat.label} className="note-summary-stat">
+            <p className="note-summary-label">{stat.label}</p>
+            <p className="note-summary-value">{stat.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Line items */}
+      <div>
+        <div className="note-section-bar">
+          <FileText size={12} />
+          <p>LINE ITEMS</p>
         </div>
 
-        {/* Close Button */}
-        <FormButton
-          variant="secondary"
-          onClick={onClose}
-          fullWidth={true}
-          style={{ marginTop: '24px' }}
-        >
-          Close
-        </FormButton>
+        {/* Column headers */}
+        <div className="note-line-cols">
+          <span>PRODUCT</span>
+          <span className="note-line-col-center">EXP QTY</span>
+          <span className="note-line-col-center">ACT QTY</span>
+          <span className="note-line-col-center">EXP KG</span>
+          <span className="note-line-col-center">ACT KG</span>
+          <span className="note-line-col-center">STATUS</span>
+        </div>
+
+        {/* Rows */}
+        {delivery.items?.length ? (
+          delivery.items.map((item, i) => {
+            const qtyMismatch = Number(item.actual_quantity) !== Number(item.expected_quantity);
+            const wgtMismatch = Number(item.weight_discrepancy_kg) !== 0;
+
+            return (
+              <div
+                key={item.id ?? i}
+                className={`note-line-row${item.is_flagged ? ' is-flagged' : ''}`}
+              >
+                <span className="note-line-product">{item.product_name}</span>
+
+                <span className="note-line-qty">{item.expected_quantity}</span>
+
+                <span className={`note-line-qty-actual${qtyMismatch ? ' is-discrepancy' : ''}`}>
+                  {item.actual_quantity}
+                </span>
+
+                <span className="note-line-weight">
+                  {item.expected_weight_kg ? `${item.expected_weight_kg}kg` : '—'}
+                </span>
+
+                <span className={`note-line-weight${wgtMismatch ? ' is-discrepancy' : ''}`}>
+                  {item.actual_weight_kg ? `${item.actual_weight_kg}kg` : '—'}
+                </span>
+
+                <div className="note-line-col-center">
+                  {item.is_flagged
+                    ? <span className="badge-flagged">FLAGGED</span>
+                    : <span className="badge-ok">OK</span>
+                  }
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <div className="card-content" style={{ textAlign: 'center' }}>
+            <p className="note-summary-label">NO LINE ITEMS FOUND</p>
+          </div>
+        )}
       </div>
-    </FormCard>
+
+      {/* Footer */}
+      <div className="note-footer">
+        <p className="note-footer-meta">
+          RECORDED: {formatDate(delivery.created_at)} | STATUS: {delivery.status?.toUpperCase()}
+        </p>
+        <button onClick={onClose} className="btn-primary">
+          CLOSE
+        </button>
+      </div>
+    </div>
   );
 };
 

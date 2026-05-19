@@ -8,12 +8,12 @@
 //   login → programmes → nourish → dashboard
 // ─────────────────────────────────────────────────────────────
 
-import React, { useState } from 'react';
+import React, { useState }       from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import LoginPage       from './pages/LoginPage';
-//import ProgrammeSelect from './ProgrammeSelect';
-//import NourishSelect   from './NourishSelect';
-//import Dashboard       from './Dashboard';
+import LoginPage                 from './pages/LoginPage';
+import SelectProgrammeScreen       from './pages/SelectProgrammeScreen';
+import SelectNOCjob              from './pages/SelectNOCjob';
+import ProcurementDashboard      from './pages/ProcurementDashboard';
 
 // ── Navigation views ──────────────────────────────────────────
 const VIEWS = {
@@ -74,7 +74,7 @@ const AppContent = () => {
 
   if (view === VIEWS.PROGRAMMES) {
     return (
-      <ProgrammeSelect
+      <SelectProgrammeScreen
         userName={user?.firstName}
         userRole={user?.role}
         onSelect={handleProgrammeSelect}
@@ -85,7 +85,7 @@ const AppContent = () => {
 
   if (view === VIEWS.NOURISH) {
     return (
-      <NourishSelect
+      <SelectNOCjob
         userName={user?.firstName}
         userRole={user?.role}
         onSelect={handleTaskSelect}
@@ -97,7 +97,7 @@ const AppContent = () => {
 
   if (view === VIEWS.DASHBOARD) {
     return (
-      <Dashboard
+      <ProcurementDashboard
         userName={user?.firstName}
         userLastName={user?.lastName}
         userRole={user?.role}

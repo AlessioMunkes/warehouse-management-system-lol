@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import logo from './assets/LOL Logo.jpg';
+import logo from '../assets/LOL_Logo.jpg';
 
 const TASKS = [
   { id: 'procurement', label: 'PROCUREMENT',  desc: 'SUPPLIER DELIVERIES & INTAKE',  active: true  },

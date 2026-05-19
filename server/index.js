@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken'
 import auth from './src/middleware/auth.middleware.js'
 import cors from 'cors'
 import loginRouter from './src/routes/login.route.js'
+import deliveryRouter from './src/routes/delivery.routes.js'
 
 
 console.log('JWT_SECRET value:', process.env.JWT_SECRET)
@@ -28,9 +29,9 @@ app.get('/api/test', (req, res) => {
 })
 
 app.use('/api/login', loginRouter)   // ← moved above listen()
+app.use('/api/deliveries', deliveryRouter)
 
 // ── Start server ────────────────────────
-// Temporary debug — remove after fixing
 
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
