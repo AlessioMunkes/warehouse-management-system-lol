@@ -22,28 +22,25 @@ const getDeliveryById = async (id) => {
 };
 
 // ── Record a new delivery ─────────────────────────────────────
+// Just records that the delivery happened against a purchase order.
+// Items are already known from the PO — no cross-check needed.
 const createDelivery = async (data, userId) => {
-  const { supplierId, driverId, deliveryDate, lineItems } = data;
+  const { supplierId, driverId, deliveryDate, purchaseOrderId, signatureData, poCompleted } = data;
 
-  // Validate required fields
-  if (!supplierId)              throw new Error('Supplier is required.');
-  if (!driverId)                throw new Error('Driver is required.');
-  if (!deliveryDate)            throw new Error('Delivery date is required.');
-  if (!lineItems?.length)       throw new Error('At least one line item is required.');
-
-  // Validate each line item
-  for (const item of lineItems) {
-    if (!item.productId)        throw new Error('Each line item must have a product.');
-    if (item.expectedQuantity < 0) throw new Error('Expected quantity cannot be negative.');
-    if (item.actualQuantity < 0)   throw new Error('Actual quantity cannot be negative.');
-  }
+  if (!supplierId)       throw new Error('Supplier is required.');
+  if (!driverId)         throw new Error('Driver is required.');
+  if (!deliveryDate)     throw new Error('Delivery date is required.');
+  if (!purchaseOrderId)  throw new Error('Purchase order is required.');
+  if (!signatureData)    throw new Error('Driver signature is required.');
 
   return await deliveryModel.createDelivery({
     supplierId,
     driverId,
     deliveryDate,
-    receivedBy: userId,   // comes from the JWT via req.user — never from the frontend body
-    lineItems,
+    purchaseOrderId,
+    signatureData,
+    poCompleted: !!poCompleted,  // ensure boolean
+    receivedBy: userId,          // comes from JWT — never trusted from frontend
   });
 };
 

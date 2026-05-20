@@ -48,69 +48,85 @@ const getDeliveryById = async (id) => {
        dn.delivery_date,
        dn.status,
        dn.created_at,
-       s.name        AS supplier_name,
-       d.name        AS driver_name,
+       dn.signature,
+       dn.purchase_order_id,
+       s.name           AS supplier_name,
+       d.name           AS driver_name,
        d.license_number AS driver_id_number,
-       u.first_name  AS received_by_name
+       u.first_name     AS received_by_name
      FROM delivery_notes dn
-     JOIN suppliers s ON s.id = dn.supplier_id
+     LEFT JOIN suppliers s ON s.id = dn.supplier_id
      LEFT JOIN drivers d ON d.id = dn.driver_id
      LEFT JOIN users u ON u.id = dn.received_by
      WHERE dn.id = $1`,
     [id]
   );
 
+  // Fetch items from the linked purchase order
+  // We use purchase_order_id from the delivery note to get the expected items
   const itemsResult = await pool.query(
     `SELECT
-       dnc.id,
-       p.name        AS product_name,
-       dnc.expected_quantity,
-       dnc.actual_quantity,
-       dnc.expected_weight_kg,
-       dnc.actual_weight_kg,
-       dnc.weight_discrepancy_kg,
-       dnc.is_flagged,
-       dnc.notes
-     FROM delivery_note_cross_check dnc
-     JOIN products p ON p.id = dnc.product_id
-     WHERE dnc.delivery_note_id = $1`,
+       poi.id                AS purchase_order_item_id,
+       poi.expected_quantity,
+       poi.expected_weight_kg,
+       p.name                AS product_name,
+       p.stock_keeping_unit  AS sku
+     FROM purchase_order_items poi
+     JOIN products p ON p.id = poi.product_id
+     WHERE poi.purchase_order_id = (
+       SELECT purchase_order_id FROM delivery_notes WHERE id = $1
+     )
+     ORDER BY p.name ASC`,
+    [id]
+  );
+
+  // Also fetch the PO status so the PDF can show completion state
+  const poResult = await pool.query(
+    `SELECT
+       po.id,
+       po.status,
+       (SELECT COUNT(*) FROM delivery_notes dn WHERE dn.purchase_order_id = po.id) AS delivery_count
+     FROM purchase_orders po
+     WHERE po.id = (SELECT purchase_order_id FROM delivery_notes WHERE id = $1)`,
     [id]
   );
 
   return {
     ...deliveryResult.rows[0],
-    items: itemsResult.rows,
+    items:    itemsResult.rows,
+    po_status: poResult.rows[0]?.status       || null,
+    po_id:     poResult.rows[0]?.id           || null,
+    po_delivery_count: poResult.rows[0]?.delivery_count || 0,
   };
 };
 
-// ── Create a new delivery note + line items ───────────────────
-// Uses a transaction so if any insert fails, everything rolls back
-const createDelivery = async ({ supplierId, driverId, deliveryDate, receivedBy, lineItems }) => {
+// ── Create a new delivery note ────────────────────────────────
+// Links the delivery note to the purchase order.
+// Items are already known from the PO — no cross-check needed.
+const createDelivery = async ({ supplierId, driverId, deliveryDate, receivedBy, purchaseOrderId, signatureData, poCompleted }) => {
   const client = await pool.connect();
-
   try {
     await client.query('BEGIN');
 
-    // 1. Insert the delivery note header
-    const noteResult = await client.query(
+    // Insert the delivery note
+    const result = await client.query(
       `INSERT INTO delivery_notes
-         (supplier_id, driver_id, delivery_date, received_by, status, created_at)
-       VALUES ($1, $2, $3, $4, 'recorded', NOW())
+         (supplier_id, driver_id, delivery_date, received_by, purchase_order_id, signature, status, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 'recorded', NOW())
        RETURNING *`,
-      [supplierId, driverId, deliveryDate, receivedBy]
+      [supplierId, driverId, deliveryDate, receivedBy, purchaseOrderId, signatureData || null]
     );
 
-    const deliveryNote = noteResult.rows[0];
-
-    // 2. Insert each line item into delivery_note_cross_check
-    for (const item of lineItems) {
-      const discrepancy = (item.actualWeightKg || 0) - (item.expectedWeightKg || 0);
-      const isFlagged   = item.actualQuantity !== item.expectedQuantity || discrepancy !== 0;
-
+    // If the worker checked "PO completed", mark it so it won't appear in future deliveries
+    if (poCompleted) {
+      await client.query(
+        `UPDATE purchase_orders SET status = 'completed' WHERE id = $1`,
+        [purchaseOrderId]
+      );
     }
 
     await client.query('COMMIT');
-    return deliveryNote;
+    return result.rows[0];
 
   } catch (err) {
     await client.query('ROLLBACK');
@@ -163,13 +179,16 @@ const getProducts = async () => {
 const getPurchaseOrdersBySupplier = async (supplierId) => {
   const result = await pool.query(
     `SELECT
-         po.id,
-         po.supplier_id,
-         po.expected_delivery_date,
-         po.status
-       FROM purchase_orders po
-       WHERE po.supplier_id = $1 AND po.status = 'Pending'
-       ORDER BY po.expected_delivery_date ASC`,
+       po.id,
+       po.status,
+       po.expected_delivery_date,
+       po.created_at,
+       u.first_name AS created_by_name
+     FROM purchase_orders po
+     LEFT JOIN users u ON u.id = po.created_by
+     WHERE po.supplier_id = $1
+       AND po.status = 'approved'
+     ORDER BY po.expected_delivery_date ASC`,
     [supplierId]
   );
   return result.rows;
@@ -183,8 +202,8 @@ const getPurchaseOrderItems = async (purchaseOrderId) => {
     `SELECT
        poi.id                  AS purchase_order_item_id,
        poi.product_id,
-       poi.expected_weight_kg,
        poi.expected_quantity,
+       poi.expected_weight_kg,
        poi.unit_price,
        p.name                  AS product_name,
        p.stock_keeping_unit    AS sku,

@@ -4,7 +4,7 @@ import babel from '@rolldown/plugin-babel'
 import { VitePWA } from 'vite-plugin-pwa'
 import tailwindcss from '@tailwindcss/vite'   // ← added
 
-let faviconURL = '/favicon.svg'
+let faviconURL = './favicon.svg'
 
 export default defineConfig({
   plugins: [

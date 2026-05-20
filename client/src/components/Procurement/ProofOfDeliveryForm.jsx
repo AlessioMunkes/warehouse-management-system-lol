@@ -1,18 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import SignatureCanvas from 'react-signature-canvas';
 import { apiGet } from '../../services/api';
 
 // ─────────────────────────────────────────────────────────────
 // src/components/Procurement/ProofOfDeliveryForm.jsx
 //
 // Workflow:
-//   1. Worker selects supplier
-//   2. Approved purchase orders for that supplier load automatically
-//   3. Worker selects a PO — line items auto-populate from PO items
-//   4. Expected qty and product are read-only (from the PO)
-//   5. Worker fills in actual qty and actual weight only
-//   6. Submit calls POST /api/deliveries
+//   Step 1 — Select supplier, driver, delivery date
+//   Step 2 — Select approved purchase order
+//   Step 3 — View expected items (auto-populated from PO)
+//   Step 4 — Driver signs the digital signature pad
 //
+// Signature is saved as a base64 PNG string and sent with
+// the form submission to be stored on the delivery note.
 // No inline styles — all classes from src/css/index.css
 // ─────────────────────────────────────────────────────────────
 
@@ -28,13 +28,19 @@ const ProofOfDeliveryForm = ({
   const [deliveryDate, setDeliveryDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedPoId, setSelectedPoId] = useState('');
   const [lineItems,    setLineItems]    = useState([]);
+  const [signatureData, setSignatureData] = useState('');
 
-  const [filteredDrivers,  setFilteredDrivers]  = useState([]);
-  const [purchaseOrders,   setPurchaseOrders]   = useState([]);
-  const [errors,           setErrors]           = useState({});
-  const [loadingPOs,       setLoadingPOs]       = useState(false);
-  const [loadingItems,     setLoadingItems]     = useState(false);
-  const [poError,          setPoError]          = useState('');
+  const [filteredDrivers, setFilteredDrivers] = useState([]);
+  const [purchaseOrders,  setPurchaseOrders]  = useState([]);
+  const [errors,          setErrors]          = useState({});
+  const [loadingPOs,      setLoadingPOs]      = useState(false);
+  const [loadingItems,    setLoadingItems]    = useState(false);
+  const [poError,         setPoError]         = useState('');
+  const [isSigned,        setIsSigned]        = useState(false);
+
+  const [poCompleted, setPoCompleted] = useState(false);
+
+  const sigCanvasRef = useRef(null);
 
   // ── When supplier changes: filter drivers, fetch POs ─────────
   useEffect(() => {
@@ -49,22 +55,19 @@ const ProofOfDeliveryForm = ({
       return;
     }
 
-    // Filter drivers client-side
     setFilteredDrivers(
       drivers.filter((d) => d.supplier_id === parseInt(supplierId))
     );
 
-    // Fetch approved POs for this supplier
     const fetchPOs = async () => {
       setLoadingPOs(true);
       setPoError('');
       try {
         const res = await apiGet(`/api/deliveries/purchase-orders?supplierId=${supplierId}`);
         setPurchaseOrders(res.data);
-        if (res.data.length === 0) {
+        if (res.data.length === 0)
           setPoError('No approved purchase orders found for this supplier.');
-        }
-      } catch (err) {
+      } catch {
         setPoError('Failed to load purchase orders.');
       } finally {
         setLoadingPOs(false);
@@ -74,31 +77,48 @@ const ProofOfDeliveryForm = ({
     fetchPOs();
   }, [supplierId, drivers]);
 
-  // ── When PO is selected: fetch items and auto-populate ───────
+  // ── When PO is selected: fetch and auto-populate items ───────
   const handlePoSelect = async (poId) => {
     setSelectedPoId(poId);
     setLineItems([]);
     setLoadingItems(true);
     try {
       const res = await apiGet(`/api/deliveries/purchase-orders/${poId}/items`);
-      // Map PO items into line items — expected values pre-filled, actual blank
       setLineItems(
         res.data.map((item) => ({
           purchaseOrderItemId: item.purchase_order_item_id,
           productId:           item.product_id,
           productName:         item.product_name,
           expectedQuantity:    item.expected_quantity,
-          expectedWeightKg:    item.expected_weight_kg || '',
+          expectedWeightKg:    item.expected_weight_kg || '—',
+          sku:                 item.sku || '',
         }))
       );
-    } catch (err) {
+    } catch {
       setPoError('Failed to load purchase order items.');
     } finally {
       setLoadingItems(false);
     }
   };
-    
 
+  // ── Signature handlers ────────────────────────────────────────
+const handleSignatureEnd = () => {
+  setTimeout(() => {
+    if (sigCanvasRef.current && !sigCanvasRef.current.isEmpty()) {
+      const dataURL = sigCanvasRef.current
+        .getCanvas()
+        .toDataURL('image/png');
+      setSignatureData(dataURL);
+      setIsSigned(true);
+    }
+  }, 100);
+};
+
+  const handleClearSignature = () => {
+    sigCanvasRef.current?.clear();
+    setSignatureData('');
+    setIsSigned(false);
+  };
 
   // ── Validation ───────────────────────────────────────────────
   const validate = () => {
@@ -107,8 +127,12 @@ const ProofOfDeliveryForm = ({
     if (!driverId)     e.driverId     = 'Driver is required';
     if (!deliveryDate) e.deliveryDate = 'Date is required';
     if (!selectedPoId) e.selectedPoId = 'Select a purchase order';
-    if (new Date(deliveryDate) > new Date()) e.deliveryDate = 'Date cannot be in the future';
-    if (!lineItems.length) e.lineItems = 'No items loaded — select a purchase order';
+    if (new Date(deliveryDate) > new Date())
+      e.deliveryDate = 'Date cannot be in the future';
+    if (!lineItems.length)
+      e.lineItems = 'No items loaded — select a purchase order first';
+    if (!signatureData)
+      e.signature = 'Driver signature is required before submitting';
 
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -124,19 +148,15 @@ const ProofOfDeliveryForm = ({
         driverId,
         deliveryDate,
         purchaseOrderId: selectedPoId,
-        lineItems: lineItems.map((item) => ({
-          purchaseOrderItemId: item.purchaseOrderItemId,
-          productId:           item.productId,
-          expectedQuantity:    Number(item.expectedQuantity),
-          expectedWeightKg:    Number(item.expectedWeightKg || 0),
-        })),
+        signatureData,     // base64 PNG — backend stores this on the delivery note
+        poCompleted,       // if true, backend marks the PO as 'completed'
       });
     } catch (err) {
       setErrors((p) => ({ ...p, general: err.message }));
     }
   };
 
-  const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-ZA') : '—';
+  const formatDate = (d) => (d ? new Date(d).toLocaleDateString('en-ZA') : '—');
 
   // ── Render ───────────────────────────────────────────────────
   return (
@@ -163,7 +183,7 @@ const ProofOfDeliveryForm = ({
             </div>
           )}
 
-          {/* ── Step 1: Supplier & Driver ───────────────────── */}
+          {/* ── Step 1: Supplier, Driver, Date ─────────────── */}
           <div className="form-section">
             <p className="form-section-label">STEP 1 — SUPPLIER & DRIVER</p>
 
@@ -232,9 +252,7 @@ const ProofOfDeliveryForm = ({
               )}
 
               {poError && !loadingPOs && (
-                <div className="alert-error">
-                  <p>⚠ {poError.toUpperCase()}</p>
-                </div>
+                <div className="alert-error"><p>⚠ {poError.toUpperCase()}</p></div>
               )}
 
               {!loadingPOs && purchaseOrders.length > 0 && (
@@ -265,65 +283,51 @@ const ProofOfDeliveryForm = ({
             </div>
           )}
 
-          {/* ── Step 3: Record Actual Quantities ───────────── */}
+          {/* ── Step 3: Expected Items (read-only from PO) ──── */}
           {selectedPoId && (
-            <div>
-              <p className="form-section-label">ITEM SUMMARY: QUANTITIES EXPECTED</p>
+            <div className="form-section">
+              <p className="form-section-label">STEP 3 — EXPECTED ITEMS FROM PURCHASE ORDER</p>
 
               {loadingItems ? (
                 <p className="form-section-label">LOADING ITEMS...</p>
               ) : (
                 <>
                   {/* Column headers */}
-                  <div className="line-item-cols" style={{ gridTemplateColumns: '2fr 110px 55px' }}>
+                  <div className="line-item-cols"
+                    style={{ gridTemplateColumns: '2fr 1fr 1fr 80px' }}>
                     <span>PRODUCT</span>
+                    <span className="line-item-col-center">SKU</span>
+                    <span className="line-item-col-center">EXPECTED QTY</span>
                     <span className="line-item-col-center">EXP KG</span>
-                    <span className="line-item-col-center">EXP UNITS</span>
                   </div>
 
-                  {lineItems.map((item, i) => {
-                    const ie = Array.isArray(errors.lineItems) ? errors.lineItems[i] || {} : {};
-                    const isDiscrepancy =
-                      item.actualQuantity !== '' &&
-                      Number(item.actualQuantity) !== Number(item.expectedQuantity);
+                  {lineItems.map((item) => (
+                    <div
+                      key={item.purchaseOrderItemId}
+                      className="line-item-row"
+                      style={{ gridTemplateColumns: '2fr 1fr 1fr 80px' }}
+                    >
+                      <span className="note-line-product">{item.productName}</span>
+                      <span className="note-line-qty">{item.sku || '—'}</span>
+                      <input
+                        type="number"
+                        className="line-item-input-readonly"
+                        value={item.expectedQuantity}
+                        readOnly
+                        tabIndex={-1}
+                      />
+                      <input
+                        type="text"
+                        className="line-item-input-readonly"
+                        value={item.expectedWeightKg}
+                        readOnly
+                        tabIndex={-1}
+                      />
+                    </div>
+                  ))}
 
-                    return (
-                      <div
-                        key={item.purchaseOrderItemId}
-                        className={`line-item-row${isDiscrepancy ? ' has-discrepancy' : ''}`}
-                        style={{ gridTemplateColumns: '2fr 85px 50px' }}
-                      >
-                        {/* Product name — read only, from PO */}
-                        <span className="note-line-product">{item.productName}</span>
-
-                        {/* Expected weight — read only, from PO */}
-                        <input
-                          type="number"
-                          className="line-item-input-readonly"
-                          value={item.expectedWeightKg || ''}
-                          readOnly
-                          tabIndex={-1}
-                          placeholder="—"
-                        />
-
-                        {/* Expected units amount — read only, from PO */}
-                        <input
-                          type="number"
-                          className="line-item-input-readonly"
-                          value={item.expectedQuantity|| ''}
-                          readOnly
-                          tabIndex={-1}
-                          placeholder="—"
-                        />
-
-
-                      </div>
-                    );
-                  })}
-
-                  {/* Auto-populate info notice */}
                   <div className="info-notice">
-                    <p>ℹ PRODUCTS AND EXPECTED QUANTITIES ARE FROM THE PURCHASE ORDER</p>
+                    <p>ℹ THESE ITEMS ARE PRE-POPULATED FROM THE PURCHASE ORDER AND ARE FOR REFERENCE ONLY</p>
                   </div>
 
                   {typeof errors.lineItems === 'string' && (
@@ -333,7 +337,68 @@ const ProofOfDeliveryForm = ({
               )}
             </div>
           )}
+
+          {/* ── Step 4: Driver Signature ────────────────────── */}
+          {selectedPoId && lineItems.length > 0 && (
+            <div className="signature-section">
+              <p className="form-section-label">
+                STEP 4 — DRIVER SIGNATURE <span className="form-required">*</span>
+              </p>
+
+              <SignatureCanvas
+                ref={sigCanvasRef}
+                onEnd={handleSignatureEnd}
+                penColor="#201F1E"
+                canvasProps={{
+                  width:     548,
+                  height:    160,
+                  className: `signature-canvas-wrapper${errors.signature ? ' has-error' : ''}`,
+                }}
+              />
+
+              <div className="signature-actions">
+                <span className={isSigned ? 'signature-signed' : 'signature-hint'}>
+                  {isSigned ? '✓ SIGNED' : 'SIGN ABOVE — DRIVER TO SIGN WITH FINGER OR MOUSE'}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleClearSignature}
+                  className="btn-clear-signature"
+                >
+                  CLEAR
+                </button>
+              </div>
+
+              {errors.signature && (
+                <p className="form-error">⚠ {errors.signature}</p>
+              )}
+            </div>
+          )}
+
         </div>
+
+        {/* PO completion checkbox — shown once signature is done */}
+        {isSigned && selectedPoId && (
+          <div style={{ padding: '12px 16px', borderTop: '1px solid var(--color-border)', background: 'var(--color-lol-bg)' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={poCompleted}
+                onChange={(e) => setPoCompleted(e.target.checked)}
+                style={{ width: '16px', height: '16px', accentColor: 'var(--color-maroon)', cursor: 'pointer' }}
+              />
+              <div>
+                <p style={{ fontSize: '9px', fontWeight: 900, color: 'var(--color-text)', textTransform: 'uppercase', margin: 0 }}>
+                  Purchase order completed?
+                </p>
+                <p style={{ fontSize: '8px', color: 'var(--color-text-meta)', margin: '2px 0 0' }}>
+                  Check this if all items from Purchase Order #{selectedPoId} have been fully delivered.
+                  This will mark the PO as completed and remove it from future delivery options.
+                </p>
+              </div>
+            </label>
+          </div>
+        )}
 
         {/* Footer */}
         <div className="form-modal-footer">
@@ -347,7 +412,7 @@ const ProofOfDeliveryForm = ({
           </button>
           <button
             type="submit"
-            disabled={isSubmitting || !lineItems.length}
+            disabled={isSubmitting || !lineItems.length || !isSigned}
             className="btn-primary"
           >
             {isSubmitting ? 'RECORDING...' : 'RECORD DELIVERY'}
