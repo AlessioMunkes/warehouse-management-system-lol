@@ -12,19 +12,19 @@ const DeliveryCard = ({ delivery, onViewPdf, loadingPdf }) => (
   <div className={`card-row${delivery.status === 'deleted' ? ' is-flagged' : ''}`}>
     <div style={{ flex: 1 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-        <span style={{ fontSize: '10px', fontWeight: 900, color: '#201F1E' }}>
+        <span style={{ fontSize: '16px', fontWeight: 900, color: '#201F1E' }}>
           {delivery.supplier_name}
         </span>
         <span className={`badge badge-${delivery.status}`}>
           {delivery.status.toUpperCase()}
         </span>
       </div>
-      <p style={{ fontSize: '8px', color: '#605E5C', margin: 0 }}>
+      <p style={{ fontSize: '14px', color: '#605E5C', margin: 0 }}>
         {delivery.driver_name} · {delivery.delivery_date?.slice(0, 10)} · REC: {delivery.received_by_name}
       </p>
     </div>
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-      <span style={{ fontSize: '8px', color: '#A19F9D', fontWeight: 700 }}>
+      <span style={{ fontSize: '14px', color: '#A19F9D', fontWeight: 700 }}>
         #{delivery.id}
       </span>
       <button

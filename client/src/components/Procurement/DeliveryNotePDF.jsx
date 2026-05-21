@@ -105,19 +105,19 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
             <div>
               {isCompleted ? (
                 <>
-                  <p style={{ fontSize: '9px', fontWeight: 900, color: '#107C10', margin: '0 0 2px', textTransform: 'uppercase' }}>
+                  <p style={{ fontSize: '13px', fontWeight: 900, color: '#107C10', margin: '0 0 2px', textTransform: 'uppercase' }}>
                     Purchase Order #{delivery.po_id} — Marked as Complete
                   </p>
-                  <p style={{ fontSize: '8px', color: '#27500A', margin: 0 }}>
+                  <p style={{ fontSize: '11px', color: '#27500A', margin: 0 }}>
                     All items from this purchase order have been fully delivered and the order is now closed.
                   </p>
                 </>
               ) : (
                 <>
-                  <p style={{ fontSize: '9px', fontWeight: 900, color: '#633806', margin: '0 0 2px', textTransform: 'uppercase' }}>
+                  <p style={{ fontSize: '13px', fontWeight: 900, color: '#633806', margin: '0 0 2px', textTransform: 'uppercase' }}>
                     Purchase Order #{delivery.po_id} — Awaiting Further Delivery
                   </p>
-                  <p style={{ fontSize: '8px', color: '#633806', margin: 0 }}>
+                  <p style={{ fontSize: '11px', color: '#633806', margin: 0 }}>
                     This is delivery{' '}
                     <strong>#{delivery.id}</strong>.
                     The purchase order has not been marked as complete and may have future deliveries recorded against it.

@@ -388,10 +388,10 @@ const handleSignatureEnd = () => {
                 style={{ width: '16px', height: '16px', accentColor: 'var(--color-maroon)', cursor: 'pointer' }}
               />
               <div>
-                <p style={{ fontSize: '9px', fontWeight: 900, color: 'var(--color-text)', textTransform: 'uppercase', margin: 0 }}>
+                <p style={{ fontSize: '13px', fontWeight: 900, color: 'var(--color-text)', textTransform: 'uppercase', margin: 0 }}>
                   Purchase order completed?
                 </p>
-                <p style={{ fontSize: '8px', color: 'var(--color-text-meta)', margin: '2px 0 0' }}>
+                <p style={{ fontSize: '12px', color: 'var(--color-text-meta)', margin: '2px 0 0' }}>
                   Check this if all items from Purchase Order #{selectedPoId} have been fully delivered.
                   This will mark the PO as completed and remove it from future delivery options.
                 </p>
