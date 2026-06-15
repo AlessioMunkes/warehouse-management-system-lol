@@ -33,11 +33,9 @@ const getDeliveryById = async (req, res) => {
 // POST /api/deliveries
 const createDelivery = async (req, res) => {
   try {
-     console.log('req.body:', req.body)
     const delivery = await deliveryService.createDelivery(req.body, req.user.id);
     res.status(201).json({ success: true, data: delivery });
   } catch (err) {
-    console.error('createDelivery error:', err);
     console.error('createDelivery error:', err);
     const status = err.message.includes('required') ? 400 : 500;
     res.status(status).json({ success: false, message: err.message });

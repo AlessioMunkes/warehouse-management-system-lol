@@ -1,15 +1,26 @@
-import pg from 'pg'
-import dotenv from 'dotenv'
-dotenv.config()
+require('dotenv').config();
+const { Pool } = require('pg');
 
-const { Pool } = pg
+const requiredVars = [
+    'DB_USER',
+    'DB_HOST',
+    'DB_NAME',
+    'DB_PASSWORD',
+    'DB_PORT'
+];
+
+for (const variable of requiredVars) {
+    if (!process.env[variable]) {
+        throw new Error(`Missing required environment variable: ${variable}`);
+    }
+}
 
 const pool = new Pool({
-    user: 'postgres',
-    host: 'localhost',
-    database: 'warehouse_db',
-    password: 'team22',
-    port: 5432,
+    user: process.env.DB_USER,
+    host: process.env.DB_HOST,
+    database: process.env.DB_NAME,
+    password: process.env.DB_PASSWORD,
+    port: Number(process.env.DB_PORT),
 });
 
-export default pool
+module.exports = pool;
