@@ -1,33 +1,46 @@
 // ─────────────────────────────────────────────────────────────
 // server/src/routes/delivery.routes.js
 //
-// All delivery-related endpoints.
-// Every route is protected by auth middleware — a valid JWT
-// is required or the request is blocked before hitting
-// the controller.
-//
-// Register in index.js:
-//   import deliveryRouter from './src/routes/delivery.routes.js'
-//   app.use('/api/deliveries', deliveryRouter)
+// added role enforcement per route
+// added validateIntId on all :id params
 // ─────────────────────────────────────────────────────────────
-import express            from 'express';
-import auth               from '../middleware/auth.middleware.js';
-import deliveryController from '../controllers/delivery.controller.js';
+import express                      from 'express';
+import auth, { requireRole, ROLES } from '../middleware/auth.middleware.js';
+import { validateIntId }            from '../middleware/validate.middleware.js';
+import deliveryController           from '../controllers/delivery.controller.js';
 
 const router = express.Router();
 
-// ── Reference data (needed before recording a delivery) ───────
-router.get('/suppliers', auth, deliveryController.getSuppliers);
-router.get('/drivers',   auth, deliveryController.getDrivers);   // ?supplierId=1
-router.get('/products',  auth, deliveryController.getProducts);
+const ALL_ROLES    = [ROLES.PACKER, ROLES.RECEIVER, ROLES.MANAGER, ROLES.ADMIN];
+const RECEIVERS_UP = [ROLES.RECEIVER, ROLES.MANAGER, ROLES.ADMIN];
 
-// ── Purchase orders (used to auto-populate the delivery form) ─
-router.get('/purchase-orders',          auth, deliveryController.getPurchaseOrders);   // ?supplierId=1
-router.get('/purchase-orders/:id/items', auth, deliveryController.getPurchaseOrderItems);
+// ── Reference data ────────────────────────────────────────────
+router.get('/suppliers', auth, requireRole(...ALL_ROLES),    deliveryController.getSuppliers);
+router.get('/drivers',   auth, requireRole(...ALL_ROLES),    deliveryController.getDrivers);
+router.get('/products',  auth, requireRole(...ALL_ROLES),    deliveryController.getProducts);
+
+// ── Purchase orders ───────────────────────────────────────────
+router.get('/purchase-orders',
+  auth, requireRole(...RECEIVERS_UP),
+  deliveryController.getPurchaseOrders
+);
+router.get('/purchase-orders/:id/items',
+  auth, requireRole(...RECEIVERS_UP), validateIntId,   // SEC-08
+  deliveryController.getPurchaseOrderItems
+);
 
 // ── Delivery notes ────────────────────────────────────────────
-router.get('/',    auth, deliveryController.getDeliveries);      // ?range=today|week|month|all
-router.get('/:id', auth, deliveryController.getDeliveryById);
-router.post('/',   auth, deliveryController.createDelivery);
+router.get('/',
+  auth, requireRole(...ALL_ROLES),
+  deliveryController.getDeliveries
+);
+router.get('/:id',
+  auth, requireRole(...ALL_ROLES), validateIntId,      // SEC-08
+  deliveryController.getDeliveryById
+);
+router.post('/',
+  auth, requireRole(...RECEIVERS_UP),
+  deliveryController.createDelivery
+);
 
 export default router;

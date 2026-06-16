@@ -1,11 +1,11 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 
-import DashboardHeader    from '../components/Procurement/DashboardHeader';
-import DashboardSidebar   from '../components/Procurement/DashboardSidebar';
-import DeliveryFilters    from '../components/Procurement/DeliveryFilters';
-import DeliveryList       from '../components/Procurement/DeliveryList';
-import ProofOfDeliveryForm from '../components/Procurement/ProofOfDeliveryForm';
-import DeliveryNotePDF    from '../components/Procurement/DeliveryNotePDF';
+import DashboardHeader    from '../features/procurement/components/DashboardHeader';
+import DashboardSidebar   from '../features/procurement/components/DashboardSidebar';
+import DeliveryFilters    from '../features/procurement/components/DeliveryFilters';
+import DeliveryList       from '../features/procurement/components/DeliveryList';
+import ProofOfDeliveryForm from "../features/procurement/components/ProofOfDeliveryForm";
+import DeliveryNotePDF    from '../features/procurement/components/DeliveryNotePDF';
 import { apiGet, apiPost } from '../services/api';
 
 // ─────────────────────────────────────────────────────────────

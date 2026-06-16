@@ -1,9 +1,3 @@
-// ─────────────────────────────────────────────────────────────
-// server/src/controllers/delivery.controller.js
-//
-// Handles HTTP layer only — pulls data from req, calls the
-// service, sends back the response. No SQL, no business rules.
-// ─────────────────────────────────────────────────────────────
 import deliveryService from '../services/delivery.service.js';
 
 // GET /api/deliveries?range=today|week|month|all
@@ -13,8 +7,8 @@ const getDeliveries = async (req, res) => {
     const deliveries = await deliveryService.getDeliveries(range);
     res.json({ success: true, data: deliveries });
   } catch (err) {
-    console.error('getDeliveries error:', err);
-    res.status(500).json({ success: false, message: err.message });
+    console.error('[getDeliveries]', err.message);
+    res.status(500).json({ success: false, message: 'Failed to retrieve deliveries.' });
   }
 };
 
@@ -24,7 +18,7 @@ const getDeliveryById = async (req, res) => {
     const delivery = await deliveryService.getDeliveryById(req.params.id);
     res.json({ success: true, data: delivery });
   } catch (err) {
-    console.error('getDeliveryById error:', err);
+    console.error('[getDeliveryById]', err.message);
     const status = err.message === 'Delivery not found.' ? 404 : 500;
     res.status(status).json({ success: false, message: err.message });
   }
@@ -36,7 +30,7 @@ const createDelivery = async (req, res) => {
     const delivery = await deliveryService.createDelivery(req.body, req.user.id);
     res.status(201).json({ success: true, data: delivery });
   } catch (err) {
-    console.error('createDelivery error:', err);
+    console.error('[createDelivery]', err.message);
     const status = err.message.includes('required') ? 400 : 500;
     res.status(status).json({ success: false, message: err.message });
   }
@@ -48,8 +42,8 @@ const getSuppliers = async (req, res) => {
     const suppliers = await deliveryService.getSuppliers();
     res.json({ success: true, data: suppliers });
   } catch (err) {
-    console.error('getSuppliers error:', err);
-    res.status(500).json({ success: false, message: err.message });
+    console.error('[getSuppliers]', err.message);
+    res.status(500).json({ success: false, message: 'Failed to retrieve suppliers.' });
   }
 };
 
@@ -59,8 +53,8 @@ const getDrivers = async (req, res) => {
     const drivers = await deliveryService.getDrivers(req.query.supplierId);
     res.json({ success: true, data: drivers });
   } catch (err) {
-    console.error('getDrivers error:', err);
-    res.status(500).json({ success: false, message: err.message });
+    console.error('[getDrivers]', err.message);
+    res.status(500).json({ success: false, message: 'Failed to retrieve drivers.' });
   }
 };
 
@@ -70,8 +64,8 @@ const getProducts = async (req, res) => {
     const products = await deliveryService.getProducts();
     res.json({ success: true, data: products });
   } catch (err) {
-    console.error('getProducts error:', err);
-    res.status(500).json({ success: false, message: err.message });
+    console.error('[getProducts]', err.message);
+    res.status(500).json({ success: false, message: 'Failed to retrieve products.' });
   }
 };
 
@@ -81,7 +75,7 @@ const getPurchaseOrders = async (req, res) => {
     const orders = await deliveryService.getPurchaseOrdersBySupplier(req.query.supplierId);
     res.json({ success: true, data: orders });
   } catch (err) {
-    console.error('getPurchaseOrders error:', err);
+    console.error('[getPurchaseOrders]', err.message);
     res.status(400).json({ success: false, message: err.message });
   }
 };
@@ -92,7 +86,7 @@ const getPurchaseOrderItems = async (req, res) => {
     const items = await deliveryService.getPurchaseOrderItems(req.params.id);
     res.json({ success: true, data: items });
   } catch (err) {
-    console.error('getPurchaseOrderItems error:', err);
+    console.error('[getPurchaseOrderItems]', err.message);
     res.status(400).json({ success: false, message: err.message });
   }
 };

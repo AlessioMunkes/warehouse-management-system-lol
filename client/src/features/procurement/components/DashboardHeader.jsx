@@ -1,5 +1,4 @@
-import React from 'react';
-import logo from '../../assets/LOL_Logo.jpg';
+import logo from "../../../assets/LOL_Logo.jpg";
 
 // ─────────────────────────────────────────────────────────────
 // src/components/Procurement/DashboardHeader.jsx

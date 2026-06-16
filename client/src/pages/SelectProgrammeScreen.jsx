@@ -1,4 +1,3 @@
-import React, { useState } from 'react';
 import logo from '../assets/LOL_Logo.jpg';
 
 const PROGS = [
