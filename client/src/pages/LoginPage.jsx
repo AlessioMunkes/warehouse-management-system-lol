@@ -1,15 +1,20 @@
-import { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
-import logo from '../assets/LOL_Logo.jpg';
+// ─────────────────────────────────────────────────────────────
+// src/pages/LoginPage.jsx
+// ─────────────────────────────────────────────────────────────
+import React, { useState }   from 'react';
+import { useNavigate }        from 'react-router-dom';
+import { useAuth }            from '../context/AuthContext';
+import logo                   from '../assets/LOL_Logo.jpg';
 
-const LoginPage = ({ onLoginSuccess }) => {
-  const { login } = useAuth();
+const LoginPage = () => {
+  const { login }    = useAuth();
+  const navigate     = useNavigate();
 
-  const [username, setUsername]                     = useState('');
-  const [password, setPassword]                     = useState('');
-  const [showPassword, setShowPassword]             = useState(false);
-  const [error, setError]                           = useState('');
-  const [isLoading, setIsLoading]                   = useState(false);
+  const [username,           setUsername]           = useState('');
+  const [password,           setPassword]           = useState('');
+  const [showPassword,       setShowPassword]       = useState(false);
+  const [error,              setError]              = useState('');
+  const [isLoading,          setIsLoading]          = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -19,8 +24,8 @@ const LoginPage = ({ onLoginSuccess }) => {
     if (!password)        { setError('Password is required.');  return; }
     setIsLoading(true);
     try {
-      const user = await login(username.trim(), password);
-      onLoginSuccess(user);
+      await login(username.trim(), password);
+      navigate('/programmes');
     } catch (err) {
       setError(err.message || 'Login failed. Please try again.');
     } finally {
@@ -32,7 +37,6 @@ const LoginPage = ({ onLoginSuccess }) => {
     <div className="page-maroon">
       <div className="card">
 
-        {/* Card header — maroon section with logo */}
         <div className="card-header">
           <img
             src={logo}
@@ -43,7 +47,6 @@ const LoginPage = ({ onLoginSuccess }) => {
           <p className="card-header-sub">PROPERTY OF LADLES OF LOVE</p>
         </div>
 
-        {/* Form body */}
         <div className="form-body">
           <h2 className="section-title">EMPLOYEE SIGN IN</h2>
 
@@ -54,7 +57,6 @@ const LoginPage = ({ onLoginSuccess }) => {
           )}
 
           <form onSubmit={handleSubmit}>
-
             <div className="form-group">
               <label className="form-label">USERNAME</label>
               <input
@@ -102,14 +104,12 @@ const LoginPage = ({ onLoginSuccess }) => {
             <button type="submit" disabled={isLoading} className="btn-primary-full">
               {isLoading ? 'VERIFYING...' : 'LOGIN'}
             </button>
-
           </form>
 
           <div className="footer-meta">AUTHORISED PERSONNEL ONLY</div>
         </div>
       </div>
 
-      {/* Forgot Password Modal */}
       {showForgotPassword && (
         <div className="modal-overlay" onClick={() => setShowForgotPassword(false)}>
           <div className="modal-card" onClick={(e) => e.stopPropagation()}>

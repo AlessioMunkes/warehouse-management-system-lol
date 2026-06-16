@@ -1,52 +1,50 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
-
-import DashboardHeader    from '../features/procurement/components/DashboardHeader';
-import DashboardSidebar   from '../features/procurement/components/DashboardSidebar';
-import DeliveryFilters    from '../features/procurement/components/DeliveryFilters';
-import DeliveryList       from '../features/procurement/components/DeliveryList';
-import ProofOfDeliveryForm from "../features/procurement/components/ProofOfDeliveryForm";
-import DeliveryNotePDF    from '../features/procurement/components/DeliveryNotePDF';
-import { apiGet, apiPost } from '../services/api';
-
 // ─────────────────────────────────────────────────────────────
 // src/pages/ProcurementDashboard.jsx
-//
-// Page-level orchestrator. Owns all state and data fetching.
-// Renders layout and passes data + handlers down to components.
-// No rendering logic lives here — only state and API calls.
 // ─────────────────────────────────────────────────────────────
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useNavigate }        from 'react-router-dom';
+import { useAuth }            from '../context/AuthContext';
+import DashboardHeader        from '../features/procurement/components/DashboardHeader';
+import DashboardSidebar       from '../features/procurement/components/DashboardSidebar';
+import DeliveryFilters        from '../features/procurement/components/DeliveryFilters';
+import DeliveryList           from '../features/procurement/components/DeliveryList';
+import ProofOfDeliveryForm    from '../features/procurement/components/ProofOfDeliveryForm';
+import DeliveryNotePDF        from '../features/procurement/components/DeliveryNotePDF';
+import { apiGet, apiPost }    from '../services/api';
 
-const ProcurementDashboard = ({ userName, userRole, userId, onLogout, onBack }) => {
+const ProcurementDashboard = () => {
+  const { user, logout } = useAuth();
+  const navigate         = useNavigate();
 
-  // ── Delivery data ─────────────────────────────────────────
+  // ── Delivery data ───────────────────────────────────────────
   const [deliveries,  setDeliveries]  = useState([]);
   const [isLoading,   setIsLoading]   = useState(true);
   const [error,       setError]       = useState('');
 
-  // ── Reference data for the form ───────────────────────────
+  // ── Reference data for the form ────────────────────────────
   const [suppliers,   setSuppliers]   = useState([]);
   const [drivers,     setDrivers]     = useState([]);
 
-  // ── Filter state ──────────────────────────────────────────
-  const [searchQuery,   setSearchQuery]   = useState('');
-  const [statusFilter,  setStatusFilter]  = useState('all');
-  const [dateRange,     setDateRange]     = useState('month');
+  // ── Filter state ────────────────────────────────────────────
+  const [searchQuery,  setSearchQuery]  = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [dateRange,    setDateRange]    = useState('month');
 
-  // ── UI state ──────────────────────────────────────────────
-  const [activeMenu,       setActiveMenu]       = useState('procurement');
-  const [showDeliveryForm, setShowDeliveryForm] = useState(false);
-  const [isSubmitting,     setIsSubmitting]     = useState(false);
-  const [pdfDelivery,      setPdfDelivery]      = useState(null);
-  const [loadingPdf,       setLoadingPdf]       = useState(false);
+  // ── UI state ────────────────────────────────────────────────
+  const [activeMenu,        setActiveMenu]        = useState('procurement');
+  const [showDeliveryForm,  setShowDeliveryForm]  = useState(false);
+  const [isSubmitting,      setIsSubmitting]      = useState(false);
+  const [pdfDelivery,       setPdfDelivery]       = useState(null);
+  const [loadingPdf,        setLoadingPdf]        = useState(false);
 
-  // ── Fetch deliveries ──────────────────────────────────────
+  // ── Fetch deliveries ────────────────────────────────────────
   const fetchDeliveries = useCallback(async () => {
     setIsLoading(true);
     setError('');
     try {
       const res = await apiGet(`/api/deliveries?range=${dateRange}`);
       setDeliveries(res.data || []);
-    } catch (err) {
+    } catch {
       setError('Failed to load deliveries. Please try again.');
       setDeliveries([]);
     } finally {
@@ -56,7 +54,7 @@ const ProcurementDashboard = ({ userName, userRole, userId, onLogout, onBack }) 
 
   useEffect(() => { fetchDeliveries(); }, [fetchDeliveries]);
 
-  // ── Fetch suppliers and drivers once on mount ─────────────
+  // ── Fetch reference data once on mount ─────────────────────
   useEffect(() => {
     const fetchReferenceData = async () => {
       try {
@@ -65,7 +63,7 @@ const ProcurementDashboard = ({ userName, userRole, userId, onLogout, onBack }) 
           apiGet('/api/deliveries/drivers'),
         ]);
         setSuppliers(suppliersRes.data || []);
-        setDrivers(driversRes.data   || []);
+        setDrivers(driversRes.data     || []);
       } catch (err) {
         console.error('Failed to load reference data:', err);
       }
@@ -73,7 +71,7 @@ const ProcurementDashboard = ({ userName, userRole, userId, onLogout, onBack }) 
     fetchReferenceData();
   }, []);
 
-  // ── Client-side filter ────────────────────────────────────
+  // ── Client-side filter ──────────────────────────────────────
   const filtered = useMemo(() => {
     return deliveries.filter((d) => {
       if (statusFilter !== 'all' && d.status !== statusFilter) return false;
@@ -88,7 +86,7 @@ const ProcurementDashboard = ({ userName, userRole, userId, onLogout, onBack }) 
     });
   }, [deliveries, statusFilter, searchQuery]);
 
-  // ── Submit new delivery ───────────────────────────────────
+  // ── Submit new delivery ─────────────────────────────────────
   const handleRecord = async (formData) => {
     setIsSubmitting(true);
     try {
@@ -98,7 +96,7 @@ const ProcurementDashboard = ({ userName, userRole, userId, onLogout, onBack }) 
         deliveryDate:    formData.deliveryDate,
         purchaseOrderId: formData.purchaseOrderId,
         signatureData:   formData.signatureData,
-        poCompleted:     formData.poCompleted,     // ← pass checkbox value to backend
+        poCompleted:     formData.poCompleted,
       });
       setShowDeliveryForm(false);
       fetchDeliveries();
@@ -109,28 +107,36 @@ const ProcurementDashboard = ({ userName, userRole, userId, onLogout, onBack }) 
     }
   };
 
-  // ── Fetch delivery for PDF modal ──────────────────────────
+  // ── View PDF ────────────────────────────────────────────────
   const handleViewPdf = async (deliveryId) => {
     setLoadingPdf(true);
     try {
       const res = await apiGet(`/api/deliveries/${deliveryId}`);
       setPdfDelivery(res.data);
-    } catch (err) {
+    } catch {
       setError('Failed to load delivery details.');
     } finally {
       setLoadingPdf(false);
     }
   };
 
-  // ── Render ────────────────────────────────────────────────
+  // ── Logout ──────────────────────────────────────────────────
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
+
+  const handleBack = () => navigate('/noc');
+
+  // ── Render ──────────────────────────────────────────────────
   return (
     <>
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
 
         <DashboardHeader
-          userName={userName}
-          userRole={userRole}
-          onLogout={onLogout}
+          userName={user?.firstName}
+          userRole={user?.role}
+          onLogout={handleLogout}
         />
 
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
@@ -138,10 +144,9 @@ const ProcurementDashboard = ({ userName, userRole, userId, onLogout, onBack }) 
           <DashboardSidebar
             activeMenu={activeMenu}
             setActiveMenu={setActiveMenu}
-            onBack={onBack}
+            onBack={handleBack}
           />
 
-          {/* Main content */}
           <div style={{ flex: 1, padding: '16px', overflowY: 'auto' }}>
 
             {error && (
@@ -186,7 +191,6 @@ const ProcurementDashboard = ({ userName, userRole, userId, onLogout, onBack }) 
         </div>
       </div>
 
-      {/* PDF modal */}
       {pdfDelivery && (
         <div
           className="modal-overlay"
@@ -205,7 +209,6 @@ const ProcurementDashboard = ({ userName, userRole, userId, onLogout, onBack }) 
         </div>
       )}
 
-      {/* Record delivery modal */}
       {showDeliveryForm && (
         <div
           className="modal-overlay"

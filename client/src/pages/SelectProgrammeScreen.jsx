@@ -1,4 +1,10 @@
-import logo from '../assets/LOL_Logo.jpg';
+// ─────────────────────────────────────────────────────────────
+// src/pages/SelectProgrammeScreen.jsx
+// ─────────────────────────────────────────────────────────────
+import React           from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth }     from '../context/AuthContext';
+import logo            from '../assets/LOL_Logo.jpg';
 
 const PROGS = [
   { id: 'noc',       name: 'NOURISH OUR CHILDREN', code: 'NOC', active: true  },
@@ -6,12 +12,23 @@ const PROGS = [
   { id: 'donations', name: 'LOVE ACTIVISM',         code: 'LA',  active: false },
 ];
 
-const ProgrammeSelect = ({ userName, userRole, onSelect, onLogout }) => {
+const SelectProgrammeScreen = () => {
+  const { user, logout } = useAuth();
+  const navigate         = useNavigate();
+
+  const handleSelect = (id) => {
+    if (id === 'noc') navigate('/noc');
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
+
   return (
     <div className="page-maroon" style={{ alignItems: 'flex-start', padding: '24px 16px' }}>
       <div style={{ maxWidth: '900px', width: '100%', margin: '0 auto' }}>
 
-        {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '24px' }}>
           <img
             src={logo}
@@ -22,19 +39,18 @@ const ProgrammeSelect = ({ userName, userRole, onSelect, onLogout }) => {
             WORKSPACE
           </h1>
           <p className="header-role" style={{ fontSize: '10px', marginTop: '4px' }}>
-            WELCOME, {userName?.toUpperCase()}
+            WELCOME, {user?.firstName?.toUpperCase()}
           </p>
           <p className="breadcrumb-text" style={{ marginTop: '8px' }}>
             LOL-NOC &gt; SESSION &gt; PROGRAMME SELECT
           </p>
         </div>
 
-        {/* Programme cards grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px' }}>
           {PROGS.map((p) => (
             <button
               key={p.id}
-              onClick={() => p.active && onSelect(p.id)}
+              onClick={() => p.active && handleSelect(p.id)}
               disabled={!p.active}
               className="prog-card"
             >
@@ -51,9 +67,8 @@ const ProgrammeSelect = ({ userName, userRole, onSelect, onLogout }) => {
           ))}
         </div>
 
-        {/* Logout */}
         <div style={{ textAlign: 'center', marginTop: '28px' }}>
-          <button onClick={onLogout} className="btn-ghost">
+          <button onClick={handleLogout} className="btn-ghost">
             LOGOUT
           </button>
         </div>
@@ -63,4 +78,4 @@ const ProgrammeSelect = ({ userName, userRole, onSelect, onLogout }) => {
   );
 };
 
-export default ProgrammeSelect;
+export default SelectProgrammeScreen;

@@ -4,7 +4,7 @@
 // Business logic for the procurement dashboard.
 // Validates data and enforces rules before touching the DB.
 // ─────────────────────────────────────────────────────────────
-import deliveryModel from '../models/delivery.model.js';
+import deliveryModel from '../repositories/delivery.repository.js';
 
 // ── Get deliveries by date range ──────────────────────────────
 const getDeliveries = async (range) => {

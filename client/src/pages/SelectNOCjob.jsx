@@ -1,4 +1,10 @@
-import logo from '../assets/LOL_Logo.jpg';
+// ─────────────────────────────────────────────────────────────
+// src/pages/SelectNOCjob.jsx
+// ─────────────────────────────────────────────────────────────
+import React, { useState } from 'react';
+import { useNavigate }      from 'react-router-dom';
+import { useAuth }          from '../context/AuthContext';
+import logo                 from '../assets/LOL_Logo.jpg';
 
 const TASKS = [
   { id: 'procurement', label: 'PROCUREMENT',  desc: 'SUPPLIER DELIVERIES & INTAKE',  active: true  },
@@ -7,13 +13,26 @@ const TASKS = [
   { id: 'ecdDispatch', label: 'ECD DISPATCH', desc: 'TUESDAY & THURSDAY DISPATCH',   active: false },
 ];
 
-const NourishSelect = ({ userName, userRole, onSelect, onBack, onLogout }) => {
+const SelectNOCjob = () => {
+  const { user, logout } = useAuth();
+  const navigate         = useNavigate();
   const [selected, setSelected] = useState(null);
+
+  const handleContinue = () => {
+    if (!selected) return;
+    if (selected === 'procurement') navigate('/noc/procurement');
+  };
+
+  const handleBack = () => navigate('/programmes');
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
 
   return (
     <div className="page-light">
 
-      {/* Header bar */}
       <div className="header-bar">
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <img src={logo} alt="Logo" style={{ width: '24px', height: '24px', background: '#fff', padding: '2px' }} />
@@ -23,24 +42,21 @@ const NourishSelect = ({ userName, userRole, onSelect, onBack, onLogout }) => {
           </div>
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>
-          <button onClick={onBack}   className="btn-ghost">← BACK</button>
-          <button onClick={onLogout} className="btn-ghost">LOGOUT</button>
+          <button onClick={handleBack}   className="btn-ghost">← BACK</button>
+          <button onClick={handleLogout} className="btn-ghost">LOGOUT</button>
         </div>
       </div>
 
-      {/* Breadcrumb */}
       <div className="breadcrumb-bar">
         <p className="breadcrumb-text">LOL-NOC &gt; LOGISTICS &gt; TASK SELECT</p>
       </div>
 
-      {/* Content */}
       <div style={{ flex: 1, padding: '20px', maxWidth: '560px', margin: '0 auto', width: '100%' }}>
         <h1 className="section-title" style={{ fontSize: '13px', marginBottom: '2px' }}>SELECT TASK</h1>
         <p style={{ fontSize: '9px', color: '#605E5C', marginBottom: '16px' }}>
           CHOOSE YOUR ASSIGNMENT FOR THIS SESSION
         </p>
 
-        {/* Task list */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '20px' }}>
           {TASKS.map((t) => (
             <button
@@ -66,9 +82,8 @@ const NourishSelect = ({ userName, userRole, onSelect, onBack, onLogout }) => {
           ))}
         </div>
 
-        {/* Continue button */}
         <button
-          onClick={() => { if (selected) onSelect(selected); }}
+          onClick={handleContinue}
           disabled={!selected}
           className="btn-primary-full"
           style={{ height: '36px' }}
@@ -76,16 +91,12 @@ const NourishSelect = ({ userName, userRole, onSelect, onBack, onLogout }) => {
           CONTINUE TO {selected ? TASKS.find(t => t.id === selected)?.label : 'TASK'} →
         </button>
 
-        {/* Footer info */}
         <div className="footer-meta">
-          <p>LOGGED: {userName?.toUpperCase()} | ROLE: {userRole?.toUpperCase().replace('_', ' ')}</p>
-          <p style={{ marginTop: '3px' }}>
-            [PROD-NODE-01] | SESSION: {Math.random().toString(36).substr(2, 6).toUpperCase()}
-          </p>
+          <p>LOGGED: {user?.firstName?.toUpperCase()} | ROLE: {user?.role?.toUpperCase()}</p>
         </div>
       </div>
     </div>
   );
 };
 
-export default NourishSelect;
+export default SelectNOCjob;
