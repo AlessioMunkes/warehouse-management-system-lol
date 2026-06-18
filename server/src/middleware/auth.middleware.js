@@ -6,10 +6,10 @@
 import jwt from 'jsonwebtoken';
 
 export const ROLES = {
-  PACKER:   'packer',
-  RECEIVER: 'receiver',
+  WORKER:   'warehouse_worker',
   MANAGER:  'manager',
   ADMIN:    'admin',
+  FINANCE:  'finance',
 };
 
 // ── auth ──────────────────────────────────────────────────────

@@ -11,8 +11,8 @@ import deliveryController           from '../controllers/delivery.controller.js'
 
 const router = express.Router();
 
-const ALL_ROLES    = [ROLES.PACKER, ROLES.RECEIVER, ROLES.MANAGER, ROLES.ADMIN];
-const RECEIVERS_UP = [ROLES.RECEIVER, ROLES.MANAGER, ROLES.ADMIN];
+const ALL_ROLES    = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN, ROLES.FINANCE];
+const RECEIVERS_UP = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 
 // ── Reference data ────────────────────────────────────────────
 router.get('/suppliers', auth, requireRole(...ALL_ROLES),    deliveryController.getSuppliers);
