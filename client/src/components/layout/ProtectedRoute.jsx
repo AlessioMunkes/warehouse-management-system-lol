@@ -13,7 +13,7 @@ const ProtectedRoute = ({ roles } = {}) => {
 
   // Role check (used once SEC-04 is implemented per route)
   if (roles && !roles.includes(user.role)) {
-    return <Navigate to="/programmes" replace />;
+    return <Navigate to={user.role === 'guest' ? '/guest-home' : '/programmes'} replace />;
   }
 
   // All good — render the child route

@@ -45,6 +45,17 @@ export const AuthProvider = ({ children }) => {
     return data.user;
   };
 
+  const loginAsGuest = (name) => {
+  const guestUser = {
+    id: 'guest',
+    firstName: name,
+    role: 'guest',
+    isGuest: true,
+  };
+  localStorage.setItem('wms_user', JSON.stringify(guestUser));
+  setUser(guestUser);
+  return guestUser;
+};
   // ── Logout ────────────────────────────────────────────────────
   // Tell the server to clear the cookie, then clear the UI state.
   const logout = async () => {
@@ -58,7 +69,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, login, loginAsGuest, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

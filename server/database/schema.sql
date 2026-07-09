@@ -125,6 +125,16 @@ CREATE TABLE IF NOT EXISTS delivery_notes (
   created_at        TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 
+-- migrations/00X_volunteers.sql — NOT YET APPLIED
+CREATE TABLE volunteers (
+  id           BIGSERIAL PRIMARY KEY,
+  full_name    TEXT        NOT NULL,
+  signed_in_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  signed_out_at TIMESTAMPTZ,
+  source       TEXT        NOT NULL DEFAULT 'guest_login'
+);
+
+CREATE INDEX idx_volunteers_signed_in_at ON volunteers (signed_in_at DESC);
 
 -- ─────────────────────────────────────────────────────────────
 -- INDEXES
