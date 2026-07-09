@@ -101,9 +101,18 @@ const LoginPage = () => {
               </button>
             </div>
 
+            <div>
             <button type="submit" disabled={isLoading} className="btn-primary-full">
               {isLoading ? 'VERIFYING...' : 'LOGIN'}
             </button>
+            </div>
+              
+            <div>
+              <br></br>
+            <button type="button" onClick={() => navigate('/guest')} className="btn-primary-full" disabled={isLoading}>
+            LOGIN AS GUEST
+          </button>
+            </div>
           </form>
 
           <div className="footer-meta">AUTHORISED PERSONNEL ONLY</div>
