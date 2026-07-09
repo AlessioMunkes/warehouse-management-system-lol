@@ -10,7 +10,6 @@
 // maxAge set server-side and the server rejects expired cookies.
 // ─────────────────────────────────────────────────────────────
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { apiPost } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -45,17 +44,12 @@ export const AuthProvider = ({ children }) => {
     return data.user;
   };
 
-  const loginAsGuest = (name) => {
-  const guestUser = {
-    id: 'guest',
-    firstName: name,
-    role: 'guest',
-    isGuest: true,
-  };
-  localStorage.setItem('wms_user', JSON.stringify(guestUser));
-  setUser(guestUser);
-  return guestUser;
-};
+const loginAsGuest = async (name) => {
+  const data = await apiPost('/api/volunteers/sign-in', { name });
+  localStorage.setItem('wms_user', JSON.stringify(data.user));
+  setUser(data.user);
+  return data.user;
+}; 
   // ── Logout ────────────────────────────────────────────────────
   // Tell the server to clear the cookie, then clear the UI state.
   const logout = async () => {

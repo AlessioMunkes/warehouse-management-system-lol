@@ -10,6 +10,7 @@ export const ROLES = {
   MANAGER:  'manager',
   ADMIN:    'admin',
   FINANCE:  'finance',
+  GUEST:    'guest',
 };
 
 // ── auth ──────────────────────────────────────────────────────
