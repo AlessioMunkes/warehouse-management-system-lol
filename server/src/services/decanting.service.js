@@ -275,6 +275,76 @@ const getWeeklyProcurementReport = async (weekOf) => {
 //   return await decantingModel.getDecantableProducts();
 // };
 
+// ── CSV field escaping ─────────────────────────────────────────
+// Wraps a field in quotes (doubling any inner quotes) whenever it
+// contains a comma, quote, or newline — the standard CSV escaping
+// rule so Excel/Sheets parse the file correctly.
+const escapeCsvField = (value) => {
+  const str = value === null || value === undefined ? '' : String(value);
+  return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+};
+ 
+// ── Export a decanting record as a CSV sheet ───────────────────
+// Rebuilds one saved decanting run into the same shape as the
+// sponsor's original paper/Excel decanting sheet: a header block
+// (week, who recorded it, notes) followed by one row per product
+// line with its bag split, wastage, surplus and shortfall.
+// Returns { filename, csv } — the controller streams `csv` as the
+// file body under `filename`.
+const exportDecantingSheet = async (id) => {
+  const record = await getDecantingById(id); // throws 'not found' if missing
+ 
+  const rows = [];
+ 
+  // ── Header block ───────────────────────────────────────────
+  rows.push(['Decanting Sheet']);
+  rows.push(['Week Of', record.week_of]);
+  rows.push(['Recorded By', record.recorded_by_name || '']);
+  rows.push(['Notes', record.notes || '']);
+  rows.push([]); // blank separator row
+ 
+  // ── Column headers ───────────────────────────────────────────
+  rows.push([
+    'SKU', 'Product', 'Required (kg)', 'Actual Bulk (kg)', 'Packed (kg)',
+    'Bag Sizes Used', '5kg', '2.5kg', '1kg', '500g', '250g', 'Total Bags',
+    'Margin Error (%)', 'Within Margin', 'Wastage (kg)', 'Surplus (kg)',
+    'Shortfall (kg)', 'Line Notes',
+  ]);
+ 
+  // ── One row per product line ─────────────────────────────────
+  for (const line of record.lines) {
+    const bags = line.bags || {};
+    rows.push([
+      line.sku || '',
+      line.product_name || '',
+      line.required_kg,
+      line.actual_bulk_kg ?? '',
+      line.packed_kg,
+      (line.sizes_kg || []).join(' / '),
+      bags['5kg']   ?? 0,
+      bags['2.5kg'] ?? 0,
+      bags['1kg']   ?? 0,
+      bags['500g']  ?? 0,
+      bags['250g']  ?? 0,
+      line.total_bags,
+      (Number(line.margin_error) * 100).toFixed(2),
+      line.within_margin ? 'Yes' : 'No',
+      line.wastage_kg,
+      line.surplus_kg,
+      line.shortfall_kg,
+      line.notes || '',
+    ]);
+  }
+ 
+  // CRLF line endings — the CSV convention Excel expects
+  const csv = rows.map((row) => row.map(escapeCsvField).join(',')).join('\r\n');
+ 
+  return {
+    filename: `decanting-sheet-${record.week_of}-${record.id}.csv`,
+    csv,
+  };
+};
+
 export default {
   // exposed for the UI preview + unit testing
   calculateDecantingPlan,
@@ -288,6 +358,8 @@ export default {
   getDecantingById,
   getWeeklyProcurementReport,
   //getDecantableProducts,
+  exportDecantingSheet,
+
   // constants (handy for tests / the frontend)
   STANDARD_BAG_SIZES_KG,
   MAX_BAG_SIZE_KG,

@@ -20,4 +20,7 @@ router.post('/', auth, requireRole(...RECEIVERS_UP),          decantingControlle
 // ── Single record ─────────────────────────────────────────────
 router.get('/:id', auth, requireRole(...ALL_ROLES), validateIntId, decantingController.getById);
 
+// ── Export ────────────────────────────────────────────────────
+router.get('/:id/export', auth, requireRole(...ALL_ROLES), validateIntId, decantingController.exportSheet);
+
 export default router;
