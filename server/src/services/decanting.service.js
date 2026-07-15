@@ -271,9 +271,9 @@ const getWeeklyProcurementReport = async (weekOf) => {
 };
 
 // ── Get products that are decanted (dry goods) ────────────────
-const getDecantableProducts = async () => {
-  return await decantingModel.getDecantableProducts();
-};
+// const getDecantableProducts = async () => {
+//   return await decantingModel.getDecantableProducts();
+// };
 
 export default {
   // exposed for the UI preview + unit testing
@@ -287,7 +287,7 @@ export default {
   getDecantingRecords,
   getDecantingById,
   getWeeklyProcurementReport,
-  getDecantableProducts,
+  //getDecantableProducts,
   // constants (handy for tests / the frontend)
   STANDARD_BAG_SIZES_KG,
   MAX_BAG_SIZE_KG,

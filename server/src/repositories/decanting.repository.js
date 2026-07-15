@@ -211,5 +211,5 @@ export default {
   getDecantingRecords,
   getDecantingById,
   getWeeklyProcurementReport,
-  getDecantableProducts,
+//  getDecantableProducts,
 };

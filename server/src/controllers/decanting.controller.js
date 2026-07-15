@@ -7,7 +7,8 @@ const calculatePlan = async (req, res) => {
     res.json({ success: true, data: result });
   } catch (err) {
     console.error('[calculatePlan]', err.message);
-    const status = err.message.includes('required') || err.message.includes('must be') ? 400 : 500;
+    const isValidationError = (msg) =>
+    msg.includes('required') || msg.includes('must be') || msg.includes('cannot exceed');
     res.status(status).json({ success: false, message: err.message });
   }
 };
@@ -19,7 +20,8 @@ const recordDecanting = async (req, res) => {
     res.status(201).json({ success: true, data: record });
   } catch (err) {
     console.error('[recordDecanting]', err.message);
-    const status = err.message.includes('required') || err.message.includes('must be') ? 400 : 500;
+    const isValidationError = (msg) =>
+    msg.includes('required') || msg.includes('must be') || msg.includes('cannot exceed');
     res.status(status).json({ success: false, message: err.message });
   }
 };
@@ -61,15 +63,15 @@ const getWeeklyReport = async (req, res) => {
 };
 
 // GET /api/decanting/products
-const getDecantableProducts = async (req, res) => {
-  try {
-    const products = await decantingService.getDecantableProducts();
-    res.json({ success: true, data: products });
-  } catch (err) {
-    console.error('[getDecantableProducts]', err.message);
-    res.status(500).json({ success: false, message: 'Failed to retrieve decantable products.' });
-  }
-};
+// const getDecantableProducts = async (req, res) => {
+//   try {
+//     const products = await decantingService.getDecantableProducts();
+//     res.json({ success: true, data: products });
+//   } catch (err) {
+//     console.error('[getDecantableProducts]', err.message);
+//     res.status(500).json({ success: false, message: 'Failed to retrieve decantable products.' });
+//   }
+// };
 
 export default {
   calculatePlan,
@@ -77,5 +79,5 @@ export default {
   getRecords,
   getById,
   getWeeklyReport,
-  getDecantableProducts,
+// getDecantableProducts,
 };
