@@ -45,7 +45,7 @@ const getSlipById = async (id) => {
 const generateSlips = async ({ dispatchDate, cohort }, user) => {
   if (!isManager(user))                   fail(403, 'Only managers can generate packing slips.');
   if (!dispatchDate)                      fail(400, 'Dispatch date is required.');
-  if (!COHORTS.includes(cohort))          fail(400, 'Cohort must be tuesday or thursday.');
+  if (!COHORTS.includes(cohort))          fail(400, 'Cohort must be week1 or week2.');
 
   const date = new Date(dispatchDate);
   if (Number.isNaN(date.getTime()))       fail(400, 'Dispatch date is not a valid date.');
@@ -55,8 +55,8 @@ const generateSlips = async ({ dispatchDate, cohort }, user) => {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   if (date < today)                       fail(400, 'Cannot generate slips for a past date.');
 
-  // Tuesday cohort must dispatch on a Tuesday, Thursday on a Thursday.
-  const expectedDay = cohort === 'tuesday' ? 2 : 4;
+  // Week1 cohort must dispatch on a Tuesday, Week2 on a Thursday.
+  const expectedDay = cohort === 'week1' ? 2 : 4;
   if (date.getUTCDay() !== expectedDay) {
     fail(400, `The ${cohort} cohort must be generated for a ${cohort}.`);
   }
@@ -75,7 +75,7 @@ const assignSlip = async (slipId, body, user) => {
 
   const result = await packingRepository.assignSlip({ slipId, packerId, actorId: user.id });
 
-  if (result.notFound) fail(404, 'Packing slip not found.');
+  if (result.notFound) fail(404, 'Picking slip not found.');
   if (result.conflict) fail(409, 'This pallet is already being packed by someone else.');
   return result.slip;
 };
@@ -91,7 +91,7 @@ const confirmItem = async (slipId, itemId, body, user) => {
     slipId, itemId, status: 'confirmed', packedQuantity, actorId: user.id,
   });
 
-  if (result.notFound) fail(404, 'Packing slip item not found.');
+  if (result.notFound) fail(404, 'Picking slip item not found.');
   if (result.locked)   fail(409, 'This slip is already complete and cannot be changed.');
   if (!isManager(user) && result.assignedTo !== user.id) {
     fail(403, 'You can only confirm items on a pallet assigned to you.');
@@ -116,7 +116,7 @@ const flagItem = async (slipId, itemId, body, user) => {
     slipId, itemId, status: 'flagged', packedQuantity, flagReason: reason, actorId: user.id,
   });
 
-  if (result.notFound) fail(404, 'Packing slip item not found.');
+  if (result.notFound) fail(404, 'Picking slip item not found.');
   if (result.locked)   fail(409, 'This slip is already complete and cannot be changed.');
   if (!isManager(user) && result.assignedTo !== user.id) {
     fail(403, 'You can only flag items on a pallet assigned to you.');
@@ -134,7 +134,7 @@ const completeSlip = async (slipId, body, user) => {
     actorId:   user.id,
   });
 
-  if (result.notFound)        fail(404, 'Packing slip not found.');
+  if (result.notFound)        fail(404, 'Picking slip not found.');
   if (result.alreadyComplete) fail(409, 'This slip is already complete.');
   if (result.pendingItems) {
     fail(422, `${result.pendingItems} item(s) still need to be confirmed or flagged before this pallet can be closed.`);
