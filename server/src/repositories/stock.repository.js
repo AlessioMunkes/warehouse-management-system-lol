@@ -3,7 +3,7 @@
 //
 // All SQL for the stock module.
 // adjustStock is the single write path for every change to
-// quantity_on_hand — procurement, packing, and manual adjustments
+// quantity_on_hand — procurement, picking, and manual adjustments
 // all go through it, so there's exactly one place that can get
 // the arithmetic wrong.
 // ─────────────────────────────────────────────────────────────
@@ -12,7 +12,7 @@ import pool from '../config/db.js';
 // ── Adjust stock — the single write path for every stock change ──
 // Must be called with a client already inside BEGIN/COMMIT — either
 // its own (see manualAdjust below) or one borrowed from another
-// repository's transaction (see packing.repository.js completeSlip).
+// repository's transaction (see picking.repository.js completeSlip).
 //
 // Locks the product's stock_levels row before writing, so concurrent
 // callers touching the same product serialize instead of racing.
@@ -29,7 +29,7 @@ import pool from '../config/db.js';
 // can surface it. quantity_on_hand is NUMERIC, which node-postgres
 // returns as a string, not a number — every value read back off it
 // gets an explicit Number() cast below.
-const adjustStock = async (client, { productId, quantityDelta, unit = null, movementType, referenceId = null, reason = null, performedBy }) => {
+const adjustStock = async (client, { productId, quantityDelta, unit = null, movementType, referenceType = null, referenceId = null, reason = null, performedBy }) => {
   const existing = await client.query(
     `SELECT quantity_on_hand, unit FROM stock_levels WHERE product_id = $1 FOR UPDATE`,
     [productId]
@@ -63,9 +63,9 @@ const adjustStock = async (client, { productId, quantityDelta, unit = null, move
 
   await client.query(
     `INSERT INTO stock_movements
-       (product_id, quantity, unit, movement_type, reference_id, reason, performed_by, created_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
-    [productId, quantityDelta, resolvedUnit, movementType, referenceId, reason, performedBy]
+       (product_id, quantity, unit, movement_type, reference_type, reference_id, reason, performed_by, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+    [productId, quantityDelta, resolvedUnit, movementType, referenceType, referenceId, reason, performedBy]
   );
 
   return { before, after, isShortfall: after < 0, isUnitMismatch };
@@ -88,7 +88,7 @@ const manualAdjust = async ({ productId, quantityDelta, unit, reason, performedB
     if (!productCheck.rows[0]) { await client.query('ROLLBACK'); return { productNotFound: true }; }
 
     const outcome = await adjustStock(client, {
-      productId, quantityDelta, unit, movementType: 'adjustment', reason, performedBy,
+      productId, quantityDelta, unit, movementType: 'adjustment', referenceType: 'manual_adjustment', reason, performedBy,
     });
 
     await client.query('COMMIT');

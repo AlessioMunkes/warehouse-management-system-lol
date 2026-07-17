@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
-// server/src/repositories/packing.repository.js
+// server/src/repositories/picking.repository.js
 //
-// All SQL for the packing module.
+// All SQL for the picking module.
 // No business logic here — only database queries.
 // ─────────────────────────────────────────────────────────────
 import pool       from '../config/db.js';
@@ -10,7 +10,7 @@ import stockModel from './stock.repository.js';
 // ── Audit helper (used inside existing transactions) ──────────
 const logEvent = async (client, slipId, eventType, actorId, detail = null) => {
   await client.query(
-    `INSERT INTO packing_events (packing_slip_id, event_type, actor_id, detail)
+    `INSERT INTO picking_events (picking_slip_id, event_type, actor_id, detail)
      VALUES ($1, $2, $3, $4)`,
     [slipId, eventType, actorId, detail]
   );
@@ -21,7 +21,7 @@ const logEvent = async (client, slipId, eventType, actorId, detail = null) => {
 // to compute which cohort is active for any given dispatch date.
 const getCohortAnchor = async () => {
   const result = await pool.query(
-    `SELECT value FROM packing_settings WHERE key = 'cohort_anchor_monday'`
+    `SELECT value FROM picking_settings WHERE key = 'cohort_anchor_monday'`
   );
   return result.rows[0]?.value ?? null;
 };
@@ -52,10 +52,10 @@ const getSlips = async ({ dispatchDate, cohort, status, assignedTo }) => {
        COUNT(psi.id)                                          AS total_items,
        COUNT(psi.id) FILTER (WHERE psi.status = 'confirmed')  AS confirmed_items,
        COUNT(psi.id) FILTER (WHERE psi.status = 'flagged')    AS flagged_items
-     FROM packing_slips ps
+     FROM picking_slips ps
      JOIN ecd_centres e ON e.id = ps.ecd_id
      LEFT JOIN users u ON u.id = ps.assigned_to
-     LEFT JOIN packing_slip_items psi ON psi.packing_slip_id = ps.id
+     LEFT JOIN picking_slip_items psi ON psi.picking_slip_id = ps.id
      ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
      GROUP BY ps.id, e.name, e.child_count, e.last_collected_date, u.first_name
      ORDER BY e.name ASC`,
@@ -74,7 +74,7 @@ const getSlipById = async (id) => {
        e.child_count,
        e.contact_name,
        u.first_name   AS packer_name
-     FROM packing_slips ps
+     FROM picking_slips ps
      JOIN ecd_centres e ON e.id = ps.ecd_id
      LEFT JOIN users u ON u.id = ps.assigned_to
      WHERE ps.id = $1`,
@@ -95,9 +95,9 @@ const getSlipById = async (id) => {
        psi.confirmed_at,
        p.name               AS product_name,
        p.stock_keeping_unit AS sku
-     FROM packing_slip_items psi
+     FROM picking_slip_items psi
      JOIN products p ON p.id = psi.product_id
-     WHERE psi.packing_slip_id = $1
+     WHERE psi.picking_slip_id = $1
      ORDER BY p.name ASC, psi.unit ASC`,
     [id]
   );
@@ -115,7 +115,7 @@ const generateSlips = async ({ dispatchDate, cohort, generatedBy }) => {
     await client.query('BEGIN');
 
     const slips = await client.query(
-      `INSERT INTO packing_slips (ecd_id, dispatch_date, cohort, generated_by)
+      `INSERT INTO picking_slips (ecd_id, dispatch_date, cohort, generated_by)
        SELECT e.id, $1::date, $2::cohort_group, $3
        FROM ecd_centres e
        WHERE e.cohort = $2::cohort_group
@@ -130,7 +130,7 @@ const generateSlips = async ({ dispatchDate, cohort, generatedBy }) => {
     // later change to ecd_order_lines can never rewrite a packed slip.
     for (const slip of slips.rows) {
       await client.query(
-        `INSERT INTO packing_slip_items (packing_slip_id, product_id, required_quantity, unit)
+        `INSERT INTO picking_slip_items (picking_slip_id, product_id, required_quantity, unit)
          SELECT $1, ol.product_id, ol.quantity, ol.unit
          FROM ecd_order_lines ol
          WHERE ol.ecd_id = $2
@@ -168,7 +168,7 @@ const createSlip = async ({ ecdId, dispatchDate, cohort, generatedBy }) => {
     if (!ecdCheck.rows[0]) { await client.query('ROLLBACK'); return { ecdNotFound: true }; }
 
     const slipResult = await client.query(
-      `INSERT INTO packing_slips (ecd_id, dispatch_date, cohort, generated_by)
+      `INSERT INTO picking_slips (ecd_id, dispatch_date, cohort, generated_by)
        VALUES ($1, $2, $3::cohort_group, $4)
        ON CONFLICT (ecd_id, dispatch_date) DO NOTHING
        RETURNING id`,
@@ -180,7 +180,7 @@ const createSlip = async ({ ecdId, dispatchDate, cohort, generatedBy }) => {
     const slipId = slipResult.rows[0].id;
 
     const itemsResult = await client.query(
-      `INSERT INTO packing_slip_items (packing_slip_id, product_id, required_quantity, unit)
+      `INSERT INTO picking_slip_items (picking_slip_id, product_id, required_quantity, unit)
        SELECT $1, ol.product_id, ol.quantity, ol.unit
        FROM ecd_order_lines ol
        WHERE ol.ecd_id = $2
@@ -211,7 +211,7 @@ const assignSlip = async ({ slipId, packerId, actorId }) => {
     await client.query('BEGIN');
 
     const current = await client.query(
-      `SELECT id, status, assigned_to FROM packing_slips WHERE id = $1 FOR UPDATE`,
+      `SELECT id, status, assigned_to FROM picking_slips WHERE id = $1 FOR UPDATE`,
       [slipId]
     );
     const slip = current.rows[0];
@@ -222,7 +222,7 @@ const assignSlip = async ({ slipId, packerId, actorId }) => {
     }
 
     const result = await client.query(
-      `UPDATE packing_slips
+      `UPDATE picking_slips
        SET assigned_to = $1,
            status      = 'in_progress',
            started_at  = COALESCE(started_at, NOW())
@@ -251,7 +251,7 @@ const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReaso
     await client.query('BEGIN');
 
     const slipResult = await client.query(
-      `SELECT id, status, assigned_to FROM packing_slips WHERE id = $1 FOR UPDATE`,
+      `SELECT id, status, assigned_to FROM picking_slips WHERE id = $1 FOR UPDATE`,
       [slipId]
     );
     const slip = slipResult.rows[0];
@@ -259,13 +259,13 @@ const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReaso
     if (slip.status === 'complete'){ await client.query('ROLLBACK'); return { locked: true }; }
 
     const result = await client.query(
-      `UPDATE packing_slip_items
-       SET status          = $1::packing_item_status,
+      `UPDATE picking_slip_items
+       SET status          = $1::picking_item_status,
            packed_quantity = $2,
            flag_reason     = $3,
            confirmed_by    = $4,
            confirmed_at    = NOW()
-       WHERE id = $5 AND packing_slip_id = $6
+       WHERE id = $5 AND picking_slip_id = $6
        RETURNING *`,
       [status, packedQuantity ?? null, flagReason ?? null, actorId, itemId, slipId]
     );
@@ -307,7 +307,7 @@ const completeSlip = async ({ slipId, palletRef, actorId }) => {
     await client.query('BEGIN');
 
     const slipResult = await client.query(
-      `SELECT id, status FROM packing_slips WHERE id = $1 FOR UPDATE`,
+      `SELECT id, status FROM picking_slips WHERE id = $1 FOR UPDATE`,
       [slipId]
     );
     const slip = slipResult.rows[0];
@@ -316,8 +316,8 @@ const completeSlip = async ({ slipId, palletRef, actorId }) => {
 
     const pending = await client.query(
       `SELECT COUNT(*)::int AS n
-       FROM packing_slip_items
-       WHERE packing_slip_id = $1 AND status = 'pending'`,
+       FROM picking_slip_items
+       WHERE picking_slip_id = $1 AND status = 'pending'`,
       [slipId]
     );
     if (pending.rows[0].n > 0) {
@@ -332,8 +332,8 @@ const completeSlip = async ({ slipId, palletRef, actorId }) => {
     // the same two products can never deadlock against each other.
     const confirmedItems = await client.query(
       `SELECT product_id, packed_quantity, unit
-       FROM packing_slip_items
-       WHERE packing_slip_id = $1 AND status = 'confirmed'
+       FROM picking_slip_items
+       WHERE picking_slip_id = $1 AND status = 'confirmed'
        ORDER BY product_id ASC`,
       [slipId]
     );
@@ -344,7 +344,8 @@ const completeSlip = async ({ slipId, palletRef, actorId }) => {
         productId:     item.product_id,
         quantityDelta: -item.packed_quantity,
         unit:          item.unit,
-        movementType:  'packed',
+        movementType:  'picked',
+        referenceType: 'picking_slip',
         referenceId:   slipId,
         performedBy:   actorId,
       });
@@ -354,7 +355,7 @@ const completeSlip = async ({ slipId, palletRef, actorId }) => {
     }
 
     const result = await client.query(
-      `UPDATE packing_slips
+      `UPDATE picking_slips
        SET status       = 'complete',
            completed_at = NOW(),
            completed_by = $1,
