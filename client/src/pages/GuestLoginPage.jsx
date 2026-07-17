@@ -1,5 +1,6 @@
 // src/pages/GuestLoginPage.jsx
 import React, { useState } from 'react';
+import { apiPost } from '../services/api';
 import { useNavigate }     from 'react-router-dom';
 import { useAuth }         from '../context/AuthContext';
 import logo                from '../assets/LOL_Logo.jpg';
