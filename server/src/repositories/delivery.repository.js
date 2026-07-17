@@ -4,18 +4,18 @@
 // All SQL for the procurement dashboard.
 // No business logic here — only database queries.
 // ─────────────────────────────────────────────────────────────
-import pool from '../config/db.js';
+import pool from "../config/db.js";
 
 // ── Get all deliveries with optional date range ───────────────
 // range: 'today' | 'week' | 'month' | 'all'
-const getDeliveries = async (range = 'all') => {
-  let dateFilter = '';
+const getDeliveries = async (range = "all") => {
+  let dateFilter = "";
 
-  if (range === 'today') {
+  if (range === "today") {
     dateFilter = `AND dn.delivery_date = CURRENT_DATE`;
-  } else if (range === 'week') {
+  } else if (range === "week") {
     dateFilter = `AND dn.delivery_date >= CURRENT_DATE - INTERVAL '7 days'`;
-  } else if (range === 'month') {
+  } else if (range === "month") {
     dateFilter = `AND dn.delivery_date >= CURRENT_DATE - INTERVAL '30 days'`;
   }
 
@@ -34,7 +34,7 @@ const getDeliveries = async (range = 'all') => {
      LEFT JOIN drivers d ON d.id = dn.driver_id
      LEFT JOIN users u ON u.id = dn.received_by
      WHERE 1=1 ${dateFilter}
-     ORDER BY dn.created_at DESC`
+     ORDER BY dn.created_at DESC`,
   );
 
   return result.rows;
@@ -59,7 +59,7 @@ const getDeliveryById = async (id) => {
      LEFT JOIN drivers d ON d.id = dn.driver_id
      LEFT JOIN users u ON u.id = dn.received_by
      WHERE dn.id = $1`,
-    [id]
+    [id],
   );
 
   // Fetch items from the linked purchase order
@@ -77,7 +77,7 @@ const getDeliveryById = async (id) => {
        SELECT purchase_order_id FROM delivery_notes WHERE id = $1
      )
      ORDER BY p.name ASC`,
-    [id]
+    [id],
   );
 
   // Also fetch the PO status so the PDF can show completion state
@@ -88,14 +88,14 @@ const getDeliveryById = async (id) => {
        (SELECT COUNT(*) FROM delivery_notes dn WHERE dn.purchase_order_id = po.id) AS delivery_count
      FROM purchase_orders po
      WHERE po.id = (SELECT purchase_order_id FROM delivery_notes WHERE id = $1)`,
-    [id]
+    [id],
   );
 
   return {
     ...deliveryResult.rows[0],
-    items:    itemsResult.rows,
-    po_status: poResult.rows[0]?.status       || null,
-    po_id:     poResult.rows[0]?.id           || null,
+    items: itemsResult.rows,
+    po_status: poResult.rows[0]?.status || null,
+    po_id: poResult.rows[0]?.id || null,
     po_delivery_count: poResult.rows[0]?.delivery_count || 0,
   };
 };
@@ -103,10 +103,18 @@ const getDeliveryById = async (id) => {
 // ── Create a new delivery note ────────────────────────────────
 // Links the delivery note to the purchase order.
 // Items are already known from the PO — no cross-check needed.
-const createDelivery = async ({ supplierId, driverId, deliveryDate, receivedBy, purchaseOrderId, signatureData, poCompleted }) => {
+const createDelivery = async ({
+  supplierId,
+  driverId,
+  deliveryDate,
+  receivedBy,
+  purchaseOrderId,
+  signatureData,
+  poCompleted,
+}) => {
   const client = await pool.connect();
   try {
-    await client.query('BEGIN');
+    await client.query("BEGIN");
 
     // Insert the delivery note
     const result = await client.query(
@@ -114,22 +122,42 @@ const createDelivery = async ({ supplierId, driverId, deliveryDate, receivedBy, 
          (supplier_id, driver_id, delivery_date, received_by, purchase_order_id, signature, status, created_at)
        VALUES ($1, $2, $3, $4, $5, $6, 'recorded', NOW())
        RETURNING *`,
-      [supplierId, driverId, deliveryDate, receivedBy, purchaseOrderId, signatureData || null]
+      [
+        supplierId,
+        driverId,
+        deliveryDate,
+        receivedBy,
+        purchaseOrderId,
+        signatureData || null,
+      ],
     );
 
     // If the worker checked "PO completed", mark it so it won't appear in future deliveries
     if (poCompleted) {
       await client.query(
         `UPDATE purchase_orders SET status = 'completed' WHERE id = $1`,
-        [purchaseOrderId]
+        [purchaseOrderId],
       );
     }
 
-    await client.query('COMMIT');
-    return result.rows[0];
+    import stockModel from "./stock.repository.js";
 
+    const items = await getPurchaseOrderItems(purchaseOrderId); // reuse existing query
+    for (const item of items) {
+      await stockModel.adjustStock(client, {
+        productId: item.product_id,
+        quantityDelta: item.expected_quantity, // swap for an actual-received qty if you add that field later
+        movementType: "procurement",
+        referenceType: "delivery_note",
+        referenceId: result.rows[0].id,
+        performedBy: receivedBy,
+      });
+    }
+
+    await client.query("COMMIT");
+    return result.rows[0];
   } catch (err) {
-    await client.query('ROLLBACK');
+    await client.query("ROLLBACK");
     throw err;
   } finally {
     client.release();
@@ -139,7 +167,7 @@ const createDelivery = async ({ supplierId, driverId, deliveryDate, receivedBy, 
 // ── Get all active suppliers ──────────────────────────────────
 const getSuppliers = async () => {
   const result = await pool.query(
-    `SELECT id, name, contact_email FROM suppliers ORDER BY name ASC`
+    `SELECT id, name, contact_email FROM suppliers ORDER BY name ASC`,
   );
   return result.rows;
 };
@@ -152,13 +180,13 @@ const getDrivers = async (supplierId = null) => {
        FROM drivers
        WHERE supplier_id = $1
        ORDER BY name ASC`,
-      [supplierId]
+      [supplierId],
     );
     return result.rows;
   }
 
   const result = await pool.query(
-    `SELECT id, name, license_number, supplier_id FROM drivers ORDER BY name ASC`
+    `SELECT id, name, license_number, supplier_id FROM drivers ORDER BY name ASC`,
   );
   return result.rows;
 };
@@ -169,7 +197,7 @@ const getProducts = async () => {
     `SELECT id, name, stock_keeping_unit AS sku, weight_kg
      FROM products
      WHERE is_active = true
-     ORDER BY name ASC`
+     ORDER BY name ASC`,
   );
   return result.rows;
 };
@@ -189,7 +217,7 @@ const getPurchaseOrdersBySupplier = async (supplierId) => {
      WHERE po.supplier_id = $1
        AND po.status = 'approved'
      ORDER BY po.expected_delivery_date ASC`,
-    [supplierId]
+    [supplierId],
   );
   return result.rows;
 };
@@ -212,7 +240,7 @@ const getPurchaseOrderItems = async (purchaseOrderId) => {
      JOIN products p ON p.id = poi.product_id
      WHERE poi.purchase_order_id = $1
      ORDER BY p.name ASC`,
-    [purchaseOrderId]
+    [purchaseOrderId],
   );
   return result.rows;
 };
