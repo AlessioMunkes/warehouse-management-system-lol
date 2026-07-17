@@ -1,10 +1,10 @@
 // ─────────────────────────────────────────────────────────────
-// server/src/services/packing.service.js
+// server/src/services/picking.service.js
 //
-// Business logic for the packing workflow.
+// Business logic for the picking workflow.
 // Validates data and enforces rules before touching the DB.
 // ─────────────────────────────────────────────────────────────
-import packingRepository from '../repositories/packing.repository.js';
+import pickingRepository from '../repositories/picking.repository.js';
 import { ROLES }         from '../middleware/auth.middleware.js';
 
 const COHORTS = ['week1', 'week2'];
@@ -21,7 +21,7 @@ const fail = (status, message) => {
 
 // ── Fortnightly rotation math ───────────────────────────────────
 // Half the ECDs are 'week1', half 'week2'; each group collects every
-// other week. cohort_anchor_monday (packing_settings) is the Monday
+// other week. cohort_anchor_monday (picking_settings) is the Monday
 // of a known week1 week — every other week's cohort is computed from
 // how many whole weeks have passed since that anchor.
 const mondayOf = (date) => {
@@ -52,13 +52,13 @@ const getSlips = async (query, user) => {
 
   const assignedTo = (!isManager(user) && mine === 'true') ? user.id : undefined;
 
-  return await packingRepository.getSlips({ dispatchDate, cohort, status, assignedTo });
+  return await pickingRepository.getSlips({ dispatchDate, cohort, status, assignedTo });
 };
 
 // ── One slip ──────────────────────────────────────────────────
 const getSlipById = async (id) => {
-  const slip = await packingRepository.getSlipById(id);
-  if (!slip) fail(404, 'Packing slip not found.');
+  const slip = await pickingRepository.getSlipById(id);
+  if (!slip) fail(404, 'Picking slip not found.');
   return slip;
 };
 
@@ -77,7 +77,7 @@ const validateDispatchDate = async (dispatchDate, cohort, { allowOverride = fals
   const today = new Date(); today.setHours(0, 0, 0, 0);
   if (date < today) fail(400, 'Cannot create slips for a past date.');
 
-  const anchor = await packingRepository.getCohortAnchor();
+  const anchor = await pickingRepository.getCohortAnchor();
   if (anchor) {
     const active = resolveActiveCohort(date, anchor);
     if (active !== cohort && !allowOverride) {
@@ -92,10 +92,10 @@ const validateDispatchDate = async (dispatchDate, cohort, { allowOverride = fals
 
 // ── Generate the week's slips (manager only) ──────────────────
 const generateSlips = async ({ dispatchDate, cohort }, user) => {
-  if (!isManager(user)) fail(403, 'Only managers can generate packing slips.');
+  if (!isManager(user)) fail(403, 'Only managers can generate picking slips.');
   await validateDispatchDate(dispatchDate, cohort);   // strict — no override for the bulk weekly run
 
-  return await packingRepository.generateSlips({
+  return await pickingRepository.generateSlips({
     dispatchDate,
     cohort,
     generatedBy: user.id,   // from JWT — never trusted from frontend
@@ -110,7 +110,7 @@ const createSlip = async ({ ecdId, dispatchDate, cohort, force }, user) => {
   if (!ecdId)           fail(400, 'ECD is required.');
   await validateDispatchDate(dispatchDate, cohort, { allowOverride: force === true });
 
-  const result = await packingRepository.createSlip({
+  const result = await pickingRepository.createSlip({
     ecdId,
     dispatchDate,
     cohort,
@@ -127,9 +127,9 @@ const createSlip = async ({ ecdId, dispatchDate, cohort, force }, user) => {
 const assignSlip = async (slipId, body, user) => {
   const packerId = isManager(user) ? (body.packerId || user.id) : user.id;
 
-  const result = await packingRepository.assignSlip({ slipId, packerId, actorId: user.id });
+  const result = await pickingRepository.assignSlip({ slipId, packerId, actorId: user.id });
 
-  if (result.notFound) fail(404, 'Packing slip not found.');
+  if (result.notFound) fail(404, 'Picking slip not found.');
   if (result.conflict) fail(409, 'This pallet is already being packed by someone else.');
   return result.slip;
 };
@@ -141,11 +141,11 @@ const confirmItem = async (slipId, itemId, body, user) => {
   if (!Number.isFinite(packedQuantity)) fail(400, 'Packed quantity is required.');
   if (packedQuantity <= 0)              fail(400, 'Packed quantity must be greater than zero. Flag the item instead if you packed none.');
 
-  const result = await packingRepository.setItemStatus({
+  const result = await pickingRepository.setItemStatus({
     slipId, itemId, status: 'confirmed', packedQuantity, actorId: user.id,
   });
 
-  if (result.notFound) fail(404, 'Packing slip item not found.');
+  if (result.notFound) fail(404, 'Picking slip item not found.');
   if (result.locked)   fail(409, 'This slip is already complete and cannot be changed.');
   if (!isManager(user) && result.assignedTo !== user.id) {
     fail(403, 'You can only confirm items on a pallet assigned to you.');
@@ -166,11 +166,11 @@ const flagItem = async (slipId, itemId, body, user) => {
     fail(400, 'Packed quantity must be zero or more.');
   }
 
-  const result = await packingRepository.setItemStatus({
+  const result = await pickingRepository.setItemStatus({
     slipId, itemId, status: 'flagged', packedQuantity, flagReason: reason, actorId: user.id,
   });
 
-  if (result.notFound) fail(404, 'Packing slip item not found.');
+  if (result.notFound) fail(404, 'Picking slip item not found.');
   if (result.locked)   fail(409, 'This slip is already complete and cannot be changed.');
   if (!isManager(user) && result.assignedTo !== user.id) {
     fail(403, 'You can only flag items on a pallet assigned to you.');
@@ -179,16 +179,16 @@ const flagItem = async (slipId, itemId, body, user) => {
 };
 
 // ── Complete a slip ───────────────────────────────────────────
-// The rule from the business case: a packing slip cannot be marked
+// The rule from the business case: a picking slip cannot be marked
 // complete until every required item is confirmed or flagged.
 const completeSlip = async (slipId, body, user) => {
-  const result = await packingRepository.completeSlip({
+  const result = await pickingRepository.completeSlip({
     slipId,
     palletRef: body.palletRef,
     actorId:   user.id,
   });
 
-  if (result.notFound)        fail(404, 'Packing slip not found.');
+  if (result.notFound)        fail(404, 'Picking slip not found.');
   if (result.alreadyComplete) fail(409, 'This slip is already complete.');
   if (result.pendingItems) {
     fail(422, `${result.pendingItems} item(s) still need to be confirmed or flagged before this pallet can be closed.`);
