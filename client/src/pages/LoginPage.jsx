@@ -17,24 +17,46 @@ const LoginPage = () => {
   const [error,              setError]              = useState('');
   const [isLoading,          setIsLoading]          = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  
+  const getLoginErrorMessage = (err) => {
+  if (err.name === "NetworkError" || err.message === "Failed to fetch") {
+    return "Could not reach the server. Check your connection and try again.";
+  }
 
+  if (err.status === 401 || err.status === 403) {
+    return "Incorrect username or password.";
+  }
+
+  return err.message || "Login failed. Please try again.";
+};
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    if (!username.trim()) { setError('Username is required.'); return; }
-    if (!password)        { setError('Password is required.');  return; }
-    setIsLoading(true);
-    try {
-      await login(username.trim(), password);
-      navigate('/programmes');
-    } catch (err) {
-      setError(err.message || 'Login failed. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  
+  e.preventDefault();
+  setError("");
 
-  return (
+  if (!username.trim()) {
+    setError("Username is required.");
+    return;
+  }
+
+  if (!password) {
+    setError("Password is required.");
+    return;
+  }
+
+  setIsLoading(true);
+
+  try {
+    await login(username.trim(), password);
+    navigate("/programmes");
+  } catch (err) {
+    setError(getLoginErrorMessage(err));
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+ return (
     <div className="page-maroon">
       <div className="card">
 
@@ -156,5 +178,6 @@ const LoginPage = () => {
     </div>
   );
 };
+
 
 export default LoginPage;
