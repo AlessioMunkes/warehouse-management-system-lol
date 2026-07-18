@@ -1,26 +1,30 @@
 name: CI
 
-# Runs on every push and pull request targeting main or develop.
-# workflow_dispatch lets anyone trigger it manually from the Actions tab.
+# ── TRIGGERS ──────────────────────────────────────────────────────
+# Branch names below must match your GitHub branches EXACTLY —
+# case-sensitive, no partial matching. Update this list whenever you
+# rename a branch or want CI to also watch a new one.
 on:
   push:
-    branches: [main, staging/(DEVELOPMENT-TESTING)]
+    branches: [main, "staging/(DEVELOPMENT-TESTING)"]      
   pull_request:
-    branches: [main, staging/(DEVELOPMENT-TESTING)]
-  workflow_dispatch:
+    branches: [main, "staging/(DEVELOPMENT-TESTING)"]    
+  workflow_dispatch:   # lets you manually trigger a run from the Actions tab
 
-# Cancel older, superseded runs on the same branch/PR to save CI minutes.
+# Cancels older, superseded runs on the same branch/PR to save CI minutes.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # ── CLIENT: React + Vite app in /client ──────────────────────────
   client:
     name: Client (React / Vite)
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: client
+        working-directory: client       
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -28,25 +32,27 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '22'                              # ← CUSTOMIZE: bump if your team standardizes on a newer Node
           cache: 'npm'
-          cache-dependency-path: client/package-lock.json
+          cache-dependency-path: client/package-lock.json 
 
       - name: Install dependencies
         run: npm ci
 
       - name: Lint (ESLint)
-        run: npm run lint
+        run: npm run lint  
 
       - name: Build
-        run: npm run build
+        run: npm run build     
 
+  # ── SERVER: Node / Express app in /server ────────────────────────
   server:
     name: Server (Node / Express)
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: server
+        working-directory: server      
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -54,23 +60,24 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '22'                         
           cache: 'npm'
-          cache-dependency-path: server/package-lock.json
+          cache-dependency-path: server/package-lock.json  
 
       - name: Install dependencies
         run: npm ci
 
       - name: Run tests
-        run: npm test
+        run: npm test              
         env:
-          # Dummy values so index.js / db.js don't crash on missing env vars
-          # during CI. Replace with real integration-test values once a test
-          # suite exists. Never put real secrets here — use repo Secrets
-          # for anything that touches a real database.
-          JWT_SECRET: ci-test-secret
-          DB_USER: ci_test
-          DB_HOST: localhost
-          DB_NAME: ci_test
-          DB_PASSWORD: ci_test
-          DB_PORT: 5432
+          # Fake values so the app doesn't crash on startup during tests.
+          # Fine to leave exactly as-is — these never touch a real database.
+          # Once you actually deploy, REAL secrets go in:
+          #   GitHub repo → Settings → Secrets and variables → Actions
+          # and get referenced here as ${{ secrets.NAME }}, never typed in plain text.
+          JWT_SECRET: ci-test-secret      # ← PLACEHOLDER: fine as-is for CI
+          DB_USER: ci_test               # ← PLACEHOLDER: fine as-is for CI
+          DB_HOST: localhost             # ← PLACEHOLDER: fine as-is for CI
+          DB_NAME: ci_test               # ← PLACEHOLDER: fine as-is for CI
+          DB_PASSWORD: ci_test           # ← PLACEHOLDER: fine as-is for CI
+          DB_PORT: 5432                  # ← PLACEHOLDER: fine as-is for CI
