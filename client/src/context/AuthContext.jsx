@@ -9,30 +9,30 @@
 // token expiry check removed — the cookie has its own
 // maxAge set server-side and the server rejects expired cookies.
 // ─────────────────────────────────────────────────────────────
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState } from 'react';
+import { apiPost } from '../services/api';
 
 const AuthContext = createContext(null);
 
-export const AuthProvider = ({ children }) => {
-  const [user,      setUser]      = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+// ── Restore the user object for the UI ──────────────────────────
+// We keep the non-sensitive user info (name, role) in localStorage
+// purely so the UI knows who is logged in after a page refresh.
+// The actual auth token is in the httpOnly cookie — the browser
+// handles it automatically, we never touch it here.
+const readSavedUser = () => {
+  const savedUser = localStorage.getItem('wms_user');
+  if (!savedUser) return null;
+  try {
+    return JSON.parse(savedUser);
+  } catch {
+    localStorage.removeItem('wms_user');
+    return null;
+  }
+};
 
-  // ── On startup: restore the user object for the UI ───────────
-  // We keep the non-sensitive user info (name, role) in localStorage
-  // purely so the UI knows who is logged in after a page refresh.
-  // The actual auth token is in the httpOnly cookie — the browser
-  // handles it automatically, we never touch it here.
-  useEffect(() => {
-    const savedUser = localStorage.getItem('wms_user');
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch {
-        localStorage.removeItem('wms_user');
-      }
-    }
-    setIsLoading(false);
-  }, []);
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(readSavedUser);
+  const isLoading = false;
 
   // ── Login ─────────────────────────────────────────────────────
   // The server sets the httpOnly cookie in its response headers.
@@ -69,6 +69,7 @@ const loginAsGuest = async (name) => {
   );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>');
