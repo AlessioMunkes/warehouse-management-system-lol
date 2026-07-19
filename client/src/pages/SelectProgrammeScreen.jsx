@@ -1,81 +1,116 @@
-// ─────────────────────────────────────────────────────────────
 // src/pages/SelectProgrammeScreen.jsx
-// ─────────────────────────────────────────────────────────────
-import React           from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth }     from '../context/AuthContext';
-import logo            from '../assets/LOL_Logo.jpg';
+import { useAuth } from '../context/AuthContext';
+import PageBackground from '../features/programmeSelection/components/pageBackground';
+import PageHeader from '../features/programmeSelection/components/pageHeader';
+import ProgrammeCard from '../features/programmeSelection/components/programmeCard';
+import nocImage from '../assets/nourish_our_children.png';
+import ftsImage from '../assets/feed_the_soil.png';
+import laImage from '../assets/love_activism.png';
 
-const PROGS = [
-  { id: 'noc',       name: 'NOURISH OUR CHILDREN', code: 'NOC', active: true  },
-  { id: 'soup',      name: 'FEED THE SOIL',         code: 'FTS', active: false },
-  { id: 'donations', name: 'LOVE ACTIVISM',         code: 'LA',  active: false },
+const PROGRAMMES = [
+  {
+    tag: 'NOC',
+    title: 'Nourish Our Children',
+    description: 'Log deliveries, decants, packing and ECD collections.',
+    image: nocImage,
+    path: '/programmes/nourish-our-children',
+  },
+  {
+    tag: 'FTS',
+    title: 'Feed the Soil',
+    description: 'Track compost intake and stock levels.',
+    image: ftsImage,
+    path: '/programmes/feed-the-soil',
+  },
+  {
+    tag: 'LA',
+    title: 'Love Activism',
+    description: "Help with today's volunteer tasks and packing.",
+    image: laImage,
+    path: '/programmes/love-activism',
+  },
 ];
 
-const SelectProgrammeScreen = () => {
-  const { user, logout } = useAuth();
-  const navigate         = useNavigate();
+const GREETINGS = [
+  'Every meal starts with someone who cares.',
+  'Ready to make a difference today?',
+  "Together we're feeding communities.",
+  'Small actions. Big impact.',
+  'Thank you for helping nourish South Africa.',
+  'Another day to change lives.',
+  "Welcome back! Let's get to work.",
+  'Every parcel matters.',
+  'Helping hands. Hope delivered.',
+  "Today's work creates tomorrow's smiles.",
+  'Good to see you again.',
+  'Making every donation count.',
+  'Your work keeps communities moving.',
+  'Ready to support our programmes today?',
+  'Compassion in action starts here.',
+];
 
-  const handleSelect = (id) => {
-    if (id === 'noc') navigate('/noc');
-  };
+const ProgrammeSelectPage = () => {
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
+  const [greeting] = useState(() => {
+    const savedGreeting = sessionStorage.getItem('programmeGreeting');
+
+    if (savedGreeting) {
+      return savedGreeting;
+    }
+
+    const randomGreeting =
+      GREETINGS[Math.floor(Math.random() * GREETINGS.length)];
+
+    sessionStorage.setItem('programmeGreeting', randomGreeting);
+
+    return randomGreeting;
+  });
 
   const handleLogout = async () => {
+    sessionStorage.removeItem('programmeGreeting');
     await logout();
     navigate('/login');
   };
 
   return (
-    <div className="page-maroon" style={{ alignItems: 'flex-start', padding: '24px 16px' }}>
-      <div style={{ maxWidth: '900px', width: '100%', margin: '0 auto' }}>
+    <PageBackground flow>
+      <PageHeader
+        showBack={false}
+        onLogout={handleLogout}
+        onInfo={() => navigate('/programmes/info')}
+      />
 
-        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-          <img
-            src={logo}
-            alt="Ladles of Love"
-            style={{ width: '56px', background: '#fff', padding: '6px', marginBottom: '12px' }}
+      <main className="programme-select-content">
+        <h1 className="programme-select-eyebrow">
+          {greeting}
+        </h1>
+
+        <h1 className="programme-select-heading">
+          Hi, {user?.name || ''}!
+        </h1>
+
+        <p className="programme-select-subtitle">
+          What would you like to do today?
+        </p>
+
+        {PROGRAMMES.map((programme) => (
+          <ProgrammeCard
+            key={programme.tag}
+            tag={programme.tag}
+            title={programme.title}
+            description={programme.description}
+            image={programme.image}
+            onInfo={() => navigate(`${programme.path}/info`)}
+            onOpen={() => navigate(programme.path)}
           />
-          <h1 className="card-header-title" style={{ fontSize: '14px', letterSpacing: '1px' }}>
-            WORKSPACE
-          </h1>
-          <p className="header-role" style={{ fontSize: '10px', marginTop: '4px' }}>
-            WELCOME, {user?.firstName?.toUpperCase()}
-          </p>
-          <p className="breadcrumb-text" style={{ marginTop: '8px' }}>
-            LOL-NOC &gt; SESSION &gt; PROGRAMME SELECT
-          </p>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '8px' }}>
-          {PROGS.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => p.active && handleSelect(p.id)}
-              disabled={!p.active}
-              className="prog-card"
-            >
-              <div className="prog-card-icon">
-                <span>{p.code}</span>
-              </div>
-              <h2 className="prog-card-title">{p.name}</h2>
-              {!p.active && (
-                <p style={{ fontSize: '7px', fontWeight: 900, color: '#A4262C', marginTop: '6px', textTransform: 'uppercase' }}>
-                  INACTIVE
-                </p>
-              )}
-            </button>
-          ))}
-        </div>
-
-        <div style={{ textAlign: 'center', marginTop: '28px' }}>
-          <button onClick={handleLogout} className="btn-ghost">
-            LOGOUT
-          </button>
-        </div>
-
-      </div>
-    </div>
+        ))}
+      </main>
+    </PageBackground>
   );
 };
 
-export default SelectProgrammeScreen;
+export default ProgrammeSelectPage;
