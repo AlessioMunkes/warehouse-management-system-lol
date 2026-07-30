@@ -75,7 +75,7 @@ const PROGRAMMES = [
     name: 'Nourish Our Children',
     description:
       'Two nutritious meals every school day for children at early childhood development centres. We deliver fresh ingredients and track every meal from supplier to plate, reaching thousands of preschools across South Africa.',
-    img: '/images/noc.jpg',
+    img: '/public/images/NOC.jpg',
   },
   {
     id: 'fts',
@@ -84,7 +84,7 @@ const PROGRAMMES = [
     name: 'Feed the Soil',
     description:
       'Turning food that can’t be served into compost for local farms, closing the loop on food waste. Farmers return fresh vegetables to our kitchens, creating a self‑sustaining cycle of nourishment.',
-    img: '/images/fts.jpg',
+    img: '/public/images/FTS.jpg',
   },
   {
     id: 'la',
@@ -93,7 +93,7 @@ const PROGRAMMES = [
     name: 'Love Activism',
     description:
       'Corporate groups, community teams, and individuals give their time at the warehouse — packing, sorting, and preparing emergency food parcels. Every hour of service directly supports a child in need.',
-    img: '/images/la.jpg',
+    img: '/public/images/LA.jpg',
   },
   {
     id: 'dsk',
@@ -185,7 +185,7 @@ const LandingPage = () => {
         <section className={`lol-hero${ready ? ' is-ready' : ''}`}>
           <div
             className="lol-hero-bg"
-            style={{ backgroundImage: 'url(/images/hero.jpg)' }}
+            style={{ backgroundImage: 'url(/public/images/dannyhero.jpg)' }}
             aria-hidden="true"
           />
           <div className="lol-hero-overlay" />
@@ -230,7 +230,7 @@ const LandingPage = () => {
             {/* Right‑side icon / photo of the organisation */}
             <div className="lol-hero-icon">
               <ImgWithFallback
-                src="/images/ladles-icon.png"
+                src="/public/icons/favicon.svg"
                 alt="Ladles of Love icon"
                 fallbackText="Organisation icon"
                 fallbackPath="/public/icons/favicon.svg"
@@ -313,7 +313,7 @@ const LandingPage = () => {
                 src="/images/warehouse.jpg"
                 alt="Inside the Ladles of Love warehouse"
                 fallbackText="Add a photo of the team or warehouse"
-                fallbackPath="/images/warehouse.jpg"
+                fallbackPath="/public/images/Ladleshearts.jpg"
               />
             </div>
           </div>
