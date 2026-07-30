@@ -11,6 +11,7 @@ const RECEIVERS_UP = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 // ── Static paths before /:id to prevent shadowing ────────────
 router.post('/calculate', auth, requireRole(...ALL_ROLES),    decantingController.calculatePlan);
 router.get('/report',     auth, requireRole(...ALL_ROLES),    decantingController.getWeeklyReport);
+//router.get('/products',   auth, requireRole(...ALL_ROLES),    decantingController.getDecantableProducts);
 
 // ── Collection ────────────────────────────────────────────────
 router.get('/',  auth, requireRole(...ALL_ROLES),             decantingController.getRecords);
@@ -18,5 +19,8 @@ router.post('/', auth, requireRole(...RECEIVERS_UP),          decantingControlle
 
 // ── Single record ─────────────────────────────────────────────
 router.get('/:id', auth, requireRole(...ALL_ROLES), validateIntId, decantingController.getById);
+
+// ── Export ────────────────────────────────────────────────────
+router.get('/:id/export', auth, requireRole(...ALL_ROLES), validateIntId, decantingController.exportSheet);
 
 export default router;

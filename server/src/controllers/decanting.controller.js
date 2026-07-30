@@ -7,7 +7,9 @@ const calculatePlan = async (req, res) => {
     res.json({ success: true, data: result });
   } catch (err) {
     console.error('[calculatePlan]', err.message);
-    const status = err.message.includes('required') || err.message.includes('must be') ? 400 : 500;
+    const isValidationError = (msg) =>
+    msg.includes('required') || msg.includes('must be') || msg.includes('cannot exceed');
+    const status = isValidationError(err.message) ? 400 : 500;
     res.status(status).json({ success: false, message: err.message });
   }
 };
@@ -19,7 +21,9 @@ const recordDecanting = async (req, res) => {
     res.status(201).json({ success: true, data: record });
   } catch (err) {
     console.error('[recordDecanting]', err.message);
-    const status = err.message.includes('required') || err.message.includes('must be') ? 400 : 500;
+    const isValidationError = (msg) =>
+    msg.includes('required') || msg.includes('must be') || msg.includes('cannot exceed');
+    const status = isValidationError(err.message) ? 400 : 500;
     res.status(status).json({ success: false, message: err.message });
   }
 };
@@ -60,10 +64,38 @@ const getWeeklyReport = async (req, res) => {
   }
 };
 
+// GET /api/decanting/products
+// const getDecantableProducts = async (req, res) => {
+//   try {
+//     const products = await decantingService.getDecantableProducts();
+//     res.json({ success: true, data: products });
+//   } catch (err) {
+//     console.error('[getDecantableProducts]', err.message);
+//     res.status(500).json({ success: false, message: 'Failed to retrieve decantable products.' });
+//   }
+// };
+
+// GET /api/decanting/:id/export — downloads the decanting sheet as CSV
+const exportSheet = async (req, res) => {
+  try {
+    const { filename, csv } = await decantingService.exportDecantingSheet(req.params.id);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.status(200).send(csv);
+  } catch (err) {
+    console.error('[exportSheet]', err.message);
+    const status = err.message === 'Decanting record not found.' ? 404 : 500;
+    res.status(status).json({ success: false, message: err.message });
+  }
+};
+
 export default {
   calculatePlan,
   recordDecanting,
   getRecords,
   getById,
   getWeeklyReport,
+// getDecantableProducts,
+  exportSheet,
+
 };
