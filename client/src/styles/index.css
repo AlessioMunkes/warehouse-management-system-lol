@@ -3,6 +3,7 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap");
 @import url('https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css');
 @import url("https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css");
+
 /* ─────────────────────────────────────────────────────────────
    DESIGN TOKENS
    ───────────────────────────────────────────────────────────── */
@@ -3334,6 +3335,17 @@
     color: var(--color-text-sub);
     margin-bottom: 20px;
     max-width: 320px;
+  }
+
+  /* ── Packing: item decision panel ────────────────────────────
+     Lets a single .note-line-row's confirm/flag controls expand
+     to the full table width beneath that row, instead of being
+     squeezed into one grid cell. */
+  .item-decision-panel {
+    grid-column: 1 / -1;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-border);
   }
   }
 

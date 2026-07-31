@@ -1,4 +1,4 @@
-// src/features/packing/components/PageHeader.jsx
+// src/components/PageHeader.jsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
@@ -9,7 +9,7 @@ const getInitials = (firstName, lastName) => {
   return `${first}${last}`.toUpperCase();
 };
 
-const PageHeader = ({ status = 'SYS OK', onLogout, showBack = true, activitiesSlot = null }) => {
+const PageHeader = ({ status = 'SYS OK', onLogout, showBack = true }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -34,11 +34,9 @@ const PageHeader = ({ status = 'SYS OK', onLogout, showBack = true, activitiesSl
             </button>
           )}
 
-          {activitiesSlot}
-
           <div className="page-header-brand">
             <span className="page-header-avatar" aria-hidden="true">
-              {user ? getInitials(user?.firstName, user?.lastName) : <i className="ti ti-user" />}
+              {getInitials(user?.firstName, user?.lastName)}
             </span>
             <span className="page-header-name">
               {user?.firstName} {user?.lastName}
@@ -52,6 +50,7 @@ const PageHeader = ({ status = 'SYS OK', onLogout, showBack = true, activitiesSl
             <span>{status}</span>
           </div>
 
+          
           <button
             className="page-header-icon-btn"
             onClick={() => setShowLogoutConfirm(true)}

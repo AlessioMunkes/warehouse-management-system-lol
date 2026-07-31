@@ -1,42 +1,41 @@
-import { useState } from "react";
-import PackingBoard from "../features/packing/components/PackingBoardPage";
-import SlipDetail from "../features/packing/components/SlipDetailPage";
+// PackingPage.jsx
+// Top-level routed page for Packing. Reads :slipId from the URL
+// to decide whether to show the board or the detail view, and
+// wires in the existing PageHeader / TaskNavGrid rather than
+// duplicating any of that chrome here.
 
-export default function PackingPage({ user, onBack }) {
-    const [view, setView] = useState({
-        name: "board",
-        slipId: null,
-    });
+import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import PageHeader from "../features/packing/components/PageHeader";
+import TaskNavGrid from "../features/packing/components/TaskNavGrid";
+import PackingBoard from "../features/packing/components/PackingBoard";
+import PackingDetail from "../features/packing/components/PackingDetail";
 
-    const openSlip = (slipId) => {
-        setView({
-            name: "detail",
-            slipId,
-        });
-    };
+const BOARD_PATH = "/programmes/noc/packing";
 
-    const closeSlip = () => {
-        setView({
-            name: "board",
-            slipId: null,
-        });
-    };
+export default function PackingPage() {
+  const { slipId } = useParams();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
 
-    if (view.name === "detail") {
-        return (
-            <SlipDetail
-                slipId={view.slipId}
-                user={user}
-                onBack={closeSlip}
-            />
-        );
-    }
+  return (
+    <div className="page-light">
+      <PageHeader onLogout={logout} showBack={true} />
 
-    return (
-        <PackingBoard
-            user={user}
-            onBack={onBack}
-            onOpenSlip={openSlip}
+      {!slipId && <TaskNavGrid />}
+
+      {slipId ? (
+        <PackingDetail
+          currentUser={user}
+          slipId={slipId}
+          onBack={() => navigate(BOARD_PATH)}
         />
-    );
+      ) : (
+        <PackingBoard
+          currentUser={user}
+          onOpenSlip={(id) => navigate(`${BOARD_PATH}/${id}`)}
+        />
+      )}
+    </div>
+  );
 }

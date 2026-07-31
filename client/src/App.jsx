@@ -17,7 +17,8 @@ const App = () => (
         {/* Public */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/guest" element={<GuestLoginPage />} />
-        <Route path="/packing" element={<PackingPage />} />
+        <Route path="/programmes/noc/packing" element={<PackingPage />} />
+<Route path="/programmes/noc/packing/:slipId" element={<PackingPage />} />
 
         {/* Protected — any logged-in user */}
         <Route element={<ProtectedRoute />}>

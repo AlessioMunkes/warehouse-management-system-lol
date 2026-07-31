@@ -1,4 +1,5 @@
-import { useState } from 'react';
+// src/components/TaskNavGrid.jsx
+import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const NOC_TASKS = [
@@ -8,67 +9,51 @@ const NOC_TASKS = [
   { label: 'ECD collections', icon: 'heart-handshake', path: '/programmes/noc/ecd' },
 ];
 
-const normalize = (p) => p.replace(/\/+$/, '');
+// Matches if either path fully contains the other's last meaningful
+// segment — forgiving of small naming mismatches like
+// "/decant" vs "/decanting" that break a strict startsWith check.
+const isSamePage = (currentPath, taskPath) => {
+  const normalize = (p) => p.replace(/\/+$/, ''); // strip trailing slash
+  const current = normalize(currentPath);
+  const task = normalize(taskPath);
 
-export default function ActivitiesMenu() {
-  const [open, setOpen] = useState(false);
-  const navigate = useNavigate();
-  const location = useLocation();
-  const currentPath = normalize(location.pathname);
+  if (current === task || current.startsWith(`${task}/`)) return true;
 
-  const go = (path) => {
-    setOpen(false);
-    navigate(path);
-  };
+  const taskSegment = task.split('/').filter(Boolean).pop() ?? '';
+  const currentSegment = current.split('/').filter(Boolean).pop() ?? '';
 
   return (
-    <>
-      <button
-        className="activities-trigger"
-        onClick={() => setOpen(true)}
-        aria-label="Open activities menu"
-        data-tooltip="Activities"
-      >
-        <i className="ti ti-layout-grid" aria-hidden="true" />
-        <span className="activities-trigger__label">Activities</span>
-      </button>
-
-      {open && (
-        <div className="activities-drawer-overlay" onClick={() => setOpen(false)}>
-          <div className="activities-drawer" onClick={(e) => e.stopPropagation()}>
-            <div className="activities-drawer__header">
-              <h2>Warehouse activities</h2>
-              <button
-                className="activities-drawer__close"
-                onClick={() => setOpen(false)}
-                aria-label="Close menu"
-              >
-                <i className="ti ti-x" aria-hidden="true" />
-              </button>
-            </div>
-
-            <nav className="activities-drawer__list">
-              {NOC_TASKS.map((task) => {
-                const isActive = normalize(task.path) === currentPath
-                  || currentPath.startsWith(`${normalize(task.path)}/`);
-                return (
-                  <button
-                    key={task.path}
-                    className={`activities-drawer__item ${isActive ? 'is-active' : ''}`}
-                    onClick={() => go(task.path)}
-                  >
-                    <span className="activities-drawer__icon">
-                      <i className={`ti ti-${task.icon}`} aria-hidden="true" />
-                    </span>
-                    <span className="activities-drawer__label">{task.label}</span>
-                    {isActive && <i className="ti ti-check activities-drawer__check" aria-hidden="true" />}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-        </div>
-      )}
-    </>
+    !!taskSegment &&
+    !!currentSegment &&
+    (currentSegment.startsWith(taskSegment) || taskSegment.startsWith(currentSegment))
   );
-}
+};
+
+const TaskNavGrid = ({ tasks = NOC_TASKS }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const visibleTasks = tasks.filter(
+    (task) => !isSamePage(location.pathname, task.path)
+  );
+
+  return (
+    <nav className="task-nav-grid" aria-label="Nourish Our Children tasks">
+      {visibleTasks.map((task) => (
+        <button
+          key={task.path}
+          type="button"
+          className="task-nav-item"
+          onClick={() => navigate(task.path)}
+        >
+          <span className="task-nav-icon" aria-hidden="true">
+            <i className={`ti ti-${task.icon}`} />
+          </span>
+          <span className="task-nav-label">{task.label}</span>
+        </button>
+      ))}
+    </nav>
+  );
+};
+
+export default TaskNavGrid;
