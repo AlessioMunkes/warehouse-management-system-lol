@@ -10,6 +10,7 @@ const calculatePlan = async (req, res) => {
     console.error('[calculatePlan]', err.message);
     const isValidationError = (msg) =>
     msg.includes('required') || msg.includes('must be') || msg.includes('cannot exceed');
+    const status = isValidationError(err.message) ? 400 : 500;
     res.status(status).json({ success: false, message: err.message });
   }
 };
@@ -24,6 +25,7 @@ const recordDecanting = async (req, res) => {
     console.error('[recordDecanting]', err.message);
     const isValidationError = (msg) =>
     msg.includes('required') || msg.includes('must be') || msg.includes('cannot exceed');
+    const status = isValidationError(err.message) ? 400 : 500;
     res.status(status).json({ success: false, message: err.message });
   }
 };
