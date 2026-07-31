@@ -1,3 +1,4 @@
+import React                                 from 'react';
 import { BrowserRouter, Routes, Route, Navigate }  from 'react-router-dom';
 import { AuthProvider }                            from './context/AuthContext';
 import ProtectedRoute                              from './components/layout/ProtectedRoute';
@@ -6,6 +7,7 @@ import SelectProgrammeScreen                       from './pages/SelectProgramme
 
 import GuestLoginPage                              from './pages/GuestLoginPage';
 import GuestHomePage                               from './pages/GuestHomePage';
+import PackingPage                                 from './pages/PackingPage';
 import DecantingPage from './pages/DecantingPage';
 
 const App = () => (
@@ -16,6 +18,9 @@ const App = () => (
         {/* Public */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/guest" element={<GuestLoginPage />} />
+        <Route path="/programmes/noc/packing" element={<PackingPage />} />
+<Route path="/programmes/noc/packing/:slipId" element={<PackingPage />} />
+
         <Route path="/programmes"      element={<SelectProgrammeScreen />} />
         <Route path="/decanting"     element={<DecantingPage />} />
         {/* Protected — any logged-in user */}
