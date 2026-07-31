@@ -2000,4 +2000,205 @@
   .search-input:focus {
     border-color: var(--color-maroon);
   }
+  /* ── Heart draw canvas (Programme select gesture) ───────────── */
+  .heart-canvas-card {
+    position: relative;
+    overflow: hidden;
+    height: 280px;
+  }
+
+  .heart-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+    touch-action: none;
+  }
+
+  .heart-float {
+    position: absolute;
+    color: var(--color-accent);
+    opacity: 0.2;
+    pointer-events: none;
+    animation: heartFloat 3.2s ease-in-out infinite;
+  }
+
+  .heart-float-1 { top: 18%; left: 10%; font-size: 14px; animation-delay: 0s; }
+  .heart-float-2 { top: 70%; left: 14%; font-size: 10px; animation-delay: 0.6s; }
+  .heart-float-3 { top: 40%; left: 88%; font-size: 12px; animation-delay: 1.1s; }
+  .heart-float-4 { top: 75%; left: 82%; font-size: 16px; animation-delay: 0.3s; }
+
+  @keyframes heartFloat {
+    0%, 100% { transform: translateY(0); opacity: 0.15; }
+    50% { transform: translateY(-10px); opacity: 0.3; }
+  }
+
+  .heart-canvas-celebrate {
+    animation: cardPulse 0.5s ease-out;
+  }
+
+  @keyframes cardPulse {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.015); }
+    100% { transform: scale(1); }
+  }
+
+  .heart-burst-layer {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .heart-burst {
+    color: var(--color-accent);
+    font-size: 64px;
+    animation: burstPop 0.6s ease-out forwards;
+  }
+
+  @keyframes burstPop {
+    0% { transform: scale(0.4); opacity: 0; }
+    50% { transform: scale(1.3); opacity: 1; }
+    100% { transform: scale(1.6); opacity: 0; }
+  }
+
+  .heart-prompt {
+    color: var(--color-maroon);
+    font-weight: 700;
+    font-size: 14px;
+    margin-top: 12px;
+  }
+  /* ── Programme select: activity grid entrance ────────────────
+     Fades and lifts the activity grid in once the heart gesture
+     unlocks it, rather than having it snap into view. */
+  .activity-grid-enter {
+    animation: activityGridEnter 0.4s ease-out;
+  }
+
+  @keyframes activityGridEnter {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  /* ── Activity grid (Programme select) ────────────────────────
+     Lays out .prog-card tiles in a responsive grid. .prog-card
+     itself is unchanged/reused as-is. */
+  .activity-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 16px;
+  }
+
+  .programme-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.125rem;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid #e6e2da;
+  box-shadow: 0 1px 2px rgba(20, 20, 20, 0.04);
+}
+
+.programme-badge__icon {
+  color: #d9534f;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.programme-badge__label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #9c968a;
+}
+.programme-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 1.15rem 1.5rem;
+  border-radius: 999px;
+  border: 1px solid #ece8e0;
+  background: #ffffff;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #1c1b19;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.programme-button:hover {
+  border-color: #d9534f;
+  box-shadow: 0 4px 14px rgba(20, 20, 20, 0.06);
+  transform: translateY(-1px);
+}
+
+.programme-button:focus-visible {
+  outline: 2px solid #d9534f;
+  outline-offset: 2px;
+}
+
+.programme-button__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.programme-button__label {
+  line-height: 1;
+}
+.programme-select {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2.5rem;
+  padding: 3rem 1.5rem;
+  background: #f2efe9;
+}
+
+.programme-select__intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  text-align: center;
+  max-width: 40rem;
+}
+
+.programme-select__heading {
+  margin: 0;
+  font-size: clamp(1.8rem, 4vw, 2.75rem);
+  font-weight: 700;
+  line-height: 1.15;
+  color: #17110b;
+}
+
+.programme-select__subheading {
+  margin: 0;
+  font-size: 1rem;
+  color: #8f8a80;
+}
+
+.programme-select__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 1rem;
+  width: 100%;
+  max-width: 40rem;
+}
+
+@media (max-width: 560px) {
+  .programme-select__grid {
+    grid-template-columns: 1fr;
+  }
+}
 }
