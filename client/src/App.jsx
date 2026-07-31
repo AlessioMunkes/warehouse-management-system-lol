@@ -4,10 +4,10 @@ import { AuthProvider }                            from './context/AuthContext';
 import ProtectedRoute                              from './components/layout/ProtectedRoute';
 import LoginPage                                   from './pages/LoginPage';
 import SelectProgrammeScreen                       from './pages/SelectProgrammeScreen';
-import SelectNOCjob                                from './pages/SelectNOCjob';
-import ProcurementDashboard                        from './pages/ProcurementDashboard';
+
 import GuestLoginPage                              from './pages/GuestLoginPage';
 import GuestHomePage                               from './pages/GuestHomePage';
+import DecantingPage from './pages/DecantingPage';
 
 const App = () => (
   <AuthProvider>
@@ -17,12 +17,13 @@ const App = () => (
         {/* Public */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/guest" element={<GuestLoginPage />} />
-
+        <Route path="/programmes"      element={<SelectProgrammeScreen />} />
+        <Route path="/decanting"     element={<DecantingPage />} />
         {/* Protected — any logged-in user */}
         <Route element={<ProtectedRoute />}>
-          <Route path="/programmes"      element={<SelectProgrammeScreen />} />
-          <Route path="/noc"             element={<SelectNOCjob />} />
-          <Route path="/noc/procurement" element={<ProcurementDashboard />} />
+          
+          
+          
         </Route>
 
         {/* Guest-only */}
