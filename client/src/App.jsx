@@ -8,6 +8,7 @@ import SelectNOCjob                                from './pages/SelectNOCjob';
 import ProcurementDashboard                        from './pages/ProcurementDashboard';
 import GuestLoginPage                              from './pages/GuestLoginPage';
 import GuestHomePage                               from './pages/GuestHomePage';
+import InventoryManagementPage                     from './pages/InventoryManagementPage';
 
 const App = () => (
   <AuthProvider>
@@ -17,6 +18,7 @@ const App = () => (
         {/* Public */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/guest" element={<GuestLoginPage />} />
+        <Route path = "/inventory" element = {<InventoryManagementPage />} />
 
         {/* Protected — any logged-in user */}
         <Route element={<ProtectedRoute />}>
