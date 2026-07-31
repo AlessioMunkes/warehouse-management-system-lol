@@ -3,12 +3,14 @@ import decantingService from '../services/decanting.service.js';
 // POST /api/decanting/calculate
 const calculatePlan = async (req, res) => {
   try {
+    const status = isValidationError(err.message) ? 400 : 500;
     const result = decantingService.calculateDecantingPlan(req.body);
     res.json({ success: true, data: result });
   } catch (err) {
     console.error('[calculatePlan]', err.message);
     const isValidationError = (msg) =>
     msg.includes('required') || msg.includes('must be') || msg.includes('cannot exceed');
+    const status = isValidationError(err.message) ? 400 : 500;
     res.status(status).json({ success: false, message: err.message });
   }
 };
@@ -16,12 +18,14 @@ const calculatePlan = async (req, res) => {
 // POST /api/decanting
 const recordDecanting = async (req, res) => {
   try {
+    const status = isValidationError(err.message) ? 400 : 500;
     const record = await decantingService.recordDecanting(req.body, req.user.id);
     res.status(201).json({ success: true, data: record });
   } catch (err) {
     console.error('[recordDecanting]', err.message);
     const isValidationError = (msg) =>
     msg.includes('required') || msg.includes('must be') || msg.includes('cannot exceed');
+    const status = isValidationError(err.message) ? 400 : 500;
     res.status(status).json({ success: false, message: err.message });
   }
 };

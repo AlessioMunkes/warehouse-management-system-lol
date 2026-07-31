@@ -12,6 +12,7 @@ import deliveryRouter    from './src/routes/delivery.routes.js';
 import volunteerRouter   from './src/routes/volunteer.routes.js';
 import decantingRouter   from './src/routes/decanting.routes.js';
 import stockRouter       from './src/routes/stock.routes.js';
+import pickingRouter     from './src/routes/picking.routes.js';
 
 // ── Validate required secrets exist at startup ───────────────
 if (!process.env.JWT_SECRET) {
@@ -62,6 +63,7 @@ app.use('/api/deliveries', deliveryRouter);
 app.use('/api/volunteers', loginRateLimiter, volunteerRouter);
 app.use('/api/decanting',  decantingRouter);
 app.use('/api/stock',      stockRouter);
+app.use('/api/picking',    pickingRouter);
 
 // ── Central error handler ─────────────────────────────────────
 // Must be after all routes. Four arguments = Express error handler.

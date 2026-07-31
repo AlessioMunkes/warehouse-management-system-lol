@@ -4,7 +4,8 @@
 // All SQL for the procurement dashboard.
 // No business logic here — only database queries.
 // ─────────────────────────────────────────────────────────────
-import pool from "../config/db.js";
+import pool       from "../config/db.js";
+import stockModel from "./stock.repository.js";
 
 // ── Get all deliveries with optional date range ───────────────
 // range: 'today' | 'week' | 'month' | 'all'
@@ -139,8 +140,6 @@ const createDelivery = async ({
         [purchaseOrderId],
       );
     }
-
-    import stockModel from "./stock.repository.js";
 
     const items = await getPurchaseOrderItems(purchaseOrderId); // reuse existing query
     for (const item of items) {

@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // src/pages/ProcurementDashboard.jsx
 // ─────────────────────────────────────────────────────────────
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate }        from 'react-router-dom';
 import { useAuth }            from '../context/AuthContext';
 import DashboardHeader        from '../features/procurement/components/DashboardHeader';
@@ -38,21 +38,31 @@ const ProcurementDashboard = () => {
   const [loadingPdf,        setLoadingPdf]        = useState(false);
 
   // ── Fetch deliveries ────────────────────────────────────────
-  const fetchDeliveries = useCallback(async () => {
-    setIsLoading(true);
-    setError('');
-    try {
-      const res = await apiGet(`/api/deliveries?range=${dateRange}`);
-      setDeliveries(res.data || []);
-    } catch {
-      setError('Failed to load deliveries. Please try again.');
-      setDeliveries([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [dateRange]);
+  // Refetches whenever dateRange changes or refreshKey is bumped
+  // (manual refresh / after a successful submission).
+  const [refreshKey, setRefreshKey] = useState(0);
+  const refreshDeliveries = useCallback(() => setRefreshKey((k) => k + 1), []);
 
-  useEffect(() => { fetchDeliveries(); }, [fetchDeliveries]);
+  useEffect(() => {
+    let ignore = false;
+    const loadDeliveries = async () => {
+      setIsLoading(true);
+      setError('');
+      try {
+        const res = await apiGet(`/api/deliveries?range=${dateRange}`);
+        if (!ignore) setDeliveries(res.data || []);
+      } catch {
+        if (!ignore) {
+          setError('Failed to load deliveries. Please try again.');
+          setDeliveries([]);
+        }
+      } finally {
+        if (!ignore) setIsLoading(false);
+      }
+    };
+    loadDeliveries();
+    return () => { ignore = true; };
+  }, [dateRange, refreshKey]);
 
   // ── Fetch reference data once on mount ─────────────────────
   useEffect(() => {
@@ -99,7 +109,7 @@ const ProcurementDashboard = () => {
         poCompleted:     formData.poCompleted,
       });
       setShowDeliveryForm(false);
-      fetchDeliveries();
+      refreshDeliveries();
     } catch (err) {
       setError(err.message || 'Failed to record delivery.');
     } finally {
@@ -171,7 +181,7 @@ const ProcurementDashboard = () => {
               setStatusFilter={setStatusFilter}
               dateRange={dateRange}
               setDateRange={setDateRange}
-              onRefresh={fetchDeliveries}
+              onRefresh={refreshDeliveries}
               totalCount={deliveries.length}
               filteredCount={filtered.length}
             />
