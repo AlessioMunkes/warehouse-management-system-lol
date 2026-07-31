@@ -245,7 +245,7 @@ const assignSlip = async ({ slipId, packerId, actorId }) => {
 
 // ── Confirm or flag one line ──────────────────────────────────
 // Guarded on the parent slip's status so a completed slip can't be edited.
-const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReason, actorId }) => {
+const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReason, actorId, canOverride = false }) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -257,6 +257,15 @@ const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReaso
     const slip = slipResult.rows[0];
     if (!slip)                     { await client.query('ROLLBACK'); return { notFound: true }; }
     if (slip.status === 'complete'){ await client.query('ROLLBACK'); return { locked: true }; }
+
+    // ── Authorisation, inside the lock and BEFORE the write ──
+    // Doing this here (rather than after setItemStatus returns) means a
+    // refused packer cannot mutate the row at all. The FOR UPDATE above
+    // also closes the race where a slip is reassigned mid-check.
+    if (!canOverride && slip.assigned_to !== actorId) {
+      await client.query('ROLLBACK');
+      return { forbidden: true, assignedTo: slip.assigned_to };
+    }
 
     const result = await client.query(
       `UPDATE picking_slip_items

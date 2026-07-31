@@ -365,7 +365,8 @@ describe('confirmItem', () => {
   it('passes the quantity and actor through to the repository', async () => {
     await pickingService.confirmItem(1, 5, ok, WORKER);
     expect(repoMock.setItemStatus).toHaveBeenCalledWith({
-      slipId: 1, itemId: 5, status: 'confirmed', packedQuantity: 3, actorId: WORKER.id,
+      slipId: 1, itemId: 5, status: 'confirmed', packedQuantity: 3,
+      actorId: WORKER.id, canOverride: false,
     });
   });
 
@@ -409,8 +410,22 @@ describe('confirmItem', () => {
   });
 
   it('refuses a packer working on someone else\'s pallet with 403', async () => {
-    repoMock.setItemStatus.mockResolvedValueOnce({ item: ITEM, assignedTo: WORKER2.id });
+    repoMock.setItemStatus.mockResolvedValueOnce({ forbidden: true, assignedTo: WORKER2.id });
     await expectStatus(pickingService.confirmItem(1, 5, ok, WORKER), 403);
+  });
+
+  it('grants a manager the override flag so the repository lets them through', async () => {
+    await pickingService.confirmItem(1, 5, ok, MANAGER);
+    expect(repoMock.setItemStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ canOverride: true })
+    );
+  });
+
+  it('withholds the override flag from a packer', async () => {
+    await pickingService.confirmItem(1, 5, ok, WORKER);
+    expect(repoMock.setItemStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ canOverride: false })
+    );
   });
 
   it('lets a manager confirm on any pallet', async () => {
@@ -419,7 +434,7 @@ describe('confirmItem', () => {
   });
 
   it('refuses a packer on an unassigned pallet', async () => {
-    repoMock.setItemStatus.mockResolvedValueOnce({ item: ITEM, assignedTo: null });
+    repoMock.setItemStatus.mockResolvedValueOnce({ forbidden: true, assignedTo: null });
     await expectStatus(pickingService.confirmItem(1, 5, ok, WORKER), 403);
   });
 });
@@ -435,8 +450,8 @@ describe('flagItem', () => {
   it('sends the trimmed reason and a null quantity by default', async () => {
     await pickingService.flagItem(1, 5, { flagReason: '  short delivery  ' }, WORKER);
     expect(repoMock.setItemStatus).toHaveBeenCalledWith({
-      slipId: 1, itemId: 5, status: 'flagged',
-      packedQuantity: null, flagReason: 'short delivery', actorId: WORKER.id,
+      slipId: 1, itemId: 5, status: 'flagged', packedQuantity: null,
+      flagReason: 'short delivery', actorId: WORKER.id, canOverride: false,
     });
   });
 
@@ -489,8 +504,15 @@ describe('flagItem', () => {
   });
 
   it('refuses a packer flagging on someone else\'s pallet', async () => {
-    repoMock.setItemStatus.mockResolvedValueOnce({ item: ITEM, assignedTo: WORKER2.id });
+    repoMock.setItemStatus.mockResolvedValueOnce({ forbidden: true, assignedTo: WORKER2.id });
     await expectStatus(pickingService.flagItem(1, 5, ok, WORKER), 403);
+  });
+
+  it('grants a manager the override flag when flagging', async () => {
+    await pickingService.flagItem(1, 5, ok, MANAGER);
+    expect(repoMock.setItemStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ canOverride: true })
+    );
   });
 });
 
@@ -544,21 +566,6 @@ describe('completeSlip', () => {
 
 // ── Known defects ─────────────────────────────────────────────
 describe.skip('known defects — un-skip once fixed', () => {
-  it('DEFECT A: the ownership check runs after the write has committed', async () => {
-    // confirmItem/flagItem call setItemStatus FIRST and only then check
-    // `result.assignedTo !== user.id`. setItemStatus commits its own
-    // transaction, so by the time the 403 is raised the row is already
-    // updated — a packer can overwrite another packer's line and merely
-    // be told they were not allowed to.
-    // Fix: read the slip's assignee before writing (or push the check
-    // into setItemStatus's transaction by passing actorId + role).
-    repoMock.setItemStatus.mockResolvedValueOnce({ item: ITEM, assignedTo: WORKER2.id });
-
-    await expect(pickingService.confirmItem(1, 5, { packedQuantity: 3 }, WORKER))
-      .rejects.toMatchObject({ status: 403 });
-
-    expect(repoMock.setItemStatus).not.toHaveBeenCalled();   // fails today
-  });
 
   it('DEFECT B: completeSlip drops the shortfall warnings', async () => {
     // The repository returns { slip, shortfalls } and the controller's

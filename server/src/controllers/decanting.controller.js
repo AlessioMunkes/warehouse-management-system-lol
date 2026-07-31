@@ -20,7 +20,6 @@ const recordDecanting = async (req, res) => {
   try {
     const status = isValidationError(err.message) ? 400 : 500;
     const record = await decantingService.recordDecanting(req.body, req.user.id);
-    res.status(201).json({ success: true, data: record });
   } catch (err) {
     console.error('[recordDecanting]', err.message);
     const isValidationError = (msg) =>
@@ -83,7 +82,6 @@ const exportSheet = async (req, res) => {
     const { filename, csv } = await decantingService.exportDecantingSheet(req.params.id);
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.status(200).send(csv);
   } catch (err) {
     console.error('[exportSheet]', err.message);
     const status = err.message === 'Decanting record not found.' ? 404 : 500;

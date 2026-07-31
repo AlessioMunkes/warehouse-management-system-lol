@@ -377,22 +377,63 @@ describe('manualAdjust — own transaction', () => {
   });
 });
 
-// ── Known defects ─────────────────────────────────────────────
-describe.skip('known defects — un-skip once fixed', () => {
-  it('DEFECT E: a non-numeric delta writes NaN into the balance', async () => {
-    // adjustStock is described as the single write path, but it never
-    // validates quantityDelta. Number(undefined) is NaN, NaN < 0 is
-    // false so isShortfall stays false, and Postgres NUMERIC accepts
-    // 'NaN' — so the product's balance becomes NaN permanently and
-    // every later adjustment stays NaN. stock.service.js guards the
-    // manual path, but picking and procurement call adjustStock direct.
-    // Fix: validate Number.isFinite(quantityDelta) at the top.
-    const client = makeClient({ existing: { quantity_on_hand: '100', unit: 'kg' } });
+// ── Delta validation (was DEFECT E) ───────────────────────────
+describe('adjustStock — the delta must be a finite number', () => {
+  const existing = { quantity_on_hand: '100', unit: 'kg' };
 
-    await expect(adjustStock(client, { ...BASE, quantityDelta: undefined, unit: 'kg' }))
-      .rejects.toThrow();
+  it.each([
+    ['undefined', undefined],
+    ['null',      null],
+    ['a word',    'twenty'],
+    ['NaN',       NaN],
+    ['Infinity',  Infinity],
+    ['-Infinity', -Infinity],
+    ['an object', {}],
+  ])('rejects %s', async (_label, quantityDelta) => {
+    const client = makeClient({ existing });
+    await expect(adjustStock(client, { ...BASE, quantityDelta, unit: 'kg' }))
+      .rejects.toThrow(/must be a finite number/);
   });
 
+  it('writes nothing when the delta is invalid', async () => {
+    // Postgres NUMERIC accepts 'NaN', and NaN + anything is NaN — so a
+    // single bad write would poison the product's balance permanently.
+    // Worse, Postgres sorts NaN as GREATER than every real value, so the
+    // row would never flag as low stock or as a shortfall.
+    const client = makeClient({ existing });
+    await expect(adjustStock(client, { ...BASE, quantityDelta: undefined, unit: 'kg' }))
+      .rejects.toThrow();
+
+    expect(sqlOf(client).some((s) => /^(INSERT|UPDATE)/i.test(s))).toBe(false);
+  });
+
+  it('still accepts a numeric string and zero', async () => {
+    for (const d of ['25', 0, -0, 2.5]) {
+      const client = makeClient({ existing });
+      await expect(adjustStock(client, { ...BASE, quantityDelta: d, unit: 'kg' }))
+        .resolves.toBeDefined();
+    }
+  });
+
+  it('rejects an invalid product id before touching the database', async () => {
+    const client = makeClient({ existing });
+    await expect(adjustStock(client, { ...BASE, productId: undefined, quantityDelta: 5, unit: 'kg' }))
+      .rejects.toThrow(/valid product id/);
+    expect(client.query).not.toHaveBeenCalled();
+  });
+
+  it('records the validated number in the ledger, not the raw input', async () => {
+    const client = makeClient({ existing });
+    await adjustStock(client, { ...BASE, quantityDelta: '-30', unit: 'kg' });
+
+    const qty = findSql(client, /INSERT INTO stock_movements/i).params[1];
+    expect(qty).toBe(-30);
+    expect(typeof qty).toBe('number');
+  });
+});
+
+// ── Known defects ─────────────────────────────────────────────
+describe.skip('known defects — un-skip once fixed', () => {
   it('DEFECT F: balances are computed in JS floats, not NUMERIC', async () => {
     // quantity_on_hand is NUMERIC precisely so decimal arithmetic is
     // exact, but the sum is done in JS and written back, so binary

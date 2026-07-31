@@ -54,7 +54,7 @@ const loginAsGuest = async (name) => {
   // Tell the server to clear the cookie, then clear the UI state.
   const logout = async () => {
     try {
-      await apiPost('/api/logout', {});
+      await apiPost('/api/login/logout', {});
     } catch {
       // If the server is unreachable, still clear the local state
     }

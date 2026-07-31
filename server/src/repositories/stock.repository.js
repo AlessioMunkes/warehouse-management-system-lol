@@ -30,6 +30,31 @@ import pool from '../config/db.js';
 // returns as a string, not a number — every value read back off it
 // gets an explicit Number() cast below.
 const adjustStock = async (client, { productId, quantityDelta, unit = null, movementType, referenceType = null, referenceId = null, reason = null, performedBy }) => {
+  // ── Guard the delta before anything touches the database ──────
+  // This is the single write path for stock, and it is called directly
+  // by picking and procurement, not only through stock.service.js — so
+  // the validation has to live here, not in the service.
+  //
+  // Number(undefined) is NaN. Without this guard: after = NaN, the
+  // `NaN < 0` shortfall test is false so nothing is flagged, and
+  // Postgres NUMERIC *accepts* 'NaN' — it even sorts NaN as greater
+  // than every real value. The product's balance is then permanently
+  // NaN, because NaN + anything is NaN.
+  // null/undefined/'' are caller bugs, not a legitimate zero — and
+  // Number() quietly turns all three into 0, so they must be caught
+  // before the isFinite check rather than by it.
+  if (quantityDelta === null || quantityDelta === undefined || quantityDelta === '') {
+    throw new Error('Stock adjustment quantity must be a finite number (received: no value).');
+  }
+
+  const delta = Number(quantityDelta);
+  if (!Number.isFinite(delta)) {
+    throw new Error(`Stock adjustment quantity must be a finite number (received: ${quantityDelta}).`);
+  }
+  if (!Number.isInteger(Number(productId)) || Number(productId) <= 0) {
+    throw new Error(`Stock adjustment requires a valid product id (received: ${productId}).`);
+  }
+
   const existing = await client.query(
     `SELECT quantity_on_hand, unit FROM stock_levels WHERE product_id = $1 FOR UPDATE`,
     [productId]
@@ -52,7 +77,7 @@ const adjustStock = async (client, { productId, quantityDelta, unit = null, move
     );
   }
 
-  const after = before + Number(quantityDelta);
+  const after = before + delta;
 
   await client.query(
     `UPDATE stock_levels
@@ -65,7 +90,7 @@ const adjustStock = async (client, { productId, quantityDelta, unit = null, move
     `INSERT INTO stock_movements
        (product_id, quantity, unit, movement_type, reference_type, reference_id, reason, performed_by, created_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
-    [productId, quantityDelta, resolvedUnit, movementType, referenceType, referenceId, reason, performedBy]
+    [productId, delta, resolvedUnit, movementType, referenceType, referenceId, reason, performedBy]
   );
 
   return { before, after, isShortfall: after < 0, isUnitMismatch };

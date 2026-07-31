@@ -142,14 +142,12 @@ const confirmItem = async (slipId, itemId, body, user) => {
   if (packedQuantity <= 0)              fail(400, 'Packed quantity must be greater than zero. Flag the item instead if you packed none.');
 
   const result = await pickingRepository.setItemStatus({
-    slipId, itemId, status: 'confirmed', packedQuantity, actorId: user.id,
+    slipId, itemId, status: 'confirmed', packedQuantity, actorId: user.id, canOverride: isManager(user),
   });
 
   if (result.notFound) fail(404, 'Picking slip item not found.');
   if (result.locked)   fail(409, 'This slip is already complete and cannot be changed.');
-  if (!isManager(user) && result.assignedTo !== user.id) {
-    fail(403, 'You can only confirm items on a pallet assigned to you.');
-  }
+  if (result.forbidden) fail(403, 'You can only confirm items on a pallet assigned to you.');
   return result.item;
 };
 
@@ -168,13 +166,12 @@ const flagItem = async (slipId, itemId, body, user) => {
 
   const result = await pickingRepository.setItemStatus({
     slipId, itemId, status: 'flagged', packedQuantity, flagReason: reason, actorId: user.id,
+    canOverride: isManager(user),
   });
 
   if (result.notFound) fail(404, 'Picking slip item not found.');
   if (result.locked)   fail(409, 'This slip is already complete and cannot be changed.');
-  if (!isManager(user) && result.assignedTo !== user.id) {
-    fail(403, 'You can only flag items on a pallet assigned to you.');
-  }
+  if (result.forbidden) fail(403, 'You can only flag items on a pallet assigned to you.');
   return result.item;
 };
 
