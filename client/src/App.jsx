@@ -1,4 +1,4 @@
-import React                                       from 'react';
+import React                                 from 'react';
 import { BrowserRouter, Routes, Route, Navigate }  from 'react-router-dom';
 import { AuthProvider }                            from './context/AuthContext';
 import ProtectedRoute                              from './components/layout/ProtectedRoute';
@@ -8,7 +8,7 @@ import SelectNOCjob                                from './pages/SelectNOCjob';
 import ProcurementDashboard                        from './pages/ProcurementDashboard';
 import GuestLoginPage                              from './pages/GuestLoginPage';
 import GuestHomePage                               from './pages/GuestHomePage';
-
+import PackingPage                                 from './pages/PackingPage';
 const App = () => (
   <AuthProvider>
     <BrowserRouter>
@@ -17,6 +17,7 @@ const App = () => (
         {/* Public */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/guest" element={<GuestLoginPage />} />
+        <Route path="/packing" element={<PackingPage />} />
 
         {/* Protected — any logged-in user */}
         <Route element={<ProtectedRoute />}>
