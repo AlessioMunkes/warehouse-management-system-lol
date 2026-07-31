@@ -17,12 +17,12 @@ const App = () => (
         {/* Public */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/guest" element={<GuestLoginPage />} />
-
+        <Route path="/noc/procurement" element={<ProcurementDashboard />} />
         {/* Protected — any logged-in user */}
         <Route element={<ProtectedRoute />}>
           <Route path="/programmes"      element={<SelectProgrammeScreen />} />
           <Route path="/noc"             element={<SelectNOCjob />} />
-          <Route path="/noc/procurement" element={<ProcurementDashboard />} />
+         
         </Route>
 
         {/* Guest-only */}

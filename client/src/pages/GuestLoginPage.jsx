@@ -29,7 +29,7 @@ const GuestLoginPage = () => {
   };
 
   return (
-    <div className="page-maroon">
+    <div className="page-background">
       <div className="card">
         <div className="card-header">
           <img src={logo} alt="Ladles of Love"
