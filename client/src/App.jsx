@@ -7,6 +7,7 @@ import SelectProgrammeScreen                       from './pages/SelectProgramme
 
 import GuestLoginPage                              from './pages/GuestLoginPage';
 import GuestHomePage                               from './pages/GuestHomePage';
+import InventoryManagementPage                     from './pages/InventoryManagementPage';
 import PackingPage                                 from './pages/PackingPage';
 import DecantingPage from './pages/DecantingPage';
 
@@ -18,6 +19,7 @@ const App = () => (
         {/* Public */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/guest" element={<GuestLoginPage />} />
+        <Route path = "/inventory" element = {<InventoryManagementPage />} />
         <Route path="/programmes/noc/packing" element={<PackingPage />} />
 <Route path="/programmes/noc/packing/:slipId" element={<PackingPage />} />
 
