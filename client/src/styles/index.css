@@ -72,6 +72,8 @@
     overflow: hidden;
     background-color: var(--color-maroon);
     display: flex;
+    overflow: hidden;
+
     align-items: center;
     justify-content: center;
     padding: 16px;
@@ -106,6 +108,25 @@
     display: block;
     padding: 0;
   }
+  .page-maroon::before {
+    content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url('../assets/Laddles_of_Love_Background\ Image.webp');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  z-index: 0;
+  }
+  .page-maroon::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-color: var(--color-black);
+  opacity: 0.75; /* tint strength — increase toward 0.85 if the photo feels too busy, decrease toward 0.6 if you want more of the photo visible */
+  z-index: 1;
+}
+
 
   .page-light {
     min-height: 100vh;
@@ -181,6 +202,8 @@
   @media (max-width: 640px) {
     .card-header { padding: 20px 16px; }
   }
+}
+
 
   .card-content {
     background-color: var(--color-lol-white);

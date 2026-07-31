@@ -2,6 +2,7 @@
 // src/pages/LoginPage.jsx
 // ─────────────────────────────────────────────────────────────
 import React, { useState }   from 'react';
+
 import { useNavigate }        from 'react-router-dom';
 import { useAuth }            from '../context/AuthContext';
 import logo                   from '../assets/LOL_Logo.jpg';
@@ -16,7 +17,18 @@ const LoginPage = () => {
   const [error,              setError]              = useState('');
   const [isLoading,          setIsLoading]          = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+  
+  const getLoginErrorMessage = (err) => {
+  if (err.name === "NetworkError" || err.message === "Failed to fetch") {
+    return "Could not reach the server. Check your connection and try again.";
+  }
 
+  if (err.status === 401 || err.status === 403) {
+    return "Incorrect username or password.";
+  }
+
+  return err.message || "Login failed. Please try again.";
+};
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -37,14 +49,30 @@ const LoginPage = () => {
     <div className="page-background">
       <div className="card">
 
-        <div className="card-header">
-          <img
-            src={logo}
-            alt="Ladles of Love"
-            style={{ width: '48px', height: '48px', marginBottom: '6px', background: '#fff', padding: '3px' }}
-          />
+        <div
+  className="card-header"
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    textAlign: "center",
+  }}
+>
+  <img
+    src={logo}
+    alt="Ladles of Love"
+    style={{
+      width: "100px",
+      height: "100px",
+      background: "#fff",
+      padding: "10px",
+      borderRadius: "20%",
+      marginBottom: "12px",
+    }}
+  />
+          
           <h1 className="card-header-title">WAREHOUSE SYSTEM</h1>
-          <p className="card-header-sub">PROPERTY OF LADLES OF LOVE</p>
+          <p className="card-header-sub">YOUR NEXT STEP TOWARDS CHANGING A LIFE</p>
         </div>
 
         <div className="form-body">
@@ -139,5 +167,6 @@ const LoginPage = () => {
     </div>
   );
 };
+
 
 export default LoginPage;
