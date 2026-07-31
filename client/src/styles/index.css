@@ -68,7 +68,7 @@
     position: relative;
     min-height: 100vh;
     min-height: 100dvh; /* Fix for mobile Safari 100vh bug */
-    background-color: var(--color-lol-maroon);
+    background-color: var(--color-lol);
     display: flex;
     overflow: hidden;
 
@@ -90,7 +90,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  background-color: var(--color-maroon);
+  background-color: var(--color-black);
   opacity: 0.75; /* tint strength — increase toward 0.85 if the photo feels too busy, decrease toward 0.6 if you want more of the photo visible */
   z-index: 1;
 }
