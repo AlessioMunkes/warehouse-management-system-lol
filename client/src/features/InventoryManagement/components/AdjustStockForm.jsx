@@ -1,132 +1,75 @@
-import { useState } from "react";
 import StepCard from "./StepCard";
-import FormField from "./FormField";
+import Badge from "./Badge";
 import Button from "./Button";
-import InfoNotice from "./InfoNotice";
 
-export default function AdjustStockForm({ products, onSave }) {
-  const [selectedProductId, setSelectedProductId] = useState("");
-  const [quantityChange, setQuantityChange] = useState("");
-  const [unit, setUnit] = useState("");
-  const [reason, setReason] = useState("");
-  const [errors, setErrors] = useState({});
-  const [savedNotice, setSavedNotice] = useState(false);
+function statusBadges(product) {
+  const badges = [];
+  if (product.onHand < 0) badges.push(<Badge key="shortfall" variant="flagged">Shortfall</Badge>);
+  if (product.onHand <= product.reorderAt) badges.push(<Badge key="low" variant="pending">Low stock</Badge>);
+  if (badges.length === 0) badges.push(<Badge key="ok" variant="ok">In stock</Badge>);
+  return <div className="badge-group">{badges}</div>;
+}
 
-  function resetForm() {
-    setSelectedProductId("");
-    setQuantityChange("");
-    setUnit("");
-    setReason("");
-    setErrors({});
-  }
-
-  function handleSubmit(e) {
-    e.preventDefault();
-    setSavedNotice(false);
-
-    const nextErrors = {};
-    const product = products.find((p) => p.id === selectedProductId);
-
-    if (!selectedProductId) nextErrors.product = "Choose a product.";
-
-    const parsedChange = Number(quantityChange);
-    if (quantityChange.trim() === "" || Number.isNaN(parsedChange)) {
-      nextErrors.quantityChange = "Enter a number, positive or negative.";
-    }
-
-    const isFirstEverRecord = product && product.unit == null;
-    if (isFirstEverRecord && !unit.trim()) {
-      nextErrors.unit = "Unit is required for a product's first-ever stock record.";
-    }
-
-    if (!reason.trim()) nextErrors.reason = "Say why the count is changing.";
-
-    if (Object.keys(nextErrors).length > 0) {
-      setErrors(nextErrors);
-      return;
-    }
-
-    onSave(selectedProductId, {
-      change: parsedChange,
-      unit: unit.trim() || product?.unit,
-      reason: reason.trim(),
-    });
-
-    resetForm();
-    setSavedNotice(true);
-  }
-
+export default function StockManifestTable({ products, onViewHistory }) {
   return (
-    <StepCard title="Adjust stock" subtitle="Corrections are recorded in the product's movement history.">
-      {savedNotice && (
-        <div style={{ marginBottom: "16px" }}>
-          <InfoNotice tone="info">Adjustment saved.</InfoNotice>
-        </div>
+    <StepCard title="Stock manifest" subtitle="Every active product and its current level.">
+      {products.length === 0 ? (
+        <p className="pdf-table-empty">No products yet. Adjustments you save will appear here.</p>
+      ) : (
+        <>
+          {/* Desktop / wide-screen table */}
+          <div className="data-table-wrapper stock-table-desktop">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>SKU</th>
+                  <th>On hand</th>
+                  <th>Reorder at</th>
+                  <th>Status</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {products.map((product) => (
+                  <tr key={product.id}>
+                    <td className="is-emphasis">{product.name}</td>
+                    <td className="pdf-table-sku">{product.sku}</td>
+                    <td>{product.onHand} {product.unit}</td>
+                    <td>{product.reorderAt} {product.unit}</td>
+                    <td>{statusBadges(product)}</td>
+                    <td>
+                      <Button variant="link" type="button" onClick={() => onViewHistory?.(product.id)}>
+                        View history
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile stacked cards */}
+          <div className="stock-table-mobile">
+            {products.map((product) => (
+              <div className="card-row" key={product.id}>
+                <div className="stock-card-meta" style={{ flex: 1 }}>
+                  <span className="stock-card-name">{product.name}</span>
+                  <span className="stock-card-sku">{product.sku}</span>
+                  <div className="stock-card-figures">
+                    <span>On hand: {product.onHand} {product.unit}</span>
+                    <span>Reorder at: {product.reorderAt} {product.unit}</span>
+                  </div>
+                  {statusBadges(product)}
+                </div>
+                <Button variant="link" type="button" onClick={() => onViewHistory?.(product.id)}>
+                  View history
+                </Button>
+              </div>
+            ))}
+          </div>
+        </>
       )}
-
-      <form onSubmit={handleSubmit} noValidate>
-        <FormField
-          id="adjust-product"
-          as="select"
-          label="Product"
-          value={selectedProductId}
-          error={errors.product}
-          onChange={(e) => {
-            setSelectedProductId(e.target.value);
-            setErrors((prev) => ({ ...prev, product: undefined }));
-          }}
-        >
-          <option value="">Choose a product</option>
-          {products.map((product) => (
-            <option key={product.id} value={product.id}>
-              {product.name}
-            </option>
-          ))}
-        </FormField>
-
-        <FormField
-          id="adjust-quantity"
-          type="number"
-          label="Quantity change"
-          value={quantityChange}
-          error={errors.quantityChange}
-          helperText="Enter a positive number to add stock, or a negative number to remove it."
-          onChange={(e) => {
-            setQuantityChange(e.target.value);
-            setErrors((prev) => ({ ...prev, quantityChange: undefined }));
-          }}
-        />
-
-        <FormField
-          id="adjust-unit"
-          type="text"
-          label="Unit (optional)"
-          value={unit}
-          error={errors.unit}
-          helperText="Leave blank to use this product's existing unit. Required only if this is the product's first-ever stock record."
-          onChange={(e) => {
-            setUnit(e.target.value);
-            setErrors((prev) => ({ ...prev, unit: undefined }));
-          }}
-        />
-
-        <FormField
-          id="adjust-reason"
-          as="textarea"
-          label="Reason"
-          value={reason}
-          error={errors.reason}
-          helperText="Required — say why the count is changing."
-          onChange={(e) => {
-            setReason(e.target.value);
-            setErrors((prev) => ({ ...prev, reason: undefined }));
-          }}
-        />
-
-        <Button type="button" variant="primaryFull" onClick={handleSubmit}>
-          Save adjustment
-        </Button>
-      </form>
     </StepCard>
   );
 }

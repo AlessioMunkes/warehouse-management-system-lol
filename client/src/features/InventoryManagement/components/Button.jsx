@@ -1,5 +1,4 @@
 // src/features/InventoryManagement/components/Button.jsx
-//import React from 'react';
 const VARIANT_CLASS = {
   primary: "btn-primary",
   primaryFull: "btn-primary-full",
