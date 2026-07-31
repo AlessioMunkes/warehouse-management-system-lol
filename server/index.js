@@ -6,10 +6,11 @@ import express          from 'express';
 import cors             from 'cors';
 import helmet           from 'helmet';
 import cookieParser     from 'cookie-parser';
-import loginRateLimiter from './src/middleware/rateLimiter.middleware.js';
-import loginRouter      from './src/routes/login.route.js';
-import deliveryRouter   from './src/routes/delivery.routes.js';
-import volunteerRouter  from './src/routes/volunteer.routes.js';
+import loginRateLimiter  from './src/middleware/rateLimiter.middleware.js';
+import loginRouter       from './src/routes/login.route.js';
+import deliveryRouter    from './src/routes/delivery.routes.js';
+import volunteerRouter   from './src/routes/volunteer.routes.js';
+import decantingRouter   from './src/routes/decanting.routes.js';
 
 // ── Validate required secrets exist at startup ───────────────
 if (!process.env.JWT_SECRET) {
@@ -58,6 +59,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/login',      loginRateLimiter, loginRouter);
 app.use('/api/deliveries', deliveryRouter);
 app.use('/api/volunteers', loginRateLimiter, volunteerRouter);
+app.use('/api/decanting',  decantingRouter);
 
 // ── Central error handler ─────────────────────────────────────
 // Must be after all routes. Four arguments = Express error handler.
