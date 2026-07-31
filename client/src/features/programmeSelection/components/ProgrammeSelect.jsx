@@ -70,15 +70,17 @@ export default function ProgrammeSelect() {
 
   if (loading) {
     return (
-      <main className="programme-select">
-        <p className="programme-select__subheading">Loading…</p>
-      </main>
+      <div className="page-background page-background-flow">
+        <div className="programme-select-content">
+          <p className="programme-select-subtitle">Loading…</p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <main className="programme-select">
-      <div className="programme-select__intro">
+    <div className="page-background page-background-flow">
+      <div className="programme-select-content">
         <div className="programme-badge">
           <span className="programme-badge__icon" aria-hidden="true">
             ❤
@@ -86,28 +88,28 @@ export default function ProgrammeSelect() {
           <span className="programme-badge__label">Programme select</span>
         </div>
 
-        <h1 className="programme-select__heading">
+        <h1 className="programme-select-heading">
           Take your time, {displayName} — pick a programme
         </h1>
-        <p className="programme-select__subheading">Lovely heart. Pick where you're heading.</p>
-      </div>
+        <p className="programme-select-subtitle">Lovely heart. Pick where you're heading.</p>
 
-      <div className="programme-select__grid">
-        {PROGRAMMES.map((programme) => (
-          <button
-            key={programme.key}
-            type="button"
-            className="programme-button"
-            onClick={() => navigate(programme.path)}
-            aria-label={`Go to ${programme.label}`}
-          >
-            <span className="programme-button__icon" aria-hidden="true">
-              {programme.icon}
-            </span>
-            <span className="programme-button__label">{programme.label}</span>
-          </button>
-        ))}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {PROGRAMMES.map((programme) => (
+            <button
+              key={programme.key}
+              type="button"
+              className="programme-button"
+              onClick={() => navigate(programme.path)}
+              aria-label={`Go to ${programme.label}`}
+            >
+              <span className="programme-button__icon" aria-hidden="true">
+                {programme.icon}
+              </span>
+              <span className="programme-button__label">{programme.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
-    </main>
+    </div>
   );
 }
