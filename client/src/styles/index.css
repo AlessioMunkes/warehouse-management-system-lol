@@ -2341,7 +2341,8 @@
   }
 
   .search-input:focus { border-color: var(--color-maroon); }
-}
+
+
 /* Toolbar */
 .pdf-toolbar-actions {
   display: flex;
@@ -2429,3 +2430,139 @@
   border-radius: 4px;
   margin-top: 8px;
 }
+/* ── Split-screen login layout ───────────────────────────── */
+
+.page-split {
+  min-height: 100vh;
+  min-height: 100dvh; /* iOS Safari 100vh fix */
+  background-color: var(--color-lol-bg);
+  display: flex;
+  padding: 16px;
+  gap: 16px;
+}
+
+.split-left {
+  flex: 1 1 55%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 48px clamp(24px, 6vw, 96px);
+}
+
+.split-right {
+  flex: 1 1 45%;
+  position: relative;
+  display: flex;
+}
+
+.split-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 24px;
+}
+
+/* ── Brand row ─────────────────────────────────────────────── */
+
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 56px;
+}
+
+.brand-logo {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.brand-name {
+  font-family: 'Poppins', var(--font-family-sans);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--color-text);
+}
+
+/* ── Hero headline ─────────────────────────────────────────── */
+
+.hero-title {
+  font-family: 'Poppins', var(--font-family-sans);
+  font-weight: 700;
+  font-size: clamp(32px, 4vw, 44px);
+  line-height: 1.15;
+  color: var(--color-text);
+  margin-bottom: 12px;
+}
+
+.hero-subtitle {
+  font-size: 15px;
+  color: var(--color-text-sub);
+  margin-bottom: 32px;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   RESPONSIVE BREAKPOINTS
+   ───────────────────────────────────────────────────────────── */
+
+/* Tablets and up (768px+): image stays, panel proportions tighten */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .split-left {
+    flex: 1 1 50%;
+    padding: 40px clamp(20px, 5vw, 56px);
+  }
+  .split-right {
+    flex: 1 1 50%;
+  }
+  .hero-title {
+    font-size: clamp(28px, 3.5vw, 36px);
+  }
+}
+
+/* Phones only (below 768px): drop the image panel entirely */
+@media (max-width: 767px) {
+  .page-split {
+    flex-direction: column;
+    padding: 0;
+    min-height: 100dvh;
+  }
+
+  .split-right {
+    display: none;
+  }
+
+  .split-left {
+    flex: 1 1 auto;
+    justify-content: flex-start;
+    padding: max(32px, env(safe-area-inset-top)) 20px 32px;
+    padding-left: max(20px, env(safe-area-inset-left));
+    padding-right: max(20px, env(safe-area-inset-right));
+  }
+
+  .brand-row {
+    margin-bottom: 32px;
+  }
+
+  .hero-title {
+    font-size: 28px;
+  }
+
+  .hero-subtitle {
+    font-size: 14px;
+    margin-bottom: 24px;
+  }
+
+  .card {
+    max-width: 100%;
+  }
+}
+
+/* Small phones (below 380px): tighten further */
+@media (max-width: 380px) {
+  .hero-title {
+    font-size: 24px;
+  }
+
+  .split-left {
+    padding-top: max(24px, env(safe-area-inset-top));
+  }
