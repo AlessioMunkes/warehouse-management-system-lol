@@ -1,5 +1,4 @@
 // src/components/WeekPicker.jsx
-import React from 'react';
 
 const WeekPicker = ({ label, value, onChange, required = false, helperText }) => (
   <div className="form-group">

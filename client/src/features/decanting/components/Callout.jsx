@@ -1,5 +1,4 @@
 // src/components/Callout.jsx
-import React from 'react';
 
 const Callout = ({ icon = 'info-circle', children }) => (
   <p className="callout">

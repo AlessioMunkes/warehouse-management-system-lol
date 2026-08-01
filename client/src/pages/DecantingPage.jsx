@@ -6,7 +6,7 @@
 // save the final record. Once saved, records are write-once —
 // this matches the backend's stated design (decanting.service.js).
 // ─────────────────────────────────────────────────────────────
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 

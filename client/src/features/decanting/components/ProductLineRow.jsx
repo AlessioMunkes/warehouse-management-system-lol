@@ -1,5 +1,4 @@
 // src/components/ProductLineRow.jsx
-import React from 'react';
 import BagSizeToggle from './BagSizeToggle';
 
 const STANDARD_SIZES = ['5kg', '2.5kg', '1kg', '500g', '250g'];

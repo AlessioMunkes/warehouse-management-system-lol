@@ -1,5 +1,4 @@
 // src/components/StatusBadge.jsx
-import React from 'react';
 
 const StatusBadge = ({ status = 'success', children }) => (
   <span className={`status-badge status-badge-${status}`}>

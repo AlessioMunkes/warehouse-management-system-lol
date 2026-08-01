@@ -1,5 +1,4 @@
 // src/components/StepCard.jsx
-import React from 'react';
 
 const StepCard = ({ number, title, children }) => (
   <section className="step-card">

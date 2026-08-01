@@ -1,5 +1,4 @@
 // src/components/StatCard.jsx
-import React from 'react';
 
 const StatCard = ({ label, value }) => (
   <div className="stat-card">
