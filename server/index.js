@@ -4,6 +4,8 @@
 import 'dotenv/config';
 import express          from 'express';
 import cors             from 'cors';
+import path             from 'path';
+import { fileURLToPath } from 'url';
 import helmet           from 'helmet';
 import cookieParser     from 'cookie-parser';
 import loginRateLimiter  from './src/middleware/rateLimiter.middleware.js';
@@ -20,6 +22,8 @@ if (!process.env.JWT_SECRET) {
   process.exit(1);
 }
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 const app  = express();
 const port = process.env.PORT || 5000;
 
@@ -34,7 +38,7 @@ app.use(helmet({
       scriptSrc:  ["'self'"],
       styleSrc:   ["'self'", "'unsafe-inline'"], // unsafe-inline needed for Tailwind in dev
       imgSrc:     ["'self'", "data:"],           // data: needed for base64 signature images
-      connectSrc: ["'self'"],
+      connectSrc: ["'self'", ...(process.env.CLIENT_ORIGIN ? [process.env.CLIENT_ORIGIN] : [])],
       fontSrc:    ["'self'"],
       objectSrc:  ["'none'"],
       frameSrc:   ["'none'"],
@@ -52,6 +56,15 @@ app.use(cors({
   credentials: true,
 }));
 
+// ── Serve the built client (production only) ──────────────────
+// Hosting the SPA and the API on ONE origin avoids cross-site cookie
+// problems entirely: sameSite:'strict' keeps working, and no CORS
+// preflight is involved. In dev the Vite server on :5173 handles this.
+if (process.env.NODE_ENV === 'production') {
+  const clientDist = path.join(__dirname, '..', 'client', 'dist');
+  app.use(express.static(clientDist));
+}
+
 // ── Health check ──────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -64,6 +77,15 @@ app.use('/api/volunteers', loginRateLimiter, volunteerRouter);
 app.use('/api/decanting',  decantingRouter);
 app.use('/api/stock',      stockRouter);
 app.use('/api/picking',    pickingRouter);
+
+// ── SPA fallback (production only) ────────────────────────────
+// Any non-/api path falls through to index.html so React Router can
+// handle it. Must come AFTER the API routes, or it would swallow them.
+if (process.env.NODE_ENV === 'production') {
+  app.get(/^\/(?!api\/).*/, (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'client', 'dist', 'index.html'));
+  });
+}
 
 // ── Central error handler ─────────────────────────────────────
 // Must be after all routes. Four arguments = Express error handler.

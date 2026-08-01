@@ -35,6 +35,12 @@ const pool = new Pool({
   ssl: sslConfig,
 });
 
+pool.query('SELECT 1')
+  .then(() => console.log('[db] Connected'))
+  .catch((err) => {
+    console.error('[db] FAILED to connect:', err.message);
+    process.exit(1);
+  });
 // Surfaces connection drops (e.g. Supabase restarting, network blip)
 // in the logs instead of letting them fail silently — pg.Pool emits
 // this on any idle client that errors out.
