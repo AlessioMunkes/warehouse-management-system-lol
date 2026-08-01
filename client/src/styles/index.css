@@ -2565,4 +2565,5 @@
 
   .split-left {
     padding-top: max(24px, env(safe-area-inset-top));
-  }
+  }     
+}
