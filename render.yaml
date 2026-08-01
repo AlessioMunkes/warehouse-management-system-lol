@@ -22,10 +22,17 @@ services:
     plan: free
     region: frankfurt          # closest Render region to Cape Town
     branch: staging/(DEVELOPMENT-TESTING)
-    buildCommand: cd client && npm install && npm run build && cd ../server && npm install
+    # --include=dev is REQUIRED. NODE_ENV=production (below) makes npm
+    # skip devDependencies, but vite and @vitejs/plugin-react live there —
+    # without this the build fails with:
+    #   ERR_MODULE_NOT_FOUND: Cannot find package '@vitejs/plugin-react'
+    # The server install stays production-only: it needs no build step.
+    buildCommand: cd client && npm install --include=dev && npm run build && cd ../server && npm install --omit=dev
     startCommand: cd server && npm start
     healthCheckPath: /api/health
     envVars:
+      # Switches on static-file serving and the SPA fallback in index.js,
+      # and sets secure:true on the auth cookie.
       - key: NODE_ENV
         value: production
       - key: NODE_VERSION
