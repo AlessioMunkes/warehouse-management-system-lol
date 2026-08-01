@@ -36,10 +36,15 @@ app.use(helmet({
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc:  ["'self'"],
-      styleSrc:   ["'self'", "'unsafe-inline'"], // unsafe-inline needed for Tailwind in dev
+      // Google Fonts + Tabler icon webfont are loaded via @import in
+      // index.css, so their stylesheet AND font origins must be allowed
+      // or the browser blocks them and every icon renders as a box.
+      styleSrc:   ["'self'", "'unsafe-inline'",
+                   'https://fonts.googleapis.com', 'https://cdn.jsdelivr.net'],
+      fontSrc:    ["'self'", 'data:',
+                   'https://fonts.gstatic.com', 'https://cdn.jsdelivr.net'],
       imgSrc:     ["'self'", "data:"],           // data: needed for base64 signature images
       connectSrc: ["'self'", ...(process.env.CLIENT_ORIGIN ? [process.env.CLIENT_ORIGIN] : [])],
-      fontSrc:    ["'self'"],
       objectSrc:  ["'none'"],
       frameSrc:   ["'none'"],
     },
