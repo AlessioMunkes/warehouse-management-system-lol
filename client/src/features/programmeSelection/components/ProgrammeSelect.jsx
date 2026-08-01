@@ -29,7 +29,7 @@ const PROGRAMMES = [
   },
   {
     key: "procurement",
-    label: "Procurement",
+    label: "Receiving",
     path: "/procurement",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
@@ -70,7 +70,7 @@ export default function ProgrammeSelect() {
 
   if (loading) {
     return (
-      <div className="page-background page-background-flow">
+      <div className="page-light">
         <div className="programme-select-content">
           <p className="programme-select-subtitle">Loading…</p>
         </div>
@@ -79,7 +79,7 @@ export default function ProgrammeSelect() {
   }
 
   return (
-    <div className="page-background page-background-flow">
+    <div className="page-light">
       <div className="programme-select-content">
         <div className="programme-badge">
           <span className="programme-badge__icon" aria-hidden="true">
@@ -88,10 +88,10 @@ export default function ProgrammeSelect() {
           <span className="programme-badge__label">Programme select</span>
         </div>
 
-        <h1 className="programme-select-heading">
-          Take your time, {displayName} — pick a programme
-        </h1>
-        <p className="programme-select-subtitle">Lovely heart. Pick where you're heading.</p>
+        <h1 className="programme-select-heading">Hi {displayName}!</h1>
+        <p className="programme-select-subtitle">
+          Pick an activity to get started below by clicking on the icon of your choice
+        </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {PROGRAMMES.map((programme) => (
