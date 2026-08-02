@@ -33,8 +33,8 @@ import { apiGet, apiPost } from '../services/api';
 
 const getSuppliers = () => apiGet('/api/deliveries/suppliers').then((r) => r.data || []);
 const getDrivers = (supplierId) => apiGet(`/api/deliveries/drivers?supplierId=${supplierId}`).then((r) => r.data || []);
-const getPurchaseOrders = (supplierId) => apiGet(`/api/purchase-orders?supplierId=${supplierId}`).then((r) => r.data || []);
-const getPurchaseOrderItems = (purchaseOrderId) => apiGet(`/api/purchase-orders/${purchaseOrderId}/items`).then((r) => r.data || []);
+const getPurchaseOrders = (supplierId) => apiGet(`/api/deliveries/purchase-orders?supplierId=${supplierId}`).then((r) => r.data || []);
+const getPurchaseOrderItems = (purchaseOrderId) => apiGet(`/api/deliveries/purchase-orders/${purchaseOrderId}/items`).then((r) => r.data || []);
 
 const getValidationErrors = ({
   supplierId, driverId, deliveryDate, purchaseOrderId,
