@@ -25,10 +25,10 @@ import {
   calculateDecantingPlan,
   recordDecanting,
 } from '../services/decantingAPI';
+// Shared with ProductLineRow so the two cannot offer different sizes.
+import { STANDARD_SIZES, sizesToKg } from '../features/decanting/components/BagSizes';
 
-// Matches STANDARD_BAG_SIZES_KG on the backend, just as display
-// labels instead of raw kg numbers (backend does the kg math).
-const STANDARD_SIZES = ['5kg', '2.5kg', '1kg', '500g', '250g'];
+
 
 // Factory for a blank product line — keeps the "add another
 // product" button simple and avoids accidentally sharing state
@@ -129,11 +129,17 @@ const DecantingPage = () => {
           // Only send actualBulkKg if it was actually entered —
           // matches the backend's own optional check
           // (actualBulkKg !== undefined/null/'').
+          // The weighed bulk now CONSTRAINS the plan rather than just
+          // annotating it — if the sack is short, the backend plans
+          // what can actually be filled and reports the gap. Worth
+          // encouraging the team to always fill this in.
           actualBulkKg: line.actualBulkKg ? Number(line.actualBulkKg) : undefined,
           // Per-line override only sent if the checkbox is on —
           // otherwise the backend falls back to the plan-wide
           // default automatically (resolveSizes logic).
-          selectedSizes: line.useOwnSizes ? line.customSizes : undefined,
+          // Converted to kg: the API takes numbers, and these are
+          // display labels. Sending "2kg" made the server read NaN.
+          selectedSizes: line.useOwnSizes ? sizesToKg(line.customSizes) : undefined,
           wastageKg: line.wastageKg ? Number(line.wastageKg) : undefined,
         };
       });
@@ -151,7 +157,7 @@ const DecantingPage = () => {
     setIsCalculating(true);
     try {
       const result = await calculateDecantingPlan({
-        selectedSizes: defaultSizes,
+        selectedSizes: sizesToKg(defaultSizes),
         items,
       });
       setPlan(result);
@@ -190,7 +196,7 @@ const DecantingPage = () => {
       await recordDecanting({
         weekOf,
         notes,
-        selectedSizes: defaultSizes,
+        selectedSizes: sizesToKg(defaultSizes),
         items: buildItemsPayload(),
       });
       setSavedSuccess(true);

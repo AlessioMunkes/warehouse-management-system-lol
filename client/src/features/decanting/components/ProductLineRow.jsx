@@ -1,7 +1,9 @@
 // src/components/ProductLineRow.jsx
 import BagSizeToggle from './BagSizeToggle';
 
-const STANDARD_SIZES = ['5kg', '2.5kg', '1kg', '500g', '250g'];
+// Imported rather than redeclared: this file used to keep its own
+// copy of the list, which then diverged from the page's.
+import { STANDARD_SIZES } from './bagSizes';
 
 const ProductLineRow = ({
   index,
@@ -68,17 +70,25 @@ const ProductLineRow = ({
         </div>
 
         <div className="form-group">
-          <label className="form-label">Bulk weight available (kg)</label>
+          {/* No longer just an annotation: the weighed figure now caps
+              the plan, so the team is never told to fill more bags
+              than the sack can actually produce. Labelled to reflect
+              that, since "Optional — for surplus/shortfall" understated
+              why weighing matters. */}
+          <label className="form-label">Weighed bulk bag (kg)</label>
           <input
             type="number"
             min="0"
             step="0.1"
             className="form-input"
-            placeholder="Optional"
+            placeholder="Weigh the sack"
             value={line.actualBulkKg || ''}
             onChange={(e) => handleField('actualBulkKg', e.target.value)}
           />
-          <p className="form-helper-text">Optional — for surplus/shortfall</p>
+          <p className="form-helper-text">
+            Weigh it — sacks often hold less than the label says. Leave blank
+            only if it has not been weighed yet.
+          </p>
         </div>
       </div>
 

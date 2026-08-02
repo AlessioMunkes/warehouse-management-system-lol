@@ -68,14 +68,14 @@ describe('recordDecanting — the stored plan is recalculated server-side', () =
       items: [{
         productId: 1, productName: 'Rice', requiredKg: 25,
         // A tampered or stale client payload:
-        packedKg: 9999, totalBags: 9999, bags: { '5kg': 9999 }, withinMargin: false,
+        packedKg: 9999, totalBags: 9999, bags: { '2kg': 9999 }, withinMargin: false,
       }],
     }, USER_ID);
 
     const [line] = repoMock.createDecanting.mock.calls[0][0].lines;
     expect(line.packedKg).toBe(25);
-    expect(line.totalBags).toBe(5);
-    expect(line.bags).toEqual({ '5kg': 5, '2.5kg': 0, '1kg': 0, '500g': 0, '250g': 0 });
+    expect(line.totalBags).toBe(13); // 12 x 2kg + 1 x 1kg
+    expect(line.bags).toEqual({ '2kg': 12, '1kg': 1, '500g': 0 });
     expect(line.withinMargin).toBe(true);
   });
 
@@ -297,7 +297,7 @@ describe('exportDecantingSheet', () => {
 });
 
 // ── Known defects ─────────────────────────────────────────────
-describe.skip('known defects — un-skip once fixed', () => {
+describe('closed defects — regression guards', () => {
   it('DEFECT 3: custom bag sizes are dropped from the CSV columns', async () => {
     // The sheet hard-codes columns for 5kg/2.5kg/1kg/500g/250g. A run
     // decanted into a custom 750 g bag records total_bags: 10 while the
@@ -316,12 +316,21 @@ describe.skip('known defects — un-skip once fixed', () => {
     });
 
     const { csv } = await decantingService.exportDecantingSheet(8);
-    const header = csv.split('\r\n')[5];
-    const row    = csv.split('\r\n')[6];
+    const header = csv.split('\r\n')[5].split(',');
+    const row    = csv.split('\r\n')[6].split(',');
 
     expect(header).toContain('750g');
-    const counts = row.split(',').slice(6, 11).map(Number);
+
+    // Column positions are derived from the header rather than
+    // hard-coded, because the size columns are now built from the
+    // record itself and there is no longer a fixed set of five.
+    const sizeColumns = header.filter((h) => /^\d+(\.\d+)?(kg|g)$/.test(h));
+    const counts = sizeColumns.map((label) => Number(row[header.indexOf(label)]));
+
+    // The per-size columns must reconcile with Total Bags, or
+    // procurement loses the attribution for that size.
     expect(counts.reduce((a, b) => a + b, 0)).toBe(10);
+    expect(Number(row[header.indexOf('Total Bags')])).toBe(10);
   });
 
   it('DEFECT 4: a product name starting with = is a formula in Excel', async () => {
