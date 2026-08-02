@@ -1,15 +1,4 @@
 // ─────────────────────────────────────────────────────────────
-// src/pages/LandingPage.jsx
-//
-// Public-facing landing page for the Ladles of Love
-// Warehouse System. Designed as a holistic introduction to
-// the entire organisation – its mission, programmes, and
-// impact – so that new staff and volunteers understand the
-// bigger picture before they sign in.
-//
-// Two actions sit in the top bar at all times:
-//   • Log in (for staff & scheduled volunteers)
-//   • Volunteer with us (for new / unscheduled volunteers)
 // ─────────────────────────────────────────────────────────────
 import React, { useEffect, useState } from 'react';
 import { useNavigate }                from 'react-router-dom';
@@ -43,7 +32,6 @@ const ICON_PATHS = {
   hands:    'M7 12l-3.5 3.5a2 2 0 0 0 2.8 2.8L8 16.5M12 14l3 3a2 2 0 0 0 2.8-2.8L13 9.5 10 11M7 12l3.5-5 3.5 1 2.5 3.5',
   pin:      'M12 22s7-6.7 7-12.3A7 7 0 1 0 5 9.7C5 15.3 12 22 12 22Zm0-9.3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',
   shield:   'M12 22s8-3.6 8-10.2V5.6L12 3 4 5.6v6.2C4 18.4 12 22 12 22Zm-3.2-9.4 2.2 2.2 4.2-4.4',
-  users:    'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm9 9v-1a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v1M16.5 5.1a3 3 0 0 1 0 5.8M22.5 20v-1a4 4 0 0 0-3-3.87',
   arrow:    'M5 12h14M13 6l6 6-6 6',
   external: 'M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14 21 3',
 };
@@ -66,7 +54,6 @@ const Icon = ({ name, size = 20 }) => (
 );
 
 // ── Content ──────────────────────────────────────────────────
-// Programmes reflect the full breadth of Ladles of Love’s work.
 const PROGRAMMES = [
   {
     id: 'noc',
@@ -74,8 +61,8 @@ const PROGRAMMES = [
     code: 'NOC',
     name: 'Nourish Our Children',
     description:
-      'Two nutritious meals every school day for children at early childhood development centres. We deliver fresh ingredients and track every meal from supplier to plate, reaching thousands of preschools across South Africa.',
-    img: '/public/images/NOC.jpg',
+      "Two nutritious meals reach small children and their teachers at preschools across the network, recorded from the moment a delivery arrives to the moment a parcel is packed.",
+    img: '/images/NOC.jpg',
   },
   {
     id: 'fts',
@@ -83,8 +70,8 @@ const PROGRAMMES = [
     code: 'FTS',
     name: 'Feed the Soil',
     description:
-      'Turning food that can’t be served into compost for local farms, closing the loop on food waste. Farmers return fresh vegetables to our kitchens, creating a self‑sustaining cycle of nourishment.',
-    img: '/public/images/FTS.jpg',
+      "Food that can't go to a plate becomes compost for local farms, and the farms send fresh vegetables back to the warehouse in return.",
+    img: '/images/FTS.jpg',
   },
   {
     id: 'la',
@@ -92,49 +79,37 @@ const PROGRAMMES = [
     code: 'LA',
     name: 'Love Activism',
     description:
-      'Corporate groups, community teams, and individuals give their time at the warehouse — packing, sorting, and preparing emergency food parcels. Every hour of service directly supports a child in need.',
-    img: '/public/images/LA.jpg',
+      'Volunteers, teams and sponsors give a few hours at the warehouse, packing, sorting and making up parcels for the week ahead.',
+    img: '/images/LA.jpg',
   },
   {
     id: 'dsk',
-    iconSrc: '/public/icons/favicon.svg',  
+    icon: 'bowl',
     code: 'DSK',
     name: 'Dignity & Soup Kitchens',
     description:
       'Providing hot meals and essential supplies with dignity to homeless and vulnerable communities through a network of soup kitchens, ensuring no one goes to bed hungry.',
-    img: '/public/images/LOVEACTIVISM.jpg',
+    img: '/images/DSK.jpg',
   },
 ];
 
 const STATS = [
-  { value: '48M+',   label: 'Meals served since 2020' },
-  { value: '200+',   label: 'Preschools supported' },
-  { value: '3',      label: 'Provinces reached' },
+  { value: '48M+', label: 'Meals served since 2020' },
+  { value: '2014', label: 'Founded with one soup kitchen' },
+  { value: '3',    label: 'Provinces reached' },
 ];
 
-// Values speak to the whole organisation, not just the warehouse.
 const VALUES = [
-  {
-    icon: 'shield',
-    text: 'Full transparency — every donation is recorded and traceable from donor to dinner plate.',
-  },
-  {
-    icon: 'users',
-    text: 'Powered by thousands of volunteers and a small, passionate team who keep the food moving.',
-  },
-  {
-    icon: 'pin',
-    text: 'Operating in the Western Cape, Northern Cape and Gauteng, with plans to grow.',
-  },
+  { icon: 'shield', text: 'Every parcel is trackable, from delivery note to dispatch.' },
+  { icon: 'pin',    text: 'Built for people moving between the receiving bay, the packing tables and the loading dock.' },
 ];
 
-// ── LandingPage Component ────────────────────────────────────
 const LandingPage = () => {
   const navigate = useNavigate();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    document.title = 'Ladles of Love · Make a Difference';
+    document.title = 'Ladles of Love · Warehouse System';
     const t = setTimeout(() => setReady(true), 60);
     return () => clearTimeout(t);
   }, []);
@@ -143,30 +118,23 @@ const LandingPage = () => {
     <div className="lol-landing">
       <a href="#lol-signin" className="lol-skip-link">Skip to log in</a>
 
-      {/* ── Top bar (always visible) ───────────────────────── */}
+      {/* ── Top bar ─────────────────────────────────────────── */}
       <header className="lol-nav">
         <div className="lol-nav-inner">
           <div className="lol-nav-brand">
-            {/* Logo — replace with your actual file */}
-            <ImgWithFallback
-              src="/public/icons/favicon.svg"
+            <img
+              src="/icons/favicon.svg"
               alt="Ladles of Love"
               className="lol-nav-logo"
-              fallbackText="Ladles of Love"
-              fallbackPath="/public/icons/favicon.svg"
             />
             <div>
               <p className="lol-nav-title">Ladles of Love</p>
-              <p className="lol-nav-sub">Together we feed the nation</p>
+              <p className="lol-nav-sub">Warehouse System</p>
             </div>
           </div>
           <nav className="lol-nav-actions" aria-label="Account">
-            <button
-              type="button"
-              className="lol-btn-text"
-              onClick={() => navigate('/guest')}
-            >
-              Volunteer with us
+            <button type="button" className="lol-btn-text" onClick={() => navigate('/guest')}>
+              I'm volunteering today
             </button>
             <button
               type="button"
@@ -181,24 +149,25 @@ const LandingPage = () => {
       </header>
 
       <main>
-        {/* ── Hero — full‑width background photo, strong mission ── */}
+        {/* ── Hero ────────────────────────────────────────── */}
         <section className={`lol-hero${ready ? ' is-ready' : ''}`}>
           <div
             className="lol-hero-bg"
-            style={{ backgroundImage: 'url(/public/images/dannyhero.jpg)' }}
+            style={{ backgroundImage: 'url(/images/dannyhero.jpg)' }}
             aria-hidden="true"
           />
-          <div className="lol-hero-overlay" />
+          <div className="lol-hero-overlay" aria-hidden="true" />
+
           <div className="lol-hero-inner">
             <div className="lol-hero-copy">
-              <p className="lol-eyebrow">Ladles of Love</p>
+              <p className="lol-eyebrow lol-eyebrow--on-dark">Ladles of Love · Operations</p>
               <h1 className="lol-hero-title">
-                Feeding hope, <em>nourishing communities.</em>
+                One ladle. One plate. <em>The warehouse</em> that makes it happen.
               </h1>
               <p className="lol-hero-lede">
-                Ladles of Love is a registered non‑profit that turns compassion into action.
-                From our first pot of soup in 2014 to over 48 million meals served today,
-                we exist to make sure no child goes hungry and no food goes to waste.
+                Every parcel that leaves this warehouse starts here. It gets recorded, checked
+                and sent on its way to a preschool, a shelter or a soup kitchen across the
+                Western Cape, Northern Cape and Gauteng.
               </p>
               <div className="lol-hero-actions">
                 <button
@@ -206,7 +175,7 @@ const LandingPage = () => {
                   className="lol-btn-primary lol-btn-large"
                   onClick={() => navigate('/login')}
                 >
-                  Log in to the warehouse
+                  Log in to your account
                   <Icon name="arrow" size={18} />
                 </button>
                 <button
@@ -214,7 +183,7 @@ const LandingPage = () => {
                   className="lol-btn-secondary lol-btn-large"
                   onClick={() => navigate('/guest')}
                 >
-                  Sign up to volunteer
+                  I'm volunteering today
                 </button>
               </div>
               <dl className="lol-stat-ledger">
@@ -227,24 +196,27 @@ const LandingPage = () => {
               </dl>
             </div>
 
-            {/* Right‑side icon / photo of the organisation */}
+            {/* Right‑side icon / temporary ladle SVG */}
             <div className="lol-hero-icon">
-              <ImgWithFallback
-                src="/public/icons/favicon.svg"
-                alt="Ladles of Love icon"
-                fallbackText="Organisation icon"
-                fallbackPath="/public/icons/favicon.svg"
-              />
+              <div className="lol-hero-icon-frame" aria-hidden="true">
+                <svg viewBox="0 0 400 400" className="lol-ladle-svg">
+                  <path className="lol-ladle-handle" d="M60 340C110 300 150 260 175 215" />
+                  <ellipse className="lol-ladle-bowl" cx="255" cy="165" rx="95" ry="80" />
+                  <ellipse className="lol-ladle-bowl-inner" cx="255" cy="150" rx="70" ry="56" />
+                  <circle className="lol-ladle-drop drop-1" cx="150" cy="255" r="7" />
+                  <circle className="lol-ladle-drop drop-2" cx="128" cy="288" r="5" />
+                </svg>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* ── Our Programmes ──────────────────────────────────── */}
+        {/* ── Programmes ──────────────────────────────────── */}
         <section className="lol-programmes" aria-labelledby="lol-programmes-title">
           <div className="lol-section-inner">
-            <p className="lol-eyebrow">What we do</p>
+            <p className="lol-eyebrow">What you're signing in to</p>
             <h2 id="lol-programmes-title" className="lol-section-title">
-              Four programmes, one mission: end hunger.
+              Four programmes, one warehouse
             </h2>
             <div className="lol-programme-grid">
               {PROGRAMMES.map((p) => (
@@ -258,11 +230,7 @@ const LandingPage = () => {
                   />
                   <div className="lol-programme-card__body">
                     <div className="lol-programme-icon">
-                      {p.iconSrc ? (
-                        <img src={p.iconSrc} alt={p.code} width={22} height={22} />
-                      ) : (
-                        p.icon && <Icon name={p.icon} size={22} />
-                      )}
+                      <Icon name={p.icon} size={22} />
                     </div>
                     <p className="lol-programme-code">{p.code}</p>
                     <h3>{p.name}</h3>
@@ -274,30 +242,22 @@ const LandingPage = () => {
           </div>
         </section>
 
-        {/* ── Story / Impact ──────────────────────────────────── */}
+        {/* ── Story ───────────────────────────────────────── */}
         <section className="lol-story">
-          <div className="lol-section-inner lol-story-grid">
-            <div>
-              <p className="lol-eyebrow">Our story</p>
-              <h2 className="lol-section-title">
-                From a single pot of soup to a nationwide movement
-              </h2>
-              <p>
-                Danny Diliberto started Ladles of Love with one soup kitchen in 2014. What
-                followed is a story of ordinary people refusing to ignore hunger. Today we
-                work with over 200 preschools, community kitchens, and farms, making sure
-                that food reaches the plates that need it most — and that every plate is a
-                step toward a better future.
-              </p>
-              <p style={{ marginTop: 16 }}>
-                This website is a window into the engine that drives our logistics — the
-                warehouse where food is received, tracked, packed, and dispatched. If you’re
-                a staff member or a registered volunteer, you can log in to manage operations
-                right from here.
-              </p>
-            </div>
-
-            {/* Values */}
+          <div className="lol-section-inner">
+            <p className="lol-eyebrow">Why this exists</p>
+            <h2 className="lol-section-title">
+              Built with the people who run the warehouse
+            </h2>
+            <p>
+              Ladles of Love started in 2014 with one soup kitchen and a single weekly pot of
+              soup. Today the organisation works across the Western Cape, Northern Cape and
+              Gauteng, running preschool nutrition, soup kitchens, compost exchanges with local
+              farms and hands‑on volunteer days, and has served over 48 million meals since
+              2020. This system replaces the paper forms and scattered spreadsheets that used
+              to hold that work together, built from time spent on the warehouse floor with the
+              people who receive, pack and dispatch every day.
+            </p>
             <div className="lol-values">
               {VALUES.map((v) => (
                 <div className="lol-value" key={v.text}>
@@ -306,30 +266,18 @@ const LandingPage = () => {
                 </div>
               ))}
             </div>
-
-            {/* Photo alongside the text */}
-            <div className="lol-story-photo">
-              <ImgWithFallback
-                src="/images/warehouse.jpg"
-                alt="Inside the Ladles of Love warehouse"
-                fallbackText="Add a photo of the team or warehouse"
-                fallbackPath="/public/images/Ladleshearts.jpg"
-              />
-            </div>
           </div>
         </section>
 
-        {/* ── Get involved / External link ───────────────────── */}
+        {/* ── Get involved ────────────────────────────────── */}
         <section className="lol-getinvolved">
           <div className="lol-section-inner lol-getinvolved-inner">
             <div>
-              <h2 className="lol-section-title lol-section-title-light">
-                Want to do more?
-              </h2>
+              <h2 className="lol-section-title lol-section-title-light">New here?</h2>
               <p>
-                This page is the front door for staff and scheduled volunteers. If you’d
-                like to donate, fundraise, or learn about our other ways to give, visit
-                our main site — it’s where the full story lives.
+                This page is for staff and volunteers signing in to work. If you'd like to
+                donate, volunteer or find out more about Ladles of Love, the full story lives
+                on our main site.
               </p>
             </div>
             <a
@@ -345,7 +293,7 @@ const LandingPage = () => {
         </section>
       </main>
 
-      {/* ── Footer ──────────────────────────────────────────── */}
+      {/* ── Footer ────────────────────────────────────────── */}
       <footer className="lol-footer">
         <div className="lol-section-inner lol-footer-inner">
           <div>
@@ -359,9 +307,7 @@ const LandingPage = () => {
             <a href="https://www.facebook.com/ladlesofloveZA/" target="_blank" rel="noopener noreferrer">Facebook</a>
             <a href="https://twitter.com/ladlesoflove" target="_blank" rel="noopener noreferrer">Twitter</a>
           </div>
-          <p className="lol-footer-copy">
-            © Ladles of Love · Non‑Profit Organisation · Since 2014
-          </p>
+          <p className="lol-footer-copy">© Ladles of Love · Warehouse Management System</p>
         </div>
       </footer>
     </div>
