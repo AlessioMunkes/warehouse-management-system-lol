@@ -10,6 +10,7 @@ import helmet           from 'helmet';
 import cookieParser     from 'cookie-parser';
 import loginRateLimiter  from './src/middleware/rateLimiter.middleware.js';
 import loginRouter       from './src/routes/login.route.js';
+import sessionRouter     from './src/routes/session.route.js';
 import deliveryRouter    from './src/routes/delivery.routes.js';
 import volunteerRouter   from './src/routes/volunteer.routes.js';
 import decantingRouter   from './src/routes/decanting.routes.js';
@@ -77,6 +78,10 @@ app.get('/api/health', (req, res) => {
 
 // ── Routes ────────────────────────────────────────────────────
 app.use('/api/login',      loginRateLimiter, loginRouter);
+// Deliberately NOT behind loginRateLimiter: the client calls this on
+// every app boot and every reconnect, and 10 requests per 15 minutes
+// would lock a warehouse tablet out of its own session.
+app.use('/api/me',         sessionRouter);
 app.use('/api/deliveries', deliveryRouter);
 app.use('/api/volunteers', loginRateLimiter, volunteerRouter);
 app.use('/api/decanting',  decantingRouter);

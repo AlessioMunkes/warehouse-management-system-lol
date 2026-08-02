@@ -8,7 +8,7 @@ import logo                   from '../assets/LOL_Logo.jpg';
 import Log_In_Background      from '../assets/Log_In_Background.jpg';
 
 const LoginPage = () => {
-  const { login }  = useAuth();
+  const { login, sessionMessage } = useAuth();
   const navigate   = useNavigate();
 
   const [username, setUsername]                     = useState('');
@@ -18,12 +18,23 @@ const LoginPage = () => {
   const [isLoading, setIsLoading]                     = useState(false);
   const [showForgotPassword, setShowForgotPassword]   = useState(false);
 
+  // err.status is set by services/api.js. Note this function already
+  // read it before that existed, so the status branches below were
+  // dead and every failure fell through to err.message.
   const getLoginErrorMessage = (err) => {
-    if (err.name === "NetworkError" || err.message === "Failed to fetch") {
+    if (err.isNetworkError || err.message === "Failed to fetch") {
       return "Could not reach the server. Check your connection and try again.";
     }
-    if (err.status === 401 || err.status === 403) {
+    if (err.status === 401) {
+      // Never distinguish "no such user" from "wrong password" — that
+      // would let an attacker enumerate valid usernames.
       return "Incorrect username or password.";
+    }
+    if (err.status === 403) {
+      // 403 is NOT a credential failure: the password was correct and
+      // the account is deactivated. Showing "incorrect password" here
+      // would send someone to reset a password that works fine.
+      return err.message || "This account cannot be used to log in.";
     }
     return err.message || "Login failed. Please try again.";
   };
@@ -71,6 +82,15 @@ const LoginPage = () => {
 
           <div className="form-body">
             <h2 className="section-title">EMPLOYEE SIGN IN</h2>
+
+            {/* Explains why the user is looking at a login screen they
+                did not navigate to — an expired or revoked session. A
+                failed login attempt takes precedence over it. */}
+            {!error && sessionMessage && (
+              <div className="info-notice">
+                <p>{sessionMessage}</p>
+              </div>
+            )}
 
             {error && (
               <div className="alert-error">

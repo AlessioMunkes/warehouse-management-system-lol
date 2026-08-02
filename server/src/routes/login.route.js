@@ -12,10 +12,11 @@ import express from 'express';
 import jwt     from 'jsonwebtoken';
 import bcrypt  from 'bcrypt';
 import pool    from '../config/db.js';
+import { AUTH_COOKIE, authCookieOptions, sessionMaxAge } from '../config/cookie.js';
 
 const router = express.Router();
 
-const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const SESSION_HOURS = 8;
 
 // ── POST /api/login ───────────────────────────────────────────
 router.post('/', async (req, res) => {
@@ -27,7 +28,7 @@ router.post('/', async (req, res) => {
     }
 
    const result = await pool.query(
-      `SELECT id, username, first_name, last_name, role, password_hash
+      `SELECT id, username, first_name, last_name, role, password_hash, is_active
        FROM users
        WHERE LOWER(username) = LOWER($1)`,
       [username]
@@ -45,20 +46,27 @@ router.post('/', async (req, res) => {
       return res.status(401).json({ message: 'Invalid username or password.' });
     }
 
+    // is_active was previously never checked, so deactivating a staff
+    // member in the database did not actually stop them logging in.
+    // The compare above still runs first, deliberately: answering
+    // faster for a disabled account than a wrong password would leak
+    // which usernames exist.
+    if (!user.is_active) {
+      return res.status(403).json({ message: 'This account has been deactivated. Speak to your manager.' });
+    }
+
     const token = jwt.sign(
       { id: user.id, username: user.username, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: '8h' }
+      { expiresIn: `${SESSION_HOURS}h` }
     );
 
     // ── Set the token as an httpOnly cookie ───────────────────
     // The browser stores and sends this automatically.
     // JavaScript on the page (including any XSS attack) cannot read it.
-    res.cookie('wms_token', token, {
-      httpOnly: true,                  // not accessible via JS
-      secure:   IS_PRODUCTION,         // HTTPS only in production, HTTP ok in dev
-      sameSite: 'strict',              // never sent on cross-site requests
-      maxAge:   8 * 60 * 60 * 1000,   // 8 hours in milliseconds — matches token expiry
+    res.cookie(AUTH_COOKIE, token, {
+      ...authCookieOptions(),
+      maxAge: sessionMaxAge(SESSION_HOURS), // matches the token's own expiry
     });
 
     // Return the safe user info (no token in the body anymore)
@@ -82,12 +90,11 @@ router.post('/', async (req, res) => {
 // ── POST /api/logout ──────────────────────────────────────────
 // Clears the cookie server-side so the session is properly ended.
 // The client just calls this then clears its local user state.
+// Mounted at /api/login, so the full path is POST /api/login/logout.
 router.post('/logout', (req, res) => {
-  res.clearCookie('wms_token', {
-    httpOnly: true,
-    secure:   IS_PRODUCTION,
-    sameSite: 'strict',
-  });
+  // Same options the cookie was set with — clearCookie is a no-op
+  // otherwise. See src/config/cookie.js.
+  res.clearCookie(AUTH_COOKIE, authCookieOptions());
   res.json({ success: true });
 });
 

@@ -34,6 +34,7 @@ beforeEach(() => {
       last_name:     'Doe',
       role:          'warehouse_worker',
       password_hash: PASSWORD_HASH,
+      is_active:     true,
     }],
   });
 });
@@ -63,6 +64,22 @@ describe('POST /api/login', () => {
     const res = await request(app).post('/api/login').send({ username: 'jdoe' });
 
     expect(res.status).toBe(400);
+  });
+
+  it('refuses a deactivated account even with the correct password', async () => {
+    // is_active was previously selected but never checked, so
+    // deactivating a staff member did not stop them logging in.
+    queryMock.mockResolvedValue({
+      rows: [{
+        id: 1, username: 'JDOE', first_name: 'Jane', last_name: 'Doe',
+        role: 'warehouse_worker', password_hash: PASSWORD_HASH, is_active: false,
+      }],
+    });
+    const app = await getFreshApp();
+    const res = await request(app).post('/api/login').send({ username: 'jdoe', password: PASSWORD });
+
+    expect(res.status).toBe(403);
+    expect(res.headers['set-cookie']).toBeUndefined();
   });
 
   it('returns 429 after 11 attempts from the same IP', async () => {
