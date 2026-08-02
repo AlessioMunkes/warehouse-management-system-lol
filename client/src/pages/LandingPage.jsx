@@ -162,10 +162,10 @@ const LandingPage = () => {
             <div className="lol-hero-copy">
               <p className="lol-eyebrow lol-eyebrow--on-dark">Ladles of Love · Operations</p>
               <h1 className="lol-hero-title">
-                One ladle. One plate. <em>The warehouse</em> that makes it happen.
+                One ladle. One Mission. <em>The warehouse</em> where it happens.
               </h1>
               <p className="lol-hero-lede">
-                Every parcel that leaves this warehouse starts here. It gets recorded, checked
+                Every pallet that leaves this warehouse starts here. It gets recorded, checked
                 and sent on its way to a preschool, a shelter or a soup kitchen across the
                 Western Cape, Northern Cape and Gauteng.
               </p>
@@ -247,7 +247,7 @@ const LandingPage = () => {
           <div className="lol-section-inner">
             <p className="lol-eyebrow">Why this exists</p>
             <h2 className="lol-section-title">
-              Built with the people who run the warehouse
+              Built from the ground up alongisde our warehouse staff and volunteers
             </h2>
             <p>
               Ladles of Love started in 2014 with one soup kitchen and a single weekly pot of
@@ -276,8 +276,9 @@ const LandingPage = () => {
               <h2 className="lol-section-title lol-section-title-light">New here?</h2>
               <p>
                 This page is for staff and volunteers signing in to work. If you'd like to
-                donate, volunteer or find out more about Ladles of Love, the full story lives
-                on our main site.
+                donate, volunteer or find out more about Ladles of Love, please check out our
+                main website.
+        
               </p>
             </div>
             <a
