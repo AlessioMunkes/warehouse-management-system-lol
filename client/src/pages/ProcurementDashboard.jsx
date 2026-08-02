@@ -13,7 +13,7 @@
 // flags a delivery. See the note shown on the success screen —
 // remove it once the backend supports this properly.
 // ─────────────────────────────────────────────────────────────
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import TaskNavGrid from '../features/procurement/components/TaskNavGrid';

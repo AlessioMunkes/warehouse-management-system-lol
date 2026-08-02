@@ -29,12 +29,12 @@ router.post('/sign-in', async (req, res) => {
     }
 
     // signed_in_at comes from the DB default — never from the client
-   // const result = await pool.query(
-   //   `INSERT INTO volunteers (full_name, source)
-   //    VALUES ($1, 'guest_login')
-   //    RETURNING id, full_name, signed_in_at`,
-    //  [name.trim()]
-    //);
+    const result = await pool.query(
+      `INSERT INTO volunteers (full_name, source)
+       VALUES ($1, 'guest_login')
+       RETURNING id, full_name, signed_in_at`,
+      [name.trim()]
+    );
 
     const volunteer = result.rows[0];
 

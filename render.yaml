@@ -1,0 +1,45 @@
+# ─────────────────────────────────────────────────────────────
+# render.yaml  — place in the REPO ROOT
+#
+# Deploys the whole app as ONE web service: Express serves both the
+# API and the built React client from a single origin.
+#
+# Why one service rather than two: the auth cookie is sameSite:'strict'.
+# Split across wms-client.onrender.com and wms-api.onrender.com those
+# are *cross-site* (onrender.com is on the Public Suffix List), so the
+# browser would silently drop the cookie — login appears to work and
+# every request after it returns 401. One origin sidesteps that
+# entirely, and needs no CORS or cookie changes.
+#
+# Render free tier sleeps after 15 min idle; first request then takes
+# ~50s to wake. Fine for team testing, not for a live demo — open the
+# URL a minute before you present.
+# ─────────────────────────────────────────────────────────────
+services:
+  - type: web
+    name: wms-lol
+    runtime: node
+    plan: free
+    region: frankfurt          # closest Render region to Cape Town
+    branch: staging/(DEVELOPMENT-TESTING)
+    # --include=dev is REQUIRED. NODE_ENV=production (below) makes npm
+    # skip devDependencies, but vite and @vitejs/plugin-react live there —
+    # without this the build fails with:
+    #   ERR_MODULE_NOT_FOUND: Cannot find package '@vitejs/plugin-react'
+    # The server install stays production-only: it needs no build step.
+    buildCommand: cd client && npm install --include=dev && npm run build && cd ../server && npm install --omit=dev
+    startCommand: cd server && npm start
+    healthCheckPath: /api/health
+    envVars:
+      # Switches on static-file serving and the SPA fallback in index.js,
+      # and sets secure:true on the auth cookie.
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 22
+      - key: DATABASE_URL
+        sync: false            # paste the Supabase SESSION POOLER string in the dashboard
+      - key: JWT_SECRET
+        generateValue: true    # Render generates a strong random value
+      - key: DB_SSL
+        value: "true"
