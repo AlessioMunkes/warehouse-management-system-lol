@@ -1,11 +1,18 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../context/AuthContext";
 
+// `path` must match a route registered in App.jsx. Every programme
+// page lives under /noc/, so a bare "/packing" falls through to the
+// catch-all and silently lands the user on the landing page.
+//
+// `enabled: false` marks a programme whose page has not been built
+// yet — the tile renders disabled rather than navigating nowhere.
 const PROGRAMMES = [
   {
     key: "packing",
     label: "Packing",
-    path: "/packing",
+    path: "/noc/packing",
+    enabled: true,
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
         <path d="M12 2 3 6.5v11L12 22l9-4.5v-11L12 2Z" strokeLinejoin="round" />
@@ -17,7 +24,8 @@ const PROGRAMMES = [
   {
     key: "dispatch",
     label: "Dispatch",
-    path: "/dispatch",
+    path: null,            // no DispatchPage exists yet
+    enabled: false,
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
         <path d="M2 8h11v8H2z" strokeLinejoin="round" />
@@ -30,7 +38,8 @@ const PROGRAMMES = [
   {
     key: "procurement",
     label: "Receiving",
-    path: "/procurement",
+    path: "/noc/procurement",
+    enabled: true,
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
         <rect x="5" y="4" width="14" height="17" rx="2" />
@@ -42,7 +51,8 @@ const PROGRAMMES = [
   {
     key: "decanting",
     label: "Decanting",
-    path: "/decanting",
+    path: "/noc/decanting",
+    enabled: true,
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
         <path d="m12 2 8 4.6v9.8L12 21l-8-4.6V6.6L12 2Z" strokeLinejoin="round" />
@@ -51,24 +61,37 @@ const PROGRAMMES = [
       </svg>
     ),
   },
+  {
+    key: "inventory",
+    label: "Inventory",
+    path: "/noc/inventory",
+    enabled: true,
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+        <path d="M3 7h18v13H3z" strokeLinejoin="round" />
+        <path d="M3 7l2-3h14l2 3" strokeLinejoin="round" />
+        <path d="M10 11h4" strokeLinecap="round" />
+      </svg>
+    ),
+  },
 ];
 
+// The user object comes from our own /api/login, not from Supabase
+// Auth — it is { id, username, firstName, lastName, role }. Reading
+// user_metadata or email here always yields undefined, so everyone
+// was greeted as "there".
 function getDisplayName(user) {
   if (!user) return "there";
-  const fullName =
-    user.user_metadata?.full_name ||
-    user.user_metadata?.name ||
-    user.email?.split("@")[0];
-  if (!fullName) return "there";
-  return fullName.split(" ")[0];
+  return user.firstName || user.username || "there";
 }
 
 export default function ProgrammeSelect() {
   const navigate = useNavigate();
-  const { user, loading } = useAuth();
+  // AuthContext exposes `isLoading`, not `loading`.
+  const { user, isLoading } = useAuth();
   const displayName = getDisplayName(user);
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="page-light">
         <div className="programme-select-content">
@@ -99,8 +122,14 @@ export default function ProgrammeSelect() {
               key={programme.key}
               type="button"
               className="programme-button"
-              onClick={() => navigate(programme.path)}
-              aria-label={`Go to ${programme.label}`}
+              onClick={() => programme.path && navigate(programme.path)}
+              disabled={!programme.enabled}
+              aria-label={
+                programme.enabled
+                  ? `Go to ${programme.label}`
+                  : `${programme.label} — coming soon`
+              }
+              title={programme.enabled ? undefined : "Coming soon"}
             >
               <span className="programme-button__icon" aria-hidden="true">
                 {programme.icon}
