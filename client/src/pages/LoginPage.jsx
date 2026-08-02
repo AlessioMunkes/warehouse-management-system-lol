@@ -5,6 +5,7 @@ import { useState }           from 'react';
 import { useNavigate }        from 'react-router-dom';
 import { useAuth }            from '../context/AuthContext';
 import logo                   from '../assets/LOL_Logo.jpg';
+import Log_In_Background      from '../assets/Log_In_Background.jpg';
 
 const LoginPage = () => {
   const { login }  = useAuth();

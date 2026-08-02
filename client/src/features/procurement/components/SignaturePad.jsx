@@ -1,5 +1,5 @@
 // src/components/SignaturePad.jsx
-import React, { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 
 const SignaturePad = ({ onChange }) => {
   const canvasRef = useRef(null);

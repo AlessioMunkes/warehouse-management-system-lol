@@ -1,5 +1,4 @@
 // src/components/DecisionCard.jsx
-import React from 'react';
 
 const DecisionCard = ({ icon, title, subtitle, variant, selected, onClick }) => (
   <button

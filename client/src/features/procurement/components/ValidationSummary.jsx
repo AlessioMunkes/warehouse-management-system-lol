@@ -1,5 +1,4 @@
 // src/components/ValidationSummary.jsx
-import React from 'react';
 
 const ValidationSummary = ({ errors }) => {
   if (!errors || errors.length === 0) return null;
