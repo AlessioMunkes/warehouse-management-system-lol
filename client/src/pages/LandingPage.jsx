@@ -2,7 +2,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
 import { useNavigate }                from 'react-router-dom';
-import './LandingPage.css';
+import './styles/landingpage.css';
 
 // ── Image fallback (reusable slot for all photos) ───────────
 function ImgWithFallback({ src, alt, fallbackText, fallbackPath, className }) {
