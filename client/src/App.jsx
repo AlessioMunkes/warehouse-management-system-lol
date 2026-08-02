@@ -22,8 +22,8 @@ const App = () => (
         {/* ── Public ────────────────────────────────────────── */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/guest" element={<GuestLoginPage />} />
-
-        {/* ── Protected — any logged-in staff user ──────────── */}
+        <Route path="/noc/procurement" element={<ProcurementDashboard />} />
+        {/* Protected — any logged-in user */}
         <Route element={<ProtectedRoute />}>
           <Route path="/programmes" element={<SelectProgrammeScreen />} />
 

@@ -7,116 +7,145 @@ import { useAuth }            from '../context/AuthContext';
 import logo                   from '../assets/LOL_Logo.jpg';
 
 const LoginPage = () => {
-  const { login }    = useAuth();
-  const navigate     = useNavigate();
+  const { login }  = useAuth();
+  const navigate   = useNavigate();
 
-  const [username,           setUsername]           = useState('');
-  const [password,           setPassword]           = useState('');
-  const [showPassword,       setShowPassword]       = useState(false);
-  const [error,              setError]              = useState('');
-  const [isLoading,          setIsLoading]          = useState(false);
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [username, setUsername]                     = useState('');
+  const [password, setPassword]                      = useState('');
+  const [showPassword, setShowPassword]               = useState(false);
+  const [error, setError]                             = useState('');
+  const [isLoading, setIsLoading]                     = useState(false);
+  const [showForgotPassword, setShowForgotPassword]   = useState(false);
+
+  const getLoginErrorMessage = (err) => {
+    if (err.name === "NetworkError" || err.message === "Failed to fetch") {
+      return "Could not reach the server. Check your connection and try again.";
+    }
+    if (err.status === 401 || err.status === 403) {
+      return "Incorrect username or password.";
+    }
+    return err.message || "Login failed. Please try again.";
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    if (!username.trim()) { setError('Username is required.'); return; }
-    if (!password)        { setError('Password is required.');  return; }
+    setError("");
+
+    if (!username.trim()) {
+      setError("Username is required.");
+      return;
+    }
+    if (!password) {
+      setError("Password is required.");
+      return;
+    }
+
     setIsLoading(true);
     try {
       await login(username.trim(), password);
-      navigate('/programmes');
+      navigate("/programmes");
     } catch (err) {
-      setError(err.message || 'Login failed. Please try again.');
+      setError(getLoginErrorMessage(err));
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="page-maroon">
-      <div className="card">
-
-        <div className="card-header">
-          <img
-            src={logo}
-            alt="Ladles of Love"
-            style={{ width: '48px', height: '48px', marginBottom: '6px', background: '#fff', padding: '3px' }}
-          />
-          <h1 className="card-header-title">WAREHOUSE SYSTEM</h1>
-          <p className="card-header-sub">PROPERTY OF LADLES OF LOVE</p>
+    <div className="page-split">
+      <div className="split-left">
+        <div className="brand-row">
+          <img src={logo} alt="Ladles of Love" className="brand-logo" />
+          <span className="brand-name"></span>
         </div>
 
-        <div className="form-body">
-          <h2 className="section-title">EMPLOYEE SIGN IN</h2>
+        <h1 className="hero-title">Welcome to Batches</h1>
+        <p className="hero-subtitle">A new and improved way of delivering love</p>
 
-          {error && (
-            <div className="alert-error">
-              <p>⚠ {error.toUpperCase()}</p>
-            </div>
-          )}
+        <div className="card">
+          <div className="card-header">
+            <h1 className="card-header-title">BATCHES LOG IN </h1>
+            <p className="card-header-sub">Please fill in your details to continue</p>
+          </div>
 
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label className="form-label">USERNAME</label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="e.g. WORKER123"
-                autoComplete="username"
-                disabled={isLoading}
-                className="form-input"
-              />
-            </div>
+          <div className="form-body">
+            <h2 className="section-title">EMPLOYEE SIGN IN</h2>
 
-            <div className="form-group">
-              <label className="form-label">PASSWORD</label>
-              <div className="form-input-group">
+            {error && (
+              <div className="alert-error">
+                <p>⚠ {error.toUpperCase()}</p>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit}>
+              <div className="form-group">
+                <label className="form-label">USERNAME</label>
                 <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="current-password"
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="e.g. WORKER123"
+                  autoComplete="username"
                   disabled={isLoading}
                   className="form-input"
                 />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">PASSWORD</label>
+                <div className="form-input-group">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="current-password"
+                    disabled={isLoading}
+                    className="form-input"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="btn-toggle-password"
+                  >
+                    {showPassword ? 'HIDE' : 'SHOW'}
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ textAlign: 'right', marginBottom: '16px' }}>
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="btn-toggle-password"
+                  onClick={() => setShowForgotPassword(true)}
+                  className="btn-link"
                 >
-                  {showPassword ? 'HIDE' : 'SHOW'}
+                  FORGOT PASSWORD?
                 </button>
               </div>
-            </div>
 
-            <div style={{ textAlign: 'right', marginBottom: '16px' }}>
-              <button
-                type="button"
-                onClick={() => setShowForgotPassword(true)}
-                className="btn-link"
-              >
-                FORGOT PASSWORD?
+              <button type="submit" disabled={isLoading} className="btn-primary-full">
+                {isLoading ? 'VERIFYING...' : 'LOGIN'}
               </button>
-            </div>
 
-            <div>
-            <button type="submit" disabled={isLoading} className="btn-primary-full">
-              {isLoading ? 'VERIFYING...' : 'LOGIN'}
-            </button>
-            </div>
-              
-            <div>
-              <br></br>
-            <button type="button" onClick={() => navigate('/guest')} className="btn-primary-full" disabled={isLoading}>
-            LOGIN AS GUEST
-          </button>
-            </div>
-          </form>
+              <div style={{ marginTop: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => navigate('/guest')}
+                  className="btn-primary-full"
+                  style={{ backgroundColor: 'transparent', color: 'var(--color-maroon)', border: '1px solid var(--color-maroon)' }}
+                  disabled={isLoading}
+                >
+                  LOGIN AS GUEST
+                </button>
+              </div>
+            </form>
 
-          <div className="footer-meta">AUTHORISED PERSONNEL ONLY</div>
+            <div className="footer-meta">AUTHORISED PERSONNEL ONLY</div>
+          </div>
         </div>
+      </div>
+
+      <div className="split-right">
+        <img src={Log_In_Background} alt="" className="split-image" />
       </div>
 
       {showForgotPassword && (
