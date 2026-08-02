@@ -5,6 +5,10 @@
    Reuses --color-* tokens from styles/index.css.
    Only page‑specific extras live here, scoped under .lol-landing.
    ───────────────────────────────────────────────────────────── */
+@import '@fontsource/montserrat/500.css';
+@import '@fontsource/montserrat/600.css';
+@import '@fontsource/montserrat/700.css';
+@import '@fontsource/montserrat/900.css';
 
 .lol-landing {
   --lol-khaki-on-dark: #b5a87e;
