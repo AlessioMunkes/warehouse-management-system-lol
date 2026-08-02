@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate }  from 'react-router-dom';
 import { AuthProvider }                            from './context/AuthContext';
 import ProtectedRoute                              from './components/layout/ProtectedRoute';
-
+import LandingPage                                 from './pages/LandingPage';
 import LoginPage                                   from './pages/LoginPage';
 import GuestLoginPage                              from './pages/GuestLoginPage';
 import GuestHomePage                               from './pages/GuestHomePage';
@@ -18,8 +18,8 @@ const App = () => (
   <AuthProvider>
     <BrowserRouter>
       <Routes>
-
-        {/* ── Public ────────────────────────────────────────── */}
+        {/* Public */}
+        <Route path="/"      element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/guest" element={<GuestLoginPage />} />
         <Route path="/noc/procurement" element={<ProcurementDashboard />} />
@@ -41,6 +41,8 @@ const App = () => (
           <Route path="/guest-home" element={<GuestHomePage />} />
         </Route>
 
+        {/* Catch-all */}
+        <Route path="*" element={<Navigate to="/" replace />} />
         {/* ── Redirects ─────────────────────────────────────── */}
         {/* Old paths kept working so existing links don't break */}
         <Route path="/inventory" element={<Navigate to="/noc/inventory" replace />} />

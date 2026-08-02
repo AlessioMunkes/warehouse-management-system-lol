@@ -7,28 +7,27 @@
 
 /* ─────────────────────────────────────────────────────────────
    DESIGN TOKENS
+   Brand match: ladlesoflove.org.za (charcoal, red, khaki, beige)
+
+   
    ───────────────────────────────────────────────────────────── */
 @theme {
-  --color-maroon:      #7A1A1A;
-  --color-maroon-deep: #4A0F0F;
-  --color-accent:      #E31E24;
-  --color-lol-bg:      #F3F2F1;
-  --color-lol-white:   #FFFFFF;
-  --color-border:      #D2D0CE;
-  --color-text:        #201F1E;
-  --color-text-sub:    #605E5C;
-  --color-text-meta:   #A19F9D;
-  --color-danger:      #A4262C;
-  --color-danger-bg:   #FDE7E9;
+  --color-maroon:        #2b3336;   /* dark charcoal — headings, header bars. ~10:1 */
+  --color-accent:        #d93840;   /* red — CTAs, highlights */
+  --color-accent-hover:  #c13039;   /* red, one step darker, for hover states */
+  --color-lol-bg:        #e9e3dd;   /* warm beige page background */
+  --color-lol-white:     #ffffff;
+  --color-border:        #d2d0ce;
+  --color-text:          #555555;   /* body text. ~5.9:1 */
+  --color-text-sub:      #5f5940;   /* olive/khaki, subtler text. ~5.5:1 */
+  --color-text-meta:     #656158;   /* tiny meta labels. ~4.8:1 */
+  --color-danger:        #a4262c;
+  --color-danger-bg:     #fde7e9;
 
-  --font-family-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont,
-    'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
-  --font-family-display: 'Poppins', var(--font-family-sans);
+  --font-family-sans: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 
-  --radius-card: 20px;
-  --radius-control: 999px;
+  --radius-none: 0px;   /* your UI uses sharp corners throughout */
 }
-
 
 /* ─────────────────────────────────────────────────────────────
    BASE
@@ -58,8 +57,7 @@
     font-family: var(--font-family-sans);
     background-color: var(--color-lol-bg);
     color: var(--color-text);
-    line-height: 1.5;
-    font-size: 16px;
+    font-size: 18px;
     -webkit-font-smoothing: antialiased;
   }
 
@@ -83,15 +81,9 @@
    ───────────────────────────────────────────────────────────── */
 @layer components {
 
-  /* ── Page backgrounds / layouts ─────────────────────────────
-     .page-background       → photo + maroon tint (login, guest
-                                login, programme select)
-     .page-background-flow  → top-aligned content variant
-     .page-light            → plain light page (task screens:
-                                decanting, deliveries, packing)
-     ───────────────────────────────────────────────────────────── */
-  .page-background {
-    position: relative;
+  /* ── Page layouts ─────────────────────────────────────────── */
+
+  .page-maroon {
     min-height: 100vh;
     min-height: 100dvh;
     overflow: hidden;
@@ -177,6 +169,10 @@
 
   .page-title-row { margin-bottom: 20px; }
 
+  .card {
+    width: 100%;
+    max-width: 420px;
+    background-color: var(--color-lol-white);
 
   /* ── Login / guest login card ──────────────────────────────── */
   .card {
@@ -416,6 +412,7 @@
 
   .page-header-icon-btn:hover::after { opacity: 1; }
 
+  /* ── Header bar ───────────────────────────────────────────── */
   @media (max-width: 640px) {
     .page-header-icon-btn::after { display: none; } /* tooltips awkward on touch */
   }
@@ -423,6 +420,7 @@
   /* Legacy dashboard header bar */
   .header-bar {
     background-color: var(--color-maroon);
+    height: 56px;
     min-height: 56px;
     min-height: 56px;
     display: flex;
@@ -456,8 +454,33 @@
 
   .header-role {
     color: var(--color-text-meta);
-    font-size: 12px;
-    font-size: 12px;
+    font-size: 11px;
+    text-transform: uppercase;
+  }
+
+
+  /* ── Card header ──────────────────────────────────────────── */
+
+  .card-header {
+    padding: 16px 20px;
+    text-align: center;
+    background-color: var(--color-maroon);
+  }
+
+  .card-header-title {
+    color: var(--color-lol-white);
+    font-size: 16px;
+    font-weight: 900;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin: 0;
+  }
+
+  .card-header-sub {
+    color: var(--color-text-meta);
+    font-size: 11px;
+    font-weight: 700;
+    margin-top: 4px;
   }
 
 
@@ -480,6 +503,7 @@
   .breadcrumb-text span { color: var(--color-maroon); }
   .breadcrumb-text span { color: var(--color-maroon); }
 
+  /* ── Section title ────────────────────────────────────────── */
 
   /* ── Section / step titles ──────────────────────────────────── */
   /* ── Section / step titles ──────────────────────────────────── */
@@ -648,14 +672,25 @@
 
   .form-required { color: var(--color-accent); }
 
-  .form-grid-2 {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
+  /* ── Buttons ──────────────────────────────────────────────── */
+
+  .btn-primary {
+    height: 44px;
+    padding: 0 20px;
+    background-color: var(--color-accent);
+    border: none;
+    color: var(--color-lol-white);
+    font-size: 14px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: background-color 0.15s;
+    white-space: nowrap;
   }
 
-  @media (max-width: 640px) {
-    .form-grid-2 { grid-template-columns: 1fr; }
+  .btn-primary:hover:not(:disabled) {
+    background-color: var(--color-accent-hover);
   }
 
   .form-input-half {
@@ -699,19 +734,7 @@
     width: 100%;
   }
 
-  .date-picker-trigger {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    height: 44px;
-    padding: 0 18px;
-    border-radius: var(--radius-control);
-    background-color: var(--color-lol-white);
-    border: 1px solid var(--color-border);
-    color: var(--color-text-meta);
-    font-size: 14px;
-    cursor: pointer;
-    transition: border-color 0.15s ease;
+  .btn-primary-full {
     width: 100%;
     justify-content: flex-start;
   }
@@ -742,8 +765,7 @@
     justify-content: center;
     gap: 6px;
     height: 44px;
-    padding: 0 20px;
-    background-color: var(--color-maroon);
+    background-color: var(--color-accent);
     border: none;
     border-radius: var(--radius-control);
     border-radius: var(--radius-control);
@@ -757,28 +779,14 @@
     white-space: nowrap;
   }
 
-  .btn-primary:hover:not(:disabled) { background-color: var(--color-accent); }
-  .btn-primary:active:not(:disabled) { transform: scale(0.97); }
-  .btn-primary:disabled { background-color: var(--color-text-meta); cursor: not-allowed; }
-  .btn-primary:hover:not(:disabled) { background-color: var(--color-accent); }
-  .btn-primary:active:not(:disabled) { transform: scale(0.97); }
-  .btn-primary:disabled { background-color: var(--color-text-meta); cursor: not-allowed; }
-
-  .btn-primary-full:active:not(:disabled) {
-    transform: scale(0.98);
+  .btn-primary-full:hover:not(:disabled) {
+    background-color: var(--color-accent-hover);
   }
 
   .btn-primary-full:disabled {
     background-color: var(--color-text-meta);
     cursor: not-allowed;
   }
-
-  .btn-primary-full:hover:not(:disabled) { background-color: var(--color-accent); }
-  .btn-primary-full:active:not(:disabled) { transform: scale(0.98); }
-  .btn-primary-full:disabled { background-color: var(--color-text-meta); cursor: not-allowed; }
-  .btn-primary-full:hover:not(:disabled) { background-color: var(--color-accent); }
-  .btn-primary-full:active:not(:disabled) { transform: scale(0.98); }
-  .btn-primary-full:disabled { background-color: var(--color-text-meta); cursor: not-allowed; }
 
   .btn-secondary {
     display: inline-flex;
@@ -802,12 +810,6 @@
     background-color: var(--color-lol-bg);
   }
 
-  .btn-secondary:disabled {
-    color: var(--color-text-meta);
-    cursor: not-allowed;
-  }
-
-  /* Ghost — used on dark/maroon backgrounds (e.g. logout) */
   .btn-ghost {
     background: transparent;
     border: 1px solid rgba(255, 255, 255, 0.4);
@@ -823,7 +825,6 @@
   .btn-ghost:hover { background-color: rgba(255, 255, 255, 0.12); }
   .btn-ghost:hover { background-color: rgba(255, 255, 255, 0.12); }
 
-  /* Text-only link button — forgot password, logout, etc */
   .btn-link {
     background: none;
     border: none;
@@ -1854,12 +1855,17 @@
     }
   }
 
-  .product-line-row {
-    background-color: var(--color-lol-bg);
-    border: 1px solid var(--color-border);
-    border-radius: 14px;
-    padding: 20px;
-    margin-bottom: 16px;
+  .btn-toggle-password {
+    height: 44px;
+    padding: 0 14px;
+    background: transparent;
+    border: none;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-text-meta);
+    cursor: pointer;
+    text-transform: uppercase;
+    flex-shrink: 0;
   }
 
 
@@ -1870,10 +1876,11 @@
     padding: 40px 24px 60px;
   }
 
-  .programme-select-eyebrow {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.7);
-    margin-bottom: 4px;
+  .alert-error {
+    background-color: var(--color-danger-bg);
+    border: 1px solid var(--color-danger);
+    padding: 10px 14px;
+    margin-bottom: 16px;
   }
 
   .programme-select-heading {
@@ -1921,10 +1928,15 @@
     opacity: 0.6;
   }
 
-  .programme-card-banner {
-    position: relative;
-    height: 120px;
-    overflow: hidden;
+  /* ── Sidebar ──────────────────────────────────────────────── */
+
+  .sidebar {
+    width: 240px;
+    background-color: var(--color-lol-white);
+    border-right: 1px solid var(--color-border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
   }
 
   .programme-card-image {
@@ -2035,8 +2047,6 @@
     color: var(--color-text);
   }
 
-
-  /* ── Task select row ────────────────────────────────────────── */
   .task-row {
     display: flex;
     align-items: center;
@@ -2051,10 +2061,10 @@
     transition: border-color 0.15s ease, background-color 0.15s ease;
   }
 
-  .product-line-override-toggle input {
-    width: 18px;
-    height: 18px;
-    cursor: pointer;
+  .task-row.selected {
+    background-color: rgba(43, 51, 54, 0.04);
+    border-color: var(--color-maroon);
+    border-left: 4px solid var(--color-accent);
   }
 
 
@@ -2177,10 +2187,95 @@
   }
 
 
-  /* ── Form modal (ProofOfDelivery, DeliveryNoteView) ────────── */
-  .form-modal,
-  .form-modal-wide,
-  .pdf-modal {
+  /* ── Table ────────────────────────────────────────────────── */
+
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 15px;
+  }
+
+  .data-table th {
+    background-color: var(--color-lol-bg);
+    border: 1px solid var(--color-border);
+    padding: 10px 14px;
+    font-size: 12px;
+    font-weight: 900;
+    color: var(--color-text-meta);
+    text-transform: uppercase;
+    text-align: left;
+    letter-spacing: 0.5px;
+  }
+
+  .data-table td {
+    border: 1px solid var(--color-border);
+    padding: 10px 14px;
+    color: var(--color-text);
+    vertical-align: middle;
+  }
+
+  .data-table tr:nth-child(even) td {
+    background-color: rgba(233, 227, 221, 0.5);
+  }
+
+  .data-table tr:hover td {
+    background-color: rgba(43, 51, 54, 0.04);
+  }
+
+
+  /* ── Footer meta ──────────────────────────────────────────── */
+
+  .footer-meta {
+    margin-top: 24px;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-border);
+    text-align: center;
+    font-size: 11px;
+    color: var(--color-text-meta);
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  /* ── Divider ──────────────────────────────────────────────── */
+
+  .divider {
+    height: 1px;
+    background-color: var(--color-border);
+    margin: 16px 0;
+  }
+
+  /* ── Search bar ───────────────────────────────────────────── */
+
+  .search-bar {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+
+  .search-input {
+    width: 320px;
+    height: 42px;
+    padding: 0 12px;
+    border: 1px solid var(--color-border);
+    font-size: 15px;
+    font-family: inherit;
+    background-color: var(--color-lol-white);
+    outline: none;
+    text-transform: uppercase;
+  }
+
+  .search-input:focus {
+    border-color: var(--color-maroon);
+  }
+}
+
+/* ── Form modal card (ProofOfDeliveryForm, DeliveryNoteView) ─ */
+
+@layer components {
+
+  .form-modal {
+    width: 720px;
     max-width: 100%;
     background-color: var(--color-lol-white);
     border: 1px solid var(--color-border);
@@ -2188,6 +2283,12 @@
     border-radius: 16px;
   }
 
+  .form-modal-wide {
+    width: 800px;
+    max-width: 100%;
+    background-color: var(--color-lol-white);
+    border: 1px solid var(--color-border);
+    border-top: 4px solid var(--color-accent);
   .form-modal      { width: 720px; }
   .form-modal-wide { width: 800px; }
   .pdf-modal       { width: 840px; }
@@ -2276,6 +2377,8 @@
     margin-bottom: 24px;
   }
 
+  .form-required {
+    color: var(--color-danger);
   .modal-actions {
     display: flex;
     gap: 12px;
@@ -2453,6 +2556,19 @@
     cursor: not-allowed;
   }
 
+  .discrepancy-notice {
+    background-color: #FFF3EE;
+    border: 1px solid var(--color-accent);
+    border-top: none;
+    padding: 10px 14px;
+  }
+
+  .discrepancy-notice p {
+    font-size: 12px;
+    font-weight: 900;
+    color: var(--color-accent-hover);
+    margin: 0;
+  }
 
   /* ── PO selection card ──────────────────────────────────────── */
   .po-card {
@@ -2583,6 +2699,7 @@
 
   .note-summary-value {
     font-size: 22px;
+    font-weight: 900;
     font-weight: 700;
     color: var(--color-maroon);
   }
@@ -2677,7 +2794,7 @@
   }
 
   .note-line-qty-actual.is-discrepancy {
-    color: var(--color-accent);
+    color: var(--color-accent-hover);
   }
 
   .note-line-weight {
@@ -2687,7 +2804,7 @@
   }
 
   .note-line-weight.is-discrepancy {
-    color: var(--color-accent);
+    color: var(--color-accent-hover);
   }
 
   .note-status-chip {
@@ -2701,15 +2818,91 @@
   }
 
   .note-status-chip.is-discrepancy {
-    background-color: rgba(227, 30, 36, 0.2);
-    border: 1px solid rgba(227, 30, 36, 0.4);
-    color: var(--color-accent);
+    background-color: rgba(217, 56, 64, 0.2);
+    border: 1px solid rgba(217, 56, 64, 0.4);
+    color: var(--color-accent-hover);
   }
 
   .note-status-chip.is-ok {
     background-color: rgba(16, 124, 16, 0.2);
     border: 1px solid rgba(16, 124, 16, 0.4);
     color: #107C10;
+  }
+
+  .note-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    border-top: 1px solid var(--color-border);
+    background-color: var(--color-lol-bg);
+  }
+
+  .note-footer-meta {
+    font-size: 11px;
+    color: var(--color-text-meta);
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+}
+
+/* ── Additional utility classes ──────────────────────────────── */
+
+  .line-item-input-readonly {
+    width: 100%;
+    height: 38px;
+    padding: 0 10px;
+    background-color: #EDEBE9;
+    border: 1px solid var(--color-border);
+    font-size: 16px;
+    color: var(--color-text-sub);
+    text-align: center;
+    font-family: inherit;
+    cursor: not-allowed;
+  }
+
+  .po-card {
+    border: 1px solid var(--color-border);
+    padding: 14px 16px;
+    cursor: pointer;
+    background-color: var(--color-lol-white);
+    transition: border-color 0.15s, background-color 0.15s;
+    width: 100%;
+    text-align: left;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .po-card:hover {
+    border-color: var(--color-maroon);
+    background-color: var(--color-lol-bg);
+  }
+
+  .po-card.selected {
+    border-color: var(--color-maroon);
+    border-left: 4px solid var(--color-accent);
+    background-color: rgba(43, 51, 54, 0.04);
+  }
+
+  .po-card-id {
+    font-size: 15px;
+    font-weight: 900;
+    color: var(--color-text);
+  }
+
+  .po-card-meta {
+    font-size: 12px;
+    color: var(--color-text-meta);
+    margin-top: 4px;
+  }
+
+  .info-notice {
+    background-color: #EFF6FF;
+    border: 1px solid #93C5FD;
+    border-top: none;
+    padding: 10px 14px;
   }
 
   .note-footer {
@@ -2777,16 +2970,20 @@
     font-weight: 600;
   }
 
+  /* ── Delivery Note PDF modal ───────────────────────────────── */
 
-  /* ── PDF document ───────────────────────────────────────────── */
+  .pdf-modal {
+    width: 840px;
+    max-width: 100%;
+    background-color: var(--color-lol-white);
+    border: 1px solid var(--color-border);
+    border-top: 4px solid var(--color-accent);
+  }
+
   .pdf-document {
     padding: 32px;
     background-color: var(--color-lol-white);
-    font-family: Tahoma, sans-serif; /* intentionally kept for print/PDF fidelity */
-  }
-
-  @media (max-width: 640px) {
-    .pdf-document { padding: 16px; }
+    font-family: var(--font-family-sans);
   }
 
   .pdf-doc-header {
@@ -2974,6 +3171,11 @@
     color: var(--color-text);
   }
 
+  .btn-view-pdf {
+    height: 36px;
+    padding: 0 14px;
+    background-color: var(--color-lol-white);
+    border: 1px solid var(--color-border);
 
   /* ── Footer / meta text ─────────────────────────────────────── */
   .footer-meta {
