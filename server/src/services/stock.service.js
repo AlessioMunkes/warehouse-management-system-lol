@@ -6,6 +6,18 @@
 // ─────────────────────────────────────────────────────────────
 import stockModel from '../repositories/stock.repository.js';
 
+// ── fail ───────────────────────────────────────────────────────
+// Mirrors picking.service.js. Without a `.status` on the error, the
+// controller's `err.status || 500` sends every validation failure
+// down the 500 branch, which replaces the message with a generic
+// "Failed to adjust stock." — so the manager sees a blank error and
+// no clue what was wrong. Attaching the status keeps the message.
+const fail = (status, message) => {
+  const err = new Error(message);
+  err.status = status;
+  throw err;
+};
+
 // ── Get the current manifest ────────────────────────────────
 const getManifest = async () => {
   return await stockModel.getManifest();
@@ -13,7 +25,7 @@ const getManifest = async () => {
 
 // ── Get movement history for one product ──────────────────────
 const getMovements = async (productId) => {
-  if (!productId) throw new Error('Product ID is required.');
+  if (!productId) fail(400, 'Product ID is required.');
   return await stockModel.getMovements(productId);
 };
 
@@ -28,10 +40,10 @@ const adjustManually = async (data, userId) => {
   const { productId, quantityDelta, unit, reason } = data;
   const delta = Number(quantityDelta);
 
-  if (!productId)                                    throw new Error('Product is required.');
+  if (!productId)                                    fail(400, 'Product is required.');
   if (quantityDelta === undefined || quantityDelta === null || !Number.isFinite(delta) || delta === 0)
-                                                       throw new Error('A non-zero quantity change is required.');
-  if (!reason || !reason.trim())                      throw new Error('A reason is required for manual adjustments.');
+                                                       fail(400, 'A non-zero quantity change is required.');
+  if (!reason || !reason.trim())                      fail(400, 'A reason is required for manual adjustments.');
 
   const result = await stockModel.manualAdjust({
     productId,
@@ -41,7 +53,7 @@ const adjustManually = async (data, userId) => {
     performedBy:   userId, // comes from JWT — never trusted from frontend
   });
 
-  if (result.productNotFound) throw new Error('Product not found.');
+  if (result.productNotFound) fail(404, 'Product not found.');
 
   return result;
 };

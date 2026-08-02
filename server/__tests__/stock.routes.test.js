@@ -245,39 +245,40 @@ describe('stock routes — error handling', () => {
   });
 });
 
-// ── Known defects ─────────────────────────────────────────────
-describe.skip('known defects — un-skip once fixed', () => {
+// ── Validation passthrough (was DEFECT G/H) ───────────────────
+// The service is mocked in this file, so these can only assert the
+// controller half of the contract: that a status the service attaches
+// survives to the client with its message intact. The service half —
+// that fail() actually attaches 400/404 — lives in
+// stock.service.test.js under 'error contract with the controller'.
+// Both halves have to hold, or the manager gets a blank error.
+describe('validation errors reach the client intact', () => {
   const validationCases = [
     ['a missing reason',   'A reason is required for manual adjustments.'],
     ['a zero quantity',    'A non-zero quantity change is required.'],
     ['a missing product',  'Product is required.'],
   ];
 
-  it.each(validationCases)(
-    'DEFECT G: %s returns 500 instead of 400, and the message is swallowed',
-    async (_label, message) => {
-      // stock.service.js throws bare `new Error(...)` with no `.status`,
-      // but stock.controller.js reads `err.status || 500` and only shows
-      // err.message when status < 500. So every validation failure reaches
-      // the manager as a blank "Failed to adjust stock." with no clue what
-      // was wrong. The controller's own TODO flags this.
-      // Fix: add picking.service.js's fail(status, message) helper to
-      // stock.service.js and throw fail(400, ...) / fail(404, ...).
-      serviceMock.adjustManually.mockRejectedValueOnce(new Error(message));
+  const withStatus = (status, message) =>
+    Object.assign(new Error(message), { status });
 
-      const res = await request(app).post(`${BASE}/adjust`)
-        .set('Cookie', cookieFor(ROLES.MANAGER)).send({});
+  it.each(validationCases)('%s returns 400 with the reason shown', async (_label, message) => {
+    serviceMock.adjustManually.mockRejectedValueOnce(withStatus(400, message));
 
-      expect(res.status).toBe(400);
-      expect(res.body.message).toBe(message);
-    });
+    const res = await request(app).post(`${BASE}/adjust`)
+      .set('Cookie', cookieFor(ROLES.MANAGER)).send({});
 
-  it('DEFECT H: an unknown product returns 500 rather than 404', async () => {
-    serviceMock.adjustManually.mockRejectedValueOnce(new Error('Product not found.'));
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe(message);
+  });
+
+  it('an unknown product returns 404, not 500', async () => {
+    serviceMock.adjustManually.mockRejectedValueOnce(withStatus(404, 'Product not found.'));
 
     const res = await request(app).post(`${BASE}/adjust`)
       .set('Cookie', cookieFor(ROLES.MANAGER)).send(BODY);
 
     expect(res.status).toBe(404);
+    expect(res.body.message).toBe('Product not found.');
   });
 });

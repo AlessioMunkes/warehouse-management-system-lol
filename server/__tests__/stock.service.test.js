@@ -6,11 +6,10 @@
 // config/db.js, which calls process.exit(1) when DB_* env vars are
 // missing and would kill the vitest process with no failure output.
 //
-// NOTE: stock.service.js throws bare `new Error(...)` with no
-// `.status`, while stock.controller.js reads `err.status || 500`.
-// Every validation failure below therefore surfaces to the client
-// as a 500. That is covered as DEFECT G in stock.routes.test.js and
-// is already flagged in the controller's own TODO.
+// NOTE: stock.service.js now uses a fail(status, message) helper
+// (mirroring picking.service.js), so validation failures carry a
+// .status and stock.controller.js surfaces the real message instead
+// of a generic 500. This was DEFECT G/H.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
@@ -195,21 +194,30 @@ describe('adjustManually — rejected adjustments', () => {
 
 // ── Error contract ────────────────────────────────────────────
 describe('error contract with the controller', () => {
-  // stock.controller.js maps err.status, falling back to 500. Nothing
-  // in stock.service.js sets .status, so this pins the current state:
-  // when the fail() helper is added, these become the 400/404 checks.
+  // stock.controller.js maps err.status, falling back to 500 and
+  // replacing the message with a generic one. The fail() helper now
+  // attaches a status to every validation failure, so the manager
+  // sees the real reason instead of a blank "Failed to adjust stock."
   const cases = [
-    ['missing product', { ...VALID, productId: undefined }],
-    ['zero delta',      { ...VALID, quantityDelta: 0 }],
-    ['missing reason',  { ...VALID, reason: '' }],
+    ['missing product', { ...VALID, productId: undefined }, 'Product is required.'],
+    ['zero delta',      { ...VALID, quantityDelta: 0 },     'A non-zero quantity change is required.'],
+    ['missing reason',  { ...VALID, reason: '' },           'A reason is required for manual adjustments.'],
   ];
 
-  it.each(cases)('%s throws without a status, so the controller sends 500', async (_l, body) => {
-    try {
-      await stockService.adjustManually(body, USER_ID);
-      throw new Error('should have thrown');
-    } catch (err) {
-      expect(err.status).toBeUndefined();
-    }
+  it.each(cases)('%s throws 400 with the message intact', async (_l, body, message) => {
+    await expect(stockService.adjustManually(body, USER_ID))
+      .rejects.toMatchObject({ status: 400, message });
+  });
+
+  it('an unknown product throws 404, not 400', async () => {
+    repoMock.manualAdjust.mockResolvedValueOnce({ productNotFound: true });
+
+    await expect(stockService.adjustManually(VALID, USER_ID))
+      .rejects.toMatchObject({ status: 404, message: 'Product not found.' });
+  });
+
+  it('getMovements without an id throws 400', async () => {
+    await expect(stockService.getMovements(undefined))
+      .rejects.toMatchObject({ status: 400, message: 'Product ID is required.' });
   });
 });

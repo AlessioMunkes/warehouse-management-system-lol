@@ -64,6 +64,7 @@ describe('AuthContext', () => {
 
     await screen.findByText('no-user');
     expect(localStorage.getItem('wms_user')).toBeNull();
-    expect(apiPost).toHaveBeenCalledWith('/api/logout', {});
+    // Mounted at /api/login in index.js, so logout is a sub-path of it.
+    expect(apiPost).toHaveBeenCalledWith('/api/login/logout', {});
   });
 });
