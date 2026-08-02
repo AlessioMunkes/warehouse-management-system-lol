@@ -1,16 +1,19 @@
 // ─────────────────────────────────────────────────────────────
 // src/pages/SelectNOCjob.jsx
 // ─────────────────────────────────────────────────────────────
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate }      from 'react-router-dom';
 import { useAuth }          from '../context/AuthContext';
 import logo                 from '../assets/LOL_Logo.jpg';
 
+// `to` is the route each task opens. A task with no `to` has no page
+// built yet and renders disabled, so the tile can't lead to a dead route.
 const TASKS = [
-  { id: 'procurement', label: 'PROCUREMENT',  desc: 'SUPPLIER DELIVERIES & INTAKE',  active: true  },
-  { id: 'decanting',   label: 'DECANTING',    desc: 'VEGETABLE WEIGHING & BAGGING',  active: false },
-  { id: 'packing',     label: 'PACKING',      desc: 'PALLET PACKING',                active: false },
-  { id: 'ecdDispatch', label: 'ECD DISPATCH', desc: 'TUESDAY & THURSDAY DISPATCH',   active: false },
+  { id: 'procurement', label: 'PROCUREMENT',  desc: 'SUPPLIER DELIVERIES & INTAKE', to: '/noc/procurement' },
+  { id: 'decanting',   label: 'DECANTING',    desc: 'VEGETABLE WEIGHING & BAGGING', to: '/noc/decanting' },
+  { id: 'packing',     label: 'PACKING',      desc: 'PALLET PACKING',               to: '/noc/packing' },
+  { id: 'inventory',   label: 'INVENTORY',    desc: 'STOCK LEVELS & ADJUSTMENTS',   to: '/noc/inventory' },
+  { id: 'ecdDispatch', label: 'ECD DISPATCH', desc: 'TUESDAY & THURSDAY DISPATCH',  to: null },
 ];
 
 const SelectNOCjob = () => {
@@ -19,8 +22,8 @@ const SelectNOCjob = () => {
   const [selected, setSelected] = useState(null);
 
   const handleContinue = () => {
-    if (!selected) return;
-    if (selected === 'procurement') navigate('/noc/procurement');
+    const task = TASKS.find((t) => t.id === selected);
+    if (task?.to) navigate(task.to);
   };
 
   const handleBack = () => navigate('/programmes');
@@ -61,8 +64,8 @@ const SelectNOCjob = () => {
           {TASKS.map((t) => (
             <button
               key={t.id}
-              onClick={() => t.active && setSelected(t.id)}
-              disabled={!t.active}
+              onClick={() => t.to && setSelected(t.id)}
+              disabled={!t.to}
               className={`task-row${selected === t.id ? ' selected' : ''}`}
             >
               <div className="task-row-icon">{t.label[0]}</div>
@@ -70,12 +73,12 @@ const SelectNOCjob = () => {
                 <p className="task-row-label">{t.label}</p>
                 <p className="task-row-desc">{t.desc}</p>
               </div>
-              {!t.active && (
+              {!t.to && (
                 <span style={{ fontSize: '7px', fontWeight: 900, color: '#A4262C', textTransform: 'uppercase' }}>
                   OFF
                 </span>
               )}
-              {selected === t.id && t.active && (
+              {selected === t.id && t.to && (
                 <span style={{ fontSize: '12px', fontWeight: 900, color: '#E31E24' }}>✓</span>
               )}
             </button>

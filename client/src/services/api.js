@@ -6,7 +6,17 @@
 // request — we just need credentials: 'include' to enable that.
 // ─────────────────────────────────────────────────────────────
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// In production the API is served from the SAME origin as this app
+// (Express serves client/dist), so an empty base gives relative URLs
+// like /api/login. In dev, Vite runs on :5173 and the API on :5000,
+// so we need the absolute origin.
+//
+// Note the DEV check rather than `|| fallback`: VITE_API_URL is baked
+// in at BUILD time, so an unset variable in a production build would
+// otherwise leave every request pointing at the developer's localhost.
+const API_BASE =
+  import.meta.env.VITE_API_URL ??
+  (import.meta.env.DEV ? 'http://localhost:5000' : '');
 
 // ── Handle response — throw a clean error on non-2xx ─────────
 const handleResponse = async (res) => {

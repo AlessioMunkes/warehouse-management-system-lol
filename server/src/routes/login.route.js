@@ -26,11 +26,11 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: 'Username and password are required.' });
     }
 
-    const result = await pool.query(
+   const result = await pool.query(
       `SELECT id, username, first_name, last_name, role, password_hash
        FROM users
-       WHERE username = $1`,
-      [username.toUpperCase()]
+       WHERE LOWER(username) = LOWER($1)`,
+      [username]
     );
 
     // Same message for wrong username OR wrong password — never reveal which
@@ -74,7 +74,7 @@ router.post('/', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('[login]', error.message);
+    console.error('[login]', error);
     res.status(500).json({ message: 'Server error during login.' });
   }
 });

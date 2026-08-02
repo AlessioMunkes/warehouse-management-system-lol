@@ -1,9 +1,16 @@
-import React, { useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
 // ─────────────────────────────────────────────────────────────
 // src/components/Procurement/DeliveryNotePDF.jsx
+//
+// Renders a saved delivery record as a formatted note. The
+// toolbar action opens the generated PDF in a new browser tab
+// (view-only) rather than forcing a file download, so managers
+// reviewing a delivery can glance at it without a file landing
+// in their downloads folder. The browser's own PDF viewer still
+// lets them save/print from there if they choose to.
 // ─────────────────────────────────────────────────────────────
 
 const formatDate = (d) => {
@@ -14,26 +21,28 @@ const formatDate = (d) => {
 };
 
 const DeliveryNotePDF = ({ delivery, onClose }) => {
-  const documentRef  = useRef(null);
+  const documentRef = useRef(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [genError, setGenError] = useState('');
 
   if (!delivery) return null;
 
   const isCompleted = delivery.po_status === 'completed';
 
-  // ── Generate and download PDF ─────────────────────────────
-  const handleDownload = async () => {
+  // ── Generate PDF and open it in a new tab ─────────────────
+  const handleViewPdf = async () => {
     if (!documentRef.current) return;
     setIsGenerating(true);
+    setGenError('');
     try {
-      const canvas    = await html2canvas(documentRef.current, {
+      const canvas = await html2canvas(documentRef.current, {
         scale: 2, useCORS: true, backgroundColor: '#FFFFFF', logging: false,
       });
-      const imgData   = canvas.toDataURL('image/png');
-      const pdf       = new jsPDF('p', 'mm', 'a4');
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight= pdf.internal.pageSize.getHeight();
-      const imgWidth  = pageWidth;
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imgWidth = pageWidth;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
       let yPos = 0;
@@ -42,9 +51,17 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
         pdf.addImage(imgData, 'PNG', 0, -yPos, imgWidth, imgHeight);
         yPos += pageHeight;
       }
-      pdf.save(`DeliveryNote_${delivery.id}_${delivery.supplier_name?.replace(/\s+/g, '_')}.pdf`);
+
+      // bloburl opens in the browser's built-in PDF viewer —
+      // no forced download; the viewer can still save/print if needed.
+      const blobUrl = pdf.output('bloburl');
+      const opened = window.open(blobUrl, '_blank');
+      if (!opened) {
+        setGenError('Pop-up blocked — allow pop-ups for this site to view the PDF.');
+      }
     } catch (err) {
       console.error('PDF generation failed:', err);
+      setGenError('Could not generate the PDF. Please try again.');
     } finally {
       setIsGenerating(false);
     }
@@ -58,21 +75,21 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
         <span className="pdf-toolbar-title">
           DELIVERY NOTE #{delivery.id} — {delivery.supplier_name}
         </span>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="pdf-toolbar-actions">
+          {genError && <span className="pdf-toolbar-error">{genError}</span>}
           <button
-            onClick={handleDownload}
+            onClick={handleViewPdf}
             disabled={isGenerating}
-            className="btn-primary"
-            style={{ height: '28px', fontSize: '8px' }}
+            className="btn-primary btn-sm"
           >
-            {isGenerating ? 'GENERATING...' : '↓ DOWNLOAD PDF'}
+            {isGenerating ? 'GENERATING...' : '⤢ VIEW PDF'}
           </button>
           <button onClick={onClose} className="btn-ghost">✕ CLOSE</button>
         </div>
       </div>
 
       {/* Scrollable document */}
-      <div style={{ maxHeight: '80vh', overflowY: 'auto' }}>
+      <div className="pdf-scroll-area">
         <div className="pdf-document" ref={documentRef}>
 
           {/* Document header */}
@@ -85,42 +102,32 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
             <div>
               <p className="pdf-doc-id-label">RECORD NUMBER</p>
               <p className="pdf-doc-id">#{String(delivery.id).padStart(4, '0')}</p>
-              <p className="pdf-doc-id-label" style={{ marginTop: '4px' }}>
+              <p className="pdf-doc-id-label pdf-doc-id-label--spaced">
                 DATE RECORDED: {formatDate(delivery.created_at)}
               </p>
             </div>
           </div>
 
-          {/* ── PO Completion status banner ──────────────────── */}
-          <div style={{
-            padding: '10px 14px',
-            marginBottom: '14px',
-            border: `1px solid ${isCompleted ? '#107C10' : '#BA7517'}`,
-            background: isCompleted ? '#DFF6DD' : '#FAEEDA',
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '10px',
-          }}>
-          
+          {/* PO completion status banner */}
+          <div className={`pdf-status-banner ${isCompleted ? 'pdf-status-banner--complete' : 'pdf-status-banner--pending'}`}>
             <div>
               {isCompleted ? (
                 <>
-                  <p style={{ fontSize: '13px', fontWeight: 900, color: '#107C10', margin: '0 0 2px', textTransform: 'uppercase' }}>
+                  <p className="pdf-status-title pdf-status-title--complete">
                     Purchase Order #{delivery.po_id} — Marked as Complete
                   </p>
-                  <p style={{ fontSize: '11px', color: '#27500A', margin: 0 }}>
+                  <p className="pdf-status-body pdf-status-body--complete">
                     All items from this purchase order have been fully delivered and the order is now closed.
                   </p>
                 </>
               ) : (
                 <>
-                  <p style={{ fontSize: '13px', fontWeight: 900, color: '#633806', margin: '0 0 2px', textTransform: 'uppercase' }}>
+                  <p className="pdf-status-title pdf-status-title--pending">
                     Purchase Order #{delivery.po_id} — Awaiting Further Delivery
                   </p>
-                  <p style={{ fontSize: '11px', color: '#633806', margin: 0 }}>
-                    This is delivery{' '}
-                    <strong>#{delivery.id}</strong>.
-                    The purchase order has not been marked as complete and may have future deliveries recorded against it.
+                  <p className="pdf-status-body pdf-status-body--pending">
+                    This is delivery <strong>#{delivery.id}</strong>. The purchase order has not been marked
+                    as complete and may have future deliveries recorded against it.
                   </p>
                 </>
               )}
@@ -164,25 +171,25 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
               <tr>
                 <th>Product</th>
                 <th>SKU</th>
-                <th style={{ textAlign: 'center' }}>Expected Qty</th>
-                <th style={{ textAlign: 'center' }}>Expected Weight (kg)</th>
+                <th className="pdf-table-center">Expected Qty</th>
+                <th className="pdf-table-center">Expected Weight (kg)</th>
               </tr>
             </thead>
             <tbody>
               {delivery.items?.length ? (
                 delivery.items.map((item, i) => (
                   <tr key={item.purchase_order_item_id ?? i}>
-                    <td style={{ fontWeight: 700 }}>{item.product_name}</td>
-                    <td style={{ color: '#605E5C' }}>{item.sku || '—'}</td>
-                    <td style={{ textAlign: 'center' }}>{item.expected_quantity}</td>
-                    <td style={{ textAlign: 'center' }}>
+                    <td className="pdf-table-product">{item.product_name}</td>
+                    <td className="pdf-table-sku">{item.sku || '—'}</td>
+                    <td className="pdf-table-center">{item.expected_quantity}</td>
+                    <td className="pdf-table-center">
                       {item.expected_weight_kg ? `${item.expected_weight_kg} kg` : '—'}
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={4} style={{ textAlign: 'center', color: '#A19F9D', padding: '16px' }}>
+                  <td colSpan={4} className="pdf-table-empty">
                     No items on record
                   </td>
                 </tr>
@@ -195,11 +202,7 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
             <div className="pdf-signature-block">
               <p className="pdf-signature-label">Driver Signature</p>
               {delivery.signature ? (
-                <img
-                  src={delivery.signature}
-                  alt="Driver signature"
-                  className="pdf-signature-img"
-                />
+                <img src={delivery.signature} alt="Driver signature" className="pdf-signature-img" />
               ) : (
                 <div className="pdf-signature-line" />
               )}
@@ -219,7 +222,7 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
           {/* Footer stamp */}
           <div className="pdf-footer-stamp">
             <p>LADLES OF LOVE NGO · WAREHOUSE MANAGEMENT SYSTEM</p>
-            <p style={{ marginTop: '2px' }}>
+            <p className="pdf-footer-stamp--spaced">
               DOCUMENT GENERATED: {new Date().toLocaleString('en-ZA')} · RECORD #{delivery.id}
             </p>
           </div>

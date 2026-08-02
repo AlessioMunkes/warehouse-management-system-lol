@@ -1,7 +1,8 @@
 // src/pages/GuestLoginPage.jsx
-import React, { useState } from 'react';
+import { useState }        from 'react';
 import { useNavigate }     from 'react-router-dom';
 import { useAuth }         from '../context/AuthContext';
+import { apiPost }         from '../services/api';
 import logo                from '../assets/LOL_Logo.jpg';
 
 
@@ -28,7 +29,7 @@ const GuestLoginPage = () => {
   };
 
   return (
-    <div className="page-maroon">
+    <div className="page-background">
       <div className="card">
         <div className="card-header">
           <img src={logo} alt="Ladles of Love"
