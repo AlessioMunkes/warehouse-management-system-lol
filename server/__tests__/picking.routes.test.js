@@ -229,7 +229,7 @@ describe('picking routes — controller passes the right arguments', () => {
       .send({ packedQuantity: 3 });
 
     expect(serviceMock.confirmItem).toHaveBeenCalledWith(
-      1, '5', { packedQuantity: 3 }, expect.objectContaining({ id: 42 })
+      1, 5, { packedQuantity: 3 }, expect.objectContaining({ id: 42 })
     );
   });
 
@@ -239,7 +239,7 @@ describe('picking routes — controller passes the right arguments', () => {
       .send({ flagReason: 'Only 2 crates left' });
 
     expect(serviceMock.flagItem).toHaveBeenCalledWith(
-      1, '5', { flagReason: 'Only 2 crates left' }, expect.anything()
+      1, 5, { flagReason: 'Only 2 crates left' }, expect.anything()
     );
   });
 
@@ -363,19 +363,34 @@ describe('picking routes — service status is honoured', () => {
   });
 });
 
-// ── Known defects ─────────────────────────────────────────────
-describe.skip('known defects — un-skip once fixed', () => {
+// ── Regressions — previously known defects, now fixed ─────────
+describe('regressions — previously known defects', () => {
   it.each(['confirm', 'flag'])(
-    'DEFECT D: :itemId is never validated as an integer (%s)', async (action) => {
-      // validateIntId only inspects req.params.id, so :itemId reaches the
-      // repository as an arbitrary string. It is passed as a bound query
-      // parameter so there is no injection risk, but garbage travels all
-      // the way to Postgres and surfaces as a 500 instead of a clean 400.
-      // The TODO in picking.routes.js acknowledges this.
-      // Fix: a validateIntParam('itemId') variant, applied to both routes.
+    ':itemId is validated as an integer (%s)', async (action) => {
+      // Was DEFECT D. validateIntId only inspected req.params.id, so
+      // :itemId reached the repository as an arbitrary string. It was
+      // passed as a bound query parameter so there was no injection
+      // risk, but garbage travelled all the way to Postgres and came
+      // back as a 500 instead of a clean 400.
       const res = await request(app).post(`${BASE}/1/items/abc/${action}`)
         .set('Cookie', cookieFor(ROLES.WORKER)).send({ packedQuantity: 1, flagReason: 'x' });
 
       expect(res.status).toBe(400);
     });
+
+  it.each(['confirm', 'flag'])(
+    'a bad :itemId never reaches the service (%s)', async (action) => {
+      await request(app).post(`${BASE}/1/items/0/${action}`)
+        .set('Cookie', cookieFor(ROLES.WORKER)).send({ packedQuantity: 1, flagReason: 'x' });
+
+      expect(serviceMock.confirmItem).not.toHaveBeenCalled();
+      expect(serviceMock.flagItem).not.toHaveBeenCalled();
+    });
+
+  it('hands the service a numeric item id after validation', async () => {
+    await request(app).post(`${BASE}/1/items/5/confirm`)
+      .set('Cookie', cookieFor(ROLES.WORKER)).send({ packedQuantity: 3 });
+
+    expect(serviceMock.confirmItem).toHaveBeenCalledWith(1, 5, expect.anything(), expect.anything());
+  });
 });

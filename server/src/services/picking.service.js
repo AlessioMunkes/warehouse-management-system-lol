@@ -24,6 +24,13 @@ const fail = (status, message) => {
 // other week. cohort_anchor_monday (picking_settings) is the Monday
 // of a known week1 week — every other week's cohort is computed from
 // how many whole weeks have passed since that anchor.
+//
+// NOTE: this fortnightly model is what the code implements, but the
+// business case (BR-12), the warehouse visit notes (§4.2) and
+// database.md all describe weekday cohorts ('tuesday' / 'thursday')
+// collecting weekly. One of the two is wrong. Resolve it with the
+// sponsor before Milestone 3 — if fortnightly is correct, the design
+// documents need updating, because they are what gets handed over.
 const mondayOf = (date) => {
   const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
   const day = d.getUTCDay();               // 0 = Sunday .. 6 = Saturday
@@ -42,8 +49,10 @@ const resolveActiveCohort = (dispatchDate, anchorMondayStr) => {
 const isManager = (user) => user.role === ROLES.MANAGER || user.role === ROLES.ADMIN;
 
 // ── List slips ────────────────────────────────────────────────
-// A packer only ever sees their own board unless they ask for the
-// unassigned pool; a manager sees everything.
+// Everyone sees the whole board by default — a packer has to be able
+// to see unclaimed pallets in order to claim one. `mine=true` narrows
+// a packer to the pallets already assigned to them; for a manager it
+// is ignored, because a manager's board is the whole floor.
 const getSlips = async (query, user) => {
   const { dispatchDate, cohort, status, mine } = query;
 
@@ -91,6 +100,9 @@ const validateDispatchDate = async (dispatchDate, cohort, { allowOverride = fals
 };
 
 // ── Generate the week's slips (manager only) ──────────────────
+// Returns { created, emptySlips } — emptySlips lists any ECD whose
+// master data produced a slip with no lines, so the manager can fix
+// it before packing starts rather than discovering an empty pallet.
 const generateSlips = async ({ dispatchDate, cohort }, user) => {
   if (!isManager(user)) fail(403, 'Only managers can generate picking slips.');
   await validateDispatchDate(dispatchDate, cohort);   // strict — no override for the bulk weekly run
@@ -135,6 +147,11 @@ const assignSlip = async (slipId, body, user) => {
 };
 
 // ── Confirm a line ────────────────────────────────────────────
+// Returns { ...item, variance } — variance is non-null when the
+// packer confirmed a quantity other than the one the slip asked for.
+// That is allowed (the packer is looking at the actual pallet), but
+// it travels back to the UI so the line is visibly marked rather
+// than counted as a clean confirm.
 const confirmItem = async (slipId, itemId, body, user) => {
   const packedQuantity = Number(body.packedQuantity);
 
@@ -148,7 +165,7 @@ const confirmItem = async (slipId, itemId, body, user) => {
   if (result.notFound) fail(404, 'Picking slip item not found.');
   if (result.locked)   fail(409, 'This slip is already complete and cannot be changed.');
   if (result.forbidden) fail(403, 'You can only confirm items on a pallet assigned to you.');
-  return result.item;
+  return { ...result.item, variance: result.variance ?? null };
 };
 
 // ── Flag a line ───────────────────────────────────────────────
@@ -178,19 +195,27 @@ const flagItem = async (slipId, itemId, body, user) => {
 // ── Complete a slip ───────────────────────────────────────────
 // The rule from the business case: a picking slip cannot be marked
 // complete until every required item is confirmed or flagged.
+//
+// Returns the WHOLE repository result — { slip, shortfalls?,
+// unitMismatches? } — not just the slip. Returning result.slip alone
+// meant the shortfall warning the repository worked out was thrown
+// away before it reached the manager, and the client's `result.slip`
+// came back undefined.
 const completeSlip = async (slipId, body, user) => {
   const result = await pickingRepository.completeSlip({
     slipId,
-    palletRef: body.palletRef,
-    actorId:   user.id,
+    palletRef:   body.palletRef,
+    actorId:     user.id,
+    canOverride: isManager(user),
   });
 
   if (result.notFound)        fail(404, 'Picking slip not found.');
   if (result.alreadyComplete) fail(409, 'This slip is already complete.');
+  if (result.forbidden)       fail(403, 'You can only close a pallet assigned to you.');
   if (result.pendingItems) {
     fail(422, `${result.pendingItems} item(s) still need to be confirmed or flagged before this pallet can be closed.`);
   }
-  return result.slip;
+  return result;
 };
 
 export default {

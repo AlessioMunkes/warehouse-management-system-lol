@@ -77,14 +77,30 @@ const adjustStock = async (client, { productId, quantityDelta, unit = null, move
     );
   }
 
-  const after = before + delta;
-
-  await client.query(
+  // ── Let Postgres do the sum ───────────────────────────────────
+  // quantity_on_hand is NUMERIC precisely so decimal arithmetic is
+  // exact. Computing `before + delta` in JavaScript and writing the
+  // result back threw that away: JS numbers are binary floats, so
+  // 0.1 + 0.2 stored 0.30000000000000004, and over a season of
+  // decanting movements the balance drifted away from the sum of the
+  // ledger. Adding in SQL and reading the stored value back with
+  // RETURNING keeps the balance exact and makes the ledger and the
+  // balance reconcilable.
+  //
+  // The row is already locked by the SELECT ... FOR UPDATE above, so
+  // this read-modify-write is still safe against a concurrent caller.
+  const updated = await client.query(
     `UPDATE stock_levels
-     SET quantity_on_hand = $1, updated_at = NOW()
-     WHERE product_id = $2`,
-    [after, productId]
+     SET quantity_on_hand = quantity_on_hand + $1::numeric,
+         updated_at       = NOW()
+     WHERE product_id = $2
+     RETURNING quantity_on_hand`,
+    [delta, productId]
   );
+
+  // One conversion of the stored value for the caller to report on —
+  // not an accumulating calculation, so no error compounds here.
+  const after = Number(updated.rows[0].quantity_on_hand);
 
   await client.query(
     `INSERT INTO stock_movements

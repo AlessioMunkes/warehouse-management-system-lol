@@ -22,18 +22,36 @@ const { adjustStock, manualAdjust } = stockRepository;
 
 // ── Fake client ───────────────────────────────────────────────
 // pg returns NUMERIC columns as strings, so `existing` mirrors that.
+//
+// The balance is now summed by Postgres (`SET quantity_on_hand =
+// quantity_on_hand + $1::numeric ... RETURNING`), so the fake has to
+// answer that UPDATE the way the database would: exact decimal
+// addition, rounded to the 3 decimal places the column declares, and
+// handed back as a string.
+const NUMERIC_SCALE = 3;   // matches NUMERIC(12,3) in schema.sql
+
 const makeClient = ({ existing = null } = {}) => {
   const calls = [];
+  // Tracks the balance across the INSERT-then-UPDATE path used for a
+  // product's first movement.
+  let balance = existing && existing !== 'no-product'
+    ? Number(existing.quantity_on_hand)
+    : 0;
+
   const client = {
     calls,
     release: vi.fn(),
     query: vi.fn(async (sql, params) => {
       calls.push({ sql: sql.replace(/\s+/g, ' ').trim(), params });
       if (/SELECT quantity_on_hand, unit FROM stock_levels/i.test(sql)) {
-        return { rows: existing ? [existing] : [] };
+        return { rows: existing && existing !== 'no-product' ? [existing] : [] };
       }
       if (/SELECT id FROM products/i.test(sql)) {
         return { rows: existing === 'no-product' ? [] : [{ id: 1 }] };
+      }
+      if (/UPDATE stock_levels/i.test(sql)) {
+        balance = Number((balance + Number(params[0])).toFixed(NUMERIC_SCALE));
+        return { rows: [{ quantity_on_hand: balance.toFixed(NUMERIC_SCALE) }], rowCount: 1 };
       }
       return { rows: [], rowCount: 1 };
     }),
@@ -90,12 +108,24 @@ describe('adjustStock — arithmetic', () => {
     expect(result.after).toBeCloseTo(12.75, 6);
   });
 
-  it('writes the computed balance, not the delta, to stock_levels', async () => {
+  it('adds the delta in SQL rather than writing a JS-computed balance', async () => {
+    // This used to pass `before + delta` as the new balance. It now
+    // passes the delta and lets Postgres add it to the stored value,
+    // so NUMERIC precision is never routed through a binary float.
     const client = makeClient({ existing: { quantity_on_hand: '100', unit: 'kg' } });
     await adjustStock(client, { ...BASE, quantityDelta: 25, unit: 'kg' });
 
     const update = findSql(client, /UPDATE stock_levels/i);
-    expect(update.params[0]).toBe(125);
+    expect(update.params[0]).toBe(25);
+    expect(update.sql).toMatch(/quantity_on_hand \+ \$1::numeric/i);
+  });
+
+  it('reads the new balance back from the database, not from JS', async () => {
+    const client = makeClient({ existing: { quantity_on_hand: '100', unit: 'kg' } });
+    await adjustStock(client, { ...BASE, quantityDelta: 25, unit: 'kg' });
+
+    const update = findSql(client, /UPDATE stock_levels/i);
+    expect(update.sql).toMatch(/RETURNING quantity_on_hand/i);
   });
 });
 
@@ -432,20 +462,35 @@ describe('adjustStock — the delta must be a finite number', () => {
   });
 });
 
-// ── Known defects ─────────────────────────────────────────────
-describe.skip('known defects — un-skip once fixed', () => {
-  it('DEFECT F: balances are computed in JS floats, not NUMERIC', async () => {
-    // quantity_on_hand is NUMERIC precisely so decimal arithmetic is
-    // exact, but the sum is done in JS and written back, so binary
-    // float error accumulates: 0.1 + 0.2 stores 0.30000000000000004.
-    // Over a season of decanting movements the ledger and the balance
-    // drift apart.
-    // Fix: let Postgres do the sum —
-    //   SET quantity_on_hand = quantity_on_hand + $1::numeric
-    // and read the new value back with RETURNING.
+// ── Regression — previously known defect, now fixed ───────────
+describe('regression — balances are summed in NUMERIC, not JS floats', () => {
+  it('adds 0.1 and 0.2 without binary float error', async () => {
+    // Was DEFECT F. quantity_on_hand is NUMERIC precisely so decimal
+    // arithmetic is exact, but the sum used to be done in JS and
+    // written back, so 0.1 + 0.2 stored 0.30000000000000004. Over a
+    // season of decanting movements the ledger and the balance drifted
+    // apart. Postgres does the addition now.
     const client = makeClient({ existing: { quantity_on_hand: '0.1', unit: 'kg' } });
     const result = await adjustStock(client, { ...BASE, quantityDelta: 0.2, unit: 'kg' });
 
     expect(result.after).toBe(0.3);
+  });
+
+  it('stays exact across a run of decimal movements', async () => {
+    // Ten 0.1 kg movements should land on 1, not 0.9999999999999999.
+    let balance = '0';
+    for (let i = 0; i < 10; i += 1) {
+      const client = makeClient({ existing: { quantity_on_hand: balance, unit: 'kg' } });
+      const result = await adjustStock(client, { ...BASE, quantityDelta: 0.1, unit: 'kg' });
+      balance = String(result.after);
+    }
+    expect(Number(balance)).toBe(1);
+  });
+
+  it('still reports the balance before the movement', async () => {
+    const client = makeClient({ existing: { quantity_on_hand: '0.1', unit: 'kg' } });
+    const result = await adjustStock(client, { ...BASE, quantityDelta: 0.2, unit: 'kg' });
+
+    expect(result.before).toBe(0.1);
   });
 });

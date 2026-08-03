@@ -1,10 +1,10 @@
 // ─────────────────────────────────────────────────────────────
 // server/src/routes/picking.routes.js
 // ─────────────────────────────────────────────────────────────
-import express                      from 'express';
-import auth, { requireRole, ROLES } from '../middleware/auth.middleware.js';
-import { validateIntId }            from '../middleware/validate.middleware.js';
-import pickingController            from '../controllers/picking.controller.js';
+import express                            from 'express';
+import auth, { requireRole, ROLES }       from '../middleware/auth.middleware.js';
+import { validateIntId, validateIntParam } from '../middleware/validate.middleware.js';
+import pickingController                  from '../controllers/picking.controller.js';
 
 const router = express.Router();
 
@@ -24,20 +24,22 @@ router.get('/',  auth, requireRole(...ALL_ROLES),    pickingController.getSlips)
 router.post('/', auth, requireRole(...MANAGERS_UP),  pickingController.createSlip); // ad-hoc slip, manager only — same reasoning as /generate above
 
 // ── Single slip ───────────────────────────────────────────────
-router.get('/:id',         auth, requireRole(...ALL_ROLES),  validateIntId, pickingController.getSlipById);
-router.post('/:id/assign', auth, requireRole(...PACKERS_UP), validateIntId, pickingController.assignSlip);
+router.get('/:id',           auth, requireRole(...ALL_ROLES),  validateIntId, pickingController.getSlipById);
+router.post('/:id/assign',   auth, requireRole(...PACKERS_UP), validateIntId, pickingController.assignSlip);
 router.post('/:id/complete', auth, requireRole(...PACKERS_UP), validateIntId, pickingController.completeSlip);
 
 // ── Slip items ────────────────────────────────────────────────
-// TODO(Alessio): :itemId isn't validated as an integer here — validateIntId
-// only checks req.params.id. Needs a middleware change (e.g. a param-name
-// variant) to cover :itemId too before these routes go to prod.
+// Both params are validated. :itemId used to be left unchecked, so a
+// non-numeric item id travelled all the way to Postgres and came back
+// as a 500; validateIntParam('itemId') stops it at the door with a 400.
 router.post('/:id/items/:itemId/confirm',
-  auth, requireRole(...PACKERS_UP), validateIntId,
+  auth, requireRole(...PACKERS_UP),
+  validateIntId, validateIntParam('itemId'),
   pickingController.confirmItem
 );
 router.post('/:id/items/:itemId/flag',
-  auth, requireRole(...PACKERS_UP), validateIntId,
+  auth, requireRole(...PACKERS_UP),
+  validateIntId, validateIntParam('itemId'),
   pickingController.flagItem
 );
 

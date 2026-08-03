@@ -359,7 +359,21 @@ describe('confirmItem', () => {
   const ok = { packedQuantity: 3 };
 
   it('confirms a line on the packer\'s own slip', async () => {
-    await expect(pickingService.confirmItem(1, 5, ok, WORKER)).resolves.toBe(ITEM);
+    await expect(pickingService.confirmItem(1, 5, ok, WORKER)).resolves.toMatchObject(ITEM);
+  });
+
+  it('reports no variance when the packed quantity matches the slip', async () => {
+    await expect(pickingService.confirmItem(1, 5, ok, WORKER))
+      .resolves.toMatchObject({ variance: null });
+  });
+
+  it('carries the variance back when the packer confirmed a different quantity', async () => {
+    // A confirm that does not match required_quantity is still a valid
+    // confirm, but it must not look like a clean one to dispatch.
+    const variance = { required: 20, packed: 10, difference: -10 };
+    repoMock.setItemStatus.mockResolvedValueOnce({ item: ITEM, variance, assignedTo: WORKER.id });
+    await expect(pickingService.confirmItem(1, 5, ok, WORKER))
+      .resolves.toMatchObject({ variance });
   });
 
   it('passes the quantity and actor through to the repository', async () => {
@@ -430,7 +444,7 @@ describe('confirmItem', () => {
 
   it('lets a manager confirm on any pallet', async () => {
     repoMock.setItemStatus.mockResolvedValueOnce({ item: ITEM, assignedTo: WORKER2.id });
-    await expect(pickingService.confirmItem(1, 5, ok, MANAGER)).resolves.toBe(ITEM);
+    await expect(pickingService.confirmItem(1, 5, ok, MANAGER)).resolves.toMatchObject(ITEM);
   });
 
   it('refuses a packer on an unassigned pallet', async () => {
@@ -520,18 +534,25 @@ describe('flagItem', () => {
 describe('completeSlip', () => {
   it('closes the pallet and returns the slip', async () => {
     await expect(pickingService.completeSlip(1, { palletRef: 'PAL-001' }, WORKER))
-      .resolves.toBe(SLIP);
+      .resolves.toMatchObject({ slip: SLIP });
   });
 
   it('passes the pallet reference and actor through', async () => {
     await pickingService.completeSlip(1, { palletRef: 'PAL-001' }, WORKER);
     expect(repoMock.completeSlip).toHaveBeenCalledWith(
-      { slipId: 1, palletRef: 'PAL-001', actorId: WORKER.id }
+      { slipId: 1, palletRef: 'PAL-001', actorId: WORKER.id, canOverride: false }
+    );
+  });
+
+  it('grants a manager the override flag when closing', async () => {
+    await pickingService.completeSlip(1, {}, MANAGER);
+    expect(repoMock.completeSlip).toHaveBeenCalledWith(
+      expect.objectContaining({ canOverride: true })
     );
   });
 
   it('allows completion without a pallet reference', async () => {
-    await expect(pickingService.completeSlip(1, {}, WORKER)).resolves.toBe(SLIP);
+    await expect(pickingService.completeSlip(1, {}, WORKER)).resolves.toMatchObject({ slip: SLIP });
   });
 
   it('maps a missing slip to 404', async () => {
@@ -564,30 +585,45 @@ describe('completeSlip', () => {
   });
 });
 
-// ── Known defects ─────────────────────────────────────────────
-describe.skip('known defects — un-skip once fixed', () => {
+// ── Regressions — previously known defects, now fixed ─────────
+describe('regressions — previously known defects', () => {
 
-  it('DEFECT B: completeSlip drops the shortfall warnings', async () => {
-    // The repository returns { slip, shortfalls } and the controller's
-    // own docblock promises { slip, shortfalls? }, but the service
-    // returns `result.slip` alone — so a manager is never told that a
-    // pallet was closed against stock the system does not have.
-    // Fix: return the whole result, not just result.slip.
+  it('completeSlip returns the shortfall warnings, not just the slip', async () => {
+    // Was DEFECT B. The repository returns { slip, shortfalls } and the
+    // controller's docblock promises { slip, shortfalls? }, but the
+    // service used to return `result.slip` alone — so a manager was
+    // never told a pallet had been closed against stock the system does
+    // not have, and the client's `result.slip` came back undefined.
     const shortfalls = [{ productId: 4, onHand: 2, required: 5, after: -3 }];
     repoMock.completeSlip.mockResolvedValueOnce({ slip: SLIP, shortfalls });
 
     const result = await pickingService.completeSlip(1, {}, WORKER);
-    expect(result).toMatchObject({ shortfalls });
+    expect(result).toMatchObject({ slip: SLIP, shortfalls });
   });
 
-  it('DEFECT C: completeSlip does not check who owns the pallet', async () => {
-    // confirmItem and flagItem both refuse a packer working on someone
-    // else's pallet, but completeSlip has no such check — any worker can
-    // close any pallet, including one mid-pack by a colleague.
-    // Fix: apply the same assignee check, or state explicitly that
-    // closing is a shared action and drop it from confirm/flag too.
-    repoMock.completeSlip.mockResolvedValueOnce({ slip: { ...SLIP, assigned_to: WORKER2.id } });
+  it('completeSlip passes unit mismatches through as well', async () => {
+    const unitMismatches = [{ productId: 4, slipUnit: 'kg' }];
+    repoMock.completeSlip.mockResolvedValueOnce({ slip: SLIP, unitMismatches });
+
     await expect(pickingService.completeSlip(1, {}, WORKER))
-      .rejects.toMatchObject({ status: 403 });
+      .resolves.toMatchObject({ unitMismatches });
+  });
+
+  it('completeSlip refuses a packer closing someone else\'s pallet', async () => {
+    // Was DEFECT C. confirmItem and flagItem both refused a packer
+    // working on another packer's pallet, but completeSlip had no such
+    // check — and completing is the write that moves stock, so it
+    // cannot be looser than the writes leading up to it. The check now
+    // lives in the repository, inside the row lock, the same way it
+    // does for confirm and flag.
+    repoMock.completeSlip.mockResolvedValueOnce({ forbidden: true, assignedTo: WORKER2.id });
+    await expectStatus(pickingService.completeSlip(1, {}, WORKER), 403);
+  });
+
+  it('completeSlip still lets a manager close any pallet', async () => {
+    await pickingService.completeSlip(1, {}, MANAGER);
+    expect(repoMock.completeSlip).toHaveBeenCalledWith(
+      expect.objectContaining({ canOverride: true })
+    );
   });
 });

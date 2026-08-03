@@ -17,8 +17,42 @@ const STATUS_BADGE = {
   cancelled: { className: "badge badge-inactive", label: "Cancelled" },
 };
 
+// A centre is on a fortnightly rotation, so ~14 days between
+// collections is normal. Past three weeks it has missed at least one
+// turn, which warehouse visit §4.1 says has to be visible and
+// followed up rather than discovered after the fact.
+const MISSED_COLLECTION_DAYS = 21;
+
 function isManager(user) {
   return user?.role === "manager" || user?.role === "admin";
+}
+
+// Days between the last recorded collection and this slip's dispatch
+// date. Returns null when we can't tell, so "unknown" and "overdue"
+// stay distinguishable.
+function daysSinceCollection(lastCollectedDate, dispatchDate) {
+  if (!lastCollectedDate || !dispatchDate) return null;
+  const last = new Date(lastCollectedDate);
+  const due = new Date(dispatchDate);
+  if (Number.isNaN(last.getTime()) || Number.isNaN(due.getTime())) return null;
+  return Math.round((due - last) / (24 * 60 * 60 * 1000));
+}
+
+function CollectionWarning({ slip }) {
+  const gap = daysSinceCollection(slip.last_collected_date, slip.dispatch_date);
+
+  if (!slip.last_collected_date) {
+    return <span className="badge badge-pending">No collection on record</span>;
+  }
+  if (gap !== null && gap >= MISSED_COLLECTION_DAYS) {
+    const weeks = Math.floor(gap / 7);
+    return (
+      <span className="status-badge status-badge-warning">
+        Not collected in {weeks} weeks
+      </span>
+    );
+  }
+  return null;
 }
 
 export default function PackingBoard({ currentUser, onOpenSlip }) {
@@ -83,6 +117,17 @@ export default function PackingBoard({ currentUser, onOpenSlip }) {
       setError(err.message || "Could not claim this pallet.");
     } finally {
       setClaimingId(null);
+    }
+  };
+
+  // The card is a div with role="button", so it has to answer Enter
+  // and Space the way a real button does. A lot of the volunteers on
+  // this floor are older or use assistive tech (warehouse visit §1.3),
+  // and without this they can focus a pallet but never open it.
+  const handleCardKeyDown = (e, slipId) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      onOpenSlip(slipId);
     }
   };
 
@@ -171,13 +216,24 @@ export default function PackingBoard({ currentUser, onOpenSlip }) {
             const assignedToMe = slip.assigned_to === currentUser?.id;
             const unassigned = !slip.assigned_to;
 
+            // Both come back from the board query. flagged_items are
+            // lines the packer marked short or damaged; variance_items
+            // are lines confirmed at a quantity other than the one the
+            // slip asked for. Neither used to be shown, which meant a
+            // pallet with problems looked identical to a clean one and
+            // dispatch had no reason to check it twice.
+            const flagged = Number(slip.flagged_items) || 0;
+            const variance = Number(slip.variance_items) || 0;
+
             return (
               <div
                 key={slip.id}
                 className="po-card"
                 onClick={() => onOpenSlip(slip.id)}
+                onKeyDown={(e) => handleCardKeyDown(e, slip.id)}
                 role="button"
                 tabIndex={0}
+                aria-label={`Open picking slip for ${slip.ecd_name}`}
               >
                 <div>
                   <div className="po-card-id">{slip.ecd_name}</div>
@@ -189,6 +245,19 @@ export default function PackingBoard({ currentUser, onOpenSlip }) {
                 </div>
 
                 <div className="flex items-center gap-2 flex-wrap">
+                  <CollectionWarning slip={slip} />
+
+                  {flagged > 0 && (
+                    <span className="note-status-chip is-discrepancy">
+                      {flagged} flagged
+                    </span>
+                  )}
+                  {variance > 0 && (
+                    <span className="note-status-chip is-discrepancy">
+                      {variance} qty differs
+                    </span>
+                  )}
+
                   {assignedToMe && slip.status !== "complete" && (
                     <span className="badge badge-recorded">Assigned to you</span>
                   )}

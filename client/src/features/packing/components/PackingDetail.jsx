@@ -9,17 +9,19 @@
  * Packing feature — flow overview
  * ─────────────────────────────────────────────────────────────
  *
- * 1. BOARD  (/programmes/noc/packing)
+ * 1. BOARD  (/noc/packing)
  *    - On mount: GET /api/picking, filtered by dispatch date /
  *      cohort / status (+ "my pallets only" for non-managers).
  *    - Each slip renders as a .po-card: ECD name, cohort, child
- *      count, items packed, packer name or "Unclaimed".
+ *      count, items packed, packer name or "Unclaimed", plus
+ *      flagged / quantity-variance chips and a collection warning
+ *      for centres that have missed their turn.
  *    - Unassigned slip → "Claim pallet" button → POST /assign
  *      → list refetches, card now shows the packer's name.
- *    - Clicking anywhere else on the card → navigate to
- *      /programmes/noc/packing/:slipId.
+ *    - Clicking (or pressing Enter/Space on) the card → navigate
+ *      to /noc/packing/:slipId.
  *
- * 2. DETAIL  (/programmes/noc/packing/:slipId)
+ * 2. DETAIL  (/noc/packing/:slipId)
  *    - On mount: GET /api/picking/:id.
  *
  *    Step 1 — ownership
@@ -43,20 +45,26 @@
  *          Flag    → reason pill + detail + optional qty
  *                     → POST /flag
  *        Either path collapses the panel and refetches the slip.
+ *      - A confirmed line whose quantity does not match the slip
+ *        is marked "Qty differs", not shown as a clean confirm.
  *
  *    Footer
  *      - "Complete pallet" enables once every item is confirmed
  *        or flagged (zero pending) → optional pallet ref →
  *        POST /complete.
- *      - On success: slip locks, badge becomes "Pallet complete",
- *        any shortfalls returned by the API surface as a
+ *      - On success the slip is REFETCHED rather than replaced
+ *        from the response: /complete returns the slip row on its
+ *        own, with no items array, so assigning it to state
+ *        directly would blank the view. Any shortfalls or unit
+ *        mismatches the API reports are kept and surfaced as a
  *        discrepancy notice.
  *
  *    - "← Back to board" returns to the board view.
  *
  * PERMISSION GATE (applies throughout)
  *    - Only a manager or the slip's currently assigned packer
- *      ever sees edit controls (confirm/flag/complete).
+ *      ever sees edit controls (confirm/flag/complete), and the
+ *      server enforces the same rule on all three writes.
  *    - Claiming is open to anyone while a slip is unassigned.
  *    - Once status === "complete", no edit UI renders for
  *      anyone, regardless of role — the decision panel does not
@@ -86,6 +94,28 @@ function isManager(user) {
   return user?.role === "manager" || user?.role === "admin";
 }
 
+// A confirmed line whose packed quantity isn't the quantity the slip
+// asked for. Legitimate — the packer is looking at the actual pallet —
+// but it must not read as a clean confirm, because dispatch checks
+// quantities at the gate and needs to know where to look.
+function hasQuantityVariance(item) {
+  if (item.status !== "confirmed") return false;
+  if (item.packed_quantity == null) return false;
+  return Number(item.packed_quantity) !== Number(item.required_quantity);
+}
+
+// Shared Enter/Space handling for the div-based decision cards.
+// They carry role="button", so they have to behave like buttons for
+// keyboard and switch users (warehouse visit §1.3, WCAG 2.1 AA).
+function activateOnKey(handler) {
+  return (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handler();
+    }
+  };
+}
+
 function ItemDecisionPanel({ item, slipId, onUpdated }) {
   const [mode, setMode] = useState("idle");
   const [packedQuantity, setPackedQuantity] = useState(item.required_quantity);
@@ -103,6 +133,9 @@ function ItemDecisionPanel({ item, slipId, onUpdated }) {
     setDetailText("");
     setError(null);
   };
+
+  const differsFromRequired =
+    packedQuantity !== "" && Number(packedQuantity) !== Number(item.required_quantity);
 
   const handleConfirm = async () => {
     setSubmitting(true);
@@ -159,6 +192,7 @@ function ItemDecisionPanel({ item, slipId, onUpdated }) {
             role="button"
             tabIndex={0}
             onClick={() => setMode("confirming")}
+            onKeyDown={activateOnKey(() => setMode("confirming"))}
           >
             <span className="decision-card-icon">✓</span>
             <span className="decision-card-title">Confirm</span>
@@ -169,6 +203,7 @@ function ItemDecisionPanel({ item, slipId, onUpdated }) {
             role="button"
             tabIndex={0}
             onClick={() => setMode("flagging")}
+            onKeyDown={activateOnKey(() => setMode("flagging"))}
           >
             <span className="decision-card-icon">⚠</span>
             <span className="decision-card-title">Flag</span>
@@ -179,9 +214,10 @@ function ItemDecisionPanel({ item, slipId, onUpdated }) {
 
       {mode === "confirming" && (
         <div className="form-group">
-          <label className="form-label">Quantity packed</label>
+          <label className="form-label" htmlFor={`qty-${item.id}`}>Quantity packed</label>
           <div className="form-input-group">
             <input
+              id={`qty-${item.id}`}
               type="number"
               className="form-input"
               value={packedQuantity}
@@ -190,6 +226,20 @@ function ItemDecisionPanel({ item, slipId, onUpdated }) {
             />
             <span className="form-input-icon">{item.unit}</span>
           </div>
+
+          {/* Say it before the write, not after. The slip asked for a
+              specific quantity; if the packer is about to record a
+              different one, that is either a real variance worth
+              recording or a typo worth catching here. */}
+          {differsFromRequired && (
+            <div className="info-notice mt-3">
+              <p>
+                The slip asks for {item.required_quantity} {item.unit}. Confirming a
+                different quantity marks this line for dispatch to check. Use Flag
+                instead if the item is short or damaged.
+              </p>
+            </div>
+          )}
 
           {error && <p className="form-error">{error}</p>}
 
@@ -213,6 +263,7 @@ function ItemDecisionPanel({ item, slipId, onUpdated }) {
                 key={reason}
                 type="button"
                 className={`reason-pill ${selectedReason === reason ? "reason-pill-active" : ""}`}
+                aria-pressed={selectedReason === reason}
                 onClick={() => setSelectedReason(reason)}
               >
                 {reason}
@@ -229,9 +280,12 @@ function ItemDecisionPanel({ item, slipId, onUpdated }) {
           />
 
           <div className="form-group mt-3">
-            <label className="form-label">Qty actually packed (optional)</label>
+            <label className="form-label" htmlFor={`flag-qty-${item.id}`}>
+              Qty actually packed (optional)
+            </label>
             <div className="form-input-group">
               <input
+                id={`flag-qty-${item.id}`}
                 type="number"
                 className="form-input"
                 value={flagPackedQuantity}
@@ -240,6 +294,13 @@ function ItemDecisionPanel({ item, slipId, onUpdated }) {
               />
               <span className="form-input-icon">{item.unit}</span>
             </div>
+            {/* Worth saying plainly: this number moves stock. A flagged
+                line with a quantity is deducted when the pallet closes;
+                leave it blank only if you genuinely don't know. */}
+            <p className="text-xs text-text-meta mt-1">
+              Whatever you enter here comes off stock when the pallet is closed.
+              Leave it blank if you don't know how much went out.
+            </p>
           </div>
 
           {error && <p className="form-error">{error}</p>}
@@ -259,18 +320,23 @@ function ItemDecisionPanel({ item, slipId, onUpdated }) {
 }
 
 function ItemRow({ item, slipId, canEdit, locked, onUpdated }) {
+  const variance = hasQuantityVariance(item);
+
   const statusChip =
-    item.status === "confirmed"
+    item.status === "confirmed" && variance
+      ? { className: "note-status-chip is-discrepancy", label: "Qty differs" }
+      : item.status === "confirmed"
       ? { className: "note-status-chip is-ok", label: "Confirmed" }
       : item.status === "flagged"
       ? { className: "note-status-chip is-discrepancy", label: "Flagged" }
       : { className: "note-status-chip", label: "Pending" };
 
   const showPanel = canEdit && !locked && item.status === "pending";
+  const discrepancy = item.status === "flagged" || variance;
 
   return (
     <>
-      <div className={`note-line-row ${item.status === "flagged" ? "is-flagged" : ""}`}>
+      <div className={`note-line-row ${discrepancy ? "is-flagged" : ""}`}>
         <div>
           <div className="note-line-product">{item.product_name}</div>
           <div className="text-xs text-text-meta">{item.sku}</div>
@@ -278,7 +344,7 @@ function ItemRow({ item, slipId, canEdit, locked, onUpdated }) {
         <div className="note-line-qty">
           {item.required_quantity} {item.unit}
         </div>
-        <div className={`note-line-qty-actual ${item.status === "flagged" ? "is-discrepancy" : ""}`}>
+        <div className={`note-line-qty-actual ${discrepancy ? "is-discrepancy" : ""}`}>
           {item.packed_quantity != null ? `${item.packed_quantity} ${item.unit}` : "—"}
         </div>
         <div className="text-sm text-text-sub">{item.flag_reason || "—"}</div>
@@ -305,7 +371,8 @@ export default function PackingDetail({ currentUser, slipId, onBack }) {
   const [palletRef, setPalletRef] = useState("");
   const [completing, setCompleting] = useState(false);
   const [completeError, setCompleteError] = useState(null);
-  const [shortfallCount, setShortfallCount] = useState(0);
+  const [shortfalls, setShortfalls] = useState([]);
+  const [unitMismatches, setUnitMismatches] = useState([]);
 
   // Bumped after any successful mutation (claim, confirm, flag,
   // complete) to trigger a refetch without calling a
@@ -356,8 +423,15 @@ export default function PackingDetail({ currentUser, slipId, onBack }) {
     setCompleteError(null);
     try {
       const result = await completeSlip(slipId, palletRef || undefined);
-      setSlip(result.slip);
-      setShortfallCount(result.shortfalls ? result.shortfalls.length : 0);
+
+      // Keep the warnings, then refetch. /complete returns
+      // { slip, shortfalls?, unitMismatches? } where `slip` is the
+      // bare picking_slips row — no items, no ECD name. Putting that
+      // straight into state used to blank the whole screen; refetching
+      // gives us the full slip back with its lines intact.
+      setShortfalls(result.shortfalls || []);
+      setUnitMismatches(result.unitMismatches || []);
+      triggerReload();
     } catch (err) {
       setCompleteError(err.message || "Could not complete this pallet.");
     } finally {
@@ -394,9 +468,11 @@ export default function PackingDetail({ currentUser, slipId, onBack }) {
   const assignedToMe = slip.assigned_to === currentUser?.id;
   const canEdit = manager || assignedToMe;
 
-  const confirmedCount = slip.items.filter((i) => i.status === "confirmed").length;
-  const flaggedCount = slip.items.filter((i) => i.status === "flagged").length;
-  const pendingCount = slip.items.filter((i) => i.status === "pending").length;
+  const items = slip.items || [];
+  const confirmedCount = items.filter((i) => i.status === "confirmed").length;
+  const flaggedCount = items.filter((i) => i.status === "flagged").length;
+  const pendingCount = items.filter((i) => i.status === "pending").length;
+  const varianceCount = items.filter(hasQuantityVariance).length;
 
   return (
     <div className="decanting-content">
@@ -423,6 +499,14 @@ export default function PackingDetail({ currentUser, slipId, onBack }) {
           {slip.contact_name ? ` · ${slip.contact_name}` : ""}
         </p>
 
+        {/* Warehouse visit §3.6 — the slip itself has to show whether
+            this centre has been collecting, not just the dashboard. */}
+        <p className="text-xs text-text-meta mb-3">
+          {slip.last_collected_date
+            ? `Last collected ${slip.last_collected_date}`
+            : "No collection recorded for this centre yet"}
+        </p>
+
         {unassigned && !locked && (
           <button type="button" className="btn-primary" onClick={handleClaim} disabled={claiming}>
             {claiming ? "Claiming…" : "Claim this pallet"}
@@ -447,6 +531,10 @@ export default function PackingDetail({ currentUser, slipId, onBack }) {
           <div className="note-summary-value">{flaggedCount}</div>
         </div>
         <div className="note-summary-stat">
+          <div className="note-summary-label">Qty differs</div>
+          <div className="note-summary-value">{varianceCount}</div>
+        </div>
+        <div className="note-summary-stat">
           <div className="note-summary-label">Pending</div>
           <div className="note-summary-value">{pendingCount}</div>
         </div>
@@ -458,15 +546,27 @@ export default function PackingDetail({ currentUser, slipId, onBack }) {
           <h2 className="step-card-title">Confirm or flag each item</h2>
         </div>
 
-        <div className="note-line-cols">
-          <div>Product</div>
-          <div className="note-line-col-center">Required</div>
-          <div className="note-line-col-center">Packed</div>
-          <div>Notes</div>
-          <div>Status</div>
-        </div>
+        {items.length === 0 && (
+          <div className="info-notice">
+            <p>
+              This slip has no items. The centre has no dispatch quantities set up, so
+              nothing will be packed or deducted from stock. Ask a manager to add its
+              order lines before this pallet goes out.
+            </p>
+          </div>
+        )}
 
-        {slip.items.map((item) => (
+        {items.length > 0 && (
+          <div className="note-line-cols">
+            <div>Product</div>
+            <div className="note-line-col-center">Required</div>
+            <div className="note-line-col-center">Packed</div>
+            <div>Notes</div>
+            <div>Status</div>
+          </div>
+        )}
+
+        {items.map((item) => (
           <ItemRow
             key={item.id}
             item={item}
@@ -488,11 +588,22 @@ export default function PackingDetail({ currentUser, slipId, onBack }) {
               </div>
             )}
 
-            {shortfallCount > 0 && (
+            {shortfalls.length > 0 && (
               <div className="discrepancy-notice mb-3">
                 <p>
-                  Stock shortfall recorded for {shortfallCount} item(s) — a manager will need
-                  to reconcile this.
+                  {shortfalls.length} item(s) were packed beyond the stock the system has
+                  on record. The pallet is closed and the food is going out — a manager
+                  needs to reconcile the count on the stock screen.
+                </p>
+              </div>
+            )}
+
+            {unitMismatches.length > 0 && (
+              <div className="discrepancy-notice mb-3">
+                <p>
+                  {unitMismatches.length} item(s) were packed in a different unit to the
+                  one on the stock record. The deduction used the stock record's unit —
+                  check which one is right before the next count.
                 </p>
               </div>
             )}
@@ -503,7 +614,9 @@ export default function PackingDetail({ currentUser, slipId, onBack }) {
               </span>
             ) : (
               <div className="decanting-save-row">
+                <label className="sr-only" htmlFor="palletRef">Pallet reference</label>
                 <input
+                  id="palletRef"
                   type="text"
                   className="form-input"
                   placeholder="Pallet reference (optional)"

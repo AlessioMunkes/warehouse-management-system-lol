@@ -29,7 +29,15 @@ const makeClient = (slip) => {
         return { rows: slip ? [slip] : [] };
       }
       if (/UPDATE picking_slip_items/i.test(sql)) {
-        return { rows: [{ id: 5, status: 'confirmed' }] };
+        // quantity_variance is subtracted by Postgres, not by JS, so
+        // the fake hands it back the way the database would.
+        return {
+          rows: [{
+            id: 5, status: 'confirmed',
+            required_quantity: '7.200', packed_quantity: '8.700',
+            quantity_variance: '1.500',
+          }],
+        };
       }
       return { rows: [], rowCount: 1 };
     }),
@@ -130,5 +138,64 @@ describe('setItemStatus — authorisation happens before the write', () => {
     const client = makeClient({ id: 1, status: 'in_progress', assigned_to: OTHER });
     await call(client);
     expect(client.release).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── Variance arithmetic ───────────────────────────────────────
+// A confirm at a quantity other than the one on the slip is valid,
+// but it has to be visible rather than counted as a clean confirm —
+// dispatch re-checks quantities at the gate and needs to know where
+// to look.
+describe('setItemStatus — quantity variance', () => {
+  it('asks Postgres for the difference rather than computing it in JS', async () => {
+    // 8.7 - 7.2 in JS floats is 1.4999999999999991, and that is the
+    // number that would land in the audit log and on the screen.
+    const client = makeClient({ id: 1, status: 'in_progress', assigned_to: OWNER });
+    await call(client);
+
+    const update = sql(client).find((s) => /^UPDATE picking_slip_items/i.test(s));
+    expect(update).toMatch(/RETURNING \*, \(packed_quantity - required_quantity\) AS quantity_variance/i);
+  });
+
+  it('reports the exact difference the database returned', async () => {
+    const client = makeClient({ id: 1, status: 'in_progress', assigned_to: OWNER });
+    const result = await call(client);
+
+    expect(result.variance).toEqual({ required: 7.2, packed: 8.7, difference: 1.5 });
+  });
+
+  it('reports no variance when the packed quantity matches', async () => {
+    const client = makeClient({ id: 1, status: 'in_progress', assigned_to: OWNER });
+    client.query = vi.fn(async (s) => {
+      client.calls.push(s.replace(/\s+/g, ' ').trim());
+      if (/SELECT id, status, assigned_to FROM picking_slips/i.test(s)) {
+        return { rows: [{ id: 1, status: 'in_progress', assigned_to: OWNER }] };
+      }
+      if (/UPDATE picking_slip_items/i.test(s)) {
+        return { rows: [{ id: 5, status: 'confirmed', required_quantity: '7.200', packed_quantity: '7.200', quantity_variance: '0.000' }] };
+      }
+      return { rows: [], rowCount: 1 };
+    });
+    const result = await call(client);
+
+    expect(result.variance).toBeNull();
+  });
+
+  it('never reports a variance on a flagged line', async () => {
+    // A flag already carries its own reason and shows as a
+    // discrepancy; marking it as a variance too would double-count it.
+    const client = makeClient({ id: 1, status: 'in_progress', assigned_to: OWNER });
+    const result = await call(client, { status: 'flagged', flagReason: 'Short quantity' });
+
+    expect(result.variance).toBeNull();
+  });
+
+  it('does not leak quantity_variance into the returned item', async () => {
+    // It is a computed column for the repository's own use — the API
+    // response shape should not change because of it.
+    const client = makeClient({ id: 1, status: 'in_progress', assigned_to: OWNER });
+    const result = await call(client);
+
+    expect(result.item).not.toHaveProperty('quantity_variance');
   });
 });

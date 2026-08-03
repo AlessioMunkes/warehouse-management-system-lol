@@ -3,7 +3,12 @@ import BagSizeToggle from './BagSizeToggle';
 
 // Imported rather than redeclared: this file used to keep its own
 // copy of the list, which then diverged from the page's.
-import { STANDARD_SIZES } from './bagSizes';
+//
+// Case matters. This said './bagSizes' while the file on disk is
+// BagSizes.jsx — fine on a case-insensitive Windows or macOS disk,
+// unresolvable on a Linux CI runner, so `npm run build` failed in
+// CI while working locally. Same trap as the lockfile issue.
+import { STANDARD_SIZES } from './BagSizes';
 
 const ProductLineRow = ({
   index,
