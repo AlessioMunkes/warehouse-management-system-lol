@@ -24,11 +24,11 @@ const App = () => (
         <Route path="/login" element={<LoginPage />} />
         <Route path="/guest" element={<GuestLoginPage />} />
         <Route path="/noc/procurement" element={<ProcurementDashboard />} />
-        
+        <Route path="/programmes" element={<SelectProgrammeScreen />} />
+
         {/* Protected — any logged-in user */}
         <Route element={<ProtectedRoute />}>
-          <Route path="/programmes" element={<SelectProgrammeScreen />} />
-
+          
           {/* NOC: task select, then one route per task */}
           <Route path="/noc"             element={<SelectNOCjob />} />
           
