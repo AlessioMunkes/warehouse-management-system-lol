@@ -23,14 +23,14 @@ const App = () => (
         <Route path="/"      element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/guest" element={<GuestLoginPage />} />
-
+        <Route path="/noc/procurement" element={<ProcurementDashboard />} />
         {/* Protected — any logged-in user */}
         <Route element={<ProtectedRoute />}>
           <Route path="/programmes" element={<SelectProgrammeScreen />} />
 
           {/* NOC: task select, then one route per task */}
           <Route path="/noc"             element={<SelectNOCjob />} />
-          <Route path="/noc/procurement" element={<ProcurementDashboard />} />
+          
           <Route path="/noc/decanting"   element={<DecantingPage />} />
 
           {/* Both packing paths come from routes/paths.js, which is
