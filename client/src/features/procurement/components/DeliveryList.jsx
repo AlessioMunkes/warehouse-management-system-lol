@@ -1,5 +1,3 @@
-import React from 'react';
-
 // ─────────────────────────────────────────────────────────────
 // src/components/Procurement/DeliveryList.jsx
 //

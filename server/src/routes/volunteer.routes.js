@@ -11,11 +11,11 @@
 import express from 'express';
 import jwt     from 'jsonwebtoken';
 import pool    from '../config/db.js';
+import { AUTH_COOKIE, authCookieOptions, sessionMaxAge } from '../config/cookie.js';
 
 const router = express.Router();
 
-const IS_PRODUCTION  = process.env.NODE_ENV === 'production';
-const SESSION_HOURS  = 12;
+const SESSION_HOURS = 12;
 
 router.post('/sign-in', async (req, res) => {
   try {
@@ -29,12 +29,12 @@ router.post('/sign-in', async (req, res) => {
     }
 
     // signed_in_at comes from the DB default — never from the client
-   // const result = await pool.query(
-   //   `INSERT INTO volunteers (full_name, source)
-   //    VALUES ($1, 'guest_login')
-   //    RETURNING id, full_name, signed_in_at`,
-    //  [name.trim()]
-    //);
+    const result = await pool.query(
+      `INSERT INTO volunteers (full_name, source)
+       VALUES ($1, 'guest_login')
+       RETURNING id, full_name, signed_in_at`,
+      [name.trim()]
+    );
 
     const volunteer = result.rows[0];
 
@@ -44,11 +44,9 @@ router.post('/sign-in', async (req, res) => {
       { expiresIn: `${SESSION_HOURS}h` }
     );
 
-    res.cookie('wms_token', token, {
-      httpOnly: true,
-      secure:   IS_PRODUCTION,
-      sameSite: 'strict',
-      maxAge:   SESSION_HOURS * 60 * 60 * 1000,
+    res.cookie(AUTH_COOKIE, token, {
+      ...authCookieOptions(),
+      maxAge: sessionMaxAge(SESSION_HOURS),
     });
 
     return res.status(201).json({

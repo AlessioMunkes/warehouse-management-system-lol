@@ -1,0 +1,385 @@
+/* ─────────────────────────────────────────────────────────────
+   LandingPage.css
+   Brand match: ladlesoflove.org.za
+
+   Reuses --color-* tokens from styles/index.css.
+   Only page‑specific extras live here, scoped under .lol-landing.
+   ───────────────────────────────────────────────────────────── */
+@import '@fontsource/montserrat/500.css';
+@import '@fontsource/montserrat/600.css';
+@import '@fontsource/montserrat/700.css';
+@import '@fontsource/montserrat/900.css';
+
+.lol-landing {
+  --lol-khaki-on-dark: #b5a87e;
+  --lol-beige-dark:    #dcd5cc;
+  --lol-radius:        4px;
+  --lol-shadow:        0 4px 20px rgba(0, 0, 0, 0.06);
+  --lol-max:           1200px;
+
+  font-family: var(--font-family-sans);
+  color: var(--color-text);
+  background: var(--color-lol-white);
+  line-height: 1.7;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.lol-landing img { max-width: 100%; height: auto; display: block; }
+.lol-landing a { text-decoration: none; color: inherit; }
+
+.lol-landing a:focus-visible,
+.lol-landing button:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.lol-icon { display: block; flex-shrink: 0; }
+
+/* ── Skip link ─────────────────────────────────────────────── */
+.lol-skip-link {
+  position: absolute;
+  top: -100px;
+  left: 0;
+  background: var(--color-accent);
+  color: #fff;
+  padding: 0.5rem 1.5rem;
+  z-index: 1000;
+  font-weight: 700;
+}
+.lol-skip-link:focus { top: 0; }
+
+/* ── Shared layout helpers ─────────────────────────────────── */
+.lol-section-inner { max-width: var(--lol-max); margin: 0 auto; }
+
+.lol-eyebrow {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-weight: 700;
+  color: var(--color-text-sub);
+  margin-bottom: 0.5rem;
+}
+.lol-eyebrow--on-dark { color: var(--lol-khaki-on-dark); }
+
+.lol-section-title {
+  font-size: 2.2rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: var(--color-maroon);
+}
+.lol-section-title-light { color: #fff; margin-bottom: 0.5rem; }
+
+/* ── Buttons ──────────────────────────────────────────────── */
+.lol-btn-primary {
+  background: var(--color-accent);
+  color: #fff;
+  border: none;
+  padding: 0.6rem 1.8rem;
+  border-radius: 2rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: background 0.2s, transform 0.2s;
+  white-space: nowrap;
+}
+.lol-btn-primary:hover { background: var(--color-accent-hover); transform: translateY(-1px); }
+
+.lol-btn-secondary {
+  background: transparent;
+  color: var(--color-accent);
+  border: 2px solid var(--color-accent);
+  padding: 0.5rem 1.8rem;
+  border-radius: 2rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  white-space: nowrap;
+}
+.lol-btn-secondary:hover { background: var(--color-accent); color: #fff; }
+
+.lol-btn-text {
+  background: none;
+  border: none;
+  color: var(--color-text);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0.5rem 0.2rem;
+  white-space: nowrap;
+}
+.lol-btn-text:hover { color: var(--color-accent); }
+
+.lol-btn-large { padding: 0.8rem 2.2rem; font-size: 1rem; }
+
+.lol-btn-outline-light {
+  border: 2px solid #fff;
+  color: #fff;
+  padding: 0.7rem 2rem;
+  border-radius: 2rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: background 0.2s, color 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.lol-btn-outline-light:hover { background: #fff; color: var(--color-accent); }
+
+/* ── Navigation ───────────────────────────────────────────── */
+.lol-nav {
+  background: var(--color-lol-white);
+  border-bottom: 1px solid var(--color-border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.lol-nav-inner {
+  max-width: var(--lol-max);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.8rem 1.5rem;
+  gap: 1rem;
+}
+.lol-nav-brand { display: flex; align-items: center; gap: 0.75rem; }
+.lol-nav-logo {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  border-radius: var(--lol-radius);
+  border: 1px solid var(--color-border);
+  background: #fff;
+  padding: 3px;
+  flex-shrink: 0;
+}
+.lol-nav-title { font-weight: 700; font-size: 1.2rem; color: var(--color-maroon); line-height: 1.1; }
+.lol-nav-sub { font-size: 0.8rem; color: var(--color-text-sub); }
+.lol-nav-actions { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+
+/* ── Hero ─────────────────────────────────────────────────── */
+.lol-hero {
+  position: relative;
+  overflow: hidden;
+  background: var(--color-maroon);
+  color: #fff;
+  min-height: 85vh;
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.lol-hero.is-ready { opacity: 1; transform: translateY(0); }
+
+.lol-hero-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.2;
+  z-index: 0;
+}
+.lol-hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(43, 51, 54, 0.92) 0%, rgba(217, 56, 64, 0.82) 100%);
+  z-index: 1;
+}
+.lol-hero-inner {
+  max-width: var(--lol-max);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 3rem;
+  padding: 4rem 1.5rem;
+  position: relative;
+  z-index: 2;
+  flex-wrap: wrap;
+}
+.lol-hero-copy { flex: 2; min-width: 300px; }
+
+.lol-hero-title {
+  font-size: 3rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 1.5rem;
+  color: #fff;
+}
+.lol-hero-title em { font-style: normal; color: var(--lol-khaki-on-dark); }
+
+.lol-hero-lede {
+  font-size: 1.15rem;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.92);
+  max-width: 600px;
+  margin-bottom: 2rem;
+}
+
+.lol-hero-actions { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 2.5rem; }
+
+.lol-stat-ledger { display: flex; gap: 2rem; flex-wrap: wrap; }
+.lol-stat { text-align: left; }
+.lol-stat dt { font-size: 2rem; font-weight: 700; color: #fff; }
+.lol-stat dd { font-size: 0.85rem; color: rgba(255, 255, 255, 0.85); margin-top: 2px; }
+
+/* Ladle graphic (temporary, replace with a photo when ready) */
+.lol-hero-icon { flex: 1; max-width: 280px; min-width: 180px; display: flex; align-items: center; justify-content: center; }
+.lol-hero-icon-frame {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 4px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lol-ladle-svg { width: 62%; height: 62%; }
+.lol-ladle-handle { fill: none; stroke: #fff; stroke-width: 16; stroke-linecap: round; }
+.lol-ladle-bowl { fill: #fff; }
+.lol-ladle-bowl-inner { fill: var(--color-maroon); }
+.lol-ladle-drop { fill: var(--lol-khaki-on-dark); animation: lol-drip 2.6s ease-in infinite; }
+.lol-ladle-drop.drop-2 { animation-delay: 0.9s; }
+
+@keyframes lol-drip {
+  0%   { opacity: 0; transform: translateY(-6px) scale(0.6); }
+  15%  { opacity: 1; transform: translateY(0) scale(1); }
+  70%  { opacity: 1; transform: translateY(34px) scale(0.9); }
+  100% { opacity: 0; transform: translateY(46px) scale(0.6); }
+}
+
+/* ── Programmes ───────────────────────────────────────────── */
+.lol-programmes { background: var(--color-lol-white); padding: 5rem 1.5rem; }
+
+.lol-programme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 2rem;
+  margin-top: 3rem;
+}
+
+.lol-programme-card {
+  background: var(--color-lol-white);
+  border-radius: var(--lol-radius);
+  overflow: hidden;
+  box-shadow: var(--lol-shadow);
+  border: 1px solid var(--color-border);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.lol-programme-card:hover { transform: translateY(-4px); box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1); }
+
+.lol-programme-card__photo {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+}
+
+.lol-programme-card__body { padding: 1.5rem; }
+
+.lol-programme-icon {
+  margin-bottom: 0.75rem;
+  color: var(--color-accent);
+}
+
+.lol-programme-code {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--color-text-sub);
+  margin-bottom: 0.25rem;
+  text-transform: uppercase;
+}
+.lol-programme-card h3 { font-size: 1.25rem; font-weight: 700; margin-bottom: 0.75rem; color: var(--color-maroon); }
+.lol-programme-card p { font-size: 0.9rem; color: var(--color-text); line-height: 1.6; }
+
+/* ── Story ────────────────────────────────────────────────── */
+.lol-story { background: var(--color-lol-bg); padding: 5rem 1.5rem; }
+.lol-story p { font-size: 1rem; color: var(--color-text); line-height: 1.7; max-width: 70ch; }
+
+.lol-values {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1.5rem;
+  margin-top: 2.5rem;
+}
+.lol-value {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  background: var(--color-lol-white);
+  border: 1px solid var(--color-border);
+  padding: 1.25rem;
+}
+.lol-value-icon { flex-shrink: 0; margin-top: 0.2rem; color: var(--color-accent); }
+.lol-value p { font-size: 0.9rem; color: var(--color-text); line-height: 1.6; }
+
+/* ── Get involved band ────────────────────────────────────── */
+.lol-getinvolved { background: var(--color-accent); color: #fff; padding: 4rem 1.5rem; }
+.lol-getinvolved-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+.lol-getinvolved p { color: rgba(255, 255, 255, 0.92); max-width: 52ch; font-size: 0.95rem; line-height: 1.6; }
+
+/* ── Footer ───────────────────────────────────────────────── */
+.lol-footer { background: var(--color-maroon); color: rgba(255, 255, 255, 0.8); padding: 3rem 1.5rem; font-size: 0.9rem; }
+.lol-footer-inner { display: flex; flex-direction: column; gap: 1.5rem; align-items: center; text-align: center; }
+.lol-footer-title { font-weight: 700; font-size: 1.2rem; color: #fff; }
+.lol-footer-meta { font-size: 0.85rem; margin-top: 0.25rem; color: rgba(255, 255, 255, 0.65); }
+.lol-footer-links { display: flex; gap: 1.5rem; font-size: 0.9rem; }
+.lol-footer-links a { color: rgba(255, 255, 255, 0.8); }
+.lol-footer-links a:hover { color: var(--lol-khaki-on-dark); }
+.lol-footer-copy { font-size: 0.8rem; color: rgba(255, 255, 255, 0.55); }
+
+/* ── Image fallback (used by ImgWithFallback) ─────────────── */
+.img-slot {
+  position: relative;
+  background: var(--lol-beige-dark);
+  overflow: hidden;
+}
+.img-slot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.img-slot__fallback {
+  position: absolute;
+  inset: 0;
+  display: none;            /* shown only when image errors */
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text);
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 1rem;
+  background: var(--lol-beige-dark);
+}
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .lol-hero-inner { flex-direction: column; text-align: center; }
+  .lol-hero-title { font-size: 2.2rem; }
+  .lol-hero-lede { font-size: 1rem; }
+  .lol-stat-ledger { justify-content: center; }
+  .lol-stat { text-align: center; }
+  .lol-hero-icon { order: -1; max-width: 180px; }
+  .lol-getinvolved-inner { flex-direction: column; text-align: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lol-hero { transition: none !important; opacity: 1 !important; transform: none !important; }
+  .lol-ladle-drop { animation: none !important; opacity: 1; }
+  .lol-programme-card:hover { transform: none; }
+  .lol-btn-primary:hover { transform: none; }
+}
