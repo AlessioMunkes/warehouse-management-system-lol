@@ -23,21 +23,16 @@ const App = () => (
         {/* Public */}
         <Route path="/"      element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/guest" element={<GuestLoginPage />} /> 
-        
-      <Route element={<ProtectedRoute roles={['manager']} />}>
-  <Route path="/manager" element={<ManagerActivityScreen />} />
-  <Route path="/noc/inventory" element={<InventoryManagementPage />} />
-  {/* any other manager-only pages go inside this same block */}
-</Route>
+        <Route path="/guest" element={<GuestLoginPage />} />
+        <Route path="/noc/procurement" element={<ProcurementDashboard />} />
+        <Route path="/programmes" element={<SelectProgrammeScreen />} />
 
         {/* Protected — any logged-in user */}
         <Route element={<ProtectedRoute />}>
-          <Route path="/programmes" element={<SelectProgrammeScreen />} />
-
+          
           {/* NOC: task select, then one route per task */}
           <Route path="/noc"             element={<SelectNOCjob />} />
-          <Route path="/noc/procurement" element={<ProcurementDashboard />} />
+          
           <Route path="/noc/decanting"   element={<DecantingPage />} />
 p <Route path="/noc/inventory"   element={<InventoryManagementPage />} />
           {/* Both packing paths come from routes/paths.js, which is

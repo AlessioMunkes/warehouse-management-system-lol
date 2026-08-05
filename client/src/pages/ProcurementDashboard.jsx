@@ -32,7 +32,7 @@ import { apiGet, apiPost } from '../services/api';
 // Reference-data fetchers — wired to the real API layer.
 
 const getSuppliers = () => apiGet('/api/deliveries/suppliers').then((r) => r.data || []);
-
+//const getDrivers = (supplierId) => apiGet(`/api/deliveries/drivers?supplierId=${supplierId}`).then((r) => r.data || []);
 const getPurchaseOrders = (supplierId) => apiGet(`/api/deliveries/purchase-orders?supplierId=${supplierId}`).then((r) => r.data || []);
 const getPurchaseOrderItems = (purchaseOrderId) => apiGet(`/api/deliveries/purchase-orders/${purchaseOrderId}/items`).then((r) => r.data || []);
 
@@ -42,7 +42,6 @@ const getValidationErrors = ({
 }) => {
   const errors = [];
   if (!supplierId) errors.push('Choose a supplier.');
-
   if (!deliveryDate) errors.push('Pick a delivery date.');
   if (!purchaseOrderId) errors.push('Choose a purchase order.');
   if (!decision) errors.push('Accept the delivery or flag it for return.');
@@ -57,13 +56,13 @@ const ProcurementDashboard = () => {
 
   // ── Reference data ──────────────────────────────────────────
   const [suppliers, setSuppliers] = useState([]);
- 
+  
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [poItems, setPoItems] = useState([]);
 
   // ── Form state ───────────────────────────────────────────────
   const [supplierId, setSupplierId] = useState('');
-
+  
   const [deliveryDate, setDeliveryDate] = useState('');
   const [purchaseOrderId, setPurchaseOrderId] = useState('');
   const [decision, setDecision] = useState(null); // 'accept' | 'return'
@@ -88,7 +87,7 @@ const ProcurementDashboard = () => {
   // Fetch drivers + purchase orders whenever the supplier changes.
   useEffect(() => {
     if (supplierId) {
-     
+      // getDrivers(supplierId).then(setDrivers).catch(console.error);
       getPurchaseOrders(supplierId).then(setPurchaseOrders).catch(console.error);
     }
   }, [supplierId]);
@@ -107,10 +106,10 @@ const ProcurementDashboard = () => {
 
   const handleSupplierChange = (newSupplierId) => {
     setSupplierId(newSupplierId);
-   
+    //setDriverId('');
     setPurchaseOrderId('');
     setPoItems([]);
-    
+    //setDrivers([]);
     setPurchaseOrders([]);
   };
 
@@ -234,9 +233,7 @@ const ProcurementDashboard = () => {
             placeholder="Select a supplier"
             options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
           />
-          <Dropdown
-           
-          />
+          
           <DatePicker
             label="Delivery date"
             required
