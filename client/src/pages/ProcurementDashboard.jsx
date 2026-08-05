@@ -32,17 +32,17 @@ import { apiGet, apiPost } from '../services/api';
 // Reference-data fetchers — wired to the real API layer.
 
 const getSuppliers = () => apiGet('/api/deliveries/suppliers').then((r) => r.data || []);
-const getDrivers = (supplierId) => apiGet(`/api/deliveries/drivers?supplierId=${supplierId}`).then((r) => r.data || []);
+
 const getPurchaseOrders = (supplierId) => apiGet(`/api/deliveries/purchase-orders?supplierId=${supplierId}`).then((r) => r.data || []);
 const getPurchaseOrderItems = (purchaseOrderId) => apiGet(`/api/deliveries/purchase-orders/${purchaseOrderId}/items`).then((r) => r.data || []);
 
 const getValidationErrors = ({
-  supplierId, driverId, deliveryDate, purchaseOrderId,
+  supplierId, deliveryDate, purchaseOrderId,
   decision, reason, signatureData,
 }) => {
   const errors = [];
   if (!supplierId) errors.push('Choose a supplier.');
-  if (!driverId) errors.push('Choose a driver.');
+
   if (!deliveryDate) errors.push('Pick a delivery date.');
   if (!purchaseOrderId) errors.push('Choose a purchase order.');
   if (!decision) errors.push('Accept the delivery or flag it for return.');
@@ -57,13 +57,13 @@ const ProcurementDashboard = () => {
 
   // ── Reference data ──────────────────────────────────────────
   const [suppliers, setSuppliers] = useState([]);
-  const [drivers, setDrivers] = useState([]);
+ 
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [poItems, setPoItems] = useState([]);
 
   // ── Form state ───────────────────────────────────────────────
   const [supplierId, setSupplierId] = useState('');
-  const [driverId, setDriverId] = useState('');
+
   const [deliveryDate, setDeliveryDate] = useState('');
   const [purchaseOrderId, setPurchaseOrderId] = useState('');
   const [decision, setDecision] = useState(null); // 'accept' | 'return'
@@ -88,7 +88,7 @@ const ProcurementDashboard = () => {
   // Fetch drivers + purchase orders whenever the supplier changes.
   useEffect(() => {
     if (supplierId) {
-      getDrivers(supplierId).then(setDrivers).catch(console.error);
+     
       getPurchaseOrders(supplierId).then(setPurchaseOrders).catch(console.error);
     }
   }, [supplierId]);
@@ -107,10 +107,10 @@ const ProcurementDashboard = () => {
 
   const handleSupplierChange = (newSupplierId) => {
     setSupplierId(newSupplierId);
-    setDriverId('');
+   
     setPurchaseOrderId('');
     setPoItems([]);
-    setDrivers([]);
+    
     setPurchaseOrders([]);
   };
 
@@ -122,7 +122,7 @@ const ProcurementDashboard = () => {
   };
 
   const validationErrors = getValidationErrors({
-    supplierId, driverId, deliveryDate, purchaseOrderId, decision, reason, signatureData,
+    supplierId, deliveryDate, purchaseOrderId, decision, reason, signatureData,
   });
 
   const selectedPO = purchaseOrders.find((po) => String(po.id) === String(purchaseOrderId));
@@ -143,7 +143,7 @@ const ProcurementDashboard = () => {
       // yet (see file header note).
       const res = await apiPost('/api/deliveries', {
         supplierId,
-        driverId,
+        
         deliveryDate,
         purchaseOrderId,
         signatureData,
@@ -235,13 +235,7 @@ const ProcurementDashboard = () => {
             options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
           />
           <Dropdown
-            label="Driver"
-            required
-            value={driverId}
-            onChange={setDriverId}
-            placeholder={supplierId ? 'Select a driver' : 'Pick a supplier first'}
-            disabled={!supplierId}
-            options={drivers.map((d) => ({ value: d.id, label: d.name }))}
+           
           />
           <DatePicker
             label="Delivery date"

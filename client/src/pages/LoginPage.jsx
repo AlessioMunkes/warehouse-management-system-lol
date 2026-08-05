@@ -39,6 +39,20 @@ const LoginPage = () => {
     return err.message || "Login failed. Please try again.";
   };
 
+  // Sends managers and workers to their own landing screen instead
+  // of everyone defaulting to /programmes.
+  const redirectByRole = (loggedInUser) => {
+    switch (loggedInUser?.role) {
+      case "manager":
+        navigate("/manager");
+        break;
+      case "worker":
+      default:
+        navigate("/programmes");
+        break;
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -54,8 +68,8 @@ const LoginPage = () => {
 
     setIsLoading(true);
     try {
-      await login(username.trim(), password);
-      navigate("/programmes");
+      const loggedInUser = await login(username.trim(), password);
+      redirectByRole(loggedInUser);
     } catch (err) {
       setError(getLoginErrorMessage(err));
     } finally {
