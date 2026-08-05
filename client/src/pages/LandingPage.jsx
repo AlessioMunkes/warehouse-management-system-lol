@@ -1,10 +1,9 @@
 // ─────────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
-import { useNavigate }                from 'react-router-dom';
+import { useNavigate }        from 'react-router-dom';
 import '../styles/landingpage.css';
 
-// ── Image fallback (reusable slot for all photos) ───────────
+// ── Image fallback ──────────────────────────────────────────
 function ImgWithFallback({ src, alt, fallbackText, fallbackPath, className }) {
   return (
     <div className="img-slot">
@@ -25,7 +24,7 @@ function ImgWithFallback({ src, alt, fallbackText, fallbackPath, className }) {
   );
 }
 
-// ── Inline SVG icons (no external dependencies) ──────────────
+// ── Inline SVG icons ────────────────────────────────────────
 const ICON_PATHS = {
   bowl:     'M3 12h18a9 9 0 0 1-18 0Zm2-3c2.2-2 13.8-2 16 0M8.5 5.5l1 2M15.5 5.5l-1 2',
   sprout:   'M12 21V12M12 12C7 12 4 8 4 4c5 0 9 3 9 8Zm0 0c5 0 9-3.5 9-8-5 0-9 3-9 8Z',
@@ -89,7 +88,7 @@ const PROGRAMMES = [
     name: 'Dignity & Soup Kitchens',
     description:
       'Providing hot meals and essential supplies with dignity to homeless and vulnerable communities through a network of soup kitchens, ensuring no one goes to bed hungry.',
-    img: '/images/DSK.jpg',
+    img: '/images/Ladleshearts.jpg',
   },
 ];
 
@@ -153,7 +152,7 @@ const LandingPage = () => {
         <section className={`lol-hero${ready ? ' is-ready' : ''}`}>
           <div
             className="lol-hero-bg"
-            style={{ backgroundImage: 'url(/images/dannyhero.jpg)' }}
+            style={{ backgroundImage: 'url(/images/dannyheartinghero.jpeg)' }}
             aria-hidden="true"
           />
           <div className="lol-hero-overlay" aria-hidden="true" />
@@ -196,16 +195,14 @@ const LandingPage = () => {
               </dl>
             </div>
 
-            {/* Right‑side icon / temporary ladle SVG */}
+            {/* Actual logo replaces the animated ladle */}
             <div className="lol-hero-icon">
               <div className="lol-hero-icon-frame" aria-hidden="true">
-                <svg viewBox="0 0 400 400" className="lol-ladle-svg">
-                  <path className="lol-ladle-handle" d="M60 340C110 300 150 260 175 215" />
-                  <ellipse className="lol-ladle-bowl" cx="255" cy="165" rx="95" ry="80" />
-                  <ellipse className="lol-ladle-bowl-inner" cx="255" cy="150" rx="70" ry="56" />
-                  <circle className="lol-ladle-drop drop-1" cx="150" cy="255" r="7" />
-                  <circle className="lol-ladle-drop drop-2" cx="128" cy="288" r="5" />
-                </svg>
+                <img
+                  src="/icons/icons2.png"
+                  alt="Ladles of Love logo"
+                  className="lol-hero-logo"
+                />
               </div>
             </div>
           </div>
@@ -252,7 +249,7 @@ const LandingPage = () => {
             <p>
               Ladles of Love started in 2014 with one soup kitchen and a single weekly pot of
               soup. Today the organisation works across the Western Cape, Northern Cape and
-              Gauteng, running preschool nutrition, soup kitchens, compost exchanges with local
+              Gauteng, running preschool nutrition, dignity and soup kitchens, compost exchanges with local
               farms and hands‑on volunteer days, and has served over 48 million meals since
               2020. This system replaces the paper forms and scattered spreadsheets that used
               to hold that work together, built from time spent on the warehouse floor with the
@@ -275,10 +272,16 @@ const LandingPage = () => {
             <div>
               <h2 className="lol-section-title lol-section-title-light">New here?</h2>
               <p>
-                This page is for staff and volunteers signing in to work. If you'd like to
-                donate, volunteer or find out more about Ladles of Love, please check out our
-                main website.
-        
+                This web application is for staff and volunteers signing in to work at our warehouses. If you'd like to
+                donate, volunteer or find out more about Ladles of Love, please check out our{''}
+                <a 
+                 href="https://ladlesoflove.org.za/"
+                 target="_blank"
+                 rel="noopener noreferrer"
+                >
+                  main website. 
+                </a>
+                
               </p>
             </div>
             <a
@@ -302,11 +305,17 @@ const LandingPage = () => {
             <p className="lol-footer-meta">
               Unit 4, Hewett Park, 17 Hewett Avenue, Epping 2, Cape Town
             </p>
+            <p className="lol-footer-meta"> 
+              35th Street, Johannesburg, 2090
+            </p>
           </div>
           <div className="lol-footer-links">
             <a href="https://www.instagram.com/ladlesoflove" target="_blank" rel="noopener noreferrer">Instagram</a>
             <a href="https://www.facebook.com/ladlesofloveZA/" target="_blank" rel="noopener noreferrer">Facebook</a>
-            <a href="https://twitter.com/ladlesoflove" target="_blank" rel="noopener noreferrer">Twitter</a>
+            <a href="https://twitter.com/ladlesoflove" target="_blank" rel="noopener noreferrer">X</a>
+            <a href="https://za.linkedin.com/company/ladles-of-love" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+            <a href="https://www.tiktok.com/@ladlesoflove" target="_blank" rel="noopener noreferrer">TikTok</a>
+            <a href="https://ladlesoflove.org.za/" target="_blank" rel="noopener noreferrer">Website</a>
           </div>
           <p className="lol-footer-copy">© Ladles of Love · Warehouse Management System</p>
         </div>
