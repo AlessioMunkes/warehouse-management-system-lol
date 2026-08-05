@@ -24,12 +24,18 @@ const App = () => (
         <Route path="/"      element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/guest" element={<GuestLoginPage />} />
-        <Route path="/noc/procurement" element={<ProcurementDashboard />} />
-        <Route path="/programmes" element={<SelectProgrammeScreen />} />
 
+        {/* Protected — manager only */}
+<Route element={<ProtectedRoute roles={['manager']} />}>
+  <Route path="/manager"       element={<ManagerActivityScreen />} />
+  <Route path="/noc/inventory" element={<InventoryManagementPage />} />
+ </Route>
+       
         {/* Protected — any logged-in user */}
         <Route element={<ProtectedRoute />}>
-          
+           <Route path="/noc/procurement" element={<ProcurementDashboard />} />
+        <Route path="/programmes" element={<SelectProgrammeScreen />} />
+
           {/* NOC: task select, then one route per task */}
           <Route path="/noc"             element={<SelectNOCjob />} />
           
