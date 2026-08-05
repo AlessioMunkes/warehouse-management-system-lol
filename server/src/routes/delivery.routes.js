@@ -16,7 +16,6 @@ const RECEIVERS_UP = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 
 // ── Reference data ────────────────────────────────────────────
 router.get('/suppliers', auth, requireRole(...ALL_ROLES),    deliveryController.getSuppliers);
-router.get('/drivers',   auth, requireRole(...ALL_ROLES),    deliveryController.getDrivers);
 router.get('/products',  auth, requireRole(...ALL_ROLES),    deliveryController.getProducts);
 
 // ── Purchase orders ───────────────────────────────────────────

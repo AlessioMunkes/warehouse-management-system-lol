@@ -46,20 +46,6 @@ CREATE TABLE IF NOT EXISTS suppliers (
 );
 
 
--- ─────────────────────────────────────────────────────────────
--- DRIVERS
--- Drivers who deliver on behalf of a supplier.
--- Each driver belongs to one supplier.
--- ─────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS drivers (
-  id             SERIAL        PRIMARY KEY,
-  name           VARCHAR(200)  NOT NULL,
-  license_number VARCHAR(50)   NOT NULL UNIQUE,
-  supplier_id    INTEGER       NOT NULL REFERENCES suppliers(id) ON DELETE RESTRICT,
-  is_active      BOOLEAN       NOT NULL DEFAULT TRUE,
-  created_at     TIMESTAMPTZ   NOT NULL DEFAULT NOW()
-);
-
 
 -- ─────────────────────────────────────────────────────────────
 -- PRODUCTS
@@ -115,7 +101,6 @@ CREATE TABLE IF NOT EXISTS purchase_order_items (
 CREATE TABLE IF NOT EXISTS delivery_notes (
   id                SERIAL        PRIMARY KEY,
   supplier_id       INTEGER       NOT NULL REFERENCES suppliers(id) ON DELETE RESTRICT,
-  driver_id         INTEGER       REFERENCES drivers(id) ON DELETE SET NULL,
   received_by       INTEGER       REFERENCES users(id) ON DELETE SET NULL,
   purchase_order_id INTEGER       NOT NULL REFERENCES purchase_orders(id) ON DELETE RESTRICT,
   delivery_date     DATE          NOT NULL,
@@ -146,8 +131,6 @@ CREATE INDEX idx_volunteers_signed_in_at ON volunteers (signed_in_at DESC);
 CREATE INDEX IF NOT EXISTS idx_users_username    ON users(username);
 CREATE INDEX IF NOT EXISTS idx_users_role        ON users(role);
 
--- drivers
-CREATE INDEX IF NOT EXISTS idx_drivers_supplier  ON drivers(supplier_id);
 
 -- purchase_orders
 CREATE INDEX IF NOT EXISTS idx_po_supplier       ON purchase_orders(supplier_id);
@@ -160,7 +143,6 @@ CREATE INDEX IF NOT EXISTS idx_poi_product       ON purchase_order_items(product
 
 -- delivery_notes
 CREATE INDEX IF NOT EXISTS idx_dn_supplier       ON delivery_notes(supplier_id);
-CREATE INDEX IF NOT EXISTS idx_dn_driver         ON delivery_notes(driver_id);
 CREATE INDEX IF NOT EXISTS idx_dn_received_by    ON delivery_notes(received_by);
 CREATE INDEX IF NOT EXISTS idx_dn_po             ON delivery_notes(purchase_order_id);
 CREATE INDEX IF NOT EXISTS idx_dn_delivery_date  ON delivery_notes(delivery_date);

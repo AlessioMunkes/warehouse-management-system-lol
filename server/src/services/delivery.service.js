@@ -25,17 +25,15 @@ const getDeliveryById = async (id) => {
 // Just records that the delivery happened against a purchase order.
 // Items are already known from the PO — no cross-check needed.
 const createDelivery = async (data, userId) => {
-  const { supplierId, driverId, deliveryDate, purchaseOrderId, signatureData, poCompleted } = data;
+  const { supplierId, deliveryDate, purchaseOrderId, signatureData, poCompleted } = data;
 
   if (!supplierId)       throw new Error('Supplier is required.');
-  if (!driverId)         throw new Error('Driver is required.');
   if (!deliveryDate)     throw new Error('Delivery date is required.');
   if (!purchaseOrderId)  throw new Error('Purchase order is required.');
   if (!signatureData)    throw new Error('Driver signature is required.');
 
   return await deliveryModel.createDelivery({
     supplierId,
-    driverId,
     deliveryDate,
     purchaseOrderId,
     signatureData,
@@ -49,10 +47,7 @@ const getSuppliers = async () => {
   return await deliveryModel.getSuppliers();
 };
 
-// ── Get drivers (optionally by supplier) ─────────────────────
-const getDrivers = async (supplierId) => {
-  return await deliveryModel.getDrivers(supplierId || null);
-};
+
 
 // ── Get products ──────────────────────────────────────────────
 const getProducts = async () => {
@@ -78,7 +73,6 @@ export default {
   getDeliveryById,
   createDelivery,
   getSuppliers,
-  getDrivers,
   getProducts,
   getPurchaseOrdersBySupplier,
   getPurchaseOrderItems,

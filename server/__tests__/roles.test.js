@@ -18,7 +18,6 @@ const deliveryServiceMock = {
   getDeliveryById:             vi.fn().mockResolvedValue({ id: 1 }),
   createDelivery:              vi.fn().mockResolvedValue({ id: 1 }),
   getSuppliers:                vi.fn(),
-  getDrivers:                  vi.fn(),
   getProducts:                 vi.fn(),
   getPurchaseOrdersBySupplier: vi.fn(),
   getPurchaseOrderItems:       vi.fn(),
@@ -34,7 +33,6 @@ const signToken = (role) =>
 
 const validDeliveryBody = {
   supplierId:      1,
-  driverId:        1,
   deliveryDate:    '2026-07-18',
   purchaseOrderId: 1,
   signatureData:   'data:image/png;base64,xxx',

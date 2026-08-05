@@ -27,12 +27,9 @@ const getDeliveries = async (range = "all") => {
        dn.status,
        dn.created_at,
        s.name        AS supplier_name,
-       d.name        AS driver_name,
-       d.license_number AS driver_id_number,
        u.first_name  AS received_by_name
      FROM delivery_notes dn
      JOIN suppliers s ON s.id = dn.supplier_id
-     LEFT JOIN drivers d ON d.id = dn.driver_id
      LEFT JOIN users u ON u.id = dn.received_by
      WHERE 1=1 ${dateFilter}
      ORDER BY dn.created_at DESC`,
@@ -52,12 +49,9 @@ const getDeliveryById = async (id) => {
        dn.signature,
        dn.purchase_order_id,
        s.name           AS supplier_name,
-       d.name           AS driver_name,
-       d.license_number AS driver_id_number,
        u.first_name     AS received_by_name
      FROM delivery_notes dn
      LEFT JOIN suppliers s ON s.id = dn.supplier_id
-     LEFT JOIN drivers d ON d.id = dn.driver_id
      LEFT JOIN users u ON u.id = dn.received_by
      WHERE dn.id = $1`,
     [id],
@@ -106,7 +100,6 @@ const getDeliveryById = async (id) => {
 // Items are already known from the PO — no cross-check needed.
 const createDelivery = async ({
   supplierId,
-  driverId,
   deliveryDate,
   receivedBy,
   purchaseOrderId,
@@ -120,12 +113,11 @@ const createDelivery = async ({
     // Insert the delivery note
     const result = await client.query(
       `INSERT INTO delivery_notes
-         (supplier_id, driver_id, delivery_date, received_by, purchase_order_id, signature, status, created_at)
+         (supplier_id, delivery_date, received_by, purchase_order_id, signature, status, created_at)
        VALUES ($1, $2, $3, $4, $5, $6, 'recorded', NOW())
        RETURNING *`,
       [
         supplierId,
-        driverId,
         deliveryDate,
         receivedBy,
         purchaseOrderId,
@@ -171,24 +163,6 @@ const getSuppliers = async () => {
   return result.rows;
 };
 
-// ── Get drivers — optionally filtered by supplier ─────────────
-const getDrivers = async (supplierId = null) => {
-  if (supplierId) {
-    const result = await pool.query(
-      `SELECT id, name, license_number, supplier_id
-       FROM drivers
-       WHERE supplier_id = $1
-       ORDER BY name ASC`,
-      [supplierId],
-    );
-    return result.rows;
-  }
-
-  const result = await pool.query(
-    `SELECT id, name, license_number, supplier_id FROM drivers ORDER BY name ASC`,
-  );
-  return result.rows;
-};
 
 // ── Get all active products ───────────────────────────────────
 const getProducts = async () => {
@@ -249,7 +223,6 @@ export default {
   getDeliveryById,
   createDelivery,
   getSuppliers,
-  getDrivers,
   getProducts,
   getPurchaseOrdersBySupplier,
   getPurchaseOrderItems,

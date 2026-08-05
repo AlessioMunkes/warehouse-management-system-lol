@@ -180,7 +180,7 @@ const handleSignatureEnd = () => {
             </div>
           )}
 
-          {/* ── Step 1: Supplier, Driver, Date ─────────────── */}
+          {/* ── Step 1: Supplier, Date ─────────────── */}
           <div className="form-section">
             <p className="form-section-label">STEP 1 — SUPPLIER </p>
 

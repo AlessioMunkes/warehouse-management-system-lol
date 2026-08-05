@@ -47,16 +47,7 @@ const getSuppliers = async (req, res) => {
   }
 };
 
-// GET /api/deliveries/drivers?supplierId=1
-const getDrivers = async (req, res) => {
-  try {
-    const drivers = await deliveryService.getDrivers(req.query.supplierId);
-    res.json({ success: true, data: drivers });
-  } catch (err) {
-    console.error('[getDrivers]', err.message);
-    res.status(500).json({ success: false, message: 'Failed to retrieve drivers.' });
-  }
-};
+
 
 // GET /api/deliveries/products
 const getProducts = async (req, res) => {
@@ -96,7 +87,6 @@ export default {
   getDeliveryById,
   createDelivery,
   getSuppliers,
-  getDrivers,
   getProducts,
   getPurchaseOrders,
   getPurchaseOrderItems,
