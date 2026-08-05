@@ -111,19 +111,19 @@ const createDelivery = async ({
     await client.query("BEGIN");
 
     // Insert the delivery note
-    const result = await client.query(
-      `INSERT INTO delivery_notes
-         (supplier_id, delivery_date, received_by, purchase_order_id, signature, status, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, 'recorded', NOW())
-       RETURNING *`,
-      [
-        supplierId,
-        deliveryDate,
-        receivedBy,
-        purchaseOrderId,
-        signatureData || null,
-      ],
-    );
+  const result = await client.query(
+    `INSERT INTO delivery_notes
+      (supplier_id, delivery_date, received_by, purchase_order_id, signature)
+    VALUES ($1, $2, $3, $4, $5)
+    RETURNING *`,
+    [
+      supplierId,
+      deliveryDate,
+      receivedBy,
+      purchaseOrderId,
+      signatureData || null,
+    ],
+  );
 
     // If the worker checked "PO completed", mark it so it won't appear in future deliveries
     if (poCompleted) {
