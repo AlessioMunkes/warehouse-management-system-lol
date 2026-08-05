@@ -141,12 +141,10 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
               <p className="pdf-meta-value">{delivery.supplier_name || '—'}</p>
             </div>
             <div>
-              <p className="pdf-meta-label">Driver</p>
-              <p className="pdf-meta-value">{delivery.driver_name || '—'}</p>
+            
             </div>
             <div>
-              <p className="pdf-meta-label">Driver ID / Licence</p>
-              <p className="pdf-meta-value">{delivery.driver_id_number || '—'}</p>
+              
             </div>
             <div>
               <p className="pdf-meta-label">Delivery Date</p>
@@ -207,7 +205,7 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
                 <div className="pdf-signature-line" />
               )}
               <p className="pdf-signature-name">
-                {delivery.driver_name || 'Driver'} · {formatDate(delivery.delivery_date)}
+                {formatDate(delivery.delivery_date)}
               </p>
             </div>
             <div className="pdf-signature-block">

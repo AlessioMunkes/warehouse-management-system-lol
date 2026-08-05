@@ -18,7 +18,7 @@ const DeliveryCard = ({ delivery, onViewPdf, loadingPdf }) => (
         </span>
       </div>
       <p style={{ fontSize: '14px', color: '#605E5C', margin: 0 }}>
-        {delivery.driver_name} · {delivery.delivery_date?.slice(0, 10)} · REC: {delivery.received_by_name}
+        {delivery.delivery_date?.slice(0, 10)} · REC: {delivery.received_by_name}
       </p>
     </div>
     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

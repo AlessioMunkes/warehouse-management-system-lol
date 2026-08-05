@@ -3,7 +3,7 @@
 //
 // Records a delivery against a purchase order. Payload matches
 // the CONFIRMED backend contract (delivery.service.js createDelivery):
-// only supplierId, driverId, deliveryDate, purchaseOrderId,
+// only supplierId,deliveryDate, purchaseOrderId,
 // signatureData, poCompleted are read server-side. receivedBy is
 // derived from the JWT — never sent from the frontend.
 //
@@ -32,7 +32,7 @@ import { apiGet, apiPost } from '../services/api';
 // Reference-data fetchers — wired to the real API layer.
 
 const getSuppliers = () => apiGet('/api/deliveries/suppliers').then((r) => r.data || []);
-//const getDrivers = (supplierId) => apiGet(`/api/deliveries/drivers?supplierId=${supplierId}`).then((r) => r.data || []);
+
 const getPurchaseOrders = (supplierId) => apiGet(`/api/deliveries/purchase-orders?supplierId=${supplierId}`).then((r) => r.data || []);
 const getPurchaseOrderItems = (purchaseOrderId) => apiGet(`/api/deliveries/purchase-orders/${purchaseOrderId}/items`).then((r) => r.data || []);
 
@@ -84,10 +84,10 @@ const ProcurementDashboard = () => {
     getSuppliers().then(setSuppliers).catch(console.error);
   }, []);
 
-  // Fetch drivers + purchase orders whenever the supplier changes.
+
   useEffect(() => {
     if (supplierId) {
-      // getDrivers(supplierId).then(setDrivers).catch(console.error);
+      
       getPurchaseOrders(supplierId).then(setPurchaseOrders).catch(console.error);
     }
   }, [supplierId]);
@@ -106,10 +106,10 @@ const ProcurementDashboard = () => {
 
   const handleSupplierChange = (newSupplierId) => {
     setSupplierId(newSupplierId);
-    //setDriverId('');
+
     setPurchaseOrderId('');
     setPoItems([]);
-    //setDrivers([]);
+    
     setPurchaseOrders([]);
   };
 
@@ -224,7 +224,7 @@ const ProcurementDashboard = () => {
         )}
 
         {/* ── Step 1 ──────────────────────────────────────────── */}
-        <StepCard number={1} title="Choose the supplier and driver">
+        <StepCard number={1} title="Choose the supplier ">
           <Dropdown
             label="Supplier"
             required

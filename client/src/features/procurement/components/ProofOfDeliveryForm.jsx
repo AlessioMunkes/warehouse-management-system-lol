@@ -21,16 +21,16 @@ const ProofOfDeliveryForm = ({
   onCancel,
   isSubmitting = false,
   suppliers    = [],
-  drivers      = [],
+  
 }) => {
   const [supplierId,   setSupplierId]   = useState('');
-  const [driverId,     setDriverId]     = useState('');
+ 
   const [deliveryDate, setDeliveryDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedPoId, setSelectedPoId] = useState('');
   const [lineItems,    setLineItems]    = useState([]);
   const [signatureData, setSignatureData] = useState('');
 
-  const [filteredDrivers, setFilteredDrivers] = useState([]);
+  
   const [purchaseOrders,  setPurchaseOrders]  = useState([]);
   const [errors,          setErrors]          = useState({});
   const [loadingPOs,      setLoadingPOs]      = useState(false);
@@ -44,20 +44,17 @@ const ProofOfDeliveryForm = ({
 
   // ── When supplier changes: filter drivers, fetch POs ─────────
   useEffect(() => {
-    setDriverId('');
+    
     setSelectedPoId('');
     setLineItems([]);
     setPurchaseOrders([]);
     setPoError('');
 
     if (!supplierId) {
-      setFilteredDrivers([]);
+     
       return;
     }
 
-    setFilteredDrivers(
-      drivers.filter((d) => d.supplier_id === parseInt(supplierId))
-    );
 
     const fetchPOs = async () => {
       setLoadingPOs(true);
@@ -75,7 +72,7 @@ const ProofOfDeliveryForm = ({
     };
 
     fetchPOs();
-  }, [supplierId, drivers]);
+  }, [supplierId]);
 
   // ── When PO is selected: fetch and auto-populate items ───────
   const handlePoSelect = async (poId) => {
@@ -124,7 +121,7 @@ const handleSignatureEnd = () => {
   const validate = () => {
     const e = {};
     if (!supplierId)   e.supplierId   = 'Supplier is required';
-    if (!driverId)     e.driverId     = 'Driver is required';
+   
     if (!deliveryDate) e.deliveryDate = 'Date is required';
     if (!selectedPoId) e.selectedPoId = 'Select a purchase order';
     if (new Date(deliveryDate) > new Date())
@@ -145,7 +142,7 @@ const handleSignatureEnd = () => {
     try {
       await onSubmit({
         supplierId,
-        driverId,
+      
         deliveryDate,
         purchaseOrderId: selectedPoId,
         signatureData,     // base64 PNG — backend stores this on the delivery note
@@ -185,7 +182,7 @@ const handleSignatureEnd = () => {
 
           {/* ── Step 1: Supplier, Driver, Date ─────────────── */}
           <div className="form-section">
-            <p className="form-section-label">STEP 1 — SUPPLIER & DRIVER</p>
+            <p className="form-section-label">STEP 1 — SUPPLIER </p>
 
             <div className="form-grid-2">
 
@@ -206,25 +203,7 @@ const handleSignatureEnd = () => {
                 {errors.supplierId && <p className="form-error">⚠ {errors.supplierId}</p>}
               </div>
 
-              <div className="form-group">
-                <label className="form-label">
-                  DRIVER <span className="form-required">*</span>
-                </label>
-                <select
-                  className="form-select"
-                  value={driverId}
-                  onChange={(e) => setDriverId(e.target.value)}
-                  disabled={!supplierId || filteredDrivers.length === 0}
-                >
-                  <option value="">
-                    {supplierId ? 'Select driver...' : 'Select supplier first'}
-                  </option>
-                  {filteredDrivers.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name} · {d.license_number}</option>
-                  ))}
-                </select>
-                {errors.driverId && <p className="form-error">⚠ {errors.driverId}</p>}
-              </div>
+             
 
             </div>
 
