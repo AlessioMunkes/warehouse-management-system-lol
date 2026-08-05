@@ -1,8 +1,13 @@
-export default function SectionHeader({ title, subtitle }) {
+export default function SectionHeader({ title, subtitle, inlineHeadingStyle = null }) {
   return (
-    <div className="page-section-title">
-      <h1 className="page-section-title-heading">{title}</h1>
-      {subtitle && <p className="page-section-title-subtitle">{subtitle}</p>}
+    <div className="page-title-row">
+      <h1
+        className={inlineHeadingStyle ? undefined : "programme-select-heading"}
+        style={inlineHeadingStyle || undefined}
+      >
+        {title}
+      </h1>
+      {subtitle && <p className="form-helper-text">{subtitle}</p>}
     </div>
   );
 }

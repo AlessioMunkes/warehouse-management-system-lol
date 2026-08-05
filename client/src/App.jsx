@@ -14,6 +14,7 @@ import ProcurementDashboard                        from './pages/ProcurementDash
 import DecantingPage                               from './pages/DecantingPage';
 import PackingPage                                 from './pages/PackingPage';
 import InventoryManagementPage                     from './pages/InventoryManagementPage';
+import ManagerActivityScreen                       from './pages/ManagerActivityScreen';
 
 const App = () => (
   <AuthProvider>
@@ -33,7 +34,7 @@ const App = () => (
           <Route path="/noc"             element={<SelectNOCjob />} />
           
           <Route path="/noc/decanting"   element={<DecantingPage />} />
-
+p <Route path="/noc/inventory"   element={<InventoryManagementPage />} />
           {/* Both packing paths come from routes/paths.js, which is
               also what PackingPage navigates with — the board and the
               route table can't drift apart again. */}

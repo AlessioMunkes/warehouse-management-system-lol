@@ -74,19 +74,21 @@ export default function StockManifestTable({ products, onViewHistory, isLoading 
           {/* Mobile stacked cards */}
           <div className="stock-table-mobile">
             {products.map((product) => (
-              <div className="card-row" key={product.id}>
-                <div className="stock-card-meta" style={{ flex: 1 }}>
-                  <span className="stock-card-name">{product.name}</span>
-                  <span className="stock-card-sku">{product.sku}</span>
-                  <div className="stock-card-figures">
-                    <span>On hand: {product.onHand} {product.unit}</span>
-                    <span>Reorder at: {product.reorderAt} {product.unit}</span>
-                  </div>
-                  {statusBadges(product)}
-                </div>
-                <Button variant="link" type="button" onClick={() => onViewHistory?.(product)}>
-                  View history
-                </Button>
+    <div className="card-row" key={product.id}>
+      <div className="stock-card-meta" style={{ flex: 1 }}>
+        <div className="stock-card-title-row">
+          <span className="stock-card-name">{product.name}</span>
+          <span className="stock-card-sku">{product.sku}</span>
+        </div>
+        <div className="stock-card-figures">
+          <span>On hand: {product.onHand} {product.unit}</span>
+          <span>Reorder at: {product.reorderAt} {product.unit}</span>
+        </div>
+        {statusBadges(product)}
+      </div>
+      <Button variant="link" type="button" onClick={() => onViewHistory?.(product)}>
+        View history
+      </Button>
               </div>
             ))}
           </div>

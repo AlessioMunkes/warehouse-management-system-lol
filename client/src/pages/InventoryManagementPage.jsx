@@ -22,6 +22,20 @@ import { getManifest, getMovements, adjustStock } from "../services/stockAPI";
 // else keeps a worker from filling it in only to be refused.
 const CAN_ADJUST = ["manager", "admin"];
 
+// TEMPORARY: .programme-select-heading isn't rendering on this page
+// (stylesheet import issue still being tracked down), so the heading
+// is styled inline here as a stopgap. Scoped to Inventory only via
+// SectionHeader's inlineHeadingStyle prop — Procurement and any other
+// SectionHeader usage are unaffected. Remove once the CSS import is
+// fixed and swap back to className="programme-select-heading".
+const INVENTORY_HEADING_STYLE = {
+  fontFamily: "'Poppins', var(--font-family-sans)",
+  fontSize: "32px",
+  fontWeight: 700,
+  color: "black",
+  marginBottom: "8px",
+};
+
 export default function InventoryManagementPage() {
   const { user, logout } = useAuth();
 
@@ -40,10 +54,6 @@ export default function InventoryManagementPage() {
   const canAdjust = CAN_ADJUST.includes(user?.role);
 
   // ── Initial load ────────────────────────────────────────────
-  // The async function is defined inside the effect (same pattern as
-  // DecantingPage). The react-hooks compiler rules reject a setState
-  // called synchronously from an effect body, so isLoading starts
-  // true and is only ever cleared once the request settles.
   useEffect(() => {
     let cancelled = false;
 
@@ -76,22 +86,13 @@ export default function InventoryManagementPage() {
   }, []);
 
   // ── Save an adjustment ──────────────────────────────────────
-  // Returns true/false so the form knows whether to clear itself.
   const handleAdjust = async (payload) => {
     setIsSaving(true);
     setNotice(null);
     try {
       const result = await adjustStock(payload);
-
-      // Refetch rather than patching local state: quantity_on_hand is
-      // NUMERIC and the server is the only thing allowed to decide the
-      // new balance. Recomputing it here would let the screen and the
-      // ledger disagree.
       await reloadManifest();
 
-      // isShortfall / isUnitMismatch are not failures — the write went
-      // through. Surface them as warnings so the manager knows, without
-      // implying the adjustment was rejected.
       const warnings = [];
       if (result?.isShortfall) {
         warnings.push(`This leaves ${result.after} on hand — the system now shows a shortfall.`);
@@ -133,10 +134,11 @@ export default function InventoryManagementPage() {
     <div className="page-light">
       <PageHeader onLogout={logout} showBack={true} />
 
-      <div className="decanting-content">
+      <main className="decanting-content">
         <SectionHeader
-          title="Inventory"
+          title="Inventory Management"
           subtitle="Current stock levels and manual adjustments."
+          inlineHeadingStyle={INVENTORY_HEADING_STYLE}
         />
 
         {loadError && (
@@ -160,7 +162,7 @@ export default function InventoryManagementPage() {
             isSaving={isSaving}
           />
         )}
-      </div>
+      </main>
 
       {historyFor && (
         <MovementHistory
