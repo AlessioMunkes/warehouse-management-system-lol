@@ -106,6 +106,7 @@ const createDelivery = async ({
   signatureData,
   poCompleted,
 }) => {
+  
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -135,10 +136,12 @@ const createDelivery = async ({
 
     const items = await getPurchaseOrderItems(purchaseOrderId); // reuse existing query
     for (const item of items) {
+       console.log('DELIVERY UNIT →', item.product_id, JSON.stringify(item.default_unit));
       await stockModel.adjustStock(client, {
         productId: item.product_id,
         quantityDelta: item.expected_quantity, // swap for an actual-received qty if you add that field later
-        movementType: "procurement",
+        unit: item.default_unit,
+        movementType: "received",
         referenceType: "delivery_note",
         referenceId: result.rows[0].id,
         performedBy: receivedBy,
@@ -206,6 +209,7 @@ const getPurchaseOrderItems = async (purchaseOrderId) => {
        poi.expected_quantity,
        poi.expected_weight_kg,
        poi.unit_price,
+       p.default_unit,
        p.name                  AS product_name,
        p.stock_keeping_unit    AS sku,
        p.weight_kg             AS product_weight_kg
