@@ -22,8 +22,11 @@ const getDeliveryById = async (id) => {
 };
 
 // ── Record a new delivery ─────────────────────────────────────
-// Just records that the delivery happened against a purchase order.
-// Items are already known from the PO — no cross-check needed.
+// The browser sends only purchaseOrderItemId, receivedQuantity,
+// overAction and discrepancyReason per line. Everything used to move
+// stock — product id, expected quantity, unit — is re-read from the
+// purchase order here. WORKER can reach this endpoint, so a crafted
+// request must not be able to adjust stock for an arbitrary product.
 const createDelivery = async (data, userId) => {
   const { supplierId, deliveryDate, purchaseOrderId,
           signatureData, poCompleted, lineItems } = data;
@@ -35,33 +38,35 @@ const createDelivery = async (data, userId) => {
   if (!Array.isArray(lineItems) || lineItems.length === 0)
     throw new Error('At least one delivery line is required.');
 
-  // Never trust quantities or product ids from the browser — re-read
-  // the PO and match on purchase_order_item_id. WORKER can reach this
-  // endpoint, so a crafted request must not be able to move stock for
-  // an arbitrary product.
   const poItems = await deliveryModel.getPurchaseOrderItems(purchaseOrderId);
-  const poById  = new Map(poItems.map(i => [String(i.purchase_order_item_id), i]));
+  const poById  = new Map(poItems.map((i) => [String(i.purchase_order_item_id), i]));
 
-  const seen = new Set();
+  const seen     = new Set();
   const resolved = [];
   let hasDiscrepancy = false;
 
   for (const line of lineItems) {
     const key = String(line.purchaseOrderItemId);
     const po  = poById.get(key);
-    if (!po) throw new Error('Delivery line does not belong to this purchase order.');
+
+    if (!po)           throw new Error('Delivery line does not belong to this purchase order.');
     if (seen.has(key)) throw new Error('Duplicate line for the same purchase order item.');
     seen.add(key);
 
     const expected = Number(po.expected_quantity);
     const received = Number(line.receivedQuantity);
+
     if (!Number.isFinite(received) || received < 0)
       throw new Error(`Received quantity for ${po.product_name} must be zero or more.`);
 
+    // A surplus can be taken into stock or turned away at the gate.
+    // Either way received_quantity records what physically arrived —
+    // the generated discrepancy_quantity column depends on it.
     let accepted = received;
     if (received > expected && line.overAction === 'reject') accepted = expected;
 
-    const variance = accepted - expected;
+    const variance = received - expected;
+
     if (variance !== 0 && !String(line.discrepancyReason || '').trim())
       throw new Error(`A reason is required for ${po.product_name} — received ${received}, expected ${expected}.`);
     if (variance !== 0) hasDiscrepancy = true;
@@ -71,18 +76,21 @@ const createDelivery = async (data, userId) => {
       purchaseOrderItemId: po.purchase_order_item_id,
       expectedQuantity:    expected,
       expectedWeightKg:    po.expected_weight_kg ?? null,
-      receivedQuantity:    received,   // ← this line
-      acceptedQuantity:    accepted,
+      receivedQuantity:    received,   // what arrived — drives discrepancy_quantity
+      acceptedQuantity:    accepted,   // what goes into stock
       unit:                po.default_unit,
       discrepancyReason:   variance === 0 ? null : String(line.discrepancyReason).trim(),
     });
   }
 
   return await deliveryModel.createDelivery({
-    supplierId, deliveryDate, purchaseOrderId, signatureData,
+    supplierId,
+    deliveryDate,
+    purchaseOrderId,
+    signatureData,
     poCompleted: !!poCompleted,
-    receivedBy: userId,
-    lineItems: resolved,
+    receivedBy:  userId,          // comes from JWT — never trusted from frontend
+    lineItems:   resolved,
     hasDiscrepancy,
   });
 };
@@ -91,8 +99,6 @@ const createDelivery = async (data, userId) => {
 const getSuppliers = async () => {
   return await deliveryModel.getSuppliers();
 };
-
-
 
 // ── Get products ──────────────────────────────────────────────
 const getProducts = async () => {

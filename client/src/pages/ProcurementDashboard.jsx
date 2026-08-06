@@ -246,7 +246,7 @@ const ProcurementDashboard = () => {
             )}
 
             <Button variant="primary" onClick={() => navigate('/programmes')}>
-              Back to Nourish Our Children
+              Back to main menu
             </Button>
           </StepCard>
 
