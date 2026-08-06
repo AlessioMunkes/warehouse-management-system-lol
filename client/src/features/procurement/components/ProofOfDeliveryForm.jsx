@@ -3,17 +3,23 @@ import SignatureCanvas from 'react-signature-canvas';
 import { apiGet } from "../../../services/api";
 
 // ─────────────────────────────────────────────────────────────
-// src/components/Procurement/ProofOfDeliveryForm.jsx
+// src/features/procurement/components/ProofOfDeliveryForm.jsx
 //
 // Workflow:
-//   Step 1 — Select supplier, driver, delivery date
+//   Step 1 — Select supplier and delivery date
 //   Step 2 — Select approved purchase order
-//   Step 3 — View expected items (auto-populated from PO)
+//   Step 3 — Confirm what actually arrived (defaults to the PO
+//            quantities; the worker edits any line that differs)
 //   Step 4 — Driver signs the digital signature pad
 //
-// Signature is saved as a base64 PNG string and sent with
-// the form submission to be stored on the delivery note.
-// No inline styles — all classes from src/css/index.css
+// Quantities are NOT reference-only. What is entered here is what
+// gets added to stock, so a short delivery must be corrected on the
+// line rather than accepted silently. Any line that differs from the
+// order requires a reason, and an over-delivery must be explicitly
+// accepted into stock or rejected back to the ordered quantity.
+//
+// Signature is saved as a base64 PNG string and sent with the form
+// submission to be stored on the delivery note.
 // ─────────────────────────────────────────────────────────────
 
 const ProofOfDeliveryForm = ({
@@ -21,40 +27,32 @@ const ProofOfDeliveryForm = ({
   onCancel,
   isSubmitting = false,
   suppliers    = [],
-  
 }) => {
-  const [supplierId,   setSupplierId]   = useState('');
- 
-  const [deliveryDate, setDeliveryDate] = useState(new Date().toISOString().split('T')[0]);
-  const [selectedPoId, setSelectedPoId] = useState('');
-  const [lineItems,    setLineItems]    = useState([]);
+  const [supplierId,    setSupplierId]    = useState('');
+  const [deliveryDate,  setDeliveryDate]  = useState(new Date().toISOString().split('T')[0]);
+  const [selectedPoId,  setSelectedPoId]  = useState('');
+  const [lineItems,     setLineItems]     = useState([]);
   const [signatureData, setSignatureData] = useState('');
 
-  
-  const [purchaseOrders,  setPurchaseOrders]  = useState([]);
-  const [errors,          setErrors]          = useState({});
-  const [loadingPOs,      setLoadingPOs]      = useState(false);
-  const [loadingItems,    setLoadingItems]    = useState(false);
-  const [poError,         setPoError]         = useState('');
-  const [isSigned,        setIsSigned]        = useState(false);
+  const [purchaseOrders, setPurchaseOrders] = useState([]);
+  const [errors,         setErrors]         = useState({});
+  const [loadingPOs,     setLoadingPOs]     = useState(false);
+  const [loadingItems,   setLoadingItems]   = useState(false);
+  const [poError,        setPoError]        = useState('');
+  const [isSigned,       setIsSigned]       = useState(false);
 
   const [poCompleted, setPoCompleted] = useState(false);
 
   const sigCanvasRef = useRef(null);
 
-  // ── When supplier changes: filter drivers, fetch POs ─────────
+  // ── When supplier changes: reset and fetch POs ────────────────
   useEffect(() => {
-    
     setSelectedPoId('');
     setLineItems([]);
     setPurchaseOrders([]);
     setPoError('');
 
-    if (!supplierId) {
-     
-      return;
-    }
-
+    if (!supplierId) return;
 
     const fetchPOs = async () => {
       setLoadingPOs(true);
@@ -74,7 +72,9 @@ const ProofOfDeliveryForm = ({
     fetchPOs();
   }, [supplierId]);
 
-  // ── When PO is selected: fetch and auto-populate items ───────
+  // ── When PO is selected: fetch and auto-populate items ────────
+  // Received quantity defaults to the expected quantity so that the
+  // common case (everything arrived) needs no typing at all.
   const handlePoSelect = async (poId) => {
     setSelectedPoId(poId);
     setLineItems([]);
@@ -86,9 +86,13 @@ const ProofOfDeliveryForm = ({
           purchaseOrderItemId: item.purchase_order_item_id,
           productId:           item.product_id,
           productName:         item.product_name,
-          expectedQuantity:    item.expected_quantity,
-          expectedWeightKg:    item.expected_weight_kg || '—',
           sku:                 item.sku || '',
+          unit:                item.default_unit || '',
+          expectedQuantity:    Number(item.expected_quantity),
+          expectedWeightKg:    item.expected_weight_kg || '—',
+          receivedQuantity:    Number(item.expected_quantity),
+          overAction:          'accept',
+          discrepancyReason:   '',
         }))
       );
     } catch {
@@ -98,18 +102,45 @@ const ProofOfDeliveryForm = ({
     }
   };
 
-  // ── Signature handlers ────────────────────────────────────────
-const handleSignatureEnd = () => {
-  setTimeout(() => {
-    if (sigCanvasRef.current && !sigCanvasRef.current.isEmpty()) {
-      const dataURL = sigCanvasRef.current
-        .getCanvas()
-        .toDataURL('image/png');
-      setSignatureData(dataURL);
-      setIsSigned(true);
-    }
-  }, 100);
-};
+  // ── Line editing ─────────────────────────────────────────────
+  const updateLine = (id, patch) =>
+    setLineItems((prev) =>
+      prev.map((l) => (l.purchaseOrderItemId === id ? { ...l, ...patch } : l))
+    );
+
+  const isBlank    = (l) => l.receivedQuantity === '' || l.receivedQuantity === null;
+  const hasVariance = (l) =>
+    !isBlank(l) && Number(l.receivedQuantity) !== Number(l.expectedQuantity);
+  const isOver      = (l) =>
+    !isBlank(l) && Number(l.receivedQuantity) > Number(l.expectedQuantity);
+
+  // What will actually be added to stock for this line — a rejected
+  // surplus is capped back to the ordered quantity.
+  const acceptedQty = (l) => {
+    if (isBlank(l)) return 0;
+    const received = Number(l.receivedQuantity);
+    if (isOver(l) && l.overAction === 'reject') return Number(l.expectedQuantity);
+    return received;
+  };
+
+  const varianceLabel = (l) => {
+    const diff = acceptedQty(l) - Number(l.expectedQuantity);
+    if (diff === 0) return null;
+    return diff > 0 ? `+${diff} over` : `${diff} short`;
+  };
+
+  const discrepancyCount = lineItems.filter(hasVariance).length;
+
+  // ── Signature handlers ───────────────────────────────────────
+  const handleSignatureEnd = () => {
+    setTimeout(() => {
+      if (sigCanvasRef.current && !sigCanvasRef.current.isEmpty()) {
+        const dataURL = sigCanvasRef.current.getCanvas().toDataURL('image/png');
+        setSignatureData(dataURL);
+        setIsSigned(true);
+      }
+    }, 100);
+  };
 
   const handleClearSignature = () => {
     sigCanvasRef.current?.clear();
@@ -118,16 +149,25 @@ const handleSignatureEnd = () => {
   };
 
   // ── Validation ───────────────────────────────────────────────
+  // Mirrors the server rules so the worker gets feedback before the
+  // round trip. The server re-checks all of this — this is not the
+  // enforcement point.
   const validate = () => {
     const e = {};
     if (!supplierId)   e.supplierId   = 'Supplier is required';
-   
     if (!deliveryDate) e.deliveryDate = 'Date is required';
     if (!selectedPoId) e.selectedPoId = 'Select a purchase order';
     if (new Date(deliveryDate) > new Date())
       e.deliveryDate = 'Date cannot be in the future';
-    if (!lineItems.length)
+
+    if (!lineItems.length) {
       e.lineItems = 'No items loaded — select a purchase order first';
+    } else if (lineItems.some((l) => isBlank(l) || Number(l.receivedQuantity) < 0)) {
+      e.lineItems = 'Received quantity must be zero or more on every line';
+    } else if (lineItems.some((l) => hasVariance(l) && !l.discrepancyReason.trim())) {
+      e.lineItems = 'Give a reason for every line that differs from the order';
+    }
+
     if (!signatureData)
       e.signature = 'Driver signature is required before submitting';
 
@@ -142,11 +182,16 @@ const handleSignatureEnd = () => {
     try {
       await onSubmit({
         supplierId,
-      
         deliveryDate,
         purchaseOrderId: selectedPoId,
-        signatureData,     // base64 PNG — backend stores this on the delivery note
-        poCompleted,       // if true, backend marks the PO as 'completed'
+        signatureData,   // base64 PNG — backend stores this on the delivery note
+        poCompleted,     // if true, backend marks the PO as 'completed'
+        lineItems: lineItems.map((l) => ({
+          purchaseOrderItemId: l.purchaseOrderItemId,
+          receivedQuantity:    Number(l.receivedQuantity),
+          overAction:          l.overAction,
+          discrepancyReason:   l.discrepancyReason.trim(),
+        })),
       });
     } catch (err) {
       setErrors((p) => ({ ...p, general: err.message }));
@@ -154,6 +199,8 @@ const handleSignatureEnd = () => {
   };
 
   const formatDate = (d) => (d ? new Date(d).toLocaleDateString('en-ZA') : '—');
+
+  const GRID = '2fr 0.8fr 0.8fr 1fr 0.8fr';
 
   // ── Render ───────────────────────────────────────────────────
   return (
@@ -180,12 +227,11 @@ const handleSignatureEnd = () => {
             </div>
           )}
 
-          {/* ── Step 1: Supplier, Date ─────────────── */}
+          {/* ── Step 1: Supplier, Date ─────────────────────────── */}
           <div className="form-section">
-            <p className="form-section-label">STEP 1 — SUPPLIER </p>
+            <p className="form-section-label">STEP 1 — SUPPLIER</p>
 
             <div className="form-grid-2">
-
               <div className="form-group">
                 <label className="form-label">
                   SUPPLIER <span className="form-required">*</span>
@@ -202,9 +248,6 @@ const handleSignatureEnd = () => {
                 </select>
                 {errors.supplierId && <p className="form-error">⚠ {errors.supplierId}</p>}
               </div>
-
-             
-
             </div>
 
             <div className="form-group">
@@ -221,7 +264,7 @@ const handleSignatureEnd = () => {
             </div>
           </div>
 
-          {/* ── Step 2: Select Purchase Order ──────────────── */}
+          {/* ── Step 2: Select Purchase Order ──────────────────── */}
           {supplierId && (
             <div className="form-section">
               <p className="form-section-label">STEP 2 — SELECT PURCHASE ORDER</p>
@@ -262,52 +305,143 @@ const handleSignatureEnd = () => {
             </div>
           )}
 
-          {/* ── Step 3: Expected Items (read-only from PO) ──── */}
+          {/* ── Step 3: Confirm what actually arrived ──────────── */}
           {selectedPoId && (
             <div className="form-section">
-              <p className="form-section-label">STEP 3 — EXPECTED ITEMS FROM PURCHASE ORDER</p>
+              <p className="form-section-label">STEP 3 — CONFIRM WHAT ARRIVED</p>
 
               {loadingItems ? (
                 <p className="form-section-label">LOADING ITEMS...</p>
               ) : (
                 <>
                   {/* Column headers */}
-                  <div className="line-item-cols"
-                    style={{ gridTemplateColumns: '2fr 1fr 1fr 80px' }}>
+                  <div className="line-item-cols" style={{ gridTemplateColumns: GRID }}>
                     <span>PRODUCT</span>
                     <span className="line-item-col-center">SKU</span>
-                    <span className="line-item-col-center">EXPECTED QTY</span>
-                    <span className="line-item-col-center">EXP KG</span>
+                    <span className="line-item-col-center">ORDERED</span>
+                    <span className="line-item-col-center">RECEIVED</span>
+                    <span className="line-item-col-center">UNIT</span>
                   </div>
 
-                  {lineItems.map((item) => (
-                    <div
-                      key={item.purchaseOrderItemId}
-                      className="line-item-row"
-                      style={{ gridTemplateColumns: '2fr 1fr 1fr 80px' }}
-                    >
-                      <span className="note-line-product">{item.productName}</span>
-                      <span className="note-line-qty">{item.sku || '—'}</span>
-                      <input
-                        type="number"
-                        className="line-item-input-readonly"
-                        value={item.expectedQuantity}
-                        readOnly
-                        tabIndex={-1}
-                      />
-                      <input
-                        type="text"
-                        className="line-item-input-readonly"
-                        value={item.expectedWeightKg}
-                        readOnly
-                        tabIndex={-1}
-                      />
-                    </div>
-                  ))}
+                  {lineItems.map((item) => {
+                    const variance = hasVariance(item);
+                    return (
+                      <div key={item.purchaseOrderItemId}>
+                        <div
+                          className="line-item-row"
+                          style={{ gridTemplateColumns: GRID }}
+                        >
+                          <span className="note-line-product">{item.productName}</span>
+                          <span className="note-line-qty">{item.sku || '—'}</span>
+                          <input
+                            type="text"
+                            className="line-item-input-readonly"
+                            value={item.expectedQuantity}
+                            readOnly
+                            tabIndex={-1}
+                          />
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            className="line-item-input"
+                            value={item.receivedQuantity}
+                            onChange={(e) =>
+                              updateLine(item.purchaseOrderItemId, {
+                                receivedQuantity:
+                                  e.target.value === '' ? '' : Number(e.target.value),
+                              })
+                            }
+                          />
+                          <span className="note-line-qty">{item.unit || '—'}</span>
+                        </div>
+
+                        {/* Discrepancy capture — only shown when the line differs */}
+                        {variance && (
+                          <div
+                            style={{
+                              display:      'flex',
+                              flexDirection:'column',
+                              gap:          '8px',
+                              padding:      '10px 12px',
+                              margin:       '0 0 8px',
+                              borderLeft:   '3px solid var(--color-maroon)',
+                              background:   'var(--color-lol-bg)',
+                            }}
+                          >
+                            <p
+                              style={{
+                                margin: 0,
+                                fontSize: '12px',
+                                fontWeight: 900,
+                                textTransform: 'uppercase',
+                                color: 'var(--color-maroon)',
+                              }}
+                            >
+                              ⚠ {varianceLabel(item)} — {item.productName}
+                            </p>
+
+                            {isOver(item) && (
+                              <select
+                                className="form-select"
+                                value={item.overAction}
+                                onChange={(e) =>
+                                  updateLine(item.purchaseOrderItemId, {
+                                    overAction: e.target.value,
+                                  })
+                                }
+                              >
+                                <option value="accept">
+                                  Accept the surplus into stock ({acceptedQty(item)} {item.unit})
+                                </option>
+                                <option value="reject">
+                                  Reject the surplus — take {item.expectedQuantity} {item.unit} only
+                                </option>
+                              </select>
+                            )}
+
+                            <input
+                              type="text"
+                              className="form-input"
+                              placeholder="Reason — required (e.g. supplier short-shipped, crate damaged)"
+                              value={item.discrepancyReason}
+                              onChange={(e) =>
+                                updateLine(item.purchaseOrderItemId, {
+                                  discrepancyReason: e.target.value,
+                                })
+                              }
+                            />
+
+                            <p
+                              style={{
+                                margin: 0,
+                                fontSize: '11px',
+                                color: 'var(--color-text-meta)',
+                              }}
+                            >
+                              {acceptedQty(item)} {item.unit} will be added to stock.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
 
                   <div className="info-notice">
-                    <p>ℹ THESE ITEMS ARE PRE-POPULATED FROM THE PURCHASE ORDER AND ARE FOR REFERENCE ONLY</p>
+                    <p>
+                      ℹ QUANTITIES DEFAULT TO THE PURCHASE ORDER. EDIT ANY LINE THAT
+                      DIFFERS — WHAT IS ENTERED HERE IS WHAT GETS ADDED TO STOCK.
+                    </p>
                   </div>
+
+                  {discrepancyCount > 0 && (
+                    <div className="alert-error">
+                      <p>
+                        ⚠ {discrepancyCount} LINE{discrepancyCount > 1 ? 'S' : ''} DIFFER
+                        FROM THE ORDER — THIS DELIVERY WILL BE FLAGGED
+                      </p>
+                    </div>
+                  )}
 
                   {typeof errors.lineItems === 'string' && (
                     <p className="form-error">⚠ {errors.lineItems}</p>
@@ -317,7 +451,7 @@ const handleSignatureEnd = () => {
             </div>
           )}
 
-          {/* ── Step 4: Driver Signature ────────────────────── */}
+          {/* ── Step 4: Driver Signature ───────────────────────── */}
           {selectedPoId && lineItems.length > 0 && (
             <div className="signature-section">
               <p className="form-section-label">

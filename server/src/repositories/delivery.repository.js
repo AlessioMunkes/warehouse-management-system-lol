@@ -98,35 +98,63 @@ const getDeliveryById = async (id) => {
 // ── Create a new delivery note ────────────────────────────────
 // Links the delivery note to the purchase order.
 // Items are already known from the PO — no cross-check needed.
+// Receives already-validated, PO-verified lines from the service.
 const createDelivery = async ({
-  supplierId,
-  deliveryDate,
-  receivedBy,
-  purchaseOrderId,
-  signatureData,
-  poCompleted,
+  supplierId, deliveryDate, receivedBy, purchaseOrderId,
+  signatureData, poCompleted, lineItems, hasDiscrepancy,
 }) => {
-  
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
 
-    // Insert the delivery note
-  const result = await client.query(
-    `INSERT INTO delivery_notes
-      (supplier_id, delivery_date, received_by, purchase_order_id, signature)
-    VALUES ($1, $2, $3, $4, $5)
-    RETURNING *`,
-    [
-      supplierId,
-      deliveryDate,
-      receivedBy,
-      purchaseOrderId,
-      signatureData || null,
-    ],
-  );
+    const noteResult = await client.query(
+      `INSERT INTO delivery_notes
+         (supplier_id, delivery_date, received_by, purchase_order_id, signature, status)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [supplierId, deliveryDate, receivedBy, purchaseOrderId,
+       signatureData || null, hasDiscrepancy ? 'flagged' : 'recorded'],
+    );
+    const deliveryNoteId = noteResult.rows[0].id;
 
-    // If the worker checked "PO completed", mark it so it won't appear in future deliveries
+    // adjustStock's contract: callers touching multiple products must
+    // lock in product_id order or they deadlock against completeSlip.
+    const ordered = [...lineItems].sort((a, b) => a.productId - b.productId);
+    const warnings = [];
+
+    for (const line of ordered) {
+       await client.query(
+        `INSERT INTO delivery_note_items
+           (delivery_note_id, product_id, purchase_order_item_id,
+            expected_quantity, expected_weight_kg,
+            received_quantity, unit, discrepancy_reason)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [deliveryNoteId, line.productId, line.purchaseOrderItemId,
+         line.expectedQuantity, line.expectedWeightKg,
+         line.receivedQuantity, line.unit, line.discrepancyReason],
+      );
+
+      // A fully-rejected or zero-received line still gets a note row —
+      // the record of what didn't arrive matters — but moves no stock.
+      if (line.acceptedQuantity > 0) {
+        const res = await stockModel.adjustStock(client, {
+          productId:     line.productId,
+          quantityDelta: line.acceptedQuantity,
+          unit:          line.unit,
+          movementType:  "received",
+          referenceType: "delivery_note",
+          referenceId:   deliveryNoteId,
+          performedBy:   receivedBy,
+        });
+        if (res.isUnitMismatch) {
+          warnings.push({
+            productId: line.productId,
+            message: `Delivery unit "${line.unit}" differs from the unit already on record; stock was added in the recorded unit.`,
+          });
+        }
+      }
+    }
+
     if (poCompleted) {
       await client.query(
         `UPDATE purchase_orders SET status = 'completed' WHERE id = $1`,
@@ -134,22 +162,8 @@ const createDelivery = async ({
       );
     }
 
-    const items = await getPurchaseOrderItems(purchaseOrderId); // reuse existing query
-    for (const item of items) {
-       console.log('DELIVERY UNIT →', item.product_id, JSON.stringify(item.default_unit));
-      await stockModel.adjustStock(client, {
-        productId: item.product_id,
-        quantityDelta: item.expected_quantity, // swap for an actual-received qty if you add that field later
-        unit: item.default_unit,
-        movementType: "received",
-        referenceType: "delivery_note",
-        referenceId: result.rows[0].id,
-        performedBy: receivedBy,
-      });
-    }
-
     await client.query("COMMIT");
-    return result.rows[0];
+    return { ...noteResult.rows[0], warnings };
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;
@@ -157,6 +171,7 @@ const createDelivery = async ({
     client.release();
   }
 };
+
 
 // ── Get all active suppliers ──────────────────────────────────
 const getSuppliers = async () => {
@@ -212,7 +227,8 @@ const getPurchaseOrderItems = async (purchaseOrderId) => {
        p.default_unit,
        p.name                  AS product_name,
        p.stock_keeping_unit    AS sku,
-       p.weight_kg             AS product_weight_kg
+       p.weight_kg             AS product_weight_kg,
+       p.default_unit
      FROM purchase_order_items poi
      JOIN products p ON p.id = poi.product_id
      WHERE poi.purchase_order_id = $1

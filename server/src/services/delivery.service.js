@@ -25,20 +25,65 @@ const getDeliveryById = async (id) => {
 // Just records that the delivery happened against a purchase order.
 // Items are already known from the PO — no cross-check needed.
 const createDelivery = async (data, userId) => {
-  const { supplierId, deliveryDate, purchaseOrderId, signatureData, poCompleted } = data;
+  const { supplierId, deliveryDate, purchaseOrderId,
+          signatureData, poCompleted, lineItems } = data;
 
-  if (!supplierId)       throw new Error('Supplier is required.');
-  if (!deliveryDate)     throw new Error('Delivery date is required.');
-  if (!purchaseOrderId)  throw new Error('Purchase order is required.');
-  if (!signatureData)    throw new Error('Driver signature is required.');
+  if (!supplierId)      throw new Error('Supplier is required.');
+  if (!deliveryDate)    throw new Error('Delivery date is required.');
+  if (!purchaseOrderId) throw new Error('Purchase order is required.');
+  if (!signatureData)   throw new Error('Driver signature is required.');
+  if (!Array.isArray(lineItems) || lineItems.length === 0)
+    throw new Error('At least one delivery line is required.');
+
+  // Never trust quantities or product ids from the browser — re-read
+  // the PO and match on purchase_order_item_id. WORKER can reach this
+  // endpoint, so a crafted request must not be able to move stock for
+  // an arbitrary product.
+  const poItems = await deliveryModel.getPurchaseOrderItems(purchaseOrderId);
+  const poById  = new Map(poItems.map(i => [String(i.purchase_order_item_id), i]));
+
+  const seen = new Set();
+  const resolved = [];
+  let hasDiscrepancy = false;
+
+  for (const line of lineItems) {
+    const key = String(line.purchaseOrderItemId);
+    const po  = poById.get(key);
+    if (!po) throw new Error('Delivery line does not belong to this purchase order.');
+    if (seen.has(key)) throw new Error('Duplicate line for the same purchase order item.');
+    seen.add(key);
+
+    const expected = Number(po.expected_quantity);
+    const received = Number(line.receivedQuantity);
+    if (!Number.isFinite(received) || received < 0)
+      throw new Error(`Received quantity for ${po.product_name} must be zero or more.`);
+
+    let accepted = received;
+    if (received > expected && line.overAction === 'reject') accepted = expected;
+
+    const variance = accepted - expected;
+    if (variance !== 0 && !String(line.discrepancyReason || '').trim())
+      throw new Error(`A reason is required for ${po.product_name} — received ${received}, expected ${expected}.`);
+    if (variance !== 0) hasDiscrepancy = true;
+
+    resolved.push({
+      productId:           po.product_id,
+      purchaseOrderItemId: po.purchase_order_item_id,
+      expectedQuantity:    expected,
+      expectedWeightKg:    po.expected_weight_kg ?? null,
+      receivedQuantity:    received,   // ← this line
+      acceptedQuantity:    accepted,
+      unit:                po.default_unit,
+      discrepancyReason:   variance === 0 ? null : String(line.discrepancyReason).trim(),
+    });
+  }
 
   return await deliveryModel.createDelivery({
-    supplierId,
-    deliveryDate,
-    purchaseOrderId,
-    signatureData,
-    poCompleted: !!poCompleted,  // ensure boolean
-    receivedBy: userId,          // comes from JWT — never trusted from frontend
+    supplierId, deliveryDate, purchaseOrderId, signatureData,
+    poCompleted: !!poCompleted,
+    receivedBy: userId,
+    lineItems: resolved,
+    hasDiscrepancy,
   });
 };
 
