@@ -14,7 +14,7 @@
 // in a database and a number on a shelf.
 //
 // Everything else (wrong cohort day BR-12, an unpacked slip, a
-// collection after the 16:00 write-off) proceeds on a manager
+// collection after a pallet was written off) proceeds on a manager
 // override with a recorded reason, which is what the paper process
 // already does when Grizel signs off an exception at the gate.
 // ─────────────────────────────────────────────────────────────
@@ -24,11 +24,66 @@ import { ROLES }          from '../middleware/auth.middleware.js';
 const COHORTS  = ['week1', 'week2'];
 const STATUSES = ['awaiting', 'collected', 'late_collected', 'not_collected', 'cancelled'];
 
-// BR-14. Kept as a constant rather than a settings row for now — if
-// the sponsor ever wants it configurable, move it to picking_settings
-// alongside cohort_anchor_monday rather than adding a second
-// settings mechanism.
-const NON_COLLECTION_CUTOFF_HOUR = 16;
+// ─────────────────────────────────────────────────────────────
+// BR-14 — AUTOMATIC NON-COLLECTION SWEEP: CURRENTLY DISABLED
+//
+// Flip `enabled` to true to switch it on. Nothing else needs to
+// change in this file; every time-triggered code path below is
+// guarded by this flag and short-circuits when it is false.
+//
+// WHY IT IS OFF
+// The rule itself is settled (BR-14, CSF3): at 16:00 on a dispatch
+// day, any pallet nobody has come for is flagged and the manager is
+// notified. What is NOT settled is how it fires, and getting that
+// wrong is worse than not having it:
+//
+//   1. Where the clock comes from. This service runs on Render in
+//      UTC. A naive `new Date().getHours() >= 16` writes pallets off
+//      at 14:00 SAST — in the middle of the Tuesday collection
+//      window, while drivers are still arriving. A pallet wrongly
+//      marked 'not_collected' needs a manager override to release,
+//      which turns a scheduling bug into a queue at the gate.
+//
+//   2. What triggers it. Supabase pg_cron, a Render cron job hitting
+//      the endpoint with an internal credential, or opportunistic
+//      evaluation when the board loads — each has different failure
+//      modes, and a cron that silently stops firing is not noticed
+//      until a month of stock counts is wrong.
+//
+//   3. Whether 16:00 is even right. It came from the sponsor email
+//      and the URS, not from watching a dispatch day. Worth checking
+//      against real arrival times before it starts changing state.
+//
+// The MANUAL sweep below still works while this is off. A manager can
+// deliberately write off a pallet at the end of the day, which is the
+// same outcome without a background job deciding it unattended.
+//
+// The gate is unaffected either way: with no dispatch event on a
+// pallet it simply reads as awaiting collection indefinitely, which
+// is exactly what the paper register does today.
+// ─────────────────────────────────────────────────────────────
+const NON_COLLECTION_SWEEP = {
+  enabled:    false,
+  cutoffHour: 16,   // SAST, per BR-14. Unused while disabled.
+};
+
+// South Africa is UTC+2 year round — no daylight saving — so a fixed
+// offset is accurate rather than a shortcut.
+//
+// This exists because node-postgres parses a DATE column into a JS
+// Date at the SERVER's local midnight. That is correct on a Windows
+// dev machine in Cape Town and wrong on a UTC container, which is
+// what CI and Render both are. Without it, "is this pallet booked for
+// today?" answers incorrectly between midnight and 02:00 SAST and
+// tells a manager a Tuesday pallet belongs to Monday.
+//
+// Setting TZ=Africa/Johannesburg on the Render service would also fix
+// this, and is worth doing anyway — but an environment variable
+// someone forgets to set on a new environment fails silently, so the
+// offset is applied explicitly here too.
+const WAREHOUSE_UTC_OFFSET_MINUTES = 120;
+
+const warehouseNow = () => new Date(Date.now() + WAREHOUSE_UTC_OFFSET_MINUTES * 60 * 1000);
 
 // Signatures arrive as base64 PNG data URLs from a canvas, the same
 // way delivery notes already store them. A signature from a phone
@@ -45,19 +100,27 @@ const fail = (status, message) => {
 
 const isManager = (user) => user.role === ROLES.MANAGER || user.role === ROLES.ADMIN;
 
-// node-postgres parses a DATE column into a JS Date at LOCAL
-// midnight, so toISOString() on it shifts a day backwards for
-// anywhere east of UTC — which includes Cape Town. Formatting from
-// the local components instead keeps "is this pallet for today?"
-// answering correctly at the gate at 08:00 on a Tuesday.
+// Formats a date as YYYY-MM-DD in warehouse time. Reads the UTC
+// components of an already-shifted instant rather than the local
+// ones, so the result does not depend on the container's timezone.
 const toDateString = (value) => {
-  const d = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(d.getTime())) return null;
+  if (value === null || value === undefined) return null;
+  const raw = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(raw.getTime())) return null;
+
+  // A DATE column comes back as local midnight; a timestamp comes
+  // back as a real instant. Shifting by the offset and reading UTC
+  // parts gives the warehouse's calendar day in both cases.
+  const shifted = new Date(raw.getTime() + WAREHOUSE_UTC_OFFSET_MINUTES * 60 * 1000);
   const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())}`;
 };
 
-const todayString = () => toDateString(new Date());
+const todayString = () => {
+  const now = warehouseNow();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${now.getUTCFullYear()}-${pad(now.getUTCMonth() + 1)}-${pad(now.getUTCDate())}`;
+};
 
 // ── Eligibility ───────────────────────────────────────────────
 // Computed in one place so the gate screen and the collect endpoint
@@ -65,18 +128,29 @@ const todayString = () => toDateString(new Date());
 // screen renders these as warnings; collect() below reads the same
 // object to decide what it insists on.
 const evaluateEligibility = (gateView) => {
-  const now         = new Date();
   const dispatchDay = toDateString(gateView.dispatch_date);
 
   return {
-    ecdInactive:      gateView.ecd_is_active === false || gateView.ecd_approved_at === null,
-    slipNotPacked:    !['complete', 'dispatched'].includes(gateView.slip_status),
-    wrongDay:         dispatchDay !== null && dispatchDay !== todayString(),
-    afterCutoff:      now.getHours() >= NON_COLLECTION_CUTOFF_HOUR,
-    writtenOff:       gateView.dispatch_status === 'not_collected',
+    ecdInactive:       gateView.ecd_is_active === false || gateView.ecd_approved_at === null,
+    slipNotPacked:     !['complete', 'dispatched'].includes(gateView.slip_status),
+    wrongDay:          dispatchDay !== null && dispatchDay !== todayString(),
+
+    // Purely informational for the gate screen, and only meaningful
+    // once the sweep is switched on. While it is off this stays false
+    // so no screen shows a cutoff warning for a rule that is not
+    // being enforced — telling staff a deadline has passed when
+    // nothing happens at that deadline just teaches them to ignore
+    // the banner.
+    afterCutoff:       NON_COLLECTION_SWEEP.enabled &&
+                       warehouseNow().getUTCHours() >= NON_COLLECTION_SWEEP.cutoffHour,
+
+    // Still evaluated with the sweep off: a manager can write a
+    // pallet off manually, and that pallet must still need an
+    // override to release afterwards.
+    writtenOff:        gateView.dispatch_status === 'not_collected',
     alreadyDispatched: ['collected', 'late_collected'].includes(gateView.dispatch_status),
-    hasFlaggedLines:  (gateView.items || []).some((i) => i.status === 'flagged'),
-    hasVariance:      (gateView.items || []).some(
+    hasFlaggedLines:   (gateView.items || []).some((i) => i.status === 'flagged'),
+    hasVariance:       (gateView.items || []).some(
       (i) => i.status === 'confirmed' &&
              i.packed_quantity !== null &&
              Number(i.packed_quantity) !== Number(i.required_quantity)
@@ -85,22 +159,24 @@ const evaluateEligibility = (gateView) => {
 };
 
 // ── The gate board ────────────────────────────────────────────
-// Runs the 16:00 sweep opportunistically. Render's scheduler is the
-// primary trigger, but a cron job that silently stops firing is not
-// something anyone notices until a month of stock counts is wrong, so
-// the board also sweeps whenever it is loaded after the cutoff for a
-// past-or-present date. sweepNonCollections is idempotent, so the two
-// triggers cannot conflict.
+// With the sweep enabled this also runs it opportunistically, as a
+// backstop against a scheduler that has quietly stopped firing.
+// sweepNonCollections is idempotent, so the scheduled and
+// opportunistic triggers cannot conflict.
+//
+// While the sweep is disabled the board is a pure read.
 const getBoard = async (query, user) => {
   const { dispatchDate, cohort, status } = query;
 
   if (cohort && !COHORTS.includes(cohort))   fail(400, 'Cohort must be week1 or week2.');
   if (status && !STATUSES.includes(status))  fail(400, 'Invalid dispatch status filter.');
 
-  if (dispatchDate) {
-    const isPast     = dispatchDate < todayString();
-    const pastCutoff = new Date().getHours() >= NON_COLLECTION_CUTOFF_HOUR;
-    if (isPast || (dispatchDate === todayString() && pastCutoff)) {
+  if (NON_COLLECTION_SWEEP.enabled && dispatchDate) {
+    const today      = todayString();
+    const isPast     = dispatchDate < today;
+    const pastCutoff = warehouseNow().getUTCHours() >= NON_COLLECTION_SWEEP.cutoffHour;
+
+    if (isPast || (dispatchDate === today && pastCutoff)) {
       await dispatchRepository.sweepNonCollections({ dispatchDate, actorId: user.id });
     }
   }
@@ -207,7 +283,7 @@ const collect = async (slipId, body, user) => {
     needsOverride.push('this pallet has not been closed off by the packing team yet');
   }
   if (eligibility.writtenOff) {
-    needsOverride.push('this pallet was already recorded as not collected at 16:00');
+    needsOverride.push('this pallet was already recorded as not collected');
   }
 
   if (needsOverride.length > 0) {
@@ -241,12 +317,17 @@ const collect = async (slipId, body, user) => {
   return result;
 };
 
-// ── Run the 16:00 sweep on demand (manager only) ──────────────
-// The scheduler calls the same service method. Exposed to managers
-// too so a sweep can be forced after a power cut or a deploy that
-// happened to land across 16:00.
+// ── Write off uncollected pallets (manager only) ──────────────
+// Deliberately NOT gated behind NON_COLLECTION_SWEEP.enabled. What is
+// disabled is the automatic, unattended, clock-driven version of this
+// — not a manager choosing at the end of the day to record that three
+// centres did not turn up. That decision has a human behind it and an
+// actor id in the audit log.
+//
+// When the automatic sweep is switched on, the scheduler calls this
+// same method, which is why the repository write is idempotent.
 const sweep = async (body, user) => {
-  if (!isManager(user)) fail(403, 'Only managers can run the non-collection sweep.');
+  if (!isManager(user)) fail(403, 'Only managers can record non-collections.');
 
   const dispatchDate = body.dispatchDate || todayString();
   if (Number.isNaN(new Date(dispatchDate).getTime())) fail(400, 'Dispatch date is not a valid date.');
