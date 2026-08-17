@@ -1,6 +1,8 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate }                 from 'react-router-dom';
+import L                               from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import '../styles/landingpage.css';
 
 // ── Image fallback ───────────────────────────────────────────
@@ -36,6 +38,7 @@ const ICON_PATHS = {
   close:    'M6 6l12 12M18 6 6 18',
   heart:    'M12 21s-7.1-4.35-9.5-8.5C.7 8.9 2.2 5.3 5.7 5.2c2 0 3.6 1.2 4.6 2.7 1-1.5 2.6-2.7 4.6-2.7 3.5.1 5 3.7 3.2 7.3C19.1 16.65 12 21 12 21Z',
   info:     'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm0-6.5v-5M12 8h.01',
+  paper:    'M6 2h9l4 4v16H6V2Zm9 0v4h4M8.5 10h7M8.5 14h7M8.5 18h4.5',
 };
 
 const Icon = ({ name, size = 20 }) => (
@@ -54,6 +57,104 @@ const Icon = ({ name, size = 20 }) => (
     <path d={ICON_PATHS[name]} />
   </svg>
 );
+
+// ── Locations map (Leaflet + OpenStreetMap, no API key) ─────
+const LOCATIONS = [
+  { id: 'epping',      name: 'Epping 2 (HQ)', detail: 'Unit 4, Hewett Park',                    lat: -33.9337, lng: 18.5177, isHQ: true },
+  { id: 'tokai',       name: 'Tokai',         detail: 'Blue Route Mall parking lot',             lat: -34.0576, lng: 18.4306 },
+  { id: 'seapoint',    name: 'Sea Point',     detail: 'Sunset Beach parking lot',                lat: -33.9159, lng: 18.3845 },
+  { id: 'oranjezicht', name: 'Oranjezicht',   detail: 'Van Riebeeck Park',                       lat: -33.9426, lng: 18.4103 },
+  { id: 'rondebosch',  name: 'Rondebosch',    detail: 'Outdoor community gym, Campground Road',  lat: -33.9634, lng: 18.4715 },
+];
+
+function makePinIcon(isHQ) {
+  const size = isHQ ? 34 : 26;
+  const fill = isHQ ? '#d42d33' : '#ef3a40';
+  return L.divIcon({
+    className: 'lol-map-pin',
+    html: `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="${fill}" stroke="#fff" stroke-width="1"><path d="${ICON_PATHS.pin}"/></svg>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size],
+    popupAnchor: [0, -size],
+  });
+}
+
+function LocationsMap({ locations }) {
+  const containerRef = useRef(null);
+  const mapRef = useRef(null);
+
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return;
+
+    const map = L.map(containerRef.current, { scrollWheelZoom: false });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 19,
+    }).addTo(map);
+
+    const markers = locations.map((loc) =>
+      L.marker([loc.lat, loc.lng], { icon: makePinIcon(loc.isHQ) })
+        .addTo(map)
+        .bindPopup(`<strong>${loc.name}</strong><br/>${loc.detail}`)
+    );
+    map.fitBounds(L.featureGroup(markers).getBounds(), { padding: [32, 32] });
+
+    mapRef.current = map;
+    return () => {
+      map.remove();
+      mapRef.current = null;
+    };
+  }, [locations]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="lol-map-canvas"
+      aria-label="Interactive map of Ladles of Love collection and drop-off points across Cape Town"
+    />
+  );
+}
+
+// ── Count-up stat, animates 0 → value once scrolled into view ─
+function CountUpStat({ icon, value, suffix, label }) {
+  const ref = useRef(null);
+  const [display, setDisplay] = useState(0);
+  const started = useRef(false);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting || started.current) return;
+        started.current = true;
+
+        const duration = 1400;
+        const start = performance.now();
+        const tick = (now) => {
+          const progress = Math.min((now - start) / duration, 1);
+          const eased = 1 - (1 - progress) ** 3;
+          setDisplay(Math.round(value * eased));
+          if (progress < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+        observer.disconnect();
+      },
+      { threshold: 0.4 }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [value]);
+
+  return (
+    <div className="lol-impact-stat" ref={ref}>
+      <Icon name={icon} size={28} />
+      <span className="lol-impact-value">{display.toLocaleString()}{suffix}</span>
+      <span className="lol-impact-label">{label}</span>
+    </div>
+  );
+}
 
 // ── Simple swipeable image slideshow ────────────────────────
 function WarehouseSlideshow({ photos }) {
@@ -153,8 +254,18 @@ const PROGRAMMES = [
 ];
 
 const CONTEXT_STATS = [
-  { value: '64%', label: 'of households in South Africa don’t have reliable access to food' },
-  { value: '29%', label: 'of children under five show signs of stunting' },
+  { value: '63%', label: 'of SA households lack food security' },
+  { value: '28%', label: 'of SA children under five suffer from stunting' },
+  { value: '18%', label: 'of SA households severely affected by child malnutrition' },
+];
+
+// ── Impact counters — placeholder/estimated figures until we wire
+// these up to real reporting data. Update IMPACT_COUNTERS with real
+// numbers once available; the "(estimated)" note below can come out then.
+const IMPACT_COUNTERS = [
+  { id: 'paper',    icon: 'paper',  value: 18540, suffix: '',    label: 'sheets of paper saved by digital record-keeping' },
+  { id: 'compost',  icon: 'sprout', value: 9280,  suffix: ' kg', label: 'food waste turned into compost for local farms' },
+  { id: 'children', icon: 'bowl',   value: 6150,  suffix: '',    label: 'children fed through meals tracked in this system' },
 ];
 
 const WAREHOUSE_PHOTOS = [
@@ -320,9 +431,18 @@ const LandingPage = () => {
               <WarehouseSlideshow photos={WAREHOUSE_PHOTOS} />
             </div>
             <div>
-              <h2 className="lol-section-title">
-                From Our Warehouse to Each Of Our Beneficiaries Across South Africa Every Week
-              </h2>
+              <div className="lol-team-heading">
+                <h2 className="lol-section-title">
+                  From Our Warehouse to Each Of Our Beneficiaries Across South Africa Every Week
+                </h2>
+                <img
+                  src="/icons/child-icon.svg"
+                  alt=""
+                  aria-hidden="true"
+                  className="lol-accent-illustration"
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                />
+              </div>
               <p>
                 We spent time with the people who run the receiving bay, the decanting and packing stations and the
                 dispatch process to make your experience at our warehouses easier, clearer and more environmentally conscious. Every part of this system has been built with our staff and volunteers across all demographics in mind.
@@ -333,14 +453,25 @@ const LandingPage = () => {
 
         <section className="lol-programmes" aria-labelledby="lol-programmes-title">
           <div className="lol-section-inner">
-            <h2 id="lol-programmes-title" className="lol-section-title">
-              Our warehouses are the center of all our programming
-            </h2>
-            <p>
-              Every pallet that leaves our warehouses is packed, checked and sent out to the
-              places where food is needed most. Volunteers often come in to help pack, and we
-              manage waste collection kits from here too.
-            </p>
+            <div className="lol-programmes-intro">
+              <div>
+                <h2 id="lol-programmes-title" className="lol-section-title">
+                  Our warehouses are the center of all our programming
+                </h2>
+                <p>
+                  Every pallet that leaves our warehouses is packed, checked and sent out to the
+                  places where food is needed most. Volunteers often come in to help pack, and we
+                  manage waste collection kits from here too.
+                </p>
+              </div>
+              <img
+                src="/icons/foodbox.svg"
+                alt=""
+                aria-hidden="true"
+                className="lol-accent-illustration"
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+            </div>
             <div className="lol-programme-grid">
               {PROGRAMMES.map((p) => (
                 <article className="lol-programme-card" key={p.id}>
@@ -366,6 +497,19 @@ const LandingPage = () => {
           </div>
         </section>
 
+        {/* ── Impact counters — estimated figures, real data to follow ── */}
+        <section className="lol-impact" aria-labelledby="lol-impact-title">
+          <div className="lol-section-inner">
+            <h2 id="lol-impact-title" className="lol-section-title lol-section-title-light">Our impact so far</h2>
+            <div className="lol-impact-grid">
+              {IMPACT_COUNTERS.map((c) => (
+                <CountUpStat key={c.id} icon={c.icon} value={c.value} suffix={c.suffix} label={c.label} />
+              ))}
+            </div>
+            <p className="lol-impact-note">(Estimated figures: real counts coming soon.)</p>
+          </div>
+        </section>
+
         {/* ── Our Why ──────────────────────────────────────────── */}
         <section className="lol-story">
           <div className="lol-section-inner">
@@ -388,7 +532,7 @@ const LandingPage = () => {
                 </p>
 
                 <div className="lol-context-panel">
-                  <p className="lol-context-lead">The need behind the numbers:</p>
+                  <p className="lol-context-lead">The reality we're responding to:</p>
                   <div className="lol-context-stats">
                     {CONTEXT_STATS.map((c) => (
                       <div className="lol-context-stat" key={c.label}>
@@ -396,7 +540,19 @@ const LandingPage = () => {
                         <span className="lol-context-label">{c.label}</span>
                       </div>
                     ))}
+                    <div className="lol-context-stat-icon">
+                      <img
+                        src="/icons/benevolent-icon.svg"
+                        alt=""
+                        aria-hidden="true"
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
+                    </div>
                   </div>
+                  <p className="lol-context-source">
+                    Statistics updated Jan 2026 &middot;{' '}
+                    <a href="https://hsrc.ac.za/" target="_blank" rel="noopener noreferrer">hsrc.ac.za</a>
+                  </p>
                 </div>
               </div>
 
@@ -417,43 +573,11 @@ const LandingPage = () => {
           <div className="lol-section-inner">
             <p className="lol-eyebrow">Where the food goes</p>
             <h2 id="lol-map-title" className="lol-section-title">Across three provinces</h2>
-            <div className="lol-map-layout">
-              <div className="lol-map-embed">
-                <iframe
-                  title="Ladles of Love, Cape Town warehouse"
-                  src={`https://maps.google.com/maps?q=${encodeURIComponent(
-                    'Unit 4, Hewett Park, 17 Hewett Avenue, Epping 2, Cape Town, South Africa'
-                  )}&z=13&output=embed`}
-                  loading="lazy"
-                  referrerPolicy="no-referrer-when-downgrade"
-                />
-              </div>
-              <div className="lol-map-legend">
-                <p className="lol-map-legend-title">Reach across Cape Town</p>
-                <ul className="lol-map-legend-list">
-                  <li className="lol-map-legend-item">
-                    <span className="lol-map-legend-dot" />
-                    <div><strong>Epping 2 (HQ)</strong><span className="lol-map-legend-detail">Unit 4, Hewett Park</span></div>
-                  </li>
-                  <li className="lol-map-legend-item">
-                    <span className="lol-map-legend-dot" />
-                    <div><strong>Tokai</strong><span className="lol-map-legend-detail">Blue Route Mall parking lot</span></div>
-                  </li>
-                  <li className="lol-map-legend-item">
-                    <span className="lol-map-legend-dot" />
-                    <div><strong>Sea Point</strong><span className="lol-map-legend-detail">Sunset Beach parking lot</span></div>
-                  </li>
-                  <li className="lol-map-legend-item">
-                    <span className="lol-map-legend-dot" />
-                    <div><strong>Oranjezicht</strong><span className="lol-map-legend-detail">Van Riebeeck Park</span></div>
-                  </li>
-                  <li className="lol-map-legend-item">
-                    <span className="lol-map-legend-dot" />
-                    <div><strong>Rondebosch</strong><span className="lol-map-legend-detail">Outdoor community gym, Campground Road</span></div>
-                  </li>
-                </ul>
-              </div>
-            </div>
+            <p className="lol-map-lede">
+              Tap a pin to see the collection or drop-off point, from our Cape Town warehouse
+              to our community pop-ups and kitchens across the city.
+            </p>
+            <LocationsMap locations={LOCATIONS} />
           </div>
         </section>
 

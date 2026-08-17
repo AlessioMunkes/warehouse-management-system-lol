@@ -21,7 +21,7 @@
   --text-sub: #7d786a;
   --text-meta: #a39d8f;
 
-  --font-display: "Poppins", "Inter", system-ui, -apple-system, sans-serif;
+  --font-display: "Montserrat", "Inter", system-ui, -apple-system, sans-serif;
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
 
   --max-width: 1200px;
@@ -55,22 +55,14 @@
 }
 .lol-skip-link:focus { top: 0; }
 
-/* Eyebrow — small gold tick before every eyebrow label now */
+/* Eyebrow — small label above a section heading */
 .lol-eyebrow {
-  display: inline-flex; align-items: center;
-  font-size: 0.8rem; text-transform: uppercase; letter-spacing: 2px;
-  font-weight: 700; color: var(--khaki);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 900; color: var(--khaki);
   margin-bottom: 0.5rem;
 }
-.lol-eyebrow::before {
-  content: '';
-  display: inline-block;
-  width: 18px; height: 2px;
-  background: var(--khaki);
-  margin-right: 8px;
-}
 .lol-eyebrow--on-dark { color: rgba(255, 255, 255, 0.9); }
-.lol-eyebrow--on-dark::before { background: var(--accent); }
 
 /* Section titles */
 .lol-section-title {
@@ -216,6 +208,19 @@
   opacity: 1;
 }
 
+/* ── Accent illustrations — hand-drawn Canva pieces used the way
+   runnapatosonoma.com places its mascot: large, beside a heading,
+   filling what would otherwise be empty margin. Light backgrounds
+   only, so the black outlines keep their contrast. ──────────────── */
+.lol-accent-illustration {
+  width: 150px;
+  height: auto;
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+@media (max-width: 900px) { .lol-accent-illustration { width: 110px; } }
+@media (max-width: 640px) { .lol-accent-illustration { display: none; } }
+
 /* ── Image fallback ───────────────────────────────────────── */
 .img-slot { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--bg); border-radius: inherit; }
 .img-slot img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -231,6 +236,8 @@
 .lol-team-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2.75rem; align-items: center; }
 .lol-team-photo { min-width: 0; }
 .lol-team p { color: var(--text-sub); line-height: 1.7; }
+.lol-team-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; }
+.lol-team-heading .lol-section-title { margin-bottom: 1rem; }
 
 /* Slideshow */
 .lol-slideshow { position: relative; height: 320px; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); background: var(--bg); }
@@ -251,11 +258,13 @@
 
 /* ── Programmes ───────────────────────────────────────────── */
 .lol-programmes { background: var(--bg); padding: 4.5rem 0; }
+.lol-programmes-intro { display: flex; align-items: center; justify-content: space-between; gap: 2rem; }
+.lol-programmes-intro > div { min-width: 0; }
 .lol-programme-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.75rem; margin-top: 2rem; }
 .lol-programme-card { background: #fff; border-radius: var(--radius); overflow: hidden; box-shadow: 0 4px 16px rgba(43, 51, 54, 0.06); }
 .lol-programme-card .img-slot { height: 180px; }
 .lol-programme-card__body { padding: 1.5rem; }
-.lol-programme-icon-img { width: 24px; height: 24px; object-fit: contain; margin-bottom: 0.5rem; }
+.lol-programme-icon-img { width: 56px; height: 56px; object-fit: contain; margin-bottom: 0.75rem; }
 .lol-programme-card h3 { font-family: var(--font-display); font-size: 1.15rem; font-weight: 700; color: var(--maroon); margin-bottom: 0.5rem; }
 .lol-programme-card p { font-size: 0.9rem; color: var(--text-sub); line-height: 1.5; }
 
@@ -277,26 +286,59 @@
   border-radius: 0 var(--radius) var(--radius) 0;
   padding: 1.5rem 2rem;
 }
-.lol-context-lead { font-weight: 700; color: var(--text); margin-bottom: 1rem; font-size: 0.98rem; }
-.lol-context-stats { display: flex; gap: 2.5rem; flex-wrap: wrap; }
+.lol-context-lead { font-family: var(--font-display); font-weight: 900; color: var(--maroon); margin-bottom: 1rem; font-size: 1rem; }
+.lol-context-stats { display: grid; grid-template-columns: repeat(2, minmax(160px, 1fr)); gap: 1.75rem 2.5rem; }
 .lol-context-stat { max-width: 220px; }
 .lol-context-value { display: block; font-family: var(--font-display); font-size: 2rem; font-weight: 700; color: var(--khaki-deep); }
 .lol-context-label { font-size: 0.85rem; color: var(--text-sub); line-height: 1.4; }
+.lol-context-stat-icon { display: flex; align-items: center; justify-content: flex-end; }
+.lol-context-stat-icon img { width: 80px; height: auto; opacity: 0.9; }
+@media (max-width: 640px) {
+  .lol-context-stats { grid-template-columns: 1fr; }
+  .lol-context-stat-icon { display: none; }
+}
+.lol-context-source { margin-top: 1.25rem; font-size: 0.78rem; color: var(--text-meta); }
+.lol-context-source a { color: var(--text-meta); text-decoration: underline; }
+.lol-context-source a:hover { color: var(--accent); }
 
-/* ── Map — real single verified pin + a legend instead of
-   fake multi-pins the free embed can't actually render ─────── */
+/* ── Impact counters — dark band between Programmes and Our Why.
+   Placeholder/estimated numbers until real reporting data lands. */
+.lol-impact { background: var(--maroon); padding: 4rem 0; }
+.lol-impact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 2rem;
+  margin-top: 2rem;
+}
+.lol-impact-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  color: #fff;
+}
+.lol-impact-stat .lol-icon { color: var(--accent); }
+.lol-impact-value { font-family: var(--font-display); font-size: 2.4rem; font-weight: 700; }
+.lol-impact-label { font-size: 0.88rem; color: rgba(255, 255, 255, 0.75); line-height: 1.4; max-width: 32ch; }
+.lol-impact-note { margin-top: 2rem; font-size: 0.78rem; color: rgba(255, 255, 255, 0.5); }
+
+/* ── Map — real, interactive multi-pin map (Leaflet + OpenStreetMap).
+   Every location is a real pin with its own popup, so the separate
+   text list this used to sit next to is gone. ────────────────────── */
 .lol-map-section { background: var(--bg); padding: 4.5rem 0; }
-.lol-map-layout { display: grid; grid-template-columns: 1.5fr 1fr; gap: 1.75rem; margin-top: 2rem; align-items: stretch; }
-.lol-map-embed { border-radius: var(--radius); overflow: hidden; height: 420px; box-shadow: 0 4px 16px rgba(43, 51, 54, 0.06); }
-.lol-map-embed iframe { width: 100%; height: 100%; border: 0; display: block; }
-.lol-map-legend { background: #fff; border-radius: var(--radius); padding: 1.75rem; box-shadow: 0 4px 16px rgba(43, 51, 54, 0.06); }
-.lol-map-legend-title { font-family: var(--font-display); font-weight: 700; color: var(--maroon); font-size: 1rem; margin-bottom: 1rem; }
-.lol-map-legend-list { list-style: none; display: flex; flex-direction: column; gap: 0.9rem; }
-.lol-map-legend-item { display: flex; gap: 0.75rem; align-items: flex-start; }
-.lol-map-legend-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-top: 6px; flex-shrink: 0; }
-.lol-map-legend-item strong { display: block; color: var(--text); font-weight: 600; font-size: 0.88rem; }
-.lol-map-legend-detail { display: block; color: var(--text-sub); font-size: 0.82rem; }
-@media (max-width: 860px) { .lol-map-layout { grid-template-columns: 1fr; } .lol-map-embed { height: 320px; } }
+.lol-map-lede { color: var(--text-sub); max-width: 60ch; margin-bottom: 1.5rem; }
+.lol-map-canvas {
+  height: 460px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(43, 51, 54, 0.06);
+  border: 1px solid var(--border);
+  background: var(--border);
+}
+.leaflet-marker-icon.lol-map-pin { background: transparent; border: none; }
+.leaflet-popup-content-wrapper { border-radius: 10px; }
+.leaflet-popup-content { font-family: var(--font-sans); font-size: 0.85rem; color: var(--text); margin: 0.65rem 0.9rem; }
+.leaflet-popup-content strong { display: block; font-family: var(--font-display); color: var(--maroon); font-size: 0.92rem; margin-bottom: 0.15rem; }
+@media (max-width: 860px) { .lol-map-canvas { height: 340px; } }
 
 /* ── Get involved ─────────────────────────────────────────── */
 .lol-getinvolved { background: var(--maroon); padding: 4.5rem 0; }
@@ -308,7 +350,7 @@
   transition: transform 0.15s, box-shadow 0.15s;
 }
 .lol-cta-tile:hover { transform: translateY(-4px); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16); }
-.lol-cta-tile img { width: 26px; height: 26px; object-fit: contain; flex-shrink: 0; }
+.lol-cta-tile img { width: 48px; height: 48px; object-fit: contain; flex-shrink: 0; margin-bottom: 0.25rem; }
 .lol-cta-tile-title { font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; color: var(--maroon); }
 .lol-cta-tile-text { font-size: 0.85rem; color: var(--text-sub); }
 .lol-cta-tile-link { font-weight: 700; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.4px; color: var(--accent); }
@@ -322,7 +364,7 @@
 }
 .lol-footer-brand-title { font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; color: #fff; margin-bottom: 0.4rem; }
 .lol-footer-tagline { font-size: 0.85rem; color: rgba(255, 255, 255, 0.6); line-height: 1.5; }
-.lol-footer-col-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--khaki); margin-bottom: 0.75rem; }
+.lol-footer-col-title { font-family: var(--font-display); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--khaki); margin-bottom: 0.75rem; }
 .lol-footer-meta { font-size: 0.85rem; margin-bottom: 0.35rem; color: rgba(255, 255, 255, 0.65); line-height: 1.5; }
 .lol-footer-links { display: flex; flex-direction: column; gap: 0.5rem; }
 .lol-footer-links a { font-size: 0.85rem; color: var(--accent); font-weight: 700; }
