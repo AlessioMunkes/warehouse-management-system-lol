@@ -3,9 +3,27 @@
 //
 // All SQL for the picking module.
 // No business logic here — only database queries.
+//
+// STOCK TIMING (changed — read this before editing completeSlip)
+// This module NO LONGER writes to stock_levels or stock_movements.
+// Stock is deducted at the dispatch gate, against what was actually
+// loaded into the vehicle, in dispatch.repository.collect().
+//
+// The old behaviour deducted at completeSlip. It kept slip state and
+// stock in one transaction, but it meant quantity_on_hand went
+// negative for food that was still standing on a pallet in the
+// staging area, and every uncollected pallet left a permanent
+// overstatement that Friday's count had to absorb.
+//
+// Packing now only READS stock, to warn the packer that the shelf may
+// not hold what the slip is asking for. That read is a flag, never a
+// block — see the note on completeSlip below.
+//
+// The `stockModel` import is deliberately gone. If you find yourself
+// adding it back, you are about to double-deduct.
 // ─────────────────────────────────────────────────────────────
-import pool       from '../config/db.js';
-import stockModel from './stock.repository.js';
+import pool                  from '../config/db.js';
+import { committedStockSql } from './committedStock.sql.js';
 
 // ── Audit helper (used inside existing transactions) ──────────
 const logEvent = async (client, slipId, eventType, actorId, detail = null) => {
@@ -299,8 +317,15 @@ const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReaso
       [slipId]
     );
     const slip = slipResult.rows[0];
-    if (!slip)                     { await client.query('ROLLBACK'); return { notFound: true }; }
-    if (slip.status === 'complete'){ await client.query('ROLLBACK'); return { locked: true }; }
+    if (!slip) { await client.query('ROLLBACK'); return { notFound: true }; }
+
+    // 'dispatched' is included alongside 'complete': once the pallet
+    // has physically left the gate, editing the line it was built from
+    // would rewrite history the dispatch note was printed against.
+    if (slip.status === 'complete' || slip.status === 'dispatched') {
+      await client.query('ROLLBACK');
+      return { locked: true };
+    }
 
     // ── Authorisation, inside the lock and BEFORE the write ──
     // Doing this here (rather than after setItemStatus returns) means a
@@ -365,31 +390,34 @@ const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReaso
 // The core rule: cannot complete while any line is still 'pending'.
 // Enforced inside the transaction, not in JS, so a race can't slip past it.
 //
-// Stock is deducted here, in the same transaction as the completion
-// write, so slip state and stock can never diverge. If a packed
-// quantity exceeds recorded stock, completion still succeeds — ECDs
-// can't go without food because a system count is off — but the
-// shortfall is logged as its own audit event and returned to the
-// caller so the UI can surface it as a warning for a manager to
-// reconcile via the manual adjustment screen.
+// STOCK IS NOT DEDUCTED HERE ANY MORE.
 //
-// Flagged lines are deducted too, whenever the packer recorded a
-// quantity. A flag usually means "short quantity — I packed 10 of the
-// 20", and those 10 physically leave the warehouse; deducting only
-// 'confirmed' lines silently overstated stock on every partial pack.
-// A flagged line with no recorded quantity (the packer didn't know)
-// is skipped — there is nothing to deduct.
+// It used to be. The reasoning then was that slip state and stock
+// should commit together, which is true as far as it goes — but it
+// forced quantity_on_hand to mean "on hand, minus anything anyone has
+// packed", which is not a number anybody can count. A packed pallet
+// stands in the staging area for one to two days, and roughly one in
+// ten is never collected, so the ledger drifted below the shelf every
+// single week and Friday's count spent its time reconciling the
+// difference. Deduction now happens at the gate against what was
+// actually loaded into the vehicle (dispatch.repository.collect), so
+// quantity_on_hand means exactly what the counters count.
 //
-// NOTE ON TIMING: stock leaves the ledger when the pallet is packed,
-// not when it is collected. The pallet is physically still on the
-// floor until the ECD driver arrives, and non-collections are common,
-// so an uncollected pallet leaves a standing negative in the ledger
-// against food that is still in the building. Every movement written
-// here carries reference_type 'picking_slip' + reference_id, so the
-// dispatch module can post a compensating movement when a pallet goes
-// uncollected. That reversal belongs in the dispatch module and is
-// not implemented yet — until it is, Friday's count will show a
-// positive variance for every uncollected pallet.
+// What this function does instead is READ availability and warn.
+// available = quantity_on_hand - committed, where committed is every
+// other packed-but-not-yet-dispatched pallet (committedStock.sql.js).
+// If this pallet's packed quantities exceed that, the packer and the
+// manager are told — but completion still succeeds. An ECD never goes
+// without food because a system count is off. Same rule as before,
+// same `shortfalls` shape on the response; only the meaning has
+// tightened, from "the ledger just went negative" to "the shelf may
+// not hold this".
+//
+// Because nothing is written to stock here, this transaction no
+// longer needs product_id-ordered row locks. Keep the ORDER BY on the
+// read anyway — a stable order makes the warning list reproducible
+// between runs, and it keeps this query shaped like the one in
+// dispatch.repository.collect() that does still lock.
 const completeSlip = async ({ slipId, palletRef, actorId, canOverride = false }) => {
   const client = await pool.connect();
   try {
@@ -400,12 +428,15 @@ const completeSlip = async ({ slipId, palletRef, actorId, canOverride = false })
       [slipId]
     );
     const slip = slipResult.rows[0];
-    if (!slip)                      { await client.query('ROLLBACK'); return { notFound: true }; }
-    if (slip.status === 'complete') { await client.query('ROLLBACK'); return { alreadyComplete: true }; }
+    if (!slip) { await client.query('ROLLBACK'); return { notFound: true }; }
+    if (slip.status === 'complete' || slip.status === 'dispatched') {
+      await client.query('ROLLBACK');
+      return { alreadyComplete: true };
+    }
 
-    // Same ownership rule as confirm/flag. Closing a pallet is the
-    // write that moves stock, so it can't be looser than the writes
-    // that lead up to it.
+    // Same ownership rule as confirm/flag. Closing a pallet is what
+    // makes it eligible for the gate, so it can't be looser than the
+    // writes that lead up to it.
     if (!canOverride && slip.assigned_to !== actorId) {
       await client.query('ROLLBACK');
       return { forbidden: true, assignedTo: slip.assigned_to };
@@ -422,43 +453,82 @@ const completeSlip = async ({ slipId, palletRef, actorId, canOverride = false })
       return { pendingItems: pending.rows[0].n };
     }
 
-    // Deduct packed quantities from stock in THIS transaction, so
-    // stock and slip state can never diverge. Locked in product_id
-    // order — matches the lock order any other caller of adjustStock
-    // (e.g. procurement) should also use, so two transactions touching
-    // the same two products can never deadlock against each other.
-    const packedItems = await client.query(
-      `SELECT product_id, packed_quantity, unit, status
-       FROM picking_slip_items
-       WHERE picking_slip_id = $1
-         AND status IN ('confirmed', 'flagged')
-         AND packed_quantity IS NOT NULL
-         AND packed_quantity > 0
-       ORDER BY product_id ASC`,
+    // ── Availability check (read-only) ──────────────────────────
+    // Totals are summed and compared by Postgres in NUMERIC. Summing
+    // packed_quantity across lines in JS is how DEFECT F got in; the
+    // comparison is done in SQL for the same reason.
+    //
+    // Lines for one product in different units are summed together,
+    // which is what the old adjustStock loop effectively did too (the
+    // ledger's established unit won). Any line whose unit differs from
+    // the ledger's is reported in unitMismatches so a human can decide
+    // which of the two is wrong.
+    //
+    // The exclusion of this slip from `committed` is belt-and-braces:
+    // its status is still 'in_progress' at this point so it would be
+    // excluded anyway, but that is an ordering coincidence, and
+    // ordering coincidences do not survive refactors.
+    const availability = await client.query(
+      `WITH packed AS (
+         SELECT
+           psi.product_id,
+           SUM(psi.packed_quantity)::numeric  AS packed_quantity,
+           ARRAY_AGG(DISTINCT psi.unit)       AS units
+         FROM picking_slip_items psi
+         WHERE psi.picking_slip_id = $1
+           AND psi.status IN ('confirmed', 'flagged')
+           AND psi.packed_quantity IS NOT NULL
+           AND psi.packed_quantity > 0
+         GROUP BY psi.product_id
+       )
+       SELECT
+         packed.product_id,
+         packed.packed_quantity,
+         packed.units,
+         p.name                                            AS product_name,
+         COALESCE(sl.quantity_on_hand, 0)::numeric         AS quantity_on_hand,
+         sl.unit                                           AS ledger_unit,
+         COALESCE(c.committed, 0)::numeric                 AS committed,
+         (COALESCE(sl.quantity_on_hand, 0) - COALESCE(c.committed, 0))::numeric AS available,
+         (packed.packed_quantity >
+            (COALESCE(sl.quantity_on_hand, 0) - COALESCE(c.committed, 0)))      AS is_shortfall
+       FROM packed
+       JOIN products p ON p.id = packed.product_id
+       LEFT JOIN stock_levels sl ON sl.product_id = packed.product_id
+       LEFT JOIN (${committedStockSql({ excludeSlipParam: '$1' })}) c
+              ON c.product_id = packed.product_id
+       ORDER BY packed.product_id ASC`,
       [slipId]
     );
 
-    const shortfalls    = [];
+    const shortfalls     = [];
     const unitMismatches = [];
-    for (const item of packedItems.rows) {
-      const { before, after, isShortfall, isUnitMismatch } = await stockModel.adjustStock(client, {
-        productId:     item.product_id,
-        quantityDelta: -item.packed_quantity,
-        unit:          item.unit,
-        movementType:  'picked',
-        referenceType: 'picking_slip',
-        referenceId:   slipId,
-        performedBy:   actorId,
-      });
-      if (isShortfall) {
-        shortfalls.push({ productId: item.product_id, onHand: before, required: Number(item.packed_quantity), after });
+
+    for (const row of availability.rows) {
+      if (row.is_shortfall) {
+        shortfalls.push({
+          productId:   row.product_id,
+          productName: row.product_name,
+          onHand:      Number(row.quantity_on_hand),
+          committed:   Number(row.committed),
+          available:   Number(row.available),
+          packed:      Number(row.packed_quantity),
+        });
       }
-      // The ledger's established unit wins, so the running total is
-      // still arithmetically sound — but a slip line in kg deducting
-      // from a ledger in units means one of the two is wrong, and
-      // that has to reach a human rather than vanish.
-      if (isUnitMismatch) {
-        unitMismatches.push({ productId: item.product_id, slipUnit: item.unit });
+
+      // A product with no stock_levels row has no established unit
+      // yet, so there is nothing to disagree with — the first
+      // movement against it (which will now be the dispatch) sets it.
+      if (row.ledger_unit) {
+        const mismatched = (row.units || []).filter((u) => u !== row.ledger_unit);
+        if (mismatched.length > 0) {
+          unitMismatches.push({
+            productId:   row.product_id,
+            productName: row.product_name,
+            slipUnits:   mismatched,
+            ledgerUnit:  row.ledger_unit,
+          });
+        }
       }
     }
 
