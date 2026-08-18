@@ -13,6 +13,7 @@ import SelectNOCjob                                from './pages/SelectNOCjob';
 import ProcurementDashboard                        from './pages/ProcurementDashboard';
 import DecantingPage                               from './pages/DecantingPage';
 import PackingPage                                 from './pages/PackingPage';
+import ReceivingPage                               from './pages/ReceivingPage';
 import InventoryManagementPage                     from './pages/InventoryManagementPage';
 import ManagerActivityScreen                       from './pages/ManagerActivityScreen';
 
@@ -26,40 +27,33 @@ const App = () => (
         <Route path="/guest" element={<GuestLoginPage />} />
 
         {/* Protected — manager only */}
-<Route element={<ProtectedRoute roles={['manager']} />}>
-  <Route path="/manager"       element={<ManagerActivityScreen />} />
-  <Route path="/noc/inventory" element={<InventoryManagementPage />} />
- </Route>
-       
-        {/* Protected — any logged-in user */}
-        <Route element={<ProtectedRoute />}>
-           <Route path="/noc/procurement" element={<ProcurementDashboard />} />
-        <Route path="/programmes" element={<SelectProgrammeScreen />} />
-
-          {/* NOC: task select, then one route per task */}
-          <Route path="/noc"             element={<SelectNOCjob />} />
-          
-          <Route path="/noc/decanting"   element={<DecantingPage />} />
-p <Route path="/noc/inventory"   element={<InventoryManagementPage />} />
-          {/* Both packing paths come from routes/paths.js, which is
-              also what PackingPage navigates with — the board and the
-              route table can't drift apart again. */}
-          <Route path={PACKING.board}         element={<PackingPage />} />
-          <Route path={PACKING.detailPattern} element={<PackingPage />} />
-
-          <Route path="/noc/inventory"   element={<InventoryManagementPage />} />
+        <Route element={<ProtectedRoute roles={['manager']} />}>
+          <Route path="/manager"       element={<ManagerActivityScreen />} />
+          <Route path="/noc/inventory" element={<InventoryManagementPage />} />
         </Route>
 
-        {/* ── Guest-only ────────────────────────────────────── */}
+        {/* Protected — any logged-in user */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="/noc/procurement" element={<ProcurementDashboard />} />
+          <Route path="/programmes"      element={<SelectProgrammeScreen />} />
+
+          {/* NOC task select */}
+          <Route path="/noc"           element={<SelectNOCjob />} />
+          <Route path="/noc/decanting" element={<DecantingPage />} />
+
+          <Route path="/staff/receiving" element={<ReceivingPage />} />
+
+          {/* Packing paths from routes/paths.js */}
+          <Route path={PACKING.board}         element={<PackingPage />} />
+          <Route path={PACKING.detailPattern} element={<PackingPage />} />
+        </Route>
+
+        {/* Guest-only */}
         <Route element={<ProtectedRoute roles={['guest']} />}>
           <Route path="/guest-home" element={<GuestHomePage />} />
         </Route>
 
-        {/* ── Redirects ─────────────────────────────────────── */}
-        {/* Old paths kept working so existing links don't break.
-            The packing pair covers the deep link too — without
-            :slipId, an old bookmark to a specific pallet would hit
-            the catch-all instead of the slip. */}
+        {/* Redirects */}
         <Route path="/inventory" element={<Navigate to="/noc/inventory" replace />} />
         <Route path="/decanting" element={<Navigate to="/noc/decanting" replace />} />
         <Route path="/programmes/noc/packing"
@@ -67,14 +61,7 @@ p <Route path="/noc/inventory"   element={<InventoryManagementPage />} />
         <Route path="/programmes/noc/packing/:slipId"
                element={<Navigate to={PACKING.board} replace />} />
 
-        {/* Catch-all. There used to be two of these plus a second "/"
-            route; React Router picks one by ranking, so the others
-            were dead code that read as if they did something.
-            Unknown paths go to the landing page, which is the front
-            door for staff, volunteers and visitors alike (warehouse
-            visit §6.1) and carries the login button — sending them to
-            /login instead made a typo'd URL look like a session error.
-            TODO: replace with a real 404 page. */}
+        {/* Catch-all */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

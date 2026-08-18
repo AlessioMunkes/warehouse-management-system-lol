@@ -1,0 +1,535 @@
+/* ==========================================================================
+   client/src/styles/staff.css
+
+   Chrome for the four warehouse-staff task pages: receiving, packing,
+   decanting, dispatch.
+
+   Everything is namespaced .stf-* so it cannot collide with index.css,
+   which every existing screen depends on. Import it AFTER index.css.
+
+   ── Tokens ────────────────────────────────────────────────────────────
+   Taken from landingpage.css, not invented, so a staff page and the
+   front door read as one product. The landing page's own rule is
+   followed here too:
+
+       charcoal  structure, headings, surfaces
+       red       anything clickable
+       gold      small editorial accents
+
+   One deliberate addition: --stf-attention, a deep brick used for
+   short counts, expired batches and quantity variances. Red is spoken
+   for by actions, and a warning that shares its colour with every
+   button is a warning nobody reads. The brick is visibly browner and
+   darker than --stf-accent so the two never read as the same thing —
+   and per ACC-03 the mark and the sentence carry the meaning anyway,
+   so colour is never the only signal.
+
+   ── Two rules the layouts are built on ────────────────────────────────
+   ACC-05  a multi-step task is sequential screens, one decision each.
+           .stf-rail is the indicator, kept deliberately quiet.
+   ACC-06  this is a PWA used on a phone in a warehouse, often with
+           gloves. Tap targets 44px minimum; numbers typed on the floor
+           are 56px.
+   ========================================================================== */
+
+.stf-shell {
+  /* Brand, from landingpage.css */
+  --stf-ink:        #2b3336;   /* --maroon      structure and headings */
+  --stf-ink-deep:   #171b1c;   /* --maroon-deep */
+  --stf-accent:     #ef3a40;   /* --accent      clickable */
+  --stf-accent-deep:#d42d33;   /* --accent-deep hover */
+  --stf-gold:       #979168;   /* --khaki       editorial accents */
+  --stf-gold-deep:  #8a8058;   /* --khaki-deep */
+  --stf-sand:       #e9e3dd;   /* --bg          page ground */
+  --stf-border:     #ddd4c8;   /* --border */
+  --stf-text:       #5c5c5c;   /* --text */
+  --stf-text-sub:   #6f6a5e;   /* --text-sub, darkened for 4.5:1 (ACC-02) */
+  --stf-text-meta:  #8b8578;   /* --text-meta, darkened for the same reason */
+  --stf-white:      #ffffff;
+
+  /* Staff-only */
+  --stf-attention:  #8a3227;
+  --stf-attention-ink: #6d2a20;
+  --stf-attention-bg:  #f6efe9;
+  --stf-attention-border: #e2d3c6;
+
+  --stf-font-display: "Montserrat", "Inter", system-ui, -apple-system, sans-serif;
+  --stf-font-sans:    "Inter", system-ui, -apple-system, sans-serif;
+
+  --stf-radius:   12px;   /* tighter than the landing page's 16px: these
+                             are controls in a column, not marketing cards */
+  --stf-radius-sm: 8px;
+  --stf-radius-pill: 999px;
+  --stf-tap:   44px;
+  --stf-field: 56px;
+
+  /* 100dvh, not 100vh: on iOS Safari the address bar makes 100vh taller
+     than the visible viewport, which pushed the tab bar below the fold
+     on exactly the device this is built for. */
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: var(--stf-sand);
+  font-family: var(--stf-font-sans);
+  color: var(--stf-text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.stf-shell img { max-width: 100%; display: block; }
+.stf-shell a { color: var(--stf-accent); text-decoration: none; }
+.stf-shell a:hover { color: var(--stf-accent-deep); text-decoration: underline; }
+.stf-shell a:focus-visible,
+.stf-shell button:focus-visible {
+  outline: 3px solid var(--stf-accent);
+  outline-offset: 2px;
+}
+
+/* ── App bar ─────────────────────────────────────────────────────── */
+.stf-appbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  /* Sits under the notch without the brand row colliding with the
+     status bar. */
+  padding-top: max(10px, env(safe-area-inset-top));
+  background: var(--stf-ink);
+  color: var(--stf-white);
+}
+
+.stf-appbar-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.stf-appbar-logo  { width: 30px; height: 30px; object-fit: contain; flex-shrink: 0; }
+.stf-appbar-name  { font-family: var(--stf-font-display); font-size: 14px; font-weight: 700; color: var(--stf-white); }
+.stf-appbar-prog  {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.72);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.stf-appbar-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+
+.stf-appbar-btn {
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--stf-radius-pill);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+  font: 600 12px/1 var(--stf-font-sans);
+  cursor: pointer;
+}
+.stf-appbar-btn:hover { background: rgba(255, 255, 255, 0.14); }
+.stf-appbar-btn[aria-pressed='true'] { border-color: rgba(255, 255, 255, 0.6); }
+
+/* ── Breadcrumb row ──────────────────────────────────────────────── */
+.stf-crumb {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--stf-border);
+  background: var(--stf-white);
+  font-size: 12px;
+  color: var(--stf-text-sub);
+}
+.stf-crumb-back {
+  min-height: 32px;
+  border: 0;
+  background: none;
+  padding: 4px 0;
+  font: 700 12px/1.4 var(--stf-font-sans);
+  color: var(--stf-accent);
+  cursor: pointer;
+  text-align: left;
+}
+.stf-crumb-back:hover { color: var(--stf-accent-deep); text-decoration: underline; }
+.stf-crumb-meta { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* The single column every task page lays out in. Same column on a phone
+   and on a bench tablet — the tablet gets more air, not a denser layout
+   to relearn. */
+.stf-main {
+  flex: 1;
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 18px 18px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* The week planner inside Decanting is a two-column form, not a task
+   flow. It keeps the same chrome and takes the room it needs. */
+.stf-main.is-wide { max-width: 1200px; }
+
+/* ── Bottom tab bar ──────────────────────────────────────────────── */
+/* How staff move between the four tasks. A sidebar collapses behind a
+   hamburger at this width, hiding all four destinations behind a tap;
+   on a phone held one-handed the thumb is already at the bottom. */
+.stf-tabbar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: stretch;
+  border-top: 1px solid var(--stf-border);
+  background: var(--stf-white);
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 20;
+}
+
+.stf-tab {
+  flex: 1;
+  min-height: var(--stf-tap);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 2px;
+  border: 0;
+  border-top: 2px solid transparent;
+  background: none;
+  color: var(--stf-text-sub);
+  font: 600 10px/1.2 var(--stf-font-sans);
+  cursor: pointer;
+}
+.stf-tab-icon  { width: 24px; height: 24px; object-fit: contain; opacity: 0.55; }
+.stf-tab-glyph { font-size: 18px; line-height: 24px; opacity: 0.55; }
+.stf-tab.is-current { border-top-color: var(--stf-accent); color: var(--stf-ink); }
+.stf-tab.is-current .stf-tab-icon,
+.stf-tab.is-current .stf-tab-glyph { opacity: 1; }
+
+/* ── Doodle footer ───────────────────────────────────────────────── */
+.stf-footer {
+  height: 52px;
+  border-top: 1px solid var(--stf-border);
+  background: var(--stf-sand) center / contain no-repeat;
+}
+
+/* ── Step rail (ACC-05) ──────────────────────────────────────────── */
+/* Four thin bars and a quiet line of text. Not a numbered wizard
+   header: staff need to know roughly where they are, not to navigate a
+   diagram. Red, because the filled bars are the one thing on the rail
+   that changes. */
+.stf-rail { display: flex; flex-direction: column; gap: 9px; }
+.stf-rail-bars { display: flex; gap: 5px; }
+.stf-rail-bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--stf-border);
+  transition: background 180ms ease;
+}
+.stf-rail-bar.is-done { background: var(--stf-accent); }
+.stf-rail-meta {
+  display: flex; justify-content: space-between; gap: 12px;
+  font-size: 12px; color: var(--stf-text-sub);
+}
+
+/* ── Step screen ─────────────────────────────────────────────────── */
+.stf-step      { display: flex; flex-direction: column; gap: 20px; }
+.stf-step-head { display: flex; flex-direction: column; gap: 6px; }
+.stf-step-title {
+  margin: 0;
+  font-family: var(--stf-font-display);
+  font-size: clamp(1.3rem, 4.5vw, 1.5rem);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--stf-ink);
+  text-wrap: pretty;
+}
+.stf-step-sub  { margin: 0; font-size: 14px; line-height: 1.5; color: var(--stf-text-sub); text-wrap: pretty; }
+.stf-step-body { display: flex; flex-direction: column; gap: 16px; }
+
+/* ── Actions ─────────────────────────────────────────────────────── */
+/* One action per screen commits the step; anything else is outlined and
+   sits under it. Both the same height, so a pair never reads as two
+   different kinds of control. Pill and 44px+, matching the landing
+   page's buttons. */
+.stf-actions { display: flex; flex-direction: column; gap: 10px; }
+.stf-actions.is-row { flex-direction: row; }
+.stf-actions.is-row > * { flex: 1; }
+
+.stf-btn {
+  min-height: 48px;
+  padding: 0 24px;
+  border: 1.5px solid transparent;
+  border-radius: var(--stf-radius-pill);
+  font: 600 15px/1 var(--stf-font-sans);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+.stf-btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+
+.stf-btn-primary { background: var(--stf-accent); color: var(--stf-white); }
+.stf-btn-primary:hover:not([disabled]) { background: var(--stf-accent-deep); }
+
+.stf-btn-secondary {
+  background: var(--stf-white);
+  border-color: var(--stf-border);
+  color: var(--stf-ink);
+}
+.stf-btn-secondary:hover:not([disabled]) { background: var(--stf-sand); border-color: var(--stf-gold); }
+
+/* Used where the action is the way out of a problem — "flag shortage",
+   "something is wrong with this one". */
+.stf-btn-warn {
+  background: var(--stf-white);
+  border-color: var(--stf-attention);
+  color: var(--stf-attention-ink);
+}
+.stf-btn-warn:hover:not([disabled]) { background: var(--stf-attention-bg); }
+
+/* ── Fields ──────────────────────────────────────────────────────── */
+.stf-field { display: flex; flex-direction: column; gap: 7px; }
+.stf-field-label {
+  font-family: var(--stf-font-display);
+  font-size: 12px; font-weight: 700;
+  color: var(--stf-ink);
+}
+.stf-field-hint { font-size: 12px; line-height: 1.5; color: var(--stf-text-sub); }
+
+.stf-input {
+  min-height: var(--stf-field);
+  width: 100%;
+  padding: 0 16px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  color: var(--stf-ink);
+  font: 700 26px/1 var(--stf-font-display);
+  font-variant-numeric: tabular-nums;
+}
+.stf-input:focus { border-color: var(--stf-accent); }
+.stf-input.is-flagged { border-color: var(--stf-attention); }
+.stf-input.is-text { font: 400 16px/1 var(--stf-font-sans); }
+
+/* iOS zooms the page in when a focused input is under 16px. Nothing
+   here is, but the rule is explicit so a future edit cannot bring it
+   back. */
+.stf-input, .stf-select { font-size: max(16px, 1em); }
+
+.stf-select {
+  min-height: var(--stf-field);
+  width: 100%;
+  padding: 0 14px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  color: var(--stf-ink);
+  font: 400 16px/1 var(--stf-font-sans);
+}
+
+/* ── Choice list ─────────────────────────────────────────────────── */
+/* Tap targets instead of a dropdown: on the floor, picking "cold room"
+   from two visible options beats opening a menu. */
+.stf-choices { display: flex; flex-direction: column; gap: 10px; }
+.stf-choice {
+  width: 100%;
+  min-height: var(--stf-tap);
+  padding: 16px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+.stf-choice:hover { border-color: var(--stf-gold); }
+.stf-choice.is-chosen { border-color: var(--stf-accent); background: var(--stf-white); box-shadow: inset 0 0 0 1px var(--stf-accent); }
+.stf-choice-label { font-family: var(--stf-font-display); font-size: 16px; font-weight: 700; color: var(--stf-ink); }
+.stf-choice-meta  { font-size: 13px; color: var(--stf-text-sub); }
+
+/* ── Notices (ACC-03: a mark and a sentence, never colour alone) ─── */
+.stf-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--stf-border);
+  border-left: 4px solid var(--stf-gold);
+  border-radius: 0 var(--stf-radius) var(--stf-radius) 0;
+  background: var(--stf-white);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--stf-text);
+}
+.stf-notice.is-warn {
+  border-color: var(--stf-attention-border);
+  border-left-color: var(--stf-attention);
+  background: var(--stf-attention-bg);
+}
+.stf-notice-mark {
+  flex-shrink: 0;
+  width: 18px; height: 18px;
+  border: 1.5px solid var(--stf-gold-deep);
+  border-radius: 50%;
+  color: var(--stf-gold-deep);
+  font: 700 12px/15px var(--stf-font-display);
+  text-align: center;
+}
+.stf-notice.is-warn .stf-notice-mark,
+.stf-row.is-warn .stf-notice-mark {
+  border-color: var(--stf-attention);
+  color: var(--stf-attention);
+}
+.stf-notice-body { flex: 1; min-width: 0; }
+.stf-notice-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+
+/* ── List and rows ───────────────────────────────────────────────── */
+.stf-list {
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  overflow: hidden;
+  background: var(--stf-white);
+}
+.stf-row {
+  width: 100%;
+  min-height: var(--stf-tap);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--stf-border);
+  background: none;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.stf-row:last-child { border-bottom: 0; }
+.stf-row:hover { background: var(--stf-sand); }
+.stf-row.is-warn { background: var(--stf-attention-bg); }
+.stf-row.is-static { cursor: default; }
+.stf-row.is-static:hover { background: none; }
+.stf-row.is-warn.is-static:hover { background: var(--stf-attention-bg); }
+.stf-row-main  { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.stf-row-title { font-family: var(--stf-font-display); font-size: 15px; font-weight: 700; color: var(--stf-ink); }
+.stf-row-meta  { font-size: 12px; line-height: 1.45; color: var(--stf-text-sub); }
+.stf-row-value {
+  font-family: var(--stf-font-display);
+  font-size: 18px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--stf-ink);
+}
+
+/* ── key: value captions ─────────────────────────────────────────── */
+.stf-kv     { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; font-size: 12px; color: var(--stf-text-sub); }
+.stf-kv-key { color: var(--stf-text-meta); }
+.stf-kv-val { color: var(--stf-ink); font-weight: 600; }
+
+/* ── Instruction numbers (decanting step 3) ──────────────────────── */
+/* Nothing to type on that screen, which is why these can be this big
+   and read from a metre away with both hands full. */
+.stf-instruction {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 20px;
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+}
+.stf-instruction-n {
+  min-width: 56px;
+  font-family: var(--stf-font-display);
+  font-size: 2.4rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--stf-ink);
+}
+.stf-instruction-l { font-size: 16px; color: var(--stf-text); }
+
+/* ── Signature ───────────────────────────────────────────────────── */
+.stf-sign-canvas {
+  width: 100%;
+  height: 170px;
+  border: 2px dashed var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+  /* Without this the browser treats the first drag as a page pan and
+     the driver's signature scrolls the screen instead. */
+  touch-action: none;
+  display: block;
+}
+
+/* ── Counter ─────────────────────────────────────────────────────── */
+.stf-counter { display: flex; align-items: center; gap: 12px; }
+.stf-counter-btn {
+  width: 48px; height: 48px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: 50%;
+  background: var(--stf-white);
+  font: 400 22px/1 var(--stf-font-sans);
+  color: var(--stf-ink);
+  cursor: pointer;
+}
+.stf-counter-btn:hover { border-color: var(--stf-accent); color: var(--stf-accent); }
+.stf-counter-val {
+  min-width: 44px; text-align: center;
+  font-family: var(--stf-font-display);
+  font-size: 22px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--stf-ink);
+}
+
+/* ── Progress bar (packing) ──────────────────────────────────────── */
+.stf-progress { display: flex; align-items: center; gap: 14px; }
+.stf-progress-track { flex: 1; height: 10px; border-radius: 5px; background: var(--stf-border); overflow: hidden; }
+.stf-progress-fill  { height: 100%; background: var(--stf-accent); transition: width 240ms ease; }
+.stf-progress-count {
+  font-family: var(--stf-font-display);
+  font-size: 13px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--stf-ink);
+}
+
+/* ── Quiet states ────────────────────────────────────────────────── */
+.stf-empty {
+  padding: 24px 20px;
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+  font-size: 14px; line-height: 1.6;
+  color: var(--stf-text-sub);
+}
+.stf-skeleton { height: 56px; border-radius: var(--stf-radius); background: var(--stf-border); }
+
+.stf-sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+/* ── ACC-08 · reduced motion ─────────────────────────────────────── */
+/* Honoured from the OS setting, and from the in-app "Less movement"
+   toggle, which sets data-stf-motion="reduced" on <html> so it also
+   covers a shared tablet whose OS setting nobody can change. */
+@media (prefers-reduced-motion: reduce) {
+  .stf-rail-bar, .stf-progress-fill, .stf-btn, .stf-choice { transition: none !important; }
+}
+[data-stf-motion='reduced'] .stf-rail-bar,
+[data-stf-motion='reduced'] .stf-progress-fill,
+[data-stf-motion='reduced'] .stf-btn,
+[data-stf-motion='reduced'] .stf-choice { transition: none !important; }
+
+/* ── Bench tablet ────────────────────────────────────────────────── */
+/* Same column, more air. Deliberately not a wider table: the staff who
+   use the tablet are the staff who use the phone. */
+@media (min-width: 720px) {
+  .stf-main { max-width: 620px; padding: 28px 24px 40px; }
+  .stf-tab { font-size: 11px; }
+  .stf-tab-icon { width: 28px; height: 28px; }
+  .stf-instruction-n { font-size: 2.8rem; }
+}
