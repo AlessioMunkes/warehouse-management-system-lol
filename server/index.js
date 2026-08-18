@@ -15,7 +15,8 @@ import deliveryRouter    from './src/routes/delivery.routes.js';
 import volunteerRouter   from './src/routes/volunteer.routes.js';
 import decantingRouter   from './src/routes/decanting.routes.js';
 import stockRouter       from './src/routes/stock.routes.js';
-import pickingRouter     from './src/routes/picking.routes.js'; 
+import pickingRouter     from './src/routes/picking.routes.js';
+import donationRouter    from './src/routes/donation.routes.js';
 
 // ── Validate required secrets exist at startup ───────────────
 if (!process.env.JWT_SECRET) {
@@ -88,6 +89,7 @@ app.use('/api/decanting',  decantingRouter);
 app.use('/api/stock',      stockRouter);
 app.use('/api/picking',    pickingRouter);
 app.use('/api/dispatch',   dispatchRouter);
+app.use('/api/donations',  donationRouter);
 
 // ── SPA fallback (production only) ────────────────────────────
 // Any non-/api path falls through to index.html so React Router can
