@@ -1,99 +1,148 @@
 // ─────────────────────────────────────────────────────────────
 // StockManifestTable.jsx
 //
-// Every active product and its current level.
-//
-// The responsive desktop-table / mobile-card split used to live in
-// AdjustStockForm.jsx, which was a copy of this component that had
-// been improved in the wrong file. The improvement is kept here;
-// AdjustStockForm is now an actual form.
-//
-// Status badges come from is_shortfall / is_low_stock, which the
-// repository computes in SQL, so every screen that reads the
-// manifest agrees on what "low" means. Don't recompute them here.
+// Searchable manifest table using CSS classes for status badges and layouts.
 // ─────────────────────────────────────────────────────────────
-import StepCard from "./StepCard";
-import Badge from "./Badge";
-import Button from "./Button";
 
-function statusBadges(product) {
-  const badges = [];
-  if (product.isShortfall) badges.push(<Badge key="shortfall" variant="flagged">Shortfall</Badge>);
-  if (product.isLowStock)  badges.push(<Badge key="low" variant="pending">Low stock</Badge>);
-  if (badges.length === 0) badges.push(<Badge key="ok" variant="ok">In stock</Badge>);
-  return <div className="badge-group">{badges}</div>;
+import { useState, useMemo } from "react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Search, History, Edit3 } from "lucide-react";
+
+function renderStatusBadge(product) {
+  if (product.isShortfall) {
+    return <Badge className="badge-shortfall">Shortfall</Badge>;
+  }
+  if (product.isLowStock) {
+    return <Badge className="badge-lowstock">Low stock</Badge>;
+  }
+  return <Badge className="badge-instock">In stock</Badge>;
 }
 
-export default function StockManifestTable({ products, onViewHistory, isLoading = false }) {
-  if (isLoading) {
-    return (
-      <StepCard title="Stock manifest" subtitle="Every active product and its current level.">
-        <p className="pdf-table-empty">Loading stock levels…</p>
-      </StepCard>
+export default function StockManifestTable({
+  products = [],
+  isLoading = false,
+  canAdjust = false,
+  onAdjust,
+  onViewHistory,
+}) {
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filteredProducts = useMemo(() => {
+    if (!searchTerm.trim()) return products;
+    const q = searchTerm.toLowerCase();
+    return products.filter(
+      (p) =>
+        p.name?.toLowerCase().includes(q) || p.sku?.toLowerCase().includes(q)
     );
-  }
+  }, [products, searchTerm]);
 
   return (
-    <StepCard title="Stock manifest" subtitle="Every active product and its current level.">
-      {products.length === 0 ? (
-        <p className="pdf-table-empty">No active products found.</p>
-      ) : (
-        <>
-          {/* Desktop / wide-screen table */}
-          <div className="data-table-wrapper stock-table-desktop">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Product</th>
-                  <th>SKU</th>
-                  <th>On hand</th>
-                  <th>Reorder at</th>
-                  <th>Status</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {products.map((product) => (
-                  <tr key={product.id}>
-                    <td className="is-emphasis">{product.name}</td>
-                    <td className="pdf-table-sku">{product.sku}</td>
-                    <td>{product.onHand} {product.unit}</td>
-                    <td>{product.reorderAt} {product.unit}</td>
-                    <td>{statusBadges(product)}</td>
-                    <td>
-                      <Button variant="link" type="button" onClick={() => onViewHistory?.(product)}>
-                        View history
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+    <Card className="border-border bg-card shadow-sm">
+      <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-4">
+        <div>
+          <CardTitle className="text-xl font-bold tracking-tight">
+            Stock Manifest
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Current levels, reorder thresholds, and quick actions.
+          </p>
+        </div>
 
-          {/* Mobile stacked cards */}
-          <div className="stock-table-mobile">
-            {products.map((product) => (
-    <div className="card-row" key={product.id}>
-      <div className="stock-card-meta" style={{ flex: 1 }}>
-        <div className="stock-card-title-row">
-          <span className="stock-card-name">{product.name}</span>
-          <span className="stock-card-sku">{product.sku}</span>
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Search name or SKU..."
+            className="pl-9"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
-        <div className="stock-card-figures">
-          <span>On hand: {product.onHand} {product.unit}</span>
-          <span>Reorder at: {product.reorderAt} {product.unit}</span>
-        </div>
-        {statusBadges(product)}
-      </div>
-      <Button variant="link" type="button" onClick={() => onViewHistory?.(product)}>
-        View history
-      </Button>
-              </div>
-            ))}
+      </CardHeader>
+
+      <CardContent>
+        {isLoading ? (
+          <div className="py-12 text-center text-sm text-muted-foreground">
+            Loading stock levels...
           </div>
-        </>
-      )}
-    </StepCard>
+        ) : filteredProducts.length === 0 ? (
+          <div className="py-12 text-center text-sm text-muted-foreground">
+            No matching products found.
+          </div>
+        ) : (
+          <div className="rounded-md border border-border overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-muted/50">
+                <TableRow>
+                  <TableHead className="font-semibold">Product</TableHead>
+                  <TableHead className="font-semibold">SKU</TableHead>
+                  <TableHead className="font-semibold">On Hand</TableHead>
+                  <TableHead className="font-semibold">Reorder At</TableHead>
+                  <TableHead className="font-semibold">Status</TableHead>
+                  <TableHead className="text-right font-semibold">
+                    Actions
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredProducts.map((product) => (
+                  <TableRow key={product.id} className="hover:bg-muted/30">
+                    <TableCell className="font-medium text-foreground">
+                      {product.name}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {product.sku}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {product.onHand} {product.unit}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {product.reorderAt} {product.unit}
+                    </TableCell>
+                    <TableCell>{renderStatusBadge(product)}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        {canAdjust && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onAdjust?.(product)}
+                            className="h-8 gap-1"
+                          >
+                            <Edit3 className="h-3.5 w-3.5" />
+                            <span>Adjust</span>
+                          </Button>
+                        )}
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onViewHistory?.(product)}
+                          className="h-8 gap-1"
+                        >
+                          <History className="h-3.5 w-3.5" />
+                          <span>History</span>
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

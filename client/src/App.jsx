@@ -15,6 +15,7 @@ import PackingSelectPage                           from './pages/PackingSelectPa
 import DispatchPage                                from './pages/DispatchPage';
 import InventoryManagementPage                     from './pages/InventoryManagementPage';
 import ManagerActivityScreen                       from './pages/ManagerActivityScreen';
+import TaskDashboard from './pages/TaskDashboardPage';
 
 const App = () => (
   <AuthProvider>
@@ -35,7 +36,7 @@ const App = () => (
         <Route element={<ProtectedRoute />}>
           {/* NOC task select — the placeholder dashboard until the
               real one lands. */}
-          <Route path="/noc"           element={<SelectNOCjob />} />
+          <Route path="/noc"           element={<TaskDashboard />} />
           <Route path="/noc/decanting" element={<DecantingPage />} />
 
           {/* One URL per task, shared by managers and workers alike —
