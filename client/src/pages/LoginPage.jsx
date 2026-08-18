@@ -72,16 +72,16 @@ const LoginPage = () => {
     return err.message || "Login failed. Please try again.";
   };
 
-  // Sends managers and workers to their own landing screen instead
-  // of everyone defaulting to /programmes.
+  // Sends managers and workers to their own landing screen. Everyone
+  // who isn't a manager lands on the NOC task chooser (STAFF.home) —
+  // there is no /programmes anymore.
   const redirectByRole = (loggedInUser) => {
     switch (loggedInUser?.role) {
       case "manager":
         navigate("/manager");
         break;
-      case "worker":
       default:
-        navigate("/programmes");
+        navigate(STAFF.home);
         break;
     }
   };
