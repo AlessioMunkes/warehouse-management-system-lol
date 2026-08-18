@@ -1,5 +1,6 @@
 // ─────────────────────────────────────────────────────────────
 // InventoryManagementPage.jsx
+// Styled with Ladles of Love Brand Palette & Typography
 // ─────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useState } from "react";
@@ -110,44 +111,44 @@ export default function InventoryManagementPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
-      {/* Top Navbar Header */}
+    <div className="min-h-screen bg-white text-[#2b3336] font-['Montserrat',sans-serif] flex flex-col">
+      {/* 1. App Top Navigation Bar Header */}
       <TopNavbar
         reducedMovement={reducedMovement}
         onToggleMovement={setReducedMovement}
       />
 
-      {/* Main Content Container with max-w-6xl for optimal readability */}
-      <main className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-8 space-y-6 sm:space-y-8 flex-1">
+      {/* 2. Main Content Container (Bounded at max-w-6xl for scannability) */}
+      <main className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-6 sm:space-y-8 flex-1">
         
-        {/* Responsive Page Header */}
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+        {/* Page Heading Banner with Brand Accent Bar */}
+        <div className="border-l-4 border-[#ef3a40] pl-4 py-1">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#2b3336]">
             Inventory Management
           </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            Current stock levels, manual adjustments, and audit trail logs.
+          <p className="text-xs sm:text-sm text-[#676767] mt-1 font-normal">
+            Real-time stock manifest, manual distribution adjustments, and audit trail logs.
           </p>
         </div>
 
-        {/* Fetch Error Banner */}
+        {/* Global Fetch Error Banner */}
         {loadError && (
-          <div className="p-3 sm:p-4 rounded-md bg-rose-50 border border-rose-200 text-rose-800 text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-sm">
+          <div className="p-4 rounded-[4px] bg-[#fff4f2] border-2 border-[#ef3a40] text-[#2b3336] text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
             <span>{loadError}</span>
             <button
               onClick={reloadManifest}
-              className="text-xs sm:text-sm font-semibold underline hover:no-underline self-start sm:self-auto focus:outline-none"
+              className="text-xs sm:text-sm font-semibold underline hover:text-[#ef3a40] focus:outline-none"
             >
               Try again
             </button>
           </div>
         )}
 
-        {/* Stock Health Bar (Responsive Grid inside component) */}
-        <StockHealthBar products={products}  reducedMovement={reducedMovement}/>
+        {/* 3. Stock Health Summary Cards (Passes reducedMovement) */}
+        <StockHealthBar products={products} reducedMovement={reducedMovement} />
 
-        {/* Stock Manifest Table with horizontal scroll container for mobile */}
-        <div className="w-full overflow-x-auto">
+        {/* 4. Stock Manifest Data Table */}
+        <div className="w-full overflow-x-auto rounded-[4px] border border-[#e9e3dd] shadow-sm bg-white">
           <StockManifestTable
             products={products}
             isLoading={isLoading}
@@ -158,7 +159,7 @@ export default function InventoryManagementPage() {
         </div>
       </main>
 
-      {/* Adjustment Modal */}
+      {/* Single Product Stock Adjustment Modal */}
       {adjustingProduct && (
         <AdjustStockModal
           product={adjustingProduct}

@@ -2,7 +2,27 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/inter";
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
 
+@layer base {
+  :root {
+    /* Brand Colors */
+    --nectar-accent: #ef3a40;
+    --nectar-dark: #2b3336;
+    --nectar-olive: #979168;
+    --nectar-cream: #e9e3dd;
+    --nectar-bg: #ffffff;
+    
+    /* Typography Overrides */
+    --font-montserrat: 'Montserrat', 'Open Sans', Helvetica, sans-serif;
+  }
+
+  body {
+    font-family: var(--font-montserrat);
+    color: var(--nectar-dark);
+    background-color: var(--nectar-bg);
+  }
+}
 @custom-variant dark (&:is(.dark *));
 
 /* Global stylesheet. Page-specific styles live alongside their pages
