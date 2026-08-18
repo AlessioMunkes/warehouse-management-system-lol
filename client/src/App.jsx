@@ -7,7 +7,7 @@ import LoginPage                                   from './pages/LoginPage';
 import GuestLoginPage                              from './pages/GuestLoginPage';
 import GuestHomePage                               from './pages/GuestHomePage';
 
-import SelectNOCjob                                from './pages/SelectNOCjob';
+//import SelectNOCjob                                from './pages/SelectNOCjob';
 
 import ProcurementPage                             from './pages/ProcurementPage';
 import DecantingPage                               from './pages/DecantingPage';

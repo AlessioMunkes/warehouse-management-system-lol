@@ -97,7 +97,7 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
   const [error, setError] = useState(null);
 
   const step = STEP_META[phase];
-  const weekOf = useMemo(mondayOfThisWeek, []);
+ const weekOf = useMemo(() => mondayOfThisWeek(), []);
 
   useEffect(() => { onCrumbChange?.(step.label); }, [step.label, onCrumbChange]);
 

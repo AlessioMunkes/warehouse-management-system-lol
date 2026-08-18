@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import logo from '../assets/Batches_Logo.jpeg';
 import {HugeiconsIcon} from '@hugeicons/react';
 import Log_In_Background from '../assets/Log_In_Background.jpg';
-
+import { STAFF } from '../routes/paths';
 // shadcn/ui components
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

@@ -67,9 +67,18 @@ export default function ReceivingFlow({ onCrumbChange }) {
   const [lineIndex, setLineIndex] = useState(0);
 
   const [suppliers, setSuppliers] = useState([]);
-  const [orders, setOrders] = useState([]);
+
+  // What the last fetch returned, keyed implicitly by supplierId. The
+  // list only means anything while a supplier is selected, so the
+  // "no supplier, no orders" case is derived below rather than being
+  // written back into state from the effect — clearing state
+  // synchronously inside an effect body triggers a cascading render
+  // (react-hooks/set-state-in-effect).
+  const [fetchedOrders, setFetchedOrders] = useState([]);
   const [supplierId, setSupplierId] = useState('');
   const [orderId, setOrderId] = useState('');
+
+  const orders = supplierId ? fetchedOrders : [];
 
   // One entry per order line: what was expected, what was counted,
   // where it went, and the use-by date if it is fresh.
@@ -99,18 +108,18 @@ export default function ReceivingFlow({ onCrumbChange }) {
 
   // ── Supplier chosen, load its approved orders ───────────────
   useEffect(() => {
-    if (!supplierId) { setOrders([]); return undefined; }
+    if (!supplierId) return undefined;
     let cancelled = false;
     (async () => {
       setError(null);
       try {
         const list = await receivingAPI.getPurchaseOrders(supplierId);
-        if (!cancelled) setOrders(list);
+        if (!cancelled) setFetchedOrders(list);
       } catch (err) {
         // A supplier with no approved order is a normal state that
         // has an explanation, not a failure. The empty case below
         // says what to do about it.
-        if (!cancelled) { setOrders([]); setError(err.message); }
+        if (!cancelled) { setFetchedOrders([]); setError(err.message); }
       }
     })();
     return () => { cancelled = true; };
