@@ -1,389 +1,392 @@
-/* ─────────────────────────────────────────────────────────────
-   LandingPage.css
-   Brand match: ladlesoflove.org.za
-   Reuses --color-* tokens from styles/index.css.
-   Only page‑specific extras live here, scoped under .lol-landing.
-   ───────────────────────────────────────────────────────────── */
-.lol-landing {
-  --lol-khaki-on-dark: #b5a87e;
-  --lol-beige-dark:    #dcd5cc;
-  --lol-radius:        4px;
-  --lol-shadow:        0 4px 20px rgba(0, 0, 0, 0.06);
-  --lol-max:           1200px;
+/* ==========================================================================
+   Ladles of Love Landing Page — Stylesheet
+   Brand tokens verified against ladlesoflove.org.za's own theme config.
+   Rule of thumb applied throughout this pass: charcoal (--maroon) is for
+   structure and headings, red (--accent) is for anything clickable, gold
+   (--khaki) is for small editorial accents. That's what fixes the "blue"
+   read without inventing an unverified colour.
+   ========================================================================== */
 
-  font-family: var(--font-family-sans);
-  color: var(--color-text);
-  background: var(--color-lol-white);
-  line-height: 1.7;
+.lol-landing {
+  --maroon: #2b3336;
+  --maroon-deep: #171b1c;
+  --accent: #ef3a40;
+  --accent-deep: #d42d33;
+  --khaki: #979168;
+  --khaki-deep: #8a8058;
+  --bg: #e9e3dd;
+  --white: #ffffff;
+  --border: #ddd4c8;
+  --text: #5c5c5c;
+  --text-sub: #7d786a;
+  --text-meta: #a39d8f;
+
+  --font-display: "Montserrat", "Inter", system-ui, -apple-system, sans-serif;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+
+  --max-width: 1200px;
+  --radius: 16px;
+  --radius-pill: 999px;
+
+  font-family: var(--font-sans);
+  color: var(--text);
+  background: var(--white);
+  line-height: 1.6;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
-.lol-landing img { max-width: 100%; height: auto; display: block; }
+.lol-landing img { max-width: 100%; display: block; }
 .lol-landing a { text-decoration: none; color: inherit; }
-
 .lol-landing a:focus-visible,
 .lol-landing button:focus-visible {
-  outline: 3px solid var(--color-accent);
+  outline: 3px solid var(--accent);
   outline-offset: 2px;
 }
 
 .lol-icon { display: block; flex-shrink: 0; }
+.lol-section-inner { max-width: var(--max-width); margin: 0 auto; padding: 0 1.5rem; }
 
-/* ── Skip link ─────────────────────────────────────────────── */
+/* Skip link */
 .lol-skip-link {
-  position: absolute;
-  top: -100px;
-  left: 0;
-  background: var(--color-accent);
-  color: #fff;
-  padding: 0.5rem 1.5rem;
-  z-index: 1000;
-  font-weight: 700;
+  position: absolute; top: -100px; left: 0;
+  background: var(--maroon); color: #fff;
+  padding: 0.6rem 1.2rem; z-index: 1000; font-weight: 700;
 }
 .lol-skip-link:focus { top: 0; }
 
-/* ── Shared layout helpers ─────────────────────────────────── */
-.lol-section-inner { max-width: var(--lol-max); margin: 0 auto; }
-
+/* Eyebrow — small label above a section heading */
 .lol-eyebrow {
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  font-weight: 700;
-  color: var(--color-text-sub);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 900; color: var(--khaki);
   margin-bottom: 0.5rem;
 }
-.lol-eyebrow--on-dark { color: var(--lol-khaki-on-dark); }
+.lol-eyebrow--on-dark { color: rgba(255, 255, 255, 0.9); }
 
+/* Section titles */
 .lol-section-title {
-  font-size: 2.2rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 3vw, 2.1rem);
   font-weight: 700;
-  margin-bottom: 0.5rem;
-  color: var(--color-maroon);
+  color: var(--maroon);
+  margin-bottom: 1rem;
+  line-height: 1.2;
 }
-.lol-section-title-light { color: #fff; margin-bottom: 0.5rem; }
+.lol-section-title-light { color: #fff; }
 
-/* ── Buttons ──────────────────────────────────────────────── */
+/* Buttons — primary is now red by default, not charcoal */
 .lol-btn-primary {
-  background: var(--color-accent);
-  color: #fff;
-  border: none;
-  padding: 0.6rem 1.8rem;
-  border-radius: 2rem;
-  font-weight: 700;
-  font-size: 0.9rem;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  transition: background 0.2s, transform 0.2s;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 44px; padding: 0 22px;
+  background: var(--accent); color: #fff; border: none;
+  border-radius: var(--radius-pill);
+  font-weight: 600; font-size: 14px; cursor: pointer;
+  transition: background 0.15s ease;
   white-space: nowrap;
 }
-.lol-btn-primary:hover { background: var(--color-accent-hover); transform: translateY(-1px); }
+.lol-btn-primary:hover { background: var(--accent-deep); }
 
+/* Secondary (hero) — red-bordered so it reads red even sitting on a photo */
 .lol-btn-secondary {
-  background: transparent;
-  color: var(--color-accent);
-  border: 2px solid var(--color-accent);
-  padding: 0.5rem 1.8rem;
-  border-radius: 2rem;
-  font-weight: 700;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: background 0.2s, color 0.2s;
-  white-space: nowrap;
-}
-.lol-btn-secondary:hover { background: var(--color-accent); color: #fff; }
-
-.lol-btn-text {
-  background: none;
-  border: none;
-  color: var(--color-text);
-  font-weight: 600;
-  font-size: 0.9rem;
-  cursor: pointer;
-  padding: 0.5rem 0.2rem;
-  white-space: nowrap;
-}
-.lol-btn-text:hover { color: var(--color-accent); }
-
-.lol-btn-large { padding: 0.8rem 2.2rem; font-size: 1rem; }
-
-.lol-btn-outline-light {
-  border: 2px solid #fff;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 44px; padding: 0 22px;
+  background: rgba(239, 58, 64, 0.14);
+  border: 1.5px solid var(--accent);
   color: #fff;
-  padding: 0.7rem 2rem;
-  border-radius: 2rem;
-  font-weight: 700;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  transition: background 0.2s, color 0.2s;
+  border-radius: var(--radius-pill);
+  font-weight: 600; font-size: 14px; cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
   white-space: nowrap;
-  flex-shrink: 0;
 }
-.lol-btn-outline-light:hover { background: #fff; color: var(--color-accent); }
+.lol-btn-secondary:hover { background: var(--accent); border-color: var(--accent); }
+.lol-btn-large { height: 50px; padding: 0 26px; font-size: 15px; }
 
 /* ── Navigation ───────────────────────────────────────────── */
-.lol-nav {
-  background: var(--color-lol-white);
-  border-bottom: 1px solid var(--color-border);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
+.lol-nav { background: #fff; position: sticky; top: 0; z-index: 100; }
 .lol-nav-inner {
-  max-width: var(--lol-max);
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.8rem 1.5rem;
-  gap: 1rem;
+  max-width: var(--max-width); margin: 0 auto;
+  display: flex; align-items: center; gap: 1.5rem;
+  padding: 0.85rem 1.5rem;
 }
-.lol-nav-brand { display: flex; align-items: center; gap: 0.75rem; }
-.lol-nav-logo {
-  width: 44px;
-  height: 44px;
-  object-fit: contain;
-  border-radius: var(--lol-radius);
-  border: 1px solid var(--color-border);
-  background: #fff;
-  padding: 3px;
-  flex-shrink: 0;
+.lol-menu-trigger {
+  width: 40px; height: 40px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--maroon); cursor: pointer;
 }
-.lol-nav-title { font-weight: 700; font-size: 1.2rem; color: var(--color-maroon); line-height: 1.1; }
-.lol-nav-sub { font-size: 0.8rem; color: var(--color-text-sub); }
-.lol-nav-actions { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+@media (min-width: 861px) { .lol-menu-trigger { display: none; } }
+
+.lol-nav-brand { display: flex; align-items: center; gap: 0.7rem; margin-right: auto; min-width: 0; }
+.lol-nav-logo { width: 52px; height: 52px; object-fit: contain; flex-shrink: 0; }
+
+/* Nav links now red, matching the login button next to them */
+.lol-nav-links { display: flex; align-items: center; gap: 1.85rem; }
+.lol-nav-link { font-size: 0.92rem; font-weight: 700; color: var(--accent); transition: color 0.15s ease; }
+.lol-nav-link:hover { color: var(--accent-deep); }
+@media (max-width: 860px) { .lol-nav-links { display: none; } }
+
+/* ── Drawer (mobile only) ─────────────────────────────────── */
+.lol-drawer-backdrop {
+  position: fixed; inset: 0; background: rgba(20, 15, 12, 0.5);
+  opacity: 0; pointer-events: none; transition: opacity 0.2s; z-index: 190;
+}
+.lol-drawer-backdrop.is-open { opacity: 1; pointer-events: auto; }
+.lol-drawer {
+  position: fixed; top: 0; left: 0; height: 100dvh;
+  width: min(320px, 85vw);
+  background: #fff; z-index: 200;
+  transform: translateX(-100%);
+  transition: transform 0.2s;
+  display: flex; flex-direction: column;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.12);
+}
+.lol-drawer.is-open { transform: translateX(0); }
+.lol-drawer-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1.25rem; border-bottom: 1px solid var(--border);
+}
+.lol-drawer-title { font-family: var(--font-display); font-weight: 700; color: var(--maroon); }
+.lol-drawer-close { background: none; border: none; cursor: pointer; color: var(--text-sub); }
+.lol-drawer-links { padding: 0.75rem; display: flex; flex-direction: column; gap: 0.25rem; }
+.lol-drawer-link {
+  display: flex; align-items: center; gap: 0.85rem;
+  padding: 0.9rem 1rem; border-radius: 12px;
+  font-weight: 700; color: var(--accent);
+  transition: background 0.15s, color 0.15s;
+}
+.lol-drawer-link:hover { background: var(--bg); color: var(--accent-deep); }
+.lol-drawer-link img { width: 20px; height: 20px; object-fit: contain; flex-shrink: 0; }
+.lol-drawer-link svg:last-child { color: var(--text-meta); margin-left: auto; }
 
 /* ── Hero ─────────────────────────────────────────────────── */
 .lol-hero {
-  position: relative;
-  overflow: hidden;
-  background: var(--color-maroon);
-  color: #fff;
-  min-height: 85vh;
-  display: flex;
-  align-items: center;
-  opacity: 0;
-  transform: translateY(10px);
-  transition: opacity 0.6s ease, transform 0.6s ease;
+  position: relative; min-height: 82vh;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  overflow: hidden; background: var(--maroon);
 }
-.lol-hero.is-ready { opacity: 1; transform: translateY(0); }
-
-.lol-hero-bg {
-  position: absolute;
-  inset: 0;
-  background-size: cover;
-  background-position: center;
-  opacity: 0.5;
-  z-index: 0;
-}
-.lol-hero-overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(43, 51, 54, 0.55) 0%, rgba(217, 56, 64, 0.35) 100%);
+.lol-hero-bg { position: absolute; inset: 0; background-size: cover; background-position: center; z-index: 0; }
+.lol-hero-scrim {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(20, 15, 12, 0) 55%, rgba(20, 15, 12, 0.45) 100%);
   z-index: 1;
 }
-.lol-hero-inner {
-  max-width: var(--lol-max);
-  margin: 0 auto;
-  display: flex;
-  align-items: center;
-  gap: 3rem;
-  padding: 4rem 1.5rem;
-  position: relative;
-  z-index: 2;
-  flex-wrap: wrap;
+.lol-hero-content {
+  position: relative; z-index: 2;
+  max-width: var(--max-width); margin: 0 auto; width: 100%;
+  padding: 0 1.5rem 2rem; color: #fff;
 }
-.lol-hero-copy { flex: 2; min-width: 300px; }
-
 .lol-hero-title {
-  font-size: 3rem;
-  font-weight: 700;
-  line-height: 1.2;
-  margin-bottom: 1.5rem;
-  color: #fff;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  font-weight: 700; line-height: 1.1;
+  margin-bottom: 1rem;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.4);
 }
-.lol-hero-title em { font-style: normal; color: var(--lol-khaki-on-dark); }
-
 .lol-hero-lede {
-  font-size: 1.15rem;
-  line-height: 1.7;
-  color: rgba(255, 255, 255, 0.92);
-  max-width: 600px;
-  margin-bottom: 2rem;
+  font-size: 1.05rem; max-width: 560px; margin-bottom: 1.5rem;
+  color: rgba(255, 255, 255, 0.95);
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.35);
+}
+.lol-hero-actions { display: flex; gap: 1rem; flex-wrap: wrap; }
+.lol-proof-line {
+  position: relative; z-index: 2; text-align: center;
+  color: #ffffff; font-size: 1.05rem; font-weight: 500; letter-spacing: 0.02em;
+  padding: 1.25rem 1.5rem;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.5);
 }
 
-.lol-hero-actions { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 2.5rem; }
+/* ── Organic divider — forced to true black regardless of the
+   source SVG's own fill, since brightness(0) maps every colour
+   in the image to black while keeping its transparency intact */
+.lol-divider {
+  display: block;
+  width: 150px; max-width: 30vw;
+  margin: 0 0 1.25rem 0;
+  filter: brightness(0);
+  opacity: 1;
+}
 
-.lol-stat-ledger { display: flex; gap: 2rem; flex-wrap: wrap; }
-.lol-stat { text-align: left; }
-.lol-stat dt { font-size: 2rem; font-weight: 700; color: #fff; }
-.lol-stat dd { font-size: 0.85rem; color: rgba(255, 255, 255, 0.85); margin-top: 2px; }
+/* ── Accent illustrations — hand-drawn Canva pieces used the way
+   runnapatosonoma.com places its mascot: large, beside a heading,
+   filling what would otherwise be empty margin. Light backgrounds
+   only, so the black outlines keep their contrast. ──────────────── */
+.lol-accent-illustration {
+  width: 150px;
+  height: auto;
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+@media (max-width: 900px) { .lol-accent-illustration { width: 110px; } }
+@media (max-width: 640px) { .lol-accent-illustration { display: none; } }
 
-/* ── Logo in hero (replaces animated ladle) ──────────────── */
-.lol-hero-icon {
-  flex: 1;
-  max-width: 280px;
-  min-width: 180px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* ── Image fallback ───────────────────────────────────────── */
+.img-slot { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--bg); border-radius: inherit; }
+.img-slot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.img-slot__fallback {
+  position: absolute; inset: 0; display: none;
+  flex-direction: column; align-items: center; justify-content: center;
+  background: var(--bg); color: var(--text-meta);
+  font-size: 0.85rem; text-align: center; padding: 1rem;
 }
-.lol-hero-icon-frame {
-  width: 100%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  border: 4px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.08);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
+
+/* ── Team section ─────────────────────────────────────────── */
+.lol-team { background: #fff; padding: 4.5rem 0; }
+.lol-team-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2.75rem; align-items: center; }
+.lol-team-photo { min-width: 0; }
+.lol-team p { color: var(--text-sub); line-height: 1.7; }
+.lol-team-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; }
+.lol-team-heading .lol-section-title { margin-bottom: 1rem; }
+
+/* Slideshow */
+.lol-slideshow { position: relative; height: 320px; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); background: var(--bg); }
+.lol-slideshow-track { display: flex; height: 100%; transition: transform 0.4s ease; }
+.lol-slideshow-slide { flex: 0 0 100%; height: 100%; }
+.lol-slideshow-slide .img-slot { height: 100%; }
+.lol-slideshow-arrow {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.92); border: none; border-radius: 50%;
+  cursor: pointer; z-index: 3; color: var(--accent);
 }
-.lol-hero-logo {
-  width: 75%;
-  height: 75%;
-  object-fit: contain;
-}
+.lol-slideshow-arrow-left { left: 12px; }
+.lol-slideshow-arrow-right { right: 12px; }
+.lol-slideshow-dots { position: absolute; bottom: 14px; left: 0; right: 0; display: flex; gap: 8px; justify-content: center; z-index: 3; }
+.lol-slideshow-dot { width: 8px; height: 8px; border-radius: 50%; border: none; background: rgba(255, 255, 255, 0.55); cursor: pointer; padding: 0; }
+.lol-slideshow-dot.is-active { background: var(--accent); width: 22px; border-radius: 999px; }
 
 /* ── Programmes ───────────────────────────────────────────── */
-.lol-programmes { background: var(--color-lol-white); padding: 5rem 1.5rem; }
-
-.lol-programme-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 2rem;
-  margin-top: 3rem;
-}
-
-.lol-programme-card {
-  background: var(--color-lol-white);
-  border-radius: var(--lol-radius);
-  overflow: hidden;
-  box-shadow: var(--lol-shadow);
-  border: 1px solid var(--color-border);
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-.lol-programme-card:hover { transform: translateY(-4px); box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1); }
-
-.lol-programme-card__photo {
-  width: 100%;
-  height: 200px;
-  object-fit: cover;
-}
-
+.lol-programmes { background: var(--bg); padding: 4.5rem 0; }
+.lol-programmes-intro { display: flex; align-items: center; justify-content: space-between; gap: 2rem; }
+.lol-programmes-intro > div { min-width: 0; }
+.lol-programme-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.75rem; margin-top: 2rem; }
+.lol-programme-card { background: #fff; border-radius: var(--radius); overflow: hidden; box-shadow: 0 4px 16px rgba(43, 51, 54, 0.06); }
+.lol-programme-card .img-slot { height: 180px; }
 .lol-programme-card__body { padding: 1.5rem; }
+.lol-programme-icon-img { width: 56px; height: 56px; object-fit: contain; margin-bottom: 0.75rem; }
+.lol-programme-card h3 { font-family: var(--font-display); font-size: 1.15rem; font-weight: 700; color: var(--maroon); margin-bottom: 0.5rem; }
+.lol-programme-card p { font-size: 0.9rem; color: var(--text-sub); line-height: 1.5; }
 
-.lol-programme-icon {
-  margin-bottom: 0.75rem;
-  color: var(--color-accent);
+/* ── Our Why — text + photo, so it no longer trails off into
+   empty space on wide screens ─────────────────────────────── */
+.lol-story { background: #fff; padding: 5rem 0; }
+.lol-story-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 3rem; align-items: start; }
+.lol-story-text { min-width: 0; }
+.lol-story p { color: var(--text-sub); line-height: 1.85; margin-bottom: 1.5rem; font-size: 1.05rem; }
+.lol-story-photo .img-slot { aspect-ratio: 3 / 4; border-radius: var(--radius); }
+@media (max-width: 900px) { .lol-story-grid { grid-template-columns: 1fr; } }
+
+/* Stat panel — anchors the two context numbers to a lead-in
+   line and a bordered panel instead of floating in whitespace */
+.lol-context-panel {
+  margin-top: 1.5rem;
+  background: var(--bg);
+  border-left: 4px solid var(--accent);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 1.5rem 2rem;
 }
-
-.lol-programme-code {
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 1px;
-  color: var(--color-text-sub);
-  margin-bottom: 0.25rem;
-  text-transform: uppercase;
+.lol-context-lead { font-family: var(--font-display); font-weight: 900; color: var(--maroon); margin-bottom: 1rem; font-size: 1rem; }
+.lol-context-stats { display: grid; grid-template-columns: repeat(2, minmax(160px, 1fr)); gap: 1.75rem 2.5rem; }
+.lol-context-stat { max-width: 220px; }
+.lol-context-value { display: block; font-family: var(--font-display); font-size: 2rem; font-weight: 700; color: var(--khaki-deep); }
+.lol-context-label { font-size: 0.85rem; color: var(--text-sub); line-height: 1.4; }
+.lol-context-stat-icon { display: flex; align-items: center; justify-content: flex-end; }
+.lol-context-stat-icon img { width: 80px; height: auto; opacity: 0.9; }
+@media (max-width: 640px) {
+  .lol-context-stats { grid-template-columns: 1fr; }
+  .lol-context-stat-icon { display: none; }
 }
-.lol-programme-card h3 { font-size: 1.25rem; font-weight: 700; margin-bottom: 0.75rem; color: var(--color-maroon); }
-.lol-programme-card p { font-size: 0.9rem; color: var(--color-text); line-height: 1.6; }
+.lol-context-source { margin-top: 1.25rem; font-size: 0.78rem; color: var(--text-meta); }
+.lol-context-source a { color: var(--text-meta); text-decoration: underline; }
+.lol-context-source a:hover { color: var(--accent); }
 
-/* ── Story ────────────────────────────────────────────────── */
-.lol-story { background: var(--color-lol-bg); padding: 5rem 1.5rem; }
-.lol-story p { font-size: 1rem; color: var(--color-text); line-height: 1.7; max-width: 70ch; }
-
-.lol-values {
+/* ── Impact counters — dark band between Programmes and Our Why.
+   Placeholder/estimated numbers until real reporting data lands. */
+.lol-impact { background: var(--maroon); padding: 4rem 0; }
+.lol-impact-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1.5rem;
-  margin-top: 2.5rem;
-}
-.lol-value {
-  display: flex;
-  gap: 1rem;
-  align-items: flex-start;
-  background: var(--color-lol-white);
-  border: 1px solid var(--color-border);
-  padding: 1.25rem;
-}
-.lol-value-icon { flex-shrink: 0; margin-top: 0.2rem; color: var(--color-accent); }
-.lol-value p { font-size: 0.9rem; color: var(--color-text); line-height: 1.6; }
-
-/* ── Get involved band ────────────────────────────────────── */
-.lol-getinvolved { background: var(--color-accent); color: #fff; padding: 4rem 1.5rem; }
-.lol-getinvolved-inner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   gap: 2rem;
-  flex-wrap: wrap;
+  margin-top: 2rem;
 }
-.lol-getinvolved p { color: rgba(255, 255, 255, 0.92); max-width: 52ch; font-size: 0.95rem; line-height: 1.6; }
-
-/* ── Footer ───────────────────────────────────────────────── */
-.lol-footer { background: var(--color-maroon); color: rgba(255, 255, 255, 0.8); padding: 3rem 1.5rem; font-size: 0.9rem; }
-.lol-footer-inner { display: flex; flex-direction: column; gap: 1.5rem; align-items: center; text-align: center; }
-.lol-footer-title { font-weight: 700; font-size: 1.2rem; color: #fff; }
-.lol-footer-meta { font-size: 0.85rem; margin-top: 0.25rem; color: rgba(255, 255, 255, 0.65); }
-.lol-footer-links { display: flex; gap: 1.5rem; font-size: 0.9rem; }
-.lol-footer-links a { color: rgba(255, 255, 255, 0.8); }
-.lol-footer-links a:hover { color: var(--lol-khaki-on-dark); }
-.lol-footer-copy { font-size: 0.8rem; color: rgba(255, 255, 255, 0.55); }
-
-/* ── Image fallback (used by ImgWithFallback) ─────────────── */
-.img-slot {
-  position: relative;
-  background: var(--lol-beige-dark);
-  overflow: hidden;
-}
-.img-slot img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.img-slot__fallback {
-  position: absolute;
-  inset: 0;
-  display: none;            /* shown only when image errors */
+.lol-impact-stat {
+  display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text);
-  font-size: 0.85rem;
-  text-align: center;
-  padding: 1rem;
-  background: var(--lol-beige-dark);
+  gap: 0.6rem;
+  color: #fff;
+}
+.lol-impact-stat .lol-icon { color: var(--accent); }
+.lol-impact-value { font-family: var(--font-display); font-size: 2.4rem; font-weight: 700; }
+.lol-impact-label { font-size: 0.88rem; color: rgba(255, 255, 255, 0.75); line-height: 1.4; max-width: 32ch; }
+.lol-impact-note { margin-top: 2rem; font-size: 0.78rem; color: rgba(255, 255, 255, 0.5); }
+
+/* ── Map — real, interactive multi-pin map (Leaflet + OpenStreetMap).
+   Every location is a real pin with its own popup, so the separate
+   text list this used to sit next to is gone. ────────────────────── */
+.lol-map-section { background: var(--bg); padding: 4.5rem 0; }
+.lol-map-lede { color: var(--text-sub); max-width: 60ch; margin-bottom: 1.5rem; }
+.lol-map-canvas {
+  height: 460px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(43, 51, 54, 0.06);
+  border: 1px solid var(--border);
+  background: var(--border);
+}
+.leaflet-marker-icon.lol-map-pin { background: transparent; border: none; }
+.leaflet-popup-content-wrapper { border-radius: 10px; }
+.leaflet-popup-content { font-family: var(--font-sans); font-size: 0.85rem; color: var(--text); margin: 0.65rem 0.9rem; }
+.leaflet-popup-content strong { display: block; font-family: var(--font-display); color: var(--maroon); font-size: 0.92rem; margin-bottom: 0.15rem; }
+@media (max-width: 860px) { .lol-map-canvas { height: 340px; } }
+
+/* ── Get involved ─────────────────────────────────────────── */
+.lol-getinvolved { background: var(--maroon); padding: 4.5rem 0; }
+.lol-getinvolved-lede { color: rgba(255, 255, 255, 0.85); max-width: 60ch; margin-bottom: 2rem; }
+.lol-cta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; }
+.lol-cta-tile {
+  background: #fff; border-radius: var(--radius); padding: 1.75rem;
+  display: flex; flex-direction: column; gap: 0.5rem; color: var(--text);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.lol-cta-tile:hover { transform: translateY(-4px); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16); }
+.lol-cta-tile img { width: 48px; height: 48px; object-fit: contain; flex-shrink: 0; margin-bottom: 0.25rem; }
+.lol-cta-tile-title { font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; color: var(--maroon); }
+.lol-cta-tile-text { font-size: 0.85rem; color: var(--text-sub); }
+.lol-cta-tile-link { font-weight: 700; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.4px; color: var(--accent); }
+
+/* ── Footer — rebuilt tight and dense, the old intro paragraph
+   is gone since Get Involved above already says the same thing */
+.lol-footer { background: var(--maroon); color: rgba(255, 255, 255, 0.82); padding: 3rem 0 1.75rem; }
+.lol-footer-top {
+  display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr; gap: 2rem;
+  padding-bottom: 2rem; border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+.lol-footer-brand-title { font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; color: #fff; margin-bottom: 0.4rem; }
+.lol-footer-tagline { font-size: 0.85rem; color: rgba(255, 255, 255, 0.6); line-height: 1.5; }
+.lol-footer-col-title { font-family: var(--font-display); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--khaki); margin-bottom: 0.75rem; }
+.lol-footer-meta { font-size: 0.85rem; margin-bottom: 0.35rem; color: rgba(255, 255, 255, 0.65); line-height: 1.5; }
+.lol-footer-links { display: flex; flex-direction: column; gap: 0.5rem; }
+.lol-footer-links a { font-size: 0.85rem; color: var(--accent); font-weight: 700; }
+.lol-footer-links a:hover { color: #fff; }
+.lol-footer-links--social { flex-direction: row; flex-wrap: wrap; gap: 0.9rem; }
+.lol-footer-links--social a { color: rgba(255, 255, 255, 0.85); font-weight: 500; }
+.lol-footer-links--social a:hover { color: var(--accent); }
+.lol-footer-bottom {
+  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;
+  padding-top: 1.5rem; font-size: 0.76rem; color: rgba(255, 255, 255, 0.5);
 }
 
 /* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 900px) { .lol-team-grid { grid-template-columns: 1fr; } }
 @media (max-width: 768px) {
-  .lol-hero-inner {
-    flex-direction: column;
-    text-align: center;
-  }
-  .lol-hero-title { font-size: 2.2rem; }
-  .lol-hero-lede { font-size: 1rem; }
-  .lol-stat-ledger { justify-content: center; }
-  .lol-stat { text-align: center; }
-  .lol-hero-icon { order: -1; max-width: 180px; }
-  .lol-getinvolved-inner { flex-direction: column; text-align: center; }
-
-  .lol-nav-inner {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.8rem;
-  }
-  .lol-nav-brand { justify-content: center; }
-  .lol-nav-actions { justify-content: center; }
+  .lol-hero { min-height: 70vh; }
+  .lol-hero-actions { flex-direction: column; align-items: stretch; }
+  .lol-team, .lol-programmes, .lol-story, .lol-map-section, .lol-getinvolved { padding: 3rem 0; }
 }
-
-@media (prefers-reduced-motion: reduce) {
-  .lol-hero { transition: none !important; opacity: 1 !important; transform: none !important; }
-  .lol-programme-card:hover { transform: none; }
-  .lol-btn-primary:hover { transform: none; }
+@media (max-width: 760px) { .lol-footer-top { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 480px) {
+  .lol-section-inner { padding: 0 1rem; }
+  .lol-nav-inner { padding: 0.65rem 1rem; }
+  .lol-footer-top { grid-template-columns: 1fr; }
 }

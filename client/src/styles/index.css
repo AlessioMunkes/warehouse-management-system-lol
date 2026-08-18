@@ -59,14 +59,7 @@
    ───────────────────────────────────────────────────────────── */
 @layer components {
 
-  /* ── Page backgrounds / layouts ─────────────────────────────
-     .page-background       → photo + maroon tint (login, guest
-                                login, programme select)
-     .page-background-flow  → top-aligned content variant
-     .page-maroon           → alt photo + black tint variant
-     .page-light            → plain light page (task screens:
-                                decanting, deliveries, packing)
-     ───────────────────────────────────────────────────────────── */
+  /* ── Page backgrounds / layouts ───────────────────────────── */
   .page-background {
     position: relative;
     min-height: 100vh;
@@ -104,18 +97,11 @@
     z-index: 2;
   }
 
-  /* Full-width variant — programme select, dashboards (content
-     is not centered, it flows top-to-bottom instead) */
   .page-background-flow {
     display: block;
     padding: 0;
   }
 
-  
-
-  
-
-  /* Plain light background — dashboard body, task select */
   .page-light {
     min-height: 100vh;
     min-height: 100dvh;
@@ -191,20 +177,17 @@
     .card-header { padding: 20px 16px; }
   }
 
-  /* Generic white content card (delivery records, PO items) */
   .card-content {
     background-color: var(--color-lol-white);
     border: 1px solid var(--color-border);
     border-radius: 12px;
     padding: 16px 24px;
-    
   }
 
   @media (max-width: 640px) {
     .card-content { padding: 14px 16px; }
   }
 
-  /* Delivery record row card */
   .card-row {
     background-color: var(--color-lol-white);
     border: 1px solid var(--color-border);
@@ -276,8 +259,6 @@
     min-width: 0;
   }
 
-  
-
   .page-header-avatar {
     display: flex;
     align-items: center;
@@ -301,10 +282,6 @@
     text-overflow: ellipsis;
     max-width: 40vw;
   }
-
-  
-
-  
 
   .page-header-status {
     display: flex;
@@ -382,10 +359,9 @@
   }
 
   @media (max-width: 640px) {
-    .page-header-icon-btn::after { display: none; } /* tooltips awkward on touch */
+    .page-header-icon-btn::after { display: none; }
   }
 
-  /* Legacy header bar (dashboard) — kept for other screens */
   .header-bar {
     background-color: var(--color-maroon);
     min-height: 56px;
@@ -407,8 +383,6 @@
     font-weight: 600;
     letter-spacing: 0.3px;
   }
-
-  
 
   .header-role {
     color: var(--color-text-meta);
@@ -510,7 +484,7 @@
     background-color: var(--color-lol-bg);
     border: 1px solid var(--color-border);
     border-radius: 12px;
-    font-size: 16px; /* keep 16px on mobile to avoid iOS auto-zoom */
+    font-size: 16px;
     color: var(--color-text);
     outline: none;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
@@ -537,7 +511,6 @@
     margin-top: 4px;
   }
 
-  /* Password field wrapper (input + show/hide button together) */
   .form-input-group {
     display: flex;
     align-items: center;
@@ -705,7 +678,6 @@
   .btn-primary:active:not(:disabled) { transform: scale(0.97); }
   .btn-primary:disabled { background-color: var(--color-text-meta); cursor: not-allowed; }
 
-  /* Full-width primary — login submit, modal confirm */
   .btn-primary-full {
     width: 100%;
     height: 48px;
@@ -727,7 +699,6 @@
   .btn-primary-full:active:not(:disabled) { transform: scale(0.98); }
   .btn-primary-full:disabled { background-color: var(--color-text-meta); cursor: not-allowed; }
 
-  /* White outlined — secondary action */
   .btn-secondary {
     display: inline-flex;
     align-items: center;
@@ -749,7 +720,6 @@
   .btn-secondary:hover:not(:disabled) { background-color: var(--color-lol-bg); }
   .btn-secondary:disabled { color: var(--color-text-meta); cursor: not-allowed; }
 
-  /* Ghost — used on dark/maroon backgrounds (e.g. logout) */
   .btn-ghost {
     background: transparent;
     border: 1px solid rgba(255, 255, 255, 0.4);
@@ -764,7 +734,6 @@
 
   .btn-ghost:hover { background-color: rgba(255, 255, 255, 0.12); }
 
-  /* Text-only link button — forgot password, logout, etc */
   .btn-link {
     background: none;
     border: none;
@@ -779,7 +748,6 @@
 
   .btn-link:hover { color: var(--color-text); }
 
-  /* Show/hide password toggle inside input group */
   .btn-toggle-password {
     height: 44px;
     padding: 0 14px;
@@ -852,7 +820,6 @@
     border-color: var(--color-maroon);
   }
 
-  /* Every primary/secondary tap target on touch stays >= 44px tall */
   @media (max-width: 640px) {
     .btn-primary, .btn-secondary { min-height: 44px; }
   }
@@ -1184,15 +1151,36 @@
 
 
   /* ── Sidebar (dashboard left nav) ───────────────────────────── */
-  
+  .sidebar {
+    width: 240px;
+    background-color: var(--color-lol-white);
+    border-right: 1px solid var(--color-border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
 
-  
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    padding: 12px 16px;
+    background: transparent;
+    border: none;
+    border-left: 4px solid transparent;
+    cursor: pointer;
+    text-align: left;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text);
+    text-transform: uppercase;
+    transition: background-color 0.15s ease;
+  }
 
-  
-
-  
-
-  
+  .sidebar-item:hover:not(:disabled) {
+    background-color: var(--color-lol-bg);
+  }
 
   .sidebar-item.active {
     background-color: var(--color-maroon);
@@ -1200,7 +1188,10 @@
     color: var(--color-lol-white);
   }
 
-  
+  .sidebar-item:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
 
 
   /* ── Programme select page ──────────────────────────────────── */
@@ -1213,8 +1204,6 @@
   @media (max-width: 640px) {
     .programme-select-content { padding: 24px 16px 40px; }
   }
-
-  
 
   .programme-select-heading {
     font-family: var(--font-family-display);
@@ -1234,99 +1223,8 @@
     margin-bottom: 32px;
   }
 
-  
 
   /* ── Programme card ─────────────────────────────────────────── */
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  /* Legacy prog-card (icon-only variant, still used elsewhere) */
-  
-
-  
-  
-
-  
-
-  
-
-  
-
-  /* ── Heart draw canvas (Programme select gesture) ───────────── */
-  
-
-  
-
-  
-
-  
-  
-  
-  
-
-  @keyframes heartFloat {
-    0%, 100% { transform: translateY(0); opacity: 0.15; }
-    50% { transform: translateY(-10px); opacity: 0.3; }
-  }
-
-  
-
-  @keyframes cardPulse {
-    0% { transform: scale(1); }
-    40% { transform: scale(1.015); }
-    100% { transform: scale(1); }
-  }
-
-  
-
-  
-
-  @keyframes burstPop {
-    0% { transform: scale(0.4); opacity: 0; }
-    50% { transform: scale(1.3); opacity: 1; }
-    100% { transform: scale(1.6); opacity: 0; }
-  }
-
-  
-
-  /* ── Programme select: activity grid entrance ────────────────
-     Fades and lifts the activity grid in once the heart gesture
-     unlocks it, rather than having it snap into view. */
-  
-
-  @keyframes activityGridEnter {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  /* ── Activity grid (Programme select) ────────────────────────
-     Lays out .prog-card tiles in a responsive grid. .prog-card
-     itself is unchanged/reused as-is. */
-  
-
   .programme-badge {
     display: inline-flex;
     align-items: center;
@@ -1401,7 +1299,6 @@
     transition: color 0.15s ease;
   }
 
-  /* Disabled tile — a programme whose page is not built yet. */
   .programme-button:disabled {
     opacity: 0.45;
     cursor: not-allowed;
@@ -1418,18 +1315,17 @@
   }
 
 
-  /* ── Task nav grid (used on packing board / task select) ─────
-     Fixed 3-column layout matched to .packing-board's max width. */
+  /* ── Task nav grid (used on packing board / task select) ───── */
   .task-nav-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 12px;
     margin-bottom: 20px;
-    max-width: 960px; /* match .packing-board */
+    max-width: 960px;
     margin-left: auto;
     margin-right: auto;
     width: 100%;
-    padding: 0 24px; /* match .packing-board's side padding */
+    padding: 0 24px;
   }
 
   @media (max-width: 640px) {
@@ -1455,8 +1351,6 @@
     border-color: var(--color-maroon);
     transform: translateY(-1px);
   }
-
-  
 
   .task-nav-item-active .task-nav-icon,
   .task-nav-item-active .task-nav-label { color: var(--color-lol-white); }
@@ -1770,11 +1664,10 @@
     border: 1px solid var(--color-border);
     border-top: 4px solid var(--color-accent);
     border-radius: 16px;
-    width: 840px;          /* merged from a second definition below */
+    width: 840px;
   }
 
   .form-modal      { width: 720px; }
-  
 
   @media (min-width: 641px) and (max-width: 1024px) {
     .form-modal, .form-modal-wide, .pdf-modal { width: 90%; }
@@ -1857,8 +1750,6 @@
   .data-table tr:nth-child(even) td { background-color: rgba(243, 242, 241, 0.5); }
   .data-table tr:hover td { background-color: rgba(122, 26, 26, 0.04); }
 
-  /* Small screens: allow the table itself to scroll rather than
-     squeezing columns unreadably */
   @media (max-width: 640px) {
     .data-table-wrapper {
       overflow-x: auto;
@@ -1870,8 +1761,6 @@
 
 
   /* ── Line item grid ─────────────────────────────────────────── */
-  
-
   .line-item-cols {
     display: grid;
     grid-template-columns: 2fr 100px 100px 90px 90px 40px;
@@ -1931,13 +1820,7 @@
       width: 60%;
       text-align: right;
     }
-
-    
   }
-
-  
-
-  
 
   .line-item-input.is-discrepancy {
     border-color: var(--color-accent);
@@ -1957,22 +1840,6 @@
     font-family: inherit;
     cursor: not-allowed;
   }
-
-  
-
-  
-
-  /* ── Packing: per-item decision panel ─────────────────────────
-     Wraps a single picking-slip item's confirm/flag UI so it
-     spans full-width beneath that item's row (note-line-row /
-     line-item-row) without fighting the grid columns above it. */
-  .item-decision-panel {
-    grid-column: 1 / -1;
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid var(--color-border);
-  }
-
 
   /* ── PO selection card ──────────────────────────────────────── */
   .po-card {
@@ -2006,18 +1873,7 @@
   .po-card-id { font-size: 15px; font-weight: 700; color: var(--color-text); }
   .po-card-meta { font-size: 13px; color: var(--color-text-meta); margin-top: 4px; }
 
-
   /* ── DeliveryNoteView ───────────────────────────────────────── */
-  
-
-  
-
-  
-
-  
-
-  
-
   .note-summary-row {
     display: flex;
     border-bottom: 1px solid var(--color-border);
@@ -2053,12 +1909,6 @@
     font-weight: 700;
     color: var(--color-maroon);
   }
-
-  
-
-  
-
-  
 
   .note-line-cols {
     display: grid;
@@ -2133,16 +1983,27 @@
     color: #107C10;
   }
 
-  
+  .note-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    border-top: 1px solid var(--color-border);
+    background-color: var(--color-lol-bg);
+  }
 
-  
-
+  .note-footer-meta {
+    font-size: 11px;
+    color: var(--color-text-meta);
+    font-weight: 700;
+    text-transform: uppercase;
+  }
 
   /* ── PDF document ───────────────────────────────────────────── */
   .pdf-document {
     padding: 32px;
     background-color: var(--color-lol-white);
-    font-family: Tahoma, sans-serif; /* intentionally kept for print/PDF fidelity */
+    font-family: Tahoma, sans-serif;
   }
 
   @media (max-width: 640px) {
@@ -2262,8 +2123,7 @@
 
   .pdf-toolbar-title { font-size: 14px; font-weight: 600; color: var(--color-text); }
 
-
-  /* ── Footer / meta text ─────────────────────────────────────── */
+  /* ── Footer meta ───────────────────────────────────────────── */
   .footer-meta {
     margin-top: 24px;
     padding-top: 12px;
@@ -2274,25 +2134,33 @@
     font-weight: 500;
   }
 
-  
-
-
   /* ── Search bar ─────────────────────────────────────────────── */
-  
+  .search-bar {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 24px;
+  }
 
-  
+  .search-input {
+    width: 320px;
+    height: 42px;
+    padding: 0 12px;
+    border: 1px solid var(--color-border);
+    font-size: 15px;
+    font-family: inherit;
+    background-color: var(--color-lol-white);
+    outline: none;
+  }
 
-  
-
-  
-
-  
-
+  .search-input:focus {
+    border-color: var(--color-maroon);
+  }
 
   /* ── Split-screen login layout ───────────────────────────── */
   .page-split {
     min-height: 100vh;
-    min-height: 100dvh; /* iOS Safari 100vh fix */
+    min-height: 100dvh;
     background-color: var(--color-lol-bg);
     display: flex;
     padding: 16px;
@@ -2320,7 +2188,6 @@
     border-radius: 24px;
   }
 
-  /* ── Brand row ─────────────────────────────────────────────── */
   .brand-row {
     display: flex;
     align-items: center;
@@ -2341,7 +2208,6 @@
     color: var(--color-text);
   }
 
-  /* ── Hero headline ─────────────────────────────────────────── */
   .hero-title {
     font-family: 'Poppins', var(--font-family-sans);
     font-weight: 700;
@@ -2357,582 +2223,197 @@
     margin-bottom: 32px;
   }
 
-  /* Tablets and up (768px+): image stays, panel proportions tighten */
   @media (min-width: 768px) and (max-width: 1024px) {
-    .split-left {
-      flex: 1 1 50%;
-      padding: 40px clamp(20px, 5vw, 56px);
-    }
-    .split-right {
-      flex: 1 1 50%;
-    }
-    .hero-title {
-      font-size: clamp(28px, 3.5vw, 36px);
-    }
+    .split-left { flex: 1 1 50%; padding: 40px clamp(20px, 5vw, 56px); }
+    .split-right { flex: 1 1 50%; }
+    .hero-title { font-size: clamp(28px, 3.5vw, 36px); }
   }
 
-  /* Phones only (below 768px): drop the image panel entirely */
   @media (max-width: 767px) {
-    .page-split {
-      flex-direction: column;
-      padding: 0;
-      min-height: 100dvh;
-    }
-
-    .split-right {
-      display: none;
-    }
-
-    .split-left {
-      flex: 1 1 auto;
-      justify-content: flex-start;
-      padding: max(32px, env(safe-area-inset-top)) 20px 32px;
-      padding-left: max(20px, env(safe-area-inset-left));
-      padding-right: max(20px, env(safe-area-inset-right));
-    }
-
-    .brand-row {
-      margin-bottom: 32px;
-    }
-
-    .hero-title {
-      font-size: 28px;
-    }
-
-    .hero-subtitle {
-      font-size: 14px;
-      margin-bottom: 24px;
-    }
-
-    .card {
-      max-width: 100%;
-    }
+    .page-split { flex-direction: column; padding: 0; min-height: 100dvh; }
+    .split-right { display: none; }
+    .split-left { flex: 1 1 auto; justify-content: flex-start; padding: max(32px, env(safe-area-inset-top)) 20px 32px; }
+    .brand-row { margin-bottom: 32px; }
+    .hero-title { font-size: 28px; }
+    .hero-subtitle { font-size: 14px; margin-bottom: 24px; }
+    .card { max-width: 100%; }
   }
 
-  /* Small phones (below 380px): tighten further */
   @media (max-width: 380px) {
-    .hero-title {
-      font-size: 24px;
-    }
-
-    .split-left {
-      padding-top: max(24px, env(safe-area-inset-top));
-    }
+    .hero-title { font-size: 24px; }
+    .split-left { padding-top: max(24px, env(safe-area-inset-top)); }
   }
 
-
-  /* ── Progress bar (SlipCard) ──────────────────────────────────── */
+  /* ── Progress bar (SlipCard) ────────────────────────────────── */
   .progress {
     display: flex;
     align-items: center;
     gap: 10px;
   }
 
-  
+  .progress-track {
+    flex: 1;
+    height: 8px;
+    background: var(--color-border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
 
-  
-
-  
-
-  
-
+  .progress-fill {
+    height: 100%;
+    background: var(--color-accent);
+  }
 
   /* ── Packing board ────────────────────────────────────────── */
-  
+  .packing-board {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 24px 24px 60px;
+    width: 100%;
+  }
 
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  /* ── Polished empty state ─────────────────────────────────────── */
-  
-
-  
-
-  
-
-  
-
-
-  /* ── Filter bar (Packing board) ──────────────────────────────
-     Reuses .filter-bar naming since FilterBar.jsx isn't a plain
-     form — keeps its own compact layout distinct from
-     .search-bar / .form-grid-2 used elsewhere.
-     ───────────────────────────────────────────────────────────── */
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  /* ── Filter panel wrapper ──────────────────────────────────────── */
-  
-
-  
-
-  
-
+  /* ── Filter bar (Packing board) ────────────────────────────── */
+  .filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 20px;
+  }
 
   /* ── Slip card (Packing board grid item) ─────────────────────── */
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-
-  /* ── Slip detail page ─────────────────────────────────────────── */
-  
-
-  
-
-  
-
-  
-
-  
-
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-
-  /* ── Item row ──────────────────────────────────────────────────── */
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-
-  /* ── Generic small button set (item-row / slip-detail specific) ──
-     Deliberately distinct from .btn-primary/.btn-secondary — these
-     are compact, inline actions on individual pallet items, not
-     full-size page actions.
-     ───────────────────────────────────────────────────────────── */
-  
-
-  .btn--confirm {
-    background-color: #107C10;
-    color: var(--color-lol-white);
+  .slip-card {
+    background: var(--color-lol-white);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
   }
 
-  .btn--confirm:hover:not(:disabled) { background-color: #0B5A0B; }
-  .btn--confirm:disabled { opacity: 0.6; cursor: not-allowed; }
-
-  .btn--flag {
-    background-color: var(--color-accent);
-    color: var(--color-lol-white);
+  .slip-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
   }
 
-  .btn--flag:hover:not(:disabled) { background-color: var(--color-maroon); }
-  .btn--flag:disabled { opacity: 0.6; cursor: not-allowed; }
-
-  .btn--ghost {
-    background-color: transparent;
-    border-color: var(--color-border);
-    color: var(--color-text-sub);
+  .slip-card-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--color-maroon);
   }
 
-  .btn--ghost:hover { background-color: var(--color-lol-bg); }
-
-  .btn--primary {
-    background-color: var(--color-maroon);
-    color: var(--color-lol-white);
-    height: 48px;
+  .slip-card-meta {
+    font-size: 12px;
+    color: var(--color-text-meta);
   }
 
-  .btn--primary:hover { background-color: var(--color-accent); }
+  .slip-card-progress {
+    margin-top: auto;
+  }
 
+  .slip-card-actions {
+    display: flex;
+    gap: 8px;
+  }
 
-  /* ── Complete slip bar ─────────────────────────────────────────── */
-  
+  /* ── Complete slip bar ─────────────────────────────────────── */
+  .complete-bar {
+    position: sticky;
+    bottom: 0;
+    background: var(--color-lol-white);
+    border-top: 1px solid var(--color-border);
+    padding: 12px 24px;
+  }
 
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  .complete-bar__row .btn--primary {
-    flex-shrink: 0;
-    padding: 0 20px;
+  .complete-bar__row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
   }
 
   @media (max-width: 480px) {
-    
-    
-    .complete-bar__row .btn--primary {
-      width: 100%;
+    .complete-bar__row {
+      flex-direction: column;
+      align-items: stretch;
     }
   }
 
-
   /* ── Activities trigger + drawer ──────────────────────────────── */
-  
+  .activities-trigger {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 30;
+  }
 
-  
-  
+  .activities-drawer {
+    position: fixed;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: min(320px, 90vw);
+    background: var(--color-lol-white);
+    box-shadow: -4px 0 24px rgba(0,0,0,0.12);
+    transform: translateX(100%);
+    transition: transform 0.2s ease;
+    z-index: 40;
+  }
 
-  
-
-  
-
-  
+  .activities-drawer.is-open {
+    transform: translateX(0);
+  }
 
   @keyframes drawerIn {
     from { transform: translateX(-100%); }
     to   { transform: translateX(0); }
   }
 
-  
+  @media (prefers-reduced-motion: reduce) {
+    .activities-drawer { transition: none; }
+  }
 
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
 }
-
 
 /* ─────────────────────────────────────────────────────────────
    UNLAYERED UTILITY OVERRIDES
-   (kept outside @layer so they always win the cascade —
-   matches the source files' intent)
    ───────────────────────────────────────────────────────────── */
-
-/* Toolbar */
-.pdf-toolbar-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.pdf-toolbar-error {
-  font-size: 8px;
-  color: #A80000;
-}
-.btn-sm {
-  height: 28px;
-  font-size: 8px;
-}
-
-/* Scroll area */
-.pdf-scroll-area {
-  max-height: 80vh;
-  overflow-y: auto;
-}
-
-/* Doc id label spacing */
-.pdf-doc-id-label--spaced {
-  margin-top: 4px;
-}
-
-/* Status banner */
-.pdf-status-banner {
-  padding: 10px 14px;
-  margin-bottom: 14px;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  border: 1px solid;
-}
-.pdf-status-banner--complete {
-  border-color: #107C10;
-  background: #DFF6DD;
-}
-.pdf-status-banner--pending {
-  border-color: #BA7517;
-  background: #FAEEDA;
-}
-.pdf-status-title {
-  font-size: 13px;
-  font-weight: 900;
-  margin: 0 0 2px;
-  text-transform: uppercase;
-}
+.pdf-toolbar-actions { display: flex; gap: 8px; align-items: center; }
+.pdf-toolbar-error { font-size: 8px; color: #A80000; }
+.btn-sm { height: 28px; font-size: 8px; }
+.pdf-scroll-area { max-height: 80vh; overflow-y: auto; }
+.pdf-doc-id-label--spaced { margin-top: 4px; }
+.pdf-status-banner { padding: 10px 14px; margin-bottom: 14px; display: flex; align-items: flex-start; gap: 10px; border: 1px solid; }
+.pdf-status-banner--complete { border-color: #107C10; background: #DFF6DD; }
+.pdf-status-banner--pending { border-color: #BA7517; background: #FAEEDA; }
+.pdf-status-title { font-size: 13px; font-weight: 900; margin: 0 0 2px; text-transform: uppercase; }
 .pdf-status-title--complete { color: #107C10; }
 .pdf-status-title--pending { color: #633806; }
-.pdf-status-body {
-  font-size: 11px;
-  margin: 0;
-}
+.pdf-status-body { font-size: 11px; margin: 0; }
 .pdf-status-body--complete { color: #27500A; }
 .pdf-status-body--pending { color: #633806; }
-
-/* Table helpers */
-.pdf-table-center {
-  text-align: center;
-}
-.pdf-table-product {
-  font-weight: 700;
-}
-.pdf-table-sku {
-  color: #605E5C;
-}
-.pdf-table-empty {
-  text-align: center;
-  color: #A19F9D;
-  padding: 16px;
-}
-
-/* Footer */
-.pdf-footer-stamp--spaced {
-  margin-top: 2px;
-}
-.alert-notice {
-  font-size: 12px;
-  color: #633806;
-  background: #FAEEDA;
-  border: 1px solid #BA7517;
-  padding: 8px 12px;
-  border-radius: 4px;
-  margin-top: 8px;
-}
-
-  /* ─────────────────────────────────────────────────────────────
-     Section header (SectionHeader.jsx)
-     Page-level title block, sits above the step cards.
-     ───────────────────────────────────────────────────────────── */
-  .page-section-title {
-    margin-bottom: 20px;
-  }
-
-  .page-section-title-heading {
-    font-family: var(--font-family-display);
-    font-size: 22px;
-    font-weight: 700;
-    color: var(--color-text);
-    margin: 0;
-  }
-
-  .page-section-title-subtitle {
-    font-size: 14px;
-    color: var(--color-text-sub);
-    margin: 4px 0 0;
-  }
-
-  /* ─────────────────────────────────────────────────────────────
-     Step card body (StepCard.jsx)
-     The content region below .step-card-header.
-     ───────────────────────────────────────────────────────────── */
-  .step-card-body {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-  }
-
-  /* ─────────────────────────────────────────────────────────────
-     Stock manifest (AdjustStockForm.jsx)
-     One table for wide screens, stacked cards for narrow ones —
-     only one is ever visible, toggled at the 640px breakpoint
-     used throughout this sheet.
-     ───────────────────────────────────────────────────────────── */
-  .badge-group {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    align-items: center;
-  }
-
-  .is-emphasis {
-    font-weight: 600;
-    color: var(--color-text);
-  }
-
-  .stock-table-desktop { display: block; }
-  .stock-table-mobile  { display: none; }
-
-  .stock-card-meta {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-width: 0;              /* lets long product names truncate */
-  }
-
-  .stock-card-name {
-    font-weight: 600;
-    font-size: 15px;
-    color: var(--color-text);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .stock-card-sku {
-    font-size: 12px;
-    color: var(--color-text-meta);
-    letter-spacing: 0.02em;
-  }
-
-  .stock-card-figures {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 16px;
-    font-size: 13px;
-    color: var(--color-text-sub);
-    margin: 2px 0 4px;
-  }
-
-  @media (max-width: 640px) {
-    .stock-table-desktop { display: none; }
-    .stock-table-mobile  {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-  }
-.stock-card-title-row {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.stock-card-figures {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 16px;
-  font-size: 13px;
-  color: var(--color-text-sub);
-  margin: 4px 0 8px;
-}
-
-.stock-card-figures span::after {
-  content: '';
-}
-/* ─────────────────────────────────────────────────────────────
-   Badge group (StockManifest.jsx)
-   Reusable inline badge set for stock status, slip status, etc.
-   ───────────────────────────────────────────────────────────── */
-.badge-group .badge,
-.badge-group .badge-flagged,
-.badge-group .badge-pending,
-.badge-group .badge-ok,
-.badge-group .badge-recorded,
-.badge-group .badge-deleted,
-.badge-group .badge-complete,
-.badge-group .badge-inactive {
-  display: inline-flex;
-  align-items: center;
-  height: 24px;
-  padding: 0 10px;
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: var(--radius-control);
-  line-height: 1;
+.pdf-table-center { text-align: center; }
+.pdf-table-product { font-weight: 700; }
+.pdf-table-sku { color: #605E5C; }
+.pdf-table-empty { text-align: center; color: #A19F9D; padding: 16px; }
+.pdf-footer-stamp--spaced { margin-top: 2px; }
+.alert-notice { font-size: 12px; color: #633806; background: #FAEEDA; border: 1px solid #BA7517; padding: 8px 12px; border-radius: 4px; margin-top: 8px; }
+.page-section-title { margin-bottom: 20px; }
+.page-section-title-heading { font-family: var(--font-family-display); font-size: 22px; font-weight: 700; color: var(--color-text); margin: 0; }
+.page-section-title-subtitle { font-size: 14px; color: var(--color-text-sub); margin: 4px 0 0; }
+.step-card-body { display: flex; flex-direction: column; gap: 16px; }
+.badge-group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.is-emphasis { font-weight: 600; color: var(--color-text); }
+.stock-table-desktop { display: block; }
+.stock-table-mobile { display: none; }
+.stock-card-meta { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.stock-card-name { font-weight: 600; font-size: 15px; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stock-card-sku { font-size: 12px; color: var(--color-text-meta); letter-spacing: 0.02em; }
+.stock-card-figures { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; color: var(--color-text-sub); margin: 2px 0 4px; }
+@media (max-width: 640px) {
+  .stock-table-desktop { display: none; }
+  .stock-table-mobile { display: flex; flex-direction: column; gap: 10px; }
 }

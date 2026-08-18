@@ -6,6 +6,7 @@ import { useNavigate }        from 'react-router-dom';
 import { useAuth }            from '../context/AuthContext';
 import logo                   from '../assets/LOL_Logo.jpg';
 import Log_In_Background      from '../assets/Log_In_Background.jpg';
+import { STAFF }              from '../routes/paths';
 
 const LoginPage = () => {
   const { login, sessionMessage } = useAuth();
@@ -39,16 +40,16 @@ const LoginPage = () => {
     return err.message || "Login failed. Please try again.";
   };
 
-  // Sends managers and workers to their own landing screen instead
-  // of everyone defaulting to /programmes.
+  // Sends managers and workers to their own landing screen. Everyone
+  // who isn't a manager lands on the NOC task chooser (STAFF.home) —
+  // there is no /programmes anymore.
   const redirectByRole = (loggedInUser) => {
     switch (loggedInUser?.role) {
       case "manager":
         navigate("/manager");
         break;
-      case "worker":
       default:
-        navigate("/programmes");
+        navigate(STAFF.home);
         break;
     }
   };
