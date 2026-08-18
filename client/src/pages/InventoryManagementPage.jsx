@@ -1,51 +1,34 @@
 // ─────────────────────────────────────────────────────────────
 // InventoryManagementPage.jsx
-//
-// The page previously took `products`, `onAdjust` and `onLogout` as
-// props, but App.jsx renders it with none — so the manifest was
-// permanently empty, adjustments only touched local state and were
-// lost on refresh, and the logout button threw. It now owns its own
-// data and reads the session from context, like every other page.
 // ─────────────────────────────────────────────────────────────
+
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import PageHeader from "../features/InventoryManagement/components/PageHeader";
-import SectionHeader from "../features/InventoryManagement/components/SectionHeader";
+import { TopNavbar } from "../features/taskdashboard/components/TopNavBar";
+import StockHealthBar from "../features/InventoryManagement/components/StockHealthBar";
 import StockManifestTable from "../features/InventoryManagement/components/StockManifestTable";
-import AdjustStockForm from "../features/InventoryManagement/components/AdjustStockForm";
+import AdjustStockModal from "../features/InventoryManagement/components/AdjustStockModal";
 import MovementHistory from "../features/InventoryManagement/components/MovementHistory";
-import InfoNotice from "../features/InventoryManagement/components/InfoNotice";
 import { getManifest, getMovements, adjustStock } from "../services/stockAPI";
 
-// POST /api/stock/adjust is gated to manager/admin server-side
-// (MANAGERS_UP in stock.routes.js). Hiding the form for everyone
-// else keeps a worker from filling it in only to be refused.
 const CAN_ADJUST = ["manager", "admin"];
 
-// TEMPORARY: .programme-select-heading isn't rendering on this page
-// (stylesheet import issue still being tracked down), so the heading
-// is styled inline here as a stopgap. Scoped to Inventory only via
-// SectionHeader's inlineHeadingStyle prop — Procurement and any other
-// SectionHeader usage are unaffected. Remove once the CSS import is
-// fixed and swap back to className="programme-select-heading".
-const INVENTORY_HEADING_STYLE = {
-  fontFamily: "'Poppins', var(--font-family-sans)",
-  fontSize: "32px",
-  fontWeight: 700,
-  color: "black",
-  marginBottom: "8px",
-};
-
 export default function InventoryManagementPage() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
+  // Accessibility toggle state for TopNavbar
+  const [reducedMovement, setReducedMovement] = useState(false);
+
+  // Manifest & data loading state
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
 
+  // Stock adjustment modal state
   const [isSaving, setIsSaving] = useState(false);
-  const [notice, setNotice] = useState(null); // { tone, text }
+  const [adjustingProduct, setAdjustingProduct] = useState(null);
 
+  // Movement history drawer state
   const [historyFor, setHistoryFor] = useState(null);
   const [movements, setMovements] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -53,30 +36,40 @@ export default function InventoryManagementPage() {
 
   const canAdjust = CAN_ADJUST.includes(user?.role);
 
-  // ── Initial load ────────────────────────────────────────────
+  // ── Initial Data Load ──────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
 
     const loadManifest = async () => {
       try {
         const rows = await getManifest();
-        if (!cancelled) { setProducts(rows); setLoadError(null); }
+        if (!cancelled) {
+          setProducts(rows);
+          setLoadError(null);
+        }
       } catch (err) {
-        if (!cancelled) setLoadError(err.message || "Could not load stock levels.");
+        if (!cancelled) {
+          setLoadError(err.message || "Could not load stock levels.");
+        }
       } finally {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
     };
 
     loadManifest();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // ── Manual refresh — retry button, and after a saved adjustment ──
+  // ── Reload Manifest Data ───────────────────────────────────
   const reloadManifest = useCallback(async () => {
     setIsLoading(true);
     try {
-      setProducts(await getManifest());
+      const rows = await getManifest();
+      setProducts(rows);
       setLoadError(null);
     } catch (err) {
       setLoadError(err.message || "Could not load stock levels.");
@@ -85,44 +78,30 @@ export default function InventoryManagementPage() {
     }
   }, []);
 
-  // ── Save an adjustment ──────────────────────────────────────
-  const handleAdjust = async (payload) => {
+  // ── Adjustment Handler ─────────────────────────────────────
+  const handleAdjustSave = async (payload) => {
     setIsSaving(true);
-    setNotice(null);
     try {
-      const result = await adjustStock(payload);
+      await adjustStock(payload);
       await reloadManifest();
-
-      const warnings = [];
-      if (result?.isShortfall) {
-        warnings.push(`This leaves ${result.after} on hand — the system now shows a shortfall.`);
-      }
-      if (result?.isUnitMismatch) {
-        warnings.push("The unit sent didn't match the unit on record; the recorded unit was kept.");
-      }
-
-      setNotice(
-        warnings.length
-          ? { tone: "warning", text: `Adjustment saved. ${warnings.join(" ")}` }
-          : { tone: "info", text: `Adjustment saved. New level: ${result?.after}.` }
-      );
       return true;
     } catch (err) {
-      setNotice({ tone: "error", text: err.message || "Could not save the adjustment." });
+      alert(err.message || "Failed to save stock adjustment.");
       return false;
     } finally {
       setIsSaving(false);
     }
   };
 
-  // ── Drill in to one product's ledger ────────────────────────
+  // ── Movement History Handler ──────────────────────────────
   const handleViewHistory = async (product) => {
     setHistoryFor(product);
     setMovements([]);
     setHistoryError(null);
     setHistoryLoading(true);
     try {
-      setMovements(await getMovements(product.id));
+      const history = await getMovements(product.id);
+      setMovements(history);
     } catch (err) {
       setHistoryError(err.message || "Could not load movement history.");
     } finally {
@@ -131,39 +110,65 @@ export default function InventoryManagementPage() {
   };
 
   return (
-    <div className="page-light">
-      <PageHeader onLogout={logout} showBack={true} />
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
+      {/* Top Navbar Header */}
+      <TopNavbar
+        reducedMovement={reducedMovement}
+        onToggleMovement={setReducedMovement}
+      />
 
-      <main className="decanting-content">
-        <SectionHeader
-          title="Inventory Management"
-          subtitle="Current stock levels and manual adjustments."
-          inlineHeadingStyle={INVENTORY_HEADING_STYLE}
-        />
+      {/* Main Content Container with max-w-6xl for optimal readability */}
+      <main className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-4 sm:py-8 space-y-6 sm:space-y-8 flex-1">
+        
+        {/* Responsive Page Header */}
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+            Inventory Management
+          </h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+            Current stock levels, manual adjustments, and audit trail logs.
+          </p>
+        </div>
 
+        {/* Fetch Error Banner */}
         {loadError && (
-          <InfoNotice tone="error">
-            {loadError} <button className="btn-link" onClick={reloadManifest}>Try again</button>
-          </InfoNotice>
+          <div className="p-3 sm:p-4 rounded-md bg-rose-50 border border-rose-200 text-rose-800 text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-sm">
+            <span>{loadError}</span>
+            <button
+              onClick={reloadManifest}
+              className="text-xs sm:text-sm font-semibold underline hover:no-underline self-start sm:self-auto focus:outline-none"
+            >
+              Try again
+            </button>
+          </div>
         )}
 
-        {notice && <InfoNotice tone={notice.tone}>{notice.text}</InfoNotice>}
+        {/* Stock Health Bar (Responsive Grid inside component) */}
+        <StockHealthBar products={products}  reducedMovement={reducedMovement}/>
 
-        <StockManifestTable
-          products={products}
-          isLoading={isLoading}
-          onViewHistory={handleViewHistory}
-        />
-
-        {canAdjust && (
-          <AdjustStockForm
+        {/* Stock Manifest Table with horizontal scroll container for mobile */}
+        <div className="w-full overflow-x-auto">
+          <StockManifestTable
             products={products}
-            onSave={handleAdjust}
-            isSaving={isSaving}
+            isLoading={isLoading}
+            canAdjust={canAdjust}
+            onAdjust={(prod) => setAdjustingProduct(prod)}
+            onViewHistory={handleViewHistory}
           />
-        )}
+        </div>
       </main>
 
+      {/* Adjustment Modal */}
+      {adjustingProduct && (
+        <AdjustStockModal
+          product={adjustingProduct}
+          onSave={handleAdjustSave}
+          onClose={() => setAdjustingProduct(null)}
+          isSaving={isSaving}
+        />
+      )}
+
+      {/* Movement History Drawer */}
       {historyFor && (
         <MovementHistory
           product={historyFor}

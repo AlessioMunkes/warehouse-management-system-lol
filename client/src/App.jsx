@@ -7,14 +7,15 @@ import LoginPage                                   from './pages/LoginPage';
 import GuestLoginPage                              from './pages/GuestLoginPage';
 import GuestHomePage                               from './pages/GuestHomePage';
 
-import SelectProgrammeScreen                       from './pages/SelectProgrammeScreen';
-import SelectNOCjob                                from './pages/SelectNOCjob';
 
-import ProcurementDashboard                        from './pages/ProcurementDashboard';
+//import SelectProgrammeScreen                       from './pages/SelectProgrammeScreen';
+import TaskDashboard                                from './pages/TaskDashboardPage';
+
+
 import DecantingPage                               from './pages/DecantingPage';
 import PackingPage                                 from './pages/PackingPage';
 import InventoryManagementPage                     from './pages/InventoryManagementPage';
-import ManagerActivityScreen                       from './pages/ManagerActivityScreen';
+//import ManagerActivityScreen                       from './pages/ManagerActivityScreen';
 
 const App = () => (
   <AuthProvider>
@@ -24,23 +25,25 @@ const App = () => (
         <Route path="/"      element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/guest" element={<GuestLoginPage />} />
-
+<Route path="/noc/decanting"   element={<DecantingPage />} />
+ <Route path="/noc"             element={<TaskDashboard />} />
+ <Route path="/noc/inventory" element={<InventoryManagementPage />} />
         {/* Protected — manager only */}
 <Route element={<ProtectedRoute roles={['manager']} />}>
-  <Route path="/manager"       element={<ManagerActivityScreen />} />
-  <Route path="/noc/inventory" element={<InventoryManagementPage />} />
+  
+  
  </Route>
        
         {/* Protected — any logged-in user */}
         <Route element={<ProtectedRoute />}>
-           <Route path="/noc/procurement" element={<ProcurementDashboard />} />
-        <Route path="/programmes" element={<SelectProgrammeScreen />} />
+         
+      
 
           {/* NOC: task select, then one route per task */}
-          <Route path="/noc"             element={<SelectNOCjob />} />
+         
           
-          <Route path="/noc/decanting"   element={<DecantingPage />} />
-p <Route path="/noc/inventory"   element={<InventoryManagementPage />} />
+          
+ <Route path="/noc/inventory"   element={<InventoryManagementPage />} />
           {/* Both packing paths come from routes/paths.js, which is
               also what PackingPage navigates with — the board and the
               route table can't drift apart again. */}
@@ -62,7 +65,7 @@ p <Route path="/noc/inventory"   element={<InventoryManagementPage />} />
             the catch-all instead of the slip. */}
         <Route path="/inventory" element={<Navigate to="/noc/inventory" replace />} />
         <Route path="/decanting" element={<Navigate to="/noc/decanting" replace />} />
-        <Route path="/programmes/noc/packing"
+        <Route path="/noc/packing"
                element={<Navigate to={PACKING.board} replace />} />
         <Route path="/programmes/noc/packing/:slipId"
                element={<Navigate to={PACKING.board} replace />} />

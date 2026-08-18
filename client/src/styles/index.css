@@ -1,2 +1,905 @@
+﻿@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/inter";
+
+@custom-variant dark (&:is(.dark *));
+
 /* Global stylesheet. Page-specific styles live alongside their pages
    (e.g. client/src/styles/landingpage.css, imported directly by LandingPage.jsx). */
+
+@theme inline {
+    --font-heading: var(--font-sans);
+    --font-sans: 'Inter Variable', sans-serif;
+    --color-sidebar-ring: var(--sidebar-ring);
+    --color-sidebar-border: var(--sidebar-border);
+    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+    --color-sidebar-accent: var(--sidebar-accent);
+    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+    --color-sidebar-primary: var(--sidebar-primary);
+    --color-sidebar-foreground: var(--sidebar-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-chart-5: var(--chart-5);
+    --color-chart-4: var(--chart-4);
+    --color-chart-3: var(--chart-3);
+    --color-chart-2: var(--chart-2);
+    --color-chart-1: var(--chart-1);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.145 0 0);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.145 0 0);
+    --popover: oklch(1 0 0);
+    --popover-foreground: oklch(0.145 0 0);
+    --primary: oklch(0.205 0 0);
+    --primary-foreground: oklch(0.985 0 0);
+    --secondary: oklch(0.97 0 0);
+    --secondary-foreground: oklch(0.205 0 0);
+    --muted: oklch(0.97 0 0);
+    --muted-foreground: oklch(0.556 0 0);
+    --accent: oklch(0.97 0 0);
+    --accent-foreground: oklch(0.205 0 0);
+    --destructive: oklch(0.577 0.245 27.325);
+    --border: oklch(0.922 0 0);
+    --input: oklch(0.922 0 0);
+    --ring: oklch(0.708 0 0);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --radius: 0.625rem;
+    --sidebar: oklch(0.985 0 0);
+    --sidebar-foreground: oklch(0.145 0 0);
+    --sidebar-primary: oklch(0.205 0 0);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.97 0 0);
+    --sidebar-accent-foreground: oklch(0.205 0 0);
+    --sidebar-border: oklch(0.922 0 0);
+    --sidebar-ring: oklch(0.708 0 0);
+
+    /* Custom Theme Colors */
+    --color-header-bg: #262626;
+    --color-header-text: #FFFFFF;
+    --color-header-text-muted: #B3B3B3;
+    --color-bg: #FAF9F6;
+    --color-card-bg: #F5F4F0;
+    --color-card-border: #E5E3DE;
+    --color-text: #1A1A1A;
+    --color-text-muted: #6B6B6B;
+    --font-base: 'Inter', sans-serif;
+}
+
+.dark {
+    --background: oklch(0.145 0 0);
+    --foreground: oklch(0.985 0 0);
+    --card: oklch(0.205 0 0);
+    --card-foreground: oklch(0.985 0 0);
+    --popover: oklch(0.205 0 0);
+    --popover-foreground: oklch(0.985 0 0);
+    --primary: oklch(0.922 0 0);
+    --primary-foreground: oklch(0.205 0 0);
+    --secondary: oklch(0.269 0 0);
+    --secondary-foreground: oklch(0.985 0 0);
+    --muted: oklch(0.269 0 0);
+    --muted-foreground: oklch(0.708 0 0);
+    --accent: oklch(0.269 0 0);
+    --accent-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.704 0.191 22.216);
+    --border: oklch(1 0 0 / 10%);
+    --input: oklch(1 0 0 / 15%);
+    --ring: oklch(0.556 0 0);
+    --chart-1: oklch(0.87 0 0);
+    --chart-2: oklch(0.556 0 0);
+    --chart-3: oklch(0.439 0 0);
+    --chart-4: oklch(0.371 0 0);
+    --chart-5: oklch(0.269 0 0);
+    --sidebar: oklch(0.205 0 0);
+    --sidebar-foreground: oklch(0.985 0 0);
+    --sidebar-primary: oklch(0.488 0.243 264.376);
+    --sidebar-primary-foreground: oklch(0.985 0 0);
+    --sidebar-accent: oklch(0.269 0 0);
+    --sidebar-accent-foreground: oklch(0.985 0 0);
+    --sidebar-border: oklch(1 0 0 / 10%);
+    --sidebar-ring: oklch(0.556 0 0);
+}
+
+/* ── Split layout (Login Mobile First) ────────────────────────── */
+
+.login-page {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.login-image-side {
+  position: relative;
+  flex: 1 1 50%;
+  display: none;
+}
+
+.login-bg-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.login-form-side {
+  position: relative;
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem 1rem;
+  background: #fafafa;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (min-width: 900px) {
+  .login-form-side {
+    flex: 1 1 50%;
+  }
+  .login-image-side {
+    display: block;
+  }
+}
+
+/* ── Logo above form ───────────────────────────────────────── */
+
+.login-logo-top {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 24px;
+  position: relative;
+  z-index: 10;
+}
+
+.login-logo {
+  width: 64px;
+  height: 64px;
+  border-radius: 9999px;
+  background: white;
+  border: 1px solid #ddd;
+  object-fit: cover;
+  cursor: pointer;
+  transition: transform 0.6s ease;
+}
+
+.login-logo:hover {
+  animation: spinLogo 1s linear;
+}
+
+.login-logo:active {
+  animation: spinLogo 0.4s ease-out;
+}
+
+/* ── Card (Login) ───────────────────────────────────────────── */
+
+.login-card {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 100%;
+  background: transparent;
+  box-shadow: none;
+  border: none;
+}
+
+.login-card-header {
+  background: transparent;
+  text-align: center;
+  padding: 0 0 24px;
+}
+
+.login-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.login-subtitle {
+  font-size: 0.85rem;
+  color: #6b6b6b;
+}
+
+.login-card-body {
+  background: white;
+  padding: 1.25rem;
+  border-radius: 16px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.login-section-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: #999;
+  margin: 0 0 16px;
+}
+
+/* ── Floating decorative icons ─────────────────────────────── */
+
+.login-floating-icon {
+  display: none; /* Hidden on mobile to avoid layout shifts */
+}
+
+/* ── Notices ────────────────────────────────────────────────── */
+
+.login-notice-info {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 0.85rem;
+  color: #1e40af;
+}
+
+.login-notice-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 0.85rem;
+  color: #b91c1c;
+}
+
+/* ── Form ───────────────────────────────────────────────────── */
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.login-field {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+}
+
+.login-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.login-field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.login-forgot-link {
+  background: none;
+  border: none;
+  font-size: 0.75rem;
+  color: #6b6b6b;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.login-input-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.login-input {
+  background: #faf9f7;
+  width: 100%;
+}
+
+.login-input-password {
+  background: #faf9f7;
+  padding-right: 56px;
+  width: 100%;
+}
+
+.login-toggle-visibility {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #9ca3af;
+  cursor: pointer;
+}
+
+/* ── Buttons ────────────────────────────────────────────────── */
+
+.login-btn-primary {
+  width: 100%;
+  background: #ef3a40;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.login-btn-primary:hover,
+.login-btn-primary:hover:not(:disabled) {
+  background-color: #ef3a40;
+  cursor: pointer;
+}
+
+.login-btn-primary:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.login-btn-guest {
+  width: 100%;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.login-btn-guest:hover:not(:disabled) {
+  background-color: rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+}
+
+.login-btn-guest:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.login-footer-meta {
+  text-align: center;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  color: #9ca3af;
+  margin-top: 20px;
+}
+
+/* ── Forgot password modal ─────────────────────────────────── */
+
+.forgot-modal-content {
+  width: 90vw;
+  max-width: 384px;
+  border-radius: 16px;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.forgot-modal-title {
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.forgot-modal-desc {
+  text-align: center;
+  font-size: 0.85rem;
+  color: #ef3a40;
+  padding-top: 8px;
+}
+
+.forgot-modal-footer {
+  margin-top: 16px;
+}
+
+.forgot-modal-btn {
+  width: 100%;
+  background: #ef3a40;
+}
+
+/* ── Mobile Top Navbar (Fills Screen Width Completely) ──────── */
+
+.top-navbar {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 0.875rem;
+  background-color: var(--color-header-bg);
+  color: var(--color-header-text);
+  font-family: var(--font-base);
+  gap: 0.5rem;
+}
+
+.top-navbar__left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.top-navbar__back-button {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex-shrink: 0;
+}
+
+.top-navbar__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  color: inherit;
+  min-width: 0;
+}
+
+.top-navbar__logo {
+  height: 2.25rem;
+  width: 2.25rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.top-navbar__brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+  min-width: 0;
+}
+
+.top-navbar__brand-name {
+  font-weight: 600;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.top-navbar__brand-tagline {
+  font-size: 0.7rem;
+  color: var(--color-header-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.top-navbar__right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.top-navbar__role {
+  color: var(--color-header-text-muted);
+  white-space: nowrap;
+}
+
+.top-navbar__divider {
+  width: 1px;
+  height: 0.875rem;
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.top-navbar__logout {
+  background: none;
+  border: none;
+  color: var(--color-header-text);
+  font-size: 0.75rem;
+  cursor: pointer;
+  white-space: nowrap;
+  padding: 0;
+}
+
+/* ── Greeting ───────────────────────────────────────────── */
+
+.greeting {
+  margin-bottom: 1.25rem;
+}
+
+.greeting__title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--color-text);
+  font-family: var(--font-base);
+}
+
+.greeting__subtitle {
+  color: var(--color-text-muted);
+  font-family: var(--font-base);
+  font-size: 0.875rem;
+}
+
+/* ── Main Layout Container ──────────────────────────────── */
+
+.home-main {
+  padding: 1.25rem 1rem;
+  width: 100%;
+  box-sizing: border-box;
+  background-color: var(--color-bg);
+}
+
+/* ── Strict Mobile Vertical Task List ────────────────────── */
+
+.task-grid {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  gap: 0.875rem !important;
+  margin-top: 1rem !important;
+}
+
+.task-card {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 1.125rem 1.25rem !important;
+  gap: 1rem !important;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+
+  transition: transform 0.15s ease,
+              box-shadow 0.15s ease,
+              background-color 0.15s ease;
+}
+
+.task-card__icon {
+  width: 2.5rem !important;
+  height: 2.5rem !important;
+  flex-shrink: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.task-card__title {
+  font-size: 1.05rem !important;
+  font-weight: 600;
+  color: #1f2937;
+  text-align: left !important;
+  font-family: var(--font-base);
+}
+
+.task-card:active {
+  transform: scale(0.98);
+  background-color: #f1f5f9;
+}
+
+.task-card:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+/* ==========================================================================
+   Task Dashboard Grid & Card Responsiveness
+   ========================================================================== */
+
+/* Responsive Grid Layout */
+.task-grid {
+  display: grid;
+  grid-template-columns: 1fr; /* Mobile-first: single column */
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+/* Tablet & Desktop: 2 Columns */
+@media (min-width: 640px) {
+  .task-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Task Card Base Styling
+   -------------------------------------------------------------------------- */
+.task-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.75rem;
+  text-decoration: none;
+  text-align: center;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+
+  /* Smooth transitions for all state changes */
+  transition: transform 0.2s ease-out,
+              box-shadow 0.2s ease-out,
+              border-color 0.2s ease-out,
+              background-color 0.2s ease-out;
+}
+
+.task-card__icon {
+  width: 3rem;
+  height: 3rem;
+  margin-bottom: 0.75rem;
+  
+  /* Smooth scale transition on hover/active */
+  transition: transform 0.2s ease-out;
+}
+
+.task-card__title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1f2937;
+  transition: color 0.2s ease-out;
+}
+
+/* --------------------------------------------------------------------------
+   Hover State (Mouse cursor over card)
+   -------------------------------------------------------------------------- */
+.task-card:hover {
+  /* Lift card up by 4px */
+  transform: translateY(-4px);
+
+  /* Enhance shadow for depth */
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 
+              0 4px 6px -2px rgba(0, 0, 0, 0.05);
+
+  /* Subtle border & background tint */
+  border-color: #cbd5e1;
+  background-color: #f8fafc;
+}
+
+/* Slightly enlarge the icon when card is hovered */
+.task-card:hover .task-card__icon {
+  transform: scale(1.08);
+}
+
+/* Highlight text color on hover */
+.task-card:hover .task-card__title {
+  color: #0f172a;
+}
+
+/* --------------------------------------------------------------------------
+   Active State (Mouse clicked or pressed down)
+   -------------------------------------------------------------------------- */
+.task-card:active {
+  /* Push card back down and scale down slightly for tactile press feedback */
+  transform: translateY(0) scale(0.98);
+
+  /* Compress shadow */
+  box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.06);
+
+  /* Darken background slightly on press */
+  background-color: #f1f5f9;
+}
+
+/* Slightly compress icon when pressed */
+.task-card:active .task-card__icon {
+  transform: scale(0.95);
+}
+
+/* --------------------------------------------------------------------------
+   Focus State (Keyboard navigation for accessibility)
+   -------------------------------------------------------------------------- */
+.task-card:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+/* ==========================================================================
+   TopNavbar Styling & Accessibility Button
+   ========================================================================== */
+
+/* Main Header Layout */
+.top-navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.5rem;
+  background-color: #000000;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+/* Left Navigation Section (Back Button + Logo) */
+.top-navbar__left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Right Navigation Section (User info, Toggles, Logout) */
+.top-navbar__right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+/* --------------------------------------------------------------------------
+   "Less Movement" Button & Icon Styling
+   -------------------------------------------------------------------------- */
+.top-navbar__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+/* Icon alignment inside the Less Movement button */
+.top-navbar__toggle svg {
+  flex-shrink: 0;
+  color: #6b7280; /* Neutral subtle grey icon */
+  transition: color 0.15s ease;
+}
+
+/* Hover effect on Less Movement button */
+.top-navbar__toggle:hover svg {
+  color: #111827; /* Darken icon on hover */
+}
+/* --------------------------------------------------------------------------
+   Tooltip Styling (for low visual strain hint)
+   -------------------------------------------------------------------------- */
+.top-navbar__tooltip {
+  background-color: #1e293b;
+  color: #f8fafc;
+  font-size: 0.75rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.375rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  pointer-events: none;
+}
+/* ─────────────────────────────────────────────────────────────
+   Inventory Management Module Stylesheet
+   ───────────────────────────────────────────────────────────── */
+
+/* --- Stock Health Segment Progress Bar --- */
+.health-bar-container {
+  position: relative;
+  display: flex;
+  height: 1rem; /* 16px */
+  width: 100%;
+  overflow: hidden;
+  border-radius: 9999px;
+  background-color: hsl(var(--secondary));
+}
+
+.health-bar-segment {
+  height: 100%;
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
+}
+
+/* Status-specific bar fill classes */
+.health-bar-segment--instock {
+  background-color: #10b981; /* Emerald-500 */
+}
+.health-bar-segment--instock:hover {
+  background-color: #059669; /* Emerald-600 */
+}
+
+.health-bar-segment--lowstock {
+  background-color: #f59e0b; /* Amber-500 */
+}
+.health-bar-segment--lowstock:hover {
+  background-color: #d97706; /* Amber-600 */
+}
+
+.health-bar-segment--shortfall {
+  background-color: #ef4444; /* Rose-500 */
+}
+.health-bar-segment--shortfall:hover {
+  background-color: #dc2626; /* Rose-600 */
+}
+
+/* Status color indicator dots */
+.status-dot {
+  height: 0.75rem; /* 12px */
+  width: 0.75rem;
+  border-radius: 9999px;
+}
+.status-dot--instock {
+  background-color: #10b981;
+}
+.status-dot--lowstock {
+  background-color: #f59e0b;
+}
+.status-dot--shortfall {
+  background-color: #ef4444;
+}
+
+/* --- Metric Cards Borders --- */
+.metric-card--instock {
+  border-left-width: 4px;
+  border-left-color: #10b981;
+}
+
+.metric-card--lowstock {
+  border-left-width: 4px;
+  border-left-color: #f59e0b;
+}
+
+.metric-card--shortfall {
+  border-left-width: 4px;
+  border-left-color: #ef4444;
+}
+
+/* Text status accents */
+.text-status-instock {
+  color: #059669;
+}
+.text-status-lowstock {
+  color: #d97706;
+}
+.text-status-shortfall {
+  color: #dc2626;
+}
+
+/* --- Table Status Badges --- */
+.badge-instock {
+  background-color: #d1fae5;
+  color: #065f46;
+  border-color: #a7f3d0;
+}
+.badge-instock:hover {
+  background-color: #a7f3d0;
+}
+
+.badge-lowstock {
+  background-color: #fef3c7;
+  color: #92400e;
+  border-color: #fde68a;
+}
+.badge-lowstock:hover {
+  background-color: #fde68a;
+}
+
+.badge-shortfall {
+  background-color: #ffe4e6;
+  color: #9f1239;
+  border-color: #fecdd3;
+}
+.badge-shortfall:hover {
+  background-color: #fecdd3;
+}
+
+/* --- Layout Utility Classes --- */
+.movement-table-cell-truncated {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}

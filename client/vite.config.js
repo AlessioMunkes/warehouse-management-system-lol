@@ -2,9 +2,13 @@ import { defineConfig } from 'vite'
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
 import { VitePWA } from 'vite-plugin-pwa'
+import path from 'path';
+import { fileURLToPath } from 'url'
 import tailwindcss from '@tailwindcss/vite'   // ← added
 
 let faviconURL = './favicon.svg'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
   plugins: [
@@ -22,4 +26,9 @@ export default defineConfig({
     }),
     babel({ presets: [reactCompilerPreset()] })
   ],
+  resolve: {
+    alias :{
+      "@" : path.resolve(__dirname , "./src"),
+    },
+  },
 })
