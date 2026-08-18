@@ -124,11 +124,12 @@ const ProcurementDashboard = () => {
   // Fetch expected items the moment a PO is selected, and seed each
   // line's received quantity with the ordered amount so the common
   // case (everything arrived) needs no typing.
+  // No setLines([]) on the empty branch: `lines` starts as [] and both
+  // handleSupplierChange and handlePurchaseOrderChange already clear it
+  // synchronously whenever purchaseOrderId is cleared. Clearing here too
+  // was redundant and triggered react-hooks/set-state-in-effect.
   useEffect(() => {
-    if (!purchaseOrderId) {
-      setLines([]);
-      return;
-    }
+    if (!purchaseOrderId) return;
     getPurchaseOrderItems(purchaseOrderId)
       .then((items) =>
         setLines(

@@ -17,6 +17,7 @@ import decantingRouter   from './src/routes/decanting.routes.js';
 import stockRouter       from './src/routes/stock.routes.js';
 import pickingRouter     from './src/routes/picking.routes.js';
 import donationRouter    from './src/routes/donation.routes.js';
+import dispatchRouter    from './src/routes/dispatch.routes.js';
 
 // ── Validate required secrets exist at startup ───────────────
 if (!process.env.JWT_SECRET) {
