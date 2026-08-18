@@ -1,0 +1,43 @@
+// ─────────────────────────────────────────────────────────────
+// server/src/routes/dispatch.routes.js
+// ─────────────────────────────────────────────────────────────
+import express                            from 'express';
+import auth, { requireRole, ROLES }       from '../middleware/auth.middleware.js';
+import { validateIntId, validateIntParam } from '../middleware/validate.middleware.js';
+import dispatchController                 from '../controllers/dispatch.controller.js';
+
+const router = express.Router();
+
+const ALL_ROLES       = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN, ROLES.FINANCE];
+const DISPATCHERS_UP  = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];  // record a collection at the gate
+const MANAGERS_UP     = [ROLES.MANAGER, ROLES.ADMIN];                // sweep / write-offs need a human decision behind them
+const FINANCE_UP      = [ROLES.MANAGER, ROLES.ADMIN, ROLES.FINANCE]; // non-collection history feeds BR-16 reconciliation
+
+// ── Static paths before /:id to prevent shadowing ────────────
+router.post('/sweep',           auth, requireRole(...MANAGERS_UP), dispatchController.sweep);
+router.get('/non-collections',  auth, requireRole(...FINANCE_UP),  dispatchController.getNonCollectionHistory);
+
+// ── Dispatch note ─────────────────────────────────────────────
+// Also a static prefix ahead of /:id — the note is keyed by a
+// dispatch_events id, a different id space to the picking_slip_id
+// that /:id below uses. /notes/:eventId keeps the two from being
+// confused at the URL level, not just in the controller comment.
+router.get('/notes/:eventId',
+  auth, requireRole(...ALL_ROLES),
+  validateIntParam('eventId'),
+  dispatchController.getDispatchNote
+);
+
+// ── The gate board ──────────────────────────────────────────
+router.get('/', auth, requireRole(...ALL_ROLES), dispatchController.getBoard);
+
+// ── One pallet at the gate ───────────────────────────────────
+router.get('/:id', auth, requireRole(...ALL_ROLES), validateIntId, dispatchController.getGateView);
+
+router.post('/:id/collect',
+  auth, requireRole(...DISPATCHERS_UP),
+  validateIntId,
+  dispatchController.collect
+);
+
+export default router;

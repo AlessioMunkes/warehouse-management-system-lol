@@ -88,6 +88,7 @@ app.use('/api/volunteers', loginRateLimiter, volunteerRouter);
 app.use('/api/decanting',  decantingRouter);
 app.use('/api/stock',      stockRouter);
 app.use('/api/picking',    pickingRouter);
+app.use('/api/dispatch',   dispatchRouter);
 app.use('/api/donations',  donationRouter);
 
 // ── SPA fallback (production only) ────────────────────────────
