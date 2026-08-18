@@ -1,19 +1,18 @@
 import { BrowserRouter, Routes, Route, Navigate }  from 'react-router-dom';
 import { AuthProvider }                            from './context/AuthContext';
 import ProtectedRoute                              from './components/layout/ProtectedRoute';
-import { PACKING }                                 from './routes/paths';
+import { PACKING, STAFF }                          from './routes/paths';
 import LandingPage                                 from './pages/LandingPage';
 import LoginPage                                   from './pages/LoginPage';
 import GuestLoginPage                              from './pages/GuestLoginPage';
 import GuestHomePage                               from './pages/GuestHomePage';
 
-import SelectProgrammeScreen                       from './pages/SelectProgrammeScreen';
 import SelectNOCjob                                from './pages/SelectNOCjob';
 
-import ProcurementDashboard                        from './pages/ProcurementDashboard';
+import ProcurementPage                             from './pages/ProcurementPage';
 import DecantingPage                               from './pages/DecantingPage';
-import PackingPage                                 from './pages/PackingPage';
-import ReceivingPage                               from './pages/ReceivingPage';
+import PackingSelectPage                           from './pages/PackingSelectPage';
+import DispatchPage                                from './pages/DispatchPage';
 import InventoryManagementPage                     from './pages/InventoryManagementPage';
 import ManagerActivityScreen                       from './pages/ManagerActivityScreen';
 
@@ -34,18 +33,19 @@ const App = () => (
 
         {/* Protected — any logged-in user */}
         <Route element={<ProtectedRoute />}>
-          <Route path="/noc/procurement" element={<ProcurementDashboard />} />
-          <Route path="/programmes"      element={<SelectProgrammeScreen />} />
-
-          {/* NOC task select */}
+          {/* NOC task select — the placeholder dashboard until the
+              real one lands. */}
           <Route path="/noc"           element={<SelectNOCjob />} />
           <Route path="/noc/decanting" element={<DecantingPage />} />
 
-          <Route path="/staff/receiving" element={<ReceivingPage />} />
-
-          {/* Packing paths from routes/paths.js */}
-          <Route path={PACKING.board}         element={<PackingPage />} />
-          <Route path={PACKING.detailPattern} element={<PackingPage />} />
+          {/* One URL per task, shared by managers and workers alike —
+              each page picks manager view vs. staff flow by role
+              internally (see ProcurementPage.jsx / PackingSelectPage.jsx
+              / DecantingPage.jsx). */}
+          <Route path={STAFF.receiving}       element={<ProcurementPage />} />
+          <Route path={PACKING.board}         element={<PackingSelectPage />} />
+          <Route path={PACKING.detailPattern} element={<PackingSelectPage />} />
+          <Route path={STAFF.dispatch}        element={<DispatchPage />} />
         </Route>
 
         {/* Guest-only */}

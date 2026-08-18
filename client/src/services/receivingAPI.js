@@ -1,46 +1,32 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/services/receivingAPI.js
 //
-// The receiving flow speaks to the EXISTING delivery endpoints —
-// there is no new backend here. Confirmed against
-// server/src/routes/delivery.routes.js and delivery.controller.js:
-// all of them return the { success, data } envelope, so every
-// function below unwraps .data, the same contract decantingAPI.js
-// follows.
+// The receiving flow speaks to the delivery endpoints — confirmed
+// against server/src/routes/delivery.routes.js and
+// delivery.controller.js: all of them return the { success, data }
+// envelope, so every function below unwraps .data, the same contract
+// decantingAPI.js follows.
 //
-// What the server accepts today, and what that means for this UI:
+// POST /api/deliveries now accepts, per migrations/00X_receiving_
+// dispatch.sql and the matching delivery.service.js changes:
+//   { supplierId, deliveryDate, purchaseOrderId,
+//     signatureData, poCompleted,
+//     lineItems: [{ purchaseOrderItemId, receivedQuantity, overAction,
+//                    location, expiryDate, discrepancyReason }] }
 //
-//   POST /api/deliveries requires
-//     { supplierId, driverId, deliveryDate, purchaseOrderId,
-//       signatureData, poCompleted }
+// location is required per line; expiryDate only for a line whose
+// product is is_perishable. This 500s if that migration hasn't been
+// applied to the database this API is talking to yet.
 //
-//   It records THAT a delivery arrived against a purchase order. It
-//   does NOT accept per-line counted quantities, put-away locations
-//   or use-by dates — delivery.service.js says the items are
-//   "already known from the PO, no cross-check needed".
-//
-// The wireframes do capture those three things per line, because URS
-// 1.3 and the sponsor's short-delivery problem both need them. So
-// this module sends what the server takes and passes the counted
-// lines as a "lines" array in the same body: harmless to the current
-// controller, which destructures only the fields it knows, and the
-// shape the endpoint should grow into. HANDOFF.md has the one server
-// change that persists them.
+// No driver field — there is no drivers table and nothing in this
+// flow captures a driver name. delivery_notes.driver_name is the real
+// column if that's ever added; it isn't written from here today.
 // ─────────────────────────────────────────────────────────────
 import { apiGet, apiPost } from './api';
 
 // GET /api/deliveries/suppliers
 export const getSuppliers = async () => {
   const res = await apiGet('/api/deliveries/suppliers');
-  return res.data ?? [];
-};
-
-// GET /api/deliveries/drivers?supplierId=
-// supplierId is optional server-side; passing it is what keeps the
-// driver list short enough to tap instead of scroll.
-export const getDrivers = async (supplierId) => {
-  const qs = supplierId ? `?supplierId=${encodeURIComponent(supplierId)}` : '';
-  const res = await apiGet(`/api/deliveries/drivers${qs}`);
   return res.data ?? [];
 };
 
@@ -75,23 +61,21 @@ export const getProducts = async () => {
 
 // POST /api/deliveries
 export const recordDelivery = async ({
-  supplierId, driverId, deliveryDate, purchaseOrderId, signatureData, poCompleted, lines,
+  supplierId, deliveryDate, purchaseOrderId, signatureData, poCompleted, lineItems,
 }) => {
   const res = await apiPost('/api/deliveries', {
     supplierId,
-    driverId,
     deliveryDate,
     purchaseOrderId,
     signatureData,
     poCompleted: Boolean(poCompleted),
-    lines, // ignored by the current controller, see the header note
+    lineItems,
   });
   return res.data;
 };
 
 export default {
   getSuppliers,
-  getDrivers,
   getPurchaseOrders,
   getPurchaseOrderItems,
   getProducts,

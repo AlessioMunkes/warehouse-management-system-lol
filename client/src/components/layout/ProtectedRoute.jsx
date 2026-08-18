@@ -12,6 +12,7 @@
 // ─────────────────────────────────────────────────────────────
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { STAFF } from '../../routes/paths';
 
 const ProtectedRoute = ({ roles } = {}) => {
   const { user, isLoading } = useAuth();
@@ -30,7 +31,7 @@ const ProtectedRoute = ({ roles } = {}) => {
 
   // Role check (used once SEC-04 is implemented per route)
   if (roles && !roles.includes(user.role)) {
-    return <Navigate to={user.role === 'guest' ? '/guest-home' : '/programmes'} replace />;
+    return <Navigate to={user.role === 'guest' ? '/guest-home' : STAFF.home} replace />;
   }
 
   // All good — render the child route

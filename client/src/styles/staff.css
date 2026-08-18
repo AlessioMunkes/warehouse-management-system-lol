@@ -506,6 +506,44 @@
 }
 .stf-skeleton { height: 56px; border-radius: var(--stf-radius); background: var(--stf-border); }
 
+/* ── Segmented tabs ──────────────────────────────────────────────── */
+/* For a board with a few named subsets (packing's "assigned to me /
+   spare / done") — not the bottom .stf-tab task bar, which is
+   navigation between the four tasks, not filters within one of them. */
+.stf-segments {
+  display: flex; gap: 4px;
+  padding: 3px;
+  background: var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+}
+.stf-segment {
+  flex: 1;
+  min-height: var(--stf-tap);
+  padding: 8px 10px;
+  border: none;
+  border-radius: calc(var(--stf-radius-sm) - 3px);
+  background: transparent;
+  font: 600 13px/1.3 var(--stf-font-sans);
+  color: var(--stf-text-sub);
+  cursor: pointer;
+}
+.stf-segment.is-active { background: var(--stf-white); color: var(--stf-ink); }
+
+/* ── Status badge ────────────────────────────────────────────────── */
+.stf-badge {
+  display: inline-flex; align-items: center;
+  padding: 4px 9px;
+  border-radius: var(--stf-radius-pill);
+  font: 600 11px/1.2 var(--stf-font-sans);
+  letter-spacing: 0.02em;
+  background: var(--stf-border);
+  color: var(--stf-text-sub);
+  white-space: nowrap;
+}
+.stf-badge.is-active  { background: var(--stf-sand); color: var(--stf-ink); }
+.stf-badge.is-done     { background: var(--stf-ink); color: var(--stf-white); }
+.stf-badge.is-warn     { background: var(--stf-attention-bg); color: var(--stf-attention-ink); }
+
 .stf-sr-only {
   position: absolute; width: 1px; height: 1px;
   padding: 0; margin: -1px; overflow: hidden;

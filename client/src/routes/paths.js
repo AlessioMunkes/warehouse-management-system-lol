@@ -14,28 +14,34 @@
 // The staff task pages are added here for the same reason: the tab
 // bar, the four pages and the route table all read from STAFF, so a
 // renamed route cannot leave a tab pointing at nothing.
+//
+// Receiving and packing each used to have two URLs — a manager one
+// and a "/staff/..." one — and every chooser screen only ever linked
+// to the manager one, so a worker could never reach the new flow
+// except by typing the staff URL directly. They now share a single
+// URL with the manager view, the same way decanting already did:
+// ProcurementPage/PackingSelectPage pick the shape by role at the one
+// path everything links to. See DecantingPage.jsx for the pattern
+// this follows.
 // ─────────────────────────────────────────────────────────────
 
 export const PACKING = {
-  // The manager's board, and the <Route> pattern for one slip.
+  // One URL for everyone. PackingSelectPage decides whether that
+  // renders the manager's board (PackingPage) or the packer's own
+  // flow (PackingStaffPage).
   board: '/noc/packing',
   detailPattern: '/noc/packing/:slipId',
   detail: (slipId) => `/noc/packing/${slipId}`,
-
-  // The packer's own board, and one pallet on it. A separate path
-  // rather than a query flag, because the two screens are different
-  // shapes for different people — see PackingStaffPage.jsx.
-  staffBoard: '/staff/packing',
-  staffDetailPattern: '/staff/packing/:slipId',
-  staffDetail: (slipId) => `/staff/packing/${slipId}`,
 };
 
 export const STAFF = {
   // The task chooser. Still SelectNOCjob for now; the wireframed
   // dashboard (icon grid or journey) replaces it in the next pass.
   home:      '/noc',
-  receiving: '/staff/receiving',
-  packing:   PACKING.staffBoard,
+  // One URL for everyone — ProcurementPage picks the manager
+  // dashboard or the receiving wizard by role.
+  receiving: '/noc/procurement',
+  packing:   PACKING.board,
   // One route, two shapes: DecantingPage picks the sack flow or the
   // week planner by role. There is no /staff/decanting.
   decanting: '/noc/decanting',

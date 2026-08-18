@@ -15,6 +15,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { STAFF } from '../routes/paths';
 import TaskNavGrid from '../features/procurement/components/TaskNavGrid';
 import PageHeader from '../features/procurement/components/PageHeader';
 import StepCard from '../features/procurement/components/StepCard';
@@ -245,7 +246,7 @@ const ProcurementDashboard = () => {
               </div>
             )}
 
-            <Button variant="primary" onClick={() => navigate('/programmes')}>
+            <Button variant="primary" onClick={() => navigate(STAFF.home)}>
               Back to main menu
             </Button>
           </StepCard>

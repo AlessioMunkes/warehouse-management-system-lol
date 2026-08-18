@@ -30,11 +30,11 @@ import { STAFF } from '../../routes/paths';
 // path can never leave a tab unlabelled.
 const ICON_EXT = 'svg';
 const TABS = [
-  { label: 'Home',      to: STAFF.home,      icon: null,          glyph: 'ti ti-home' },
-  { label: 'Receiving', to: STAFF.receiving, icon: 'receiving',   glyph: 'ti ti-truck-delivery' },
-  { label: 'Packing',   to: STAFF.packing,   icon: 'packing',     glyph: 'ti ti-package' },
-  { label: 'Decanting', to: STAFF.decanting, icon: 'decanting',   glyph: 'ti ti-flask' },
-  { label: 'Dispatch',  to: STAFF.dispatch,  icon: 'dispatch',    glyph: 'ti ti-clipboard-check' },
+  { label: 'Home',      to: STAFF.home,      icon: null,               glyph: 'ti ti-home' },
+  { label: 'Receiving', to: STAFF.receiving, icon: 'receiving-icon',   glyph: 'ti ti-truck-delivery' },
+  { label: 'Packing',   to: STAFF.packing,   icon: 'packing-icon',     glyph: 'ti ti-package' },
+  { label: 'Decanting', to: STAFF.decanting, icon: 'decanting-icon',   glyph: 'ti ti-flask' },
+  { label: 'Dispatch',  to: STAFF.dispatch,  icon: 'dispatch-icon',    glyph: 'ti ti-clipboard-check' },
 ];
 
 const isCurrent = (pathname, to) =>

@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// client/src/features/receiving/components/ReceivingFlow.jsx
+// client/src/features/procurement/components/ReceivingFlow.jsx
 //
 // Receiving, as four sequential screens (ACC-05):
 //
@@ -36,15 +36,19 @@ const LOCATIONS = [
 ];
 
 // Fresh lines need a use-by date and are picked date-first; dry goods
-// are picked oldest-first and have no date to record (BR-06). The
-// products table has no category column yet, so freshness is inferred
-// from the name yesterday's way. HANDOFF.md asks for is_perishable.
+// are picked oldest-first and have no date to record (BR-06). Reads
+// products.is_perishable now that it exists (migrations/00X_receiving_
+// dispatch.sql); the name heuristic stays only as a fallback for a
+// database that hasn't had that migration applied yet, so a missing
+// column degrades this to a guess rather than breaking the screen.
 const FRESH_HINTS = [
   'spinach', 'butternut', 'cabbage', 'carrot', 'tomato', 'onion',
   'apple', 'banana', 'potato', 'lettuce', 'fresh', 'milk',
 ];
-const isFreshProduct = (name = '') =>
-  FRESH_HINTS.some((hint) => name.toLowerCase().includes(hint));
+const isFreshProduct = (item) =>
+  typeof item.is_perishable === 'boolean'
+    ? item.is_perishable
+    : FRESH_HINTS.some((hint) => (item.product_name || '').toLowerCase().includes(hint));
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const longDate = (value) =>
@@ -128,9 +132,9 @@ export default function ReceivingFlow({ onCrumbChange }) {
     try {
       const items = await receivingAPI.getPurchaseOrderItems(orderId);
       setLines(items.map((item) => {
-        const fresh = isFreshProduct(item.product_name);
+        const fresh = isFreshProduct(item);
         return {
-          purchaseOrderItemId: item.id,
+          purchaseOrderItemId: item.purchase_order_item_id,
           productId:  item.product_id,
           name:       item.product_name,
           sku:        item.sku,
@@ -168,28 +172,36 @@ export default function ReceivingFlow({ onCrumbChange }) {
     setSaving(true);
     setError(null);
     try {
-      // The endpoint requires a driver. Receiving at the dock does not
-      // always know who drove, so the supplier's first driver stands
-      // in; HANDOFF.md asks for the field to be made optional.
-      const drivers = await receivingAPI.getDrivers(supplierId);
+      // No driver is recorded here — there is no drivers table and
+      // this flow has no field for one. delivery_notes.driver_name is
+      // the real column to write to if that's ever added.
       await receivingAPI.recordDelivery({
         supplierId,
-        driverId: drivers[0]?.id ?? null,
         deliveryDate: todayISO(),
         purchaseOrderId: orderId,
         // The endpoint validates that a signature is present. These
         // wireframes do not ask for one at intake (the driver signs at
         // dispatch, not receiving), so the receipt records that it was
-        // accepted in the app instead. Also in HANDOFF.md.
+        // accepted in the app instead.
         signatureData: 'received-in-app',
         poCompleted: lines.every((l) => Number(l.counted) >= l.expected),
-        lines: lines.map((l) => ({
-          productId: l.productId,
-          purchaseOrderItemId: l.purchaseOrderItemId,
-          countedQuantity: Number(l.counted || 0),
-          location: l.location,
-          useBy: l.useBy || null,
-        })),
+        lineItems: lines.map((line) => {
+          const receivedQuantity = Number(line.counted || 0);
+          const variance = receivedQuantity - line.expected;
+          return {
+            purchaseOrderItemId: line.purchaseOrderItemId,
+            receivedQuantity,
+            overAction: 'accept', // no reject-the-extra UI on this screen yet
+            location: line.location,
+            expiryDate: line.fresh ? (line.useBy || null) : null,
+            // Short and over counts are recorded structurally rather
+            // than typed out by staff (that is the whole point of this
+            // flow) — the service still requires a reason string for
+            // any line that varies from the order, so this is it.
+            discrepancyReason:
+              variance === 0 ? '' : variance < 0 ? 'Short count at receiving' : 'Over count at receiving',
+          };
+        }),
       });
       setPhase('done');
     } catch (err) {

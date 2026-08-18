@@ -20,7 +20,7 @@ export default function PackingStaffPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const backToList = () => navigate(PACKING.staffBoard);
+  const backToList = () => navigate(PACKING.board);
 
   return (
     <StaffShell
@@ -31,6 +31,7 @@ export default function PackingStaffPage() {
     >
       {slipId ? (
         <StaffSlipFlow
+          currentUser={user}
           slipId={slipId}
           onBack={backToList}
           onFinished={backToList}
@@ -38,7 +39,7 @@ export default function PackingStaffPage() {
       ) : (
         <StaffSlipList
           currentUser={user}
-          onOpenSlip={(id) => navigate(PACKING.staffDetail(id))}
+          onOpenSlip={(id) => navigate(PACKING.detail(id))}
         />
       )}
     </StaffShell>
