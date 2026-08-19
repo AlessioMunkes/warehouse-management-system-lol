@@ -28,7 +28,7 @@ const STATUSES = ['awaiting', 'collected', 'late_collected', 'not_collected', 'c
 // the sponsor ever wants it configurable, move it to picking_settings
 // alongside cohort_anchor_monday rather than adding a second
 // settings mechanism.
-const NON_COLLECTION_CUTOFF_HOUR = 16;
+export const NON_COLLECTION_CUTOFF_HOUR = 16;
 
 // Signatures arrive as base64 PNG data URLs from a canvas, the same
 // way delivery notes already store them. A signature from a phone
@@ -45,34 +45,103 @@ const fail = (status, message) => {
 
 const isManager = (user) => user.role === ROLES.MANAGER || user.role === ROLES.ADMIN;
 
-// node-postgres parses a DATE column into a JS Date at LOCAL
-// midnight, so toISOString() on it shifts a day backwards for
-// anywhere east of UTC — which includes Cape Town. Formatting from
-// the local components instead keeps "is this pallet for today?"
-// answering correctly at the gate at 08:00 on a Tuesday.
-const toDateString = (value) => {
+// ─────────────────────────────────────────────────────────────
+// TIME
+//
+// Two different questions get asked about time in this file, and they
+// need two different tools. Conflating them is what broke both.
+//
+//   "What date is this pallet booked for?"  — a DATE column.
+//   "What is the time in the warehouse?"    — an instant.
+//
+// The server runs in UTC. Render containers always do, and nothing in
+// the deploy sets TZ, so process.env.TZ is unset and every JS date
+// method that says "local" means UTC. Cape Town is UTC+2.
+//
+// The bug this replaces: both the 16:00 cutoff and "is this pallet
+// for today?" were read with getHours()/getFullYear() off a plain
+// new Date(). On a developer's laptop that gave the right answer and
+// on Render it gave a UTC one, so BR-14's 16:00 write-off actually
+// fired at 18:00 SAST — two hours after the gate closed, every day —
+// and the day itself rolled over at 02:00 SAST rather than midnight.
+//
+// South Africa has no daylight saving and has not since 1944, so a
+// fixed offset is exact here. It is also more honest than
+// Intl/timeZone lookups, which would silently depend on the
+// container's ICU data being present and current.
+// ─────────────────────────────────────────────────────────────
+export const SAST_OFFSET_MINUTES = 2 * 60;
+
+const pad = (n) => String(n).padStart(2, '0');
+
+// Shift the instant forward by the offset, then read UTC components.
+// UTC components are the same number on every machine, so this
+// answers "what time is it in Cape Town" identically in CI, on a
+// laptop, and on Render.
+const sastNow = () => new Date(Date.now() + SAST_OFFSET_MINUTES * 60 * 1000);
+
+// Today's date in the warehouse.
+export const todayString = () => {
+  const d = sastNow();
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+};
+
+// The hour on the warehouse clock, 0-23. What BR-14's cutoff is
+// compared against.
+export const currentHour = () => sastNow().getUTCHours();
+
+// ── Formatting a DATE column ──────────────────────────────────
+// DELIBERATELY different from the above, and not interchangeable
+// with it. node-postgres parses a DATE into a JS Date at LOCAL
+// midnight, so '2026-08-19' becomes midnight-in-whatever-zone-this-
+// process-is. Reading the LOCAL components back gives the original
+// string on any machine; toISOString() would shift it a day backwards
+// anywhere east of UTC.
+//
+// Only ever pass this a value that came out of a DATE column. Passing
+// it new Date() is what produced the wrong "today" — that is what
+// todayString() above is for.
+export const pgDateToString = (value) => {
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return null;
-  const pad = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
-const todayString = () => toDateString(new Date());
+// ── Date input from a client ──────────────────────────────────
+// dispatchDate arrives as a raw query string and goes to Postgres as
+// $1::date. new Date(x) is far too generous a check: it accepts
+// "Mon Aug 17 2026" and browser-specific junk, and Number.isNaN on
+// the result passes strings Postgres will then reject mid-statement
+// as a 500. Worse, a string like '0000-99-99' string-compares as
+// "past", which triggers the sweep — so a malformed query parameter
+// reached a WRITE before it reached a cast error.
+//
+// Calendar-checked, not just shape-checked, so 2026-02-30 fails here
+// rather than in the database.
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+export const isValidDateString = (value) => {
+  if (typeof value !== 'string' || !DATE_PATTERN.test(value)) return false;
+  const [y, m, d] = value.split('-').map(Number);
+  const probe = new Date(Date.UTC(y, m - 1, d));
+  return probe.getUTCFullYear() === y
+      && probe.getUTCMonth() === m - 1
+      && probe.getUTCDate() === d;
+};
 
 // ── Eligibility ───────────────────────────────────────────────
 // Computed in one place so the gate screen and the collect endpoint
 // can never disagree about whether a pallet needs an override. The
 // screen renders these as warnings; collect() below reads the same
 // object to decide what it insists on.
-const evaluateEligibility = (gateView) => {
-  const now         = new Date();
-  const dispatchDay = toDateString(gateView.dispatch_date);
+export const evaluateEligibility = (gateView) => {
+  const dispatchDay = pgDateToString(gateView.dispatch_date);
 
   return {
     ecdInactive:      gateView.ecd_is_active === false || gateView.ecd_approved_at === null,
     slipNotPacked:    !['complete', 'dispatched'].includes(gateView.slip_status),
     wrongDay:         dispatchDay !== null && dispatchDay !== todayString(),
-    afterCutoff:      now.getHours() >= NON_COLLECTION_CUTOFF_HOUR,
+    afterCutoff:      currentHour() >= NON_COLLECTION_CUTOFF_HOUR,
     writtenOff:       gateView.dispatch_status === 'not_collected',
     alreadyDispatched: ['collected', 'late_collected'].includes(gateView.dispatch_status),
     hasFlaggedLines:  (gateView.items || []).some((i) => i.status === 'flagged'),
@@ -97,10 +166,19 @@ const getBoard = async (query, user) => {
   if (cohort && !COHORTS.includes(cohort))   fail(400, 'Cohort must be week1 or week2.');
   if (status && !STATUSES.includes(status))  fail(400, 'Invalid dispatch status filter.');
 
+  // Validated BEFORE it is compared or passed on. The comparison
+  // below is a string compare, which happily calls '0000-99-99' a
+  // past date and triggers a write against a value Postgres cannot
+  // cast.
+  if (dispatchDate !== undefined && !isValidDateString(dispatchDate)) {
+    fail(400, 'Dispatch date must be a real date in YYYY-MM-DD form.');
+  }
+
   if (dispatchDate) {
-    const isPast     = dispatchDate < todayString();
-    const pastCutoff = new Date().getHours() >= NON_COLLECTION_CUTOFF_HOUR;
-    if (isPast || (dispatchDate === todayString() && pastCutoff)) {
+    const today      = todayString();
+    const isPast     = dispatchDate < today;
+    const pastCutoff = currentHour() >= NON_COLLECTION_CUTOFF_HOUR;
+    if (isPast || (dispatchDate === today && pastCutoff)) {
       await dispatchRepository.sweepNonCollections({ dispatchDate, actorId: user.id });
     }
   }
@@ -200,7 +278,7 @@ const collect = async (slipId, body, user) => {
   const needsOverride = [];
   if (eligibility.wrongDay) {
     needsOverride.push(
-      `${gateView.ecd_name} is booked for ${toDateString(gateView.dispatch_date)}, not today`
+      `${gateView.ecd_name} is booked for ${pgDateToString(gateView.dispatch_date)}, not today`
     );
   }
   if (eligibility.slipNotPacked) {
@@ -249,7 +327,9 @@ const sweep = async (body, user) => {
   if (!isManager(user)) fail(403, 'Only managers can run the non-collection sweep.');
 
   const dispatchDate = body.dispatchDate || todayString();
-  if (Number.isNaN(new Date(dispatchDate).getTime())) fail(400, 'Dispatch date is not a valid date.');
+  if (!isValidDateString(dispatchDate)) {
+    fail(400, 'Dispatch date must be a real date in YYYY-MM-DD form.');
+  }
 
   return await dispatchRepository.sweepNonCollections({ dispatchDate, actorId: user.id });
 };
@@ -271,14 +351,25 @@ const getNonCollectionHistory = async (query, user) => {
   }
 
   const { ecdId, from, to } = query;
-  if (ecdId !== undefined && !Number.isInteger(Number(ecdId))) fail(400, 'Invalid ECD centre.');
-  if (from && Number.isNaN(new Date(from).getTime()))          fail(400, '"From" is not a valid date.');
-  if (to && Number.isNaN(new Date(to).getTime()))              fail(400, '"To" is not a valid date.');
+
+  // Number('') is 0 and Number.isInteger(0) is true, so the old check
+  // let an empty ecdId through as centre 0 and quietly returned
+  // nothing instead of the unfiltered history the caller asked for.
+  if (ecdId !== undefined && ecdId !== '') {
+    const parsed = Number(ecdId);
+    if (!Number.isInteger(parsed) || parsed <= 0) fail(400, 'Invalid ECD centre.');
+  }
+  if (from !== undefined && from !== '' && !isValidDateString(from)) {
+    fail(400, '"From" must be a real date in YYYY-MM-DD form.');
+  }
+  if (to !== undefined && to !== '' && !isValidDateString(to)) {
+    fail(400, '"To" must be a real date in YYYY-MM-DD form.');
+  }
 
   return await dispatchRepository.getNonCollectionHistory({
-    ecdId: ecdId === undefined ? undefined : Number(ecdId),
-    from,
-    to,
+    ecdId: ecdId === undefined || ecdId === '' ? undefined : Number(ecdId),
+    from:  from || undefined,
+    to:    to   || undefined,
   });
 };
 
