@@ -19,10 +19,10 @@ export default function Home() {
   const [reducedMovement, setReducedMovement] = useState(false);
 
   const tasks = [
-    { to: "STAFF.receiving", icon: receivingIcon, title: "Receiving" },
-    { to: "PACKING.board", icon: packingIcon, title: "Packing" },
-    { to: "STAFF.decanting", icon: decantingIcon, title: "Decanting" },
-    { to: "STAFF.dispatch", icon: dispatchIcon, title: "Dispatch" },
+    { to: STAFF.receiving, icon: receivingIcon, title: "Receiving" },
+    { to: PACKING.board, icon: packingIcon, title: "Packing" },
+    { to: STAFF.decanting, icon: decantingIcon, title: "Decanting" },
+    { to: STAFF.dispatch, icon: dispatchIcon, title: "Dispatch" },
   ];
 
   return (
