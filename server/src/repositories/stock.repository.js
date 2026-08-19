@@ -7,7 +7,8 @@
 // all go through it, so there's exactly one place that can get
 // the arithmetic wrong.
 // ─────────────────────────────────────────────────────────────
-import pool from '../config/db.js';
+import pool                  from '../config/db.js';
+import { committedStockSql } from './committedStock.sql.js';
 
 // ── Adjust stock — the single write path for every stock change ──
 // Must be called with a client already inside BEGIN/COMMIT — either
@@ -146,18 +147,46 @@ const manualAdjust = async ({ productId, quantityDelta, unit, reason, performedB
 // ── Manifest — current levels for the overview screen ─────────
 // is_shortfall / is_low_stock are computed here rather than in the
 // UI so every screen that reads the manifest gets the same badges.
+//
+// COMMITTED STOCK IS PART OF THE ANSWER.
+// committedStock.sql.js names three call sites that need its exact
+// definition — the packing availability check, the dispatch gate
+// view, and this manifest. This one did not import it, which is
+// precisely the disagreement that file exists to prevent: packing
+// refused to commit rice it could see the manifest promising, because
+// the manifest was counting pallets that were already built and
+// standing in the staging area waiting for a driver.
+//
+//   quantity_on_hand — what is physically inside the building
+//   committed        — packed, closed, not yet collected
+//   available        — what a packer can still allocate
+//
+// The badges are derived from AVAILABLE, not on hand, because "can I
+// still promise this to an ECD?" is the question the inventory screen
+// is actually asked. Nothing is lost by the change: committed can
+// never be negative, so available <= quantity_on_hand always, and a
+// ledger that has genuinely gone below zero still trips is_shortfall.
+//
+// All three come back as NUMERIC, which node-postgres returns as
+// STRINGS — see the Number() casts in client/src/services/stockAPI.js.
 const getManifest = async () => {
   const result = await pool.query(
     `SELECT
        p.id, p.name, p.stock_keeping_unit AS sku,
-       COALESCE(sl.quantity_on_hand, 0)   AS quantity_on_hand,
-       COALESCE(sl.unit, '')              AS unit,
-       COALESCE(sl.reorder_threshold, 0)  AS reorder_threshold,
-       COALESCE(sl.quantity_on_hand, 0) < 0                                  AS is_shortfall,
-       COALESCE(sl.quantity_on_hand, 0) <= COALESCE(sl.reorder_threshold, 0) AS is_low_stock,
+       COALESCE(sl.quantity_on_hand, 0)::numeric AS quantity_on_hand,
+       COALESCE(c.committed, 0)::numeric         AS committed,
+       (COALESCE(sl.quantity_on_hand, 0) - COALESCE(c.committed, 0))::numeric AS available,
+       COALESCE(sl.unit, '')                     AS unit,
+       COALESCE(sl.reorder_threshold, 0)         AS reorder_threshold,
+       (COALESCE(sl.quantity_on_hand, 0) - COALESCE(c.committed, 0)) < 0
+         AS is_shortfall,
+       (COALESCE(sl.quantity_on_hand, 0) - COALESCE(c.committed, 0))
+         <= COALESCE(sl.reorder_threshold, 0)
+         AS is_low_stock,
        sl.updated_at
      FROM products p
      LEFT JOIN stock_levels sl ON sl.product_id = p.id
+     LEFT JOIN (${committedStockSql()}) c ON c.product_id = p.id
      WHERE p.is_active = true
      ORDER BY p.name ASC`
   );

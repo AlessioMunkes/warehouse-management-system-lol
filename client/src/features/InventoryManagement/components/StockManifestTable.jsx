@@ -1,7 +1,19 @@
 // ─────────────────────────────────────────────────────────────
 // StockManifestTable.jsx
 //
-// Searchable manifest table using CSS classes for status badges and layouts.
+// Searchable manifest table using CSS classes for status badges and
+// layouts.
+//
+// THREE QUANTITIES, NOT ONE. "On hand" is what is physically in the
+// building; some of it is already packed onto pallets waiting at the
+// dispatch gate and cannot be promised to anyone else. The manager
+// asking "can I still allocate this?" needs Available, and the
+// manager asking "does the shelf count match?" needs On hand. Showing
+// only one of them is what let the inventory screen and the packing
+// screen disagree about how much rice there was.
+//
+// The status badge is derived from Available server-side — see
+// server/src/repositories/stock.repository.js getManifest.
 // ─────────────────────────────────────────────────────────────
 
 import { useState, useMemo } from "react";
@@ -88,6 +100,8 @@ export default function StockManifestTable({
                   <TableHead className="font-semibold">Product</TableHead>
                   <TableHead className="font-semibold">SKU</TableHead>
                   <TableHead className="font-semibold">On Hand</TableHead>
+                  <TableHead className="font-semibold">Committed</TableHead>
+                  <TableHead className="font-semibold">Available</TableHead>
                   <TableHead className="font-semibold">Reorder At</TableHead>
                   <TableHead className="font-semibold">Status</TableHead>
                   <TableHead className="text-right font-semibold">
@@ -106,6 +120,19 @@ export default function StockManifestTable({
                     </TableCell>
                     <TableCell className="font-medium">
                       {product.onHand} {product.unit}
+                    </TableCell>
+                    {/* Zero committed is the ordinary state, so it is
+                        muted rather than dashed out — a dash would
+                        read as "unknown". */}
+                    <TableCell className="text-muted-foreground">
+                      {product.committed > 0
+                        ? `${product.committed} ${product.unit}`
+                        : "—"}
+                    </TableCell>
+                    {/* The number the allocation decision is made on,
+                        so it carries the emphasis. */}
+                    <TableCell className="font-semibold">
+                      {product.available} {product.unit}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {product.reorderAt} {product.unit}

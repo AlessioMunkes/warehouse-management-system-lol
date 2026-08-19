@@ -2,6 +2,20 @@
 // StockHealthBar.jsx
 //
 // Renders stock category health summaries and metric cards.
+//
+// THE FIELD NAMES MATTER. This component used to read prod.quantity,
+// prod.minThreshold and prod.reorderLevel. None of those exist — the
+// manifest is mapped in services/stockAPI.js and produces onHand,
+// available, reorderAt, isShortfall and isLowStock. Every read
+// therefore came back undefined, `qty` fell through to 0, and the
+// first branch counted EVERY product as a shortfall: the bar reported
+// 100% shortfall on a fully stocked warehouse.
+//
+// It now reads the same isShortfall / isLowStock flags the table
+// badges use, which are computed once in SQL. Deriving them a second
+// time here is how the bar and the table ended up able to disagree in
+// the first place.
+//
 // Supports `reducedMovement` accessibility mode:
 // - When active: Suppresses status icons, indicator dots, and vivid colors.
 // - When inactive: Displays color-coded badges, status dots, and icons.
@@ -30,13 +44,13 @@ export default function StockHealthBar({ products = [], reducedMovement = false 
     let lowStock = 0;
     let shortfall = 0;
 
+    // Same order of precedence the table's badge uses: a shortfall is
+    // also below its reorder threshold, and should be counted once,
+    // as the worse of the two.
     products.forEach((prod) => {
-      const qty = prod.quantity ?? 0;
-      const min = prod.minThreshold ?? prod.reorderLevel ?? 10;
-
-      if (qty === 0) {
+      if (prod.isShortfall) {
         shortfall += 1;
-      } else if (qty <= min) {
+      } else if (prod.isLowStock) {
         lowStock += 1;
       } else {
         inStock += 1;
@@ -62,7 +76,9 @@ export default function StockHealthBar({ products = [], reducedMovement = false 
           <div>
             <h2 className="text-base font-semibold">Overall Stock Health</h2>
             <p className="text-xs sm:text-sm text-muted-foreground">
-              Real-time overview of active SKUs across status categories.
+              Active SKUs by status, measured on available stock —
+              what is on hand minus what is already packed for
+              collection.
             </p>
           </div>
           <span className="self-start sm:self-auto text-xs font-medium px-2.5 py-1 rounded-full bg-muted text-muted-foreground">
@@ -183,7 +199,7 @@ export default function StockHealthBar({ products = [], reducedMovement = false 
                   : "text-amber-600 dark:text-amber-400"
               }`}
             >
-              {metrics.lowStockPct}% below threshold
+              {metrics.lowStockPct}% at or below threshold
             </p>
           </div>
         </div>
@@ -215,7 +231,7 @@ export default function StockHealthBar({ products = [], reducedMovement = false 
                   : "text-rose-600 dark:text-rose-400"
               }`}
             >
-              {metrics.shortfallPct}% deficit
+              {metrics.shortfallPct}% over-committed
             </p>
           </div>
         </div>

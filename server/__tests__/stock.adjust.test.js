@@ -494,3 +494,73 @@ describe('regression — balances are summed in NUMERIC, not JS floats', () => {
     expect(result.before).toBe(0.1);
   });
 });
+// ─────────────────────────────────────────────────────────────
+// getManifest — the manifest must agree with the packing screen
+//
+// committedStock.sql.js names three call sites that need its exact
+// definition: the packing availability check, the dispatch gate view,
+// and this manifest. The manifest did not import it, so a pallet that
+// was packed, closed and standing in the staging area still counted
+// as available — and packing refused to commit rice the inventory
+// screen was visibly promising.
+//
+// These assert against the QUERY TEXT rather than results, because
+// the regression to guard against is structural: someone rewriting
+// this query without the join. A result-shaped test would pass on a
+// query that had silently dropped it.
+// ─────────────────────────────────────────────────────────────
+describe('getManifest — committed stock is part of the answer', () => {
+  const runManifest = async () => {
+    poolMock.query.mockResolvedValueOnce({ rows: [] });
+    await stockRepository.getManifest();
+    return poolMock.query.mock.calls[0][0].replace(/\s+/g, ' ');
+  };
+
+  it('joins the shared committed-stock definition', async () => {
+    const text = await runManifest();
+    // The distinguishing tables of committedStockSql. If these are
+    // gone, the manifest has drifted back to counting staged pallets
+    // as available.
+    expect(text).toMatch(/picking_slip_items/);
+    expect(text).toMatch(/dispatch_events/);
+  });
+
+  it('returns on hand, committed and available as separate columns', async () => {
+    const text = await runManifest();
+    expect(text).toMatch(/AS quantity_on_hand/i);
+    expect(text).toMatch(/AS committed/i);
+    expect(text).toMatch(/AS available/i);
+  });
+
+  it('derives available as on hand minus committed', async () => {
+    const text = await runManifest();
+    expect(text).toMatch(
+      /COALESCE\(sl\.quantity_on_hand, 0\) - COALESCE\(c\.committed, 0\)\)::numeric AS available/i
+    );
+  });
+
+  // The badges have to come off available, not on hand. Deriving them
+  // from on hand is what let the manifest call a fully-committed
+  // product "in stock".
+  it('computes is_shortfall and is_low_stock from available', async () => {
+    const text = await runManifest();
+    const shortfall = text.match(/(\S.*?)\s*AS is_shortfall/i)[1];
+    const lowStock  = text.match(/(\S.*?)\s*AS is_low_stock/i)[1];
+    expect(shortfall).toMatch(/c\.committed/);
+    expect(lowStock).toMatch(/c\.committed/);
+  });
+
+  it('still lists inactive products out and keeps the name ordering', async () => {
+    const text = await runManifest();
+    expect(text).toMatch(/WHERE p\.is_active = true/i);
+    expect(text).toMatch(/ORDER BY p\.name ASC/i);
+  });
+
+  // A product with no stock_levels row must still appear, at zero,
+  // rather than dropping off the screen.
+  it('keeps every active product with LEFT JOINs', async () => {
+    const text = await runManifest();
+    expect(text).toMatch(/LEFT JOIN stock_levels/i);
+    expect(text).toMatch(/LEFT JOIN \(\s*SELECT/i);
+  });
+});
