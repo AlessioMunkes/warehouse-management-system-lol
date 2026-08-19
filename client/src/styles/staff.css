@@ -423,6 +423,21 @@
   color: var(--stf-ink);
 }
 
+/* .stf-row is otherwise a single-line horizontal button (see
+   ReceivingFlow, GateQueue). The dispatch gate check row packs a
+   3-column grid plus a conditional variance-reason field and hint
+   text into the same row, so it needs to stack vertically instead of
+   squeezing those extra lines onto the item's own line. */
+.stf-row--check {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  cursor: default;
+}
+.stf-row--check:hover { background: none; }
+.stf-row--check.is-warn:hover { background: var(--stf-attention-bg); }
+.stf-row--check .stf-row-main { width: 100%; }
+
 /* ── key: value captions ─────────────────────────────────────────── */
 .stf-kv     { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; font-size: 12px; color: var(--stf-text-sub); }
 .stf-kv-key { color: var(--stf-text-meta); }
