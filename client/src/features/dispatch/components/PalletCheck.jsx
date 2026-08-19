@@ -398,7 +398,7 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
           goes into the vehicle, and it is the number that comes off
           the stock. */}
       <div className="stf-list">
-        <div className="stf-row is-static">
+        <div className="stf-row stf-row--check is-static">
           <span className="stf-row-main" style={GRID}>
             <span className="stf-row-meta">ITEM</span>
             <span className="stf-row-meta">SLIP</span>
@@ -416,7 +416,7 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
           return (
             <div
               key={item.id}
-              className={`stf-row${loadable ? '' : ' is-static'}${problem || differs ? ' is-warn' : ''}`}
+              className={`stf-row stf-row--check${loadable ? '' : ' is-static'}${problem || differs ? ' is-warn' : ''}`}
             >
               <span className="stf-row-main" style={GRID}>
                 <span className="stf-row-title">
