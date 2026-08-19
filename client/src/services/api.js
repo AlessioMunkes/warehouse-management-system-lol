@@ -18,6 +18,43 @@ export const API_BASE =
   import.meta.env.VITE_API_URL ??
   (import.meta.env.DEV ? 'http://localhost:5000' : '');
 
+// ── Idempotency keys ──────────────────────────────────────────
+// Lives here rather than in one feature's API module because three
+// write paths now need it — receiving, donation intake and the
+// dispatch gate — and they must agree on the format. The server
+// validates the shape against a UUID v4 regex, so the fallback below
+// has to set the version and variant bits properly.
+//
+// A key identifies ONE attempt at a write, and must be reused on
+// every retry of that attempt. Generating a fresh one per tap makes
+// each retry look like a new delivery to the server, which is the
+// exact problem the key exists to prevent.
+//
+// crypto.randomUUID is unavailable on plain http:// origins, which is
+// how a tablet reaches a laptop on the warehouse LAN during testing —
+// hence the fallback rather than a hard dependency.
+export const newIdempotencyKey = () => {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+
+  const bytes = new Uint8Array(16);
+  if (globalThis.crypto?.getRandomValues) {
+    globalThis.crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < 16; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;   // version 4
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;   // variant 10x
+
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0'));
+  return [
+    hex.slice(0, 4).join(''),
+    hex.slice(4, 6).join(''),
+    hex.slice(6, 8).join(''),
+    hex.slice(8, 10).join(''),
+    hex.slice(10, 16).join(''),
+  ].join('-');
+};
+
 // ── Unauthorized hook ─────────────────────────────────────────
 // AuthContext registers a callback here at mount. When ANY request
 // comes back 401, the session is gone as far as the server is

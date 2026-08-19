@@ -7,12 +7,19 @@
 // envelope, so every function below unwraps .data, the same contract
 // decantingAPI.js follows.
 //
-// POST /api/deliveries now accepts, per migrations/00X_receiving_
-// dispatch.sql and the matching delivery.service.js changes:
+// POST /api/deliveries accepts:
 //   { supplierId, deliveryDate, purchaseOrderId,
-//     signatureData, poCompleted,
+//     signatureData, poCompleted, idempotencyKey,
 //     lineItems: [{ purchaseOrderItemId, receivedQuantity, overAction,
 //                    location, expiryDate, discrepancyReason }] }
+//
+// idempotencyKey is what stops a retried submit receiving the same
+// pallet twice. Receiving happens on a tablet at a loading bay on a
+// Monday morning; a dropped connection used to mean a second delivery
+// note and a second call to adjustStock, so the stock went up twice
+// for one physical delivery with two plausible notes to explain it.
+// One key per attempt, reused on every retry of that attempt — see
+// ReceivingFlow.jsx.
 //
 // location is required per line; expiryDate only for a line whose
 // product is is_perishable. This 500s if that migration hasn't been
@@ -60,8 +67,13 @@ export const getProducts = async () => {
 };
 
 // POST /api/deliveries
+// Returns the delivery note with `duplicate` on it. A duplicate is a
+// SUCCESS — the retry did the right thing and the goods were only
+// received once — so callers should say "already recorded" rather
+// than treating it as a failure.
 export const recordDelivery = async ({
-  supplierId, deliveryDate, purchaseOrderId, signatureData, poCompleted, lineItems,
+  supplierId, deliveryDate, purchaseOrderId, signatureData, poCompleted,
+  lineItems, idempotencyKey,
 }) => {
   const res = await apiPost('/api/deliveries', {
     supplierId,
@@ -70,6 +82,7 @@ export const recordDelivery = async ({
     signatureData,
     poCompleted: Boolean(poCompleted),
     lineItems,
+    idempotencyKey: idempotencyKey || null,
   });
   return res.data;
 };

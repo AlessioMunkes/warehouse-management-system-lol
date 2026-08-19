@@ -32,7 +32,7 @@
 // the lines that differ need to be sent, because the overwhelmingly
 // common case is that the count matched.
 // ─────────────────────────────────────────────────────────────
-import { API_BASE } from './api';
+import { API_BASE, newIdempotencyKey } from './api';
 
 const BASE_URL = `${API_BASE}/api/dispatch`;
 
@@ -93,42 +93,16 @@ export const todayISO = () => {
 };
 
 // ── Idempotency key ───────────────────────────────────────────
-// The gate is the one screen that genuinely runs offline — a driver
-// standing in a yard with no signal — so a collection may be sent
-// more than once. The server stores this key UNIQUE and returns the
-// original event on a replay instead of deducting stock twice.
+// newIdempotencyKey moved to api.js — receiving needs the same thing
+// and the server validates one shape, so there is one generator. It
+// is re-exported here so anything importing it from this module
+// keeps working.
 //
-// It must be generated ONCE per collection attempt and reused on
-// every retry of that attempt; a fresh one per tap defeats the whole
-// mechanism. See PalletCheck.jsx, which holds it in state for the
-// life of the screen.
-//
-// dispatch.service.validateCollectBody checks the shape against a
-// UUID v4 regex, so the fallback below has to set the version and
-// variant bits properly. crypto.randomUUID is unavailable on plain
-// http:// origins, which is exactly how a tablet reaches a laptop on
-// the warehouse LAN during testing.
-export const newIdempotencyKey = () => {
-  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
-
-  const bytes = new Uint8Array(16);
-  if (globalThis.crypto?.getRandomValues) {
-    globalThis.crypto.getRandomValues(bytes);
-  } else {
-    for (let i = 0; i < 16; i += 1) bytes[i] = Math.floor(Math.random() * 256);
-  }
-  bytes[6] = (bytes[6] & 0x0f) | 0x40;   // version 4
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;   // variant 10x
-
-  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0'));
-  return [
-    hex.slice(0, 4).join(''),
-    hex.slice(4, 6).join(''),
-    hex.slice(6, 8).join(''),
-    hex.slice(8, 10).join(''),
-    hex.slice(10, 16).join(''),
-  ].join('-');
-};
+// One key per collection ATTEMPT, reused on every retry of that
+// attempt. See PalletCheck.jsx, which holds it in state for the life
+// of the screen; a fresh key per tap would defeat the mechanism
+// entirely.
+export { newIdempotencyKey };
 
 // ── GET /api/dispatch ─────────────────────────────────────────
 // The gate board: every packed pallet for the day, plus everything

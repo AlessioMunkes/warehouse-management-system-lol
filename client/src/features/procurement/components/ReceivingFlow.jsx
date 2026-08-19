@@ -25,6 +25,7 @@ import {
   StepRail, StepScreen, Actions, Button, NumberField, ChoiceList, Notice, KeyValues,
 } from '../../staff/components/StepPrimitives';
 import receivingAPI from '../../../services/receivingAPI';
+import { newIdempotencyKey } from '../../../services/api';
 
 const TOTAL_STEPS = 4;
 
@@ -50,7 +51,15 @@ const isFreshProduct = (item) =>
     ? item.is_perishable
     : FRESH_HINTS.some((hint) => (item.product_name || '').toLowerCase().includes(hint));
 
-const todayISO = () => new Date().toISOString().slice(0, 10);
+// NOT toISOString().slice(0, 10). That formats in UTC and Cape Town
+// is UTC+2, so between midnight and 02:00 SAST it returns YESTERDAY
+// and the note is dated to the wrong day. Local components give the
+// date the person at the bay would write down.
+const todayISO = () => {
+  const d   = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
 const longDate = (value) =>
   new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long' });
 
@@ -87,6 +96,15 @@ export default function ReceivingFlow({ onCrumbChange }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+
+  // ONE key for this pass through the flow, regenerated only by
+  // restart(). A tablet at the loading bay loses signal often, and
+  // finish() below is retried by the person tapping again — which
+  // used to create a second delivery note and put the stock up twice.
+  // Reusing the key makes the server recognise the retry and hand
+  // back the original note. A key generated inside finish() would be
+  // new on every tap and would protect nothing.
+  const [attemptKey, setAttemptKey] = useState(newIdempotencyKey);
 
   const step = STEP_META[phase];
 
@@ -194,6 +212,7 @@ export default function ReceivingFlow({ onCrumbChange }) {
         // accepted in the app instead.
         signatureData: 'received-in-app',
         poCompleted: lines.every((l) => Number(l.counted) >= l.expected),
+        idempotencyKey: attemptKey,
         lineItems: lines.map((line) => {
           const receivedQuantity = Number(line.counted || 0);
           const variance = receivedQuantity - line.expected;
@@ -225,6 +244,10 @@ export default function ReceivingFlow({ onCrumbChange }) {
     setLines([]);
     setOrderId('');
     setLineIndex(0);
+    // A new delivery is a new attempt. Keeping the old key would make
+    // the server treat the next genuine delivery as a replay of the
+    // last one and silently record nothing.
+    setAttemptKey(newIdempotencyKey());
   };
 
   if (loading) return <div className="stf-skeleton" aria-label="Loading" />;

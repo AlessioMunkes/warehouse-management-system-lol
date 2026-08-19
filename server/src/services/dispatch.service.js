@@ -20,6 +20,7 @@
 // ─────────────────────────────────────────────────────────────
 import dispatchRepository from '../repositories/dispatch.repository.js';
 import { ROLES }          from '../middleware/auth.middleware.js';
+import { isValidDateString, isPositiveInt } from '../utils/validation.js';
 
 const COHORTS  = ['week1', 'week2'];
 const STATUSES = ['awaiting', 'collected', 'late_collected', 'not_collected', 'cancelled'];
@@ -108,26 +109,16 @@ export const pgDateToString = (value) => {
 };
 
 // ── Date input from a client ──────────────────────────────────
-// dispatchDate arrives as a raw query string and goes to Postgres as
-// $1::date. new Date(x) is far too generous a check: it accepts
-// "Mon Aug 17 2026" and browser-specific junk, and Number.isNaN on
-// the result passes strings Postgres will then reject mid-statement
-// as a 500. Worse, a string like '0000-99-99' string-compares as
-// "past", which triggers the sweep — so a malformed query parameter
-// reached a WRITE before it reached a cast error.
+// isValidDateString lives in utils/validation.js now, not here.
+// delivery.service.js needs exactly the same check, and a second copy
+// of a validator is how the movement_type constraint and the role
+// constants both drifted. See that file for why new Date(x) is not a
+// validator.
 //
-// Calendar-checked, not just shape-checked, so 2026-02-30 fails here
-// rather than in the database.
-const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-
-export const isValidDateString = (value) => {
-  if (typeof value !== 'string' || !DATE_PATTERN.test(value)) return false;
-  const [y, m, d] = value.split('-').map(Number);
-  const probe = new Date(Date.UTC(y, m - 1, d));
-  return probe.getUTCFullYear() === y
-      && probe.getUTCMonth() === m - 1
-      && probe.getUTCDate() === d;
-};
+// Why it matters at this particular call site: dispatchDate reaches
+// Postgres as $1::date, and the sweep trigger below is a STRING
+// compare — so '0000-99-99' reads as a past date and triggers a WRITE
+// before anything gets as far as a cast error.
 
 // ── Eligibility ───────────────────────────────────────────────
 // Computed in one place so the gate screen and the collect endpoint
@@ -355,9 +346,8 @@ const getNonCollectionHistory = async (query, user) => {
   // Number('') is 0 and Number.isInteger(0) is true, so the old check
   // let an empty ecdId through as centre 0 and quietly returned
   // nothing instead of the unfiltered history the caller asked for.
-  if (ecdId !== undefined && ecdId !== '') {
-    const parsed = Number(ecdId);
-    if (!Number.isInteger(parsed) || parsed <= 0) fail(400, 'Invalid ECD centre.');
+  if (ecdId !== undefined && ecdId !== '' && !isPositiveInt(ecdId)) {
+    fail(400, 'Invalid ECD centre.');
   }
   if (from !== undefined && from !== '' && !isValidDateString(from)) {
     fail(400, '"From" must be a real date in YYYY-MM-DD form.');
@@ -372,6 +362,8 @@ const getNonCollectionHistory = async (query, user) => {
     to:    to   || undefined,
   });
 };
+
+export { isValidDateString };
 
 export default {
   getBoard,
