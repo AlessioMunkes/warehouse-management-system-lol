@@ -15,7 +15,7 @@ import dispatchIcon from "./../../public/icons/dispatch-icon.svg";
 
 export default function Home() {
   const { user } = useAuth();
-  const firstName = user?.name?.split(" ")[0] ?? "";
+  const firstName = user?.firstName ?? "";
   const [reducedMovement, setReducedMovement] = useState(false);
 
   const tasks = [

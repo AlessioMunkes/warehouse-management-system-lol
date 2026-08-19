@@ -85,7 +85,7 @@ export function TopNavbar({ reducedMovement, onToggleMovement }) {
         <div className="top-navbar__right">
           {user && (
             <span>
-              {user.name} <span className="top-navbar__role">· {roleLabel}</span>
+              {user.firstName} {user.lastName} <span className="top-navbar__role">· {roleLabel}</span>
             </span>
           )}
 
