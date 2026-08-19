@@ -84,10 +84,12 @@ export function TopNavbar({ reducedMovement, onToggleMovement }) {
 
         <div className="top-navbar__right">
           {user && (
-            <span>
+            
+              <span className="top-navbar__user-name">
               {user.firstName} {user.lastName} <span className="top-navbar__role">· {roleLabel}</span>
             </span>
           )}
+      
 
           <Separator orientation="vertical" className="h-4 top-navbar__divider" />
 

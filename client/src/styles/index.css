@@ -526,6 +526,7 @@
   gap: 0.5rem;
   font-size: 0.75rem;
   flex-shrink: 0;
+color:white;
 }
 
 .top-navbar__role {
@@ -769,7 +770,7 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 0.875rem;
-  color: #374151;
+  color: #f2f4f7;
 }
 
 /* --------------------------------------------------------------------------
