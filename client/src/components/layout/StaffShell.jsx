@@ -14,6 +14,14 @@
 // PageHeader is untouched, so the manager screens keep it.
 // ─────────────────────────────────────────────────────────────
 import { useNavigate } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useAuth } from '../../context/AuthContext';
 import useReducedMotion from '../../features/staff/hooks/useReducedMotion';
 import StaffTabBar from './StaffTabBar';
@@ -49,12 +57,32 @@ export default function StaffShell({
   return (
     <div className="stf-shell">
       <header className="stf-appbar">
-        <div className="stf-appbar-brand">
-          <img className="stf-appbar-logo" src={LOGO_URL} alt="" aria-hidden="true" />
-          <span className="stf-appbar-name">Batches</span>
-          <span className="stf-appbar-prog">
-            {user?.firstName ? `${user.firstName} ${user.lastName ?? ''}`.trim() : 'Nourish Our Children'}
-          </span>
+        <div className="stf-appbar-left">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => navigate(-1)}
+                  aria-label="Go back"
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Go back to previous page</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <div className="stf-appbar-brand">
+            <img className="stf-appbar-logo" src={LOGO_URL} alt="" aria-hidden="true" />
+            <span className="stf-appbar-name">Batches</span>
+            <span className="stf-appbar-prog">
+              {user?.firstName ? `${user.firstName} ${user.lastName ?? ''}`.trim() : 'Nourish Our Children'}
+            </span>
+          </div>
         </div>
 
         <div className="stf-appbar-actions">

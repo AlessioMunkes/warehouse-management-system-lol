@@ -99,6 +99,7 @@
   color: var(--stf-white);
 }
 
+.stf-appbar-left  { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .stf-appbar-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .stf-appbar-logo  { width: 30px; height: 30px; object-fit: contain; flex-shrink: 0; }
 .stf-appbar-name  { font-family: var(--stf-font-display); font-size: 14px; font-weight: 700; color: var(--stf-white); }
