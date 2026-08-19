@@ -1,58 +1,230 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/services/dispatchAPI.js
 //
-// Dispatch is the one staff task with no backend of its own yet, so
-// this module is explicit about what is real and what is not.
+// Client wrapper around /api/dispatch. One function per route in
+// dispatch.routes.js, nothing invented.
 //
-// REAL, today:
-//   The gate queue and the pallet check are built entirely from the
-//   picking endpoints. A pallet that is staged for collection is a
-//   picking slip with status 'complete', and its lines already carry
-//   required_quantity, packed_quantity, status and flag_reason — which
-//   is exactly the "slip says / actually there" comparison the gate
-//   needs. No new query required.
+// WHAT THIS REPLACES, and why it matters
+// The previous version of this file predated the dispatch backend.
+// It built the gate queue out of picking slips and posted collections
+// to POST /api/picking/:id/collect — a route that does not exist, so
+// every collection at the gate 404'd. Its payload was wrong too: it
+// sent { signatureData, collectedBy, note } where the server requires
+// { driverName, signature }, so even with the URL corrected the
+// request would have come back 400.
 //
-// NEW, and needed:
-//   Recording the collection itself: who collected, when, and the
-//   driver's signature. URS 2.3 makes the signature the proof of
-//   delivery, and nothing in the current server stores one against a
-//   picking slip. recordCollection() below calls
-//   POST /api/picking/:id/collect, which does not exist yet — the
-//   server files for it are in this handoff under server/, and until
-//   they are merged this call returns a 404 that the UI surfaces as
-//   "could not save the collection".
+// The dispatch board is NOT the picking board. A pallet's gate state
+// lives in dispatch_events, not in picking_slips.status, and only
+// GET /api/dispatch joins the two. Reading picking slips directly
+// meant a collected pallet simply vanished from the queue — its slip
+// status becomes 'dispatched', not 'complete' — with no "collected"
+// row to show for it, and the eligibility flags the server computes
+// (wrong day, written off at 16:00, inactive centre) never reached
+// the screen at all.
 //
-// Deliberately NOT invented here: the 16:00 non-collection sweep
-// (BR-14). That is a scheduled server job, not something a phone at
-// the gate should be triggering. The dispatch screen only reports its
-// result.
+// LOADED QUANTITY IS THE POINT.
+// Stock is deducted at the gate against loaded_quantity — what
+// dispatch staff counted into the vehicle — not packed_quantity,
+// which is what the packer believed they put on the pallet on
+// Monday. The old client sent no line data at all, so every dispatch
+// silently deducted the packed figure and the gate re-check counted
+// for nothing. recordCollection takes a sparse `lines` array: only
+// the lines that differ need to be sent, because the overwhelmingly
+// common case is that the count matched.
 // ─────────────────────────────────────────────────────────────
-import { apiPost } from './api';
-import { fetchPickingSlips, fetchPickingSlip } from './pickingAPI';
+import { API_BASE } from './api';
 
-// ── The gate queue ────────────────────────────────────────────
-// Pallets staged for a given day. dispatchDate defaults to today,
-// because that is the only day anybody collects on.
-export const getGateQueue = async (dispatchDate) => {
-  const date = dispatchDate || new Date().toISOString().slice(0, 10);
-  const slips = await fetchPickingSlips({ dispatchDate: date, status: 'complete' });
-  return slips || [];
-};
+const BASE_URL = `${API_BASE}/api/dispatch`;
 
-// ── One pallet, with its lines ────────────────────────────────
-export const getPallet = (slipId) => fetchPickingSlip(slipId);
-
-// ── Record the collection (NEW ENDPOINT, see header) ──────────
-// signatureData is a base64 PNG from the signature pad. The server's
-// helmet CSP already allows img-src data:, which is what the existing
-// delivery signatures rely on, so nothing needs changing there.
-export const recordCollection = async (slipId, { signatureData, collectedBy, note }) => {
-  const res = await apiPost(`/api/picking/${slipId}/collect`, {
-    signatureData,
-    collectedBy,          // the driver's or centre representative's name
-    note: note || null,   // why a quantity differed, if it did
+// ── Shared request helper ─────────────────────────────────────
+// Mirrors pickingAPI.js so the two modules cannot drift on the two
+// things that are easy to forget on a new endpoint:
+//
+//   credentials: 'include' — auth is an httpOnly cookie. Without it
+//     fetch sends nothing and every request 401s while the user is
+//     visibly logged in.
+//
+//   API_BASE — in dev the client is on :5173 and the API on :5000
+//     with no Vite proxy, so a bare '/api/dispatch' would hit the
+//     Vite dev server and 404.
+const request = async (path, options = {}) => {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    credentials: 'include',
+    ...options,
+    headers: {
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...options.headers,
+    },
   });
-  return res.data;
+  return handleResponse(res);
 };
 
-export default { getGateQueue, getPallet, recordCollection };
+// Unwraps the { success, data, message } envelope every dispatch
+// endpoint returns, and throws with `.status` attached so callers can
+// tell a server refusal (403/409) from a dead connection.
+async function handleResponse(res) {
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    throw new Error(
+      `Could not reach the dispatch service (status ${res.status}). Check your connection and try again.`
+    );
+  }
+
+  const json = await res.json();
+  if (!json.success) {
+    const err = new Error(json.message || 'Request failed.');
+    err.status  = res.status;
+    err.payload = json;
+    throw err;
+  }
+  return json.data;
+}
+
+// ── Today, in the warehouse's own timezone ────────────────────
+// NOT toISOString().slice(0, 10). That formats in UTC, and Cape Town
+// is UTC+2 — so between midnight and 02:00 SAST it returns YESTERDAY
+// and the gate queue loads the wrong day's pallets. Building the
+// string from the local date components gives the date the person
+// holding the phone would write down.
+export const todayISO = () => {
+  const d   = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
+// ── Idempotency key ───────────────────────────────────────────
+// The gate is the one screen that genuinely runs offline — a driver
+// standing in a yard with no signal — so a collection may be sent
+// more than once. The server stores this key UNIQUE and returns the
+// original event on a replay instead of deducting stock twice.
+//
+// It must be generated ONCE per collection attempt and reused on
+// every retry of that attempt; a fresh one per tap defeats the whole
+// mechanism. See PalletCheck.jsx, which holds it in state for the
+// life of the screen.
+//
+// dispatch.service.validateCollectBody checks the shape against a
+// UUID v4 regex, so the fallback below has to set the version and
+// variant bits properly. crypto.randomUUID is unavailable on plain
+// http:// origins, which is exactly how a tablet reaches a laptop on
+// the warehouse LAN during testing.
+export const newIdempotencyKey = () => {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+
+  const bytes = new Uint8Array(16);
+  if (globalThis.crypto?.getRandomValues) {
+    globalThis.crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < 16; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;   // version 4
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;   // variant 10x
+
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0'));
+  return [
+    hex.slice(0, 4).join(''),
+    hex.slice(4, 6).join(''),
+    hex.slice(6, 8).join(''),
+    hex.slice(8, 10).join(''),
+    hex.slice(10, 16).join(''),
+  ].join('-');
+};
+
+// ── GET /api/dispatch ─────────────────────────────────────────
+// The gate board: every packed pallet for the day, plus everything
+// already handled today, each row carrying its dispatch status.
+//
+// Rows are keyed on picking_slip_id, NOT id — the row is a join of a
+// picking slip and its dispatch event, and `id` would be ambiguous.
+//
+// Loading the board may run the 16:00 non-collection sweep as a
+// server-side side effect. That is deliberate on the server's part;
+// nothing is needed here beyond calling it.
+export const getBoard = ({ dispatchDate, cohort, status } = {}) => {
+  const params = new URLSearchParams();
+  if (dispatchDate) params.set('dispatchDate', dispatchDate);
+  if (cohort)       params.set('cohort', cohort);
+  if (status)       params.set('status', status);
+
+  const qs = params.toString();
+  return request(qs ? `?${qs}` : '');
+};
+
+// Today's board, which is the only day anybody collects on.
+export const getGateQueue = (dispatchDate) =>
+  getBoard({ dispatchDate: dispatchDate || todayISO() });
+
+// ── GET /api/dispatch/:id ─────────────────────────────────────
+// One pallet as the gate sees it: the slip, its lines pre-filled with
+// packed_quantity, and the `eligibility` object the server computed.
+//
+// Read those eligibility flags rather than re-deriving them here.
+// They exist precisely so the screen and the collect endpoint cannot
+// disagree about whether a pallet needs a manager's authorisation.
+export const getGateView = (slipId) => request(`/${slipId}`);
+
+// ── POST /api/dispatch/:id/collect ────────────────────────────
+// lines is a SPARSE override map: [{ itemId, loadedQuantity,
+// varianceReason }]. Any line not named keeps its packed quantity, so
+// staff never have to retype twenty numbers to say "it all matched".
+//
+// signature is a base64 PNG data URL. It is not optional — BR-13
+// makes it the proof of collection that replaces the paper register,
+// and the server rejects a collection without one.
+export const recordCollection = (
+  slipId,
+  { driverName, signature, vehicleReg, lines, idempotencyKey, overrideReason } = {}
+) =>
+  request(`/${slipId}/collect`, {
+    method: 'POST',
+    body: JSON.stringify({
+      driverName,
+      signature,
+      vehicleReg:     vehicleReg || null,
+      lines:          lines || [],
+      idempotencyKey: idempotencyKey || null,
+      overrideReason: overrideReason || null,
+    }),
+  });
+
+// ── GET /api/dispatch/notes/:eventId ──────────────────────────
+// The proof-of-collection document. Keyed on a dispatch_events id,
+// which is a DIFFERENT id space to the picking_slip_id every other
+// call in this file takes — pass row.dispatch_event_id, not
+// row.picking_slip_id.
+export const getDispatchNote = (eventId) => request(`/notes/${eventId}`);
+
+// ── POST /api/dispatch/sweep (manager only) ───────────────────
+// Forces the 16:00 non-collection write-off for a date. The board
+// already sweeps opportunistically; this is for after a power cut or
+// a deploy that landed across the cutoff.
+export const runSweep = (dispatchDate) =>
+  request('/sweep', {
+    method: 'POST',
+    body: JSON.stringify(dispatchDate ? { dispatchDate } : {}),
+  });
+
+// ── GET /api/dispatch/non-collections (BR-26) ─────────────────
+// A centre that repeatedly fails to collect is a pattern, not an
+// incident. Manager and finance only.
+export const getNonCollectionHistory = ({ ecdId, from, to } = {}) => {
+  const params = new URLSearchParams();
+  if (ecdId) params.set('ecdId', ecdId);
+  if (from)  params.set('from', from);
+  if (to)    params.set('to', to);
+
+  const qs = params.toString();
+  return request(`/non-collections${qs ? `?${qs}` : ''}`);
+};
+
+export default {
+  getBoard,
+  getGateQueue,
+  getGateView,
+  recordCollection,
+  getDispatchNote,
+  runSweep,
+  getNonCollectionHistory,
+  todayISO,
+  newIdempotencyKey,
+};
