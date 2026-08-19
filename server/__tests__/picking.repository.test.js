@@ -199,3 +199,112 @@ describe('setItemStatus — quantity variance', () => {
     expect(result.item).not.toHaveProperty('quantity_variance');
   });
 });
+// ─────────────────────────────────────────────────────────────
+// assignSlip — the status guard fires inside the lock
+//
+// Same technique as the setItemStatus tests above: a fake client
+// records every statement, so we can prove the UPDATE never runs
+// rather than merely that the return value looks right. That
+// distinction is the whole point — the bug being fixed was an UPDATE
+// that set status = 'in_progress' with nothing checking what the
+// status had been, so a closed pallet silently reopened.
+// ─────────────────────────────────────────────────────────────
+const assignClient = (slip) => {
+  const calls = [];
+  return {
+    calls,
+    release: vi.fn(),
+    query: vi.fn(async (sql) => {
+      calls.push(sql.replace(/\s+/g, ' ').trim());
+      if (/SELECT id, status, assigned_to FROM picking_slips/i.test(sql)) {
+        return { rows: slip ? [slip] : [] };
+      }
+      if (/UPDATE picking_slips/i.test(sql)) {
+        return { rows: [{ id: 1, ...slip, status: 'in_progress', assigned_to: OWNER }] };
+      }
+      return { rows: [], rowCount: 1 };
+    }),
+  };
+};
+
+const claim = (client, over = {}) => {
+  poolMock.connect.mockResolvedValueOnce(client);
+  return pickingRepository.assignSlip({ slipId: 1, packerId: OWNER, actorId: OWNER, ...over });
+};
+
+const claimed = (c) => c.calls.some((s) => /^UPDATE picking_slips/i.test(s));
+
+describe('assignSlip — status guard', () => {
+  it('locks the row before deciding anything', async () => {
+    const client = assignClient({ id: 1, status: 'pending', assigned_to: null });
+    await claim(client);
+    expect(sql(client)[1]).toMatch(/FOR UPDATE/i);
+  });
+
+  it.each(['pending', 'in_progress'])('claims a %s pallet', async (status) => {
+    const client = assignClient({ id: 1, status, assigned_to: null });
+    const result = await claim(client);
+    expect(result.slip).toBeDefined();
+    expect(claimed(client)).toBe(true);
+  });
+
+  it.each(['complete', 'dispatched', 'cancelled'])(
+    'refuses a %s pallet and writes nothing',
+    async (status) => {
+      const client = assignClient({ id: 1, status, assigned_to: null });
+      const result = await claim(client);
+      expect(result).toMatchObject({ locked: true, status });
+      expect(claimed(client)).toBe(false);
+      expect(sql(client)).toContain('ROLLBACK');
+    }
+  );
+
+  it('refuses a closed pallet even with canOverride — the guard is not an ownership check', async () => {
+    const client = assignClient({ id: 1, status: 'complete', assigned_to: null });
+    const result = await claim(client, { canOverride: true });
+    expect(result).toMatchObject({ locked: true });
+    expect(claimed(client)).toBe(false);
+  });
+
+  it('returns notFound for a slip that does not exist', async () => {
+    const client = assignClient(null);
+    expect(await claim(client)).toMatchObject({ notFound: true });
+    expect(claimed(client)).toBe(false);
+  });
+});
+
+describe('assignSlip — ownership', () => {
+  it('lets a packer re-claim a pallet they already hold', async () => {
+    const client = assignClient({ id: 1, status: 'in_progress', assigned_to: OWNER });
+    const result = await claim(client);
+    expect(result.slip).toBeDefined();
+    expect(result.reassignedFrom).toBeNull();
+  });
+
+  it('refuses a packer taking a pallet off someone else', async () => {
+    const client = assignClient({ id: 1, status: 'in_progress', assigned_to: OTHER });
+    const result = await claim(client);
+    expect(result).toMatchObject({ conflict: true, assignedTo: OTHER });
+    expect(claimed(client)).toBe(false);
+  });
+
+  it('lets canOverride take a pallet off someone else', async () => {
+    const client = assignClient({ id: 1, status: 'in_progress', assigned_to: OTHER });
+    const result = await claim(client, { canOverride: true });
+    expect(result.slip).toBeDefined();
+    expect(result.reassignedFrom).toBe(OTHER);
+    expect(claimed(client)).toBe(true);
+  });
+
+  // picking_events.event_type is constrained in the database. A new
+  // label would violate that constraint and roll back the whole
+  // reassignment — the exact failure mode a mocked-pg suite cannot
+  // otherwise see, so it is asserted here explicitly.
+  it('records a reassignment as an "assigned" event, not a new event type', async () => {
+    const client = assignClient({ id: 1, status: 'in_progress', assigned_to: OTHER });
+    await claim(client, { canOverride: true });
+    const event = client.query.mock.calls.find(([s]) => /INSERT INTO picking_events/i.test(s));
+    expect(event[1][1]).toBe('assigned');
+    expect(event[1][3]).toMatchObject({ packer_id: OWNER, reassigned_from: OTHER });
+  });
+});

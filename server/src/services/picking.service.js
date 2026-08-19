@@ -134,15 +134,52 @@ const createSlip = async ({ ecdId, dispatchDate, cohort, force }, user) => {
   return result;
 };
 
-// ── Claim a slip ──────────────────────────────────────────────
-// A packer can only claim for themselves. A manager can reassign.
-const assignSlip = async (slipId, body, user) => {
-  const packerId = isManager(user) ? (body.packerId || user.id) : user.id;
+// ── Why a pallet cannot be claimed ────────────────────────────
+// Written for the floor, not for the log. A packer who taps Claim on
+// a pallet that has already gone needs to know that it has gone, not
+// read a status name out of a database column.
+const LOCKED_REASON = {
+  complete:   'This pallet has already been closed off by packing, so it cannot be claimed again.',
+  dispatched: 'This pallet has already been collected and has left the gate.',
+  cancelled:  'This pallet was cancelled.',
+};
 
-  const result = await pickingRepository.assignSlip({ slipId, packerId, actorId: user.id });
+// ── Claim a slip ──────────────────────────────────────────────
+// A packer can only claim for themselves — a packerId in the body is
+// ignored for them, so a crafted request cannot park a pallet on a
+// colleague. A manager may name someone, and may take a pallet off
+// whoever currently holds it (canOverride below); the repository
+// records the previous holder in the audit event either way.
+//
+// Nobody, manager included, can claim a pallet packing has already
+// closed. That guard lives in the repository, inside the row lock.
+const assignSlip = async (slipId, body, user) => {
+  const manager = isManager(user);
+
+  // Validated rather than passed straight through: an unchecked
+  // packerId reaches a foreign key and comes back as a 500 with a
+  // Postgres message in it.
+  if (manager && body.packerId !== undefined && body.packerId !== null && body.packerId !== '') {
+    const parsed = Number(body.packerId);
+    if (!Number.isInteger(parsed) || parsed <= 0) fail(400, 'That is not a valid packer.');
+  }
+
+  const packerId = manager ? (Number(body.packerId) || user.id) : user.id;
+
+  const result = await pickingRepository.assignSlip({
+    slipId,
+    packerId,
+    actorId:     user.id,
+    canOverride: manager,
+  });
 
   if (result.notFound) fail(404, 'Picking slip not found.');
-  if (result.conflict) fail(409, 'This pallet is already being packed by someone else.');
+  if (result.locked) {
+    fail(409, LOCKED_REASON[result.status] || 'This pallet can no longer be claimed.');
+  }
+  if (result.conflict) {
+    fail(409, 'This pallet is already being packed by someone else. A manager can reassign it.');
+  }
   return result.slip;
 };
 

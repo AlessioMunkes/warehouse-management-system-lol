@@ -311,7 +311,7 @@ describe('assignSlip — claiming a pallet', () => {
   it('lets a packer claim a slip for themselves', async () => {
     await pickingService.assignSlip(1, {}, WORKER);
     expect(repoMock.assignSlip).toHaveBeenCalledWith(
-      { slipId: 1, packerId: WORKER.id, actorId: WORKER.id }
+      { slipId: 1, packerId: WORKER.id, actorId: WORKER.id, canOverride: false }
     );
   });
 
@@ -325,7 +325,7 @@ describe('assignSlip — claiming a pallet', () => {
   it('lets a manager assign a slip to a named packer', async () => {
     await pickingService.assignSlip(1, { packerId: WORKER2.id }, MANAGER);
     expect(repoMock.assignSlip).toHaveBeenCalledWith(
-      { slipId: 1, packerId: WORKER2.id, actorId: MANAGER.id }
+      { slipId: 1, packerId: WORKER2.id, actorId: MANAGER.id, canOverride: true }
     );
   });
 
@@ -341,6 +341,67 @@ describe('assignSlip — claiming a pallet', () => {
     const call = repoMock.assignSlip.mock.calls[0][0];
     expect(call.packerId).toBe(WORKER2.id);
     expect(call.actorId).toBe(MANAGER.id);
+  });
+
+  // ── canOverride: ownership only ─────────────────────────────
+  // A manager taking a pallet off a packer who has gone home is a
+  // real operation the service has always claimed to support. It did
+  // not: the repository had no canOverride parameter, so the conflict
+  // branch fired for managers too.
+  it('lets a manager override the ownership check', async () => {
+    await pickingService.assignSlip(1, { packerId: WORKER2.id }, MANAGER);
+    expect(repoMock.assignSlip.mock.calls[0][0].canOverride).toBe(true);
+  });
+
+  it('does not let a packer override the ownership check', async () => {
+    await pickingService.assignSlip(1, {}, WORKER);
+    expect(repoMock.assignSlip.mock.calls[0][0].canOverride).toBe(false);
+  });
+
+  it('surfaces a conflict as a 409 that names the way out', async () => {
+    repoMock.assignSlip.mockResolvedValue({ conflict: true, assignedTo: WORKER2.id });
+    await expect(pickingService.assignSlip(1, {}, WORKER)).rejects.toMatchObject({ status: 409 });
+    await expect(pickingService.assignSlip(1, {}, WORKER)).rejects.toThrow(/manager can reassign/i);
+  });
+
+  it('passes a missing slip through as a 404', async () => {
+    repoMock.assignSlip.mockResolvedValue({ notFound: true });
+    await expect(pickingService.assignSlip(1, {}, WORKER)).rejects.toMatchObject({ status: 404 });
+  });
+
+  // ── The status guard ────────────────────────────────────────
+  // Claiming a closed pallet used to reopen it: the UPDATE set
+  // status = 'in_progress' with nothing checking what it was before.
+  // A reopened slip leaves the dispatch board and stops counting as
+  // committed stock, so the goods on it read as available again.
+  it.each([
+    ['complete',   /closed off by packing/i],
+    ['dispatched', /left the gate/i],
+    ['cancelled',  /cancelled/i],
+  ])('refuses to claim a %s pallet, in words a packer can act on', async (status, message) => {
+    repoMock.assignSlip.mockResolvedValue({ locked: true, status });
+    await expect(pickingService.assignSlip(1, {}, WORKER)).rejects.toMatchObject({ status: 409 });
+    repoMock.assignSlip.mockResolvedValue({ locked: true, status });
+    await expect(pickingService.assignSlip(1, {}, WORKER)).rejects.toThrow(message);
+  });
+
+  it('refuses a manager too — reopening a closed pallet is not a claim', async () => {
+    repoMock.assignSlip.mockResolvedValue({ locked: true, status: 'complete' });
+    await expect(pickingService.assignSlip(1, {}, MANAGER)).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('falls back to a generic refusal for a status it has no wording for', async () => {
+    repoMock.assignSlip.mockResolvedValue({ locked: true, status: 'something_new' });
+    await expect(pickingService.assignSlip(1, {}, WORKER)).rejects.toThrow(/no longer be claimed/i);
+  });
+
+  // ── packerId validation ─────────────────────────────────────
+  // Unvalidated it reaches a foreign key and returns a 500 carrying a
+  // Postgres message.
+  it.each([['abc'], [0], [-3], [1.5]])('rejects packerId %p with a 400', async (packerId) => {
+    await expect(pickingService.assignSlip(1, { packerId }, MANAGER))
+      .rejects.toMatchObject({ status: 400 });
+    expect(repoMock.assignSlip).not.toHaveBeenCalled();
   });
 
   it('maps a missing slip to 404', async () => {

@@ -257,10 +257,41 @@ const createSlip = async ({ ecdId, dispatchDate, cohort, generatedBy }) => {
   }
 };
 
+// ── Which statuses can still be claimed ───────────────────────
+// A pallet is claimable while it is being built and no longer after
+// packing has closed it off. Kept next to assignSlip rather than in
+// the service because, like every other guard in this file, it has to
+// be evaluated INSIDE the row lock — a check in the service can be
+// overtaken between the read and the write.
+const CLAIMABLE_STATUSES = ['pending', 'in_progress'];
+
 // ── Claim a slip ──────────────────────────────────────────────
 // FOR UPDATE prevents two packers claiming the same pallet.
-// Returns null if someone else already holds it.
-const assignSlip = async ({ slipId, packerId, actorId }) => {
+//
+// TWO guards, and they are different things.
+//
+// STATUS. The UPDATE below sets status = 'in_progress'
+// unconditionally, so without a status guard claiming an already
+// CLOSED pallet silently reopened it. The damage from that is not
+// obvious: a reopened slip drops out of the dispatch board (which
+// filters on status IN ('complete','dispatched')) and out of
+// committedStockSql (which requires status = 'complete'), so a pallet
+// physically standing in the staging area stops being counted as
+// committed and its stock reads as available to the next packer. The
+// pallet also becomes editable again through setItemStatus, which
+// guards 'complete'/'dispatched' but has no say over how the slip got
+// back to 'in_progress'. Nobody may claim a closed pallet — not even
+// a manager. Reopening one is a deliberate act that deserves its own
+// endpoint, not a side effect of tapping Claim.
+//
+// OWNERSHIP. Taking a pallet off another packer is a legitimate thing
+// for a manager to do — a shift ends, someone goes home sick — and
+// picking.service.js has always documented it as supported. It was
+// not: canOverride did not exist here, so the conflict branch fired
+// for managers too and reassignment was impossible through the API.
+// canOverride now covers ownership only; the status guard above
+// applies to everybody.
+const assignSlip = async ({ slipId, packerId, actorId, canOverride = false }) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -271,9 +302,20 @@ const assignSlip = async ({ slipId, packerId, actorId }) => {
     );
     const slip = current.rows[0];
     if (!slip) { await client.query('ROLLBACK'); return { notFound: true }; }
-    if (slip.assigned_to && slip.assigned_to !== packerId) {
+
+    if (!CLAIMABLE_STATUSES.includes(slip.status)) {
       await client.query('ROLLBACK');
-      return { conflict: true };
+      return { locked: true, status: slip.status };
+    }
+
+    // Re-claiming a pallet you already hold is not a reassignment —
+    // it is a packer tapping the same button twice, and it succeeds
+    // quietly.
+    const isReassignment = Boolean(slip.assigned_to) && slip.assigned_to !== packerId;
+
+    if (isReassignment && !canOverride) {
+      await client.query('ROLLBACK');
+      return { conflict: true, assignedTo: slip.assigned_to };
     }
 
     const result = await client.query(
@@ -286,9 +328,22 @@ const assignSlip = async ({ slipId, packerId, actorId }) => {
       [packerId, slipId]
     );
 
-    await logEvent(client, slipId, 'assigned', actorId, { packer_id: packerId });
+    // A reassignment is recorded as an 'assigned' event carrying the
+    // previous holder in its detail, NOT as a new 'reassigned' event
+    // type. picking_events.event_type is constrained in the database,
+    // and a label the constraint has never seen would roll the whole
+    // transaction back at the one moment a manager is trying to
+    // unblock a stalled pallet. The detail column is JSONB and takes
+    // whatever it is given.
+    await logEvent(client, slipId, 'assigned', actorId, {
+      packer_id: packerId,
+      ...(isReassignment
+        ? { reassigned_from: slip.assigned_to, previous_status: slip.status }
+        : {}),
+    });
+
     await client.query('COMMIT');
-    return { slip: result.rows[0] };
+    return { slip: result.rows[0], reassignedFrom: isReassignment ? slip.assigned_to : null };
 
   } catch (err) {
     await client.query('ROLLBACK');
@@ -567,6 +622,7 @@ const completeSlip = async ({ slipId, palletRef, actorId, canOverride = false })
 };
 
 export default {
+  CLAIMABLE_STATUSES,
   getCohortAnchor,
   getSlips,
   getSlipById,
