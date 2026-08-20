@@ -40,7 +40,14 @@ const STATE = {
   awaiting:       { label: 'Waiting for collection', tone: '',           openable: true  },
   collected:      { label: 'Collected',              tone: ' is-static', openable: false },
   late_collected: { label: 'Collected (late)',       tone: ' is-static', openable: false },
-  not_collected:  { label: 'Not collected',          tone: ' is-warn is-static', openable: false },
+  // Openable. The 16:00 sweep records that a day ended without this
+  // pallet leaving; it does not put the pallet out of reach. A driver
+  // arriving at 16:40 is collecting the same food off the same floor,
+  // so the row opens and the collection runs normally — it is filed
+  // as 'late_collected' afterwards. Marked warn so it still reads as
+  // an exception on the board, but not is-static, which is what made
+  // it un-tappable.
+  not_collected:  { label: 'Not collected',          tone: ' is-warn',   openable: true  },
   cancelled:      { label: 'Cancelled',              tone: ' is-static', openable: false },
 };
 
@@ -109,7 +116,7 @@ export default function GateQueue({ onOpenPallet }) {
             if (blocked) {
               meta = 'This centre is not active, so nothing can go out to it today.';
             } else if (row.dispatch_status === 'not_collected') {
-              meta = 'Written off at 16:00. A manager can still release it.';
+              meta = 'Written off at 16:00 — still collectable. It will be recorded as a late collection.';
             } else if (at) {
               meta = `${state.label} at ${at}${row.driver_name ? ` · ${row.driver_name}` : ''}`;
             } else {

@@ -13,10 +13,17 @@
 // upstream by the programme team, not a discrepancy between a number
 // in a database and a number on a shelf.
 //
-// Everything else (wrong cohort day BR-12, an unpacked slip, a
-// collection after the 16:00 write-off) proceeds on a manager
-// override with a recorded reason, which is what the paper process
-// already does when Grizel signs off an exception at the gate.
+// Two things (a pallet booked for another day, and a slip packing has
+// not closed off) proceed on a manager override with a recorded
+// reason, which is what the paper process already does when Grizel
+// signs off an exception at the gate.
+//
+// A collection after the 16:00 write-off is NOT one of them. It is
+// recorded — the event becomes 'late_collected' and the day shows it
+// as late — and otherwise proceeds exactly as an on-time collection
+// does, with no override, no manager and no extra taps. The sweep
+// exists to keep the non-collection history honest at the end of a
+// day, not to close the gate at 16:00.
 // ─────────────────────────────────────────────────────────────
 import dispatchRepository from '../repositories/dispatch.repository.js';
 import { ROLES }          from '../middleware/auth.middleware.js';
@@ -275,9 +282,24 @@ const collect = async (slipId, body, user) => {
   if (eligibility.slipNotPacked) {
     needsOverride.push('this pallet has not been closed off by the packing team yet');
   }
-  if (eligibility.writtenOff) {
-    needsOverride.push('this pallet was already recorded as not collected at 16:00');
-  }
+  // writtenOff is DELIBERATELY not in this list.
+  //
+  // BR-14's 16:00 sweep is a bookkeeping act, not a gate closure. It
+  // writes a 'not_collected' event so the non-collection history
+  // (BR-26) is accurate for a day that has otherwise ended; it does
+  // not mean the food has gone anywhere. If the driver turns up at
+  // 16:40 the pallet is still on the floor and still theirs, and the
+  // collection proceeds exactly as an on-time one would — the
+  // repository upgrades the existing event to 'late_collected' and
+  // deducts stock as normal, which is the flag.
+  //
+  // Requiring a manager here made the sweep a lock: the board sweeps
+  // opportunistically whenever it is loaded after 16:00, so from
+  // 16:00 onwards every remaining pallet became un-collectable by the
+  // warehouse worker actually standing at the gate. That inverts the
+  // rule that runs through this whole file — nothing stops food
+  // leaving the building over a data disagreement — and the data
+  // disagreement here is with a clock.
 
   if (needsOverride.length > 0) {
     if (!isManager(user)) {

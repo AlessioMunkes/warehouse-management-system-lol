@@ -316,3 +316,76 @@ describe('getNonCollectionHistory', () => {
     );
   });
 });
+// ── The 16:00 write-off is a flag, not a lock (BR-14) ─────────
+// The sweep runs opportunistically from getBoard, so from 16:00
+// onwards essentially every uncollected pallet carries
+// dispatch_status = 'not_collected'. When that fed needsOverride, the
+// effect was that the gate closed itself at 16:00 for the warehouse
+// worker actually standing at it — a driver arriving at 16:40 had to
+// find a manager before food could leave, which is the opposite of
+// the rule this service is built on.
+//
+// These pin the corrected behaviour: written off still SHOWS (the
+// flag survives, and the repository files the event as
+// 'late_collected'), but it does not gate anything.
+describe('a pallet written off at 16:00 can still be collected', () => {
+  const writtenOff = () => gateView({ dispatch_status: 'not_collected' });
+
+  beforeEach(() => {
+    atUtc('2026-08-19T14:40:00Z');          // 16:40 SAST, after the sweep
+    repoMock.collect.mockResolvedValue({ event: { id: 9, status: 'late_collected' } });
+  });
+
+  const body = {
+    driverName: 'S. Mokoena',
+    signature:  'data:image/png;base64,iVBORw0KGgo=',
+  };
+
+  it('still flags it as written off', () => {
+    expect(evaluateEligibility(writtenOff()).writtenOff).toBe(true);
+  });
+
+  it('lets a warehouse worker collect it with no override reason', async () => {
+    repoMock.getGateView.mockResolvedValue(writtenOff());
+
+    await expect(dispatchService.collect(1, body, WORKER)).resolves.toMatchObject({
+      event: { status: 'late_collected' },
+    });
+
+    expect(repoMock.collect).toHaveBeenCalledWith(
+      expect.objectContaining({ overrideReason: null, actorId: WORKER.id })
+    );
+  });
+
+  it('does not ask a manager for a reason either', async () => {
+    repoMock.getGateView.mockResolvedValue(writtenOff());
+    await expect(dispatchService.collect(1, body, MANAGER)).resolves.toBeTruthy();
+  });
+
+  // The cutoff alone — before the sweep has written anything — was
+  // never a gate, and must not become one.
+  it('does not gate on the clock alone', async () => {
+    repoMock.getGateView.mockResolvedValue(gateView());
+    expect(evaluateEligibility(gateView()).afterCutoff).toBe(true);
+    await expect(dispatchService.collect(1, body, WORKER)).resolves.toBeTruthy();
+  });
+
+  // Being written off must not smuggle a pallet past the checks that
+  // ARE gates. A written-off pallet at an inactive centre is still
+  // blocked, and one that packing never closed off still needs a
+  // manager.
+  it('still blocks an inactive centre (BR-11)', async () => {
+    repoMock.getGateView.mockResolvedValue(
+      gateView({ dispatch_status: 'not_collected', ecd_is_active: false })
+    );
+    await expect(dispatchService.collect(1, body, WORKER)).rejects.toMatchObject({ status: 409 });
+    expect(repoMock.collect).not.toHaveBeenCalled();
+  });
+
+  it('still needs a manager when packing has not closed the slip', async () => {
+    repoMock.getGateView.mockResolvedValue(
+      gateView({ dispatch_status: 'not_collected', slip_status: 'in_progress' })
+    );
+    await expect(dispatchService.collect(1, body, WORKER)).rejects.toMatchObject({ status: 403 });
+  });
+});
