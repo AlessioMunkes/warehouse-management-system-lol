@@ -194,6 +194,65 @@ describe('getBoard — the sweep trigger', () => {
     expect(repoMock.getBoard).not.toHaveBeenCalled();
   });
 
+  // ── scope=gate ──────────────────────────────────────────────
+  // The gate board carries no date of its own. "Today" has to be
+  // resolved from todayString(), not from CURRENT_DATE (UTC on
+  // Render) and not from the browser clock.
+  describe('scope=gate', () => {
+    it("passes the SAST date as gateToday, not the UTC one", async () => {
+      // 00:30 SAST on the 20th is still 22:30 UTC on the 19th. The
+      // board must scope to the 20th, which is the day the warehouse
+      // is having.
+      atUtc('2026-08-19T22:30:00Z');
+      await dispatchService.getBoard({ scope: 'gate' }, MANAGER);
+      expect(repoMock.getBoard).toHaveBeenCalledWith(
+        expect.objectContaining({ gateToday: '2026-08-20', dispatchDate: undefined })
+      );
+    });
+
+    it('sweeps after the cutoff even with no date asked for', async () => {
+      // Dropping the date filter must not drop the sweep trigger:
+      // the gate board is the fallback for a cron that stops firing.
+      atUtc('2026-08-19T14:00:00Z');   // 16:00 SAST
+      await dispatchService.getBoard({ scope: 'gate' }, MANAGER);
+      expect(repoMock.sweepNonCollections).toHaveBeenCalledWith(
+        { dispatchDate: '2026-08-19', actorId: MANAGER.id }
+      );
+    });
+
+    it('does not sweep before the cutoff', async () => {
+      atUtc('2026-08-19T13:00:00Z');   // 15:00 SAST
+      await dispatchService.getBoard({ scope: 'gate' }, MANAGER);
+      expect(repoMock.sweepNonCollections).not.toHaveBeenCalled();
+    });
+
+    it('yields to an explicit dispatchDate', async () => {
+      atUtc('2026-08-19T08:00:00Z');
+      await dispatchService.getBoard(
+        { scope: 'gate', dispatchDate: '2026-08-19' }, MANAGER
+      );
+      expect(repoMock.getBoard).toHaveBeenCalledWith(
+        expect.objectContaining({ dispatchDate: '2026-08-19', gateToday: undefined })
+      );
+    });
+
+    it('rejects an unknown scope rather than silently ignoring it', async () => {
+      atUtc('2026-08-19T08:00:00Z');
+      await expect(dispatchService.getBoard({ scope: 'everything' }, MANAGER))
+        .rejects.toMatchObject({ status: 400 });
+      expect(repoMock.getBoard).not.toHaveBeenCalled();
+    });
+
+    it('leaves the undated board unscoped and unswept', async () => {
+      atUtc('2026-08-19T14:00:00Z');
+      await dispatchService.getBoard({}, MANAGER);
+      expect(repoMock.sweepNonCollections).not.toHaveBeenCalled();
+      expect(repoMock.getBoard).toHaveBeenCalledWith(
+        expect.objectContaining({ gateToday: undefined })
+      );
+    });
+  });
+
   it('still rejects a bad cohort and status', async () => {
     atUtc('2026-08-19T08:00:00Z');
     await expect(dispatchService.getBoard({ cohort: 'week3' }, MANAGER))

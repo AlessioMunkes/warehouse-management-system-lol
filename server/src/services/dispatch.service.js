@@ -159,10 +159,13 @@ export const evaluateEligibility = (gateView) => {
 // past-or-present date. sweepNonCollections is idempotent, so the two
 // triggers cannot conflict.
 const getBoard = async (query, user) => {
-  const { dispatchDate, cohort, status } = query;
+  const { dispatchDate, cohort, status, scope } = query;
 
   if (cohort && !COHORTS.includes(cohort))   fail(400, 'Cohort must be week1 or week2.');
   if (status && !STATUSES.includes(status))  fail(400, 'Invalid dispatch status filter.');
+  if (scope !== undefined && scope !== 'gate') {
+    fail(400, "Scope must be 'gate' if supplied.");
+  }
 
   // Validated BEFORE it is compared or passed on. The comparison
   // below is a string compare, which happily calls '0000-99-99' a
@@ -172,6 +175,11 @@ const getBoard = async (query, user) => {
     fail(400, 'Dispatch date must be a real date in YYYY-MM-DD form.');
   }
 
+  // scope=gate carries no date of its own, so "today" is resolved
+  // here rather than in SQL — todayString() is the one place that
+  // knows the service runs in UTC and the warehouse does not.
+  const gateToday = (!dispatchDate && scope === 'gate') ? todayString() : undefined;
+
   if (dispatchDate) {
     const today      = todayString();
     const isPast     = dispatchDate < today;
@@ -179,9 +187,15 @@ const getBoard = async (query, user) => {
     if (isPast || (dispatchDate === today && pastCutoff)) {
       await dispatchRepository.sweepNonCollections({ dispatchDate, actorId: user.id });
     }
+  } else if (gateToday && currentHour() >= NON_COLLECTION_CUTOFF_HOUR) {
+    // The gate board is the other place the sweep gets triggered from
+    // (see the note above this function). Dropping the date filter
+    // must not also drop that trigger, or an afternoon where nobody
+    // opens the dated board leaves the day unswept.
+    await dispatchRepository.sweepNonCollections({ dispatchDate: gateToday, actorId: user.id });
   }
 
-  return await dispatchRepository.getBoard({ dispatchDate, cohort, status });
+  return await dispatchRepository.getBoard({ dispatchDate, cohort, status, gateToday });
 };
 
 // ── One pallet at the gate ────────────────────────────────────

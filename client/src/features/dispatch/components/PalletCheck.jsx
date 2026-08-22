@@ -1,7 +1,13 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/features/dispatch/components/GateQueue.jsx
 //
-// Today's board at the gate, from GET /api/dispatch.
+// The board at the gate, from GET /api/dispatch?scope=gate.
+//
+// Not just today: every pallet still outstanding on any date, plus
+// whatever was handled today. A pallet staged for Tuesday that nobody
+// fetched is still in the building on Thursday and has to be
+// releasable — the 16:00 sweep marks it not_collected but leaves it
+// collectable as a late collection.
 //
 // WHAT CHANGED
 // This used to make two calls to the PICKING endpoints and treat a
@@ -26,11 +32,11 @@
 // computes it per pallet and returns it in the gate view's
 // eligibility object, which PalletCheck reads. It is not surfaced on
 // the board because a pallet booked for another day should not be in
-// today's list in the first place — if one appears, opening it
+// this list in the first place — if one appears, opening it
 // explains why.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
-import dispatchAPI, { todayISO } from '../../../services/dispatchAPI';
+import dispatchAPI from '../../../services/dispatchAPI';
 import { Notice } from '../../staff/components/StepPrimitives';
 
 // The four states a row can be in, and how each reads on the floor.
@@ -69,7 +75,7 @@ export default function GateQueue({ onOpenPallet }) {
   useEffect(() => {
     let cancelled = false;
 
-    dispatchAPI.getGateQueue(todayISO())
+    dispatchAPI.getGateQueue()
       .then((board) => { if (!cancelled) setRows(board || []); })
       .catch((err) => {
         if (!cancelled) setError(err.message || 'Could not load the gate queue.');
@@ -83,7 +89,7 @@ export default function GateQueue({ onOpenPallet }) {
   const waiting = rows.filter((r) => stateOf(r).openable);
 
   const summary = rows.length === 0
-    ? 'Nothing staged for today yet.'
+    ? 'Nothing waiting for collection.'
     : `${done.length} of ${rows.length} collected · ${waiting.length} still waiting`;
 
   return (
@@ -98,7 +104,7 @@ export default function GateQueue({ onOpenPallet }) {
       {loading ? (
         <div className="stf-skeleton" aria-label="Loading" />
       ) : rows.length === 0 ? (
-        <div className="stf-empty">No pallets are staged for collection today.</div>
+        <div className="stf-empty">No pallets are waiting for collection.</div>
       ) : (
         <div className="stf-list">
           {rows.map((row) => {

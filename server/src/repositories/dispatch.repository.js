@@ -45,11 +45,45 @@ const logEvent = async (client, slipId, eventType, actorId, detail = null) => {
 // only the outstanding queue. Drivers arrive first come, first
 // served, so the board is ordered by ECD name for lookup speed, not
 // by any notion of scheduled time.
-const getBoard = async ({ dispatchDate, cohort, status }) => {
+//
+// Three ways to scope it:
+//   dispatchDate   — one exact day. Used by the manager's board and
+//                    by the sweep, which both reason about a date.
+//   gateToday      — the gate's own view: every pallet still
+//                    outstanding on ANY date, plus whatever was
+//                    handled today. A pallet staged for Tuesday that
+//                    nobody fetched is still sitting in the building
+//                    on Thursday, and the gate has to be able to
+//                    release it — the 16:00 sweep marks it
+//                    not_collected but explicitly leaves it
+//                    collectable as a late collection.
+//   neither        — no date restriction at all.
+// dispatchDate wins if both are supplied.
+//
+// gateToday must be a SAST date string from todayString(), never
+// CURRENT_DATE: Render runs UTC, so between midnight and 02:00 SAST
+// CURRENT_DATE is still yesterday and the day's collections would
+// drop off the board.
+const getBoard = async ({ dispatchDate, cohort, status, gateToday }) => {
   const params = [];
   const where  = [`ps.status IN ('complete', 'dispatched')`];
 
-  if (dispatchDate) { params.push(dispatchDate); where.push(`ps.dispatch_date = $${params.length}`); }
+  if (dispatchDate) {
+    params.push(dispatchDate);
+    where.push(`ps.dispatch_date = $${params.length}`);
+  } else if (gateToday) {
+    params.push(gateToday);
+    // "Outstanding" is the absence of a completed collection, not a
+    // specific status: no event row yet, or an event that is not one
+    // of the two terminal collected states. not_collected is
+    // deliberately outstanding — it is written off, not gone.
+    where.push(`(
+         de.id IS NULL
+      OR de.status IS NULL
+      OR de.status NOT IN ('collected', 'late_collected')
+      OR ps.dispatch_date = $${params.length}::date
+    )`);
+  }
   if (cohort)       { params.push(cohort);       where.push(`ps.cohort = $${params.length}`); }
   if (status) {
     params.push(status);
@@ -268,7 +302,7 @@ const collect = async ({
                vehicle_reg     = $4,
                signature       = $5,
                override_reason = COALESCE($6, override_reason),
-               override_by     = CASE WHEN $6::text IS NOT NULL THEN $2 ELSE override_by END,
+               override_by     = CASE WHEN $6::text IS NOT NULL THEN $2::integer ELSE override_by END,
                idempotency_key = COALESCE($7, idempotency_key)
            WHERE id = $8
            RETURNING *`,
@@ -279,8 +313,18 @@ const collect = async ({
           `INSERT INTO dispatch_events
              (picking_slip_id, status, collected_at, dispatched_by, driver_name,
               vehicle_reg, signature, override_reason, override_by, idempotency_key)
-           VALUES ($1, 'collected', NOW(), $2, $3, $4, $5, $6,
-                   CASE WHEN $6::text IS NOT NULL THEN $2 ELSE NULL END, $7)
+           VALUES ($1, 'collected', NOW(), $2::integer, $3, $4, $5, $6,
+                   -- $2 is deduced as integer from dispatched_by above, then
+                   -- deduced again inside this CASE against an untyped NULL.
+                   -- The two deductions conflict and Postgres raises 42P08
+                   -- ("inconsistent types deduced for parameter $2") — on
+                   -- FIRST-TIME collection only, since the UPDATE branch
+                   -- below has `ELSE override_by`, a column with a known
+                   -- type. Casting both arms pins it. Reproduced and fixed
+                   -- against real Postgres 16; the pg mock in the tests
+                   -- cannot see this class of error at all.
+                   CASE WHEN $6::text IS NOT NULL THEN $2::integer
+                        ELSE NULL::integer END, $7)
            RETURNING *`,
           [slipId, actorId, driverName, vehicleReg ?? null,
            signature ?? null, overrideReason, idempotencyKey]

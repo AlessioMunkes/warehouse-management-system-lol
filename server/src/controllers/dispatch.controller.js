@@ -19,7 +19,9 @@
 import dispatchService from '../services/dispatch.service.js';
 
 // ── The gate board ───────────────────────────────────────────
-// GET /api/dispatch?dispatchDate=&cohort=&status=
+// GET /api/dispatch?dispatchDate=&cohort=&status=&scope=
+// scope=gate drops the date filter in favour of "outstanding on any
+// date, plus handled today" — see getBoard in dispatch.service.js.
 // Returns: every packed pallet for the day, one row per slip, with
 // today's dispatch status baked in. May opportunistically run the
 // 16:00 non-collection sweep as a side effect (see the service).

@@ -114,19 +114,34 @@ export { newIdempotencyKey };
 // Loading the board may run the 16:00 non-collection sweep as a
 // server-side side effect. That is deliberate on the server's part;
 // nothing is needed here beyond calling it.
-export const getBoard = ({ dispatchDate, cohort, status } = {}) => {
+export const getBoard = ({ dispatchDate, cohort, status, scope } = {}) => {
   const params = new URLSearchParams();
   if (dispatchDate) params.set('dispatchDate', dispatchDate);
   if (cohort)       params.set('cohort', cohort);
   if (status)       params.set('status', status);
+  if (scope)        params.set('scope', scope);
 
   const qs = params.toString();
   return request(qs ? `?${qs}` : '');
 };
 
-// Today's board, which is the only day anybody collects on.
+// The gate's board: every pallet still outstanding on ANY date, plus
+// whatever was handled today.
+//
+// This used to default to todayISO(), which hid a pallet staged for
+// Tuesday and never fetched — it is still physically in the building
+// on Thursday, and the 16:00 sweep marks it not_collected precisely
+// because it stays collectable as a late collection. A row nobody can
+// see is a row nobody can release.
+//
+// "Today" is now resolved server-side from todayString(), not from the
+// browser clock: a device with the wrong date or a non-SAST timezone
+// would otherwise scope the board to the wrong day. Pass an explicit
+// dispatchDate only when you actually want one exact day.
 export const getGateQueue = (dispatchDate) =>
-  getBoard({ dispatchDate: dispatchDate || todayISO() });
+  dispatchDate
+    ? getBoard({ dispatchDate })
+    : getBoard({ scope: 'gate' });
 
 // ── GET /api/dispatch/:id ─────────────────────────────────────
 // One pallet as the gate sees it: the slip, its lines pre-filled with
