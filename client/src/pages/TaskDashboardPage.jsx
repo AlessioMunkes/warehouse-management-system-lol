@@ -4,10 +4,11 @@ import { useState } from "react";
 import { TopNavbar } from "../features/taskdashboard/components/TopNavBar";
 import { Greeting } from "../features/taskdashboard/components/Greeting";
 import { TaskGrid } from "../features/taskdashboard/components/TaskGrid";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "./../context/AuthContext";
 import { STAFF, PACKING } from "../routes/paths";
 
 
+import donationIcon from "./../../public/icons/donation-Icon.svg.jpg";
 import receivingIcon from "./../../public/icons/receiving-icon.svg";
 import packingIcon from "./../../public/icons/packing-icon.svg";
 import decantingIcon from "./../../public/icons/decanting-icon.svg";
@@ -23,6 +24,8 @@ export default function Home() {
     { to: PACKING.board, icon: packingIcon, title: "Packing" },
     { to: STAFF.decanting, icon: decantingIcon, title: "Decanting" },
     { to: STAFF.dispatch, icon: dispatchIcon, title: "Dispatch" },
+    {to: STAFF.donation, icon : donationIcon ,titile : "Donation"},
+
   ];
 
   return (

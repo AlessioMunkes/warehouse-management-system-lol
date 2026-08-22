@@ -6,7 +6,7 @@ import LandingPage                                 from './pages/LandingPage';
 import LoginPage                                   from './pages/LoginPage';
 import GuestLoginPage                              from './pages/GuestLoginPage';
 import GuestHomePage                               from './pages/GuestHomePage';
-
+import PageNotFound                               from "./pages/PageNotFound";
 //import SelectNOCjob                                from './pages/SelectNOCjob';
 
 import ProcurementPage                             from './pages/ProcurementPage';
@@ -17,6 +17,12 @@ import InventoryManagementPage                     from './pages/InventoryManage
 import ManagerActivityScreen                       from './pages/ManagerActivityScreen';
 import TaskDashboard from './pages/TaskDashboardPage';
 
+// Donations — new feature, own draft context scoped to just these
+// two routes (see features/donation/components/DonationDraftContext.jsx)
+import { DonationDraftProvider }                   from './features/donation/components/DonationDraftContext';
+import { DonationDetailsPage }                     from './pages/DonationDetailsPage';
+import { ReviewPage as DonationReviewPage }         from './pages/ReviewPage';
+
 const App = () => (
   <AuthProvider>
     <BrowserRouter>
@@ -25,11 +31,12 @@ const App = () => (
         <Route path="/"      element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/guest" element={<GuestLoginPage />} />
-
+         
+        
         {/* Protected — manager only */}
         <Route element={<ProtectedRoute roles={['manager']} />}>
           <Route path="/manager"       element={<ManagerActivityScreen />} />
-          <Route path="/noc/inventory" element={<InventoryManagementPage />} />
+        <Route path="/noc/inventory" element={<InventoryManagementPage />} />
         </Route>
 
         {/* Protected — any logged-in user */}
@@ -38,7 +45,29 @@ const App = () => (
               real one lands. */}
           <Route path="/noc"           element={<TaskDashboard />} />
           <Route path="/noc/decanting" element={<DecantingPage />} />
-
+            {/* TEMP — moved out of ProtectedRoute for local testing while
+                        auth/DB isn't fully wired up yet. Move back inside the
+                        "any logged-in user" ProtectedRoute block (see below)
+                        before this goes near a demo or production — donation
+                        intake should require login + RECEIVERS_UP role, matching
+                        donation.routes.js. */}
+                    <Route
+                      path="/donations/new"
+                      element={
+                        <DonationDraftProvider>
+                          <DonationDetailsPage />
+                        </DonationDraftProvider>
+                      }
+                    />
+                    <Route
+                      path="/donations/new/review"
+                      element={
+                        <DonationDraftProvider>
+                          <DonationReviewPage />
+                        </DonationDraftProvider>
+                      }
+                    />
+            
           {/* One URL per task, shared by managers and workers alike —
               each page picks manager view vs. staff flow by role
               internally (see ProcurementPage.jsx / PackingSelectPage.jsx
@@ -63,7 +92,7 @@ const App = () => (
                element={<Navigate to={PACKING.board} replace />} />
 
         {/* Catch-all */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<PageNotFound />} />
       </Routes>
     </BrowserRouter>
   </AuthProvider>

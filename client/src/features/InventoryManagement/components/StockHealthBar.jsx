@@ -1,28 +1,15 @@
 // ─────────────────────────────────────────────────────────────
 // StockHealthBar.jsx
 //
-// Renders stock category health summaries and metric cards.
-//
-// THE FIELD NAMES MATTER. This component used to read prod.quantity,
-// prod.minThreshold and prod.reorderLevel. None of those exist — the
-// manifest is mapped in services/stockAPI.js and produces onHand,
-// available, reorderAt, isShortfall and isLowStock. Every read
-// therefore came back undefined, `qty` fell through to 0, and the
-// first branch counted EVERY product as a shortfall: the bar reported
-// 100% shortfall on a fully stocked warehouse.
-//
-// It now reads the same isShortfall / isLowStock flags the table
-// badges use, which are computed once in SQL. Deriving them a second
-// time here is how the bar and the table ended up able to disagree in
-// the first place.
-//
-// Supports `reducedMovement` accessibility mode:
-// - When active: Suppresses status icons, indicator dots, and vivid colors.
-// - When inactive: Displays color-coded badges, status dots, and icons.
+// Renders stock category health metric cards.
+// Supports `reducedMovement` accessibility mode.
 // ─────────────────────────────────────────────────────────────
 
 import { useMemo } from "react";
 import { Boxes, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
+
+// Custom stylesheet
+import "../../../styles/index.css";
 
 export default function StockHealthBar({ products = [], reducedMovement = false }) {
   // Compute inventory category counts and percentages
@@ -44,9 +31,6 @@ export default function StockHealthBar({ products = [], reducedMovement = false 
     let lowStock = 0;
     let shortfall = 0;
 
-    // Same order of precedence the table's badge uses: a shortfall is
-    // also below its reorder threshold, and should be counted once,
-    // as the worse of the two.
     products.forEach((prod) => {
       if (prod.isShortfall) {
         shortfall += 1;
@@ -69,72 +53,20 @@ export default function StockHealthBar({ products = [], reducedMovement = false 
   }, [products]);
 
   return (
-    <div className="space-y-4">
-      {/* Top Banner / Distribution Status Bar */}
-      <div className="p-4 sm:p-5 rounded-xl border bg-card text-card-foreground shadow-sm space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <h2 className="text-base font-semibold">Overall Stock Health</h2>
-            <p className="text-xs sm:text-sm text-muted-foreground">
-              Active SKUs by status, measured on available stock —
-              what is on hand minus what is already packed for
-              collection.
-            </p>
-          </div>
-          <span className="self-start sm:self-auto text-xs font-medium px-2.5 py-1 rounded-full bg-muted text-muted-foreground">
-            {metrics.total} Total SKUs
-          </span>
-        </div>
-
-        {/* Status Category Legend */}
-        <div className="flex flex-wrap items-center gap-4 text-xs sm:text-sm font-medium pt-1">
-          <div className="flex items-center gap-1.5">
-            {!reducedMovement && (
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-            )}
-            <span className={reducedMovement ? "text-foreground" : "text-emerald-700 dark:text-emerald-400"}>
-              In Stock: {metrics.inStock} ({metrics.inStockPct}%)
-            </span>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            {!reducedMovement && (
-              <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
-            )}
-            <span className={reducedMovement ? "text-foreground" : "text-amber-700 dark:text-amber-400"}>
-              Low Stock: {metrics.lowStock} ({metrics.lowStockPct}%)
-            </span>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            {!reducedMovement && (
-              <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
-            )}
-            <span className={reducedMovement ? "text-foreground" : "text-rose-700 dark:text-rose-400"}>
-              Shortfall: {metrics.shortfall} ({metrics.shortfallPct}%)
-            </span>
-          </div>
-        </div>
-      </div>
-
+    <div className="stock-health-wrapper">
       {/* Metric Breakdown Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        
+      <div className="stock-grid">
         {/* 1. Total SKUs Card */}
-        <div className="p-4 rounded-xl border bg-card text-card-foreground shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs sm:text-sm font-medium text-muted-foreground">
-              Total SKUs
-            </span>
+        <div className="stock-card">
+          <div className="stock-card-header">
+            <span className="stock-card-label">Total SKUs</span>
             {!reducedMovement && (
-              <Boxes className="h-5 w-5 text-muted-foreground" />
+              <Boxes className="stock-icon stock-icon-neutral" />
             )}
           </div>
-          <div className="mt-3">
-            <span className="text-2xl sm:text-3xl font-bold tracking-tight">
-              {metrics.total}
-            </span>
-            <p className="text-xs text-muted-foreground mt-1">
+          <div className="stock-card-body">
+            <span className="stock-card-value">{metrics.total}</span>
+            <p className="stock-card-subtext stock-text-sub-accessible">
               Active catalog items
             </p>
           </div>
@@ -142,29 +74,23 @@ export default function StockHealthBar({ products = [], reducedMovement = false 
 
         {/* 2. In Stock Card */}
         <div
-          className={`p-4 rounded-xl border bg-card text-card-foreground shadow-sm flex flex-col justify-between transition-colors ${
-            reducedMovement
-              ? "border-border"
-              : "border-l-4 border-l-emerald-500"
+          className={`stock-card ${
+            !reducedMovement ? "stock-card-emerald" : ""
           }`}
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs sm:text-sm font-medium text-muted-foreground">
-              In Stock
-            </span>
+          <div className="stock-card-header">
+            <span className="stock-card-label">In Stock</span>
             {!reducedMovement && (
-              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+              <CheckCircle2 className="stock-icon stock-icon-emerald" />
             )}
           </div>
-          <div className="mt-3">
-            <span className="text-2xl sm:text-3xl font-bold tracking-tight">
-              {metrics.inStock}
-            </span>
+          <div className="stock-card-body">
+            <span className="stock-card-value">{metrics.inStock}</span>
             <p
-              className={`text-xs mt-1 font-medium ${
+              className={`stock-card-subtext ${
                 reducedMovement
-                  ? "text-muted-foreground"
-                  : "text-emerald-600 dark:text-emerald-400"
+                  ? "stock-text-sub-accessible"
+                  : "stock-text-emerald"
               }`}
             >
               {metrics.inStockPct}% of inventory
@@ -174,29 +100,23 @@ export default function StockHealthBar({ products = [], reducedMovement = false 
 
         {/* 3. Low Stock Card */}
         <div
-          className={`p-4 rounded-xl border bg-card text-card-foreground shadow-sm flex flex-col justify-between transition-colors ${
-            reducedMovement
-              ? "border-border"
-              : "border-l-4 border-l-amber-500"
+          className={`stock-card ${
+            !reducedMovement ? "stock-card-amber" : ""
           }`}
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs sm:text-sm font-medium text-muted-foreground">
-              Low Stock
-            </span>
+          <div className="stock-card-header">
+            <span className="stock-card-label">Low Stock</span>
             {!reducedMovement && (
-              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              <AlertTriangle className="stock-icon stock-icon-amber" />
             )}
           </div>
-          <div className="mt-3">
-            <span className="text-2xl sm:text-3xl font-bold tracking-tight">
-              {metrics.lowStock}
-            </span>
+          <div className="stock-card-body">
+            <span className="stock-card-value">{metrics.lowStock}</span>
             <p
-              className={`text-xs mt-1 font-medium ${
+              className={`stock-card-subtext ${
                 reducedMovement
-                  ? "text-muted-foreground"
-                  : "text-amber-600 dark:text-amber-400"
+                  ? "stock-text-sub-accessible"
+                  : "stock-text-amber"
               }`}
             >
               {metrics.lowStockPct}% at or below threshold
@@ -206,36 +126,29 @@ export default function StockHealthBar({ products = [], reducedMovement = false 
 
         {/* 4. Shortfall Card */}
         <div
-          className={`p-4 rounded-xl border bg-card text-card-foreground shadow-sm flex flex-col justify-between transition-colors ${
-            reducedMovement
-              ? "border-border"
-              : "border-l-4 border-l-rose-500"
+          className={`stock-card ${
+            !reducedMovement ? "stock-card-rose" : ""
           }`}
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs sm:text-sm font-medium text-muted-foreground">
-              Shortfall
-            </span>
+          <div className="stock-card-header">
+            <span className="stock-card-label">Shortfall</span>
             {!reducedMovement && (
-              <XCircle className="h-5 w-5 text-rose-600" />
+              <XCircle className="stock-icon stock-icon-rose" />
             )}
           </div>
-          <div className="mt-3">
-            <span className="text-2xl sm:text-3xl font-bold tracking-tight">
-              {metrics.shortfall}
-            </span>
+          <div className="stock-card-body">
+            <span className="stock-card-value">{metrics.shortfall}</span>
             <p
-              className={`text-xs mt-1 font-medium ${
+              className={`stock-card-subtext ${
                 reducedMovement
-                  ? "text-muted-foreground"
-                  : "text-rose-600 dark:text-rose-400"
+                  ? "stock-text-sub-accessible"
+                  : "stock-text-rose"
               }`}
             >
               {metrics.shortfallPct}% over-committed
             </p>
           </div>
         </div>
-
       </div>
     </div>
   );
