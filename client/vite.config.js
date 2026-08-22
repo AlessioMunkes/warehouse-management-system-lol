@@ -1,24 +1,34 @@
-import { defineConfig } from 'vitest/config';
-import react from '@vitejs/plugin-react';
-import { fileURLToPath } from 'node:url';
+import { defineConfig } from 'vite'
+import react, { reactCompilerPreset } from '@vitejs/plugin-react'
+import babel from '@rolldown/plugin-babel'
+import { VitePWA } from 'vite-plugin-pwa'
+import path from 'path';
+import { fileURLToPath } from 'url'
+import tailwindcss from '@tailwindcss/vite'   // ← added
+
+let faviconURL = './favicon.svg'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    tailwindcss(),                              // ← added (must be first)
+    react(),
+    VitePWA({
+      includeAssets: [faviconURL],
+      manifest: {
+        theme_color: '#7A1A1A',                 // updated to match your brand
+        icons: [
+          { src: faviconURL, sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' },
+          { src: faviconURL, sizes: '192x192',  type: 'image/svg+xml' }
+        ]
+      }
+    }),
+    babel({ presets: [reactCompilerPreset()] })
+  ],
   resolve: {
-    // Mirrors the "@" alias in vite.config.js. Without it, any test that
-    // transitively imports a shadcn component ("@/components/ui/button")
-    // dies at import-analysis before a single assertion runs — the app
-    // builds fine, only the test runner can't resolve the path.
-    //
-    // import.meta.url rather than __dirname: this config is ESM, and
-    // unlike vite.config.js it isn't in eslint's globalIgnores, so
-    // __dirname would trip no-undef.
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
+    alias :{
+      "@" : path.resolve(__dirname , "./src"),
     },
   },
-  test: {
-    environment: 'jsdom',
-    setupFiles: ['./src/tests/setup.js'],
-  },
-});
+})

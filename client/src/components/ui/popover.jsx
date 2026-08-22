@@ -11,10 +11,26 @@ function Popover({
   return <PopoverPrimitive.Root data-slot="popover" {...props} />;
 }
 
+// See the note in tooltip.jsx — Base UI uses `render`, not `asChild`.
 function PopoverTrigger({
+  asChild,
+  children,
   ...props
 }) {
-  return <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props} />;
+  if (asChild) {
+    return (
+      <PopoverPrimitive.Trigger
+        data-slot="popover-trigger"
+        render={children}
+        {...props}
+      />
+    );
+  }
+  return (
+    <PopoverPrimitive.Trigger data-slot="popover-trigger" {...props}>
+      {children}
+    </PopoverPrimitive.Trigger>
+  );
 }
 
 function PopoverContent({

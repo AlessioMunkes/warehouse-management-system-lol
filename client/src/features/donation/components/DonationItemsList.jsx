@@ -6,7 +6,7 @@
 // it marks fields touched and auto-focuses/scrolls to the first error.
 // ─────────────────────────────────────────────────────────────
 import { useState, useRef, useImperativeHandle, forwardRef } from "react";
-import { ProductMatchCombobox } from "./ProductMatchCombobox";
+import { ProductMatchCombobox } from "./ProductMatchComboBox";
 
 const UNITS = ["kg", "g", "l", "ml", "each", "bag", "box", "crate", "punnet"];
 

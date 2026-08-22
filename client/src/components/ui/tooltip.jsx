@@ -15,10 +15,32 @@ function Tooltip({
   return <TooltipPrimitive.Root data-slot="tooltip" {...props} />;
 }
 
+// Base UI composes via `render`, not Radix's `asChild`. Call sites
+// across the app were written against the Radix API, where `asChild`
+// silently did nothing: it leaked to the DOM as an unknown attribute
+// and Base UI wrapped the child in its own <button>, producing nested
+// interactive elements (invalid HTML, and a screen reader reads the
+// control twice). Translating here fixes every call site at once and
+// keeps `asChild` working for anything written against shadcn docs.
 function TooltipTrigger({
+  asChild,
+  children,
   ...props
 }) {
-  return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />;
+  if (asChild) {
+    return (
+      <TooltipPrimitive.Trigger
+        data-slot="tooltip-trigger"
+        render={children}
+        {...props}
+      />
+    );
+  }
+  return (
+    <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props}>
+      {children}
+    </TooltipPrimitive.Trigger>
+  );
 }
 
 function TooltipContent({
