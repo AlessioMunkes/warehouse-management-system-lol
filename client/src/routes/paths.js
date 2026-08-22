@@ -25,6 +25,10 @@
 // this follows.
 // ─────────────────────────────────────────────────────────────
 
+// Single source for the donation intake base path — STAFF.donation and
+// DONATIONS.new must never drift apart.
+const DONATIONS_NEW = '/donations/new';
+
 export const PACKING = {
   // One URL for everyone. PackingSelectPage decides whether that
   // renders the manager's board (PackingPage) or the packer's own
@@ -46,4 +50,22 @@ export const STAFF = {
   // week planner by role. There is no /staff/decanting.
   decanting: '/noc/decanting',
   dispatch:  '/staff/dispatch',
+  // Donation intake. Entry point of the draft flow; see DONATIONS
+  // below for the later steps.
+  donation:  DONATIONS_NEW,
 };
+
+// ── Donations ────────────────────────────────────────────────
+// Split from STAFF because the intake flow is role-gated more
+// tightly than the rest of the task dashboard (see App.jsx).
+export const DONATIONS = {
+  new:    DONATIONS_NEW,
+  review: `${DONATIONS_NEW}/review`,
+};
+
+// Client-side mirror of RECEIVERS_UP in
+// server/src/routes/donation.routes.js. Finance reads the money side
+// (Section 18A queue) but does not intake stock, so it is absent from
+// both lists. If the server list changes, change this one with it —
+// they are two halves of the same rule.
+export const DONATION_INTAKE_ROLES = ['warehouse_worker', 'manager', 'admin'];

@@ -24,7 +24,7 @@ export default function Home() {
     { to: PACKING.board, icon: packingIcon, title: "Packing" },
     { to: STAFF.decanting, icon: decantingIcon, title: "Decanting" },
     { to: STAFF.dispatch, icon: dispatchIcon, title: "Dispatch" },
-    {to: STAFF.donation, icon : donationIcon ,titile : "Donation"},
+    { to: STAFF.donation, icon: donationIcon, title: "Donation" },
 
   ];
 

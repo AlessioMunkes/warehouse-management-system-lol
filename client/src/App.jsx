@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate }  from 'react-router-dom';
 import { AuthProvider }                            from './context/AuthContext';
 import ProtectedRoute                              from './components/layout/ProtectedRoute';
-import { PACKING, STAFF }                          from './routes/paths';
+import { PACKING, STAFF, DONATIONS, DONATION_INTAKE_ROLES } from './routes/paths';
 import LandingPage                                 from './pages/LandingPage';
 import LoginPage                                   from './pages/LoginPage';
 import GuestLoginPage                              from './pages/GuestLoginPage';
@@ -18,7 +18,7 @@ import ManagerActivityScreen                       from './pages/ManagerActivity
 import TaskDashboard from './pages/TaskDashboardPage';
 
 // Donations — new feature, own draft context scoped to just these
-// two routes (see features/donation/components/DonationDraftContext.jsx)
+// two routes (see features/donation/context/DonationDraftProvider.jsx)
 import { DonationDraftProvider }                   from './features/donation/context/DonationDraftProvider';
 import { DonationDetailsPage }                     from './pages/DonationDetailsPage';
 import { ReviewPage as DonationReviewPage }         from './pages/ReviewPage';
@@ -45,29 +45,7 @@ const App = () => (
               real one lands. */}
           <Route path="/noc"           element={<TaskDashboard />} />
           <Route path="/noc/decanting" element={<DecantingPage />} />
-            {/* TEMP — moved out of ProtectedRoute for local testing while
-                        auth/DB isn't fully wired up yet. Move back inside the
-                        "any logged-in user" ProtectedRoute block (see below)
-                        before this goes near a demo or production — donation
-                        intake should require login + RECEIVERS_UP role, matching
-                        donation.routes.js. */}
-                    <Route
-                      path="/donations/new"
-                      element={
-                        <DonationDraftProvider>
-                          <DonationDetailsPage />
-                        </DonationDraftProvider>
-                      }
-                    />
-                    <Route
-                      path="/donations/new/review"
-                      element={
-                        <DonationDraftProvider>
-                          <DonationReviewPage />
-                        </DonationDraftProvider>
-                      }
-                    />
-            
+
           {/* One URL per task, shared by managers and workers alike —
               each page picks manager view vs. staff flow by role
               internally (see ProcurementPage.jsx / PackingSelectPage.jsx
@@ -76,6 +54,35 @@ const App = () => (
           <Route path={PACKING.board}         element={<PackingSelectPage />} />
           <Route path={PACKING.detailPattern} element={<PackingSelectPage />} />
           <Route path={STAFF.dispatch}        element={<DispatchPage />} />
+        </Route>
+
+        {/* Protected — donation intake, RECEIVERS_UP only.
+            Mirrors POST /api/donations in server/src/routes/donation.routes.js,
+            which is auth + requireRole(WORKER, MANAGER, ADMIN). Finance can
+            read the money side but does not intake stock, so it is excluded
+            here exactly as it is there — the client gate is a UX courtesy,
+            the server route is the actual control.
+
+            The draft context is mounted per-route rather than around the
+            block so the sessionStorage draft is scoped to the two intake
+            pages and cleared by navigating away from them. */}
+        <Route element={<ProtectedRoute roles={DONATION_INTAKE_ROLES} />}>
+          <Route
+            path={STAFF.donation}
+            element={
+              <DonationDraftProvider>
+                <DonationDetailsPage />
+              </DonationDraftProvider>
+            }
+          />
+          <Route
+            path={DONATIONS.review}
+            element={
+              <DonationDraftProvider>
+                <DonationReviewPage />
+              </DonationDraftProvider>
+            }
+          />
         </Route>
 
         {/* Guest-only */}

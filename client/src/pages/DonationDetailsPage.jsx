@@ -17,6 +17,7 @@ import { TopNavbar } from "../features/taskdashboard/components/TopNavBar";
 //import { MobileBottomNav } from "@/components/layout/MoileBottomNav"; // pending teammate
 
 import { useDonationDraft } from "../features/donation/context/DonationDraftContext";
+import { DONATIONS } from "../routes/paths";
 import { DonationRail } from "../features/donation/components/DonationRail";
 import { CategorySelector } from "../features/donation/components/CategorySelector";
 import { DonationItemsList } from "../features/donation/components/DonationItemsList";
@@ -55,7 +56,7 @@ export function DonationDetailsPage() {
   };
 
   const handleNext = () => {
-    if (validate()) navigate("/donations/new/review");
+    if (validate()) navigate(DONATIONS.review);
   };
 
   const today = new Date().toLocaleDateString("en-ZA", {

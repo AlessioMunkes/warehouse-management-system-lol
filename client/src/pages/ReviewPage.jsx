@@ -16,6 +16,7 @@ import { TopNavbar } from "../features/taskdashboard/components/TopNavBar";
 //import { MobileBottomNav } from "@/components/layout/MoileBottomNav"; // pending teammate
 
 import { useDonationDraft } from "../features/donation/context/DonationDraftContext";
+import { DONATIONS } from "../routes/paths";
 import { DonationRail } from "../features/donation/components/DonationRail";
 import { ReviewSummary, SectionPicker, EditSectionDialog } from "../features/donation/components/ReviewSummary";
 import { CompletionDialog } from "../features/donation/components/WarningsNotice";
@@ -58,7 +59,7 @@ export function ReviewPage() {
   const handleRecordAnother = () => {
     resetDraft();
     setCompletionOpen(false);
-    navigate("/donations/new");
+    navigate(DONATIONS.new);
   };
 
   const handleGoHome = () => {
@@ -101,7 +102,7 @@ export function ReviewPage() {
           <div className="stf-actions is-row">
             <button
               className="stf-btn stf-btn-secondary"
-              onClick={() => navigate("/donations/new")}
+              onClick={() => navigate(DONATIONS.new)}
             >
               Back
             </button>
