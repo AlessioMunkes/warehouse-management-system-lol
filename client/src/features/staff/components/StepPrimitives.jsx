@@ -10,7 +10,7 @@
 // sequential screens with one decision each. ACC-06 is why the
 // numbers are 56px and every tap target is at least 44px.
 // ─────────────────────────────────────────────────────────────
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 // ── Step rail ─────────────────────────────────────────────────
 // Four thin bars and a quiet line of text. Deliberately not a
@@ -183,10 +183,19 @@ export const KeyValues = ({ pairs }) => (
 // data (that's Segments, used on the packing board) — so it gets its
 // own name even though it borrows .stf-segments' look, overridden to
 // a full pill (see staff.css's .stf-toggle rule) rather than the
-// filter tabs' softer corners. A sliding highlight behind the active
-// option, the same idea booking.com uses for its List/Grid switch.
-// Hard-coded to two options — the thumb's position is plain
-// arithmetic, not measured, and only works out for exactly two.
+// filter tabs' softer corners.
+//
+// Sized to its labels, not stretched to fill the row — the same
+// booking.com List/Grid control this was asked to look like is a
+// short, content-hugging pill sitting inline among other controls,
+// not a full-width block. That only works if the sliding thumb's
+// width and position are the button's REAL rendered size, since two
+// labels like "Guided" and "Form" are not the same width — hence the
+// measuring below, the same thing booking.com's own markup does with
+// its --bui-segmented-control-active-scale-x/-transform-x custom
+// properties (measured in JS, not a fixed CSS split). A ResizeObserver
+// re-measures on layout changes — a font finishing its load, the
+// bench-tablet breakpoint — not just on option changes.
 //
 // No title-attribute tooltip: this is a phone held with one hand,
 // and `title` never shows on a tap, only a mouse hover that will
@@ -195,20 +204,45 @@ export const KeyValues = ({ pairs }) => (
 // selected — you learn what a mode does by trying it, in the same
 // breath as trying it.
 export const ViewToggle = ({ options, value, onChange, className = '' }) => {
+  const containerRef = useRef(null);
+  const buttonRefs = useRef([]);
+  const [thumb, setThumb] = useState(null);
   const index = options.findIndex((o) => o.value === value);
   const active = options[index];
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    const button = buttonRefs.current[index];
+    if (!container || !button) return undefined;
+
+    const measure = () => {
+      const containerBox = container.getBoundingClientRect();
+      const buttonBox = button.getBoundingClientRect();
+      setThumb({ width: buttonBox.width, x: buttonBox.left - containerBox.left });
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [index, options]);
+
   return (
     <div className={`stf-toggle-block${className ? ` ${className}` : ''}`}>
-      <div
-        className={`stf-segments stf-toggle${index === 1 ? ' is-index-1' : ''}`}
-        role="radiogroup"
-      >
-        <span className="stf-segment-thumb" aria-hidden="true" />
-        {options.map((option) => {
+      <div className="stf-toggle" role="radiogroup" ref={containerRef}>
+        {thumb ? (
+          <span
+            className="stf-segment-thumb"
+            aria-hidden="true"
+            style={{ width: `${thumb.width}px`, transform: `translateX(${thumb.x}px)` }}
+          />
+        ) : null}
+        {options.map((option, i) => {
           const chosen = option.value === value;
           return (
             <button
               key={option.value}
+              ref={(el) => { buttonRefs.current[i] = el; }}
               type="button"
               role="radio"
               aria-checked={chosen}

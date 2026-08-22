@@ -580,22 +580,30 @@
 
 /* ── View toggle (Guided / Form) ───────────────────────────────────
    Same .stf-segments shell as the filter tabs above, but a full pill
-   rather than their softer corners — this is the one place in the app
-   asking to look like booking.com's List/Grid switch, not the filter-
-   tab language used everywhere else. A sliding thumb added on top,
-   opt-in via .stf-toggle so the packing board's tabs are untouched.
-   The maths only works out for exactly two equal-width segments with
-   the container's own 3px padding and 4px gap: translateX(100%) moves
-   the thumb by its own width, and adding the 4px gap lands it exactly
-   on the second segment. Do not reuse this for three options without
-   redoing the arithmetic. */
-.stf-toggle-block { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+   rather than their softer corners, and sized to its labels rather
+   than stretched to fill the row — this is the one place in the app
+   asking to look like booking.com's compact List/Grid switch, not the
+   full-width filter-tab language used everywhere else (nor the
+   full-width block this looked like before: a fixed 50/50 split only
+   works for two equal-width segments, which forced the whole control
+   to stretch to make that true). The thumb's width and position come
+   from JS measuring the real button (see ViewToggle in
+   StepPrimitives.jsx) — CSS here only draws it. */
+.stf-toggle-block {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
 .stf-toggle {
   position: relative;
-  width: 100%;
+  display: inline-flex;
+  width: auto;
   border-radius: var(--stf-radius-pill);
 }
 .stf-toggle .stf-segment {
+  flex: none;
+  padding: 10px 18px;
   position: relative;
   z-index: 1;
   border-radius: var(--stf-radius-pill);
@@ -603,26 +611,32 @@
 }
 .stf-segment-thumb {
   position: absolute;
-  top: 3px; bottom: 3px; left: 3px;
-  width: calc(50% - 5px);
+  top: 3px; bottom: 3px; left: 0;
   border-radius: var(--stf-radius-pill);
   background: var(--stf-white);
   box-shadow: 0 1px 2px rgba(43, 51, 54, 0.14);
-  transition: transform 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 220ms cubic-bezier(0.4, 0, 0.2, 1), width 220ms cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 0;
 }
-.stf-toggle.is-index-1 .stf-segment-thumb { transform: translateX(calc(100% + 4px)); }
 
-/* One line, centred, naming whichever option is currently active.
-   Not a title-attribute tooltip: this is read with a thumb, not a
-   mouse, and title never shows on a tap. */
+/* One line naming whichever option is currently active, left-aligned
+   under the (now content-sized) pill. Not a title-attribute tooltip:
+   this is read with a thumb, not a mouse, and title never shows on a
+   tap. */
 .stf-toggle-hint { margin: 0; font-size: 12px; color: var(--stf-text-sub); }
 
 /* ── Coachmark (first-run nudge toward the view toggle) ───────────
    Anchored to whatever wraps the toggle (.stf-toggle-anchor gives it
    position: relative), not fixed to the viewport — it only ever
    needs to point at one control, right below it. */
-.stf-toggle-anchor { position: relative; }
+.stf-toggle-anchor {
+  position: relative;
+  /* .stf-main is a flex column; a direct child stretches to its full
+     width by default. This is the actual direct child (ViewToggle's
+     own .stf-toggle-block sits inside it), so the override belongs
+     here, not one level down. */
+  align-self: flex-start;
+}
 .stf-coachmark {
   position: absolute;
   top: calc(100% + 4px);
