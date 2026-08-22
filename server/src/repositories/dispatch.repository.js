@@ -319,7 +319,7 @@ const collect = async ({
                    -- The two deductions conflict and Postgres raises 42P08
                    -- ("inconsistent types deduced for parameter $2") — on
                    -- FIRST-TIME collection only, since the UPDATE branch
-                   -- below has `ELSE override_by`, a column with a known
+                   -- below has ELSE override_by, a column with a known
                    -- type. Casting both arms pins it. Reproduced and fixed
                    -- against real Postgres 16; the pg mock in the tests
                    -- cannot see this class of error at all.
