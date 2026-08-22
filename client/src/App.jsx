@@ -19,7 +19,7 @@ import TaskDashboard from './pages/TaskDashboardPage';
 
 // Donations — new feature, own draft context scoped to just these
 // two routes (see features/donation/components/DonationDraftContext.jsx)
-import { DonationDraftProvider }                   from './features/donation/components/DonationDraftContext';
+import { DonationDraftProvider }                   from './features/donation/context/DonationDraftProvider';
 import { DonationDetailsPage }                     from './pages/DonationDetailsPage';
 import { ReviewPage as DonationReviewPage }         from './pages/ReviewPage';
 

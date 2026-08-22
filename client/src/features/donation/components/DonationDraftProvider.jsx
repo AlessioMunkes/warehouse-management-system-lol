@@ -1,45 +1,23 @@
 // ─────────────────────────────────────────────────────────────
-// features/donations/context/DonationDraftContext.jsx
+// features/donation/components/DonationDraftProvider.jsx
 //
 // Holds the in-progress donation while the worker moves across the
 // three routes (/donations/new -> /donor -> /review). Backed by
 // sessionStorage so a refresh or a locked phone doesn't wipe progress
 // mid-entry at the gate.
+//
+// Component-only by design: the context object, the empty-draft
+// factories and the useDonationDraft hook live in
+// DonationDraftContext.js. Keeping non-component exports out of this
+// file is what satisfies react-refresh/only-export-components.
 // ─────────────────────────────────────────────────────────────
-import { createContext, useContext, useState, useEffect, useCallback } from "react";
-
-const STORAGE_KEY = "donation-draft";
-
-// One empty item row — id is local-only (crypto.randomUUID), never
-// sent to the backend. The backend assigns its own item ids on insert.
-const emptyItem = () => ({
-  id: crypto.randomUUID(),
-  description: "",
-  quantity: "",
-  unit: "",
-  productId: null,
-  productLabel: "",
-});
-
-// Shape mirrors donation.service.js's createDonation payload closely,
-// so mapping draft -> POST body at submit time is close to 1:1.
-const emptyDraft = () => ({
-  category: "",              // ⚠ placeholder pending Alessio — see CategorySelector.jsx
-  items: [emptyItem()],
-  estimatedValueZar: "",
-  programmeCode: "",
-  notes: "",
-  donorConsentGiven: null,   // null = not yet answered (distinct from false)
-  donorName: "",
-  donorContact: "",
-  donorTaxReference: "",
-  // Generated once per draft, not per submit attempt — the backend's
-  // ON CONFLICT (idempotency_key) relies on this staying the same
-  // across a retried submit, e.g. after a network blip.
-  idempotencyKey: crypto.randomUUID(),
-});
-
-const DonationDraftContext = createContext(null);
+import { useState, useEffect, useCallback } from "react";
+import {
+  DonationDraftContext,
+  STORAGE_KEY,
+  emptyDraft,
+  emptyItem,
+} from "./context/DonationDraftContext";
 
 export function DonationDraftProvider({ children }) {
   const [draft, setDraft] = useState(() => {
@@ -77,12 +55,4 @@ export function DonationDraftProvider({ children }) {
       {children}
     </DonationDraftContext.Provider>
   );
-}
-
-export function useDonationDraft() {
-  const ctx = useContext(DonationDraftContext);
-  if (!ctx) {
-    throw new Error("useDonationDraft must be called inside <DonationDraftProvider>");
-  }
-  return ctx;
 }
