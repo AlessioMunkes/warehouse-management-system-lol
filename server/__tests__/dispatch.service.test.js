@@ -448,3 +448,73 @@ describe('a pallet written off at 16:00 can still be collected', () => {
     await expect(dispatchService.collect(1, body, WORKER)).rejects.toMatchObject({ status: 403 });
   });
 });
+
+// ── BR-12 as an advisory ──────────────────────────────────────
+// wrongDay used to require a manager's override. It became untenable
+// once the gate board stopped filtering to today: the board now shows
+// every pallet still outstanding on any date, so EVERY stale pallet
+// trips wrongDay by definition and the block would have gated the
+// whole feature behind a manager.
+//
+// It is recorded, not ignored — collect passes wrongDay and bookedFor
+// down so the repository can log a wrong_day_collection event.
+describe('a pallet booked for another day can still be collected', () => {
+  const offSchedule = () => gateView({ dispatch_date: new Date(2026, 7, 17) });
+
+  beforeEach(() => {
+    atUtc('2026-08-19T08:00:00Z');          // 10:00 SAST, well before the cutoff
+    repoMock.collect.mockResolvedValue({ event: { id: 11, status: 'collected' } });
+  });
+
+  const body = {
+    driverName: 'N. Dlamini',
+    signature:  'data:image/png;base64,iVBORw0KGgo=',
+  };
+
+  it('still flags it as the wrong day', () => {
+    expect(evaluateEligibility(offSchedule()).wrongDay).toBe(true);
+  });
+
+  it('lets a warehouse worker collect it with no override reason', async () => {
+    repoMock.getGateView.mockResolvedValue(offSchedule());
+
+    await expect(dispatchService.collect(1, body, WORKER)).resolves.toBeTruthy();
+    expect(repoMock.collect).toHaveBeenCalledWith(
+      expect.objectContaining({ overrideReason: null, actorId: WORKER.id })
+    );
+  });
+
+  it('passes the flag and the booked date down to be recorded', async () => {
+    repoMock.getGateView.mockResolvedValue(offSchedule());
+    await dispatchService.collect(1, body, WORKER);
+
+    expect(repoMock.collect).toHaveBeenCalledWith(
+      expect.objectContaining({ wrongDay: true, bookedFor: '2026-08-17' })
+    );
+  });
+
+  it('does not flag an on-schedule collection', async () => {
+    repoMock.getGateView.mockResolvedValue(gateView());
+    await dispatchService.collect(1, body, WORKER);
+
+    expect(repoMock.collect).toHaveBeenCalledWith(
+      expect.objectContaining({ wrongDay: false, bookedFor: null })
+    );
+  });
+
+  // Off-schedule must not smuggle a pallet past the checks that ARE
+  // gates.
+  it('still blocks an inactive centre (BR-11)', async () => {
+    repoMock.getGateView.mockResolvedValue(
+      gateView({ dispatch_date: new Date(2026, 7, 17), ecd_is_active: false })
+    );
+    await expect(dispatchService.collect(1, body, WORKER)).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('still needs a manager when packing has not closed the slip', async () => {
+    repoMock.getGateView.mockResolvedValue(
+      gateView({ dispatch_date: new Date(2026, 7, 17), slip_status: 'in_progress' })
+    );
+    await expect(dispatchService.collect(1, body, WORKER)).rejects.toMatchObject({ status: 403 });
+  });
+});

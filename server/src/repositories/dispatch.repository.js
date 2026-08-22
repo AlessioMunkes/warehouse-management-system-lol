@@ -225,6 +225,11 @@ const collect = async ({
   slipId, driverName, vehicleReg, signature,
   lines = [], idempotencyKey = null, overrideReason = null,
   actorId,
+  // Advisory flags from the service. These do not change what is
+  // written to stock or to dispatch_events; they are recorded in the
+  // audit log so a manager can see the collection was irregular
+  // without the gate having refused it.
+  wrongDay = false, bookedFor = null,
 }) => {
   const client = await pool.connect();
   try {
@@ -428,6 +433,15 @@ const collect = async ({
     }
     if (unitMismatches.length > 0) {
       await logEvent(client, slipId, 'unit_mismatch', actorId, { unitMismatches, at: 'dispatch' });
+    }
+    // BR-12 as a record rather than a refusal. Logged separately from
+    // the collection itself so it can be counted without parsing the
+    // collection event's detail blob.
+    if (wrongDay) {
+      await logEvent(client, slipId, 'wrong_day_collection', actorId, {
+        booked_for: bookedFor,
+        at:         'dispatch',
+      });
     }
 
     await client.query('COMMIT');
