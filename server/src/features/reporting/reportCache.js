@@ -5,55 +5,40 @@
 //
 // Render's free tier sleeps on inactivity, so ANY in-process cache
 // is cold on every wake — it cannot be a cross-session latency
-// strategy, only a within-session one. At that job, against six
-// metrics and a handful of ranges, a Map with timestamps is the
-// whole requirement, and it is one less dependency to explain to
-// whoever maintains this after handover.
-//
-// The TTL split is by mutability, not by metric. A date range that
-// ended before today is closed — the fortnightly cycle is done and
-// those rows will not change — so it can be held for an hour. A
-// range including today gets sixty seconds, because a manager who
-// records a collection and re-asks must see it.
+// strategy, only a within-session one. At that job, against
+// eighteen metrics and a handful of ranges, a Map with timestamps is
+// the whole requirement and one less dependency at handover.
 // ─────────────────────────────────────────────────────────────
 import { CACHE_TTL } from './reportCatalog.js';
 
 const store = new Map();
-
-// Hard ceiling. Six metrics × dimensions × ranges will not approach
-// this in practice; it exists so a scripted client cannot grow the
-// map without bound on a 512 MB instance.
-const MAX_ENTRIES = 200;
+const MAX_ENTRIES = 300;
 
 // Key from the NORMALISED spec, never the raw request or the user's
-// question text — two differently-worded questions that resolve to
-// the same spec should share a cache entry. Object.keys are sorted
-// so filter ordering cannot produce two keys for one query.
+// question — two differently-worded questions resolving to the same
+// spec should share an entry. Keys are sorted so filter ordering
+// cannot produce two keys for one query. dateRange is null on
+// snapshots, which is fine: it just means one key per snapshot spec.
 export const cacheKey = (spec) => JSON.stringify({
   m: spec.metric,
   d: spec.dimension,
   f: Object.keys(spec.filters).sort().map((k) => [k, spec.filters[k]]),
-  r: [spec.dateRange.from, spec.dateRange.to],
+  r: spec.dateRange ? [spec.dateRange.from, spec.dateRange.to] : null,
   l: spec.limit,
 });
 
-// A range is historic only once it has fully ended. `todayISO` is
-// passed in rather than read here so the caller owns date
-// resolution and tests can pin it.
+// Historic only once the range has fully ended. todayISO is passed
+// in so the caller owns date resolution and tests can pin it.
 export const ttlFor = (spec, todayISO) =>
-  spec.dateRange.to < todayISO ? CACHE_TTL.HISTORIC : CACHE_TTL.LIVE;
+  spec.dateRange && spec.dateRange.to < todayISO ? CACHE_TTL.HISTORIC : CACHE_TTL.LIVE;
 
 export const get = (key) => {
   const hit = store.get(key);
   if (!hit) return null;
-  if (Date.now() > hit.expiresAt) {
-    store.delete(key);
-    return null;
-  }
-  // Refresh insertion order so the eviction below drops genuinely
-  // cold entries rather than merely old ones.
-  store.delete(key);
-  store.set(key, hit);
+  if (Date.now() > hit.expiresAt) { store.delete(key); return null; }
+  // Refresh insertion order so eviction drops genuinely cold entries
+  // rather than merely old ones.
+  store.delete(key); store.set(key, hit);
   return hit.value;
 };
 
@@ -65,11 +50,9 @@ export const set = (key, value, ttlMs) => {
   store.set(key, { value, expiresAt: Date.now() + ttlMs });
 };
 
-// Called after any write that could change a reported number. Cheap
-// and blunt on purpose: correctness beats a partial invalidation
-// scheme nobody will maintain.
+// Cheap and blunt on purpose: correctness beats a partial
+// invalidation scheme nobody will maintain.
 export const clear = () => store.clear();
-
-export const size = () => store.size;
+export const size  = () => store.size;
 
 export default { cacheKey, ttlFor, get, set, clear, size };
