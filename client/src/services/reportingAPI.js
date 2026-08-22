@@ -4,21 +4,21 @@
 // Wrapper around /api/reporting. One function per route in
 // reporting.routes.js, nothing invented.
 //
-// Both routes are manager/admin only on the server. The client gate
-// in App.jsx is a UX courtesy; the route guard is the real control.
+// All three routes are manager/admin only on the server. The client
+// gate in App.jsx is a UX courtesy; the route guard is the control.
 // ─────────────────────────────────────────────────────────────
 import { apiGet, apiPost } from './api';
 
 // GET /api/reporting/catalog
-// The report builder's dropdowns are built entirely from this, so a
-// metric added on the server appears in the UI with no client change.
+// Returns { aiEnabled, metrics }. aiEnabled is false when no API key
+// is configured — the page uses it to hide the ask box entirely.
 export const getCatalog = () => apiGet('/api/reporting/catalog');
 
 // POST /api/reporting/report
-// spec: { metric, dimension?, filters?, dateRange:{from,to}, chartType?, limit? }
-//
-// POST rather than GET because the spec is a nested object. Nothing
-// here writes — the verb is about payload shape, not side effects.
 export const runReport = (spec) => apiPost('/api/reporting/report', spec);
 
-export default { getCatalog, runReport };
+// POST /api/reporting/ask
+// Returns either a report payload or { type: 'clarify', question, options }.
+export const askQuestion = (question) => apiPost('/api/reporting/ask', { question });
+
+export default { getCatalog, runReport, askQuestion };

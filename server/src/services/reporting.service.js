@@ -3,14 +3,15 @@
 //
 // Validate → cache lookup → repository → shape → cache store.
 //
-// The AI layer, when it lands, calls runReport() with a spec it
+// reportingAi.service.js calls runReport() with a spec the model
 // produced. It gets no privileged path: same validator, same cache,
-// same queries. That is the design — the model chooses WHICH
-// question, never HOW it is answered.
+// same queries. The model chooses WHICH question, never HOW it is
+// answered.
 // ─────────────────────────────────────────────────────────────
 import repo             from '../repositories/reporting.repository.js';
 import cache            from '../features/reporting/reportCache.js';
 import { validateSpec } from '../features/reporting/specValidator.js';
+import aiProvider       from '../features/reporting/ai/provider.js';
 import {
   METRICS, DIMENSIONS, getMetric, describeSpec,
 } from '../features/reporting/reportCatalog.js';
@@ -32,7 +33,12 @@ const todayISO = () => {
 // ── The catalog, for the UI's dropdowns ───────────────────────
 // The client builds its whole report builder from this, so a metric
 // added on the server appears in the UI with no client change.
+//
+// aiEnabled drives whether the ask box renders at all. When the key
+// lapses after handover the input disappears and the dropdowns
+// carry on — the feature degrades rather than breaking.
 const getCatalog = () => ({
+  aiEnabled: aiProvider.isEnabled(),
   metrics: Object.values(METRICS).map((m) => ({
     id: m.id,
     label: m.label,
@@ -57,22 +63,16 @@ const runReport = async (input) => {
 
   const fn = repo[metric.repoFn];
   if (typeof fn !== 'function') {
-    // Catalog and repository out of sync — a developer error, not a
-    // user one, so it is a 500 and it says which entry is broken.
     throw fail(500, `Report "${metric.label}" is not implemented (${metric.repoFn}).`);
   }
 
   let series = await fn(spec);
 
-  // Factor-based metrics convert here rather than in SQL so the raw
-  // measurement stays inspectable and a factor change does not
-  // require re-running the query.
-  const meta = {
-    unit: metric.unit,
-    caveat: metric.caveat,
-    cached: false,
-  };
+  const meta = { unit: metric.unit, caveat: metric.caveat, cached: false };
 
+  // Factor-based metrics convert here rather than in SQL so the raw
+  // measurement stays inspectable and one bad factor cannot corrupt
+  // a cached result.
   if (metric.factorKey) {
     const factor = await repo.getFactor(metric.factorKey);
     if (!factor) {
@@ -103,9 +103,6 @@ const runReport = async (input) => {
 
   const payload = {
     spec,
-    // The restatement the manager reads above the chart. Generated
-    // server-side so the AI path and the dropdown path cannot
-    // describe the same spec two different ways.
     description: describeSpec(spec),
     chartType: spec.chartType,
     series,
