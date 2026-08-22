@@ -24,6 +24,7 @@ import receivingIcon from "./../../public/icons/receiving-icon.svg";
 import packingIcon from "./../../public/icons/packing-icon.svg";
 import decantingIcon from "./../../public/icons/decanting-icon.svg";
 import dispatchIcon from "./../../public/icons/dispatch-icon.svg";
+import reportingIcon from "./../../public/icons/reporting-icon.svg";
 
 export default function Home() {
   const { user } = useAuth();
@@ -47,6 +48,12 @@ export default function Home() {
       title: "Onboard Beneficiary",
       disabled: false,
       noticeMessage: "The Beneficiary Onboarding module is currently undergoing routine maintenance.",
+    },
+    {
+      to: "/noc/reporting",
+      icon: reportingIcon,
+      title: "Reporting & Analytics",
+      disabled: false,
     },
     {
       to: "/noc/inventory",

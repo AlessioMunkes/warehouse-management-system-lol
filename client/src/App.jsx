@@ -16,6 +16,7 @@ import DispatchPage                                from './pages/DispatchPage';
 import InventoryManagementPage                     from './pages/InventoryManagementPage';
 import ManagerActivityScreen                       from './pages/ManagerActivityScreen';
 import TaskDashboard from './pages/TaskDashboardPage';
+import ReportingPage                               from './pages/ReportingPage';
 
 // Donations — new feature, own draft context scoped to just these
 // two routes (see features/donation/context/DonationDraftProvider.jsx)
@@ -37,6 +38,7 @@ const App = () => (
         <Route element={<ProtectedRoute roles={['manager']} />}>
           <Route path="/manager"       element={<ManagerActivityScreen />} />
         <Route path="/noc/inventory" element={<InventoryManagementPage />} />
+          <Route path={STAFF.reporting} element={<ReportingPage />} />
         </Route>
 
         {/* Protected — any logged-in user */}

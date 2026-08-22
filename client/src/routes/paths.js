@@ -50,6 +50,9 @@ export const STAFF = {
   // week planner by role. There is no /staff/decanting.
   decanting: '/noc/decanting',
   dispatch:  '/staff/dispatch',
+  // Manager-only. Both /api/reporting routes are
+  // requireRole(MANAGER, ADMIN); the App.jsx gate mirrors that.
+  reporting: '/noc/reporting',
   // Donation intake. Entry point of the draft flow; see DONATIONS
   // below for the later steps.
   donation:  DONATIONS_NEW,
