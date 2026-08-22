@@ -178,6 +178,74 @@ export const KeyValues = ({ pairs }) => (
   </p>
 );
 
+// ── View toggle ───────────────────────────────────────────────
+// Two ways to work the same task, not a filter between subsets of
+// data (that's Segments, used on the packing board) — so it gets its
+// own name even though it borrows .stf-segments' look, overridden to
+// a full pill (see staff.css's .stf-toggle rule) rather than the
+// filter tabs' softer corners. A sliding highlight behind the active
+// option, the same idea booking.com uses for its List/Grid switch.
+// Hard-coded to two options — the thumb's position is plain
+// arithmetic, not measured, and only works out for exactly two.
+//
+// No title-attribute tooltip: this is a phone held with one hand,
+// and `title` never shows on a tap, only a mouse hover that will
+// never happen here. Each option's `hint` is shown instead as a
+// short caption under the pill, for whichever option is currently
+// selected — you learn what a mode does by trying it, in the same
+// breath as trying it.
+export const ViewToggle = ({ options, value, onChange, className = '' }) => {
+  const index = options.findIndex((o) => o.value === value);
+  const active = options[index];
+  return (
+    <div className={`stf-toggle-block${className ? ` ${className}` : ''}`}>
+      <div
+        className={`stf-segments stf-toggle${index === 1 ? ' is-index-1' : ''}`}
+        role="radiogroup"
+      >
+        <span className="stf-segment-thumb" aria-hidden="true" />
+        {options.map((option) => {
+          const chosen = option.value === value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={chosen}
+              className={`stf-segment${chosen ? ' is-active' : ''}`}
+              onClick={() => onChange(option.value)}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+      {active?.hint ? (
+        <p className="stf-toggle-hint" aria-live="polite">{active.hint}</p>
+      ) : null}
+    </div>
+  );
+};
+
+// ── Coachmark ─────────────────────────────────────────────────
+// A first-run nudge toward a control that is easy to miss, not a
+// permanent label. Pair with useCoachmark, which decides whether it
+// should be showing at all — this component only draws it. Dismissed
+// by tapping it, and the arrow's bounce is switched off under ACC-08
+// (see staff.css's [data-stf-motion] rule) since it is the only
+// animated part.
+export const Coachmark = ({ show, onDismiss, children }) => {
+  if (!show) return null;
+  return (
+    <div className="stf-coachmark" role="status">
+      <span className="stf-coachmark-arrow" aria-hidden="true">&#8593;</span>
+      <button type="button" className="stf-coachmark-body" onClick={onDismiss}>
+        {children}
+      </button>
+    </div>
+  );
+};
+
 // ── Counter ───────────────────────────────────────────────────
 // 48px either side of the number, because the alternative on a phone
 // is a text field and a keyboard covering half the screen.

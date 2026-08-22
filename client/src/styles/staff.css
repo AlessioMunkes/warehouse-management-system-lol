@@ -578,6 +578,102 @@
 }
 .stf-segment.is-active { background: var(--stf-white); color: var(--stf-ink); }
 
+/* ── View toggle (Guided / Form) ───────────────────────────────────
+   Same .stf-segments shell as the filter tabs above, but a full pill
+   rather than their softer corners — this is the one place in the app
+   asking to look like booking.com's List/Grid switch, not the filter-
+   tab language used everywhere else. A sliding thumb added on top,
+   opt-in via .stf-toggle so the packing board's tabs are untouched.
+   The maths only works out for exactly two equal-width segments with
+   the container's own 3px padding and 4px gap: translateX(100%) moves
+   the thumb by its own width, and adding the 4px gap lands it exactly
+   on the second segment. Do not reuse this for three options without
+   redoing the arithmetic. */
+.stf-toggle-block { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.stf-toggle {
+  position: relative;
+  width: 100%;
+  border-radius: var(--stf-radius-pill);
+}
+.stf-toggle .stf-segment {
+  position: relative;
+  z-index: 1;
+  border-radius: var(--stf-radius-pill);
+  background: transparent; /* the thumb draws the active background now */
+}
+.stf-segment-thumb {
+  position: absolute;
+  top: 3px; bottom: 3px; left: 3px;
+  width: calc(50% - 5px);
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-white);
+  box-shadow: 0 1px 2px rgba(43, 51, 54, 0.14);
+  transition: transform 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 0;
+}
+.stf-toggle.is-index-1 .stf-segment-thumb { transform: translateX(calc(100% + 4px)); }
+
+/* One line, centred, naming whichever option is currently active.
+   Not a title-attribute tooltip: this is read with a thumb, not a
+   mouse, and title never shows on a tap. */
+.stf-toggle-hint { margin: 0; font-size: 12px; color: var(--stf-text-sub); }
+
+/* ── Coachmark (first-run nudge toward the view toggle) ───────────
+   Anchored to whatever wraps the toggle (.stf-toggle-anchor gives it
+   position: relative), not fixed to the viewport — it only ever
+   needs to point at one control, right below it. */
+.stf-toggle-anchor { position: relative; }
+.stf-coachmark {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  max-width: 190px;
+}
+.stf-coachmark-arrow {
+  flex-shrink: 0;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--stf-ink);
+  animation: stf-coachmark-bounce 1.2s ease-in-out infinite;
+}
+.stf-coachmark-body {
+  border: 0;
+  border-radius: var(--stf-radius-sm);
+  padding: 8px 10px;
+  background: var(--stf-ink);
+  color: var(--stf-white);
+  font: 600 12px/1.4 var(--stf-font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+@keyframes stf-coachmark-bounce {
+  0%, 100% { transform: translateY(-2px); }
+  50%      { transform: translateY(2px); }
+}
+
+/* ── Full-form line row (Receiving's "Form" mode) ──────────────────
+   One card per order line holding everything the guided flow spreads
+   across two screens (count, then put-away) — the point of this mode
+   is that none of it is hidden behind a Next button. */
+.stf-formrows { display: flex; flex-direction: column; gap: 12px; }
+.stf-formrow {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+}
+.stf-formrow.is-warn { border-color: var(--stf-attention-border); }
+.stf-formrow-head  { display: flex; flex-direction: column; gap: 2px; }
+.stf-formrow-title { font-family: var(--stf-font-display); font-size: 15px; font-weight: 700; color: var(--stf-ink); }
+.stf-formrow-meta  { font-size: 12px; color: var(--stf-text-sub); }
+
 /* ── Status badge ────────────────────────────────────────────────── */
 .stf-badge {
   display: inline-flex; align-items: center;
@@ -632,12 +728,15 @@ body.reduced-movement .decorative-icon {
    toggle, which sets data-stf-motion="reduced" on <html> so it also
    covers a shared tablet whose OS setting nobody can change. */
 @media (prefers-reduced-motion: reduce) {
-  .stf-rail-bar, .stf-progress-fill, .stf-btn, .stf-choice { transition: none !important; }
+  .stf-rail-bar, .stf-progress-fill, .stf-btn, .stf-choice, .stf-segment-thumb { transition: none !important; }
+  .stf-coachmark-arrow { animation: none !important; }
 }
 [data-stf-motion='reduced'] .stf-rail-bar,
 [data-stf-motion='reduced'] .stf-progress-fill,
 [data-stf-motion='reduced'] .stf-btn,
-[data-stf-motion='reduced'] .stf-choice { transition: none !important; }
+[data-stf-motion='reduced'] .stf-choice,
+[data-stf-motion='reduced'] .stf-segment-thumb { transition: none !important; }
+[data-stf-motion='reduced'] .stf-coachmark-arrow { animation: none !important; }
 
 /* ── Bench tablet ────────────────────────────────────────────────── */
 /* Same column, more air. Deliberately not a wider table: the staff who

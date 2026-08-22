@@ -19,13 +19,46 @@
 // the numbers agree is a system that gets abandoned for a clipboard.
 // The difference is recorded and the manager is told; the delivery
 // still gets received.
+//
+// A second shape exists alongside the four screens above: `mode`
+// ('guided' | 'full', a worker's own choice, remembered per device)
+// picks between them without forking any of the data fetching,
+// validation or commit logic below — both shapes read and write the
+// exact same `lines` state, so switching mid-task carries whatever's
+// already been counted across rather than losing it. Guided is the
+// default every worker starts from. The toggle itself only appears
+// once there is something to toggle the shape OF — before an order is
+// chosen, both modes render the identical "which delivery" screen, so
+// showing it there just reads as a control that does nothing.
+//
+// There is no "save and finish later" in Full form. That button's on
+// an early mockup, but nothing in this app persists a delivery that
+// hasn't been submitted, so promising to save one would be a lie the
+// first time someone's tab closed. "Check and finish" is the one
+// action that actually does something.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useState } from 'react';
 import {
   StepRail, StepScreen, Actions, Button, NumberField, ChoiceList, Notice, KeyValues,
+  ViewToggle, Coachmark,
 } from '../../staff/components/StepPrimitives';
+import useCoachmark from '../../staff/hooks/useCoachmark';
 import receivingAPI from '../../../services/receivingAPI';
 import { newIdempotencyKey } from '../../../services/api';
+import { useAuth } from '../../../context/AuthContext';
+
+const MODE_KEY = 'stf_receiving_view_mode';
+const MODES = [
+  { value: 'guided', label: 'Guided', hint: 'Step by step' },
+  { value: 'full',   label: 'Form',   hint: 'Everything at once' },
+];
+const readStoredMode = () => {
+  try {
+    return localStorage.getItem(MODE_KEY) === 'full' ? 'full' : 'guided';
+  } catch {
+    return 'guided';
+  }
+};
 
 const TOTAL_STEPS = 4;
 
@@ -72,8 +105,11 @@ const STEP_META = {
 };
 
 export default function ReceivingFlow({ onCrumbChange }) {
+  const { user } = useAuth();
   const [phase, setPhase] = useState('which');
   const [lineIndex, setLineIndex] = useState(0);
+  const [mode, setMode] = useState(readStoredMode);
+  const { show: showCoachmark, dismiss: dismissCoachmark } = useCoachmark('receiving-view-toggle');
 
   const [suppliers, setSuppliers] = useState([]);
 
@@ -151,6 +187,23 @@ export default function ReceivingFlow({ onCrumbChange }) {
     [suppliers, supplierId]
   );
   const shortLines = lines.filter((l) => l.counted !== '' && Number(l.counted) < l.expected);
+  const receivedByName = user?.firstName ? `${user.firstName} ${user.lastName ?? ''}`.trim() : 'You';
+  const showToggle = lines.length > 0 && phase !== 'done';
+  const showFullForm = mode === 'full' && showToggle;
+
+  const handleModeChange = (next) => {
+    setMode(next);
+    try { localStorage.setItem(MODE_KEY, next); } catch { /* nothing we can do */ }
+    dismissCoachmark();
+  };
+
+  // The hint disappears the moment someone uses the toggle (above) or
+  // after a few seconds regardless — a first-run nudge, not a fixture.
+  useEffect(() => {
+    if (!showCoachmark || !showToggle) return undefined;
+    const timer = setTimeout(dismissCoachmark, 5000);
+    return () => clearTimeout(timer);
+  }, [showCoachmark, showToggle, dismissCoachmark]);
 
   // ── Step 1 to 2 ─────────────────────────────────────────────
   const startCounting = async () => {
@@ -182,8 +235,12 @@ export default function ReceivingFlow({ onCrumbChange }) {
     }
   };
 
-  const patchLine = (patch) =>
-    setLines((all) => all.map((line, i) => (i === lineIndex ? { ...line, ...patch } : line)));
+  // Guided only ever edits "the current line"; Full form edits
+  // whichever line the worker's finger is on, all of them visible at
+  // once — so patching by an explicit index is the one both need.
+  const patchLineAt = (index, patch) =>
+    setLines((all) => all.map((line, i) => (i === index ? { ...line, ...patch } : line)));
+  const patchLine = (patch) => patchLineAt(lineIndex, patch);
 
   const goToNextLine = () => {
     if (lineIndex + 1 < lines.length) {
@@ -254,7 +311,19 @@ export default function ReceivingFlow({ onCrumbChange }) {
 
   return (
     <>
-      <StepRail step={step.n} total={TOTAL_STEPS} label={step.label} />
+      {showToggle ? (
+        <div className="stf-toggle-anchor">
+          <ViewToggle options={MODES} value={mode} onChange={handleModeChange} />
+          <Coachmark show={showCoachmark} onDismiss={dismissCoachmark}>
+            Tap here to switch view
+          </Coachmark>
+        </div>
+      ) : null}
+
+      {/* The rail counts steps through a sequence — Full form has no
+          sequence, everything is already on the screen, so there is
+          nothing for it to show. */}
+      {showFullForm ? null : <StepRail step={step.n} total={TOTAL_STEPS} label={step.label} />}
 
       {error ? <Notice tone="warn">{error}</Notice> : null}
 
@@ -302,8 +371,99 @@ export default function ReceivingFlow({ onCrumbChange }) {
         </StepScreen>
       )}
 
+      {/* ── Full form: every line, one screen ───────────────── */}
+      {showFullForm && (
+        <StepScreen
+          title={`${supplierName} · Order ${orderId}`}
+          sub={`${lines.length} item${lines.length === 1 ? '' : 's'} on the order. Fill in what is on the floor.`}
+          actions={
+            <Actions>
+              <Button disabled={saving} onClick={finish}>
+                {saving ? 'Saving' : 'Check and finish'}
+              </Button>
+            </Actions>
+          }
+        >
+          <KeyValues pairs={[['Order', orderId], ['Received by', receivedByName]]} />
+
+          <div className="stf-formrows">
+            {lines.map((line, i) => {
+              const counted = line.counted;
+              const variance = counted === '' ? 0 : Number(counted) - line.expected;
+              const short = counted !== '' && variance < 0;
+              const over = counted !== '' && variance > 0;
+              return (
+                <div
+                  key={line.purchaseOrderItemId}
+                  className={`stf-formrow${short || over ? ' is-warn' : ''}`}
+                >
+                  <div className="stf-formrow-head">
+                    <span className="stf-formrow-title">{line.name}</span>
+                    <span className="stf-formrow-meta">
+                      Code: {line.sku} · Expected: {line.expected}
+                      {line.expectedKg ? ` (${line.expectedKg} kg)` : ''}
+                    </span>
+                  </div>
+
+                  <NumberField
+                    id={`stf-counted-${line.purchaseOrderItemId}`}
+                    label="How many are here?"
+                    value={line.counted}
+                    flagged={counted !== '' && Number(counted) !== line.expected}
+                    onChange={(value) => patchLineAt(i, { counted: value })}
+                  />
+
+                  <ChoiceList
+                    legend={`Where the ${line.name} is going`}
+                    options={LOCATIONS}
+                    value={line.location}
+                    onChange={(value) => patchLineAt(i, { location: value })}
+                  />
+
+                  {line.fresh ? (
+                    <div className="stf-field">
+                      <label className="stf-field-label" htmlFor={`stf-useby-${line.purchaseOrderItemId}`}>
+                        What is the date on the box?
+                      </label>
+                      <input
+                        id={`stf-useby-${line.purchaseOrderItemId}`}
+                        className="stf-input is-text"
+                        type="date"
+                        value={line.useBy}
+                        onChange={(e) => patchLineAt(i, { useBy: e.target.value })}
+                      />
+                    </div>
+                  ) : null}
+
+                  {short ? (
+                    <Notice tone="warn">
+                      {line.expected - Number(counted)} fewer than expected. Saving still tells
+                      your manager and keeps this delivery open.
+                    </Notice>
+                  ) : null}
+                  {over ? (
+                    <Notice tone="warn">
+                      That is more than expected — count again, and if it is right your manager
+                      will check it against the order.
+                    </Notice>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+
+          {shortLines.length > 0 ? (
+            <Notice tone="warn">
+              {shortLines.length} {shortLines.length === 1 ? 'line is' : 'lines are'} short.
+              Saving still records the delivery, and your manager gets the difference to follow
+              up.
+            </Notice>
+          ) : null}
+        </StepScreen>
+      )}
+
       {/* ── 2 · Count one item ─────────────────────────────── */}
-      {phase === 'count' && currentLine && (
+      {!showFullForm && phase === 'count' && currentLine && (
         <StepScreen
           title={currentLine.name}
           sub={`The note says ${currentLine.expected}. Count what is actually there.`}
@@ -359,7 +519,7 @@ export default function ReceivingFlow({ onCrumbChange }) {
       )}
 
       {/* ── 3 · Where it goes ──────────────────────────────── */}
-      {phase === 'place' && currentLine && (
+      {!showFullForm && phase === 'place' && currentLine && (
         <StepScreen
           title={`Where are you putting the ${currentLine.name.toLowerCase()}?`}
           sub="Pick the place you are carrying it to."
@@ -405,7 +565,7 @@ export default function ReceivingFlow({ onCrumbChange }) {
       )}
 
       {/* ── 4 · Read-back ──────────────────────────────────── */}
-      {phase === 'check' && (
+      {!showFullForm && phase === 'check' && (
         <StepScreen
           title="Does this look right?"
           sub="Tap any line to change it."
