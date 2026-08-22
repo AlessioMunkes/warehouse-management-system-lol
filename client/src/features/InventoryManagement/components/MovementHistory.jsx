@@ -21,6 +21,9 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 
+// Import custom CSS
+import "../../../styles/index.css"; // Adjust path to match your folder structure
+
 const TYPE_LABEL = {
   adjustment: "Manual adjustment",
   receipt: "Goods received",
@@ -53,8 +56,8 @@ export default function MovementHistory({
 
   return (
     <Sheet open onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="sm:max-w-xl w-full overflow-y-auto">
-        <SheetHeader className="pb-4 border-b border-border">
+      <SheetContent className="movement-sheet-content">
+        <SheetHeader className="movement-sheet-header">
           <SheetTitle>{product.name}</SheetTitle>
           <SheetDescription>
             SKU: {product.sku} · {product.onHand} {product.unit} on hand.
@@ -62,23 +65,23 @@ export default function MovementHistory({
           </SheetDescription>
         </SheetHeader>
 
-        <div className="py-6">
+        <div className="movement-body-wrapper">
           {isLoading ? (
-            <p className="text-center text-sm text-muted-foreground py-8">
+            <p className="movement-placeholder-text">
               Loading movement history...
             </p>
           ) : error ? (
-            <div className="p-3 text-sm rounded bg-rose-50 text-rose-700 border border-rose-200">
+            <div className="movement-error-banner">
               {error}
             </div>
           ) : movements.length === 0 ? (
-            <p className="text-center text-sm text-muted-foreground py-8">
+            <p className="movement-placeholder-text">
               No movements recorded for this product yet.
             </p>
           ) : (
-            <div className="rounded-md border border-border">
+            <div className="movement-table-container">
               <Table>
-                <TableHeader className="bg-muted/50">
+                <TableHeader className="movement-table-header">
                   <TableRow>
                     <TableHead>When</TableHead>
                     <TableHead>Change</TableHead>
@@ -90,7 +93,7 @@ export default function MovementHistory({
                 <TableBody>
                   {movements.map((m) => (
                     <TableRow key={m.id}>
-                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                      <TableCell className="movement-cell-date">
                         {formatWhen(m.createdAt)}
                       </TableCell>
                       <TableCell>
@@ -105,13 +108,13 @@ export default function MovementHistory({
                           {m.unit}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-xs font-medium">
+                      <TableCell className="movement-cell-type">
                         {TYPE_LABEL[m.movementType] ?? m.movementType}
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground movement-table-cell-truncated">
+                      <TableCell className="movement-cell-reason">
                         {m.reason || "—"}
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
+                      <TableCell className="movement-cell-author">
                         {m.performedByName}
                       </TableCell>
                     </TableRow>

@@ -13,6 +13,7 @@ const TASK_DESCRIPTIONS = {
   Packing: "Assemble and pack food boxes for distribution.",
   Decanting: "Unpack bulk supplies and transfer to processing areas.",
   Dispatch: "Schedule and manage outbound deliveries to recipient sites.",
+  Donation:"Reciveing and valuing incoming donations"
 };
 
 export function TaskGrid({ tasks, reducedMovement }) {

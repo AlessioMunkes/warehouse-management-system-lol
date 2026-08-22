@@ -20,6 +20,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
+// Import custom CSS
+import "../../../styles/staff.css"; // Adjust path to match your folder structure
+
 const REASONS = [
   "Stock count correction",
   "Damaged / spoiled",
@@ -118,7 +121,7 @@ export default function AdjustStockModal({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="adjust-modal-container">
         <DialogHeader>
           <DialogTitle>Adjust Stock — {product.name}</DialogTitle>
           <DialogDescription>
@@ -127,13 +130,13 @@ export default function AdjustStockModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-2">
+        <div className="adjust-modal-body">
           {/* Direction Select */}
-          <div className="space-y-2">
+          <div className="adjust-field-group">
             <Label htmlFor="direction">Direction</Label>
             <select
               id="direction"
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              className="adjust-select-input"
               value={direction}
               onChange={(e) => setDirection(e.target.value)}
             >
@@ -143,7 +146,7 @@ export default function AdjustStockModal({
           </div>
 
           {/* Quantity Input */}
-          <div className="space-y-2">
+          <div className="adjust-field-group">
             <Label htmlFor="amount">
               Quantity ({product.unit || "units"})
             </Label>
@@ -156,25 +159,23 @@ export default function AdjustStockModal({
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="adjust-projected-text">
               New projected level:{" "}
-              <span className="font-semibold text-foreground">
+              <span className="adjust-projected-value">
                 {projectedLevel} {product.unit}
               </span>
             </p>
             {errors.amount && (
-              <p className="text-xs font-medium text-rose-500">
-                {errors.amount}
-              </p>
+              <p className="adjust-error-message">{errors.amount}</p>
             )}
           </div>
 
           {/* Reason Selection */}
-          <div className="space-y-2">
+          <div className="adjust-field-group">
             <Label htmlFor="reason">Reason</Label>
             <select
               id="reason"
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              className="adjust-select-input"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
             >
@@ -186,14 +187,12 @@ export default function AdjustStockModal({
               ))}
             </select>
             {errors.reason && (
-              <p className="text-xs font-medium text-rose-500">
-                {errors.reason}
-              </p>
+              <p className="adjust-error-message">{errors.reason}</p>
             )}
           </div>
 
           {/* Additional Notes */}
-          <div className="space-y-2">
+          <div className="adjust-field-group">
             <Label htmlFor="note">Notes / Explanation</Label>
             <Textarea
               id="note"
@@ -203,20 +202,20 @@ export default function AdjustStockModal({
               onChange={(e) => setNote(e.target.value)}
             />
             {errors.note && (
-              <p className="text-xs font-medium text-rose-500">{errors.note}</p>
+              <p className="adjust-error-message">{errors.note}</p>
             )}
           </div>
 
           {/* Threshold Reorder Level Subsection */}
-          <div className="pt-3 border-t border-border space-y-2">
-            <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+          <div className="adjust-threshold-section">
+            <Label className="adjust-threshold-label">
               Reorder Warning Threshold
             </Label>
-            <div className="flex gap-2 items-center">
+            <div className="adjust-threshold-controls">
               <Input
                 type="number"
                 min="0"
-                className="w-32"
+                className="adjust-threshold-input"
                 value={newReorderAt}
                 onChange={(e) => setNewReorderAt(e.target.value)}
               />
@@ -232,11 +231,11 @@ export default function AdjustStockModal({
             </div>
             {thresholdMsg && (
               <p
-                className={`text-xs font-medium ${
+                className={
                   thresholdMsg.tone === "success"
-                    ? "text-emerald-600"
-                    : "text-rose-500"
-                }`}
+                    ? "adjust-success-message"
+                    : "adjust-error-message"
+                }
               >
                 {thresholdMsg.text}
               </p>
@@ -244,7 +243,7 @@ export default function AdjustStockModal({
           </div>
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
+        <DialogFooter className="adjust-modal-footer">
           <Button
             variant="outline"
             onClick={onClose}

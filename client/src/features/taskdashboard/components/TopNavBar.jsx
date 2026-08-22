@@ -1,6 +1,6 @@
 // src/components/layout/TopNavbar.jsx
-import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { ArrowLeft, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -40,6 +40,12 @@ export function TopNavbar({ reducedMovement, onToggleMovement }) {
   const navigate = useNavigate();
   const roleLabel = user?.role ? ROLE_LABELS[user.role] ?? user.role : "";
 
+  // Synchronize body class on initial load / route change based on persisted setting
+  useEffect(() => {
+    const isSavedReduced = localStorage.getItem("reducedMovement") === "true";
+    document.body.classList.toggle("reduced-movement", isSavedReduced);
+  }, []);
+
   const handleConfirmLogout = () => {
     logout();
     setLogoutOpen(false);
@@ -47,7 +53,19 @@ export function TopNavbar({ reducedMovement, onToggleMovement }) {
   };
 
   const handleConfirmMovement = () => {
-    onToggleMovement(!reducedMovement);
+    const nextState = !reducedMovement;
+
+    // 1. Save preference to localStorage so it persists across screen navigations & refreshes
+    localStorage.setItem("reducedMovement", String(nextState));
+
+    // 2. Toggle global CSS class on body
+    document.body.classList.toggle("reduced-movement", nextState);
+    
+    // 3. Call parent callback to update React state
+    if (onToggleMovement) {
+      onToggleMovement(nextState);
+    }
+    
     setMovementDialogOpen(false);
   };
 
@@ -73,25 +91,31 @@ export function TopNavbar({ reducedMovement, onToggleMovement }) {
             </TooltipContent>
           </Tooltip>
 
-          <Link to="/" className="top-navbar__brand">
+          {/* Brand header */}
+          <div className="top-navbar__brand">
             <img src={batchesLogo} alt="" className="top-navbar__logo" />
             <div className="top-navbar__brand-text">
-              <span className="top-navbar__brand-name">Batches</span>
-              <span className="top-navbar__brand-tagline">Nourish Our Children</span>
+              <span className="top-navbar__brand-name">
+                Batches
+              </span>
+              <span className="top-navbar__brand-tagline">
+                Nourish Our Children
+              </span>
             </div>
-          </Link>
+          </div>
         </div>
 
         <div className="top-navbar__right">
           {user && (
-            
-              <span className="top-navbar__user-name">
-              {user.firstName} {user.lastName} <span className="top-navbar__role">· {roleLabel}</span>
+            <span className="top-navbar__user-name">
+              {user.firstName} {user.lastName}{" "}
+              <span className="top-navbar__role">
+                · {roleLabel}
+              </span>
             </span>
           )}
-      
 
-          <Separator orientation="vertical" className="h-4 top-navbar__divider" />
+          <Separator orientation="vertical" className="top-navbar__divider hidden sm:block" />
 
           {/* Less Movement Tooltip */}
           <Tooltip>
@@ -99,10 +123,10 @@ export function TopNavbar({ reducedMovement, onToggleMovement }) {
               <Button
                 size="sm"
                 onClick={() => setMovementDialogOpen(true)}
-                className="top-navbar__toggle bg-white text-gray-800 hover:bg-white/90 border border-gray-200 shadow-sm"
+                className="top-navbar__toggle"
               >
-                <EyeOff className="h-4 w-4 mr-1.5 text-gray-600" />
-                Less movement
+                <EyeOff className="top-navbar__toggle-icon" />
+                <span className="top-navbar__toggle-text">Less movement</span>
               </Button>
             </TooltipTrigger>
             <TooltipContent>
@@ -110,7 +134,7 @@ export function TopNavbar({ reducedMovement, onToggleMovement }) {
             </TooltipContent>
           </Tooltip>
 
-          <Separator orientation="vertical" className="h-4 top-navbar__divider" />
+          <Separator orientation="vertical" className="top-navbar__divider" />
 
           {/* Log out Tooltip */}
           <Tooltip>
