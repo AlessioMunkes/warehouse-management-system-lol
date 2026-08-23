@@ -25,6 +25,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import AskBox        from '../features/reporting/components/AskBox';
 import ReportBuilder from '../features/reporting/components/ReportBuilder';
 import ReportChart   from '../features/reporting/components/ReportChart';
+import DataUpload   from '../features/reporting/components/DataUpload';
 import { resolvePreset, DEFAULT_PRESET } from '../features/reporting/dateRanges';
 import { getCatalog, runReport } from '../services/reportingAPI';
 
@@ -226,6 +227,10 @@ export default function ReportingPage() {
             </footer>
           </section>
         )}
+        <div className="mt-6">
+          <DataUpload />
+        </div>
+
       </main>
     </div>
   );

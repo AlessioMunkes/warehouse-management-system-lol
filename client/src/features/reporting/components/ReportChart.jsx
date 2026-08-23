@@ -187,7 +187,15 @@ const TableView = ({ series, unit, dimensionLabel }) => (
 // cannot disagree. Quoted because ECD and product names contain
 // commas.
 const downloadCSV = (report, dimensionLabel) => {
+  // Uploaded data gets a provenance line inside the file. Without it
+  // an exported CSV is indistinguishable from a warehouse report the
+  // moment it leaves this screen.
+  const header = report.meta?.uploaded
+    ? [[`# Source: ${report.description} — uploaded file, not warehouse data`]]
+    : [];
+
   const rows = [
+    ...header,
     [dimensionLabel, report.meta?.unit ?? 'Value'],
     ...report.series.map((r) => [r.label, r.value]),
   ];
