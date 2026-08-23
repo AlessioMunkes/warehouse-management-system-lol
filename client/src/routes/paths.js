@@ -50,6 +50,9 @@ export const STAFF = {
   // week planner by role. There is no /staff/decanting.
   decanting: '/noc/decanting',
   dispatch:  '/staff/dispatch',
+  // Manager-only. Both /api/reporting routes are
+  // requireRole(MANAGER, ADMIN); the App.jsx gate mirrors that.
+  reporting: '/noc/reporting',
   // Donation intake. Entry point of the draft flow; see DONATIONS
   // below for the later steps.
   donation:  DONATIONS_NEW,
@@ -69,3 +72,12 @@ export const DONATIONS = {
 // both lists. If the server list changes, change this one with it —
 // they are two halves of the same rule.
 export const DONATION_INTAKE_ROLES = ['warehouse_worker', 'manager', 'admin'];
+
+// ── Suppliers ────────────────────────────────────────────────
+// Manager and admin only, mirroring MANAGES_UP in
+// server/src/routes/supplier.routes.js. Workers can READ suppliers
+// through the API (the receiving dropdown needs it) but have no
+// screen of their own, so the route itself is gated to managers.
+export const SUPPLIERS = {
+  directory: '/noc/suppliers',
+};
