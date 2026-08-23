@@ -68,6 +68,12 @@ export default function Home() {
       disabled: false,
       noticeMessage: "Picking Slip Assignment feature is coming in the next iteration.",
     },
+    {
+      to: "/noc/suppliers",
+      icon: receivingIcon,
+      title: "Manage Suppliers",
+      disabled: false,
+    },
   ];
 
   // Called when a blocked task card is clicked (see isBlocked below).

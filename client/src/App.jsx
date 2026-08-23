@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate }  from 'react-router-dom';
 import { AuthProvider }                            from './context/AuthContext';
 import ProtectedRoute                              from './components/layout/ProtectedRoute';
-import { PACKING, STAFF, DONATIONS, DONATION_INTAKE_ROLES } from './routes/paths';
+import { PACKING, STAFF, DONATIONS, DONATION_INTAKE_ROLES , SUPPLIERS } from './routes/paths';
 import LandingPage                                 from './pages/LandingPage';
 import LoginPage                                   from './pages/LoginPage';
 import GuestLoginPage                              from './pages/GuestLoginPage';
@@ -16,6 +16,7 @@ import DispatchPage                                from './pages/DispatchPage';
 import InventoryManagementPage                     from './pages/InventoryManagementPage';
 import ManagerActivityScreen                       from './pages/ManagerActivityScreen';
 import TaskDashboard from './pages/TaskDashboardPage';
+import SupplierDirectoryPage                       from './pages/SupplierDirectoryPage';
 
 // Donations — new feature, own draft context scoped to just these
 // two routes (see features/donation/context/DonationDraftProvider.jsx)
@@ -35,6 +36,7 @@ const App = () => (
         
         {/* Protected — manager only */}
         <Route element={<ProtectedRoute roles={['manager']} />}>
+          <Route path={SUPPLIERS.directory} element={<SupplierDirectoryPage />} />
           <Route path="/manager"       element={<ManagerActivityScreen />} />
         <Route path="/noc/inventory" element={<InventoryManagementPage />} />
         </Route>
