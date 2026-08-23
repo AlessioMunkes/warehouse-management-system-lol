@@ -19,6 +19,7 @@ import pickingRouter     from './src/routes/picking.routes.js';
 import donationRouter    from './src/routes/donation.routes.js';
 import dispatchRouter    from './src/routes/dispatch.routes.js';
 import supplierRouter   from './src/routes/supplier.routes.js';
+import reportingRouter   from './src/routes/reporting.routes.js';
 
 // ── Validate required secrets exist at startup ───────────────
 if (!process.env.JWT_SECRET) {
@@ -93,6 +94,7 @@ app.use('/api/picking',    pickingRouter);
 app.use('/api/dispatch',   dispatchRouter);
 app.use('/api/donations',  donationRouter);
 app.use('/api/suppliers',  supplierRouter);
+app.use('/api/reporting',  reportingRouter);
 
 // ── SPA fallback (production only) ────────────────────────────
 // Any non-/api path falls through to index.html so React Router can

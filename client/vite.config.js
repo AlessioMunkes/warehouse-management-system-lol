@@ -15,6 +15,12 @@ export default defineConfig({
     tailwindcss(),                              // ← added (must be first)
     react(),
     VitePWA({
+      // SheetJS is dynamically imported by the spreadsheet charting
+      // feature. Workbox precaches every asset by default, which would
+      // download ~400 kB on install for users who never drop a file.
+      workbox: {
+        globIgnores: ['**/xlsx-*.js'],
+      },
       includeAssets: [faviconURL],
       manifest: {
         theme_color: '#7A1A1A',                 // updated to match your brand
