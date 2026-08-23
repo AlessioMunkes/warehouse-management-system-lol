@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import logo from '../assets/Batches_Logo.jpeg';
 import { HugeiconsIcon } from '@hugeicons/react';
 import Log_In_Background from '../assets/Log_In_Background.jpg';
-import { STAFF } from '../routes/paths';
+import { STAFF, ADMIN } from '../routes/paths';
 
 // shadcn/ui components
 import { Button } from '@/components/ui/button';
@@ -70,6 +70,9 @@ const LoginPage = () => {
 
   const redirectByRole = (loggedInUser) => {
     switch (loggedInUser?.role) {
+      case "admin":
+        navigate(ADMIN.dashboard);
+        break;
       case "manager":
         navigate("/manager");
         break;

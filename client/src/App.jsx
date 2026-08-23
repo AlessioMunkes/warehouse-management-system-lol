@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate }  from 'react-router-dom';
 import { AuthProvider }                            from './context/AuthContext';
 import ProtectedRoute                              from './components/layout/ProtectedRoute';
-import { PACKING, STAFF, DONATIONS, DONATION_INTAKE_ROLES , SUPPLIERS } from './routes/paths';
+import { PACKING, STAFF, DONATIONS, DONATION_INTAKE_ROLES, ADMIN } from './routes/paths';
 import LandingPage                                 from './pages/LandingPage';
 import LoginPage                                   from './pages/LoginPage';
 import GuestLoginPage                              from './pages/GuestLoginPage';
@@ -18,6 +18,7 @@ import ManagerActivityScreen                       from './pages/ManagerActivity
 import TaskDashboard from './pages/TaskDashboardPage';
 import SupplierDirectoryPage                       from './pages/SupplierDirectoryPage';
 import ReportingPage                               from './pages/ReportingPage';
+import AdminActivityScreen                         from './pages/AdminActivityScreen';
 
 // Donations — new feature, own draft context scoped to just these
 // two routes (see features/donation/context/DonationDraftProvider.jsx)
@@ -35,9 +36,14 @@ const App = () => (
         <Route path="/guest" element={<GuestLoginPage />} />
          
         
+        {/* ── Admin only ─────────────────────────────────── */}
+        <Route element={<ProtectedRoute roles={['admin']} />}>
+          <Route path={ADMIN.dashboard} element={<AdminActivityScreen />} />
+          <Route path={ADMIN.suppliers} element={<SupplierDirectoryPage />} />
+        </Route>
+
         {/* Protected — manager only */}
         <Route element={<ProtectedRoute roles={['manager']} />}>
-          <Route path={SUPPLIERS.directory} element={<SupplierDirectoryPage />} />
           <Route path="/manager"       element={<ManagerActivityScreen />} />
         <Route path="/noc/inventory" element={<InventoryManagementPage />} />
           <Route path={STAFF.reporting} element={<ReportingPage />} />
