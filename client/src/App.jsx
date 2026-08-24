@@ -17,6 +17,7 @@ import InventoryManagementPage                     from './pages/InventoryManage
 import ManagerActivityScreen                       from './pages/ManagerActivityScreen';
 import TaskDashboard from './pages/TaskDashboardPage';
 import SupplierDirectoryPage                       from './pages/SupplierDirectoryPage';
+import PurchaseOrdersPage                          from './pages/PurchaseOrdersPage';
 import ReportingPage                               from './pages/ReportingPage';
 import AdminActivityScreen                         from './pages/AdminActivityScreen';
 
@@ -47,6 +48,7 @@ const App = () => (
           <Route path="/manager"       element={<ManagerActivityScreen />} />
         <Route path="/noc/inventory" element={<InventoryManagementPage />} />
           <Route path={STAFF.reporting} element={<ReportingPage />} />
+          <Route path={STAFF.purchaseOrders} element={<PurchaseOrdersPage />} />
         </Route>
 
         {/* Protected — any logged-in user */}

@@ -411,7 +411,7 @@ const getPurchaseOrdersBySupplier = async (supplierId) => {
      FROM purchase_orders po
      LEFT JOIN users u ON u.id = po.created_by
      WHERE po.supplier_id = $1
-       AND po.status = 'approved'
+       AND po.status IN ('pending', 'in_transit', 'partially_received')
      ORDER BY po.expected_delivery_date ASC`,
     [supplierId],
   );
