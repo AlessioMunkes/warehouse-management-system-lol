@@ -10,6 +10,8 @@
 // mode). Editing an existing user never shows or submits a password —
 // resetting one is a deliberate future addition, not this form's job
 // (see user.service.js: updateUser has no password branch at all).
+// confirmPassword is client-only state, used to catch a typo before
+// submit — it is never included in the payload sent to the server.
 //
 // SELF-LOCKOUT GUARD, CLIENT SIDE.
 // When isSelf is true and the account being edited is currently an
@@ -28,9 +30,12 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input }  from '@/components/ui/input';
 import {
+  InputGroup, InputGroupAddon, InputGroupInput, InputGroupButton,
+} from '@/components/ui/input-group';
+import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -43,7 +48,8 @@ const ROLE_OPTIONS = [
 ];
 
 const BLANK = {
-  username: '', firstName: '', lastName: '', role: 'warehouse_worker', password: '',
+  username: '', firstName: '', lastName: '', role: 'warehouse_worker',
+  password: '', confirmPassword: '',
 };
 
 export default function UserForm({
@@ -58,6 +64,9 @@ export default function UserForm({
   const isEdit = Boolean(initial);
   const [form, setForm] = useState({ ...BLANK, ...(initial ?? {}) });
   const [touched, setTouched] = useState({});
+  // Shared by both password inputs — one toggle reveals or hides them
+  // together, same as the SHOW/HIDE control on LoginPage.jsx.
+  const [showPassword, setShowPassword] = useState(false);
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
   const touch = (key) => () => setTouched((t) => ({ ...t, [key]: true }));
@@ -66,11 +75,15 @@ export default function UserForm({
   const firstNameMissing = !String(form.firstName ?? '').trim();
   const lastNameMissing  = !String(form.lastName ?? '').trim();
   const passwordInvalid  = !isEdit && String(form.password ?? '').length < MIN_PASSWORD_LENGTH;
+  const confirmMismatch  = !isEdit && form.password !== form.confirmPassword;
   const roleLocked       = isEdit && isSelf && form.role === 'admin';
 
   const submit = () => {
-    setTouched({ username: true, firstName: true, lastName: true, password: true });
-    if (usernameMissing || firstNameMissing || lastNameMissing || passwordInvalid) return;
+    setTouched({
+      username: true, firstName: true, lastName: true,
+      password: true, confirmPassword: true,
+    });
+    if (usernameMissing || firstNameMissing || lastNameMissing || passwordInvalid || confirmMismatch) return;
 
     const payload = {
       username:  form.username,
@@ -78,6 +91,8 @@ export default function UserForm({
       lastName:  form.lastName,
       role:      form.role,
     };
+    // confirmPassword never leaves the browser — it exists only to
+    // catch a typo before submit.
     if (!isEdit) payload.password = form.password;
 
     onSubmit(payload);
@@ -145,21 +160,62 @@ export default function UserForm({
       </div>
 
       {!isEdit ? (
-        <Field data-invalid={(touched.password && passwordInvalid) || undefined}>
-          <FieldLabel htmlFor="user-password">Password</FieldLabel>
-          <Input
-            id="user-password"
-            type="password"
-            value={form.password}
-            onChange={set('password')}
-            onBlur={touch('password')}
-            aria-invalid={(touched.password && passwordInvalid) || undefined}
-          />
-          <FieldDescription>At least {MIN_PASSWORD_LENGTH} characters.</FieldDescription>
-          {touched.password && passwordInvalid ? (
-            <FieldError>Password must be at least {MIN_PASSWORD_LENGTH} characters.</FieldError>
-          ) : null}
-        </Field>
+        <div className="grid gap-7 sm:grid-cols-2">
+          <Field data-invalid={(touched.password && passwordInvalid) || undefined}>
+            <FieldLabel htmlFor="user-password">Password</FieldLabel>
+            <InputGroup>
+              <InputGroupInput
+                id="user-password"
+                type={showPassword ? 'text' : 'password'}
+                value={form.password}
+                onChange={set('password')}
+                onBlur={touch('password')}
+                aria-invalid={(touched.password && passwordInvalid) || undefined}
+              />
+              <InputGroupAddon align="inline-end">
+                <InputGroupButton
+                  type="button"
+                  size="icon-xs"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  onClick={() => setShowPassword((v) => !v)}
+                >
+                  {showPassword ? <EyeOff /> : <Eye />}
+                </InputGroupButton>
+              </InputGroupAddon>
+            </InputGroup>
+            <FieldDescription>At least {MIN_PASSWORD_LENGTH} characters.</FieldDescription>
+            {touched.password && passwordInvalid ? (
+              <FieldError>Password must be at least {MIN_PASSWORD_LENGTH} characters.</FieldError>
+            ) : null}
+          </Field>
+
+          <Field data-invalid={(touched.confirmPassword && confirmMismatch) || undefined}>
+            <FieldLabel htmlFor="user-confirm-password">Confirm password</FieldLabel>
+            <InputGroup>
+              <InputGroupInput
+                id="user-confirm-password"
+                type={showPassword ? 'text' : 'password'}
+                value={form.confirmPassword}
+                onChange={set('confirmPassword')}
+                onBlur={touch('confirmPassword')}
+                aria-invalid={(touched.confirmPassword && confirmMismatch) || undefined}
+              />
+              <InputGroupAddon align="inline-end">
+                <InputGroupButton
+                  type="button"
+                  size="icon-xs"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  onClick={() => setShowPassword((v) => !v)}
+                >
+                  {showPassword ? <EyeOff /> : <Eye />}
+                </InputGroupButton>
+              </InputGroupAddon>
+            </InputGroup>
+            {touched.confirmPassword && confirmMismatch ? (
+              <FieldError>Passwords do not match.</FieldError>
+            ) : null}
+          </Field>
+        </div>
       ) : null}
 
       <Field orientation="horizontal">

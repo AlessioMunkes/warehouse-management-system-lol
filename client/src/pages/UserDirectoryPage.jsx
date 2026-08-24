@@ -204,119 +204,126 @@ export default function UserDirectoryPage() {
           </div>
         ) : null}
 
-        {isLoading ? (
-          <div className="mt-6 space-y-3">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-24 w-full" />
-          </div>
-        ) : (
-          <div className="mt-6 space-y-6">
-            {mode === 'create' ? (
-              <Card>
-                <CardHeader><CardTitle>Create a user</CardTitle></CardHeader>
-                <CardContent>
-                  <UserForm onSubmit={create} onCancel={() => setMode('list')} busy={busy} />
-                </CardContent>
-              </Card>
-            ) : mode === 'edit' && selected ? (
-              <Card>
-                <CardHeader><CardTitle>Edit {selected.firstName} {selected.lastName}</CardTitle></CardHeader>
-                <CardContent>
-                  <UserForm
-                    initial={selected}
-                    isSelf={selected.id === user?.id}
-                    submitLabel="Save changes"
-                    onSubmit={save}
-                    onCancel={() => setMode('list')}
-                    busy={busy}
+        <div className="mt-6 space-y-6">
+          {mode === 'create' ? (
+            <Card>
+              <CardHeader><CardTitle>Create a user</CardTitle></CardHeader>
+              <CardContent>
+                <UserForm onSubmit={create} onCancel={() => setMode('list')} busy={busy} />
+              </CardContent>
+            </Card>
+          ) : mode === 'edit' && selected ? (
+            <Card>
+              <CardHeader><CardTitle>Edit {selected.firstName} {selected.lastName}</CardTitle></CardHeader>
+              <CardContent>
+                <UserForm
+                  initial={selected}
+                  isSelf={selected.id === user?.id}
+                  submitLabel="Save changes"
+                  onSubmit={save}
+                  onCancel={() => setMode('list')}
+                  busy={busy}
+                />
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {/* This toolbar is deliberately OUTSIDE the isLoading
+                  check below. Gating the whole block on isLoading swaps
+                  this search input for a Skeleton and back on every
+                  reload — and reload fires on every keystroke, since
+                  loadUsers depends on `search`. Swapping the element
+                  out destroys its DOM node mid-type, which is what was
+                  stealing focus after each letter. Only the results
+                  area below (table / empty state) needs to reflect a
+                  fetch in flight; the controls that trigger a fetch
+                  must stay mounted through it. */}
+              <div className="flex flex-wrap items-center gap-3">
+                <InputGroup className="min-w-56 flex-1">
+                  <InputGroupAddon align="inline-start">
+                    <Search />
+                  </InputGroupAddon>
+                  <InputGroupInput
+                    placeholder="Search by username or name"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
                   />
-                </CardContent>
-              </Card>
-            ) : (
-              <>
-                <div className="flex flex-wrap items-center gap-3">
-                  <InputGroup className="min-w-56 flex-1">
-                    <InputGroupAddon align="inline-start">
-                      <Search />
-                    </InputGroupAddon>
-                    <InputGroupInput
-                      placeholder="Search by username or name"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                    />
-                  </InputGroup>
+                </InputGroup>
 
-                  <Field orientation="horizontal" className="w-auto">
-                    <Checkbox
-                      id="include-inactive"
-                      checked={includeInactive}
-                      onCheckedChange={(v) => setIncludeInactive(Boolean(v))}
-                    />
-                    <FieldLabel htmlFor="include-inactive" className="font-normal">
-                      Show inactive
-                    </FieldLabel>
-                  </Field>
-
-                  {canManage ? (
-                    <Button type="button" onClick={() => { setSelected(null); setMode('create'); }}>
-                      <Plus />
-                      Create user
-                    </Button>
-                  ) : null}
-                </div>
-
-                {selected ? (
-                  <UserDetail
-                    targetUser={selected}
-                    canManage={canManage}
-                    isSelf={selected.id === user?.id}
-                    onEdit={() => setMode('edit')}
-                    onToggleActive={toggleActive}
-                    onClose={() => setSelected(null)}
+                <Field orientation="horizontal" className="w-auto">
+                  <Checkbox
+                    id="include-inactive"
+                    checked={includeInactive}
+                    onCheckedChange={(v) => setIncludeInactive(Boolean(v))}
                   />
+                  <FieldLabel htmlFor="include-inactive" className="font-normal">
+                    Show inactive
+                  </FieldLabel>
+                </Field>
+
+                {canManage ? (
+                  <Button type="button" onClick={() => { setSelected(null); setMode('create'); }}>
+                    <Plus />
+                    Create user
+                  </Button>
                 ) : null}
+              </div>
 
-                {users.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No users match.</p>
-                ) : (
-                  <Card>
-                    <CardContent className="p-0">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>User</TableHead>
-                            <TableHead>Username</TableHead>
-                            <TableHead>Role</TableHead>
-                            <TableHead />
+              {selected ? (
+                <UserDetail
+                  targetUser={selected}
+                  canManage={canManage}
+                  isSelf={selected.id === user?.id}
+                  onEdit={() => setMode('edit')}
+                  onToggleActive={toggleActive}
+                  onClose={() => setSelected(null)}
+                />
+              ) : null}
+
+              {isLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-24 w-full" />
+                  <Skeleton className="h-24 w-full" />
+                </div>
+              ) : users.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No users match.</p>
+              ) : (
+                <Card>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>User</TableHead>
+                          <TableHead>Username</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead />
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {users.map((u) => (
+                          <TableRow
+                            key={u.id}
+                            className="cursor-pointer"
+                            onClick={() => open(u.id)}
+                          >
+                            <TableCell className="font-medium">{u.firstName} {u.lastName}</TableCell>
+                            <TableCell className="text-muted-foreground">{u.username}</TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {ROLE_LABELS[u.role] ?? u.role}
+                            </TableCell>
+                            <TableCell>
+                              {!u.isActive ? <Badge variant="outline">Inactive</Badge> : null}
+                            </TableCell>
                           </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {users.map((u) => (
-                            <TableRow
-                              key={u.id}
-                              className="cursor-pointer"
-                              onClick={() => open(u.id)}
-                            >
-                              <TableCell className="font-medium">{u.firstName} {u.lastName}</TableCell>
-                              <TableCell className="text-muted-foreground">{u.username}</TableCell>
-                              <TableCell className="text-muted-foreground">
-                                {ROLE_LABELS[u.role] ?? u.role}
-                              </TableCell>
-                              <TableCell>
-                                {!u.isActive ? <Badge variant="outline">Inactive</Badge> : null}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </CardContent>
-                  </Card>
-                )}
-              </>
-            )}
-          </div>
-        )}
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          )}
+        </div>
       </main>
     </>
   );
