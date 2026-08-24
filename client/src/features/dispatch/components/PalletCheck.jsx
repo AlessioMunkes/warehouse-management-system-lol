@@ -37,98 +37,11 @@
 // recorded, and where a person needs to own the decision, that person
 // is asked for a reason.
 // ─────────────────────────────────────────────────────────────
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import dispatchAPI, { newIdempotencyKey } from '../../../services/dispatchAPI';
 import { useAuth } from '../../../context/AuthContext';
-import { Actions, Button, Notice, TextField } from '../../staff/components/StepPrimitives';
-
-// ── Signature pad ─────────────────────────────────────────────
-// Unchanged in shape. The one fix: whether anything was drawn is now
-// tracked on a ref as well as in state. `stop` used to read the state
-// value captured in its own render, which is a race that only shows
-// up as an occasional signature silently not registering — the worst
-// possible bug on the one field that is legally load-bearing.
-function SignaturePad({ onChange }) {
-  const canvasRef = useRef(null);
-  const drawing   = useRef(false);
-  const inked     = useRef(false);
-  const [signed, setSigned] = useState(false);
-
-  useEffect(() => {
-    const ctx = canvasRef.current.getContext('2d');
-    ctx.strokeStyle = '#2b3336';
-    ctx.lineWidth   = 2.5;
-    ctx.lineCap     = 'round';
-  }, []);
-
-  const posOf = (e) => {
-    const rect  = canvasRef.current.getBoundingClientRect();
-    const point = e.touches ? e.touches[0] : e;
-    // The canvas is 600x170 internally but CSS-scaled to the phone's
-    // width. Without this ratio the ink lands away from the fingertip.
-    const scaleX = canvasRef.current.width / rect.width;
-    const scaleY = canvasRef.current.height / rect.height;
-    return {
-      x: (point.clientX - rect.left) * scaleX,
-      y: (point.clientY - rect.top) * scaleY,
-    };
-  };
-
-  const start = (e) => {
-    e.preventDefault();
-    const { x, y } = posOf(e);
-    const ctx = canvasRef.current.getContext('2d');
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    drawing.current = true;
-  };
-
-  const move = (e) => {
-    if (!drawing.current) return;
-    e.preventDefault();
-    const { x, y } = posOf(e);
-    const ctx = canvasRef.current.getContext('2d');
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    inked.current = true;
-    if (!signed) setSigned(true);
-  };
-
-  const stop = () => {
-    if (!drawing.current) return;
-    drawing.current = false;
-    if (inked.current) onChange(canvasRef.current.toDataURL('image/png'));
-  };
-
-  const clear = () => {
-    const canvas = canvasRef.current;
-    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
-    inked.current = false;
-    setSigned(false);
-    onChange(null);
-  };
-
-  return (
-    <div className="stf-field">
-      <label className="stf-field-label" htmlFor="stf-signature">Driver signature</label>
-      <canvas
-        id="stf-signature"
-        ref={canvasRef}
-        className="stf-sign-canvas"
-        width={600}
-        height={170}
-        onMouseDown={start}
-        onMouseMove={move}
-        onMouseUp={stop}
-        onMouseLeave={stop}
-        onTouchStart={start}
-        onTouchMove={move}
-        onTouchEnd={stop}
-      />
-      <Button variant="secondary" onClick={clear} disabled={!signed}>Clear</Button>
-    </div>
-  );
-}
+import { Actions, Button, Notice, TextField, SignaturePad } from '../../staff/components/StepPrimitives';
+import DispatchNotePDF from './DispatchNotePDF';
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -160,6 +73,15 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
   const [error, setError]       = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [outcome, setOutcome]   = useState(null);
+
+  // The proof-of-collection document. Fetched once the collection
+  // saves and shown automatically; kept separately from `outcome` so
+  // closing the popup doesn't lose it — "View dispatch note" below
+  // just re-opens what's already loaded.
+  const [note, setNote]               = useState(null);
+  const [noteOpen, setNoteOpen]       = useState(false);
+  const [noteLoading, setNoteLoading] = useState(false);
+  const [noteError, setNoteError]     = useState(null);
 
   const [driverName, setDriverName]         = useState('');
   const [vehicleReg, setVehicleReg]         = useState('');
@@ -197,6 +119,32 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
     return () => { cancelled = true; };
   }, [palletId]);
 
+  // Fires once, the moment a collection saves — auto-pops the note so
+  // the person at the gate doesn't have to go looking for it.
+  useEffect(() => {
+    const eventId = outcome?.event?.id;
+    if (!eventId) return;
+    let cancelled = false;
+    dispatchAPI.getDispatchNote(eventId)
+      .then((data) => { if (!cancelled) { setNote(data); setNoteOpen(true); } })
+      .catch((err) => { if (!cancelled) setNoteError(err.message || 'Could not load the dispatch note.'); });
+    return () => { cancelled = true; };
+  }, [outcome]);
+
+  // Re-open handler for the "View dispatch note" button: reuses what
+  // is already loaded, or retries the fetch if it failed earlier.
+  const openNote = () => {
+    if (note) { setNoteOpen(true); return; }
+    const eventId = outcome?.event?.id;
+    if (!eventId) return;
+    setNoteLoading(true);
+    setNoteError(null);
+    dispatchAPI.getDispatchNote(eventId)
+      .then((data) => { setNote(data); setNoteOpen(true); })
+      .catch((err) => setNoteError(err.message || 'Could not load the dispatch note.'))
+      .finally(() => setNoteLoading(false));
+  };
+
   if (loading) return <div className="stf-skeleton" aria-label="Loading" />;
 
   if (error && !gate) {
@@ -210,9 +158,10 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
   if (!gate) return null;
 
   // ── Done screen ─────────────────────────────────────────────
-  // Only reached when the collection saved but the server sent
-  // something back worth reading. A clean collection returns straight
-  // to the queue.
+  // Reached on every successful collection now, clean or not — this is
+  // the screen the dispatch note pops up on. Warnings (shortfalls,
+  // unit mismatches, a replayed submit) are layered on top when the
+  // server sent something worth reading.
   if (outcome) {
     return (
       <section className="stf-step">
@@ -238,9 +187,18 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
           </Notice>
         ) : null}
 
+        {noteError ? <Notice tone="warn">{noteError}</Notice> : null}
+
         <Actions>
-          <Button onClick={onBack}>Gate queue</Button>
+          <Button onClick={openNote} disabled={noteLoading}>
+            {noteLoading ? 'Loading note…' : 'View dispatch note'}
+          </Button>
+          <Button variant="secondary" onClick={onBack}>Gate queue</Button>
         </Actions>
+
+        {noteOpen && note ? (
+          <DispatchNotePDF note={note} onClose={() => setNoteOpen(false)} />
+        ) : null}
       </section>
     );
   }
@@ -313,12 +271,12 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
         overrideReason: overrideNeeded ? overrideReason.trim() : null,
       });
 
-      // Only hold the screen when there is something to read.
-      if (result?.shortfalls?.length || result?.unitMismatches?.length || result?.replayed) {
-        setOutcome(result);
-      } else {
-        onCollected(result);
-      }
+      // Always hold the screen now — this is what shows the dispatch
+      // note popup. The gate queue is told about the collection right
+      // away (it only bumps a refetch key, it doesn't navigate), so
+      // it's already fresh by the time the person taps "Gate queue".
+      setOutcome(result);
+      onCollected(result);
     } catch (err) {
       setError(err.message || 'Could not save this collection. Please try again.');
     } finally {
@@ -494,7 +452,7 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
         />
       ) : null}
 
-      <SignaturePad onChange={setSignature} />
+      <SignaturePad onChange={setSignature} label="Driver signature" />
 
       <p className="stf-field-hint">
         Once signed, this pallet is recorded as collected and the loaded quantities come off the stock.

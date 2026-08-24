@@ -36,7 +36,11 @@ export default function DispatchPage() {
         <PalletCheck
           palletId={palletId}
           onBack={backToQueue}
-          onCollected={() => { setQueueKey((k) => k + 1); backToQueue(); }}
+          // Bump-only: PalletCheck now stays on screen after a
+          // collection to show the dispatch note popup, so this must
+          // not navigate away too. Whenever the person does tap "Gate
+          // queue" (onBack, above), the board is already fresh.
+          onCollected={() => setQueueKey((k) => k + 1)}
         />
       ) : (
         <GateQueue key={queueKey} onOpenPallet={setPalletId} />

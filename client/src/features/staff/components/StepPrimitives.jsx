@@ -10,7 +10,7 @@
 // sequential screens with one decision each. ACC-06 is why the
 // numbers are 56px and every tap target is at least 44px.
 // ─────────────────────────────────────────────────────────────
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 // ── Step rail ─────────────────────────────────────────────────
 // Four thin bars and a quiet line of text. Deliberately not a
@@ -177,6 +177,95 @@ export const KeyValues = ({ pairs }) => (
     ))}
   </p>
 );
+
+// ── Signature pad ─────────────────────────────────────────────
+// Shared by every step flow that needs proof of handover (dispatch
+// collection, receiving). Whether anything was drawn is tracked on a
+// ref as well as in state: `stop` used to read the state value
+// captured in its own render, which is a race that only shows up as
+// an occasional signature silently not registering — the worst
+// possible bug on the one field that is legally load-bearing.
+export const SignaturePad = ({ onChange, label = 'Signature' }) => {
+  const canvasRef = useRef(null);
+  const drawing   = useRef(false);
+  const inked     = useRef(false);
+  const [signed, setSigned] = useState(false);
+
+  useEffect(() => {
+    const ctx = canvasRef.current.getContext('2d');
+    ctx.strokeStyle = '#2b3336';
+    ctx.lineWidth   = 2.5;
+    ctx.lineCap     = 'round';
+  }, []);
+
+  const posOf = (e) => {
+    const rect  = canvasRef.current.getBoundingClientRect();
+    const point = e.touches ? e.touches[0] : e;
+    // The canvas is 600x170 internally but CSS-scaled to the phone's
+    // width. Without this ratio the ink lands away from the fingertip.
+    const scaleX = canvasRef.current.width / rect.width;
+    const scaleY = canvasRef.current.height / rect.height;
+    return {
+      x: (point.clientX - rect.left) * scaleX,
+      y: (point.clientY - rect.top) * scaleY,
+    };
+  };
+
+  const start = (e) => {
+    e.preventDefault();
+    const { x, y } = posOf(e);
+    const ctx = canvasRef.current.getContext('2d');
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    drawing.current = true;
+  };
+
+  const move = (e) => {
+    if (!drawing.current) return;
+    e.preventDefault();
+    const { x, y } = posOf(e);
+    const ctx = canvasRef.current.getContext('2d');
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    inked.current = true;
+    if (!signed) setSigned(true);
+  };
+
+  const stop = () => {
+    if (!drawing.current) return;
+    drawing.current = false;
+    if (inked.current) onChange(canvasRef.current.toDataURL('image/png'));
+  };
+
+  const clear = () => {
+    const canvas = canvasRef.current;
+    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+    inked.current = false;
+    setSigned(false);
+    onChange(null);
+  };
+
+  return (
+    <div className="stf-field">
+      <label className="stf-field-label" htmlFor="stf-signature">{label}</label>
+      <canvas
+        id="stf-signature"
+        ref={canvasRef}
+        className="stf-sign-canvas"
+        width={600}
+        height={170}
+        onMouseDown={start}
+        onMouseMove={move}
+        onMouseUp={stop}
+        onMouseLeave={stop}
+        onTouchStart={start}
+        onTouchMove={move}
+        onTouchEnd={stop}
+      />
+      <Button variant="secondary" onClick={clear} disabled={!signed}>Clear</Button>
+    </div>
+  );
+};
 
 // ── Counter ───────────────────────────────────────────────────
 // 48px either side of the number, because the alternative on a phone

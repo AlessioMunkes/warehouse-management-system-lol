@@ -22,10 +22,11 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useState } from 'react';
 import {
-  StepRail, StepScreen, Actions, Button, NumberField, ChoiceList, Notice, KeyValues,
+  StepRail, StepScreen, Actions, Button, NumberField, ChoiceList, Notice, KeyValues, SignaturePad,
 } from '../../staff/components/StepPrimitives';
 import receivingAPI from '../../../services/receivingAPI';
 import { newIdempotencyKey } from '../../../services/api';
+import DeliveryNotePDF from './DeliveryNotePDF';
 
 const TOTAL_STEPS = 4;
 
@@ -92,6 +93,22 @@ export default function ReceivingFlow({ onCrumbChange }) {
   // One entry per order line: what was expected, what was counted,
   // where it went, and the use-by date if it is fresh.
   const [lines, setLines] = useState([]);
+
+  // Captured on the read-back screen, right before Finish — the same
+  // spot PalletCheck signs off a dispatch. The server only requires
+  // signatureData to be present; this replaces the old hardcoded
+  // 'received-in-app' placeholder, which was never a valid image and
+  // left the signature block on the delivery note silently blank.
+  const [signature, setSignature] = useState(null);
+
+  // The delivery note, fetched back after Finish and shown
+  // automatically — mirrors what ProcurementDashboard.jsx does after
+  // its own submit.
+  const [note, setNote]                       = useState(null);
+  const [noteOpen, setNoteOpen]               = useState(false);
+  const [noteLoading, setNoteLoading]         = useState(false);
+  const [noteError, setNoteError]             = useState(null);
+  const [lastDeliveryId, setLastDeliveryId]   = useState(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -195,22 +212,19 @@ export default function ReceivingFlow({ onCrumbChange }) {
   };
 
   // ── Commit ──────────────────────────────────────────────────
+  // No driver is recorded here — there is no drivers table and
+  // delivery_notes has no driver_name column (deliberately removed;
+  // supplier + PO ID is enough). The signature is the receiver's own,
+  // proof this delivery was checked in by the person named on it.
   const finish = async () => {
     setSaving(true);
     setError(null);
     try {
-      // No driver is recorded here — there is no drivers table and
-      // this flow has no field for one. delivery_notes.driver_name is
-      // the real column to write to if that's ever added.
-      await receivingAPI.recordDelivery({
+      const result = await receivingAPI.recordDelivery({
         supplierId,
         deliveryDate: todayISO(),
         purchaseOrderId: orderId,
-        // The endpoint validates that a signature is present. These
-        // wireframes do not ask for one at intake (the driver signs at
-        // dispatch, not receiving), so the receipt records that it was
-        // accepted in the app instead.
-        signatureData: 'received-in-app',
+        signatureData: signature,
         poCompleted: lines.every((l) => Number(l.counted) >= l.expected),
         idempotencyKey: attemptKey,
         lineItems: lines.map((line) => {
@@ -232,6 +246,26 @@ export default function ReceivingFlow({ onCrumbChange }) {
         }),
       });
       setPhase('done');
+
+      // The POST response is just the bare delivery_notes row — fetch
+      // the full note (items, product names, po_status) so the popup
+      // has something to show. Best-effort: the delivery is already
+      // saved either way, so a failure here surfaces as a retryable
+      // "View delivery note" button rather than blocking completion.
+      const deliveryId = result?.id;
+      setLastDeliveryId(deliveryId || null);
+      if (deliveryId) {
+        setNoteLoading(true);
+        try {
+          const full = await receivingAPI.getDeliveryById(deliveryId);
+          setNote(full);
+          setNoteOpen(true);
+        } catch (fetchErr) {
+          setNoteError(fetchErr.message || 'Could not load the delivery note.');
+        } finally {
+          setNoteLoading(false);
+        }
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -239,11 +273,28 @@ export default function ReceivingFlow({ onCrumbChange }) {
     }
   };
 
+  // Re-open handler for the "View delivery note" button on the done
+  // screen: reuses what's already loaded, or retries the fetch.
+  const openNote = () => {
+    if (note) { setNoteOpen(true); return; }
+    setNoteLoading(true);
+    setNoteError(null);
+    receivingAPI.getDeliveryById(lastDeliveryId)
+      .then((full) => { setNote(full); setNoteOpen(true); })
+      .catch((err) => setNoteError(err.message || 'Could not load the delivery note.'))
+      .finally(() => setNoteLoading(false));
+  };
+
   const restart = () => {
     setPhase('which');
     setLines([]);
     setOrderId('');
     setLineIndex(0);
+    setSignature(null);
+    setNote(null);
+    setNoteOpen(false);
+    setNoteError(null);
+    setLastDeliveryId(null);
     // A new delivery is a new attempt. Keeping the old key would make
     // the server treat the next genuine delivery as a replay of the
     // last one and silently record nothing.
@@ -411,7 +462,7 @@ export default function ReceivingFlow({ onCrumbChange }) {
           sub="Tap any line to change it."
           actions={
             <Actions>
-              <Button disabled={saving} onClick={finish}>
+              <Button disabled={saving || !signature} onClick={finish}>
                 {saving ? 'Saving' : 'Finish this delivery'}
               </Button>
             </Actions>
@@ -449,6 +500,11 @@ export default function ReceivingFlow({ onCrumbChange }) {
               still records the delivery, and your manager gets the difference to follow up.
             </Notice>
           ) : null}
+
+          <SignaturePad onChange={setSignature} label="Your signature" />
+          <p className="stf-field-hint">
+            Once signed, this delivery is recorded and the stock comes onto the system.
+          </p>
         </StepScreen>
       )}
 
@@ -459,11 +515,20 @@ export default function ReceivingFlow({ onCrumbChange }) {
           sub="The stock is on the system. You can put the next one in, or move on to packing."
           actions={
             <Actions>
-              <Button onClick={restart}>Receive another delivery</Button>
+              <Button onClick={openNote} disabled={noteLoading}>
+                {noteLoading ? 'Loading note…' : 'View delivery note'}
+              </Button>
+              <Button variant="secondary" onClick={restart}>Receive another delivery</Button>
             </Actions>
           }
-        />
+        >
+          {noteError ? <Notice tone="warn">{noteError}</Notice> : null}
+        </StepScreen>
       )}
+
+      {noteOpen && note ? (
+        <DeliveryNotePDF delivery={note} onClose={() => setNoteOpen(false)} />
+      ) : null}
     </>
   );
 }

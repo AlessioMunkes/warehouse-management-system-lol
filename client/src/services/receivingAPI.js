@@ -66,6 +66,17 @@ export const getProducts = async () => {
   return res.data ?? [];
 };
 
+// GET /api/deliveries/:id
+// The full note with its line items (product names, SKUs, po_status,
+// signature) — what POST /api/deliveries returns is just the bare
+// delivery_notes row, not enough to render DeliveryNotePDF. Mirrors
+// the inline fetch ProcurementDashboard.jsx already makes after its
+// own submit.
+export const getDeliveryById = async (id) => {
+  const res = await apiGet(`/api/deliveries/${id}`);
+  return res.data;
+};
+
 // POST /api/deliveries
 // Returns the delivery note with `duplicate` on it. A duplicate is a
 // SUCCESS — the retry did the right thing and the goods were only
@@ -92,5 +103,6 @@ export default {
   getPurchaseOrders,
   getPurchaseOrderItems,
   getProducts,
+  getDeliveryById,
   recordDelivery,
 };

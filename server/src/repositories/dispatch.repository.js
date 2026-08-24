@@ -258,6 +258,14 @@ const collect = async ({
     );
 
     // ── Upsert the event header ────────────────────────────────
+    // $2::int casts below: without them, Postgres unifies the type of
+    // $2 across ALL its uses in the statement. Both branches of the
+    // override_by CASE are otherwise "unknown"-typed (a bare parameter
+    // and a bare NULL), so Postgres defaults that CASE to text — which
+    // then conflicts with $2's direct use as dispatched_by (integer)
+    // and the insert/update fails with "inconsistent types deduced for
+    // parameter $2" before a single row is written. Pinning the type
+    // explicitly removes the ambiguity.
     const eventResult = existing
       ? await client.query(
           `UPDATE dispatch_events
@@ -268,7 +276,7 @@ const collect = async ({
                vehicle_reg     = $4,
                signature       = $5,
                override_reason = COALESCE($6, override_reason),
-               override_by     = CASE WHEN $6::text IS NOT NULL THEN $2 ELSE override_by END,
+               override_by     = CASE WHEN $6::text IS NOT NULL THEN $2::int ELSE override_by END,
                idempotency_key = COALESCE($7, idempotency_key)
            WHERE id = $8
            RETURNING *`,
@@ -280,7 +288,7 @@ const collect = async ({
              (picking_slip_id, status, collected_at, dispatched_by, driver_name,
               vehicle_reg, signature, override_reason, override_by, idempotency_key)
            VALUES ($1, 'collected', NOW(), $2, $3, $4, $5, $6,
-                   CASE WHEN $6::text IS NOT NULL THEN $2 ELSE NULL END, $7)
+                   CASE WHEN $6::text IS NOT NULL THEN $2::int ELSE NULL END, $7)
            RETURNING *`,
           [slipId, actorId, driverName, vehicleReg ?? null,
            signature ?? null, overrideReason, idempotencyKey]
