@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { TopNavbar } from "../features/taskdashboard/components/TopNavBar";
 import { Greeting } from "../features/taskdashboard/components/Greeting";
 import { useAuth } from "@/context/AuthContext";
+import { STAFF } from "../routes/paths";
 import {
   Tooltip,
   TooltipContent,
@@ -59,6 +60,12 @@ export default function Home() {
       to: "/noc/inventory",
       icon: packingIcon,
       title: "Manage Inventory",
+      disabled: false,
+    },
+    {
+      to: STAFF.purchaseOrders,
+      icon: receivingIcon,
+      title: "Purchase Orders",
       disabled: false,
     },
     {
