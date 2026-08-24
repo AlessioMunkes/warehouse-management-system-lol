@@ -17,6 +17,7 @@ import InventoryManagementPage                     from './pages/InventoryManage
 import ManagerActivityScreen                       from './pages/ManagerActivityScreen';
 import TaskDashboard from './pages/TaskDashboardPage';
 import SupplierDirectoryPage                       from './pages/SupplierDirectoryPage';
+import UserDirectoryPage                            from './pages/UserDirectoryPage';
 import PurchaseOrdersPage                          from './pages/PurchaseOrdersPage';
 import ReportingPage                               from './pages/ReportingPage';
 import AdminActivityScreen                         from './pages/AdminActivityScreen';
@@ -41,6 +42,7 @@ const App = () => (
         <Route element={<ProtectedRoute roles={['admin']} />}>
           <Route path={ADMIN.dashboard} element={<AdminActivityScreen />} />
           <Route path={ADMIN.suppliers} element={<SupplierDirectoryPage />} />
+          <Route path={ADMIN.users}     element={<UserDirectoryPage />} />
         </Route>
 
         {/* Protected — manager only */}

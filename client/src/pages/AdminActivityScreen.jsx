@@ -54,6 +54,16 @@ export default function AdminActivityScreen() {
       title: "Manage Suppliers",
       disabled: false,
     },
+    {
+      to: ADMIN.users,
+      // No icon here on purpose: unlike suppliers, there is no
+      // existing icon whose meaning is close enough to reuse without
+      // being misleading (volunteer-icon.svg means guests, a
+      // different thing entirely — see UserDirectoryPage.jsx). The
+      // tile just renders without one; task-card handles that fine.
+      title: "Manage Users",
+      disabled: false,
+    },
   ];
 
   const handleTaskClick = (task) => {
