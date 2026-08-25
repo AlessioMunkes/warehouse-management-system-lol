@@ -13,6 +13,7 @@ import ProcurementPage                             from './pages/ProcurementPage
 import DecantingPage                               from './pages/DecantingPage';
 import PackingSelectPage                           from './pages/PackingSelectPage';
 import DispatchPage                                from './pages/DispatchPage';
+import ReceiptsPage                                from './pages/ReceiptsPage';
 import InventoryManagementPage                     from './pages/InventoryManagementPage';
 import ManagerActivityScreen                       from './pages/ManagerActivityScreen';
 import TaskDashboard from './pages/TaskDashboardPage';
@@ -44,11 +45,19 @@ const App = () => (
         </Route>
 
         {/* Protected — manager only */}
-        <Route element={<ProtectedRoute roles={['manager']} />}>
+        {/* 'admin' added: ProtectedRoute has no admin special case, so
+            roles={['manager']} was locking admins out of the manager screen,
+            inventory, reporting and purchase orders — while the server has
+            always treated MANAGERS_UP as [MANAGER, ADMIN]. The two now agree. */}
+        <Route element={<ProtectedRoute roles={['manager', 'admin']} />}>
           <Route path="/manager"       element={<ManagerActivityScreen />} />
         <Route path="/noc/inventory" element={<InventoryManagementPage />} />
           <Route path={STAFF.reporting} element={<ReportingPage />} />
           <Route path={STAFF.purchaseOrders} element={<PurchaseOrdersPage />} />
+          {/* Past delivery notes and dispatch notes. Manager and admin only —
+              the server endpoints are gated to the same pair, so the two
+              cannot drift into a UI that hides a route anyone can still call. */}
+          <Route path={STAFF.receipts} element={<ReceiptsPage />} />
         </Route>
 
         {/* Protected — any logged-in user */}
@@ -66,6 +75,8 @@ const App = () => (
           <Route path={PACKING.board}         element={<PackingSelectPage />} />
           <Route path={PACKING.detailPattern} element={<PackingSelectPage />} />
           <Route path={STAFF.dispatch}        element={<DispatchPage />} />
+          {/* Receipts lives in the manager block above — a worker who typed
+              the URL would otherwise reach it, tile or no tile. */}
         </Route>
 
         {/* Protected — donation intake, RECEIVERS_UP only.

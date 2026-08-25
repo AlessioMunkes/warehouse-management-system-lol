@@ -1,4 +1,8 @@
 ﻿@import "tailwindcss";
+/* Printable note documents + the receipts archive. Plain CSS with literal
+   brand hex, because html2canvas cannot parse the oklch() colours Tailwind v4
+   and shadcn emit. See the header of receipts.css. */
+@import './receipts.css';
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/inter";

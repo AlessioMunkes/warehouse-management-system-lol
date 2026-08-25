@@ -61,6 +61,14 @@ export const STAFF = {
   // that. Reads are open to warehouse staff, but they reach a PO
   // through the receiving flow rather than this screen.
   purchaseOrders: '/noc/purchase-orders',
+  // The receipts archive: past delivery notes and past dispatch notes.
+  // NOT manager-gated. Both server GETs are requireRole(...ALL_ROLES) and the
+  // URS puts each document in front of warehouse staff — the procurement
+  // sequence diagram's [view delivery note selected] frame is Warehouse
+  // Staff, and the dispatch one says the note is viewable by staff, admin and
+  // management. Declared here for the same reason everything else is: the
+  // route table and the entry tiles read one string, so they cannot drift.
+  receipts: '/noc/receipts',
 };
 
 // ── Donations ────────────────────────────────────────────────

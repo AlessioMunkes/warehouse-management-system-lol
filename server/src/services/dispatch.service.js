@@ -28,6 +28,7 @@
 import dispatchRepository from '../repositories/dispatch.repository.js';
 import { ROLES }          from '../middleware/auth.middleware.js';
 import { isValidDateString, isPositiveInt } from '../utils/validation.js';
+import { DISPATCH_SORTS, SORT_DIRECTIONS } from '../constants/receiptSort.js';
 
 const COHORTS  = ['week1', 'week2'];
 const STATUSES = ['awaiting', 'collected', 'late_collected', 'not_collected', 'cancelled'];
@@ -393,6 +394,81 @@ const getDispatchNote = async (eventId) => {
   return note;
 };
 
+// ── The goods-out archive ─────────────────────────────────────
+// Open to every logged-in role, matching GET /notes/:eventId and the URS,
+// which says the dispatch note is viewable by staff, admin and management.
+// Non-collection HISTORY stays manager-only below — that is a compliance
+// view about a centre's behaviour, not a receipt.
+const ARCHIVE_MAX_PAGE_SIZE     = 100;
+const ARCHIVE_DEFAULT_PAGE_SIZE = 25;
+
+const listDispatchNotes = async (query = {}) => {
+  const { from, to, ecdId, cohort, status, search, sort, dir, limit, offset } = query || {};
+
+  if (sort !== undefined && sort !== '' && !(sort in DISPATCH_SORTS)) {
+    fail(400, `Sort must be one of: ${Object.keys(DISPATCH_SORTS).join(', ')}.`);
+  }
+  if (dir !== undefined && dir !== '' && !SORT_DIRECTIONS.includes(dir)) {
+    fail(400, 'Sort direction must be asc or desc.');
+  }
+
+  if (from !== undefined && from !== '' && !isValidDateString(from)) {
+    fail(400, '"From" must be a real date in YYYY-MM-DD form.');
+  }
+  if (to !== undefined && to !== '' && !isValidDateString(to)) {
+    fail(400, '"To" must be a real date in YYYY-MM-DD form.');
+  }
+  if (from && to && from > to) {
+    fail(400, '"From" cannot be after "to".');
+  }
+  if (ecdId !== undefined && ecdId !== '' && !isPositiveInt(ecdId)) {
+    fail(400, 'Invalid beneficiary.');
+  }
+  if (cohort && !COHORTS.includes(cohort)) {
+    fail(400, 'Cohort must be week1 or week2.');
+  }
+  // 'awaiting' is excluded deliberately: an awaiting event is a pallet still
+  // standing in the yard, which is the board's business, not the archive's.
+  if (status && !STATUSES.includes(status)) {
+    fail(400, 'Invalid dispatch status filter.');
+  }
+
+  const safeLimit = Math.min(
+    Math.max(parseInt(limit, 10) || ARCHIVE_DEFAULT_PAGE_SIZE, 1),
+    ARCHIVE_MAX_PAGE_SIZE
+  );
+  const safeOffset = Math.max(parseInt(offset, 10) || 0, 0);
+
+  const cleanSearch = typeof search === 'string' && search.trim()
+    ? search.trim().slice(0, 100)
+    : null;
+
+  const rows = await dispatchRepository.listDispatchNotes({
+    from:   from || null,
+    to:     to   || null,
+    ecdId:  ecdId ? Number(ecdId) : null,
+    cohort: cohort || null,
+    status: status || null,
+    search: cleanSearch,
+    sort:   sort || 'collected_at',
+    dir:    dir  || 'desc',
+    limit:  safeLimit,
+    offset: safeOffset,
+  });
+
+  const total = rows.length ? Number(rows[0].total_count) : 0;
+
+  return {
+    rows: rows.map(({ total_count, ...row }) => row),   // eslint-disable-line no-unused-vars
+    total,
+    limit:  safeLimit,
+    offset: safeOffset,
+  };
+};
+
+const getDispatchBeneficiaryOptions = async () =>
+  await dispatchRepository.getDispatchBeneficiaryOptions();
+
 // ── Non-collection history (BR-26) ────────────────────────────
 const getNonCollectionHistory = async (query, user) => {
   if (!isManager(user) && user.role !== ROLES.FINANCE) {
@@ -429,5 +505,7 @@ export default {
   collect,
   sweep,
   getDispatchNote,
+  listDispatchNotes,
+  getDispatchBeneficiaryOptions,
   getNonCollectionHistory,
 };

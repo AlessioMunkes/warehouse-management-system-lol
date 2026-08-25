@@ -24,7 +24,10 @@ vi.mock('../src/services/delivery.service.js', () => ({ default: deliveryService
 const { buildDeliveryApp } = await import('./helpers/deliveryApp.js');
 const app = buildDeliveryApp();
 
-const token      = jwt.sign({ id: 1, username: 'TEST', role: ROLES.WORKER }, process.env.JWT_SECRET, { expiresIn: '1h' });
+// MANAGER, not WORKER. GET /api/deliveries/:id is manager-and-admin only now,
+// and a worker token would 403 before validateIntId runs — leaving these
+// tests green on the wrong reason or red for the wrong one.
+const token      = jwt.sign({ id: 1, username: 'TEST', role: ROLES.MANAGER }, process.env.JWT_SECRET, { expiresIn: '1h' });
 const authCookie = `wms_token=${token}`;
 
 describe('GET /api/deliveries/:id validation', () => {
