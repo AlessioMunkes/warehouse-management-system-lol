@@ -48,14 +48,26 @@ const BASE_URL = `${API_BASE}/api/dispatch`;
 //     with no Vite proxy, so a bare '/api/dispatch' would hit the
 //     Vite dev server and 404.
 const request = async (path, options = {}) => {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    credentials: 'include',
-    ...options,
-    headers: {
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-      ...options.headers,
-    },
-  });
+  let res;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      credentials: 'include',
+      ...options,
+      headers: {
+        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+        ...options.headers,
+      },
+    });
+  } catch {
+    // fetch() only rejects when the request never completed at all —
+    // the API server is down, the wrong port, offline. Left unguarded,
+    // that threw the browser's own "Failed to fetch" straight into the
+    // UI, which tells a warehouse worker nothing they can act on. This
+    // is the same networkError() api.js's apiGet/apiPost already throw.
+    const err = new Error('Could not reach the server. Check your connection and try again.');
+    err.isNetworkError = true;
+    throw err;
+  }
   return handleResponse(res);
 };
 
@@ -183,6 +195,15 @@ export const recordCollection = (
 // row.picking_slip_id.
 export const getDispatchNote = (eventId) => request(`/notes/${eventId}`);
 
+// ── GET /api/dispatch/history?range=today|week|month|all ──────
+// The staff dispatch history page's list — same range shape
+// receivingAPI.getDeliveries and decantingAPI.getDecantingRecords
+// already use. getGateQueue/getBoard above are the live gate view,
+// scoped to one day or "still outstanding"; this is a real multi-day
+// history of completed collections, each row carrying the
+// dispatch_event_id a note is opened with.
+export const getHistory = (range = 'all') => request(`/history?range=${encodeURIComponent(range)}`);
+
 // ── POST /api/dispatch/sweep (manager only) ───────────────────
 // Forces the 16:00 non-collection write-off for a date. The board
 // already sweeps opportunistically; this is for after a power cut or
@@ -212,6 +233,7 @@ export default {
   getGateView,
   recordCollection,
   getDispatchNote,
+  getHistory,
   runSweep,
   getNonCollectionHistory,
   todayISO,

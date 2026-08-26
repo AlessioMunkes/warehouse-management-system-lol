@@ -12,7 +12,7 @@
 // modes need the list and neither should fetch its own copy.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 import PageHeader from '../features/decanting/components/PageHeader';
@@ -21,6 +21,7 @@ import DecantingPlanner from '../features/decanting/components/DecantingPlanner'
 import DecantingFlow from '../features/decanting/components/DecantingFlow';
 import StaffShell from '../components/layout/StaffShell';
 import { getProducts } from '../services/decantingAPI';
+import { STAFF } from '../routes/paths';
 
 const isManager = (user) => user?.role === 'manager' || user?.role === 'admin';
 
@@ -58,7 +59,15 @@ const DecantingPage = () => {
   }
 
   return (
-    <StaffShell crumb={`Decanting / ${stepLabel}`} meta="This week">
+    <StaffShell
+      crumb={`Decanting / ${stepLabel}`}
+      actions={
+        <Link to={STAFF.decantingRecords} className="stf-crumb-link">
+          <i className="ti ti-history" aria-hidden="true" />
+          <span>History</span>
+        </Link>
+      }
+    >
       <DecantingFlow products={products} onCrumbChange={handleCrumb} />
     </StaffShell>
   );
