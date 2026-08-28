@@ -20,7 +20,7 @@ import { DONATIONS } from "../routes/paths";
 import { DonationRail } from "../features/donation/components/DonationRail";
 import { ReviewSummary, SectionPicker, EditSectionDialog } from "../features/donation/components/ReviewSummary";
 import { CompletionDialog } from "../features/donation/components/WarningsNotice";
-import { createDonation } from "../services/donationAPI";
+import { createPendingDonation } from "../services/donationAPI";
 
 export function ReviewPage() {
   const navigate = useNavigate();
@@ -46,8 +46,17 @@ export function ReviewPage() {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const result = await createDonation(draft);
-      setCompletionResult(result); // { donation, warnings, duplicate }
+      // Pending-donation endpoint: returns the created pending donation
+      // with items[].status of 'resolved' or 'awaiting_resolution'.
+      const result = await createPendingDonation(draft);
+      const items = result?.items || [];
+      setCompletionResult({
+        pendingDonationId: result?.id ?? null,
+        status: result?.status ?? null,
+        resolvedCount: items.filter((it) => it.status === "resolved" || it.status === "committed").length,
+        awaitingCount: items.filter((it) => it.status === "awaiting_resolution").length,
+        awaitingItems: items.filter((it) => it.status === "awaiting_resolution"),
+      });
       setCompletionOpen(true);
     } catch (err) {
       setSubmitError(err.message || "Failed to record donation.");

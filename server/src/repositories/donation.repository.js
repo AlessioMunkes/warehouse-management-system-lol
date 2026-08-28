@@ -181,8 +181,9 @@ const createDonation = async ({
       const itemResult = await client.query(
         `INSERT INTO donation_items
            (donation_id, product_id, description, quantity, unit,
-            estimated_value_zar, location_id, routing_status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            estimated_value_zar, location_id, routing_status,
+            routed_category, routing_outcome, routed_source)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING id`,
         [
           donationId,
@@ -193,6 +194,9 @@ const createDonation = async ({
           item.estimatedValueZar ?? null,
           item.locationId ?? null,
           item.routingStatus,
+          item.routedCategory ?? null,
+          item.routingOutcome ?? null,
+          item.routedSource ?? null,
         ]
       );
 
@@ -361,6 +365,19 @@ const listUnmatchedItems = async () => {
      ORDER BY d.received_at ASC, di.id ASC`
   );
   return result.rows;
+};
+
+const getLocationIdForArea = async (area) => {
+  if (!area) return null;
+  const result = await pool.query(
+    `SELECT id
+     FROM storage_locations
+     WHERE area = $1 AND is_active = true
+     ORDER BY id ASC
+     LIMIT 1`,
+    [area]
+  );
+  return result.rows[0]?.id ?? null;
 };
 
 // ── Resolve one unmatched line ────────────────────────────────
@@ -540,6 +557,7 @@ export default {
   getDonationById,
   listDonations,
   listUnmatchedItems,
+  getLocationIdForArea,
   resolveUnmatchedItem,
   reclassifyDonation,
   listSection18AQueue,

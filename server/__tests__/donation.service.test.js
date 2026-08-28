@@ -14,6 +14,7 @@ const repoMock = {
   getEligibleEcdCentres:  vi.fn(),
   findByIdempotencyKey:   vi.fn(),
   getProgrammeByCode:     vi.fn(),
+  getLocationIdForArea:   vi.fn(),
   createDonation:         vi.fn(),
   getDonationById:        vi.fn(),
   listDonations:          vi.fn(),
@@ -24,7 +25,12 @@ const repoMock = {
   getDonationEvents:      vi.fn(),
 };
 
+const routeMock = {
+  determineRouting: vi.fn(),
+};
+
 vi.mock('../src/repositories/donation.repository.js', () => ({ default: repoMock }));
+vi.mock('../src/lib/donationRouting.js', () => ({ determineRouting: routeMock.determineRouting }));
 
 const module = await import('../src/services/donation.service.js');
 const donationService = module.default;
@@ -44,8 +50,25 @@ beforeEach(() => {
   repoMock.getSection18AThreshold.mockResolvedValue(1000);
   repoMock.getEligibleEcdCentres.mockResolvedValue([]);
   repoMock.findByIdempotencyKey.mockResolvedValue(null);
+  repoMock.getLocationIdForArea.mockResolvedValue(1);
   repoMock.createDonation.mockResolvedValue({ donationId: 1, warnings: [] });
   repoMock.getDonationById.mockResolvedValue({ id: 1, category: 'recipe_food' });
+  routeMock.determineRouting.mockImplementation(async ({ productId }) => {
+    if (productId === 3) {
+      return {
+        source: 'product_default',
+        category: 'recipe_food',
+        routing_outcome: 'stocked_to_flow',
+        storage_area: 'dry_store',
+      };
+    }
+    return {
+      source: 'unclassified',
+      category: null,
+      routing_outcome: 'manual_review',
+      storage_area: null,
+    };
+  });
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -243,6 +266,20 @@ describe('createDonation — required fields', () => {
 // createDonation — the never-block rule
 // ─────────────────────────────────────────────────────────────
 describe('createDonation — records rather than refuses', () => {
+  it('auto-classifies a matched product and assigns a storage location', async () => {
+    const result = await donationService.createDonation(validBody({
+      items: [{ productId: 3, description: 'Rice', quantity: 25, unit: 'kg' }],
+    }), USER_ID);
+
+    expect(result).toBeTruthy();
+    expect(repoMock.createDonation).toHaveBeenCalled();
+    const written = repoMock.createDonation.mock.calls[0][0];
+    expect(written.items[0].routingStatus).toBe('allocated');
+    expect(written.items[0].locationId).toBe(1);
+    expect(written.items[0].routedCategory).toBe('recipe_food');
+    expect(written.items[0].routedSource).toBe('product_default');
+  });
+
   it('records a donation whose items have no product match', async () => {
     const result = await donationService.createDonation(validBody({
       items: [{ description: 'Two crates of unlabelled tinned fish', quantity: 2, unit: 'crate' }],
@@ -251,7 +288,16 @@ describe('createDonation — records rather than refuses', () => {
     expect(repoMock.createDonation).toHaveBeenCalled();
     const written = repoMock.createDonation.mock.calls[0][0];
     expect(written.items[0].routingStatus).toBe('unmatched');
+    expect(written.items[0].routedSource).toBe('unclassified');
     expect(result.warnings.length).toBeGreaterThan(0);
+  });
+
+  it('only writes the donation once even when auto-classification runs', async () => {
+    await donationService.createDonation(validBody({
+      items: [{ productId: 3, description: 'Rice', quantity: 25, unit: 'kg' }],
+    }), USER_ID);
+
+    expect(repoMock.createDonation).toHaveBeenCalledTimes(1);
   });
 
   it('records a donation with no donor details at all', async () => {

@@ -19,11 +19,15 @@ import TaskDashboard from './pages/TaskDashboardPage';
 import SupplierDirectoryPage                       from './pages/SupplierDirectoryPage';
 import ReportingPage                               from './pages/ReportingPage';
 import AdminActivityScreen                         from './pages/AdminActivityScreen';
+import CategoryRoutingRulesPage                    from './pages/CategoryRoutingRulesPage';
+import DonationClassificationPage                 from './pages/DonationClassificationPage';
+import EvaluateRoutingPage                         from './pages/EvaluateRoutingPage';
+import DonationManagementPage                      from './pages/DonationManagementPage';
 
 // Donations — new feature, own draft context scoped to just these
 // two routes (see features/donation/context/DonationDraftProvider.jsx)
 import { DonationDraftProvider }                   from './features/donation/context/DonationDraftProvider';
-import { DonationDetailsPage }                     from './pages/DonationDetailsPage';
+import {DonationDetailsPage } from './pages/DonationDetailsPage';
 import { ReviewPage as DonationReviewPage }         from './pages/ReviewPage';
 
 const App = () => (
@@ -40,7 +44,13 @@ const App = () => (
         <Route element={<ProtectedRoute roles={['admin']} />}>
           <Route path={ADMIN.dashboard} element={<AdminActivityScreen />} />
           <Route path={ADMIN.suppliers} element={<SupplierDirectoryPage />} />
+          <Route path={ADMIN.donationManagement} element={<DonationManagementPage />} />
         </Route>
+
+        {/* Temporary test access: make the admin pages reachable directly in local development without login. */}
+        <Route path={ADMIN.categoryRouting} element={<CategoryRoutingRulesPage />} />
+        <Route path={ADMIN.donationClassification} element={<DonationClassificationPage />} />
+        <Route path={ADMIN.evaluateRouting} element={<EvaluateRoutingPage />} />
 
         {/* Protected — manager only */}
         <Route element={<ProtectedRoute roles={['manager']} />}>

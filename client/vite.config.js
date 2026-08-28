@@ -37,4 +37,15 @@ export default defineConfig({
       "@" : path.resolve(__dirname , "./src"),
     },
   },
+  server: {
+    // Dev-only proxy: /api/* from the Vite client forwards to the Express
+    // backend so httpOnly cookie auth (wms_token) works same-origin during
+    // development without CORS/credentials gymnastics.
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
+    },
+  },
 })

@@ -58,7 +58,12 @@ function SignaturePad({ onChange }) {
   const [signed, setSigned] = useState(false);
 
   useEffect(() => {
-    const ctx = canvasRef.current.getContext('2d');
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
     ctx.strokeStyle = '#2b3336';
     ctx.lineWidth   = 2.5;
     ctx.lineCap     = 'round';
@@ -78,9 +83,13 @@ function SignaturePad({ onChange }) {
   };
 
   const start = (e) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
     e.preventDefault();
     const { x, y } = posOf(e);
-    const ctx = canvasRef.current.getContext('2d');
     ctx.beginPath();
     ctx.moveTo(x, y);
     drawing.current = true;
@@ -88,9 +97,13 @@ function SignaturePad({ onChange }) {
 
   const move = (e) => {
     if (!drawing.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
     e.preventDefault();
     const { x, y } = posOf(e);
-    const ctx = canvasRef.current.getContext('2d');
     ctx.lineTo(x, y);
     ctx.stroke();
     inked.current = true;
@@ -105,7 +118,12 @@ function SignaturePad({ onChange }) {
 
   const clear = () => {
     const canvas = canvasRef.current;
-    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     inked.current = false;
     setSigned(false);
     onChange(null);

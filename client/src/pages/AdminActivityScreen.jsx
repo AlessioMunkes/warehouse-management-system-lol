@@ -1,5 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/pages/AdminActivityScreen.jsx
+// ─────────────────────────────────────────────────────────────
+// client/src/pages/AdminActivityScreen.jsx
 //
 // The admin landing screen. Structurally a copy of
 // ManagerActivityScreen — same TopNavbar, same Greeting, same
@@ -13,7 +15,7 @@
 // that opens the notice modal instead of navigating, which is how the
 // manager grid handles features that are not ready.
 // ─────────────────────────────────────────────────────────────
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { TopNavbar } from "../features/taskdashboard/components/TopNavBar";
 import { Greeting } from "../features/taskdashboard/components/Greeting";
@@ -33,6 +35,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import donationManagementAPI from "../services/donationManagementAPI";
 import { ADMIN } from "../routes/paths";
 
 // No supplier-specific icon exists in client/public/icons. Goods
@@ -46,12 +49,84 @@ export default function AdminActivityScreen() {
 
   const [reducedMovement, setReducedMovement] = useState(false);
   const [activeModalTask, setActiveModalTask] = useState(null);
+  const [pendingReviewCount, setPendingReviewCount] = useState(0);
+  const [donationMgmtCount, setDonationMgmtCount] = useState(null);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadPendingReviewCount = async () => {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:5000' : '')}/api/donations/admin/pending-classifications?countOnly=true`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (!response.ok) return;
+        const payload = await response.json();
+        if (isActive) {
+          setPendingReviewCount(Number(payload.count || 0));
+        }
+      } catch {
+        if (isActive) setPendingReviewCount(0);
+      }
+    };
+    void loadPendingReviewCount();
+
+    // D6/Q2 — the badge on the Donation Management tile is a single
+    // DEDUPLICATED attention count, not a raw sum: legacy/unlinked flags
+    // plus pending donations in an attention status. Intake-linked flags
+    // are intentionally NOT counted separately — they already belong to a
+    // pending donation counted by the second term (one donation blocked by
+    // 3 flagged items counts as 1, not 4). The computation itself lives in
+    // donationManagementAPI.getAttentionCounts().
+    const loadDonationMgmtCount = async () => {
+      try {
+        const { total } = await donationManagementAPI.getAttentionCounts();
+        if (isActive) setDonationMgmtCount(total);
+      } catch {
+        // Badge is advisory — a failed load leaves the tile badge-less
+        // rather than blocking the dashboard.
+        if (isActive) setDonationMgmtCount(null);
+      }
+    };
+
+    void loadDonationMgmtCount();
+    return () => { isActive = false; };
+  }, []);
 
   const tasks = [
     {
       to: ADMIN.suppliers,
       icon: receivingIcon,
       title: "Manage Suppliers",
+      disabled: false,
+    },
+    {
+      to: ADMIN.categoryRouting,
+      icon: receivingIcon,
+      title: "Category Routing Rules",
+      disabled: false,
+    },
+    {
+      to: ADMIN.donationClassification,
+      icon: receivingIcon,
+      title: "Donation Classification",
+      badgeText: pendingReviewCount > 0 ? `Needs Review (${pendingReviewCount})` : null,
+      disabled: false,
+    },
+    {
+      to: ADMIN.evaluateRouting,
+      icon: receivingIcon,
+      title: "Explain Donation Routing",
+      disabled: false,
+    },
+    {
+      to: ADMIN.donationManagement,
+      icon: receivingIcon,
+      title: "Donation Management",
+      badgeText: donationMgmtCount > 0 ? `Needs attention (${donationMgmtCount})` : null,
       disabled: false,
     },
   ];

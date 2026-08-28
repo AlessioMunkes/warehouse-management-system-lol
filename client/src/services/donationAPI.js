@@ -9,6 +9,26 @@
 // ⚠ Route this through whatever authenticated API client the rest of
 // the app already uses (axios instance with token interceptor, etc.)
 // rather than a bare fetch — placeholder shown for shape only.
+// Shared fetch wrapper: same-origin /api path (Vite dev proxy forwards to
+// the Express backend) and credentials included so the httpOnly wms_token
+// cookie reaches the server. All donation endpoints go through this.
+async function apiPost(path, payload) {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+
+  const json = await res.json();
+
+  if (!res.ok || !json.success) {
+    throw new Error(json.message || "Request failed.");
+  }
+
+  return json.data;
+}
+
 export async function createDonation(draft) {
   const payload = {
     category: draft.category,
@@ -28,17 +48,63 @@ export async function createDonation(draft) {
     })),
   };
 
-  const res = await fetch("/api/donations", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  return apiPost("/api/donations", payload); // { donation, warnings, duplicate }
+}
+
+// ── Pending-donation intake ───────────────────────────────────
+// Maps the local draft shape to POST /api/donations/pending
+// (pendingDonation.service.js createPendingDonationFromIntake).
+//
+// draftSnapshot is archival/audit-only (nothing downstream parses it),
+// so stringifying the whole draft at submit time is exactly right.
+//
+// Items with no productId must carry requestedCategory so the backend's
+// determineRouting can classify them; otherwise they can neither
+// auto-resolve nor create a manager flag (flags.product_id is NOT NULL)
+// and the submit fails.
+export async function createPendingDonation(draft) {
+  const payload = {
+    donorName: draft.donorName,
+    donorContact: draft.donorContact,
+    donorTaxReference: draft.donorTaxReference,
+    donorConsentGiven: draft.donorConsentGiven === true,
+    estimatedValueZar: Number(draft.estimatedValueZar) || 0,
+    donationCategory: draft.category,
+    notes: draft.notes,
+    idempotencyKey: draft.idempotencyKey,
+    draftSnapshot: JSON.stringify({
+      capturedAt: new Date().toISOString(),
+      source: "donation-intake-ui",
+      draft,
+    }),
+    items: draft.items.map((i) => ({
+      description: i.description,
+      quantity: Number(i.quantity),
+      unit: i.unit,
+      productId: i.productId ?? null,
+      requestedCategory: i.requestedCategory || null,
+    })),
+  };
+
+  return apiPost("/api/donations/pending", payload);
+}
+
+// ── Staff intake product search (Part A) ─────────────────────
+// Backs the "Match to stock item" combobox: GET /api/donations/intake/
+// products/search?name=...  Same-credentials GET, mirrors apiPost's
+// success-shape handling but for a list endpoint.
+export async function searchProducts(name) {
+  const term = String(name ?? '').trim();
+  if (!term) return [];
+
+  const res = await fetch(
+    `/api/donations/intake/products/search?name=${encodeURIComponent(term)}`,
+    { method: 'GET', credentials: 'include', headers: { 'Content-Type': 'application/json' } }
+  );
 
   const json = await res.json();
-
   if (!res.ok || !json.success) {
-    throw new Error(json.message || "Failed to record donation.");
+    throw new Error(json.message || 'Product search failed.');
   }
-
-  return json.data; // { donation, warnings, duplicate }
+  return Array.isArray(json.data) ? json.data : [];
 }

@@ -23,7 +23,9 @@ import { readdirSync, statSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import vm from 'node:vm';
 
-const SRC = new URL('../src/', import.meta.url).pathname;
+// Resolve relative to this test file (not process.cwd()) so the suite
+// passes whether vitest runs from the repo root or from server/.
+const SRC = join(import.meta.dirname, '..', 'src');
 
 const walk = (dir, acc = []) => {
   for (const entry of readdirSync(dir)) {

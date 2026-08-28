@@ -79,4 +79,8 @@ export const DONATION_INTAKE_ROLES = ['warehouse_worker', 'manager', 'admin'];
 export const ADMIN = {
   dashboard: '/admin',
   suppliers: '/admin/suppliers',
+  categoryRouting: '/admin/category-routing',
+  donationClassification: '/admin/donation-classification',
+  evaluateRouting: '/admin/evaluate-routing',
+  donationManagement: '/admin/donation-management',
 };
