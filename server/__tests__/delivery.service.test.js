@@ -27,6 +27,7 @@ const repoMock = {
   getPurchaseOrderItems:       vi.fn(),
   createDelivery:              vi.fn(),
   getSuppliers:                vi.fn(),
+  getSuppliersWithOpenOrders:  vi.fn(),
   getProducts:                 vi.fn(),
   getPurchaseOrdersBySupplier: vi.fn(),
 };
@@ -68,12 +69,43 @@ beforeEach(() => {
   repoMock.getDeliveryById.mockResolvedValue({ id: 900, status: 'recorded' });
 });
 
+// ── Suppliers — full list vs. open-orders-only ─────────────────
+describe('getSuppliers', () => {
+  it('returns every supplier by default', async () => {
+    repoMock.getSuppliers.mockResolvedValue([{ id: 1, name: 'Everyone' }]);
+    const result = await deliveryService.getSuppliers();
+    expect(result).toEqual([{ id: 1, name: 'Everyone' }]);
+    expect(repoMock.getSuppliersWithOpenOrders).not.toHaveBeenCalled();
+  });
+
+  it('narrows to suppliers with an open order when asked', async () => {
+    repoMock.getSuppliersWithOpenOrders.mockResolvedValue([{ id: 4, name: 'Ubuntu Bakery Supplies' }]);
+    const result = await deliveryService.getSuppliers(true);
+    expect(result).toEqual([{ id: 4, name: 'Ubuntu Bakery Supplies' }]);
+    expect(repoMock.getSuppliers).not.toHaveBeenCalled();
+  });
+});
+
 // ── The happy path still works ────────────────────────────────
 describe('createDelivery — the ordinary case', () => {
   it('records a matching delivery', async () => {
     const result = await deliveryService.createDelivery(body(), USER_ID);
     expect(result.duplicate).toBe(false);
     expect(result.note.id).toBe(900);
+  });
+
+  it('hands back the joined record, not the bare insert row, so the note PDF has what it needs', async () => {
+    // The repository's own insert returns only the delivery_notes
+    // columns it just wrote; the service re-fetches the full joined
+    // shape (supplier name, items, po_status) in the same request
+    // rather than making the caller ask for it separately.
+    repoMock.getDeliveryById.mockResolvedValue({
+      id: 900, status: 'recorded', supplier_name: 'Ubuntu Bakery Supplies', items: [{ product_name: 'Rice 10kg' }],
+    });
+    const result = await deliveryService.createDelivery(body(), USER_ID);
+    expect(repoMock.getDeliveryById).toHaveBeenCalledWith(900);
+    expect(result.note.supplier_name).toBe('Ubuntu Bakery Supplies');
+    expect(result.note.items).toEqual([{ product_name: 'Rice 10kg' }]);
   });
 
   it('re-reads product, unit and expected quantity from the order, never the body', async () => {

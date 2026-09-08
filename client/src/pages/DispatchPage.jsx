@@ -10,12 +10,11 @@
 // back action has to be one tap from a phone at a gate.
 // ─────────────────────────────────────────────────────────────
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import StaffShell from '../components/layout/StaffShell';
 import GateQueue from '../features/dispatch/components/GateQueue';
 import PalletCheck from '../features/dispatch/components/PalletCheck';
-
-const now = () =>
-  new Date().toLocaleString('en-ZA', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+import { STAFF } from '../routes/paths';
 
 export default function DispatchPage() {
   const [palletId, setPalletId] = useState(null);
@@ -28,9 +27,16 @@ export default function DispatchPage() {
   return (
     <StaffShell
       crumb={palletId ? 'Dispatch / this pallet' : 'Dispatch'}
-      meta={now()}
       onBack={palletId ? backToQueue : undefined}
       backLabel="Gate queue"
+      actions={
+        palletId ? null : (
+          <Link to={STAFF.dispatchHistory} className="stf-crumb-link">
+            <i className="ti ti-history" aria-hidden="true" />
+            <span>History</span>
+          </Link>
+        )
+      }
     >
       {palletId ? (
         <PalletCheck

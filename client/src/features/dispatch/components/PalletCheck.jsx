@@ -1,166 +1,589 @@
 // ─────────────────────────────────────────────────────────────
-// client/src/features/dispatch/components/GateQueue.jsx
+// client/src/features/dispatch/components/PalletCheck.jsx
 //
-// The board at the gate, from GET /api/dispatch?scope=gate.
+// One pallet at the gate, as three sequential screens (ACC-05),
+// matching the shape ReceivingFlow.jsx and DecantingFlow.jsx already
+// established:
 //
-// Not just today: every pallet still outstanding on any date, plus
-// whatever was handled today. A pallet staged for Tuesday that nobody
-// fetched is still in the building on Thursday and has to be
-// releasable — the 16:00 sweep marks it not_collected but leaves it
-// collectable as a late collection.
+//   1  Which pallet is this?    the beneficiary, the eligibility flags,
+//                                an override reason if a manager needs
+//                                to authorise one
+//   2  Count what's loaded      one line, one number — repeats per
+//                                item, same as receiving's per-line
+//                                counting screen
+//   3  Confirm the collection   read-back, driver's name and vehicle,
+//                                the driver's signature, then finish
 //
-// WHAT CHANGED
-// This used to make two calls to the PICKING endpoints and treat a
-// slip with status 'complete' as "waiting" and status 'collected' as
-// "done". Neither was right. A pallet's gate state lives in
-// dispatch_events, not in picking_slips.status, and 'collected' is
-// not a picking slip status at all — the value is 'dispatched' — so
-// the "collected today" count was permanently zero and a collected
-// pallet just disappeared off the screen with nothing to show for it.
+// There is no put-away step here — nothing about a collection has a
+// location to record — so this is three steps, not receiving's four.
 //
-// One call now returns the whole day: awaiting, collected, late, and
-// written off, each row carrying dispatch_status. Rows are keyed on
-// picking_slip_id, not id.
+// Guided and Form modes read and write the exact same state, the same
+// `mode` pattern ReceivingFlow.jsx/DecantingFlow.jsx use: Form is the
+// same fields as one scrolling dialog instead of three screens.
 //
-// Everything is SHOWN; only awaiting pallets are openable. Staff need
-// to see that a centre was written off at 16:00 or that a driver has
-// already been, not wonder where the row went. An inactive ECD is the
-// one hard block (BR-11), so it is shown greyed with the reason
-// spelled out rather than hidden.
+// The one HARD block is an inactive beneficiary centre (BR-11) — nothing here
+// can get past that, for anyone. Two more (a pallet booked for
+// another day, or one packing hasn't closed off) need a manager's
+// typed reason to proceed; a warehouse worker sees why and is told to
+// find one, matching exactly what dispatch.service.js's collect()
+// itself enforces — this screen is not the source of truth for any of
+// that, evaluateEligibility() on the server is, but disagreeing with
+// it here would just mean a worker fills in a whole form only to have
+// the server refuse it at the very last tap.
 //
-// BR-12 (wrong collection day) is no longer missing: the server
-// computes it per pallet and returns it in the gate view's
-// eligibility object, which PalletCheck reads. It is not surfaced on
-// the board because a pallet booked for another day should not be in
-// this list in the first place — if one appears, opening it
-// explains why.
+// A dispatch note pops up after a successful collection, the same way
+// DeliveryNotePDF/DecantingSheetPDF do — see DispatchNotePDF.jsx, fed
+// by what recordCollection's response already returns (the full
+// joined note, not just the bare event row — see dispatch.service.js's
+// own getDispatchNote-after-collect pattern).
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
-import dispatchAPI from '../../../services/dispatchAPI';
-import { Notice } from '../../staff/components/StepPrimitives';
+import {
+  StepRail, StepScreen, Actions, Button, NumberField, TextField, Notice, KeyValues,
+  ViewToggle, Coachmark,
+} from '../../staff/components/StepPrimitives';
+import useCoachmark from '../../staff/hooks/useCoachmark';
+import { useAuth } from '../../../context/AuthContext';
+import dispatchAPI, { newIdempotencyKey } from '../../../services/dispatchAPI';
+import SignaturePad from '../../procurement/components/SignaturePad';
+import DispatchNotePDF from './DispatchNotePDF';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../components/ui/dialog';
 
-// The four states a row can be in, and how each reads on the floor.
-// Kept as one table so the label, the styling and the "can you open
-// it?" decision cannot drift apart.
-const STATE = {
-  awaiting:       { label: 'Waiting for collection', tone: '',           openable: true  },
-  collected:      { label: 'Collected',              tone: ' is-static', openable: false },
-  late_collected: { label: 'Collected (late)',       tone: ' is-static', openable: false },
-  // Openable. The 16:00 sweep records that a day ended without this
-  // pallet leaving; it does not put the pallet out of reach. A driver
-  // arriving at 16:40 is collecting the same food off the same floor,
-  // so the row opens and the collection runs normally — it is filed
-  // as 'late_collected' afterwards. Marked warn so it still reads as
-  // an exception on the board, but not is-static, which is what made
-  // it un-tappable.
-  not_collected:  { label: 'Not collected',          tone: ' is-warn',   openable: true  },
-  cancelled:      { label: 'Cancelled',              tone: ' is-static', openable: false },
+const isManager = (user) => user?.role === 'manager' || user?.role === 'admin';
+
+const SignatureField = ({ value, onChange }) => (
+  <div className="stf-signature-field">
+    <span className="stf-field-label">Driver&rsquo;s signature</span>
+    <SignaturePad
+      onChange={onChange}
+      canvasClassName="stf-sign-canvas"
+      clearButtonClassName="stf-signature-clear"
+    />
+    {!value ? (
+      <p className="stf-field-hint">Ask the driver to sign above before you finish.</p>
+    ) : null}
+  </div>
+);
+
+const MODE_KEY = 'stf_dispatch_view_mode';
+const MODES = [
+  { value: 'guided', label: 'Guided', hint: 'Step by step' },
+  { value: 'full',   label: 'Form',   hint: 'Everything at once' },
+];
+const readStoredMode = () => {
+  try {
+    return localStorage.getItem(MODE_KEY) === 'full' ? 'full' : 'guided';
+  } catch {
+    return 'guided';
+  }
 };
 
-const stateOf = (row) => STATE[row.dispatch_status] || STATE.awaiting;
-
-// Time formatted for a glance, not a report.
-const timeOf = (value) => {
-  if (!value) return null;
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
+const TOTAL_STEPS = 3;
+const STEP_META = {
+  which: { n: 1, label: 'Which pallet' },
+  count: { n: 2, label: 'Counting' },
+  check: { n: 3, label: 'Confirm the collection' },
+  done:  { n: 3, label: 'Collected' },
 };
 
-export default function GateQueue({ onOpenPallet }) {
-  const [rows, setRows]       = useState([]);
+// The reasons this screen can put on a line without asking a worker
+// to type free text — the same choice ReceivingFlow.jsx made for its
+// own discrepancyReason, and for the same reason (ACC-09: no field a
+// floor worker has to compose a sentence into).
+const varianceReasonFor = (variance) =>
+  variance === 0 ? null : variance < 0 ? 'Short count at dispatch' : 'Over count at dispatch';
+
+export default function PalletCheck({ palletId, onBack, onCollected }) {
+  const { user } = useAuth();
+
+  const [gateView, setGateView] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState(null);
+  const [loadError, setLoadError] = useState(null);
 
+  const [phase, setPhase] = useState('which');
+  const [lineIndex, setLineIndex] = useState(0);
+  const [lines, setLines] = useState([]);
+
+  const [overrideReason, setOverrideReason] = useState('');
+  const [driverName, setDriverName] = useState('');
+  const [vehicleReg, setVehicleReg] = useState('');
+  const [signature, setSignature] = useState(null);
+
+  const [mode, setMode] = useState(readStoredMode);
+  const [formOpen, setFormOpen] = useState(false);
+  const [shellNode, setShellNode] = useState(null);
+  useEffect(() => {
+    const resolve = () => setShellNode(document.querySelector('.stf-shell'));
+    resolve();
+  }, []);
+  const { show: showCoachmark, dismiss: dismissCoachmark } = useCoachmark('dispatch-view-toggle');
+
+  const [attemptKey, setAttemptKey] = useState(newIdempotencyKey);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [pdfNote, setPdfNote] = useState(null);
+
+  // A fresh pallet is a fresh session — DispatchPage keeps this
+  // component mounted across pallets (only `palletId` changes), so
+  // none of the previous pallet's state, or its idempotency key, may
+  // survive into this one.
   useEffect(() => {
     let cancelled = false;
+    // Wrapped rather than called directly at the top of the effect —
+    // react-hooks/set-state-in-effect flags a bare synchronous
+    // setState in an effect body; the same workaround ReceivingFlow.jsx
+    // and DecantingFlow.jsx use for their own shellNode-resolving effect.
+    const resetForNewPallet = () => {
+      setLoading(true);
+      setLoadError(null);
+      setPhase('which');
+      setLineIndex(0);
+      setOverrideReason('');
+      setDriverName('');
+      setVehicleReg('');
+      setSignature(null);
+      setFormOpen(false);
+      setPdfNote(null);
+      setError(null);
+      setAttemptKey(newIdempotencyKey());
+    };
+    resetForNewPallet();
 
-    dispatchAPI.getGateQueue()
-      .then((board) => { if (!cancelled) setRows(board || []); })
-      .catch((err) => {
-        if (!cancelled) setError(err.message || 'Could not load the gate queue.');
+    dispatchAPI.getGateView(palletId)
+      .then((view) => {
+        if (cancelled) return;
+        setGateView(view);
+        setLines(
+          (view.items || []).map((item) => ({
+            itemId:   item.id,
+            name:     item.product_name,
+            sku:      item.sku,
+            unit:     item.unit,
+            required: Number(item.required_quantity ?? 0),
+            packed:   item.packed_quantity === null ? null : Number(item.packed_quantity),
+            loaded:   item.packed_quantity === null ? '' : String(item.packed_quantity),
+          }))
+        );
       })
+      .catch((err) => { if (!cancelled) setLoadError(err.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; };
-  }, []);
+  }, [palletId]);
 
-  const done    = rows.filter((r) => ['collected', 'late_collected'].includes(r.dispatch_status));
-  const waiting = rows.filter((r) => stateOf(r).openable);
+  const step = STEP_META[phase];
+  const showToggle = phase !== 'done';
+  const eligibility = gateView?.eligibility || {};
+  // Only lines that were actually packed can be loaded — the same
+  // filter dispatch.repository.js's collect() applies server-side, so
+  // a line the packer never confirmed does not show as something to
+  // count at the gate.
+  const packedLines = lines.filter((l) => l.packed !== null && l.packed > 0);
+  const currentLine = packedLines[lineIndex];
+  const hasLines = packedLines.length > 0;
 
-  const summary = rows.length === 0
-    ? 'Nothing waiting for collection.'
-    : `${done.length} of ${rows.length} collected · ${waiting.length} still waiting`;
+  // wrongDay is deliberately NOT an override condition — matches
+  // dispatch.service.js's own collect(): a pallet booked for another
+  // day is recorded (wrong_day_collection in the audit log) rather
+  // than gated, for the same reason a written-off pallet isn't gated
+  // either. Blocking here would disagree with what the server accepts.
+  const needsOverride = eligibility.slipNotPacked;
+  const overrideReasonText = eligibility.slipNotPacked
+    ? 'packing has not closed this pallet off yet'
+    : '';
+  const canStart = !eligibility.ecdInactive && (!needsOverride || (isManager(user) && overrideReason.trim()));
+
+  const handleModeChange = (next) => {
+    setMode(next);
+    if (next === 'full') setFormOpen(true);
+    try { localStorage.setItem(MODE_KEY, next); } catch { /* nothing we can do */ }
+    dismissCoachmark();
+  };
+
+  useEffect(() => {
+    if (!showCoachmark || !showToggle) return undefined;
+    const timer = setTimeout(dismissCoachmark, 5000);
+    return () => clearTimeout(timer);
+  }, [showCoachmark, showToggle, dismissCoachmark]);
+
+  const startCollection = () => {
+    if (mode === 'full') { setFormOpen(true); return; }
+    setLineIndex(0);
+    setPhase(hasLines ? 'count' : 'check');
+  };
+
+  const patchLineAt = (index, patch) =>
+    setLines((all) => {
+      const target = packedLines[index];
+      if (!target) return all;
+      return all.map((line) => (line.itemId === target.itemId ? { ...line, ...patch } : line));
+    });
+
+  const goToNextLine = () => {
+    if (lineIndex + 1 < packedLines.length) {
+      setLineIndex(lineIndex + 1);
+    } else {
+      setPhase('check');
+    }
+  };
+
+  const finish = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const overrides = packedLines
+        .filter((line) => Number(line.loaded || 0) !== line.packed)
+        .map((line) => ({
+          itemId:         line.itemId,
+          loadedQuantity: Number(line.loaded || 0),
+          varianceReason: varianceReasonFor(Number(line.loaded || 0) - line.packed),
+        }));
+
+      const result = await dispatchAPI.recordCollection(palletId, {
+        driverName,
+        vehicleReg,
+        signature,
+        lines: overrides,
+        idempotencyKey: attemptKey,
+        overrideReason: needsOverride ? overrideReason : null,
+      });
+
+      setPhase('done');
+      setFormOpen(false);
+      // recordCollection's response already carries the full joined
+      // note (see dispatch.service.js's own getDispatchNote-after-
+      // collect pattern) — no second fetch needed for the pop-up.
+      setPdfNote(result.note);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const backToQueue = () => {
+    setPdfNote(null);
+    onCollected?.();
+  };
+
+  if (loading) return <div className="stf-skeleton" aria-label="Loading" />;
+  if (loadError) return <Notice tone="warn">{loadError}</Notice>;
+  if (!gateView) return null;
 
   return (
-    <section className="stf-step">
-      <div className="stf-step-head">
-        <h1 className="stf-step-title" tabIndex={-1}>At the gate</h1>
-        <p className="stf-step-sub">{summary}</p>
-      </div>
+    <>
+      {showToggle ? (
+        <div className="stf-toggle-anchor">
+          <ViewToggle options={MODES} value={mode} onChange={handleModeChange} />
+          <Coachmark show={showCoachmark} onDismiss={dismissCoachmark}>
+            Tap here to switch view
+          </Coachmark>
+        </div>
+      ) : null}
+
+      {mode === 'full' ? null : <StepRail step={step.n} total={TOTAL_STEPS} label={step.label} />}
 
       {error ? <Notice tone="warn">{error}</Notice> : null}
 
-      {loading ? (
-        <div className="stf-skeleton" aria-label="Loading" />
-      ) : rows.length === 0 ? (
-        <div className="stf-empty">No pallets are waiting for collection.</div>
-      ) : (
-        <div className="stf-list">
-          {rows.map((row) => {
-            const state    = stateOf(row);
-            // BR-11 is the one hard block: an inactive centre cannot
-            // be released to, so its row cannot be opened whatever
-            // its dispatch status says.
-            const blocked  = row.ecd_is_active === false;
-            const openable = state.openable && !blocked;
-            const at       = timeOf(row.collected_at);
+      {/* ── 1 · Which pallet (Guided) ──────────────────────── */}
+      {phase === 'which' && mode !== 'full' && (
+        <StepScreen
+          title={gateView.ecd_name}
+          sub={gateView.pallet_ref ? `Pallet ${gateView.pallet_ref}` : 'Check the pallet before you release it.'}
+          actions={
+            <Actions>
+              <Button disabled={!canStart} onClick={startCollection}>Start the collection</Button>
+              <Button variant="secondary" onClick={onBack}>Back to the gate queue</Button>
+            </Actions>
+          }
+        >
+          <KeyValues
+            pairs={[
+              ['Cohort', gateView.cohort],
+              ['Items', `${packedLines.length}`],
+            ]}
+          />
 
-            // What the second line says, in order of what matters
-            // most to someone standing at a gate.
-            let meta;
-            if (blocked) {
-              meta = 'This centre is not active, so nothing can go out to it today.';
-            } else if (row.dispatch_status === 'not_collected') {
-              meta = 'Written off at 16:00 — still collectable. It will be recorded as a late collection.';
-            } else if (at) {
-              meta = `${state.label} at ${at}${row.driver_name ? ` · ${row.driver_name}` : ''}`;
-            } else {
-              const flags = [];
-              if (Number(row.flagged_items) > 0)  flags.push(`${row.flagged_items} flagged`);
-              if (Number(row.variance_items) > 0) flags.push(`${row.variance_items} short or over`);
-              meta = [`${row.total_items} items`, ...flags].join(' · ');
-            }
+          {eligibility.ecdInactive ? (
+            <Notice tone="warn">
+              {gateView.ecd_name} is not an active centre with approved quantities, so this pallet
+              cannot be released. Ask a manager to activate the centre first.
+            </Notice>
+          ) : null}
 
-            const open = () => onOpenPallet(row.picking_slip_id);
-
-            return (
-              <div
-                key={row.picking_slip_id}
-                className={`stf-row${blocked ? ' is-warn is-static' : state.tone}`}
-                role={openable ? 'button' : undefined}
-                tabIndex={openable ? 0 : undefined}
-                onClick={openable ? open : undefined}
-                onKeyDown={
-                  openable
-                    ? (e) => {
-                        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
-                      }
-                    : undefined
-                }
-              >
-                <span className="stf-row-main">
-                  <span className="stf-row-title">
-                    {row.ecd_name}
-                    {row.pallet_ref ? ` · ${row.pallet_ref}` : ''}
-                  </span>
-                  <span className="stf-row-meta">{meta}</span>
-                </span>
+          {!eligibility.ecdInactive && needsOverride ? (
+            isManager(user) ? (
+              <div className="stf-field">
+                <label className="stf-field-label" htmlFor="stf-override-reason">
+                  Reason for authorising this collection
+                </label>
+                <textarea
+                  id="stf-override-reason"
+                  className="stf-input is-text"
+                  rows={2}
+                  value={overrideReason}
+                  onChange={(e) => setOverrideReason(e.target.value)}
+                  placeholder={`${overrideReasonText}. Say why this can still go out today.`}
+                />
               </div>
-            );
-          })}
-        </div>
+            ) : (
+              <Notice tone="warn">
+                {overrideReasonText}. Ask a manager to authorise this collection at the gate.
+              </Notice>
+            )
+          ) : null}
+
+          {eligibility.hasFlaggedLines ? (
+            <Notice tone="warn">Packing flagged one or more lines on this pallet. Check them below.</Notice>
+          ) : null}
+          {eligibility.hasVariance ? (
+            <Notice tone="warn">What was packed doesn&rsquo;t match the order on one or more lines.</Notice>
+          ) : null}
+          {eligibility.writtenOff ? (
+            <Notice>
+              This pallet was written off at 16:00 as not collected. It is still here — collecting it
+              now records a late collection, nothing else changes.
+            </Notice>
+          ) : null}
+          {eligibility.wrongDay ? (
+            <Notice>
+              {gateView.ecd_name} is booked for another day. Collecting it now still goes through —
+              it's recorded as an off-schedule collection for your manager to see.
+            </Notice>
+          ) : null}
+        </StepScreen>
       )}
-    </section>
+
+      {/* ── 2 · Count what's loaded ────────────────────────── */}
+      {mode !== 'full' && phase === 'count' && currentLine && (
+        <StepScreen
+          title={currentLine.name}
+          sub={`Packing counted ${currentLine.packed}. Count what's actually going onto the vehicle.`}
+          actions={
+            <Actions>
+              <Button disabled={currentLine.loaded === ''} onClick={goToNextLine}>
+                {lineIndex + 1 < packedLines.length ? 'Next item' : 'Confirm the collection'}
+              </Button>
+              {lineIndex > 0 ? (
+                <Button variant="secondary" onClick={() => setLineIndex(lineIndex - 1)}>
+                  Back to the last item
+                </Button>
+              ) : (
+                <Button variant="secondary" onClick={() => setPhase('which')}>Back</Button>
+              )}
+            </Actions>
+          }
+        >
+          <NumberField
+            id="stf-loaded"
+            label="How many are going on the vehicle?"
+            value={currentLine.loaded}
+            flagged={currentLine.loaded !== '' && Number(currentLine.loaded) !== currentLine.packed}
+            onChange={(value) => patchLineAt(lineIndex, { loaded: value })}
+          />
+
+          <KeyValues
+            pairs={[
+              ['Code', currentLine.sku],
+              ['Packed', `${currentLine.packed} ${currentLine.unit}`],
+              ['Item', `${lineIndex + 1} of ${packedLines.length}`],
+            ]}
+          />
+
+          {currentLine.loaded !== '' && Number(currentLine.loaded) !== currentLine.packed ? (
+            <Notice tone="warn">
+              That's different from what packing recorded. Saving still records the collection — a
+              manager will see the difference.
+            </Notice>
+          ) : null}
+        </StepScreen>
+      )}
+
+      {/* ── 3 · Confirm the collection ─────────────────────── */}
+      {mode !== 'full' && phase === 'check' && (
+        <StepScreen
+          title="Does this look right?"
+          sub="Tap any line to change it, then get the driver's signature."
+          actions={
+            <Actions>
+              <Button disabled={saving || !driverName.trim() || !signature} onClick={finish}>
+                {saving ? 'Saving' : 'Confirm collection'}
+              </Button>
+            </Actions>
+          }
+        >
+          {packedLines.length > 0 ? (
+            <div className="stf-list">
+              {packedLines.map((line, i) => {
+                const varied = line.loaded !== '' && Number(line.loaded) !== line.packed;
+                return (
+                  <button
+                    key={line.itemId}
+                    type="button"
+                    className={`stf-row${varied ? ' is-warn' : ''}`}
+                    onClick={() => { setLineIndex(i); setPhase('count'); }}
+                  >
+                    {varied ? <span className="stf-notice-mark" aria-hidden="true">!</span> : null}
+                    <span className="stf-row-main">
+                      <span className="stf-row-title">{line.name}</span>
+                      <span className="stf-row-meta">
+                        {line.loaded || 0} {line.unit} loaded · packed {line.packed} {line.unit}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+
+          <TextField
+            id="stf-driver-name"
+            label="Driver's name"
+            value={driverName}
+            onChange={setDriverName}
+          />
+          <TextField
+            id="stf-vehicle-reg"
+            label="Vehicle registration (optional)"
+            value={vehicleReg}
+            onChange={setVehicleReg}
+          />
+
+          <SignatureField value={signature} onChange={setSignature} />
+        </StepScreen>
+      )}
+
+      {/* ── Form mode: an entry screen, plus one scrolling dialog ── */}
+      {phase !== 'done' && mode === 'full' && (
+        <StepScreen
+          title="Fill in one form"
+          actions={
+            <Actions>
+              <Button disabled={!canStart} onClick={() => setFormOpen(true)}>
+                Start this collection
+              </Button>
+              <Button variant="secondary" onClick={onBack}>Back to the gate queue</Button>
+            </Actions>
+          }
+        >
+          {eligibility.ecdInactive ? (
+            <Notice tone="warn">
+              {gateView.ecd_name} is not an active centre with approved quantities, so this pallet
+              cannot be released. Ask a manager to activate the centre first.
+            </Notice>
+          ) : null}
+          {!eligibility.ecdInactive && needsOverride && !isManager(user) ? (
+            <Notice tone="warn">
+              {overrideReasonText}. Ask a manager to authorise this collection at the gate.
+            </Notice>
+          ) : null}
+        </StepScreen>
+      )}
+
+      <Dialog open={formOpen} onOpenChange={setFormOpen}>
+        <DialogContent
+          container={shellNode ?? undefined}
+          className="max-w-[560px] w-[calc(100%-2rem)] max-h-[85vh] p-0 gap-0 flex flex-col overflow-hidden"
+        >
+          <DialogHeader className="stf-dialog-head">
+            <DialogTitle>{gateView.ecd_name}</DialogTitle>
+            <DialogDescription>
+              Check every line, then get the driver&rsquo;s name and signature.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="stf-dialog-scroll">
+            <div className="stf-dialog-fields">
+              {needsOverride && isManager(user) ? (
+                <div className="stf-field">
+                  <label className="stf-field-label" htmlFor="stf-full-override-reason">
+                    Reason for authorising this collection
+                  </label>
+                  <textarea
+                    id="stf-full-override-reason"
+                    className="stf-input is-text"
+                    rows={2}
+                    value={overrideReason}
+                    onChange={(e) => setOverrideReason(e.target.value)}
+                    placeholder={`${overrideReasonText}. Say why this can still go out today.`}
+                  />
+                </div>
+              ) : null}
+
+              <div className="stf-formrows">
+                {packedLines.map((line, i) => {
+                  const varied = line.loaded !== '' && Number(line.loaded) !== line.packed;
+                  return (
+                    <div key={line.itemId} className={`stf-formrow${varied ? ' is-warn' : ''}`}>
+                      <div className="stf-formrow-head">
+                        <span className="stf-formrow-title">{line.name}</span>
+                        <span className="stf-formrow-meta">
+                          Code: {line.sku} · Packed: {line.packed} {line.unit}
+                        </span>
+                      </div>
+
+                      <NumberField
+                        id={`stf-full-loaded-${line.itemId}`}
+                        label="How many are going on the vehicle?"
+                        value={line.loaded}
+                        flagged={varied}
+                        onChange={(value) => patchLineAt(i, { loaded: value })}
+                      />
+
+                      {varied ? (
+                        <Notice tone="warn">
+                          That's different from what packing recorded. Saving still records the
+                          collection — a manager will see the difference.
+                        </Notice>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <TextField
+                id="stf-full-driver-name"
+                label="Driver's name"
+                value={driverName}
+                onChange={setDriverName}
+              />
+              <TextField
+                id="stf-full-vehicle-reg"
+                label="Vehicle registration (optional)"
+                value={vehicleReg}
+                onChange={setVehicleReg}
+              />
+
+              <SignatureField value={signature} onChange={setSignature} />
+            </div>
+          </div>
+
+          <div className="stf-dialog-footer">
+            <Actions>
+              <Button disabled={saving || !driverName.trim() || !signature} onClick={finish}>
+                {saving ? 'Saving' : 'Confirm collection'}
+              </Button>
+            </Actions>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Done ───────────────────────────────────────────── */}
+      {phase === 'done' && (
+        <StepScreen
+          title="Collection confirmed"
+          sub="The stock is off the system and the pallet is on its way."
+          actions={
+            <Actions>
+              <Button onClick={backToQueue}>Back to the gate queue</Button>
+            </Actions>
+          }
+        />
+      )}
+
+      {pdfNote ? (
+        <DispatchNotePDF note={pdfNote} onClose={() => setPdfNote(null)} />
+      ) : null}
+    </>
   );
 }

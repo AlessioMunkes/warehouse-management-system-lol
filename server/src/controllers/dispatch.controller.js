@@ -39,6 +39,24 @@ const getBoard = async (req, res) => {
   }
 };
 
+// ── Past collections (staff history page) ────────────────────
+// GET /api/dispatch/history?range=today|week|month|all
+// Returns: every completed collection in range, most recent first —
+// each row's dispatch_event_id opens that collection's note.
+const getHistory = async (req, res) => {
+  try {
+    const history = await dispatchService.getHistory(req.query.range);
+    res.status(200).json({ success: true, data: history });
+  } catch (err) {
+    console.error('[getHistory]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to retrieve dispatch history.',
+    });
+  }
+};
+
 // ── Run the 16:00 sweep on demand (manager only) ─────────────
 // POST /api/dispatch/sweep
 // Body: { dispatchDate? } — defaults to today.
@@ -60,7 +78,7 @@ const sweep = async (req, res) => {
 // ── Non-collection history (BR-26) ───────────────────────────
 // GET /api/dispatch/non-collections?ecdId=&from=&to=
 // Returns: every non-collection event in range, with a running
-// per-ECD count so a repeat offender stands out.
+// per-beneficiary count so a repeat offender stands out.
 const getNonCollectionHistory = async (req, res) => {
   try {
     const history = await dispatchService.getNonCollectionHistory(req.query, req.user);
@@ -135,6 +153,7 @@ const collect = async (req, res) => {
 
 export default {
   getBoard,
+  getHistory,
   sweep,
   getNonCollectionHistory,
   getDispatchNote,

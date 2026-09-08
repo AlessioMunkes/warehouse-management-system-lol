@@ -1,7 +1,11 @@
 // src/components/SignaturePad.jsx
 import { useRef, useState, useEffect } from 'react';
 
-const SignaturePad = ({ onChange }) => {
+const SignaturePad = ({
+  onChange,
+  canvasClassName = 'signature-canvas',
+  clearButtonClassName = 'btn-link',
+}) => {
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
@@ -59,7 +63,7 @@ const SignaturePad = ({ onChange }) => {
     <div>
       <canvas
         ref={canvasRef}
-        className="signature-canvas"
+        className={canvasClassName}
         width={800}
         height={220}
         onMouseDown={startDrawing}
@@ -71,7 +75,7 @@ const SignaturePad = ({ onChange }) => {
         onTouchEnd={stopDrawing}
       />
       <div className="signature-actions">
-        <button type="button" className="btn-link" onClick={clearSignature}>
+        <button type="button" className={clearButtonClassName} onClick={clearSignature}>
           Clear signature
         </button>
       </div>

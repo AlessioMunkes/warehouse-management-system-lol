@@ -8,8 +8,8 @@
 // repository: the system never stops food leaving the building
 // because of a data problem. Almost everything the gate checks is
 // therefore a FLAG the screen shows, not an error that refuses the
-// request. There is exactly one hard block — an ECD centre that is
-// not active (BR-11) — because that is a governance decision made
+// request. There is exactly one hard block — a beneficiary centre
+// that is not active (BR-11) — because that is a governance decision made
 // upstream by the programme team, not a discrepancy between a number
 // in a database and a number on a shelf.
 //
@@ -198,6 +198,17 @@ const getBoard = async (query, user) => {
   return await dispatchRepository.getBoard({ dispatchDate, cohort, status, gateToday });
 };
 
+// ── Past collections, for the staff history page ─────────────────
+// Same range shape delivery.service.js's getDeliveries already uses —
+// an unrecognised or missing range quietly falls back to 'all' rather
+// than failing, since this is a read the whole staff team should be
+// able to reach without worrying about the exact query string.
+const VALID_HISTORY_RANGES = ['today', 'week', 'month', 'all'];
+const getHistory = async (range) => {
+  const safeRange = VALID_HISTORY_RANGES.includes(range) ? range : 'all';
+  return await dispatchRepository.getHistory(safeRange);
+};
+
 // ── One pallet at the gate ────────────────────────────────────
 const getGateView = async (slipId) => {
   const gateView = await dispatchRepository.getGateView(slipId);
@@ -288,14 +299,32 @@ const collect = async (slipId, body, user) => {
   // authorisation" tells a warehouse worker nothing actionable; "ask
   // a manager to authorise it" does.
   const needsOverride = [];
-  if (eligibility.wrongDay) {
-    needsOverride.push(
-      `${gateView.ecd_name} is booked for ${pgDateToString(gateView.dispatch_date)}, not today`
-    );
-  }
   if (eligibility.slipNotPacked) {
     needsOverride.push('this pallet has not been closed off by the packing team yet');
   }
+  // wrongDay is DELIBERATELY not in this list, for the same reason
+  // writtenOff is not (see below).
+  //
+  // BR-12 says a pallet is booked for a cohort day. It does not say
+  // food may not leave the building on any other day, and a driver
+  // standing at the gate with a vehicle has already solved a harder
+  // logistics problem than the calendar has. Blocking here meant a
+  // centre that missed Tuesday could not collect until a manager was
+  // physically found — and the manager's answer was always going to
+  // be yes, because the alternative is food sitting in Epping while
+  // children do not eat.
+  //
+  // It became untenable once the gate board stopped filtering to
+  // today: the board now shows every pallet still outstanding on any
+  // date, precisely so stale ones can be released, and EVERY one of
+  // those trips wrongDay by definition. The block would have gated
+  // the entire feature behind a manager.
+  //
+  // Recorded, not ignored. The collection is flagged wrong_day in the
+  // audit log with the date it was actually booked for, so BR-26
+  // reporting and any manager review still see it. Same principle as
+  // shortfall and unit mismatch: the system records what happened
+  // rather than refusing to let it happen.
   // writtenOff is DELIBERATELY not in this list.
   //
   // BR-14's 16:00 sweep is a bookkeeping act, not a gate closure. It
@@ -337,13 +366,24 @@ const collect = async (slipId, body, user) => {
     idempotencyKey: payload.idempotencyKey,
     overrideReason: payload.overrideReason,
     actorId:        user.id,
+    // Advisory, not a gate. Recorded against the collection so a
+    // manager reviewing BR-26 can see it went out off-schedule.
+    wrongDay:       eligibility.wrongDay,
+    bookedFor:      eligibility.wrongDay ? pgDateToString(gateView.dispatch_date) : null,
   });
 
   if (result.notFound)          fail(404, 'Picking slip not found.');
   if (result.notPacked)         fail(409, 'This pallet has not been packed yet.');
   if (result.alreadyDispatched) fail(409, 'This pallet has already been collected.');
 
-  return result;
+  // The gate screen pops up the dispatch note the moment a collection
+  // succeeds (the same pattern receiving's note follows). Fetching the
+  // full joined note here — one extra LOCAL query, on a connection
+  // already open — means the gate screen doesn't have to make a
+  // second HTTP round trip for it, the same fix applied to
+  // delivery.service.js's createDelivery.
+  const note = await dispatchRepository.getDispatchNote(result.event.id);
+  return { ...result, note };
 };
 
 // ── Run the 16:00 sweep on demand (manager only) ──────────────
@@ -383,7 +423,7 @@ const getNonCollectionHistory = async (query, user) => {
   // let an empty ecdId through as centre 0 and quietly returned
   // nothing instead of the unfiltered history the caller asked for.
   if (ecdId !== undefined && ecdId !== '' && !isPositiveInt(ecdId)) {
-    fail(400, 'Invalid ECD centre.');
+    fail(400, 'Invalid beneficiary centre.');
   }
   if (from !== undefined && from !== '' && !isValidDateString(from)) {
     fail(400, '"From" must be a real date in YYYY-MM-DD form.');
@@ -403,6 +443,7 @@ export { isValidDateString };
 
 export default {
   getBoard,
+  getHistory,
   getGateView,
   collect,
   sweep,

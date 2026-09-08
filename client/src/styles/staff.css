@@ -148,6 +148,22 @@
 .stf-crumb-back:hover { color: var(--stf-accent-deep); text-decoration: underline; }
 .stf-crumb-meta { font-variant-numeric: tabular-nums; white-space: nowrap; }
 
+/* An action link in the crumb row (e.g. Receiving's "History") — in
+   the persistent header rather than inline page content, so it stays
+   reachable and visible regardless of scroll position or which
+   screen/dialog is currently showing. */
+.stf-crumb-link {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  font: 700 12px/1.4 var(--stf-font-sans);
+  color: var(--stf-accent);
+  white-space: nowrap;
+}
+.stf-crumb-link:hover { color: var(--stf-accent-deep); }
+.stf-crumb-link i { font-size: 14px; }
+
 /* The single column every task page lays out in. Same column on a phone
    and on a bench tablet — the tablet gets more air, not a denser layout
    to relearn. */
@@ -634,8 +650,9 @@
   /* .stf-main is a flex column; a direct child stretches to its full
      width by default. This is the actual direct child (ViewToggle's
      own .stf-toggle-block sits inside it), so the override belongs
-     here, not one level down. */
-  align-self: flex-start;
+     here, not one level down. Right-aligned to match the booking.com
+     reference this control was modelled on. */
+  align-self: flex-end;
 }
 .stf-coachmark {
   position: absolute;
@@ -702,6 +719,139 @@
 .stf-badge.is-active  { background: var(--stf-sand); color: var(--stf-ink); }
 .stf-badge.is-done     { background: var(--stf-ink); color: var(--stf-white); }
 .stf-badge.is-warn     { background: var(--stf-attention-bg); color: var(--stf-attention-ink); }
+
+/* ── Select field ─────────────────────────────────────────────────── */
+/* .stf-select itself already exists (donation forms use it) — this
+   file only adds the wrapper spacing to match .stf-field's rhythm,
+   which SelectField in StepPrimitives.jsx already relies on. */
+
+/* ── Date field ───────────────────────────────────────────────────── */
+/* The real <input type="date"> is kept in the document (so
+   showPicker() and native validation still work) but visually
+   collapsed — the button is what a worker actually sees and taps. */
+.stf-date-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: var(--stf-field);
+  padding: 0 16px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  color: var(--stf-ink);
+  font: 400 16px/1 var(--stf-font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+.stf-date-trigger:hover { border-color: var(--stf-gold); }
+.stf-date-trigger i { font-size: 18px; color: var(--stf-text-sub); }
+.stf-date-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* ── Quantity readout + edit (Form mode) ─────────────────────────── */
+/* Pre-filled from the order, shown as a plain value rather than an
+   open input — most deliveries match the order exactly, so an
+   always-editable field on every one of a dozen lines is a dozen
+   chances to bump a number by accident. Edit is one deliberate tap
+   away instead. */
+.stf-qty-readout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: var(--stf-field);
+  padding: 0 16px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-sand);
+}
+.stf-qty-readout-val {
+  font: 700 22px/1 var(--stf-font-display);
+  color: var(--stf-ink);
+  font-variant-numeric: tabular-nums;
+}
+.stf-qty-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--stf-tap);
+  padding: 0 14px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-white);
+  color: var(--stf-ink);
+  font: 600 13px/1 var(--stf-font-sans);
+}
+.stf-qty-edit-btn:hover { border-color: var(--stf-accent); color: var(--stf-accent); }
+.stf-qty-edit-btn i { font-size: 15px; }
+
+/* ── Signature field ──────────────────────────────────────────────── */
+/* Wraps SignaturePad, which is shared with the manager side and takes
+   its class names as props precisely so it can look native here
+   instead of borrowing the manager page's plain-link styling. */
+.stf-signature-field { display: flex; flex-direction: column; gap: 8px; }
+.stf-signature-actions { display: flex; justify-content: flex-end; }
+.stf-signature-clear {
+  min-height: var(--stf-tap);
+  padding: 0 4px;
+  border: none;
+  background: none;
+  color: var(--stf-accent);
+  font: 600 13px/1 var(--stf-font-sans);
+}
+.stf-signature-clear:hover { color: var(--stf-accent-deep); text-decoration: underline; }
+
+/* ── Form-mode dialog (the "one scrolling form") ─────────────────── */
+/* Chrome (centering, backdrop blur, close button) comes from the
+   shared Dialog component; these three just lay out its inside —
+   a fixed head, a scrollable field stack, and a footer that stays put
+   so the submit button is reachable without scrolling back up. */
+.stf-dialog-head {
+  padding: 20px 20px 0;
+}
+.stf-dialog-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+.stf-dialog-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.stf-dialog-footer {
+  padding: 14px 20px;
+  border-top: 1px solid var(--stf-border);
+  background: var(--stf-white);
+}
+
+/* ── Static (read-only) field value ──────────────────────────────── */
+/* Looks like an input's box without inviting a tap — for a value the
+   screen already knows (who's signed in) rather than one someone
+   needs to choose. */
+.stf-static-value {
+  display: flex;
+  align-items: center;
+  min-height: var(--stf-field);
+  padding: 0 16px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-sand);
+  color: var(--stf-ink);
+  font: 600 16px/1 var(--stf-font-sans);
+}
+
+/* History's own link now lives in the crumb bar (.stf-crumb-link,
+   above StaffShell.jsx's block) instead of here — inline page content
+   scrolls out of view and, worse, sits behind the Form dialog once
+   that's open, so it isn't reachable from both modes at all times. */
 
 .stf-sr-only {
   position: absolute; width: 1px; height: 1px;

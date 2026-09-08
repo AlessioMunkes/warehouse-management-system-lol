@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate }  from 'react-router-dom';
 import { AuthProvider }                            from './context/AuthContext';
 import ProtectedRoute                              from './components/layout/ProtectedRoute';
-import { PACKING, STAFF, DONATIONS, DONATION_INTAKE_ROLES } from './routes/paths';
+import { PACKING, STAFF, DONATIONS, DONATION_INTAKE_ROLES, ADMIN } from './routes/paths';
 import LandingPage                                 from './pages/LandingPage';
 import LoginPage                                   from './pages/LoginPage';
 import GuestLoginPage                              from './pages/GuestLoginPage';
@@ -10,12 +10,20 @@ import PageNotFound                               from "./pages/PageNotFound";
 //import SelectNOCjob                                from './pages/SelectNOCjob';
 
 import ProcurementPage                             from './pages/ProcurementPage';
+import StaffDeliveriesPage                         from './pages/StaffDeliveriesPage';
 import DecantingPage                               from './pages/DecantingPage';
+import StaffDecantingRecordsPage                   from './pages/StaffDecantingRecordsPage';
 import PackingSelectPage                           from './pages/PackingSelectPage';
 import DispatchPage                                from './pages/DispatchPage';
+import StaffDispatchHistoryPage                    from './pages/StaffDispatchHistoryPage';
 import InventoryManagementPage                     from './pages/InventoryManagementPage';
 import ManagerActivityScreen                       from './pages/ManagerActivityScreen';
 import TaskDashboard from './pages/TaskDashboardPage';
+import SupplierDirectoryPage                       from './pages/SupplierDirectoryPage';
+import PurchaseOrdersPage                          from './pages/PurchaseOrdersPage';
+import ReportingPage                               from './pages/ReportingPage';
+import AdminActivityScreen                         from './pages/AdminActivityScreen';
+import UserDirectoryPage                            from './pages/UserDirectoryPage';
 
 // Donations — new feature, own draft context scoped to just these
 // two routes (see features/donation/context/DonationDraftProvider.jsx)
@@ -33,10 +41,19 @@ const App = () => (
         <Route path="/guest" element={<GuestLoginPage />} />
          
         
+        {/* ── Admin only ─────────────────────────────────── */}
+        <Route element={<ProtectedRoute roles={['admin']} />}>
+          <Route path={ADMIN.dashboard} element={<AdminActivityScreen />} />
+          <Route path={ADMIN.suppliers} element={<SupplierDirectoryPage />} />
+          <Route path={ADMIN.users}     element={<UserDirectoryPage />} />
+        </Route>
+
         {/* Protected — manager only */}
         <Route element={<ProtectedRoute roles={['manager']} />}>
           <Route path="/manager"       element={<ManagerActivityScreen />} />
         <Route path="/noc/inventory" element={<InventoryManagementPage />} />
+          <Route path={STAFF.reporting} element={<ReportingPage />} />
+          <Route path={STAFF.purchaseOrders} element={<PurchaseOrdersPage />} />
         </Route>
 
         {/* Protected — any logged-in user */}
@@ -45,15 +62,18 @@ const App = () => (
               real one lands. */}
           <Route path="/noc"           element={<TaskDashboard />} />
           <Route path="/noc/decanting" element={<DecantingPage />} />
+          <Route path={STAFF.decantingRecords} element={<StaffDecantingRecordsPage />} />
 
           {/* One URL per task, shared by managers and workers alike —
               each page picks manager view vs. staff flow by role
               internally (see ProcurementPage.jsx / PackingSelectPage.jsx
               / DecantingPage.jsx). */}
           <Route path={STAFF.receiving}       element={<ProcurementPage />} />
+          <Route path={STAFF.deliveries}      element={<StaffDeliveriesPage />} />
           <Route path={PACKING.board}         element={<PackingSelectPage />} />
           <Route path={PACKING.detailPattern} element={<PackingSelectPage />} />
           <Route path={STAFF.dispatch}        element={<DispatchPage />} />
+          <Route path={STAFF.dispatchHistory} element={<StaffDispatchHistoryPage />} />
         </Route>
 
         {/* Protected — donation intake, RECEIVERS_UP only.

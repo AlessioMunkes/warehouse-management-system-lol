@@ -149,3 +149,32 @@ export const apiPatch = async (endpoint, body = {}) => {
   }
   return handleResponse(res);
 };
+
+// ── Short-lived cache for rarely-changing dropdown data ────────
+// Suppliers, open-order suppliers, decantable products — all barely
+// change minute to minute, but each staff task page is a fresh route
+// mount (ReceivingPage/DecantingPage don't stay alive between visits),
+// so without this every single visit re-paid the full round trip
+// behind a loading skeleton before Guided or Form mode could show
+// anything at all. That read as "the form is slow to appear" when the
+// actual cost was a page-mount fetch, not the form itself.
+//
+// Deliberately a plain module-level Map, not a library: this only
+// needs to survive across route mounts within one tab, not across
+// reloads, and a short TTL means a stale read self-heals within a
+// minute even if nothing ever calls invalidateCache.
+const cache = new Map();
+
+export const cachedGet = async (key, ttlMs, fetcher) => {
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < ttlMs) return hit.value;
+
+  const value = await fetcher();
+  cache.set(key, { value, at: Date.now() });
+  return value;
+};
+
+// Call after a write that could change what a cached read above would
+// return — e.g. receiving a delivery can flip a purchase order to
+// 'completed', which changes who has an open order to receive against.
+export const invalidateCache = (key) => cache.delete(key);

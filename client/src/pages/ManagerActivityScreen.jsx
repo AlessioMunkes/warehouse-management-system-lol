@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { TopNavbar } from "../features/taskdashboard/components/TopNavBar";
 import { Greeting } from "../features/taskdashboard/components/Greeting";
 import { useAuth } from "@/context/AuthContext";
+import { STAFF } from "../routes/paths";
 import {
   Tooltip,
   TooltipContent,
@@ -24,6 +25,7 @@ import receivingIcon from "./../../public/icons/receiving-icon.svg";
 import packingIcon from "./../../public/icons/packing-icon.svg";
 import decantingIcon from "./../../public/icons/decanting-icon.svg";
 import dispatchIcon from "./../../public/icons/dispatch-icon.svg";
+import reportingIcon from "./../../public/icons/reporting-icon.svg";
 
 export default function Home() {
   const { user } = useAuth();
@@ -49,9 +51,21 @@ export default function Home() {
       noticeMessage: "The Beneficiary Onboarding module is currently undergoing routine maintenance.",
     },
     {
+      to: "/noc/reporting",
+      icon: reportingIcon,
+      title: "Reporting & Analytics",
+      disabled: false,
+    },
+    {
       to: "/noc/inventory",
       icon: packingIcon,
       title: "Manage Inventory",
+      disabled: false,
+    },
+    {
+      to: STAFF.purchaseOrders,
+      icon: receivingIcon,
+      title: "Purchase Orders",
       disabled: false,
     },
     {

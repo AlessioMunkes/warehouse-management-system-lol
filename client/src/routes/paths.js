@@ -45,14 +45,34 @@ export const STAFF = {
   // One URL for everyone — ProcurementPage picks the manager
   // dashboard or the receiving wizard by role.
   receiving: '/noc/procurement',
+  // A sub-screen of receiving, not a sixth tab: the tab bar is a
+  // fixed five-item strip with no spare icon slot, and this only
+  // needs to be reachable from the receiving flow, not from
+  // everywhere. Reached via a link on ReceivingFlow's first screen.
+  deliveries: '/noc/procurement/deliveries',
   packing:   PACKING.board,
   // One route, two shapes: DecantingPage picks the sack flow or the
   // week planner by role. There is no /staff/decanting.
   decanting: '/noc/decanting',
+  // A sub-screen of decanting, not a sixth tab, same reasoning as
+  // deliveries above — reached via a link on Decanting's crumb bar.
+  decantingRecords: '/noc/decanting/sheets',
   dispatch:  '/staff/dispatch',
+  // A sub-screen of dispatch, not a sixth tab, same reasoning as
+  // deliveries/decantingRecords above — reached via a link on the
+  // gate queue's crumb bar.
+  dispatchHistory: '/staff/dispatch/history',
+  // Manager-only. Both /api/reporting routes are
+  // requireRole(MANAGER, ADMIN); the App.jsx gate mirrors that.
+  reporting: '/noc/reporting',
   // Donation intake. Entry point of the draft flow; see DONATIONS
   // below for the later steps.
   donation:  DONATIONS_NEW,
+  // Manager-only, like reporting above: POST /api/purchase-orders
+  // is requireRole(MANAGER, ADMIN) and the App.jsx gate mirrors
+  // that. Reads are open to warehouse staff, but they reach a PO
+  // through the receiving flow rather than this screen.
+  purchaseOrders: '/noc/purchase-orders',
 };
 
 // ── Donations ────────────────────────────────────────────────
@@ -69,3 +89,12 @@ export const DONATIONS = {
 // both lists. If the server list changes, change this one with it —
 // they are two halves of the same rule.
 export const DONATION_INTAKE_ROLES = ['warehouse_worker', 'manager', 'admin'];
+
+// ── Admin ────────────────────────────────────────────────────
+// Admin-only screens. Gated in App.jsx with roles={['admin']} and
+// mirrored on the server by requireRole(MANAGER, ADMIN) for writes.
+export const ADMIN = {
+  dashboard: '/admin',
+  suppliers: '/admin/suppliers',
+  users:     '/admin/users',
+};

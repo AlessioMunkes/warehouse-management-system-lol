@@ -120,6 +120,96 @@ export const TextField = ({ id, label, hint, value, onChange, ...rest }) => {
   );
 };
 
+// ── Select field ──────────────────────────────────────────────
+// A native <select>, for a list too long to make sense as tap
+// targets (every supplier, every one of a supplier's open orders) —
+// ChoiceList is the right control for two or three options, this is
+// the right one for a dropdown that can hold dozens.
+export const SelectField = ({ id, label, hint, value, onChange, options, placeholder, disabled = false }) => {
+  const fieldId = id || 'stf-select';
+  return (
+    <div className="stf-field">
+      <label className="stf-field-label" htmlFor={fieldId}>{label}</label>
+      <select
+        id={fieldId}
+        className="stf-select"
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        <option value="" disabled>{placeholder || 'Choose one'}</option>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
+      {hint ? <p className="stf-field-hint">{hint}</p> : null}
+    </div>
+  );
+};
+
+// ── Date field ────────────────────────────────────────────────
+// A native date input is functional but reads as a bare grey box.
+// This wraps it in a button showing the date in words, and taps
+// straight into the native picker via showPicker() — the same
+// trick the manager side's DatePicker.jsx uses, ported to .stf-*.
+export const DateField = ({ id, label, hint, value, onChange }) => {
+  const fieldId = id || 'stf-date';
+  const inputRef = useRef(null);
+  const formatted = value
+    ? new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
+    : null;
+  return (
+    <div className="stf-field">
+      <label className="stf-field-label" htmlFor={fieldId}>{label}</label>
+      <button
+        type="button"
+        className="stf-date-trigger"
+        onClick={() => inputRef.current?.showPicker?.() || inputRef.current?.focus()}
+      >
+        <i className="ti ti-calendar" aria-hidden="true" />
+        <span>{formatted || 'Pick a date'}</span>
+      </button>
+      <input
+        ref={inputRef}
+        id={fieldId}
+        className="stf-date-hidden"
+        type="date"
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      {hint ? <p className="stf-field-hint">{hint}</p> : null}
+    </div>
+  );
+};
+
+// ── Quantity field ────────────────────────────────────────────
+// Form mode pre-fills every line with the expected quantity — most
+// deliveries match the order exactly, so retyping every number is
+// work nobody needs to do. What's shown is a plain readout with an
+// Edit button beside it; tapping Edit swaps that line to the same
+// NumberField Guided mode uses. Matches ACC-03: the affordance to
+// change a value is a labelled button, not an icon a worker has to
+// guess the meaning of.
+export const QuantityField = ({ id, label, value, editing, flagged, onEdit, onChange }) => {
+  if (editing) {
+    return (
+      <NumberField id={id} label={label} value={value} flagged={flagged} onChange={onChange} autoFocus />
+    );
+  }
+  return (
+    <div className="stf-field">
+      <span className="stf-field-label">{label}</span>
+      <div className="stf-qty-readout">
+        <span className="stf-qty-readout-val">{value}</span>
+        <button type="button" className="stf-qty-edit-btn" onClick={onEdit}>
+          <i className="ti ti-pencil" aria-hidden="true" />
+          Edit
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // ── Choice list ───────────────────────────────────────────────
 // Tap targets instead of a <select>. A dropdown hides its options
 // until tapped and needs a second tap to commit; with two or three

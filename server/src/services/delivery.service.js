@@ -203,13 +203,27 @@ const createDelivery = async (data, userId) => {
     return { note, warnings: [], duplicate: true };
   }
 
-  const { warnings = [], ...note } = result;
+  // The repository's own insert only returns the bare delivery_notes
+  // row it just wrote — no supplier name, no line items, no PO status.
+  // The note PDF needs all of that, and used to be handed just the id
+  // and fetch the rest itself in a second round trip from the tablet.
+  // Fetching it here instead costs one extra LOCAL query, on a
+  // connection already open, rather than a second HTTP round trip
+  // from wherever the receiving flow is running — the same join
+  // getDeliveryById always did, just moved to where it's cheap.
+  const { warnings = [] } = result;
+  const note = await deliveryModel.getDeliveryById(result.id);
   return { note, warnings, duplicate: false };
 };
 
 // ── Get suppliers ─────────────────────────────────────────────
-const getSuppliers = async () => {
-  return await deliveryModel.getSuppliers();
+// openOrdersOnly narrows this to suppliers with an approved order —
+// the Form view's supplier picker uses it so it never offers a
+// supplier with nothing to receive against.
+const getSuppliers = async (openOrdersOnly = false) => {
+  return openOrdersOnly
+    ? await deliveryModel.getSuppliersWithOpenOrders()
+    : await deliveryModel.getSuppliers();
 };
 
 // ── Get products ──────────────────────────────────────────────

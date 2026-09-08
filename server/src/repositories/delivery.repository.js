@@ -51,10 +51,12 @@ const getDeliveries = async (range = "all") => {
        dn.status,
        dn.created_at,
        s.name        AS supplier_name,
-       u.first_name  AS received_by_name
+       u.first_name  AS received_by_name,
+       po.status     AS po_status
      FROM delivery_notes dn
      JOIN suppliers s ON s.id = dn.supplier_id
      LEFT JOIN users u ON u.id = dn.received_by
+     LEFT JOIN purchase_orders po ON po.id = dn.purchase_order_id
      WHERE 1=1 ${dateFilter}
      ORDER BY dn.created_at DESC`,
   );
@@ -76,6 +78,8 @@ const getDeliveryById = async (id) => {
        dn.signature,
        dn.purchase_order_id,
        s.name           AS supplier_name,
+       s.address        AS supplier_address,
+       s.contact_phone  AS supplier_phone,
        u.first_name     AS received_by_name
      FROM delivery_notes dn
      LEFT JOIN suppliers s ON s.id = dn.supplier_id
@@ -387,6 +391,24 @@ const getSuppliers = async () => {
   return result.rows;
 };
 
+// ── Get suppliers with at least one order still open ──────────
+// For the Form view's supplier picker: no point offering a supplier
+// there is nothing to receive from. Same 'approved' rule as
+// getPurchaseOrdersBySupplier above — kept in step deliberately, so
+// this list and that one never disagree about what counts as open.
+// DISTINCT because a supplier can have more than one open order and
+// should still only appear once.
+const getSuppliersWithOpenOrders = async () => {
+  const result = await pool.query(
+    `SELECT DISTINCT s.id, s.name, s.contact_email
+     FROM suppliers s
+     JOIN purchase_orders po ON po.supplier_id = s.id
+     WHERE po.status = 'approved'
+     ORDER BY s.name ASC`,
+  );
+  return result.rows;
+};
+
 // ── Get all active products ───────────────────────────────────
 const getProducts = async () => {
   const result = await pool.query(
@@ -399,7 +421,17 @@ const getProducts = async () => {
 };
 
 // ── Get purchase orders for a supplier ───────────────────────
-// Only returns approved POs — can't receive against a pending one
+// Only returns approved POs — can't receive against a pending one.
+//
+// NOTE: as of the "Create purchase order" work elsewhere in this repo,
+// PO_STATUSES (server/src/services/purchaseOrder.service.js, BR-07B)
+// no longer includes 'approved' at all — that commit changed this
+// exact query to `status IN ('pending', 'in_transit',
+// 'partially_received')` instead. This still checks 'approved'
+// because that's what was explicitly asked for pending a resolution
+// between BR-07B and the received-goods approval requirement — the
+// two are in direct conflict and someone needs to reconcile them,
+// not this file guessing.
 const getPurchaseOrdersBySupplier = async (supplierId) => {
   const result = await pool.query(
     `SELECT
@@ -450,6 +482,7 @@ export default {
   getPurchaseOrder,
   createDelivery,
   getSuppliers,
+  getSuppliersWithOpenOrders,
   getProducts,
   getPurchaseOrdersBySupplier,
   getPurchaseOrderItems,
