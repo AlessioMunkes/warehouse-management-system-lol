@@ -12,6 +12,7 @@ import { ROLES } from '../src/middleware/auth.middleware.js';
 
 const serviceMock = {
   getBoard:                vi.fn(),
+  getHistory:               vi.fn(),
   getGateView:              vi.fn(),
   collect:                  vi.fn(),
   sweep:                     vi.fn(),
@@ -52,6 +53,7 @@ const withStatus = (status, message) => Object.assign(new Error(message), { stat
 beforeEach(() => {
   vi.clearAllMocks();
   serviceMock.getBoard.mockResolvedValue([]);
+  serviceMock.getHistory.mockResolvedValue([]);
   serviceMock.getGateView.mockResolvedValue(GATE_VIEW);
   serviceMock.collect.mockResolvedValue(COLLECTED);
   serviceMock.sweep.mockResolvedValue({ flagged: 0, slipIds: [] });
@@ -61,6 +63,7 @@ beforeEach(() => {
 
 const endpoints = [
   ['get',  BASE],
+  ['get',  `${BASE}/history`],
   ['get',  `${BASE}/1`],
   ['post', `${BASE}/1/collect`],
   ['post', `${BASE}/sweep`],
@@ -92,6 +95,11 @@ describe('dispatch routes — authentication', () => {
 describe('dispatch routes — authorisation', () => {
   it.each(ALL_ROLES)('%s can view the gate board', async (role) => {
     const res = await request(app).get(BASE).set('Cookie', cookieFor(role));
+    expect(res.status).toBe(200);
+  });
+
+  it.each(ALL_ROLES)('%s can view dispatch history', async (role) => {
+    const res = await request(app).get(`${BASE}/history`).set('Cookie', cookieFor(role));
     expect(res.status).toBe(200);
   });
 
@@ -174,6 +182,12 @@ describe('dispatch routes — fixed paths are not swallowed by /:id', () => {
     expect(serviceMock.getDispatchNote).toHaveBeenCalled();
     expect(serviceMock.getGateView).not.toHaveBeenCalled();
   });
+
+  it('routes /history to the history handler, not to getGateView', async () => {
+    await request(app).get(`${BASE}/history`).set('Cookie', cookieFor(ROLES.WORKER));
+    expect(serviceMock.getHistory).toHaveBeenCalled();
+    expect(serviceMock.getGateView).not.toHaveBeenCalled();
+  });
 });
 
 // ── Parameter validation ──────────────────────────────────────
@@ -197,6 +211,11 @@ describe('dispatch controller — responses', () => {
   it('wraps every success in the { success, data } envelope', async () => {
     const res = await request(app).get(BASE).set('Cookie', cookieFor(ROLES.MANAGER));
     expect(res.body).toEqual({ success: true, data: [] });
+  });
+
+  it('passes the range query param through to the service', async () => {
+    await request(app).get(`${BASE}/history?range=week`).set('Cookie', cookieFor(ROLES.WORKER));
+    expect(serviceMock.getHistory).toHaveBeenCalledWith('week');
   });
 
   it('returns 201 for a newly recorded collection', async () => {

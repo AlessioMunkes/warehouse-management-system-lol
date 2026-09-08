@@ -76,10 +76,10 @@ const createDelivery = async (req, res) => {
   }
 };
 
-// ── GET /api/deliveries/suppliers ────────────────────────────
+// ── GET /api/deliveries/suppliers?openOrdersOnly=true ────────
 const getSuppliers = async (req, res) => {
   try {
-    const suppliers = await deliveryService.getSuppliers();
+    const suppliers = await deliveryService.getSuppliers(req.query.openOrdersOnly === 'true');
     res.json({ success: true, data: suppliers });
   } catch (err) {
     respondWithError(res, err, 'getSuppliers', 'Failed to retrieve suppliers.');

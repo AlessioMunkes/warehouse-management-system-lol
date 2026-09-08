@@ -8,7 +8,7 @@ import '../../../styles/deliveryNotePDF.css';
 // — same document shell (.pdf-* classes, deliveryNotePDF.css), same
 // html2canvas+jsPDF pipeline (usePdfDocument). Where a delivery note
 // records goods coming IN from a supplier, this records goods going
-// OUT to an ECD centre: the "To" party is the centre, not a supplier,
+// OUT to a beneficiary centre: the "To" party is the centre, not a supplier,
 // and the two closing blocks are the driver who collected (signs, the
 // external party) and the warehouse staff member who ran the gate
 // check (named, no signature — the record already knows who was

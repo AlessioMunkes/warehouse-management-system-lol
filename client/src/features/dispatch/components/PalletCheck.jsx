@@ -5,8 +5,8 @@
 // matching the shape ReceivingFlow.jsx and DecantingFlow.jsx already
 // established:
 //
-//   1  Which pallet is this?    the ECD, the eligibility flags, an
-//                                override reason if a manager needs
+//   1  Which pallet is this?    the beneficiary, the eligibility flags,
+//                                an override reason if a manager needs
 //                                to authorise one
 //   2  Count what's loaded      one line, one number — repeats per
 //                                item, same as receiving's per-line
@@ -21,7 +21,7 @@
 // `mode` pattern ReceivingFlow.jsx/DecantingFlow.jsx use: Form is the
 // same fields as one scrolling dialog instead of three screens.
 //
-// The one HARD block is an inactive ECD centre (BR-11) — nothing here
+// The one HARD block is an inactive beneficiary centre (BR-11) — nothing here
 // can get past that, for anyone. Two more (a pallet booked for
 // another day, or one packing hasn't closed off) need a manager's
 // typed reason to proceed; a warehouse worker sees why and is told to
@@ -182,11 +182,15 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
   const currentLine = packedLines[lineIndex];
   const hasLines = packedLines.length > 0;
 
-  const needsOverride = eligibility.wrongDay || eligibility.slipNotPacked;
-  const overrideReasonText = [
-    eligibility.wrongDay ? `${gateView?.ecd_name} is booked for another day` : null,
-    eligibility.slipNotPacked ? 'packing has not closed this pallet off yet' : null,
-  ].filter(Boolean).join(', and ');
+  // wrongDay is deliberately NOT an override condition — matches
+  // dispatch.service.js's own collect(): a pallet booked for another
+  // day is recorded (wrong_day_collection in the audit log) rather
+  // than gated, for the same reason a written-off pallet isn't gated
+  // either. Blocking here would disagree with what the server accepts.
+  const needsOverride = eligibility.slipNotPacked;
+  const overrideReasonText = eligibility.slipNotPacked
+    ? 'packing has not closed this pallet off yet'
+    : '';
   const canStart = !eligibility.ecdInactive && (!needsOverride || (isManager(user) && overrideReason.trim()));
 
   const handleModeChange = (next) => {
@@ -337,8 +341,14 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
           ) : null}
           {eligibility.writtenOff ? (
             <Notice>
-              This pallet was not collected by 16:00pm. Collecting it
-              now records a late collection.
+              This pallet was written off at 16:00 as not collected. It is still here — collecting it
+              now records a late collection, nothing else changes.
+            </Notice>
+          ) : null}
+          {eligibility.wrongDay ? (
+            <Notice>
+              {gateView.ecd_name} is booked for another day. Collecting it now still goes through —
+              it's recorded as an off-schedule collection for your manager to see.
             </Notice>
           ) : null}
         </StepScreen>
@@ -382,7 +392,8 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
 
           {currentLine.loaded !== '' && Number(currentLine.loaded) !== currentLine.packed ? (
             <Notice tone="warn">
-              That's different from what packing recorded. Saving the record will alert the manager.
+              That's different from what packing recorded. Saving still records the collection — a
+              manager will see the difference.
             </Notice>
           ) : null}
         </StepScreen>
@@ -457,8 +468,8 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
         >
           {eligibility.ecdInactive ? (
             <Notice tone="warn">
-              {gateView.ecd_name} is not an active centre, so this pallet
-              cannot be released. Ask manager to activate the centre first.
+              {gateView.ecd_name} is not an active centre with approved quantities, so this pallet
+              cannot be released. Ask a manager to activate the centre first.
             </Notice>
           ) : null}
           {!eligibility.ecdInactive && needsOverride && !isManager(user) ? (
@@ -521,8 +532,8 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
 
                       {varied ? (
                         <Notice tone="warn">
-                          That's different from what packing recorded. Saving the record will
-                          alert the manager of the difference.
+                          That's different from what packing recorded. Saving still records the
+                          collection — a manager will see the difference.
                         </Notice>
                       ) : null}
                     </div>

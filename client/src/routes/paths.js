@@ -96,4 +96,5 @@ export const DONATION_INTAKE_ROLES = ['warehouse_worker', 'manager', 'admin'];
 export const ADMIN = {
   dashboard: '/admin',
   suppliers: '/admin/suppliers',
+  users:     '/admin/users',
 };
