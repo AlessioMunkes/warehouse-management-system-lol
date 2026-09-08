@@ -27,6 +27,7 @@ import ImpactReportPage                             from './pages/ImpactReportPa
 import PickingSlipManagementPage                    from './pages/PickingSlipManagementPage';
 import UserDirectoryPage                            from './pages/UserDirectoryPage';
 import ProductManagementPage                        from './pages/ProductManagementPage';
+import DocumentsPage                                 from './pages/DocumentsPage';
 
 // Donations — new feature, own draft context scoped to just these
 // two routes (see features/donation/context/DonationDraftProvider.jsx)
@@ -74,6 +75,7 @@ const App = () => (
           <Route path={STAFF.purchaseOrders} element={<PurchaseOrdersPage />} />
           <Route path={STAFF.beneficiaries} element={<BeneficiaryDirectoryPage />} />
           <Route path={STAFF.pickingSlips} element={<PickingSlipManagementPage />} />
+          <Route path={STAFF.documents} element={<DocumentsPage />} />
           {/* Manager-reachable but not primary — see
               ProductManagementPage.jsx's own role gating for the
               actual write-permission split. */}

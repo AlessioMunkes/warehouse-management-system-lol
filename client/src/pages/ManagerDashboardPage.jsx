@@ -21,6 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import { STAFF, ADMIN } from '../routes/paths';
 import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
 import DashboardGreeting from '../features/taskdashboard/components/DashboardGreeting';
+import DonutStat from '../features/taskdashboard/components/DonutStat';
 import dashboardAPI from '../services/dashboardAPI';
 import { runReport } from '../services/reportingAPI';
 import { resolvePreset } from '../features/reporting/dateRanges';
@@ -30,13 +31,18 @@ import {
 } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  AlertTriangle, Package, ShoppingCart, Truck, Users2,
+  AlertTriangle, Package, ShoppingCart, Truck,
 } from 'lucide-react';
 
 const BENEFICIARY_LABELS = {
   ecd: 'ECDs', soup_kitchen: 'Soup kitchens',
   dignity_kitchen: 'Dignity kitchens', community: 'Community',
 };
+
+// One fixed palette, reused across every donut on this page rather
+// than each panel inventing its own — a legend only reads as
+// consistent if red always means the same kind of thing.
+const DONUT_COLORS = ['#2b3336', '#ef3a40', '#c9a86a', '#6b8f71', '#8a8a8a'];
 
 const ErrorBanner = ({ message }) => (
   <div className="p-3 rounded-[4px] bg-[#fff4f2] border-2 border-[#ef3a40] text-[#2b3336] text-sm">
@@ -155,8 +161,8 @@ export default function ManagerDashboardPage() {
           )}
         </div>
 
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          <Card>
+        <div className="mt-6 grid gap-4 sm:grid-cols-3">
+          <Card className="sm:col-span-2">
             <CardHeader><CardTitle>Most dispatched products this month</CardTitle></CardHeader>
             <CardContent>
               {reportError ? (
@@ -172,6 +178,24 @@ export default function ManagerDashboardPage() {
           </Card>
 
           <Card>
+            <CardHeader><CardTitle>Product health</CardTitle></CardHeader>
+            <CardContent>
+              {summary ? (
+                <DonutStat
+                  centerValue={summary.activeProductCount}
+                  centerLabel="active"
+                  segments={[
+                    { label: 'Healthy stock', value: Math.max(0, summary.activeProductCount - summary.lowStockCount), color: DONUT_COLORS[0] },
+                    { label: 'Low stock', value: summary.lowStockCount, color: DONUT_COLORS[1] },
+                  ]}
+                />
+              ) : (
+                <Skeleton className="h-24 w-full" />
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="sm:col-span-2">
             <CardHeader><CardTitle>Dispatched by beneficiary type this month</CardTitle></CardHeader>
             <CardContent>
               {reportError ? (
@@ -181,22 +205,16 @@ export default function ManagerDashboardPage() {
               ) : byBeneficiary.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nothing dispatched yet this month.</p>
               ) : (
-                <RankedBars rows={byBeneficiary} labelFor={(l) => BENEFICIARY_LABELS[l] ?? l} />
+                <DonutStat
+                  centerValue={byBeneficiary.reduce((s, r) => s + Number(r.value), 0).toLocaleString('en-ZA')}
+                  centerLabel="kg total"
+                  segments={byBeneficiary.map((row, i) => ({
+                    label: BENEFICIARY_LABELS[row.label] ?? row.label,
+                    value: Number(row.value),
+                    color: DONUT_COLORS[i % DONUT_COLORS.length],
+                  }))}
+                />
               )}
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="mt-6">
-          <Card>
-            <CardHeader><CardTitle>Quick links</CardTitle></CardHeader>
-            <CardContent className="flex flex-wrap gap-2">
-              <Link to={STAFF.beneficiaries} className="flex items-center gap-1.5 rounded-[4px] border px-3 py-1.5 text-sm hover:bg-muted/50">
-                <Users2 className="size-4" /> Beneficiaries
-              </Link>
-              <Link to={STAFF.reporting} className="flex items-center gap-1.5 rounded-[4px] border px-3 py-1.5 text-sm hover:bg-muted/50">
-                <Package className="size-4" /> Full reporting
-              </Link>
             </CardContent>
           </Card>
         </div>

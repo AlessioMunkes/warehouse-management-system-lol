@@ -37,6 +37,7 @@ import {
 import {
   LayoutDashboard, Users2, ClipboardList, ShoppingCart,
   BarChart3, HeartHandshake, Package, Truck, Search, Plus, LogOut,
+  FileText,
 } from 'lucide-react';
 import batchesLogo from '../../../assets/Batches_Logo.jpeg';
 
@@ -65,6 +66,7 @@ const NAV_SECTIONS = (role) => [
       { to: STAFF.beneficiaries, label: 'Beneficiaries', icon: Users2 },
       { to: STAFF.pickingSlips, label: 'Picking Slips', icon: ClipboardList },
       { to: STAFF.purchaseOrders, label: 'Purchase Orders', icon: ShoppingCart },
+      { to: STAFF.documents, label: 'Documents', icon: FileText },
     ],
   },
   {

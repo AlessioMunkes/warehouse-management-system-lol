@@ -89,6 +89,12 @@ export const STAFF = {
   // all three, since assignment happens inline on a slip rather than
   // as a separate page.
   pickingSlips: '/noc/picking-slips',
+  // Manager-only archive of generated delivery/dispatch notes — reuses
+  // receivingAPI.getDeliveries/getDeliveryById and
+  // dispatchAPI.getHistory/getDispatchNote, the same functions the
+  // staff-side equivalents already call, so no new route gating is
+  // needed beyond what those two already require.
+  documents: '/noc/documents',
 };
 
 // ── Donations ────────────────────────────────────────────────
