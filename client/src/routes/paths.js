@@ -97,4 +97,5 @@ export const ADMIN = {
   dashboard: '/admin',
   suppliers: '/admin/suppliers',
   users:     '/admin/users',
+  products:  '/admin/products',
 };

@@ -24,6 +24,7 @@ import PurchaseOrdersPage                          from './pages/PurchaseOrdersP
 import ReportingPage                               from './pages/ReportingPage';
 import AdminActivityScreen                         from './pages/AdminActivityScreen';
 import UserDirectoryPage                            from './pages/UserDirectoryPage';
+import ProductManagementPage                        from './pages/ProductManagementPage';
 
 // Donations — new feature, own draft context scoped to just these
 // two routes (see features/donation/context/DonationDraftProvider.jsx)
@@ -46,6 +47,7 @@ const App = () => (
           <Route path={ADMIN.dashboard} element={<AdminActivityScreen />} />
           <Route path={ADMIN.suppliers} element={<SupplierDirectoryPage />} />
           <Route path={ADMIN.users}     element={<UserDirectoryPage />} />
+          <Route path={ADMIN.products}  element={<ProductManagementPage />} />
         </Route>
 
         {/* Protected — manager only */}

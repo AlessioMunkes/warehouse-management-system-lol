@@ -37,8 +37,12 @@ import { ADMIN } from "../routes/paths";
 
 // No supplier-specific icon exists in client/public/icons. Goods
 // arriving from suppliers is the nearest existing meaning, so the
-// receiving icon is reused rather than a new asset invented.
+// receiving icon is reused rather than a new asset invented. Same
+// reasoning for users (volunteer icon — people) and products
+// (foodbox icon — stock) below: no dedicated icon exists for either.
 import receivingIcon from "./../../public/icons/receiving-icon.svg";
+import volunteerIcon from "./../../public/icons/volunteer-icon.svg";
+import foodboxIcon   from "./../../public/icons/foodbox.svg";
 
 export default function AdminActivityScreen() {
   const { user } = useAuth();
@@ -52,6 +56,18 @@ export default function AdminActivityScreen() {
       to: ADMIN.suppliers,
       icon: receivingIcon,
       title: "Manage Suppliers",
+      disabled: false,
+    },
+    {
+      to: ADMIN.users,
+      icon: volunteerIcon,
+      title: "Manage Users",
+      disabled: false,
+    },
+    {
+      to: ADMIN.products,
+      icon: foodboxIcon,
+      title: "Manage Products",
       disabled: false,
     },
   ];
