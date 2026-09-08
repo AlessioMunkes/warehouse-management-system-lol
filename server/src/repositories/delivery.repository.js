@@ -394,7 +394,7 @@ const getSuppliers = async () => {
 // ── Get suppliers with at least one order still open ──────────
 // For the Form view's supplier picker: no point offering a supplier
 // there is nothing to receive from. Same 'approved' rule as
-// getPurchaseOrdersBySupplier above — kept in step deliberately, so
+// getPurchaseOrdersBySupplier below — kept in step deliberately, so
 // this list and that one never disagree about what counts as open.
 // DISTINCT because a supplier can have more than one open order and
 // should still only appear once.
@@ -421,17 +421,13 @@ const getProducts = async () => {
 };
 
 // ── Get purchase orders for a supplier ───────────────────────
-// Only returns approved POs — can't receive against a pending one.
-//
-// NOTE: as of the "Create purchase order" work elsewhere in this repo,
-// PO_STATUSES (server/src/services/purchaseOrder.service.js, BR-07B)
-// no longer includes 'approved' at all — that commit changed this
-// exact query to `status IN ('pending', 'in_transit',
-// 'partially_received')` instead. This still checks 'approved'
-// because that's what was explicitly asked for pending a resolution
-// between BR-07B and the received-goods approval requirement — the
-// two are in direct conflict and someone needs to reconcile them,
-// not this file guessing.
+// Only returns approved (or further along) POs — can't receive
+// against one still pending a manager's sign-off. This used to
+// disagree with getSuppliersWithOpenOrders above about what "open"
+// meant, because 'approved' had been dropped from PO_STATUSES
+// (server/src/services/purchaseOrder.service.js) without anywhere
+// left that could actually reach it. PO_STATUSES now has 'approved'
+// back — see that file's own comment — so both queries agree again.
 const getPurchaseOrdersBySupplier = async (supplierId) => {
   const result = await pool.query(
     `SELECT
@@ -443,7 +439,7 @@ const getPurchaseOrdersBySupplier = async (supplierId) => {
      FROM purchase_orders po
      LEFT JOIN users u ON u.id = po.created_by
      WHERE po.supplier_id = $1
-       AND po.status IN ('pending', 'in_transit', 'partially_received')
+       AND po.status IN ('approved', 'in_transit', 'partially_received')
      ORDER BY po.expected_delivery_date ASC`,
     [supplierId],
   );

@@ -28,14 +28,23 @@ const clean = (value) => {
   return trimmed === '' ? null : trimmed;
 };
 
-// BR-07B, in one place, matching migration 002's CHECK. Anything
+// BR-07B, in one place, matching the CHECK constraint. Anything
 // reading or writing a PO status reads it from here — movement_type
 // drifted precisely because its allowed values were written twice.
+//
+// 'approved' and 'completed' (renamed from the old 'received') were
+// added to close a real gap: delivery.repository.js's receiving flow
+// already wrote status = 'completed' and queried status = 'approved'
+// before either value was ever reachable through this list — a PO
+// could physically never get there. See
+// scratchpad/po_status_migration.sql for the CHECK-constraint change
+// this list now assumes has been applied.
 export const PO_STATUSES = [
-  'pending',
+  'pending',              // pending approval
+  'approved',             // manager has signed off; ready to send to the supplier
   'in_transit',
   'partially_received',
-  'received',
+  'completed',            // goods fully received as expected
   'returned',
   'follow_up_required',
 ];
@@ -211,8 +220,35 @@ const getPurchaseOrder = async (rawId) => {
   return purchaseOrder;
 };
 
+// ── Status transitions ─────────────────────────────────────────
+// General-purpose, not approve-only: PurchaseOrderDetail.jsx's
+// Approve button is the first caller, but 'returned'/
+// 'follow_up_required' need the same mechanism and the same
+// mandatory-reason rule the CHECK constraint already enforces on
+// Returned (see PurchaseOrderDetail.jsx's own comment on that).
+const setPurchaseOrderStatus = async (rawId, body = {}) => {
+  if (!isPositiveInt(rawId)) throw fail(400, 'A valid purchase order ID is required.');
+
+  const status = clean(body.status);
+  if (!status || !PO_STATUSES.includes(status)) {
+    throw fail(400, `Unknown status "${status}". Must be one of: ${PO_STATUSES.join(', ')}.`);
+  }
+
+  const reason = clean(body.reason);
+  if (status === 'returned' && !reason) {
+    throw fail(400, 'A reason is required when marking a purchase order as returned.');
+  }
+
+  const existing = await repo.getPurchaseOrderById(Number(rawId));
+  if (!existing) throw fail(404, 'Purchase order not found.');
+  if (existing.status === status) return existing;
+
+  return repo.updatePurchaseOrderStatus(Number(rawId), status, reason);
+};
+
 export default {
   createPurchaseOrder,
   listPurchaseOrders,
   getPurchaseOrder,
+  setPurchaseOrderStatus,
 };

@@ -24,7 +24,6 @@ import { Button } from "@/components/ui/button";
 import receivingIcon from "./../../public/icons/receiving-icon.svg";
 import packingIcon from "./../../public/icons/packing-icon.svg";
 import decantingIcon from "./../../public/icons/decanting-icon.svg";
-import dispatchIcon from "./../../public/icons/dispatch-icon.svg";
 import reportingIcon from "./../../public/icons/reporting-icon.svg";
 
 export default function Home() {
@@ -65,12 +64,6 @@ export default function Home() {
       to: STAFF.pickingSlips,
       icon: decantingIcon,
       title: "Manage Picking Slips",
-      disabled: false,
-    },
-    {
-      to: STAFF.assignPickingSlips,
-      icon: dispatchIcon,
-      title: "Assign Picking Slips",
       disabled: false,
     },
     {

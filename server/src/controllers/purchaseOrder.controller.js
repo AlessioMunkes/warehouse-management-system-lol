@@ -52,4 +52,14 @@ const getOne = async (req, res) => {
   }
 };
 
-export default { create, list, getOne };
+// ── PATCH /api/purchase-orders/:id/status ──────────────────────
+const setStatus = async (req, res) => {
+  try {
+    const data = await purchaseOrderService.setPurchaseOrderStatus(req.params.id, req.body);
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    respondError(res, err, 'setPurchaseOrderStatus', 'Failed to change the purchase order status.');
+  }
+};
+
+export default { create, list, getOne, setStatus };

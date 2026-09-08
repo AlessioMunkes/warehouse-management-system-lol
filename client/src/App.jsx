@@ -24,7 +24,6 @@ import PurchaseOrdersPage                          from './pages/PurchaseOrdersP
 import ReportingPage                               from './pages/ReportingPage';
 import BeneficiaryDirectoryPage                     from './pages/BeneficiaryDirectoryPage';
 import PickingSlipManagementPage                    from './pages/PickingSlipManagementPage';
-import AssignPickingSlipsPage                       from './pages/AssignPickingSlipsPage';
 import AdminActivityScreen                         from './pages/AdminActivityScreen';
 import UserDirectoryPage                            from './pages/UserDirectoryPage';
 import ProductManagementPage                        from './pages/ProductManagementPage';
@@ -61,7 +60,6 @@ const App = () => (
           <Route path={STAFF.purchaseOrders} element={<PurchaseOrdersPage />} />
           <Route path={STAFF.beneficiaries} element={<BeneficiaryDirectoryPage />} />
           <Route path={STAFF.pickingSlips} element={<PickingSlipManagementPage />} />
-          <Route path={STAFF.assignPickingSlips} element={<AssignPickingSlipsPage />} />
         </Route>
 
         {/* Protected — any logged-in user */}

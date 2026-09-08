@@ -22,24 +22,26 @@
 // were free. expectedQuantity is INTEGER, which pg already returns as
 // a number, so it needs no such care.
 //
-// There is no update or delete. BR-07B moves a PO through its states;
-// it does not edit one in place, and nothing in the URS asks for a PO
-// to be destroyed.
+// There is no delete — nothing in the URS asks for a PO to be
+// destroyed. setPurchaseOrderStatus is the one update path, and it
+// only ever moves a PO through its states (BR-07B); it cannot edit
+// the lines, supplier, or anything else about it in place.
 // ─────────────────────────────────────────────────────────────
-import { apiGet, apiPost } from "./api";
+import { apiGet, apiPost, apiPatch } from "./api";
 
 // ── BR-07B, for display ───────────────────────────────────────
 // Mirrors PO_STATUSES in server/src/services/purchaseOrder.service.js
-// and the CHECK in migration 002. Three copies of one list is two too
-// many, but the server cannot hand the client its labels without an
-// endpoint that exists only to do that — so this file is the single
-// client-side copy, and every screen reads it rather than writing its
-// own switch.
+// and the database CHECK constraint. Three copies of one list is two
+// too many, but the server cannot hand the client its labels without
+// an endpoint that exists only to do that — so this file is the
+// single client-side copy, and every screen reads it rather than
+// writing its own switch.
 export const PO_STATUS_LABELS = {
-  pending:            "Pending",
+  pending:            "Pending approval",
+  approved:           "Approved",
   in_transit:         "In transit",
   partially_received: "Partially received",
-  received:           "Received",
+  completed:          "Completed",
   returned:           "Returned",
   follow_up_required: "Follow-up required",
 };
@@ -48,7 +50,7 @@ export const PO_STATUS_LABELS = {
 // open_purchase_orders count in supplier.repository.js — if that
 // definition changes, change this with it.
 export const OPEN_PO_STATUSES = [
-  "pending", "in_transit", "partially_received", "follow_up_required",
+  "pending", "approved", "in_transit", "partially_received", "follow_up_required",
 ];
 
 // ── Row mappers ───────────────────────────────────────────────
@@ -122,4 +124,17 @@ export const createPurchaseOrder = async (payload) => {
   }
 };
 
-export default { getPurchaseOrders, getPurchaseOrder, createPurchaseOrder };
+// ── PATCH /api/purchase-orders/:id/status ───────────────────────
+// reason is only actually required by the server when status is
+// 'returned' — see purchaseOrder.service.js's setPurchaseOrderStatus.
+export const setPurchaseOrderStatus = async (id, status, reason = null) => {
+  const body = await apiPatch(`/api/purchase-orders/${id}/status`, { status, reason });
+  return toPurchaseOrder(body.data ?? {});
+};
+
+export const approvePurchaseOrder = async (id) => setPurchaseOrderStatus(id, "approved");
+
+export default {
+  getPurchaseOrders, getPurchaseOrder, createPurchaseOrder,
+  setPurchaseOrderStatus, approvePurchaseOrder,
+};

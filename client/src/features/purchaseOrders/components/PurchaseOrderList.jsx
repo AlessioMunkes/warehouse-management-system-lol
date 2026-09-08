@@ -28,7 +28,7 @@ const money = (value) =>
 // sitting quietly in a list of six greys.
 const badgeVariant = (status) => {
   if (status === 'returned' || status === 'follow_up_required') return 'destructive';
-  if (status === 'received') return 'secondary';
+  if (status === 'completed') return 'secondary';
   return 'outline';
 };
 

@@ -135,8 +135,17 @@ export default function PurchaseOrdersPage() {
     }
   };
 
+  const approve = async () => {
+    setError(null);
+    try {
+      await purchaseOrderAPI.approvePurchaseOrder(selected.id);
+      await loadPurchaseOrders();
+      await open(selected.id);
+    } catch (err) { setError(err.message); }
+  };
+
   const visible = tab === 'open'
-    ? purchaseOrders.filter((po) => po.status !== 'received' && po.status !== 'returned')
+    ? purchaseOrders.filter((po) => po.status !== 'completed' && po.status !== 'returned')
     : purchaseOrders;
 
   return (
@@ -227,6 +236,8 @@ export default function PurchaseOrdersPage() {
                 {mode === 'detail' && selected ? (
                   <PurchaseOrderDetail
                     purchaseOrder={selected}
+                    canManage={canManage}
+                    onApprove={approve}
                     onClose={() => { setSelected(null); setMode('list'); }}
                   />
                 ) : null}

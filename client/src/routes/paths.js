@@ -78,14 +78,13 @@ export const STAFF = {
   // screen in its own right, so it lives here rather than under
   // ADMIN — a manager reaches both from the same task set.
   beneficiaries: '/noc/beneficiaries',
-  // POST /api/picking (createSlip) and POST /api/picking/generate
-  // are both requireRole(MANAGER, ADMIN) in picking.routes.js —
-  // this is the manager-facing screen for both.
+  // POST /api/picking (createSlip), POST /api/picking/generate, and
+  // assigning a slip to a specific worker (POST /api/picking/:id/assign
+  // with a packerId, only honoured for a manager) are all
+  // requireRole(MANAGER, ADMIN) in picking.routes.js — one screen for
+  // all three, since assignment happens inline on a slip rather than
+  // as a separate page.
   pickingSlips: '/noc/picking-slips',
-  // POST /api/picking/:id/assign with a packerId in the body is
-  // only honoured for a manager (picking.service.js's assignSlip) —
-  // a worker calling the same route always claims for themselves.
-  assignPickingSlips: '/noc/picking-slips/assign',
 };
 
 // ── Donations ────────────────────────────────────────────────

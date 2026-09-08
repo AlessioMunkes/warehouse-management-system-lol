@@ -11,7 +11,7 @@
 // definition rather than inventing a new one:
 //   - low stock:            reporting.repository.js's lowStockItems
 //   - open purchase orders: purchaseOrder.service.js's PO_STATUSES,
-//                            everything before 'received'/'cancelled'
+//                            everything before 'completed'/'returned'
 //   - pending dispatch:     dispatch.repository.js's getBoard, the
 //                            same "no terminal collection yet" test,
 //                            narrowed to today rather than gateToday's
@@ -23,12 +23,12 @@ import pool from '../config/db.js';
 
 const num = (v) => (v === null || v === undefined ? 0 : Number(v));
 
-// PO statuses that are still open — everything short of 'received'
-// or 'cancelled'. Matches purchaseOrder.service.js's PO_STATUSES list
+// PO statuses that are still open — everything short of 'completed'
+// or 'returned'. Matches purchaseOrder.service.js's PO_STATUSES list
 // minus the two terminal ones. Inlined as a literal, not parameterised
 // — it is a fixed constant, not caller-supplied, the same reasoning
 // dispatch.repository.js's getBoard uses for its own status literals.
-const OPEN_PO_STATUSES_SQL = `'pending', 'in_transit', 'partially_received'`;
+const OPEN_PO_STATUSES_SQL = `'pending', 'approved', 'in_transit', 'partially_received'`;
 
 const getSummary = async () => {
   const [lowStock, openPOs, deliveriesToday, dispatchesToday] = await Promise.all([

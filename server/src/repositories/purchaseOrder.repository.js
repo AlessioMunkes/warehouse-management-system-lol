@@ -231,8 +231,27 @@ const getPurchaseOrderById = async (id) => {
   return { ...purchaseOrder, items };
 };
 
+// ── Status transition ────────────────────────────────────────
+// status_reason is cleared (not merely left) on every transition
+// that isn't 'returned' — a stale return reason must not survive
+// onto a PO that has since moved past it and read as if it still
+// applies.
+const updatePurchaseOrderStatus = async (id, status, reason) => {
+  const { rows } = await pool.query(
+    `UPDATE purchase_orders
+        SET status = $2,
+            status_reason = $3,
+            status_changed_at = NOW()
+      WHERE id = $1
+      RETURNING ${PO_COLUMNS.replace(/po\./g, '')}`,
+    [id, status, status === 'returned' ? reason : null]
+  );
+  return rows[0] ?? null;
+};
+
 export default {
   createPurchaseOrder,
   listPurchaseOrders,
   getPurchaseOrderById,
+  updatePurchaseOrderStatus,
 };
