@@ -1,0 +1,204 @@
+/* ─────────────────────────────────────────────────────────────
+   client/src/styles/deliveryNotePDF.css
+
+   Styles for every staff-facing PDF/document popup — DeliveryNotePDF
+   first, DecantingSheetPDF now too, DispatchNotePDF later. The
+   .pdf-* classes here were never delivery-specific in name (.pdf-
+   document, .pdf-doc-header, .pdf-table, ...), so a second document
+   type reuses this file rather than duplicating ~180 lines of near-
+   identical rules under a new name. Kept at this path rather than
+   renamed to something generic — renaming would mean every future
+   file handoff has to also tell you to delete the old one, for a
+   cosmetic gain.
+
+   Imported directly by each component (not added to staff.css or
+   landingpage.css) because these components are shared between the
+   manager dashboard (plain page, no .lol-landing/.stf-shell ancestor)
+   and the staff flows (.stf-shell) — neither wrapper's CSS custom
+   properties can be relied on here, so the brand colours are written
+   out directly instead of through the --stf- or --maroon-style
+   variables.
+   ───────────────────────────────────────────────────────────── */
+
+.pdf-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background: rgba(23, 27, 28, 0.55);
+}
+
+.pdf-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #2b3336;
+  color: #ffffff;
+}
+.pdf-toolbar-title {
+  font: 700 13px/1.3 "Montserrat", "Inter", system-ui, sans-serif;
+  letter-spacing: 0.02em;
+}
+.pdf-toolbar-actions { display: flex; align-items: center; gap: 10px; }
+.pdf-toolbar-error { font-size: 12px; color: #f5b5b7; }
+
+.pdf-scroll-area {
+  flex: 1;
+  overflow: auto;
+  padding: 24px 16px 40px;
+}
+
+/* Sparse and quiet rather than boxed — redesigned against a plain
+   delivery-note template (large title, generous whitespace, a single
+   light table, a script-style signature at the bottom) instead of the
+   denser, heavily-bordered layout this replaces. */
+.pdf-document {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 56px 48px;
+  background: #ffffff;
+  border-radius: 4px;
+  color: #2b3336;
+  font: 400 14px/1.6 "Inter", system-ui, sans-serif;
+}
+
+.pdf-doc-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 18px;
+}
+.pdf-doc-title-tick {
+  width: 34px;
+  height: 5px;
+  margin-bottom: 10px;
+  background: #ef3a40;
+  border-radius: 2px;
+}
+.pdf-doc-title {
+  margin: 0;
+  font: 700 40px/1.1 "Montserrat", "Inter", system-ui, sans-serif;
+  letter-spacing: 0.01em;
+  color: #1f2628;
+}
+.pdf-doc-logo {
+  /* Sized by a bounding box, not a fixed width+height, so whatever
+     the real logo's own proportions turn out to be, it's never
+     stretched or distorted to fill a shape it wasn't drawn for. */
+  max-height: 120px;
+  max-width: 180px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.pdf-doc-rule {
+  height: 3px;
+  background: #ef3a40;
+  margin-bottom: 40px;
+}
+
+.pdf-doc-parties {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 32px;
+  margin-bottom: 36px;
+}
+.pdf-doc-party-col { display: flex; flex-direction: column; gap: 24px; }
+.pdf-doc-party { display: flex; flex-direction: column; gap: 4px; }
+.pdf-doc-party-heading {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #2b3336;
+}
+.pdf-doc-party-line { margin: 0; font-size: 13px; font-style: normal; color: #6f6a5e; }
+.pdf-doc-party-line--primary { font-size: 15px; font-style: normal; font-weight: 700; color: #1f2628; }
+
+.pdf-doc-meta-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 240px;
+  padding: 20px 22px;
+  border-radius: 8px;
+  background: #f4f2ee;
+}
+.pdf-doc-meta-line {
+  margin: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  font-size: 13px;
+  color: #2b3336;
+}
+.pdf-doc-meta-line span { color: #8b8578; }
+.pdf-doc-meta-line span::after { content: ':'; }
+.pdf-doc-meta-line strong { font-weight: 700; }
+.pdf-status-complete { color: #1a7d42; }
+.pdf-status-partial  { color: #8a5a27; }
+
+.pdf-doc-additional { margin-bottom: 40px; }
+.pdf-doc-section-heading {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #2b3336;
+}
+.pdf-doc-additional-text { margin: 0; font-size: 13px; line-height: 1.7; color: #6f6a5e; }
+
+.pdf-table { width: 100%; border-collapse: collapse; margin-bottom: 40px; }
+.pdf-table thead { border-top: 2px solid #ef3a40; }
+.pdf-table th {
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #2b3336;
+}
+.pdf-table td {
+  padding: 12px 12px;
+  border-bottom: 1px solid #ece7df;
+  font-size: 13px;
+}
+.pdf-table-center { text-align: center; }
+.pdf-table-product { font-weight: 500; }
+.pdf-table-sku { color: #8b8578; font-variant-numeric: tabular-nums; }
+.pdf-table-empty { text-align: center; color: #8b8578; padding: 24px 10px; }
+
+.pdf-signature-section {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 32px;
+  margin-bottom: 36px;
+}
+.pdf-signature-block { display: flex; flex-direction: column; gap: 8px; }
+.pdf-signature-label { margin: 0; font-size: 12px; font-weight: 700; color: #2b3336; }
+.pdf-signature-img { max-height: 60px; max-width: 100%; object-fit: contain; align-self: flex-start; }
+.pdf-signature-line { height: 44px; border-bottom: 1.5px solid #2b3336; }
+.pdf-signature-name { margin: 0; font-size: 12px; color: #6f6a5e; }
+/* No signature line above it (Received By isn't a second physical
+   signature) — needs more visual weight than a small caption so it
+   doesn't read as an orphaned line under nothing. */
+.pdf-signature-name--standalone {
+  padding-top: 4px;
+  font-size: 14px;
+  color: #2b3336;
+}
+
+@media (max-width: 640px) {
+  .pdf-document { padding: 32px 24px; }
+  .pdf-doc-parties { flex-direction: column; }
+  .pdf-doc-meta-box { width: 100%; }
+  .pdf-signature-section { grid-template-columns: 1fr; }
+}
