@@ -22,6 +22,9 @@ import TaskDashboard from './pages/TaskDashboardPage';
 import SupplierDirectoryPage                       from './pages/SupplierDirectoryPage';
 import PurchaseOrdersPage                          from './pages/PurchaseOrdersPage';
 import ReportingPage                               from './pages/ReportingPage';
+import BeneficiaryDirectoryPage                     from './pages/BeneficiaryDirectoryPage';
+import PickingSlipManagementPage                    from './pages/PickingSlipManagementPage';
+import AssignPickingSlipsPage                       from './pages/AssignPickingSlipsPage';
 import AdminActivityScreen                         from './pages/AdminActivityScreen';
 import UserDirectoryPage                            from './pages/UserDirectoryPage';
 import ProductManagementPage                        from './pages/ProductManagementPage';
@@ -56,6 +59,9 @@ const App = () => (
         <Route path="/noc/inventory" element={<InventoryManagementPage />} />
           <Route path={STAFF.reporting} element={<ReportingPage />} />
           <Route path={STAFF.purchaseOrders} element={<PurchaseOrdersPage />} />
+          <Route path={STAFF.beneficiaries} element={<BeneficiaryDirectoryPage />} />
+          <Route path={STAFF.pickingSlips} element={<PickingSlipManagementPage />} />
+          <Route path={STAFF.assignPickingSlips} element={<AssignPickingSlipsPage />} />
         </Route>
 
         {/* Protected — any logged-in user */}

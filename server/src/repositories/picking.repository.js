@@ -621,6 +621,22 @@ const completeSlip = async ({ slipId, palletRef, actorId, canOverride = false })
   }
 };
 
+// ── Assignable workers (manager-only lookup) ────────────────────
+// Deliberately narrow: id + name only, active warehouse_worker
+// accounts only. This is NOT a general users read — /api/users stays
+// admin-only account provisioning (see user.routes.js's own header
+// comment). This exists solely so AssignPickingSlipsPage.jsx's
+// dropdown has someone to assign a slip to.
+const getAssignableWorkers = async () => {
+  const { rows } = await pool.query(
+    `SELECT id, first_name, last_name
+       FROM users
+      WHERE role = 'warehouse_worker' AND is_active = true
+      ORDER BY first_name ASC, last_name ASC`
+  );
+  return rows;
+};
+
 export default {
   CLAIMABLE_STATUSES,
   getCohortAnchor,
@@ -631,4 +647,5 @@ export default {
   assignSlip,
   setItemStatus,
   completeSlip,
+  getAssignableWorkers,
 };

@@ -44,13 +44,6 @@ export default function Home() {
   // those cards open the info modal instead of navigating.
   const tasks = [
     {
-      to: null,
-      icon: receivingIcon,
-      title: "Onboard Beneficiary",
-      disabled: false,
-      noticeMessage: "The Beneficiary Onboarding module is currently undergoing routine maintenance.",
-    },
-    {
       to: "/noc/reporting",
       icon: reportingIcon,
       title: "Reporting & Analytics",
@@ -69,18 +62,22 @@ export default function Home() {
       disabled: false,
     },
     {
-      to: null,
+      to: STAFF.pickingSlips,
       icon: decantingIcon,
       title: "Manage Picking Slips",
       disabled: false,
-      noticeMessage: "Picking Slips module feature is coming in the next iteration.",
     },
     {
-      to: null,
+      to: STAFF.assignPickingSlips,
       icon: dispatchIcon,
       title: "Assign Picking Slips",
       disabled: false,
-      noticeMessage: "Picking Slip Assignment feature is coming in the next iteration.",
+    },
+    {
+      to: STAFF.beneficiaries,
+      icon: receivingIcon,
+      title: "Beneficiaries",
+      disabled: false,
     },
   ];
 

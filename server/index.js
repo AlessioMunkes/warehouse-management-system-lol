@@ -24,6 +24,7 @@ import reportingRouter   from './src/routes/reporting.routes.js';
 import userRouter        from './src/routes/user.routes.js';
 import productRouter     from './src/routes/product.routes.js';
 import dashboardRouter   from './src/routes/dashboard.routes.js';
+import beneficiaryRouter from './src/routes/beneficiary.routes.js';
 
 // ── Validate required secrets exist at startup ───────────────
 if (!process.env.JWT_SECRET) {
@@ -103,6 +104,7 @@ app.use('/api/reporting',  reportingRouter);
 app.use('/api/users',      userRouter);
 app.use('/api/products',   productRouter);
 app.use('/api/dashboard',  dashboardRouter);
+app.use('/api/beneficiaries', beneficiaryRouter);
 
 // ── SPA fallback (production only) ────────────────────────────
 // Any non-/api path falls through to index.html so React Router can

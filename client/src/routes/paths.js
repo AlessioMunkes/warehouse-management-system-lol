@@ -73,6 +73,19 @@ export const STAFF = {
   // that. Reads are open to warehouse staff, but they reach a PO
   // through the receiving flow rather than this screen.
   purchaseOrders: '/noc/purchase-orders',
+  // Manager-only, same reasoning as purchaseOrders above. Needed by
+  // picking slip creation (the ECD dropdown) as much as it is a
+  // screen in its own right, so it lives here rather than under
+  // ADMIN — a manager reaches both from the same task set.
+  beneficiaries: '/noc/beneficiaries',
+  // POST /api/picking (createSlip) and POST /api/picking/generate
+  // are both requireRole(MANAGER, ADMIN) in picking.routes.js —
+  // this is the manager-facing screen for both.
+  pickingSlips: '/noc/picking-slips',
+  // POST /api/picking/:id/assign with a packerId in the body is
+  // only honoured for a manager (picking.service.js's assignSlip) —
+  // a worker calling the same route always claims for themselves.
+  assignPickingSlips: '/noc/picking-slips/assign',
 };
 
 // ── Donations ────────────────────────────────────────────────
