@@ -17,14 +17,14 @@ import PackingSelectPage                           from './pages/PackingSelectPa
 import DispatchPage                                from './pages/DispatchPage';
 import StaffDispatchHistoryPage                    from './pages/StaffDispatchHistoryPage';
 import InventoryManagementPage                     from './pages/InventoryManagementPage';
-import ManagerActivityScreen                       from './pages/ManagerActivityScreen';
+import ManagerDashboardPage                         from './pages/ManagerDashboardPage';
 import TaskDashboard from './pages/TaskDashboardPage';
 import SupplierDirectoryPage                       from './pages/SupplierDirectoryPage';
 import PurchaseOrdersPage                          from './pages/PurchaseOrdersPage';
 import ReportingPage                               from './pages/ReportingPage';
 import BeneficiaryDirectoryPage                     from './pages/BeneficiaryDirectoryPage';
+import ImpactReportPage                             from './pages/ImpactReportPage';
 import PickingSlipManagementPage                    from './pages/PickingSlipManagementPage';
-import AdminActivityScreen                         from './pages/AdminActivityScreen';
 import UserDirectoryPage                            from './pages/UserDirectoryPage';
 import ProductManagementPage                        from './pages/ProductManagementPage';
 
@@ -44,22 +44,40 @@ const App = () => (
         <Route path="/guest" element={<GuestLoginPage />} />
          
         
-        {/* ── Admin only ─────────────────────────────────── */}
+        {/* ── Admin only ─────────────────────────────────────
+            Account provisioning and supplier master data — not
+            reachable by managers, per explicit product decision this
+            session (Products moved out of this block below; Users
+            and Suppliers stay here). */}
         <Route element={<ProtectedRoute roles={['admin']} />}>
-          <Route path={ADMIN.dashboard} element={<AdminActivityScreen />} />
+          {/* Same dashboard a manager lands on — it already shows the
+              admin-only sidebar sections (Suppliers, Users) when
+              user.role is 'admin'. AdminActivityScreen.jsx (a
+              separate task-grid) is removed as superseded; nothing
+              else routed to it. */}
+          <Route path={ADMIN.dashboard} element={<ManagerDashboardPage />} />
           <Route path={ADMIN.suppliers} element={<SupplierDirectoryPage />} />
           <Route path={ADMIN.users}     element={<UserDirectoryPage />} />
-          <Route path={ADMIN.products}  element={<ProductManagementPage />} />
         </Route>
 
-        {/* Protected — manager only */}
-        <Route element={<ProtectedRoute roles={['manager']} />}>
-          <Route path="/manager"       element={<ManagerActivityScreen />} />
+        {/* Protected — manager and admin.
+            roles={['manager']} alone silently excluded admin here —
+            ProtectedRoute's role check is a strict allowlist with no
+            admin-bypass, so an admin account could not reach any of
+            these even though every one of their server routes is
+            requireRole(MANAGER, ADMIN). Fixed by listing both. */}
+        <Route element={<ProtectedRoute roles={['manager', 'admin']} />}>
+          <Route path="/manager"       element={<ManagerDashboardPage />} />
         <Route path="/noc/inventory" element={<InventoryManagementPage />} />
           <Route path={STAFF.reporting} element={<ReportingPage />} />
+          <Route path={STAFF.impactReport} element={<ImpactReportPage />} />
           <Route path={STAFF.purchaseOrders} element={<PurchaseOrdersPage />} />
           <Route path={STAFF.beneficiaries} element={<BeneficiaryDirectoryPage />} />
           <Route path={STAFF.pickingSlips} element={<PickingSlipManagementPage />} />
+          {/* Manager-reachable but not primary — see
+              ProductManagementPage.jsx's own role gating for the
+              actual write-permission split. */}
+          <Route path={ADMIN.products}  element={<ProductManagementPage />} />
         </Route>
 
         {/* Protected — any logged-in user */}

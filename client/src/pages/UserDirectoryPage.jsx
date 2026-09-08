@@ -20,7 +20,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth }   from '../context/AuthContext';
-import { TopNavbar } from '../features/taskdashboard/components/TopNavBar';
+import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
 import UserForm      from '../features/users/components/UserForm';
 import userAPI        from '../services/userAPI';
 
@@ -117,8 +117,6 @@ export default function UserDirectoryPage() {
   const { user } = useAuth();
   const canManage = CAN_MANAGE.includes(user?.role);
 
-  const [reducedMovement, setReducedMovement] = useState(false);
-
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState('');
   const [includeInactive, setIncludeInactive] = useState(false);
@@ -186,12 +184,7 @@ export default function UserDirectoryPage() {
   };
 
   return (
-    <>
-      <TopNavbar
-        reducedMovement={reducedMovement}
-        onToggleMovement={() => setReducedMovement((v) => !v)}
-      />
-
+    <ManagerLayout>
       <main className="mx-auto w-full max-w-5xl px-4 py-6">
         <h1 className="text-2xl font-medium">Users</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -325,6 +318,6 @@ export default function UserDirectoryPage() {
           )}
         </div>
       </main>
-    </>
+    </ManagerLayout>
   );
 }

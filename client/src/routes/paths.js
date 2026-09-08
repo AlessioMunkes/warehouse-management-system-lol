@@ -68,6 +68,10 @@ export const STAFF = {
   // Donation intake. Entry point of the draft flow; see DONATIONS
   // below for the later steps.
   donation:  DONATIONS_NEW,
+  // Manager-only, same reasoning as reporting above — a dedicated
+  // view for the two impactOnly metrics in reportCatalog.js, rather
+  // than one more entry in ReportingPage.jsx's full metric picker.
+  impactReport: '/noc/impact-report',
   // Manager-only, like reporting above: POST /api/purchase-orders
   // is requireRole(MANAGER, ADMIN) and the App.jsx gate mirrors
   // that. Reads are open to warehouse staff, but they reach a PO

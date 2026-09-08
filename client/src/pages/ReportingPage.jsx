@@ -20,7 +20,7 @@
 // misreads is visible before anyone acts on the number.
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback } from 'react';
-import { TopNavbar } from '../features/taskdashboard/components/TopNavBar';
+import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
 import { Skeleton } from '@/components/ui/skeleton';
 import AskBox        from '../features/reporting/components/AskBox';
 import ReportBuilder from '../features/reporting/components/ReportBuilder';
@@ -34,8 +34,6 @@ const MUTED    = '#676767';
 const BORDER   = '#e9e3dd';
 
 export default function ReportingPage() {
-  const [reducedMovement, setReducedMovement] = useState(false);
-
   const [catalog, setCatalog]     = useState(null);
   const [metricId, setMetricId]   = useState(null);
   const [dimension, setDimension] = useState('none');
@@ -128,13 +126,8 @@ export default function ReportingPage() {
     metric?.dimensions.find((d) => d.id === dimension)?.label ?? 'Category';
 
   return (
-    <div className="min-h-screen bg-white text-[#2b3336] font-['Montserrat',sans-serif]">
-      <TopNavbar
-        reducedMovement={reducedMovement}
-        onToggleMovement={setReducedMovement}
-      />
-
-      <main className="px-4 sm:px-6 py-6 max-w-3xl mx-auto">
+    <ManagerLayout>
+      <main className="px-4 sm:px-6 py-6 max-w-3xl mx-auto text-[#2b3336] font-['Montserrat',sans-serif]">
         <header className="mb-5">
           <h1 className="text-2xl font-bold tracking-tight">Reporting and analytics</h1>
           <p className="mt-1 text-sm" style={{ color: MUTED }}>
@@ -232,6 +225,6 @@ export default function ReportingPage() {
         </div>
 
       </main>
-    </div>
+    </ManagerLayout>
   );
 }

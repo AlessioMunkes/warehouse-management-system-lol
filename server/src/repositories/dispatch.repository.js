@@ -25,6 +25,7 @@
 // ─────────────────────────────────────────────────────────────
 import pool       from '../config/db.js';
 import stockModel from './stock.repository.js';
+import { createNotification } from './notification.repository.js';
 
 // ── Audit helper ──────────────────────────────────────────────
 // Dispatch writes into picking_events, not a separate log. The slip
@@ -530,6 +531,19 @@ const sweepNonCollections = async ({ dispatchDate, actorId }) => {
         dispatch_event_id: row.id,
         dispatch_date:     dispatchDate,
         rule:              'BR-14',
+      });
+    }
+
+    // BR-14: "the system must ... notify the Warehouse Manager." This
+    // is that notification — one summary per sweep run, not one per
+    // pallet, matching picking.repository.js's own generateSlips
+    // notification.
+    if (swept.rowCount > 0) {
+      await createNotification(client, {
+        type:  'non_collections_flagged',
+        title: `${swept.rowCount} pallet${swept.rowCount === 1 ? '' : 's'} not collected by 16:00`,
+        body:  `${dispatchDate} — flagged automatically per BR-14.`,
+        entityType: 'dispatch_sweep',
       });
     }
 

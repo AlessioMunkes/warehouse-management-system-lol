@@ -24,7 +24,7 @@
 // first, not a client-side button pointed at nothing.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
-import { TopNavbar }  from '../features/taskdashboard/components/TopNavBar';
+import ManagerLayout   from '../features/taskdashboard/components/ManagerLayout';
 import beneficiaryAPI from '../services/beneficiaryAPI';
 import {
   fetchPickingSlips, fetchPickingSlip, fetchAssignableWorkers,
@@ -144,7 +144,6 @@ const SlipDetail = ({ slip, workers, assignChoice, onAssignChoice, onAssign, ass
 );
 
 export default function PickingSlipManagementPage() {
-  const [reducedMovement, setReducedMovement] = useState(false);
   const [mode, setMode] = useState('list'); // list | generate | create
 
   const [beneficiaries, setBeneficiaries] = useState([]);
@@ -238,12 +237,7 @@ export default function PickingSlipManagementPage() {
     : slips;
 
   return (
-    <>
-      <TopNavbar
-        reducedMovement={reducedMovement}
-        onToggleMovement={() => setReducedMovement((v) => !v)}
-      />
-
+    <ManagerLayout>
       <main className="mx-auto w-full max-w-4xl px-4 py-6">
         <h1 className="text-2xl font-medium">Picking Slips</h1>
         <p className="mt-1 text-sm text-muted-foreground">What do you need to do?</p>
@@ -462,6 +456,6 @@ export default function PickingSlipManagementPage() {
           </div>
         ) : null}
       </main>
-    </>
+    </ManagerLayout>
   );
 }

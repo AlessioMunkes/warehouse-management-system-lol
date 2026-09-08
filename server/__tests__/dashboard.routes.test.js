@@ -32,7 +32,7 @@ const cookieFor = (role) => {
 };
 
 const SUMMARY = {
-  lowStockCount: 3, openPurchaseOrders: 5,
+  lowStockCount: 3, activeProductCount: 42, openPurchaseOrders: 5,
   deliveriesExpectedToday: 2, pendingDispatchesToday: 4,
 };
 

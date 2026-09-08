@@ -31,7 +31,7 @@ const num = (v) => (v === null || v === undefined ? 0 : Number(v));
 const OPEN_PO_STATUSES_SQL = `'pending', 'approved', 'in_transit', 'partially_received'`;
 
 const getSummary = async () => {
-  const [lowStock, openPOs, deliveriesToday, dispatchesToday] = await Promise.all([
+  const [lowStock, activeProducts, openPOs, deliveriesToday, dispatchesToday] = await Promise.all([
     pool.query(
       `SELECT COUNT(*)::int AS count
          FROM stock_levels sl
@@ -39,6 +39,9 @@ const getSummary = async () => {
         WHERE p.is_active = true
           AND sl.reorder_threshold > 0
           AND sl.quantity_on_hand <= sl.reorder_threshold`
+    ),
+    pool.query(
+      `SELECT COUNT(*)::int AS count FROM products WHERE is_active = true`
     ),
     pool.query(
       `SELECT COUNT(*)::int AS count
@@ -63,10 +66,11 @@ const getSummary = async () => {
   ]);
 
   return {
-    lowStockCount:          num(lowStock.rows[0]?.count),
-    openPurchaseOrders:     num(openPOs.rows[0]?.count),
+    lowStockCount:           num(lowStock.rows[0]?.count),
+    activeProductCount:      num(activeProducts.rows[0]?.count),
+    openPurchaseOrders:      num(openPOs.rows[0]?.count),
     deliveriesExpectedToday: num(deliveriesToday.rows[0]?.count),
-    pendingDispatchesToday: num(dispatchesToday.rows[0]?.count),
+    pendingDispatchesToday:  num(dispatchesToday.rows[0]?.count),
   };
 };
 
