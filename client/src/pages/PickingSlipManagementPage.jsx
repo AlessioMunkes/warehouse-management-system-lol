@@ -49,7 +49,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Search, CalendarPlus, PackagePlus, X } from 'lucide-react';
+import { Search, CalendarPlus, PackagePlus, X, ArrowLeft } from 'lucide-react';
 
 const COHORT_OPTIONS = [
   { value: 'week1', label: 'Week 1' },
@@ -255,8 +255,18 @@ export default function PickingSlipManagementPage() {
           </div>
         ) : null}
 
+        {mode !== 'list' ? (
+          <Button
+            type="button" variant="ghost" size="sm" className="mt-4 -ml-2"
+            onClick={() => setMode('list')}
+          >
+            <ArrowLeft />
+            Back to picking slips
+          </Button>
+        ) : null}
+
         {mode === 'generate' ? (
-          <Card className="mt-6">
+          <Card className="mt-4">
             <CardHeader><CardTitle>Generate this week's slips</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
@@ -309,7 +319,7 @@ export default function PickingSlipManagementPage() {
         ) : null}
 
         {mode === 'create' ? (
-          <Card className="mt-6">
+          <Card className="mt-4">
             <CardHeader><CardTitle>Create an ad-hoc slip</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
