@@ -29,13 +29,29 @@
 // flow captures a driver name. delivery_notes.driver_name is the real
 // column if that's ever added; it isn't written from here today.
 // ─────────────────────────────────────────────────────────────
-import { apiGet, apiPost } from './api';
+import { apiGet, apiPost, cachedGet, invalidateCache } from './api';
+
+// 60s: short enough that a supplier added this morning shows up
+// within a minute of the next page visit, long enough that hopping
+// into Receiving twice in a row doesn't re-pay the round trip both
+// times. See api.js's cachedGet for why this exists at all.
+const SUPPLIER_CACHE_TTL_MS = 60_000;
 
 // GET /api/deliveries/suppliers
-export const getSuppliers = async () => {
-  const res = await apiGet('/api/deliveries/suppliers');
-  return res.data ?? [];
-};
+export const getSuppliers = async () =>
+  cachedGet('deliveries:suppliers', SUPPLIER_CACHE_TTL_MS, async () => {
+    const res = await apiGet('/api/deliveries/suppliers');
+    return res.data ?? [];
+  });
+
+// GET /api/deliveries/suppliers?openOrdersOnly=true
+// For the Form view's supplier dropdown: only suppliers with an
+// approved order worth receiving against.
+export const getSuppliersWithOpenOrders = async () =>
+  cachedGet('deliveries:suppliers:open', SUPPLIER_CACHE_TTL_MS, async () => {
+    const res = await apiGet('/api/deliveries/suppliers?openOrdersOnly=true');
+    return res.data ?? [];
+  });
 
 // GET /api/deliveries/purchase-orders?supplierId=
 // Approved orders only, per delivery.repository. This is the "which
@@ -84,6 +100,28 @@ export const recordDelivery = async ({
     lineItems,
     idempotencyKey: idempotencyKey || null,
   });
+  // A receiving submission can flip its purchase order to 'completed'
+  // (poCompleted above), which changes who has an open order — the
+  // cached open-suppliers list from getSuppliersWithOpenOrders would
+  // otherwise still offer that supplier for up to a minute afterwards.
+  invalidateCache('deliveries:suppliers:open');
+  return res.data;
+};
+
+// GET /api/deliveries?range=today|week|month|all
+// The staff deliveries dashboard's list — same range shape
+// ProcurementDashboard already understands, defaults to 'all'.
+export const getDeliveries = async (range = 'all') => {
+  const res = await apiGet(`/api/deliveries?range=${encodeURIComponent(range)}`);
+  return res.data ?? [];
+};
+
+// GET /api/deliveries/:id
+// One delivery with its line items and signature, for the note PDF —
+// created fresh right after a submit, or opened later from the
+// deliveries dashboard.
+export const getDeliveryById = async (id) => {
+  const res = await apiGet(`/api/deliveries/${id}`);
   return res.data;
 };
 
@@ -140,6 +178,7 @@ export const getSupplierOptions = async () => {
 
 export default {
   getSuppliers,
+  getSuppliersWithOpenOrders,
   getPurchaseOrders,
   getPurchaseOrderItems,
   getProducts,

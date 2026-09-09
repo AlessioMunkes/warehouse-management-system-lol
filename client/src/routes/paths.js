@@ -45,11 +45,23 @@ export const STAFF = {
   // One URL for everyone — ProcurementPage picks the manager
   // dashboard or the receiving wizard by role.
   receiving: '/noc/procurement',
+  // A sub-screen of receiving, not a sixth tab: the tab bar is a
+  // fixed five-item strip with no spare icon slot, and this only
+  // needs to be reachable from the receiving flow, not from
+  // everywhere. Reached via a link on ReceivingFlow's first screen.
+  deliveries: '/noc/procurement/deliveries',
   packing:   PACKING.board,
   // One route, two shapes: DecantingPage picks the sack flow or the
   // week planner by role. There is no /staff/decanting.
   decanting: '/noc/decanting',
+  // A sub-screen of decanting, not a sixth tab, same reasoning as
+  // deliveries above — reached via a link on Decanting's crumb bar.
+  decantingRecords: '/noc/decanting/sheets',
   dispatch:  '/staff/dispatch',
+  // A sub-screen of dispatch, not a sixth tab, same reasoning as
+  // deliveries/decantingRecords above — reached via a link on the
+  // gate queue's crumb bar.
+  dispatchHistory: '/staff/dispatch/history',
   // Manager-only. Both /api/reporting routes are
   // requireRole(MANAGER, ADMIN); the App.jsx gate mirrors that.
   reporting: '/noc/reporting',

@@ -3,16 +3,22 @@
 // Every endpoint here is confirmed against the real
 // decanting.controller.js — all wrap responses as { success, data },
 // so every function below unwraps .data before returning.
-import { apiGet, apiPost } from './api';
+import { apiGet, apiPost, cachedGet } from './api';
 
 // NOTE: decanting.controller.js has getDecantableProducts fully
 // commented out (route, controller, and service). Reusing
 // procurement's existing products endpoint as a stopgap until
 // that's uncommented on the backend — not something to fix here.
-export const getProducts = async () => {
-  const res = await apiGet('/api/deliveries/products');
-  return res.data;
-};
+//
+// Cached the same way receivingAPI.js caches suppliers: this is a
+// fresh route mount every visit to Decanting, and the product list
+// barely changes minute to minute, so without this every visit re-
+// paid the round trip before either view mode had anything to show.
+export const getProducts = async () =>
+  cachedGet('decanting:products', 60_000, async () => {
+    const res = await apiGet('/api/deliveries/products');
+    return res.data;
+  });
 
 export const calculateDecantingPlan = async (data) => {
   const res = await apiPost('/api/decanting/calculate', data);
