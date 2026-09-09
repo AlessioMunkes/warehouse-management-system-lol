@@ -69,6 +69,12 @@ export default function Home() {
       disabled: false,
     },
     {
+      to: STAFF.receipts,
+      icon: dispatchIcon,
+      title: "Receipts",
+      disabled: false,
+    },
+    {
       to: null,
       icon: decantingIcon,
       title: "Manage Picking Slips",

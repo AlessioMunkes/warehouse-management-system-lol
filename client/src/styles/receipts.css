@@ -1,0 +1,436 @@
+/* ─────────────────────────────────────────────────────────────
+   client/src/styles/receipts.css
+
+   Styling for the printable note documents (DeliveryNotePDF,
+   DispatchNotePDF) and the receipts archive list.
+
+   WHY PLAIN CSS AND LITERAL HEX
+   These nodes are handed to html2canvas 1.4.1, which cannot parse
+   oklch() and throws mid-render when it meets one. index.css defines
+   62 oklch colours through shadcn/Tailwind v4, so every Tailwind
+   semantic token (bg-muted, text-foreground, border-border) is a
+   landmine inside a node destined for a PDF. Literal hex only.
+
+   The class names are the ones DeliveryNotePDF.jsx has always used.
+   They were never defined — this file is the missing half of that
+   component, not a new convention.
+
+   Brand tokens, matching index.css:
+     #2b3336 dark   #ef3a40 accent   #e9e3dd cream   #676767 muted
+   ───────────────────────────────────────────────────────────── */
+
+/* ─────────────────────────────────────────────────────────────
+   THE oklch RESET — do not remove without reading this
+
+   index.css carries, in the shadcn base layer:
+
+       @layer base { * { @apply border-border outline-ring/50; } }
+
+   which sets border-color: var(--border) and outline-color:
+   color-mix(in oklab, var(--ring) 50%, transparent) on EVERY
+   element in the document. --border is oklch.
+
+   html2canvas 1.4.1 reads the computed border and outline colour
+   of every node it renders and throws on both oklch() and
+   color-mix(). Neither existed when it was last released. Without
+   this reset the PDF fails on every record, which is exactly what
+   happened.
+
+   TWO THINGS MAKE THIS WORK:
+
+   :where() gives the selector ZERO specificity, so every real rule
+   in this file still wins. Without it, `.pdf-document *` (0,1,1)
+   would beat `.pdf-doc-header` (0,1,0) and flatten the header rule.
+
+   These rules are UNLAYERED. Unlayered styles outrank every cascade
+   layer regardless of source order, so this beats @layer base even
+   though index.css imports it near the top.
+
+   The custom properties below are a second line of defence: if a
+   var() reference leaks into the document from somewhere we have
+   not anticipated, it resolves to hex instead of oklch.
+   ───────────────────────────────────────────────────────────── */
+:where(.pdf-document, .pdf-document *) {
+  border-color: #e9e3dd;
+  outline-color: transparent;
+  text-decoration-color: currentColor;
+  --tw-ring-color: transparent;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-shadow: 0 0 #0000;
+}
+
+.pdf-document {
+  --background: #ffffff;
+  --foreground: #2b3336;
+  --card: #ffffff;
+  --card-foreground: #2b3336;
+  --popover: #ffffff;
+  --popover-foreground: #2b3336;
+  --primary: #2b3336;
+  --primary-foreground: #ffffff;
+  --secondary: #e9e3dd;
+  --secondary-foreground: #2b3336;
+  --muted: #f6f4f1;
+  --muted-foreground: #676767;
+  --accent: #e9e3dd;
+  --accent-foreground: #2b3336;
+  --destructive: #ef3a40;
+  --destructive-foreground: #ffffff;
+  --border: #e9e3dd;
+  --input: #e9e3dd;
+  --ring: #2b3336;
+}
+
+/* ── The modal shell ──────────────────────────────────────── */
+.pdf-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background: rgba(43, 51, 54, 0.55);
+}
+
+.pdf-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  background: #2b3336;
+  color: #ffffff;
+}
+
+.pdf-toolbar-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pdf-toolbar-actions { display: flex; align-items: center; gap: 8px; }
+
+.pdf-toolbar-error {
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffd7d8;
+  max-width: 320px;
+}
+
+.pdf-scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 12px 48px;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── The document itself ──────────────────────────────────── */
+/* Fixed 794px = A4 at 96dpi. html2canvas rasterises at the node's
+   layout width, so letting this be fluid makes the PDF's proportions
+   depend on the reader's window size. It is deliberately NOT
+   responsive; the wrapper scrolls instead. */
+.pdf-document {
+  width: 794px;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 40px 44px;
+  background: #ffffff;
+  color: #2b3336;
+  font-family: 'Montserrat', 'Open Sans', Helvetica, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+}
+
+.pdf-doc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  padding-bottom: 18px;
+  border-bottom: 3px solid #2b3336;
+}
+
+.pdf-doc-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #2b3336;
+}
+
+.pdf-doc-subtitle {
+  margin: 2px 0 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #676767;
+}
+
+.pdf-doc-id-label {
+  margin: 0;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #676767;
+  text-align: right;
+}
+
+.pdf-doc-id-label--spaced { margin-top: 8px; }
+
+.pdf-doc-id {
+  margin: 2px 0 0;
+  font-size: 20px;
+  font-weight: 800;
+  color: #ef3a40;
+  text-align: right;
+}
+
+/* ── Status banner ────────────────────────────────────────── */
+.pdf-status-banner {
+  margin: 18px 0;
+  padding: 12px 14px;
+  border-left: 4px solid #676767;
+  background: #f6f4f1;
+}
+
+.pdf-status-banner--complete { border-left-color: #2b3336; background: #f1f4f2; }
+.pdf-status-banner--pending  { border-left-color: #ef3a40; background: #fdf1f1; }
+.pdf-status-banner--warning  { border-left-color: #ef3a40; background: #fdf1f1; }
+
+.pdf-status-title { margin: 0; font-size: 13px; font-weight: 700; }
+.pdf-status-title--complete { color: #2b3336; }
+.pdf-status-title--pending  { color: #ef3a40; }
+
+.pdf-status-body { margin: 4px 0 0; font-size: 12px; color: #676767; }
+.pdf-status-body--complete,
+.pdf-status-body--pending { color: #676767; }
+
+/* ── Meta grid ────────────────────────────────────────────── */
+.pdf-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px 20px;
+  margin: 18px 0 24px;
+}
+
+.pdf-meta-label {
+  margin: 0;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #676767;
+}
+
+.pdf-meta-value { margin: 2px 0 0; font-size: 13px; font-weight: 600; }
+
+/* ── Items table ──────────────────────────────────────────── */
+.pdf-items-title {
+  margin: 0 0 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #2b3336;
+}
+
+.pdf-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+
+.pdf-table thead th {
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #ffffff;
+  background: #2b3336;
+}
+
+.pdf-table tbody td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #e9e3dd;
+  vertical-align: top;
+}
+
+.pdf-table tbody tr:nth-child(even) td { background: #faf8f6; }
+
+.pdf-table-center { text-align: center; }
+.pdf-table-product { font-weight: 600; }
+.pdf-table-sku { color: #676767; font-size: 11px; }
+
+.pdf-table-empty {
+  padding: 20px;
+  text-align: center;
+  color: #676767;
+  font-style: italic;
+}
+
+/* A line that did not match. Not colour alone — the variance cell also
+   carries text, because a printed PDF may be photocopied in mono. */
+.pdf-table-row--variance td { background: #fdf1f1 !important; }
+
+.pdf-variance-short { color: #ef3a40; font-weight: 700; }
+.pdf-variance-over  { color: #8a6d00; font-weight: 700; }
+.pdf-variance-none  { color: #676767; }
+
+.pdf-reason-row td {
+  padding: 6px 10px 10px;
+  font-size: 11px;
+  color: #676767;
+  background: #fdf1f1 !important;
+  border-bottom: 1px solid #e9e3dd;
+}
+
+.pdf-reason-label {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 9px;
+  color: #2b3336;
+}
+
+/* ── Totals ───────────────────────────────────────────────── */
+.pdf-totals-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 28px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 2px solid #2b3336;
+}
+
+.pdf-total-block { text-align: right; }
+
+/* ── Signatures ───────────────────────────────────────────── */
+.pdf-signature-section {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
+  margin-top: 36px;
+}
+
+.pdf-signature-block { min-height: 90px; }
+
+.pdf-signature-label {
+  margin: 0 0 6px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #676767;
+}
+
+.pdf-signature-img {
+  display: block;
+  max-height: 64px;
+  max-width: 100%;
+  margin-bottom: 4px;
+}
+
+.pdf-signature-line {
+  height: 48px;
+  border-bottom: 1px solid #2b3336;
+  margin-bottom: 4px;
+}
+
+.pdf-signature-name { margin: 0; font-size: 11px; color: #676767; }
+
+.pdf-signature-withheld {
+  height: 48px;
+  display: flex;
+  align-items: flex-end;
+  font-size: 11px;
+  font-style: italic;
+  color: #676767;
+  border-bottom: 1px solid #e9e3dd;
+  margin-bottom: 4px;
+}
+
+/* ── Footer ───────────────────────────────────────────────── */
+.pdf-footer-stamp {
+  margin-top: 32px;
+  padding-top: 12px;
+  border-top: 1px solid #e9e3dd;
+  text-align: center;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #676767;
+}
+
+.pdf-footer-stamp p { margin: 0; }
+.pdf-footer-stamp--spaced { margin-top: 4px !important; }
+
+/* ─────────────────────────────────────────────────────────────
+   PRINT
+
+   The previous version of this block only set .pdf-modal to
+   position: static. That drops the modal out of its fixed overlay
+   and into normal document flow BELOW the page it was covering —
+   which was never hidden — so printing produced several pages of
+   filter bar and results table with the note somewhere underneath.
+
+   Hiding the page needs a sibling selector, which is why PdfShell
+   renders through a portal into document.body. The modal is a direct
+   child of body, so everything else can be switched off by name.
+
+   display: none, not visibility: hidden — a hidden element still
+   occupies its box and would print as blank leading pages.
+   ───────────────────────────────────────────────────────────── */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+
+  /* Everything except the note. #root holds the whole app. */
+  body > *:not(.pdf-modal) { display: none !important; }
+
+  .pdf-modal {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    background: none !important;
+  }
+
+  /* Screen furniture: the toolbar is the buttons, and it has no
+     meaning on paper. */
+  .pdf-toolbar { display: none !important; }
+
+  .pdf-scroll-area {
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  /* The 794px fixed width exists so html2canvas rasterises at a
+     predictable size. On paper the page box decides the width. */
+  .pdf-document {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    /* Without this, browsers drop the dark table header and the
+       banner tints to save ink, and a variance row stops reading as
+       one. The colour is carrying meaning here, not decoration. */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Page-break behaviour. A note that runs past one page should
+     break between rows, not through them, and the signature block
+     should not be orphaned from what it signs off. */
+  .pdf-table       { page-break-inside: auto; }
+  .pdf-table tr    { page-break-inside: avoid; break-inside: avoid; }
+  .pdf-table thead { display: table-header-group; }
+  .pdf-reason-row  { page-break-before: avoid; }
+  .pdf-signature-section,
+  .pdf-status-banner,
+  .pdf-totals-row  { page-break-inside: avoid; break-inside: avoid; }
+  .pdf-footer-stamp { page-break-before: avoid; }
+}

@@ -25,6 +25,9 @@ export default function Home() {
     { to: STAFF.decanting, icon: decantingIcon, title: "Decanting" },
     { to: STAFF.dispatch, icon: dispatchIcon, title: "Dispatch" },
     { to: STAFF.donation, icon: donationIcon, title: "Donation" },
+    // Receipts is manager-only and deliberately absent here. The tile and the
+    // route guard in App.jsx have to agree — a hidden tile on an open route is
+    // not access control, it is just a tidier way to lose track of one.
 
   ];
 
