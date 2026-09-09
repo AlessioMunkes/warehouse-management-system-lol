@@ -431,11 +431,11 @@ const createDelivery = async ({
       }
     }
 
-    // 'received', not 'completed'. Both are legal in the database, but
-    // 'completed' is legacy: supplier.repository.js counts open orders as
-    // `status NOT IN ('received','returned')`, so a completed PO kept being
-    // counted as open, and PO_STATUSES has no 'completed' so the manager's
-    // status filter could never surface one.
+    // 'completed' — the only closed-off value purchase_orders_status_check
+    // permits. This used to write 'received', which is not in the
+    // constraint, so every fully-received delivery raised 23514 and rolled
+    // back the entire receipt: the delivery note, its line items and its
+    // stock movements all disappeared along with the status update.
     //
     // OPEN QUESTION FOR HUSSAIN (BR-07B): should a delivery that does NOT
     // close the order set 'partially_received' automatically? Right now the
@@ -488,9 +488,11 @@ const getSuppliers = async () => {
 
 // ── Get suppliers with at least one order still open ──────────
 // For the Form view's supplier picker: no point offering a supplier
-// there is nothing to receive from. Same 'approved' rule as
-// getPurchaseOrdersBySupplier below — kept in step deliberately, so
-// this list and that one never disagree about what counts as open.
+// there is nothing to receive from. Reads OPEN_PO_STATUSES, the same
+// list getPurchaseOrdersBySupplier below uses, so the two can never
+// disagree about what counts as open. It used to hard-code
+// status = 'approved', which stopped matching anything the moment
+// 'approved' became legacy — the picker silently went near-empty.
 // DISTINCT because a supplier can have more than one open order and
 // should still only appear once.
 const getSuppliersWithOpenOrders = async () => {
@@ -498,8 +500,9 @@ const getSuppliersWithOpenOrders = async () => {
     `SELECT DISTINCT s.id, s.name, s.contact_email
      FROM suppliers s
      JOIN purchase_orders po ON po.supplier_id = s.id
-     WHERE po.status = 'approved'
+     WHERE po.status = ANY($1)
      ORDER BY s.name ASC`,
+    [OPEN_PO_STATUSES],
   );
   return result.rows;
 };
@@ -516,13 +519,10 @@ const getProducts = async () => {
 };
 
 // ── Get purchase orders for a supplier ───────────────────────
-// Only returns approved (or further along) POs — can't receive
-// against one still pending a manager's sign-off. This used to
-// disagree with getSuppliersWithOpenOrders above about what "open"
-// meant, because 'approved' had been dropped from PO_STATUSES
-// (server/src/services/purchaseOrder.service.js) without anywhere
-// left that could actually reach it. PO_STATUSES now has 'approved'
-// back — see that file's own comment — so both queries agree again.
+// Only returns orders still expecting goods — can't receive against
+// one already closed off. Reads the same OPEN_PO_STATUSES as
+// getSuppliersWithOpenOrders above, so the two agree by construction
+// rather than by two people remembering to edit both.
 const getPurchaseOrdersBySupplier = async (supplierId) => {
   const result = await pool.query(
     `SELECT

@@ -60,7 +60,7 @@ const cookieFor = (role) => {
 // and refused by the ROUTE — a test that only checks the tile is missing from
 // a dashboard proves nothing about who can call the endpoint.
 const ALLOWED_ROLES = [ROLES.MANAGER, ROLES.ADMIN];
-const BLOCKED_ROLES = [ROLES.WORKER, ROLES.FINANCE];
+const BLOCKED_ROLES = [ROLES.WORKER, 'finance'];
 const PAGE = { rows: [], total: 0, limit: 25, offset: 0 };
 
 beforeEach(() => { vi.clearAllMocks(); });

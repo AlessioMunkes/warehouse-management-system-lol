@@ -19,11 +19,11 @@ import StaffDispatchHistoryPage                    from './pages/StaffDispatchHi
 import ReceiptsPage                                from './pages/ReceiptsPage';
 import InventoryManagementPage                     from './pages/InventoryManagementPage';
 import ManagerDashboardPage                         from './pages/ManagerDashboardPage';
+import AdminActivityScreen                         from './pages/AdminActivityScreen';
 import TaskDashboard from './pages/TaskDashboardPage';
 import SupplierDirectoryPage                       from './pages/SupplierDirectoryPage';
 import PurchaseOrdersPage                          from './pages/PurchaseOrdersPage';
 import ReportingPage                               from './pages/ReportingPage';
-import AdminActivityScreen                         from './pages/AdminActivityScreen';
 import CategoryRoutingRulesPage                    from './pages/CategoryRoutingRulesPage';
 import DonationClassificationPage                 from './pages/DonationClassificationPage';
 import EvaluateRoutingPage                         from './pages/EvaluateRoutingPage';
@@ -58,26 +58,30 @@ const App = () => (
             reachable by managers, per explicit product decision this
             session (Products moved out of this block below; Users
             and Suppliers stay here). */}
-        <Route element={<ProtectedRoute roles={['admin']} />}>
-          {/* Same dashboard a manager lands on — it already shows the
-              admin-only sidebar sections (Suppliers, Users) when
-              user.role is 'admin'. AdminActivityScreen.jsx (a
-              separate task-grid) is removed as superseded; nothing
-              else routed to it. */}
-          <Route path={ADMIN.dashboard} element={<ManagerDashboardPage />} />
+        <Route element={<ProtectedRoute roles={['admin']} shell />}>
+          {/* The admin landing screen. LoginPage.jsx redirects every
+              admin here, and this grid is the only navigation to
+              Category Routing, Donation Classification, Explain Routing
+              and Donation Management. PR #52 repointed this path at
+              ManagerDashboardPage and called the grid superseded — but
+              that dashboard's sidebar listed none of those four, so the
+              screens became URL-only. Its own Dashboard tile leads to
+              ManagerDashboardPage, which is still at /manager. */}
+          <Route path={ADMIN.dashboard} element={<AdminActivityScreen />} />
           <Route path={ADMIN.suppliers} element={<SupplierDirectoryPage />} />
           <Route path={ADMIN.donationManagement} element={<DonationManagementPage />} />
-        </Route>
-
-        {/* Temporary test access: make the admin pages reachable directly in local development without login. */}
-        <Route path={ADMIN.categoryRouting} element={<CategoryRoutingRulesPage />} />
-        <Route path={ADMIN.donationClassification} element={<DonationClassificationPage />} />
-        <Route path={ADMIN.evaluateRouting} element={<EvaluateRoutingPage />} />
-
-        {/* Protected — manager only */}
-        <Route element={<ProtectedRoute roles={['manager']} />}>
-          <Route path="/manager"       element={<ManagerActivityScreen />} />
-          <Route path={ADMIN.users}     element={<UserDirectoryPage />} />
+          {/* Account provisioning. Every route in user.routes.js is
+              requireRole(ADMIN), so this was unreachable while it sat in
+              a manager-only block — the client gate now matches the
+              server instead of contradicting it. */}
+          <Route path={ADMIN.users} element={<UserDirectoryPage />} />
+          {/* These three sat outside every guard, labelled "temporary
+              test access ... without login". That reached staging, where
+              anyone who knew the URL could open them. The server routes
+              behind them were always gated; the screens now are too. */}
+          <Route path={ADMIN.categoryRouting} element={<CategoryRoutingRulesPage />} />
+          <Route path={ADMIN.donationClassification} element={<DonationClassificationPage />} />
+          <Route path={ADMIN.evaluateRouting} element={<EvaluateRoutingPage />} />
         </Route>
 
         {/* Protected — manager and admin.
@@ -90,7 +94,7 @@ const App = () => (
             roles={['manager']} was locking admins out of the manager screen,
             inventory, reporting and purchase orders — while the server has
             always treated MANAGERS_UP as [MANAGER, ADMIN]. The two now agree. */}
-        <Route element={<ProtectedRoute roles={['manager', 'admin', 'admin']} />}>
+        <Route element={<ProtectedRoute roles={['manager', 'admin']} shell />}>
           <Route path="/manager"       element={<ManagerDashboardPage />} />
         <Route path="/noc/inventory" element={<InventoryManagementPage />} />
           <Route path={STAFF.reporting} element={<ReportingPage />} />
@@ -109,11 +113,15 @@ const App = () => (
           <Route path={ADMIN.products}  element={<ProductManagementPage />} />
         </Route>
 
+        {/* The warehouse worker's dashboard. Split out of the block
+            below so it can take the shell: the four flows underneath it
+            are StaffShell screens and must not. */}
+        <Route element={<ProtectedRoute shell />}>
+          <Route path="/noc" element={<TaskDashboard />} />
+        </Route>
+
         {/* Protected — any logged-in user */}
         <Route element={<ProtectedRoute />}>
-          {/* NOC task select — the placeholder dashboard until the
-              real one lands. */}
-          <Route path="/noc"           element={<TaskDashboard />} />
           <Route path="/noc/decanting" element={<DecantingPage />} />
           <Route path={STAFF.decantingRecords} element={<StaffDecantingRecordsPage />} />
 
@@ -141,7 +149,7 @@ const App = () => (
             The draft context is mounted per-route rather than around the
             block so the sessionStorage draft is scoped to the two intake
             pages and cleared by navigating away from them. */}
-        <Route element={<ProtectedRoute roles={DONATION_INTAKE_ROLES} />}>
+        <Route element={<ProtectedRoute roles={DONATION_INTAKE_ROLES} shell />}>
           <Route
             path={STAFF.donation}
             element={
@@ -162,7 +170,7 @@ const App = () => (
 
         {/* Volunteer Management — current coordinator workflow is available
             to the two live management roles only. */}
-        <Route element={<ProtectedRoute roles={VOLUNTEER_MANAGEMENT_ROLES} />}>
+        <Route element={<ProtectedRoute roles={VOLUNTEER_MANAGEMENT_ROLES} shell />}>
           <Route path={VOLUNTEERS.events} element={<VolunteerEventsPage />} />
           <Route path={VOLUNTEERS.eventPattern} element={<VolunteerEventWorkspacePage />} />
         </Route>

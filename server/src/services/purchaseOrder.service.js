@@ -224,6 +224,10 @@ const getPurchaseOrder = async (rawId) => {
 const setPurchaseOrderStatus = async (rawId, body = {}) => {
   if (!isPositiveInt(rawId)) throw fail(400, 'A valid purchase order ID is required.');
 
+  // PO_STATUSES is the CHECK constraint verbatim, so anything this
+  // accepts is a value the database will store and anything it rejects
+  // would have raised 23514. 'approved' is in the list — the manager's
+  // Approve button depends on it — and 'received' is not.
   const status = clean(body.status);
   if (!status || !PO_STATUSES.includes(status)) {
     throw fail(400, `Unknown status "${status}". Must be one of: ${PO_STATUSES.join(', ')}.`);

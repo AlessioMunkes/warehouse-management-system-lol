@@ -44,121 +44,38 @@ import {
 } from '../../staff/components/StepPrimitives';
 import useCoachmark from '../../staff/hooks/useCoachmark';
 import { useAuth } from '../../../context/AuthContext';
-import { Actions, Button, Notice, TextField } from '../../staff/components/StepPrimitives';
+import dispatchAPI, { newIdempotencyKey } from '../../../services/dispatchAPI';
+import SignaturePad from '../../procurement/components/SignaturePad';
+import DispatchNotePDF from './DispatchNotePDF';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../components/ui/dialog';
 
-// ── Signature pad ─────────────────────────────────────────────
-// Unchanged in shape. The one fix: whether anything was drawn is now
-// tracked on a ref as well as in state. `stop` used to read the state
-// value captured in its own render, which is a race that only shows
-// up as an occasional signature silently not registering — the worst
-// possible bug on the one field that is legally load-bearing.
-function SignaturePad({ onChange }) {
-  const canvasRef = useRef(null);
-  const drawing   = useRef(false);
-  const inked     = useRef(false);
-  const [signed, setSigned] = useState(false);
+const isManager = (user) => user?.role === 'manager' || user?.role === 'admin';
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+const SignatureField = ({ value, onChange }) => (
+  <div className="stf-signature-field">
+    <span className="stf-field-label">Driver&rsquo;s signature</span>
+    <SignaturePad
+      onChange={onChange}
+      canvasClassName="stf-sign-canvas"
+      clearButtonClassName="stf-signature-clear"
+    />
+    {!value ? (
+      <p className="stf-field-hint">Ask the driver to sign above before you finish.</p>
+    ) : null}
+  </div>
+);
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.strokeStyle = '#2b3336';
-    ctx.lineWidth   = 2.5;
-    ctx.lineCap     = 'round';
-  }, []);
-
-  const posOf = (e) => {
-    const rect  = canvasRef.current.getBoundingClientRect();
-    const point = e.touches ? e.touches[0] : e;
-    // The canvas is 600x170 internally but CSS-scaled to the phone's
-    // width. Without this ratio the ink lands away from the fingertip.
-    const scaleX = canvasRef.current.width / rect.width;
-    const scaleY = canvasRef.current.height / rect.height;
-    return {
-      x: (point.clientX - rect.left) * scaleX,
-      y: (point.clientY - rect.top) * scaleY,
-    };
-  };
-
-  const start = (e) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    e.preventDefault();
-    const { x, y } = posOf(e);
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    drawing.current = true;
-  };
-
-  const move = (e) => {
-    if (!drawing.current) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    e.preventDefault();
-    const { x, y } = posOf(e);
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    inked.current = true;
-    if (!signed) setSigned(true);
-  };
-
-  const stop = () => {
-    if (!drawing.current) return;
-    drawing.current = false;
-    if (inked.current) onChange(canvasRef.current.toDataURL('image/png'));
-  };
-
-  const clear = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    inked.current = false;
-    setSigned(false);
-    onChange(null);
-  };
-
-  return (
-    <div className="stf-field">
-      <label className="stf-field-label" htmlFor="stf-signature">Driver signature</label>
-      <canvas
-        id="stf-signature"
-        ref={canvasRef}
-        className="stf-sign-canvas"
-        width={600}
-        height={170}
-        onMouseDown={start}
-        onMouseMove={move}
-        onMouseUp={stop}
-        onMouseLeave={stop}
-        onTouchStart={start}
-        onTouchMove={move}
-        onTouchEnd={stop}
-      />
-      <Button variant="secondary" onClick={clear} disabled={!signed}>Clear</Button>
-    </div>
-  );
-}
-
-// ── Helpers ───────────────────────────────────────────────────
-
-// A South African keyboard produces both "12,5" and "12.5"; only one
-// of them is a number. Same normalisation NumberField applies.
-const toNumber = (value) => {
-  const n = Number(String(value ?? '').replace(',', '.').trim());
-  return Number.isFinite(n) ? n : NaN;
+const MODE_KEY = 'stf_dispatch_view_mode';
+const MODES = [
+  { value: 'guided', label: 'Guided', hint: 'Step by step' },
+  { value: 'full',   label: 'Form',   hint: 'Everything at once' },
+];
+const readStoredMode = () => {
+  try {
+    return localStorage.getItem(MODE_KEY) === 'full' ? 'full' : 'guided';
+  } catch {
+    return 'guided';
+  }
 };
 
 const TOTAL_STEPS = 3;

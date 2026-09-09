@@ -9,8 +9,8 @@
 // Writes are manager and admin only — creating or editing a product
 // touches a row every operational table in the system references.
 //
-// ROLES.FINANCE is deliberately absent, same reasoning as
-// supplier.routes.js: users.role's CHECK constraint doesn't allow it.
+// The role constants match users.role's CHECK exactly — see
+// supplier.routes.js.
 // ─────────────────────────────────────────────────────────────
 import express                      from 'express';
 import auth, { requireRole, ROLES } from '../middleware/auth.middleware.js';

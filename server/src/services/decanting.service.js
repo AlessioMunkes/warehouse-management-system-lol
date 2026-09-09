@@ -476,11 +476,6 @@ const getWeeklyProcurementReport = async (weekOf) => {
   return await decantingModel.getWeeklyProcurementReport(weekOf);
 };
 
-// ── Get products that are decanted (dry goods) ────────────────
-// const getDecantableProducts = async () => {
-//   return await decantingModel.getDecantableProducts();
-// };
-
 // ── Turn a bag label back into kg, for ordering CSV columns ───
 // "2kg" -> 2, "500g" -> 0.5.
 const labelToKg = (label) =>
@@ -585,7 +580,6 @@ export default {
   getDecantingRecords,
   getDecantingById,
   getWeeklyProcurementReport,
-  //getDecantableProducts,
   exportDecantingSheet,
 
   // constants (handy for tests / the frontend)

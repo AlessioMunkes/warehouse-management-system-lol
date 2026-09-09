@@ -29,7 +29,6 @@ const ROLE_LABELS = {
   warehouse_worker: "Warehouse staff",
   manager: "Manager",
   admin: "Admin",
-  finance: "Finance",
   guest: "Guest",
 };
 

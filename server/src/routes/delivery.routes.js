@@ -11,7 +11,7 @@ import deliveryController           from '../controllers/delivery.controller.js'
 
 const router = express.Router();
 
-const ALL_ROLES    = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN, ROLES.FINANCE];
+const ALL_ROLES    = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 // The receipts archive. Recording a delivery stays open to workers — that is
 // the job. Browsing every delivery ever recorded is a manager's view.
 const MANAGERS_UP  = [ROLES.MANAGER, ROLES.ADMIN];

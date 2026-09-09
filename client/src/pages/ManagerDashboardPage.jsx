@@ -16,12 +16,12 @@
 // would run them by hand.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { STAFF, ADMIN } from '../routes/paths';
 import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
 import DashboardGreeting from '../features/taskdashboard/components/DashboardGreeting';
 import DonutStat from '../features/taskdashboard/components/DonutStat';
+import StatTile from '../features/taskdashboard/components/StatTile';
 import dashboardAPI from '../services/dashboardAPI';
 import { runReport } from '../services/reportingAPI';
 import { resolvePreset } from '../features/reporting/dateRanges';
@@ -49,23 +49,6 @@ const ErrorBanner = ({ message }) => (
     {message}
   </div>
 );
-
-const StatTile = ({ icon: Icon, label, value, to, warn }) => {
-  const content = (
-    <Card className={warn && value > 0 ? 'border-[#ef3a40]' : undefined}>
-      <CardContent className="flex items-center gap-3 p-4">
-        <div className={`rounded-full p-2 ${warn && value > 0 ? 'bg-[#fff4f2] text-[#ef3a40]' : 'bg-muted text-muted-foreground'}`}>
-          <Icon className="size-5" />
-        </div>
-        <div>
-          <p className="text-2xl font-semibold leading-none">{value}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{label}</p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-  return to ? <Link to={to}>{content}</Link> : content;
-};
 
 // A small ranked bar list — reused for both "most dispatched
 // products" and "dispatched by beneficiary type," which are the same

@@ -6,12 +6,15 @@
 // ─────────────────────────────────────────────────────────────
 
 import { useMemo } from "react";
+import { useReducedMotion } from '../../taskdashboard/components/shellContext';
 import { Boxes, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
 
 // Custom stylesheet
 import "../../../styles/index.css";
 
-export default function StockHealthBar({ products = [], reducedMovement = false }) {
+export default function StockHealthBar({ products = [], reducedMovement: reducedMovementProp }) {
+  const { reducedMotion } = useReducedMotion();
+  const reducedMovement = reducedMovementProp ?? reducedMotion;
   // Compute inventory category counts and percentages
   const metrics = useMemo(() => {
     const total = products.length;

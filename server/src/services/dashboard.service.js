@@ -9,5 +9,6 @@
 import repo from '../repositories/dashboard.repository.js';
 
 const getSummary = async () => repo.getSummary();
+const getMyWork  = async () => repo.getMyWork();
 
-export default { getSummary };
+export default { getSummary, getMyWork };

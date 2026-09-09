@@ -37,7 +37,12 @@
 import { useRef, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+// html2canvas-pro, matching usePdfDocument.js — see the long note at the
+// top of that file. Plain html2canvas is not a declared dependency any
+// more (PR #51 replaced it in package.json) and it throws on the oklch()
+// colours receipts.css and Tailwind v4 both emit, which this shell walks
+// on every generation.
+import html2canvas from 'html2canvas-pro';
 
 // Colour functions html2canvas 1.4.1 cannot parse.
 const UNSUPPORTED = /(oklch|oklab|color-mix|\blab\(|\blch\()/i;

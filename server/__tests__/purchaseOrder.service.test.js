@@ -42,9 +42,19 @@ describe('setPurchaseOrderStatus', () => {
       .rejects.toMatchObject({ status: 400 });
   });
 
-  it('rejects the old "received" value now that it has been renamed', async () => {
+  it('accepts "approved" — the manager Approve button depends on it', async () => {
+    await expect(purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status: 'approved' }))
+      .resolves.toBeTruthy();
+  });
+
+  it('rejects "received", which the CHECK constraint does not permit', async () => {
     await expect(purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status: 'received' }))
       .rejects.toMatchObject({ status: 400 });
+  });
+
+  it('accepts "completed", the fully-received state', async () => {
+    await expect(purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status: 'completed' }))
+      .resolves.toBeTruthy();
   });
 
   it('accepts every current PO_STATUSES value', async () => {

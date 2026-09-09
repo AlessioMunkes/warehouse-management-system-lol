@@ -11,8 +11,6 @@
 // ─────────────────────────────────────────────────────────────
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-
-import { TopNavbar } from "../features/taskdashboard/components/TopNavBar";
 //import { MobileBottomNav } from "@/components/layout/MoileBottomNav"; // pending teammate
 
 import { useDonationDraft } from "../features/donation/context/DonationDraftContext";
@@ -83,7 +81,6 @@ export function ReviewPage() {
 
   return (
     <div className="stf-shell">
-      <TopNavbar />
 
       <div className="stf-crumb">
         <span>Donations / Review Donation</span>

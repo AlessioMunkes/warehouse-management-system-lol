@@ -1,6 +1,3 @@
-import usePdfDocument from '../../staff/hooks/usePdfDocument';
-import '../../../styles/deliveryNotePDF.css';
-
 // ─────────────────────────────────────────────────────────────
 // src/features/procurement/components/DeliveryNotePDF.jsx
 //
@@ -29,63 +26,10 @@ import {
   formatDate, formatDateTime, fmtQty, variance, qty,
 } from '../../receipts/components/noteFormat';
 
-// A public asset, not an import — same convention StaffShell.jsx uses
-// for /images/BatchesLogo.png. Lives in client/public/images/.
-const PDF_LOGO_URL = '/images/pdf_logo.png';
-
-// Hardcoded to the one warehouse this app currently operates against.
-// A real multi-warehouse setup (a warehouses table, tracking which
-// location the signed-in session belongs to) would replace this with
-// a lookup — worth doing once there's more than one warehouse to pick
-// between, not before.
-const WAREHOUSE = {
-  name: 'Ladles of Love — Cape Town Warehouse',
-  addressLines: ['Unit 4, Hewett Park', '17 Hewett Ave, Epping', 'Cape Town, 7460'],
-  phone: '',
-};
-
-// Suppliers don't reliably have a real address/phone on file yet — the
-// columns exist (server/src/repositories/delivery.repository.js joins
-// them in) but most rows are still unpopulated. Rather than leave the
-// From block half-empty, this fills the gap with a clearly-generic
-// placeholder until real data exists; once a supplier's own address/
-// phone is saved, delivery.supplier_address/_phone come through from
-// the query above and this fallback is never reached for that row.
-const DUMMY_SUPPLIER_ADDRESS = 'Cape Town, South Africa';
-const DUMMY_SUPPLIER_PHONE = '021 000 0000';
-
-const formatDate = (d) => {
-  if (!d) return '—';
-  return new Date(d).toLocaleDateString('en-ZA', {
-    year: 'numeric', month: 'long', day: 'numeric',
-  });
-};
-
-const DeliveryNotePDF = ({ delivery, onClose }) => {
-  const { documentRef, isGenerating, error: genError, openPdf: handleViewPdf } = usePdfDocument();
-
-  if (!delivery) return null;
-
-  // Treats either terminal spelling as "done": the codebase currently
-  // has two purchase_orders lifecycles that disagree with each other
-  // (one write path uses 'completed', BR-07B's own PO_STATUSES list
-  // calls the same state 'received') — this stays defensive until
-  // that's resolved with the team, rather than betting on one.
-  const isCompleted = delivery.po_status === 'completed' || delivery.po_status === 'received';
-
-  const additionalInfo = delivery.has_discrepancies
-    ? `This delivery did not fully match the purchase order${
-        delivery.discrepancy_count
-          ? ` — ${delivery.discrepancy_count} line${delivery.discrepancy_count === 1 ? '' : 's'} varied from what was expected, detailed below`
-          : ''
-      }. A manager has been notified to follow up.`
-    : isCompleted
-      ? 'All items on this purchase order have been delivered in full and the order is now closed.'
-      : 'This is one delivery recorded against the purchase order above. The order is not yet fully delivered and may have further deliveries recorded against it.';
-// The PO states that mean nothing further is expected. 'completed' is legacy
-// — still legal in the database, no longer written. See
+// The PO states that mean nothing further is expected. 'received' is not
+// one of them — it is not in purchase_orders_status_check at all. See
 // server/src/constants/purchaseOrderStatus.js.
-const CLOSED_PO_STATUSES = ['received', 'completed'];
+const CLOSED_PO_STATUSES = ['completed', 'returned'];
 
 const DeliveryNotePDF = ({ delivery, onClose }) => {
   if (!delivery) return null;

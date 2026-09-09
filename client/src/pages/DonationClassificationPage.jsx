@@ -2,8 +2,6 @@
 // It loads the products, lets the admin search, filters only unclassified items, and updates
 // the default category in place. The page uses a single hook so the fetch/filter/pagination logic
 // is isolated and easy to replace later if the backend starts paginating on the server.
-
-import { TopNavbar } from '../features/taskdashboard/components/TopNavBar';
 import DonationClassificationTable from '../features/donationAdmin/components/DonationClassificationTable';
 import useDonationClassification from '../features/donationAdmin/hooks/useDonationClassification';
 
@@ -26,7 +24,6 @@ export default function DonationClassificationPage() {
 
   return (
     <div className="min-h-screen bg-[#f8f5f2] text-[#2b3336]">
-      <TopNavbar reducedMovement={false} onToggleMovement={() => {}} />
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">

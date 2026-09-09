@@ -42,7 +42,7 @@ const cookieFor = (role, overrides = {}) => {
   return [`wms_token=${token}`];
 };
 
-const ALL_ROLES   = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN, ROLES.FINANCE];
+const ALL_ROLES   = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 const PACKERS_UP  = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 const MANAGERS_UP = [ROLES.MANAGER, ROLES.ADMIN];
 
@@ -129,14 +129,14 @@ describe('picking routes — role enforcement', () => {
     expect(res.status).toBe(201);
   });
 
-  it.each([ROLES.WORKER, ROLES.FINANCE])('%s cannot generate slips', async (role) => {
+  it.each([ROLES.WORKER, 'finance'])('%s cannot generate slips', async (role) => {
     const res = await request(app).post(`${BASE}/generate`)
       .set('Cookie', cookieFor(role)).send({});
     expect(res.status).toBe(403);
     expect(serviceMock.generateSlips).not.toHaveBeenCalled();
   });
 
-  it.each([ROLES.WORKER, ROLES.FINANCE])('%s cannot create an ad-hoc slip', async (role) => {
+  it.each([ROLES.WORKER, 'finance'])('%s cannot create an ad-hoc slip', async (role) => {
     const res = await request(app).post(BASE).set('Cookie', cookieFor(role)).send({});
     expect(res.status).toBe(403);
     expect(serviceMock.createSlip).not.toHaveBeenCalled();
@@ -150,13 +150,13 @@ describe('picking routes — role enforcement', () => {
 
   it.each(['assign', 'complete'])('finance cannot %s a slip', async (action) => {
     const res = await request(app).post(`${BASE}/1/${action}`)
-      .set('Cookie', cookieFor(ROLES.FINANCE)).send({});
+      .set('Cookie', cookieFor('finance')).send({});
     expect(res.status).toBe(403);
   });
 
   it.each(['confirm', 'flag'])('finance cannot %s a line', async (action) => {
     const res = await request(app).post(`${BASE}/1/items/5/${action}`)
-      .set('Cookie', cookieFor(ROLES.FINANCE)).send({});
+      .set('Cookie', cookieFor('finance')).send({});
     expect(res.status).toBe(403);
   });
 
@@ -410,7 +410,7 @@ describe('picking routes — GET /workers', () => {
     expect(res.body).toEqual({ success: true, data: [{ id: 2, first_name: 'A', last_name: 'B' }] });
   });
 
-  it.each([ROLES.WORKER, ROLES.FINANCE])('%s cannot list assignable workers', async (role) => {
+  it.each([ROLES.WORKER, 'finance'])('%s cannot list assignable workers', async (role) => {
     const res = await request(app).get(`${BASE}/workers`).set('Cookie', cookieFor(role));
     expect(res.status).toBe(403);
     expect(serviceMock.getAssignableWorkers).not.toHaveBeenCalled();

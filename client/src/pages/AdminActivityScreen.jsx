@@ -1,230 +1,170 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/pages/AdminActivityScreen.jsx
-// ─────────────────────────────────────────────────────────────
-// client/src/pages/AdminActivityScreen.jsx
 //
-// The admin landing screen. Structurally a copy of
-// ManagerActivityScreen — same TopNavbar, same Greeting, same
-// task-grid / task-card classes, same "coming soon" Dialog — because
-// an admin should not have to learn a second layout, and because the
-// grid CSS already exists and did not need rewriting.
+// The admin landing screen. LoginPage sends every admin here.
 //
-// It holds one live tile today. That is honest: supplier management
-// is the only admin-side feature that exists. Add entries to `tasks`
-// below as more arrive; a tile with `to: null` renders as a button
-// that opens the notice modal instead of navigating, which is how the
-// manager grid handles features that are not ready.
+// Grouped by what an admin is answerable for rather than listed flat:
+// accounts and volunteers, the master data every other module reads,
+// and where donations end up. It is deliberately NOT the manager
+// dashboard — beneficiaries, picking slips and purchase orders are the
+// manager's day, and burying the four donation screens among them was
+// how they went unnoticed in the first place.
+//
+// D6/Q2: the Donation Management badge is a single DEDUPLICATED count —
+// unlinked flags plus pending donations needing attention, with
+// intake-linked flags NOT counted twice, so one donation blocked by
+// three flagged items counts once. See
+// donationManagementAPI.getAttentionCounts().
 // ─────────────────────────────────────────────────────────────
-import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { TopNavbar } from "../features/taskdashboard/components/TopNavBar";
-import { Greeting } from "../features/taskdashboard/components/Greeting";
-import { useAuth } from "@/context/AuthContext";
+import { useEffect, useState } from 'react';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import donationManagementAPI from "../services/donationManagementAPI";
-import { ADMIN } from "../routes/paths";
+  Users2, HandHeart, Package, Truck, Gift, Tags, Route, AlertTriangle,
+} from 'lucide-react';
+import DashboardGreeting from '../features/taskdashboard/components/DashboardGreeting';
+import StatTile from '../features/taskdashboard/components/StatTile';
+import ActionCard from '../features/taskdashboard/components/ActionCard';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useAuth } from '@/context/AuthContext';
+import donationManagementAPI from '../services/donationManagementAPI';
+import dashboardAPI from '../services/dashboardAPI';
+import { getUsers } from '../services/userAPI';
+import { ADMIN, VOLUNTEERS } from '../routes/paths';
 
-// No supplier-specific icon exists in client/public/icons. Goods
-// arriving from suppliers is the nearest existing meaning, so the
-// receiving icon is reused rather than a new asset invented.
-import receivingIcon from "./../../public/icons/receiving-icon.svg";
-// Reuse the same volunteer asset as the manager dashboard tile.
-import volunteerIcon from "./../../public/icons/volunteer-icon.svg";
+const API_BASE = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:5000' : '');
 
 export default function AdminActivityScreen() {
   const { user } = useAuth();
-  const firstName = user?.firstName ?? "";
 
-  const [reducedMovement, setReducedMovement] = useState(false);
-  const [activeModalTask, setActiveModalTask] = useState(null);
   const [pendingReviewCount, setPendingReviewCount] = useState(0);
   const [donationMgmtCount, setDonationMgmtCount] = useState(null);
+  const [summary, setSummary] = useState(null);
+  const [userCount, setUserCount] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let isActive = true;
 
     const loadPendingReviewCount = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:5000' : '')}/api/donations/admin/pending-classifications?countOnly=true`, {
+        const response = await fetch(`${API_BASE}/api/donations/admin/pending-classifications?countOnly=true`, {
           method: 'GET',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
         });
-
         if (!response.ok) return;
         const payload = await response.json();
-        if (isActive) {
-          setPendingReviewCount(Number(payload.count || 0));
-        }
+        if (isActive) setPendingReviewCount(Number(payload.count || 0));
       } catch {
         if (isActive) setPendingReviewCount(0);
       }
     };
-    void loadPendingReviewCount();
 
-    // D6/Q2 — the badge on the Donation Management tile is a single
-    // DEDUPLICATED attention count, not a raw sum: legacy/unlinked flags
-    // plus pending donations in an attention status. Intake-linked flags
-    // are intentionally NOT counted separately — they already belong to a
-    // pending donation counted by the second term (one donation blocked by
-    // 3 flagged items counts as 1, not 4). The computation itself lives in
-    // donationManagementAPI.getAttentionCounts().
     const loadDonationMgmtCount = async () => {
       try {
         const { total } = await donationManagementAPI.getAttentionCounts();
         if (isActive) setDonationMgmtCount(total);
       } catch {
-        // Badge is advisory — a failed load leaves the tile badge-less
-        // rather than blocking the dashboard.
+        // Advisory — a failed load leaves the card without a badge
+        // rather than blocking the screen.
         if (isActive) setDonationMgmtCount(null);
       }
     };
 
+    void loadPendingReviewCount();
     void loadDonationMgmtCount();
+
+    // Catalog health, which is master data an admin owns.
+    dashboardAPI.getDashboardSummary()
+      .then((data) => { if (isActive) setSummary(data); })
+      .catch(() => { if (isActive) setSummary(null); })
+      .finally(() => { if (isActive) setLoading(false); });
+
+    // No count endpoint for users, and one route is not worth adding for
+    // a number this small — the directory the admin is about to open
+    // returns the rows anyway.
+    getUsers()
+      .then((rows) => { if (isActive) setUserCount(Array.isArray(rows) ? rows.length : null); })
+      .catch(() => { if (isActive) setUserCount(null); });
+
     return () => { isActive = false; };
   }, []);
 
-  const tasks = [
-    {
-      to: VOLUNTEERS.events,
-      icon: volunteerIcon,
-      title: "Volunteer Management",
-      disabled: false,
-    },
-    {
-      to: ADMIN.suppliers,
-      icon: receivingIcon,
-      title: "Manage Suppliers",
-      disabled: false,
-    },
-    {
-      to: ADMIN.categoryRouting,
-      icon: receivingIcon,
-      title: "Category Routing Rules",
-      disabled: false,
-    },
-    {
-      to: ADMIN.donationClassification,
-      icon: receivingIcon,
-      title: "Donation Classification",
-      badgeText: pendingReviewCount > 0 ? `Needs Review (${pendingReviewCount})` : null,
-      disabled: false,
-    },
-    {
-      to: ADMIN.evaluateRouting,
-      icon: receivingIcon,
-      title: "Explain Donation Routing",
-      disabled: false,
-    },
-    {
-      to: ADMIN.donationManagement,
-      icon: receivingIcon,
-      title: "Donation Management",
-      badgeText: donationMgmtCount > 0 ? `Needs attention (${donationMgmtCount})` : null,
-      disabled: false,
-    },
-  ];
-
-  const handleTaskClick = (task) => {
-    if (task.disabled || !task.to) {
-      setActiveModalTask(task);
-    }
-  };
+  const summaryLine = summary
+    ? [
+        summary.lowStockCount > 0 ? `${summary.lowStockCount} low on stock` : null,
+        donationMgmtCount > 0 ? `${donationMgmtCount} in the donation queue` : null,
+        pendingReviewCount > 0 ? `${pendingReviewCount} awaiting classification` : null,
+      ].filter(Boolean).join(' · ') || 'nothing needs your attention'
+    : null;
 
   return (
-    <div className="min-h-screen bg-white text-[#2b3336] font-['Montserrat',sans-serif]">
-      <TopNavbar
-        reducedMovement={reducedMovement}
-        onToggleMovement={setReducedMovement}
-      />
+    <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6">
+      <DashboardGreeting name={user?.firstName} summaryLine={summaryLine} />
 
-      <main className="px-4 sm:px-6 py-6 max-w-3xl mx-auto">
-        <Greeting name={firstName} />
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {loading ? (
+          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)
+        ) : (
+          <>
+            <StatTile icon={Users2} label="User accounts" value={userCount ?? '—'} to={ADMIN.users} />
+            <StatTile icon={Package} label="Active products" value={summary?.activeProductCount ?? '—'} to={ADMIN.products} />
+            <StatTile icon={AlertTriangle} label="Low stock items" value={summary?.lowStockCount ?? 0} to="/noc/inventory" warn />
+            <StatTile icon={Gift} label="Donation queue" value={donationMgmtCount ?? 0} to={ADMIN.donationManagement} warn />
+          </>
+        )}
+      </div>
 
-        <TooltipProvider>
-          <div className="task-grid">
-            {tasks.map((task) => {
-              const isBlocked = task.disabled || !task.to;
+      <h2 className="mt-8 mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        People
+      </h2>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <ActionCard
+          to={ADMIN.users} icon={Users2} title="Users"
+          description="Create accounts, set roles, deactivate someone who has left."
+        />
+        <ActionCard
+          to={VOLUNTEERS.events} icon={HandHeart} title="Volunteer Management"
+          description="Love Activism events, the spaces they run in, and who checked in."
+        />
+      </div>
 
-              const cardContent = (
-                <>
-                  {!reducedMovement && task.icon && (
-                    <img src={task.icon} alt="" className="task-card__icon" />
-                  )}
-                  <span className="task-card__title">{task.title}</span>
-                  {task.badgeText && (
-                    <span className="task-card__badge">{task.badgeText}</span>
-                  )}
-                </>
-              );
+      <h2 className="mt-8 mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        Master data
+      </h2>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <ActionCard
+          to={ADMIN.products} icon={Package} title="Products"
+          description="The item catalog every delivery, slip and donation references."
+        />
+        <ActionCard
+          to={ADMIN.suppliers} icon={Truck} title="Manage Suppliers"
+          description="Who the warehouse buys from, and the terms on each agreement."
+        />
+      </div>
 
-              return (
-                <Tooltip key={task.title}>
-                  <TooltipTrigger asChild>
-                    {isBlocked ? (
-                      <button
-                        type="button"
-                        onClick={() => handleTaskClick(task)}
-                        className="task-card"
-                      >
-                        {cardContent}
-                      </button>
-                    ) : (
-                      <Link to={task.to} className="task-card">
-                        {cardContent}
-                      </Link>
-                    )}
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{task.noticeMessage ?? `Navigate to ${task.title}`}</p>
-                  </TooltipContent>
-                </Tooltip>
-              );
-            })}
-          </div>
-        </TooltipProvider>
-      </main>
-
-      <Dialog
-        open={Boolean(activeModalTask)}
-        onOpenChange={(open) => !open && setActiveModalTask(null)}
-      >
-        <DialogContent className="rounded-[4px] border-2 border-[#e9e3dd] bg-white max-w-md">
-          <DialogHeader className="space-y-2">
-            <div className="flex items-center gap-2 border-b border-[#e9e3dd] pb-3">
-              <span className="text-[#ef3a40] text-xl">ℹ</span>
-              <DialogTitle className="text-lg font-bold text-[#2b3336]">
-                {activeModalTask?.title?.toUpperCase()}
-              </DialogTitle>
-            </div>
-            <DialogDescription className="text-sm text-[#676767] leading-relaxed pt-2">
-              {activeModalTask?.noticeMessage || "This feature is currently unavailable or under development."}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="pt-4">
-            <Button
-              onClick={() => setActiveModalTask(null)}
-              className="w-full sm:w-auto bg-[#2b3336] hover:bg-black text-white font-bold text-xs tracking-wider rounded-[4px] px-6"
-            >
-              GOT IT
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <h2 className="mt-8 mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        Donations
+      </h2>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <ActionCard
+          to={ADMIN.donationManagement} icon={Gift} title="Donation Management"
+          description="Pending donations and flagged items waiting on a decision."
+          badge={donationMgmtCount > 0 ? `Needs attention (${donationMgmtCount})` : null}
+        />
+        <ActionCard
+          to={ADMIN.donationClassification} icon={Tags} title="Donation Classification"
+          description="Set the category a product counts as when it is donated."
+          badge={pendingReviewCount > 0 ? `Needs Review (${pendingReviewCount})` : null}
+        />
+        <ActionCard
+          to={ADMIN.categoryRouting} icon={Route} title="Category Routing Rules"
+          description="Where each donation category is stored and what happens to it."
+        />
+        <ActionCard
+          to={ADMIN.evaluateRouting} icon={Route} title="Explain Donation Routing"
+          description="Trace why a specific item routed the way it did."
+        />
+      </div>
     </div>
   );
 }

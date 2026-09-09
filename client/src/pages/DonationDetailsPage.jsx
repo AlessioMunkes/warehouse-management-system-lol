@@ -10,8 +10,6 @@
 // ─────────────────────────────────────────────────────────────
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
-
-import { TopNavbar } from "../features/taskdashboard/components/TopNavBar";
 //import { MobileBottomNav } from "@/components/layout/MoileBottomNav"; // pending teammate
 
 import { useDonationDraft } from "../features/donation/context/DonationDraftContext";
@@ -72,7 +70,6 @@ export function DonationDetailsPage() {
 
   return (
     <div className="stf-shell">
-      <TopNavbar />
 
       <div className="stf-crumb">
         <span>Donations / Record a Donation</span>

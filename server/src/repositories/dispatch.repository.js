@@ -150,15 +150,31 @@ const getBoard = async ({ dispatchDate, cohort, status, gateToday }) => {
 // equivalent for dispatch: every COMPLETED collection in the given
 // range, most recent first, each row carrying its dispatch_event_id
 // so the staff page can open that collection's note.
+// Every dispatch that reached a terminal state, not just the collected
+// ones. 'awaiting' is deliberately absent: those pallets have not been
+// dispatched yet and belong on the gate queue, which is the screen that
+// exists for them.
+const HISTORY_STATUSES = ['collected', 'late_collected', 'not_collected', 'cancelled'];
+
 const getHistory = async (range = 'all') => {
+  // Ranges filter on ps.dispatch_date, NOT de.collected_at. A pallet
+  // nobody fetched has collected_at NULL, and NULL >= a date is not
+  // true, so filtering on it would have hidden every non-collection
+  // from Today/Week/Month even with the status filter widened.
+  //
+  // dispatch_date is a plain `date`, so comparing it to the SAST
+  // calendar date is the whole of the timezone handling needed here —
+  // no AT TIME ZONE on the column itself. The right-hand side has to be
+  // SAST though: Render runs UTC, and CURRENT_DATE there is yesterday
+  // for the first two hours of every SAST day.
   let dateFilter = '';
 
   if (range === 'today') {
-    dateFilter = `AND de.collected_at::date = CURRENT_DATE`;
+    dateFilter = `AND ps.dispatch_date = (now() AT TIME ZONE 'Africa/Johannesburg')::date`;
   } else if (range === 'week') {
-    dateFilter = `AND de.collected_at >= CURRENT_DATE - INTERVAL '7 days'`;
+    dateFilter = `AND ps.dispatch_date >= (now() AT TIME ZONE 'Africa/Johannesburg')::date - INTERVAL '7 days'`;
   } else if (range === 'month') {
-    dateFilter = `AND de.collected_at >= CURRENT_DATE - INTERVAL '30 days'`;
+    dateFilter = `AND ps.dispatch_date >= (now() AT TIME ZONE 'Africa/Johannesburg')::date - INTERVAL '30 days'`;
   }
 
   const result = await pool.query(
@@ -166,16 +182,27 @@ const getHistory = async (range = 'all') => {
        de.id            AS dispatch_event_id,
        de.status,
        de.collected_at,
+       de.flagged_at,
        de.driver_name,
+       de.override_reason,
        ps.id            AS picking_slip_id,
        ps.dispatch_date,
        ps.pallet_ref,
-       e.name           AS ecd_name
+       -- LEFT JOIN + COALESCE, matching getGateView and every other
+       -- query in this file. ps.ecd_id is nullable and beneficiary_kind
+       -- allows soup_kitchen / dignity_kitchen / other; the INNER JOIN
+       -- this replaced dropped all of them out of history silently.
+       COALESCE(e.name, ps.beneficiary_name) AS ecd_name,
+       ps.beneficiary_kind::text AS beneficiary_kind
      FROM dispatch_events de
-     JOIN picking_slips ps ON ps.id = de.picking_slip_id
-     JOIN ecd_centres e    ON e.id = ps.ecd_id
-     WHERE de.status IN ('collected', 'late_collected') ${dateFilter}
-     ORDER BY de.collected_at DESC`
+     JOIN picking_slips ps      ON ps.id = de.picking_slip_id
+     LEFT JOIN ecd_centres e    ON e.id = ps.ecd_id
+     WHERE de.status = ANY($1) ${dateFilter}
+     -- By the day it was due, then by when it actually moved. NULLS LAST
+     -- keeps non-collections below the collections they sit alongside
+     -- rather than at the top, which is what a DESC sort does by default.
+     ORDER BY ps.dispatch_date DESC, de.collected_at DESC NULLS LAST`,
+    [HISTORY_STATUSES],
   );
 
   return result.rows;

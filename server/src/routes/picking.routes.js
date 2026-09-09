@@ -8,7 +8,7 @@ import pickingController                  from '../controllers/picking.controlle
 
 const router = express.Router();
 
-const ALL_ROLES    = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN, ROLES.FINANCE];
+const ALL_ROLES    = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 const PACKERS_UP    = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN]; // actually claim/pack/complete slips
 const MANAGERS_UP   = [ROLES.MANAGER, ROLES.ADMIN];               // generate/create slips
 

@@ -71,7 +71,7 @@ describe('pending donation routes', () => {
   it('does not allow finance to create a pending donation', async () => {
     const res = await request(app)
       .post(BASE)
-      .set('Cookie', cookieFor(ROLES.FINANCE))
+      .set('Cookie', cookieFor('finance'))
       .send({});
 
     expect(res.status).toBe(403);
@@ -227,7 +227,7 @@ describe('GET /api/donations/pending — donation management list endpoint', () 
   });
 
   it('is admin-only, matching its reconciliation sibling', async () => {
-    for (const role of [ROLES.WORKER, ROLES.MANAGER, ROLES.FINANCE]) {
+    for (const role of [ROLES.WORKER, ROLES.MANAGER, 'finance']) {
       const res = await request(app)
         .get(BASE)
         .set('Cookie', cookieFor(role));

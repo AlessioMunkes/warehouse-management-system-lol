@@ -114,10 +114,8 @@ export const DONATIONS = {
 };
 
 // Client-side mirror of RECEIVERS_UP in
-// server/src/routes/donation.routes.js. Finance reads the money side
-// (Section 18A queue) but does not intake stock, so it is absent from
-// both lists. If the server list changes, change this one with it —
-// they are two halves of the same rule.
+// server/src/routes/donation.routes.js. If the server list changes,
+// change this one with it — they are two halves of the same rule.
 export const DONATION_INTAKE_ROLES = ['warehouse_worker', 'manager', 'admin'];
 
 // Volunteer Management is currently available to the two live roles that

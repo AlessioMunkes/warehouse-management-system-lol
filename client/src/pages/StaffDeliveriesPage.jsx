@@ -35,12 +35,11 @@ const RANGES = [
 // The badge people actually want to read here is "did the order this
 // delivery belongs to get fully delivered" — not "recorded", which is
 // just delivery_notes' own bookkeeping status and true of every row.
-// isPoComplete treats either terminal spelling as done: the codebase
-// currently has TWO purchase_orders lifecycles disagreeing with each
-// other (one path writes 'completed', BR-07B's own PO_STATUSES list
-// calls it 'received' instead) — this is deliberately defensive until
-// that's settled with the team, not a guess at which one wins.
-const isPoComplete = (poStatus) => poStatus === 'completed' || poStatus === 'received';
+// 'completed' is the only closed-off value purchase_orders_status_check
+// permits — see server/src/constants/purchaseOrderStatus.js. This used
+// to accept 'received' as well, on the belief that two lifecycles were
+// in play; there is one, and the constraint decides it.
+const isPoComplete = (poStatus) => poStatus === 'completed';
 
 const badgeFor = (delivery) => (
   isPoComplete(delivery.po_status)

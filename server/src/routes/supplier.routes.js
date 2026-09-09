@@ -13,11 +13,9 @@
 // admin only: registering a supplier creates a permanent, FK'd row
 // that feeds every procurement metric.
 //
-// ROLES.FINANCE is deliberately absent from both lists. The role
-// cannot be inserted — users.role CHECK allows warehouse_worker,
-// manager and admin only — so listing it would describe access that
-// no account can hold. Manager and admin absorb what finance would
-// have done.
+// users.role's CHECK allows warehouse_worker, manager and admin only,
+// and the role constants now match it exactly, so every list in this
+// file describes access an account can actually hold.
 // ─────────────────────────────────────────────────────────────
 import express                      from 'express';
 import auth, { requireRole, ROLES } from '../middleware/auth.middleware.js';

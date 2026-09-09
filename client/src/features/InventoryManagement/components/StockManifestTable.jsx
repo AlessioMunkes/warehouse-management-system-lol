@@ -49,9 +49,59 @@ import {
   Filter,
   RotateCcw,
   Calendar,
+  Columns3,
+  ArrowUp,
+  ArrowDown,
+  ChevronsUpDown,
 } from "lucide-react";
 
 import "../../../styles/landingpage.css";
+
+// ── Columns ──────────────────────────────────────────────────
+// One definition drives the header, the body and the Columns menu, so
+// hiding a column cannot leave its cells behind.
+//
+// `width` is a percentage because the table is fixed-layout: eight
+// auto-width columns plus a full product name is what forced the
+// horizontal scroll. Fixed layout means the browser honours these
+// instead of widening to fit the longest cell.
+//
+// `sort` is the value a row sorts on. Product and SKU sort as text,
+// everything else numerically — sorting "12" against "9" as strings is
+// how a stock table ends up claiming 9 is more than 12.
+const COLUMNS = [
+  { key: 'name',      label: 'Product',   width: '26%', align: 'left',
+    sort: (p) => (p.name ?? '').toLowerCase() },
+  { key: 'sku',       label: 'SKU',       width: '14%', align: 'left',
+    sort: (p) => (p.sku ?? '').toLowerCase() },
+  { key: 'onHand',    label: 'On Hand',   width: '10%', align: 'right',
+    sort: (p) => Number(p.onHand ?? 0) },
+  { key: 'committed', label: 'Committed', width: '10%', align: 'right',
+    sort: (p) => Number(p.committed ?? 0) },
+  { key: 'available', label: 'Available', width: '10%', align: 'right',
+    sort: (p) => Number(p.available ?? 0) },
+  { key: 'reorderAt', label: 'Reorder At',width: '10%', align: 'right',
+    sort: (p) => Number(p.reorderAt ?? 0) },
+  { key: 'status',    label: 'Status',    width: '10%', align: 'left',
+    // Shortfall first, then low stock, then healthy — the order someone
+    // scanning for problems wants, not alphabetical.
+    sort: (p) => (p.isShortfall ? 2 : p.isLowStock ? 1 : 0) },
+  { key: 'actions',   label: 'Actions',   width: '10%', align: 'right',
+    sort: null },
+];
+
+const COLUMN_KEY = 'wms_stock_columns';
+
+const readStoredColumns = () => {
+  try {
+    const raw = localStorage.getItem(COLUMN_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
 
 function renderStatusBadge(product) {
   if (product.isShortfall) {
@@ -78,6 +128,39 @@ export default function StockManifestTable({
   const [endDate, setEndDate] = useState("");
   const [hasCommitted, setHasCommitted] = useState(false);
   const [needsReorder, setNeedsReorder] = useState(false);
+
+  // Which columns are on. Remembered per device: someone who works from
+  // the shortfall list every morning should not re-hide four columns
+  // each time they open the page.
+  const [visibleKeys, setVisibleKeys] = useState(
+    () => readStoredColumns() ?? COLUMNS.map((c) => c.key)
+  );
+
+  // null = the order the server sent, which is alphabetical by name.
+  const [sort, setSort] = useState(null); // { key, direction }
+
+  const setColumnVisible = (key, on) => {
+    setVisibleKeys((previous) => {
+      const next = on
+        ? [...new Set([...previous, key])]
+        : previous.filter((k) => k !== key);
+      try { localStorage.setItem(COLUMN_KEY, JSON.stringify(next)); } catch { /* nothing we can do */ }
+      return next;
+    });
+  };
+
+  // Highest first on the first click. On a stock table the interesting
+  // rows are the big numbers and the shortfalls, so ascending first
+  // would mean everyone clicks twice, every time.
+  const toggleSort = (key) => {
+    setSort((previous) => {
+      if (!previous || previous.key !== key) return { key, direction: 'desc' };
+      if (previous.direction === 'desc') return { key, direction: 'asc' };
+      return null;   // third click returns to the server's order
+    });
+  };
+
+  const columns = COLUMNS.filter((c) => visibleKeys.includes(c.key));
 
   // Active Filters Count (excluding search)
   const activeFiltersCount = useMemo(() => {
@@ -163,6 +246,25 @@ export default function StockManifestTable({
     needsReorder,
   ]);
 
+  // Applied after filtering, so the two compose: filters decide which
+  // rows, sort decides their order. localeCompare for text so 'Éclair'
+  // files next to 'Eclair' rather than after 'Zucchini'.
+  const sortedProducts = useMemo(() => {
+    if (!sort) return filteredProducts;
+    const column = COLUMNS.find((c) => c.key === sort.key);
+    if (!column?.sort) return filteredProducts;
+
+    const factor = sort.direction === 'desc' ? -1 : 1;
+    return [...filteredProducts].sort((a, b) => {
+      const left = column.sort(a);
+      const right = column.sort(b);
+      if (typeof left === 'string' || typeof right === 'string') {
+        return String(left).localeCompare(String(right), 'en-ZA') * factor;
+      }
+      return (left - right) * factor;
+    });
+  }, [filteredProducts, sort]);
+
   return (
     <Card className="stock-manifest-card">
       <CardHeader className="stock-manifest-header">
@@ -241,6 +343,46 @@ export default function StockManifestTable({
 
           {/* Popover Controls & Reset */}
           <div className="stock-actions-group">
+            {/* Columns. Hiding one is per-device and remembered, which
+                is what makes the table usable on a laptop without
+                dropping the columns a desk user needs. */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="stock-filter-btn">
+                  <Columns3 className="h-3.5 w-3.5" />
+                  <span>Columns</span>
+                  {visibleKeys.length < COLUMNS.length && (
+                    <span className="stock-filter-count">
+                      {COLUMNS.length - visibleKeys.length}
+                    </span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-3" align="end">
+                <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Show columns
+                </h4>
+                <div className="flex flex-col gap-2">
+                  {COLUMNS.map((c) => {
+                    const on = visibleKeys.includes(c.key);
+                    // Never let the last one go: an empty table is not a
+                    // view anyone asked for.
+                    const isLast = on && visibleKeys.length === 1;
+                    return (
+                      <label key={c.key} className="flex items-center gap-2 text-sm">
+                        <Checkbox
+                          checked={on}
+                          disabled={isLast}
+                          onCheckedChange={(checked) => setColumnVisible(c.key, checked === true)}
+                        />
+                        <span>{c.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
+
             {/* Extended Filters Popover */}
             <Popover>
               <PopoverTrigger asChild>
@@ -372,75 +514,116 @@ export default function StockManifestTable({
           </div>
         ) : (
           <div className="stock-table-wrapper">
-            <Table>
+            <Table className="w-full table-fixed">
+              <colgroup>
+                {columns.map((c) => <col key={c.key} style={{ width: c.width }} />)}
+              </colgroup>
               <TableHeader className="stock-table-header">
                 <TableRow>
-                  <TableHead className="font-semibold">Product</TableHead>
-                  <TableHead className="font-semibold">SKU</TableHead>
-                  <TableHead className="font-semibold">On Hand</TableHead>
-                  <TableHead className="font-semibold">Committed</TableHead>
-                  <TableHead className="font-semibold">Available</TableHead>
-                  <TableHead className="font-semibold">Reorder At</TableHead>
-                  <TableHead className="font-semibold">Status</TableHead>
-                  <TableHead className="text-right font-semibold">
-                    Actions
-                  </TableHead>
+                  {columns.map((c) => (
+                    <TableHead
+                      key={c.key}
+                      className={`font-semibold ${c.align === 'right' ? 'text-right' : ''}`}
+                    >
+                      {c.sort ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleSort(c.key)}
+                          aria-label={`Sort by ${c.label}`}
+                          className={`inline-flex items-center gap-1 hover:text-[#2b3336] ${
+                            c.align === 'right' ? 'flex-row-reverse' : ''
+                          }`}
+                        >
+                          <span>{c.label}</span>
+                          {sort?.key === c.key
+                            ? (sort.direction === 'desc'
+                                ? <ArrowDown className="h-3 w-3" />
+                                : <ArrowUp className="h-3 w-3" />)
+                            : <ChevronsUpDown className="h-3 w-3 opacity-30" />}
+                        </button>
+                      ) : c.label}
+                    </TableHead>
+                  ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredProducts.map((product) => (
+                {sortedProducts.map((product) => (
                   <TableRow key={product.id} className="stock-table-row">
-                    <TableCell className="stock-cell-product">
-                      {product.name}
-                    </TableCell>
-                    <TableCell className="stock-cell-sku">
-                      {product.sku}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {product.onHand} {product.unit}
-                    </TableCell>
-                    {/* Zero committed is the ordinary state, so it is
-                        muted rather than dashed out — a dash would
-                        read as "unknown". */}
-                    <TableCell className="text-muted-foreground">
-                      {product.committed > 0
-                        ? `${product.committed} ${product.unit}`
-                        : "—"}
-                    </TableCell>
-                    {/* The number the allocation decision is made on,
-                        so it carries the emphasis. */}
-                    <TableCell className="font-semibold">
-                      {product.available} {product.unit}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {product.reorderAt} {product.unit}
-                    </TableCell>
-                    <TableCell>{renderStatusBadge(product)}</TableCell>
-                    <TableCell className="stock-action-cell">
-                      <div className="stock-action-group">
-                        {canAdjust && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => onAdjust?.(product)}
-                            className="stock-action-btn"
-                          >
-                            <Edit3 className="h-3.5 w-3.5" />
-                            <span>Adjust</span>
-                          </Button>
-                        )}
+                    {columns.map((c) => {
+                      // truncate + title: fixed layout means a long
+                      // product name would otherwise be clipped with no
+                      // way to read it. The tooltip is the full value.
+                      if (c.key === 'name') return (
+                        <TableCell key={c.key} className="stock-cell-product truncate" title={product.name}>
+                          {product.name}
+                        </TableCell>
+                      );
+                      if (c.key === 'sku') return (
+                        <TableCell key={c.key} className="stock-cell-sku truncate" title={product.sku}>
+                          {product.sku}
+                        </TableCell>
+                      );
+                      if (c.key === 'onHand') return (
+                        <TableCell key={c.key} className="text-right font-medium">
+                          {product.onHand} {product.unit}
+                        </TableCell>
+                      );
+                      // Zero committed is the ordinary state, so it is
+                      // muted rather than dashed out — a dash would
+                      // read as "unknown".
+                      if (c.key === 'committed') return (
+                        <TableCell key={c.key} className="text-right text-muted-foreground">
+                          {product.committed > 0 ? `${product.committed} ${product.unit}` : "—"}
+                        </TableCell>
+                      );
+                      // The number the allocation decision is made on,
+                      // so it carries the emphasis.
+                      if (c.key === 'available') return (
+                        <TableCell key={c.key} className="text-right font-semibold">
+                          {product.available} {product.unit}
+                        </TableCell>
+                      );
+                      if (c.key === 'reorderAt') return (
+                        <TableCell key={c.key} className="text-right text-muted-foreground">
+                          {product.reorderAt} {product.unit}
+                        </TableCell>
+                      );
+                      if (c.key === 'status') return (
+                        <TableCell key={c.key}>{renderStatusBadge(product)}</TableCell>
+                      );
+                      return (
+                        <TableCell key={c.key} className="stock-action-cell">
+                          <div className="stock-action-group">
+                            {canAdjust && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => onAdjust?.(product)}
+                                className="stock-action-btn"
+                                aria-label={`Adjust ${product.name}`}
+                              >
+                                <Edit3 className="h-3.5 w-3.5" />
+                                {/* Label hidden on narrow viewports —
+                                    two labelled buttons is what pushed
+                                    the last column off screen. */}
+                                <span className="hidden xl:inline">Adjust</span>
+                              </Button>
+                            )}
 
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => onViewHistory?.(product)}
-                          className="stock-action-btn"
-                        >
-                          <History className="h-3.5 w-3.5" />
-                          <span>History</span>
-                        </Button>
-                      </div>
-                    </TableCell>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => onViewHistory?.(product)}
+                              className="stock-action-btn"
+                              aria-label={`History for ${product.name}`}
+                            >
+                              <History className="h-3.5 w-3.5" />
+                              <span className="hidden xl:inline">History</span>
+                            </Button>
+                          </div>
+                        </TableCell>
+                      );
+                    })}
                   </TableRow>
                 ))}
               </TableBody>

@@ -32,7 +32,7 @@ const list = async (req, res) => {
 // ── GET /api/products/:id ───────────────────────────────────────
 const getOne = async (req, res) => {
   try {
-    const data = await productService.getProduct(req.params.id);
+    const data = await productService.getProductById(req.params.id);
     res.status(200).json({ success: true, data });
   } catch (err) {
     respondError(res, err, 'getProduct', 'Failed to retrieve product.');
@@ -62,7 +62,7 @@ const update = async (req, res) => {
 // ── PATCH /api/products/:id/status ──────────────────────────────
 const setStatus = async (req, res) => {
   try {
-    const data = await productService.setProductStatus(req.params.id, req.body);
+    const data = await productService.setActive(req.params.id, req.body?.isActive);
     res.status(200).json({ success: true, data });
   } catch (err) {
     respondError(res, err, 'setProductStatus', 'Failed to change product status.');

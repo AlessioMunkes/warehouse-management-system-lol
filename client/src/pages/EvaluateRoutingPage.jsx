@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { TopNavbar } from '../features/taskdashboard/components/TopNavBar';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
@@ -109,7 +108,6 @@ export default function EvaluateRoutingPage() {
 
   return (
     <div className="min-h-screen bg-[#f8f5f2] text-[#2b3336]">
-      <TopNavbar reducedMovement={false} onToggleMovement={() => {}} />
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">

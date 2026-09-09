@@ -20,4 +20,17 @@ export const getDashboardSummary = async () => {
   return toSummary(body.data ?? {});
 };
 
-export default { getDashboardSummary };
+// The worker dashboard's three counts. A separate endpoint, not a
+// filtered summary: /summary is manager-and-admin because it reports
+// across the whole catalog and every supplier.
+export const getMyWork = async () => {
+  const body = await apiGet("/api/dashboard/my-work");
+  const row = body.data ?? {};
+  return {
+    slipsToPack:        Number(row.slipsToPack ?? 0),
+    deliveriesExpected: Number(row.deliveriesExpected ?? 0),
+    palletsAtGate:      Number(row.palletsAtGate ?? 0),
+  };
+};
+
+export default { getDashboardSummary, getMyWork };

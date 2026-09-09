@@ -8,14 +8,13 @@ import dispatchController                 from '../controllers/dispatch.controll
 
 const router = express.Router();
 
-const ALL_ROLES       = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN, ROLES.FINANCE];
+const ALL_ROLES       = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 const DISPATCHERS_UP  = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];  // record a collection at the gate
 const MANAGERS_UP     = [ROLES.MANAGER, ROLES.ADMIN];                // sweep / write-offs need a human decision behind them
-const FINANCE_UP      = [ROLES.MANAGER, ROLES.ADMIN, ROLES.FINANCE]; // non-collection history feeds BR-16 reconciliation
 
 // ── Static paths before /:id to prevent shadowing ────────────
 router.post('/sweep',           auth, requireRole(...MANAGERS_UP), dispatchController.sweep);
-router.get('/non-collections',  auth, requireRole(...FINANCE_UP),  dispatchController.getNonCollectionHistory);
+router.get('/non-collections',  auth, requireRole(...MANAGERS_UP), dispatchController.getNonCollectionHistory);
 router.get('/history',          auth, requireRole(...ALL_ROLES),   dispatchController.getHistory);
 
 // ── Dispatch note ─────────────────────────────────────────────

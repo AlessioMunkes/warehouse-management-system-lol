@@ -9,7 +9,6 @@ export const ROLES = {
   WORKER:   'warehouse_worker',
   MANAGER:  'manager',
   ADMIN:    'admin',
-  FINANCE:  'finance',
   GUEST:    'guest',
 };
 

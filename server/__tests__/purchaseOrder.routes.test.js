@@ -36,7 +36,7 @@ const cookieFor = (role) => {
 };
 
 const WRITE_ROLES     = [ROLES.MANAGER, ROLES.ADMIN];
-const NON_WRITE_ROLES = [ROLES.WORKER, ROLES.FINANCE];
+const NON_WRITE_ROLES = [ROLES.WORKER, 'finance'];
 
 const SOME_PO = { id: 12, status: 'approved' };
 

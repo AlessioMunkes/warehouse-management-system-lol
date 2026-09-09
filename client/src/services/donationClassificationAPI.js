@@ -12,7 +12,7 @@ export const PRODUCT_CLASSIFICATION_CATEGORIES = [
 const API_BASE = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:5000' : '');
 
 const parseResponse = async (response) => {
-  let payload = {};
+  let payload;
 
   try {
     payload = await response.json();

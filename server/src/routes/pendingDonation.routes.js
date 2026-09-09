@@ -5,7 +5,7 @@ import pendingDonationController from '../controllers/pendingDonation.controller
 
 const router = express.Router();
 
-const ALL_ROLES = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN, ROLES.FINANCE];
+const ALL_ROLES = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 const RECEIVERS_UP = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 const MANAGERS_UP = [ROLES.MANAGER, ROLES.ADMIN];
 const ADMIN_ONLY = [ROLES.ADMIN];

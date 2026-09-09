@@ -35,10 +35,9 @@ const cookieFor = (role, overrides = {}) => {
   return [`wms_token=${token}`];
 };
 
-const ALL_ROLES      = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN, ROLES.FINANCE];
+const ALL_ROLES      = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 const DISPATCHERS_UP = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 const MANAGERS_UP    = [ROLES.MANAGER, ROLES.ADMIN];
-const FINANCE_UP     = [ROLES.MANAGER, ROLES.ADMIN, ROLES.FINANCE];
 
 const COLLECT_BODY = {
   driverName: 'Sipho Nkosi',
@@ -119,7 +118,7 @@ describe('dispatch routes — authorisation', () => {
     expect(res.status).toBe(200);
   });
 
-  it.each([ROLES.WORKER, ROLES.FINANCE])('%s cannot read a dispatch note', async (role) => {
+  it.each([ROLES.WORKER, 'finance'])('%s cannot read a dispatch note', async (role) => {
     const res = await request(app).get(`${BASE}/notes/1`).set('Cookie', cookieFor(role));
     expect(res.status).toBe(403);
   });
@@ -133,7 +132,7 @@ describe('dispatch routes — authorisation', () => {
   // Finance reconciles the money side but does not stand at the gate.
   it('finance cannot record a collection', async () => {
     const res = await request(app).post(`${BASE}/1/collect`)
-      .set('Cookie', cookieFor(ROLES.FINANCE)).send(COLLECT_BODY);
+      .set('Cookie', cookieFor('finance')).send(COLLECT_BODY);
     expect(res.status).toBe(403);
   });
 
@@ -163,7 +162,7 @@ describe('dispatch routes — authorisation', () => {
     expect(res.status).toBe(403);
   });
 
-  it.each(FINANCE_UP)('%s can view non-collection history', async (role) => {
+  it.each(MANAGERS_UP)('%s can view non-collection history', async (role) => {
     const res = await request(app).get(`${BASE}/non-collections`).set('Cookie', cookieFor(role));
     expect(res.status).toBe(200);
   });
@@ -183,7 +182,7 @@ describe('dispatch routes — fixed paths are not swallowed by /:id', () => {
   });
 
   it('routes /non-collections to the history handler, not to getGateView', async () => {
-    await request(app).get(`${BASE}/non-collections`).set('Cookie', cookieFor(ROLES.FINANCE));
+    await request(app).get(`${BASE}/non-collections`).set('Cookie', cookieFor(ROLES.MANAGER));
     expect(serviceMock.getNonCollectionHistory).toHaveBeenCalled();
     expect(serviceMock.getGateView).not.toHaveBeenCalled();
   });

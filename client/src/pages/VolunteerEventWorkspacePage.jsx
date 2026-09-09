@@ -17,7 +17,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { TopNavbar } from '../features/taskdashboard/components/TopNavBar';
 import TimeslotPanel from '../features/volunteerManagement/components/TimeslotPanel';
 import BookingTable from '../features/volunteerManagement/components/BookingTable';
 import WalkInDialog from '../features/volunteerManagement/components/WalkInDialog';
@@ -37,7 +36,6 @@ export default function VolunteerEventWorkspacePage() {
   const { user } = useAuth();
   const canManage = VOLUNTEER_MANAGEMENT_ROLES.includes(user?.role);
   const canRecordAttendance = ['warehouse_worker', ...VOLUNTEER_MANAGEMENT_ROLES].includes(user?.role);
-  const [reducedMovement, setReducedMovement] = useState(false);
   const [workspace, setWorkspace] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [attendanceByBooking, setAttendanceByBooking] = useState({});
@@ -156,7 +154,6 @@ export default function VolunteerEventWorkspacePage() {
   const eventIsActive = event && !['COMPLETED', 'CANCELLED'].includes(event.status);
 
   return <div className="min-h-screen bg-white text-[#2b3336] font-['Montserrat',sans-serif]">
-    <TopNavbar reducedMovement={reducedMovement} onToggleMovement={setReducedMovement} />
     <main className="px-4 sm:px-6 py-6 max-w-6xl mx-auto grid gap-6">
       <div><Link className={buttonVariants({ variant: 'outline' })} to={VOLUNTEERS.events}>Back to events</Link></div>
       {error && <div role="alert" className="p-4 rounded-[4px] bg-[#fff4f2] border-2 border-[#ef3a40] text-sm flex justify-between gap-3"><span>{error}</span><Button variant="outline" onClick={refresh}>Try again</Button></div>}

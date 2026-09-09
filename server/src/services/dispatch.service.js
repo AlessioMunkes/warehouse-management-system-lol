@@ -489,7 +489,7 @@ const getDispatchBeneficiaryOptions = async () =>
 
 // ── Non-collection history (BR-26) ────────────────────────────
 const getNonCollectionHistory = async (query, user) => {
-  if (!isManager(user) && user.role !== ROLES.FINANCE) {
+  if (!isManager(user)) {
     fail(403, 'Only managers can view non-collection history.');
   }
 

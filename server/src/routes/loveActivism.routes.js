@@ -36,7 +36,7 @@ const router = express.Router();
 // DEFERRED: Love Activism Coordinator role mapping. No coordinator
 // role exists in auth.middleware.js ROLES, users table, or config.
 // If/when it is introduced, add it to MANAGERS_UP / STAFF_UP below.
-const ALL_ROLES = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN, ROLES.FINANCE];
+const ALL_ROLES = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 const MANAGERS_UP = [ROLES.MANAGER, ROLES.ADMIN];
 const STAFF_UP = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 

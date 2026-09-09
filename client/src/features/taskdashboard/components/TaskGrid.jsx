@@ -1,5 +1,6 @@
 // src/features/taskdashboard/components/TaskGrid.jsx
 import { Link } from "react-router-dom";
+import { useReducedMotion } from './shellContext';
 import {
   Tooltip,
   TooltipContent,
@@ -16,7 +17,12 @@ const TASK_DESCRIPTIONS = {
   Donation:"Reciveing and valuing incoming donations"
 };
 
-export function TaskGrid({ tasks, reducedMovement }) {
+// reducedMovement stays an optional prop so an explicit caller still
+// wins, but with none passed it reads the shell's setting — which is the
+// one the user actually toggled.
+export function TaskGrid({ tasks, reducedMovement: reducedMovementProp }) {
+  const { reducedMotion } = useReducedMotion();
+  const reducedMovement = reducedMovementProp ?? reducedMotion;
   return (
     <TooltipProvider>
       <div className="task-grid">

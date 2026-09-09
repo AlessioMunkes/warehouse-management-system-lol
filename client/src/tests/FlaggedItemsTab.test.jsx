@@ -101,12 +101,6 @@ describe('FlaggedItemsTab', () => {
   });
 
   it('shows a "committing" confirmation when the accept resolves the last open flag', async () => {
-    const resolveFlag = vi.fn().mockResolvedValue({
-      pendingDonationId: 21,
-      status: 'awaiting_resolution',
-      flagId: 1,
-      finalized: true,
-    });
     mockUseFlaggedItems.mockReturnValue(baseHook({ resolveFlag: vi.fn().mockResolvedValue({ pendingDonationId: 21, status: 'committing', flagId: 1, finalized: true }) }));
 
     render(<FlaggedItemsTab />);

@@ -34,7 +34,7 @@ const cookieFor = (role, overrides = {}) => {
   return [`wms_token=${token}`];
 };
 
-const NON_ADMIN_ROLES = [ROLES.WORKER, ROLES.MANAGER, ROLES.FINANCE];
+const NON_ADMIN_ROLES = [ROLES.WORKER, ROLES.MANAGER, 'finance'];
 
 const USER_BODY = {
   username: 'jdoe', firstName: 'Jane', lastName: 'Doe',

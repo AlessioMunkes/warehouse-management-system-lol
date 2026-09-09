@@ -33,12 +33,12 @@
 // ─────────────────────────────────────────────────────────────
 import deliveryModel from '../repositories/delivery.repository.js';
 import { isValidDateString, isPositiveInt, isUuid } from '../utils/validation.js';
-import { isOpenPurchaseOrder } from '../constants/purchaseOrderStatus.js';
+import { isOpenPurchaseOrder, CLOSED_PO_STATUSES } from '../constants/purchaseOrderStatus.js';
 import { DELIVERY_SORTS, SORT_DIRECTIONS } from '../constants/receiptSort.js';
 
 // Orders that have already been closed off, for the specific "reopen it
-// first" message. Everything else that is not open gets the generic one.
-const CLOSED_PO_STATUSES = ['received', 'completed', 'returned'];
+// first" message, now read from the shared constant rather than a third
+// hand-written copy. Everything else that is not open gets the generic one.
 
 // ── fail ───────────────────────────────────────────────────────
 // Mirrors picking.service.js, stock.service.js and the rest.

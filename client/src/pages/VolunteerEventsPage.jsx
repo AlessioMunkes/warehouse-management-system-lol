@@ -15,7 +15,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { CalendarDays, CheckCircle2, Pencil, Plus, XCircle } from 'lucide-react';
-import { TopNavbar } from '../features/taskdashboard/components/TopNavBar';
 import EventFormDialog from '../features/volunteerManagement/components/EventFormDialog';
 import volunteerManagementAPI from '../services/volunteerManagementAPI';
 import { VOLUNTEERS } from '../routes/paths';
@@ -50,7 +49,6 @@ const ErrorBanner = ({ message, onRetry }) => (
 
 export default function VolunteerEventsPage() {
   const navigate = useNavigate();
-  const [reducedMovement, setReducedMovement] = useState(false);
   const [events, setEvents] = useState([]);
   const [isLoading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -136,7 +134,6 @@ export default function VolunteerEventsPage() {
 
   return (
     <div className="min-h-screen bg-white text-[#2b3336] font-['Montserrat',sans-serif]">
-      <TopNavbar reducedMovement={reducedMovement} onToggleMovement={setReducedMovement} />
       <main className="px-4 sm:px-6 py-6 max-w-6xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
           <div>

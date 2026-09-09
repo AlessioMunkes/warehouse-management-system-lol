@@ -342,9 +342,14 @@ describe('getNonCollectionHistory', () => {
       .rejects.toMatchObject({ status: 403 });
   });
 
-  it('lets finance through — it feeds BR-16 reconciliation', async () => {
-    await dispatchService.getNonCollectionHistory({}, { id: 3, role: 'finance' });
-    expect(repoMock.getNonCollectionHistory).toHaveBeenCalled();
+  it('refuses a role that is not manager or admin', async () => {
+    // BR-16 reconciliation used to carve out an exemption for 'finance'.
+    // users.role's CHECK never permitted that value, so the exemption
+    // could not fire for anyone; the check is now the manager rule alone.
+    await expect(
+      dispatchService.getNonCollectionHistory({}, { id: 3, role: 'warehouse_worker' })
+    ).rejects.toMatchObject({ status: 403 });
+    expect(repoMock.getNonCollectionHistory).not.toHaveBeenCalled();
   });
 
   // Number('') is 0 and Number.isInteger(0) is true, so an empty

@@ -25,6 +25,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import useReducedMotion from '../../features/staff/hooks/useReducedMotion';
 import StaffTabBar from './StaffTabBar';
+import { AppNavDrawer } from '../../features/taskdashboard/components/AppNav';
 
 // Both live in client/public/, the same convention the landing page
 // uses for /images/BatchesLogo.png and /icons/*.svg — plain URLs, no
@@ -58,6 +59,12 @@ export default function StaffShell({
     <div className="stf-shell">
       <header className="stf-appbar">
         <div className="stf-appbar-left">
+          {/* Everything the role can open. The tab bar below switches
+              between the four tasks; this reaches the rest without
+              backing out to /noc. No breakpoint on it — this shell has
+              no sidebar at any width. */}
+          <AppNavDrawer />
+
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>

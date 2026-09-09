@@ -8,14 +8,13 @@ import donationController                 from '../controllers/donation.controll
 
 const router = express.Router();
 
-const ALL_ROLES    = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN, ROLES.FINANCE];
-const RECEIVERS_UP = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN]; // record donations at the gate — finance reads the money side but doesn't intake stock
+const ALL_ROLES    = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
+const RECEIVERS_UP = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN]; // record donations at the gate
 const MANAGERS_UP  = [ROLES.MANAGER, ROLES.ADMIN];               // resolve unmatched lines / reclassify — both can move stock
-const FINANCE_UP   = [ROLES.MANAGER, ROLES.ADMIN, ROLES.FINANCE]; // Section 18A queue
 
 // ── Static paths before /:id to prevent shadowing ────────────
 router.get('/unmatched',   auth, requireRole(...MANAGERS_UP), donationController.listUnmatchedItems);
-router.get('/section-18a', auth, requireRole(...FINANCE_UP),  donationController.listSection18AQueue);
+router.get('/section-18a', auth, requireRole(...MANAGERS_UP), donationController.listSection18AQueue);
 
 // ── Unmatched-item resolution ────────────────────────────────
 // Also a static prefix ahead of /:id — /items/:itemId/resolve would

@@ -4,8 +4,8 @@
 // ─────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useState } from "react";
+import { useReducedMotion } from '../features/taskdashboard/components/shellContext';
 import { useAuth } from "../context/AuthContext";
-import { TopNavbar } from "../features/taskdashboard/components/TopNavBar";
 import StockHealthBar from "../features/InventoryManagement/components/StockHealthBar";
 import StockManifestTable from "../features/InventoryManagement/components/StockManifestTable";
 import AdjustStockModal from "../features/InventoryManagement/components/AdjustStockModal";
@@ -18,7 +18,7 @@ export default function InventoryManagementPage() {
   const { user } = useAuth();
 
   // Accessibility toggle state for TopNavbar
-  const [reducedMovement, setReducedMovement] = useState(false);
+  const { reducedMotion: reducedMovement } = useReducedMotion();
 
   // Manifest & data loading state
   const [products, setProducts] = useState([]);
@@ -113,10 +113,6 @@ export default function InventoryManagementPage() {
   return (
     <div className="min-h-screen bg-white text-[#2b3336] font-['Montserrat',sans-serif] flex flex-col">
       {/* 1. App Top Navigation Bar Header */}
-      <TopNavbar
-        reducedMovement={reducedMovement}
-        onToggleMovement={setReducedMovement}
-      />
 
       {/* 2. Main Content Container (Bounded at max-w-6xl for scannability) */}
       <main className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-6 sm:space-y-8 flex-1">
@@ -148,7 +144,10 @@ export default function InventoryManagementPage() {
         <StockHealthBar products={products} reducedMovement={reducedMovement} />
 
         {/* 4. Stock Manifest Data Table */}
-        <div className="w-full overflow-x-auto rounded-[4px] border border-[#e9e3dd] shadow-sm bg-white">
+        {/* No overflow-x-auto: the table is fixed-layout and fits its
+            container now, so a scroll region here would only ever hide
+            a regression rather than absorb one. */}
+        <div className="w-full rounded-[4px] border border-[#e9e3dd] shadow-sm bg-white">
           <StockManifestTable
             products={products}
             isLoading={isLoading}

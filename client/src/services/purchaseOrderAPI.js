@@ -46,11 +46,12 @@ export const PO_STATUS_LABELS = {
   follow_up_required: "Follow-up required",
 };
 
-// Which states still need someone to do something. Matches the
-// open_purchase_orders count in supplier.repository.js — if that
-// definition changes, change this with it.
+// Which states can still be received against. Mirrors OPEN_PO_STATUSES
+// in server/src/constants/purchaseOrderStatus.js — if that changes,
+// change this with it. 'follow_up_required' is not here: a decision has
+// been taken on those, and reopening one is a manager's action.
 export const OPEN_PO_STATUSES = [
-  "pending", "approved", "in_transit", "partially_received", "follow_up_required",
+  "pending", "approved", "in_transit", "partially_received",
 ];
 
 // ── Row mappers ───────────────────────────────────────────────

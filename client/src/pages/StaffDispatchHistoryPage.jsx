@@ -2,12 +2,18 @@
 // client/src/pages/StaffDispatchHistoryPage.jsx
 //
 // The dispatch equivalent of StaffDeliveriesPage.jsx /
-// StaffDecantingRecordsPage.jsx: every collection already recorded,
-// filterable by how far back to look, each one openable as the same
-// DispatchNotePDF that pops up right after a collection in
-// PalletCheck.jsx. Reached from a "History" link on the gate queue's
-// crumb bar — see routes/paths.js's STAFF.dispatchHistory comment for
-// why this isn't its own tab bar slot.
+// StaffDecantingRecordsPage.jsx: every dispatch that reached a terminal
+// state — collected, late, not collected, cancelled — filterable by how
+// far back to look. Collected ones open as the same DispatchNotePDF
+// that pops up right after a collection in PalletCheck.jsx; the others
+// have no note to open, because no goods left the building.
+//
+// Pallets still awaiting collection are NOT here. They are on the gate
+// queue, which is the screen that acts on them.
+//
+// Reached from a "History" link on the gate queue's crumb bar — see
+// routes/paths.js's STAFF.dispatchHistory comment for why this isn't
+// its own tab bar slot.
 //
 // Deliberately read-only and un-paginated, same reasoning as the
 // other two history pages: getHistory already returns everything in
@@ -30,6 +36,16 @@ const RANGES = [
 
 const formatDate = (value) =>
   value ? new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+
+// One entry per terminal dispatch_events.status. `note` is whether a
+// dispatch note exists to open: nothing was loaded for the two that
+// never left, so offering "View note" on them would be a dead button.
+const STATUS_META = {
+  collected:      { label: 'Collected',     tone: 'is-done',   note: true  },
+  late_collected: { label: 'Late',          tone: 'is-warn',   note: true  },
+  not_collected:  { label: 'Not collected', tone: 'is-warn',   note: false },
+  cancelled:      { label: 'Cancelled',     tone: 'is-active', note: false },
+};
 
 export default function StaffDispatchHistoryPage() {
   const navigate = useNavigate();
@@ -72,13 +88,16 @@ export default function StaffDispatchHistoryPage() {
 
   return (
     <StaffShell
-      crumb="Dispatch / Past collections"
+      crumb="Dispatch / History"
       onBack={() => navigate(STAFF.dispatch)}
     >
       <div className="stf-step">
         <div className="stf-step-head">
-          <h1 className="stf-step-title" tabIndex={-1}>Past collections</h1>
-          <p className="stf-step-sub">Every collection that's been recorded, most recent first.</p>
+          <h1 className="stf-step-title" tabIndex={-1}>Dispatch history</h1>
+          <p className="stf-step-sub">
+            Every dispatch that's been closed off — collected, late, not collected
+            or cancelled — most recent first. Pallets still waiting are on the gate queue.
+          </p>
         </div>
 
         {error ? <Notice tone="warn">{error}</Notice> : null}
@@ -102,7 +121,7 @@ export default function StaffDispatchHistoryPage() {
           <div className="stf-skeleton" aria-label="Loading" />
         ) : history.length === 0 ? (
           <div className="stf-empty">
-            No collections recorded in this range yet.
+            No dispatches recorded in this range yet.
           </div>
         ) : (
           <div className="stf-list">
@@ -114,23 +133,33 @@ export default function StaffDispatchHistoryPage() {
                     {row.pallet_ref ? ` · ${row.pallet_ref}` : ''}
                   </span>
                   <span className="stf-row-meta">
-                    {formatDate(row.collected_at)}
+                    {/* collected_at for the two that moved; dispatch_date
+                        for the two that did not, which is the only date
+                        those rows have. */}
+                    {formatDate(row.collected_at ?? row.dispatch_date)}
                     {row.driver_name ? ` · ${row.driver_name}` : ''}
+                    {row.beneficiary_kind && row.beneficiary_kind !== 'ecd'
+                      ? ` · ${row.beneficiary_kind.replace(/_/g, ' ')}`
+                      : ''}
                   </span>
                 </span>
-                {row.status === 'late_collected' ? (
-                  <span className="stf-badge is-warn">Late</span>
+                <span className={`stf-badge ${STATUS_META[row.status]?.tone ?? 'is-active'}`}>
+                  {STATUS_META[row.status]?.label ?? row.status}
+                </span>
+                {STATUS_META[row.status]?.note ? (
+                  <button
+                    type="button"
+                    className="stf-btn stf-btn-secondary"
+                    onClick={() => openPdf(row.dispatch_event_id)}
+                    disabled={openingId === row.dispatch_event_id}
+                  >
+                    {openingId === row.dispatch_event_id ? 'Opening…' : 'View note'}
+                  </button>
                 ) : (
-                  <span className="stf-badge is-done">Collected</span>
+                  /* No note exists for a pallet that never left — the
+                     reason is what there is to show instead. */
+                  <span className="stf-row-meta">{row.override_reason || '—'}</span>
                 )}
-                <button
-                  type="button"
-                  className="stf-btn stf-btn-secondary"
-                  onClick={() => openPdf(row.dispatch_event_id)}
-                  disabled={openingId === row.dispatch_event_id}
-                >
-                  {openingId === row.dispatch_event_id ? 'Opening…' : 'View note'}
-                </button>
               </div>
             ))}
           </div>

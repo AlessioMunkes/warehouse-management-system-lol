@@ -38,7 +38,7 @@ const cookieFor = (role) => {
 
 const READ_ROLES  = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 const WRITE_ROLES = [ROLES.MANAGER, ROLES.ADMIN];
-const NON_WRITE_ROLES = [ROLES.WORKER, ROLES.FINANCE];
+const NON_WRITE_ROLES = [ROLES.WORKER, 'finance'];
 
 const BENEFICIARY_BODY = { name: 'Sunnyside ECD', cohort: 'week1', contactName: 'Jane Doe', childCount: 40 };
 const SOME_BENEFICIARY = { id: 6, ...BENEFICIARY_BODY, isActive: true, approvedAt: null };

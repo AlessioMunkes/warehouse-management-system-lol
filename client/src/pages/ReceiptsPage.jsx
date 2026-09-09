@@ -37,7 +37,6 @@
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { TopNavbar } from '../features/taskdashboard/components/TopNavBar';
 import ReceiptFilters from '../features/receipts/components/ReceiptFilters';
 import ReceiptsTable from '../features/receipts/components/ReceiptsTable';
 import StatusPill from '../features/receipts/components/StatusPill';
@@ -82,7 +81,6 @@ const EMPTY_SORT = {
 
 export default function ReceiptsPage() {
   const navigate = useNavigate();
-  const [reducedMovement, setReducedMovement] = useState(false);
 
   const [tab, setTab]         = useState('in');
   const [filters, setFilters] = useState(EMPTY_FILTERS);
@@ -171,7 +169,7 @@ export default function ReceiptsPage() {
       setError('');
       try {
         const result = tab === 'in'
-          ? await receivingAPI.getDeliveries({
+          ? await receivingAPI.getDeliveryArchive({
               from:       filters.from || undefined,
               to:         filters.to || undefined,
               supplierId: filters.entity || undefined,
@@ -340,10 +338,6 @@ export default function ReceiptsPage() {
 
   return (
     <>
-      <TopNavbar
-        reducedMovement={reducedMovement}
-        onToggleMovement={setReducedMovement}
-      />
 
       <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
         <div className="mb-5">

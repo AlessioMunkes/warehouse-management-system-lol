@@ -23,7 +23,7 @@
 // real, larger feature flagged separately, not a fake input that
 // silently does nothing forever. It says so.
 // ─────────────────────────────────────────────────────────────
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { STAFF, ADMIN } from '../../../routes/paths';
@@ -34,18 +34,18 @@ import { Input }  from '@/components/ui/input';
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from '@/components/ui/popover';
+import { Search, Plus, LogOut, EyeOff, Eye } from 'lucide-react';
 import {
-  LayoutDashboard, Users2, ClipboardList, ShoppingCart,
-  BarChart3, HeartHandshake, Package, Truck, Search, Plus, LogOut,
-  FileText,
-} from 'lucide-react';
-import batchesLogo from '../../../assets/Batches_Logo.jpeg';
+  ShellContext, useInsideShell,
+  ReducedMotionContext, MOTION_KEY, readStoredMotion, applyMotionAttribute,
+} from './shellContext';
+import { NAV_SECTIONS, homeForRole } from './navSections';
+import { SidebarNav, AppNavDrawer } from './AppNav';
 
 const ROLE_LABELS = {
   warehouse_worker: 'Warehouse staff',
   manager: 'Manager',
   admin: 'Admin',
-  finance: 'Finance',
   guest: 'Guest',
 };
 
@@ -53,44 +53,6 @@ const ROLE_LABELS = {
 // rather than shown disabled — a manager was never going to reach
 // them anyway (App.jsx blocks the route), so a greyed-out link would
 // just be a dead end with extra steps.
-const NAV_SECTIONS = (role) => [
-  {
-    label: 'Overview',
-    items: [
-      { to: '/manager', label: 'Dashboard', icon: LayoutDashboard },
-    ],
-  },
-  {
-    label: 'Operations',
-    items: [
-      { to: STAFF.beneficiaries, label: 'Beneficiaries', icon: Users2 },
-      { to: STAFF.pickingSlips, label: 'Picking Slips', icon: ClipboardList },
-      { to: STAFF.purchaseOrders, label: 'Purchase Orders', icon: ShoppingCart },
-      { to: STAFF.documents, label: 'Documents', icon: FileText },
-    ],
-  },
-  {
-    label: 'Catalog',
-    items: [
-      { to: ADMIN.products, label: 'Products', icon: Package },
-      role === 'admin' ? { to: ADMIN.suppliers, label: 'Suppliers', icon: Truck } : null,
-    ].filter(Boolean),
-  },
-  {
-    label: 'Insights',
-    items: [
-      { to: STAFF.reporting, label: 'Reporting', icon: BarChart3 },
-      { to: STAFF.impactReport, label: 'Impact Report', icon: HeartHandshake },
-    ],
-  },
-  role === 'admin' ? {
-    label: 'Admin',
-    items: [
-      { to: ADMIN.users, label: 'Users', icon: Users2 },
-    ],
-  } : null,
-].filter(Boolean);
-
 // Ordered by how often a manager actually reaches for each — same
 // reasoning PickingSlipManagementPage.jsx's own quick actions use.
 const QUICK_CREATE = [
@@ -100,29 +62,37 @@ const QUICK_CREATE = [
   { to: STAFF.beneficiaries, label: 'Beneficiary' },
 ];
 
-const NavLink = ({ to, label, icon: Icon, active }) => (
-  <Link
-    to={to}
-    className={`flex items-center gap-2.5 rounded-[4px] px-3 py-2 text-sm transition-colors ${
-      active
-        ? 'bg-[#2b3336] text-white font-medium'
-        : 'text-[#2b3336] hover:bg-[#f3efe9]'
-    }`}
-  >
-    <Icon className="size-4 shrink-0" />
-    {label}
-  </Link>
-);
-
 export default function ManagerLayout({ children }) {
+  // Already inside a shell — ProtectedRoute supplied one at the route
+  // level. Render the children and nothing else, so the ten pages that
+  // call this directly did not need rewriting.
+  const alreadyInShell = useInsideShell();
+  if (alreadyInShell) return <>{children}</>;
+
+  return <ManagerLayoutShell>{children}</ManagerLayoutShell>;
+}
+
+function ManagerLayoutShell({ children }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+  const [reducedMotion, setReducedMotionState] = useState(readStoredMotion);
+
+  const setReducedMotion = (next) => {
+    setReducedMotionState(next);
+    applyMotionAttribute(next);
+    try { localStorage.setItem(MOTION_KEY, String(next)); } catch { /* nothing we can do */ }
+  };
+
+  // On mount too, not only on change: a reload restores the value from
+  // storage but nothing would have re-marked the document for CSS.
+  useEffect(() => { applyMotionAttribute(reducedMotion); }, [reducedMotion]);
 
   const roleLabel = user?.role ? ROLE_LABELS[user.role] ?? user.role : '';
   const sections = NAV_SECTIONS(user?.role);
+  const homeTo = homeForRole(user?.role);
 
   const handleConfirmLogout = () => {
     logout();
@@ -131,36 +101,21 @@ export default function ManagerLayout({ children }) {
   };
 
   return (
+   <ShellContext.Provider value={true}>
+    <ReducedMotionContext.Provider value={{ reducedMotion, setReducedMotion }}>
     <div className="flex min-h-screen bg-[#faf8f5]">
       {/* ── Sidebar ─────────────────────────────────────────── */}
       <aside className="hidden w-56 shrink-0 flex-col border-r border-[#e9e3dd] bg-white px-3 py-4 sm:flex">
-        <Link to="/manager" className="mb-6 flex items-center gap-2 px-2">
-          <img src={batchesLogo} alt="" className="h-8 w-8 rounded-[4px] object-cover" />
-          <div>
-            <p className="text-sm font-semibold leading-tight">Batches</p>
-            <p className="text-[11px] leading-tight text-muted-foreground">Nourish Our Children</p>
-          </div>
-        </Link>
-
-        <nav className="flex flex-1 flex-col gap-5 overflow-y-auto">
-          {sections.map((section) => (
-            <div key={section.label}>
-              <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                {section.label}
-              </p>
-              <div className="flex flex-col gap-0.5">
-                {section.items.map((item) => (
-                  <NavLink key={item.to} {...item} active={location.pathname === item.to} />
-                ))}
-              </div>
-            </div>
-          ))}
-        </nav>
+        <SidebarNav sections={sections} pathname={location.pathname} homeTo={homeTo} />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* ── Top bar ───────────────────────────────────────── */}
         <header className="flex items-center gap-3 border-b border-[#e9e3dd] bg-white px-4 py-2.5">
+          {/* Same breakpoint as the sidebar above, so exactly one of the
+              two is ever on screen. */}
+          <AppNavDrawer className="sm:hidden" />
+
           <div className="relative hidden max-w-xs flex-1 sm:block">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -192,6 +147,19 @@ export default function ManagerLayout({ children }) {
               </PopoverContent>
             </Popover>
 
+            {/* Was TopNavbar's "Less movement" button. TaskGrid and
+                StockHealthBar read it; deleting that bar without moving
+                this would have deleted the feature. */}
+            <Button
+              type="button" variant="ghost" size="icon"
+              onClick={() => setReducedMotion(!reducedMotion)}
+              aria-pressed={reducedMotion}
+              aria-label={reducedMotion ? 'Allow movement' : 'Reduce movement'}
+              title={reducedMotion ? 'Movement reduced' : 'Reduce movement'}
+            >
+              {reducedMotion ? <EyeOff /> : <Eye />}
+            </Button>
+
             <NotificationBell />
 
             {user ? (
@@ -220,5 +188,7 @@ export default function ManagerLayout({ children }) {
         onConfirm={handleConfirmLogout}
       />
     </div>
+    </ReducedMotionContext.Provider>
+   </ShellContext.Provider>
   );
 }

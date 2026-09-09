@@ -13,8 +13,19 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { STAFF } from '../../routes/paths';
+import ManagerLayout from '../../features/taskdashboard/components/ManagerLayout';
 
-const ProtectedRoute = ({ roles } = {}) => {
+// `shell` wraps the whole group in the app shell — sidebar on desktop,
+// hamburger drawer on a phone — so a route group opts in with one word
+// instead of twenty-two pages each importing a layout. ManagerLayout is
+// idempotent, so the pages that already render it keep working: theirs
+// becomes a passthrough inside this one.
+//
+// The four warehouse floor flows deliberately do NOT pass it. They use
+// StaffShell, which is phone-first with a bottom tab bar for one-handed
+// use at the gate — script 10 adds the same drawer there rather than
+// replacing that shell with this one.
+const ProtectedRoute = ({ roles, shell = false } = {}) => {
   const { user, isLoading } = useAuth();
 
   // Still checking with the server — decide nothing yet.
@@ -35,7 +46,7 @@ const ProtectedRoute = ({ roles } = {}) => {
   }
 
   // All good — render the child route
-  return <Outlet />;
+  return shell ? <ManagerLayout><Outlet /></ManagerLayout> : <Outlet />;
 };
 
 export default ProtectedRoute;

@@ -66,9 +66,14 @@
   /* 100dvh, not 100vh: on iOS Safari the address bar makes 100vh taller
      than the visible viewport, which pushed the tab bar below the fold
      on exactly the device this is built for. */
+  /* The tab bar's height, used twice: once to size the bar, once to
+     pad the shell so content is never hidden behind it. */
+  --stf-tabbar-h: 60px;
+
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
+  padding-bottom: calc(var(--stf-tabbar-h) + env(safe-area-inset-bottom));
   background: var(--stf-sand);
   font-family: var(--stf-font-sans);
   color: var(--stf-text);
@@ -187,8 +192,14 @@
    hamburger at this width, hiding all four destinations behind a tap;
    on a phone held one-handed the thumb is already at the bottom. */
 .stf-tabbar {
-  position: sticky;
+  /* Fixed, not sticky. Sticky pins to the bottom of the scroll box, and
+     the doodle footer sits inside that box after the bar — so the bar
+     stopped 52px short of the window with a white gap beneath it. */
+  position: fixed;
+  left: 0;
+  right: 0;
   bottom: 0;
+  min-height: var(--stf-tabbar-h);
   display: flex;
   align-items: stretch;
   border-top: 1px solid var(--stf-border);

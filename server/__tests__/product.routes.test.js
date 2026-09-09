@@ -15,10 +15,10 @@ import { ROLES } from '../src/middleware/auth.middleware.js';
 
 const serviceMock = {
   listProducts:     vi.fn(),
-  getProduct:       vi.fn(),
+  getProductById:   vi.fn(),
   createProduct:    vi.fn(),
   updateProduct:    vi.fn(),
-  setProductStatus: vi.fn(),
+  setActive:        vi.fn(),
 };
 
 vi.mock('../src/services/product.service.js', () => ({ default: serviceMock }));
@@ -38,7 +38,7 @@ const cookieFor = (role, overrides = {}) => {
 
 const READ_ROLES  = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 const WRITE_ROLES = [ROLES.MANAGER, ROLES.ADMIN];
-const NON_WRITE_ROLES = [ROLES.WORKER, ROLES.FINANCE];
+const NON_WRITE_ROLES = [ROLES.WORKER, 'finance'];
 
 const PRODUCT_BODY = {
   name: 'Maize meal 10kg', sku: 'MM-10KG', defaultUnit: 'bag',
@@ -52,10 +52,10 @@ const withStatus = (status, message) => Object.assign(new Error(message), { stat
 beforeEach(() => {
   vi.clearAllMocks();
   serviceMock.listProducts.mockResolvedValue([SOME_PRODUCT]);
-  serviceMock.getProduct.mockResolvedValue(SOME_PRODUCT);
+  serviceMock.getProductById.mockResolvedValue(SOME_PRODUCT);
   serviceMock.createProduct.mockResolvedValue(SOME_PRODUCT);
   serviceMock.updateProduct.mockResolvedValue(SOME_PRODUCT);
-  serviceMock.setProductStatus.mockResolvedValue(SOME_PRODUCT);
+  serviceMock.setActive.mockResolvedValue(SOME_PRODUCT);
 });
 
 // ── Authentication ────────────────────────────────────────────
@@ -118,7 +118,7 @@ describe('product routes — parameter validation', () => {
   it.each(['abc', '0', '-1', '1e3'])('rejects id "%s" with a 400', async (id) => {
     const res = await request(app).get(`${BASE}/${id}`).set('Cookie', cookieFor(ROLES.ADMIN));
     expect(res.status).toBe(400);
-    expect(serviceMock.getProduct).not.toHaveBeenCalled();
+    expect(serviceMock.getProductById).not.toHaveBeenCalled();
   });
 });
 
@@ -149,7 +149,7 @@ describe('product controller — responses', () => {
   });
 
   it('passes a 404 from the service straight through', async () => {
-    serviceMock.getProduct.mockRejectedValue(withStatus(404, 'Product not found.'));
+    serviceMock.getProductById.mockRejectedValue(withStatus(404, 'Product not found.'));
     const res = await request(app).get(`${BASE}/999`).set('Cookie', cookieFor(ROLES.MANAGER));
     expect(res.status).toBe(404);
   });

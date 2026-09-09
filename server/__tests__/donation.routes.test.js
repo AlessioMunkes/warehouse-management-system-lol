@@ -36,10 +36,9 @@ const cookieFor = (role, overrides = {}) => {
   return [`wms_token=${token}`];
 };
 
-const ALL_ROLES    = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN, ROLES.FINANCE];
+const ALL_ROLES    = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 const RECEIVERS_UP = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 const MANAGERS_UP  = [ROLES.MANAGER, ROLES.ADMIN];
-const FINANCE_UP   = [ROLES.MANAGER, ROLES.ADMIN, ROLES.FINANCE];
 
 const BODY = {
   category:          'recipe_food',
@@ -110,7 +109,7 @@ describe('donation routes — authorisation', () => {
   // stock arriving at the gate.
   it('finance cannot record a donation', async () => {
     const res = await request(app).post(BASE)
-      .set('Cookie', cookieFor(ROLES.FINANCE)).send(BODY);
+      .set('Cookie', cookieFor('finance')).send(BODY);
     expect(res.status).toBe(403);
   });
 
@@ -140,7 +139,7 @@ describe('donation routes — authorisation', () => {
     expect(res.status).toBe(200);
   });
 
-  it.each(FINANCE_UP)('%s can read the Section 18A queue', async (role) => {
+  it.each(MANAGERS_UP)('%s can read the Section 18A queue', async (role) => {
     const res = await request(app).get(`${BASE}/section-18a`).set('Cookie', cookieFor(role));
     expect(res.status).toBe(200);
   });
@@ -172,7 +171,7 @@ describe('donation routes — fixed paths are not swallowed by /:id', () => {
   });
 
   it('routes /section-18a to the queue, not to getDonationById', async () => {
-    await request(app).get(`${BASE}/section-18a`).set('Cookie', cookieFor(ROLES.FINANCE));
+    await request(app).get(`${BASE}/section-18a`).set('Cookie', cookieFor(ROLES.MANAGER));
     expect(serviceMock.listSection18AQueue).toHaveBeenCalled();
     expect(serviceMock.getDonationById).not.toHaveBeenCalled();
   });

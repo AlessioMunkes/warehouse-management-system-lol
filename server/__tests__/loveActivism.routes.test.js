@@ -66,22 +66,22 @@ describe('love-activism RBAC', () => {
     expect((await request(app).get(`${BASE}/spaces`).set('Cookie', ck(ROLES.MANAGER))).status).toBe(200);
     expect((await request(app).get(`${BASE}/spaces`).set('Cookie', ck(ROLES.ADMIN))).status).toBe(200);
     expect((await request(app).get(`${BASE}/spaces`).set('Cookie', ck(ROLES.WORKER))).status).toBe(403);
-    expect((await request(app).get(`${BASE}/spaces`).set('Cookie', ck(ROLES.FINANCE))).status).toBe(403);
+    expect((await request(app).get(`${BASE}/spaces`).set('Cookie', ck('finance'))).status).toBe(403);
   });
-  it('manager writes reject worker/finance 403', async () => {
+  it('manager writes reject a worker or an unassignable role with 403', async () => {
     const r1 = await request(app).post(`${BASE}/events`).set('Cookie', ck(ROLES.WORKER)).send({});
     expect(r1.status).toBe(403);
     const r2 = await request(app).patch(`${BASE}/events/e1`).set('Cookie', ck(ROLES.WORKER)).send({});
     expect(r2.status).toBe(403);
-    const r3 = await request(app).post(`${BASE}/events/e1/booking`).set('Cookie', ck(ROLES.FINANCE)).send({});
+    const r3 = await request(app).post(`${BASE}/events/e1/booking`).set('Cookie', ck('finance')).send({});
     expect(r3.status).toBe(403);
     const r4 = await request(app).post(`${BASE}/sync/event_booking/e1/retry`).set('Cookie', ck(ROLES.WORKER)).send({});
     expect(r4.status).toBe(403);
   });
-  it('reads allow all; finance blocked from staff writes; guest blocked', async () => {
-    expect((await request(app).get(`${BASE}/events`).set('Cookie', ck(ROLES.FINANCE))).status).toBe(200);
+  it('reads allow every warehouse role; an unassignable role is blocked from staff writes; guest blocked', async () => {
+    expect((await request(app).get(`${BASE}/events`).set('Cookie', ck(ROLES.WORKER))).status).toBe(200);
     expect((await request(app).get(`${BASE}/timeslots/t1/capacity`).set('Cookie', ck(ROLES.WORKER))).status).toBe(200);
-    expect((await request(app).put(`${BASE}/bookings/b1/attendance`).set('Cookie', ck(ROLES.FINANCE)).send({ checkedIn: true })).status).toBe(403);
+    expect((await request(app).put(`${BASE}/bookings/b1/attendance`).set('Cookie', ck('finance')).send({ checkedIn: true })).status).toBe(403);
     expect((await request(app).get(`${BASE}/events`).set('Cookie', ck(ROLES.GUEST))).status).toBe(403);
   });
 });

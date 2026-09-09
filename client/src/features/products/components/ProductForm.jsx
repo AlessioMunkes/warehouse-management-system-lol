@@ -5,7 +5,10 @@
 // SupplierForm.jsx/UserForm.jsx — the fields are identical and two
 // copies would drift.
 //
-// ONLY `name` AND `defaultUnit` ARE REQUIRED, matching
+// `name`, `sku` AND `defaultUnit` ARE REQUIRED. SKU is not optional
+// whatever an earlier version of this comment said: products
+// .stock_keeping_unit is NOT NULL UNIQUE, so a blank one is a 400 from
+// the server rather than a product without a code. Matching
 // product.service.js's buildProductPayload exactly. Everything else
 // (SKU, category, weight, is_perishable) is optional — plenty of
 // products in the current catalog have no SKU on record.

@@ -116,15 +116,6 @@ export const getDeliveries = async (range = 'all') => {
   return res.data ?? [];
 };
 
-// GET /api/deliveries/:id
-// One delivery with its line items and signature, for the note PDF —
-// created fresh right after a submit, or opened later from the
-// deliveries dashboard.
-export const getDeliveryById = async (id) => {
-  const res = await apiGet(`/api/deliveries/${id}`);
-  return res.data;
-};
-
 // ─────────────────────────────────────────────────────────────
 // THE GOODS-IN ARCHIVE
 //
@@ -135,7 +126,7 @@ export const getDeliveryById = async (id) => {
 // Every row carries has_discrepancies and discrepancy_count, so the list can
 // show which notes need a manager's attention without opening each one.
 // ─────────────────────────────────────────────────────────────
-export const getDeliveries = async ({
+export const getDeliveryArchive = async ({
   from, to, supplierId, status, search, sort, dir, limit, offset,
 } = {}) => {
   const params = new URLSearchParams();
@@ -184,6 +175,7 @@ export default {
   getProducts,
   recordDelivery,
   getDeliveries,
+  getDeliveryArchive,
   getDeliveryById,
   getSupplierOptions,
 };

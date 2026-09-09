@@ -25,4 +25,13 @@ const getSummary = async (req, res) => {
   }
 };
 
-export default { getSummary };
+const getMyWork = async (req, res) => {
+  try {
+    const data = await dashboardService.getMyWork();
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    respondError(res, err, 'getMyWork', 'Failed to retrieve your work summary.');
+  }
+};
+
+export default { getSummary, getMyWork };

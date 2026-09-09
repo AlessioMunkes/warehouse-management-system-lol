@@ -1,10 +1,12 @@
 // ─────────────────────────────────────────────────────────────
 // server/__tests__/product.service.test.js
 //
-// product.repository.js is mocked, so these tests exercise the
-// service's own rules: only name + defaultUnit are required, weight
-// is optional-but-positive-if-present, and a name/SKU clash 409s on
-// both create and update — same split user.service.test.js uses.
+// product.repository.js is mocked, so these exercise the service's own
+// rules against the real `products` shape: name, SKU and default unit
+// are required, weight is optional but non-negative when given, blank
+// is "not recorded" while zero is a real measurement, update is a
+// partial patch, and a name/SKU clash 409s without a product counting
+// as its own clash.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
@@ -12,9 +14,9 @@ const repoMock = {
   listProducts:    vi.fn(),
   getProductById:  vi.fn(),
   findByNameOrSku: vi.fn(),
-  insertProduct:   vi.fn(),
+  createProduct:   vi.fn(),
   updateProduct:   vi.fn(),
-  setProductActive: vi.fn(),
+  setActive:       vi.fn(),
 };
 
 vi.mock('../src/repositories/product.repository.js', () => ({ default: repoMock }));
@@ -25,63 +27,88 @@ const PRODUCT_ID = 5;
 
 const existingProduct = (over = {}) => ({
   id: PRODUCT_ID, name: 'Maize meal 10kg', sku: 'MM-10KG',
-  default_unit: 'bag', weight_kg: 10, category: 'Dry goods',
+  weight_kg: 10, default_unit: 'bag', category: 'Dry goods',
   is_perishable: false, is_active: true, ...over,
 });
 
 const body = (over = {}) => ({
-  name: 'Maize meal 10kg', sku: 'MM-10KG', defaultUnit: 'bag',
-  weightKg: 10, category: 'Dry goods', isPerishable: false, ...over,
+  name: 'Maize meal 10kg', stockKeepingUnit: 'MM-10KG',
+  defaultUnit: 'bag', weightKg: 10, category: 'Dry goods',
+  isPerishable: false, ...over,
 });
 
 beforeEach(() => {
   vi.clearAllMocks();
   repoMock.findByNameOrSku.mockResolvedValue(null);
   repoMock.getProductById.mockResolvedValue(existingProduct());
-  repoMock.insertProduct.mockResolvedValue({ id: 900, ...existingProduct() });
+  repoMock.createProduct.mockResolvedValue({ id: 900, ...existingProduct() });
   repoMock.updateProduct.mockResolvedValue(existingProduct());
-  repoMock.setProductActive.mockResolvedValue(existingProduct());
+  repoMock.setActive.mockResolvedValue(existingProduct({ is_active: false }));
+  repoMock.listProducts.mockResolvedValue([]);
 });
 
 describe('listProducts', () => {
   it('treats the string "true" from a query param as true', async () => {
-    repoMock.listProducts.mockResolvedValue([]);
     await productService.listProducts({ includeInactive: 'true', search: '' });
     expect(repoMock.listProducts).toHaveBeenCalledWith({ includeInactive: true, search: null });
   });
 
-  it('defaults to excluding inactive products and no search filter', async () => {
-    repoMock.listProducts.mockResolvedValue([]);
+  it('defaults to active products only and no search filter', async () => {
     await productService.listProducts({});
     expect(repoMock.listProducts).toHaveBeenCalledWith({ includeInactive: false, search: null });
   });
+
+  it('trims a search term and passes it through', async () => {
+    await productService.listProducts({ search: '  maize  ' });
+    expect(repoMock.listProducts).toHaveBeenCalledWith({ includeInactive: false, search: 'maize' });
+  });
 });
 
-describe('getProduct', () => {
+describe('getProductById', () => {
   it('rejects a non-numeric id', async () => {
-    await expect(productService.getProduct('abc')).rejects.toMatchObject({ status: 400 });
+    await expect(productService.getProductById('abc')).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('rejects a zero or negative id', async () => {
+    await expect(productService.getProductById(0)).rejects.toMatchObject({ status: 400 });
   });
 
   it('404s when the repository finds nothing', async () => {
     repoMock.getProductById.mockResolvedValue(null);
-    await expect(productService.getProduct(999)).rejects.toMatchObject({ status: 404 });
+    await expect(productService.getProductById(999)).rejects.toMatchObject({ status: 404 });
   });
 });
 
-describe('createProduct — validation', () => {
+describe('createProduct', () => {
   it('requires a name', async () => {
     await expect(productService.createProduct(body({ name: '  ' })))
       .rejects.toMatchObject({ status: 400 });
   });
 
-  it('requires a default unit', async () => {
-    await expect(productService.createProduct(body({ defaultUnit: '' })))
+  it('requires a SKU, because stock_keeping_unit is NOT NULL', async () => {
+    await expect(productService.createProduct(body({ stockKeepingUnit: '' })))
       .rejects.toMatchObject({ status: 400 });
   });
 
-  it('rejects a zero weight', async () => {
-    await expect(productService.createProduct(body({ weightKg: 0 })))
-      .rejects.toMatchObject({ status: 400 });
+  it('accepts sku as an alias for stockKeepingUnit', async () => {
+    await productService.createProduct({ name: 'Rice 5kg', sku: 'RC-5KG' });
+    expect(repoMock.createProduct).toHaveBeenCalledWith(
+      expect.objectContaining({ stockKeepingUnit: 'RC-5KG' })
+    );
+  });
+
+  it('falls back to kg, the column default, when no unit is given', async () => {
+    await productService.createProduct({ name: 'Rice 5kg', sku: 'RC-5KG' });
+    expect(repoMock.createProduct).toHaveBeenCalledWith(
+      expect.objectContaining({ defaultUnit: 'kg' })
+    );
+  });
+
+  it('carries category and the perishable flag through to the repository', async () => {
+    await productService.createProduct(body({ category: 'Fresh produce', isPerishable: true }));
+    expect(repoMock.createProduct).toHaveBeenCalledWith(
+      expect.objectContaining({ category: 'Fresh produce', isPerishable: true })
+    );
   });
 
   it('rejects a negative weight', async () => {
@@ -89,80 +116,101 @@ describe('createProduct — validation', () => {
       .rejects.toMatchObject({ status: 400 });
   });
 
-  it('accepts a blank weight as "not recorded", not zero', async () => {
-    await productService.createProduct(body({ weightKg: '' }));
-    expect(repoMock.insertProduct).toHaveBeenCalledWith(expect.objectContaining({ weightKg: null }));
+  it('rejects a non-numeric weight', async () => {
+    await expect(productService.createProduct(body({ weightKg: 'heavy' })))
+      .rejects.toMatchObject({ status: 400 });
   });
 
-  it('409s on a name clash', async () => {
-    repoMock.findByNameOrSku.mockResolvedValue(existingProduct({ name: 'Maize meal 10kg' }));
+  it('treats a blank weight as "not recorded", not zero', async () => {
+    await productService.createProduct(body({ weightKg: '' }));
+    expect(repoMock.createProduct).toHaveBeenCalledWith(
+      expect.objectContaining({ weightKg: null })
+    );
+  });
+
+  it('keeps a zero weight as a real measurement', async () => {
+    await productService.createProduct(body({ weightKg: 0 }));
+    expect(repoMock.createProduct).toHaveBeenCalledWith(
+      expect.objectContaining({ weightKg: 0 })
+    );
+  });
+
+  it('409s on a name or SKU clash found up front', async () => {
+    repoMock.findByNameOrSku.mockResolvedValue(existingProduct());
     await expect(productService.createProduct(body())).rejects.toMatchObject({ status: 409 });
   });
 
-  it('names the SKU specifically when that is what clashed', async () => {
-    repoMock.findByNameOrSku.mockResolvedValue(existingProduct({ name: 'Different name' }));
-    await expect(productService.createProduct(body()))
-      .rejects.toMatchObject({ message: expect.stringContaining('SKU') });
+  it('409s on the unique-constraint race the pre-check cannot catch', async () => {
+    repoMock.createProduct.mockRejectedValue(Object.assign(new Error('dup'), { code: '23505' }));
+    await expect(productService.createProduct(body())).rejects.toMatchObject({ status: 409 });
   });
 });
 
 describe('updateProduct — partial patch semantics', () => {
-  it('404s when the target product does not exist', async () => {
-    repoMock.getProductById.mockResolvedValue(null);
-    await expect(productService.updateProduct(PRODUCT_ID, { name: 'X' }))
-      .rejects.toMatchObject({ status: 404 });
-  });
-
   it('rejects an empty patch rather than writing nothing', async () => {
-    await expect(productService.updateProduct(PRODUCT_ID, {})).rejects.toMatchObject({ status: 400 });
+    await expect(productService.updateProduct(PRODUCT_ID, {}))
+      .rejects.toMatchObject({ status: 400 });
   });
 
-  it('only sends fields actually present in the body', async () => {
+  it('only forwards fields actually present in the body', async () => {
     await productService.updateProduct(PRODUCT_ID, { category: 'Fresh produce' });
-    const patch = repoMock.updateProduct.mock.calls[0][1];
-    expect(patch).toEqual({ category: 'Fresh produce' });
+    expect(repoMock.updateProduct).toHaveBeenCalledWith(PRODUCT_ID, { category: 'Fresh produce' });
   });
 
-  it('409s when renaming into a name/SKU someone else already has', async () => {
-    repoMock.findByNameOrSku.mockResolvedValue(existingProduct({ id: 999 }));
-    await expect(productService.updateProduct(PRODUCT_ID, { name: 'Taken name' }))
-      .rejects.toMatchObject({ status: 409 });
+  it('lets a blank category clear the field', async () => {
+    await productService.updateProduct(PRODUCT_ID, { category: '' });
+    expect(repoMock.updateProduct).toHaveBeenCalledWith(PRODUCT_ID, { category: null });
   });
 
-  it('excludes the product\'s own row when checking for a clash', async () => {
+  it('does not check for a clash when neither name nor SKU is changing', async () => {
+    await productService.updateProduct(PRODUCT_ID, { category: 'Cold chain' });
+    expect(repoMock.findByNameOrSku).not.toHaveBeenCalled();
+  });
+
+  it('excludes the row being edited when it does check', async () => {
     await productService.updateProduct(PRODUCT_ID, { name: 'Maize meal 10kg' });
     expect(repoMock.findByNameOrSku).toHaveBeenCalledWith(
       'Maize meal 10kg', existingProduct().sku, { excludeId: PRODUCT_ID }
     );
   });
 
-  it('does not re-check for a clash when neither name nor sku changed', async () => {
-    await productService.updateProduct(PRODUCT_ID, { category: 'Cold chain' });
-    expect(repoMock.findByNameOrSku).not.toHaveBeenCalled();
-  });
-});
-
-describe('setProductStatus', () => {
-  it('requires isActive to be a boolean', async () => {
-    await expect(productService.setProductStatus(PRODUCT_ID, { isActive: 'yes' }))
-      .rejects.toMatchObject({ status: 400 });
+  it('409s when renaming into a name another product already has', async () => {
+    repoMock.findByNameOrSku.mockResolvedValue(existingProduct({ id: 999 }));
+    await expect(productService.updateProduct(PRODUCT_ID, { name: 'Taken name' }))
+      .rejects.toMatchObject({ status: 409 });
   });
 
-  it('404s when the target product does not exist', async () => {
-    repoMock.getProductById.mockResolvedValue(null);
-    await expect(productService.setProductStatus(PRODUCT_ID, { isActive: false }))
+  it('404s when the row does not exist', async () => {
+    repoMock.updateProduct.mockResolvedValue(null);
+    await expect(productService.updateProduct(PRODUCT_ID, { category: 'X' }))
       .rejects.toMatchObject({ status: 404 });
   });
 
-  it('is a no-op (no write) when the status already matches', async () => {
-    repoMock.getProductById.mockResolvedValue(existingProduct({ is_active: false }));
-    const result = await productService.setProductStatus(PRODUCT_ID, { isActive: false });
-    expect(repoMock.setProductActive).not.toHaveBeenCalled();
-    expect(result.is_active).toBe(false);
+  it('rejects a blank name rather than clearing it', async () => {
+    await expect(productService.updateProduct(PRODUCT_ID, { name: '   ' }))
+      .rejects.toMatchObject({ status: 400 });
+  });
+});
+
+describe('setActive', () => {
+  it('rejects anything that is not an explicit boolean', async () => {
+    await expect(productService.setActive(PRODUCT_ID, 'yes'))
+      .rejects.toMatchObject({ status: 400 });
   });
 
-  it('writes the new status when it actually changes', async () => {
-    await productService.setProductStatus(PRODUCT_ID, { isActive: false });
-    expect(repoMock.setProductActive).toHaveBeenCalledWith(PRODUCT_ID, false);
+  it('accepts the string "false" a query param would produce', async () => {
+    await productService.setActive(PRODUCT_ID, 'false');
+    expect(repoMock.setActive).toHaveBeenCalledWith(PRODUCT_ID, false);
+  });
+
+  it('accepts a real boolean', async () => {
+    await productService.setActive(PRODUCT_ID, true);
+    expect(repoMock.setActive).toHaveBeenCalledWith(PRODUCT_ID, true);
+  });
+
+  it('404s when the row does not exist', async () => {
+    repoMock.setActive.mockResolvedValue(null);
+    await expect(productService.setActive(PRODUCT_ID, false))
+      .rejects.toMatchObject({ status: 404 });
   });
 });

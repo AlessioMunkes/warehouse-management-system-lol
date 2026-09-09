@@ -33,7 +33,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
-import PurchaseOrderLines, { blankLine } from './PurchaseOrderLines';
+import PurchaseOrderLines from './PurchaseOrderLines';
+import { blankLine } from './purchaseOrderLine';
 
 // Render runs UTC and the warehouse does not. Between midnight and
 // 02:00 SAST the container still thinks it is yesterday, so a date

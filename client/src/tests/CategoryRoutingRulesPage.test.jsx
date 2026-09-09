@@ -8,7 +8,6 @@ const { mockGetCategoryRules, mockUpdateCategoryRule } = vi.hoisted(() => ({
 }));
 
 vi.mock('../features/taskdashboard/components/TopNavBar', () => ({
-  TopNavbar: () => <div>Top Navbar</div>,
 }));
 
 vi.mock('../services/categoryRoutingAPI', () => ({
@@ -53,7 +52,6 @@ describe('CategoryRoutingRulesPage', () => {
 
     expect(screen.getByText('Recipe Food')).toBeInTheDocument();
     expect(screen.getByText('Donate to the soup kitchen')).toBeInTheDocument();
-    expect(screen.getByText('Top Navbar')).toBeInTheDocument();
   });
 
   it('opens the inline editor and saves updates for a selected rule', async () => {

@@ -15,18 +15,35 @@ import pool from '../config/db.js';
  * Fetches all products from the database, sorted alphabetically by name.
  * Allows filtering by active status if requested (e.g., active-only for catalog listings).
  */
-const listProducts = async ({ isActive } = {}) => {
-  // We explicitly select only valid columns from `products` (avoiding SELECT * and non-existent updated_at)
-  let query = `SELECT id, name, stock_keeping_unit AS sku, weight_kg, is_active, created_at FROM products`;
-  const params = [];
+// The column list every read below shares. `products` has no updated_at,
+// so nothing references one.
+const PRODUCT_COLUMNS = `
+  id, name, stock_keeping_unit AS sku, weight_kg, is_active, created_at,
+  category, is_perishable, default_unit`;
 
-  if (isActive !== undefined) {
-    query += ` WHERE is_active = $1`;
-    params.push(Boolean(isActive));
+const listProducts = async ({ includeInactive = false, search = null } = {}) => {
+  const params = [];
+  const where  = [];
+
+  // Inactive products are soft-deleted, not gone: they stay joined to
+  // historical donations and deliveries. The catalog hides them unless
+  // asked, which is what the page's toggle asks for.
+  if (!includeInactive) where.push('is_active = true');
+
+  if (search) {
+    params.push(`%${search}%`);
+    where.push(`(name ILIKE $${params.length}
+              OR stock_keeping_unit ILIKE $${params.length}
+              OR category ILIKE $${params.length})`);
   }
 
-  query += ` ORDER BY name ASC;`;
-  const result = await pool.query(query, params);
+  const result = await pool.query(
+    `SELECT ${PRODUCT_COLUMNS}
+     FROM products
+     ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+     ORDER BY name ASC`,
+    params,
+  );
   return result.rows;
 };
 
@@ -35,12 +52,10 @@ const listProducts = async ({ isActive } = {}) => {
  * Returns the product object if found, or null if no record matches.
  */
 const getProductById = async (id) => {
-  const query = `
-    SELECT id, name, stock_keeping_unit AS sku, weight_kg, is_active, created_at 
-    FROM products 
-    WHERE id = $1;
-  `;
-  const result = await pool.query(query, [id]);
+  const result = await pool.query(
+    `SELECT ${PRODUCT_COLUMNS} FROM products WHERE id = $1`,
+    [id],
+  );
   return result.rows[0] || null;
 };
 
@@ -48,14 +63,23 @@ const getProductById = async (id) => {
  * Checks for duplicate product names or SKUs (case-insensitive search).
  * Useful for pre-validation in the service layer before attempting insertions or updates.
  */
-const findByNameOrSku = async (name, sku) => {
-  const query = `
-    SELECT id, name, stock_keeping_unit 
-    FROM products 
-    WHERE LOWER(name) = LOWER($1) OR LOWER(stock_keeping_unit) = LOWER($2) 
-    LIMIT 1;
-  `;
-  const result = await pool.query(query, [name, sku]);
+// excludeId matters on update: without it the row being edited is its
+// own clash, LIMIT 1 returns it, and a genuine clash with a DIFFERENT
+// product further down the table is never seen.
+const findByNameOrSku = async (name, sku, { excludeId = null } = {}) => {
+  const params = [name, sku];
+  let exclude = '';
+  if (excludeId !== null && excludeId !== undefined) {
+    params.push(excludeId);
+    exclude = ` AND id <> $${params.length}`;
+  }
+  const result = await pool.query(
+    `SELECT id, name, stock_keeping_unit
+     FROM products
+     WHERE (LOWER(name) = LOWER($1) OR LOWER(stock_keeping_unit) = LOWER($2))${exclude}
+     LIMIT 1`,
+    params,
+  );
   return result.rows[0] || null;
 };
 
@@ -63,27 +87,60 @@ const findByNameOrSku = async (name, sku) => {
  * Inserts a new product record into the `products` table.
  * Defaults new products to `is_active = true` and timestamps them with NOW().
  */
-const createProduct = async ({ name, stockKeepingUnit, weightKg = null }) => {
-  const query = `
-    INSERT INTO products (name, stock_keeping_unit, weight_kg, is_active, created_at) 
-    VALUES ($1, $2, $3, true, NOW()) 
-    RETURNING id, name, stock_keeping_unit AS sku, weight_kg, is_active, created_at;
-  `;
-  const result = await pool.query(query, [name, stockKeepingUnit, weightKg]);
+const createProduct = async ({
+  name, stockKeepingUnit, weightKg = null,
+  defaultUnit = 'kg', category = null, isPerishable = false,
+}) => {
+  // default_unit is NOT NULL DEFAULT 'kg' in the schema, so the default
+  // above keeps a payload that omits it valid rather than relying on the
+  // column default and reading back something the caller did not choose.
+  const result = await pool.query(
+    `INSERT INTO products
+       (name, stock_keeping_unit, weight_kg, default_unit, category, is_perishable, is_active, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, true, NOW())
+     RETURNING ${PRODUCT_COLUMNS}`,
+    [name, stockKeepingUnit, weightKg, defaultUnit, category, isPerishable],
+  );
   return result.rows[0];
 };
 
 /**
  * Updates basic product metadata (name, SKU, and weight) for an existing product ID.
  */
-const updateProduct = async (id, { name, stockKeepingUnit, weightKg = null }) => {
-  const query = `
-    UPDATE products 
-    SET name = $1, stock_keeping_unit = $2, weight_kg = $3 
-    WHERE id = $4 
-    RETURNING id, name, stock_keeping_unit AS sku, weight_kg, is_active;
-  `;
-  const result = await pool.query(query, [name, stockKeepingUnit, weightKg, id]);
+// A real partial patch. This used to SET every column unconditionally
+// from a payload that defaulted the absent ones, so renaming a product
+// silently blanked its category, weight and unit — and the client does
+// send partial patches.
+const PRODUCT_PATCH_COLUMNS = {
+  name:             'name',
+  stockKeepingUnit: 'stock_keeping_unit',
+  weightKg:         'weight_kg',
+  defaultUnit:      'default_unit',
+  category:         'category',
+  isPerishable:     'is_perishable',
+};
+
+const updateProduct = async (id, patch = {}) => {
+  const sets   = [];
+  const params = [];
+
+  for (const [key, column] of Object.entries(PRODUCT_PATCH_COLUMNS)) {
+    if (!Object.prototype.hasOwnProperty.call(patch, key)) continue;
+    params.push(patch[key]);
+    sets.push(`${column} = $${params.length}`);
+  }
+
+  // Nothing to change is the caller's problem, not a silent success:
+  // an UPDATE with an empty SET is a syntax error.
+  if (!sets.length) return getProductById(id);
+
+  params.push(id);
+  const result = await pool.query(
+    `UPDATE products SET ${sets.join(', ')}
+     WHERE id = $${params.length}
+     RETURNING ${PRODUCT_COLUMNS}`,
+    params,
+  );
   return result.rows[0] || null;
 };
 
@@ -92,13 +149,11 @@ const updateProduct = async (id, { name, stockKeepingUnit, weightKg = null }) =>
  * Soft deletion ensures historical donation records tied to this product stay intact.
  */
 const setActive = async (id, isActive) => {
-  const query = `
-    UPDATE products 
-    SET is_active = $1 
-    WHERE id = $2 
-    RETURNING id, name, is_active;
-  `;
-  const result = await pool.query(query, [Boolean(isActive), id]);
+  const result = await pool.query(
+    `UPDATE products SET is_active = $1 WHERE id = $2
+     RETURNING ${PRODUCT_COLUMNS}`,
+    [Boolean(isActive), id],
+  );
   return result.rows[0] || null;
 };
 
@@ -110,19 +165,19 @@ const setActive = async (id, isActive) => {
  */
 const getAllProductsWithDefaults = async () => {
   const query = `
-    SELECT 
-      p.id, 
-      p.name, 
-      p.stock_keeping_unit AS sku, 
-      p.is_active, 
-      d.donation_category, 
-      d.set_by, 
-      u.first_name AS set_by_name, 
-      d.created_at AS classification_created_at, 
-      d.updated_at AS classification_updated_at 
-    FROM products p 
-    LEFT JOIN donation_routing_defaults d ON d.product_id = p.id 
-    LEFT JOIN users u ON u.id = d.set_by 
+    SELECT
+      p.id,
+      p.name,
+      p.stock_keeping_unit AS sku,
+      p.is_active,
+      d.donation_category,
+      d.set_by,
+      u.first_name AS set_by_name,
+      d.created_at AS classification_created_at,
+      d.updated_at AS classification_updated_at
+    FROM products p
+    LEFT JOIN donation_routing_defaults d ON d.product_id = p.id
+    LEFT JOIN users u ON u.id = d.set_by
     WHERE p.is_active = true
     ORDER BY p.name ASC;
   `;
@@ -136,9 +191,9 @@ const getAllProductsWithDefaults = async () => {
  */
 const getProductRoutingDefault = async (productId) => {
   const query = `
-    SELECT d.product_id, d.donation_category, p.name AS product_name 
-    FROM donation_routing_defaults d 
-    JOIN products p ON p.id = d.product_id 
+    SELECT d.product_id, d.donation_category, p.name AS product_name
+    FROM donation_routing_defaults d
+    JOIN products p ON p.id = d.product_id
     WHERE d.product_id = $1 AND p.is_active = true;
   `;
   const result = await pool.query(query, [productId]);
@@ -237,13 +292,13 @@ const getPendingClassifications = async ({ countOnly = false } = {}) => {
  */
 const upsertProductRoutingDefault = async ({ productId, donationCategory, setBy }, client = pool) => {
   const query = `
-    INSERT INTO donation_routing_defaults (product_id, donation_category, set_by, created_at, updated_at) 
-    VALUES ($1, $2, $3, NOW(), NOW()) 
-    ON CONFLICT (product_id) 
-    DO UPDATE SET 
-      donation_category = EXCLUDED.donation_category, 
-      set_by = EXCLUDED.set_by, 
-      updated_at = NOW() 
+    INSERT INTO donation_routing_defaults (product_id, donation_category, set_by, created_at, updated_at)
+    VALUES ($1, $2, $3, NOW(), NOW())
+    ON CONFLICT (product_id)
+    DO UPDATE SET
+      donation_category = EXCLUDED.donation_category,
+      set_by = EXCLUDED.set_by,
+      updated_at = NOW()
     RETURNING product_id, donation_category, set_by, updated_at;
   `;
   // Callers already inside a transaction (e.g. finalizePendingClassification
@@ -260,8 +315,8 @@ const upsertProductRoutingDefault = async ({ productId, donationCategory, setBy 
  */
 const deleteProductRoutingDefault = async (productId) => {
   const query = `
-    DELETE FROM donation_routing_defaults 
-    WHERE product_id = $1 
+    DELETE FROM donation_routing_defaults
+    WHERE product_id = $1
     RETURNING product_id;
   `;
   const result = await pool.query(query, [productId]);

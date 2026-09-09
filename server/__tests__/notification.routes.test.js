@@ -33,7 +33,7 @@ const cookieFor = (role) => {
 };
 
 const READ_ROLES     = [ROLES.MANAGER, ROLES.ADMIN];
-const NON_READ_ROLES = [ROLES.WORKER, ROLES.FINANCE, ROLES.GUEST];
+const NON_READ_ROLES = [ROLES.WORKER, 'finance', ROLES.GUEST];
 
 beforeEach(() => {
   vi.clearAllMocks();

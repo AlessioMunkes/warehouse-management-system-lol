@@ -32,16 +32,7 @@ import {
 } from '@/components/ui/table';
 import { Plus, Trash2, PackageSearch } from 'lucide-react';
 
-export const blankLine = () => ({
-  // A client-side key so React can track a row that has no id yet.
-  // Array index would do the wrong thing the moment a middle row is
-  // removed: every row below it would re-key and lose focus.
-  key: `line-${Math.random().toString(36).slice(2, 10)}`,
-  productId: '',
-  expectedQuantity: '',
-  expectedWeightKg: '',
-  unitPrice: '',
-});
+import { blankLine } from './purchaseOrderLine';
 
 const money = (value) =>
   `R ${Number(value || 0).toLocaleString('en-ZA', {

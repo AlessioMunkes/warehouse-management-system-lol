@@ -20,15 +20,66 @@
 //                            pallets belong, not a dashboard count.
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
+import { OPEN_PO_STATUSES } from '../constants/purchaseOrderStatus.js';
 
 const num = (v) => (v === null || v === undefined ? 0 : Number(v));
 
-// PO statuses that are still open — everything short of 'completed'
-// or 'returned'. Matches purchaseOrder.service.js's PO_STATUSES list
-// minus the two terminal ones. Inlined as a literal, not parameterised
-// — it is a fixed constant, not caller-supplied, the same reasoning
-// dispatch.repository.js's getBoard uses for its own status literals.
-const OPEN_PO_STATUSES_SQL = `'pending', 'approved', 'in_transit', 'partially_received'`;
+// Read from the constants module rather than hand-written here. This
+// was a third copy of the open-PO list — the module exists because the
+// first two drifted, and a fourth would have drifted too.
+//
+// SAST_TODAY, not CURRENT_DATE: Render runs UTC, so CURRENT_DATE is
+// yesterday's date for the first two hours of every South African day
+// and every "today" count below was answering for the wrong one.
+const SAST_TODAY = `(now() AT TIME ZONE 'Africa/Johannesburg')::date`;
+
+// One array, reused by every query that asks what is still open.
+const openPoParams = [OPEN_PO_STATUSES];
+
+// What a warehouse worker needs before choosing a task: what is left to
+// pack, what is arriving, what is waiting at the gate. Deliberately not
+// a subset of getSummary — low stock across the whole catalog and open
+// POs across every supplier are management information, which is why
+// /summary is manager-and-admin and this is a separate endpoint rather
+// than a filtered view of that one.
+//
+// "Not yet packed" counts slips due today or earlier: a slip due
+// Tuesday that is still pending on Thursday is more urgent, not less,
+// so it stays on the list rather than dropping off it.
+const getMyWork = async () => {
+  const [toPack, deliveries, atGate] = await Promise.all([
+    pool.query(
+      `SELECT COUNT(*)::int AS count
+         FROM picking_slips
+        WHERE status IN ('pending', 'in_progress')
+          AND dispatch_date <= ${SAST_TODAY}`
+    ),
+    pool.query(
+      `SELECT COUNT(*)::int AS count
+         FROM purchase_orders
+        WHERE status = ANY($1)
+          AND expected_delivery_date = ${SAST_TODAY}`, openPoParams
+    ),
+    // Packed and still in the building. Same shape as the gate queue in
+    // dispatch.repository.js: a terminal dispatch_events row is what
+    // takes a pallet off it, not the picking slip's own status.
+    pool.query(
+      `SELECT COUNT(*)::int AS count
+         FROM picking_slips ps
+         LEFT JOIN dispatch_events de ON de.picking_slip_id = ps.id
+        WHERE ps.status IN ('complete', 'dispatched')
+          AND ps.dispatch_date <= ${SAST_TODAY}
+          AND (de.id IS NULL OR de.status IS NULL
+               OR de.status NOT IN ('collected', 'late_collected', 'cancelled'))`
+    ),
+  ]);
+
+  return {
+    slipsToPack:        num(toPack.rows[0]?.count),
+    deliveriesExpected: num(deliveries.rows[0]?.count),
+    palletsAtGate:      num(atGate.rows[0]?.count),
+  };
+};
 
 const getSummary = async () => {
   const [lowStock, activeProducts, openPOs, deliveriesToday, dispatchesToday] = await Promise.all([
@@ -46,20 +97,20 @@ const getSummary = async () => {
     pool.query(
       `SELECT COUNT(*)::int AS count
          FROM purchase_orders
-        WHERE status IN (${OPEN_PO_STATUSES_SQL})`
+        WHERE status = ANY($1)`, openPoParams
     ),
     pool.query(
       `SELECT COUNT(*)::int AS count
          FROM purchase_orders
-        WHERE status IN (${OPEN_PO_STATUSES_SQL})
-          AND expected_delivery_date = CURRENT_DATE`
+        WHERE status = ANY($1)
+          AND expected_delivery_date = ${SAST_TODAY}`, openPoParams
     ),
     pool.query(
       `SELECT COUNT(*)::int AS count
          FROM picking_slips ps
          LEFT JOIN dispatch_events de ON de.picking_slip_id = ps.id
         WHERE ps.status IN ('complete', 'dispatched')
-          AND ps.dispatch_date = CURRENT_DATE
+          AND ps.dispatch_date = ${SAST_TODAY}
           AND (de.id IS NULL OR de.status IS NULL
                OR de.status NOT IN ('collected', 'late_collected'))`
     ),
@@ -74,4 +125,4 @@ const getSummary = async () => {
   };
 };
 
-export default { getSummary };
+export default { getSummary, getMyWork };

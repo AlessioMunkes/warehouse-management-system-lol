@@ -8,10 +8,8 @@
 // Love to spend, and Warehouse Visit 2.2 is explicit that PO control
 // sits with the manager, calling it a security requirement.
 //
-// ROLES.FINANCE is absent for the same reason as in
-// supplier.routes.js: users.role CHECK allows warehouse_worker,
-// manager and admin only, so listing it would describe access no
-// account can hold.
+// The role constants match users.role's CHECK exactly — see
+// supplier.routes.js.
 //
 // BR-07C's automatic manager notification is still not built — the
 // status-change route below only changes the status.

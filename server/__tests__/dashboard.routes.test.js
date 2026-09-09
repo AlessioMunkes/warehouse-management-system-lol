@@ -60,7 +60,7 @@ describe('dashboard routes — authorisation', () => {
     expect(res.status).toBe(200);
   });
 
-  it.each([ROLES.WORKER, ROLES.FINANCE, ROLES.GUEST])('%s cannot read the summary', async (role) => {
+  it.each([ROLES.WORKER, 'finance', ROLES.GUEST])('%s cannot read the summary', async (role) => {
     const res = await request(app).get(`${BASE}/summary`).set('Cookie', cookieFor(role));
     expect(res.status).toBe(403);
   });

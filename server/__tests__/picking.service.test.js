@@ -35,7 +35,7 @@ const WORKER  = { id: 10, role: ROLES.WORKER };
 const WORKER2 = { id: 11, role: ROLES.WORKER };
 const MANAGER = { id: 20, role: ROLES.MANAGER };
 const ADMIN   = { id: 21, role: ROLES.ADMIN };
-const FINANCE = { id: 30, role: ROLES.FINANCE };
+const FINANCE = { id: 30, role: 'finance' };
 
 // Anchor Monday 2026-01-05 puts the week of Mon 2026-08-03 on week1
 // (30 whole weeks later) and the week of Mon 2026-08-10 on week2.
@@ -146,7 +146,7 @@ describe('generateSlips — manager only, strict rotation', () => {
       ).resolves.toEqual({ created: 12 });
     });
 
-  it.each([[ROLES.WORKER, WORKER], [ROLES.FINANCE, FINANCE]])(
+  it.each([[ROLES.WORKER, WORKER], ['finance', FINANCE]])(
     '%s is refused with 403', async (_role, user) => {
       await expectStatus(
         pickingService.generateSlips({ dispatchDate: WEEK1_DATE, cohort: 'week1' }, user), 403
@@ -250,7 +250,7 @@ describe('createSlip — ad-hoc, manager only', () => {
       .resolves.toEqual({ slipId: 99, itemCount: 7 });
   });
 
-  it.each([[ROLES.WORKER, WORKER], [ROLES.FINANCE, FINANCE]])(
+  it.each([[ROLES.WORKER, WORKER], ['finance', FINANCE]])(
     '%s is refused with 403', async (_role, user) => {
       await expectStatus(pickingService.createSlip(body, user), 403);
       expect(repoMock.createSlip).not.toHaveBeenCalled();

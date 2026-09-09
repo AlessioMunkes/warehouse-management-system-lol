@@ -5,7 +5,6 @@ import DonationClassificationPage from '../pages/DonationClassificationPage';
 const mockUseDonationClassification = vi.fn();
 
 vi.mock('../features/taskdashboard/components/TopNavBar', () => ({
-  TopNavbar: () => <div>Top Navbar</div>,
 }));
 
 vi.mock('../features/donationAdmin/hooks/useDonationClassification', () => ({
@@ -44,7 +43,6 @@ describe('DonationClassificationPage', () => {
     expect(screen.getByText('Donation Classification')).toBeInTheDocument();
     expect(screen.getByText('Rice Pack')).toBeInTheDocument();
     expect(screen.getByText('RICE-001')).toBeInTheDocument();
-    expect(screen.getByText('Top Navbar')).toBeInTheDocument();
   });
 
   it('allows the user to switch the unclassified filter', () => {

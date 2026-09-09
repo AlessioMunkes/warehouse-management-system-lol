@@ -10,7 +10,6 @@
 // .stf-tab is StaffShell's bottom bar, which is a different thing.
 // ─────────────────────────────────────────────────────────────
 import { useState } from 'react';
-import { TopNavbar } from '../features/taskdashboard/components/TopNavBar';
 import FlaggedItemsTab from '../features/donationManagement/components/FlaggedItemsTab';
 import PendingDonationsTab from '../features/donationManagement/components/PendingDonationsTab';
 import ReconciliationTab from '../features/donationManagement/components/ReconciliationTab';
@@ -26,7 +25,6 @@ export default function DonationManagementPage() {
 
   return (
     <div className="min-h-screen bg-[#f8f5f2] text-[#2b3336] font-['Montserrat',sans-serif]">
-      <TopNavbar reducedMovement={false} onToggleMovement={() => {}} />
 
       <main className="mx-auto w-full max-w-5xl px-4 py-6">
         <h1 className="text-2xl font-medium">Donation Management</h1>

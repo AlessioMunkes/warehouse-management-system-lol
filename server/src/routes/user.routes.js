@@ -6,12 +6,9 @@
 // directory read like suppliers. Nobody below admin can list staff
 // accounts, create one, or flip is_active.
 //
-// ROLES.FINANCE / ROLES.GUEST are not used here at all: 'guest' is not
-// a valid users.role value (guests are volunteers, not users — see
-// session.route.js), and finance is a leftover the DB CHECK constraint
-// no longer allows into users.role. Neither belongs in a role list for
-// this resource, so unlike supplier.routes.js there is no comment
-// needed explaining an absence — this file just never imports them.
+// ROLES.GUEST is not used here: 'guest' is not a valid users.role value
+// at all (guests are volunteers, not users — see session.route.js), so
+// it does not belong in a role list for this resource.
 // ─────────────────────────────────────────────────────────────
 import express                      from 'express';
 import auth, { requireRole, ROLES } from '../middleware/auth.middleware.js';

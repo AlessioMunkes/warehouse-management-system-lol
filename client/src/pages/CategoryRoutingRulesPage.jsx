@@ -3,7 +3,6 @@
 // edit one row inline without opening a popup. The top navigation is included so this
 // screen matches the rest of the app and feels like part of the admin area.
 import { useEffect, useState } from 'react';
-import { TopNavbar } from '../features/taskdashboard/components/TopNavBar';
 import CategoryRoutingEditor from '../features/donationAdmin/components/CategoryRoutingEditor';
 import CategoryRoutingTable from '../features/donationAdmin/components/CategoryRoutingTable';
 import categoryRoutingAPI from '../services/categoryRoutingAPI';
@@ -106,7 +105,6 @@ export default function CategoryRoutingRulesPage() {
 
   return (
     <div className="min-h-screen bg-[#f8f5f2] text-[#2b3336]">
-      <TopNavbar reducedMovement={false} onToggleMovement={() => {}} />
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
