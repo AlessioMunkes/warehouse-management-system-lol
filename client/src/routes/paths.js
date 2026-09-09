@@ -120,6 +120,17 @@ export const DONATIONS = {
 // they are two halves of the same rule.
 export const DONATION_INTAKE_ROLES = ['warehouse_worker', 'manager', 'admin'];
 
+// Volunteer Management is currently available to the two live roles that
+// perform the coordinator workflow. Keep this list shared by route guards and
+// dashboard entry points until a coordinator role exists in the live system.
+export const VOLUNTEER_MANAGEMENT_ROLES = ['manager', 'admin'];
+
+export const VOLUNTEERS = {
+  events: '/volunteers',
+  eventPattern: '/volunteers/events/:eventId',
+  event: (eventId) => `/volunteers/events/${eventId}`,
+};
+
 // ── Admin ────────────────────────────────────────────────────
 // Admin-only screens. Gated in App.jsx with roles={['admin']} and
 // mirrored on the server by requireRole(MANAGER, ADMIN) for writes.

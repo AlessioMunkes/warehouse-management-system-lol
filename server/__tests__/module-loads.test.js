@@ -21,9 +21,10 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, statSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 
-const SRC = new URL('../src/', import.meta.url).pathname;
+const SRC = fileURLToPath(new URL('../src/', import.meta.url));
 
 const walk = (dir, acc = []) => {
   for (const entry of readdirSync(dir)) {

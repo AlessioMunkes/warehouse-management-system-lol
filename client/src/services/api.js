@@ -178,3 +178,21 @@ export const cachedGet = async (key, ttlMs, fetcher) => {
 // return — e.g. receiving a delivery can flip a purchase order to
 // 'completed', which changes who has an open order to receive against.
 export const invalidateCache = (key) => cache.delete(key);
+
+// PUT is used by the attendance contract. It lives in the shared helper so
+// that future attendance components keep the same cookie, network-error and
+// session-expiry behaviour as every other API call.
+export const apiPut = async (endpoint, body = {}) => {
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${endpoint}`, {
+      method:      'PUT',
+      credentials: 'include',
+      headers:     { 'Content-Type': 'application/json' },
+      body:        JSON.stringify(body),
+    });
+  } catch {
+    throw networkError();
+  }
+  return handleResponse(res);
+};

@@ -1,16 +1,29 @@
+// ─────────────────────────────────────────────────────────────
+// client/src/pages/AdminActivityScreen.jsx
+//
+// The admin landing screen. Structurally a copy of
+// ManagerActivityScreen — same TopNavbar, same Greeting, same
+// task-grid / task-card classes, same "coming soon" Dialog — because
+// an admin should not have to learn a second layout, and because the
+// grid CSS already exists and did not need rewriting.
+//
+// It holds one live tile today. That is honest: supplier management
+// is the only admin-side feature that exists. Add entries to `tasks`
+// below as more arrive; a tile with `to: null` renders as a button
+// that opens the notice modal instead of navigating, which is how the
+// manager grid handles features that are not ready.
+// ─────────────────────────────────────────────────────────────
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { TopNavbar } from "../features/taskdashboard/components/TopNavBar";
 import { Greeting } from "../features/taskdashboard/components/Greeting";
 import { useAuth } from "@/context/AuthContext";
-import { STAFF, VOLUNTEERS } from "../routes/paths";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-// shadcn/ui Dialog imports
 import {
   Dialog,
   DialogContent,
@@ -20,30 +33,22 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { ADMIN, VOLUNTEERS } from "../routes/paths";
 
+// No supplier-specific icon exists in client/public/icons. Goods
+// arriving from suppliers is the nearest existing meaning, so the
+// receiving icon is reused rather than a new asset invented.
 import receivingIcon from "./../../public/icons/receiving-icon.svg";
-import packingIcon from "./../../public/icons/packing-icon.svg";
-import decantingIcon from "./../../public/icons/decanting-icon.svg";
-import dispatchIcon from "./../../public/icons/dispatch-icon.svg";
-import reportingIcon from "./../../public/icons/reporting-icon.svg";
-// Reuse the existing dashboard-sized volunteer asset.
+// Reuse the same volunteer asset as the manager dashboard tile.
 import volunteerIcon from "./../../public/icons/volunteer-icon.svg";
 
-export default function Home() {
+export default function AdminActivityScreen() {
   const { user } = useAuth();
   const firstName = user?.firstName ?? "";
 
-  // Toggled by the "Less movement" control in TopNavbar — hides icons and
-  // (elsewhere) disables hover animation for users sensitive to motion.
   const [reducedMovement, setReducedMovement] = useState(false);
-
-  // Holds the task object whose "coming soon / unavailable" modal is open.
-  // null = no modal showing. Setting this to a task object opens the Dialog.
   const [activeModalTask, setActiveModalTask] = useState(null);
 
-  // Task definitions for the dashboard grid.
-  // `to: null` or `disabled: true` means the feature isn't live yet —
-  // those cards open the info modal instead of navigating.
   const tasks = [
     {
       to: VOLUNTEERS.events,
@@ -52,54 +57,13 @@ export default function Home() {
       disabled: false,
     },
     {
-      to: null,
+      to: ADMIN.suppliers,
       icon: receivingIcon,
-      title: "Onboard Beneficiary",
+      title: "Manage Suppliers",
       disabled: false,
-      noticeMessage: "The Beneficiary Onboarding module is currently undergoing routine maintenance.",
-    },
-    {
-      to: "/noc/reporting",
-      icon: reportingIcon,
-      title: "Reporting & Analytics",
-      disabled: false,
-    },
-    {
-      to: "/noc/inventory",
-      icon: packingIcon,
-      title: "Manage Inventory",
-      disabled: false,
-    },
-    {
-      to: STAFF.purchaseOrders,
-      icon: receivingIcon,
-      title: "Purchase Orders",
-      disabled: false,
-    },
-    {
-      to: STAFF.receipts,
-      icon: dispatchIcon,
-      title: "Receipts",
-      disabled: false,
-    },
-    {
-      to: null,
-      icon: decantingIcon,
-      title: "Manage Picking Slips",
-      disabled: false,
-      noticeMessage: "Picking Slips module feature is coming in the next iteration.",
-    },
-    {
-      to: null,
-      icon: dispatchIcon,
-      title: "Assign Picking Slips",
-      disabled: false,
-      noticeMessage: "Picking Slip Assignment feature is coming in the next iteration.",
     },
   ];
 
-  // Called when a blocked task card is clicked (see isBlocked below).
-  // Opens the modal with that task's notice message.
   const handleTaskClick = (task) => {
     if (task.disabled || !task.to) {
       setActiveModalTask(task);
@@ -116,21 +80,11 @@ export default function Home() {
       <main className="px-4 sm:px-6 py-6 max-w-3xl mx-auto">
         <Greeting name={firstName} />
 
-        {/* ── Task grid, embedded directly in this page ──
-            Each task renders as either:
-            a <Link> (working route, navigates normally), or
-            a <button> (blocked task, opens the info modal)
-            depending on isBlocked below. */}
         <TooltipProvider>
           <div className="task-grid">
             {tasks.map((task) => {
-              // A task is "blocked" if it's explicitly disabled OR has no
-              // route to navigate to. Blocked tasks get a button + modal
-              // instead of a real link.
               const isBlocked = task.disabled || !task.to;
 
-              // Shared visual content for both the Link and button cases,
-              // so the two render paths stay visually identical.
               const cardContent = (
                 <>
                   {!reducedMovement && task.icon && (
@@ -144,8 +98,6 @@ export default function Home() {
               );
 
               return (
-                // key={task.title} rather than task.to, since multiple
-                // tasks share `to: null` and would collide as React keys.
                 <Tooltip key={task.title}>
                   <TooltipTrigger asChild>
                     {isBlocked ? (
@@ -172,10 +124,6 @@ export default function Home() {
         </TooltipProvider>
       </main>
 
-      {/* ── Feature Unavailable / Coming Soon Dialog Pop-up ──
-          Controlled by activeModalTask: open whenever it's non-null.
-          onOpenChange handles closing via overlay click / Escape,
-          keeping state in sync if the user dismisses it that way. */}
       <Dialog
         open={Boolean(activeModalTask)}
         onOpenChange={(open) => !open && setActiveModalTask(null)}
