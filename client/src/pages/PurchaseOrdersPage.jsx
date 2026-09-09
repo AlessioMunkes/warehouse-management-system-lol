@@ -27,7 +27,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth }   from '../context/AuthContext';
-import { TopNavbar } from '../features/taskdashboard/components/TopNavBar';
+import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
 import PurchaseOrderForm   from '../features/purchaseOrders/components/PurchaseOrderForm';
 import PurchaseOrderList   from '../features/purchaseOrders/components/PurchaseOrderList';
 import PurchaseOrderDetail from '../features/purchaseOrders/components/PurchaseOrderDetail';
@@ -67,7 +67,6 @@ export default function PurchaseOrdersPage() {
   const { user } = useAuth();
   const canManage = CAN_MANAGE.includes(user?.role);
 
-  const [reducedMovement, setReducedMovement] = useState(false);
   const [tab, setTab]           = useState('open');
   const [statusFilter, setStatusFilter] = useState('');
   const [purchaseOrders, setPurchaseOrders] = useState([]);
@@ -135,17 +134,21 @@ export default function PurchaseOrdersPage() {
     }
   };
 
+  const approve = async () => {
+    setError(null);
+    try {
+      await purchaseOrderAPI.approvePurchaseOrder(selected.id);
+      await loadPurchaseOrders();
+      await open(selected.id);
+    } catch (err) { setError(err.message); }
+  };
+
   const visible = tab === 'open'
-    ? purchaseOrders.filter((po) => po.status !== 'received' && po.status !== 'returned')
+    ? purchaseOrders.filter((po) => po.status !== 'completed' && po.status !== 'returned')
     : purchaseOrders;
 
   return (
-    <>
-      <TopNavbar
-        reducedMovement={reducedMovement}
-        onToggleMovement={() => setReducedMovement((v) => !v)}
-      />
-
+    <ManagerLayout>
       <main className="mx-auto w-full max-w-5xl px-4 py-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -227,6 +230,8 @@ export default function PurchaseOrdersPage() {
                 {mode === 'detail' && selected ? (
                   <PurchaseOrderDetail
                     purchaseOrder={selected}
+                    canManage={canManage}
+                    onApprove={approve}
                     onClose={() => { setSelected(null); setMode('list'); }}
                   />
                 ) : null}
@@ -241,6 +246,6 @@ export default function PurchaseOrdersPage() {
           </>
         )}
       </main>
-    </>
+    </ManagerLayout>
   );
 }

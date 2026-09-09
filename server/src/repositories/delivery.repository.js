@@ -84,6 +84,7 @@ const getDeliveries = async ({
        s.id                  AS supplier_id,
        s.name                AS supplier_name,
        u.first_name          AS received_by_name,
+       po.status     AS po_status,
        po.po_number,
        po.status             AS po_status,
        COALESCE(d.discrepancy_count, 0)        AS discrepancy_count,
@@ -142,6 +143,8 @@ const getDeliveryById = async (id) => {
        dn.signature,
        dn.purchase_order_id,
        s.name           AS supplier_name,
+       s.address        AS supplier_address,
+       s.contact_phone  AS supplier_phone,
        u.first_name     AS received_by_name
      FROM delivery_notes dn
      LEFT JOIN suppliers s ON s.id = dn.supplier_id
@@ -483,6 +486,24 @@ const getSuppliers = async () => {
   return result.rows;
 };
 
+// ── Get suppliers with at least one order still open ──────────
+// For the Form view's supplier picker: no point offering a supplier
+// there is nothing to receive from. Same 'approved' rule as
+// getPurchaseOrdersBySupplier below — kept in step deliberately, so
+// this list and that one never disagree about what counts as open.
+// DISTINCT because a supplier can have more than one open order and
+// should still only appear once.
+const getSuppliersWithOpenOrders = async () => {
+  const result = await pool.query(
+    `SELECT DISTINCT s.id, s.name, s.contact_email
+     FROM suppliers s
+     JOIN purchase_orders po ON po.supplier_id = s.id
+     WHERE po.status = 'approved'
+     ORDER BY s.name ASC`,
+  );
+  return result.rows;
+};
+
 // ── Get all active products ───────────────────────────────────
 const getProducts = async () => {
   const result = await pool.query(
@@ -495,7 +516,13 @@ const getProducts = async () => {
 };
 
 // ── Get purchase orders for a supplier ───────────────────────
-// Only returns approved POs — can't receive against a pending one
+// Only returns approved (or further along) POs — can't receive
+// against one still pending a manager's sign-off. This used to
+// disagree with getSuppliersWithOpenOrders above about what "open"
+// meant, because 'approved' had been dropped from PO_STATUSES
+// (server/src/services/purchaseOrder.service.js) without anywhere
+// left that could actually reach it. PO_STATUSES now has 'approved'
+// back — see that file's own comment — so both queries agree again.
 const getPurchaseOrdersBySupplier = async (supplierId) => {
   const result = await pool.query(
     `SELECT
@@ -547,6 +574,7 @@ export default {
   getPurchaseOrder,
   createDelivery,
   getSuppliers,
+  getSuppliersWithOpenOrders,
   getProducts,
   getPurchaseOrdersBySupplier,
   getPurchaseOrderItems,

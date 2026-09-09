@@ -16,6 +16,7 @@ const FINANCE_UP      = [ROLES.MANAGER, ROLES.ADMIN, ROLES.FINANCE]; // non-coll
 // ── Static paths before /:id to prevent shadowing ────────────
 router.post('/sweep',           auth, requireRole(...MANAGERS_UP), dispatchController.sweep);
 router.get('/non-collections',  auth, requireRole(...FINANCE_UP),  dispatchController.getNonCollectionHistory);
+router.get('/history',          auth, requireRole(...ALL_ROLES),   dispatchController.getHistory);
 
 // ── Dispatch note ─────────────────────────────────────────────
 // Also a static prefix ahead of /:id — the note is keyed by a

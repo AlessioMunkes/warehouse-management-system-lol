@@ -29,7 +29,7 @@ const clean = (value) => {
   return trimmed === '' ? null : trimmed;
 };
 
-// BR-07B, in one place, matching migration 002's CHECK. Anything
+// BR-07B, in one place, matching the CHECK constraint. Anything
 // reading or writing a PO status reads it from here — movement_type
 // drifted precisely because its allowed values were written twice.
 // Moved to ../constants/purchaseOrderStatus.js so delivery.repository.js can
@@ -215,8 +215,35 @@ const getPurchaseOrder = async (rawId) => {
   return purchaseOrder;
 };
 
+// ── Status transitions ─────────────────────────────────────────
+// General-purpose, not approve-only: PurchaseOrderDetail.jsx's
+// Approve button is the first caller, but 'returned'/
+// 'follow_up_required' need the same mechanism and the same
+// mandatory-reason rule the CHECK constraint already enforces on
+// Returned (see PurchaseOrderDetail.jsx's own comment on that).
+const setPurchaseOrderStatus = async (rawId, body = {}) => {
+  if (!isPositiveInt(rawId)) throw fail(400, 'A valid purchase order ID is required.');
+
+  const status = clean(body.status);
+  if (!status || !PO_STATUSES.includes(status)) {
+    throw fail(400, `Unknown status "${status}". Must be one of: ${PO_STATUSES.join(', ')}.`);
+  }
+
+  const reason = clean(body.reason);
+  if (status === 'returned' && !reason) {
+    throw fail(400, 'A reason is required when marking a purchase order as returned.');
+  }
+
+  const existing = await repo.getPurchaseOrderById(Number(rawId));
+  if (!existing) throw fail(404, 'Purchase order not found.');
+  if (existing.status === status) return existing;
+
+  return repo.updatePurchaseOrderStatus(Number(rawId), status, reason);
+};
+
 export default {
   createPurchaseOrder,
   listPurchaseOrders,
   getPurchaseOrder,
+  setPurchaseOrderStatus,
 };

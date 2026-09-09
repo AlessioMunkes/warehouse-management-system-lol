@@ -13,10 +13,8 @@
 // manager and admin only, so listing it would describe access no
 // account can hold.
 //
-// No status-change route yet. BR-07B's transitions and BR-07C's
-// automatic manager notification are the next slice; migration 002
-// already carries the six states and the mandatory-reason constraint
-// they need.
+// BR-07C's automatic manager notification is still not built — the
+// status-change route below only changes the status.
 // ─────────────────────────────────────────────────────────────
 import express                      from 'express';
 import auth, { requireRole, ROLES } from '../middleware/auth.middleware.js';
@@ -39,5 +37,8 @@ router.post('/',
 // documented at the top of supplier.routes.js.
 router.get('/:id',
   auth, requireRole(...READERS), validateIntId, purchaseOrderController.getOne);
+
+router.patch('/:id/status',
+  auth, requireRole(...MANAGES_UP), validateIntId, purchaseOrderController.setStatus);
 
 export default router;

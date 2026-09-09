@@ -1,9 +1,10 @@
 // ─────────────────────────────────────────────────────────────
 // features/purchaseOrders/components/PurchaseOrderDetail.jsx
 //
-// Read-only. Same Card + close-button shape as SupplierDetail in
-// SupplierDirectoryPage.jsx, so opening a PO feels like opening a
-// supplier.
+// Mostly read-only — the one action is Approve, shown only while the
+// PO is still pending. Same Card + close-button shape as
+// SupplierDetail in SupplierDirectoryPage.jsx, so opening a PO feels
+// like opening a supplier.
 //
 // The received column is the whole point of the panel. It comes from
 // delivery_note_items summed across every delivery note logged against
@@ -30,7 +31,7 @@ const money = (value) =>
     minimumFractionDigits: 2, maximumFractionDigits: 2,
   })}`;
 
-export default function PurchaseOrderDetail({ purchaseOrder: po, onClose }) {
+export default function PurchaseOrderDetail({ purchaseOrder: po, canManage, onApprove, onClose }) {
   const facts = [
     ['Supplier',   po.supplierName],
     ['Status',     po.statusLabel],
@@ -118,6 +119,12 @@ export default function PurchaseOrderDetail({ purchaseOrder: po, onClose }) {
             <p className="text-sm text-muted-foreground">Notes</p>
             <p className="text-sm">{po.notes}</p>
           </div>
+        ) : null}
+
+        {canManage && po.status === 'pending' ? (
+          <Button type="button" variant="outline" onClick={onApprove}>
+            Approve
+          </Button>
         ) : null}
       </CardContent>
     </Card>

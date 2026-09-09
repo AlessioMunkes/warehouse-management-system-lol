@@ -255,6 +255,12 @@ const completeSlip = async (slipId, body, user) => {
   return result;
 };
 
+// ── Assignable workers (manager only) ──────────────────────────
+const getAssignableWorkers = async (user) => {
+  if (!isManager(user)) fail(403, 'Only managers can view assignable workers.');
+  return pickingRepository.getAssignableWorkers();
+};
+
 export default {
   getSlips,
   getSlipById,
@@ -264,4 +270,5 @@ export default {
   confirmItem,
   flagItem,
   completeSlip,
+  getAssignableWorkers,
 };

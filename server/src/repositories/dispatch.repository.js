@@ -21,10 +21,11 @@
 // committed (see committedStock.sql.js) and the goods read as
 // available again. There is no compensating movement to post, and
 // therefore nothing to make idempotent, nothing to double-post, and
-// nothing to unwind if the ECD turns up late.
+// nothing to unwind if the beneficiary turns up late.
 // ─────────────────────────────────────────────────────────────
 import pool       from '../config/db.js';
 import stockModel from './stock.repository.js';
+import { createNotification } from './notification.repository.js';
 import { DISPATCH_SORTS, buildOrderBy } from '../constants/receiptSort.js';
 
 // ── Audit helper ──────────────────────────────────────────────
@@ -44,7 +45,7 @@ const logEvent = async (client, slipId, eventType, actorId, detail = null) => {
 // Every pallet that is packed and waiting, plus everything already
 // handled today, so dispatch staff can see the whole day rather than
 // only the outstanding queue. Drivers arrive first come, first
-// served, so the board is ordered by ECD name for lookup speed, not
+// served, so the board is ordered by beneficiary name for lookup speed, not
 // by any notion of scheduled time.
 //
 // Three ways to scope it:
@@ -137,6 +138,44 @@ const getBoard = async ({ dispatchDate, cohort, status, gateToday }) => {
      GROUP BY ps.id, e.id, de.id, u.first_name, ps.beneficiary_kind, ps.beneficiary_name
      ORDER BY COALESCE(e.name, ps.beneficiary_name) ASC`,
     params
+  );
+
+  return result.rows;
+};
+
+// ── Past collections, for the staff history page ───────────────
+// getBoard above answers "what's outstanding" for one day or the
+// live gate queue — it was never a multi-day history the way
+// delivery.repository.js's getDeliveries(range) is. This is that
+// equivalent for dispatch: every COMPLETED collection in the given
+// range, most recent first, each row carrying its dispatch_event_id
+// so the staff page can open that collection's note.
+const getHistory = async (range = 'all') => {
+  let dateFilter = '';
+
+  if (range === 'today') {
+    dateFilter = `AND de.collected_at::date = CURRENT_DATE`;
+  } else if (range === 'week') {
+    dateFilter = `AND de.collected_at >= CURRENT_DATE - INTERVAL '7 days'`;
+  } else if (range === 'month') {
+    dateFilter = `AND de.collected_at >= CURRENT_DATE - INTERVAL '30 days'`;
+  }
+
+  const result = await pool.query(
+    `SELECT
+       de.id            AS dispatch_event_id,
+       de.status,
+       de.collected_at,
+       de.driver_name,
+       ps.id            AS picking_slip_id,
+       ps.dispatch_date,
+       ps.pallet_ref,
+       e.name           AS ecd_name
+     FROM dispatch_events de
+     JOIN picking_slips ps ON ps.id = de.picking_slip_id
+     JOIN ecd_centres e    ON e.id = ps.ecd_id
+     WHERE de.status IN ('collected', 'late_collected') ${dateFilter}
+     ORDER BY de.collected_at DESC`
   );
 
   return result.rows;
@@ -330,7 +369,7 @@ const collect = async ({
                    -- The two deductions conflict and Postgres raises 42P08
                    -- ("inconsistent types deduced for parameter $2") — on
                    -- FIRST-TIME collection only, since the UPDATE branch
-                   -- below has ELSE override_by, a column with a known
+                   -- below has an ELSE override_by, a column with a known
                    -- type. Casting both arms pins it. Reproduced and fixed
                    -- against real Postgres 16; the pg mock in the tests
                    -- cannot see this class of error at all.
@@ -498,6 +537,19 @@ const sweepNonCollections = async ({ dispatchDate, actorId }) => {
         dispatch_event_id: row.id,
         dispatch_date:     dispatchDate,
         rule:              'BR-14',
+      });
+    }
+
+    // BR-14: "the system must ... notify the Warehouse Manager." This
+    // is that notification — one summary per sweep run, not one per
+    // pallet, matching picking.repository.js's own generateSlips
+    // notification.
+    if (swept.rowCount > 0) {
+      await createNotification(client, {
+        type:  'non_collections_flagged',
+        title: `${swept.rowCount} pallet${swept.rowCount === 1 ? '' : 's'} not collected by 16:00`,
+        body:  `${dispatchDate} — flagged automatically per BR-14.`,
+        entityType: 'dispatch_sweep',
       });
     }
 
@@ -700,6 +752,7 @@ const getNonCollectionHistory = async ({ ecdId, from, to }) => {
 
 export default {
   getBoard,
+  getHistory,
   getGateView,
   collect,
   sweepNonCollections,

@@ -8,8 +8,8 @@
 // repository: the system never stops food leaving the building
 // because of a data problem. Almost everything the gate checks is
 // therefore a FLAG the screen shows, not an error that refuses the
-// request. There is exactly one hard block — an ECD centre that is
-// not active (BR-11) — because that is a governance decision made
+// request. There is exactly one hard block — a beneficiary centre
+// that is not active (BR-11) — because that is a governance decision made
 // upstream by the programme team, not a discrepancy between a number
 // in a database and a number on a shelf.
 //
@@ -199,6 +199,17 @@ const getBoard = async (query, user) => {
   return await dispatchRepository.getBoard({ dispatchDate, cohort, status, gateToday });
 };
 
+// ── Past collections, for the staff history page ─────────────────
+// Same range shape delivery.service.js's getDeliveries already uses —
+// an unrecognised or missing range quietly falls back to 'all' rather
+// than failing, since this is a read the whole staff team should be
+// able to reach without worrying about the exact query string.
+const VALID_HISTORY_RANGES = ['today', 'week', 'month', 'all'];
+const getHistory = async (range) => {
+  const safeRange = VALID_HISTORY_RANGES.includes(range) ? range : 'all';
+  return await dispatchRepository.getHistory(safeRange);
+};
+
 // ── One pallet at the gate ────────────────────────────────────
 const getGateView = async (slipId) => {
   const gateView = await dispatchRepository.getGateView(slipId);
@@ -366,7 +377,14 @@ const collect = async (slipId, body, user) => {
   if (result.notPacked)         fail(409, 'This pallet has not been packed yet.');
   if (result.alreadyDispatched) fail(409, 'This pallet has already been collected.');
 
-  return result;
+  // The gate screen pops up the dispatch note the moment a collection
+  // succeeds (the same pattern receiving's note follows). Fetching the
+  // full joined note here — one extra LOCAL query, on a connection
+  // already open — means the gate screen doesn't have to make a
+  // second HTTP round trip for it, the same fix applied to
+  // delivery.service.js's createDelivery.
+  const note = await dispatchRepository.getDispatchNote(result.event.id);
+  return { ...result, note };
 };
 
 // ── Run the 16:00 sweep on demand (manager only) ──────────────
@@ -481,7 +499,7 @@ const getNonCollectionHistory = async (query, user) => {
   // let an empty ecdId through as centre 0 and quietly returned
   // nothing instead of the unfiltered history the caller asked for.
   if (ecdId !== undefined && ecdId !== '' && !isPositiveInt(ecdId)) {
-    fail(400, 'Invalid ECD centre.');
+    fail(400, 'Invalid beneficiary centre.');
   }
   if (from !== undefined && from !== '' && !isValidDateString(from)) {
     fail(400, '"From" must be a real date in YYYY-MM-DD form.');
@@ -501,6 +519,7 @@ export { isValidDateString };
 
 export default {
   getBoard,
+  getHistory,
   getGateView,
   collect,
   sweep,

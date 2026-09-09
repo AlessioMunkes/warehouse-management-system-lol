@@ -68,6 +68,10 @@ export const STAFF = {
   // Donation intake. Entry point of the draft flow; see DONATIONS
   // below for the later steps.
   donation:  DONATIONS_NEW,
+  // Manager-only, same reasoning as reporting above — a dedicated
+  // view for the two impactOnly metrics in reportCatalog.js, rather
+  // than one more entry in ReportingPage.jsx's full metric picker.
+  impactReport: '/noc/impact-report',
   // Manager-only, like reporting above: POST /api/purchase-orders
   // is requireRole(MANAGER, ADMIN) and the App.jsx gate mirrors
   // that. Reads are open to warehouse staff, but they reach a PO
@@ -81,6 +85,24 @@ export const STAFF = {
   // management. Declared here for the same reason everything else is: the
   // route table and the entry tiles read one string, so they cannot drift.
   receipts: '/noc/receipts',
+  // Manager-only, same reasoning as purchaseOrders above. Needed by
+  // picking slip creation (the ECD dropdown) as much as it is a
+  // screen in its own right, so it lives here rather than under
+  // ADMIN — a manager reaches both from the same task set.
+  beneficiaries: '/noc/beneficiaries',
+  // POST /api/picking (createSlip), POST /api/picking/generate, and
+  // assigning a slip to a specific worker (POST /api/picking/:id/assign
+  // with a packerId, only honoured for a manager) are all
+  // requireRole(MANAGER, ADMIN) in picking.routes.js — one screen for
+  // all three, since assignment happens inline on a slip rather than
+  // as a separate page.
+  pickingSlips: '/noc/picking-slips',
+  // Manager-only archive of generated delivery/dispatch notes — reuses
+  // receivingAPI.getDeliveries/getDeliveryById and
+  // dispatchAPI.getHistory/getDispatchNote, the same functions the
+  // staff-side equivalents already call, so no new route gating is
+  // needed beyond what those two already require.
+  documents: '/noc/documents',
 };
 
 // ── Donations ────────────────────────────────────────────────
@@ -104,4 +126,6 @@ export const DONATION_INTAKE_ROLES = ['warehouse_worker', 'manager', 'admin'];
 export const ADMIN = {
   dashboard: '/admin',
   suppliers: '/admin/suppliers',
+  users:     '/admin/users',
+  products:  '/admin/products',
 };

@@ -15,14 +15,15 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ROLES } from '../src/middleware/auth.middleware.js';
 
 const repoMock = {
-  getCohortAnchor: vi.fn(),
-  getSlips:        vi.fn(),
-  getSlipById:     vi.fn(),
-  generateSlips:   vi.fn(),
-  createSlip:      vi.fn(),
-  assignSlip:      vi.fn(),
-  setItemStatus:   vi.fn(),
-  completeSlip:    vi.fn(),
+  getCohortAnchor:      vi.fn(),
+  getSlips:             vi.fn(),
+  getSlipById:          vi.fn(),
+  generateSlips:        vi.fn(),
+  createSlip:           vi.fn(),
+  assignSlip:           vi.fn(),
+  setItemStatus:        vi.fn(),
+  completeSlip:         vi.fn(),
+  getAssignableWorkers: vi.fn(),
 };
 
 vi.mock('../src/repositories/picking.repository.js', () => ({ default: repoMock }));
@@ -686,5 +687,29 @@ describe('regressions — previously known defects', () => {
     expect(repoMock.completeSlip).toHaveBeenCalledWith(
       expect.objectContaining({ canOverride: true })
     );
+  });
+});
+
+// ── getAssignableWorkers ─────────────────────────────────────────
+describe('getAssignableWorkers', () => {
+  it('rejects a worker', async () => {
+    await expectStatus(pickingService.getAssignableWorkers(WORKER), 403);
+    expect(repoMock.getAssignableWorkers).not.toHaveBeenCalled();
+  });
+
+  it('rejects finance', async () => {
+    await expectStatus(pickingService.getAssignableWorkers(FINANCE), 403);
+  });
+
+  it('lets a manager through', async () => {
+    repoMock.getAssignableWorkers.mockResolvedValueOnce([{ id: 1, first_name: 'A', last_name: 'B' }]);
+    await expect(pickingService.getAssignableWorkers(MANAGER)).resolves.toEqual(
+      [{ id: 1, first_name: 'A', last_name: 'B' }]
+    );
+  });
+
+  it('lets an admin through', async () => {
+    repoMock.getAssignableWorkers.mockResolvedValueOnce([]);
+    await expect(pickingService.getAssignableWorkers(ADMIN)).resolves.toEqual([]);
   });
 });
