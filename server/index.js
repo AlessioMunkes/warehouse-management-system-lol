@@ -22,8 +22,15 @@ import pickingRouter     from './src/routes/picking.routes.js';
 import donationRouter    from './src/routes/donation.routes.js';
 import pendingDonationRouter from './src/routes/pendingDonation.routes.js';
 import dispatchRouter    from './src/routes/dispatch.routes.js';
-import supplierRouter   from './src/routes/supplier.routes.js';
+import supplierRouter    from './src/routes/supplier.routes.js';
+import purchaseOrderRouter from './src/routes/purchaseOrder.routes.js';
 import reportingRouter   from './src/routes/reporting.routes.js';
+import userRouter        from './src/routes/user.routes.js';
+import productRouter     from './src/routes/product.routes.js';
+import dashboardRouter   from './src/routes/dashboard.routes.js';
+import beneficiaryRouter from './src/routes/beneficiary.routes.js';
+import notificationRouter from './src/routes/notification.routes.js';
+import loveActivismRouter   from './src/routes/loveActivism.routes.js';
 
 // ── Validate required secrets exist at startup ───────────────
 if (!process.env.JWT_SECRET) {
@@ -114,7 +121,14 @@ app.use('/api/donations',  donationRouter);
 app.use('/api/donations',  donationIntakeRouter);
 app.use('/api/donations/admin', donationAdminRoutes);
 app.use('/api/suppliers',  supplierRouter);
+app.use('/api/purchase-orders', purchaseOrderRouter);
 app.use('/api/reporting',  reportingRouter);
+app.use('/api/users',      userRouter);
+app.use('/api/products',   productRouter);
+app.use('/api/dashboard',  dashboardRouter);
+app.use('/api/beneficiaries', beneficiaryRouter);
+app.use('/api/notifications', notificationRouter);
+app.use('/api/love-activism', loveActivismRouter);
 
 // ── SPA fallback (production only) ────────────────────────────
 // Any non-/api path falls through to index.html so React Router can

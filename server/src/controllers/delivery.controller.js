@@ -31,13 +31,30 @@ const respondWithError = (res, err, label, fallback) => {
   });
 };
 
-// ── GET /api/deliveries?range=today|week|month|all ───────────
+// ── GET /api/deliveries ──────────────────────────────────────
+// Query: range | from | to | supplierId | status | limit | offset
+// Returns { rows, total, limit, offset } inside the usual envelope, so the
+// client reads res.data.rows. The whole query object is handed to the service,
+// which validates it — the controller stays a passthrough, same as every other
+// handler in this file.
 const getDeliveries = async (req, res) => {
   try {
-    const deliveries = await deliveryService.getDeliveries(req.query.range || 'all');
-    res.json({ success: true, data: deliveries });
+    const result = await deliveryService.getDeliveries(req.query);
+    res.json({ success: true, data: result });
   } catch (err) {
     respondWithError(res, err, 'getDeliveries', 'Failed to retrieve deliveries.');
+  }
+};
+
+// ── GET /api/deliveries/supplier-options ─────────────────────
+// Only the suppliers that actually have delivery notes, for the archive's
+// filter dropdown.
+const getSupplierOptions = async (req, res) => {
+  try {
+    const suppliers = await deliveryService.getSupplierOptions();
+    res.json({ success: true, data: suppliers });
+  } catch (err) {
+    respondWithError(res, err, 'getSupplierOptions', 'Failed to retrieve supplier options.');
   }
 };
 
@@ -76,10 +93,10 @@ const createDelivery = async (req, res) => {
   }
 };
 
-// ── GET /api/deliveries/suppliers ────────────────────────────
+// ── GET /api/deliveries/suppliers?openOrdersOnly=true ────────
 const getSuppliers = async (req, res) => {
   try {
-    const suppliers = await deliveryService.getSuppliers();
+    const suppliers = await deliveryService.getSuppliers(req.query.openOrdersOnly === 'true');
     res.json({ success: true, data: suppliers });
   } catch (err) {
     respondWithError(res, err, 'getSuppliers', 'Failed to retrieve suppliers.');
@@ -118,6 +135,7 @@ const getPurchaseOrderItems = async (req, res) => {
 
 export default {
   getDeliveries,
+  getSupplierOptions,
   getDeliveryById,
   createDelivery,
   getSuppliers,

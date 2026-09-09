@@ -29,13 +29,29 @@
 // flow captures a driver name. delivery_notes.driver_name is the real
 // column if that's ever added; it isn't written from here today.
 // ─────────────────────────────────────────────────────────────
-import { apiGet, apiPost } from './api';
+import { apiGet, apiPost, cachedGet, invalidateCache } from './api';
+
+// 60s: short enough that a supplier added this morning shows up
+// within a minute of the next page visit, long enough that hopping
+// into Receiving twice in a row doesn't re-pay the round trip both
+// times. See api.js's cachedGet for why this exists at all.
+const SUPPLIER_CACHE_TTL_MS = 60_000;
 
 // GET /api/deliveries/suppliers
-export const getSuppliers = async () => {
-  const res = await apiGet('/api/deliveries/suppliers');
-  return res.data ?? [];
-};
+export const getSuppliers = async () =>
+  cachedGet('deliveries:suppliers', SUPPLIER_CACHE_TTL_MS, async () => {
+    const res = await apiGet('/api/deliveries/suppliers');
+    return res.data ?? [];
+  });
+
+// GET /api/deliveries/suppliers?openOrdersOnly=true
+// For the Form view's supplier dropdown: only suppliers with an
+// approved order worth receiving against.
+export const getSuppliersWithOpenOrders = async () =>
+  cachedGet('deliveries:suppliers:open', SUPPLIER_CACHE_TTL_MS, async () => {
+    const res = await apiGet('/api/deliveries/suppliers?openOrdersOnly=true');
+    return res.data ?? [];
+  });
 
 // GET /api/deliveries/purchase-orders?supplierId=
 // Approved orders only, per delivery.repository. This is the "which
@@ -84,13 +100,90 @@ export const recordDelivery = async ({
     lineItems,
     idempotencyKey: idempotencyKey || null,
   });
+  // A receiving submission can flip its purchase order to 'completed'
+  // (poCompleted above), which changes who has an open order — the
+  // cached open-suppliers list from getSuppliersWithOpenOrders would
+  // otherwise still offer that supplier for up to a minute afterwards.
+  invalidateCache('deliveries:suppliers:open');
   return res.data;
+};
+
+// GET /api/deliveries?range=today|week|month|all
+// The staff deliveries dashboard's list — same range shape
+// ProcurementDashboard already understands, defaults to 'all'.
+export const getDeliveries = async (range = 'all') => {
+  const res = await apiGet(`/api/deliveries?range=${encodeURIComponent(range)}`);
+  return res.data ?? [];
+};
+
+// GET /api/deliveries/:id
+// One delivery with its line items and signature, for the note PDF —
+// created fresh right after a submit, or opened later from the
+// deliveries dashboard.
+export const getDeliveryById = async (id) => {
+  const res = await apiGet(`/api/deliveries/${id}`);
+  return res.data;
+};
+
+// ─────────────────────────────────────────────────────────────
+// THE GOODS-IN ARCHIVE
+//
+// GET /api/deliveries returns { rows, total, limit, offset } — NOT a bare
+// array. It used to return an array and had no caller in client/src at all,
+// which is why changing the shape is safe.
+//
+// Every row carries has_discrepancies and discrepancy_count, so the list can
+// show which notes need a manager's attention without opening each one.
+// ─────────────────────────────────────────────────────────────
+export const getDeliveries = async ({
+  from, to, supplierId, status, search, sort, dir, limit, offset,
+} = {}) => {
+  const params = new URLSearchParams();
+  if (from)       params.set('from', from);
+  if (to)         params.set('to', to);
+  if (supplierId) params.set('supplierId', supplierId);
+  if (status)     params.set('status', status);
+  if (search)     params.set('search', search);
+  if (sort)       params.set('sort', sort);
+  if (dir)        params.set('dir', dir);
+  if (limit  !== undefined) params.set('limit', limit);
+  if (offset !== undefined) params.set('offset', offset);
+
+  const qs  = params.toString();
+  const res = await apiGet(`/api/deliveries${qs ? `?${qs}` : ''}`);
+  return res.data ?? { rows: [], total: 0, limit: 25, offset: 0 };
+};
+
+// GET /api/deliveries/:id
+// The full note: line items with received AND expected quantities, the
+// signature, discrepancy reasons, and items_from_purchase_order — which is
+// TRUE when the lines came off the purchase order because the note predates
+// delivery_note_items. When it is true the quantities are what was ORDERED,
+// not a record of what physically arrived, and the document must say so.
+// (Zero notes are in that state today, but the branch is kept live rather
+// than deleted, because a silently wrong delivery note is the exact failure
+// this feature exists to prevent.)
+export const getDeliveryById = async (id) => {
+  const res = await apiGet(`/api/deliveries/${id}`);
+  return res.data ?? null;
+};
+
+// GET /api/deliveries/supplier-options
+// Only suppliers that actually have notes — a filter offering suppliers with
+// no history is a filter that mostly returns nothing.
+export const getSupplierOptions = async () => {
+  const res = await apiGet('/api/deliveries/supplier-options');
+  return res.data ?? [];
 };
 
 export default {
   getSuppliers,
+  getSuppliersWithOpenOrders,
   getPurchaseOrders,
   getPurchaseOrderItems,
   getProducts,
   recordDelivery,
+  getDeliveries,
+  getDeliveryById,
+  getSupplierOptions,
 };

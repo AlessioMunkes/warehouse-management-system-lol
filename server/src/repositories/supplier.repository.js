@@ -101,7 +101,8 @@ const getSupplierStats = async (id) => {
        (SELECT COUNT(*) FROM purchase_orders po
          WHERE po.supplier_id = $1)::int AS purchase_order_count,
        (SELECT COUNT(*) FROM purchase_orders po
-         WHERE po.supplier_id = $1 AND po.status = 'pending')::int AS open_purchase_orders,
+         WHERE po.supplier_id = $1
+           AND po.status NOT IN ('completed', 'returned'))::int AS open_purchase_orders,
        (SELECT COUNT(*) FROM delivery_notes dn
          WHERE dn.supplier_id = $1)::int AS delivery_note_count,
        (SELECT MAX(dn.delivery_date) FROM delivery_notes dn

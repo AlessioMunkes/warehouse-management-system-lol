@@ -148,6 +148,22 @@
 .stf-crumb-back:hover { color: var(--stf-accent-deep); text-decoration: underline; }
 .stf-crumb-meta { font-variant-numeric: tabular-nums; white-space: nowrap; }
 
+/* An action link in the crumb row (e.g. Receiving's "History") — in
+   the persistent header rather than inline page content, so it stays
+   reachable and visible regardless of scroll position or which
+   screen/dialog is currently showing. */
+.stf-crumb-link {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  font: 700 12px/1.4 var(--stf-font-sans);
+  color: var(--stf-accent);
+  white-space: nowrap;
+}
+.stf-crumb-link:hover { color: var(--stf-accent-deep); }
+.stf-crumb-link i { font-size: 14px; }
+
 /* The single column every task page lays out in. Same column on a phone
    and on a bench tablet — the tablet gets more air, not a denser layout
    to relearn. */
@@ -578,6 +594,117 @@
 }
 .stf-segment.is-active { background: var(--stf-white); color: var(--stf-ink); }
 
+/* ── View toggle (Guided / Form) ───────────────────────────────────
+   Same .stf-segments shell as the filter tabs above, but a full pill
+   rather than their softer corners, and sized to its labels rather
+   than stretched to fill the row — this is the one place in the app
+   asking to look like booking.com's compact List/Grid switch, not the
+   full-width filter-tab language used everywhere else (nor the
+   full-width block this looked like before: a fixed 50/50 split only
+   works for two equal-width segments, which forced the whole control
+   to stretch to make that true). The thumb's width and position come
+   from JS measuring the real button (see ViewToggle in
+   StepPrimitives.jsx) — CSS here only draws it. */
+.stf-toggle-block {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.stf-toggle {
+  position: relative;
+  display: inline-flex;
+  width: auto;
+  border-radius: var(--stf-radius-pill);
+}
+.stf-toggle .stf-segment {
+  flex: none;
+  padding: 10px 18px;
+  position: relative;
+  z-index: 1;
+  border-radius: var(--stf-radius-pill);
+  background: transparent; /* the thumb draws the active background now */
+}
+.stf-segment-thumb {
+  position: absolute;
+  top: 3px; bottom: 3px; left: 0;
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-white);
+  box-shadow: 0 1px 2px rgba(43, 51, 54, 0.14);
+  transition: transform 220ms cubic-bezier(0.4, 0, 0.2, 1), width 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 0;
+}
+
+/* One line naming whichever option is currently active, left-aligned
+   under the (now content-sized) pill. Not a title-attribute tooltip:
+   this is read with a thumb, not a mouse, and title never shows on a
+   tap. */
+.stf-toggle-hint { margin: 0; font-size: 12px; color: var(--stf-text-sub); }
+
+/* ── Coachmark (first-run nudge toward the view toggle) ───────────
+   Anchored to whatever wraps the toggle (.stf-toggle-anchor gives it
+   position: relative), not fixed to the viewport — it only ever
+   needs to point at one control, right below it. */
+.stf-toggle-anchor {
+  position: relative;
+  /* .stf-main is a flex column; a direct child stretches to its full
+     width by default. This is the actual direct child (ViewToggle's
+     own .stf-toggle-block sits inside it), so the override belongs
+     here, not one level down. Right-aligned to match the booking.com
+     reference this control was modelled on. */
+  align-self: flex-end;
+}
+.stf-coachmark {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  max-width: 190px;
+}
+.stf-coachmark-arrow {
+  flex-shrink: 0;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--stf-ink);
+  animation: stf-coachmark-bounce 1.2s ease-in-out infinite;
+}
+.stf-coachmark-body {
+  border: 0;
+  border-radius: var(--stf-radius-sm);
+  padding: 8px 10px;
+  background: var(--stf-ink);
+  color: var(--stf-white);
+  font: 600 12px/1.4 var(--stf-font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+@keyframes stf-coachmark-bounce {
+  0%, 100% { transform: translateY(-2px); }
+  50%      { transform: translateY(2px); }
+}
+
+/* ── Full-form line row (Receiving's "Form" mode) ──────────────────
+   One card per order line holding everything the guided flow spreads
+   across two screens (count, then put-away) — the point of this mode
+   is that none of it is hidden behind a Next button. */
+.stf-formrows { display: flex; flex-direction: column; gap: 12px; }
+.stf-formrow {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+}
+.stf-formrow.is-warn { border-color: var(--stf-attention-border); }
+.stf-formrow-head  { display: flex; flex-direction: column; gap: 2px; }
+.stf-formrow-title { font-family: var(--stf-font-display); font-size: 15px; font-weight: 700; color: var(--stf-ink); }
+.stf-formrow-meta  { font-size: 12px; color: var(--stf-text-sub); }
+
 /* ── Status badge ────────────────────────────────────────────────── */
 .stf-badge {
   display: inline-flex; align-items: center;
@@ -592,6 +719,139 @@
 .stf-badge.is-active  { background: var(--stf-sand); color: var(--stf-ink); }
 .stf-badge.is-done     { background: var(--stf-ink); color: var(--stf-white); }
 .stf-badge.is-warn     { background: var(--stf-attention-bg); color: var(--stf-attention-ink); }
+
+/* ── Select field ─────────────────────────────────────────────────── */
+/* .stf-select itself already exists (donation forms use it) — this
+   file only adds the wrapper spacing to match .stf-field's rhythm,
+   which SelectField in StepPrimitives.jsx already relies on. */
+
+/* ── Date field ───────────────────────────────────────────────────── */
+/* The real <input type="date"> is kept in the document (so
+   showPicker() and native validation still work) but visually
+   collapsed — the button is what a worker actually sees and taps. */
+.stf-date-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: var(--stf-field);
+  padding: 0 16px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  color: var(--stf-ink);
+  font: 400 16px/1 var(--stf-font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+.stf-date-trigger:hover { border-color: var(--stf-gold); }
+.stf-date-trigger i { font-size: 18px; color: var(--stf-text-sub); }
+.stf-date-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* ── Quantity readout + edit (Form mode) ─────────────────────────── */
+/* Pre-filled from the order, shown as a plain value rather than an
+   open input — most deliveries match the order exactly, so an
+   always-editable field on every one of a dozen lines is a dozen
+   chances to bump a number by accident. Edit is one deliberate tap
+   away instead. */
+.stf-qty-readout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: var(--stf-field);
+  padding: 0 16px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-sand);
+}
+.stf-qty-readout-val {
+  font: 700 22px/1 var(--stf-font-display);
+  color: var(--stf-ink);
+  font-variant-numeric: tabular-nums;
+}
+.stf-qty-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--stf-tap);
+  padding: 0 14px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-white);
+  color: var(--stf-ink);
+  font: 600 13px/1 var(--stf-font-sans);
+}
+.stf-qty-edit-btn:hover { border-color: var(--stf-accent); color: var(--stf-accent); }
+.stf-qty-edit-btn i { font-size: 15px; }
+
+/* ── Signature field ──────────────────────────────────────────────── */
+/* Wraps SignaturePad, which is shared with the manager side and takes
+   its class names as props precisely so it can look native here
+   instead of borrowing the manager page's plain-link styling. */
+.stf-signature-field { display: flex; flex-direction: column; gap: 8px; }
+.stf-signature-actions { display: flex; justify-content: flex-end; }
+.stf-signature-clear {
+  min-height: var(--stf-tap);
+  padding: 0 4px;
+  border: none;
+  background: none;
+  color: var(--stf-accent);
+  font: 600 13px/1 var(--stf-font-sans);
+}
+.stf-signature-clear:hover { color: var(--stf-accent-deep); text-decoration: underline; }
+
+/* ── Form-mode dialog (the "one scrolling form") ─────────────────── */
+/* Chrome (centering, backdrop blur, close button) comes from the
+   shared Dialog component; these three just lay out its inside —
+   a fixed head, a scrollable field stack, and a footer that stays put
+   so the submit button is reachable without scrolling back up. */
+.stf-dialog-head {
+  padding: 20px 20px 0;
+}
+.stf-dialog-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+.stf-dialog-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.stf-dialog-footer {
+  padding: 14px 20px;
+  border-top: 1px solid var(--stf-border);
+  background: var(--stf-white);
+}
+
+/* ── Static (read-only) field value ──────────────────────────────── */
+/* Looks like an input's box without inviting a tap — for a value the
+   screen already knows (who's signed in) rather than one someone
+   needs to choose. */
+.stf-static-value {
+  display: flex;
+  align-items: center;
+  min-height: var(--stf-field);
+  padding: 0 16px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-sand);
+  color: var(--stf-ink);
+  font: 600 16px/1 var(--stf-font-sans);
+}
+
+/* History's own link now lives in the crumb bar (.stf-crumb-link,
+   above StaffShell.jsx's block) instead of here — inline page content
+   scrolls out of view and, worse, sits behind the Form dialog once
+   that's open, so it isn't reachable from both modes at all times. */
 
 .stf-sr-only {
   position: absolute; width: 1px; height: 1px;
@@ -876,12 +1136,15 @@ body.reduced-movement .decorative-icon {
    toggle, which sets data-stf-motion="reduced" on <html> so it also
    covers a shared tablet whose OS setting nobody can change. */
 @media (prefers-reduced-motion: reduce) {
-  .stf-rail-bar, .stf-progress-fill, .stf-btn, .stf-choice { transition: none !important; }
+  .stf-rail-bar, .stf-progress-fill, .stf-btn, .stf-choice, .stf-segment-thumb { transition: none !important; }
+  .stf-coachmark-arrow { animation: none !important; }
 }
 [data-stf-motion='reduced'] .stf-rail-bar,
 [data-stf-motion='reduced'] .stf-progress-fill,
 [data-stf-motion='reduced'] .stf-btn,
-[data-stf-motion='reduced'] .stf-choice { transition: none !important; }
+[data-stf-motion='reduced'] .stf-choice,
+[data-stf-motion='reduced'] .stf-segment-thumb { transition: none !important; }
+[data-stf-motion='reduced'] .stf-coachmark-arrow { animation: none !important; }
 
 /* ── Bench tablet ────────────────────────────────────────────────── */
 /* Same column, more air. Deliberately not a wider table: the staff who

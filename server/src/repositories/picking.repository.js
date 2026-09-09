@@ -24,6 +24,7 @@
 // ─────────────────────────────────────────────────────────────
 import pool                  from '../config/db.js';
 import { committedStockSql } from './committedStock.sql.js';
+import { createNotification } from './notification.repository.js';
 
 // ── Audit helper (used inside existing transactions) ──────────
 const logEvent = async (client, slipId, eventType, actorId, detail = null) => {
@@ -188,6 +189,16 @@ const generateSlips = async ({ dispatchDate, cohort, generatedBy }) => {
       }
     }
 
+    if (slips.rowCount > 0) {
+      await createNotification(client, {
+        type:  'picking_slips_generated',
+        title: `${slips.rowCount} picking slip${slips.rowCount === 1 ? '' : 's'} generated`,
+        body:  `${cohort}, ${dispatchDate}` +
+          (emptySlips.length ? ` — ${emptySlips.length} with no lines to check.` : '.'),
+        entityType: 'picking_slip_run',
+      });
+    }
+
     await client.query('COMMIT');
     return { created: slips.rowCount, emptySlips };
 
@@ -209,7 +220,7 @@ const createSlip = async ({ ecdId, dispatchDate, cohort, generatedBy }) => {
     await client.query('BEGIN');
 
     const ecdCheck = await client.query(
-      `SELECT id FROM ecd_centres WHERE id = $1 AND is_active = TRUE AND approved_at IS NOT NULL`,
+      `SELECT id, name FROM ecd_centres WHERE id = $1 AND is_active = TRUE AND approved_at IS NOT NULL`,
       [ecdId]
     );
     if (!ecdCheck.rows[0]) { await client.query('ROLLBACK'); return { ecdNotFound: true }; }
@@ -245,6 +256,14 @@ const createSlip = async ({ ecdId, dispatchDate, cohort, generatedBy }) => {
     if (itemsResult.rowCount === 0) {
       await logEvent(client, slipId, 'no_order_lines', generatedBy, { dispatch_date: dispatchDate });
     }
+
+    await createNotification(client, {
+      type:       'picking_slip_created',
+      title:      `Ad-hoc picking slip created for ${ecdCheck.rows[0].name}`,
+      body:       `${dispatchDate}${itemsResult.rowCount === 0 ? ' — no lines to check.' : '.'}`,
+      entityType: 'picking_slip',
+      entityId:   slipId,
+    });
 
     await client.query('COMMIT');
     return { slipId, itemCount: itemsResult.rowCount };
@@ -621,6 +640,22 @@ const completeSlip = async ({ slipId, palletRef, actorId, canOverride = false })
   }
 };
 
+// ── Assignable workers (manager-only lookup) ────────────────────
+// Deliberately narrow: id + name only, active warehouse_worker
+// accounts only. This is NOT a general users read — /api/users stays
+// admin-only account provisioning (see user.routes.js's own header
+// comment). This exists solely so AssignPickingSlipsPage.jsx's
+// dropdown has someone to assign a slip to.
+const getAssignableWorkers = async () => {
+  const { rows } = await pool.query(
+    `SELECT id, first_name, last_name
+       FROM users
+      WHERE role = 'warehouse_worker' AND is_active = true
+      ORDER BY first_name ASC, last_name ASC`
+  );
+  return rows;
+};
+
 export default {
   CLAIMABLE_STATUSES,
   getCohortAnchor,
@@ -631,4 +666,5 @@ export default {
   assignSlip,
   setItemStatus,
   completeSlip,
+  getAssignableWorkers,
 };

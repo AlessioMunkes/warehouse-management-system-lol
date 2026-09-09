@@ -21,6 +21,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 const repoMock = {
   getBoard:                vi.fn(),
+  getHistory:              vi.fn(),
   getGateView:             vi.fn(),
   collect:                 vi.fn(),
   sweepNonCollections:     vi.fn(),
@@ -516,5 +517,51 @@ describe('a pallet booked for another day can still be collected', () => {
       gateView({ dispatch_date: new Date(2026, 7, 17), slip_status: 'in_progress' })
     );
     await expect(dispatchService.collect(1, body, WORKER)).rejects.toMatchObject({ status: 403 });
+  });
+});
+
+// ── A successful collection hands back the note in the same call ──
+// The gate screen pops up the dispatch note the moment collection
+// succeeds; this saves it a second HTTP round trip for the note by
+// fetching the joined record here instead of leaving the caller to
+// ask for it separately (the same fix delivery.service.js's
+// createDelivery got).
+describe('getHistory — an unrecognised range falls back to all', () => {
+  it('passes a valid range straight through', async () => {
+    repoMock.getHistory.mockResolvedValue([{ dispatch_event_id: 1 }]);
+    const result = await dispatchService.getHistory('week');
+    expect(repoMock.getHistory).toHaveBeenCalledWith('week');
+    expect(result).toEqual([{ dispatch_event_id: 1 }]);
+  });
+
+  it('falls back to all for an unrecognised range', async () => {
+    repoMock.getHistory.mockResolvedValue([]);
+    await dispatchService.getHistory('nonsense');
+    expect(repoMock.getHistory).toHaveBeenCalledWith('all');
+  });
+
+  it('falls back to all when no range is given', async () => {
+    repoMock.getHistory.mockResolvedValue([]);
+    await dispatchService.getHistory(undefined);
+    expect(repoMock.getHistory).toHaveBeenCalledWith('all');
+  });
+});
+
+describe('collect — the note comes back with the collection', () => {
+  const body = {
+    driverName: 'S. Mokoena',
+    signature:  'data:image/png;base64,iVBORw0KGgo=',
+  };
+
+  it('fetches and attaches the full dispatch note', async () => {
+    atUtc('2026-08-19T06:00:00Z'); // matches gateView()'s default dispatch_date — not the wrong day
+    repoMock.getGateView.mockResolvedValue(gateView());
+    repoMock.collect.mockResolvedValue({ event: { id: 9, status: 'collected' } });
+    repoMock.getDispatchNote.mockResolvedValue({ id: 9, ecd_name: 'Sunnyside ECD', lines: [] });
+
+    const result = await dispatchService.collect(1, body, WORKER);
+
+    expect(repoMock.getDispatchNote).toHaveBeenCalledWith(9);
+    expect(result.note).toEqual({ id: 9, ecd_name: 'Sunnyside ECD', lines: [] });
   });
 });

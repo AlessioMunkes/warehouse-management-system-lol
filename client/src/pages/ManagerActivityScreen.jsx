@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { TopNavbar } from "../features/taskdashboard/components/TopNavBar";
 import { Greeting } from "../features/taskdashboard/components/Greeting";
 import { useAuth } from "@/context/AuthContext";
+import { STAFF, VOLUNTEERS } from "../routes/paths";
 import {
   Tooltip,
   TooltipContent,
@@ -25,6 +26,8 @@ import packingIcon from "./../../public/icons/packing-icon.svg";
 import decantingIcon from "./../../public/icons/decanting-icon.svg";
 import dispatchIcon from "./../../public/icons/dispatch-icon.svg";
 import reportingIcon from "./../../public/icons/reporting-icon.svg";
+// Reuse the existing dashboard-sized volunteer asset.
+import volunteerIcon from "./../../public/icons/volunteer-icon.svg";
 
 export default function Home() {
   const { user } = useAuth();
@@ -43,6 +46,12 @@ export default function Home() {
   // those cards open the info modal instead of navigating.
   const tasks = [
     {
+      to: VOLUNTEERS.events,
+      icon: volunteerIcon,
+      title: "Volunteer Management",
+      disabled: false,
+    },
+    {
       to: null,
       icon: receivingIcon,
       title: "Onboard Beneficiary",
@@ -59,6 +68,18 @@ export default function Home() {
       to: "/noc/inventory",
       icon: packingIcon,
       title: "Manage Inventory",
+      disabled: false,
+    },
+    {
+      to: STAFF.purchaseOrders,
+      icon: receivingIcon,
+      title: "Purchase Orders",
+      disabled: false,
+    },
+    {
+      to: STAFF.receipts,
+      icon: dispatchIcon,
+      title: "Receipts",
       disabled: false,
     },
     {

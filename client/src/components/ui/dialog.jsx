@@ -50,10 +50,17 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  // Optional portal target. Base UI's Portal renders into document.body
+  // by default, which is outside any DOM ancestor that scopes CSS
+  // custom properties (e.g. .stf-shell's --stf-* tokens, .lol-landing's
+  // --maroon/--accent) — content styled with those variables would
+  // silently fall back to unset. Pass the scoping ancestor's element
+  // here to portal inside it instead.
+  container,
   ...props
 }) {
   return (
-    <DialogPortal>
+    <DialogPortal container={container}>
       <DialogOverlay />
       <DialogPrimitive.Popup
         data-slot="dialog-content"

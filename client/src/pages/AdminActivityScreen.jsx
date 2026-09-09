@@ -42,6 +42,8 @@ import { ADMIN } from "../routes/paths";
 // arriving from suppliers is the nearest existing meaning, so the
 // receiving icon is reused rather than a new asset invented.
 import receivingIcon from "./../../public/icons/receiving-icon.svg";
+// Reuse the same volunteer asset as the manager dashboard tile.
+import volunteerIcon from "./../../public/icons/volunteer-icon.svg";
 
 export default function AdminActivityScreen() {
   const { user } = useAuth();
@@ -97,6 +99,12 @@ export default function AdminActivityScreen() {
   }, []);
 
   const tasks = [
+    {
+      to: VOLUNTEERS.events,
+      icon: volunteerIcon,
+      title: "Volunteer Management",
+      disabled: false,
+    },
     {
       to: ADMIN.suppliers,
       icon: receivingIcon,

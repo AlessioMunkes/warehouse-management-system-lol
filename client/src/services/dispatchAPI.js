@@ -48,14 +48,26 @@ const BASE_URL = `${API_BASE}/api/dispatch`;
 //     with no Vite proxy, so a bare '/api/dispatch' would hit the
 //     Vite dev server and 404.
 const request = async (path, options = {}) => {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    credentials: 'include',
-    ...options,
-    headers: {
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-      ...options.headers,
-    },
-  });
+  let res;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      credentials: 'include',
+      ...options,
+      headers: {
+        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+        ...options.headers,
+      },
+    });
+  } catch {
+    // fetch() only rejects when the request never completed at all —
+    // the API server is down, the wrong port, offline. Left unguarded,
+    // that threw the browser's own "Failed to fetch" straight into the
+    // UI, which tells a warehouse worker nothing they can act on. This
+    // is the same networkError() api.js's apiGet/apiPost already throw.
+    const err = new Error('Could not reach the server. Check your connection and try again.');
+    err.isNetworkError = true;
+    throw err;
+  }
   return handleResponse(res);
 };
 
@@ -183,6 +195,15 @@ export const recordCollection = (
 // row.picking_slip_id.
 export const getDispatchNote = (eventId) => request(`/notes/${eventId}`);
 
+// ── GET /api/dispatch/history?range=today|week|month|all ──────
+// The staff dispatch history page's list — same range shape
+// receivingAPI.getDeliveries and decantingAPI.getDecantingRecords
+// already use. getGateQueue/getBoard above are the live gate view,
+// scoped to one day or "still outstanding"; this is a real multi-day
+// history of completed collections, each row carrying the
+// dispatch_event_id a note is opened with.
+export const getHistory = (range = 'all') => request(`/history?range=${encodeURIComponent(range)}`);
+
 // ── POST /api/dispatch/sweep (manager only) ───────────────────
 // Forces the 16:00 non-collection write-off for a date. The board
 // already sweeps opportunistically; this is for after a power cut or
@@ -206,12 +227,55 @@ export const getNonCollectionHistory = ({ ecdId, from, to } = {}) => {
   return request(`/non-collections${qs ? `?${qs}` : ''}`);
 };
 
+// ── GET /api/dispatch/notes ───────────────────────────────────
+// THE GOODS-OUT ARCHIVE. Not the board.
+//
+// getBoard answers "what is standing in the yard right now" and is scoped to
+// a day or to the gate's outstanding set. This answers "find me the
+// collection from Little Stars on the 14th" — an open date range, ordered by
+// when it happened.
+//
+// Returns { rows, total, limit, offset }. Each row's dispatch_event_id is
+// what getDispatchNote takes; picking_slip_id is a DIFFERENT id space and
+// passing it will fetch the wrong record or 404.
+//
+// not_collected events are included deliberately. A pallet nobody came for is
+// still a record of the day, and given how often it happens here it is
+// arguably the most useful thing in the archive.
+export const listDispatchNotes = ({
+  from, to, ecdId, cohort, status, search, sort, dir, limit, offset,
+} = {}) => {
+  const params = new URLSearchParams();
+  if (from)   params.set('from', from);
+  if (to)     params.set('to', to);
+  if (ecdId)  params.set('ecdId', ecdId);
+  if (cohort) params.set('cohort', cohort);
+  if (status) params.set('status', status);
+  if (search) params.set('search', search);
+  if (sort)   params.set('sort', sort);
+  if (dir)    params.set('dir', dir);
+  if (limit  !== undefined) params.set('limit', limit);
+  if (offset !== undefined) params.set('offset', offset);
+
+  const qs = params.toString();
+  return request(`/notes${qs ? `?${qs}` : ''}`);
+};
+
+// ── GET /api/dispatch/notes/options ───────────────────────────
+// Beneficiaries with dispatch history, for the archive filter. Includes
+// offboarded centres — BR-27 keeps their records permanently, so their notes
+// have to stay findable.
+export const getDispatchBeneficiaryOptions = () => request('/notes/options');
+
 export default {
   getBoard,
   getGateQueue,
   getGateView,
   recordCollection,
   getDispatchNote,
+  getHistory,
+  listDispatchNotes,
+  getDispatchBeneficiaryOptions,
   runSweep,
   getNonCollectionHistory,
   todayISO,

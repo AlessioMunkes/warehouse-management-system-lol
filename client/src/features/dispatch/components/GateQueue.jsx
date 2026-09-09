@@ -22,11 +22,13 @@
 // written off, each row carrying dispatch_status. Rows are keyed on
 // picking_slip_id, not id.
 //
-// Everything is SHOWN; only awaiting pallets are openable. Staff need
-// to see that a centre was written off at 16:00 or that a driver has
-// already been, not wonder where the row went. An inactive ECD is the
-// one hard block (BR-11), so it is shown greyed with the reason
-// spelled out rather than hidden.
+// Everything still awaiting is shown; only an already-COMPLETED
+// dispatch survives for a centre that has since gone inactive — the
+// pallet already left, and the centre's current status doesn't
+// rewrite that history. A centre with nothing awaiting it (BR-11's
+// hard block) has no reason to occupy a row on the working queue at
+// all, so those are filtered out entirely rather than shown greyed
+// out with an explanation nobody standing at the gate can act on.
 //
 // BR-12 (wrong collection day) is no longer missing: the server
 // computes it per pallet and returns it in the gate view's
@@ -76,7 +78,17 @@ export default function GateQueue({ onOpenPallet }) {
     let cancelled = false;
 
     dispatchAPI.getGateQueue()
-      .then((board) => { if (!cancelled) setRows(board || []); })
+      .then((board) => {
+        if (cancelled) return;
+        // Hide a centre with nothing outstanding — see the header
+        // comment above. A completed dispatch is kept regardless of
+        // the centre's current status.
+        const visible = (board || []).filter((row) =>
+          row.ecd_is_active !== false ||
+          ['collected', 'late_collected'].includes(row.dispatch_status)
+        );
+        setRows(visible);
+      })
       .catch((err) => {
         if (!cancelled) setError(err.message || 'Could not load the gate queue.');
       })
@@ -109,27 +121,25 @@ export default function GateQueue({ onOpenPallet }) {
         <div className="stf-list">
           {rows.map((row) => {
             const state    = stateOf(row);
-            // BR-11 is the one hard block: an inactive centre cannot
-            // be released to, so its row cannot be opened whatever
-            // its dispatch status says.
-            const blocked  = row.ecd_is_active === false;
-            const openable = state.openable && !blocked;
+            const openable = state.openable;
             const at       = timeOf(row.collected_at);
 
             // What the second line says, in order of what matters
             // most to someone standing at a gate.
             let meta;
-            if (blocked) {
-              meta = 'This centre is not active, so nothing can go out to it today.';
-            } else if (row.dispatch_status === 'not_collected') {
-              meta = 'Written off at 16:00 — still collectable. It will be recorded as a late collection.';
+            if (row.dispatch_status === 'not_collected') {
+              meta = 'Awaiting late collection. Written off at 16:00.';
             } else if (at) {
               meta = `${state.label} at ${at}${row.driver_name ? ` · ${row.driver_name}` : ''}`;
+              // The centre going inactive afterwards doesn't rewrite
+              // this pallet's history — it's shown here purely as
+              // information, never as a reason to hide a completed row.
+              if (row.ecd_is_active === false) meta += ' · Centre now inactive';
             } else {
               const flags = [];
               if (Number(row.flagged_items) > 0)  flags.push(`${row.flagged_items} flagged`);
               if (Number(row.variance_items) > 0) flags.push(`${row.variance_items} short or over`);
-              meta = [`${row.total_items} items`, ...flags].join(' · ');
+              meta = [`${row.total_items} items ready for dispatch`, ...flags].join(' · ');
             }
 
             const open = () => onOpenPallet(row.picking_slip_id);
@@ -137,7 +147,7 @@ export default function GateQueue({ onOpenPallet }) {
             return (
               <div
                 key={row.picking_slip_id}
-                className={`stf-row${blocked ? ' is-warn is-static' : state.tone}`}
+                className={`stf-row${state.tone}`}
                 role={openable ? 'button' : undefined}
                 tabIndex={openable ? 0 : undefined}
                 onClick={openable ? open : undefined}

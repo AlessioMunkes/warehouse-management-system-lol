@@ -22,7 +22,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth }   from '../context/AuthContext';
-import { TopNavbar } from '../features/taskdashboard/components/TopNavBar';
+import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
 import SupplierForm  from '../features/suppliers/components/SupplierForm';
 import ProspectPad   from '../features/suppliers/components/ProspectPad';
 import supplierAPI   from '../services/supplierAPI';
@@ -197,8 +197,6 @@ export default function SupplierDirectoryPage() {
   const { user } = useAuth();
   const canManage = CAN_MANAGE.includes(user?.role);
 
-  const [reducedMovement, setReducedMovement] = useState(false);
-
   const [tab, setTab] = useState('suppliers');
   const [suppliers, setSuppliers] = useState([]);
   const [prospects, setProspects] = useState([]);
@@ -316,12 +314,7 @@ export default function SupplierDirectoryPage() {
   };
 
   return (
-    <>
-      <TopNavbar
-        reducedMovement={reducedMovement}
-        onToggleMovement={() => setReducedMovement((v) => !v)}
-      />
-
+    <ManagerLayout>
       <main className="mx-auto w-full max-w-5xl px-4 py-6">
         <h1 className="text-2xl font-medium">Suppliers</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -476,6 +469,6 @@ export default function SupplierDirectoryPage() {
           </div>
         )}
       </main>
-    </>
+    </ManagerLayout>
   );
 }

@@ -19,13 +19,97 @@
 // the numbers agree is a system that gets abandoned for a clipboard.
 // The difference is recorded and the manager is told; the delivery
 // still gets received.
+//
+// A second shape exists alongside the four screens above: `mode`
+// ('guided' | 'full', a worker's own choice, remembered per device)
+// picks between them without forking any of the data fetching,
+// validation or commit logic below — both shapes read and write the
+// exact same `lines` state, so switching mid-task carries whatever's
+// already been counted across rather than losing it. Guided is the
+// default every worker starts from. The toggle sits at the top right
+// (matching the booking.com-style reference it was built against) and
+// is visible from the first screen on, since Form mode's shape is
+// already different from Guided's before any order is even picked.
+//
+// Form mode is ONE scrolling dialog, not a second sequence of pages —
+// supplier, who's receiving it, the order, the date, every line and
+// the signature, top to bottom, centred over a dimmed/blurred backdrop
+// (client/src/components/ui/dialog.jsx, the same Dialog LoginPage.jsx
+// already uses elsewhere). `formOpen` controls only whether that
+// dialog is visible; it is independent of `mode`, so dismissing it
+// (backdrop tap, Escape, the X) never silently discards what was
+// already picked — reopening resumes instead of restarting. What sits
+// on the page behind it is just enough to show something is there to
+// tap ("Start a new delivery" / "Continue this delivery").
+//
+// Quantities in Form mode start pre-filled with the expected amount
+// rather than empty: most deliveries match the order exactly, and
+// retyping every line for the ones that do is work nobody asked for.
+// Guided's per-item counting screen still starts empty — an active
+// count is the point of that mode. Switching TO Form mode backfills
+// any line still uncounted; switching a line manually counted first
+// is left alone either way (see handleModeChange, startCounting).
+//
+// A signature is captured here now, at receiving, right before the
+// final submit in both modes — not at dispatch. That's a deliberate
+// change from this flow's first version, which recorded acceptance
+// with a fixed string because the driver signed elsewhere. The driver
+// now signs the tablet at the bay, and the delivery note carries it.
+//
+// finish() closes the dialog (setFormOpen(false)) the moment a submit
+// succeeds, in the same breath as setPhase('done') — closing the note
+// PDF that pops up afterward must not drop a worker back into what
+// looks like the same unsent form still sitting behind it.
+//
+// There is no "save and finish later" in Form mode. That button's on
+// an early mockup, but nothing in this app persists a delivery that
+// hasn't been submitted, so promising to save one would be a lie the
+// first time someone's tab closed. "Check and finish" is the one
+// action that actually does something.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useState } from 'react';
 import {
-  StepRail, StepScreen, Actions, Button, NumberField, ChoiceList, Notice, KeyValues,
+  StepRail, StepScreen, Actions, Button, NumberField, SelectField, DateField, QuantityField,
+  ChoiceList, Notice, KeyValues, ViewToggle, Coachmark,
 } from '../../staff/components/StepPrimitives';
+import useCoachmark from '../../staff/hooks/useCoachmark';
 import receivingAPI from '../../../services/receivingAPI';
 import { newIdempotencyKey } from '../../../services/api';
+import { useAuth } from '../../../context/AuthContext';
+import SignaturePad from './SignaturePad';
+import DeliveryNotePDF from './DeliveryNotePDF';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../components/ui/dialog';
+
+// Shared by both modes' final screen, right before the submit button.
+// SignaturePad is the manager side's own component — canvasClassName/
+// clearButtonClassName are what let it look native here instead of
+// carrying the manager page's plain-link styling.
+const SignatureField = ({ value, onChange }) => (
+  <div className="stf-signature-field">
+    <span className="stf-field-label">Driver&rsquo;s signature</span>
+    <SignaturePad
+      onChange={onChange}
+      canvasClassName="stf-sign-canvas"
+      clearButtonClassName="stf-signature-clear"
+    />
+    {!value ? (
+      <p className="stf-field-hint">Ask the driver to sign above before you finish.</p>
+    ) : null}
+  </div>
+);
+
+const MODE_KEY = 'stf_receiving_view_mode';
+const MODES = [
+  { value: 'guided', label: 'Guided', hint: 'Step by step' },
+  { value: 'full',   label: 'Form',   hint: 'Everything at once' },
+];
+const readStoredMode = () => {
+  try {
+    return localStorage.getItem(MODE_KEY) === 'full' ? 'full' : 'guided';
+  } catch {
+    return 'guided';
+  }
+};
 
 const TOTAL_STEPS = 4;
 
@@ -72,10 +156,44 @@ const STEP_META = {
 };
 
 export default function ReceivingFlow({ onCrumbChange }) {
+  const { user } = useAuth();
   const [phase, setPhase] = useState('which');
   const [lineIndex, setLineIndex] = useState(0);
+  const [mode, setMode] = useState(readStoredMode);
+  // Form mode is one scrolling dialog rather than its own page — this
+  // is purely "is it open right now", independent of `mode`, so
+  // dismissing it (backdrop tap, Escape, the X) doesn't also flip the
+  // toggle back to Guided. Whatever was already picked (supplier,
+  // order, counted lines) is left alone when it closes; reopening
+  // resumes rather than restarts.
+  const [formOpen, setFormOpen] = useState(false);
+  // Resolved once, after mount, rather than read inline during render —
+  // .stf-shell is a real DOM ancestor by the time this component's own
+  // effects run, so there's no reason to re-query it on every render.
+  // Passed to the dialog as its portal target: see the Dialog block
+  // below for why that matters.
+  const [shellNode, setShellNode] = useState(null);
+  useEffect(() => {
+    const resolve = () => setShellNode(document.querySelector('.stf-shell'));
+    resolve();
+  }, []);
+  const { show: showCoachmark, dismiss: dismissCoachmark } = useCoachmark('receiving-view-toggle');
 
   const [suppliers, setSuppliers] = useState([]);
+  // Narrower than `suppliers` — only those with an approved order.
+  // Full form's supplier dropdown uses this one; Guided's ChoiceList
+  // keeps using the full list, unchanged.
+  const [openSuppliers, setOpenSuppliers] = useState([]);
+  const [deliveryDate, setDeliveryDate] = useState(todayISO);
+  const [signature, setSignature] = useState(null);
+  // Which lines' pre-filled quantity a worker has chosen to edit, in
+  // Full form. Purely a display concern — not part of `lines`, and
+  // not sent to the server.
+  const [editingQty, setEditingQty] = useState({});
+  // The delivery just recorded, fetched in full (items, signature,
+  // supplier name) so DeliveryNotePDF has what it needs. null hides
+  // the pop-up; set once by finish() on success.
+  const [pdfDelivery, setPdfDelivery] = useState(null);
 
   // What the last fetch returned, keyed implicitly by supplierId. The
   // list only means anything while a supplier is selected, so the
@@ -109,12 +227,20 @@ export default function ReceivingFlow({ onCrumbChange }) {
   const step = STEP_META[phase];
 
   // ── Suppliers, once ─────────────────────────────────────────
+  // Both lists are fetched together up front rather than lazily on
+  // first switch to Full form — mode is remembered per device and
+  // can already be 'full' on load, so the filtered list needs to be
+  // ready before the first screen renders, not fetched reactively
+  // after the fact.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const list = await receivingAPI.getSuppliers();
-        if (!cancelled) setSuppliers(list);
+        const [list, openList] = await Promise.all([
+          receivingAPI.getSuppliers(),
+          receivingAPI.getSuppliersWithOpenOrders(),
+        ]);
+        if (!cancelled) { setSuppliers(list); setOpenSuppliers(openList); }
       } catch (err) {
         if (!cancelled) setError(err.message);
       } finally {
@@ -151,13 +277,47 @@ export default function ReceivingFlow({ onCrumbChange }) {
     [suppliers, supplierId]
   );
   const shortLines = lines.filter((l) => l.counted !== '' && Number(l.counted) < l.expected);
+  const receivedByName = user?.firstName ? `${user.firstName} ${user.lastName ?? ''}`.trim() : 'You';
+  const hasLines = lines.length > 0;
+  const showToggle = phase !== 'done';
+
+  const handleModeChange = (next) => {
+    setMode(next);
+    if (next === 'full') {
+      // Any line still at its untouched default picks up the expected
+      // quantity the moment Full form becomes the active shape — a
+      // line someone already counted in Guided is never touched here.
+      setLines((all) => all.map((line) => (
+        line.counted === '' ? { ...line, counted: String(line.expected) } : line
+      )));
+      // Tapping "Form" opens the dialog directly rather than landing
+      // on a page that then needs its own "open the form" tap — the
+      // tap on the toggle already said what the worker wants to do.
+      setFormOpen(true);
+    }
+    try { localStorage.setItem(MODE_KEY, next); } catch { /* nothing we can do */ }
+    dismissCoachmark();
+  };
+
+  // The hint disappears the moment someone uses the toggle (above) or
+  // after a few seconds regardless — a first-run nudge, not a fixture.
+  useEffect(() => {
+    if (!showCoachmark || !showToggle) return undefined;
+    const timer = setTimeout(dismissCoachmark, 5000);
+    return () => clearTimeout(timer);
+  }, [showCoachmark, showToggle, dismissCoachmark]);
 
   // ── Step 1 to 2 ─────────────────────────────────────────────
-  const startCounting = async () => {
+  // Takes the order id explicitly rather than reading `orderId` off
+  // closure state: Form mode calls this straight from the order
+  // dropdown's onChange, in the same tick as setOrderId(value) — the
+  // state update hasn't landed yet at that point, so a stale read
+  // would fetch items for whatever order was previously selected.
+  const startCounting = async (poId) => {
     setSaving(true);
     setError(null);
     try {
-      const items = await receivingAPI.getPurchaseOrderItems(orderId);
+      const items = await receivingAPI.getPurchaseOrderItems(poId);
       setLines(items.map((item) => {
         const fresh = isFreshProduct(item);
         return {
@@ -168,13 +328,19 @@ export default function ReceivingFlow({ onCrumbChange }) {
           expected:   Number(item.expected_quantity ?? 0),
           expectedKg: item.expected_weight_kg === null ? null : Number(item.expected_weight_kg),
           fresh,
-          counted:    '',
+          // Full form pre-fills; Guided starts every line empty
+          // because the point of that mode is an active count.
+          counted:    mode === 'full' ? String(item.expected_quantity ?? '') : '',
           location:   fresh ? 'cold_room' : 'dry_store',
           useBy:      '',
         };
       }));
       setLineIndex(0);
-      setPhase('count');
+      // Guided moves into its per-item sequence; Form mode has no
+      // sequence to move into — the lines just appear further down
+      // the same dialog, and `phase` staying at 'which' keeps the
+      // crumb accurate for as long as that dialog is open.
+      if (mode !== 'full') setPhase('count');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -182,8 +348,12 @@ export default function ReceivingFlow({ onCrumbChange }) {
     }
   };
 
-  const patchLine = (patch) =>
-    setLines((all) => all.map((line, i) => (i === lineIndex ? { ...line, ...patch } : line)));
+  // Guided only ever edits "the current line"; Full form edits
+  // whichever line the worker's finger is on, all of them visible at
+  // once — so patching by an explicit index is the one both need.
+  const patchLineAt = (index, patch) =>
+    setLines((all) => all.map((line, i) => (i === index ? { ...line, ...patch } : line)));
+  const patchLine = (patch) => patchLineAt(lineIndex, patch);
 
   const goToNextLine = () => {
     if (lineIndex + 1 < lines.length) {
@@ -199,18 +369,16 @@ export default function ReceivingFlow({ onCrumbChange }) {
     setSaving(true);
     setError(null);
     try {
-      // No driver is recorded here — there is no drivers table and
-      // this flow has no field for one. delivery_notes.driver_name is
-      // the real column to write to if that's ever added.
-      await receivingAPI.recordDelivery({
+      // No driver NAME is recorded here — there is no drivers table
+      // and this flow has no field for one. delivery_notes.driver_name
+      // is the real column to write to if that's ever added. The
+      // driver's actual signature is captured above and does go to
+      // delivery_notes.signature via signatureData below.
+      const result = await receivingAPI.recordDelivery({
         supplierId,
-        deliveryDate: todayISO(),
+        deliveryDate,
         purchaseOrderId: orderId,
-        // The endpoint validates that a signature is present. These
-        // wireframes do not ask for one at intake (the driver signs at
-        // dispatch, not receiving), so the receipt records that it was
-        // accepted in the app instead.
-        signatureData: 'received-in-app',
+        signatureData: signature,
         poCompleted: lines.every((l) => Number(l.counted) >= l.expected),
         idempotencyKey: attemptKey,
         lineItems: lines.map((line) => {
@@ -232,6 +400,18 @@ export default function ReceivingFlow({ onCrumbChange }) {
         }),
       });
       setPhase('done');
+      // Closing the dialog here is what actually ends Form mode's
+      // pass through this flow. Without it, `lines` stays populated
+      // (nothing here clears it — restart() does that, on its own
+      // button) and the mega-form would still be mounted behind the
+      // PDF pop-up, so closing the PDF dropped a worker right back
+      // into what looked like the same unsent form.
+      setFormOpen(false);
+      // recordDelivery's response already carries the full joined
+      // record (supplier name, items, po_status) — the server fetches
+      // that itself now instead of handing back the bare row and
+      // making this screen ask for it again over a second round trip.
+      setPdfDelivery(result);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -244,6 +424,11 @@ export default function ReceivingFlow({ onCrumbChange }) {
     setLines([]);
     setOrderId('');
     setLineIndex(0);
+    setDeliveryDate(todayISO());
+    setSignature(null);
+    setEditingQty({});
+    setPdfDelivery(null);
+    setFormOpen(false);
     // A new delivery is a new attempt. Keeping the old key would make
     // the server treat the next genuine delivery as a replay of the
     // last one and silently record nothing.
@@ -254,18 +439,30 @@ export default function ReceivingFlow({ onCrumbChange }) {
 
   return (
     <>
-      <StepRail step={step.n} total={TOTAL_STEPS} label={step.label} />
+      {showToggle ? (
+        <div className="stf-toggle-anchor">
+          <ViewToggle options={MODES} value={mode} onChange={handleModeChange} />
+          <Coachmark show={showCoachmark} onDismiss={dismissCoachmark}>
+            Tap here to switch view
+          </Coachmark>
+        </div>
+      ) : null}
+
+      {/* The rail counts steps through a sequence — Form mode has no
+          sequence, it is one scrolling dialog, so there is nothing
+          for it to show. */}
+      {mode === 'full' ? null : <StepRail step={step.n} total={TOTAL_STEPS} label={step.label} />}
 
       {error ? <Notice tone="warn">{error}</Notice> : null}
 
-      {/* ── 1 · Which delivery ─────────────────────────────── */}
-      {phase === 'which' && (
+      {/* ── 1 · Which delivery (Guided) ────────────────────── */}
+      {phase === 'which' && mode !== 'full' && (
         <StepScreen
           title="Which delivery is this?"
           sub="The driver has a note with a number on it."
           actions={
             <Actions>
-              <Button disabled={!orderId || saving} onClick={startCounting}>
+              <Button disabled={!orderId || saving} onClick={() => startCounting(orderId)}>
                 {saving ? 'Loading the list' : 'Start counting'}
               </Button>
             </Actions>
@@ -302,8 +499,185 @@ export default function ReceivingFlow({ onCrumbChange }) {
         </StepScreen>
       )}
 
+      {/* ── Form mode: an entry screen, plus one scrolling dialog ──
+          Everything — supplier, order, date, every line, the
+          signature — lives in the dialog below, in that order, as one
+          form you scroll down to fill. This screen is just what's
+          visible behind it: enough to show something is there to tap,
+          without pretending Form mode has its own sequence of pages. */}
+      {phase !== 'done' && mode === 'full' && (
+        <StepScreen
+          title="Fill in one form"
+          actions={
+            <Actions>
+              <Button onClick={() => setFormOpen(true)}>
+                {hasLines ? 'Continue this delivery' : 'Start a new delivery'}
+              </Button>
+            </Actions>
+          }
+        />
+      )}
+
+      <Dialog open={formOpen} onOpenChange={setFormOpen}>
+        <DialogContent
+          container={shellNode ?? undefined}
+          className="max-w-[560px] w-[calc(100%-2rem)] max-h-[85vh] p-0 gap-0 flex flex-col overflow-hidden"
+        >
+          <DialogHeader className="stf-dialog-head">
+            <DialogTitle>
+              {supplierId ? `${supplierName}${orderId ? ` · Order ${orderId}` : ''}` : 'Which delivery is this?'}
+            </DialogTitle>
+            <DialogDescription>
+              Pick the supplier and order, then fill in what is on the floor.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="stf-dialog-scroll">
+            <div className="stf-dialog-fields">
+              <SelectField
+                id="stf-full-supplier"
+                label="Who it came from"
+                placeholder="Choose a supplier"
+                options={openSuppliers.map((s) => ({ value: s.id, label: s.name }))}
+                value={supplierId}
+                onChange={(value) => { setSupplierId(value); setOrderId(''); setLines([]); }}
+                hint={openSuppliers.length === 0 ? 'No supplier has an approved order right now.' : undefined}
+              />
+
+              <div className="stf-field">
+                <span className="stf-field-label">Received by</span>
+                <div className="stf-static-value">{receivedByName}</div>
+              </div>
+
+              {supplierId ? (
+                <SelectField
+                  id="stf-full-order"
+                  label="Which order"
+                  placeholder="Choose an order"
+                  options={orders.map((o) => ({
+                    value: o.id,
+                    label: o.expected_delivery_date
+                      ? `Order ${o.id} · Due ${longDate(o.expected_delivery_date)}`
+                      : `Order ${o.id}`,
+                  }))}
+                  value={orderId}
+                  onChange={(value) => { setOrderId(value); startCounting(value); }}
+                  disabled={orders.length === 0}
+                  hint={orders.length === 0 ? `There is no open order for ${supplierName} today.` : undefined}
+                />
+              ) : null}
+
+              {orderId ? (
+                <DateField
+                  id="stf-full-date"
+                  label="Delivery date"
+                  value={deliveryDate}
+                  onChange={setDeliveryDate}
+                />
+              ) : null}
+
+              {saving && !hasLines ? (
+                <p className="stf-field-hint">Loading the order&rsquo;s items…</p>
+              ) : null}
+
+              {hasLines ? (
+                <>
+                  <div className="stf-formrows">
+                    {lines.map((line, i) => {
+                      const counted = line.counted;
+                      const variance = counted === '' ? 0 : Number(counted) - line.expected;
+                      const short = counted !== '' && variance < 0;
+                      const over = counted !== '' && variance > 0;
+                      return (
+                        <div
+                          key={line.purchaseOrderItemId}
+                          className={`stf-formrow${short || over ? ' is-warn' : ''}`}
+                        >
+                          <div className="stf-formrow-head">
+                            <span className="stf-formrow-title">{line.name}</span>
+                            <span className="stf-formrow-meta">
+                              Code: {line.sku} · Expected: {line.expected}
+                              {line.expectedKg ? ` (${line.expectedKg} kg)` : ''}
+                            </span>
+                          </div>
+
+                          <QuantityField
+                            id={`stf-counted-${line.purchaseOrderItemId}`}
+                            label="How many are here?"
+                            value={line.counted}
+                            editing={!!editingQty[line.purchaseOrderItemId]}
+                            flagged={counted !== '' && Number(counted) !== line.expected}
+                            onEdit={() => setEditingQty((all) => ({ ...all, [line.purchaseOrderItemId]: true }))}
+                            onChange={(value) => patchLineAt(i, { counted: value })}
+                          />
+
+                          <ChoiceList
+                            legend={`Where the ${line.name} is going`}
+                            options={LOCATIONS}
+                            value={line.location}
+                            onChange={(value) => patchLineAt(i, { location: value })}
+                          />
+
+                          {line.fresh ? (
+                            <div className="stf-field">
+                              <label className="stf-field-label" htmlFor={`stf-useby-${line.purchaseOrderItemId}`}>
+                                What is the date on the box?
+                              </label>
+                              <input
+                                id={`stf-useby-${line.purchaseOrderItemId}`}
+                                className="stf-input is-text"
+                                type="date"
+                                value={line.useBy}
+                                onChange={(e) => patchLineAt(i, { useBy: e.target.value })}
+                              />
+                            </div>
+                          ) : null}
+
+                          {short ? (
+                            <Notice tone="warn">
+                              {line.expected - Number(counted)} fewer than expected. Saving still
+                              tells your manager and keeps this delivery open.
+                            </Notice>
+                          ) : null}
+                          {over ? (
+                            <Notice tone="warn">
+                              That is more than expected — count again, and if it is right your
+                              manager will check it against the order.
+                            </Notice>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {shortLines.length > 0 ? (
+                    <Notice tone="warn">
+                      {shortLines.length} {shortLines.length === 1 ? 'line is' : 'lines are'}
+                      short. Saving still records the delivery, and your manager gets the
+                      difference to follow up.
+                    </Notice>
+                  ) : null}
+
+                  <SignatureField value={signature} onChange={setSignature} />
+                </>
+              ) : null}
+            </div>
+          </div>
+
+          {hasLines ? (
+            <div className="stf-dialog-footer">
+              <Actions>
+                <Button disabled={saving || !signature} onClick={finish}>
+                  {saving ? 'Saving' : 'Check and finish'}
+                </Button>
+              </Actions>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
       {/* ── 2 · Count one item ─────────────────────────────── */}
-      {phase === 'count' && currentLine && (
+      {mode !== 'full' && phase === 'count' && currentLine && (
         <StepScreen
           title={currentLine.name}
           sub={`The note says ${currentLine.expected}. Count what is actually there.`}
@@ -359,7 +733,7 @@ export default function ReceivingFlow({ onCrumbChange }) {
       )}
 
       {/* ── 3 · Where it goes ──────────────────────────────── */}
-      {phase === 'place' && currentLine && (
+      {mode !== 'full' && phase === 'place' && currentLine && (
         <StepScreen
           title={`Where are you putting the ${currentLine.name.toLowerCase()}?`}
           sub="Pick the place you are carrying it to."
@@ -405,13 +779,13 @@ export default function ReceivingFlow({ onCrumbChange }) {
       )}
 
       {/* ── 4 · Read-back ──────────────────────────────────── */}
-      {phase === 'check' && (
+      {mode !== 'full' && phase === 'check' && (
         <StepScreen
           title="Does this look right?"
           sub="Tap any line to change it."
           actions={
             <Actions>
-              <Button disabled={saving} onClick={finish}>
+              <Button disabled={saving || !signature} onClick={finish}>
                 {saving ? 'Saving' : 'Finish this delivery'}
               </Button>
             </Actions>
@@ -449,6 +823,8 @@ export default function ReceivingFlow({ onCrumbChange }) {
               still records the delivery, and your manager gets the difference to follow up.
             </Notice>
           ) : null}
+
+          <SignatureField value={signature} onChange={setSignature} />
         </StepScreen>
       )}
 
@@ -464,6 +840,14 @@ export default function ReceivingFlow({ onCrumbChange }) {
           }
         />
       )}
+
+      {/* The note pops up the moment it can be fetched back in full;
+          closing it just clears the state above — the delivery itself
+          is already saved, and stays reachable from the deliveries
+          dashboard either way. */}
+      {pdfDelivery ? (
+        <DeliveryNotePDF delivery={pdfDelivery} onClose={() => setPdfDelivery(null)} />
+      ) : null}
     </>
   );
 }

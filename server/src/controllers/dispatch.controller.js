@@ -39,6 +39,24 @@ const getBoard = async (req, res) => {
   }
 };
 
+// ── Past collections (staff history page) ────────────────────
+// GET /api/dispatch/history?range=today|week|month|all
+// Returns: every completed collection in range, most recent first —
+// each row's dispatch_event_id opens that collection's note.
+const getHistory = async (req, res) => {
+  try {
+    const history = await dispatchService.getHistory(req.query.range);
+    res.status(200).json({ success: true, data: history });
+  } catch (err) {
+    console.error('[getHistory]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to retrieve dispatch history.',
+    });
+  }
+};
+
 // ── Run the 16:00 sweep on demand (manager only) ─────────────
 // POST /api/dispatch/sweep
 // Body: { dispatchDate? } — defaults to today.
@@ -60,7 +78,7 @@ const sweep = async (req, res) => {
 // ── Non-collection history (BR-26) ───────────────────────────
 // GET /api/dispatch/non-collections?ecdId=&from=&to=
 // Returns: every non-collection event in range, with a running
-// per-ECD count so a repeat offender stands out.
+// per-beneficiary count so a repeat offender stands out.
 const getNonCollectionHistory = async (req, res) => {
   try {
     const history = await dispatchService.getNonCollectionHistory(req.query, req.user);
@@ -89,6 +107,40 @@ const getDispatchNote = async (req, res) => {
     res.status(status).json({
       success: false,
       message: status < 500 ? err.message : 'Failed to retrieve dispatch note.',
+    });
+  }
+};
+
+// ── The goods-out archive ────────────────────────────────────
+// GET /api/dispatch/notes?from=&to=&ecdId=&cohort=&status=&limit=&offset=
+// Returns { rows, total, limit, offset }. Each row carries
+// dispatch_event_id, which is what GET /notes/:eventId takes — NOT
+// picking_slip_id, which is a different id space.
+const listDispatchNotes = async (req, res) => {
+  try {
+    const result = await dispatchService.listDispatchNotes(req.query);
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    console.error('[listDispatchNotes]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to retrieve dispatch notes.',
+    });
+  }
+};
+
+// ── Beneficiary filter options ───────────────────────────────
+// GET /api/dispatch/notes/options
+const getDispatchBeneficiaryOptions = async (req, res) => {
+  try {
+    const options = await dispatchService.getDispatchBeneficiaryOptions();
+    res.status(200).json({ success: true, data: options });
+  } catch (err) {
+    console.error('[getDispatchBeneficiaryOptions]', err.message);
+    res.status(err.status || 500).json({
+      success: false,
+      message: 'Failed to retrieve beneficiary options.',
     });
   }
 };
@@ -135,9 +187,12 @@ const collect = async (req, res) => {
 
 export default {
   getBoard,
+  getHistory,
   sweep,
   getNonCollectionHistory,
   getDispatchNote,
+  listDispatchNotes,
+  getDispatchBeneficiaryOptions,
   getGateView,
   collect,
 };
