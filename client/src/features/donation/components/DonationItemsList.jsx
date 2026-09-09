@@ -10,6 +10,14 @@ import { ProductMatchCombobox } from "./ProductMatchComboBox";
 
 const UNITS = ["kg", "g", "l", "ml", "each", "bag", "box", "crate", "punnet"];
 
+// Same four BR-10 categories as CategorySelector.jsx — keep in sync.
+const ITEM_CATEGORIES = [
+  { value: "recipe_food",     label: "Recipe food" },
+  { value: "add_on_food",     label: "Add-on food" },
+  { value: "non_recipe_food", label: "Non-recipe food" },
+  { value: "non_food",        label: "Non-food" },
+];
+
 // ── Description ──────────────────────────────────────────────
 const descriptionMessage = (v) => {
   if (!v?.trim()) return { valid: false, message: "A description is required." };
@@ -42,7 +50,12 @@ const DonationItemRow = forwardRef(function DonationItemRow(
   // Expose validation check & focus mechanism to parent component
   useImperativeHandle(ref, () => ({
     validateAndFocus: () => {
-      // Mark all fields as touched so validation errors show up visually
+      // Mark fields as touched so validation errors show up visually.
+      // NOTE: requestedCategory is deliberately NOT validated here —
+      // leaving the BR-10 category blank on an unmatched item is a
+      // supported path: the backend creates a warehouse_manager_flags
+      // row (+ inactive placeholder product) and defers classification
+      // to a manager instead of failing the submit.
       setTouched({ description: true, quantity: true });
 
       if (!descState.valid) {
@@ -140,9 +153,27 @@ const DonationItemRow = forwardRef(function DonationItemRow(
             }
           />
           {!item.productId && (
-            <span className="stf-field-hint">
-              No stock item matched — will be flagged for a manager to resolve.
-            </span>
+            <>
+              {/* Progressive disclosure: only unmatched items are offered a
+                  manual category — a matched product routes via its own
+                  default. The category is OPTIONAL now: leaving it blank is
+                  the manager-review path, not a validation error. */}
+              <span className="stf-field-label">What kind of item is this? (optional)</span>
+              <select
+                className="stf-select"
+                value={item.requestedCategory || ""}
+                onChange={(e) => onChange({ ...item, requestedCategory: e.target.value })}
+              >
+                <option value="">Leave blank for manager review</option>
+                {ITEM_CATEGORIES.map((c) => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
+              <span className="stf-field-hint">
+                Not sure which category fits? Leave it blank — this item will be
+                sent to a warehouse manager to classify.
+              </span>
+            </>
           )}
         </div>
       </div>
@@ -180,6 +211,7 @@ export const DonationItemsList = forwardRef(function DonationItemsList(
         unit: "",
         productId: null,
         productLabel: "",
+        requestedCategory: "",
       },
     ]);
 

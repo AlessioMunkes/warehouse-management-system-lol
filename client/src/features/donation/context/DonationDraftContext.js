@@ -26,6 +26,10 @@ export const emptyItem = () => ({
   unit: "",
   productId: null,
   productLabel: "",
+  // Per-item category (one of the four BR-10 categories). Used by the
+  // pending-donation endpoint's routing when the item has no matched
+  // product; only shown in the UI when productId is unset.
+  requestedCategory: "",
 });
 
 // Shape mirrors donation.service.js's createDonation payload closely,

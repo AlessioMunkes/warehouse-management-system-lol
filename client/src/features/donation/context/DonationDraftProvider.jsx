@@ -21,15 +21,15 @@ import {
 
 export function DonationDraftProvider({ children }) {
   const [draft, setDraft] = useState(() => {
-    try {
-      const saved = sessionStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : emptyDraft();
-    } catch {
-      // Corrupt/unparseable storage shouldn't crash the page —
-      // just start fresh.
-      return emptyDraft();
-    }
-  });
+  try {
+    const saved = sessionStorage.getItem(STORAGE_KEY);
+    return saved ? { ...emptyDraft(), ...JSON.parse(saved) } : emptyDraft();
+  } catch {
+    // Corrupt/unparseable storage shouldn't crash the page —
+    // just start fresh.
+    return emptyDraft();
+  }
+});
 
   // Persist on every change. Cheap for a form this size, and simpler
   // than debouncing for a first pass.

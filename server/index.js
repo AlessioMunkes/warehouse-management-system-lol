@@ -7,6 +7,9 @@ import cors             from 'cors';
 import path             from 'path';
 import { fileURLToPath } from 'url';
 import helmet           from 'helmet';
+
+import donationAdminRoutes from './src/routes/donationAdmin.routes.js';
+import donationIntakeRouter from './src/routes/donationIntake.routes.js';
 import cookieParser     from 'cookie-parser';
 import loginRateLimiter  from './src/middleware/rateLimiter.middleware.js';
 import loginRouter       from './src/routes/login.route.js';
@@ -17,6 +20,7 @@ import decantingRouter   from './src/routes/decanting.routes.js';
 import stockRouter       from './src/routes/stock.routes.js';
 import pickingRouter     from './src/routes/picking.routes.js';
 import donationRouter    from './src/routes/donation.routes.js';
+import pendingDonationRouter from './src/routes/pendingDonation.routes.js';
 import dispatchRouter    from './src/routes/dispatch.routes.js';
 import supplierRouter    from './src/routes/supplier.routes.js';
 import purchaseOrderRouter from './src/routes/purchaseOrder.routes.js';
@@ -38,6 +42,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app  = express();
 const port = process.env.PORT || 5000;
+const defaultClientOrigins = new Set([
+  'http://localhost:5173',
+  'http://localhost:5174',
+]);
+
+const isAllowedClientOrigin = (origin) => {
+  if (!origin) return true;
+  if (process.env.CLIENT_ORIGIN) return origin === process.env.CLIENT_ORIGIN;
+  return defaultClientOrigins.has(origin);
+};
 
 // helmet sets 11 HTTP headers that protect against common attacks.
 // Must be first — before cors, routes, everything.
@@ -69,7 +83,10 @@ app.use(helmet({
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 app.use(cors({
-  origin:      process.env.CLIENT_ORIGIN || 'http://localhost:5173',
+  origin:      (origin, callback) => {
+    if (isAllowedClientOrigin(origin)) return callback(null, true);
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
   credentials: true,
 }));
 
@@ -99,7 +116,10 @@ app.use('/api/decanting',  decantingRouter);
 app.use('/api/stock',      stockRouter);
 app.use('/api/picking',    pickingRouter);
 app.use('/api/dispatch',   dispatchRouter);
+app.use('/api/donations',  pendingDonationRouter);
 app.use('/api/donations',  donationRouter);
+app.use('/api/donations',  donationIntakeRouter);
+app.use('/api/donations/admin', donationAdminRoutes);
 app.use('/api/suppliers',  supplierRouter);
 app.use('/api/purchase-orders', purchaseOrderRouter);
 app.use('/api/reporting',  reportingRouter);

@@ -46,7 +46,7 @@ export function DonorConsentSection({ consentGiven, onChange }) {
   );
 }
 
-export function DonorInfoFields({ donorName, donorContact, donorTaxReference, disabled, onChange }) {
+export function DonorInfoFields({ donorName, donorContact, donorTaxReference, disabled, onChange, error }) {
   return (
     <div className="stf-step-body">
       <div className="stf-field">
@@ -59,15 +59,14 @@ export function DonorInfoFields({ donorName, donorContact, donorTaxReference, di
         />
       </div>
       <div className="stf-field">
-        <span className="stf-field-label">Donor email
-            
-        </span>
+        <span className="stf-field-label">Donor email</span>
         <input
           className="stf-input is-text"
           disabled={disabled}
           value={donorContact}
           onChange={(e) => onChange({ donorContact: e.target.value })}
         />
+        {error && <span className="stf-error">{error}</span>}
       </div>
       <div className="stf-field">
         <span className="stf-field-label">Tax reference</span>
@@ -86,3 +85,4 @@ export function DonorInfoFields({ donorName, donorContact, donorTaxReference, di
     </div>
   );
 }
+ 

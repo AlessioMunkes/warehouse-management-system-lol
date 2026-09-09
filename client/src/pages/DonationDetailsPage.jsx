@@ -2,13 +2,11 @@
 // src/pages/DonationDetailsPage.jsx
 // Route: /donations/new
 //
-// Page 1 of 2. Category, Items, Value & Programme, Donor Consent/Info,
-// Notes -> Next (goes to Review).
-//
-// UPDATED: .stf-crumb added under TopNavbar (matches Receiving's
-// pattern). .stf-rail moved inside .stf-main, right above the step
-// heading, instead of full-width between navbar and main — fixes the
-// rail rendering as a stray bar stuck under the black navbar.
+// Page 1 of 2. Step indicator restored — this page still leads to a
+// separate Review page (step 2). Category selector removed (search-
+// driven item classification instead, handled inside
+// DonationItemsList). Donor fields conditionally rendered based on
+// consent, not just disabled.
 // ─────────────────────────────────────────────────────────────
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
@@ -19,7 +17,6 @@ import { TopNavbar } from "../features/taskdashboard/components/TopNavBar";
 import { useDonationDraft } from "../features/donation/context/DonationDraftContext";
 import { DONATIONS } from "../routes/paths";
 import { DonationRail } from "../features/donation/components/DonationRail";
-import { CategorySelector } from "../features/donation/components/CategorySelector";
 import { DonationItemsList } from "../features/donation/components/DonationItemsList";
 import { ValueProgrammeFields } from "../features/donation/components/ValueProgrammeFields";
 import { DonorConsentSection, DonorInfoFields } from "../features/donation/components/DonationSection";
@@ -31,16 +28,26 @@ export function DonationDetailsPage() {
   const [errors, setErrors] = useState({});
   const [itemErrors, setItemErrors] = useState({});
 
-  // Donor consent/info deliberately has no hard validation here —
-  // "no consent" is a valid answer, not an incomplete field. Only
-  // Category, Items, and Value block progression.
+  // Category is no longer a field on this form (removed — see
+  // CategorySelector removal note), so it's dropped from validation.
+  // Donor consent/info still has no hard validation — "no consent" is
+  // a valid answer, not an incomplete field.
   const validate = () => {
     const next = {};
-    if (!draft.category) next.category = "Select a category to continue.";
 
     if (draft.estimatedValueZar === "" || Number(draft.estimatedValueZar) < 0) {
       next.value = "An estimated value is required (enter 0 if none).";
     }
+    // Only validate donor email if consent was given AND something was
+  // actually typed — an empty field shouldn't block submission (donor
+  // email presumably isn't itself mandatory even when consent is yes,
+  // just optional contact info — adjust if that's wrong).
+  if (draft.donorConsentGiven === true && draft.donorContact.trim()) {
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(draft.donorContact.trim())) {
+      next.donorContact = "Enter a valid email address.";
+    }
+  }
 
     const nextItemErrors = {};
     draft.items.forEach((item) => {
@@ -80,12 +87,6 @@ export function DonationDetailsPage() {
             <h1 className="stf-step-title">Record a Donation</h1>
           </div>
 
-          <CategorySelector
-            value={draft.category}
-            onChange={(v) => updateDraft({ category: v })}
-            error={errors.category}
-          />
-
           <DonationItemsList
             items={draft.items}
             onChange={(items) => updateDraft({ items })}
@@ -104,13 +105,26 @@ export function DonationDetailsPage() {
             onChange={(v) => updateDraft({ donorConsentGiven: v })}
           />
 
-          <DonorInfoFields
-            donorName={draft.donorName}
-            donorContact={draft.donorContact}
-            donorTaxReference={draft.donorTaxReference}
-            disabled={!draft.donorConsentGiven}
-            onChange={updateDraft}
-          />
+          {draft.donorConsentGiven === true && (
+            <DonorInfoFields
+              donorName={draft.donorName}
+              donorContact={draft.donorContact}
+              donorTaxReference={draft.donorTaxReference}
+              onChange={updateDraft}
+              error={errors.donorContact}
+            />
+          )}
+
+          {draft.donorConsentGiven === false && (
+            <p className="stf-hint">
+              Donor details will not be recorded. This donation will not be
+              eligible for a Section 18A tax certificate.
+            </p>
+          )}
+
+          {draft.donorConsentGiven == null && (
+            <p className="stf-hint">Select an option above to continue.</p>
+          )}
 
           <NotesField
             notes={draft.notes}

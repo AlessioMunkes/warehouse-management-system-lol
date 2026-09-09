@@ -868,6 +868,250 @@
   margin: 4px 0;
 }
 
+/* ── Donation intake: item rows & stock search ──────────────────── */
+/* Classes for the search-first item-entry row used on the donation
+   intake form. Visual language mirrors the existing .stf-field /
+   .stf-input / .stf-btn / .stf-row patterns above — same tokens,
+   radius steps, tap targets, and font stack — so a staff member
+   can't tell these rules came from a different .jsx file. */
+
+.stf-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.stf-section-title {
+  margin: 0 0 8px;
+  font-family: var(--stf-font-display);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--stf-ink);
+}
+
+.stf-item-row {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+}
+
+.stf-item-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.stf-item-row-title {
+  font-family: var(--stf-font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--stf-ink);
+}
+
+.stf-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--stf-tap);
+  min-height: var(--stf-tap);
+  padding: 0;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  color: var(--stf-text-sub);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.stf-icon-btn:hover {
+  background: var(--stf-sand);
+  border-color: var(--stf-accent);
+  color: var(--stf-accent);
+}
+.stf-icon-btn:focus-visible {
+  outline: 2px solid rgba(59, 130, 246, 0.6);
+  outline-offset: 2px;
+}
+
+.stf-search-input {
+  position: relative;
+}
+.stf-search-input input {
+  min-height: var(--stf-tap);
+  width: 100%;
+  padding: 0 14px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  color: var(--stf-ink);
+  font: 400 16px/1 var(--stf-font-sans);
+  font-size: max(16px, 1em);
+}
+.stf-search-input input:focus {
+  border-color: var(--stf-accent);
+  outline: none;
+}
+
+.stf-search-results {
+  position: absolute;
+  z-index: 30;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: 4px 0 0;
+  padding: 4px 0;
+  list-style: none;
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  max-height: 220px;
+  overflow-y: auto;
+}
+.stf-search-results li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+}
+.stf-search-results li:not(:last-child) {
+  border-bottom: 1px solid var(--stf-border);
+}
+.stf-search-results li:hover {
+  background: var(--stf-sand);
+}
+.stf-search-results li > span:first-child {
+  font-weight: 600;
+  color: var(--stf-ink);
+}
+.stf-search-result-category {
+  font-size: 13px;
+  color: var(--stf-text-sub);
+}
+
+.stf-btn-small {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1.5px solid transparent;
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-accent);
+  color: var(--stf-white);
+  font: 600 13px/1 var(--stf-font-sans);
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+.stf-btn-small:hover {
+  background: var(--stf-accent-deep);
+}
+.stf-btn-small:active {
+  transform: scale(0.97);
+}
+.stf-btn-small:focus-visible {
+  outline: 2px solid rgba(59, 130, 246, 0.6);
+  outline-offset: 2px;
+}
+
+.stf-btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 24px;
+  border: 1.5px solid var(--stf-accent);
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-white);
+  color: var(--stf-accent);
+  font: 600 15px/1 var(--stf-font-sans);
+  gap: 8px;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.stf-btn-outline:hover {
+  background: var(--stf-accent);
+  color: var(--stf-white);
+}
+.stf-btn-outline:active {
+  transform: scale(0.97);
+}
+.stf-btn-outline:focus-visible {
+  outline: 3px solid rgba(59, 130, 246, 0.6);
+  outline-offset: 2px;
+}
+
+.is-full { width: 100%; }
+
+.stf-manual-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.stf-manual-fields input,
+.stf-manual-fields select {
+  min-height: var(--stf-field);
+  width: 100%;
+  padding: 0 14px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  color: var(--stf-ink);
+  font-size: max(16px, 1em);
+}
+.stf-manual-fields input[type="number"] {
+  font: 700 26px/1 var(--stf-font-display);
+  font-variant-numeric: tabular-nums;
+}
+.stf-manual-fields input[type="text"],
+.stf-manual-fields select {
+  font: 400 16px/1 var(--stf-font-sans);
+}
+.stf-manual-fields input:focus,
+.stf-manual-fields select:focus {
+  border-color: var(--stf-accent);
+  outline: none;
+}
+.stf-field-row {
+  display: flex;
+  gap: 16px;
+}
+.stf-field-row > div {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.stf-hint {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--stf-text-sub);
+}
+.stf-hint-success {
+  color: #1a7d42;
+}
+.stf-error {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--stf-attention);
+  display: inline-block;
+  padding: 4px 8px;
+  border: 1px solid var(--stf-attention);
+  border-radius: 4px;
+  margin-top: 4px;
+}
+
 /* ── Less Movement / Reduced Motion Accessibility Mode ── */
 
 body.reduced-movement *,

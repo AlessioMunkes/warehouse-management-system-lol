@@ -17,6 +17,7 @@
 // as a warning for someone to resolve later. Same principle as
 // isShortfall in the stock repository: a flag, not an error.
 // ─────────────────────────────────────────────────────────────
+import { determineRouting } from '../lib/donationRouting.js';
 import donationModel from '../repositories/donation.repository.js';
 
 // ── fail ───────────────────────────────────────────────────────
@@ -289,16 +290,59 @@ const createDonation = async (data, userId) => {
 
   const warnings = [];
 
-  const routed = normalised.map((item) => {
+  const routed = [];
+
+  for (const item of normalised) {
     const allocations = category === 'add_on_food'
       ? splitByChildCount(item.quantity, centres)
       : [];
 
-    const routingStatus = resolveRouting({
+    let routingStatus = resolveRouting({
       category,
       productId:       item.productId,
       allocationCount: allocations.length,
     });
+
+    let routedCategory = null;
+    let routingOutcome = null;
+    let routedSource = null;
+    let locationId = item.locationId ?? null;
+
+    if (item.productId) {
+      const itemRouting = await determineRouting({ productId: item.productId });
+      if (itemRouting.source === 'product_default' || itemRouting.source === 'manual_category') {
+        routingStatus = 'allocated';
+        routedCategory = itemRouting.category;
+        routingOutcome = itemRouting.routing_outcome;
+        routedSource = itemRouting.source;
+
+        if (itemRouting.storage_area) {
+          // Deterministic choice: lowest storage_locations.id wins when multiple
+          // locations share the same area. This is a placeholder; a future
+          // enhancement can add a designated primary flag to a location row.
+          const match = await donationModel.getLocationIdForArea(itemRouting.storage_area);
+          locationId = match ?? null;
+          if (!match) {
+            warnings.push({
+              description: item.description,
+              message: `"${item.description}" was classified to storage area "${itemRouting.storage_area}", but no active storage_locations row currently matches it.`,
+            });
+          }
+        }
+      } else {
+        routingStatus = 'unmatched';
+        routedSource = 'unclassified';
+        routingOutcome = itemRouting.routing_outcome;
+        locationId = null;
+      }
+    } else {
+      // Flow B already has a separate pending_classification stub path for truly
+      // unrecognized intake items. Flow A intentionally keeps description-only
+      // lines in the unmatched queue instead of creating a second manager flow.
+      routedSource = 'unclassified';
+      routingOutcome = 'manual_review';
+      locationId = null;
+    }
 
     if (routingStatus === 'unmatched') {
       warnings.push({
@@ -314,8 +358,16 @@ const createDonation = async (data, userId) => {
       });
     }
 
-    return { ...item, routingStatus, allocations };
-  });
+    routed.push({
+      ...item,
+      locationId,
+      routingStatus,
+      routedCategory,
+      routingOutcome,
+      routedSource,
+      allocations,
+    });
+  }
 
   if (section18aStatus === 'qualifying_pending_donor') {
     warnings.push({

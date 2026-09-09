@@ -30,16 +30,46 @@ export function WarningsNotice({ warnings, onDismiss }) {
   );
 }
 
+// result is the partitioned submit outcome built by ReviewPage:
+//   { pendingDonationId, status, resolvedCount, awaitingCount, awaitingItems }
+// awaitingItems non-empty -> "pending manager review" state; otherwise the
+// donation auto-committed and we show plain success.
 export function CompletionDialog({ open, result, onRecordAnother, onGoHome }) {
   if (!result) return null;
+
+  const pendingReview = (result.awaitingCount || 0) > 0;
+
   return (
     <Dialog open={open}>
       <DialogContent className="stf-shell">
         <DialogHeader>
-          <DialogTitle>Donation recorded</DialogTitle>
+          <DialogTitle>
+            {pendingReview ? "Donation received — pending manager review" : "Donation recorded"}
+          </DialogTitle>
         </DialogHeader>
 
-        {result.warnings?.length > 0 && (
+        {pendingReview && (
+          <div className="stf-notice is-warn">
+            <span className="stf-notice-mark">!</span>
+            <div className="stf-notice-body">
+              <p style={{ margin: 0 }}>
+                {result.awaitingCount} item{result.awaitingCount === 1 ? "" : "s"} couldn't be
+                matched automatically and need{result.awaitingCount === 1 ? "s" : ""} a manager
+                to classify before this donation is finalised.
+              </p>
+              {result.awaitingItems?.map((it) => (
+                <p key={it.id} style={{ margin: "6px 0 0" }}>
+                  • {it.description || "Untitled item"} — {it.quantity} {it.unit}
+                </p>
+              ))}
+              <p style={{ margin: "6px 0 0" }}>
+                Everything else has been recorded. A manager will review the flagged items.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {!pendingReview && result.warnings?.length > 0 && (
           <div className="stf-notice is-warn">
             <span className="stf-notice-mark">!</span>
             <div className="stf-notice-body">
