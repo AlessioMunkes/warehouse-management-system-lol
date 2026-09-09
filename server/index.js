@@ -21,6 +21,7 @@ import dispatchRouter    from './src/routes/dispatch.routes.js';
 import supplierRouter   from './src/routes/supplier.routes.js';
 import purchaseOrderRouter from './src/routes/purchaseOrder.routes.js';
 import reportingRouter   from './src/routes/reporting.routes.js';
+import loveActivismRouter   from './src/routes/loveActivism.routes.js';
 
 // ── Validate required secrets exist at startup ───────────────
 if (!process.env.JWT_SECRET) {
@@ -97,6 +98,7 @@ app.use('/api/donations',  donationRouter);
 app.use('/api/suppliers',  supplierRouter);
 app.use('/api/purchase-orders', purchaseOrderRouter);
 app.use('/api/reporting',  reportingRouter);
+app.use('/api/love-activism', loveActivismRouter);
 
 // ── SPA fallback (production only) ────────────────────────────
 // Any non-/api path falls through to index.html so React Router can

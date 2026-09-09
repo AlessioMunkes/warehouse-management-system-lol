@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate }  from 'react-router-dom';
 import { AuthProvider }                            from './context/AuthContext';
 import ProtectedRoute                              from './components/layout/ProtectedRoute';
-import { PACKING, STAFF, DONATIONS, DONATION_INTAKE_ROLES, ADMIN } from './routes/paths';
+import { PACKING, STAFF, DONATIONS, DONATION_INTAKE_ROLES, ADMIN, VOLUNTEERS, VOLUNTEER_MANAGEMENT_ROLES } from './routes/paths';
 import LandingPage                                 from './pages/LandingPage';
 import LoginPage                                   from './pages/LoginPage';
 import GuestLoginPage                              from './pages/GuestLoginPage';
@@ -20,6 +20,8 @@ import SupplierDirectoryPage                       from './pages/SupplierDirecto
 import PurchaseOrdersPage                          from './pages/PurchaseOrdersPage';
 import ReportingPage                               from './pages/ReportingPage';
 import AdminActivityScreen                         from './pages/AdminActivityScreen';
+import VolunteerEventsPage                        from './pages/VolunteerEventsPage';
+import VolunteerEventWorkspacePage                from './pages/VolunteerEventWorkspacePage';
 
 // Donations — new feature, own draft context scoped to just these
 // two routes (see features/donation/context/DonationDraftProvider.jsx)
@@ -95,6 +97,13 @@ const App = () => (
               </DonationDraftProvider>
             }
           />
+        </Route>
+
+        {/* Volunteer Management — current coordinator workflow is available
+            to the two live management roles only. */}
+        <Route element={<ProtectedRoute roles={VOLUNTEER_MANAGEMENT_ROLES} />}>
+          <Route path={VOLUNTEERS.events} element={<VolunteerEventsPage />} />
+          <Route path={VOLUNTEERS.eventPattern} element={<VolunteerEventWorkspacePage />} />
         </Route>
 
         {/* Guest-only */}

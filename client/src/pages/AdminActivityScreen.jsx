@@ -33,12 +33,14 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ADMIN } from "../routes/paths";
+import { ADMIN, VOLUNTEERS } from "../routes/paths";
 
 // No supplier-specific icon exists in client/public/icons. Goods
 // arriving from suppliers is the nearest existing meaning, so the
 // receiving icon is reused rather than a new asset invented.
 import receivingIcon from "./../../public/icons/receiving-icon.svg";
+// Reuse the same volunteer asset as the manager dashboard tile.
+import volunteerIcon from "./../../public/icons/volunteer-icon.svg";
 
 export default function AdminActivityScreen() {
   const { user } = useAuth();
@@ -48,6 +50,12 @@ export default function AdminActivityScreen() {
   const [activeModalTask, setActiveModalTask] = useState(null);
 
   const tasks = [
+    {
+      to: VOLUNTEERS.events,
+      icon: volunteerIcon,
+      title: "Volunteer Management",
+      disabled: false,
+    },
     {
       to: ADMIN.suppliers,
       icon: receivingIcon,

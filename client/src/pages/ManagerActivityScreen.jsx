@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { TopNavbar } from "../features/taskdashboard/components/TopNavBar";
 import { Greeting } from "../features/taskdashboard/components/Greeting";
 import { useAuth } from "@/context/AuthContext";
-import { STAFF } from "../routes/paths";
+import { STAFF, VOLUNTEERS } from "../routes/paths";
 import {
   Tooltip,
   TooltipContent,
@@ -26,6 +26,8 @@ import packingIcon from "./../../public/icons/packing-icon.svg";
 import decantingIcon from "./../../public/icons/decanting-icon.svg";
 import dispatchIcon from "./../../public/icons/dispatch-icon.svg";
 import reportingIcon from "./../../public/icons/reporting-icon.svg";
+// Reuse the existing dashboard-sized volunteer asset.
+import volunteerIcon from "./../../public/icons/volunteer-icon.svg";
 
 export default function Home() {
   const { user } = useAuth();
@@ -43,6 +45,12 @@ export default function Home() {
   // `to: null` or `disabled: true` means the feature isn't live yet —
   // those cards open the info modal instead of navigating.
   const tasks = [
+    {
+      to: VOLUNTEERS.events,
+      icon: volunteerIcon,
+      title: "Volunteer Management",
+      disabled: false,
+    },
     {
       to: null,
       icon: receivingIcon,

@@ -9,7 +9,7 @@
 // Before this, every failure was a bare Error with neither.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { apiGet, apiPost, setUnauthorizedHandler } from '../services/api';
+import { apiGet, apiPost, apiPut, setUnauthorizedHandler } from '../services/api';
 
 const jsonResponse = (status, body) => ({
   ok: status >= 200 && status < 300,
@@ -106,5 +106,20 @@ describe('credentials', () => {
     for (const call of fetch.mock.calls) {
       expect(call[1].credentials).toBe('include');
     }
+  });
+
+  it('sends PUT requests through the shared authenticated client', async () => {
+    fetch.mockResolvedValue(jsonResponse(200, { success: true }));
+
+    await apiPut('/api/love-activism/bookings/booking-1/attendance', { status: 'PRESENT' });
+
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/love-activism/bookings/booking-1/attendance'),
+      expect.objectContaining({
+        method: 'PUT',
+        credentials: 'include',
+        body: JSON.stringify({ status: 'PRESENT' }),
+      })
+    );
   });
 });
