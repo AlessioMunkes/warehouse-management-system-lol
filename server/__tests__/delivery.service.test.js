@@ -188,11 +188,36 @@ describe('createDelivery — the purchase order must match the note', () => {
     expect(repoMock.createDelivery).not.toHaveBeenCalled();
   });
 
-  it('refuses an order still pending approval', async () => {
+  // 'pending' is RECEIVABLE. This test used to assert the opposite, which is
+  // what migration 002 turned into a bug: the gate demanded 'approved', a
+  // status BR-07B stopped producing, while getPurchaseOrdersBySupplier only
+  // ever offered pending / in_transit / partially_received. Every order the
+  // dropdown showed was rejected here.
+  it('accepts an order still pending — a PO is receivable from the moment it is raised', async () => {
     repoMock.getPurchaseOrder.mockResolvedValue({ id: PO, supplier_id: SUPPLIER, status: 'pending' });
-    await expect(deliveryService.createDelivery(body(), USER_ID))
-      .rejects.toThrow(/not been approved/i);
+    repoMock.createDelivery.mockResolvedValue({ id: 900 });
+    repoMock.getDeliveryById.mockResolvedValue({ id: 900 });
+    await expect(deliveryService.createDelivery(body(), USER_ID)).resolves.toBeTruthy();
   });
+
+  it.each(['in_transit', 'partially_received'])(
+    'accepts an order in %s', async (status) => {
+      repoMock.getPurchaseOrder.mockResolvedValue({ id: PO, supplier_id: SUPPLIER, status });
+      repoMock.createDelivery.mockResolvedValue({ id: 901 });
+      repoMock.getDeliveryById.mockResolvedValue({ id: 901 });
+      await expect(deliveryService.createDelivery(body(), USER_ID)).resolves.toBeTruthy();
+    }
+  );
+
+  // Receiving against a closed order would add its stock a second time.
+  it.each(['received', 'returned', 'follow_up_required'])(
+    'refuses an order in %s', async (status) => {
+      repoMock.getPurchaseOrder.mockResolvedValue({ id: PO, supplier_id: SUPPLIER, status });
+      await expect(deliveryService.createDelivery(body(), USER_ID))
+        .rejects.toMatchObject({ status: 409 });
+      expect(repoMock.createDelivery).not.toHaveBeenCalled();
+    }
+  );
 
   // The service check is a courtesy; the repository's is the one that
   // holds, because it runs with the row locked. These prove the
@@ -345,9 +370,50 @@ describe('reads', () => {
       .rejects.toMatchObject({ status: 400 });
   });
 
-  it('falls back to "all" for an unknown range rather than failing', async () => {
+  // getDeliveries now takes the whole query object and resolves named ranges
+  // to concrete SAST dates before the repository sees them, so the repository
+  // never has to reason about "today" on a UTC container.
+  it('400s an unknown range rather than silently widening it', async () => {
+    await expect(deliveryService.getDeliveries({ range: 'since-tuesday' }))
+      .rejects.toMatchObject({ status: 400 });
+  });
+
+  it('resolves an unknown range to no date bounds when none is given', async () => {
     repoMock.getDeliveries.mockResolvedValue([]);
-    await deliveryService.getDeliveries('since-tuesday');
-    expect(repoMock.getDeliveries).toHaveBeenCalledWith('all');
+    await deliveryService.getDeliveries({});
+    expect(repoMock.getDeliveries).toHaveBeenCalledWith(
+      expect.objectContaining({ from: null, to: null, limit: 25, offset: 0 })
+    );
+  });
+
+  it('resolves range=today to one concrete SAST date, never CURRENT_DATE', async () => {
+    repoMock.getDeliveries.mockResolvedValue([]);
+    await deliveryService.getDeliveries({ range: 'today' });
+    const arg = repoMock.getDeliveries.mock.calls[0][0];
+    expect(arg.from).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(arg.from).toBe(arg.to);
+  });
+
+  it('rejects a from that is after its to', async () => {
+    await expect(deliveryService.getDeliveries({ from: '2026-09-01', to: '2026-08-01' }))
+      .rejects.toMatchObject({ status: 400 });
+  });
+
+  it('caps the page size so one request cannot pull the whole archive', async () => {
+    repoMock.getDeliveries.mockResolvedValue([]);
+    await deliveryService.getDeliveries({ limit: '5000' });
+    expect(repoMock.getDeliveries).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 100 })
+    );
+  });
+
+  it('lifts total off the window function and strips it from the rows', async () => {
+    repoMock.getDeliveries.mockResolvedValue([
+      { id: 1, total_count: '42' },
+      { id: 2, total_count: '42' },
+    ]);
+    const page = await deliveryService.getDeliveries({});
+    expect(page.total).toBe(42);
+    expect(page.rows[0]).not.toHaveProperty('total_count');
   });
 });

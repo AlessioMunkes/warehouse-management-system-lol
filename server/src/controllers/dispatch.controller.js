@@ -111,6 +111,40 @@ const getDispatchNote = async (req, res) => {
   }
 };
 
+// ── The goods-out archive ────────────────────────────────────
+// GET /api/dispatch/notes?from=&to=&ecdId=&cohort=&status=&limit=&offset=
+// Returns { rows, total, limit, offset }. Each row carries
+// dispatch_event_id, which is what GET /notes/:eventId takes — NOT
+// picking_slip_id, which is a different id space.
+const listDispatchNotes = async (req, res) => {
+  try {
+    const result = await dispatchService.listDispatchNotes(req.query);
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    console.error('[listDispatchNotes]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to retrieve dispatch notes.',
+    });
+  }
+};
+
+// ── Beneficiary filter options ───────────────────────────────
+// GET /api/dispatch/notes/options
+const getDispatchBeneficiaryOptions = async (req, res) => {
+  try {
+    const options = await dispatchService.getDispatchBeneficiaryOptions();
+    res.status(200).json({ success: true, data: options });
+  } catch (err) {
+    console.error('[getDispatchBeneficiaryOptions]', err.message);
+    res.status(err.status || 500).json({
+      success: false,
+      message: 'Failed to retrieve beneficiary options.',
+    });
+  }
+};
+
 // ── One pallet at the gate ───────────────────────────────────
 // GET /api/dispatch/:id
 // Returns: the slip, its items, and the computed eligibility flags
@@ -157,6 +191,8 @@ export default {
   sweep,
   getNonCollectionHistory,
   getDispatchNote,
+  listDispatchNotes,
+  getDispatchBeneficiaryOptions,
   getGateView,
   collect,
 };

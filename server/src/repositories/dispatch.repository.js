@@ -26,6 +26,7 @@
 import pool       from '../config/db.js';
 import stockModel from './stock.repository.js';
 import { createNotification } from './notification.repository.js';
+import { DISPATCH_SORTS, buildOrderBy } from '../constants/receiptSort.js';
 
 // ── Audit helper ──────────────────────────────────────────────
 // Dispatch writes into picking_events, not a separate log. The slip
@@ -106,10 +107,14 @@ const getBoard = async ({ dispatchDate, cohort, status, gateToday }) => {
        ps.pallet_ref,
        ps.status            AS slip_status,
        e.id                 AS ecd_id,
-       e.name               AS ecd_name,
+       COALESCE(e.name, ps.beneficiary_name) AS ecd_name,
+       ps.beneficiary_kind::text AS beneficiary_kind,
        e.contact_name,
        e.child_count,
-       e.is_active          AS ecd_is_active,
+       -- A non-ECD beneficiary has no ecd_centres row, so is_active is NULL.
+       -- COALESCE to true: BR-11's hard block is about a DEACTIVATED centre,
+       -- and "no centre record" is not the same thing as "deactivated".
+       COALESCE(e.is_active, true) AS ecd_is_active,
        e.last_collected_date,
        de.id                AS dispatch_event_id,
        COALESCE(de.status, 'awaiting') AS dispatch_status,
@@ -125,13 +130,13 @@ const getBoard = async ({ dispatchDate, cohort, status, gateToday }) => {
            AND psi.packed_quantity IS DISTINCT FROM psi.required_quantity
        )                                                    AS variance_items
      FROM picking_slips ps
-     JOIN ecd_centres e ON e.id = ps.ecd_id
+     LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
      LEFT JOIN dispatch_events de ON de.picking_slip_id = ps.id
      LEFT JOIN users u ON u.id = de.dispatched_by
      LEFT JOIN picking_slip_items psi ON psi.picking_slip_id = ps.id
      WHERE ${where.join(' AND ')}
-     GROUP BY ps.id, e.id, de.id, u.first_name
-     ORDER BY e.name ASC`,
+     GROUP BY ps.id, e.id, de.id, u.first_name, ps.beneficiary_kind, ps.beneficiary_name
+     ORDER BY COALESCE(e.name, ps.beneficiary_name) ASC`,
     params
   );
 
@@ -191,10 +196,11 @@ const getGateView = async (slipId) => {
        ps.status            AS slip_status,
        ps.completed_at,
        e.id                 AS ecd_id,
-       e.name               AS ecd_name,
+       COALESCE(e.name, ps.beneficiary_name) AS ecd_name,
+       ps.beneficiary_kind::text AS beneficiary_kind,
        e.contact_name,
        e.child_count,
-       e.is_active          AS ecd_is_active,
+       COALESCE(e.is_active, true) AS ecd_is_active,
        e.approved_at        AS ecd_approved_at,
        e.last_collected_date,
        de.id                AS dispatch_event_id,
@@ -205,7 +211,7 @@ const getGateView = async (slipId) => {
        de.flagged_at,
        de.override_reason
      FROM picking_slips ps
-     JOIN ecd_centres e ON e.id = ps.ecd_id
+     LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
      LEFT JOIN dispatch_events de ON de.picking_slip_id = ps.id
      WHERE ps.id = $1`,
     [slipId]
@@ -289,7 +295,7 @@ const collect = async ({
     const slipResult = await client.query(
       `SELECT ps.id, ps.status, ps.ecd_id, ps.dispatch_date, e.is_active AS ecd_is_active
        FROM picking_slips ps
-       JOIN ecd_centres e ON e.id = ps.ecd_id
+       LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
        WHERE ps.id = $1
        FOR UPDATE OF ps`,
       [slipId]
@@ -570,14 +576,15 @@ const getDispatchNote = async (eventId) => {
        ps.dispatch_date,
        ps.cohort,
        ps.pallet_ref,
-       e.name        AS ecd_name,
+       COALESCE(e.name, ps.beneficiary_name) AS ecd_name,
+       ps.beneficiary_kind::text AS beneficiary_kind,
        e.contact_name,
        e.child_count,
        u.first_name  AS dispatched_by_name,
        o.first_name  AS override_by_name
      FROM dispatch_events de
      JOIN picking_slips ps ON ps.id = de.picking_slip_id
-     JOIN ecd_centres e ON e.id = ps.ecd_id
+     LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
      LEFT JOIN users u ON u.id = de.dispatched_by
      LEFT JOIN users o ON o.id = de.override_by
      WHERE de.id = $1`,
@@ -606,6 +613,109 @@ const getDispatchNote = async (eventId) => {
   return { ...eventResult.rows[0], lines: linesResult.rows };
 };
 
+// ── The goods-out archive ─────────────────────────────────────
+// Every dispatch event ever recorded, filterable and paged.
+//
+// THIS IS NOT getBoard. The board answers "what is standing in the yard right
+// now" — it is scoped to one day or to the gate's outstanding set, and it
+// joins picking_slip_items to compute variance counts for the gate screen.
+// The archive answers "find me the collection from Little Stars on the 14th",
+// which needs an open date range, an ordering by when the thing happened, and
+// no interest in what is outstanding.
+//
+// Ordered by collected_at, falling back to flagged_at for a non-collection
+// (which has no collected_at at all) and then to the dispatch date. A
+// not_collected event is a record of something that did not happen, and it
+// still belongs in the archive — arguably it is the most important thing in
+// it, given how common non-collection is here.
+const listDispatchNotes = async ({
+  from = null,
+  to = null,
+  ecdId = null,
+  cohort = null,
+  status = null,
+  search = null,
+  sort = 'collected_at',
+  dir = 'desc',
+  limit = 25,
+  offset = 0,
+} = {}) => {
+  const orderBy = buildOrderBy(DISPATCH_SORTS, sort, dir, 'collected_at', 'de.id');
+  const result = await pool.query(
+    `SELECT
+       de.id                AS dispatch_event_id,
+       de.status,
+       de.collected_at,
+       de.flagged_at,
+       de.driver_name,
+       de.vehicle_reg,
+       de.override_reason,
+       ps.id                AS picking_slip_id,
+       ps.dispatch_date,
+       ps.cohort,
+       ps.pallet_ref,
+       ps.beneficiary_kind::text AS beneficiary_kind,
+       e.id                 AS ecd_id,
+       COALESCE(e.name, ps.beneficiary_name) AS ecd_name,
+       e.contact_name,
+       e.child_count,
+       u.first_name         AS dispatched_by_name,
+       COALESCE(l.line_count, 0)    AS line_count,
+       COALESCE(l.variance_count, 0) AS variance_count,
+       COUNT(*) OVER ()             AS total_count
+     FROM dispatch_events de
+     JOIN picking_slips ps ON ps.id = de.picking_slip_id
+     LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
+     LEFT JOIN users u ON u.id = de.dispatched_by
+     LEFT JOIN LATERAL (
+       SELECT
+         COUNT(*) AS line_count,
+         COUNT(*) FILTER (
+           WHERE del.loaded_quantity IS DISTINCT FROM del.packed_quantity
+         ) AS variance_count
+       FROM dispatch_event_lines del
+       WHERE del.dispatch_event_id = de.id
+     ) l ON TRUE
+     WHERE ($1::date IS NULL OR ps.dispatch_date >= $1::date)
+       AND ($2::date IS NULL OR ps.dispatch_date <= $2::date)
+       AND ($3::int  IS NULL OR ps.ecd_id        = $3::int)
+       AND ($4::text IS NULL OR ps.cohort::text  = $4::text)
+       AND ($5::text IS NULL OR de.status        = $5::text)
+       -- Beneficiary name is COALESCEd so the three non-ECD kinds are
+       -- searchable by the name on the slip, not just ECD centres.
+       AND ($6::text IS NULL
+            OR COALESCE(e.name, ps.beneficiary_name) ILIKE '%' || $6::text || '%'
+            OR ps.pallet_ref  ILIKE '%' || $6::text || '%'
+            OR de.driver_name ILIKE '%' || $6::text || '%'
+            OR de.id::text    ILIKE '%' || $6::text || '%')
+     ORDER BY ${orderBy}
+     LIMIT $7 OFFSET $8`,
+    [from, to, ecdId, cohort, status, search, limit, offset]
+  );
+
+  return result.rows;
+};
+
+// ── Beneficiaries that appear in the archive ──────────────────
+// The filter dropdown offers only beneficiaries with dispatch history, the
+// same reasoning as delivery.repository's getSupplierOptions. Offboarded
+// centres are included: BR-27 keeps their records permanently, so their notes
+// must stay findable.
+const getDispatchBeneficiaryOptions = async () => {
+  const result = await pool.query(
+    `SELECT DISTINCT
+       ps.ecd_id                             AS ecd_id,
+       COALESCE(e.name, ps.beneficiary_name) AS name,
+       ps.beneficiary_kind::text             AS beneficiary_kind,
+       COALESCE(e.is_active, true)           AS is_active
+     FROM dispatch_events de
+     JOIN picking_slips ps ON ps.id = de.picking_slip_id
+     LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
+     ORDER BY name ASC`
+  );
+  return result.rows;
+};
+
 // ── Non-collection history (BR-26) ────────────────────────────
 // A centre that repeatedly fails to collect is an operations problem,
 // not a one-off. The manager needs the pattern, not the single event.
@@ -626,14 +736,14 @@ const getNonCollectionHistory = async ({ ecdId, from, to }) => {
        ps.cohort,
        ps.pallet_ref,
        e.id             AS ecd_id,
-       e.name           AS ecd_name,
+       COALESCE(e.name, ps.beneficiary_name) AS ecd_name,
        e.contact_name,
        COUNT(*) OVER (PARTITION BY e.id) AS ecd_non_collection_count
      FROM dispatch_events de
      JOIN picking_slips ps ON ps.id = de.picking_slip_id
-     JOIN ecd_centres e ON e.id = ps.ecd_id
+     LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
      WHERE ${where.join(' AND ')}
-     ORDER BY ps.dispatch_date DESC, e.name ASC`,
+     ORDER BY ps.dispatch_date DESC, COALESCE(e.name, ps.beneficiary_name) ASC`,
     params
   );
 
@@ -647,5 +757,7 @@ export default {
   collect,
   sweepNonCollections,
   getDispatchNote,
+  listDispatchNotes,
+  getDispatchBeneficiaryOptions,
   getNonCollectionHistory,
 };

@@ -30,35 +30,100 @@
 // ─────────────────────────────────────────────────────────────
 import pool       from "../config/db.js";
 import stockModel from "./stock.repository.js";
+import { DELIVERY_SORTS, buildOrderBy } from "../constants/receiptSort.js";
+import {
+  isOpenPurchaseOrder,
+  OPEN_PO_STATUSES,
+  PO_STATUS_FULLY_RECEIVED,
+  PO_STATUS_PARTIALLY_RECEIVED,   // eslint-disable-line no-unused-vars -- see createDelivery
+} from "../constants/purchaseOrderStatus.js";
 
-// ── Get all deliveries with optional date range ───────────────
-// range: 'today' | 'week' | 'month' | 'all'
-const getDeliveries = async (range = "all") => {
-  let dateFilter = "";
-
-  if (range === "today") {
-    dateFilter = `AND dn.delivery_date = CURRENT_DATE`;
-  } else if (range === "week") {
-    dateFilter = `AND dn.delivery_date >= CURRENT_DATE - INTERVAL '7 days'`;
-  } else if (range === "month") {
-    dateFilter = `AND dn.delivery_date >= CURRENT_DATE - INTERVAL '30 days'`;
-  }
-
+// ── The goods-in archive ──────────────────────────────────────
+// Every delivery note ever recorded, filterable and paged.
+//
+// WHY THIS GREW FROM range='today|week|month|all'
+// A named range answers "what came in recently". The archive answers "find me
+// the note for the short delivery from Meridian in July", which needs an
+// explicit from/to, a supplier, and a way to jump to the flagged ones. The
+// four named ranges are still honoured by the service, which converts them to
+// concrete dates before calling this.
+//
+// CURRENT_DATE IS NOT USED HERE. Render runs UTC and the warehouse is SAST,
+// so between 00:00 and 02:00 CURRENT_DATE is still yesterday and "today"
+// silently loses a day's notes. The service resolves calendar dates in SAST
+// and passes them in — the same rule dispatch.repository's gateToday follows.
+//
+// LEFT JOIN suppliers, not JOIN. getDeliveryById already used LEFT, so a note
+// whose supplier row went missing vanished from the list while still opening
+// by id. BR-27's retention principle says a historical record survives the
+// removal of the thing it refers to.
+//
+// COUNT(*) OVER () rides along on the same scan rather than a second query.
+// It is identical on every row; the service lifts it off row zero.
+const getDeliveries = async ({
+  from = null,
+  to = null,
+  supplierId = null,
+  status = null,
+  search = null,
+  sort = 'delivery_date',
+  dir = 'desc',
+  limit = 25,
+  offset = 0,
+} = {}) => {
+  // From the whitelist, never from the caller's string. See receiptSort.js.
+  const orderBy = buildOrderBy(DELIVERY_SORTS, sort, dir, 'delivery_date', 'dn.id');
   const result = await pool.query(
     `SELECT
        dn.id,
        dn.delivery_date,
        dn.status,
        dn.created_at,
-       s.name        AS supplier_name,
-       u.first_name  AS received_by_name,
-       po.status     AS po_status
+       dn.driver_name,
+       dn.purchase_order_id,
+       s.id                  AS supplier_id,
+       s.name                AS supplier_name,
+       u.first_name          AS received_by_name,
+       po.status     AS po_status,
+       po.po_number,
+       po.status             AS po_status,
+       COALESCE(d.discrepancy_count, 0)        AS discrepancy_count,
+       COALESCE(d.discrepancy_count, 0) > 0    AS has_discrepancies,
+       COALESCE(d.unresolved_count, 0)         AS unresolved_discrepancy_count,
+       COALESCE(i.line_count, 0)               AS line_count,
+       COUNT(*) OVER ()                        AS total_count
      FROM delivery_notes dn
-     JOIN suppliers s ON s.id = dn.supplier_id
-     LEFT JOIN users u ON u.id = dn.received_by
+     LEFT JOIN suppliers s       ON s.id  = dn.supplier_id
+     LEFT JOIN users u           ON u.id  = dn.received_by
      LEFT JOIN purchase_orders po ON po.id = dn.purchase_order_id
-     WHERE 1=1 ${dateFilter}
-     ORDER BY dn.created_at DESC`,
+     -- Aggregated in subqueries rather than a GROUP BY over the join, so the
+     -- window function above counts NOTES and not note-item rows.
+     LEFT JOIN LATERAL (
+       SELECT
+         COUNT(*) FILTER (WHERE dni.discrepancy_quantity <> 0)                                   AS discrepancy_count,
+         COUNT(*) FILTER (WHERE dni.discrepancy_quantity <> 0 AND dni.discrepancy_resolved = false) AS unresolved_count
+       FROM delivery_note_items dni
+       WHERE dni.delivery_note_id = dn.id
+     ) d ON TRUE
+     LEFT JOIN LATERAL (
+       SELECT COUNT(*) AS line_count
+       FROM delivery_note_items dni2
+       WHERE dni2.delivery_note_id = dn.id
+     ) i ON TRUE
+     WHERE ($1::date IS NULL OR dn.delivery_date >= $1::date)
+       AND ($2::date IS NULL OR dn.delivery_date <= $2::date)
+       AND ($3::int  IS NULL OR dn.supplier_id   = $3::int)
+       AND ($4::text IS NULL OR dn.status        = $4::text)
+       -- Free text across the two things someone actually has in their hand:
+       -- a PO number off a printed order, or the note's own record number.
+       -- dn.id::text so "11" matches note 11 without a separate numeric field.
+       AND ($5::text IS NULL
+            OR po.po_number ILIKE '%' || $5::text || '%'
+            OR dn.id::text  ILIKE '%' || $5::text || '%'
+            OR s.name       ILIKE '%' || $5::text || '%')
+     ORDER BY ${orderBy}
+     LIMIT $6 OFFSET $7`,
+    [from, to, supplierId, status, search, limit, offset],
   );
 
   return result.rows;
@@ -269,7 +334,12 @@ const createDelivery = async ({
     // Only an open order can be received against. A 'completed' one
     // has already had its stock taken in; receiving against it again
     // doubles the balance.
-    if (purchaseOrder.status !== "approved") {
+    // BR-07B vocabulary. This used to demand status === 'approved', a value
+    // migration 002 stopped producing — while getPurchaseOrdersBySupplier
+    // below offered pending/in_transit/partially_received. The two disagreed,
+    // so every order the dropdown offered was rejected here and the only
+    // orders that passed were ones the dropdown never showed.
+    if (!isOpenPurchaseOrder(purchaseOrder.status)) {
       await client.query("ROLLBACK");
       return { purchaseOrderNotOpen: true, status: purchaseOrder.status };
     }
@@ -361,10 +431,21 @@ const createDelivery = async ({
       }
     }
 
+    // 'received', not 'completed'. Both are legal in the database, but
+    // 'completed' is legacy: supplier.repository.js counts open orders as
+    // `status NOT IN ('received','returned')`, so a completed PO kept being
+    // counted as open, and PO_STATUSES has no 'completed' so the manager's
+    // status filter could never surface one.
+    //
+    // OPEN QUESTION FOR HUSSAIN (BR-07B): should a delivery that does NOT
+    // close the order set 'partially_received' automatically? Right now the
+    // status only moves when the receiver ticks the box, which means a PO
+    // that has had three partial deliveries still reads 'pending'. The
+    // constant is imported and ready if the answer is yes.
     if (poCompleted) {
       await client.query(
-        `UPDATE purchase_orders SET status = 'completed' WHERE id = $1`,
-        [purchaseOrderId],
+        `UPDATE purchase_orders SET status = $2 WHERE id = $1`,
+        [purchaseOrderId, PO_STATUS_FULLY_RECEIVED],
       );
     }
 
@@ -381,6 +462,20 @@ const createDelivery = async ({
   } finally {
     client.release();
   }
+};
+
+// ── Suppliers that actually appear in the archive ─────────────
+// The filter dropdown should offer the suppliers you have notes FOR, not
+// every supplier on file — otherwise most options return nothing. Includes
+// deactivated suppliers, because their historical notes are still there.
+const getSupplierOptions = async () => {
+  const result = await pool.query(
+    `SELECT DISTINCT s.id, s.name, s.is_active
+     FROM delivery_notes dn
+     JOIN suppliers s ON s.id = dn.supplier_id
+     ORDER BY s.name ASC`,
+  );
+  return result.rows;
 };
 
 // ── Get all active suppliers ──────────────────────────────────
@@ -439,9 +534,9 @@ const getPurchaseOrdersBySupplier = async (supplierId) => {
      FROM purchase_orders po
      LEFT JOIN users u ON u.id = po.created_by
      WHERE po.supplier_id = $1
-       AND po.status IN ('approved', 'in_transit', 'partially_received')
+       AND po.status = ANY($2)
      ORDER BY po.expected_delivery_date ASC`,
-    [supplierId],
+    [supplierId, OPEN_PO_STATUSES],
   );
   return result.rows;
 };
@@ -473,6 +568,7 @@ const getPurchaseOrderItems = async (purchaseOrderId) => {
 
 export default {
   getDeliveries,
+  getSupplierOptions,
   getDeliveryById,
   findByIdempotencyKey,
   getPurchaseOrder,

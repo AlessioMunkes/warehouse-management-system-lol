@@ -16,6 +16,7 @@ import StaffDecantingRecordsPage                   from './pages/StaffDecantingR
 import PackingSelectPage                           from './pages/PackingSelectPage';
 import DispatchPage                                from './pages/DispatchPage';
 import StaffDispatchHistoryPage                    from './pages/StaffDispatchHistoryPage';
+import ReceiptsPage                                from './pages/ReceiptsPage';
 import InventoryManagementPage                     from './pages/InventoryManagementPage';
 import ManagerDashboardPage                         from './pages/ManagerDashboardPage';
 import TaskDashboard from './pages/TaskDashboardPage';
@@ -67,12 +68,20 @@ const App = () => (
             admin-bypass, so an admin account could not reach any of
             these even though every one of their server routes is
             requireRole(MANAGER, ADMIN). Fixed by listing both. */}
-        <Route element={<ProtectedRoute roles={['manager', 'admin']} />}>
+        {/* 'admin' added: ProtectedRoute has no admin special case, so
+            roles={['manager']} was locking admins out of the manager screen,
+            inventory, reporting and purchase orders — while the server has
+            always treated MANAGERS_UP as [MANAGER, ADMIN]. The two now agree. */}
+        <Route element={<ProtectedRoute roles={['manager', 'admin', 'admin']} />}>
           <Route path="/manager"       element={<ManagerDashboardPage />} />
         <Route path="/noc/inventory" element={<InventoryManagementPage />} />
           <Route path={STAFF.reporting} element={<ReportingPage />} />
           <Route path={STAFF.impactReport} element={<ImpactReportPage />} />
           <Route path={STAFF.purchaseOrders} element={<PurchaseOrdersPage />} />
+          {/* Past delivery notes and dispatch notes. Manager and admin only —
+              the server endpoints are gated to the same pair, so the two
+              cannot drift into a UI that hides a route anyone can still call. */}
+          <Route path={STAFF.receipts} element={<ReceiptsPage />} />
           <Route path={STAFF.beneficiaries} element={<BeneficiaryDirectoryPage />} />
           <Route path={STAFF.pickingSlips} element={<PickingSlipManagementPage />} />
           <Route path={STAFF.documents} element={<DocumentsPage />} />
@@ -100,6 +109,8 @@ const App = () => (
           <Route path={PACKING.detailPattern} element={<PackingSelectPage />} />
           <Route path={STAFF.dispatch}        element={<DispatchPage />} />
           <Route path={STAFF.dispatchHistory} element={<StaffDispatchHistoryPage />} />
+          {/* Receipts lives in the manager block above — a worker who typed
+              the URL would otherwise reach it, tile or no tile. */}
         </Route>
 
         {/* Protected — donation intake, RECEIVERS_UP only.

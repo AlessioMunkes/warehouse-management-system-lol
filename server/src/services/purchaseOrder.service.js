@@ -15,6 +15,7 @@
 // ─────────────────────────────────────────────────────────────
 import repo from '../repositories/purchaseOrder.repository.js';
 import { isPositiveInt, isValidDateString } from '../utils/validation.js';
+import { PO_STATUSES as PO_STATUS_LIST } from '../constants/purchaseOrderStatus.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -31,23 +32,17 @@ const clean = (value) => {
 // BR-07B, in one place, matching the CHECK constraint. Anything
 // reading or writing a PO status reads it from here — movement_type
 // drifted precisely because its allowed values were written twice.
+// Moved to ../constants/purchaseOrderStatus.js so delivery.repository.js can
+// read the same list without importing this service (which would be circular
+// — the service imports the repository). Re-exported here unchanged so every
+// existing `import { PO_STATUSES } from './purchaseOrder.service.js'` keeps
+// working.
 //
-// 'approved' and 'completed' (renamed from the old 'received') were
-// added to close a real gap: delivery.repository.js's receiving flow
-// already wrote status = 'completed' and queried status = 'approved'
-// before either value was ever reachable through this list — a PO
-// could physically never get there. See
-// scratchpad/po_status_migration.sql for the CHECK-constraint change
-// this list now assumes has been applied.
-export const PO_STATUSES = [
-  'pending',              // pending approval
-  'approved',             // manager has signed off; ready to send to the supplier
-  'in_transit',
-  'partially_received',
-  'completed',            // goods fully received as expected
-  'returned',
-  'follow_up_required',
-];
+// Written as import-then-const rather than `export { X } from '...'` on
+// purpose: module-loads.test.js parses each file by stripping the `export`
+// keyword with a regex, and a re-export leaves `{ PO_STATUSES } from '...'`
+// behind, which is a syntax error. The safety net caught it.
+export const PO_STATUSES = PO_STATUS_LIST;
 
 // Render runs UTC. Comparing an SAST calendar date against the
 // container's today is wrong for two hours every night: between 00:00
@@ -199,7 +194,7 @@ const createPurchaseOrder = async (body, userId) => {
 // ── Read ──────────────────────────────────────────────────────
 const listPurchaseOrders = async ({ status, supplierId } = {}) => {
   const cleanStatus = clean(status);
-  if (cleanStatus && !PO_STATUSES.includes(cleanStatus)) {
+  if (cleanStatus && !PO_STATUS_LIST.includes(cleanStatus)) {
     throw fail(400, `Unknown status filter "${cleanStatus}".`);
   }
   if (supplierId !== undefined && supplierId !== null && supplierId !== ''
