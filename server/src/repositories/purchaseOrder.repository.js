@@ -18,6 +18,7 @@
 // ─────────────────────────────────────────────────────────────
 import pool           from '../config/db.js';
 import { logAudit }   from './auditLog.repository.js';
+import { createNotification } from './notification.repository.js';
 
 // Named columns rather than SELECT *, so a column added later does not
 // silently start crossing the API.
@@ -231,8 +232,56 @@ const getPurchaseOrderById = async (id) => {
   return { ...purchaseOrder, items };
 };
 
+// ── Status transition ────────────────────────────────────────
+// status_reason is cleared (not merely left) on every transition
+// that isn't 'returned' — a stale return reason must not survive
+// onto a PO that has since moved past it and read as if it still
+// applies.
+//
+// Runs in its own transaction (rather than a bare pool.query) purely
+// so the notification for 'returned'/'follow_up_required' can use
+// createNotification, which — like logAudit — requires the caller's
+// client so a notification can never survive a change that itself
+// got rolled back.
+const updatePurchaseOrderStatus = async (id, status, reason) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows } = await client.query(
+      `UPDATE purchase_orders
+          SET status = $2,
+              status_reason = $3,
+              status_changed_at = NOW()
+        WHERE id = $1
+        RETURNING ${PO_COLUMNS.replace(/po\./g, '')}`,
+      [id, status, status === 'returned' ? reason : null]
+    );
+    const po = rows[0] ?? null;
+
+    if (po && (status === 'returned' || status === 'follow_up_required')) {
+      await createNotification(client, {
+        type:       'purchase_order_needs_attention',
+        title:      `Purchase order ${po.po_number} ${status === 'returned' ? 'returned' : 'needs follow-up'}`,
+        body:       reason ?? null,
+        entityType: 'purchase_order',
+        entityId:   id,
+      });
+    }
+
+    await client.query('COMMIT');
+    return po;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
 export default {
   createPurchaseOrder,
   listPurchaseOrders,
   getPurchaseOrderById,
+  updatePurchaseOrderStatus,
 };

@@ -15,6 +15,7 @@
 // ─────────────────────────────────────────────────────────────
 import repo from '../repositories/purchaseOrder.repository.js';
 import { isPositiveInt, isValidDateString } from '../utils/validation.js';
+import { PO_STATUSES as PO_STATUS_LIST } from '../constants/purchaseOrderStatus.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -28,17 +29,20 @@ const clean = (value) => {
   return trimmed === '' ? null : trimmed;
 };
 
-// BR-07B, in one place, matching migration 002's CHECK. Anything
+// BR-07B, in one place, matching the CHECK constraint. Anything
 // reading or writing a PO status reads it from here — movement_type
 // drifted precisely because its allowed values were written twice.
-export const PO_STATUSES = [
-  'pending',
-  'in_transit',
-  'partially_received',
-  'received',
-  'returned',
-  'follow_up_required',
-];
+// Moved to ../constants/purchaseOrderStatus.js so delivery.repository.js can
+// read the same list without importing this service (which would be circular
+// — the service imports the repository). Re-exported here unchanged so every
+// existing `import { PO_STATUSES } from './purchaseOrder.service.js'` keeps
+// working.
+//
+// Written as import-then-const rather than `export { X } from '...'` on
+// purpose: module-loads.test.js parses each file by stripping the `export`
+// keyword with a regex, and a re-export leaves `{ PO_STATUSES } from '...'`
+// behind, which is a syntax error. The safety net caught it.
+export const PO_STATUSES = PO_STATUS_LIST;
 
 // Render runs UTC. Comparing an SAST calendar date against the
 // container's today is wrong for two hours every night: between 00:00
@@ -190,7 +194,7 @@ const createPurchaseOrder = async (body, userId) => {
 // ── Read ──────────────────────────────────────────────────────
 const listPurchaseOrders = async ({ status, supplierId } = {}) => {
   const cleanStatus = clean(status);
-  if (cleanStatus && !PO_STATUSES.includes(cleanStatus)) {
+  if (cleanStatus && !PO_STATUS_LIST.includes(cleanStatus)) {
     throw fail(400, `Unknown status filter "${cleanStatus}".`);
   }
   if (supplierId !== undefined && supplierId !== null && supplierId !== ''
@@ -211,8 +215,35 @@ const getPurchaseOrder = async (rawId) => {
   return purchaseOrder;
 };
 
+// ── Status transitions ─────────────────────────────────────────
+// General-purpose, not approve-only: PurchaseOrderDetail.jsx's
+// Approve button is the first caller, but 'returned'/
+// 'follow_up_required' need the same mechanism and the same
+// mandatory-reason rule the CHECK constraint already enforces on
+// Returned (see PurchaseOrderDetail.jsx's own comment on that).
+const setPurchaseOrderStatus = async (rawId, body = {}) => {
+  if (!isPositiveInt(rawId)) throw fail(400, 'A valid purchase order ID is required.');
+
+  const status = clean(body.status);
+  if (!status || !PO_STATUSES.includes(status)) {
+    throw fail(400, `Unknown status "${status}". Must be one of: ${PO_STATUSES.join(', ')}.`);
+  }
+
+  const reason = clean(body.reason);
+  if (status === 'returned' && !reason) {
+    throw fail(400, 'A reason is required when marking a purchase order as returned.');
+  }
+
+  const existing = await repo.getPurchaseOrderById(Number(rawId));
+  if (!existing) throw fail(404, 'Purchase order not found.');
+  if (existing.status === status) return existing;
+
+  return repo.updatePurchaseOrderStatus(Number(rawId), status, reason);
+};
+
 export default {
   createPurchaseOrder,
   listPurchaseOrders,
   getPurchaseOrder,
+  setPurchaseOrderStatus,
 };

@@ -8,8 +8,8 @@
 // repository: the system never stops food leaving the building
 // because of a data problem. Almost everything the gate checks is
 // therefore a FLAG the screen shows, not an error that refuses the
-// request. There is exactly one hard block — an ECD centre that is
-// not active (BR-11) — because that is a governance decision made
+// request. There is exactly one hard block — a beneficiary centre
+// that is not active (BR-11) — because that is a governance decision made
 // upstream by the programme team, not a discrepancy between a number
 // in a database and a number on a shelf.
 //
@@ -28,6 +28,7 @@
 import dispatchRepository from '../repositories/dispatch.repository.js';
 import { ROLES }          from '../middleware/auth.middleware.js';
 import { isValidDateString, isPositiveInt } from '../utils/validation.js';
+import { DISPATCH_SORTS, SORT_DIRECTIONS } from '../constants/receiptSort.js';
 
 const COHORTS  = ['week1', 'week2'];
 const STATUSES = ['awaiting', 'collected', 'late_collected', 'not_collected', 'cancelled'];
@@ -198,6 +199,17 @@ const getBoard = async (query, user) => {
   return await dispatchRepository.getBoard({ dispatchDate, cohort, status, gateToday });
 };
 
+// ── Past collections, for the staff history page ─────────────────
+// Same range shape delivery.service.js's getDeliveries already uses —
+// an unrecognised or missing range quietly falls back to 'all' rather
+// than failing, since this is a read the whole staff team should be
+// able to reach without worrying about the exact query string.
+const VALID_HISTORY_RANGES = ['today', 'week', 'month', 'all'];
+const getHistory = async (range) => {
+  const safeRange = VALID_HISTORY_RANGES.includes(range) ? range : 'all';
+  return await dispatchRepository.getHistory(safeRange);
+};
+
 // ── One pallet at the gate ────────────────────────────────────
 const getGateView = async (slipId) => {
   const gateView = await dispatchRepository.getGateView(slipId);
@@ -365,7 +377,14 @@ const collect = async (slipId, body, user) => {
   if (result.notPacked)         fail(409, 'This pallet has not been packed yet.');
   if (result.alreadyDispatched) fail(409, 'This pallet has already been collected.');
 
-  return result;
+  // The gate screen pops up the dispatch note the moment a collection
+  // succeeds (the same pattern receiving's note follows). Fetching the
+  // full joined note here — one extra LOCAL query, on a connection
+  // already open — means the gate screen doesn't have to make a
+  // second HTTP round trip for it, the same fix applied to
+  // delivery.service.js's createDelivery.
+  const note = await dispatchRepository.getDispatchNote(result.event.id);
+  return { ...result, note };
 };
 
 // ── Run the 16:00 sweep on demand (manager only) ──────────────
@@ -393,6 +412,81 @@ const getDispatchNote = async (eventId) => {
   return note;
 };
 
+// ── The goods-out archive ─────────────────────────────────────
+// Open to every logged-in role, matching GET /notes/:eventId and the URS,
+// which says the dispatch note is viewable by staff, admin and management.
+// Non-collection HISTORY stays manager-only below — that is a compliance
+// view about a centre's behaviour, not a receipt.
+const ARCHIVE_MAX_PAGE_SIZE     = 100;
+const ARCHIVE_DEFAULT_PAGE_SIZE = 25;
+
+const listDispatchNotes = async (query = {}) => {
+  const { from, to, ecdId, cohort, status, search, sort, dir, limit, offset } = query || {};
+
+  if (sort !== undefined && sort !== '' && !(sort in DISPATCH_SORTS)) {
+    fail(400, `Sort must be one of: ${Object.keys(DISPATCH_SORTS).join(', ')}.`);
+  }
+  if (dir !== undefined && dir !== '' && !SORT_DIRECTIONS.includes(dir)) {
+    fail(400, 'Sort direction must be asc or desc.');
+  }
+
+  if (from !== undefined && from !== '' && !isValidDateString(from)) {
+    fail(400, '"From" must be a real date in YYYY-MM-DD form.');
+  }
+  if (to !== undefined && to !== '' && !isValidDateString(to)) {
+    fail(400, '"To" must be a real date in YYYY-MM-DD form.');
+  }
+  if (from && to && from > to) {
+    fail(400, '"From" cannot be after "to".');
+  }
+  if (ecdId !== undefined && ecdId !== '' && !isPositiveInt(ecdId)) {
+    fail(400, 'Invalid beneficiary.');
+  }
+  if (cohort && !COHORTS.includes(cohort)) {
+    fail(400, 'Cohort must be week1 or week2.');
+  }
+  // 'awaiting' is excluded deliberately: an awaiting event is a pallet still
+  // standing in the yard, which is the board's business, not the archive's.
+  if (status && !STATUSES.includes(status)) {
+    fail(400, 'Invalid dispatch status filter.');
+  }
+
+  const safeLimit = Math.min(
+    Math.max(parseInt(limit, 10) || ARCHIVE_DEFAULT_PAGE_SIZE, 1),
+    ARCHIVE_MAX_PAGE_SIZE
+  );
+  const safeOffset = Math.max(parseInt(offset, 10) || 0, 0);
+
+  const cleanSearch = typeof search === 'string' && search.trim()
+    ? search.trim().slice(0, 100)
+    : null;
+
+  const rows = await dispatchRepository.listDispatchNotes({
+    from:   from || null,
+    to:     to   || null,
+    ecdId:  ecdId ? Number(ecdId) : null,
+    cohort: cohort || null,
+    status: status || null,
+    search: cleanSearch,
+    sort:   sort || 'collected_at',
+    dir:    dir  || 'desc',
+    limit:  safeLimit,
+    offset: safeOffset,
+  });
+
+  const total = rows.length ? Number(rows[0].total_count) : 0;
+
+  return {
+    rows: rows.map(({ total_count, ...row }) => row),   // eslint-disable-line no-unused-vars
+    total,
+    limit:  safeLimit,
+    offset: safeOffset,
+  };
+};
+
+const getDispatchBeneficiaryOptions = async () =>
+  await dispatchRepository.getDispatchBeneficiaryOptions();
+
 // ── Non-collection history (BR-26) ────────────────────────────
 const getNonCollectionHistory = async (query, user) => {
   if (!isManager(user) && user.role !== ROLES.FINANCE) {
@@ -405,7 +499,7 @@ const getNonCollectionHistory = async (query, user) => {
   // let an empty ecdId through as centre 0 and quietly returned
   // nothing instead of the unfiltered history the caller asked for.
   if (ecdId !== undefined && ecdId !== '' && !isPositiveInt(ecdId)) {
-    fail(400, 'Invalid ECD centre.');
+    fail(400, 'Invalid beneficiary centre.');
   }
   if (from !== undefined && from !== '' && !isValidDateString(from)) {
     fail(400, '"From" must be a real date in YYYY-MM-DD form.');
@@ -425,9 +519,12 @@ export { isValidDateString };
 
 export default {
   getBoard,
+  getHistory,
   getGateView,
   collect,
   sweep,
   getDispatchNote,
+  listDispatchNotes,
+  getDispatchBeneficiaryOptions,
   getNonCollectionHistory,
 };

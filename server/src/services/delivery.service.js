@@ -33,6 +33,12 @@
 // ─────────────────────────────────────────────────────────────
 import deliveryModel from '../repositories/delivery.repository.js';
 import { isValidDateString, isPositiveInt, isUuid } from '../utils/validation.js';
+import { isOpenPurchaseOrder } from '../constants/purchaseOrderStatus.js';
+import { DELIVERY_SORTS, SORT_DIRECTIONS } from '../constants/receiptSort.js';
+
+// Orders that have already been closed off, for the specific "reopen it
+// first" message. Everything else that is not open gets the generic one.
+const CLOSED_PO_STATUSES = ['received', 'completed', 'returned'];
 
 // ── fail ───────────────────────────────────────────────────────
 // Mirrors picking.service.js, stock.service.js and the rest.
@@ -42,12 +48,115 @@ const fail = (status, message) => {
   throw err;
 };
 
-// ── Get deliveries by date range ──────────────────────────────
-const getDeliveries = async (range) => {
-  const validRanges = ['today', 'week', 'month', 'all'];
-  const safeRange   = validRanges.includes(range) ? range : 'all';
-  return await deliveryModel.getDeliveries(safeRange);
+// ── Today, in the warehouse's own timezone ────────────────────
+// Render containers run UTC. Between 00:00 and 02:00 SAST the container still
+// thinks it is yesterday, so a range resolved from the server clock loses a
+// day's notes. Fixed +02:00 — South Africa has no DST. Same helper shape as
+// purchaseOrder.service.js's todayInSAST.
+const SAST_OFFSET_MS = 2 * 60 * 60 * 1000;
+const todayInSAST = () =>
+  new Date(Date.now() + SAST_OFFSET_MS).toISOString().slice(0, 10);
+
+const daysAgoInSAST = (days) =>
+  new Date(Date.now() + SAST_OFFSET_MS - days * 86400000).toISOString().slice(0, 10);
+
+// The four named ranges the old signature took, kept working. They resolve to
+// concrete dates here so the repository never has to reason about "today".
+const resolveRange = (range) => {
+  switch (range) {
+    case 'today': return { from: todayInSAST(),   to: todayInSAST() };
+    case 'week':  return { from: daysAgoInSAST(7),  to: null };
+    case 'month': return { from: daysAgoInSAST(30), to: null };
+    default:      return { from: null, to: null };
+  }
 };
+
+const DELIVERY_STATUSES = ['recorded', 'flagged', 'closed'];
+
+const MAX_PAGE_SIZE     = 100;
+const DEFAULT_PAGE_SIZE = 25;
+
+// ── The goods-in archive ──────────────────────────────────────
+// Accepts either the named range (range=today|week|month|all) or explicit
+// from/to. Explicit dates win — a caller that sends both meant the dates.
+//
+// Returns { rows, total, limit, offset } rather than a bare array. The
+// controller keeps the { success, data } envelope, so the client reads
+// res.data.rows. That is a breaking change to this endpoint's shape, which is
+// safe only because nothing consumed it: GET /api/deliveries had no caller in
+// client/src before this feature.
+const getDeliveries = async (query = {}) => {
+  const { range, from, to, supplierId, status, search, sort, dir, limit, offset } = query || {};
+
+  // Rejected here rather than silently ignored: a sort the client thinks it
+  // asked for and did not get is worse than an error, because the table
+  // renders in some other order and looks like a data problem.
+  if (sort !== undefined && sort !== '' && !(sort in DELIVERY_SORTS)) {
+    fail(400, `Sort must be one of: ${Object.keys(DELIVERY_SORTS).join(', ')}.`);
+  }
+  if (dir !== undefined && dir !== '' && !SORT_DIRECTIONS.includes(dir)) {
+    fail(400, 'Sort direction must be asc or desc.');
+  }
+
+  if (range !== undefined && range !== '' &&
+      !['today', 'week', 'month', 'all'].includes(range)) {
+    fail(400, 'Range must be today, week, month or all.');
+  }
+  if (from !== undefined && from !== '' && !isValidDateString(from)) {
+    fail(400, '"From" must be a real date in YYYY-MM-DD form.');
+  }
+  if (to !== undefined && to !== '' && !isValidDateString(to)) {
+    fail(400, '"To" must be a real date in YYYY-MM-DD form.');
+  }
+  if (from && to && from > to) {
+    fail(400, '"From" cannot be after "to".');
+  }
+  if (supplierId !== undefined && supplierId !== '' && !isPositiveInt(supplierId)) {
+    fail(400, 'Invalid supplier.');
+  }
+  if (status !== undefined && status !== '' && !DELIVERY_STATUSES.includes(status)) {
+    fail(400, `Status must be one of: ${DELIVERY_STATUSES.join(', ')}.`);
+  }
+
+  const fallback   = resolveRange(range);
+  const safeLimit  = Math.min(
+    Math.max(parseInt(limit, 10) || DEFAULT_PAGE_SIZE, 1),
+    MAX_PAGE_SIZE,
+  );
+  const safeOffset = Math.max(parseInt(offset, 10) || 0, 0);
+
+  // Trimmed, length-capped, and turned into null when empty. ILIKE '%%'
+  // matches every row, so an empty string must not reach the query as one.
+  const cleanSearch = typeof search === 'string' && search.trim()
+    ? search.trim().slice(0, 100)
+    : null;
+
+  const rows = await deliveryModel.getDeliveries({
+    from:       from || fallback.from,
+    to:         to   || fallback.to,
+    supplierId: supplierId ? Number(supplierId) : null,
+    status:     status || null,
+    search:     cleanSearch,
+    sort:       sort || 'delivery_date',
+    dir:        dir  || 'desc',
+    limit:      safeLimit,
+    offset:     safeOffset,
+  });
+
+  // total_count is identical on every row and meaningless on the wire, so it
+  // is lifted off and stripped rather than repeated N times.
+  const total = rows.length ? Number(rows[0].total_count) : 0;
+
+  return {
+    rows: rows.map(({ total_count, ...row }) => row),   // eslint-disable-line no-unused-vars
+    total,
+    limit:  safeLimit,
+    offset: safeOffset,
+  };
+};
+
+// ── Filter options for the archive ────────────────────────────
+const getSupplierOptions = async () => await deliveryModel.getSupplierOptions();
 
 // ── Get a single delivery with line items ─────────────────────
 const getDeliveryById = async (id) => {
@@ -115,10 +224,12 @@ const createDelivery = async (data, userId) => {
   if (Number(purchaseOrder.supplier_id) !== Number(supplierId)) {
     fail(409, 'That purchase order belongs to a different supplier. Check the order number on the delivery note.');
   }
-  if (purchaseOrder.status !== 'approved') {
-    fail(409, purchaseOrder.status === 'completed'
+  // Mirrors the authoritative check inside the repository's transaction.
+  // Both read OPEN_PO_STATUSES so they cannot drift apart again.
+  if (!isOpenPurchaseOrder(purchaseOrder.status)) {
+    fail(409, CLOSED_PO_STATUSES.includes(purchaseOrder.status)
       ? 'This purchase order has already been closed off. A manager needs to reopen it before anything else can be received against it.'
-      : 'This purchase order has not been approved yet, so nothing can be received against it.');
+      : `This purchase order is marked "${purchaseOrder.status}", so nothing can be received against it.`);
   }
 
   // ── The lines ───────────────────────────────────────────────
@@ -203,13 +314,27 @@ const createDelivery = async (data, userId) => {
     return { note, warnings: [], duplicate: true };
   }
 
-  const { warnings = [], ...note } = result;
+  // The repository's own insert only returns the bare delivery_notes
+  // row it just wrote — no supplier name, no line items, no PO status.
+  // The note PDF needs all of that, and used to be handed just the id
+  // and fetch the rest itself in a second round trip from the tablet.
+  // Fetching it here instead costs one extra LOCAL query, on a
+  // connection already open, rather than a second HTTP round trip
+  // from wherever the receiving flow is running — the same join
+  // getDeliveryById always did, just moved to where it's cheap.
+  const { warnings = [] } = result;
+  const note = await deliveryModel.getDeliveryById(result.id);
   return { note, warnings, duplicate: false };
 };
 
 // ── Get suppliers ─────────────────────────────────────────────
-const getSuppliers = async () => {
-  return await deliveryModel.getSuppliers();
+// openOrdersOnly narrows this to suppliers with an approved order —
+// the Form view's supplier picker uses it so it never offers a
+// supplier with nothing to receive against.
+const getSuppliers = async (openOrdersOnly = false) => {
+  return openOrdersOnly
+    ? await deliveryModel.getSuppliersWithOpenOrders()
+    : await deliveryModel.getSuppliers();
 };
 
 // ── Get products ──────────────────────────────────────────────
@@ -238,6 +363,7 @@ const getPurchaseOrderItems = async (purchaseOrderId) => {
 
 export default {
   getDeliveries,
+  getSupplierOptions,
   getDeliveryById,
   createDelivery,
   getSuppliers,

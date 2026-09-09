@@ -145,7 +145,7 @@ export const METRICS = {
       'staff loaded onto the vehicle — not what was packed onto the pallet earlier ' +
       'in the week.',
     repoFn: 'dispatchVolume', unit: 'kg',
-    dimensions: ['none', 'month', 'week', 'cohort', 'product', 'programme', 'ecd_centre'],
+    dimensions: ['none', 'month', 'week', 'cohort', 'product', 'programme', 'ecd_centre', 'beneficiary'],
     filters: ['cohort', 'beneficiary_kind', 'programme_id', 'product_id', 'ecd_id'],
     defaultChart: 'line',
     caveat: 'Gate-loaded quantities, kilogram lines only.',

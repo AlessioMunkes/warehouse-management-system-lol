@@ -45,22 +45,64 @@ export const STAFF = {
   // One URL for everyone — ProcurementPage picks the manager
   // dashboard or the receiving wizard by role.
   receiving: '/noc/procurement',
+  // A sub-screen of receiving, not a sixth tab: the tab bar is a
+  // fixed five-item strip with no spare icon slot, and this only
+  // needs to be reachable from the receiving flow, not from
+  // everywhere. Reached via a link on ReceivingFlow's first screen.
+  deliveries: '/noc/procurement/deliveries',
   packing:   PACKING.board,
   // One route, two shapes: DecantingPage picks the sack flow or the
   // week planner by role. There is no /staff/decanting.
   decanting: '/noc/decanting',
+  // A sub-screen of decanting, not a sixth tab, same reasoning as
+  // deliveries above — reached via a link on Decanting's crumb bar.
+  decantingRecords: '/noc/decanting/sheets',
   dispatch:  '/staff/dispatch',
+  // A sub-screen of dispatch, not a sixth tab, same reasoning as
+  // deliveries/decantingRecords above — reached via a link on the
+  // gate queue's crumb bar.
+  dispatchHistory: '/staff/dispatch/history',
   // Manager-only. Both /api/reporting routes are
   // requireRole(MANAGER, ADMIN); the App.jsx gate mirrors that.
   reporting: '/noc/reporting',
   // Donation intake. Entry point of the draft flow; see DONATIONS
   // below for the later steps.
   donation:  DONATIONS_NEW,
+  // Manager-only, same reasoning as reporting above — a dedicated
+  // view for the two impactOnly metrics in reportCatalog.js, rather
+  // than one more entry in ReportingPage.jsx's full metric picker.
+  impactReport: '/noc/impact-report',
   // Manager-only, like reporting above: POST /api/purchase-orders
   // is requireRole(MANAGER, ADMIN) and the App.jsx gate mirrors
   // that. Reads are open to warehouse staff, but they reach a PO
   // through the receiving flow rather than this screen.
   purchaseOrders: '/noc/purchase-orders',
+  // The receipts archive: past delivery notes and past dispatch notes.
+  // NOT manager-gated. Both server GETs are requireRole(...ALL_ROLES) and the
+  // URS puts each document in front of warehouse staff — the procurement
+  // sequence diagram's [view delivery note selected] frame is Warehouse
+  // Staff, and the dispatch one says the note is viewable by staff, admin and
+  // management. Declared here for the same reason everything else is: the
+  // route table and the entry tiles read one string, so they cannot drift.
+  receipts: '/noc/receipts',
+  // Manager-only, same reasoning as purchaseOrders above. Needed by
+  // picking slip creation (the ECD dropdown) as much as it is a
+  // screen in its own right, so it lives here rather than under
+  // ADMIN — a manager reaches both from the same task set.
+  beneficiaries: '/noc/beneficiaries',
+  // POST /api/picking (createSlip), POST /api/picking/generate, and
+  // assigning a slip to a specific worker (POST /api/picking/:id/assign
+  // with a packerId, only honoured for a manager) are all
+  // requireRole(MANAGER, ADMIN) in picking.routes.js — one screen for
+  // all three, since assignment happens inline on a slip rather than
+  // as a separate page.
+  pickingSlips: '/noc/picking-slips',
+  // Manager-only archive of generated delivery/dispatch notes — reuses
+  // receivingAPI.getDeliveries/getDeliveryById and
+  // dispatchAPI.getHistory/getDispatchNote, the same functions the
+  // staff-side equivalents already call, so no new route gating is
+  // needed beyond what those two already require.
+  documents: '/noc/documents',
 };
 
 // ── Donations ────────────────────────────────────────────────
@@ -95,4 +137,6 @@ export const VOLUNTEERS = {
 export const ADMIN = {
   dashboard: '/admin',
   suppliers: '/admin/suppliers',
+  users:     '/admin/users',
+  products:  '/admin/products',
 };

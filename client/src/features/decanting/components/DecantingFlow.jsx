@@ -23,16 +23,49 @@
 //
 // Saving is final. decanting.service.js has no update path, by
 // design: wastage cannot be un-recorded.
+//
+// A second shape exists alongside the four screens above, the same
+// `mode` ('guided' | 'full') pattern ReceivingFlow.jsx introduced:
+// Form mode is the same product/weight/required/bags/wastage fields
+// as one scrolling dialog instead of four screens, calling the exact
+// same workOutTheBags/save functions Guided uses — there is only ever
+// one product per save here, so there is no per-line list to build
+// the way receiving's Form mode needed. No signature is captured in
+// either mode: unlike receiving or dispatch, a decanting record has
+// no external party handing something over to sign for — it is an
+// internal record of what one worker weighed and bagged.
+//
+// A decanting sheet PDF pops up after a successful save, the same way
+// DeliveryNotePDF does after a receiving submit — see
+// DecantingSheetPDF.jsx, fed directly by what recordDecanting already
+// returns (the full joined record, not just the bare insert row).
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useState } from 'react';
 import {
   StepRail, StepScreen, Actions, Button, NumberField, ChoiceList, Notice,
+  SelectField, ViewToggle, Coachmark,
 } from '../../staff/components/StepPrimitives';
+import useCoachmark from '../../staff/hooks/useCoachmark';
 import { calculateDecantingPlan, recordDecanting } from '../../../services/decantingAPI';
 // The same list the planner and ProductLineRow offer. Importing it
 // rather than restating it is the point of folding the two views: a
 // fourth bag size added here appears in both, or in neither.
 import { STANDARD_SIZES, sizesToKg } from './BagSizes';
+import DecantingSheetPDF from './DecantingSheetPDF';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../components/ui/dialog';
+
+const MODE_KEY = 'stf_decanting_view_mode';
+const MODES = [
+  { value: 'guided', label: 'Guided', hint: 'Step by step' },
+  { value: 'full',   label: 'Form',   hint: 'Everything at once' },
+];
+const readStoredMode = () => {
+  try {
+    return localStorage.getItem(MODE_KEY) === 'full' ? 'full' : 'guided';
+  } catch {
+    return 'guided';
+  }
+};
 
 const TOTAL_STEPS = 4;
 
@@ -96,10 +129,41 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
+  const [mode, setMode] = useState(readStoredMode);
+  // Whether the Form dialog is open right now — independent of `mode`,
+  // the same reasoning as ReceivingFlow.jsx's own formOpen: dismissing
+  // it must not silently discard a sack already weighed.
+  const [formOpen, setFormOpen] = useState(false);
+  const [shellNode, setShellNode] = useState(null);
+  useEffect(() => {
+    const resolve = () => setShellNode(document.querySelector('.stf-shell'));
+    resolve();
+  }, []);
+  const { show: showCoachmark, dismiss: dismissCoachmark } = useCoachmark('decanting-view-toggle');
+  // The sheet just saved, fetched in full by recordDecanting itself —
+  // null hides the pop-up; set once by save() on success.
+  const [pdfRecord, setPdfRecord] = useState(null);
+
   const step = STEP_META[phase];
  const weekOf = useMemo(() => mondayOfThisWeek(), []);
+  const showToggle = phase !== 'done';
 
   useEffect(() => { onCrumbChange?.(step.label); }, [step.label, onCrumbChange]);
+
+  const handleModeChange = (next) => {
+    setMode(next);
+    // Tapping "Form" opens the dialog directly, the same as Receiving's
+    // toggle — the tap already said what the worker wants to do.
+    if (next === 'full') setFormOpen(true);
+    try { localStorage.setItem(MODE_KEY, next); } catch { /* nothing we can do */ }
+    dismissCoachmark();
+  };
+
+  useEffect(() => {
+    if (!showCoachmark || !showToggle) return undefined;
+    const timer = setTimeout(dismissCoachmark, 5000);
+    return () => clearTimeout(timer);
+  }, [showCoachmark, showToggle, dismissCoachmark]);
 
   const product = products.find((p) => String(p.id) === String(productId));
 
@@ -143,7 +207,7 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
     setBusy(true);
     setError(null);
     try {
-      await recordDecanting({
+      const result = await recordDecanting({
         weekOf,
         selectedSizes: BAG_SIZES_KG,
         items: [{
@@ -154,6 +218,14 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
         }],
       });
       setPhase('done');
+      // Ends Form mode's pass through this flow the same way finish()
+      // does in ReceivingFlow.jsx — without this the mega-form would
+      // still be mounted behind the sheet pop-up.
+      setFormOpen(false);
+      // recordDecanting already returns the full joined record (see
+      // decanting.repository.js's own getDecantingById-after-insert
+      // pattern) — no second fetch needed for the pop-up.
+      setPdfRecord(result);
     } catch (err) {
       setError(
         /cannot exceed/.test(err.message)
@@ -173,6 +245,8 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
     setPlan(null);
     setProduced({});
     setWastageKg('');
+    setFormOpen(false);
+    setPdfRecord(null);
   };
 
   // Bag labels, largest first, as the plan returned them.
@@ -185,12 +259,21 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
 
   return (
     <>
-      <StepRail step={step.n} total={TOTAL_STEPS} label={step.label} />
+      {showToggle ? (
+        <div className="stf-toggle-anchor">
+          <ViewToggle options={MODES} value={mode} onChange={handleModeChange} />
+          <Coachmark show={showCoachmark} onDismiss={dismissCoachmark}>
+            Tap here to switch view
+          </Coachmark>
+        </div>
+      ) : null}
+
+      {mode === 'full' ? null : <StepRail step={step.n} total={TOTAL_STEPS} label={step.label} />}
 
       {error ? <Notice tone="warn">{error}</Notice> : null}
 
       {/* ── 1 · Which sack ─────────────────────────────────── */}
-      {phase === 'product' && (
+      {phase === 'product' && mode !== 'full' && (
         <StepScreen
           title="What are you decanting?"
           sub="Pick the sack in front of you."
@@ -214,7 +297,7 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
       )}
 
       {/* ── 2 · Weight ─────────────────────────────────────── */}
-      {phase === 'weight' && (
+      {phase === 'weight' && mode !== 'full' && (
         <StepScreen
           title="What does the scale say?"
           sub="Put the whole sack on the scale and read the number."
@@ -244,7 +327,7 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
       )}
 
       {/* ── 3 · The instruction ────────────────────────────── */}
-      {phase === 'bag' && plan && (
+      {phase === 'bag' && mode !== 'full' && plan && (
         <StepScreen
           title="Bag this many"
           sub="Fill these, then come back and tell us what you got."
@@ -281,7 +364,7 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
       )}
 
       {/* ── 4 · Count back ─────────────────────────────────── */}
-      {phase === 'count' && plan && (
+      {phase === 'count' && mode !== 'full' && plan && (
         <StepScreen
           title="What did you actually get?"
           sub="Count the bags you filled."
@@ -328,6 +411,132 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
         </StepScreen>
       )}
 
+      {/* ── Form mode: an entry screen, plus one scrolling dialog ──
+          Product, both kg fields, the bag plan and wastage — all in
+          one form instead of four screens. There is only ever one
+          product per save here, so unlike ReceivingFlow's Form mode
+          there is no per-line list to render, just the same fields
+          Guided's four screens ask for, one after another down the
+          page. */}
+      {phase !== 'done' && mode === 'full' && (
+        <StepScreen
+          title="Fill in one form"
+          actions={
+            <Actions>
+              <Button onClick={() => setFormOpen(true)}>
+                {productId ? 'Continue this sack' : 'Start a new sack'}
+              </Button>
+            </Actions>
+          }
+        />
+      )}
+
+      <Dialog open={formOpen} onOpenChange={setFormOpen}>
+        <DialogContent
+          container={shellNode ?? undefined}
+          className="max-w-[560px] w-[calc(100%-2rem)] max-h-[85vh] p-0 gap-0 flex flex-col overflow-hidden"
+        >
+          <DialogHeader className="stf-dialog-head">
+            <DialogTitle>{product ? product.name : 'What are you decanting?'}</DialogTitle>
+            <DialogDescription>
+              Pick the sack, weigh it, then fill in what you bagged.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="stf-dialog-scroll">
+            <div className="stf-dialog-fields">
+              <SelectField
+                id="stf-full-product"
+                label="Product"
+                placeholder="Choose a product"
+                options={products.map((p) => ({ value: p.id, label: p.name }))}
+                value={productId}
+                onChange={(value) => { setProductId(value); setPlan(null); setProduced({}); }}
+              />
+
+              {productId ? (
+                <>
+                  <NumberField
+                    id="stf-full-weighed"
+                    label="Kilograms on the scale"
+                    value={weighedKg}
+                    onChange={(value) => { setWeighedKg(value); setPlan(null); }}
+                  />
+                  <NumberField
+                    id="stf-full-required"
+                    label="Kilograms the centres need this week"
+                    hint="Your manager sets this. Ask them if you are not sure."
+                    value={requiredKg}
+                    onChange={(value) => { setRequiredKg(value); setPlan(null); }}
+                  />
+
+                  {!plan ? (
+                    <Actions>
+                      <Button disabled={!weighedKg || !requiredKg || busy} onClick={workOutTheBags}>
+                        {busy ? 'Working it out' : 'Work out the bags'}
+                      </Button>
+                    </Actions>
+                  ) : null}
+                </>
+              ) : null}
+
+              {plan ? (
+                <>
+                  <div className="stf-formrows">
+                    {bagLabels.map((label) => (
+                      <NumberField
+                        key={label}
+                        id={`stf-full-made-${label}`}
+                        label={`${label} bags`}
+                        value={produced[label] ?? 0}
+                        onChange={(value) => setProduced((all) => ({ ...all, [label]: value }))}
+                      />
+                    ))}
+                  </div>
+
+                  <p className="stf-field-hint">{leftoverSentence(plan)}</p>
+
+                  {plan.isBulkLimited ? (
+                    <Notice tone="warn">
+                      This sack does not hold everything the centres need this week. Pack what is
+                      here and tell your manager, so they can order more.
+                    </Notice>
+                  ) : null}
+
+                  <NumberField
+                    id="stf-full-wastage"
+                    label="Spilled or spoiled, in kilograms"
+                    hint="Put 0 if none was lost."
+                    value={wastageKg}
+                    flagged={Number(wastageKg) > 0}
+                    onChange={setWastageKg}
+                  />
+
+                  {Number(wastageKg) > Number(weighedKg) * 0.05 ? (
+                    <Notice tone="warn">
+                      That is more waste than usual for a sack this size. Your manager will look at
+                      it. You can still save.
+                    </Notice>
+                  ) : null}
+
+                  <Notice>
+                    Once you save this, it cannot be changed. It goes on the week of {longDate(weekOf)}.
+                  </Notice>
+                </>
+              ) : null}
+            </div>
+          </div>
+
+          {plan ? (
+            <div className="stf-dialog-footer">
+              <Actions>
+                <Button disabled={busy} onClick={save}>{busy ? 'Saving' : 'Save'}</Button>
+              </Actions>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
       {/* ── Done ───────────────────────────────────────────── */}
       {phase === 'done' && (
         <StepScreen
@@ -340,6 +549,10 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
           }
         />
       )}
+
+      {pdfRecord ? (
+        <DecantingSheetPDF record={pdfRecord} onClose={() => setPdfRecord(null)} />
+      ) : null}
     </>
   );
 }

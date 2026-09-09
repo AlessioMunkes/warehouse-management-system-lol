@@ -10,7 +10,7 @@
 // sequential screens with one decision each. ACC-06 is why the
 // numbers are 56px and every tap target is at least 44px.
 // ─────────────────────────────────────────────────────────────
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 // ── Step rail ─────────────────────────────────────────────────
 // Four thin bars and a quiet line of text. Deliberately not a
@@ -120,6 +120,96 @@ export const TextField = ({ id, label, hint, value, onChange, ...rest }) => {
   );
 };
 
+// ── Select field ──────────────────────────────────────────────
+// A native <select>, for a list too long to make sense as tap
+// targets (every supplier, every one of a supplier's open orders) —
+// ChoiceList is the right control for two or three options, this is
+// the right one for a dropdown that can hold dozens.
+export const SelectField = ({ id, label, hint, value, onChange, options, placeholder, disabled = false }) => {
+  const fieldId = id || 'stf-select';
+  return (
+    <div className="stf-field">
+      <label className="stf-field-label" htmlFor={fieldId}>{label}</label>
+      <select
+        id={fieldId}
+        className="stf-select"
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        <option value="" disabled>{placeholder || 'Choose one'}</option>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
+      {hint ? <p className="stf-field-hint">{hint}</p> : null}
+    </div>
+  );
+};
+
+// ── Date field ────────────────────────────────────────────────
+// A native date input is functional but reads as a bare grey box.
+// This wraps it in a button showing the date in words, and taps
+// straight into the native picker via showPicker() — the same
+// trick the manager side's DatePicker.jsx uses, ported to .stf-*.
+export const DateField = ({ id, label, hint, value, onChange }) => {
+  const fieldId = id || 'stf-date';
+  const inputRef = useRef(null);
+  const formatted = value
+    ? new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' })
+    : null;
+  return (
+    <div className="stf-field">
+      <label className="stf-field-label" htmlFor={fieldId}>{label}</label>
+      <button
+        type="button"
+        className="stf-date-trigger"
+        onClick={() => inputRef.current?.showPicker?.() || inputRef.current?.focus()}
+      >
+        <i className="ti ti-calendar" aria-hidden="true" />
+        <span>{formatted || 'Pick a date'}</span>
+      </button>
+      <input
+        ref={inputRef}
+        id={fieldId}
+        className="stf-date-hidden"
+        type="date"
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      {hint ? <p className="stf-field-hint">{hint}</p> : null}
+    </div>
+  );
+};
+
+// ── Quantity field ────────────────────────────────────────────
+// Form mode pre-fills every line with the expected quantity — most
+// deliveries match the order exactly, so retyping every number is
+// work nobody needs to do. What's shown is a plain readout with an
+// Edit button beside it; tapping Edit swaps that line to the same
+// NumberField Guided mode uses. Matches ACC-03: the affordance to
+// change a value is a labelled button, not an icon a worker has to
+// guess the meaning of.
+export const QuantityField = ({ id, label, value, editing, flagged, onEdit, onChange }) => {
+  if (editing) {
+    return (
+      <NumberField id={id} label={label} value={value} flagged={flagged} onChange={onChange} autoFocus />
+    );
+  }
+  return (
+    <div className="stf-field">
+      <span className="stf-field-label">{label}</span>
+      <div className="stf-qty-readout">
+        <span className="stf-qty-readout-val">{value}</span>
+        <button type="button" className="stf-qty-edit-btn" onClick={onEdit}>
+          <i className="ti ti-pencil" aria-hidden="true" />
+          Edit
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // ── Choice list ───────────────────────────────────────────────
 // Tap targets instead of a <select>. A dropdown hides its options
 // until tapped and needs a second tap to commit; with two or three
@@ -177,6 +267,108 @@ export const KeyValues = ({ pairs }) => (
     ))}
   </p>
 );
+
+// ── View toggle ───────────────────────────────────────────────
+// Two ways to work the same task, not a filter between subsets of
+// data (that's Segments, used on the packing board) — so it gets its
+// own name even though it borrows .stf-segments' look, overridden to
+// a full pill (see staff.css's .stf-toggle rule) rather than the
+// filter tabs' softer corners.
+//
+// Sized to its labels, not stretched to fill the row — the same
+// booking.com List/Grid control this was asked to look like is a
+// short, content-hugging pill sitting inline among other controls,
+// not a full-width block. That only works if the sliding thumb's
+// width and position are the button's REAL rendered size, since two
+// labels like "Guided" and "Form" are not the same width — hence the
+// measuring below, the same thing booking.com's own markup does with
+// its --bui-segmented-control-active-scale-x/-transform-x custom
+// properties (measured in JS, not a fixed CSS split). A ResizeObserver
+// re-measures on layout changes — a font finishing its load, the
+// bench-tablet breakpoint — not just on option changes.
+//
+// No title-attribute tooltip: this is a phone held with one hand,
+// and `title` never shows on a tap, only a mouse hover that will
+// never happen here. Each option's `hint` is shown instead as a
+// short caption under the pill, for whichever option is currently
+// selected — you learn what a mode does by trying it, in the same
+// breath as trying it.
+export const ViewToggle = ({ options, value, onChange, className = '' }) => {
+  const containerRef = useRef(null);
+  const buttonRefs = useRef([]);
+  const [thumb, setThumb] = useState(null);
+  const index = options.findIndex((o) => o.value === value);
+  const active = options[index];
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    const button = buttonRefs.current[index];
+    if (!container || !button) return undefined;
+
+    const measure = () => {
+      const containerBox = container.getBoundingClientRect();
+      const buttonBox = button.getBoundingClientRect();
+      setThumb({ width: buttonBox.width, x: buttonBox.left - containerBox.left });
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [index, options]);
+
+  return (
+    <div className={`stf-toggle-block${className ? ` ${className}` : ''}`}>
+      <div className="stf-toggle" role="radiogroup" ref={containerRef}>
+        {thumb ? (
+          <span
+            className="stf-segment-thumb"
+            aria-hidden="true"
+            style={{ width: `${thumb.width}px`, transform: `translateX(${thumb.x}px)` }}
+          />
+        ) : null}
+        {options.map((option, i) => {
+          const chosen = option.value === value;
+          return (
+            <button
+              key={option.value}
+              ref={(el) => { buttonRefs.current[i] = el; }}
+              type="button"
+              role="radio"
+              aria-checked={chosen}
+              className={`stf-segment${chosen ? ' is-active' : ''}`}
+              onClick={() => onChange(option.value)}
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+      {active?.hint ? (
+        <p className="stf-toggle-hint" aria-live="polite">{active.hint}</p>
+      ) : null}
+    </div>
+  );
+};
+
+// ── Coachmark ─────────────────────────────────────────────────
+// A first-run nudge toward a control that is easy to miss, not a
+// permanent label. Pair with useCoachmark, which decides whether it
+// should be showing at all — this component only draws it. Dismissed
+// by tapping it, and the arrow's bounce is switched off under ACC-08
+// (see staff.css's [data-stf-motion] rule) since it is the only
+// animated part.
+export const Coachmark = ({ show, onDismiss, children }) => {
+  if (!show) return null;
+  return (
+    <div className="stf-coachmark" role="status">
+      <span className="stf-coachmark-arrow" aria-hidden="true">&#8593;</span>
+      <button type="button" className="stf-coachmark-body" onClick={onDismiss}>
+        {children}
+      </button>
+    </div>
+  );
+};
 
 // ── Counter ───────────────────────────────────────────────────
 // 48px either side of the number, because the alternative on a phone
