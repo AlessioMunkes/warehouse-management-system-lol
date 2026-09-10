@@ -31,7 +31,7 @@ import {
 } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  AlertTriangle, Package, ShoppingCart, Truck,
+  AlertTriangle, Package, PhoneCall, ShoppingCart, Truck,
 } from 'lucide-react';
 
 const BENEFICIARY_LABELS = {
@@ -131,16 +131,17 @@ export default function ManagerDashboardPage() {
 
         {summaryError ? <div className="mt-4"><ErrorBanner message={summaryError} /></div> : null}
 
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {summary ? (
             <>
               <StatTile icon={AlertTriangle} label="Low stock items" value={summary.lowStockCount} to="/noc/inventory" warn />
               <StatTile icon={ShoppingCart} label="Open purchase orders" value={summary.openPurchaseOrders} to={STAFF.purchaseOrders} />
               <StatTile icon={Truck} label="Pending dispatches today" value={summary.pendingDispatchesToday} to={STAFF.pickingSlips} />
+              <StatTile icon={PhoneCall} label="Pending benevolent requests" value={summary.pendingCommunityRequests} to={STAFF.communityRequests} warn />
               <StatTile icon={Package} label="Active products" value={summary.activeProductCount} to={ADMIN.products} />
             </>
           ) : (
-            Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)
+            Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)
           )}
         </div>
 

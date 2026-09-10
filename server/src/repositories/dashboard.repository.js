@@ -82,7 +82,7 @@ const getMyWork = async () => {
 };
 
 const getSummary = async () => {
-  const [lowStock, activeProducts, openPOs, deliveriesToday, dispatchesToday] = await Promise.all([
+  const [lowStock, activeProducts, openPOs, deliveriesToday, dispatchesToday, pendingCommunityRequests] = await Promise.all([
     pool.query(
       `SELECT COUNT(*)::int AS count
          FROM stock_levels sl
@@ -114,14 +114,23 @@ const getSummary = async () => {
           AND (de.id IS NULL OR de.status IS NULL
                OR de.status NOT IN ('collected', 'late_collected'))`
     ),
+    // BR-28: call-in / walk-in requests from the public that have not
+    // been resolved yet. A log-only feature — this counts records, it
+    // does not reflect any stock reservation.
+    pool.query(
+      `SELECT COUNT(*)::int AS count
+         FROM community_requests
+        WHERE outcome = 'pending'`
+    ),
   ]);
 
   return {
-    lowStockCount:           num(lowStock.rows[0]?.count),
-    activeProductCount:      num(activeProducts.rows[0]?.count),
-    openPurchaseOrders:      num(openPOs.rows[0]?.count),
-    deliveriesExpectedToday: num(deliveriesToday.rows[0]?.count),
-    pendingDispatchesToday:  num(dispatchesToday.rows[0]?.count),
+    lowStockCount:            num(lowStock.rows[0]?.count),
+    activeProductCount:       num(activeProducts.rows[0]?.count),
+    openPurchaseOrders:       num(openPOs.rows[0]?.count),
+    deliveriesExpectedToday:  num(deliveriesToday.rows[0]?.count),
+    pendingDispatchesToday:   num(dispatchesToday.rows[0]?.count),
+    pendingCommunityRequests: num(pendingCommunityRequests.rows[0]?.count),
   };
 };
 
