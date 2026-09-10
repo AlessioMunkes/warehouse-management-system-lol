@@ -49,6 +49,25 @@ export const isPositiveInt = (value) => {
   return Number.isInteger(n) && n > 0;
 };
 
+// ── Stock units ───────────────────────────────────────────────
+// This list is not a preference, it is a CHECK constraint:
+// stock_levels_unit_check and stock_movements_unit_check both allow
+// exactly these nine values, and stock_levels.unit is NOT NULL. A
+// tenth value does not degrade gracefully — it is a 23514 mid-INSERT,
+// which surfaces as a 500 with a Postgres sentence in it.
+//
+// Written down here for the same reason isValidDateString is: more
+// than one service needs to agree on it. donation.service.js's
+// ALLOWED_UNITS and DonationItemsList.jsx's UNITS are the same nine
+// values copied out by hand — the drift this file's header warns
+// about, already in progress. Folding those two into this export is
+// worth doing, but it belongs in a change that reruns the donation
+// suite rather than this one.
+export const STOCK_UNITS = ['kg', 'g', 'l', 'ml', 'each', 'bag', 'box', 'crate', 'punnet'];
+
+export const isStockUnit = (value) =>
+  typeof value === 'string' && STOCK_UNITS.includes(value);
+
 // ── Idempotency keys ──────────────────────────────────────────
 // Shape only. A replay key is not a credential — it decides whether a
 // write is a retry, not whether the caller is allowed to make it — so
@@ -60,4 +79,4 @@ const UUID_PATTERN =
 
 export const isUuid = (value) => typeof value === 'string' && UUID_PATTERN.test(value);
 
-export default { isValidDateString, isPositiveInt, isUuid };
+export default { isValidDateString, isPositiveInt, isUuid, STOCK_UNITS, isStockUnit };
