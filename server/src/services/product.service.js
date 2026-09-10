@@ -14,12 +14,17 @@
 // category.
 // ─────────────────────────────────────────────────────────────
 import productRepo from '../repositories/product.repository.js';
+import { isStockUnit, STOCK_UNITS } from '../utils/validation.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
   err.status = status;
   throw err;
 };
+
+// products.storage_type carries its own CHECK constraint — 'dry' or
+// 'cold', and nothing else.
+const STORAGE_TYPES = ['dry', 'cold'];
 
 // Strict, so an object or 'abc' cannot slide past a truthiness check
 // and reach the database as a malformed parameter.
@@ -55,6 +60,52 @@ const parsePerishable = (raw) => {
   fail(400, 'Perishable must be true or false.');
 };
 
+// stock_levels.unit and stock_movements.unit both allow exactly the
+// nine values in STOCK_UNITS. Anything else is a 23514 raised halfway
+// through the transaction, surfacing as a 500 with Postgres wording in
+// it — so it is rejected here as a 400 with a sentence instead.
+const parseUnit = (raw, { required = false } = {}) => {
+  const unit = cleanText(raw);
+  if (unit === null) {
+    if (required) fail(400, 'A default unit is required.');
+    return null;
+  }
+  if (!isStockUnit(unit)) {
+    fail(400, `Unit must be one of: ${STOCK_UNITS.join(', ')}.`);
+  }
+  return unit;
+};
+
+const parseStorageType = (raw) => {
+  const value = cleanText(raw);
+  if (value === null) return null;
+  if (!STORAGE_TYPES.includes(value)) {
+    fail(400, `Storage type must be one of: ${STORAGE_TYPES.join(', ')}.`);
+  }
+  return value;
+};
+
+// Zero is a legitimate threshold — it is what every product already has,
+// and it means "never flag this as low". Negative is not. Blank means
+// "not set" and stays null.
+const parseThreshold = (raw) => {
+  if (raw === undefined || raw === null || raw === '') return null;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    fail(400, 'Reorder threshold must be zero or a positive number.');
+  }
+  return parsed;
+};
+
+// Nullable FK to storage_locations. Explicit null clears it; anything
+// present must at least be shaped like a row id. Whether the row EXISTS
+// is the FK constraint's job — see the 23503 handler in createProduct
+// and updateProduct below.
+const parseLocationId = (raw) => {
+  if (raw === undefined || raw === null || raw === '') return null;
+  return validateId(raw, 'Storage location ID');
+};
+
 const listProducts = async ({ includeInactive, search } = {}) =>
   productRepo.listProducts({
     // Query params arrive as strings: '?includeInactive=true'.
@@ -70,9 +121,12 @@ const getProductById = async (id) => {
 };
 
 const createProduct = async (data = {}) => {
-  const name        = cleanText(data.name);
-  const sku         = cleanText(data.stockKeepingUnit ?? data.sku);
-  const defaultUnit = cleanText(data.defaultUnit) ?? 'kg';
+  const name = cleanText(data.name);
+  const sku  = cleanText(data.stockKeepingUnit ?? data.sku);
+  // parseUnit validates a supplied value against STOCK_UNITS but returns
+  // null for blank/omitted, same as cleanText did — so a request that
+  // sends nothing still falls back to 'kg', the column default.
+  const defaultUnit = parseUnit(data.defaultUnit) ?? 'kg';
 
   if (!name) fail(400, 'A product name is required.');
   if (!sku)  fail(400, 'A stock keeping unit (SKU) is required.');
@@ -84,6 +138,9 @@ const createProduct = async (data = {}) => {
     defaultUnit,
     category:     cleanText(data.category),
     isPerishable: data.isPerishable === undefined ? false : parsePerishable(data.isPerishable),
+    storageType:       parseStorageType(data.storageType),
+    defaultLocationId: parseLocationId(data.defaultLocationId),
+    reorderThreshold:  parseThreshold(data.reorderThreshold),
   };
 
   const existing = await productRepo.findByNameOrSku(row.name, row.stockKeepingUnit);
@@ -98,6 +155,10 @@ const createProduct = async (data = {}) => {
     // actual guarantee: two requests in the same millisecond both pass
     // the check, and the unique index decides.
     if (err.code === '23505') fail(409, 'A product with that name or SKU already exists.');
+    // Nullable FK to storage_locations. Shape is checked above by
+    // parseLocationId; whether the row exists is the constraint's call —
+    // it can also vanish between the request and this insert regardless.
+    if (err.code === '23503') fail(400, 'That storage location does not exist.');
     throw err;
   }
 };
@@ -122,13 +183,14 @@ const updateProduct = async (id, data = {}) => {
     patch.stockKeepingUnit = sku;
   }
   if (has('defaultUnit')) {
-    const unit = cleanText(data.defaultUnit);
-    if (!unit) fail(400, 'A default unit is required.');
-    patch.defaultUnit = unit;
+    patch.defaultUnit = parseUnit(data.defaultUnit, { required: true });
   }
-  if (has('weightKg'))     patch.weightKg     = parseWeight(data.weightKg);
-  if (has('category'))     patch.category     = cleanText(data.category);
-  if (has('isPerishable')) patch.isPerishable = parsePerishable(data.isPerishable);
+  if (has('weightKg'))          patch.weightKg          = parseWeight(data.weightKg);
+  if (has('category'))          patch.category          = cleanText(data.category);
+  if (has('isPerishable'))      patch.isPerishable      = parsePerishable(data.isPerishable);
+  if (has('storageType'))       patch.storageType       = parseStorageType(data.storageType);
+  if (has('defaultLocationId')) patch.defaultLocationId = parseLocationId(data.defaultLocationId);
+  if (has('reorderThreshold'))  patch.reorderThreshold  = parseThreshold(data.reorderThreshold);
 
   if (!Object.keys(patch).length) {
     fail(400, 'Nothing to update — send at least one field.');
@@ -153,6 +215,7 @@ const updateProduct = async (id, data = {}) => {
     return updated;
   } catch (err) {
     if (err.code === '23505') fail(409, 'A product with that name or SKU already exists.');
+    if (err.code === '23503') fail(400, 'That storage location does not exist.');
     throw err;
   }
 };

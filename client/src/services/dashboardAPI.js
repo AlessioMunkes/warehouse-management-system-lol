@@ -8,11 +8,12 @@
 import { apiGet } from "./api";
 
 export const toSummary = (row = {}) => ({
-  lowStockCount:           Number(row.lowStockCount ?? 0),
-  activeProductCount:      Number(row.activeProductCount ?? 0),
-  openPurchaseOrders:      Number(row.openPurchaseOrders ?? 0),
-  deliveriesExpectedToday: Number(row.deliveriesExpectedToday ?? 0),
-  pendingDispatchesToday:  Number(row.pendingDispatchesToday ?? 0),
+  lowStockCount:            Number(row.lowStockCount ?? 0),
+  activeProductCount:       Number(row.activeProductCount ?? 0),
+  openPurchaseOrders:       Number(row.openPurchaseOrders ?? 0),
+  deliveriesExpectedToday:  Number(row.deliveriesExpectedToday ?? 0),
+  pendingDispatchesToday:   Number(row.pendingDispatchesToday ?? 0),
+  pendingCommunityRequests: Number(row.pendingCommunityRequests ?? 0),
 });
 
 export const getDashboardSummary = async () => {

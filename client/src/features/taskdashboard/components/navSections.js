@@ -23,7 +23,11 @@ import {
   BarChart3, HeartHandshake, Package, Truck, FileText,
   Gift, Route, Tags, HandHeart, Boxes, ReceiptText,
   PackageOpen, PackageCheck, FlaskConical, ClipboardCheck, HandCoins,
+<<<<<<< HEAD
   ScrollText,
+=======
+  PhoneCall,
+>>>>>>> dd1ab4a58d88529743474bd309373a95bc12a0c2
 } from 'lucide-react';
 import { STAFF, ADMIN, VOLUNTEERS, PACKING } from '../../../routes/paths';
 
@@ -46,6 +50,7 @@ const WORKER_SECTIONS = [
       { to: STAFF.decanting, label: 'Decanting', icon: FlaskConical },
       { to: STAFF.dispatch, label: 'Dispatch', icon: ClipboardCheck },
       { to: STAFF.donation, label: 'Donation Intake', icon: HandCoins },
+      { to: STAFF.communityRequests, label: 'Benevolent Requests', icon: PhoneCall },
     ],
   },
 ];
@@ -64,6 +69,12 @@ const ADMIN_SECTIONS = [
     items: [
       { to: ADMIN.users, label: 'Users', icon: Users2 },
       { to: VOLUNTEERS.events, label: 'Volunteer Events', icon: HandHeart },
+    ],
+  },
+  {
+    label: 'Community',
+    items: [
+      { to: STAFF.communityRequests, label: 'Benevolent Requests', icon: PhoneCall },
     ],
   },
   {
@@ -100,6 +111,7 @@ const MANAGER_SECTIONS = [
       { to: '/noc/inventory', label: 'Inventory', icon: Boxes },
       { to: STAFF.receipts, label: 'Receipts', icon: ReceiptText },
       { to: STAFF.documents, label: 'Documents', icon: FileText },
+      { to: STAFF.communityRequests, label: 'Benevolent Requests', icon: PhoneCall },
     ],
   },
   // Receiving, Packing, Decanting and Dispatch are reached through the

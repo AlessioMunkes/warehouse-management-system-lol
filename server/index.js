@@ -31,6 +31,7 @@ import dashboardRouter   from './src/routes/dashboard.routes.js';
 import beneficiaryRouter from './src/routes/beneficiary.routes.js';
 import notificationRouter from './src/routes/notification.routes.js';
 import loveActivismRouter   from './src/routes/loveActivism.routes.js';
+import communityRequestRouter from './src/routes/communityRequest.routes.js';
 
 // ── Validate required secrets exist at startup ───────────────
 if (!process.env.JWT_SECRET) {
@@ -129,6 +130,7 @@ app.use('/api/dashboard',  dashboardRouter);
 app.use('/api/beneficiaries', beneficiaryRouter);
 app.use('/api/notifications', notificationRouter);
 app.use('/api/love-activism', loveActivismRouter);
+app.use('/api/community-requests', communityRequestRouter);
 
 // ── SPA fallback (production only) ────────────────────────────
 // Any non-/api path falls through to index.html so React Router can

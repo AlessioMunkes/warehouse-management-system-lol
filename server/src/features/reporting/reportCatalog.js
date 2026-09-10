@@ -347,8 +347,8 @@ export const METRICS = {
     id: 'community_request_outcomes', label: 'Community requests', temporal: 'range',
     description:
       'Walk-in and phone-in requests for food from the public, and what happened to ' +
-      'them — fulfilled, partly fulfilled, declined, referred elsewhere, or still ' +
-      'pending. Aggregate only, no caller details.',
+      'them — pending, fulfilled, partially fulfilled, or declined (BR-28). ' +
+      'Aggregate only, no caller details.',
     repoFn: 'communityRequestOutcomes', unit: 'requests',
     dimensions: ['outcome', 'month'], filters: [],
     defaultChart: 'bar',

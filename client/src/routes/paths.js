@@ -103,11 +103,18 @@ export const STAFF = {
   // staff-side equivalents already call, so no new route gating is
   // needed beyond what those two already require.
   documents: '/noc/documents',
+<<<<<<< HEAD
   // Manager-only. All three /api/stock/ledger routes are
   // requireRole(MANAGER, ADMIN); the App.jsx gate mirrors that. The
   // per-product history drawer on the inventory screen stays open to
   // every role — this is the warehouse-wide, supervisory view.
   stockLedger: '/noc/stock-ledger',
+=======
+  // ADM-5.0 / BR-28 — the benevolent package (call-in) request log.
+  // Warehouse staff and up: every /api/community-requests route is
+  // requireRole(WORKER, MANAGER, ADMIN), and this mirrors that.
+  communityRequests: '/noc/community-requests',
+>>>>>>> dd1ab4a58d88529743474bd309373a95bc12a0c2
 };
 
 // ── Donations ────────────────────────────────────────────────
@@ -122,6 +129,11 @@ export const DONATIONS = {
 // server/src/routes/donation.routes.js. If the server list changes,
 // change this one with it — they are two halves of the same rule.
 export const DONATION_INTAKE_ROLES = ['warehouse_worker', 'manager', 'admin'];
+
+// Client-side mirror of STAFF_UP in
+// server/src/routes/communityRequest.routes.js (BR-01: "Warehouse
+// Staff or higher"). Two halves of the same rule — change them together.
+export const COMMUNITY_REQUEST_ROLES = ['warehouse_worker', 'manager', 'admin'];
 
 // Volunteer Management is currently available to the two live roles that
 // perform the coordinator workflow. Keep this list shared by route guards and
