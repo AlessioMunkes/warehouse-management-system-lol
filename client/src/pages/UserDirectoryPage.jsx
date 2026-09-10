@@ -18,7 +18,7 @@
 // the load effect are copied from SupplierDirectoryPage.jsx — one
 // error style, one loading style, one stale-response guard per app.
 // ─────────────────────────────────────────────────────────────
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth }   from '../context/AuthContext';
 import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
 import UserForm      from '../features/users/components/UserForm';
@@ -38,7 +38,10 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Search, Plus, Pencil, Power, X } from 'lucide-react';
+import {
+  Search, Plus, Pencil, Power, X,
+  ArrowUp, ArrowDown, ChevronsUpDown,
+} from 'lucide-react';
 
 const CAN_MANAGE = ['admin'];
 
@@ -49,6 +52,29 @@ const ROLE_LABELS = {
   manager:           'Manager',
   admin:             'Admin',
 };
+
+// The three values users.role actually accepts — the live CHECK
+// constraint, not a wish list. Drives the role-filter pills; each pill
+// filters on the raw value and shows ROLE_LABELS[value].
+const ROLE_FILTERS = ['warehouse_worker', 'manager', 'admin'];
+
+// One definition drives the header and the sort accessor, the same
+// shape StockManifestTable uses. Every user column sorts as text, so
+// each `sort` returns a lowercased string and the comparator is a
+// single localeCompare. The status column has no accessor: "active vs
+// inactive" is not an order anyone asked to sort by, and the server
+// already groups inactive users last.
+const COLUMNS = [
+  { key: 'name',     label: 'User',
+    sort: (u) => `${u.firstName} ${u.lastName}`.trim().toLowerCase() },
+  { key: 'username', label: 'Username',
+    sort: (u) => (u.username ?? '').toLowerCase() },
+  // Sort by the label the user reads ("Worker"), not the raw enum
+  // ("warehouse_worker") — otherwise the on-screen order looks wrong.
+  { key: 'role',     label: 'Role',
+    sort: (u) => (ROLE_LABELS[u.role] ?? u.role ?? '').toLowerCase() },
+  { key: 'status',   label: '', sort: null },
+];
 
 // Same markup as the global fetch error banner in
 // SupplierDirectoryPage / InventoryManagementPage. One error style
@@ -123,9 +149,43 @@ export default function UserDirectoryPage() {
   const [selected, setSelected] = useState(null);
   const [mode, setMode] = useState('list'); // list | create | edit
 
+  // Client-side view controls. Both operate on the already-fetched
+  // list — no server round-trip — so they compose with search and the
+  // "Show inactive" toggle (which are server-side) for free.
+  const [roleFilter, setRoleFilter] = useState(null);   // null = all roles
+  const [sort, setSort] = useState(null);               // { key, direction } | null
+
   const [isLoading, setIsLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+
+  // 3-state, same as StockManifestTable: first click sorts desc,
+  // second asc, third clears back to the server's order (is_active
+  // DESC, then username ASC — see user.repository.js).
+  const toggleSort = (key) => {
+    setSort((prev) => {
+      if (!prev || prev.key !== key) return { key, direction: 'desc' };
+      if (prev.direction === 'desc') return { key, direction: 'asc' };
+      return null;
+    });
+  };
+
+  // Role filter narrows first, then sort orders whatever is left — the
+  // two compose, they do not fight over the array.
+  const visibleUsers = useMemo(() => {
+    const filtered = roleFilter
+      ? users.filter((u) => u.role === roleFilter)
+      : users;
+
+    if (!sort) return filtered;
+    const column = COLUMNS.find((c) => c.key === sort.key);
+    if (!column?.sort) return filtered;
+
+    const factor = sort.direction === 'desc' ? -1 : 1;
+    return [...filtered].sort(
+      (a, b) => column.sort(a).localeCompare(column.sort(b), 'en-ZA') * factor
+    );
+  }, [users, roleFilter, sort]);
 
   const loadUsers = useCallback(async () => {
     setError(null);
@@ -254,6 +314,28 @@ export default function UserDirectoryPage() {
                   </FieldLabel>
                 </Field>
 
+                {/* Role filter. No pill selected = all roles. Clicking
+                    the active pill clears it. Filters the raw enum,
+                    shows the label — same split as everywhere else on
+                    this page. */}
+                <div className="flex items-center gap-1">
+                  {ROLE_FILTERS.map((role) => {
+                    const active = roleFilter === role;
+                    return (
+                      <Button
+                        key={role}
+                        type="button"
+                        size="sm"
+                        variant={active ? 'default' : 'outline'}
+                        aria-pressed={active}
+                        onClick={() => setRoleFilter(active ? null : role)}
+                      >
+                        {ROLE_LABELS[role]}
+                      </Button>
+                    );
+                  })}
+                </div>
+
                 {canManage ? (
                   <Button type="button" onClick={() => { setSelected(null); setMode('create'); }}>
                     <Plus />
@@ -278,7 +360,7 @@ export default function UserDirectoryPage() {
                   <Skeleton className="h-24 w-full" />
                   <Skeleton className="h-24 w-full" />
                 </div>
-              ) : users.length === 0 ? (
+              ) : visibleUsers.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No users match.</p>
               ) : (
                 <Card>
@@ -286,14 +368,29 @@ export default function UserDirectoryPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>User</TableHead>
-                          <TableHead>Username</TableHead>
-                          <TableHead>Role</TableHead>
-                          <TableHead />
+                          {COLUMNS.map((col) => (
+                            <TableHead key={col.key}>
+                              {col.sort ? (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleSort(col.key)}
+                                  aria-label={`Sort by ${col.label}`}
+                                  className="inline-flex items-center gap-1 hover:text-foreground"
+                                >
+                                  <span>{col.label}</span>
+                                  {sort?.key === col.key
+                                    ? (sort.direction === 'desc'
+                                        ? <ArrowDown className="h-3 w-3" />
+                                        : <ArrowUp className="h-3 w-3" />)
+                                    : <ChevronsUpDown className="h-3 w-3 opacity-30" />}
+                                </button>
+                              ) : col.label}
+                            </TableHead>
+                          ))}
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {users.map((u) => (
+                        {visibleUsers.map((u) => (
                           <TableRow
                             key={u.id}
                             className="cursor-pointer"
