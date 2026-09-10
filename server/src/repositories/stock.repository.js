@@ -472,7 +472,75 @@ const getLedgerActors = async () => {
   );
   return result.rows;
 };
+// ── 30-day stock level trace, for the inventory sparklines ─────
+//
+// One row per product per day: what the balance was at the END of
+// that day, for every day in the window.
+//
+// THE PRE-WINDOW BALANCE HAS TO CARRY IN.
+// `closing` walks the product's ENTIRE movement history, not just the
+// window, so a product whose last movement was two months ago still
+// plots its real balance as a flat line rather than starting from
+// zero. Restricting the window before the window function — the
+// obvious way to write this — draws every long-settled product as a
+// step up from nothing on the first day of the chart.
+//
+// Days with no movement inherit the last known closing balance. That
+// is the correlated subquery at the bottom: for each (product, day),
+// the most recent closing on or before that day. It runs
+// products x days times, which at this warehouse (tens of products,
+// 30 days) is a few hundred index lookups and costs nothing. If the
+// catalogue ever grows into the thousands, the fix is a lateral join
+// or a materialised daily balance — not dropping the carry-in.
+//
+// Products that have never had a movement are excluded rather than
+// returned as a flat zero line: thirty rows saying nothing happened
+// is not information, and the client renders those as a dash.
+const getStockTrends = async ({ days = 30 } = {}) => {
+  const result = await pool.query(
+    `WITH bounds AS (
+       SELECT ((now() AT TIME ZONE 'Africa/Johannesburg')::date - ($1::int - 1)) AS from_day,
+              (now() AT TIME ZONE 'Africa/Johannesburg')::date                    AS to_day
+     ),
+     daily AS (
+       SELECT sm.product_id,
+              (sm.created_at AT TIME ZONE 'Africa/Johannesburg')::date AS day,
+              SUM(sm.quantity)::numeric                                AS net
+       FROM stock_movements sm
+       GROUP BY 1, 2
+     ),
+     closing AS (
+       SELECT product_id, day,
+              SUM(net) OVER (PARTITION BY product_id
+                             ORDER BY day
+                             ROWS UNBOUNDED PRECEDING) AS balance
+       FROM daily
+     ),
+     series AS (
+       SELECT p.id AS product_id, d.day::date AS day
+       FROM products p
+       CROSS JOIN bounds b
+       CROSS JOIN LATERAL generate_series(b.from_day, b.to_day, INTERVAL '1 day') AS d(day)
+       WHERE p.is_active = true
+         AND EXISTS (SELECT 1 FROM daily dd WHERE dd.product_id = p.id)
+     )
+     SELECT s.product_id,
+            s.day,
+            COALESCE((
+              SELECT c.balance
+              FROM closing c
+              WHERE c.product_id = s.product_id AND c.day <= s.day
+              ORDER BY c.day DESC
+              LIMIT 1
+            ), 0)::numeric AS balance
+     FROM series s
+     ORDER BY s.product_id, s.day`,
+    [days],
+  );
+  return result.rows;
+};
 
 export default {
+  getStockTrends,
   getLedger, getLedgerSummary, getReconciliation, getLedgerActors,
   adjustStock, manualAdjust, getManifest, getMovements, setStockMeta };

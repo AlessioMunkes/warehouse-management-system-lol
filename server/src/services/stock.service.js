@@ -177,7 +177,44 @@ const getReconciliation = async () => {
 
 const getLedgerActors = async () => stockModel.getLedgerActors();
 
+// ── Stock trends ───────────────────────────────────────────────
+// Flat (product, day, balance) rows become one array of numbers per
+// product, in day order, which is all a sparkline needs. Grouping
+// here rather than in the component means the page does no reshaping
+// and a second consumer gets the same shape for free.
+//
+// The cap is 90 days: the window is drawn about ninety pixels wide,
+// so a longer range would render more points than there are pixels.
+const MAX_TREND_DAYS     = 90;
+const DEFAULT_TREND_DAYS = 30;
+
+const getStockTrends = async (query = {}) => {
+  const raw = query.days;
+  let days = DEFAULT_TREND_DAYS;
+
+  if (raw !== undefined && raw !== null && raw !== '') {
+    days = Number(raw);
+    if (!Number.isInteger(days) || days < 2 || days > MAX_TREND_DAYS) {
+      fail(400, `Days must be a whole number between 2 and ${MAX_TREND_DAYS}.`);
+    }
+  }
+
+  const rows = await stockModel.getStockTrends({ days });
+
+  const byProduct = {};
+  for (const row of rows) {
+    // NUMERIC arrives from node-postgres as a string. Casting here
+    // rather than in the component is the same rule stockAPI.js
+    // already follows: "-5" < 0 is false, and a sparkline built from
+    // strings plots nothing.
+    (byProduct[row.product_id] ||= []).push(Number(row.balance));
+  }
+
+  return { days, series: byProduct };
+};
+
 export default {
   getManifest, getMovements, adjustManually,
   getLedger, getReconciliation, getLedgerActors,
+  getStockTrends,
 };

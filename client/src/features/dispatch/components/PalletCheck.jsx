@@ -1,55 +1,56 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/features/dispatch/components/PalletCheck.jsx
 //
-// One pallet at the gate, as three sequential screens (ACC-05),
-// matching the shape ReceivingFlow.jsx and DecantingFlow.jsx already
-// established:
+// One pallet at the gate.
 //
-//   1  Which pallet is this?    the beneficiary, the eligibility flags,
-//                                an override reason if a manager needs
-//                                to authorise one
-//   2  Count what's loaded      one line, one number — repeats per
-//                                item, same as receiving's per-line
-//                                counting screen
-//   3  Confirm the collection   read-back, driver's name and vehicle,
-//                                the driver's signature, then finish
+// SHAPE (changed)
+// This used to be three sequential screens inside a dialog, with a
+// second, near-duplicate render tree for Form mode. It is now two
+// screens on the page itself:
 //
-// There is no put-away step here — nothing about a collection has a
-// location to record — so this is three steps, not receiving's four.
+//   1  Which pallet   the beneficiary, the eligibility flags, and a
+//                     manager's override reason where one is needed
+//   2  Load and release   every line at once, the driver, the signature
 //
-// Guided and Form modes read and write the exact same state, the same
-// `mode` pattern ReceivingFlow.jsx/DecantingFlow.jsx use: Form is the
-// same fields as one scrolling dialog instead of three screens.
+// Guided and Form are no longer different trees. They are the same
+// list; Guided focuses one row at a time and offers Next, Form leaves
+// every row collapsed and inline-editable. The worker can see the
+// whole pallet either way, and can tap any line to jump to it — which
+// is what "Guided" was previously unable to offer.
 //
-// The one HARD block is an inactive beneficiary centre (BR-11) — nothing here
-// can get past that, for anyone. Two more (a pallet booked for
-// another day, or one packing hasn't closed off) need a manager's
-// typed reason to proceed; a warehouse worker sees why and is told to
-// find one, matching exactly what dispatch.service.js's collect()
-// itself enforces — this screen is not the source of truth for any of
-// that, evaluateEligibility() on the server is, but disagreeing with
-// it here would just mean a worker fills in a whole form only to have
-// the server refuse it at the very last tap.
+// The one HARD block is an inactive beneficiary centre (BR-11) —
+// nothing here gets past that, for anyone. A pallet packing has not
+// closed off needs a manager's typed reason; a warehouse worker is
+// told to find one. This screen is not the source of truth for any of
+// that — evaluateEligibility() on the server is — but disagreeing
+// with it here would mean filling in a whole form only to be refused
+// at the last tap.
 //
-// A dispatch note pops up after a successful collection, the same way
-// DeliveryNotePDF/DecantingSheetPDF do — see DispatchNotePDF.jsx, fed
-// by what recordCollection's response already returns (the full
-// joined note, not just the bare event row — see dispatch.service.js's
-// own getDispatchNote-after-collect pattern).
+// wrongDay is deliberately NOT an override condition, matching
+// dispatch.service.js's collect(): a pallet booked for another day is
+// recorded rather than gated, same as a written-off one.
 // ─────────────────────────────────────────────────────────────
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  StepRail, StepScreen, Actions, Button, NumberField, TextField, Notice, KeyValues,
+  StepRail, StepScreen, Actions, Button, TextField, Notice, KeyValues,
   ViewToggle, Coachmark,
 } from '../../staff/components/StepPrimitives';
+import TaskPage from '../../staff/components/TaskPage';
+import WorkList from '../../staff/components/WorkList';
+import { readDraft, writeDraft, clearDraft } from '../../staff/hooks/useDraft';
 import useCoachmark from '../../staff/hooks/useCoachmark';
 import { useAuth } from '../../../context/AuthContext';
 import dispatchAPI, { newIdempotencyKey } from '../../../services/dispatchAPI';
 import SignaturePad from '../../procurement/components/SignaturePad';
 import DispatchNotePDF from './DispatchNotePDF';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../components/ui/dialog';
 
 const isManager = (user) => user?.role === 'manager' || user?.role === 'admin';
+
+// Postgres NUMERIC arrives from node-postgres as a string, so
+// packed_quantity is "1.000" and "35.000". String() kept that
+// verbatim, which put "1.000" in the box for one crate and left the
+// caret behind three meaningless zeros. Number() first.
+const qtyToInput = (value) => (value === null || value === undefined ? '' : String(Number(value)));
 
 const SignatureField = ({ value, onChange }) => (
   <div className="stf-signature-field">
@@ -67,8 +68,8 @@ const SignatureField = ({ value, onChange }) => (
 
 const MODE_KEY = 'stf_dispatch_view_mode';
 const MODES = [
-  { value: 'guided', label: 'Guided', hint: 'Step by step' },
-  { value: 'full',   label: 'Form',   hint: 'Everything at once' },
+  { value: 'guided', label: 'Guided', hint: 'One line at a time' },
+  { value: 'full',   label: 'Form',   hint: 'Every line at once' },
 ];
 const readStoredMode = () => {
   try {
@@ -78,18 +79,16 @@ const readStoredMode = () => {
   }
 };
 
-const TOTAL_STEPS = 3;
+const TOTAL_STEPS = 2;
 const STEP_META = {
   which: { n: 1, label: 'Which pallet' },
-  count: { n: 2, label: 'Counting' },
-  check: { n: 3, label: 'Confirm the collection' },
-  done:  { n: 3, label: 'Collected' },
+  work:  { n: 2, label: 'Load and release' },
+  done:  { n: 2, label: 'Collected' },
 };
 
-// The reasons this screen can put on a line without asking a worker
-// to type free text — the same choice ReceivingFlow.jsx made for its
-// own discrepancyReason, and for the same reason (ACC-09: no field a
-// floor worker has to compose a sentence into).
+// The reasons this screen can put on a line without asking a worker to
+// type free text (ACC-09: no field a floor worker has to compose a
+// sentence into).
 const varianceReasonFor = (variance) =>
   variance === 0 ? null : variance < 0 ? 'Short count at dispatch' : 'Over count at dispatch';
 
@@ -101,8 +100,8 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
   const [loadError, setLoadError] = useState(null);
 
   const [phase, setPhase] = useState('which');
-  const [lineIndex, setLineIndex] = useState(0);
   const [lines, setLines] = useState([]);
+  const [focusId, setFocusId] = useState(null);
 
   const [overrideReason, setOverrideReason] = useState('');
   const [driverName, setDriverName] = useState('');
@@ -110,18 +109,14 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
   const [signature, setSignature] = useState(null);
 
   const [mode, setMode] = useState(readStoredMode);
-  const [formOpen, setFormOpen] = useState(false);
-  const [shellNode, setShellNode] = useState(null);
-  useEffect(() => {
-    const resolve = () => setShellNode(document.querySelector('.stf-shell'));
-    resolve();
-  }, []);
   const { show: showCoachmark, dismiss: dismissCoachmark } = useCoachmark('dispatch-view-toggle');
 
   const [attemptKey, setAttemptKey] = useState(newIdempotencyKey);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [pdfNote, setPdfNote] = useState(null);
+
+  const draftKey = palletId ? `dispatch-${palletId}` : null;
 
   // A fresh pallet is a fresh session — DispatchPage keeps this
   // component mounted across pallets (only `palletId` changes), so
@@ -131,18 +126,16 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
     let cancelled = false;
     // Wrapped rather than called directly at the top of the effect —
     // react-hooks/set-state-in-effect flags a bare synchronous
-    // setState in an effect body; the same workaround ReceivingFlow.jsx
-    // and DecantingFlow.jsx use for their own shellNode-resolving effect.
+    // setState in an effect body.
     const resetForNewPallet = () => {
       setLoading(true);
       setLoadError(null);
       setPhase('which');
-      setLineIndex(0);
+      setFocusId(null);
       setOverrideReason('');
       setDriverName('');
       setVehicleReg('');
       setSignature(null);
-      setFormOpen(false);
       setPdfNote(null);
       setError(null);
       setAttemptKey(newIdempotencyKey());
@@ -153,17 +146,35 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
       .then((view) => {
         if (cancelled) return;
         setGateView(view);
-        setLines(
-          (view.items || []).map((item) => ({
-            itemId:   item.id,
-            name:     item.product_name,
-            sku:      item.sku,
-            unit:     item.unit,
-            required: Number(item.required_quantity ?? 0),
-            packed:   item.packed_quantity === null ? null : Number(item.packed_quantity),
-            loaded:   item.packed_quantity === null ? '' : String(item.packed_quantity),
-          }))
-        );
+
+        // Exception-first: a pallet normally goes out exactly as it
+        // was packed, so every line starts at the packed quantity and
+        // the worker's job is to say what is different.
+        const built = (view.items || []).map((item) => ({
+          itemId:   item.id,
+          name:     item.product_name,
+          sku:      item.sku,
+          unit:     item.unit,
+          required: Number(item.required_quantity ?? 0),
+          packed:   item.packed_quantity === null ? null : Number(item.packed_quantity),
+          loaded:   qtyToInput(item.packed_quantity),
+        }));
+
+        // A draft only refills the numbers and the driver's details —
+        // never the eligibility state, which is the server's to decide
+        // and may have changed since the tablet went to sleep.
+        const draft = readDraft(`dispatch-${palletId}`);
+        if (draft) {
+          setLines(built.map((l) => (
+            draft.loaded && draft.loaded[l.itemId] !== undefined
+              ? { ...l, loaded: draft.loaded[l.itemId] }
+              : l
+          )));
+          if (draft.driverName) setDriverName(draft.driverName);
+          if (draft.vehicleReg) setVehicleReg(draft.vehicleReg);
+        } else {
+          setLines(built);
+        }
       })
       .catch((err) => { if (!cancelled) setLoadError(err.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -172,30 +183,37 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
   }, [palletId]);
 
   const step = STEP_META[phase];
-  const showToggle = phase !== 'done';
+  const showToggle = phase === 'work';
   const eligibility = gateView?.eligibility || {};
+
   // Only lines that were actually packed can be loaded — the same
-  // filter dispatch.repository.js's collect() applies server-side, so
-  // a line the packer never confirmed does not show as something to
-  // count at the gate.
-  const packedLines = lines.filter((l) => l.packed !== null && l.packed > 0);
-  const currentLine = packedLines[lineIndex];
+  // filter dispatch.repository.js's collect() applies server-side.
+  const packedLines = useMemo(
+    () => lines.filter((l) => l.packed !== null && l.packed > 0),
+    [lines]
+  );
   const hasLines = packedLines.length > 0;
 
-  // wrongDay is deliberately NOT an override condition — matches
-  // dispatch.service.js's own collect(): a pallet booked for another
-  // day is recorded (wrong_day_collection in the audit log) rather
-  // than gated, for the same reason a written-off pallet isn't gated
-  // either. Blocking here would disagree with what the server accepts.
   const needsOverride = eligibility.slipNotPacked;
   const overrideReasonText = eligibility.slipNotPacked
     ? 'packing has not closed this pallet off yet'
     : '';
   const canStart = !eligibility.ecdInactive && (!needsOverride || (isManager(user) && overrideReason.trim()));
 
+  // Save the draft whenever the numbers or the driver change. Guarded
+  // on phase so an untouched pallet does not leave a draft behind.
+  useEffect(() => {
+    if (phase !== 'work' || !draftKey) return;
+    const loaded = {};
+    for (const line of packedLines) loaded[line.itemId] = line.loaded;
+    writeDraft(draftKey, { loaded, driverName, vehicleReg });
+  }, [phase, draftKey, packedLines, driverName, vehicleReg]);
+
   const handleModeChange = (next) => {
     setMode(next);
-    if (next === 'full') setFormOpen(true);
+    // Guided focuses the first line that still needs a look; Form has
+    // no focused row at all.
+    setFocusId(next === 'guided' ? (packedLines[0]?.itemId ?? null) : null);
     try { localStorage.setItem(MODE_KEY, next); } catch { /* nothing we can do */ }
     dismissCoachmark();
   };
@@ -207,25 +225,34 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
   }, [showCoachmark, showToggle, dismissCoachmark]);
 
   const startCollection = () => {
-    if (mode === 'full') { setFormOpen(true); return; }
-    setLineIndex(0);
-    setPhase(hasLines ? 'count' : 'check');
+    setPhase('work');
+    setFocusId(mode === 'guided' ? (packedLines[0]?.itemId ?? null) : null);
   };
 
-  const patchLineAt = (index, patch) =>
-    setLines((all) => {
-      const target = packedLines[index];
-      if (!target) return all;
-      return all.map((line) => (line.itemId === target.itemId ? { ...line, ...patch } : line));
-    });
+  const patchLine = (itemId, patch) =>
+    setLines((all) => all.map((line) => (line.itemId === itemId ? { ...line, ...patch } : line)));
 
+  const acceptAllAsPacked = () =>
+    setLines((all) => all.map((line) => (
+      line.loaded === '' ? { ...line, loaded: qtyToInput(line.packed) } : line
+    )));
+
+  const focusIndex = packedLines.findIndex((l) => l.itemId === focusId);
   const goToNextLine = () => {
-    if (lineIndex + 1 < packedLines.length) {
-      setLineIndex(lineIndex + 1);
-    } else {
-      setPhase('check');
-    }
+    const next = packedLines[focusIndex + 1];
+    setFocusId(next ? next.itemId : null);
   };
+
+  // What is stopping the commit, said out loud. A disabled primary
+  // with no explanation is a dead end, and here the missing thing is
+  // usually a field further down the page.
+  const blockers = [];
+  if (!driverName.trim()) blockers.push("the driver's name");
+  if (!signature) blockers.push("the driver's signature");
+  if (packedLines.some((l) => l.loaded === '')) blockers.push('a count on every line');
+  const blockedNote = blockers.length
+    ? `Still needed: ${blockers.join(', ')}.`
+    : null;
 
   const finish = async () => {
     setSaving(true);
@@ -249,10 +276,9 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
       });
 
       setPhase('done');
-      setFormOpen(false);
+      clearDraft(draftKey);
       // recordCollection's response already carries the full joined
-      // note (see dispatch.service.js's own getDispatchNote-after-
-      // collect pattern) — no second fetch needed for the pop-up.
+      // note — no second fetch needed for the pop-up.
       setPdfNote(result.note);
     } catch (err) {
       setError(err.message);
@@ -270,6 +296,18 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
   if (loadError) return <Notice tone="warn">{loadError}</Notice>;
   if (!gateView) return null;
 
+  const commit = (
+    <Actions>
+      <Button disabled={saving || blockers.length > 0} onClick={finish}>
+        {saving ? 'Saving' : 'Confirm collection'}
+      </Button>
+      {mode === 'guided' && focusIndex >= 0 && focusIndex + 1 < packedLines.length ? (
+        <Button variant="secondary" onClick={goToNextLine}>Next item</Button>
+      ) : null}
+      <Button variant="secondary" onClick={onBack}>Back to the gate queue</Button>
+    </Actions>
+  );
+
   return (
     <>
       {showToggle ? (
@@ -281,12 +319,12 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
         </div>
       ) : null}
 
-      {mode === 'full' ? null : <StepRail step={step.n} total={TOTAL_STEPS} label={step.label} />}
+      {phase !== 'done' ? <StepRail step={step.n} total={TOTAL_STEPS} label={step.label} /> : null}
 
       {error ? <Notice tone="warn">{error}</Notice> : null}
 
-      {/* ── 1 · Which pallet (Guided) ──────────────────────── */}
-      {phase === 'which' && mode !== 'full' && (
+      {/* ── 1 · Which pallet ───────────────────────────────── */}
+      {phase === 'which' && (
         <StepScreen
           title={gateView.ecd_name}
           sub={gateView.pallet_ref ? `Pallet ${gateView.pallet_ref}` : 'Check the pallet before you release it.'}
@@ -341,232 +379,105 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
           ) : null}
           {eligibility.writtenOff ? (
             <Notice>
-              This pallet was written off at 16:00 as not collected. It is still here — collecting it
-              now records a late collection, nothing else changes.
+              This pallet was written off as not collected. It is still here — collecting it now
+              records a late collection, nothing else changes.
             </Notice>
           ) : null}
           {eligibility.wrongDay ? (
             <Notice>
               {gateView.ecd_name} is booked for another day. Collecting it now still goes through —
-              it's recorded as an off-schedule collection for your manager to see.
+              it&rsquo;s recorded as an off-schedule collection for your manager to see.
             </Notice>
           ) : null}
         </StepScreen>
       )}
 
-      {/* ── 2 · Count what's loaded ────────────────────────── */}
-      {mode !== 'full' && phase === 'count' && currentLine && (
-        <StepScreen
-          title={currentLine.name}
-          sub={`Packing counted ${currentLine.packed}. Count what's actually going onto the vehicle.`}
-          actions={
-            <Actions>
-              <Button disabled={currentLine.loaded === ''} onClick={goToNextLine}>
-                {lineIndex + 1 < packedLines.length ? 'Next item' : 'Confirm the collection'}
-              </Button>
-              {lineIndex > 0 ? (
-                <Button variant="secondary" onClick={() => setLineIndex(lineIndex - 1)}>
-                  Back to the last item
-                </Button>
-              ) : (
-                <Button variant="secondary" onClick={() => setPhase('which')}>Back</Button>
-              )}
-            </Actions>
-          }
-        >
-          <NumberField
-            id="stf-loaded"
-            label="How many are going on the vehicle?"
-            value={currentLine.loaded}
-            flagged={currentLine.loaded !== '' && Number(currentLine.loaded) !== currentLine.packed}
-            onChange={(value) => patchLineAt(lineIndex, { loaded: value })}
-          />
-
-          <KeyValues
-            pairs={[
-              ['Code', currentLine.sku],
-              ['Packed', `${currentLine.packed} ${currentLine.unit}`],
-              ['Item', `${lineIndex + 1} of ${packedLines.length}`],
-            ]}
-          />
-
-          {currentLine.loaded !== '' && Number(currentLine.loaded) !== currentLine.packed ? (
-            <Notice tone="warn">
-              That's different from what packing recorded. Saving still records the collection — a
-              manager will see the difference.
-            </Notice>
-          ) : null}
-        </StepScreen>
-      )}
-
-      {/* ── 3 · Confirm the collection ─────────────────────── */}
-      {mode !== 'full' && phase === 'check' && (
-        <StepScreen
-          title="Does this look right?"
-          sub="Tap any line to change it, then get the driver's signature."
-          actions={
-            <Actions>
-              <Button disabled={saving || !driverName.trim() || !signature} onClick={finish}>
-                {saving ? 'Saving' : 'Confirm collection'}
-              </Button>
-            </Actions>
-          }
-        >
-          {packedLines.length > 0 ? (
-            <div className="stf-list">
-              {packedLines.map((line, i) => {
-                const varied = line.loaded !== '' && Number(line.loaded) !== line.packed;
-                return (
-                  <button
-                    key={line.itemId}
-                    type="button"
-                    className={`stf-row${varied ? ' is-warn' : ''}`}
-                    onClick={() => { setLineIndex(i); setPhase('count'); }}
-                  >
-                    {varied ? <span className="stf-notice-mark" aria-hidden="true">!</span> : null}
-                    <span className="stf-row-main">
-                      <span className="stf-row-title">{line.name}</span>
-                      <span className="stf-row-meta">
-                        {line.loaded || 0} {line.unit} loaded · packed {line.packed} {line.unit}
-                      </span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          ) : null}
-
-          <TextField
-            id="stf-driver-name"
-            label="Driver's name"
-            value={driverName}
-            onChange={setDriverName}
-          />
-          <TextField
-            id="stf-vehicle-reg"
-            label="Vehicle registration (optional)"
-            value={vehicleReg}
-            onChange={setVehicleReg}
-          />
-
-          <SignatureField value={signature} onChange={setSignature} />
-        </StepScreen>
-      )}
-
-      {/* ── Form mode: an entry screen, plus one scrolling dialog ── */}
-      {phase !== 'done' && mode === 'full' && (
-        <StepScreen
-          title="Fill in one form"
-          actions={
-            <Actions>
-              <Button disabled={!canStart} onClick={() => setFormOpen(true)}>
-                Start this collection
-              </Button>
-              <Button variant="secondary" onClick={onBack}>Back to the gate queue</Button>
-            </Actions>
-          }
-        >
-          {eligibility.ecdInactive ? (
-            <Notice tone="warn">
-              {gateView.ecd_name} is not an active centre with approved quantities, so this pallet
-              cannot be released. Ask a manager to activate the centre first.
-            </Notice>
-          ) : null}
-          {!eligibility.ecdInactive && needsOverride && !isManager(user) ? (
-            <Notice tone="warn">
-              {overrideReasonText}. Ask a manager to authorise this collection at the gate.
-            </Notice>
-          ) : null}
-        </StepScreen>
-      )}
-
-      <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent
-          container={shellNode ?? undefined}
-          className="max-w-[560px] w-[calc(100%-2rem)] max-h-[85vh] p-0 gap-0 flex flex-col overflow-hidden"
-        >
-          <DialogHeader className="stf-dialog-head">
-            <DialogTitle>{gateView.ecd_name}</DialogTitle>
-            <DialogDescription>
-              Check every line, then get the driver&rsquo;s name and signature.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="stf-dialog-scroll">
-            <div className="stf-dialog-fields">
-              {needsOverride && isManager(user) ? (
-                <div className="stf-field">
-                  <label className="stf-field-label" htmlFor="stf-full-override-reason">
-                    Reason for authorising this collection
-                  </label>
-                  <textarea
-                    id="stf-full-override-reason"
-                    className="stf-input is-text"
-                    rows={2}
-                    value={overrideReason}
-                    onChange={(e) => setOverrideReason(e.target.value)}
-                    placeholder={`${overrideReasonText}. Say why this can still go out today.`}
-                  />
-                </div>
-              ) : null}
-
-              <div className="stf-formrows">
-                {packedLines.map((line, i) => {
-                  const varied = line.loaded !== '' && Number(line.loaded) !== line.packed;
-                  return (
-                    <div key={line.itemId} className={`stf-formrow${varied ? ' is-warn' : ''}`}>
-                      <div className="stf-formrow-head">
-                        <span className="stf-formrow-title">{line.name}</span>
-                        <span className="stf-formrow-meta">
-                          Code: {line.sku} · Packed: {line.packed} {line.unit}
-                        </span>
-                      </div>
-
-                      <NumberField
-                        id={`stf-full-loaded-${line.itemId}`}
-                        label="How many are going on the vehicle?"
-                        value={line.loaded}
-                        flagged={varied}
-                        onChange={(value) => patchLineAt(i, { loaded: value })}
-                      />
-
-                      {varied ? (
-                        <Notice tone="warn">
-                          That's different from what packing recorded. Saving still records the
-                          collection — a manager will see the difference.
-                        </Notice>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </div>
-
+      {/* ── 2 · Load and release ───────────────────────────── */}
+      {phase === 'work' && (
+        <TaskPage
+          title={gateView.ecd_name}
+          sub="Check every line, then take the driver's name and signature."
+          note={blockedNote}
+          actions={commit}
+          side={
+            <div className="stf-summary">
+              <p className="stf-summary-title">Driver</p>
               <TextField
-                id="stf-full-driver-name"
+                id="stf-driver-name"
                 label="Driver's name"
                 value={driverName}
                 onChange={setDriverName}
               />
               <TextField
-                id="stf-full-vehicle-reg"
+                id="stf-vehicle-reg"
                 label="Vehicle registration (optional)"
                 value={vehicleReg}
                 onChange={setVehicleReg}
               />
-
               <SignatureField value={signature} onChange={setSignature} />
             </div>
-          </div>
+          }
+        >
+          {needsOverride && isManager(user) ? (
+            <div className="stf-field">
+              <label className="stf-field-label" htmlFor="stf-work-override-reason">
+                Reason for authorising this collection
+              </label>
+              <textarea
+                id="stf-work-override-reason"
+                className="stf-input is-text"
+                rows={2}
+                value={overrideReason}
+                onChange={(e) => setOverrideReason(e.target.value)}
+                placeholder={`${overrideReasonText}. Say why this can still go out today.`}
+              />
+            </div>
+          ) : null}
 
-          <div className="stf-dialog-footer">
-            <Actions>
-              <Button disabled={saving || !driverName.trim() || !signature} onClick={finish}>
-                {saving ? 'Saving' : 'Confirm collection'}
-              </Button>
-            </Actions>
-          </div>
-        </DialogContent>
-      </Dialog>
+          {hasLines ? (
+            <WorkList
+              lines={packedLines.map((line) => ({
+                id:       line.itemId,
+                title:    line.name,
+                sku:      line.sku,
+                unit:     line.unit,
+                expected: line.packed,
+                value:    line.loaded,
+              }))}
+              expectedLabel="packed"
+              focusId={mode === 'guided' ? focusId : null}
+              onFocus={(id) => setFocusId(mode === 'guided' ? id : null)}
+              onChange={(id, value) => patchLine(id, { loaded: value })}
+              onAcceptAll={acceptAllAsPacked}
+              acceptAllLabel="Everything as packed"
+              renderDetail={(row) => {
+                const line = packedLines.find((l) => l.itemId === row.id);
+                if (!line) return null;
+                const varied = line.loaded !== '' && Number(line.loaded) !== line.packed;
+                return (
+                  <>
+                    <KeyValues
+                      pairs={[
+                        ['Code', line.sku],
+                        ['Packed', `${line.packed} ${line.unit}`],
+                        ['Ordered', `${line.required} ${line.unit}`],
+                      ]}
+                    />
+                    {varied ? (
+                      <Notice tone="warn">
+                        That&rsquo;s different from what packing recorded. Saving still records the
+                        collection — a manager will see the difference.
+                      </Notice>
+                    ) : null}
+                  </>
+                );
+              }}
+            />
+          ) : (
+            <Notice>Nothing on this pallet was packed, so there is nothing to load.</Notice>
+          )}
+        </TaskPage>
+      )}
 
       {/* ── Done ───────────────────────────────────────────── */}
       {phase === 'done' && (

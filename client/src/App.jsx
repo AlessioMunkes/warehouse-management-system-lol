@@ -19,6 +19,7 @@ import StaffDispatchHistoryPage                    from './pages/StaffDispatchHi
 import ReceiptsPage                                from './pages/ReceiptsPage';
 import InventoryManagementPage                     from './pages/InventoryManagementPage';
 import ManagerDashboardPage                         from './pages/ManagerDashboardPage';
+import { ToastProvider }                             from './components/ui/toast';
 import StockLedgerPage                               from './pages/StockLedgerPage';
 import AdminActivityScreen                         from './pages/AdminActivityScreen';
 import TaskDashboard from './pages/TaskDashboardPage';
@@ -48,6 +49,7 @@ import { ReviewPage as DonationReviewPage }         from './pages/ReviewPage';
 const App = () => (
   <AuthProvider>
     <BrowserRouter>
+      <ToastProvider>
       <Routes>
         {/* Public */}
         <Route path="/"      element={<LandingPage />} />
@@ -205,6 +207,7 @@ const App = () => (
         {/* Catch-all */}
         <Route path="*" element={<PageNotFound />} />
       </Routes>
+      </ToastProvider>
     </BrowserRouter>
   </AuthProvider>
 );

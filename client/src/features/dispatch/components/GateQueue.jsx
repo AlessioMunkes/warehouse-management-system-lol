@@ -44,6 +44,31 @@ import { Notice } from '../../staff/components/StepPrimitives';
 // The four states a row can be in, and how each reads on the floor.
 // Kept as one table so the label, the styling and the "can you open
 // it?" decision cannot drift apart.
+// 16:00 SAST is when the sweep writes off whatever is still standing
+// (BR-14). Computed in Africa/Johannesburg rather than from the
+// tablet's own clock: a device left on another timezone would other-
+// wise count down to the wrong moment, and this is the one number on
+// the screen a worker might act on.
+const CUTOFF_HOUR = 16;
+
+const sastHourMinute = () => {
+  const parts = new Intl.DateTimeFormat('en-ZA', {
+    timeZone: 'Africa/Johannesburg',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(new Date());
+  const get = (type) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return { hour: get('hour'), minute: get('minute') };
+};
+
+const cutoffNote = () => {
+  const { hour, minute } = sastHourMinute();
+  const left = CUTOFF_HOUR * 60 - (hour * 60 + minute);
+  if (left <= 0) return 'past the 16:00 cut-off';
+  const h = Math.floor(left / 60);
+  const m = left % 60;
+  return h > 0 ? `${h}h ${m}m to the 16:00 cut-off` : `${m}m to the 16:00 cut-off`;
+};
+
 const STATE = {
   awaiting:       { label: 'Waiting for collection', tone: '',           openable: true  },
   collected:      { label: 'Collected',              tone: ' is-static', openable: false },
@@ -128,7 +153,12 @@ export default function GateQueue({ onOpenPallet }) {
             // most to someone standing at a gate.
             let meta;
             if (row.dispatch_status === 'not_collected') {
-              meta = 'Awaiting late collection. Written off at 16:00.';
+              // Was "Awaiting late collection. Written off at 16:00."
+              // on every such row at any hour and with no date, which
+              // reads at 22:41 as though it had just happened. What a
+              // person at the gate needs to know is what collecting it
+              // now actually does.
+              meta = 'Written off as not collected. Collecting it now records a late collection.';
             } else if (at) {
               meta = `${state.label} at ${at}${row.driver_name ? ` · ${row.driver_name}` : ''}`;
               // The centre going inactive afterwards doesn't rewrite
@@ -139,7 +169,10 @@ export default function GateQueue({ onOpenPallet }) {
               const flags = [];
               if (Number(row.flagged_items) > 0)  flags.push(`${row.flagged_items} flagged`);
               if (Number(row.variance_items) > 0) flags.push(`${row.variance_items} short or over`);
-              meta = [`${row.total_items} items ready for dispatch`, ...flags].join(' · ');
+              // The live cut-off, which is the thing that changes while
+              // someone is standing there. Static text saying 16:00 tells
+              // a worker nothing they cannot read off the wall clock.
+              meta = [`${row.total_items} items ready for dispatch`, ...flags, cutoffNote()].join(' · ');
             }
 
             const open = () => onOpenPallet(row.picking_slip_id);

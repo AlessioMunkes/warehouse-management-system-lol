@@ -17,6 +17,10 @@
 // ─────────────────────────────────────────────────────────────
 
 import { useState, useMemo } from "react";
+import { PackageSearch } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import EmptyState from '@/components/ui/empty-state';
+import Sparkline from './Sparkline';
 import {
   Table,
   TableBody,
@@ -69,28 +73,44 @@ import "../../../styles/landingpage.css";
 // `sort` is the value a row sorts on. Product and SKU sort as text,
 // everything else numerically — sorting "12" against "9" as strings is
 // how a stock table ends up claiming 9 is more than 12.
+// Widths re-proportioned to make room for the trend column without
+// reintroducing horizontal scroll — they still total 100%.
 const COLUMNS = [
-  { key: 'name',      label: 'Product',   width: '26%', align: 'left',
+  { key: 'name',      label: 'Product',   width: '22%', align: 'left',
     sort: (p) => (p.name ?? '').toLowerCase() },
-  { key: 'sku',       label: 'SKU',       width: '14%', align: 'left',
+  { key: 'sku',       label: 'SKU',       width: '12%', align: 'left',
     sort: (p) => (p.sku ?? '').toLowerCase() },
-  { key: 'onHand',    label: 'On Hand',   width: '10%', align: 'right',
+  { key: 'onHand',    label: 'On Hand',   width: '9%',  align: 'right',
     sort: (p) => Number(p.onHand ?? 0) },
-  { key: 'committed', label: 'Committed', width: '10%', align: 'right',
+  { key: 'committed', label: 'Committed', width: '9%',  align: 'right',
     sort: (p) => Number(p.committed ?? 0) },
-  { key: 'available', label: 'Available', width: '10%', align: 'right',
+  { key: 'available', label: 'Available', width: '9%',  align: 'right',
     sort: (p) => Number(p.available ?? 0) },
-  { key: 'reorderAt', label: 'Reorder At',width: '10%', align: 'right',
+  { key: 'reorderAt', label: 'Reorder At',width: '9%',  align: 'right',
     sort: (p) => Number(p.reorderAt ?? 0) },
-  { key: 'status',    label: 'Status',    width: '10%', align: 'left',
+  // Not sortable, deliberately. Every other accessor here reads a
+  // field off the product row, but the series lives in the `trends`
+  // prop keyed by id, and COLUMNS is module scope — it cannot see it.
+  // Sorting by "what fell the most this month" would mean special-
+  // casing this one column inside the component; worth doing if
+  // someone asks for it, not worth a fake accessor that silently
+  // sorts by nothing.
+  { key: 'trend',     label: '30 days',   width: '12%', align: 'left',
+    sort: null },
+  { key: 'status',    label: 'Status',    width: '9%',  align: 'left',
     // Shortfall first, then low stock, then healthy — the order someone
     // scanning for problems wants, not alphabetical.
     sort: (p) => (p.isShortfall ? 2 : p.isLowStock ? 1 : 0) },
-  { key: 'actions',   label: 'Actions',   width: '10%', align: 'right',
+  { key: 'actions',   label: 'Actions',   width: '9%',  align: 'right',
     sort: null },
 ];
 
-const COLUMN_KEY = 'wms_stock_columns';
+// Versioned. The stored value is a list of visible column keys, so a
+// browser holding the pre-trend list would hide the new column
+// forever and there is no way to tell "deliberately hidden" from
+// "saved before this column existed". Bumping the key resets the
+// choice once; leaving it would ship a column nobody could see.
+const COLUMN_KEY = 'wms_stock_columns_v2';
 
 const readStoredColumns = () => {
   try {
@@ -117,6 +137,7 @@ export default function StockManifestTable({
   products = [],
   isLoading = false,
   canAdjust = false,
+  trends = {},
   onAdjust,
   onViewHistory,
 }) {
@@ -495,23 +516,34 @@ export default function StockManifestTable({
 
       <CardContent>
         {isLoading ? (
-          <div className="stock-empty-state">
-            Loading stock levels...
+          // Skeleton rows rather than a line of text: the table is the
+          // whole screen, and eighteen other pages already load this
+          // way. A sentence where a table is about to appear reads as
+          // an error message.
+          <div className="space-y-2 py-2" aria-busy="true">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <Skeleton key={i} className="h-10 w-full" />
+            ))}
           </div>
         ) : filteredProducts.length === 0 ? (
-          <div className="stock-empty-state">
-            <p>No matching products found.</p>
-            {(activeFiltersCount > 0 || searchTerm) && (
-              <Button
-                variant="link"
-                size="sm"
-                onClick={handleResetFilters}
-                className="mt-2 text-xs"
-              >
-                Clear all active filters
-              </Button>
-            )}
-          </div>
+          <EmptyState
+            icon={PackageSearch}
+            title={
+              activeFiltersCount > 0 || searchTerm
+                ? "No products match these filters"
+                : "No products in the catalogue yet"
+            }
+            description={
+              activeFiltersCount > 0 || searchTerm
+                ? "Nothing in the manifest matches what you have selected."
+                : "Products appear here once they are added to the catalogue or arrive through receiving."
+            }
+            action={
+              (activeFiltersCount > 0 || searchTerm)
+                ? { label: "Clear all active filters", onClick: handleResetFilters }
+                : undefined
+            }
+          />
         ) : (
           <div className="stock-table-wrapper">
             <Table className="w-full table-fixed">
@@ -586,6 +618,11 @@ export default function StockManifestTable({
                       if (c.key === 'reorderAt') return (
                         <TableCell key={c.key} className="text-right text-muted-foreground">
                           {product.reorderAt} {product.unit}
+                        </TableCell>
+                      );
+                      if (c.key === 'trend') return (
+                        <TableCell key={c.key} className="stock-cell-trend">
+                          <Sparkline points={trends[product.id]} unit={product.unit} />
                         </TableCell>
                       );
                       if (c.key === 'status') return (

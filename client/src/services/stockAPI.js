@@ -174,7 +174,27 @@ export const getLedgerActors = async () => {
   return (body.data ?? []).map((r) => ({ id: r.id, name: r.name || "Unknown" }));
 };
 
+// ── GET /api/stock/trends ─────────────────────────────────────
+// { [productId]: number[] } — the balance at the end of each day,
+// oldest first. Products that have never moved are absent, and the
+// table renders those as a dash rather than a flat line.
+export const getStockTrends = async (days) => {
+  const qs   = days ? `?days=${encodeURIComponent(days)}` : "";
+  const body = await apiGet(`/api/stock/trends${qs}`);
+  const series = body.data?.series ?? {};
+
+  // Keys arrive as strings (JSON object keys always are) but products
+  // are keyed by integer id everywhere else, so the lookup in the
+  // table would silently miss. Normalise once, here.
+  const out = {};
+  for (const [productId, points] of Object.entries(series)) {
+    out[Number(productId)] = (points ?? []).map(Number);
+  }
+  return out;
+};
+
 export default {
   getManifest, getMovements, adjustStock,
   getLedger, getReconciliation, getLedgerActors,
+  getStockTrends,
 };

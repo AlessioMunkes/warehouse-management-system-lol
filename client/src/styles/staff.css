@@ -1166,3 +1166,223 @@ body.reduced-movement .decorative-icon {
   .stf-tab-icon { width: 28px; height: 28px; }
   .stf-instruction-n { font-size: 2.8rem; }
 }
+
+
+/* ── Task page (TaskPage.jsx) ──────────────────────────────────
+   The container that replaced the dialog both staff flows used to
+   render into. Full width of the shell rather than a 560px box, with
+   the head and the commit bar pinned so neither scrolls away from a
+   worker halfway down a nine-line delivery. */
+.stf-task {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+}
+.stf-task-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--stf-sand);
+  padding: 16px 0 12px;
+  border-bottom: 1px solid var(--stf-border);
+}
+.stf-task-title {
+  font-family: var(--stf-font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--stf-ink);
+  margin: 0;
+}
+.stf-task-title:focus-visible { outline: 2px solid var(--stf-accent); outline-offset: 3px; }
+.stf-task-sub { margin: 4px 0 0; font-size: 14px; color: var(--stf-text-sub); }
+
+.stf-task-cols { display: block; padding: 12px 0 16px; }
+.stf-task-main { min-width: 0; }
+.stf-task-side { margin-top: 16px; }
+
+/* Two panes only where there is width for two panes. Below this the
+   device is a phone or a bench tablet and the side pane is simply the
+   next thing down the page. */
+@media (min-width: 1024px) {
+  .stf-task-cols {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 24px;
+    align-items: start;
+  }
+  .stf-task-side {
+    margin-top: 0;
+    position: sticky;
+    top: 92px;
+  }
+}
+
+.stf-task-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: var(--stf-sand);
+  border-top: 1px solid var(--stf-border);
+  padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
+}
+.stf-task-note {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--stf-attention-ink);
+}
+
+/* On a wide screen the commit lives in the side pane, so the sticky
+   footer would be a second copy of it taking up the bottom of the
+   page for nothing. */
+@media (min-width: 1024px) {
+  .stf-task-foot.is-side-commit { display: none; }
+}
+
+/* ── Work list (WorkList.jsx) ──────────────────────────────────
+   One row per line: what it is on the left, the number on the right,
+   about 56px tall. The card-per-line shape this replaced was ~135px,
+   which is what made nine lines a scroll instead of a screen. */
+.stf-wl { display: flex; flex-direction: column; gap: 8px; }
+
+.stf-wl-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.stf-wl-count { font-size: 13px; color: var(--stf-text-sub); }
+.stf-wl-accept {
+  min-height: var(--stf-tap);
+  padding: 0 16px;
+  border: 1px solid var(--stf-ink);
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-white);
+  font-family: var(--stf-font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--stf-ink);
+  cursor: pointer;
+}
+.stf-wl-accept:hover { background: var(--stf-ink); color: var(--stf-white); }
+
+.stf-wl-rows {
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+  overflow: hidden;
+}
+.stf-wl-row { border-bottom: 1px solid var(--stf-border); }
+.stf-wl-row:last-child { border-bottom: 0; }
+.stf-wl-row.is-warn { background: var(--stf-attention-bg); }
+/* The focused row in Guided. A left bar rather than a colour swap,
+   so it never collides with the warn state a varied line already
+   carries — ACC-03, never colour alone. */
+.stf-wl-row.is-focus { box-shadow: inset 3px 0 0 var(--stf-accent); }
+
+.stf-wl-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: 6px 10px;
+}
+.stf-wl-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  padding: 4px 0;
+  font-family: inherit;
+}
+.stf-wl-text { min-width: 0; display: flex; flex-direction: column; }
+.stf-wl-title {
+  font-family: var(--stf-font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--stf-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stf-wl-meta {
+  font-size: 12px;
+  color: var(--stf-text-meta);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stf-wl-mark {
+  flex: 0 0 auto;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--stf-attention);
+  color: var(--stf-white);
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stf-wl-qty { flex: 0 0 auto; display: flex; align-items: center; gap: 4px; }
+.stf-wl-step {
+  width: var(--stf-tap);
+  height: var(--stf-tap);
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  font-size: 20px;
+  line-height: 1;
+  color: var(--stf-ink);
+  cursor: pointer;
+}
+.stf-wl-step:hover { background: var(--stf-sand); }
+.stf-wl-input {
+  width: 84px;
+  min-height: var(--stf-tap);
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  text-align: center;
+  font-family: var(--stf-font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--stf-ink);
+}
+.stf-wl-input.is-flagged { border-color: var(--stf-attention); }
+
+/* The accordion. Only the focused line opens, so put-away location,
+   use-by date and the variance notice are present when they matter
+   and invisible when they do not. */
+.stf-wl-detail {
+  padding: 4px 10px 14px;
+  border-top: 1px dashed var(--stf-border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Summary card, for the side pane ──────────────────────── */
+.stf-summary {
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.stf-summary-title {
+  font-family: var(--stf-font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--stf-ink);
+  margin: 0;
+}
