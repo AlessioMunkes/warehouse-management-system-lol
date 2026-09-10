@@ -103,18 +103,15 @@ export const STAFF = {
   // staff-side equivalents already call, so no new route gating is
   // needed beyond what those two already require.
   documents: '/noc/documents',
-<<<<<<< HEAD
   // Manager-only. All three /api/stock/ledger routes are
   // requireRole(MANAGER, ADMIN); the App.jsx gate mirrors that. The
   // per-product history drawer on the inventory screen stays open to
   // every role — this is the warehouse-wide, supervisory view.
   stockLedger: '/noc/stock-ledger',
-=======
   // ADM-5.0 / BR-28 — the benevolent package (call-in) request log.
   // Warehouse staff and up: every /api/community-requests route is
   // requireRole(WORKER, MANAGER, ADMIN), and this mirrors that.
   communityRequests: '/noc/community-requests',
->>>>>>> dd1ab4a58d88529743474bd309373a95bc12a0c2
 };
 
 // ── Donations ────────────────────────────────────────────────

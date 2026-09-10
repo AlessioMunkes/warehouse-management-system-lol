@@ -23,11 +23,8 @@ import {
   BarChart3, HeartHandshake, Package, Truck, FileText,
   Gift, Route, Tags, HandHeart, Boxes, ReceiptText,
   PackageOpen, PackageCheck, FlaskConical, ClipboardCheck, HandCoins,
-<<<<<<< HEAD
-  ScrollText,
-=======
   PhoneCall,
->>>>>>> dd1ab4a58d88529743474bd309373a95bc12a0c2
+  ScrollText,
 } from 'lucide-react';
 import { STAFF, ADMIN, VOLUNTEERS, PACKING } from '../../../routes/paths';
 

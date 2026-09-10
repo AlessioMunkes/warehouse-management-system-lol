@@ -48,6 +48,8 @@ fi
 python3 - <<'PYEOF'
 import os, sys
 
+CATALOG_PATH = 'server/src/features/reporting/reportCatalog.js'
+
 CHANGES = 0
 FAILED  = []
 
@@ -154,7 +156,16 @@ export default { MOVEMENT_TYPES, OUTBOUND_MOVEMENT_TYPES, isMovementType };
 # A mid-file `import` is legal ESM (declarations are hoisted) and
 # module-loads.test.js parses it happily — unlike `export ... from`,
 # which its vm parser rejects outright.
-patch('server/src/features/reporting/reportCatalog.js',
+# An earlier build of this script wrote the same import and re-export
+# with different comment prose. Recognise that as done rather than
+# aborting on a missing anchor — what matters is that the binding comes
+# from constants/movementTypes.js and is re-exported, not the wording
+# above it.
+_cat, _ = _read(CATALOG_PATH) if os.path.exists(CATALOG_PATH) else ('', False)
+if 'constants/movementTypes.js' in _cat and 'export { MOVEMENT_TYPES }' in _cat:
+    print("  = reportCatalog imports and re-exports MOVEMENT_TYPES (already applied)")
+else:
+    patch('server/src/features/reporting/reportCatalog.js',
 """export const MOVEMENT_TYPES = [
   'adjustment', 'decanted', 'dispatched', 'donated', 'picked', 'received', 'wastage',
 ];""",
@@ -163,7 +174,7 @@ patch('server/src/features/reporting/reportCatalog.js',
 // constants/ and re-exported here to keep this catalog's flat shape.
 import { MOVEMENT_TYPES } from '../../constants/movementTypes.js';
 export { MOVEMENT_TYPES };""",
-"reportCatalog imports and re-exports MOVEMENT_TYPES")
+          "reportCatalog imports and re-exports MOVEMENT_TYPES")
 
 # ══════════════════════════════════════════════════════════════
 print("2  repository")
