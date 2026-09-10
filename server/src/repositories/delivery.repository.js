@@ -395,8 +395,9 @@ const createDelivery = async ({
         `INSERT INTO delivery_note_items
            (delivery_note_id, product_id, purchase_order_item_id,
             expected_quantity, expected_weight_kg,
-            received_quantity, unit, discrepancy_reason)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            received_quantity, unit, discrepancy_reason,
+            storage_area, expiry_date)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
         [
           deliveryNoteId,
           line.productId,
@@ -406,6 +407,8 @@ const createDelivery = async ({
           line.receivedQuantity,
           line.unit,
           line.discrepancyReason,
+          line.storageArea,   // BR-07 — migration 018
+          line.expiryDate,    // BR-06 — null for anything not perishable
         ],
       );
 
@@ -556,7 +559,8 @@ const getPurchaseOrderItems = async (purchaseOrderId) => {
        p.name                  AS product_name,
        p.stock_keeping_unit    AS sku,
        p.weight_kg             AS product_weight_kg,
-       p.default_unit
+       p.default_unit,
+       p.is_perishable
      FROM purchase_order_items poi
      JOIN products p ON p.id = poi.product_id
      WHERE poi.purchase_order_id = $1

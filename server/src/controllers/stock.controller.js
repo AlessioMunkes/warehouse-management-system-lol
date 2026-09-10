@@ -9,12 +9,10 @@
 // string-matching `err.message` (see picking.controller.js for the same
 // convention). Falls back to 500 when no `.status` is present.
 //
-// TODO(Alessio): stock.service.js currently throws bare `new Error(...)`
-// with no `.status` attached (unlike picking.service.js's `fail()`
-// helper), so right now every thrown error here — even a validation
-// error like "Product ID is required." — falls through to the 500
-// branch below instead of getting a 400/404. Add a `fail(status, msg)`
-// helper to stock.service.js (mirroring picking.service.js) to fix this.
+// stock.service.js has a `fail(status, message)` helper mirroring
+// picking.service.js's, so validation errors arrive here carrying a
+// 400/404 and keep their message. (An earlier note here said it
+// didn't — it does.)
 // ─────────────────────────────────────────────────────────────
 import stockService from '../services/stock.service.js';
 
@@ -83,8 +81,65 @@ const adjustManually = async (req, res) => {
   }
 };
 
+// ── The ledger, warehouse-wide (manager/admin) ───────────────────
+// GET /api/stock/ledger
+// Query: from, to (YYYY-MM-DD, SAST), productId, movementType
+//        (repeatable or comma-separated), performedBy, referenceType,
+//        limit, cursor
+// Returns: { movements, summary, nextCursor }
+const getLedger = async (req, res) => {
+  try {
+    const data = await stockService.getLedger(req.query);
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    console.error('[getLedger]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to retrieve the stock ledger.',
+    });
+  }
+};
+
+// ── Balance vs ledger (manager/admin) ────────────────────────────
+// GET /api/stock/ledger/reconciliation
+// Returns: { products, variances } — variances is the subset that
+// does not balance, and should be empty.
+const getReconciliation = async (req, res) => {
+  try {
+    const data = await stockService.getReconciliation();
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    console.error('[getReconciliation]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to reconcile stock balances.',
+    });
+  }
+};
+
+// ── Actors, for the ledger's filter bar (manager/admin) ──────────
+// GET /api/stock/ledger/actors
+const getLedgerActors = async (req, res) => {
+  try {
+    const data = await stockService.getLedgerActors();
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    console.error('[getLedgerActors]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to retrieve ledger users.',
+    });
+  }
+};
+
 export default {
   getManifest,
   getMovements,
   adjustManually,
+  getLedger,
+  getReconciliation,
+  getLedgerActors,
 };

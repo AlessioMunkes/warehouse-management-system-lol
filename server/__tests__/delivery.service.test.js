@@ -56,7 +56,8 @@ const body = (over = {}) => ({
   deliveryDate:    '2026-08-19',
   purchaseOrderId: PO,
   signatureData:   'received-in-app',
-  lineItems:       [{ purchaseOrderItemId: 100, receivedQuantity: 20, overAction: 'accept' }],
+  lineItems:       [{ purchaseOrderItemId: 100, receivedQuantity: 20, overAction: 'accept',
+                      location: 'dry_store' }],
   ...over,
 });
 
@@ -112,7 +113,8 @@ describe('createDelivery — the ordinary case', () => {
     // A WORKER can reach this endpoint. If the body could name the
     // product, a crafted request could adjust stock for anything.
     await deliveryService.createDelivery(
-      body({ lineItems: [{ purchaseOrderItemId: 100, receivedQuantity: 20, productId: 999, unit: 'crate' }] }),
+      body({ lineItems: [{ purchaseOrderItemId: 100, receivedQuantity: 20, productId: 999, unit: 'crate',
+                           location: 'dry_store' }] }),
       USER_ID,
     );
     const line = repoMock.createDelivery.mock.calls[0][0].lineItems[0];
@@ -129,6 +131,7 @@ describe('createDelivery — the ordinary case', () => {
   it('keeps a rejected surplus out of stock but on the record', async () => {
     await deliveryService.createDelivery(
       body({ lineItems: [{
+        location: 'dry_store',
         purchaseOrderItemId: 100, receivedQuantity: 25,
         overAction: 'reject', discrepancyReason: 'Turned the extra away',
       }] }),
@@ -142,6 +145,7 @@ describe('createDelivery — the ordinary case', () => {
   it('flags the note when any line varies', async () => {
     await deliveryService.createDelivery(
       body({ lineItems: [{
+        location: 'dry_store',
         purchaseOrderItemId: 100, receivedQuantity: 18,
         discrepancyReason: 'Short count at receiving',
       }] }),

@@ -2,14 +2,49 @@
 
 ## Status of this document
 
+> **⚠ This file is the Milestone 2 target schema. It is NOT the live database, and in
+> several places it contradicts it. Do not build against this file — read the SQL in
+> `server/src/repositories/` instead, which is what actually runs.**
+
 This schema is derived from the Milestone 2 class diagram. Every change from the original
 diagram is called out inline with a `-- ADJUSTED` or `-- NEW` comment and cross-referenced
 to the relevant warehouse-visit section number, so anyone can trace *why* a field exists.
 
-**This documents the intended/target schema, not necessarily the exact live database.**
-Once the current build is available, reconcile this file against the actual Supabase
-schema (`pg_dump --schema-only`, or `server/database/schema.sql` in the repo) and update
-whichever one is wrong. Docs should track code, not the reverse.
+`server/database/schema.sql` is an empty placeholder and `server/database/migrations/`
+only holds 015 onward, so neither is a substitute. The reconciliation below was done by
+reading the queries the application issues; the authoritative version is
+`pg_dump --schema-only` against the live database, which nobody has run yet.
+
+### Known divergences from the live database
+
+Confirmed by reading the SQL in `server/src/repositories/`, September 2026.
+
+| This document says | The live database has | Evidence |
+|---|---|---|
+| `stock_items` | `products` | every repository joins `products p` |
+| `inventory` | `stock_levels` | `stock.repository.js` — `quantity_on_hand`, `unit`, `reorder_threshold` |
+| `ecd_centers` | `ecd_centres` | `dispatch.repository.js` |
+| `stock_movements.removed BOOLEAN` | `stock_movements.movement_type` + `unit`, `reason`, `performed_by` | `stock.repository.js` `adjustStock` |
+| `stock_movements.stock_item_id` | `stock_movements.product_id` | same |
+| UUID primary keys throughout | `products`, `users`, `suppliers`, `purchase_orders` are integer `SERIAL` | `validateIntId` middleware; `Number.isInteger(productId)` guard in `adjustStock` |
+| `purchase_orders.status` per §11.2 | seven values, listed verbatim in `server/src/constants/purchaseOrderStatus.js` | the CHECK constraint |
+| `decanting_records` / `decanting_lines` not described here | both live; see the schema comment at the top of `decanting.repository.js` | — |
+| — | `warehouse_manager_flags`, `pending_donation_items`, `donation_category_routing`, `donation_routing_defaults`, `reporting_queries`, `notifications` all live and undocumented here | the repositories that query them |
+
+`movement_type` is constrained to exactly: `adjustment`, `decanted`, `dispatched`,
+`donated`, `picked`, `received`, `wastage` (mirrored in `reportCatalog.js`). `picked` is
+deliberately never written — stock is deducted at the dispatch gate, not at packing; see
+the header comment in `picking.repository.js`.
+
+### Applied since this document was written
+
+- **018** — `delivery_note_items.storage_area` (BR-07) and `.expiry_date` (BR-06). The
+  receiving screen had been collecting both since it was written; the server discarded
+  them on every submit, so neither business rule was actually enforced.
+
+**Still open:** per-batch stock. `expiry_date` is now recorded against the receipt line,
+but `stock_levels` remains one balance per product, so picking cannot yet allocate
+first-expiry-first-out. BR-06 is recorded, not enforced.
 
 ## Conventions
 

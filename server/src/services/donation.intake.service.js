@@ -7,8 +7,9 @@
 //   the stock table, keeping inventory balances pure and completely clean of non-edible supplies.
 // - Dynamic dry vs cold storage staging is evaluated strictly for edible inventory items.
 // ─────────────────────────────────────────────────────────────
-import pool from '../config/db.js';
+import pool              from '../config/db.js';
 import donationRepository from '../repositories/donation.intake.repository.js';
+import stockModel         from '../repositories/stock.repository.js';
 
 export const processDonationIntake = async ({
   productId,
@@ -49,8 +50,26 @@ export const processDonationIntake = async ({
         ? 'Cold Storage'
         : 'Dry Storage';
 
-      const stockRes = await donationRepository.upsertInventoryLevel(client, productId, quantityKg);
-      updatedStockBalance = stockRes.quantity_on_hand;
+      // Inbound donation stock goes through adjustStock, the single
+      // write path for quantity_on_hand — so the balance and
+      // stock_movements stay reconcilable, the product row is locked
+      // against a concurrent receipt, and the unit comes from the
+      // product rather than being assumed to be kilograms.
+      //
+      // The previous upsertInventoryLevel did none of those three
+      // things: it added straight to stock_levels, wrote no ledger
+      // row, and hard-coded 'kg'. Stock arrived from nowhere as far
+      // as any audit or report was concerned.
+      const stockRes = await stockModel.adjustStock(client, {
+        productId,
+        quantityDelta: quantityKg,
+        unit:          product.default_unit || 'kg',
+        movementType:  'donated',
+        referenceType: 'donation_intake',
+        reason:        `Donation intake (${finalCategory})`,
+        performedBy:   receivedByUserId,
+      });
+      updatedStockBalance = stockRes.after;
 
     } else if (finalCategory === 'non_recipe_food') {
       resolvedStorageArea = routingRule.storage_area || 'Soup Kitchen Prep';

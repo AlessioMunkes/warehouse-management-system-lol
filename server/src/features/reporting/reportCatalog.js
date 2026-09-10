@@ -23,6 +23,13 @@
 // conversation, not a catalog edit.
 // ─────────────────────────────────────────────────────────────
 
+// The storage-area vocabulary is shared with the delivery service,
+// which validates put-away locations against it, so it is declared
+// once in constants/ and re-exported here to keep this catalog's flat
+// shape for its own consumers.
+import { STORAGE_AREAS }  from '../../constants/storageAreas.js';
+import { MOVEMENT_TYPES } from '../../constants/movementTypes.js';
+
 // ── Enum values (confirmed from pg_enum, 22 Aug 2026) ─────────
 export const COHORTS = ['week1', 'week2'];
 export const BENEFICIARY_KINDS = ['ecd', 'dignity_kitchen', 'soup_kitchen', 'community'];
@@ -30,14 +37,12 @@ export const BENEFICIARY_KINDS = ['ecd', 'dignity_kitchen', 'soup_kitchen', 'com
 export const IMPACT_BENEFICIARY_KINDS = ['ecd', 'soup_kitchen'];
 export const DONATION_CATEGORIES = ['recipe_food', 'add_on_food', 'non_recipe_food', 'non_food'];
 export const REQUEST_OUTCOMES = ['pending', 'fulfilled', 'partially_fulfilled', 'declined', 'referred'];
-export const STORAGE_AREAS = ['cold_room', 'dry_store', 'fts_section', 'mezzanine', 'boardroom'];
+export { STORAGE_AREAS };
 
 // CHECK constraints, not enums — confirmed from the live schema.
 export const COLLECTED_STATUSES     = ['collected', 'late_collected'];
 export const NOT_COLLECTED_STATUSES = ['not_collected'];
-export const MOVEMENT_TYPES = [
-  'adjustment', 'decanted', 'dispatched', 'donated', 'picked', 'received', 'wastage',
-];
+export { MOVEMENT_TYPES };
 export const S18A_STATUSES = [
   'not_evaluated', 'not_qualifying', 'qualifying_pending_donor', 'queued', 'issued', 'failed',
 ];

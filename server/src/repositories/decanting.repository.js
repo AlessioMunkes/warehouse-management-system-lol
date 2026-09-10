@@ -30,7 +30,8 @@
 //   ALTER TABLE products ADD COLUMN IF NOT EXISTS is_decantable BOOLEAN NOT NULL DEFAULT false;
 //
 // ─────────────────────────────────────────────────────────────
-import pool from '../config/db.js';
+import pool       from '../config/db.js';
+import stockModel from './stock.repository.js';
 
 // ── Create a decanting record with its lines ──────────────────
 // Wrapped in a transaction so a header is never left without lines.
@@ -77,10 +78,57 @@ const createDecanting = async ({ weekOf, notes, recordedBy, lines }) => {
       );
     }
 
+    // ── Wastage leaves the building, so it leaves the ledger ────
+    // Wastage is measured and typed in by the worker after the sack
+    // is decanted — it cannot be derived, which is why it arrives as
+    // a per-line figure rather than being calculated here. Whatever
+    // they entered is what comes off the product.
+    //
+    // Decanting itself moves no stock: a 50 kg sack split into
+    // 100 x 500 g bags is the same 50 kg of the same product, and the
+    // bag split is recorded on the decanting line. Only the wastage
+    // is a real change in what the warehouse holds.
+    //
+    // adjustStock's contract: callers touching multiple products must
+    // lock them in product_id order or they deadlock against other
+    // transactions doing the same (see delivery.repository.createDelivery).
+    const wasted = lines
+      .filter((l) => l.productId && Number(l.wastageKg) > 0)
+      .sort((a, b) => a.productId - b.productId);
+
+    const stockWarnings = [];
+
+    for (const line of wasted) {
+      const res = await stockModel.adjustStock(client, {
+        productId:     line.productId,
+        quantityDelta: -Math.abs(Number(line.wastageKg)),
+        unit:          'kg',
+        movementType:  'wastage',
+        referenceType: 'decanting',
+        referenceId:   record.id,
+        reason:        `Decanting wastage, week of ${weekOf}`,
+        performedBy:   recordedBy,
+      });
+
+      if (res.isUnitMismatch) {
+        stockWarnings.push({
+          productId: line.productId,
+          message: 'Decanting wastage is measured in kg but this product\'s ledger is in a different unit; the wastage was deducted in the recorded unit.',
+        });
+      }
+      if (res.isShortfall) {
+        stockWarnings.push({
+          productId: line.productId,
+          message: 'Recording this wastage took the product below zero on hand — the shelf and the ledger disagree.',
+        });
+      }
+    }
+
     await client.query('COMMIT');
 
     // Return the freshly-saved record with its lines
-    return await getDecantingById(record.id);
+    const saved = await getDecantingById(record.id);
+    return stockWarnings.length ? { ...saved, stockWarnings } : saved;
 
   } catch (err) {
     await client.query('ROLLBACK');
@@ -96,11 +144,17 @@ const getDecantingRecords = async (range = 'all') => {
   let dateFilter = '';
 
   if (range === 'today') {
-    dateFilter = `AND dr.created_at::date = CURRENT_DATE`;
+    // SAST, not UTC. Render's clock is UTC, so CURRENT_DATE is still
+    // yesterday for the first two hours of every South African day —
+    // a decanting run recorded at 01:00 local vanished from "today".
+    dateFilter = `AND (dr.created_at AT TIME ZONE 'Africa/Johannesburg')::date`
+               + ` = (now() AT TIME ZONE 'Africa/Johannesburg')::date`;
   } else if (range === 'week') {
-    dateFilter = `AND dr.created_at >= CURRENT_DATE - INTERVAL '7 days'`;
+    dateFilter = `AND (dr.created_at AT TIME ZONE 'Africa/Johannesburg')::date`
+               + ` >= (now() AT TIME ZONE 'Africa/Johannesburg')::date - INTERVAL '7 days'`;
   } else if (range === 'month') {
-    dateFilter = `AND dr.created_at >= CURRENT_DATE - INTERVAL '30 days'`;
+    dateFilter = `AND (dr.created_at AT TIME ZONE 'Africa/Johannesburg')::date`
+               + ` >= (now() AT TIME ZONE 'Africa/Johannesburg')::date - INTERVAL '30 days'`;
   }
 
   const result = await pool.query(

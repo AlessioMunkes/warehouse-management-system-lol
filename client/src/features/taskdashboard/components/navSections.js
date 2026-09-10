@@ -23,6 +23,7 @@ import {
   BarChart3, HeartHandshake, Package, Truck, FileText,
   Gift, Route, Tags, HandHeart, Boxes, ReceiptText,
   PackageOpen, PackageCheck, FlaskConical, ClipboardCheck, HandCoins,
+  ScrollText,
 } from 'lucide-react';
 import { STAFF, ADMIN, VOLUNTEERS, PACKING } from '../../../routes/paths';
 
@@ -124,6 +125,7 @@ const MANAGER_SECTIONS = [
   {
     label: 'Insights',
     items: [
+      { to: STAFF.stockLedger, label: 'Stock Ledger', icon: ScrollText },
       { to: STAFF.reporting, label: 'Reporting', icon: BarChart3 },
       { to: STAFF.impactReport, label: 'Impact Report', icon: HeartHandshake },
     ],

@@ -113,6 +113,27 @@ const adjustStock = async (client, { productId, quantityDelta, unit = null, move
   return { before, after, isShortfall: after < 0, isUnitMismatch };
 };
 
+// ── Which movement type is a manual adjustment? ───────────────
+// The adjustment screen offers a fixed reason list, and three of its
+// entries describe stock that spoiled rather than stock that was
+// mis-counted. Filing those as 'adjustment' left the ledger unable to
+// answer "how much did we lose?" — the wastage reporting dimension
+// could only ever return zero, because decanting was the sole writer
+// of that type and it wasn't writing either.
+//
+// Matched on the exact strings in AdjustStockModal.jsx's REASONS.
+// A reason added there and not here degrades to 'adjustment', which
+// is the safe direction: it under-reports wastage rather than
+// inventing it.
+const WASTAGE_REASONS = new Set([
+  'Damaged / spoiled',
+  'Expired',
+  'Spillage',
+]);
+
+const movementTypeForReason = (reason) =>
+  WASTAGE_REASONS.has(String(reason || '').trim()) ? 'wastage' : 'adjustment';
+
 // ── Manual adjustment ─────────────────────────────────────────
 // Entry point for the inventory management screen. Opens its own
 // transaction — unlike adjustStock, this isn't nested inside another
@@ -130,7 +151,10 @@ const manualAdjust = async ({ productId, quantityDelta, unit, reason, performedB
     if (!productCheck.rows[0]) { await client.query('ROLLBACK'); return { productNotFound: true }; }
 
     const outcome = await adjustStock(client, {
-      productId, quantityDelta, unit, movementType: 'adjustment', referenceType: 'manual_adjustment', reason, performedBy,
+      productId, quantityDelta, unit,
+      movementType:  movementTypeForReason(reason),
+      referenceType: 'manual_adjustment',
+      reason, performedBy,
     });
 
     await client.query('COMMIT');
@@ -206,4 +230,200 @@ const getMovements = async (productId) => {
   return result.rows;
 };
 
-export default { adjustStock, manualAdjust, getManifest, getMovements };
+// ── The ledger, warehouse-wide ─────────────────────────────────
+//
+// getMovements above answers "what happened to this product". This
+// answers "what happened", which is the manager's question, and it is
+// the only place the ledger can be read without first knowing which
+// product you care about.
+//
+// RUNNING BALANCE
+// balance_after is computed in a CTE over the UNFILTERED table and
+// filtered afterwards. That ordering is the whole point: a window
+// function only sees the rows that survive the WHERE clause, so
+// computing it after filtering would show a "balance" that counted
+// only the movements you happened to be looking at — a number that
+// looks authoritative and is wrong. Filtering to wastage-only would
+// have shown rice's balance walking down from -10.
+//
+// The CTE scans every movement on every call. At this warehouse's
+// volume that is a few thousand rows and costs nothing measurable.
+// If stock_movements ever reaches the point where it does, the fix is
+// a materialised balance column maintained by adjustStock — not
+// moving the window inside the filter.
+//
+// PAGINATION IS KEYSET, NOT OFFSET
+// (created_at, id) as a row comparison, matching the ORDER BY exactly.
+// OFFSET on an append-only table shifts every page boundary as soon as
+// one movement is written mid-browse, which silently duplicates and
+// skips rows.
+const LEDGER_CTE = `
+  WITH walked AS (
+    SELECT sm.id, sm.product_id, sm.quantity, sm.unit, sm.movement_type,
+           sm.reference_type, sm.reference_id, sm.reason,
+           sm.performed_by, sm.created_at,
+           SUM(sm.quantity) OVER (PARTITION BY sm.product_id
+                                  ORDER BY sm.created_at, sm.id
+                                  ROWS UNBOUNDED PRECEDING) AS balance_after
+    FROM stock_movements sm
+  )`;
+
+// Shared by the page query and the summary so the two can never
+// disagree about what the manager is looking at. SAST, not UTC:
+// Render's clock is UTC, so a movement recorded at 01:00 in Cape Town
+// falls on the previous calendar day and drops out of "today".
+const ledgerWhere = (filters, params, alias) => {
+  const where = [];
+  const { from, to, productId, movementTypes, performedBy, referenceType } = filters;
+
+  if (from) {
+    params.push(from);
+    where.push(`(${alias}.created_at AT TIME ZONE 'Africa/Johannesburg')::date >= $${params.length}::date`);
+  }
+  if (to) {
+    params.push(to);
+    where.push(`(${alias}.created_at AT TIME ZONE 'Africa/Johannesburg')::date <= $${params.length}::date`);
+  }
+  if (productId) {
+    params.push(productId);
+    where.push(`${alias}.product_id = $${params.length}`);
+  }
+  if (movementTypes && movementTypes.length) {
+    params.push(movementTypes);
+    where.push(`${alias}.movement_type = ANY($${params.length}::text[])`);
+  }
+  if (performedBy) {
+    params.push(performedBy);
+    where.push(`${alias}.performed_by = $${params.length}`);
+  }
+  if (referenceType) {
+    params.push(referenceType);
+    where.push(`${alias}.reference_type = $${params.length}`);
+  }
+  return where;
+};
+
+// One extra row is requested beyond the caller's limit. If it comes
+// back there is another page; it is dropped before returning, so the
+// caller never sees it. Cheaper and more honest than a COUNT(*) over
+// the whole table on every request.
+const getLedger = async ({ limit = 50, cursor = null, ...filters } = {}) => {
+  const params = [];
+  const where  = ledgerWhere(filters, params, 'w');
+
+  if (cursor) {
+    params.push(cursor.createdAt);
+    params.push(cursor.id);
+    where.push(`(w.created_at, w.id) < ($${params.length - 1}::timestamptz, $${params.length}::int)`);
+  }
+
+  params.push(limit + 1);
+
+  const result = await pool.query(
+    `${LEDGER_CTE}
+     SELECT w.id, w.product_id, w.quantity, w.unit, w.movement_type,
+            w.reference_type, w.reference_id, w.reason, w.created_at,
+            w.balance_after,
+            p.name               AS product_name,
+            p.stock_keeping_unit AS sku,
+            u.first_name         AS performed_by_name
+     FROM walked w
+     JOIN products p       ON p.id = w.product_id
+     LEFT JOIN users u     ON u.id = w.performed_by
+     ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+     ORDER BY w.created_at DESC, w.id DESC
+     LIMIT $${params.length}`,
+    params,
+  );
+
+  const rows    = result.rows;
+  const hasMore = rows.length > limit;
+  const page    = hasMore ? rows.slice(0, limit) : rows;
+  const last    = page[page.length - 1];
+
+  return {
+    rows: page,
+    nextCursor: hasMore && last
+      ? { createdAt: last.created_at, id: last.id }
+      : null,
+  };
+};
+
+// The same filters, aggregated. Reads stock_movements directly rather
+// than the CTE — the running balance is irrelevant to a total, and
+// there is no reason to walk every product's history to add up a
+// column.
+const getLedgerSummary = async (filters = {}) => {
+  const params = [];
+  const where  = ledgerWhere(filters, params, 'sm');
+
+  const result = await pool.query(
+    `SELECT
+       COALESCE(SUM(sm.quantity) FILTER (WHERE sm.quantity > 0), 0)::numeric AS total_in,
+       COALESCE(SUM(sm.quantity) FILTER (WHERE sm.quantity < 0), 0)::numeric AS total_out,
+       COALESCE(SUM(sm.quantity), 0)::numeric                                AS net_change,
+       COUNT(*)::int                                                         AS movement_count,
+       COUNT(DISTINCT sm.product_id)::int                                    AS product_count
+     FROM stock_movements sm
+     ${where.length ? `WHERE ${where.join(' AND ')}` : ''}`,
+    params,
+  );
+  return result.rows[0];
+};
+
+// ── Does the balance still equal the ledger? ───────────────────
+// quantity_on_hand is maintained by adjustStock, which writes a
+// movement in the same transaction — so for every product the two
+// must agree, and a non-zero variance means something wrote the
+// balance without writing the ledger.
+//
+// That is not hypothetical: donation intake did exactly that until
+// script 14 (INSERT ... ON CONFLICT straight into stock_levels, no
+// movement row, no row lock). This query is how you would have found
+// it, and how you find the next one.
+//
+// Products with no movements and no balance are excluded — a catalog
+// entry nothing has ever happened to is not a discrepancy.
+const getReconciliation = async () => {
+  const result = await pool.query(
+    `SELECT
+       p.id,
+       p.name,
+       p.stock_keeping_unit                        AS sku,
+       COALESCE(sl.unit, '')                       AS unit,
+       COALESCE(sl.quantity_on_hand, 0)::numeric   AS balance,
+       COALESCE(m.ledger_sum, 0)::numeric          AS ledger_sum,
+       COALESCE(m.movement_count, 0)::int          AS movement_count,
+       (COALESCE(sl.quantity_on_hand, 0) - COALESCE(m.ledger_sum, 0))::numeric AS variance
+     FROM products p
+     LEFT JOIN stock_levels sl ON sl.product_id = p.id
+     LEFT JOIN (
+       SELECT product_id,
+              SUM(quantity)  AS ledger_sum,
+              COUNT(*)       AS movement_count
+       FROM stock_movements
+       GROUP BY product_id
+     ) m ON m.product_id = p.id
+     WHERE p.is_active = true
+       AND (sl.product_id IS NOT NULL OR m.product_id IS NOT NULL)
+     ORDER BY ABS(COALESCE(sl.quantity_on_hand, 0) - COALESCE(m.ledger_sum, 0)) DESC,
+              p.name ASC`,
+  );
+  return result.rows;
+};
+
+// ── Who has moved stock, for the ledger's actor filter ─────────
+const getLedgerActors = async () => {
+  const result = await pool.query(
+    `SELECT DISTINCT u.id, u.first_name AS name
+     FROM stock_movements sm
+     JOIN users u ON u.id = sm.performed_by
+     ORDER BY u.first_name ASC`,
+  );
+  return result.rows;
+};
+
+export default {
+  adjustStock, manualAdjust, getManifest, getMovements,
+  getLedger, getLedgerSummary, getReconciliation, getLedgerActors,
+};

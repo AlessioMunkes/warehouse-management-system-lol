@@ -90,4 +90,91 @@ export const adjustStock = async ({ productId, quantityDelta, unit, reason }) =>
   return body.data;
 };
 
-export default { getManifest, getMovements, adjustStock };
+// ── Ledger row ────────────────────────────────────────────────
+// balanceAfter is that product's running balance immediately after
+// this movement, computed server-side over its full history — it is
+// NOT affected by the filters in the UI, and must not be recomputed
+// here from the visible rows.
+const toLedgerRow = (row) => ({
+  id:              row.id,
+  productId:       row.product_id,
+  productName:     row.product_name,
+  sku:             row.sku,
+  quantity:        Number(row.quantity ?? 0),
+  balanceAfter:    Number(row.balance_after ?? 0),
+  unit:            row.unit || "",
+  movementType:    row.movement_type,
+  referenceType:   row.reference_type,
+  referenceId:     row.reference_id,
+  reason:          row.reason,
+  performedByName: row.performed_by_name || "Unknown",
+  createdAt:       row.created_at,
+});
+
+const toReconciliationRow = (row) => ({
+  id:            row.id,
+  name:          row.name,
+  sku:           row.sku,
+  unit:          row.unit || "",
+  balance:       Number(row.balance ?? 0),
+  ledgerSum:     Number(row.ledger_sum ?? 0),
+  variance:      Number(row.variance ?? 0),
+  movementCount: Number(row.movement_count ?? 0),
+});
+
+// ── GET /api/stock/ledger ─────────────────────────────────────
+// Filters are omitted from the query string when empty rather than
+// sent as "", because the server treats an empty string as absent but
+// there is no reason to make it prove that on every request.
+export const getLedger = async ({
+  from, to, productId, performedBy, movementTypes, referenceType, limit, cursor,
+} = {}) => {
+  const params = new URLSearchParams();
+  if (from)          params.set("from", from);
+  if (to)            params.set("to", to);
+  if (productId)     params.set("productId", String(productId));
+  if (performedBy)   params.set("performedBy", String(performedBy));
+  if (referenceType) params.set("referenceType", referenceType);
+  if (limit)         params.set("limit", String(limit));
+  if (cursor)        params.set("cursor", cursor);
+  if (movementTypes && movementTypes.length) {
+    params.set("movementType", movementTypes.join(","));
+  }
+
+  const qs   = params.toString();
+  const body = await apiGet(`/api/stock/ledger${qs ? `?${qs}` : ""}`);
+  const data = body.data ?? {};
+
+  return {
+    movements:  (data.movements ?? []).map(toLedgerRow),
+    nextCursor: data.nextCursor ?? null,
+    summary: {
+      totalIn:       Number(data.summary?.total_in ?? 0),
+      totalOut:      Number(data.summary?.total_out ?? 0),
+      netChange:     Number(data.summary?.net_change ?? 0),
+      movementCount: Number(data.summary?.movement_count ?? 0),
+      productCount:  Number(data.summary?.product_count ?? 0),
+    },
+  };
+};
+
+// ── GET /api/stock/ledger/reconciliation ──────────────────────
+export const getReconciliation = async () => {
+  const body = await apiGet("/api/stock/ledger/reconciliation");
+  const data = body.data ?? {};
+  return {
+    products:  (data.products ?? []).map(toReconciliationRow),
+    variances: (data.variances ?? []).map(toReconciliationRow),
+  };
+};
+
+// ── GET /api/stock/ledger/actors ──────────────────────────────
+export const getLedgerActors = async () => {
+  const body = await apiGet("/api/stock/ledger/actors");
+  return (body.data ?? []).map((r) => ({ id: r.id, name: r.name || "Unknown" }));
+};
+
+export default {
+  getManifest, getMovements, adjustStock,
+  getLedger, getReconciliation, getLedgerActors,
+};

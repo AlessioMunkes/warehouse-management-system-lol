@@ -32,6 +32,7 @@
 // one.
 // ─────────────────────────────────────────────────────────────
 import deliveryModel from '../repositories/delivery.repository.js';
+import { isStorageArea } from '../constants/storageAreas.js';
 import { isValidDateString, isPositiveInt, isUuid } from '../utils/validation.js';
 import { isOpenPurchaseOrder, CLOSED_PO_STATUSES } from '../constants/purchaseOrderStatus.js';
 import { DELIVERY_SORTS, SORT_DIRECTIONS } from '../constants/receiptSort.js';
@@ -268,6 +269,36 @@ const createDelivery = async (data, userId) => {
     }
     if (variance !== 0) hasDiscrepancy = true;
 
+    // ── BR-07: every item gets a put-away location ─────────────
+    // Checked after the quantity and discrepancy rules above so that a
+    // line failing for a more specific reason still says so. The
+    // screen has always sent this; until migration 018 the server
+    // dropped it, which is why the rule was never actually enforced.
+    const storageArea = String(line.location || '').trim();
+    if (!storageArea) {
+      fail(400, `A put-away location is required for ${po.product_name}.`);
+    }
+    if (!isStorageArea(storageArea)) {
+      fail(400, `"${storageArea}" is not a storage area in this warehouse.`);
+    }
+
+    // ── BR-06: FEFO needs a date to sort on ────────────────────
+    // Only perishables carry one — dry goods are picked oldest-first
+    // and have nothing to record. A date is stored as sent; no
+    // timezone conversion, because a use-by date is a calendar date
+    // rather than an instant.
+    let expiryDate = null;
+    if (po.is_perishable) {
+      const raw = String(line.expiryDate || '').trim();
+      if (!raw) {
+        fail(400, `A use-by date is required for ${po.product_name} — it is a perishable product.`);
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(raw) || Number.isNaN(Date.parse(raw))) {
+        fail(400, `Use-by date for ${po.product_name} must be a calendar date (YYYY-MM-DD).`);
+      }
+      expiryDate = raw;
+    }
+
     resolved.push({
       productId:           po.product_id,
       purchaseOrderItemId: po.purchase_order_item_id,
@@ -277,6 +308,8 @@ const createDelivery = async (data, userId) => {
       acceptedQuantity:    accepted,   // what goes into stock
       unit:                po.default_unit,
       discrepancyReason:   variance === 0 ? null : String(line.discrepancyReason).trim(),
+      storageArea,                     // BR-07
+      expiryDate,                      // BR-06 — null unless perishable
     });
   }
 

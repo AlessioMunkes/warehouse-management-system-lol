@@ -19,6 +19,7 @@ import StaffDispatchHistoryPage                    from './pages/StaffDispatchHi
 import ReceiptsPage                                from './pages/ReceiptsPage';
 import InventoryManagementPage                     from './pages/InventoryManagementPage';
 import ManagerDashboardPage                         from './pages/ManagerDashboardPage';
+import StockLedgerPage                               from './pages/StockLedgerPage';
 import AdminActivityScreen                         from './pages/AdminActivityScreen';
 import TaskDashboard from './pages/TaskDashboardPage';
 import SupplierDirectoryPage                       from './pages/SupplierDirectoryPage';
@@ -97,6 +98,11 @@ const App = () => (
         <Route element={<ProtectedRoute roles={['manager', 'admin']} shell />}>
           <Route path="/manager"       element={<ManagerDashboardPage />} />
         <Route path="/noc/inventory" element={<InventoryManagementPage />} />
+          {/* The warehouse-wide ledger. Manager/admin only, matching
+              requireRole(MANAGERS_UP) on all three /api/stock/ledger
+              routes — warehouse staff reach movement history through
+              the per-product drawer on the inventory screen. */}
+          <Route path={STAFF.stockLedger} element={<StockLedgerPage />} />
           <Route path={STAFF.reporting} element={<ReportingPage />} />
           <Route path={STAFF.impactReport} element={<ImpactReportPage />} />
           <Route path={STAFF.purchaseOrders} element={<PurchaseOrdersPage />} />

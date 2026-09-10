@@ -24,12 +24,21 @@ import { Badge } from "@/components/ui/badge";
 // Import custom CSS
 import "../../../styles/index.css"; // Adjust path to match your folder structure
 
+// Keys are the values the database actually stores — the
+// movement_type CHECK constraint, mirrored in reportCatalog.js's
+// MOVEMENT_TYPES. Three of these were previously singular forms
+// ('receipt', 'pick', 'decant') that no row could ever match, and
+// 'donated' and 'dispatched' were missing entirely, so the drawer
+// fell through to `?? m.movementType` and showed managers the raw
+// enum value on every real row.
 const TYPE_LABEL = {
   adjustment: "Manual adjustment",
-  receipt: "Goods received",
-  pick: "Picked for dispatch",
-  decant: "Decanting",
-  wastage: "Wastage",
+  decanted:   "Decanting",
+  dispatched: "Dispatched to beneficiary",
+  donated:    "Donation received",
+  picked:     "Picked for dispatch",
+  received:   "Goods received",
+  wastage:    "Wastage",
 };
 
 const formatWhen = (iso) => {
