@@ -28,7 +28,9 @@ const PRODUCT_ID = 5;
 const existingProduct = (over = {}) => ({
   id: PRODUCT_ID, name: 'Maize meal 10kg', sku: 'MM-10KG',
   weight_kg: 10, default_unit: 'bag', category: 'Dry goods',
-  is_perishable: false, is_active: true, ...over,
+  is_perishable: false, is_active: true,
+  storage_type: 'dry', default_location_id: null,
+  reorder_threshold: 0, ledger_unit: 'bag', ...over,
 });
 
 const body = (over = {}) => ({
@@ -144,6 +146,33 @@ describe('createProduct', () => {
     repoMock.createProduct.mockRejectedValue(Object.assign(new Error('dup'), { code: '23505' }));
     await expect(productService.createProduct(body())).rejects.toMatchObject({ status: 409 });
   });
+
+  // Regression test for a live 500: before unit validation was added,
+  // defaultUnit: 'pallet' reached the INSERT unvalidated, hit
+  // stock_levels_unit_check as a 23514, and product.controller.js's
+  // respondError saw no err.status and returned a bare 500 with no
+  // indication of what was actually wrong.
+  it('rejects a unit outside STOCK_UNITS with a clean 400', async () => {
+    await expect(productService.createProduct(body({ defaultUnit: 'pallet' })))
+      .rejects.toMatchObject({ status: 400 });
+  });
+
+  it('rejects a storage type outside dry/cold', async () => {
+    await expect(productService.createProduct(body({ storageType: 'frozen' })))
+      .rejects.toMatchObject({ status: 400 });
+  });
+
+  it('keeps a zero reorder threshold as a real zero, not null', async () => {
+    await productService.createProduct(body({ reorderThreshold: 0 }));
+    expect(repoMock.createProduct).toHaveBeenCalledWith(
+      expect.objectContaining({ reorderThreshold: 0 })
+    );
+  });
+
+  it('maps a repo 23503 (storage location FK) to a clean 400', async () => {
+    repoMock.createProduct.mockRejectedValue(Object.assign(new Error('fk'), { code: '23503' }));
+    await expect(productService.createProduct(body())).rejects.toMatchObject({ status: 400 });
+  });
 });
 
 describe('updateProduct — partial patch semantics', () => {
@@ -189,6 +218,22 @@ describe('updateProduct — partial patch semantics', () => {
   it('rejects a blank name rather than clearing it', async () => {
     await expect(productService.updateProduct(PRODUCT_ID, { name: '   ' }))
       .rejects.toMatchObject({ status: 400 });
+  });
+
+  // Direct regression guard: this is the test that proves a name-only
+  // patch was rebuilt on top of Alessio's partial-patch fix rather than
+  // over it. Asserting the full shape (not just that name is present)
+  // catches a patch that quietly forwards other keys alongside it.
+  it('forwards an object with EXACTLY one key on a name-only patch', async () => {
+    await productService.updateProduct(PRODUCT_ID, { name: 'Renamed Product' });
+    const [, patchArg] = repoMock.updateProduct.mock.calls[0];
+    expect(Object.keys(patchArg)).toEqual(['name']);
+    expect(patchArg).toEqual({ name: 'Renamed Product' });
+  });
+
+  it('lets defaultLocationId: null clear the location — present-but-null differs from absent', async () => {
+    await productService.updateProduct(PRODUCT_ID, { defaultLocationId: null });
+    expect(repoMock.updateProduct).toHaveBeenCalledWith(PRODUCT_ID, { defaultLocationId: null });
   });
 });
 

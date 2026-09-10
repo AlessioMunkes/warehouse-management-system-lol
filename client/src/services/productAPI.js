@@ -13,16 +13,49 @@
 // ─────────────────────────────────────────────────────────────
 import { apiGet, apiPost, apiPatch } from "./api";
 
+// The nine values stock_levels_unit_check and stock_movements_unit_check
+// allow. Anything outside this list is a constraint violation, not a
+// validation message, so the form offers a dropdown rather than a text
+// box. Kept beside the row mapper because this is the module that owns
+// the product contract on the client.
+//
+// Server-side twin: STOCK_UNITS in server/src/utils/validation.js.
+// DonationItemsList.jsx has a third hand-copied version of the same
+// nine values; folding it in belongs with a change that touches the
+// donation feature.
+export const STOCK_UNITS = ["kg", "g", "l", "ml", "each", "bag", "box", "crate", "punnet"];
+
+// reorder_threshold is NUMERIC, which node-postgres serialises as a
+// STRING — without the cast, "20" > 15 compares as text and the field
+// renders fine while every comparison built on it is wrong. Same
+// reasoning as the casts in stockAPI.js.
+//
+// There is deliberately no quantity here. This screen is master data;
+// on-hand figures come from the inventory manifest, which reports
+// available (on hand - committed) so it agrees with the packing check
+// and the dispatch gate.
 export const toProduct = (row) => ({
-  id:           row.id,
-  name:         row.name,
-  sku:          row.sku ?? "",
-  defaultUnit:  row.default_unit ?? "",
-  weightKg:     row.weight_kg === null || row.weight_kg === undefined ? null : Number(row.weight_kg),
-  category:     row.category ?? "",
-  isPerishable: Boolean(row.is_perishable),
-  isActive:     Boolean(row.is_active),
-  createdAt:    row.created_at ?? null,
+  id:               row.id,
+  name:             row.name,
+  sku:              row.sku ?? "",
+  defaultUnit:      row.default_unit ?? "",
+  weightKg:         row.weight_kg === null || row.weight_kg === undefined ? null : Number(row.weight_kg),
+  category:         row.category ?? "",
+  storageType:      row.storage_type ?? "",
+  // Nullable FK to storage_locations — null means "not assigned", not
+  // "unknown", so this deliberately does NOT fall back to "" the way
+  // the string fields above do. An empty string sent back as a patch
+  // value would round-trip through parseLocationId as "clear it",
+  // which is only correct if that's what was actually intended.
+  defaultLocationId: row.default_location_id ?? null,
+  isPerishable:     Boolean(row.is_perishable),
+  reorderThreshold: Number(row.reorder_threshold ?? 0),
+  // What the ledger has actually been accumulating in. Normally equal
+  // to defaultUnit; a difference means a product moved before the
+  // catalogue set its unit, and the two need reconciling by hand.
+  ledgerUnit:       row.ledger_unit ?? "",
+  isActive:         Boolean(row.is_active),
+  createdAt:        row.created_at ?? null,
 });
 
 export const getProducts = async ({ includeInactive = false, search = "" } = {}) => {
@@ -56,4 +89,5 @@ export const setProductStatus = async (id, isActive) => {
 
 export default {
   getProducts, getProduct, createProduct, updateProduct, setProductStatus,
+  STOCK_UNITS,
 };

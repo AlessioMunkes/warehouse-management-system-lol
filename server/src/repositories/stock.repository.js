@@ -206,4 +206,54 @@ const getMovements = async (productId) => {
   return result.rows;
 };
 
-export default { adjustStock, manualAdjust, getManifest, getMovements };
+// ── Stock metadata — unit and reorder threshold ────────────────
+// The catalogue's write path into stock_levels. It lives here rather
+// than in product.repository.js for the same reason adjustStock does:
+// every statement that touches stock_levels or stock_movements is in
+// this file, so there is one place to look when the numbers are wrong.
+// product.repository.js calls it with its own transaction client, the
+// way delivery.repository.js and picking.repository.js call adjustStock.
+//
+// THIS IS NOT A STOCK MOVEMENT.
+// It changes what the balance is measured in and when to reorder it —
+// never the balance itself. quantity_on_hand is untouched on both
+// branches below, and nothing is written to stock_movements: a
+// zero-quantity ledger row to record a threshold edit would be noise
+// in the one table that is supposed to reconcile against the balance.
+// Quantities still change only through adjustStock.
+//
+// TWO UNIT ARGUMENTS, ON PURPOSE.
+// stock_levels.unit is NOT NULL and a product may have no row yet, so
+// creating one needs a unit whether or not the caller is changing it —
+// that is `seedUnit`, used only by the INSERT. `unit` is the separate
+// "change it to this" instruction, used only by the UPDATE. Collapsing
+// them into one argument means editing a reorder threshold quietly
+// rewrites the unit the ledger has been accumulating in, which is
+// exactly the silent drift adjustStock's isUnitMismatch exists to
+// catch. Pass unit: null to leave it alone.
+//
+// Callers must validate both units against STOCK_UNITS first —
+// stock_levels_unit_check allows nine values and rejects the rest as a
+// 23514 mid-transaction.
+const setStockMeta = async (client, { productId, seedUnit, unit = null, reorderThreshold = null }) => {
+  if (!client) {
+    throw new Error('setStockMeta requires the caller\'s transaction client.');
+  }
+  if (!seedUnit) {
+    throw new Error('setStockMeta requires a seed unit — stock_levels.unit is NOT NULL.');
+  }
+
+  const { rows } = await client.query(
+    `INSERT INTO stock_levels (product_id, quantity_on_hand, unit, reorder_threshold, updated_at)
+     VALUES ($1, 0, $2, COALESCE($3::numeric, 0), NOW())
+     ON CONFLICT (product_id) DO UPDATE
+       SET unit              = COALESCE($4::varchar, stock_levels.unit),
+           reorder_threshold = COALESCE($3::numeric, stock_levels.reorder_threshold),
+           updated_at        = NOW()
+     RETURNING product_id, quantity_on_hand, unit, reorder_threshold, updated_at`,
+    [productId, seedUnit, reorderThreshold, unit]
+  );
+  return rows[0];
+};
+
+export default { adjustStock, manualAdjust, getManifest, getMovements, setStockMeta };
