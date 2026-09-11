@@ -53,6 +53,30 @@ const toProduct = (row) => ({
   isShortfall: Boolean(row.is_shortfall),
   isLowStock:  Boolean(row.is_low_stock),
   updatedAt:   row.updated_at ?? null,
+
+  // Catalogue fields, for the summary panel. Not rendered as columns —
+  // the table is already full — but they are why the panel can stand
+  // in for the Products screen.
+  //
+  // defaultUnit is what the catalogue says this product is counted in;
+  // `unit` above is what the ledger has actually been accumulating.
+  // They are normally equal, and a difference is worth seeing rather
+  // than papering over, so both are kept.
+  category:     row.category ?? "",
+  storageType:  row.storage_type ?? "",
+  isPerishable: row.is_perishable === undefined ? undefined : Boolean(row.is_perishable),
+  // NUMERIC over the wire is a string. Number(null) is 0, and a weight
+  // nobody recorded is not zero — same guard as expectedLeadTimeDays.
+  weightKg:     row.weight_kg === null || row.weight_kg === undefined
+                  ? null
+                  : Number(row.weight_kg),
+  defaultUnit:  row.default_unit ?? "",
+  // Read by the purchase-order form to fill a line's cost. Null means
+  // nobody has priced it, and the form leaves the cost blank rather
+  // than writing a confident zero onto an order.
+  unitCost:     row.unit_cost === null || row.unit_cost === undefined
+                  ? null
+                  : Number(row.unit_cost),
 });
 
 const toMovement = (row) => ({

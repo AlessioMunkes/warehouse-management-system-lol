@@ -38,8 +38,12 @@
 // explains why.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
+import useListSearch from '../../staff/hooks/useListSearch';
+import ListTools, { FilterSegments, NoMatches } from '../../staff/components/ListTools';
 import dispatchAPI from '../../../services/dispatchAPI';
 import { Notice } from '../../staff/components/StepPrimitives';
+import Paged from '../../staff/components/Paged';
+import usePaged from '../../staff/hooks/usePaged';
 
 // The four states a row can be in, and how each reads on the floor.
 // Kept as one table so the label, the styling and the "can you open
@@ -86,6 +90,17 @@ const STATE = {
 
 const stateOf = (row) => STATE[row.dispatch_status] || STATE.awaiting;
 
+// Centre, pallet reference, driver and cohort in one haystack. At a
+// gate the thing a worker has been told is usually one of those and
+// never reliably the same one — a driver says a name, a note says a
+// pallet number.
+//
+// Module level, so its identity is stable and useListSearch's memo
+// does not recompute on every keystroke of an unrelated render.
+const searchText = (row) => [
+  row.ecd_name, row.pallet_ref, row.driver_name, row.cohort,
+].filter(Boolean).join(' ');
+
 // Time formatted for a glance, not a report.
 const timeOf = (value) => {
   if (!value) return null;
@@ -125,6 +140,21 @@ export default function GateQueue({ onOpenPallet }) {
   const done    = rows.filter((r) => ['collected', 'late_collected'].includes(r.dispatch_status));
   const waiting = rows.filter((r) => stateOf(r).openable);
 
+  const search = useListSearch(rows, searchText);
+  const [only, setOnly] = useState('all');
+
+  const visible = search.filtered.filter((row) => {
+    if (only === 'waiting') return stateOf(row).openable;
+    if (only === 'done') return ['collected', 'late_collected'].includes(row.dispatch_status);
+    return true;
+  });
+
+  // Paged over what is actually on screen. The summary line above
+  // still counts the whole board on purpose — "3 of 9 collected" is a
+  // fact about the day, and it should not change because someone
+  // typed in the search box.
+  const paged = usePaged(visible);
+
   const summary = rows.length === 0
     ? 'Nothing waiting for collection.'
     : `${done.length} of ${rows.length} collected · ${waiting.length} still waiting`;
@@ -138,13 +168,39 @@ export default function GateQueue({ onOpenPallet }) {
 
       {error ? <Notice tone="warn">{error}</Notice> : null}
 
+      {!loading && rows.length > 0 ? (
+        <ListTools
+          id="stf-gate-search"
+          query={search.query}
+          onQuery={search.setQuery}
+          placeholder="Search by centre, pallet or driver"
+        >
+          <FilterSegments
+            label="Show"
+            value={only}
+            onChange={setOnly}
+            options={[
+              { key: 'all',     label: 'All',       count: rows.length },
+              { key: 'waiting', label: 'Waiting',   count: waiting.length },
+              { key: 'done',    label: 'Collected', count: done.length },
+            ]}
+          />
+        </ListTools>
+      ) : null}
+
       {loading ? (
         <div className="stf-skeleton" aria-label="Loading" />
       ) : rows.length === 0 ? (
         <div className="stf-empty">No pallets are waiting for collection.</div>
+      ) : visible.length === 0 ? (
+        <NoMatches
+          query={search.query}
+          onClear={() => { search.setQuery(''); setOnly('all'); }}
+          noun="pallets"
+        />
       ) : (
         <div className="stf-list">
-          {rows.map((row) => {
+          {paged.slice.map((row) => {
             const state    = stateOf(row);
             const openable = state.openable;
             const at       = timeOf(row.collected_at);
@@ -204,6 +260,8 @@ export default function GateQueue({ onOpenPallet }) {
           })}
         </div>
       )}
+
+      <Paged {...paged} noun="pallets" />
     </section>
   );
 }

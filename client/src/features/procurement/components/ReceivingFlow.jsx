@@ -44,6 +44,10 @@ import TaskPage from '../../staff/components/TaskPage';
 import WorkList from '../../staff/components/WorkList';
 import { readDraft, writeDraft, clearDraft } from '../../staff/hooks/useDraft';
 import useCoachmark from '../../staff/hooks/useCoachmark';
+import useConfirmed from '../../staff/hooks/useConfirmed';
+import useUndo from '../../staff/hooks/useUndo';
+import useListSearch from '../../staff/hooks/useListSearch';
+import ListTools, { NoMatches } from '../../staff/components/ListTools';
 import receivingAPI from '../../../services/receivingAPI';
 import { newIdempotencyKey } from '../../../services/api';
 import { useAuth } from '../../../context/AuthContext';
@@ -120,6 +124,23 @@ const todayISO = () => {
 const longDate = (value) =>
   new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long' });
 
+// What an order search matches on. Module level so its identity is
+// stable and useListSearch's memo is not defeated by a new function
+// on every render.
+//
+// Both date forms are in the haystack deliberately: a worker reading
+// a driver's note types "16 august", and a worker reading this screen
+// types "2026-08-16". "order" is in there so that "order 86" works as
+// typed, rather than only the bare number.
+const orderText = (order) => [
+  'order',
+  order.id,
+  order.supplier_name,
+  order.status,
+  order.expected_delivery_date,
+  order.expected_delivery_date ? longDate(order.expected_delivery_date) : '',
+].filter(Boolean).join(' ');
+
 export default function ReceivingFlow({ onCrumbChange }) {
   const { user } = useAuth();
   const [phase, setPhase] = useState('which');
@@ -127,23 +148,59 @@ export default function ReceivingFlow({ onCrumbChange }) {
   const [focusId, setFocusId] = useState(null);
   const { show: showCoachmark, dismiss: dismissCoachmark } = useCoachmark('receiving-view-toggle');
 
+  const {
+    ids: confirmedIds, toggle: toggleConfirmed,
+    confirmAll: confirmAllLines, reset: resetConfirmed,
+  } = useConfirmed();
+  const acceptUndo = useUndo();
+
   const [suppliers, setSuppliers] = useState([]);
   // Narrower than `suppliers` — only those with an approved order.
   const [openSuppliers, setOpenSuppliers] = useState([]);
   const [deliveryDate, setDeliveryDate] = useState(todayISO);
   const [signature, setSignature] = useState(null);
   const [pdfDelivery, setPdfDelivery] = useState(null);
+  // True when the submit went to the device queue instead of the
+  // server. The done screen has to say so.
+  const [queued, setQueued] = useState(false);
 
-  // What the last fetch returned, keyed implicitly by supplierId. The
-  // list only means anything while a supplier is selected, so the
-  // "no supplier, no orders" case is derived rather than written back
-  // into state from the effect — clearing state synchronously inside
-  // an effect body triggers a cascading render.
-  const [fetchedOrders, setFetchedOrders] = useState([]);
+  // Every open order in the building, fetched once at mount.
+  //
+  // This replaced a per-supplier fetch that ran on every supplier tap.
+  // Two things fall out of holding the whole list instead: the screen
+  // can be searched by order number before anyone has chosen a
+  // supplier, and picking an order can set the supplier rather than
+  // the other way round.
+  const [openOrders, setOpenOrders] = useState([]);
   const [supplierId, setSupplierId] = useState('');
   const [orderId, setOrderId] = useState('');
 
-  const orders = supplierId ? fetchedOrders : [];
+  // The supplier picker is a filter over that list now, not the thing
+  // that fetches it.
+  const orders = supplierId
+    ? openOrders.filter((o) => String(o.supplier_id) === String(supplierId))
+    : openOrders;
+
+  const orderSearch = useListSearch(openOrders, orderText);
+
+  // A search by order number has to find the order whoever it came
+  // from, so a live query overrides the supplier filter rather than
+  // intersecting with it — otherwise typing the number off the note
+  // while the wrong supplier is selected returns nothing, which reads
+  // as "that order does not exist".
+  const visibleOrders = orderSearch.searching ? orderSearch.filtered : orders;
+
+  // Picking an order is also picking its supplier. The submit payload
+  // carries both and the server rejects a mismatch between them
+  // (delivery.repository.js checks purchase_orders.supplier_id against
+  // the body's supplierId), so a worker who found the order by number
+  // would otherwise submit with no supplier at all.
+  const selectOrder = (value) => {
+    setOrderId(value);
+    const found = openOrders.find((o) => String(o.id) === String(value));
+    if (found?.supplier_id) setSupplierId(found.supplier_id);
+  };
+
 
   // One entry per order line: what was expected, what was counted,
   // where it went, and the use-by date if it is fresh.
@@ -165,11 +222,18 @@ export default function ReceivingFlow({ onCrumbChange }) {
     let cancelled = false;
     (async () => {
       try {
-        const [list, openList] = await Promise.all([
+        const [list, openList, orderList] = await Promise.all([
           receivingAPI.getSuppliers(),
           receivingAPI.getSuppliersWithOpenOrders(),
+          // No supplier argument: every open order, all suppliers. One
+          // call at mount instead of one per supplier tap.
+          receivingAPI.getPurchaseOrders(),
         ]);
-        if (!cancelled) { setSuppliers(list); setOpenSuppliers(openList); }
+        if (!cancelled) {
+          setSuppliers(list);
+          setOpenSuppliers(openList);
+          setOpenOrders(orderList);
+        }
       } catch (err) {
         if (!cancelled) setError(err.message);
       } finally {
@@ -179,23 +243,6 @@ export default function ReceivingFlow({ onCrumbChange }) {
     return () => { cancelled = true; };
   }, []);
 
-  // ── Supplier chosen, load its approved orders ───────────────
-  useEffect(() => {
-    if (!supplierId) return undefined;
-    let cancelled = false;
-    (async () => {
-      setError(null);
-      try {
-        const list = await receivingAPI.getPurchaseOrders(supplierId);
-        if (!cancelled) setFetchedOrders(list);
-      } catch (err) {
-        // A supplier with no approved order is a normal state that has
-        // an explanation, not a failure.
-        if (!cancelled) { setFetchedOrders([]); setError(err.message); }
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [supplierId]);
 
   useEffect(() => { onCrumbChange?.(step.label); }, [step.label, onCrumbChange]);
 
@@ -242,6 +289,8 @@ export default function ReceivingFlow({ onCrumbChange }) {
   const startCounting = async (poId) => {
     setSaving(true);
     setError(null);
+    // A different order is a different job; nothing on it is ticked.
+    resetConfirmed();
     try {
       const items = await receivingAPI.getPurchaseOrderItems(poId);
       const draft = readDraft(`receiving-${poId}`);
@@ -284,22 +333,40 @@ export default function ReceivingFlow({ onCrumbChange }) {
       line.purchaseOrderItemId === itemId ? { ...line, ...patch } : line
     )));
 
-  const acceptAllAsOrdered = () =>
+  // Fills what is blank AND ticks every line — see the same note in
+  // PalletCheck.jsx. "Everything as ordered" is the confirmation.
+  const acceptAllAsOrdered = () => {
+    // See the same snapshot in PalletCheck.jsx.
+    const previousLines = lines;
+    const previousConfirmed = confirmedIds;
+    const filled = lines.filter((l) => l.counted === '').length;
+
     setLines((all) => all.map((line) => (
       line.counted === '' ? { ...line, counted: String(line.expected) } : line
     )));
+    confirmAllLines(lines.map((l) => l.purchaseOrderItemId));
 
-  const focusIndex = lines.findIndex((l) => l.purchaseOrderItemId === focusId);
-  const goToNextLine = () => {
-    const next = lines[focusIndex + 1];
-    setFocusId(next ? next.purchaseOrderItemId : null);
+    acceptUndo.propose(
+      `Took ${lines.length} ${lines.length === 1 ? 'line' : 'lines'} as ordered`
+        + (filled > 0 ? `, filling ${filled}` : ''),
+      () => { setLines(previousLines); confirmAllLines(previousConfirmed); },
+    );
   };
 
   // What is stopping the commit, said out loud rather than left for
   // someone to work out from a greyed button.
   const missingUseBy = lines.filter((l) => l.fresh && !l.useBy);
+  const unconfirmed = lines.length - lines.filter(
+    (l) => confirmedIds.some((id) => String(id) === String(l.purchaseOrderItemId))
+  ).length;
+
   const blockers = [];
   if (lines.some((l) => l.counted === '')) blockers.push('a count on every line');
+  // The tick, required. "Everything as ordered" ticks the lot, so the
+  // delivery that went exactly to plan is still one press.
+  if (unconfirmed > 0) {
+    blockers.push(`a tick on ${unconfirmed} more ${unconfirmed === 1 ? 'line' : 'lines'}`);
+  }
   if (missingUseBy.length) {
     blockers.push(`a use-by date on ${missingUseBy.length} fresh ${missingUseBy.length === 1 ? 'line' : 'lines'}`);
   }
@@ -341,6 +408,16 @@ export default function ReceivingFlow({ onCrumbChange }) {
       });
       setPhase('done');
       clearDraft(draftKey);
+
+      // Queued, not recorded. There is no delivery note to show
+      // because the server has not seen it yet — offering a PDF of a
+      // thing that has not happened is worse than offering nothing.
+      if (result?.queued) {
+        setQueued(true);
+        return;
+      }
+
+      setQueued(false);
       // recordDelivery's response already carries the full joined
       // record (supplier name, items, po_status).
       setPdfDelivery(result);
@@ -422,27 +499,53 @@ export default function ReceivingFlow({ onCrumbChange }) {
             <div className="stf-static-value">{receivedByName}</div>
           </div>
 
-          {supplierId && orders.length === 0 ? (
+          {/* The one search on this screen, and it is over the orders
+              rather than the suppliers: a driver's note has a number
+              on it, and the supplier list is four rows long. */}
+          <ListTools
+            id="stf-order-search"
+            query={orderSearch.query}
+            onQuery={orderSearch.setQuery}
+            placeholder="Search by order number, supplier or date"
+          />
+
+          {visibleOrders.length > 0 ? (
+            <ChoiceList
+              legend="Which order"
+              options={visibleOrders.map((o) => ({
+                value: o.id,
+                label: `Order ${o.id}`,
+                // The supplier is in the meta now that this list can
+                // span suppliers — "Order 86" alone is not enough to
+                // pick the right one.
+                meta: [
+                  o.supplier_name,
+                  o.expected_delivery_date
+                    ? `Due ${longDate(o.expected_delivery_date)}`
+                    : 'No due date given',
+                ].filter(Boolean).join(' · '),
+              }))}
+              value={orderId}
+              onChange={selectOrder}
+              onActivate={startCounting}
+            />
+          ) : orderSearch.searching ? (
+            <NoMatches
+              query={orderSearch.query}
+              onClear={() => orderSearch.setQuery('')}
+              noun="orders"
+            />
+          ) : supplierId ? (
             <Notice>
               There is no open order for {supplierName} today. Ask your manager to check the order
               before you sign anything in.
             </Notice>
-          ) : null}
-
-          {orders.length > 0 ? (
-            <ChoiceList
-              legend="Which order"
-              options={orders.map((o) => ({
-                value: o.id,
-                label: `Order ${o.id}`,
-                meta: o.expected_delivery_date
-                  ? `Due ${longDate(o.expected_delivery_date)}`
-                  : 'No due date given',
-              }))}
-              value={orderId}
-              onChange={setOrderId}
-            />
-          ) : null}
+          ) : (
+            <Notice>
+              There are no open orders to receive against right now. Ask your manager to approve
+              the order before you sign anything in.
+            </Notice>
+          )}
         </StepScreen>
       )}
 
@@ -457,9 +560,6 @@ export default function ReceivingFlow({ onCrumbChange }) {
               <Button disabled={saving || blockers.length > 0} onClick={finish}>
                 {saving ? 'Saving' : 'Finish this delivery'}
               </Button>
-              {mode === 'guided' && focusIndex >= 0 && focusIndex + 1 < lines.length ? (
-                <Button variant="secondary" onClick={goToNextLine}>Next item</Button>
-              ) : null}
               <Button variant="secondary" onClick={restart}>Start over</Button>
             </Actions>
           }
@@ -493,11 +593,17 @@ export default function ReceivingFlow({ onCrumbChange }) {
                 value:    line.counted,
               }))}
               expectedLabel="ordered"
+              guided={mode === 'guided'}
               focusId={mode === 'guided' ? focusId : null}
               onFocus={(id) => setFocusId(mode === 'guided' ? id : null)}
               onChange={(id, value) => patchLine(id, { counted: value })}
               onAcceptAll={acceptAllAsOrdered}
               acceptAllLabel="Everything as ordered"
+              confirmed={confirmedIds}
+              onConfirm={toggleConfirmed}
+              undo={acceptUndo.offer
+                ? { label: acceptUndo.offer.label, onUndo: acceptUndo.undo }
+                : null}
               renderDetail={(row) => {
                 const line = lines.find((l) => l.purchaseOrderItemId === row.id);
                 if (!line) return null;
@@ -572,8 +678,10 @@ export default function ReceivingFlow({ onCrumbChange }) {
       {/* ── Done ───────────────────────────────────────────── */}
       {phase === 'done' && (
         <StepScreen
-          title="Delivery received"
-          sub="The stock is on the system. You can put the next one in, or move on to packing."
+          title={queued ? 'Saved on this phone' : 'Delivery received'}
+          sub={queued
+            ? 'There was no signal, so this is waiting on your phone. It sends itself as soon as you are back in range — the bar at the top says when it has gone. Do not count it again.'
+            : 'The stock is on the system. You can put the next one in, or move on to packing.'}
           actions={
             <Actions>
               <Button onClick={restart}>Receive another delivery</Button>

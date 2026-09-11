@@ -23,6 +23,12 @@ import { useAuth }   from '../context/AuthContext';
 import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
 import UserForm      from '../features/users/components/UserForm';
 import userAPI        from '../services/userAPI';
+import ConfirmRemoveDialog from '../features/masterdata/components/ConfirmRemoveDialog';
+import useDetailFocus      from '../features/masterdata/hooks/useDetailFocus';
+import useTableView        from '../features/masterdata/hooks/useTableView';
+import MasterDataTable     from '../features/masterdata/components/MasterDataTable';
+import ColumnToggle        from '../features/masterdata/components/ColumnToggle';
+import FilterPills         from '../features/masterdata/components/FilterPills';
 
 import {
   InputGroup, InputGroupAddon, InputGroupInput,
@@ -35,13 +41,7 @@ import { Skeleton }  from '@/components/ui/skeleton';
 import {
   Card, CardContent, CardHeader, CardTitle,
 } from '@/components/ui/card';
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
-import {
-  Search, Plus, Pencil, Power, X,
-  ArrowUp, ArrowDown, ChevronsUpDown,
-} from 'lucide-react';
+import { Search, Plus, Pencil, Power, X, Trash2 } from 'lucide-react';
 
 const CAN_MANAGE = ['admin'];
 
@@ -65,15 +65,22 @@ const ROLE_FILTERS = ['warehouse_worker', 'manager', 'admin'];
 // inactive" is not an order anyone asked to sort by, and the server
 // already groups inactive users last.
 const COLUMNS = [
-  { key: 'name',     label: 'User',
-    sort: (u) => `${u.firstName} ${u.lastName}`.trim().toLowerCase() },
-  { key: 'username', label: 'Username',
-    sort: (u) => (u.username ?? '').toLowerCase() },
+  // alwaysOn: the name is what identifies the row, so it is not
+  // something the column toggle may switch off.
+  { key: 'name',     label: 'User', alwaysOn: true, weight: 3,
+    sort: (u) => `${u.firstName} ${u.lastName}`.trim().toLowerCase(),
+    cellClass: 'font-medium',
+    cell: (u) => `${u.firstName} ${u.lastName}` },
+  { key: 'username', label: 'Username', weight: 2.2, minWidth: 'sm',
+    sort: (u) => (u.username ?? '').toLowerCase(),
+    cell: (u) => u.username },
   // Sort by the label the user reads ("Worker"), not the raw enum
   // ("warehouse_worker") — otherwise the on-screen order looks wrong.
-  { key: 'role',     label: 'Role',
-    sort: (u) => (ROLE_LABELS[u.role] ?? u.role ?? '').toLowerCase() },
-  { key: 'status',   label: '', sort: null },
+  { key: 'role',     label: 'Role', weight: 1.6, minWidth: 'md',
+    sort: (u) => (ROLE_LABELS[u.role] ?? u.role ?? '').toLowerCase(),
+    cell: (u) => ROLE_LABELS[u.role] ?? u.role },
+  { key: 'status',   label: '', sort: null, alwaysOn: true, weight: 1.8,
+    cell: (u) => (!u.isActive ? <Badge variant="outline">Inactive</Badge> : null) },
 ];
 
 // Same markup as the global fetch error banner in
@@ -94,7 +101,7 @@ const ErrorBanner = ({ message, onRetry }) => (
 );
 
 // ── Detail panel ──────────────────────────────────────────────
-const UserDetail = ({ targetUser, canManage, isSelf, onEdit, onToggleActive, onClose }) => (
+const UserDetail = ({ targetUser, canManage, isSelf, onEdit, onToggleActive, onRemove, onClose }) => (
   <Card>
     <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
       <div>
@@ -126,11 +133,25 @@ const UserDetail = ({ targetUser, canManage, isSelf, onEdit, onToggleActive, onC
               user.service.js). Hiding the button here avoids a
               confusing 400 for something nobody should be able to
               attempt in the first place. */}
+          {/* Self-lockout applies to deletion too, and harder: nobody
+              can undo it, including the admin who just did it. The
+              server refuses it as well (user.service.js). */}
           {!isSelf ? (
-            <Button type="button" variant="outline" onClick={onToggleActive}>
-              <Power />
-              {targetUser.isActive ? 'Deactivate' : 'Reactivate'}
-            </Button>
+            <>
+              <Button type="button" variant="outline" onClick={onToggleActive}>
+                <Power />
+                {targetUser.isActive ? 'Deactivate' : 'Reactivate'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onRemove}
+                className="border-[#ef3a40] text-[#ef3a40] hover:bg-[#ef3a40] hover:text-white"
+              >
+                <Trash2 />
+                Delete
+              </Button>
+            </>
           ) : null}
         </div>
       ) : null}
@@ -153,22 +174,14 @@ export default function UserDirectoryPage() {
   // list — no server round-trip — so they compose with search and the
   // "Show inactive" toggle (which are server-side) for free.
   const [roleFilter, setRoleFilter] = useState(null);   // null = all roles
-  const [sort, setSort] = useState(null);               // { key, direction } | null
+  const view = useTableView('users', COLUMNS);
 
   const [isLoading, setIsLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
 
-  // 3-state, same as StockManifestTable: first click sorts desc,
-  // second asc, third clears back to the server's order (is_active
-  // DESC, then username ASC — see user.repository.js).
-  const toggleSort = (key) => {
-    setSort((prev) => {
-      if (!prev || prev.key !== key) return { key, direction: 'desc' };
-      if (prev.direction === 'desc') return { key, direction: 'asc' };
-      return null;
-    });
-  };
+  const [detailRef, focusDetail] = useDetailFocus();
 
   // Role filter narrows first, then sort orders whatever is left — the
   // two compose, they do not fight over the array.
@@ -176,16 +189,8 @@ export default function UserDirectoryPage() {
     const filtered = roleFilter
       ? users.filter((u) => u.role === roleFilter)
       : users;
-
-    if (!sort) return filtered;
-    const column = COLUMNS.find((c) => c.key === sort.key);
-    if (!column?.sort) return filtered;
-
-    const factor = sort.direction === 'desc' ? -1 : 1;
-    return [...filtered].sort(
-      (a, b) => column.sort(a).localeCompare(column.sort(b), 'en-ZA') * factor
-    );
-  }, [users, roleFilter, sort]);
+    return view.sortRows(filtered);
+  }, [users, roleFilter, view]);
 
   const loadUsers = useCallback(async () => {
     setError(null);
@@ -211,7 +216,30 @@ export default function UserDirectoryPage() {
     try {
       setSelected(await userAPI.getUser(id));
       setMode('list');
+      focusDetail();
     } catch (err) { setError(err.message); }
+  };
+
+  const deactivateFromDialog = async () => {
+    setBusy(true);
+    try {
+      await userAPI.setUserStatus(selected.id, false);
+      setConfirmRemove(false);
+      await loadUsers();
+      await open(selected.id);
+    } catch (err) { setError(err.message); setConfirmRemove(false); }
+    finally { setBusy(false); }
+  };
+
+  const remove = async () => {
+    setBusy(true);
+    try {
+      await userAPI.deleteUser(selected.id);
+      setConfirmRemove(false);
+      setSelected(null);
+      await loadUsers();
+    } catch (err) { setError(err.message); setConfirmRemove(false); }
+    finally { setBusy(false); }
   };
 
   const create = async (payload) => {
@@ -246,7 +274,7 @@ export default function UserDirectoryPage() {
   return (
     <ManagerLayout>
       <main className="mx-auto w-full max-w-5xl px-4 py-6">
-        <h1 className="text-2xl font-medium">Users</h1>
+        <h1 className="text-2xl font-medium">User Management</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Staff accounts and access. Guests sign in separately and are not managed here.
         </p>
@@ -318,23 +346,20 @@ export default function UserDirectoryPage() {
                     the active pill clears it. Filters the raw enum,
                     shows the label — same split as everywhere else on
                     this page. */}
-                <div className="flex items-center gap-1">
-                  {ROLE_FILTERS.map((role) => {
-                    const active = roleFilter === role;
-                    return (
-                      <Button
-                        key={role}
-                        type="button"
-                        size="sm"
-                        variant={active ? 'default' : 'outline'}
-                        aria-pressed={active}
-                        onClick={() => setRoleFilter(active ? null : role)}
-                      >
-                        {ROLE_LABELS[role]}
-                      </Button>
-                    );
-                  })}
-                </div>
+                <FilterPills
+                  label="Filter by role"
+                  value={roleFilter}
+                  onChange={setRoleFilter}
+                  options={ROLE_FILTERS.map((r) => ({ value: r, label: ROLE_LABELS[r] }))}
+                />
+
+                <ColumnToggle
+                  idPrefix="users"
+                  columns={view.availableColumns}
+                  hidden={view.hidden}
+                  onToggle={view.toggleColumn}
+                  onReset={view.resetColumns}
+                />
 
                 {canManage ? (
                   <Button type="button" onClick={() => { setSelected(null); setMode('create'); }}>
@@ -344,14 +369,31 @@ export default function UserDirectoryPage() {
                 ) : null}
               </div>
 
+              <div ref={detailRef} tabIndex={-1} className="scroll-mt-6 outline-none">
+                {selected ? (
+                  <UserDetail
+                    targetUser={selected}
+                    canManage={canManage}
+                    isSelf={selected.id === user?.id}
+                    onEdit={() => setMode('edit')}
+                    onToggleActive={toggleActive}
+                    onRemove={() => setConfirmRemove(true)}
+                    onClose={() => setSelected(null)}
+                  />
+                ) : null}
+              </div>
+
               {selected ? (
-                <UserDetail
-                  targetUser={selected}
-                  canManage={canManage}
-                  isSelf={selected.id === user?.id}
-                  onEdit={() => setMode('edit')}
-                  onToggleActive={toggleActive}
-                  onClose={() => setSelected(null)}
+                <ConfirmRemoveDialog
+                  open={confirmRemove}
+                  onOpenChange={setConfirmRemove}
+                  name={`${selected.firstName} ${selected.lastName}`.trim() || selected.username}
+                  noun="account"
+                  isActive={selected.isActive}
+                  busy={busy}
+                  historyNote="Everything they did stays on the record under their name."
+                  onDeactivate={deactivateFromDialog}
+                  onDelete={remove}
                 />
               ) : null}
 
@@ -365,49 +407,13 @@ export default function UserDirectoryPage() {
               ) : (
                 <Card>
                   <CardContent className="p-0">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          {COLUMNS.map((col) => (
-                            <TableHead key={col.key}>
-                              {col.sort ? (
-                                <button
-                                  type="button"
-                                  onClick={() => toggleSort(col.key)}
-                                  aria-label={`Sort by ${col.label}`}
-                                  className="inline-flex items-center gap-1 hover:text-foreground"
-                                >
-                                  <span>{col.label}</span>
-                                  {sort?.key === col.key
-                                    ? (sort.direction === 'desc'
-                                        ? <ArrowDown className="h-3 w-3" />
-                                        : <ArrowUp className="h-3 w-3" />)
-                                    : <ChevronsUpDown className="h-3 w-3 opacity-30" />}
-                                </button>
-                              ) : col.label}
-                            </TableHead>
-                          ))}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {visibleUsers.map((u) => (
-                          <TableRow
-                            key={u.id}
-                            className="cursor-pointer"
-                            onClick={() => open(u.id)}
-                          >
-                            <TableCell className="font-medium">{u.firstName} {u.lastName}</TableCell>
-                            <TableCell className="text-muted-foreground">{u.username}</TableCell>
-                            <TableCell className="text-muted-foreground">
-                              {ROLE_LABELS[u.role] ?? u.role}
-                            </TableCell>
-                            <TableCell>
-                              {!u.isActive ? <Badge variant="outline">Inactive</Badge> : null}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                    <MasterDataTable
+                      columns={view.visibleColumns}
+                      rows={visibleUsers}
+                      sort={view.sort}
+                      onToggleSort={view.toggleSort}
+                      onOpenRow={(u) => open(u.id)}
+                    />
                   </CardContent>
                 </Card>
               )}

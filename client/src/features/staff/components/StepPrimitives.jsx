@@ -215,7 +215,16 @@ export const QuantityField = ({ id, label, value, editing, flagged, onEdit, onCh
 // until tapped and needs a second tap to commit; with two or three
 // choices that is pure cost. Rendered as a radio group so assistive
 // tech reports one choice rather than three separate buttons.
-export const ChoiceList = ({ legend, options, value, onChange }) => (
+// `onActivate` turns a double-click on an option into "pick this and
+// go", so the worker never has to scroll past a list of twenty to
+// reach the button that does the same thing. Single click still only
+// selects, because a mis-tap that advances the screen is worse than
+// a scroll.
+//
+// A mouse shortcut, deliberately additive: there is no keyboard
+// equivalent because the button below the list already IS the
+// keyboard path, and it stays where it is.
+export const ChoiceList = ({ legend, options, value, onChange, onActivate }) => (
   <fieldset className="stf-choices" style={{ border: 0, margin: 0, padding: 0 }}>
     <legend className="stf-sr-only">{legend}</legend>
     {options.map((option) => {
@@ -228,6 +237,10 @@ export const ChoiceList = ({ legend, options, value, onChange }) => (
           aria-checked={chosen}
           className={`stf-choice${chosen ? ' is-chosen' : ''}`}
           onClick={() => onChange(option.value)}
+          onDoubleClick={onActivate ? () => {
+            onChange(option.value);
+            onActivate(option.value);
+          } : undefined}
         >
           <span className="stf-choice-label">{option.label}</span>
           {option.meta ? <span className="stf-choice-meta">{option.meta}</span> : null}
@@ -312,6 +325,14 @@ export const ViewToggle = ({ options, value, onChange, className = '' }) => {
     };
 
     measure();
+    // jsdom has no ResizeObserver. Without this guard every test that
+    // renders a flow with the toggle throws an unhandled error on
+    // mount — two of them were sitting in an otherwise green suite,
+    // which is exactly how a real one goes unnoticed. The measurement
+    // above has already run, so the pill is positioned either way;
+    // only re-measuring on resize is lost, and nothing resizes in a
+    // test.
+    if (typeof ResizeObserver === 'undefined') return undefined;
     const observer = new ResizeObserver(measure);
     observer.observe(container);
     return () => observer.disconnect();

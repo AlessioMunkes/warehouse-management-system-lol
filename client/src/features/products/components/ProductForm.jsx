@@ -46,7 +46,7 @@ import { STOCK_UNITS } from '@/services/productAPI';
 const STORAGE_TYPES = ['dry', 'cold'];
 
 const BLANK = {
-  name: '', sku: '', defaultUnit: '', weightKg: '',
+  name: '', sku: '', defaultUnit: '', weightKg: '', unitCost: '',
   category: '', isPerishable: false, reorderThreshold: '',
   storageType: 'dry',
 };
@@ -83,6 +83,7 @@ export default function ProductForm({
       // clearer about the intent, same reasoning SupplierForm's
       // expectedLeadTimeDays uses.
       weightKg: form.weightKg === '' || form.weightKg === null ? null : Number(form.weightKg),
+      unitCost: form.unitCost === '' || form.unitCost === null ? null : Number(form.unitCost),
       // Blank means "leave it alone" on an edit, and the column
       // default (0) on a create — not zero typed deliberately.
       reorderThreshold:
@@ -171,6 +172,24 @@ export default function ProductForm({
           {/* Genuinely optional — plenty of products are counted, not
               weighed. */}
           <FieldDescription>Leave blank for items that are counted, not weighed.</FieldDescription>
+        </Field>
+      </div>
+
+      <div className="grid gap-7 sm:grid-cols-2">
+        <Field>
+          <FieldLabel htmlFor="product-cost">Cost per item (R)</FieldLabel>
+          <Input
+            id="product-cost"
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.unitCost ?? ''}
+            onChange={set('unitCost')}
+          />
+          <FieldDescription>
+            What one costs, before VAT. Used to fill in purchase-order lines —
+            leave blank if it is donated or the price moves every time.
+          </FieldDescription>
         </Field>
       </div>
 

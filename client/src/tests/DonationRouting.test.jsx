@@ -63,10 +63,13 @@ describe('donation intake route guarding', () => {
     expect(screen.queryByText('INTAKE FORM')).not.toBeInTheDocument();
   });
 
-  it('bounces finance — reads the money side, does not intake stock', () => {
-    renderAt(DONATIONS.new, user('finance'));
-    expect(screen.getByText('TASK DASHBOARD')).toBeInTheDocument();
-    expect(screen.queryByText('INTAKE FORM')).not.toBeInTheDocument();
+  // This was 'bounces finance', a role the system no longer has. There
+  // is no signed-in staff role left to bounce — intake is open to all
+  // three — so the list itself is what is worth pinning. Narrow it and
+  // the .each blocks above start exercising the gate.
+  it('is open to every staff role and nothing else', () => {
+    expect([...DONATION_INTAKE_ROLES].sort())
+      .toEqual(['admin', 'manager', 'warehouse_worker']);
   });
 
   it('bounces a guest to the guest home', () => {

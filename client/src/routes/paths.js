@@ -97,12 +97,6 @@ export const STAFF = {
   // all three, since assignment happens inline on a slip rather than
   // as a separate page.
   pickingSlips: '/noc/picking-slips',
-  // Manager-only archive of generated delivery/dispatch notes — reuses
-  // receivingAPI.getDeliveries/getDeliveryById and
-  // dispatchAPI.getHistory/getDispatchNote, the same functions the
-  // staff-side equivalents already call, so no new route gating is
-  // needed beyond what those two already require.
-  documents: '/noc/documents',
   // Manager-only. All three /api/stock/ledger routes are
   // requireRole(MANAGER, ADMIN); the App.jsx gate mirrors that. The
   // per-product history drawer on the inventory screen stays open to
@@ -155,4 +149,5 @@ export const ADMIN = {
   donationManagement: '/admin/donation-management',
   users:     '/admin/users',
   products:  '/admin/products',
+  volunteers: '/admin/volunteers',
 };

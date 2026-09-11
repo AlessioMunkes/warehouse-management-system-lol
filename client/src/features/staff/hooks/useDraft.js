@@ -54,6 +54,37 @@ export const writeDraft = (key, data) => {
   }
 };
 
+// Every draft on this device, newest first, with enough on each to
+// name it on a screen.
+//
+// Reads the whole of localStorage rather than keeping an index: an
+// index is a second thing that can disagree with the first, and a
+// warehouse phone holds a handful of keys, not thousands. Expired
+// drafts are dropped on the way past, which is the same rule readDraft
+// applies — there is no point offering to resume last week's delivery.
+export const listDrafts = () => {
+  const found = [];
+  try {
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const storageKey = localStorage.key(i);
+      if (!storageKey || !storageKey.startsWith(PREFIX)) continue;
+
+      const key = storageKey.slice(PREFIX.length);
+      let parsed;
+      try { parsed = JSON.parse(localStorage.getItem(storageKey)); } catch { continue; }
+      if (!parsed?.savedAt) continue;
+      if (Date.now() - parsed.savedAt > MAX_AGE_MS) continue;
+
+      found.push({ key, savedAt: parsed.savedAt, data: parsed.data ?? null });
+    }
+  } catch {
+    // Private window, or storage blocked. No drafts is the right
+    // answer, and it must never throw into a render.
+    return [];
+  }
+  return found.sort((a, b) => b.savedAt - a.savedAt);
+};
+
 export const clearDraft = (key) => {
   if (!key) return;
   try {
@@ -61,4 +92,4 @@ export const clearDraft = (key) => {
   } catch { /* see writeDraft */ }
 };
 
-export default { readDraft, writeDraft, clearDraft };
+export default { readDraft, writeDraft, clearDraft, listDrafts };

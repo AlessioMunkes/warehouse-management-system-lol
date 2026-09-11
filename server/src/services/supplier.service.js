@@ -177,7 +177,30 @@ const setSupplierStatus = async (rawId, body, userId) => {
   if (!existing) throw fail(404, 'Supplier not found.');
   if (existing.is_active === body.isActive) return existing;
 
+  // An archived supplier does not come back. The CHECK constraint
+  // would reject it as a 500; this says why instead.
+  if (body.isActive) {
+    const existing = await repo.getSupplierById(id);
+    if (existing?.archived_at) {
+      // NOTE: fail() in this service RETURNS the error (product.service's
+      // throws). Dropping the `throw` here would have let a reactivation
+      // of an archived supplier fall straight through to the UPDATE and
+      // die on the CHECK constraint as a 500.
+      throw fail(409, 'This supplier was deleted and cannot be reactivated. Register a new supplier instead.');
+    }
+  }
+
   return repo.setSupplierActive(id, body.isActive, userId);
+};
+
+// ── Delete from the directory ────────────────────────────────
+const archiveSupplier = async (rawId, userId) => {
+  const id = requireId(rawId);
+  const existing = await repo.getSupplierById(id);
+  if (!existing) throw fail(404, 'Supplier not found.');
+  if (existing.archived_at) return existing;   // idempotent
+
+  return repo.archiveSupplier(id, userId);
 };
 
 // ── Prospects ─────────────────────────────────────────────────
@@ -328,6 +351,7 @@ export default {
   registerSupplier,
   updateSupplier,
   setSupplierStatus,
+  archiveSupplier,
   listProspects,
   addProspect,
   updateProspect,

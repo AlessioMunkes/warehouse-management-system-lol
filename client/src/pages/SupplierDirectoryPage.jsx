@@ -20,12 +20,18 @@
 // which is a different thing. If a Tabs primitive is ever added, this
 // is the first place that should use it.
 // ─────────────────────────────────────────────────────────────
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth }   from '../context/AuthContext';
 import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
 import SupplierForm  from '../features/suppliers/components/SupplierForm';
 import ProspectPad   from '../features/suppliers/components/ProspectPad';
 import supplierAPI   from '../services/supplierAPI';
+import ConfirmRemoveDialog from '../features/masterdata/components/ConfirmRemoveDialog';
+import useDetailFocus      from '../features/masterdata/hooks/useDetailFocus';
+import useTableView        from '../features/masterdata/hooks/useTableView';
+import MasterDataTable     from '../features/masterdata/components/MasterDataTable';
+import ColumnToggle        from '../features/masterdata/components/ColumnToggle';
+import FilterPills         from '../features/masterdata/components/FilterPills';
 
 import {
   InputGroup, InputGroupAddon, InputGroupInput,
@@ -42,9 +48,12 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Search, Plus, Pencil, Power, X, AlertTriangle } from 'lucide-react';
+import { Search, Plus, Pencil, Power, X, AlertTriangle, Trash2 } from 'lucide-react';
 
-const CAN_MANAGE = ['manager', 'admin'];
+// Admin only, matching supplier.routes.js. The prospect pad is the
+// exception and stays open to managers — see the note on PROSPECTS
+// there — so this constant gates supplier editing, not the pad.
+const CAN_MANAGE = ['admin'];
 
 const TABS = [
   { id: 'suppliers', label: 'Suppliers' },
@@ -73,7 +82,7 @@ const ErrorBanner = ({ message, onRetry }) => (
 );
 
 // ── Detail panel ──────────────────────────────────────────────
-const SupplierDetail = ({ supplier, canManage, onEdit, onToggleActive, onClose }) => {
+const SupplierDetail = ({ supplier, canManage, onEdit, onToggleActive, onRemove, onClose }) => {
   const s = supplier.stats ?? {};
   const stats = [
     ['Purchase orders',    s.purchaseOrderCount ?? 0],
@@ -172,6 +181,15 @@ const SupplierDetail = ({ supplier, canManage, onEdit, onToggleActive, onClose }
               <Power />
               {supplier.isActive ? 'Deactivate' : 'Reactivate'}
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onRemove}
+              className="border-[#ef3a40] text-[#ef3a40] hover:bg-[#ef3a40] hover:text-white"
+            >
+              <Trash2 />
+              Delete
+            </Button>
           </div>
         ) : null}
 
@@ -193,6 +211,54 @@ const SupplierDetail = ({ supplier, canManage, onEdit, onToggleActive, onClose }
 };
 
 // ── Page ──────────────────────────────────────────────────────
+// suppliers.category is free text, not an enum — there is no fixed
+// list to hard-code the way products.storage_type has one. So the
+// pills are built from the categories actually present in the fetched
+// rows: every pill is guaranteed to match something, and a category
+// added next month appears without anybody editing this file.
+//
+// Capped, because a free-text column can hold anything and eight pills
+// across the toolbar is not a filter any more.
+const MAX_CATEGORY_PILLS = 6;
+
+const categoryOptions = (suppliers) => {
+  const seen = new Map();
+  for (const s of suppliers) {
+    const value = (s.category ?? '').trim();
+    if (!value) continue;
+    seen.set(value, (seen.get(value) ?? 0) + 1);
+  }
+  return [...seen.entries()]
+    // Commonest first: the pills worth having are the ones that narrow
+    // a long list, not the one supplier filed under something unusual.
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'en-ZA'))
+    .slice(0, MAX_CATEGORY_PILLS)
+    .map(([value]) => ({ value, label: value }));
+};
+
+const COLUMNS = [
+  { key: 'name',     label: 'Supplier', alwaysOn: true, weight: 3,
+    sort: (s) => (s.name ?? '').toLowerCase(),
+    cellClass: 'font-medium',
+    cell: (s) => s.name },
+  { key: 'category', label: 'Category', weight: 2, minWidth: 'md',
+    sort: (s) => (s.category ?? '').toLowerCase(),
+    cell: (s) => s.category || '—' },
+  { key: 'contact',  label: 'Contact', weight: 3, minWidth: 'sm',
+    sort: (s) => (s.contactEmail ?? '').toLowerCase(),
+    cell: (s) => s.contactEmail || '—' },
+  { key: 'phone',    label: 'Phone', weight: 2, minWidth: 'lg',
+    sort: (s) => (s.contactPhone ?? '').toLowerCase(),
+    cell: (s) => s.contactPhone || '—' },
+  // numeric, so 10 days sorts after 9 rather than before it, and a
+  // supplier with no recorded lead time sorts last either way.
+  { key: 'leadTime', label: 'Lead time', numeric: true, weight: 1.6, minWidth: 'lg',
+    sort: (s) => (s.expectedLeadTimeDays ?? null),
+    cell: (s) => (s.expectedLeadTimeDays === null ? '—' : `${s.expectedLeadTimeDays} days`) },
+  { key: 'status',   label: '', sort: null, alwaysOn: true, weight: 1.8,
+    cell: (s) => (!s.isActive ? <Badge variant="outline">Inactive</Badge> : null) },
+];
+
 export default function SupplierDirectoryPage() {
   const { user } = useAuth();
   const canManage = CAN_MANAGE.includes(user?.role);
@@ -208,6 +274,20 @@ export default function SupplierDirectoryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState(null);
+  const view = useTableView('suppliers', COLUMNS);
+
+  const [detailRef, focusDetail] = useDetailFocus();
+
+  const categoryPills = useMemo(() => categoryOptions(suppliers), [suppliers]);
+
+  const visibleSuppliers = useMemo(() => {
+    const filtered = categoryFilter
+      ? suppliers.filter((s) => (s.category ?? '').trim() === categoryFilter)
+      : suppliers;
+    return view.sortRows(filtered);
+  }, [suppliers, categoryFilter, view]);
 
   const loadSuppliers = useCallback(async () => {
     setError(null);
@@ -247,7 +327,30 @@ export default function SupplierDirectoryPage() {
     try {
       setSelected(await supplierAPI.getSupplier(id));
       setMode('list');
+      focusDetail();
     } catch (err) { setError(err.message); }
+  };
+
+  const deactivateFromDialog = async () => {
+    setBusy(true);
+    try {
+      await supplierAPI.setSupplierStatus(selected.id, false);
+      setConfirmRemove(false);
+      await loadSuppliers();
+      await open(selected.id);
+    } catch (err) { setError(err.message); setConfirmRemove(false); }
+    finally { setBusy(false); }
+  };
+
+  const remove = async () => {
+    setBusy(true);
+    try {
+      await supplierAPI.deleteSupplier(selected.id);
+      setConfirmRemove(false);
+      setSelected(null);
+      await loadSuppliers();
+    } catch (err) { setError(err.message); setConfirmRemove(false); }
+    finally { setBusy(false); }
   };
 
   const create = async (payload) => {
@@ -316,7 +419,7 @@ export default function SupplierDirectoryPage() {
   return (
     <ManagerLayout>
       <main className="mx-auto w-full max-w-5xl px-4 py-6">
-        <h1 className="text-2xl font-medium">Suppliers</h1>
+        <h1 className="text-2xl font-medium">Supplier Management</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Who we buy from, and who we might buy from.
         </p>
@@ -408,6 +511,21 @@ export default function SupplierDirectoryPage() {
                     </FieldLabel>
                   </Field>
 
+                  <FilterPills
+                    label="Filter by category"
+                    value={categoryFilter}
+                    onChange={setCategoryFilter}
+                    options={categoryPills}
+                  />
+
+                  <ColumnToggle
+                    idPrefix="suppliers"
+                    columns={view.availableColumns}
+                    hidden={view.hidden}
+                    onToggle={view.toggleColumn}
+                    onReset={view.resetColumns}
+                  />
+
                   {canManage ? (
                     <Button type="button" onClick={() => { setSelected(null); setMode('create'); }}>
                       <Plus />
@@ -416,51 +534,45 @@ export default function SupplierDirectoryPage() {
                   ) : null}
                 </div>
 
+                <div ref={detailRef} tabIndex={-1} className="scroll-mt-6 outline-none">
+                  {selected ? (
+                    <SupplierDetail
+                      supplier={selected}
+                      canManage={canManage}
+                      onEdit={() => setMode('edit')}
+                      onToggleActive={toggleActive}
+                      onRemove={() => setConfirmRemove(true)}
+                      onClose={() => setSelected(null)}
+                    />
+                  ) : null}
+                </div>
+
                 {selected ? (
-                  <SupplierDetail
-                    supplier={selected}
-                    canManage={canManage}
-                    onEdit={() => setMode('edit')}
-                    onToggleActive={toggleActive}
-                    onClose={() => setSelected(null)}
+                  <ConfirmRemoveDialog
+                    open={confirmRemove}
+                    onOpenChange={setConfirmRemove}
+                    name={selected.name}
+                    noun="supplier"
+                    isActive={selected.isActive}
+                    busy={busy}
+                    historyNote="Past purchase orders, delivery notes and receipts keep their name."
+                    onDeactivate={deactivateFromDialog}
+                    onDelete={remove}
                   />
                 ) : null}
 
-                {suppliers.length === 0 ? (
+                {visibleSuppliers.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No suppliers match.</p>
                 ) : (
                   <Card>
                     <CardContent className="p-0">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Supplier</TableHead>
-                            <TableHead>Category</TableHead>
-                            <TableHead>Contact</TableHead>
-                            <TableHead />
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {suppliers.map((s) => (
-                            <TableRow
-                              key={s.id}
-                              className="cursor-pointer"
-                              onClick={() => open(s.id)}
-                            >
-                              <TableCell className="font-medium">{s.name}</TableCell>
-                              <TableCell className="text-muted-foreground">
-                                {s.category || '—'}
-                              </TableCell>
-                              <TableCell className="text-muted-foreground">
-                                {s.contactEmail || '—'}
-                              </TableCell>
-                              <TableCell>
-                                {!s.isActive ? <Badge variant="outline">Inactive</Badge> : null}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                      <MasterDataTable
+                        columns={view.visibleColumns}
+                        rows={visibleSuppliers}
+                        sort={view.sort}
+                        onToggleSort={view.toggleSort}
+                        onOpenRow={(s) => open(s.id)}
+                      />
                     </CardContent>
                   </Card>
                 )}

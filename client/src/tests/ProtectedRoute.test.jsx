@@ -42,22 +42,33 @@ describe('ProtectedRoute', () => {
     expect(screen.getByText('Dashboard Content')).toBeInTheDocument();
   });
 
-  it('redirects a non-admin away from an admin-only route', () => {
-    useAuth.mockReturnValue({ user: { id: 1, role: 'manager' }, isLoading: false });
-
-    render(
-      <MemoryRouter initialEntries={['/admin']}>
-        <Routes>
-          <Route path="/login" element={<div>Login Page</div>} />
-          <Route path="/noc" element={<div>Task Dashboard</div>} />
-          <Route element={<ProtectedRoute roles={['admin']} />}>
-            <Route path="/admin" element={<div>Admin Content</div>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>
+  // A refused role goes to ITS OWN home, not the warehouse worker's.
+  // This used to send everybody to /noc, so a manager who followed a
+  // stale link to an admin screen landed on the floor-staff task
+  // chooser — which reads as a broken app rather than a refusal.
+  const renderAdminOnlyAs = (role) => {
+    useAuth.mockReturnValue({ user: { id: 1, role }, isLoading: false });
+    return render(
+    <MemoryRouter initialEntries={['/admin']}>
+      <Routes>
+        <Route path="/login" element={<div>Login Page</div>} />
+        <Route path="/noc" element={<div>Worker Home</div>} />
+        <Route path="/manager" element={<div>Manager Home</div>} />
+        <Route element={<ProtectedRoute roles={['admin']} />}>
+          <Route path="/admin" element={<div>Admin Content</div>} />
+        </Route>
+      </Routes>
+    </MemoryRouter>
     );
+  };
 
-    expect(screen.getByText('Task Dashboard')).toBeInTheDocument();
+  it.each([
+    ['manager', 'Manager Home'],
+    ['warehouse_worker', 'Worker Home'],
+  ])('sends a refused %s to their own home', (role, home) => {
+    renderAdminOnlyAs(role);
+
+    expect(screen.getByText(home)).toBeInTheDocument();
     expect(screen.queryByText('Admin Content')).not.toBeInTheDocument();
   });
 });

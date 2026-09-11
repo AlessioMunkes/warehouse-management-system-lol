@@ -39,7 +39,7 @@ const SUPPLIER_COLUMNS = `
   s.id, s.name, s.contact_name, s.contact_email, s.contact_phone,
   s.address, s.agreement_ref, s.payment_terms, s.expected_lead_time_days,
   s.category, s.notes, s.is_active, s.created_at,
-  s.deactivated_at, s.created_by
+  s.deactivated_at, s.created_by, s.archived_at
 `;
 
 // ── Suppliers: read ───────────────────────────────────────────
@@ -48,6 +48,12 @@ const listSuppliers = async ({ includeInactive = false, search = null } = {}) =>
   const where = [];
 
   if (!includeInactive) where.push('s.is_active = true');
+
+  // Archived suppliers leave the directory whatever the toggle says —
+  // see the same line in product.repository.js. getSupplierById has no
+  // such filter, so a purchase order or delivery note that already
+  // names one still renders it.
+  where.push('s.archived_at IS NULL');
 
   if (search) {
     params.push(`%${search}%`);
@@ -187,6 +193,53 @@ const updateSupplier = async (id, patch) => {
     params
   );
   return rows[0] ?? null;
+};
+
+// Archiving. Sets is_active false in the same statement for the reason
+// given at length in product.repository.js: every forward-looking
+// supplier picker already filters on is_active, so this excludes the
+// supplier from all of them without editing any of them.
+const archiveSupplier = async (id, actorId) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const before = (await client.query(
+      `SELECT ${SUPPLIER_COLUMNS} FROM suppliers s WHERE s.id = $1 FOR UPDATE`,
+      [id],
+    )).rows[0] ?? null;
+    if (!before) { await client.query('ROLLBACK'); return null; }
+
+    const { rows } = await client.query(
+      `UPDATE suppliers
+          SET is_active      = false,
+              deactivated_at = COALESCE(deactivated_at, now()),
+              deactivated_by = COALESCE(deactivated_by, $2),
+              archived_at    = COALESCE(archived_at, now()),
+              archived_by    = COALESCE(archived_by, $2)
+        WHERE id = $1
+        RETURNING ${SUPPLIER_COLUMNS.replace(/s\./g, '')}`,
+      [id, actorId ?? null],
+    );
+    if (!rows[0]) { await client.query('ROLLBACK'); return null; }
+
+    await logAudit(client, {
+      entityType: 'supplier',
+      entityId:   id,
+      action:     'archived',
+      actorId:    actorId ?? null,
+      before,
+      after:      rows[0],
+    });
+
+    await client.query('COMMIT');
+    return rows[0];
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 };
 
 // is_active, deactivated_at and deactivated_by move together or not
@@ -353,6 +406,7 @@ export default {
   insertSupplier,
   updateSupplier,
   setSupplierActive,
+  archiveSupplier,
   listProspects,
   getProspectById,
   insertProspect,

@@ -14,6 +14,8 @@
 // Note the DEV check rather than `|| fallback`: VITE_API_URL is baked
 // in at BUILD time, so an unset variable in a production build would
 // otherwise leave every request pointing at the developer's localhost.
+import { reportReach, reportUnreachable } from './connection';
+
 export const API_BASE =
   import.meta.env.VITE_API_URL ??
   (import.meta.env.DEV ? 'http://localhost:5000' : '');
@@ -83,6 +85,12 @@ const handleResponse = async (res) => {
     data = {};
   }
 
+  // We got an answer, so the server is there. A 400 or a 500 is a
+  // server refusing us, not a warehouse with no signal — saying "no
+  // signal" here would send a worker looking for a wifi problem that
+  // does not exist.
+  reportReach();
+
   if (!res.ok) {
     if (res.status === 401 && onUnauthorized) onUnauthorized(data.message);
 
@@ -98,6 +106,9 @@ const handleResponse = async (res) => {
 // DNS failure, connection refused). These errors get no `.status`,
 // which is how callers distinguish them from a real server refusal.
 const networkError = () => {
+  // The one place the app learns it has lost the server. Everything
+  // the worker sees about being offline starts here.
+  reportUnreachable();
   const error = new Error('Could not reach the server. Check your connection and try again.');
   error.isNetworkError = true;
   return error;
@@ -143,6 +154,22 @@ export const apiPatch = async (endpoint, body = {}) => {
       credentials: 'include',
       headers:     { 'Content-Type': 'application/json' },
       body:        JSON.stringify(body),
+    });
+  } catch {
+    throw networkError();
+  }
+  return handleResponse(res);
+};
+
+// Deletion on this system is never a SQL DELETE — see migration 019 —
+// but DELETE is still the honest verb for what the admin is asking
+// for, and routing it through apiPatch with a flag would hide that.
+export const apiDelete = async (endpoint) => {
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${endpoint}`, {
+      method:      'DELETE',
+      credentials: 'include',
     });
   } catch {
     throw networkError();

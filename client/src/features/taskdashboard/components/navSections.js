@@ -20,7 +20,7 @@
 // ─────────────────────────────────────────────────────────────
 import {
   LayoutDashboard, Users2, ClipboardList, ShoppingCart,
-  BarChart3, HeartHandshake, Package, Truck, FileText,
+  BarChart3, HeartHandshake, Package, Truck,
   Gift, Route, Tags, HandHeart, Boxes, ReceiptText,
   PackageOpen, PackageCheck, FlaskConical, ClipboardCheck, HandCoins,
   PhoneCall,
@@ -61,24 +61,30 @@ const ADMIN_SECTIONS = [
       { to: ADMIN.dashboard, label: 'Dashboard', icon: LayoutDashboard },
     ],
   },
-  {
-    label: 'People',
-    items: [
-      { to: ADMIN.users, label: 'Users', icon: Users2 },
-      { to: VOLUNTEERS.events, label: 'Volunteer Events', icon: HandHeart },
-    ],
-  },
-  {
-    label: 'Community',
-    items: [
-      { to: STAFF.communityRequests, label: 'Benevolent Requests', icon: PhoneCall },
-    ],
-  },
+  // One section, because it is one job. Users sat under "People"
+  // alongside Volunteer Events, which put account provisioning next to
+  // event scheduling and split the admin's actual work — the master
+  // data every other module reads — across three headings.
+  //
+  // Named "X Management" rather than the bare plural: these screens
+  // create, edit, deactivate and delete, and "Products" reads like a
+  // list you look at.
   {
     label: 'Master data',
     items: [
-      { to: ADMIN.products, label: 'Products', icon: Package },
-      { to: ADMIN.suppliers, label: 'Suppliers', icon: Truck },
+      { to: ADMIN.users,     label: 'User Management',     icon: Users2 },
+      { to: ADMIN.products,  label: 'Product Management',  icon: Package },
+      { to: ADMIN.suppliers, label: 'Supplier Management', icon: Truck },
+    ],
+  },
+  // Records of what happened, as opposed to the master data above that
+  // every other module reads. One item today; the stock ledger and the
+  // audit trail are the obvious next two, and they will want to live
+  // beside it rather than under "Master data".
+  {
+    label: 'Logs',
+    items: [
+      { to: ADMIN.volunteers, label: 'Volunteer Management', icon: HandHeart },
     ],
   },
   {
@@ -107,7 +113,6 @@ const MANAGER_SECTIONS = [
       { to: STAFF.purchaseOrders, label: 'Purchase Orders', icon: ShoppingCart },
       { to: '/noc/inventory', label: 'Inventory', icon: Boxes },
       { to: STAFF.receipts, label: 'Receipts', icon: ReceiptText },
-      { to: STAFF.documents, label: 'Documents', icon: FileText },
       { to: STAFF.communityRequests, label: 'Benevolent Requests', icon: PhoneCall },
     ],
   },
@@ -117,12 +122,6 @@ const MANAGER_SECTIONS = [
     label: 'Warehouse',
     items: [
       { to: STAFF.donation, label: 'Donation Intake', icon: HandCoins },
-    ],
-  },
-  {
-    label: 'Catalog',
-    items: [
-      { to: ADMIN.products, label: 'Products', icon: Package },
     ],
   },
   {

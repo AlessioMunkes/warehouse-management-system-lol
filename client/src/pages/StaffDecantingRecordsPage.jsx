@@ -20,6 +20,8 @@ import DecantingSheetPDF from '../features/decanting/components/DecantingSheetPD
 import { Notice } from '../features/staff/components/StepPrimitives';
 import { getDecantingRecords, getDecantingById } from '../services/decantingAPI';
 import { STAFF } from '../routes/paths';
+import Paged from '../features/staff/components/Paged';
+import usePaged from '../features/staff/hooks/usePaged';
 
 const RANGES = [
   { key: 'today', label: 'Today' },
@@ -56,6 +58,8 @@ export default function StaffDecantingRecordsPage() {
     })();
     return () => { cancelled = true; };
   }, [range]);
+
+  const paged = usePaged(records);
 
   const openPdf = async (id) => {
     setOpeningId(id);
@@ -106,7 +110,7 @@ export default function StaffDecantingRecordsPage() {
           </div>
         ) : (
           <div className="stf-list">
-            {records.map((record) => (
+            {paged.slice.map((record) => (
               <div key={record.id} className="stf-row is-static">
                 <span className="stf-row-main">
                   <span className="stf-row-title">Week of {formatDate(record.week_of)}</span>
@@ -133,6 +137,8 @@ export default function StaffDecantingRecordsPage() {
             ))}
           </div>
         )}
+
+        <Paged {...paged} noun="sheets" />
       </div>
 
       {pdfRecord ? (

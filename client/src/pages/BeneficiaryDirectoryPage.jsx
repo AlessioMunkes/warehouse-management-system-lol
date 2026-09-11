@@ -12,7 +12,7 @@
 // alongside Edit/Deactivate, and picking.repository.js's own
 // createSlip/generateSlips gate is exactly what that approval unlocks.
 // ─────────────────────────────────────────────────────────────
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth }     from '../context/AuthContext';
 import ManagerLayout    from '../features/taskdashboard/components/ManagerLayout';
 import BeneficiaryForm from '../features/beneficiaries/components/BeneficiaryForm';
@@ -23,19 +23,21 @@ import {
 } from '@/components/ui/input-group';
 import { Field, FieldLabel } from '@/components/ui/field';
 import { Button }    from '@/components/ui/button';
-import { Badge }     from '@/components/ui/badge';
 import { Checkbox }  from '@/components/ui/checkbox';
 import { Skeleton }  from '@/components/ui/skeleton';
 import {
   Card, CardContent, CardHeader, CardTitle,
 } from '@/components/ui/card';
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
 import { Search, Plus, Pencil, Power, ShieldCheck, X } from 'lucide-react';
 
 const CAN_MANAGE = ['manager', 'admin'];
-const COHORT_LABELS = { week1: 'Week 1', week2: 'Week 2' };
+import useTableView    from '../features/masterdata/hooks/useTableView';
+import MasterDataTable from '../features/masterdata/components/MasterDataTable';
+import ColumnToggle    from '../features/masterdata/components/ColumnToggle';
+import FilterPills     from '../features/masterdata/components/FilterPills';
+import {
+  BENEFICIARY_COLUMNS, COHORT_FILTERS, COHORT_LABELS,
+} from '../features/beneficiaries/components/beneficiaryColumns';
 
 const fmtDate = (value) =>
   value
@@ -121,6 +123,19 @@ export default function BeneficiaryDirectoryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+
+  // Cohort narrows first, then sort orders what is left — both
+  // client-side over the already-fetched rows, so neither races the
+  // server-side search or the "Show inactive" toggle.
+  const [cohortFilter, setCohortFilter] = useState(null);
+  const view = useTableView('beneficiaries', BENEFICIARY_COLUMNS);
+
+  const visibleBeneficiaries = useMemo(() => {
+    const filtered = cohortFilter
+      ? beneficiaries.filter((b) => b.cohort === cohortFilter)
+      : beneficiaries;
+    return view.sortRows(filtered);
+  }, [beneficiaries, cohortFilter, view]);
 
   const loadBeneficiaries = useCallback(async () => {
     setError(null);
@@ -251,6 +266,21 @@ export default function BeneficiaryDirectoryPage() {
                     </FieldLabel>
                   </Field>
 
+                  <FilterPills
+                    label="Filter by cohort"
+                    value={cohortFilter}
+                    onChange={setCohortFilter}
+                    options={COHORT_FILTERS}
+                  />
+
+                  <ColumnToggle
+                    idPrefix="beneficiaries"
+                    columns={view.availableColumns}
+                    hidden={view.hidden}
+                    onToggle={view.toggleColumn}
+                    onReset={view.resetColumns}
+                  />
+
                   {canManage ? (
                     <Button type="button" onClick={() => { setSelected(null); setMode('create'); }}>
                       <Plus />
@@ -270,42 +300,18 @@ export default function BeneficiaryDirectoryPage() {
                   />
                 ) : null}
 
-                {beneficiaries.length === 0 ? (
+                {visibleBeneficiaries.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No beneficiaries match.</p>
                 ) : (
                   <Card>
                     <CardContent className="p-0">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Beneficiary</TableHead>
-                            <TableHead>Cohort</TableHead>
-                            <TableHead>Contact</TableHead>
-                            <TableHead />
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {beneficiaries.map((b) => (
-                            <TableRow
-                              key={b.id}
-                              className="cursor-pointer"
-                              onClick={() => open(b.id)}
-                            >
-                              <TableCell className="font-medium">{b.name}</TableCell>
-                              <TableCell className="text-muted-foreground">
-                                {COHORT_LABELS[b.cohort] ?? b.cohort}
-                              </TableCell>
-                              <TableCell className="text-muted-foreground">
-                                {b.contactName || '—'}
-                              </TableCell>
-                              <TableCell className="flex justify-end gap-1">
-                                {!b.approvedAt ? <Badge variant="outline">Unapproved</Badge> : null}
-                                {!b.isActive ? <Badge variant="outline">Inactive</Badge> : null}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                      <MasterDataTable
+                        columns={view.visibleColumns}
+                        rows={visibleBeneficiaries}
+                        sort={view.sort}
+                        onToggleSort={view.toggleSort}
+                        onOpenRow={(b) => open(b.id)}
+                      />
                     </CardContent>
                   </Card>
                 )}

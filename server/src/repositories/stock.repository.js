@@ -197,6 +197,8 @@ const getManifest = async () => {
   const result = await pool.query(
     `SELECT
        p.id, p.name, p.stock_keeping_unit AS sku,
+       p.category, p.storage_type, p.is_perishable,
+       p.weight_kg, p.default_unit, p.unit_cost,
        COALESCE(sl.quantity_on_hand, 0)::numeric AS quantity_on_hand,
        COALESCE(c.committed, 0)::numeric         AS committed,
        (COALESCE(sl.quantity_on_hand, 0) - COALESCE(c.committed, 0))::numeric AS available,

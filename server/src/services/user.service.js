@@ -174,9 +174,34 @@ const setUserStatus = async (rawId, body, actorId) => {
 
   const existing = await repo.getUserById(id);
   if (!existing) throw fail(404, 'User not found.');
+  if (existing.archived_at && body.isActive) {
+    throw fail(409, 'This account was deleted and cannot be reactivated. Create a new account instead.');
+  }
   if (existing.is_active === body.isActive) return existing;
 
   return repo.setUserActive(id, body.isActive, existing, actorId);
+};
+
+// ── Delete the account ───────────────────────────────────────
+// Not a SQL DELETE: audit_log.actor_id references users, so removing
+// the row would either fail or blank out the trail. This takes the
+// account out of the directory and out of the system — is_active goes
+// false in the same statement, which is what revokes the login.
+const archiveUser = async (rawId, actorId) => {
+  const id = requireId(rawId);
+
+  // Self-lockout guard (c). Same reasoning as deactivation, only worse:
+  // this one cannot be undone by anybody, including the admin who did
+  // it half a second ago.
+  if (id === actorId) {
+    throw fail(400, 'You cannot delete your own account.');
+  }
+
+  const existing = await repo.getUserById(id);
+  if (!existing) throw fail(404, 'User not found.');
+  if (existing.archived_at) return existing;   // idempotent
+
+  return repo.archiveUser(id, existing, actorId);
 };
 
 export default {
@@ -185,4 +210,5 @@ export default {
   createUser,
   updateUser,
   setUserStatus,
+  archiveUser,
 };

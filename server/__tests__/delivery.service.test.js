@@ -29,7 +29,7 @@ const repoMock = {
   getSuppliers:                vi.fn(),
   getSuppliersWithOpenOrders:  vi.fn(),
   getProducts:                 vi.fn(),
-  getPurchaseOrdersBySupplier: vi.fn(),
+  listOpenPurchaseOrders: vi.fn(),
 };
 
 vi.mock('../src/repositories/delivery.repository.js', () => ({ default: repoMock }));
@@ -194,7 +194,7 @@ describe('createDelivery — the purchase order must match the note', () => {
 
   // 'pending' is RECEIVABLE. This test used to assert the opposite, which is
   // what migration 002 turned into a bug: the gate demanded 'approved', a
-  // status BR-07B stopped producing, while getPurchaseOrdersBySupplier only
+  // status BR-07B stopped producing, while listOpenPurchaseOrders only
   // ever offered pending / in_transit / partially_received. Every order the
   // dropdown showed was rejected here.
   it('accepts an order still pending — a PO is receivable from the moment it is raised', async () => {
@@ -370,7 +370,29 @@ describe('reads', () => {
   });
 
   it('400s an invalid supplier on the order lookup', async () => {
-    await expect(deliveryService.getPurchaseOrdersBySupplier('abc'))
+    await expect(deliveryService.listOpenPurchaseOrders('abc'))
+      .rejects.toMatchObject({ status: 400 });
+  });
+
+  // The receiving screen calls this with nothing when a worker is
+  // searching by order number and does not know the supplier. That
+  // has to reach the repository as an explicit null rather than
+  // being rejected as a missing argument.
+  it('lists every open order when no supplier is given', async () => {
+    repoMock.listOpenPurchaseOrders.mockResolvedValue([{ id: 86 }]);
+
+    for (const nothing of [undefined, null, '']) {
+      repoMock.listOpenPurchaseOrders.mockClear();
+      await expect(deliveryService.listOpenPurchaseOrders(nothing)).resolves.toEqual([{ id: 86 }]);
+      expect(repoMock.listOpenPurchaseOrders).toHaveBeenCalledWith(null);
+    }
+  });
+
+  // 0 is not "no supplier", it is a bad supplier. Widening the query
+  // to the whole warehouse on a falsy id is how a filter silently
+  // stops filtering.
+  it('400s a zero supplier rather than widening to everything', async () => {
+    await expect(deliveryService.listOpenPurchaseOrders(0))
       .rejects.toMatchObject({ status: 400 });
   });
 

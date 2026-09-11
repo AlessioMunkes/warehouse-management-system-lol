@@ -58,9 +58,19 @@ const ROLE_LABELS = {
 const QUICK_CREATE = [
   { to: STAFF.pickingSlips, label: 'Picking slip' },
   { to: STAFF.purchaseOrders, label: 'Purchase order' },
-  { to: ADMIN.products, label: 'Product' },
+  // Product creation is admin-only since script 35 — every write in
+  // product.routes.js is requireRole(ADMIN), and App.jsx gates the
+  // route to match. Offering it to a manager is a shortcut to a screen
+  // that bounces them.
+  { to: ADMIN.products, label: 'Product', roles: ['admin'] },
   { to: STAFF.beneficiaries, label: 'Beneficiary' },
 ];
+
+// An entry with no `roles` is for everyone who reaches this shell.
+// Filtering here rather than at the render site means the next
+// admin-only shortcut is one word, not another conditional.
+const quickCreateFor = (role) =>
+  QUICK_CREATE.filter((item) => !item.roles || item.roles.includes(role));
 
 export default function ManagerLayout({ children }) {
   // Already inside a shell — ProtectedRoute supplied one at the route
@@ -134,7 +144,7 @@ function ManagerLayoutShell({ children }) {
                 </Button>
               </PopoverTrigger>
               <PopoverContent align="end" className="w-48 p-1">
-                {QUICK_CREATE.map((item) => (
+                {quickCreateFor(user?.role).map((item) => (
                   <Link
                     key={item.to}
                     to={item.to}

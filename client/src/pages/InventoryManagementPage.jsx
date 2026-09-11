@@ -10,6 +10,7 @@ import StockHealthBar from "../features/InventoryManagement/components/StockHeal
 import StockManifestTable from "../features/InventoryManagement/components/StockManifestTable";
 import AdjustStockModal from "../features/InventoryManagement/components/AdjustStockModal";
 import MovementHistory from "../features/InventoryManagement/components/MovementHistory";
+import StockItemSummary from "../features/InventoryManagement/components/StockItemSummary";
 import { getManifest, getMovements, adjustStock, getStockTrends } from "../services/stockAPI";
 import { useToast } from "@/components/ui/toastContext";
 
@@ -38,6 +39,15 @@ export default function InventoryManagementPage() {
   const toast = useToast();
 
   // Movement history drawer state
+  // The summary panel. It borrows the same movement fetch the history
+  // drawer uses rather than adding a second one — same endpoint, same
+  // product, and two in-flight copies of one list is how they end up
+  // disagreeing.
+  const [summaryFor, setSummaryFor] = useState(null);
+  const [summaryMovements, setSummaryMovements] = useState([]);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState(null);
+
   const [historyFor, setHistoryFor] = useState(null);
   const [movements, setMovements] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -165,6 +175,23 @@ export default function InventoryManagementPage() {
   };
 
   // ── Movement History Handler ──────────────────────────────
+  const handleOpenSummary = async (product) => {
+    setSummaryFor(product);
+    setSummaryMovements([]);
+    setSummaryError(null);
+    setSummaryLoading(true);
+    try {
+      setSummaryMovements(await getMovements(product.id));
+    } catch (err) {
+      // The panel still shows every figure and every catalogue fact —
+      // only the chart is missing — so this reports itself in place
+      // rather than closing the panel or blanking it.
+      setSummaryError(err.message || "Could not load the movement history for this product.");
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
+
   const handleViewHistory = async (product) => {
     setHistoryFor(product);
     setMovements([]);
@@ -225,6 +252,7 @@ export default function InventoryManagementPage() {
             trends={trends}
             onAdjust={(prod) => setAdjustingProduct(prod)}
             onViewHistory={handleViewHistory}
+            onOpenSummary={handleOpenSummary}
           />
         </div>
       </main>
@@ -236,6 +264,21 @@ export default function InventoryManagementPage() {
           onSave={handleAdjustSave}
           onClose={() => setAdjustingProduct(null)}
           isSaving={isSaving}
+        />
+      )}
+
+      {/* Item summary — what the row was pointing at all along */}
+      {summaryFor && (
+        <StockItemSummary
+          product={summaryFor}
+          movements={summaryMovements}
+          isLoading={summaryLoading}
+          error={summaryError}
+          canAdjust={canAdjust}
+          canEditCatalogue={user?.role === 'admin'}
+          onAdjust={(p) => { setSummaryFor(null); setAdjustingProduct(p); }}
+          onViewHistory={(p) => { setSummaryFor(null); handleViewHistory(p); }}
+          onClose={() => setSummaryFor(null)}
         />
       )}
 

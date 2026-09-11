@@ -39,6 +39,8 @@ import TaskPage from '../../staff/components/TaskPage';
 import WorkList from '../../staff/components/WorkList';
 import { readDraft, writeDraft, clearDraft } from '../../staff/hooks/useDraft';
 import useCoachmark from '../../staff/hooks/useCoachmark';
+import useConfirmed from '../../staff/hooks/useConfirmed';
+import useUndo from '../../staff/hooks/useUndo';
 import { useAuth } from '../../../context/AuthContext';
 import dispatchAPI, { newIdempotencyKey } from '../../../services/dispatchAPI';
 import SignaturePad from '../../procurement/components/SignaturePad';
@@ -109,12 +111,19 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
   const [signature, setSignature] = useState(null);
 
   const [mode, setMode] = useState(readStoredMode);
+  const {
+    ids: confirmedIds, toggle: toggleConfirmed,
+    confirmAll: confirmAllLines, reset: resetConfirmed,
+  } = useConfirmed();
+  const acceptUndo = useUndo();
   const { show: showCoachmark, dismiss: dismissCoachmark } = useCoachmark('dispatch-view-toggle');
 
   const [attemptKey, setAttemptKey] = useState(newIdempotencyKey);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [pdfNote, setPdfNote] = useState(null);
+  // See the same flag in ReceivingFlow.jsx.
+  const [queued, setQueued] = useState(false);
 
   const draftKey = palletId ? `dispatch-${palletId}` : null;
 
@@ -227,29 +236,52 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
   const startCollection = () => {
     setPhase('work');
     setFocusId(mode === 'guided' ? (packedLines[0]?.itemId ?? null) : null);
+    // A pallet you have just opened has nothing confirmed on it, and
+    // this component stays mounted across pallets.
+    resetConfirmed();
   };
 
   const patchLine = (itemId, patch) =>
     setLines((all) => all.map((line) => (line.itemId === itemId ? { ...line, ...patch } : line)));
 
-  const acceptAllAsPacked = () =>
+  // Fills what is blank AND ticks every line: pressing "everything as
+  // packed" IS the confirmation. Ticking them afterwards one at a time
+  // would make the fast path the slow one.
+  const acceptAllAsPacked = () => {
+    // Snapshot before, not a computed inverse: putting the previous
+    // arrays straight back cannot get the arithmetic wrong.
+    const previousLines = lines;
+    const previousConfirmed = confirmedIds;
+    const filled = packedLines.filter((l) => l.loaded === '').length;
+
     setLines((all) => all.map((line) => (
       line.loaded === '' ? { ...line, loaded: qtyToInput(line.packed) } : line
     )));
+    confirmAllLines(packedLines.map((l) => l.itemId));
 
-  const focusIndex = packedLines.findIndex((l) => l.itemId === focusId);
-  const goToNextLine = () => {
-    const next = packedLines[focusIndex + 1];
-    setFocusId(next ? next.itemId : null);
+    acceptUndo.propose(
+      `Took ${packedLines.length} ${packedLines.length === 1 ? 'line' : 'lines'} as packed`
+        + (filled > 0 ? `, filling ${filled}` : ''),
+      () => { setLines(previousLines); confirmAllLines(previousConfirmed); },
+    );
   };
 
   // What is stopping the commit, said out loud. A disabled primary
   // with no explanation is a dead end, and here the missing thing is
   // usually a field further down the page.
+  const unconfirmed = packedLines.length - packedLines.filter(
+    (l) => confirmedIds.some((id) => String(id) === String(l.itemId))
+  ).length;
+
   const blockers = [];
   if (!driverName.trim()) blockers.push("the driver's name");
   if (!signature) blockers.push("the driver's signature");
   if (packedLines.some((l) => l.loaded === '')) blockers.push('a count on every line');
+  // Same rule as receiving: the driver signs for what was loaded, and
+  // a signature over lines nobody looked at is what the tick is for.
+  if (unconfirmed > 0) {
+    blockers.push(`a tick on ${unconfirmed} more ${unconfirmed === 1 ? 'line' : 'lines'}`);
+  }
   const blockedNote = blockers.length
     ? `Still needed: ${blockers.join(', ')}.`
     : null;
@@ -277,6 +309,14 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
 
       setPhase('done');
       clearDraft(draftKey);
+
+      // Queued, not recorded — there is no note to show, because the
+      // server has not seen this collection yet.
+      if (result?.queued) {
+        setQueued(true);
+        return;
+      }
+      setQueued(false);
       // recordCollection's response already carries the full joined
       // note — no second fetch needed for the pop-up.
       setPdfNote(result.note);
@@ -301,9 +341,6 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
       <Button disabled={saving || blockers.length > 0} onClick={finish}>
         {saving ? 'Saving' : 'Confirm collection'}
       </Button>
-      {mode === 'guided' && focusIndex >= 0 && focusIndex + 1 < packedLines.length ? (
-        <Button variant="secondary" onClick={goToNextLine}>Next item</Button>
-      ) : null}
       <Button variant="secondary" onClick={onBack}>Back to the gate queue</Button>
     </Actions>
   );
@@ -445,11 +482,17 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
                 value:    line.loaded,
               }))}
               expectedLabel="packed"
+              guided={mode === 'guided'}
               focusId={mode === 'guided' ? focusId : null}
               onFocus={(id) => setFocusId(mode === 'guided' ? id : null)}
               onChange={(id, value) => patchLine(id, { loaded: value })}
               onAcceptAll={acceptAllAsPacked}
               acceptAllLabel="Everything as packed"
+              confirmed={confirmedIds}
+              onConfirm={toggleConfirmed}
+              undo={acceptUndo.offer
+                ? { label: acceptUndo.offer.label, onUndo: acceptUndo.undo }
+                : null}
               renderDetail={(row) => {
                 const line = packedLines.find((l) => l.itemId === row.id);
                 if (!line) return null;
@@ -482,8 +525,10 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
       {/* ── Done ───────────────────────────────────────────── */}
       {phase === 'done' && (
         <StepScreen
-          title="Collection confirmed"
-          sub="The stock is off the system and the pallet is on its way."
+          title={queued ? 'Saved on this phone' : 'Collection confirmed'}
+          sub={queued
+            ? 'There was no signal, so this collection is waiting on your phone, signature and all. It sends itself as soon as you are back in range. Let the driver go.'
+            : 'The stock is off the system and the pallet is on its way.'}
           actions={
             <Actions>
               <Button onClick={backToQueue}>Back to the gate queue</Button>

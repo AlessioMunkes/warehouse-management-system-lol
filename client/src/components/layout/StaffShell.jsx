@@ -25,6 +25,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import useReducedMotion from '../../features/staff/hooks/useReducedMotion';
 import StaffTabBar from './StaffTabBar';
+import OfflineBar from './OfflineBar';
 import { AppNavDrawer } from '../../features/taskdashboard/components/AppNav';
 
 // Both live in client/public/, the same convention the landing page
@@ -123,6 +124,8 @@ export default function StaffShell({
           {meta ? <span className="stf-crumb-meta">{meta}</span> : null}
         </span>
       </div>
+
+      <OfflineBar />
 
       <main className={wide ? 'stf-main is-wide' : 'stf-main'}>{children}</main>
 

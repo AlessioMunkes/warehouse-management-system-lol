@@ -28,7 +28,8 @@ import pool         from '../config/db.js';
 import { logAudit } from './auditLog.repository.js';
 
 const USER_COLUMNS = `
-  u.id, u.username, u.first_name, u.last_name, u.role, u.is_active
+  u.id, u.username, u.first_name, u.last_name, u.role, u.is_active,
+  u.archived_at
 `;
 
 // ── Column whitelist for updates ──────────────────────────────
@@ -45,6 +46,11 @@ const listUsers = async ({ includeInactive = false, search = null } = {}) => {
   const where = [];
 
   if (!includeInactive) where.push('u.is_active = true');
+
+  // Archived accounts leave the directory whatever the toggle says.
+  // The row itself stays because audit_log.actor_id references it and
+  // BR-04's trail has to keep naming who did what.
+  where.push('u.archived_at IS NULL');
 
   if (search) {
     params.push(`%${search}%`);
@@ -172,6 +178,50 @@ const updateUser = async (id, patch, before, actorId) => {
 // deactivated_at / deactivated_by columns exist on users (unlike
 // suppliers) and this slice does not add them. audit_log carries the
 // who/when that those columns would otherwise have held.
+// Archiving an account. is_active goes false in the same statement,
+// which is what actually revokes access — login reads is_active — and
+// the CHECK constraint from migration 019 guarantees the two can never
+// drift apart.
+//
+// The row survives because audit_log.actor_id points at it. An archived
+// admin who approved a purchase order two years ago must still have a
+// name on that approval.
+const archiveUser = async (id, before, actorId) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows } = await client.query(
+      `UPDATE users
+          SET is_active   = false,
+              archived_at = COALESCE(archived_at, now()),
+              archived_by = COALESCE(archived_by, $2)
+        WHERE id = $1
+        RETURNING ${USER_COLUMNS.replace(/u\./g, '')}`,
+      [id, actorId ?? null],
+    );
+    const user = rows[0] ?? null;
+    if (!user) { await client.query('ROLLBACK'); return null; }
+
+    await logAudit(client, {
+      entityType: 'user',
+      entityId:   id,
+      action:     'archived',
+      actorId,
+      before,
+      after:      user,
+    });
+
+    await client.query('COMMIT');
+    return user;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
 const setUserActive = async (id, isActive, before, actorId) => {
   const client = await pool.connect();
   try {
@@ -213,4 +263,5 @@ export default {
   insertUser,
   updateUser,
   setUserActive,
+  archiveUser,
 };
