@@ -19,6 +19,7 @@ import StaffDispatchHistoryPage                    from './pages/StaffDispatchHi
 import ReceiptsPage                                from './pages/ReceiptsPage';
 import InventoryManagementPage                     from './pages/InventoryManagementPage';
 import ManagerDashboardPage                         from './pages/ManagerDashboardPage';
+import { ToastProvider }                             from './components/ui/toast';
 import StockLedgerPage                               from './pages/StockLedgerPage';
 import AdminActivityScreen                         from './pages/AdminActivityScreen';
 import TaskDashboard from './pages/TaskDashboardPage';
@@ -33,8 +34,8 @@ import BeneficiaryDirectoryPage                     from './pages/BeneficiaryDir
 import ImpactReportPage                             from './pages/ImpactReportPage';
 import PickingSlipManagementPage                    from './pages/PickingSlipManagementPage';
 import UserDirectoryPage                            from './pages/UserDirectoryPage';
+import VolunteerManagementPage                       from './pages/VolunteerManagementPage';
 import ProductManagementPage                        from './pages/ProductManagementPage';
-import DocumentsPage                                 from './pages/DocumentsPage';
 import VolunteerEventsPage                        from './pages/VolunteerEventsPage';
 import VolunteerEventWorkspacePage                from './pages/VolunteerEventWorkspacePage';
 import CommunityRequestsPage                       from './pages/CommunityRequestsPage';
@@ -48,6 +49,7 @@ import { ReviewPage as DonationReviewPage }         from './pages/ReviewPage';
 const App = () => (
   <AuthProvider>
     <BrowserRouter>
+      <ToastProvider>
       <Routes>
         {/* Public */}
         <Route path="/"      element={<LandingPage />} />
@@ -71,12 +73,22 @@ const App = () => (
               ManagerDashboardPage, which is still at /manager. */}
           <Route path={ADMIN.dashboard} element={<AdminActivityScreen />} />
           <Route path={ADMIN.suppliers} element={<SupplierDirectoryPage />} />
+          {/* Admin only, matching product.routes.js. A manager reaching
+              this by URL used to get a working editor for rows the
+              server would now refuse to change. */}
+          <Route path={ADMIN.products}  element={<ProductManagementPage />} />
           <Route path={ADMIN.donationManagement} element={<DonationManagementPage />} />
           {/* Account provisioning. Every route in user.routes.js is
               requireRole(ADMIN), so this was unreachable while it sat in
               a manager-only block — the client gate now matches the
               server instead of contradicting it. */}
           <Route path={ADMIN.users} element={<UserDirectoryPage />} />
+          {/* Admin-only here, although the endpoints behind it allow
+              manager too (LOG_READERS in volunteer.routes.js). The
+              server's list is the real control; this route is about
+              where the app steers people, and the admin owns the
+              screen. A manager who needs it can be given a link. */}
+          <Route path={ADMIN.volunteers} element={<VolunteerManagementPage />} />
           {/* These three sat outside every guard, labelled "temporary
               test access ... without login". That reached staging, where
               anyone who knew the URL could open them. The server routes
@@ -113,11 +125,6 @@ const App = () => (
           <Route path={STAFF.receipts} element={<ReceiptsPage />} />
           <Route path={STAFF.beneficiaries} element={<BeneficiaryDirectoryPage />} />
           <Route path={STAFF.pickingSlips} element={<PickingSlipManagementPage />} />
-          <Route path={STAFF.documents} element={<DocumentsPage />} />
-          {/* Manager-reachable but not primary — see
-              ProductManagementPage.jsx's own role gating for the
-              actual write-permission split. */}
-          <Route path={ADMIN.products}  element={<ProductManagementPage />} />
         </Route>
 
         {/* The warehouse worker's dashboard. Split out of the block
@@ -205,6 +212,7 @@ const App = () => (
         {/* Catch-all */}
         <Route path="*" element={<PageNotFound />} />
       </Routes>
+      </ToastProvider>
     </BrowserRouter>
   </AuthProvider>
 );

@@ -6,12 +6,13 @@
 //   1. Unwrap the { success, data } envelope.
 //   2. Map snake_case to camelCase in one place.
 //
-// There is no delete for products, same reasoning as suppliers/users:
-// every operational table references products.id, most without
-// ON DELETE CASCADE — deactivation (setProductStatus) is the removal
-// path.
+// deleteProduct does NOT issue a SQL DELETE. Every operational table
+// references products.id, most without ON DELETE CASCADE, so the row
+// has to survive; what goes away is the product's standing as master
+// data. See migration 019 and ConfirmRemoveDialog.jsx, which is where
+// that distinction gets explained to the person pressing the button.
 // ─────────────────────────────────────────────────────────────
-import { apiGet, apiPost, apiPatch } from "./api";
+import { apiGet, apiPost, apiPatch, apiDelete } from "./api";
 
 // The nine values stock_levels_unit_check and stock_movements_unit_check
 // allow. Anything outside this list is a constraint violation, not a
@@ -56,6 +57,12 @@ export const toProduct = (row) => ({
   ledgerUnit:       row.ledger_unit ?? "",
   isActive:         Boolean(row.is_active),
   createdAt:        row.created_at ?? null,
+  // NUMERIC over the wire is a string, and Number(null) is 0 — a
+  // product nobody has priced is not a free one, so null survives.
+  // Same guard as weightKg above.
+  unitCost:         row.unit_cost === null || row.unit_cost === undefined
+                      ? null
+                      : Number(row.unit_cost),
 });
 
 export const getProducts = async ({ includeInactive = false, search = "" } = {}) => {
@@ -87,7 +94,13 @@ export const setProductStatus = async (id, isActive) => {
   return toProduct(body.data ?? {});
 };
 
+export const deleteProduct = async (id) => {
+  const body = await apiDelete(`/api/products/${id}`);
+  return toProduct(body.data ?? {});
+};
+
 export default {
   getProducts, getProduct, createProduct, updateProduct, setProductStatus,
+  deleteProduct,
   STOCK_UNITS,
 };

@@ -19,7 +19,7 @@ const deliveryServiceMock = {
   createDelivery:              vi.fn().mockResolvedValue({ id: 1 }),
   getSuppliers:                vi.fn(),
   getProducts:                 vi.fn(),
-  getPurchaseOrdersBySupplier: vi.fn(),
+  listOpenPurchaseOrders: vi.fn(),
   getPurchaseOrderItems:       vi.fn(),
 };
 

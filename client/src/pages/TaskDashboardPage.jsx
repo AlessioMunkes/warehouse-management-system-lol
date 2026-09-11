@@ -16,6 +16,7 @@
 import { useEffect, useState } from 'react';
 import { ClipboardList, Truck, PackageCheck, PackageOpen, FlaskConical, ClipboardCheck, HandCoins } from 'lucide-react';
 import DashboardGreeting from '../features/taskdashboard/components/DashboardGreeting';
+import UnfinishedWork from '../features/staff/components/UnfinishedWork';
 import StatTile from '../features/taskdashboard/components/StatTile';
 import ActionCard from '../features/taskdashboard/components/ActionCard';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -68,6 +69,10 @@ export default function TaskDashboardPage() {
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6">
       <DashboardGreeting name={user?.firstName} summaryLine={summaryLine} />
+
+      {/* Renders nothing when there is nothing half-done, which is
+          most days. */}
+      <UnfinishedWork />
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
         {loading ? (

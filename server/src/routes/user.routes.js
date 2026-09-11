@@ -34,4 +34,7 @@ router.patch('/:id',
 router.patch('/:id/status',
   auth, requireRole(...ADMIN_ONLY), validateIntId, userController.setStatus);
 
+router.delete('/:id',
+  auth, requireRole(...ADMIN_ONLY), validateIntId, userController.remove);
+
 export default router;

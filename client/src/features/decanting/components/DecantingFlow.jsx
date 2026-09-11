@@ -1,62 +1,88 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/features/decanting/components/DecantingFlow.jsx
 //
-// Decanting, as four sequential screens (ACC-05):
+// WHAT CHANGED, AND WHY
+// This was the last of the three staff flows still built as "four
+// guided screens, OR a scrolling pop-up dialog". Receiving and
+// dispatch were converted in script 20; decanting was missed, which
+// is why Form mode here was still a dialog that opened over the page
+// and had to be scrolled inside a 560px box on a 1300px screen.
 //
-//   1  What are you decanting?    pick the sack in front of you
-//   2  What does the scale say?   one number, the whole screen
-//   3  Bag this many              nothing to type, read from a metre
-//   4  What did you get?          count back, plus what was spilled
+// It is now the same shape as the other two:
 //
-// The split in step 3 is NOT worked out in this file. It comes from
-// POST /api/decanting/calculate, because decanting.service.js already
-// solves it properly: a closest-total search across the chosen bag
-// sizes, capped at the weighed bulk so the plan can never instruct
-// staff to pack more than is physically in the sack. Re-deriving that
-// in the client would put two answers in the building.
+//   which  pick the sack
+//   work   one page: weigh it, read the bag plan, count back what you
+//          actually got, record what was spilled
+//   done
 //
-// Two things the service decides that this screen only reports:
-//   - the 0.5% margin, stated here in plain words rather than as a
-//     percentage (ACC-09)
-//   - whether the run is bulk-limited, which is what turns "one sack
-//     is enough" into "you will be short"
+// GUIDED AND FORM ARE ONE CODE PATH
+// The old file rendered the fields twice — once as four StepScreens
+// and once inside the dialog — with the same handlers wired to both.
+// Two trees that must be kept in step is how a field gets fixed in
+// one view and not the other. Here there is one set of panels:
 //
-// Saving is final. decanting.service.js has no update path, by
-// design: wastage cannot be un-recorded.
+//   Guided  opens one panel at a time and shows the other two as a
+//           summary line, so there is always a next thing to do and
+//           always a way to see what you already did.
+//   Form    opens all three at once.
 //
-// A second shape exists alongside the four screens above, the same
-// `mode` ('guided' | 'full') pattern ReceivingFlow.jsx introduced:
-// Form mode is the same product/weight/required/bags/wastage fields
-// as one scrolling dialog instead of four screens, calling the exact
-// same workOutTheBags/save functions Guided uses — there is only ever
-// one product per save here, so there is no per-line list to build
-// the way receiving's Form mode needed. No signature is captured in
-// either mode: unlike receiving or dispatch, a decanting record has
-// no external party handing something over to sign for — it is an
-// internal record of what one worker weighed and bagged.
+// Nothing is hidden in either mode and nothing is duplicated. That is
+// also what makes the two modes visibly different, which the previous
+// version was not — switching the toggle on dispatch changed nothing
+// you could see.
 //
-// A decanting sheet PDF pops up after a successful save, the same way
-// DeliveryNotePDF does after a receiving submit — see
-// DecantingSheetPDF.jsx, fed directly by what recordDecanting already
-// returns (the full joined record, not just the bare insert row).
+// WHAT IS UNCHANGED ON PURPOSE
+//   - The split still comes from POST /api/decanting/calculate.
+//     decanting.service.js solves it with a closest-total search
+//     capped at the weighed bulk; re-deriving that here would put two
+//     answers in the building.
+//   - The 0.5% margin is still stated in plain words (ACC-09) and the
+//     bulk-limited case is still a supply problem stated as one.
+//   - The save payload is byte-for-byte what it was: weekOf,
+//     selectedSizes, and one item of { productId, requiredKg,
+//     actualBulkKg, wastageKg }.
+//   - Saving is still final. decanting.service.js has no update path,
+//     by design: wastage cannot be un-recorded.
+//   - The sheet PDF still pops up on success, fed by what
+//     recordDecanting already returns.
+//
+// ONE THING WORTH KNOWING
+// The count-back numbers are NOT sent to the server, and were not in
+// the previous version either — POST /api/decanting only takes the
+// weighed bulk and the wastage, and derives the bags from the plan.
+// So "what you actually got" is, today, a check the worker does for
+// themselves rather than a recorded fact. Left as it was rather than
+// changed quietly here: making it a recorded fact is a server change
+// (a produced/actual column on the decanting line) and a decision
+// about what a variance between planned and produced bags should
+// mean, which is not this script's call to make.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useState } from 'react';
 import {
   StepRail, StepScreen, Actions, Button, NumberField, ChoiceList, Notice,
-  SelectField, ViewToggle, Coachmark,
+  KeyValues, ViewToggle, Coachmark,
 } from '../../staff/components/StepPrimitives';
 import useCoachmark from '../../staff/hooks/useCoachmark';
+import useConfirmed from '../../staff/hooks/useConfirmed';
+import useListSearch from '../../staff/hooks/useListSearch';
+import TaskPage from '../../staff/components/TaskPage';
+import WorkList from '../../staff/components/WorkList';
+import ListTools, { NoMatches } from '../../staff/components/ListTools';
 import { calculateDecantingPlan, recordDecanting } from '../../../services/decantingAPI';
 // The same list the planner and ProductLineRow offer. Importing it
-// rather than restating it is the point of folding the two views: a
-// fourth bag size added here appears in both, or in neither.
+// rather than restating it is the point: a fourth bag size added here
+// appears in both, or in neither.
 import { STANDARD_SIZES, sizesToKg } from './BagSizes';
 import DecantingSheetPDF from './DecantingSheetPDF';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../components/ui/dialog';
+
+// Name and SKU: two sacks of maize meal are told apart by the code on
+// the bag as often as by the name on it. Module level for a stable
+// identity — see the same note in ReceivingFlow.jsx.
+const productText = (product) => [product?.name, product?.sku].filter(Boolean).join(' ');
 
 const MODE_KEY = 'stf_decanting_view_mode';
 const MODES = [
-  { value: 'guided', label: 'Guided', hint: 'Step by step' },
+  { value: 'guided', label: 'Guided', hint: 'One part at a time' },
   { value: 'full',   label: 'Form',   hint: 'Everything at once' },
 ];
 const readStoredMode = () => {
@@ -67,21 +93,19 @@ const readStoredMode = () => {
   }
 };
 
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 2;
+
+const STEP_META = {
+  which: { n: 1, label: 'What you are working with' },
+  work:  { n: 2, label: 'Weigh, bag and count back' },
+  done:  { n: 2, label: 'Saved' },
+};
 
 // Sent explicitly rather than relying on the server default, so a
 // change on either side is a visible change here too. sizesToKg is
 // what stops the old NaN bug coming back: the API takes numbers and
 // STANDARD_SIZES are display labels.
 const BAG_SIZES_KG = sizesToKg(STANDARD_SIZES);
-
-const STEP_META = {
-  product: { n: 1, label: 'What you are working with' },
-  weight:  { n: 2, label: 'Weight' },
-  bag:     { n: 3, label: 'Bag this many' },
-  count:   { n: 4, label: 'What you got' },
-  done:    { n: 4, label: 'Saved' },
-};
 
 // Monday of the current week, which is what weekOf means server-side.
 const mondayOfThisWeek = () => {
@@ -97,29 +121,63 @@ const longDate = (iso) =>
 
 // "500g" and "2kg" are the labels decanting.service.js returns as the
 // keys of the bags object; this turns one into a sentence.
-const bagPhrase = (label) => (label.endsWith('kg') ? `bags of ${label}` : `bags of ${label}`);
+const bagPhrase = (label) => `bags of ${label}`;
 
 // The margin, said the way someone standing at a scale would say it.
 // A percentage on screen is a number nobody can act on.
 const leftoverSentence = (plan) => {
   const left = Number(plan.surplusKg ?? 0);
   if (left <= 0) return 'That uses the whole sack.';
-  if (left < 1) return `That leaves a little under a kilo in the sack.`;
+  if (left < 1) return 'That leaves a little under a kilo in the sack.';
   return `That leaves about ${Math.round(left)} kg in the sack.`;
 };
+
+// ── Panel ──────────────────────────────────────────────────────
+// One part of the job. In Guided the head is a button and only one is
+// open; in Form they are all open and the head is a plain label, so
+// there is no control that looks tappable and does nothing.
+function Panel({ n, title, summary, open, done, locked, onOpen, children }) {
+  const clickable = Boolean(onOpen) && !locked;
+  const Head = clickable ? 'button' : 'div';
+
+  return (
+    <section
+      className={[
+        'stf-panel',
+        open ? 'is-open' : '',
+        done && !open ? 'is-done' : '',
+        locked ? 'is-locked' : '',
+      ].filter(Boolean).join(' ')}
+    >
+      <Head
+        className="stf-panel-head"
+        {...(clickable ? { type: 'button', onClick: onOpen, 'aria-expanded': open } : {})}
+      >
+        <span className="stf-panel-n" aria-hidden="true">{n}</span>
+        <span className="stf-panel-text">
+          <span className="stf-panel-title">{title}</span>
+          {/* The summary is what makes a closed panel worth having:
+              closed and blank is just a hidden field. */}
+          {!open && summary ? <span className="stf-panel-sum">{summary}</span> : null}
+        </span>
+      </Head>
+      {open ? <div className="stf-panel-body">{children}</div> : null}
+    </section>
+  );
+}
 
 // products comes from the page above, which fetches it once for both
 // this flow and the week planner.
 export default function DecantingFlow({ products = [], onCrumbChange }) {
-  const [phase, setPhase] = useState('product');
+  const [phase, setPhase] = useState('which');
 
   const [productId, setProductId] = useState('');
   const [weighedKg, setWeighedKg] = useState('');
 
   // requiredKg is what the ECDs need this week. It belongs to the
   // manager's confirmed demand; until that endpoint exists the staff
-  // screen asks for it once, on step 2, rather than pretending to
-  // know it. See HANDOFF.md.
+  // screen asks for it once rather than pretending to know it.
+  // See HANDOFF.md.
   const [requiredKg, setRequiredKg] = useState('');
 
   const [plan, setPlan] = useState(null);          // one line from /calculate
@@ -130,34 +188,29 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
   const [error, setError] = useState(null);
 
   const [mode, setMode] = useState(readStoredMode);
-  // Whether the Form dialog is open right now — independent of `mode`,
-  // the same reasoning as ReceivingFlow.jsx's own formOpen: dismissing
-  // it must not silently discard a sack already weighed.
-  const [formOpen, setFormOpen] = useState(false);
-  const [shellNode, setShellNode] = useState(null);
-  useEffect(() => {
-    const resolve = () => setShellNode(document.querySelector('.stf-shell'));
-    resolve();
-  }, []);
+  // Which panel Guided has open. Form ignores it entirely.
+  const [panel, setPanel] = useState('scale');
+  const [bagFocus, setBagFocus] = useState(null);
+  const {
+    ids: confirmedIds, toggle: toggleConfirmed,
+    confirmAll: confirmAllBags, reset: resetConfirmed,
+  } = useConfirmed();
+
+  // The product list here is the whole catalogue, and the names run
+  // long enough that two sacks can look identical until you read to
+  // the end of them.
+  const productSearch = useListSearch(products, productText);
+
   const { show: showCoachmark, dismiss: dismissCoachmark } = useCoachmark('decanting-view-toggle');
   // The sheet just saved, fetched in full by recordDecanting itself —
   // null hides the pop-up; set once by save() on success.
   const [pdfRecord, setPdfRecord] = useState(null);
 
   const step = STEP_META[phase];
- const weekOf = useMemo(() => mondayOfThisWeek(), []);
-  const showToggle = phase !== 'done';
+  const weekOf = useMemo(() => mondayOfThisWeek(), []);
+  const showToggle = phase === 'work';
 
   useEffect(() => { onCrumbChange?.(step.label); }, [step.label, onCrumbChange]);
-
-  const handleModeChange = (next) => {
-    setMode(next);
-    // Tapping "Form" opens the dialog directly, the same as Receiving's
-    // toggle — the tap already said what the worker wants to do.
-    if (next === 'full') setFormOpen(true);
-    try { localStorage.setItem(MODE_KEY, next); } catch { /* nothing we can do */ }
-    dismissCoachmark();
-  };
 
   useEffect(() => {
     if (!showCoachmark || !showToggle) return undefined;
@@ -165,9 +218,28 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
     return () => clearTimeout(timer);
   }, [showCoachmark, showToggle, dismissCoachmark]);
 
+  const handleModeChange = (next) => {
+    setMode(next);
+    // Switching to Guided from a half-filled form should land on the
+    // part that still needs doing, not back at the top.
+    if (next === 'guided') setPanel(plan ? 'count' : 'scale');
+    try { localStorage.setItem(MODE_KEY, next); } catch { /* nothing we can do */ }
+    dismissCoachmark();
+  };
+
   const product = products.find((p) => String(p.id) === String(productId));
 
-  // ── Step 2 to 3 · ask the server for the split ──────────────
+  // Bag labels, largest first, as the plan returned them.
+  const bagLabels = plan
+    ? Object.keys(plan.bags).sort((a, b) => {
+        const kg = (l) => (l.endsWith('kg') ? parseFloat(l) : parseFloat(l) / 1000);
+        return kg(b) - kg(a);
+      })
+    : [];
+
+  const madeTotal = bagLabels.reduce((sum, l) => sum + (Number(produced[l]) || 0), 0);
+
+  // ── Ask the server for the split ────────────────────────────
   const workOutTheBags = async () => {
     setBusy(true);
     setError(null);
@@ -186,7 +258,8 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
       // Seed the count-back with the plan, so a run that went exactly
       // as instructed needs no typing at all — only corrections do.
       setProduced({ ...line.bags });
-      setPhase('bag');
+      setBagFocus(null);
+      setPanel('bags');
     } catch (err) {
       // A validation message from the service is written for a
       // developer ("must be at least half the smallest selected bag
@@ -202,7 +275,7 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
     }
   };
 
-  // ── Step 4 · save, once, for good ───────────────────────────
+  // ── Save, once, for good ────────────────────────────────────
   const save = async () => {
     setBusy(true);
     setError(null);
@@ -218,10 +291,6 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
         }],
       });
       setPhase('done');
-      // Ends Form mode's pass through this flow the same way finish()
-      // does in ReceivingFlow.jsx — without this the mega-form would
-      // still be mounted behind the sheet pop-up.
-      setFormOpen(false);
       // recordDecanting already returns the full joined record (see
       // decanting.repository.js's own getDecantingById-after-insert
       // pattern) — no second fetch needed for the pop-up.
@@ -238,24 +307,50 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
   };
 
   const restart = () => {
-    setPhase('product');
+    setPhase('which');
     setProductId('');
     setWeighedKg('');
     setRequiredKg('');
     setPlan(null);
     setProduced({});
     setWastageKg('');
-    setFormOpen(false);
+    setPanel('scale');
+    setBagFocus(null);
     setPdfRecord(null);
   };
 
-  // Bag labels, largest first, as the plan returned them.
-  const bagLabels = plan
-    ? Object.keys(plan.bags).sort((a, b) => {
-        const kg = (l) => (l.endsWith('kg') ? parseFloat(l) : parseFloat(l) / 1000);
-        return kg(b) - kg(a);
-      })
-    : [];
+  // Weight is the thing everything else waits on, so a change to it
+  // invalidates the plan rather than leaving a stale one on screen.
+  const changeWeight = (setter) => (value) => {
+    setter(value);
+    if (plan) { setPlan(null); setProduced({}); setPanel('scale'); }
+  };
+
+  // Said above the button rather than hidden in a disabled state. On
+  // this page the missing thing is usually a panel further up that
+  // the worker has already scrolled past.
+  const blockers = [];
+  if (!weighedKg)  blockers.push('the weight on the scale');
+  if (!requiredKg) blockers.push('what the centres need this week');
+  if (!plan)       blockers.push('the bag plan');
+  const blockedNote = blockers.length ? `Still needed: ${blockers.join(', ')}.` : null;
+
+  const isOpen = (key) => mode === 'full' || panel === key;
+  const openPanel = (key) => () => {
+    if (key !== 'scale' && !plan) return;
+    setPanel(key);
+  };
+
+  const commit = (
+    <Actions>
+      <Button disabled={busy || blockers.length > 0} onClick={save}>
+        {busy ? 'Saving' : 'Save this sack'}
+      </Button>
+      <Button variant="secondary" onClick={() => setPhase('which')}>
+        Change the sack
+      </Button>
+    </Actions>
+  );
 
   return (
     <>
@@ -268,274 +363,223 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
         </div>
       ) : null}
 
-      {mode === 'full' ? null : <StepRail step={step.n} total={TOTAL_STEPS} label={step.label} />}
+      {phase !== 'done' ? <StepRail step={step.n} total={TOTAL_STEPS} label={step.label} /> : null}
 
       {error ? <Notice tone="warn">{error}</Notice> : null}
 
       {/* ── 1 · Which sack ─────────────────────────────────── */}
-      {phase === 'product' && mode !== 'full' && (
+      {phase === 'which' && (
         <StepScreen
           title="What are you decanting?"
           sub="Pick the sack in front of you."
           actions={
             <Actions>
-              <Button disabled={!productId} onClick={() => setPhase('weight')}>Next</Button>
+              <Button disabled={!productId} onClick={() => setPhase('work')}>Next</Button>
             </Actions>
           }
         >
-          <ChoiceList
-            legend="Product"
-            options={products.map((p) => ({
-              value: p.id,
-              label: p.name,
-              meta: p.weight_kg ? `Big sacks, about ${Number(p.weight_kg)} kg` : 'Bulk sacks',
-            }))}
-            value={productId}
-            onChange={setProductId}
+          <ListTools
+            id="stf-product-search"
+            query={productSearch.query}
+            onQuery={productSearch.setQuery}
+            placeholder="Search products"
           />
-        </StepScreen>
-      )}
 
-      {/* ── 2 · Weight ─────────────────────────────────────── */}
-      {phase === 'weight' && mode !== 'full' && (
-        <StepScreen
-          title="What does the scale say?"
-          sub="Put the whole sack on the scale and read the number."
-          actions={
-            <Actions>
-              <Button disabled={!weighedKg || !requiredKg || busy} onClick={workOutTheBags}>
-                {busy ? 'Working it out' : 'Work out the bags'}
-              </Button>
-              <Button variant="secondary" onClick={() => setPhase('product')}>Back</Button>
-            </Actions>
-          }
-        >
-          <NumberField
-            id="stf-weighed"
-            label="Kilograms"
-            value={weighedKg}
-            onChange={setWeighedKg}
-          />
-          <NumberField
-            id="stf-required"
-            label="Kilograms the centres need this week"
-            hint="Your manager sets this. Ask them if you are not sure."
-            value={requiredKg}
-            onChange={setRequiredKg}
-          />
-        </StepScreen>
-      )}
-
-      {/* ── 3 · The instruction ────────────────────────────── */}
-      {phase === 'bag' && mode !== 'full' && plan && (
-        <StepScreen
-          title="Bag this many"
-          sub="Fill these, then come back and tell us what you got."
-          actions={
-            <Actions>
-              <Button onClick={() => setPhase('count')}>I have filled them</Button>
-              <Button variant="secondary" onClick={() => setPhase('weight')}>
-                Change the weight
-              </Button>
-            </Actions>
-          }
-        >
-          {/* Nothing to type on this screen, which is exactly why the
-              numbers can be 34px and read with both hands full. */}
-          {bagLabels.map((label) => (
-            <div key={label} className="stf-instruction">
-              <span className="stf-instruction-n">{plan.bags[label]}</span>
-              <span className="stf-instruction-l">{bagPhrase(label)}</span>
-            </div>
-          ))}
-
-          <p className="stf-field-hint">{leftoverSentence(plan)}</p>
-
-          {/* The sack was lighter than the week needs: a supply
-              problem, not a mistake staff made. Said plainly, and it
-              does not block the run. */}
-          {plan.isBulkLimited ? (
-            <Notice tone="warn">
-              This sack does not hold everything the centres need this week. Pack what is here and
-              tell your manager, so they can order more.
-            </Notice>
-          ) : null}
-        </StepScreen>
-      )}
-
-      {/* ── 4 · Count back ─────────────────────────────────── */}
-      {phase === 'count' && mode !== 'full' && plan && (
-        <StepScreen
-          title="What did you actually get?"
-          sub="Count the bags you filled."
-          actions={
-            <Actions>
-              <Button disabled={busy} onClick={save}>{busy ? 'Saving' : 'Save'}</Button>
-              <Button variant="secondary" onClick={() => setPhase('bag')}>
-                Back to the bag list
-              </Button>
-            </Actions>
-          }
-        >
-          {bagLabels.map((label) => (
-            <NumberField
-              key={label}
-              id={`stf-made-${label}`}
-              label={`${label} bags`}
-              value={produced[label] ?? 0}
-              onChange={(value) => setProduced((all) => ({ ...all, [label]: value }))}
+          {productSearch.searching && productSearch.filtered.length === 0 ? (
+            <NoMatches
+              query={productSearch.query}
+              onClear={() => productSearch.setQuery('')}
+              noun="products"
             />
-          ))}
-
-          <NumberField
-            id="stf-wastage"
-            label="Spilled or spoiled, in kilograms"
-            hint="Put 0 if none was lost."
-            value={wastageKg}
-            flagged={Number(wastageKg) > 0}
-            onChange={setWastageKg}
-          />
-
-          {/* Threshold: more than 5% of the sack. Reported to the
-              manager, never blocked — the run happened either way. */}
-          {Number(wastageKg) > Number(weighedKg) * 0.05 ? (
-            <Notice tone="warn">
-              That is more waste than usual for a sack this size. Your manager will look at it. You
-              can still save.
-            </Notice>
-          ) : null}
-
-          <Notice>
-            Once you save this, it cannot be changed. It goes on the week of {longDate(weekOf)}.
-          </Notice>
+          ) : (
+            <ChoiceList
+              legend="Product"
+              options={productSearch.filtered.map((p) => ({
+                value: p.id,
+                label: p.name,
+                meta: p.weight_kg ? `Big sacks, about ${Number(p.weight_kg)} kg` : 'Bulk sacks',
+              }))}
+              value={productId}
+              onChange={(value) => {
+                setProductId(value);
+                // A different sack is a different job: the plan and the
+                // count-back belonged to the old one.
+                setPlan(null);
+                setProduced({});
+                setPanel('scale');
+                resetConfirmed();
+              }}
+              onActivate={() => setPhase('work')}
+            />
+          )}
         </StepScreen>
       )}
 
-      {/* ── Form mode: an entry screen, plus one scrolling dialog ──
-          Product, both kg fields, the bag plan and wastage — all in
-          one form instead of four screens. There is only ever one
-          product per save here, so unlike ReceivingFlow's Form mode
-          there is no per-line list to render, just the same fields
-          Guided's four screens ask for, one after another down the
-          page. */}
-      {phase !== 'done' && mode === 'full' && (
-        <StepScreen
-          title="Fill in one form"
-          actions={
-            <Actions>
-              <Button onClick={() => setFormOpen(true)}>
-                {productId ? 'Continue this sack' : 'Start a new sack'}
-              </Button>
-            </Actions>
-          }
-        />
-      )}
-
-      <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent
-          container={shellNode ?? undefined}
-          className="max-w-[560px] w-[calc(100%-2rem)] max-h-[85vh] p-0 gap-0 flex flex-col overflow-hidden"
-        >
-          <DialogHeader className="stf-dialog-head">
-            <DialogTitle>{product ? product.name : 'What are you decanting?'}</DialogTitle>
-            <DialogDescription>
-              Pick the sack, weigh it, then fill in what you bagged.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="stf-dialog-scroll">
-            <div className="stf-dialog-fields">
-              <SelectField
-                id="stf-full-product"
-                label="Product"
-                placeholder="Choose a product"
-                options={products.map((p) => ({ value: p.id, label: p.name }))}
-                value={productId}
-                onChange={(value) => { setProductId(value); setPlan(null); setProduced({}); }}
+      {/* ── 2 · The work, on one page ──────────────────────── */}
+      {phase === 'work' && (
+        <TaskPage
+          title={product ? product.name : 'Decanting'}
+          sub="Weigh the sack, fill the bags it works out to, then say what you actually got."
+          note={blockedNote}
+          actions={commit}
+          side={
+            <div className="stf-summary">
+              <p className="stf-summary-title">This sack</p>
+              <KeyValues
+                pairs={[
+                  ['Product', product ? product.name : '—'],
+                  ['On the scale', weighedKg ? `${weighedKg} kg` : '—'],
+                  ['Needed this week', requiredKg ? `${requiredKg} kg` : '—'],
+                  ['Bags counted back', plan ? String(madeTotal) : '—'],
+                  ['Spilled', wastageKg ? `${wastageKg} kg` : '0 kg'],
+                  ['Filed under', `Week of ${longDate(weekOf)}`],
+                ]}
               />
-
-              {productId ? (
-                <>
-                  <NumberField
-                    id="stf-full-weighed"
-                    label="Kilograms on the scale"
-                    value={weighedKg}
-                    onChange={(value) => { setWeighedKg(value); setPlan(null); }}
-                  />
-                  <NumberField
-                    id="stf-full-required"
-                    label="Kilograms the centres need this week"
-                    hint="Your manager sets this. Ask them if you are not sure."
-                    value={requiredKg}
-                    onChange={(value) => { setRequiredKg(value); setPlan(null); }}
-                  />
-
-                  {!plan ? (
-                    <Actions>
-                      <Button disabled={!weighedKg || !requiredKg || busy} onClick={workOutTheBags}>
-                        {busy ? 'Working it out' : 'Work out the bags'}
-                      </Button>
-                    </Actions>
-                  ) : null}
-                </>
-              ) : null}
-
-              {plan ? (
-                <>
-                  <div className="stf-formrows">
-                    {bagLabels.map((label) => (
-                      <NumberField
-                        key={label}
-                        id={`stf-full-made-${label}`}
-                        label={`${label} bags`}
-                        value={produced[label] ?? 0}
-                        onChange={(value) => setProduced((all) => ({ ...all, [label]: value }))}
-                      />
-                    ))}
-                  </div>
-
-                  <p className="stf-field-hint">{leftoverSentence(plan)}</p>
-
-                  {plan.isBulkLimited ? (
-                    <Notice tone="warn">
-                      This sack does not hold everything the centres need this week. Pack what is
-                      here and tell your manager, so they can order more.
-                    </Notice>
-                  ) : null}
-
-                  <NumberField
-                    id="stf-full-wastage"
-                    label="Spilled or spoiled, in kilograms"
-                    hint="Put 0 if none was lost."
-                    value={wastageKg}
-                    flagged={Number(wastageKg) > 0}
-                    onChange={setWastageKg}
-                  />
-
-                  {Number(wastageKg) > Number(weighedKg) * 0.05 ? (
-                    <Notice tone="warn">
-                      That is more waste than usual for a sack this size. Your manager will look at
-                      it. You can still save.
-                    </Notice>
-                  ) : null}
-
-                  <Notice>
-                    Once you save this, it cannot be changed. It goes on the week of {longDate(weekOf)}.
-                  </Notice>
-                </>
-              ) : null}
+              <Notice>Once you save this, it cannot be changed.</Notice>
             </div>
-          </div>
-
-          {plan ? (
-            <div className="stf-dialog-footer">
+          }
+        >
+          {/* ── Panel 1 · the scale ───────────────────────── */}
+          <Panel
+            n={1}
+            title="On the scale"
+            done={Boolean(plan)}
+            open={isOpen('scale')}
+            onOpen={mode === 'guided' ? openPanel('scale') : null}
+            summary={
+              weighedKg
+                ? `${weighedKg} kg weighed · ${requiredKg || '—'} kg needed`
+                : 'Not weighed yet'
+            }
+          >
+            <NumberField
+              id="stf-weighed"
+              label="Kilograms on the scale"
+              value={weighedKg}
+              onChange={changeWeight(setWeighedKg)}
+            />
+            <NumberField
+              id="stf-required"
+              label="Kilograms the centres need this week"
+              hint="Your manager sets this. Ask them if you are not sure."
+              value={requiredKg}
+              onChange={changeWeight(setRequiredKg)}
+            />
+            {!plan ? (
               <Actions>
-                <Button disabled={busy} onClick={save}>{busy ? 'Saving' : 'Save'}</Button>
+                <Button disabled={!weighedKg || !requiredKg || busy} onClick={workOutTheBags}>
+                  {busy ? 'Working it out' : 'Work out the bags'}
+                </Button>
               </Actions>
-            </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+            ) : null}
+          </Panel>
+
+          {/* ── Panel 2 · the instruction ─────────────────── */}
+          <Panel
+            n={2}
+            title="Bag this many"
+            done={Boolean(plan)}
+            locked={!plan}
+            open={isOpen('bags')}
+            onOpen={mode === 'guided' ? openPanel('bags') : null}
+            summary={
+              plan
+                ? bagLabels.map((l) => `${plan.bags[l]} × ${l}`).join(' · ')
+                : 'Weigh the sack first'
+            }
+          >
+            {plan ? (
+              <>
+                {/* Nothing to type here, which is exactly why the
+                    numbers can be 34px and read with both hands
+                    full. */}
+                {bagLabels.map((label) => (
+                  <div key={label} className="stf-instruction">
+                    <span className="stf-instruction-n">{plan.bags[label]}</span>
+                    <span className="stf-instruction-l">{bagPhrase(label)}</span>
+                  </div>
+                ))}
+
+                <p className="stf-field-hint">{leftoverSentence(plan)}</p>
+
+                {/* The sack was lighter than the week needs: a supply
+                    problem, not a mistake staff made. Said plainly,
+                    and it does not block the run. */}
+                {plan.isBulkLimited ? (
+                  <Notice tone="warn">
+                    This sack does not hold everything the centres need this week. Pack what is here
+                    and tell your manager, so they can order more.
+                  </Notice>
+                ) : null}
+
+                {mode === 'guided' ? (
+                  <Actions>
+                    <Button onClick={() => setPanel('count')}>I have filled them</Button>
+                  </Actions>
+                ) : null}
+              </>
+            ) : null}
+          </Panel>
+
+          {/* ── Panel 3 · count back ──────────────────────── */}
+          <Panel
+            n={3}
+            title="What you actually got"
+            locked={!plan}
+            open={isOpen('count')}
+            onOpen={mode === 'guided' ? openPanel('count') : null}
+            summary={plan ? `${madeTotal} bags counted back` : 'Weigh the sack first'}
+          >
+            {plan ? (
+              <>
+                {/* The same list receiving and dispatch count on, so a
+                    worker who has done one of those has already
+                    learned this one. Seeded from the plan, so a run
+                    that went exactly as instructed needs no typing. */}
+                <WorkList
+                  lines={bagLabels.map((label) => ({
+                    id:       label,
+                    title:    `${label} bags`,
+                    expected: plan.bags[label],
+                    value:    produced[label] ?? '',
+                  }))}
+                  expectedLabel="planned"
+                  guided={mode === 'guided'}
+                  focusId={mode === 'guided' ? bagFocus : null}
+                  onFocus={(id) => setBagFocus(mode === 'guided' ? id : null)}
+                  onChange={(id, value) => setProduced((all) => ({ ...all, [id]: value }))}
+                  onAcceptAll={() => {
+                    setProduced({ ...plan.bags });
+                    confirmAllBags(bagLabels);
+                  }}
+                  acceptAllLabel="Exactly as planned"
+                  confirmed={confirmedIds}
+                  onConfirm={toggleConfirmed}
+                />
+
+                <NumberField
+                  id="stf-wastage"
+                  label="Spilled or spoiled, in kilograms"
+                  hint="Put 0 if none was lost."
+                  value={wastageKg}
+                  flagged={Number(wastageKg) > 0}
+                  onChange={setWastageKg}
+                />
+
+                {/* Threshold: more than 5% of the sack. Reported to
+                    the manager, never blocked — the run happened
+                    either way. */}
+                {Number(wastageKg) > Number(weighedKg) * 0.05 ? (
+                  <Notice tone="warn">
+                    That is more waste than usual for a sack this size. Your manager will look at it.
+                    You can still save.
+                  </Notice>
+                ) : null}
+              </>
+            ) : null}
+          </Panel>
+        </TaskPage>
+      )}
 
       {/* ── Done ───────────────────────────────────────────── */}
       {phase === 'done' && (

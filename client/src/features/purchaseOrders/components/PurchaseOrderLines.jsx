@@ -32,7 +32,7 @@ import {
 } from '@/components/ui/table';
 import { Plus, Trash2, PackageSearch } from 'lucide-react';
 
-import { blankLine } from './purchaseOrderLine';
+import { blankLine, lineForProduct, relinkLine } from './purchaseOrderLine';
 
 const money = (value) =>
   `R ${Number(value || 0).toLocaleString('en-ZA', {
@@ -48,8 +48,23 @@ export default function PurchaseOrderLines({
 }) {
   const chosen = new Set(lines.map((l) => Number(l.productId)).filter(Boolean));
 
-  const update = (key, patch) =>
-    onChange(lines.map((l) => (l.key === key ? { ...l, ...patch } : l)));
+  // Choosing a product fills the row in from the catalogue: quantity
+  // stays whatever it is (1 on a new line), and weight and cost follow.
+  const chooseProduct = (key, productId) =>
+    onChange(lines.map((l) => (
+      l.key === key
+        ? lineForProduct(l, products.find((p) => p.id === Number(productId)))
+        : l
+    )));
+
+  // One of the three numbers was typed. relinkLine recomputes the
+  // others from the catalogue, and leaves them alone where it cannot.
+  const relink = (key, field, raw) =>
+    onChange(lines.map((l) => (
+      l.key === key
+        ? relinkLine(l, products.find((p) => p.id === Number(l.productId)), field, raw)
+        : l
+    )));
 
   const addLine = () => onChange([...lines, blankLine()]);
 
@@ -67,22 +82,20 @@ export default function PurchaseOrderLines({
   const addLowStock = () => {
     const low = products.filter((p) => p.isLowStock && !chosen.has(p.id));
     if (!low.length) return;
-    const seeded = low.map((p) => ({
+    const seeded = low.map((p) => lineForProduct({
       ...blankLine(),
-      productId: String(p.id),
       // Suggests the shortfall, rounded up. A suggestion, not a
       // decision — the manager overwrites it constantly and should.
       expectedQuantity: String(Math.max(1, Math.ceil(p.reorderAt - p.available))),
-    }));
+    }, p));
     // Drop the trailing empty row rather than stranding it mid-table.
     const kept = lines.filter((l) => l.productId !== '' || l.expectedQuantity !== '');
     onChange([...kept, ...seeded]);
   };
 
   const estimatedTotal = lines.reduce((sum, l) => {
-    const qty   = Number(l.expectedQuantity || 0);
-    const price = Number(l.unitPrice || 0);
-    return sum + (Number.isFinite(qty * price) ? qty * price : 0);
+    const cost = Number(l.lineCost || 0);
+    return sum + (Number.isFinite(cost) ? cost : 0);
   }, 0);
 
   const lowStockCount = products.filter((p) => p.isLowStock && !chosen.has(p.id)).length;
@@ -98,7 +111,7 @@ export default function PurchaseOrderLines({
               <TableHead className="min-w-[220px]">Item</TableHead>
               <TableHead className="w-[110px]">Quantity</TableHead>
               <TableHead className="w-[120px]">Weight (kg)</TableHead>
-              <TableHead className="w-[130px]">Unit price</TableHead>
+              <TableHead className="w-[130px]">Line cost</TableHead>
               <TableHead className="w-[52px]" />
             </TableRow>
           </TableHeader>
@@ -116,8 +129,8 @@ export default function PurchaseOrderLines({
                 <TableRow key={line.key} data-invalid={rejected || undefined}>
                   <TableCell>
                     <Select
-                      value={line.productId ? String(line.productId) : undefined}
-                      onValueChange={(v) => update(line.key, { productId: v })}
+                      value={line.productId ? String(line.productId) : null}
+                      onValueChange={(v) => chooseProduct(line.key, v)}
                       disabled={disabled}
                     >
                       <SelectTrigger
@@ -151,7 +164,7 @@ export default function PurchaseOrderLines({
                       type="number" min="1" step="1"
                       aria-label={`Quantity for line ${index + 1}`}
                       value={line.expectedQuantity}
-                      onChange={(e) => update(line.key, { expectedQuantity: e.target.value })}
+                      onChange={(e) => relink(line.key, 'expectedQuantity', e.target.value)}
                       disabled={disabled}
                     />
                     {product?.unit ? (
@@ -171,7 +184,7 @@ export default function PurchaseOrderLines({
                       aria-label={`Expected weight for line ${index + 1}`}
                       placeholder="—"
                       value={line.expectedWeightKg}
-                      onChange={(e) => update(line.key, { expectedWeightKg: e.target.value })}
+                      onChange={(e) => relink(line.key, 'expectedWeightKg', e.target.value)}
                       disabled={disabled}
                     />
                   </TableCell>
@@ -179,10 +192,10 @@ export default function PurchaseOrderLines({
                   <TableCell>
                     <Input
                       type="number" min="0" step="0.01"
-                      aria-label={`Unit price for line ${index + 1}`}
+                      aria-label={`Line cost for line ${index + 1}`}
                       placeholder="—"
-                      value={line.unitPrice}
-                      onChange={(e) => update(line.key, { unitPrice: e.target.value })}
+                      value={line.lineCost}
+                      onChange={(e) => relink(line.key, 'lineCost', e.target.value)}
                       disabled={disabled}
                     />
                   </TableCell>
@@ -221,7 +234,10 @@ export default function PurchaseOrderLines({
       </div>
 
       <FieldDescription>
-        Prices are optional and only used for the estimate — the invoice is what gets paid.
+        Quantity, weight and cost stay in step with each other using the
+        catalogue&rsquo;s weight and cost per item — change any one and the other
+        two follow. Prices are still only an estimate; the invoice is what
+        gets paid.
       </FieldDescription>
     </div>
   );

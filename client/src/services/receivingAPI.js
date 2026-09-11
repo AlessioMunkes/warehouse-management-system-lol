@@ -30,6 +30,7 @@
 // column if that's ever added; it isn't written from here today.
 // ─────────────────────────────────────────────────────────────
 import { apiGet, apiPost, cachedGet, invalidateCache } from './api';
+import { queueIfOffline } from './outbox';
 
 // 60s: short enough that a supplier added this morning shows up
 // within a minute of the next page visit, long enough that hopping
@@ -53,14 +54,24 @@ export const getSuppliersWithOpenOrders = async () =>
     return res.data ?? [];
   });
 
-// GET /api/deliveries/purchase-orders?supplierId=
-// Approved orders only, per delivery.repository. This is the "which
+// GET /api/deliveries/purchase-orders[?supplierId=]
+// Open orders only, per delivery.repository. This is the "which
 // delivery is this?" list on step 1: the driver's note references an
 // order, and picking it is what tells us the expected lines.
+//
+// supplierId is optional. Without it this returns every open order in
+// the building, which is what the receiving screen searches when a
+// worker has a number off a driver's note and does not know which
+// supplier the system files it under.
+//
+// The branch matters: template-stringing an undefined supplierId
+// sends the literal text "undefined" as the filter, which matches
+// nothing and looks exactly like "there are no orders".
 export const getPurchaseOrders = async (supplierId) => {
-  const res = await apiGet(
-    `/api/deliveries/purchase-orders?supplierId=${encodeURIComponent(supplierId)}`
-  );
+  const qs = supplierId === undefined || supplierId === null || supplierId === ''
+    ? ''
+    : `?supplierId=${encodeURIComponent(supplierId)}`;
+  const res = await apiGet(`/api/deliveries/purchase-orders${qs}`);
   return res.data ?? [];
 };
 
@@ -87,11 +98,16 @@ export const getProducts = async () => {
 // SUCCESS — the retry did the right thing and the goods were only
 // received once — so callers should say "already recorded" rather
 // than treating it as a failure.
+//
+// With no signal it returns { queued: true, label } instead: the
+// submission is held on this device and sent when the server can be
+// reached again. See outbox.js for why only this and the collection
+// at the gate are allowed to wait.
 export const recordDelivery = async ({
   supplierId, deliveryDate, purchaseOrderId, signatureData, poCompleted,
   lineItems, idempotencyKey,
 }) => {
-  const res = await apiPost('/api/deliveries', {
+  const body = {
     supplierId,
     deliveryDate,
     purchaseOrderId,
@@ -99,7 +115,24 @@ export const recordDelivery = async ({
     poCompleted: Boolean(poCompleted),
     lineItems,
     idempotencyKey: idempotencyKey || null,
-  });
+  };
+
+  let res;
+  try {
+    res = await apiPost('/api/deliveries', body);
+  } catch (err) {
+    // No signal: keep it on the phone rather than losing a counted
+    // delivery. Returns { queued: true } so the flow can say so
+    // instead of pretending the stock is on the system.
+    const label = purchaseOrderId ? `Order ${purchaseOrderId}` : 'A delivery';
+    if (await queueIfOffline(err, {
+      endpoint: '/api/deliveries', body, kind: 'delivery', label,
+    })) {
+      return { queued: true, label };
+    }
+    throw err;
+  }
+
   // A receiving submission can flip its purchase order to 'completed'
   // (poCompleted above), which changes who has an open order — the
   // cached open-suppliers list from getSuppliersWithOpenOrders would
@@ -113,7 +146,16 @@ export const recordDelivery = async ({
 // ProcurementDashboard already understands, defaults to 'all'.
 export const getDeliveries = async (range = 'all') => {
   const res = await apiGet(`/api/deliveries?range=${encodeURIComponent(range)}`);
-  return res.data ?? [];
+  // .rows, not .data. This endpoint returns { rows, total, limit, offset }
+  // — see the header on getDeliveryArchive below and the matching note in
+  // delivery.controller.js. Returning res.data handed callers the envelope
+  // object; `list.length === 0` was then `undefined === 0` (false), so the
+  // empty-state branch never ran and the next line called .map on an
+  // object. Array.isArray keeps an older server that still returns a bare
+  // array working rather than silently rendering nothing.
+  const data = res.data;
+  if (Array.isArray(data)) return data;
+  return data?.rows ?? [];
 };
 
 // ─────────────────────────────────────────────────────────────

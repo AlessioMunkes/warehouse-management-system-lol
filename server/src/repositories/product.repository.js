@@ -9,6 +9,7 @@
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
 import stockModel from './stock.repository.js';
+import { logAudit } from './auditLog.repository.js';
 
 // ── General Product CRUD Operations ─────────────────────────
 
@@ -29,6 +30,7 @@ const PRODUCT_COLUMNS = `
   p.id, p.name, p.stock_keeping_unit AS sku, p.weight_kg,
   p.is_active, p.created_at, p.category, p.is_perishable,
   p.default_unit, p.storage_type, p.default_location_id,
+  p.archived_at, p.unit_cost,
   COALESCE(sl.reorder_threshold, 0) AS reorder_threshold,
   sl.unit AS ledger_unit`;
 
@@ -44,6 +46,14 @@ const listProducts = async ({ includeInactive = false, search = null } = {}) => 
   // historical donations and deliveries. The catalog hides them unless
   // asked, which is what the page's toggle asks for.
   if (!includeInactive) where.push('p.is_active = true');
+
+  // Archived products are gone from the master data whatever the
+  // toggle says. That is the whole difference between the two tiers:
+  // "Show inactive" is for things you might switch back on, and an
+  // archived product is not one of those. It still resolves by id
+  // (getProductById has no such filter) so every historical join and
+  // every slip already referencing it keeps its name.
+  where.push('p.archived_at IS NULL');
 
   if (search) {
     params.push(`%${search}%`);
@@ -118,6 +128,7 @@ const createProduct = async ({
   name, stockKeepingUnit, weightKg = null,
   defaultUnit = 'kg', category = null, isPerishable = false,
   storageType = null, defaultLocationId = null, reorderThreshold = null,
+  unitCost = null,
 }) => {
   // default_unit is NOT NULL DEFAULT 'kg' in the schema, so the default
   // above keeps a payload that omits it valid rather than relying on the
@@ -129,12 +140,13 @@ const createProduct = async ({
     const { rows } = await client.query(
       `INSERT INTO products
          (name, stock_keeping_unit, weight_kg, default_unit, category,
-          is_perishable, storage_type, default_location_id, is_active, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, 'dry'), $8, true, NOW())
+          is_perishable, storage_type, default_location_id, unit_cost,
+          is_active, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, 'dry'), $8, $9, true, NOW())
        RETURNING id`,
       [
         name, stockKeepingUnit, weightKg, defaultUnit, category,
-        isPerishable, storageType, defaultLocationId,
+        isPerishable, storageType, defaultLocationId, unitCost,
       ],
     );
     const id = rows[0].id;
@@ -172,6 +184,7 @@ const PRODUCT_PATCH_COLUMNS = {
   isPerishable:      'is_perishable',
   storageType:       'storage_type',
   defaultLocationId: 'default_location_id',
+  unitCost:          'unit_cost',
 };
 
 // Wrapped in a transaction because a patch touching defaultUnit or
@@ -247,6 +260,66 @@ const updateProduct = async (id, patch = {}) => {
  * Soft-deletes or reactivates a product by toggling its `is_active` boolean flag.
  * Soft deletion ensures historical donation records tied to this product stay intact.
  */
+// Archiving is deactivation plus a headstone.
+//
+// is_active MUST go false in the same statement. Every forward-looking
+// picker in this codebase — the decanting list, the receiving list, the
+// PO line validator, the manifest, the intake search, fourteen sites —
+// already filters `is_active = true`, so setting it here excludes the
+// product from all of them without editing one of those queries and
+// without any chance of one being missed in a later merge. The CHECK
+// constraint added in migration 019 makes that a rule of the database
+// rather than a convention kept in this comment.
+const archiveProduct = async (id, actorId) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const before = (await client.query(
+      `SELECT ${PRODUCT_COLUMNS} ${PRODUCT_FROM} WHERE p.id = $1 FOR UPDATE OF p`,
+      [id],
+    )).rows[0] ?? null;
+
+    if (!before) { await client.query('ROLLBACK'); return null; }
+
+    const { rows } = await client.query(
+      `UPDATE products
+          SET is_active   = false,
+              archived_at = COALESCE(archived_at, now()),
+              archived_by = COALESCE(archived_by, $2)
+        WHERE id = $1
+        RETURNING id`,
+      [id, actorId ?? null],
+    );
+    if (!rows[0]) { await client.query('ROLLBACK'); return null; }
+
+    const after = (await client.query(
+      `SELECT ${PRODUCT_COLUMNS} ${PRODUCT_FROM} WHERE p.id = $1`,
+      [id],
+    )).rows[0];
+
+    // BR-04. Removing something from the master data is the most
+    // destructive thing this screen can do, so it leaves a row saying
+    // who did it and what the product looked like beforehand.
+    await logAudit(client, {
+      entityType: 'product',
+      entityId:   id,
+      action:     'archived',
+      actorId:    actorId ?? null,
+      before,
+      after,
+    });
+
+    await client.query('COMMIT');
+    return after;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
 const setActive = async (id, isActive) => {
   // No RETURNING: PRODUCT_COLUMNS now spans a LEFT JOIN to stock_levels.
   const { rowCount } = await pool.query(
@@ -425,6 +498,7 @@ const deleteProductRoutingDefault = async (productId) => {
 export default {
   listProducts,
   getProductById,
+  archiveProduct,
   findByNameOrSku,
   createProduct,
   updateProduct,

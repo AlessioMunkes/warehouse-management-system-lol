@@ -171,9 +171,11 @@ const generateSlips = async ({ dispatchDate, cohort, generatedBy }) => {
         `INSERT INTO picking_slip_items (picking_slip_id, product_id, required_quantity, unit)
          SELECT $1, ol.product_id, ol.quantity, ol.unit
          FROM ecd_order_lines ol
+         JOIN products p ON p.id = ol.product_id
          WHERE ol.ecd_id = $2
            AND ol.effective_from <= $3::date
            AND (ol.effective_to IS NULL OR ol.effective_to >= $3::date)
+           AND p.archived_at IS NULL
          RETURNING id`,
         [slip.id, slip.ecd_id, dispatchDate]
       );
@@ -241,9 +243,11 @@ const createSlip = async ({ ecdId, dispatchDate, cohort, generatedBy }) => {
       `INSERT INTO picking_slip_items (picking_slip_id, product_id, required_quantity, unit)
        SELECT $1, ol.product_id, ol.quantity, ol.unit
        FROM ecd_order_lines ol
+       JOIN products p ON p.id = ol.product_id
        WHERE ol.ecd_id = $2
          AND ol.effective_from <= $3::date
          AND (ol.effective_to IS NULL OR ol.effective_to >= $3::date)
+         AND p.archived_at IS NULL
        RETURNING id`,
       [slipId, ecdId, dispatchDate]
     );

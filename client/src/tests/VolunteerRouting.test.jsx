@@ -30,8 +30,11 @@ describe('Volunteer Management routing', () => {
     expect(screen.getByText('Event workspace')).toBeInTheDocument();
   });
 
-  it.each(['warehouse_worker', 'finance'])('returns %s to the warehouse home', (role) => {
-    useAuth.mockReturnValue({ user: { id: 1, role }, isLoading: false });
+  // Only warehouse_worker. The other name here was 'finance', a role
+  // this system no longer has — it was standing in for "somebody who
+  // gets bounced" and passing for the wrong reason.
+  it('returns a warehouse worker to the warehouse home', () => {
+    useAuth.mockReturnValue({ user: { id: 1, role: 'warehouse_worker' }, isLoading: false });
     renderRoute();
     expect(screen.getByText('Warehouse home')).toBeInTheDocument();
   });

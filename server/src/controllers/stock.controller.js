@@ -135,10 +135,28 @@ const getLedgerActors = async (req, res) => {
   }
 };
 
+// ── 30-day stock level trace (all roles) ─────────────────────────
+// GET /api/stock/trends?days=30
+// Returns: { days, series: { [productId]: number[] } }
+const getStockTrends = async (req, res) => {
+  try {
+    const data = await stockService.getStockTrends(req.query);
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    console.error('[getStockTrends]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to retrieve stock trends.',
+    });
+  }
+};
+
 export default {
   getManifest,
   getMovements,
   adjustManually,
+  getStockTrends,
   getLedger,
   getReconciliation,
   getLedgerActors,

@@ -17,6 +17,12 @@ router.get('/', auth, requireRole(...ALL_ROLES), stockController.getManifest);
 // ── Static paths before /:id to prevent shadowing ────────────
 router.post('/adjust', auth, requireRole(...MANAGERS_UP), stockController.adjustManually);
 
+// ── Trends (all roles) ────────────────────────────────────────
+// The sparkline data for the inventory screen. Gated like GET /api/stock
+// rather than like the ledger: it is the same manifest with a time
+// axis, not a supervisory view.
+router.get('/trends', auth, requireRole(...ALL_ROLES), stockController.getStockTrends);
+
 // ── Ledger (manager/admin) ────────────────────────────────────
 // The two /ledger/... paths are declared before /ledger itself for
 // the same reason this whole block sits above /:id — Express matches
@@ -31,6 +37,12 @@ router.post('/adjust', auth, requireRole(...MANAGERS_UP), stockController.adjust
 router.get('/ledger/reconciliation', auth, requireRole(...MANAGERS_UP), stockController.getReconciliation);
 router.get('/ledger/actors',         auth, requireRole(...MANAGERS_UP), stockController.getLedgerActors);
 router.get('/ledger',                auth, requireRole(...MANAGERS_UP), stockController.getLedger);
+
+// ── Trends (all roles) ────────────────────────────────────────
+// The sparkline data for the inventory screen. Gated like GET /api/stock
+// rather than like the ledger: it is the same manifest with a time
+// axis, not a supervisory view.
+router.get('/trends', auth, requireRole(...ALL_ROLES), stockController.getStockTrends);
 
 // ── Single product ────────────────────────────────────────────
 router.get('/:id/history', auth, requireRole(...ALL_ROLES), validateIntId, stockController.getMovements);

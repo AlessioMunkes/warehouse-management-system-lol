@@ -16,7 +16,11 @@
 // server/src/repositories/stock.repository.js getManifest.
 // ─────────────────────────────────────────────────────────────
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { PackageSearch } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import EmptyState from '@/components/ui/empty-state';
+import Sparkline from './Sparkline';
 import {
   Table,
   TableBody,
@@ -69,28 +73,86 @@ import "../../../styles/landingpage.css";
 // `sort` is the value a row sorts on. Product and SKU sort as text,
 // everything else numerically — sorting "12" against "9" as strings is
 // how a stock table ends up claiming 9 is more than 12.
+// Widths re-proportioned to make room for the trend column without
+// reintroducing horizontal scroll — they still total 100%.
 const COLUMNS = [
-  { key: 'name',      label: 'Product',   width: '26%', align: 'left',
+  { key: 'name',      label: 'Product',   width: '22%', align: 'left',
     sort: (p) => (p.name ?? '').toLowerCase() },
-  { key: 'sku',       label: 'SKU',       width: '14%', align: 'left',
+  { key: 'sku',       label: 'SKU',       width: '12%', align: 'left',
     sort: (p) => (p.sku ?? '').toLowerCase() },
-  { key: 'onHand',    label: 'On Hand',   width: '10%', align: 'right',
+  { key: 'onHand',    label: 'On Hand',   width: '9%',  align: 'right',
     sort: (p) => Number(p.onHand ?? 0) },
-  { key: 'committed', label: 'Committed', width: '10%', align: 'right',
+  { key: 'committed', label: 'Committed', width: '9%',  align: 'right',
     sort: (p) => Number(p.committed ?? 0) },
-  { key: 'available', label: 'Available', width: '10%', align: 'right',
+  { key: 'available', label: 'Available', width: '9%',  align: 'right',
     sort: (p) => Number(p.available ?? 0) },
-  { key: 'reorderAt', label: 'Reorder At',width: '10%', align: 'right',
+  { key: 'reorderAt', label: 'Reorder At',width: '9%',  align: 'right',
     sort: (p) => Number(p.reorderAt ?? 0) },
-  { key: 'status',    label: 'Status',    width: '10%', align: 'left',
+  // Not sortable, deliberately. Every other accessor here reads a
+  // field off the product row, but the series lives in the `trends`
+  // prop keyed by id, and COLUMNS is module scope — it cannot see it.
+  // Sorting by "what fell the most this month" would mean special-
+  // casing this one column inside the component; worth doing if
+  // someone asks for it, not worth a fake accessor that silently
+  // sorts by nothing.
+  { key: 'trend',     label: '30 days',   width: '12%', align: 'left',
+    sort: null },
+  { key: 'status',    label: 'Status',    width: '9%',  align: 'left',
     // Shortfall first, then low stock, then healthy — the order someone
     // scanning for problems wants, not alphabetical.
     sort: (p) => (p.isShortfall ? 2 : p.isLowStock ? 1 : 0) },
-  { key: 'actions',   label: 'Actions',   width: '10%', align: 'right',
+  { key: 'actions',   label: 'Actions',   width: '9%',  align: 'right',
     sort: null },
 ];
 
-const COLUMN_KEY = 'wms_stock_columns';
+// Versioned. The stored value is a list of visible column keys, so a
+// browser holding the pre-trend list would hide the new column
+// forever and there is no way to tell "deliberately hidden" from
+// "saved before this column existed". Bumping the key resets the
+// choice once; leaving it would ship a column nobody could see.
+// Below these widths a column is dropped. Keyed by name so this
+// survives the column list changing — a key that is not listed always
+// shows. Tailwind's own breakpoints, so a column appearing at 768
+// appears with everything else on the page that says md:.
+// Measured, not guessed: at 400px the numeric cells are 56px and
+// "0 units" needs 61 — TableCell is whitespace-nowrap, as it should be
+// for a number, so the cell has to be wide enough rather than the
+// number made to wrap. Dropping On Hand below 640 is what buys the
+// remaining columns that width.
+//
+// What survives on a phone is the product, what is Available, and the
+// buttons — Available being the number an allocation decision is
+// actually made on. The other three figures are one tap away in the
+// summary, which is the whole point of the row opening one.
+// A floor on a column's share, keyed by name for the same reason
+// MIN_VIEWPORT is — the COLUMNS array differs between branches, so
+// editing its entries one by one applies to one checkout and misses on
+// the other. A column not listed keeps whatever it declares.
+//
+// Only the four numeric columns need it: their labels are long and
+// their declared 9% does not fit them.
+// 12, not 11. At 11 the measurement came back with "Committed"
+// needing 73px and having exactly 73 — unclipped by nothing. A label
+// that fits to the pixel stops fitting the first time the font, the
+// zoom or the sidebar width moves. 12 leaves about 8px of headroom on
+// the longest of the four.
+const MIN_SHARE = {
+  onHand:    12,
+  committed: 12,
+  available: 12,
+  reorderAt: 12,
+};
+
+const MIN_VIEWPORT = {
+  status:    640,
+  onHand:    640,
+  sku:       768,
+  committed: 1024,
+  reorderAt: 1024,
+  trend:     1280,
+};
+
+const COLUMN_KEY = 'wms_stock_columns_v2';
 
 const readStoredColumns = () => {
   try {
@@ -117,8 +179,10 @@ export default function StockManifestTable({
   products = [],
   isLoading = false,
   canAdjust = false,
+  trends = {},
   onAdjust,
   onViewHistory,
+  onOpenSummary,
 }) {
   // Filter States
   const [searchTerm, setSearchTerm] = useState("");
@@ -138,6 +202,21 @@ export default function StockManifestTable({
 
   // null = the order the server sent, which is alphabetical by name.
   const [sort, setSort] = useState(null); // { key, direction }
+
+  // Measured against the window rather than a CSS media query, because
+  // the Columns menu has to agree with it — a column the layout has
+  // dropped must not sit in that list as a ticked box that does
+  // nothing when you untick it.
+  const [viewport, setViewport] = useState(
+    () => (typeof window === 'undefined' ? 1280 : window.innerWidth)
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const onResize = () => setViewport(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    onResize();
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const setColumnVisible = (key, on) => {
     setVisibleKeys((previous) => {
@@ -160,7 +239,12 @@ export default function StockManifestTable({
     });
   };
 
-  const columns = COLUMNS.filter((c) => visibleKeys.includes(c.key));
+  // Below these widths the column is not worth the space it takes.
+  // Product, On Hand, Available and the actions survive everywhere —
+  // what is here, what can be promised, and what you can do about it.
+  const columns = COLUMNS.filter(
+    (c) => visibleKeys.includes(c.key) && viewport >= (MIN_VIEWPORT[c.key] ?? 0)
+  );
 
   // Active Filters Count (excluding search)
   const activeFiltersCount = useMemo(() => {
@@ -495,46 +579,89 @@ export default function StockManifestTable({
 
       <CardContent>
         {isLoading ? (
-          <div className="stock-empty-state">
-            Loading stock levels...
+          // Skeleton rows rather than a line of text: the table is the
+          // whole screen, and eighteen other pages already load this
+          // way. A sentence where a table is about to appear reads as
+          // an error message.
+          <div className="space-y-2 py-2" aria-busy="true">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <Skeleton key={i} className="h-10 w-full" />
+            ))}
           </div>
         ) : filteredProducts.length === 0 ? (
-          <div className="stock-empty-state">
-            <p>No matching products found.</p>
-            {(activeFiltersCount > 0 || searchTerm) && (
-              <Button
-                variant="link"
-                size="sm"
-                onClick={handleResetFilters}
-                className="mt-2 text-xs"
-              >
-                Clear all active filters
-              </Button>
-            )}
-          </div>
+          <EmptyState
+            icon={PackageSearch}
+            title={
+              activeFiltersCount > 0 || searchTerm
+                ? "No products match these filters"
+                : "No products in the catalogue yet"
+            }
+            description={
+              activeFiltersCount > 0 || searchTerm
+                ? "Nothing in the manifest matches what you have selected."
+                : "Products appear here once they are added to the catalogue or arrive through receiving."
+            }
+            action={
+              (activeFiltersCount > 0 || searchTerm)
+                ? { label: "Clear all active filters", onClick: handleResetFilters }
+                : undefined
+            }
+          />
         ) : (
           <div className="stock-table-wrapper">
             <Table className="w-full table-fixed">
               <colgroup>
-                {columns.map((c) => <col key={c.key} style={{ width: c.width }} />)}
+                {/* Normalised over the VISIBLE columns. The widths in
+                    COLUMNS are absolute percentages that total 100 only
+                    when every column is on; hiding one left the table
+                    short and the browser made up the difference on the
+                    last column. Treating them as shares keeps the total
+                    at 100 for any subset. */}
+                {(() => {
+                  // MIN_SHARE raises a few columns off the floor before
+                  // normalising. Measured, not guessed: at nine columns
+                  // in a 1052px table, 9% is a 95px column — 24px of
+                  // padding and 16px of sort icon leave 55px of text,
+                  // and "Committed" needs 73. The four numeric columns
+                  // were all being cut to "Com…" and "Reord…".
+                  const shares = columns.map(
+                    (c) => Math.max(parseFloat(c.width) || 1, MIN_SHARE[c.key] ?? 0)
+                  );
+                  const total  = shares.reduce((a, b) => a + b, 0) || 1;
+                  return columns.map((c, i) => (
+                    <col key={c.key} style={{ width: `${(shares[i] / total * 100).toFixed(3)}%` }} />
+                  ));
+                })()}
               </colgroup>
               <TableHeader className="stock-table-header">
                 <TableRow>
                   {columns.map((c) => (
                     <TableHead
                       key={c.key}
-                      className={`font-semibold ${c.align === 'right' ? 'text-right' : ''}`}
+                      // title: if a label ever does shorten — a longer
+                      // one, a bigger font, a narrower window — the full
+                      // text is still one hover away rather than lost.
+                      title={c.label || undefined}
+                      className={`px-2 font-semibold ${c.align === 'right' ? 'text-right' : ''}`}
                     >
                       {c.sort ? (
                         <button
                           type="button"
                           onClick={() => toggleSort(c.key)}
                           aria-label={`Sort by ${c.label}`}
-                          className={`inline-flex items-center gap-1 hover:text-[#2b3336] ${
+                          className={`flex w-full min-w-0 items-center gap-1 hover:text-[#2b3336] ${
                             c.align === 'right' ? 'flex-row-reverse' : ''
                           }`}
                         >
-                          <span>{c.label}</span>
+                          {/* min-w-0 + truncate. An inline-flex whose
+                              span cannot shrink, inside a fixed-layout
+                              column narrower than the word, draws
+                              straight over the next column — which is
+                              exactly what "Committed" was doing to
+                              "Available". Never wrap a header: breaking
+                              mid-word depends on the font, so it comes
+                              undone the next time anything changes. */}
+                          <span className="min-w-0 truncate">{c.label}</span>
                           {sort?.key === c.key
                             ? (sort.direction === 'desc'
                                 ? <ArrowDown className="h-3 w-3" />
@@ -548,7 +675,11 @@ export default function StockManifestTable({
               </TableHeader>
               <TableBody>
                 {sortedProducts.map((product) => (
-                  <TableRow key={product.id} className="stock-table-row">
+                  <TableRow
+                    key={product.id}
+                    className={`stock-table-row${onOpenSummary ? ' cursor-pointer' : ''}`}
+                    onClick={onOpenSummary ? () => onOpenSummary(product) : undefined}
+                  >
                     {columns.map((c) => {
                       // truncate + title: fixed layout means a long
                       // product name would otherwise be clipped with no
@@ -588,6 +719,11 @@ export default function StockManifestTable({
                           {product.reorderAt} {product.unit}
                         </TableCell>
                       );
+                      if (c.key === 'trend') return (
+                        <TableCell key={c.key} className="stock-cell-trend">
+                          <Sparkline points={trends[product.id]} unit={product.unit} />
+                        </TableCell>
+                      );
                       if (c.key === 'status') return (
                         <TableCell key={c.key}>{renderStatusBadge(product)}</TableCell>
                       );
@@ -598,27 +734,26 @@ export default function StockManifestTable({
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => onAdjust?.(product)}
+                                // stopPropagation, or adjusting a row
+                                // also opens its summary behind the modal.
+                                onClick={(e) => { e.stopPropagation(); onAdjust?.(product); }}
                                 className="stock-action-btn"
+                                title={`Adjust ${product.name}`}
                                 aria-label={`Adjust ${product.name}`}
                               >
                                 <Edit3 className="h-3.5 w-3.5" />
-                                {/* Label hidden on narrow viewports —
-                                    two labelled buttons is what pushed
-                                    the last column off screen. */}
-                                <span className="hidden xl:inline">Adjust</span>
                               </Button>
                             )}
 
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => onViewHistory?.(product)}
+                              onClick={(e) => { e.stopPropagation(); onViewHistory?.(product); }}
                               className="stock-action-btn"
+                              title={`History for ${product.name}`}
                               aria-label={`History for ${product.name}`}
                             >
                               <History className="h-3.5 w-3.5" />
-                              <span className="hidden xl:inline">History</span>
                             </Button>
                           </div>
                         </TableCell>

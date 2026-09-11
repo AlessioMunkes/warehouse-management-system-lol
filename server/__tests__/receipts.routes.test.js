@@ -23,7 +23,7 @@ const deliveryServiceMock = {
   createDelivery:        vi.fn(),
   getSuppliers:          vi.fn(),
   getProducts:           vi.fn(),
-  getPurchaseOrdersBySupplier: vi.fn(),
+  listOpenPurchaseOrders: vi.fn(),
   getPurchaseOrderItems: vi.fn(),
 };
 

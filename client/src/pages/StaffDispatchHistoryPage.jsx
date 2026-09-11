@@ -26,6 +26,8 @@ import DispatchNotePDF from '../features/dispatch/components/DispatchNotePDF';
 import { Notice } from '../features/staff/components/StepPrimitives';
 import dispatchAPI from '../services/dispatchAPI';
 import { STAFF } from '../routes/paths';
+import Paged from '../features/staff/components/Paged';
+import usePaged from '../features/staff/hooks/usePaged';
 
 const RANGES = [
   { key: 'today', label: 'Today' },
@@ -72,6 +74,11 @@ export default function StaffDispatchHistoryPage() {
     })();
     return () => { cancelled = true; };
   }, [range]);
+
+  // A month of dispatches is the reason this screen needed paging
+  // first: the range selector goes to 'month' and the list does not
+  // end.
+  const paged = usePaged(history);
 
   const openPdf = async (eventId) => {
     setOpeningId(eventId);
@@ -125,7 +132,7 @@ export default function StaffDispatchHistoryPage() {
           </div>
         ) : (
           <div className="stf-list">
-            {history.map((row) => (
+            {paged.slice.map((row) => (
               <div key={row.dispatch_event_id} className="stf-row is-static">
                 <span className="stf-row-main">
                   <span className="stf-row-title">
@@ -164,6 +171,8 @@ export default function StaffDispatchHistoryPage() {
             ))}
           </div>
         )}
+
+        <Paged {...paged} noun="dispatches" />
       </div>
 
       {pdfNote ? (

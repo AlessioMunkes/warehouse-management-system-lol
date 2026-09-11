@@ -376,10 +376,21 @@ const getProducts = async () => {
 };
 
 // ── Get approved POs for a supplier ──────────────────────────
-const getPurchaseOrdersBySupplier = async (supplierId) => {
-  if (!supplierId)                  fail(400, 'Supplier ID is required.');
-  if (!isPositiveInt(supplierId))   fail(400, 'Invalid supplier.');
-  return await deliveryModel.getPurchaseOrdersBySupplier(supplierId);
+// supplierId is optional. Omitted, this is every open order across
+// every supplier — what the receiving screen searches when someone is
+// holding a note with an order number and nothing else.
+//
+// Still validated when it IS given: 'abc' is a malformed request, not
+// a request for everything. That distinction is the whole reason this
+// is an explicit empty-check rather than a falsy one — 0 and '' are
+// not valid supplier ids either, and neither should quietly widen the
+// query to the whole warehouse.
+const listOpenPurchaseOrders = async (supplierId) => {
+  if (supplierId === undefined || supplierId === null || supplierId === '') {
+    return await deliveryModel.listOpenPurchaseOrders(null);
+  }
+  if (!isPositiveInt(supplierId)) fail(400, 'Invalid supplier.');
+  return await deliveryModel.listOpenPurchaseOrders(supplierId);
 };
 
 // ── Get items for a specific PO ───────────────────────────────
@@ -401,6 +412,6 @@ export default {
   createDelivery,
   getSuppliers,
   getProducts,
-  getPurchaseOrdersBySupplier,
+  listOpenPurchaseOrders,
   getPurchaseOrderItems,
 };

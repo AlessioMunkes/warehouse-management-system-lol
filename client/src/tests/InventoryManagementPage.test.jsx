@@ -23,6 +23,11 @@ vi.mock('../services/stockAPI', () => ({
   getManifest:  vi.fn(),
   getMovements: vi.fn(),
   adjustStock:  vi.fn(),
+  // The sparkline feed. Given a default implementation here rather
+  // than in beforeEach because vi.clearAllMocks() clears calls but
+  // not implementations, and an undefined export would throw inside
+  // the page's effect before any assertion ran.
+  getStockTrends: vi.fn(async () => ({})),
 }));
 
 const mockUser = { value: { id: 1, firstName: 'Grizel', lastName: 'M', role: 'manager' } };

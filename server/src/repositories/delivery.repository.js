@@ -335,7 +335,7 @@ const createDelivery = async ({
     // has already had its stock taken in; receiving against it again
     // doubles the balance.
     // BR-07B vocabulary. This used to demand status === 'approved', a value
-    // migration 002 stopped producing — while getPurchaseOrdersBySupplier
+    // migration 002 stopped producing — while listOpenPurchaseOrders
     // below offered pending/in_transit/partially_received. The two disagreed,
     // so every order the dropdown offered was rejected here and the only
     // orders that passed were ones the dropdown never showed.
@@ -482,9 +482,16 @@ const getSupplierOptions = async () => {
 };
 
 // ── Get all active suppliers ──────────────────────────────────
+// The comment said "active" and the SQL said nothing — there was no
+// WHERE clause at all, so every deactivated supplier has been showing
+// up in the receiving picker. Predates the archive tier; found while
+// mapping which queries it had to reach.
 const getSuppliers = async () => {
   const result = await pool.query(
-    `SELECT id, name, contact_email FROM suppliers ORDER BY name ASC`,
+    `SELECT id, name, contact_email
+     FROM suppliers
+     WHERE is_active = true
+     ORDER BY name ASC`,
   );
   return result.rows;
 };
@@ -492,7 +499,7 @@ const getSuppliers = async () => {
 // ── Get suppliers with at least one order still open ──────────
 // For the Form view's supplier picker: no point offering a supplier
 // there is nothing to receive from. Reads OPEN_PO_STATUSES, the same
-// list getPurchaseOrdersBySupplier below uses, so the two can never
+// list listOpenPurchaseOrders below uses, so the two can never
 // disagree about what counts as open. It used to hard-code
 // status = 'approved', which stopped matching anything the moment
 // 'approved' became legacy — the picker silently went near-empty.
@@ -504,6 +511,7 @@ const getSuppliersWithOpenOrders = async () => {
      FROM suppliers s
      JOIN purchase_orders po ON po.supplier_id = s.id
      WHERE po.status = ANY($1)
+       AND s.is_active = true
      ORDER BY s.name ASC`,
     [OPEN_PO_STATUSES],
   );
@@ -526,20 +534,38 @@ const getProducts = async () => {
 // one already closed off. Reads the same OPEN_PO_STATUSES as
 // getSuppliersWithOpenOrders above, so the two agree by construction
 // rather than by two people remembering to edit both.
-const getPurchaseOrdersBySupplier = async (supplierId) => {
+// supplierId is OPTIONAL. Passed, this is the old per-supplier list;
+// omitted, it is every open order in the building.
+//
+// The second shape is what lets the receiving screen be searched by
+// order number. A driver arrives with a note that has an order number
+// on it and no reliable supplier name, and until now the only way in
+// was to guess the supplier first.
+//
+// supplier_name is selected because the list can now span suppliers,
+// and "Order 86" on its own is not enough to pick the right one.
+//
+// NULLS LAST because an order with no expected date sorted first
+// under plain ASC, which put the least specific rows at the top of a
+// list people read top-down. The id tiebreak keeps the order stable
+// between two calls, which keyset-free client paging depends on.
+const listOpenPurchaseOrders = async (supplierId = null) => {
   const result = await pool.query(
     `SELECT
        po.id,
        po.status,
+       po.supplier_id,
+       s.name AS supplier_name,
        po.expected_delivery_date,
        po.created_at,
        u.first_name AS created_by_name
      FROM purchase_orders po
      LEFT JOIN users u ON u.id = po.created_by
-     WHERE po.supplier_id = $1
+     LEFT JOIN suppliers s ON s.id = po.supplier_id
+     WHERE ($1::int IS NULL OR po.supplier_id = $1::int)
        AND po.status = ANY($2)
-     ORDER BY po.expected_delivery_date ASC`,
-    [supplierId, OPEN_PO_STATUSES],
+     ORDER BY po.expected_delivery_date ASC NULLS LAST, po.id ASC`,
+    [supplierId ?? null, OPEN_PO_STATUSES],
   );
   return result.rows;
 };
@@ -580,6 +606,6 @@ export default {
   getSuppliers,
   getSuppliersWithOpenOrders,
   getProducts,
-  getPurchaseOrdersBySupplier,
+  listOpenPurchaseOrders,
   getPurchaseOrderItems,
 };

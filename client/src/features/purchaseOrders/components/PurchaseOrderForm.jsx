@@ -34,7 +34,7 @@ import {
 } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import PurchaseOrderLines from './PurchaseOrderLines';
-import { blankLine } from './purchaseOrderLine';
+import { blankLine, unitPriceFor } from './purchaseOrderLine';
 
 // Render runs UTC and the warehouse does not. Between midnight and
 // 02:00 SAST the container still thinks it is yesterday, so a date
@@ -92,7 +92,7 @@ export default function PurchaseOrderForm({
         productId:        Number(l.productId),
         expectedQuantity: Number(l.expectedQuantity),
         expectedWeightKg: l.expectedWeightKg === '' ? null : Number(l.expectedWeightKg),
-        unitPrice:        l.unitPrice === '' ? null : Number(l.unitPrice),
+        unitPrice:        unitPriceFor(l),
       })),
     });
   };
@@ -105,7 +105,7 @@ export default function PurchaseOrderForm({
         <Field data-invalid={(touched && !form.supplierId) || undefined}>
           <FieldLabel htmlFor="po-supplier">Supplier</FieldLabel>
           <Select
-            value={form.supplierId || undefined}
+            value={form.supplierId || null}
             onValueChange={(v) => setForm((f) => ({ ...f, supplierId: v }))}
             disabled={busy}
           >

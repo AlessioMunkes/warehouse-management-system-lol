@@ -69,10 +69,26 @@ const setStatus = async (req, res) => {
   }
 };
 
+// ── DELETE /api/products/:id ────────────────────────────────────
+// "Delete" as an admin means it: gone from the catalogue, gone from
+// every picker. It is not a SQL DELETE — product_id is referenced by
+// picking_slip_items, delivery_note_items, dispatch lines,
+// stock_movements and eight reporting joins, and BR-04 requires all of
+// that to stay readable.
+const remove = async (req, res) => {
+  try {
+    const data = await productService.archiveProduct(req.params.id, req.user?.id);
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    respondError(res, err, 'archiveProduct', 'Failed to delete product.');
+  }
+};
+
 export default {
   list,
   getOne,
   register,
   update,
   setStatus,
+  remove,
 };

@@ -9,11 +9,17 @@
 // One list, no tabs — there is no prospect-style draft concept for
 // products the way there is for suppliers.
 // ─────────────────────────────────────────────────────────────
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth }  from '../context/AuthContext';
 import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
 import ProductForm  from '../features/products/components/ProductForm';
 import productAPI   from '../services/productAPI';
+import ConfirmRemoveDialog from '../features/masterdata/components/ConfirmRemoveDialog';
+import useDetailFocus      from '../features/masterdata/hooks/useDetailFocus';
+import useTableView        from '../features/masterdata/hooks/useTableView';
+import MasterDataTable     from '../features/masterdata/components/MasterDataTable';
+import ColumnToggle        from '../features/masterdata/components/ColumnToggle';
+import FilterPills         from '../features/masterdata/components/FilterPills';
 
 import {
   InputGroup, InputGroupAddon, InputGroupInput,
@@ -26,12 +32,57 @@ import { Skeleton }  from '@/components/ui/skeleton';
 import {
   Card, CardContent, CardHeader, CardTitle,
 } from '@/components/ui/card';
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
-import { Search, Plus, Pencil, Power, X } from 'lucide-react';
+import { Search, Plus, Pencil, Power, X, Trash2 } from 'lucide-react';
 
-const CAN_MANAGE = ['manager', 'admin'];
+// Admin only, matching requireRole on every write in
+// product.routes.js. The server is the control; this is what stops the
+// screen offering a button that would come back 403.
+const CAN_MANAGE = ['admin'];
+
+// products.storage_type carries its own CHECK — 'dry' or 'cold' and
+// nothing else (STORAGE_TYPES in product.service.js). A pill per value,
+// so the filter can never offer something the column cannot hold.
+const STORAGE_FILTERS = [
+  { value: 'dry',  label: 'Dry' },
+  { value: 'cold', label: 'Cold' },
+];
+
+// Three columns more than the table used to show, all of them things
+// somebody asks about — storage and perishability decide where a
+// delivery is put away, and both were only visible by opening the row
+// one at a time. The column toggle is what makes six columns bearable.
+const COLUMNS = [
+  { key: 'name',     label: 'Product', alwaysOn: true, weight: 4,
+    sort: (p) => (p.name ?? '').toLowerCase(),
+    cellClass: 'font-medium',
+    cell: (p) => p.name },
+  { key: 'sku',      label: 'SKU', weight: 2.2,
+    sort: (p) => (p.sku ?? '').toLowerCase(),
+    cell: (p) => p.sku || '—' },
+  { key: 'category', label: 'Category', weight: 2, minWidth: 'sm',
+    sort: (p) => (p.category ?? '').toLowerCase(),
+    cell: (p) => p.category || '—' },
+  { key: 'unit',     label: 'Unit', weight: 1.2, minWidth: 'md',
+    sort: (p) => (p.defaultUnit ?? '').toLowerCase(),
+    cell: (p) => p.defaultUnit || '—' },
+  { key: 'storage',  label: 'Storage', weight: 1.5, minWidth: 'lg',
+    sort: (p) => (p.storageType ?? '').toLowerCase(),
+    cell: (p) => (p.storageType ? p.storageType.replace(/^./, (c) => c.toUpperCase()) : '—') },
+  { key: 'cost',     label: 'Cost', weight: 1.6, minWidth: 'lg', numeric: true,
+    // Sorts on the number and shows the currency. Null is "not priced",
+    // which sorts last in both directions rather than reading as the
+    // cheapest thing in the catalogue.
+    sort: (p) => (p.unitCost ?? null),
+    cellClass: 'text-right',
+    cell: (p) => (p.unitCost === null || p.unitCost === undefined
+      ? '—'
+      : `R ${p.unitCost.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`) },
+  { key: 'perishable', label: 'Perishable', weight: 1.7, minWidth: 'lg',
+    sort: (p) => (p.isPerishable ? 'yes' : 'no'),
+    cell: (p) => (p.isPerishable ? 'Yes' : 'No') },
+  { key: 'status',   label: '', sort: null, alwaysOn: true, weight: 1.8,
+    cell: (p) => (!p.isActive ? <Badge variant="outline">Inactive</Badge> : null) },
+];
 
 // Same markup as the global fetch error banner in
 // SupplierDirectoryPage/InventoryManagementPage. One error style per app.
@@ -50,7 +101,7 @@ const ErrorBanner = ({ message, onRetry }) => (
 );
 
 // ── Detail panel ──────────────────────────────────────────────
-const ProductDetail = ({ product, canManage, onEdit, onToggleActive, onClose }) => (
+const ProductDetail = ({ product, canManage, onEdit, onToggleActive, onRemove, onClose }) => (
   <Card>
     <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
       <div>
@@ -72,6 +123,12 @@ const ProductDetail = ({ product, canManage, onEdit, onToggleActive, onClose }) 
           <dt className="text-muted-foreground">Weight</dt>
           <dd>{product.weightKg === null ? 'Not recorded' : `${product.weightKg} kg`}</dd>
         </div>
+        <div>
+          <dt className="text-muted-foreground">Cost per item</dt>
+          <dd>{product.unitCost === null || product.unitCost === undefined
+            ? 'Not priced'
+            : `R ${product.unitCost.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</dd>
+        </div>
         <div><dt className="text-muted-foreground">Perishable</dt><dd>{product.isPerishable ? 'Yes' : 'No'}</dd></div>
       </dl>
 
@@ -84,6 +141,20 @@ const ProductDetail = ({ product, canManage, onEdit, onToggleActive, onClose }) 
           <Button type="button" variant="outline" onClick={onToggleActive}>
             <Power />
             {product.isActive ? 'Deactivate' : 'Reactivate'}
+          </Button>
+          {/* Outline, not a solid red block. A filled destructive
+              button beside two outlined ones pulls the eye to the one
+              action nobody should reach for by reflex. The red border
+              and label are enough to say what it is; the dialog does
+              the actual guarding. */}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onRemove}
+            className="border-[#ef3a40] text-[#ef3a40] hover:bg-[#ef3a40] hover:text-white"
+          >
+            <Trash2 />
+            Delete
           </Button>
         </div>
       ) : null}
@@ -105,6 +176,23 @@ export default function ProductManagementPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [storageFilter, setStorageFilter] = useState(null);
+  const view = useTableView('products', COLUMNS);
+
+  // Brings the detail card to the click instead of making the admin
+  // scroll back up to find it.
+  const [detailRef, focusDetail] = useDetailFocus();
+
+  // Narrow first, then order — same composition as the user
+  // directory. Both are client-side over the already-fetched rows, so
+  // neither races the server-side search.
+  const visibleProducts = useMemo(() => {
+    const filtered = storageFilter
+      ? products.filter((p) => p.storageType === storageFilter)
+      : products;
+    return view.sortRows(filtered);
+  }, [products, storageFilter, view]);
 
   const loadProducts = useCallback(async () => {
     setError(null);
@@ -130,6 +218,7 @@ export default function ProductManagementPage() {
     try {
       setSelected(await productAPI.getProduct(id));
       setMode('list');
+      focusDetail();
     } catch (err) { setError(err.message); }
   };
 
@@ -162,10 +251,37 @@ export default function ProductManagementPage() {
     } catch (err) { setError(err.message); }
   };
 
+  // Both of the dialog's destructive answers land here. Deactivating
+  // from the dialog is the same call the Deactivate button makes — the
+  // dialog is a place to choose, not a second code path.
+  const deactivateFromDialog = async () => {
+    setBusy(true);
+    try {
+      await productAPI.setProductStatus(selected.id, false);
+      setConfirmRemove(false);
+      await loadProducts();
+      await open(selected.id);
+    } catch (err) { setError(err.message); setConfirmRemove(false); }
+    finally { setBusy(false); }
+  };
+
+  const remove = async () => {
+    setBusy(true);
+    try {
+      await productAPI.deleteProduct(selected.id);
+      setConfirmRemove(false);
+      // Nothing to reopen: the product has left the catalogue, so the
+      // detail card would be showing something that is no longer here.
+      setSelected(null);
+      await loadProducts();
+    } catch (err) { setError(err.message); setConfirmRemove(false); }
+    finally { setBusy(false); }
+  };
+
   return (
     <ManagerLayout>
       <main className="mx-auto w-full max-w-5xl px-4 py-6">
-        <h1 className="text-2xl font-medium">Products</h1>
+        <h1 className="text-2xl font-medium">Product Management</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           What we stock, and what every other module counts against.
         </p>
@@ -229,6 +345,21 @@ export default function ProductManagementPage() {
                     </FieldLabel>
                   </Field>
 
+                  <FilterPills
+                    label="Filter by storage type"
+                    value={storageFilter}
+                    onChange={setStorageFilter}
+                    options={STORAGE_FILTERS}
+                  />
+
+                  <ColumnToggle
+                    idPrefix="products"
+                    columns={view.availableColumns}
+                    hidden={view.hidden}
+                    onToggle={view.toggleColumn}
+                    onReset={view.resetColumns}
+                  />
+
                   {canManage ? (
                     <Button type="button" onClick={() => { setSelected(null); setMode('create'); }}>
                       <Plus />
@@ -237,49 +368,47 @@ export default function ProductManagementPage() {
                   ) : null}
                 </div>
 
+                {/* tabIndex so focus can be moved here; scroll-mt so the
+                    card does not land flush against the top edge. */}
+                <div ref={detailRef} tabIndex={-1} className="scroll-mt-6 outline-none">
+                  {selected ? (
+                    <ProductDetail
+                      product={selected}
+                      canManage={canManage}
+                      onEdit={() => setMode('edit')}
+                      onToggleActive={toggleActive}
+                      onRemove={() => setConfirmRemove(true)}
+                      onClose={() => setSelected(null)}
+                    />
+                  ) : null}
+                </div>
+
                 {selected ? (
-                  <ProductDetail
-                    product={selected}
-                    canManage={canManage}
-                    onEdit={() => setMode('edit')}
-                    onToggleActive={toggleActive}
-                    onClose={() => setSelected(null)}
+                  <ConfirmRemoveDialog
+                    open={confirmRemove}
+                    onOpenChange={setConfirmRemove}
+                    name={selected.name}
+                    noun="product"
+                    isActive={selected.isActive}
+                    busy={busy}
+                    historyNote="Past picking slips, delivery notes and stock history keep showing it."
+                    onDeactivate={deactivateFromDialog}
+                    onDelete={remove}
                   />
                 ) : null}
 
-                {products.length === 0 ? (
+                {visibleProducts.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No products match.</p>
                 ) : (
                   <Card>
                     <CardContent className="p-0">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Product</TableHead>
-                            <TableHead>SKU</TableHead>
-                            <TableHead>Category</TableHead>
-                            <TableHead>Unit</TableHead>
-                            <TableHead />
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {products.map((p) => (
-                            <TableRow
-                              key={p.id}
-                              className="cursor-pointer"
-                              onClick={() => open(p.id)}
-                            >
-                              <TableCell className="font-medium">{p.name}</TableCell>
-                              <TableCell className="text-muted-foreground">{p.sku || '—'}</TableCell>
-                              <TableCell className="text-muted-foreground">{p.category || '—'}</TableCell>
-                              <TableCell className="text-muted-foreground">{p.defaultUnit || '—'}</TableCell>
-                              <TableCell>
-                                {!p.isActive ? <Badge variant="outline">Inactive</Badge> : null}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                      <MasterDataTable
+                        columns={view.visibleColumns}
+                        rows={visibleProducts}
+                        sort={view.sort}
+                        onToggleSort={view.toggleSort}
+                        onOpenRow={(p) => open(p.id)}
+                      />
                     </CardContent>
                   </Card>
                 )}

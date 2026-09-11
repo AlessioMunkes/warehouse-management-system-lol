@@ -12,7 +12,7 @@
 // ─────────────────────────────────────────────────────────────
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { STAFF } from '../../routes/paths';
+import { homeForRole } from '../../features/taskdashboard/components/navSections';
 import ManagerLayout from '../../features/taskdashboard/components/ManagerLayout';
 
 // `shell` wraps the whole group in the app shell — sidebar on desktop,
@@ -41,8 +41,14 @@ const ProtectedRoute = ({ roles, shell = false } = {}) => {
   if (!user) return <Navigate to="/login" replace />;
 
   // Role check (used once SEC-04 is implemented per route)
+  //
+  // Sent to their OWN home, not the warehouse worker's. This was
+  // STAFF.home for everybody, so a manager following a stale link to an
+  // admin screen landed on the floor-staff task chooser with none of
+  // their work on it. homeForRole is the same helper the brand link
+  // uses, so the two now agree.
   if (roles && !roles.includes(user.role)) {
-    return <Navigate to={user.role === 'guest' ? '/guest-home' : STAFF.home} replace />;
+    return <Navigate to={user.role === 'guest' ? '/guest-home' : homeForRole(user.role)} replace />;
   }
 
   // All good — render the child route
