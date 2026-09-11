@@ -1,4 +1,4 @@
-// ─────────────────────────────────────────────────────────────
+﻿// ─────────────────────────────────────────────────────────────
 // features/donationManagement/components/FlaggedItemsTab.jsx
 //
 // The Flagged Items tab of the Donation Management page. Renders one
@@ -56,7 +56,7 @@ const IntakeFlagRow = ({ flag, busy, onResolve }) => {
   const [rejectReason, setRejectReason] = useState('');
   const [message, setMessage] = useState('');
 
-  const handleAccept = async () => {
+  const handleClassify = async () => {
     if (!category) return;
     const result = await onResolve(flag.flag_id, { accepted: true, category });
     if (result) setMessage(resolveMessage(result));
@@ -140,8 +140,8 @@ const IntakeFlagRow = ({ flag, busy, onResolve }) => {
                 ))}
               </SelectContent>
             </Select>
-            <Button type="button" onClick={handleAccept} disabled={!category || busy}>
-              {busy ? <Loader2 className="animate-spin" /> : null} Accept
+            <Button type="button" onClick={handleClassify} disabled={!category || busy}>
+              {busy ? <Loader2 className="animate-spin" /> : null} Classify
             </Button>
           </div>
 
@@ -258,7 +258,7 @@ const LegacyFlagRow = ({ flag, busy, onResolve }) => {
 
         <div className="mt-4 flex justify-end">
           <Button type="button" onClick={handleResolve} disabled={busy || !name.trim()}>
-            {busy ? <Loader2 className="animate-spin" /> : null} Resolve and finalize
+            {busy ? <Loader2 className="animate-spin" /> : null} Resolve
           </Button>
         </div>
       </CardContent>

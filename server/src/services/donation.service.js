@@ -19,6 +19,8 @@
 // ─────────────────────────────────────────────────────────────
 import { determineRouting } from '../lib/donationRouting.js';
 import donationModel from '../repositories/donation.repository.js';
+import emailProvider from '../providers/email.provider.js';
+import pdfProvider from '../providers/pdf.provider.js';
 
 // ── fail ───────────────────────────────────────────────────────
 // Mirrors stock.service.js and picking.service.js. Without a
@@ -412,13 +414,213 @@ const createDonation = async (data, userId) => {
 
   const donation = await donationModel.getDonationById(result.donationId);
 
+  // Emails run after the donation is durably recorded and never roll it
+  // back. A failure to send or log is surfaced in emailResults — the
+  // donation completion is not affected.
+  const emailResults = [];
+  if (!result.duplicate) {
+    const thankYou = await sendThankYouEmail(donation);
+    if (thankYou) emailResults.push(thankYou);
+    const section18a = await sendSection18ACertificateEmail(donation, userId);
+    if (section18a) emailResults.push(section18a);
+  }
+
   return {
     donation,
     warnings: [...warnings, ...(result.warnings || [])],
     duplicate: false,
+    emailResults,
   };
 };
 
+// ─────────────────────────────────────────────────────────────
+// Donation emails (thank-you + Section 18A certificate)
+//
+// Both emails run AFTER the donation is durably recorded and never
+// roll it back. A failure to send or log is surfaced in emailResults
+// for the caller, exactly the "record first, notify second" shape the
+// rest of this file follows. Anonymous donors and donors without a
+// valid email are simply skipped, not errored.
+// ─────────────────────────────────────────────────────────────
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const donorEmailFor = (donation) => {
+  const email = String(donation?.donor_contact || '').trim();
+  if (!email || !EMAIL_RE.test(email)) return null;
+  return email;
+};
+
+// Logs one send attempt. Sending and logging are deliberately wrapped
+// so a throwing provider (or a broken Gmail binding) records a 'failed'
+// row instead of bubbling up and taking the donation down with it.
+const logEmailAttempt = async ({ donationId, certificateId, emailType, recipient, subject, email }) => {
+  try {
+    const result = await emailProvider.sendEmail({
+      to: recipient,
+      subject,
+      text: email.text,
+      html: email.html,
+      attachments: email.attachments,
+    });
+    const success = Boolean(result && result.sent === true);
+    return await donationModel.logDonationEmail({
+      donationId,
+      certificateId,
+      emailType,
+      recipient,
+      subject,
+      status: success ? 'sent' : 'failed',
+      providerMessageId: success ? (result.messageId || null) : null,
+      errorMessage: success ? null : (result.reason || 'Provider reported a failure.'),
+    });
+  } catch (err) {
+    return await donationModel.logDonationEmail({
+      donationId,
+      certificateId,
+      emailType,
+      recipient,
+      subject,
+      status: 'failed',
+      errorMessage: err.message,
+    });
+  }
+};
+
+const donationReferenceFor = (donation) =>
+  donation.section_18a_certificate_ref || `DON-${donation.id}`;
+
+const sendThankYouEmail = async (donation) => {
+  const recipient = donorEmailFor(donation);
+  if (!recipient) return null;
+  return await logEmailAttempt({
+    donationId: donation.id,
+    emailType: 'thank_you',
+    recipient,
+    subject: 'Thank you for your donation',
+    email: {
+      text: `Dear ${donation.donor_name},\n\n` +
+            `Thank you for your generous donation (reference ${donationReferenceFor(donation)}).\n\n` +
+            'Your support helps Ladles of Love continue its work.\n\nWarm regards,\nLadles of Love',
+    },
+  });
+};
+// Returns the existing certificate for the donation, or creates a new
+// one if none exists yet. Never regenerates one that is already there.
+const getOrCreateSection18ACertificate = async (donation, actorId) => {
+  const existing = await donationModel.getSection18ACertificateByDonationId(donation.id);
+  if (existing) return existing;
+
+  const settings = await donationModel.getSection18ASettings();
+  if (!settings) fail(500, 'Section 18A settings are not configured.');
+
+  const donorSnapshot = {
+    name:         donation.donor_name,
+    contact:      donation.donor_contact,
+    taxReference: donation.donor_tax_reference,
+  };
+  const donationSnapshot = {
+    id:                  donation.id,
+    donation_category:   donation.donation_category,
+    estimated_value_zar: donation.estimated_value_zar,
+    received_at:         donation.received_at,
+    items:               donation.items || [],
+  };
+
+  const { certificate } = await donationModel.createSection18ACertificate({
+    donationId:   donation.id,
+    issuedBy:     actorId,
+    settings,
+    donorSnapshot,
+    donationSnapshot,
+    buildPdf: async ({ certificateNumber, issueDate }) =>
+      pdfProvider.generateSection18APdf({
+        certificateNumber,
+        issueDate,
+        settings,
+        donor:     donorSnapshot,
+        donation:  donationSnapshot,
+      }),
+  });
+
+  return certificate;
+};
+
+const sendSection18ACertificateEmail = async (donation, actorId) => {
+  if (donation.section_18a_status !== 'queued' && donation.section_18a_status !== 'issued') {
+    return null;
+  }
+  const recipient = donorEmailFor(donation);
+  if (!recipient) return null;
+
+  const certificate = await getOrCreateSection18ACertificate(donation, actorId);
+
+  return await logEmailAttempt({
+    donationId:    donation.id,
+    certificateId: certificate.id,
+    emailType: 'section18a_certificate',
+    recipient,
+    subject: 'Your Section 18A tax certificate',
+    email: {
+      text: `Dear ${donation.donor_name},\n\n` +
+            `Please find attached your Section 18A tax receipt (${certificate.certificate_number}).\n\n` +
+            'Keep it for your tax records.\n\nWarm regards,\nLadles of Love',
+      attachments: [{
+        filename:    certificate.pdf_filename,
+        content:     certificate.pdf_content,
+        contentType: certificate.pdf_content_type,
+      }],
+    },
+  });
+};
+
+const generateSection18ACertificate = async (donationId, userId) => {
+  const donation = await donationModel.getDonationById(donationId);
+  if (!donation) fail(404, 'Donation not found.');
+
+  if (await donationModel.getSection18ACertificateByDonationId(donationId)) {
+    fail(409, 'A Section 18A certificate already exists for this donation.');
+  }
+  if (!donation.donor_consent_given || !String(donation.donor_tax_reference || '').trim()) {
+    fail(400, 'Donor consent and tax reference are required to issue a certificate.');
+  }
+  if (donation.section_18a_status !== 'queued' && donation.section_18a_status !== 'issued') {
+    fail(400, 'This donation is not ready for a Section 18A certificate.');
+  }
+
+  return await getOrCreateSection18ACertificate(donation, userId);
+};
+
+const downloadSection18ACertificate = async (donationId) => {
+  const certificate = await donationModel.getSection18ACertificateByDonationId(donationId);
+  if (!certificate) fail(404, 'No Section 18A certificate exists for this donation.');
+  return {
+    buffer:            certificate.pdf_content,
+    filename:          certificate.pdf_filename,
+    contentType:       certificate.pdf_content_type,
+    certificateNumber: certificate.certificate_number,
+  };
+};
+
+const listEmailHistory = async () => await donationModel.listEmailHistory();
+
+const resendDonationEmail = async (emailLogId, userId) => {
+  const log = await donationModel.getEmailLogById(emailLogId);
+  if (!log) fail(404, 'Email log not found.');
+
+  const donation = await donationModel.getDonationById(log.donation_id);
+  if (!donation) fail(404, 'Donation not found.');
+
+  if (log.email_type === 'thank_you') {
+    const sent = await sendThankYouEmail(donation);
+    return { ...log, ...(sent || {}), emailType: log.email_type };
+  }
+  if (log.email_type === 'section18a_certificate') {
+    const sent = await sendSection18ACertificateEmail(donation, userId);
+    return { ...log, ...(sent || {}), emailType: log.email_type };
+  }
+
+  fail(400, `Cannot resend email of unsupported type "${log.email_type}".`);
+};
 // ── Reads ─────────────────────────────────────────────────────
 const listDonations = async (range) => {
   const valid = ['today', 'week', 'month', 'all'];
@@ -509,6 +711,10 @@ export default {
   getDonationEvents,
   listUnmatchedItems,
   listSection18AQueue,
+  listEmailHistory,
+  resendDonationEmail,
+  generateSection18ACertificate,
+  downloadSection18ACertificate,
   resolveUnmatchedItem,
   reclassifyDonation,
   CATEGORIES,

@@ -22,6 +22,12 @@ const repoMock = {
   resolveUnmatchedItem:   vi.fn(),
   reclassifyDonation:     vi.fn(),
   listSection18AQueue:    vi.fn(),
+  getSection18ASettings:  vi.fn(),
+  getSection18ACertificateByDonationId: vi.fn(),
+  createSection18ACertificate: vi.fn(),
+  listEmailHistory:       vi.fn(),
+  getEmailLogById:        vi.fn(),
+  logDonationEmail:       vi.fn(),
   getDonationEvents:      vi.fn(),
 };
 
@@ -53,6 +59,35 @@ beforeEach(() => {
   repoMock.getLocationIdForArea.mockResolvedValue(1);
   repoMock.createDonation.mockResolvedValue({ donationId: 1, warnings: [] });
   repoMock.getDonationById.mockResolvedValue({ id: 1, category: 'recipe_food' });
+  repoMock.getSection18ASettings.mockResolvedValue({
+    certificate_prefix: 'LOL-S18A',
+    pbo_name: 'Ladles of Love',
+    pbo_number: 'PBO-PLACEHOLDER',
+    section18a_reference: 'SECTION-18A-PLACEHOLDER',
+    pba_declaration: 'Approved PBA declaration.',
+  });
+  repoMock.getSection18ACertificateByDonationId.mockResolvedValue(null);
+  repoMock.createSection18ACertificate.mockImplementation(async ({ buildPdf, ...args }) => {
+    const pdf = await buildPdf({ certificateNumber: 'LOL-S18A-000001', issueDate: '2026-09-11' });
+    return {
+      certificate: {
+        id: 10,
+        donation_id: args.donationId,
+        certificate_number: 'LOL-S18A-000001',
+        issue_date: '2026-09-11',
+        pdf_content: pdf.buffer,
+        pdf_filename: pdf.filename,
+        pdf_content_type: pdf.contentType,
+      },
+    };
+  });
+  repoMock.listEmailHistory.mockResolvedValue([]);
+  repoMock.getEmailLogById.mockResolvedValue(null);
+  repoMock.logDonationEmail.mockImplementation(async (entry) => ({
+    id: 100,
+    ...entry,
+    sent_at: entry.status === 'sent' ? '2026-09-11T00:00:00.000Z' : null,
+  }));
   routeMock.determineRouting.mockImplementation(async ({ productId }) => {
     if (productId === 3) {
       return {
@@ -306,6 +341,82 @@ describe('createDonation — records rather than refuses', () => {
     }), USER_ID)).resolves.toBeTruthy();
   });
 
+  it('sends a thank-you email after recording a named donor with a valid email', async () => {
+    repoMock.getDonationById.mockResolvedValue({
+      id: 1,
+      donation_category: 'recipe_food',
+      estimated_value_zar: 500,
+      donor_name: 'Donor One',
+      donor_contact: 'donor@example.org',
+      donor_consent_given: true,
+      section_18a_status: 'not_qualifying',
+      section_18a_qualifying: false,
+      items: [],
+    });
+
+    const result = await donationService.createDonation(validBody({
+      donorName: 'Donor One',
+      donorContact: 'donor@example.org',
+      donorConsentGiven: true,
+    }), USER_ID);
+
+    expect(result.emailResults).toHaveLength(1);
+    expect(repoMock.logDonationEmail).toHaveBeenCalledWith(expect.objectContaining({
+      donationId: 1,
+      emailType: 'thank_you',
+      recipient: 'donor@example.org',
+      status: 'sent',
+    }));
+  });
+
+  it('skips all email for anonymous donors or invalid donor emails', async () => {
+    repoMock.getDonationById.mockResolvedValue({
+      id: 1,
+      donor_name: '',
+      donor_contact: 'not-an-email',
+      section_18a_status: 'not_qualifying',
+      items: [],
+    });
+
+    const result = await donationService.createDonation(validBody(), USER_ID);
+
+    expect(result.emailResults).toEqual([]);
+    expect(repoMock.logDonationEmail).not.toHaveBeenCalled();
+  });
+
+  it('sends a separate Section 18A email with a generated certificate attachment', async () => {
+    repoMock.getDonationById.mockResolvedValue({
+      id: 42,
+      donation_category: 'recipe_food',
+      estimated_value_zar: 5000,
+      donor_name: 'Pick n Pay',
+      donor_contact: 'tax@example.test',
+      donor_tax_reference: '9012345678',
+      donor_consent_given: true,
+      section_18a_status: 'queued',
+      section_18a_qualifying: true,
+      received_at: '2026-09-10T10:00:00.000Z',
+      items: [{ line_no: 1, description: 'Rice', quantity: 25, unit: 'kg', estimated_value_zar: 5000 }],
+    });
+
+    const result = await donationService.createDonation(validBody({
+      estimatedValueZar: 5000,
+      donorName: 'Pick n Pay',
+      donorContact: 'tax@example.test',
+      donorTaxReference: '9012345678',
+      donorConsentGiven: true,
+    }), USER_ID);
+
+    expect(result.emailResults.map((row) => row.emailType)).toEqual(['thank_you', 'section18a_certificate']);
+    expect(repoMock.createSection18ACertificate).toHaveBeenCalledTimes(1);
+    expect(repoMock.logDonationEmail).toHaveBeenCalledWith(expect.objectContaining({
+      donationId: 42,
+      emailType: 'section18a_certificate',
+      recipient: 'tax@example.test',
+      status: 'sent',
+    }));
+  });
+
   it('records add-on food even when there are no eligible ECDs to split across', async () => {
     repoMock.getEligibleEcdCentres.mockResolvedValue([]);
 
@@ -467,5 +578,90 @@ describe('reclassifyDonation', () => {
       1, { category: 'add_on_food', reason: 'Edible after all' }, USER_ID
     );
     expect(result.requiresStockReview).toBe(false);
+  });
+});
+
+describe('Section 18A certificate engine', () => {
+  const queuedDonation = {
+    id: 42,
+    donation_category: 'recipe_food',
+    estimated_value_zar: 5000,
+    donor_name: 'Pick n Pay',
+    donor_contact: 'tax@example.test',
+    donor_tax_reference: '9012345678',
+    donor_consent_given: true,
+    section_18a_status: 'queued',
+    section_18a_qualifying: true,
+    received_at: '2026-09-10T10:00:00.000Z',
+    items: [{ line_no: 1, description: 'Rice', quantity: 25, unit: 'kg', estimated_value_zar: 5000 }],
+  };
+
+  it('generates and stores a certificate for a queued qualifying donation', async () => {
+    repoMock.getDonationById.mockResolvedValue(queuedDonation);
+
+    const certificate = await donationService.generateSection18ACertificate(42, USER_ID);
+
+    expect(certificate.certificate_number).toBe('LOL-S18A-000001');
+    expect(repoMock.createSection18ACertificate).toHaveBeenCalled();
+    const write = repoMock.createSection18ACertificate.mock.calls[0][0];
+    expect(write.donorSnapshot).toEqual({
+      name: 'Pick n Pay',
+      contact: 'tax@example.test',
+      taxReference: '9012345678',
+    });
+  });
+
+  it('rejects duplicate certificate generation', async () => {
+    repoMock.getDonationById.mockResolvedValue(queuedDonation);
+    repoMock.getSection18ACertificateByDonationId.mockResolvedValue({ id: 99 });
+
+    await expect(donationService.generateSection18ACertificate(42, USER_ID))
+      .rejects.toMatchObject({ status: 409 });
+  });
+
+  it('requires donor consent and tax details before generation', async () => {
+    repoMock.getDonationById.mockResolvedValue({
+      ...queuedDonation,
+      donor_consent_given: false,
+      donor_tax_reference: '',
+    });
+
+    await expect(donationService.generateSection18ACertificate(42, USER_ID))
+      .rejects.toMatchObject({ status: 400 });
+  });
+
+  it('downloads an existing generated PDF without creating another certificate', async () => {
+    repoMock.getSection18ACertificateByDonationId.mockResolvedValue({
+      certificate_number: 'LOL-S18A-000001',
+      pdf_content: Buffer.from('%PDF-1.4'),
+      pdf_filename: 'section-18a-LOL-S18A-000001.pdf',
+      pdf_content_type: 'application/pdf',
+    });
+
+    const file = await donationService.downloadSection18ACertificate(42, USER_ID);
+
+    expect(file.filename).toBe('section-18a-LOL-S18A-000001.pdf');
+    expect(repoMock.createSection18ACertificate).not.toHaveBeenCalled();
+  });
+
+  it('resends a Section 18A email without regenerating an existing certificate', async () => {
+    repoMock.getEmailLogById.mockResolvedValue({
+      id: 5,
+      donation_id: 42,
+      email_type: 'section18a_certificate',
+    });
+    repoMock.getDonationById.mockResolvedValue({ ...queuedDonation, section_18a_status: 'issued' });
+    repoMock.getSection18ACertificateByDonationId.mockResolvedValue({
+      id: 99,
+      certificate_number: 'LOL-S18A-000001',
+      pdf_content: Buffer.from('%PDF-1.4'),
+      pdf_filename: 'section-18a-LOL-S18A-000001.pdf',
+      pdf_content_type: 'application/pdf',
+    });
+
+    const result = await donationService.resendDonationEmail(5, USER_ID);
+
+    expect(result.emailType).toBe('section18a_certificate');
+    expect(repoMock.createSection18ACertificate).not.toHaveBeenCalled();
   });
 });

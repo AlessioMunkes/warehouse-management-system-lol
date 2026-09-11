@@ -1,0 +1,50 @@
+[pendingDonation.service] createPendingDonationFromIntake failed: error: duplicate key value violates unique constraint "idx_pending_donations_idempotency_key"
+    at C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\server\node_modules\pg\lib\client.js:631:17
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.createPendingDonation (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/server/src/repositories/pendingDonation.repository.js:27:18)
+    at async Object.createPendingDonationFromIntake (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/server/src/services/pendingDonation.service.js:258:29)
+    at async createPendingDonation (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/server/src/controllers/pendingDonation.controller.js:15:29) {
+  length: 294,
+  severity: 'ERROR',
+  code: '23505',
+  detail: 'Key (idempotency_key)=(485649ff-0cc0-4e45-b955-31c20896038f) already exists.',
+  hint: undefined,
+  position: undefined,
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: 'public',
+  table: 'pending_donations',
+  column: undefined,
+  dataType: undefined,
+  constraint: 'idx_pending_donations_idempotency_key',
+  file: 'nbtinsert.c',
+  line: '666',
+  routine: '_bt_check_unique'
+}
+[createPendingDonation] duplicate key value violates unique constraint "idx_pending_donations_idempotency_key"
+[pendingDonation.service] createPendingDonationFromIntake failed: error: duplicate key value violates unique constraint "idx_pending_donations_idempotency_key"
+    at C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\server\node_modules\pg\lib\client.js:631:17
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Object.createPendingDonation (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/server/src/repositories/pendingDonation.repository.js:27:18)
+    at async Object.createPendingDonationFromIntake (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/server/src/services/pendingDonation.service.js:258:29)
+    at async createPendingDonation (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/server/src/controllers/pendingDonation.controller.js:15:29) {
+  length: 294,
+  severity: 'ERROR',
+  code: '23505',
+  detail: 'Key (idempotency_key)=(485649ff-0cc0-4e45-b955-31c20896038f) already exists.',
+  hint: undefined,
+  position: undefined,
+  internalPosition: undefined,
+  internalQuery: undefined,
+  where: undefined,
+  schema: 'public',
+  table: 'pending_donations',
+  column: undefined,
+  dataType: undefined,
+  constraint: 'idx_pending_donations_idempotency_key',
+  file: 'nbtinsert.c',
+  line: '666',
+  routine: '_bt_check_unique'
+}
+[createPendingDonation] duplicate key value violates unique constraint "idx_pending_donations_idempotency_key"

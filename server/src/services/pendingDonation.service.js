@@ -56,8 +56,31 @@ const buildDonationPayloadFromPending = (pendingDonation) => {
     return sum + (Number.isFinite(value) ? value : 0);
   }, 0);
 
+  // A pending donation may legitimately carry no donation-level category
+  // (it can be blank at intake) while each resolved item carries its own
+  // resolved_category. On commit the donation row still requires one, so
+  // derive it from the accepted items when the donation-level is blank.
+  // If items disagree (mixed categories), give up and let the commit fail
+  // loudly rather than silently picking one — a mixed donation needs a
+  // manager decision, not a guess. Coerce a blank/empty string to null.
+  const rawDonationCategory =
+    pendingDonation.donation_category ?? pendingDonation.donationCategory ?? null;
+  const donationCategory =
+    (rawDonationCategory !== null && String(rawDonationCategory).trim() !== '')
+      ? rawDonationCategory
+      : null;
+
+  const acceptedResolved = acceptedItems
+    .map((item) => item.resolved_category ?? item.resolvedCategory ?? null)
+    .filter((value) => value !== null && String(value).trim() !== '');
+
+  const category = donationCategory
+    ?? (acceptedResolved.length > 0 && new Set(acceptedResolved).size === 1
+      ? acceptedResolved[0]
+      : null);
+
   return {
-    category: pendingDonation.donation_category ?? pendingDonation.donationCategory ?? null,
+    category,
     programmeId: pendingDonation.programme_id ?? pendingDonation.programmeId ?? null,
     estimatedValueZar: totalValue,
     donorName: pendingDonation.donor_name ?? pendingDonation.donorName ?? null,
@@ -67,6 +90,7 @@ const buildDonationPayloadFromPending = (pendingDonation) => {
     notes: pendingDonation.notes ?? null,
     idempotencyKey: pendingDonation.idempotency_key ?? pendingDonation.idempotencyKey ?? null,
     items: acceptedItems.map((item) => ({
+      lineNo: item.line_no ?? item.lineNo ?? null,
       description: item.description,
       productId: item.product_id ?? item.productId ?? null,
       quantity: Number(item.quantity),
@@ -226,10 +250,23 @@ const attemptCommitForPendingDonation = async (pendingDonationId) => {
 export const createPendingDonationFromIntake = async (payload = {}) => {
   const data = payload || {};
   const items = Array.isArray(data.items) ? data.items : [];
+  const idempotencyKey = data.idempotencyKey ?? data.idempotency_key ?? null;
   const client = await pool.connect();
 
   try {
     await client.query('BEGIN');
+
+    // Retried submit: the draft context deliberately reuses the same
+    // idempotency key (network blip, double tap, lost response). Answer
+    // with the original pending donation instead of hitting the unique
+    // index and 500ing — same contract as createDonation/createDelivery.
+    if (idempotencyKey) {
+      const existing = await pendingDonationRepository.findPendingDonationIdByIdempotencyKey(idempotencyKey, client);
+      if (existing) {
+        await client.query('COMMIT');
+        return await pendingDonationRepository.getPendingDonationById(existing.id, pool);
+      }
+    }
 
     const pendingDonation = await pendingDonationRepository.createPendingDonation(
       {
@@ -244,14 +281,21 @@ export const createPendingDonationFromIntake = async (payload = {}) => {
         section18aStatus: data.section18aStatus ?? data.section_18a_status ?? null,
         section18aQualifying: data.section18aQualifying ?? data.section_18a_qualifying ?? null,
         draftSnapshot: data.draftSnapshot ?? data.draft_snapshot ?? null,
-        idempotencyKey: data.idempotencyKey ?? data.idempotency_key ?? null,
+        idempotencyKey,
         createdBy: data.createdBy ?? data.created_by ?? null,
       },
       client
     );
 
     if (!pendingDonation) {
+      // Lost the insert race — another request wrote this key first.
       await client.query('ROLLBACK');
+      if (idempotencyKey) {
+        const existing = await pendingDonationRepository.findPendingDonationIdByIdempotencyKey(idempotencyKey, pool);
+        if (existing) {
+          return await pendingDonationRepository.getPendingDonationById(existing.id, pool);
+        }
+      }
       throw new Error('Failed to create pending donation row.');
     }
 
@@ -436,8 +480,8 @@ export const resolveFlagAndMaybeCommit = async (flagId, resolution = {}) => {
     // or its UPDATE self-deadlocks against our lock from a second connection.
     await donationAdminService.finalizePendingClassification({
       flagId,
-      name: item?.description || `Pending donation item ${flagId}`,
-      sku: `PENDING-${flagId}`,
+      name: data.name || item?.description || `Pending donation item ${flagId}`,
+      sku: data.sku || `PENDING-${flagId}`,
       storageType: 'dry',
       defaultUnit: item?.unit || 'kg',
       category: finalCategory,
@@ -454,6 +498,7 @@ export const resolveFlagAndMaybeCommit = async (flagId, resolution = {}) => {
       await pendingDonationRepository.markPendingItemResolved(
         pendingItemId,
         {
+          productId: flag.product_id ?? null,
           resolvedCategory: finalCategory,
           routingStatus: data.routingStatus ?? 'accepted',
           storageAreaHint: data.storageAreaHint ?? null,

@@ -3,19 +3,22 @@ import { describe, it, expect, beforeAll, afterEach, afterAll } from 'vitest';
 import request from 'supertest';
 import { buildDonationAdminApp } from '../helpers/buildDonationAdminApp.js';
 import { buildDonationIntakeApp } from '../helpers/buildDonationIntakeApp.js';
+import { buildPendingDonationApp } from '../helpers/pendingDonationApp.js';
 import {
   createTestUser, createTestProduct, snapshotCategoryRouting,
   restoreCategoryRouting, cleanupTestData, closeTestDb, cleanupPersistentUsers,
-  trackProductIds, trackFlagIds
+  trackProductIds, trackFlagIds, trackDonationIds, trackPendingDonationIds
 } from '../helpers/testDb.js';
 import { authCookie } from '../helpers/testAuth.js';
 import pool from '../../src/config/db.js';
 
 const app = buildDonationAdminApp();
 const intakeApp = buildDonationIntakeApp();
-let manager, worker;
+const pendingApp = buildPendingDonationApp();
+let admin, manager, worker;
 
 beforeAll(async () => {
+  admin = await createTestUser('admin', { persistent: true });
   manager = await createTestUser('manager', { persistent: true });
   worker = await createTestUser('warehouse_worker', { persistent: true });
 });
@@ -213,6 +216,128 @@ describe('PUT /api/donations/admin/pending-classifications/:id/finalize', () => 
      const flagAfter = await pool.query('SELECT status FROM warehouse_manager_flags WHERE id = $1', [flagId]);
      expect(flagAfter.rows[0].status).toBe('resolved');
    });
+
+   it('keeps unresolved PENDING products out of intake search, then exposes the promoted product', async () => {
+     const unique = `lifecycle-${Date.now()}`;
+     const pendingRes = await request(pendingApp)
+       .post('/api/donations/pending')
+       .set('Cookie', authCookie(worker))
+       .send({
+         donorName: 'Lifecycle donor',
+         donationCategory: 'recipe_food',
+         estimatedValueZar: 25,
+         idempotencyKey: unique,
+         draftSnapshot: { source: 'integration-lifecycle-test' },
+         items: [{
+           lineNo: 1,
+           description: `Lifecycle Rice ${unique}`,
+           quantity: 3,
+           unit: 'kg',
+           estimatedValueZar: 25,
+         }],
+       });
+
+     expect(pendingRes.status).toBe(201);
+     const pendingDonationId = Number(pendingRes.body.data.id);
+     trackPendingDonationIds([pendingDonationId]);
+
+     const flagRow = await pool.query(
+       `SELECT id, product_id, pending_donation_item_id
+        FROM warehouse_manager_flags
+        WHERE pending_donation_id = $1`,
+       [pendingDonationId]
+     );
+     expect(flagRow.rows).toHaveLength(1);
+
+     const flagId = Number(flagRow.rows[0].id);
+     const productId = Number(flagRow.rows[0].product_id);
+     const pendingItemId = Number(flagRow.rows[0].pending_donation_item_id);
+     trackFlagIds([flagId]);
+     trackProductIds([productId]);
+
+     const pendingProduct = await pool.query(
+       `SELECT id, name, stock_keeping_unit AS sku, is_active
+        FROM products
+        WHERE id = $1`,
+       [productId]
+     );
+     expect(pendingProduct.rows[0].sku).toMatch(/^PENDING-/);
+
+     await pool.query('UPDATE products SET is_active = true WHERE id = $1', [productId]);
+
+     const hiddenSearch = await request(intakeApp)
+       .get('/api/donations/intake/products/search')
+       .query({ name: 'Lifecycle Rice' })
+       .set('Cookie', authCookie(worker));
+     expect(hiddenSearch.status).toBe(200);
+     expect(hiddenSearch.body.data.some((row) => row.id === productId)).toBe(false);
+
+     const productCountBefore = await pool.query(
+       `SELECT COUNT(*)::int AS count FROM products WHERE id = $1`,
+       [productId]
+     );
+
+     const promotedName = `Lifecycle Rice Resolved ${unique}`;
+     const promotedSku = `LIFE-RICE-${unique}`;
+     const resolveRes = await request(pendingApp)
+       .post(`/api/donations/pending/flags/${flagId}/resolve`)
+       .set('Cookie', authCookie(admin))
+       .send({
+         accepted: true,
+         category: 'recipe_food',
+         name: promotedName,
+         sku: promotedSku,
+       });
+
+     expect(resolveRes.status).toBe(200);
+     expect(resolveRes.body.success).toBe(true);
+     const committedDonationId = Number(resolveRes.body.data.donationId);
+     trackDonationIds([committedDonationId]);
+
+     const productAfter = await pool.query(
+       `SELECT id, name, stock_keeping_unit AS sku, is_active
+        FROM products
+        WHERE id = $1`,
+       [productId]
+     );
+     expect(productAfter.rows).toHaveLength(1);
+     expect(productAfter.rows[0]).toMatchObject({
+       id: productId,
+       name: promotedName,
+       sku: promotedSku,
+       is_active: true,
+     });
+
+     const productCountAfter = await pool.query(
+       `SELECT COUNT(*)::int AS count FROM products WHERE id = $1`,
+       [productId]
+     );
+     expect(productCountAfter.rows[0].count).toBe(productCountBefore.rows[0].count);
+
+     const visibleSearch = await request(intakeApp)
+       .get('/api/donations/intake/products/search')
+       .query({ name: 'Lifecycle Rice Resolved' })
+       .set('Cookie', authCookie(worker));
+     expect(visibleSearch.status).toBe(200);
+     expect(visibleSearch.body.data).toEqual(
+       expect.arrayContaining([
+         expect.objectContaining({ id: productId, name: promotedName, sku: promotedSku }),
+       ])
+     );
+
+     const pendingItemAfter = await pool.query(
+       `SELECT pdi.status, pdi.product_id, pdi.committed_donation_item_id, di.product_id AS committed_product_id
+        FROM pending_donation_items pdi
+        JOIN donation_items di ON di.id = pdi.committed_donation_item_id
+        WHERE pdi.id = $1`,
+       [pendingItemId]
+     );
+     expect(pendingItemAfter.rows[0]).toMatchObject({
+       status: 'committed',
+       product_id: productId,
+       committed_product_id: productId,
+     });
+   }, 20000);
 });
 
 describe('GET /api/donations/admin/products-with-defaults', () => {

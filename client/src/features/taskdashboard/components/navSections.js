@@ -25,6 +25,7 @@ import {
   PackageOpen, PackageCheck, FlaskConical, ClipboardCheck, HandCoins,
   PhoneCall,
   ScrollText,
+  Mail,
 } from 'lucide-react';
 import { STAFF, ADMIN, VOLUNTEERS, PACKING } from '../../../routes/paths';
 
@@ -84,10 +85,12 @@ const ADMIN_SECTIONS = [
   {
     label: 'Donations',
     items: [
-      { to: ADMIN.donationManagement, label: 'Donation Management', icon: Gift },
+      { to: ADMIN.donationManagement, label: 'Classification Queue', icon: Gift },
+      { to: ADMIN.section18aManagement, label: 'Section 18A Management', icon: ScrollText },
       { to: ADMIN.donationClassification, label: 'Donation Classification', icon: Tags },
       { to: ADMIN.categoryRouting, label: 'Category Routing', icon: Route },
       { to: ADMIN.evaluateRouting, label: 'Explain Routing', icon: Route },
+      { to: ADMIN.emailIntegration, label: 'Email Integration', icon: Mail },
     ],
   },
 ];

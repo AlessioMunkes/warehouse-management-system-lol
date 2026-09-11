@@ -20,10 +20,15 @@ async function apiPost(path, payload) {
     body: JSON.stringify(payload),
   });
 
-  const json = await res.json();
+  let json;
+  try {
+    json = await res.json();
+  } catch {
+    json = {};
+  }
 
   if (!res.ok || !json.success) {
-    throw new Error(json.message || "Request failed.");
+    throw new Error(json.message || `Request failed (${res.status}).`);
   }
 
   return json.data;

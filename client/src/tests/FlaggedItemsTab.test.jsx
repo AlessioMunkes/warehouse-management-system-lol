@@ -91,8 +91,8 @@ describe('FlaggedItemsTab', () => {
 
     render(<FlaggedItemsTab />);
 
-    // Category preselected from the enriched donation_category, so Accept is live.
-    fireEvent.click(screen.getByRole('button', { name: 'Accept' }));
+    // Category preselected from the enriched donation_category, so Classify is live.
+    fireEvent.click(screen.getByRole('button', { name: 'Classify' }));
 
     await waitFor(() => {
       expect(resolveFlag).toHaveBeenCalledWith(1, { accepted: true, category: 'non_recipe_food' });
@@ -100,12 +100,12 @@ describe('FlaggedItemsTab', () => {
     expect(await screen.findByText('Awaiting further resolutions.')).toBeInTheDocument();
   });
 
-  it('shows a "committing" confirmation when the accept resolves the last open flag', async () => {
+  it('shows a  committing confirmation when the classify resolves the last open flag', async () => {
     mockUseFlaggedItems.mockReturnValue(baseHook({ resolveFlag: vi.fn().mockResolvedValue({ pendingDonationId: 21, status: 'committing', flagId: 1, finalized: true }) }));
 
     render(<FlaggedItemsTab />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Accept' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Classify' }));
     expect(await screen.findByText('Donation now committing.')).toBeInTheDocument();
   });
 
@@ -142,7 +142,7 @@ describe('FlaggedItemsTab', () => {
 
     render(<FlaggedItemsTab />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Resolve and finalize' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Resolve' }));
 
     await waitFor(() => {
       // No sku in the payload: the server generates its placeholder SKU

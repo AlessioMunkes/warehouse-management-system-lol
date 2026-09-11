@@ -29,6 +29,7 @@ import CategoryRoutingRulesPage                    from './pages/CategoryRouting
 import DonationClassificationPage                 from './pages/DonationClassificationPage';
 import EvaluateRoutingPage                         from './pages/EvaluateRoutingPage';
 import DonationManagementPage                      from './pages/DonationManagementPage';
+import Section18AManagementPage                    from './pages/Section18AManagementPage';
 import BeneficiaryDirectoryPage                     from './pages/BeneficiaryDirectoryPage';
 import ImpactReportPage                             from './pages/ImpactReportPage';
 import PickingSlipManagementPage                    from './pages/PickingSlipManagementPage';
@@ -38,6 +39,7 @@ import DocumentsPage                                 from './pages/DocumentsPage
 import VolunteerEventsPage                        from './pages/VolunteerEventsPage';
 import VolunteerEventWorkspacePage                from './pages/VolunteerEventWorkspacePage';
 import CommunityRequestsPage                       from './pages/CommunityRequestsPage';
+import GmailSettingsPage                           from './pages/GmailSettingsPage';
 
 // Donations — new feature, own draft context scoped to just these
 // two routes (see features/donation/context/DonationDraftProvider.jsx)
@@ -72,6 +74,7 @@ const App = () => (
           <Route path={ADMIN.dashboard} element={<AdminActivityScreen />} />
           <Route path={ADMIN.suppliers} element={<SupplierDirectoryPage />} />
           <Route path={ADMIN.donationManagement} element={<DonationManagementPage />} />
+          <Route path={ADMIN.section18aManagement} element={<Section18AManagementPage />} />
           {/* Account provisioning. Every route in user.routes.js is
               requireRole(ADMIN), so this was unreachable while it sat in
               a manager-only block — the client gate now matches the
@@ -84,6 +87,10 @@ const App = () => (
           <Route path={ADMIN.categoryRouting} element={<CategoryRoutingRulesPage />} />
           <Route path={ADMIN.donationClassification} element={<DonationClassificationPage />} />
           <Route path={ADMIN.evaluateRouting} element={<EvaluateRoutingPage />} />
+          {/* Gmail integration for donation thank-you emails. The page's
+              server routes are requireRole(ADMIN), so it sits in this
+              admin-only block rather than the manager/admin one. */}
+          <Route path={ADMIN.emailIntegration} element={<GmailSettingsPage />} />
         </Route>
 
         {/* Protected — manager and admin.

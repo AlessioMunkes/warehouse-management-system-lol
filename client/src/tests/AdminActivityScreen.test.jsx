@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/tests/AdminActivityScreen.test.jsx
 //
-// Covers the D6/Q2 dashboard badge: the Donation Management tile shows one
+// Covers the D6/Q2 dashboard badge: the Classification Queue tile shows one
 // DEDUPLICATED attention count — legacy/unlinked flags + pending donations
 // needing attention — computed by donationManagementAPI.getAttentionCounts().
 // The intake-linked flags that belong to one of the counted pending
@@ -134,7 +134,7 @@ describe('AdminActivityScreen — Donation Management badge (D6/Q2)', () => {
     });
     expect(screen.queryByText(/Needs attention/)).not.toBeInTheDocument();
     // The tile itself still renders.
-    expect(screen.getByText('Donation Management')).toBeInTheDocument();
+    expect(screen.getByText('Classification Queue')).toBeInTheDocument();
   });
 
   it('leaves the separate "Needs Review" tile badge untouched', async () => {

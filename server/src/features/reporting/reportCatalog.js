@@ -30,12 +30,6 @@
 import { STORAGE_AREAS }  from '../../constants/storageAreas.js';
 import { MOVEMENT_TYPES } from '../../constants/movementTypes.js';
 
-// The storage-area vocabulary is shared with the delivery service,
-// which validates put-away locations against it, so it is declared
-// once in constants/ and re-exported here to keep this catalog's flat
-// shape for its own consumers.
-import { STORAGE_AREAS } from '../../constants/storageAreas.js';
-
 // ── Enum values (confirmed from pg_enum, 22 Aug 2026) ─────────
 export const COHORTS = ['week1', 'week2'];
 export const BENEFICIARY_KINDS = ['ecd', 'dignity_kitchen', 'soup_kitchen', 'community'];

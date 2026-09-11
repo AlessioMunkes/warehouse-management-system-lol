@@ -153,6 +153,8 @@ export const ADMIN = {
   donationClassification: '/admin/donation-classification',
   evaluateRouting: '/admin/evaluate-routing',
   donationManagement: '/admin/donation-management',
+  section18aManagement: '/admin/section-18a',
   users:     '/admin/users',
   products:  '/admin/products',
+  emailIntegration: '/admin/email-integration',
 };

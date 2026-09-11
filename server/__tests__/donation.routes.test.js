@@ -17,6 +17,10 @@ const serviceMock = {
   getDonationEvents:    vi.fn(),
   listUnmatchedItems:   vi.fn(),
   listSection18AQueue:  vi.fn(),
+  listEmailHistory:     vi.fn(),
+  resendDonationEmail:  vi.fn(),
+  generateSection18ACertificate: vi.fn(),
+  downloadSection18ACertificate: vi.fn(),
   resolveUnmatchedItem: vi.fn(),
   reclassifyDonation:   vi.fn(),
 };
@@ -58,6 +62,20 @@ beforeEach(() => {
   serviceMock.getDonationEvents.mockResolvedValue([]);
   serviceMock.listUnmatchedItems.mockResolvedValue([]);
   serviceMock.listSection18AQueue.mockResolvedValue([]);
+  serviceMock.listEmailHistory.mockResolvedValue([]);
+  serviceMock.resendDonationEmail.mockResolvedValue({ id: 2, status: 'sent' });
+  serviceMock.generateSection18ACertificate.mockResolvedValue({
+    id: 10,
+    donation_id: 1,
+    certificate_number: 'LOL-S18A-000001',
+    issue_date: '2026-09-11',
+    pdf_filename: 'section-18a-LOL-S18A-000001.pdf',
+  });
+  serviceMock.downloadSection18ACertificate.mockResolvedValue({
+    buffer: Buffer.from('%PDF-1.4'),
+    filename: 'section-18a-LOL-S18A-000001.pdf',
+    contentType: 'application/pdf',
+  });
   serviceMock.resolveUnmatchedItem.mockResolvedValue({ resolved: true });
   serviceMock.reclassifyDonation.mockResolvedValue({ reclassified: true });
 });
@@ -69,6 +87,10 @@ const endpoints = [
   ['get',   `${BASE}/1/events`],
   ['get',   `${BASE}/unmatched`],
   ['get',   `${BASE}/section-18a`],
+  ['get',   `${BASE}/section-18a/emails`],
+  ['post',  `${BASE}/section-18a/emails/1/resend`],
+  ['get',   `${BASE}/1/section-18a/certificate`],
+  ['post',  `${BASE}/1/section-18a/certificate`],
   ['patch', `${BASE}/items/1/resolve`],
   ['patch', `${BASE}/1/classification`],
 ];
@@ -144,10 +166,45 @@ describe('donation routes — authorisation', () => {
     expect(res.status).toBe(200);
   });
 
+  it.each(MANAGERS_UP)('%s can read and resend Section 18A email history', async (role) => {
+    const history = await request(app).get(`${BASE}/section-18a/emails`).set('Cookie', cookieFor(role));
+    const resend = await request(app).post(`${BASE}/section-18a/emails/1/resend`).set('Cookie', cookieFor(role));
+    expect(history.status).toBe(200);
+    expect(resend.status).toBe(200);
+  });
+
+  it.each(MANAGERS_UP)('%s can generate and download Section 18A certificates', async (role) => {
+    const generate = await request(app).post(`${BASE}/1/section-18a/certificate`)
+      .set('Cookie', cookieFor(role));
+    const download = await request(app).get(`${BASE}/1/section-18a/certificate`)
+      .set('Cookie', cookieFor(role));
+    expect(generate.status).toBe(201);
+    expect(download.status).toBe(200);
+    expect(download.headers['content-type']).toMatch(/application\/pdf/);
+  });
+
   it('a worker cannot read the Section 18A queue', async () => {
     const res = await request(app).get(`${BASE}/section-18a`)
       .set('Cookie', cookieFor(ROLES.WORKER));
     expect(res.status).toBe(403);
+  });
+
+  it('a worker cannot read or resend Section 18A email history', async () => {
+    const history = await request(app).get(`${BASE}/section-18a/emails`)
+      .set('Cookie', cookieFor(ROLES.WORKER));
+    const resend = await request(app).post(`${BASE}/section-18a/emails/1/resend`)
+      .set('Cookie', cookieFor(ROLES.WORKER));
+    expect(history.status).toBe(403);
+    expect(resend.status).toBe(403);
+  });
+
+  it('a worker cannot generate or download Section 18A certificates', async () => {
+    const generate = await request(app).post(`${BASE}/1/section-18a/certificate`)
+      .set('Cookie', cookieFor(ROLES.WORKER));
+    const download = await request(app).get(`${BASE}/1/section-18a/certificate`)
+      .set('Cookie', cookieFor(ROLES.WORKER));
+    expect(generate.status).toBe(403);
+    expect(download.status).toBe(403);
   });
 
   // Donor name, contact and tax reference are POPIA-relevant personal
@@ -175,6 +232,12 @@ describe('donation routes — fixed paths are not swallowed by /:id', () => {
     expect(serviceMock.listSection18AQueue).toHaveBeenCalled();
     expect(serviceMock.getDonationById).not.toHaveBeenCalled();
   });
+
+  it('routes /section-18a/emails to email history, not to getDonationById', async () => {
+    await request(app).get(`${BASE}/section-18a/emails`).set('Cookie', cookieFor(ROLES.MANAGER));
+    expect(serviceMock.listEmailHistory).toHaveBeenCalled();
+    expect(serviceMock.getDonationById).not.toHaveBeenCalled();
+  });
 });
 
 // ── Parameter validation ──────────────────────────────────────
@@ -190,6 +253,13 @@ describe('donation routes — parameter validation', () => {
       .set('Cookie', cookieFor(ROLES.MANAGER)).send({ productId: 3 });
     expect(res.status).toBe(400);
     expect(serviceMock.resolveUnmatchedItem).not.toHaveBeenCalled();
+  });
+
+  it.each(['abc', '0'])('rejects email id "%s" with a 400', async (emailId) => {
+    const res = await request(app).post(`${BASE}/section-18a/emails/${emailId}/resend`)
+      .set('Cookie', cookieFor(ROLES.MANAGER)).send({});
+    expect(res.status).toBe(400);
+    expect(serviceMock.resendDonationEmail).not.toHaveBeenCalled();
   });
 });
 

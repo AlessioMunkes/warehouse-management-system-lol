@@ -1,0 +1,85 @@
+[2m06:01:31[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/login[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1193:18)
+    at afterConnectMultiple (node:net:1783:7)
+[2m06:49:33[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\features\taskdashboard\components\navSections.js: Identifier 'Mail' has already been declared. (29:2)
+
+[0m [90m 27 |[39m   [33mScrollText[39m[33m,[39m
+ [90m 28 |[39m   [33mMail[39m[33m,[39m
+[31m[1m>[22m[39m[90m 29 |[39m   [33mMail[39m[33m,[39m
+ [90m    |[39m   [31m[1m^[22m[39m
+ [90m 30 |[39m } [36mfrom[39m [32m'lucide-react'[39m[33m;[39m
+ [90m 31 |[39m [36mimport[39m { [33mSTAFF[39m[33m,[39m [33mADMIN[39m[33m,[39m [33mVOLUNTEERS[39m[33m,[39m [33mPACKING[39m } [36mfrom[39m [32m'../../../routes/paths'[39m[33m;[39m
+ [90m 32 |[39m[0m
+[2m06:49:33[22m [31m[1m[vite][22m[39m [31mInternal server error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\features\taskdashboard\components\navSections.js: Identifier 'Mail' has already been declared. (29:2)
+
+[0m [90m 27 |[31m   [33mScrollText[31m[33m,[31m
+ [90m 28 |[31m   [33mMail[31m[33m,[31m
+[31m[1m>[22m[31m[90m 29 |[31m   [33mMail[31m[33m,[31m
+ [90m    |[31m   [31m[1m^[22m[31m
+ [90m 30 |[31m } [36mfrom[31m [32m'lucide-react'[31m[33m;[31m
+ [90m 31 |[31m [36mimport[31m { [33mSTAFF[31m[33m,[31m [33mADMIN[31m[33m,[31m [33mVOLUNTEERS[31m[33m,[31m [33mPACKING[31m } [36mfrom[31m [32m'../../../routes/paths'[31m[33m;[31m
+ [90m 32 |[31m[0m[39m
+[2m06:49:33[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\features\taskdashboard\components\navSections.js: Identifier 'Mail' has already been declared. (29:2)
+
+[0m [90m 27 |[39m   [33mScrollText[39m[33m,[39m
+ [90m 28 |[39m   [33mMail[39m[33m,[39m
+[31m[1m>[22m[39m[90m 29 |[39m   [33mMail[39m[33m,[39m
+ [90m    |[39m   [31m[1m^[22m[39m
+ [90m 30 |[39m } [36mfrom[39m [32m'lucide-react'[39m[33m;[39m
+ [90m 31 |[39m [36mimport[39m { [33mSTAFF[39m[33m,[39m [33mADMIN[39m[33m,[39m [33mVOLUNTEERS[39m[33m,[39m [33mPACKING[39m } [36mfrom[39m [32m'../../../routes/paths'[39m[33m;[39m
+ [90m 32 |[39m[0m
+[2m06:49:40[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\features\taskdashboard\components\navSections.js: Identifier 'Mail' has already been declared. (29:2)
+
+[0m [90m 27 |[39m   [33mScrollText[39m[33m,[39m
+ [90m 28 |[39m   [33mMail[39m[33m,[39m
+[31m[1m>[22m[39m[90m 29 |[39m   [33mMail[39m[33m,[39m
+ [90m    |[39m   [31m[1m^[22m[39m
+ [90m 30 |[39m } [36mfrom[39m [32m'lucide-react'[39m[33m;[39m
+ [90m 31 |[39m [36mimport[39m { [33mSTAFF[39m[33m,[39m [33mADMIN[39m[33m,[39m [33mVOLUNTEERS[39m[33m,[39m [33mPACKING[39m } [36mfrom[39m [32m'../../../routes/paths'[39m[33m;[39m
+ [90m 32 |[39m[0m
+[2m06:49:40[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\features\taskdashboard\components\navSections.js: Identifier 'Mail' has already been declared. (29:2)
+
+[0m [90m 27 |[39m   [33mScrollText[39m[33m,[39m
+ [90m 28 |[39m   [33mMail[39m[33m,[39m
+[31m[1m>[22m[39m[90m 29 |[39m   [33mMail[39m[33m,[39m
+ [90m    |[39m   [31m[1m^[22m[39m
+ [90m 30 |[39m } [36mfrom[39m [32m'lucide-react'[39m[33m;[39m
+ [90m 31 |[39m [36mimport[39m { [33mSTAFF[39m[33m,[39m [33mADMIN[39m[33m,[39m [33mVOLUNTEERS[39m[33m,[39m [33mPACKING[39m } [36mfrom[39m [32m'../../../routes/paths'[39m[33m;[39m
+ [90m 32 |[39m[0m
+[2m06:49:41[22m [31m[1m[vite][22m[39m [31mInternal server error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\features\taskdashboard\components\navSections.js: Identifier 'Mail' has already been declared. (29:2)
+
+[0m [90m 27 |[31m   [33mScrollText[31m[33m,[31m
+ [90m 28 |[31m   [33mMail[31m[33m,[31m
+[31m[1m>[22m[31m[90m 29 |[31m   [33mMail[31m[33m,[31m
+ [90m    |[31m   [31m[1m^[22m[31m
+ [90m 30 |[31m } [36mfrom[31m [32m'lucide-react'[31m[33m;[31m
+ [90m 31 |[31m [36mimport[31m { [33mSTAFF[31m[33m,[31m [33mADMIN[31m[33m,[31m [33mVOLUNTEERS[31m[33m,[31m [33mPACKING[31m } [36mfrom[31m [32m'../../../routes/paths'[31m[33m;[31m
+ [90m 32 |[31m[0m[39m
+[2m06:49:54[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\features\taskdashboard\components\navSections.js: Unexpected token (28:0)
+
+[0m [90m 26 |[39m   [33mPhoneCall[39m[33m,[39m
+ [90m 27 |[39m   [33mScrollText[39m[33m,[39m
+[31m[1m>[22m[39m[90m 28 |[39m [32m`  Mail,[39m
+ [90m    |[39m [31m[1m^[22m[39m
+ [90m 29 |[39m [32m  Mail[39m
+ [90m 30 |[39m [32m} from 'lucide-react';[39m
+ [90m 31 |[39m [32mimport { STAFF, ADMIN, VOLUNTEERS, PACKING } from '../../../routes/paths';[39m[0m
+[2m06:49:54[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\features\taskdashboard\components\navSections.js: Unexpected token (28:0)
+
+[0m [90m 26 |[39m   [33mPhoneCall[39m[33m,[39m
+ [90m 27 |[39m   [33mScrollText[39m[33m,[39m
+[31m[1m>[22m[39m[90m 28 |[39m [32m`  Mail,[39m
+ [90m    |[39m [31m[1m^[22m[39m
+ [90m 29 |[39m [32m  Mail[39m
+ [90m 30 |[39m [32m} from 'lucide-react';[39m
+ [90m 31 |[39m [32mimport { STAFF, ADMIN, VOLUNTEERS, PACKING } from '../../../routes/paths';[39m[0m
+[2m06:49:54[22m [31m[1m[vite][22m[39m [31mInternal server error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\features\taskdashboard\components\navSections.js: Unexpected token (28:0)
+
+[0m [90m 26 |[31m   [33mPhoneCall[31m[33m,[31m
+ [90m 27 |[31m   [33mScrollText[31m[33m,[31m
+[31m[1m>[22m[31m[90m 28 |[31m [32m`  Mail,[31m
+ [90m    |[31m [31m[1m^[22m[31m
+ [90m 29 |[31m [32m  Mail[31m
+ [90m 30 |[31m [32m} from 'lucide-react';[31m
+ [90m 31 |[31m [32mimport { STAFF, ADMIN, VOLUNTEERS, PACKING } from '../../../routes/paths';[31m[0m[39m

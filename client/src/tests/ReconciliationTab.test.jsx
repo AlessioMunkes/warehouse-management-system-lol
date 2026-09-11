@@ -110,7 +110,7 @@ describe('ReconciliationTab', () => {
     expect(screen.queryByText(/already resolved before the failure/)).not.toBeInTheDocument();
   });
 
-  it('clicking Retry commit calls retryCommit with the donation id and removes the row after refresh', async () => {
+  it('clicking Retry calls retryCommit with the donation id and removes the row after refresh', async () => {
     // First load returns both rows; the refresh after the successful retry
     // returns only the commit_incomplete row (the failed one was committed).
     donationManagementAPI.getPendingDonations
@@ -121,7 +121,7 @@ describe('ReconciliationTab', () => {
     await screen.findByText('Failed Donor');
 
     const failedRow = screen.getByText('Failed Donor').closest('[data-slot="card"]');
-    fireEvent.click(within(failedRow).getByRole('button', { name: /Retry commit/i }));
+    fireEvent.click(within(failedRow).getByRole('button', { name: /Retry/i }));
 
     await waitFor(() => {
       expect(donationManagementAPI.retryCommit).toHaveBeenCalledTimes(1);
@@ -149,7 +149,7 @@ describe('ReconciliationTab', () => {
     await screen.findByText('Failed Donor');
 
     const failedRow = screen.getByText('Failed Donor').closest('[data-slot="card"]');
-    fireEvent.click(within(failedRow).getByRole('button', { name: /Retry commit/i }));
+    fireEvent.click(within(failedRow).getByRole('button', { name: /Retry/i }));
 
     // The error is attached to that row only.
     await screen.findByText('Retry failed server-side');

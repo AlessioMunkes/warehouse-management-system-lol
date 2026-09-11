@@ -11,6 +11,7 @@ const poolMock = {
 };
 
 const pendingRepoMock = {
+  findPendingDonationIdByIdempotencyKey: vi.fn(),
   createPendingDonation: vi.fn(),
   createPendingDonationItems: vi.fn(),
   getPendingDonationById: vi.fn(),
@@ -62,7 +63,13 @@ const { default: pendingDonationService } = await import('../src/services/pendin
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // clearAllMocks keeps pending mockResolvedValueOnce queues; a test that
+  // queues more connects than its code path consumes would leak its client
+  // into the NEXT test's Once queue and shift every assertion. Reset the
+  // connect mock outright so every test starts with an empty queue.
+  poolMock.connect.mockReset();
   poolMock.query.mockResolvedValue({ rows: [] });
+  pendingRepoMock.findPendingDonationIdByIdempotencyKey.mockResolvedValue(null);
   pendingRepoMock.updatePendingDonationStatus.mockResolvedValue({ id: 10 });
   pendingRepoMock.markPendingItemCommitted.mockResolvedValue({ id: 1 });
   pendingRepoMock.setPendingDonationCommittedId.mockResolvedValue({ id: 10, committed_donation_id: 20 });
@@ -244,6 +251,92 @@ describe('pendingDonationService.retryCommit', () => {
       expect.anything(),
       expect.anything()
     );
+  });
+
+  it('derives donation category from resolved items when donation_category is blank', async () => {
+    const eventLog = [];
+    pendingRepoMock.getPendingDonationById
+      .mockImplementationOnce(async () => ({
+        id: 10,
+        status: 'commit_failed',
+        donation_category: '',
+        donor_name: 'Pick n Pay',
+        donor_consent_given: true,
+        donor_tax_reference: '9012',
+        items: [
+          { id: 100, line_no: 1, status: 'resolved', description: 'Tomato', quantity: 5, unit: 'kg', resolved_category: 'recipe_food' },
+        ],
+      }))
+      .mockImplementationOnce(async () => ({
+        id: 10,
+        status: 'committing',
+        donation_category: '',
+        donor_name: 'Pick n Pay',
+        donor_consent_given: true,
+        donor_tax_reference: '9012',
+        items: [
+          { id: 100, line_no: 1, status: 'resolved', description: 'Tomato', quantity: 5, unit: 'kg', resolved_category: 'recipe_food' },
+        ],
+      }));
+
+    pendingRepoMock.updatePendingDonationStatus.mockImplementation(async (id, status) => {
+      eventLog.push(`status:${status}`);
+      return { id, status };
+    });
+
+    const beginClient = makeClient();
+    const finalizeClient = makeClient();
+    poolMock.connect
+      .mockResolvedValueOnce(beginClient)
+      .mockResolvedValueOnce(finalizeClient);
+
+    pendingRepoMock.setPendingDonationCommittedId.mockResolvedValue({ id: 10, status: 'committing', committed_donation_id: 20 });
+    pendingRepoMock.markPendingItemCommitted.mockResolvedValue({ id: 100 });
+    donationServiceMock.createDonation.mockResolvedValue({ donation: { id: 20, items: [{ id: 200, donation_id: 20 }] } });
+
+    const result = await pendingDonationService.retryCommit(10);
+
+    expect(donationServiceMock.createDonation).toHaveBeenCalledTimes(1);
+    // The blank donation-level category is derived from the single resolved
+    // item's resolved_category instead of being passed through as ''.
+    expect(donationServiceMock.createDonation.mock.calls[0][0].category).toBe('recipe_food');
+    expect(result).toEqual({ pendingDonationId: 10, donationId: 20, committed: true });
+  });
+
+  it('leaves a mixed-category donation unresolved rather than guessing a category', async () => {
+    pendingRepoMock.getPendingDonationById
+      .mockImplementationOnce(async () => ({
+        id: 11,
+        status: 'commit_failed',
+        donation_category: '',
+        items: [
+          { id: 100, line_no: 1, status: 'resolved', description: 'Tomato', quantity: 1, unit: 'kg', resolved_category: 'recipe_food' },
+          { id: 101, line_no: 2, status: 'resolved', description: 'Bricks', quantity: 1, unit: 'each', resolved_category: 'non_food' },
+        ],
+      }))
+      .mockImplementationOnce(async () => ({
+        id: 11,
+        status: 'committing',
+        donation_category: '',
+        items: [
+          { id: 100, line_no: 1, status: 'resolved', description: 'Tomato', quantity: 1, unit: 'kg', resolved_category: 'recipe_food' },
+          { id: 101, line_no: 2, status: 'resolved', description: 'Bricks', quantity: 1, unit: 'each', resolved_category: 'non_food' },
+        ],
+      }));
+
+    pendingRepoMock.updatePendingDonationStatus.mockImplementation(async (id, status) => {
+      return { id, status };
+    });
+
+    const beginClient = makeClient();
+    poolMock.connect.mockResolvedValueOnce(beginClient);
+    pendingRepoMock.setPendingDonationCommittedId.mockResolvedValue({ id: 11, status: 'committing', committed_donation_id: 20 });
+    donationServiceMock.createDonation.mockRejectedValue(Object.assign(new Error('A donation category is required.'), { status: 400 }));
+
+    await expect(pendingDonationService.retryCommit(11)).rejects.toMatchObject({ status: 400 });
+    // createDonation was invoked but the category stayed blank (mixed items
+    // must not silently pick one), so the existing 400 guard surfaces it.
+    expect(donationServiceMock.createDonation).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -438,3 +531,84 @@ describe('pending donation commit finalization', () => {
     );
   });
 });
+
+// ── Idempotent intake submit ─────────────────────────────────────────────
+// DonationDraftContext reuses one idempotency key per draft on purpose, so
+// a retried submit (network blip, double tap, lost response) must answer
+// with the original pending donation instead of 500ing on the unique index.
+describe('createPendingDonationFromIntake — idempotent replay', () => {
+  it('returns the original pending donation without writing again', async () => {
+    const client = makeClient();
+    poolMock.connect.mockResolvedValueOnce(client);
+    pendingRepoMock.findPendingDonationIdByIdempotencyKey.mockResolvedValue({ id: 55 });
+    pendingRepoMock.getPendingDonationById.mockResolvedValue({ id: 55, items: [] });
+
+    const result = await pendingDonationService.createPendingDonationFromIntake({
+      donorName: 'Retry Donor',
+      idempotencyKey: 'KEY-REPLAY-1',
+      items: [],
+    });
+
+    expect(result.id).toBe(55);
+    expect(pendingRepoMock.createPendingDonation).not.toHaveBeenCalled();
+    expect(pendingRepoMock.createPendingDonationItems).not.toHaveBeenCalled();
+    expect(client.query.mock.calls.map((call) => call[0])).toEqual(['BEGIN', 'COMMIT']);
+  });
+
+  it('answers the lost insert race with the original pending donation', async () => {
+    const client = makeClient();
+    poolMock.connect.mockResolvedValueOnce(client);
+    // First call (pre-lookup): nothing there. Insert loses the race.
+    // Second call (post-rollback): the other request's row is visible.
+    pendingRepoMock.findPendingDonationIdByIdempotencyKey
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 55 });
+    pendingRepoMock.createPendingDonation.mockResolvedValue(null);
+    pendingRepoMock.getPendingDonationById.mockResolvedValue({ id: 55, items: [] });
+
+    const result = await pendingDonationService.createPendingDonationFromIntake({
+      donorName: 'Race Donor',
+      idempotencyKey: 'KEY-RACE-1',
+      items: [],
+    });
+
+    expect(result.id).toBe(55);
+    expect(pendingRepoMock.createPendingDonationItems).not.toHaveBeenCalled();
+    expect(client.query.mock.calls.map((call) => call[0])).toEqual(['BEGIN', 'ROLLBACK']);
+  });
+
+  it('still writes normally when no idempotency key is supplied', async () => {
+    const intakeClient = makeClient();
+    const beginClient = makeClient();
+    const finalizeClient = makeClient();
+    poolMock.connect
+      .mockResolvedValueOnce(intakeClient)
+      .mockResolvedValueOnce(beginClient)
+      .mockResolvedValueOnce(finalizeClient);
+    pendingRepoMock.createPendingDonation.mockResolvedValue({ id: 77 });
+    pendingRepoMock.createPendingDonationItems.mockResolvedValue([{ id: 1 }]);
+    pendingRepoMock.updatePendingDonationStatus.mockResolvedValue({ id: 77, status: 'committing' });
+    pendingRepoMock.getPendingDonationById
+      .mockResolvedValueOnce({ id: 77, items: [{ id: 1, status: 'resolved', line_no: 1 }] })
+      .mockResolvedValueOnce({
+        id: 77,
+        status: 'committing',
+        donation_category: 'recipe_food',
+        items: [{ id: 1, line_no: 1, status: 'resolved', description: 'Rice', quantity: 1, unit: 'kg' }],
+      });
+    pendingRepoMock.setPendingDonationCommittedId.mockResolvedValue({ id: 77, status: 'committing', committed_donation_id: 20 });
+    pendingRepoMock.markPendingItemCommitted.mockResolvedValue({ id: 1 });
+    donationServiceMock.createDonation.mockResolvedValue({ donation: { id: 20, items: [{ id: 200, donation_id: 20 }] } });
+
+    const result = await pendingDonationService.createPendingDonationFromIntake({
+      donorName: 'Plain Donor',
+      items: [{ description: 'Rice', quantity: 1, unit: 'kg', resolvedCategory: 'recipe_food', status: 'resolved' }],
+    });
+
+    expect(result.id).toBe(77);
+    expect(donationServiceMock.createDonation).toHaveBeenCalledTimes(1);
+    expect(pendingRepoMock.createPendingDonation).toHaveBeenCalledTimes(1);
+    expect(intakeClient.query.mock.calls.map((call) => call[0])).toEqual(['BEGIN', 'COMMIT']);
+  });
+});
+

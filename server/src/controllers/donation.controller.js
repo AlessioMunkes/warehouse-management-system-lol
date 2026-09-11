@@ -92,6 +92,76 @@ const listSection18AQueue = async (req, res) => {
   }
 };
 
+const listEmailHistory = async (req, res) => {
+  try {
+    const emails = await donationService.listEmailHistory();
+    res.status(200).json({ success: true, data: emails });
+  } catch (err) {
+    console.error('[listEmailHistory]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to retrieve donation email history.',
+    });
+  }
+};
+
+const resendDonationEmail = async (req, res) => {
+  try {
+    const email = await donationService.resendDonationEmail(req.params.emailId, req.user.id);
+    res.status(200).json({ success: true, data: email });
+  } catch (err) {
+    console.error('[resendDonationEmail]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to resend donation email.',
+    });
+  }
+};
+
+// POST /api/donations/:id/section-18a/certificate
+// Generates and stores the certificate PDF for a queued donation.
+const generateSection18ACertificate = async (req, res) => {
+  try {
+    const certificate = await donationService.generateSection18ACertificate(req.params.id, req.user.id);
+    res.status(201).json({ success: true, data: {
+      id: certificate.id,
+      donation_id: certificate.donation_id,
+      certificate_number: certificate.certificate_number,
+      issue_date: certificate.issue_date,
+      pdf_filename: certificate.pdf_filename,
+    } });
+  } catch (err) {
+    console.error('[generateSection18ACertificate]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to generate the Section 18A certificate.',
+    });
+  }
+};
+
+// GET /api/donations/:id/section-18a/certificate
+// Existing download action target. If the certificate has not been
+// generated yet, the service generates and stores it first.
+const downloadSection18ACertificate = async (req, res) => {
+  try {
+    const file = await donationService.downloadSection18ACertificate(req.params.id, req.user.id);
+    res.status(200);
+    res.setHeader('Content-Type', file.contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${file.filename}"`);
+    res.send(file.buffer);
+  } catch (err) {
+    console.error('[downloadSection18ACertificate]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to download the Section 18A certificate.',
+    });
+  }
+};
+
 // ── Resolve an unmatched line ────────────────────────────────
 // PATCH /api/donations/items/:itemId/resolve
 // Body: { productId, unit?, locationId? }
@@ -167,6 +237,10 @@ export default {
   createDonation,
   listUnmatchedItems,
   listSection18AQueue,
+  listEmailHistory,
+  resendDonationEmail,
+  generateSection18ACertificate,
+  downloadSection18ACertificate,
   resolveUnmatchedItem,
   getDonationById,
   getDonationEvents,

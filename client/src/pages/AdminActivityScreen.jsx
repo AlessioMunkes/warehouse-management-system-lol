@@ -18,7 +18,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
 import {
-  Users2, HandHeart, Package, Truck, Gift, Tags, Route, AlertTriangle,
+  Users2, HandHeart, Package, Truck, Gift, Tags, Route, AlertTriangle, ScrollText,
 } from 'lucide-react';
 import DashboardGreeting from '../features/taskdashboard/components/DashboardGreeting';
 import StatTile from '../features/taskdashboard/components/StatTile';
@@ -147,9 +147,13 @@ export default function AdminActivityScreen() {
       </h2>
       <div className="grid gap-3 sm:grid-cols-2">
         <ActionCard
-          to={ADMIN.donationManagement} icon={Gift} title="Donation Management"
+          to={ADMIN.donationManagement} icon={Gift} title="Classification Queue"
           description="Pending donations and flagged items waiting on a decision."
           badge={donationMgmtCount > 0 ? `Needs attention (${donationMgmtCount})` : null}
+        />
+        <ActionCard
+          to={ADMIN.section18aManagement} icon={ScrollText} title="Section 18A Management"
+          description="Review donations that qualify for tax certificates."
         />
         <ActionCard
           to={ADMIN.donationClassification} icon={Tags} title="Donation Classification"

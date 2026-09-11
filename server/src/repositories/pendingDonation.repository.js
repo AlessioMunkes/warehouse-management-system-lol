@@ -5,6 +5,20 @@ const coerceValue = (value) => {
   return value;
 };
 
+// ── Idempotency lookup ────────────────────────────────────────
+// A retried intake submit carries the SAME key by design (see
+// DonationDraftContext). It must answer with the original pending
+// donation, not 500 on the unique index. Mirrors
+// donation.repository's findByIdempotencyKey — same problem, same shape.
+const findPendingDonationIdByIdempotencyKey = async (key, client = pool) => {
+  if (!key) return null;
+  const result = await client.query(
+    `SELECT id FROM pending_donations WHERE idempotency_key = $1 LIMIT 1`,
+    [key]
+  );
+  return result.rows[0] || null;
+};
+
 const createPendingDonation = async (data = {}, client = pool) => {
   const payload = data || {};
 
@@ -41,6 +55,7 @@ const createPendingDonation = async (data = {}, client = pool) => {
        created_by,
        status
      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'draft')
+     ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
      RETURNING *;`,
     [
       row.donorName,
@@ -293,22 +308,24 @@ const setPendingDonationCommittedId = async (id, donationId, client) => {
   return result.rows[0] || null;
 };
 
-const markPendingItemResolved = async (itemId, { resolvedCategory, routingStatus, storageAreaHint, resolvedBy } = {}, client = pool) => {
+const markPendingItemResolved = async (itemId, { productId, resolvedCategory, routingStatus, storageAreaHint, resolvedBy } = {}, client = pool) => {
   const result = await client.query(
     // NOTE: no resolved_at column exists on pending_donation_items in the
     // live schema (only rejected_at); updated_at tracks resolution time.
     `UPDATE pending_donation_items
      SET status = 'resolved',
-         resolved_category = $1,
-         routing_status = $2,
-         storage_area_hint = $3,
-         resolved_by = $4,
+         product_id = COALESCE($1, product_id),
+         resolved_category = $2,
+         routing_status = $3,
+         storage_area_hint = $4,
+         resolved_by = $5,
          rejection_reason = NULL,
          rejected_at = NULL,
          updated_at = NOW()
-     WHERE id = $5
+     WHERE id = $6
      RETURNING *;`,
     [
+     productId ?? null,
      resolvedCategory ?? null,
      routingStatus ?? null,
      storageAreaHint ?? null,
@@ -426,6 +443,7 @@ const listPendingDonationsByStatus = async (statuses = [], client = pool) => {
 };
 
 export default {
+  findPendingDonationIdByIdempotencyKey,
   createPendingDonation,
   createPendingDonationItems,
   getPendingDonationById,
