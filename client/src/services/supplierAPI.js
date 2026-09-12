@@ -14,7 +14,7 @@
 // delivery_notes.supplier_id are ON DELETE RESTRICT, so deactivation
 // is the removal path — see setSupplierStatus below.
 // ─────────────────────────────────────────────────────────────
-import { apiGet, apiPost, apiPatch } from "./api";
+import { apiGet, apiPost, apiPatch, apiDelete } from "./api";
 
 // ── Row mappers ───────────────────────────────────────────────
 export const toSupplier = (row) => ({
@@ -109,6 +109,13 @@ export const setSupplierStatus = async (id, isActive) => {
 };
 
 // ── Prospects ─────────────────────────────────────────────────
+// Not a SQL DELETE — purchase_orders and delivery_notes reference
+// suppliers ON DELETE RESTRICT. See migration 019.
+export const deleteSupplier = async (id) => {
+  const body = await apiDelete(`/api/suppliers/${id}`);
+  return toSupplier(body.data ?? {});
+};
+
 export const getProspects = async ({ status = "" } = {}) => {
   const qs = status ? `?status=${encodeURIComponent(status)}` : "";
   const body = await apiGet(`/api/suppliers/prospects${qs}`);
@@ -144,5 +151,6 @@ export const convertProspect = async (id, overrides = {}) => {
 
 export default {
   getSuppliers, getSupplier, registerSupplier, updateSupplier, setSupplierStatus,
+  deleteSupplier,
   getProspects, addProspect, updateProspect, deleteProspect, convertProspect,
 };

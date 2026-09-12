@@ -53,6 +53,26 @@ const parseWeight = (raw) => {
   return parsed;
 };
 
+// What we expect to pay for ONE of these, before VAT, in rand. Its own
+// parser rather than reusing parseWeight so the error names the field
+// the person was actually typing in.
+//
+// Blank is "we have never priced this", which is not the same as free —
+// so '' becomes null and 0 stays 0, exactly as weight does. A donated
+// line really can be zero.
+const parseUnitCost = (raw) => {
+  if (raw === undefined || raw === null || raw === '') return null;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    fail(400, 'Cost per item must be zero or a positive amount.');
+  }
+  // NUMERIC(12,2) in the database. Rounding here rather than letting
+  // Postgres do it silently means the number read back is the number
+  // that was stored, and a purchase-order estimate built from it adds
+  // up to what the screen showed.
+  return Math.round(parsed * 100) / 100;
+};
+
 const parsePerishable = (raw) => {
   if (typeof raw === 'boolean') return raw;
   if (raw === 'true')  return true;
@@ -141,6 +161,7 @@ const createProduct = async (data = {}) => {
     storageType:       parseStorageType(data.storageType),
     defaultLocationId: parseLocationId(data.defaultLocationId),
     reorderThreshold:  parseThreshold(data.reorderThreshold),
+    unitCost:          parseUnitCost(data.unitCost),
   };
 
   const existing = await productRepo.findByNameOrSku(row.name, row.stockKeepingUnit);
@@ -186,6 +207,7 @@ const updateProduct = async (id, data = {}) => {
     patch.defaultUnit = parseUnit(data.defaultUnit, { required: true });
   }
   if (has('weightKg'))          patch.weightKg          = parseWeight(data.weightKg);
+  if (has('unitCost'))          patch.unitCost          = parseUnitCost(data.unitCost);
   if (has('category'))          patch.category          = cleanText(data.category);
   if (has('isPerishable'))      patch.isPerishable      = parsePerishable(data.isPerishable);
   if (has('storageType'))       patch.storageType       = parseStorageType(data.storageType);
@@ -223,7 +245,33 @@ const updateProduct = async (id, data = {}) => {
 const setActive = async (id, isActive) => {
   const validId = validateId(id);
   const boolActive = parsePerishable(isActive);   // same explicit-boolean rule
+
+  // An archived product cannot be switched back on from here. The
+  // database would refuse it anyway (products_archived_implies_inactive)
+  // but a CHECK violation surfaces as a 500 and tells the admin
+  // nothing, so the refusal is spelled out where it can be read.
+  const existing = await productRepo.getProductById(validId);
+  if (!existing) fail(404, 'Product not found.');
+  if (existing.archived_at && boolActive) {
+    fail(409, 'This product was deleted from the catalogue and cannot be reactivated. Create a new product instead.');
+  }
+
   const result = await productRepo.setActive(validId, boolActive);
+  if (!result) fail(404, 'Product not found.');
+  return result;
+};
+
+// ── Delete from the catalogue ────────────────────────────────
+// Not a DELETE statement. See migration 019: the row stays so that
+// every slip, delivery note and report already referencing it keeps
+// its product name, and stops being something anyone can pick.
+const archiveProduct = async (id, actorId) => {
+  const validId = validateId(id);
+  const existing = await productRepo.getProductById(validId);
+  if (!existing) fail(404, 'Product not found.');
+  if (existing.archived_at) return existing;   // already gone; idempotent
+
+  const result = await productRepo.archiveProduct(validId, actorId);
   if (!result) fail(404, 'Product not found.');
   return result;
 };
@@ -234,4 +282,5 @@ export default {
   createProduct,
   updateProduct,
   setActive,
+  archiveProduct,
 };

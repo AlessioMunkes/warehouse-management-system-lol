@@ -17,7 +17,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { STAFF, ADMIN } from '../routes/paths';
+import { STAFF } from '../routes/paths';
 import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
 import DashboardGreeting from '../features/taskdashboard/components/DashboardGreeting';
 import DonutStat from '../features/taskdashboard/components/DonutStat';
@@ -138,7 +138,11 @@ export default function ManagerDashboardPage() {
               <StatTile icon={ShoppingCart} label="Open purchase orders" value={summary.openPurchaseOrders} to={STAFF.purchaseOrders} />
               <StatTile icon={Truck} label="Pending dispatches today" value={summary.pendingDispatchesToday} to={STAFF.pickingSlips} />
               <StatTile icon={PhoneCall} label="Pending benevolent requests" value={summary.pendingCommunityRequests} to={STAFF.communityRequests} warn />
-              <StatTile icon={Package} label="Active products" value={summary.activeProductCount} to={ADMIN.products} />
+              {/* Inventory, not Product Management: the catalogue editor
+                  is admin-only since script 35, and this tile was a
+                  one-click trip to a bounce. Same products, a screen the
+                  manager owns. */}
+              <StatTile icon={Package} label="Active products" value={summary.activeProductCount} to="/noc/inventory" />
             </>
           ) : (
             Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)

@@ -78,10 +78,25 @@ const setStatus = async (req, res) => {
   }
 };
 
+// ── DELETE /api/users/:id ─────────────────────────────────────
+// See the note above setStatus: audit_log references users ON DELETE
+// RESTRICT, so this archives rather than deletes. The account is gone
+// from the directory and can no longer sign in; the trail keeps its
+// name.
+const remove = async (req, res) => {
+  try {
+    const data = await userService.archiveUser(req.params.id, req.user.id);
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    respondError(res, err, 'archiveUser', 'Failed to delete user.');
+  }
+};
+
 export default {
   list,
   getOne,
   register,
   update,
   setStatus,
+  remove,
 };

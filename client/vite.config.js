@@ -6,7 +6,16 @@ import path from 'path';
 import { fileURLToPath } from 'url'
 import tailwindcss from '@tailwindcss/vite'   // ← added
 
-let faviconURL = './favicon.svg'
+// Two forms of the same file, because the two consumers want
+// different things:
+//   FAVICON_ASSET — a path relative to publicDir, for the workbox
+//                   glob in includeAssets.
+//   FAVICON_URL   — a root-absolute URL, for manifest icon src, which
+//                   the browser resolves against the site root rather
+//                   than against the manifest's own location.
+// Both point into icons/ because that is where ba3f2f8 put the file.
+const FAVICON_ASSET = 'icons/favicon.svg'
+const FAVICON_URL   = '/icons/favicon.svg'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -21,12 +30,20 @@ export default defineConfig({
       workbox: {
         globIgnores: ['**/xlsx-*.js'],
       },
-      includeAssets: [faviconURL],
+      includeAssets: [FAVICON_ASSET],
       manifest: {
+        // name and short_name were both the repo slug, so an installed
+        // shortcut would have read "warehouse-management-system-lol"
+        // on someone's home screen. short_name is what a launcher
+        // shows under the icon, where there is room for about twelve
+        // characters.
+        name: 'Ladles of Love Warehouse Management',
+        short_name: 'LoL WMS',
+        description: 'Stock, receiving, packing and dispatch for the Ladles of Love warehouse.',
         theme_color: '#7A1A1A',                 // updated to match your brand
         icons: [
-          { src: faviconURL, sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' },
-          { src: faviconURL, sizes: '192x192',  type: 'image/svg+xml' }
+          { src: FAVICON_URL, sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' },
+          { src: FAVICON_URL, sizes: '192x192', type: 'image/svg+xml' }
         ]
       }
     }),

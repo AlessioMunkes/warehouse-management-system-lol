@@ -116,7 +116,9 @@ const getProducts = async (req, res) => {
 // ── GET /api/deliveries/purchase-orders?supplierId=1 ─────────
 const getPurchaseOrders = async (req, res) => {
   try {
-    const orders = await deliveryService.getPurchaseOrdersBySupplier(req.query.supplierId);
+    // Without supplierId this is every open order, for the receiving
+    // screen's search; with it, that supplier's open orders as before.
+    const orders = await deliveryService.listOpenPurchaseOrders(req.query.supplierId);
     res.json({ success: true, data: orders });
   } catch (err) {
     respondWithError(res, err, 'getPurchaseOrders', 'Failed to retrieve purchase orders.');

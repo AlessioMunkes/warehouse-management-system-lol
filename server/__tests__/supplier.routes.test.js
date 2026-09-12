@@ -84,8 +84,9 @@ describe('write access', () => {
     expect(service.registerSupplier).not.toHaveBeenCalled();
   });
 
-  it('201s a manager registering a supplier', async () => {
-    await as(request(app).post('/api/suppliers').send({ name: 'X' }), 'manager').expect(201);
+  it('403s a manager registering a supplier', async () => {
+    await as(request(app).post('/api/suppliers').send({ name: 'X' }), 'manager').expect(403);
+    expect(service.registerSupplier).not.toHaveBeenCalled();
   });
 
   it('201s an admin registering a supplier', async () => {
@@ -93,7 +94,7 @@ describe('write access', () => {
   });
 
   it('attributes the write to the authenticated user', async () => {
-    await as(request(app).post('/api/suppliers').send({ name: 'X' }), 'manager').expect(201);
+    await as(request(app).post('/api/suppliers').send({ name: 'X' }), 'admin').expect(201);
     expect(service.registerSupplier).toHaveBeenCalledWith({ name: 'X' }, 2);
   });
 
@@ -109,7 +110,7 @@ describe('error translation', () => {
     err.status = 409;
     service.registerSupplier.mockRejectedValue(err);
 
-    const res = await as(request(app).post('/api/suppliers').send({ name: 'X' }), 'manager').expect(409);
+    const res = await as(request(app).post('/api/suppliers').send({ name: 'X' }), 'admin').expect(409);
     expect(res.body.message).toMatch(/already exists/);
   });
 
@@ -117,7 +118,7 @@ describe('error translation', () => {
   // with a fixed sentence rather than echoed.
   it('does not echo the message of an unexpected error', async () => {
     service.registerSupplier.mockRejectedValue(new Error('relation "suppliers" does not exist'));
-    const res = await as(request(app).post('/api/suppliers').send({ name: 'X' }), 'manager').expect(500);
+    const res = await as(request(app).post('/api/suppliers').send({ name: 'X' }), 'admin').expect(500);
     expect(res.body.message).not.toMatch(/relation/);
   });
 });
@@ -142,9 +143,12 @@ describe('prospects', () => {
     await as(request(app).post('/api/suppliers/prospects').send({ name: 'A lead' }), 'manager').expect(201);
   });
 
-  it('converts through a manager-only route', async () => {
+  it('converts through an admin-only route, while the pad stays with the manager', async () => {
     service.convertProspect.mockResolvedValue({ supplier: { id: 9 }, prospect: { id: 5 } });
-    await as(request(app).post('/api/suppliers/prospects/5/convert').send({}), 'manager').expect(201);
+    await as(request(app).post('/api/suppliers/prospects/5/convert').send({}), 'admin').expect(201);
+    // The manager keeps the pad and loses only this one route, because
+    // this is the route that creates master data.
+    await as(request(app).post('/api/suppliers/prospects/5/convert').send({}), 'manager').expect(403);
     await as(request(app).post('/api/suppliers/prospects/5/convert').send({}), 'warehouse_worker').expect(403);
   });
 

@@ -12,10 +12,17 @@
 // growing the API for a distinction the client can compute itself.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
+import useListSearch from '../../staff/hooks/useListSearch';
+import ListTools, { NoMatches } from '../../staff/components/ListTools';
 import { fetchPickingSlips, assignSlip } from '../../../services/pickingAPI';
 import { Notice } from '../../staff/components/StepPrimitives';
+import Paged from '../../staff/components/Paged';
+import usePaged from '../../staff/hooks/usePaged';
 
 const COHORT_LABELS = { week1: 'Week 1', week2: 'Week 2' };
+
+// Centre and packer. Module level so its identity is stable.
+const slipText = (slip) => [slip.ecd_name, slip.packer_name].filter(Boolean).join(' ');
 const DONE_STATUSES = ['complete', 'collected'];
 const MISSED_COLLECTION_DAYS = 21; // same threshold as the manager board
 
@@ -74,6 +81,14 @@ export default function StaffSlipList({ onOpenSlip }) {
 
   const rows = tab === 'mine' ? active : tab === 'spare' ? spare : done;
   const counts = { mine: active.length, spare: spare.length, done: done.length };
+  // The tabs are the filter this screen already had; search narrows
+  // whichever one is open.
+  const search = useListSearch(rows, slipText);
+
+  // usePaged clamps when the list shrinks, which is what stops a
+  // switch from a long tab to a short one — or a search that matches
+  // two rows — landing on an empty page 3 with nothing to explain it.
+  const paged = usePaged(search.filtered);
 
   const handleClaim = async (e, slipId) => {
     e.stopPropagation();
@@ -114,6 +129,15 @@ export default function StaffSlipList({ onOpenSlip }) {
         ))}
       </div>
 
+      {!loading && rows.length > 0 ? (
+        <ListTools
+          id="stf-slip-search"
+          query={search.query}
+          onQuery={search.setQuery}
+          placeholder="Search by centre or packer"
+        />
+      ) : null}
+
       {loading ? (
         <div className="stf-skeleton" aria-label="Loading" />
       ) : rows.length === 0 ? (
@@ -122,9 +146,15 @@ export default function StaffSlipList({ onOpenSlip }) {
           {tab === 'spare' && 'No spare pallets right now. Check back once your manager assigns the next batch.'}
           {tab === 'done' && "Nothing finished yet today — completed and collected pallets will show up here."}
         </div>
+      ) : search.filtered.length === 0 ? (
+        <NoMatches
+          query={search.query}
+          onClear={() => search.setQuery('')}
+          noun="pallets"
+        />
       ) : (
         <div className="stf-list">
-          {rows.map((slip) => {
+          {paged.slice.map((slip) => {
             const badge = badgeFor(slip);
             const gap = daysSinceCollection(slip.last_collected_date, slip.dispatch_date);
             const missed = !slip.last_collected_date || (gap !== null && gap >= MISSED_COLLECTION_DAYS);
@@ -168,6 +198,8 @@ export default function StaffSlipList({ onOpenSlip }) {
           })}
         </div>
       )}
+
+      <Paged {...paged} noun="pallets" />
     </div>
   );
 }

@@ -24,39 +24,53 @@ import supplierController           from '../controllers/supplier.controller.js'
 
 const router = express.Router();
 
-const READERS    = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
-const MANAGES_UP = [ROLES.MANAGER, ROLES.ADMIN];
+const READERS = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
+
+// Admin only, matching products.
+const WRITERS = [ROLES.ADMIN];
+
+// The prospect pad is NOT master data and stays with the manager.
+// A prospect is a lead — a name and a note about someone who might
+// supply us one day. Nothing references it, nothing counts against it,
+// and it is the manager who meets these people. Converting one to a
+// real supplier DOES create master data, so that single route sits
+// with the admin below.
+const PROSPECTS = [ROLES.MANAGER, ROLES.ADMIN];
 
 // ── Prospects (static paths — MUST precede /:id) ──────────────
 router.get('/prospects',
-  auth, requireRole(...MANAGES_UP), supplierController.listProspects);
+  auth, requireRole(...PROSPECTS), supplierController.listProspects);
 
 router.post('/prospects',
-  auth, requireRole(...MANAGES_UP), supplierController.addProspect);
+  auth, requireRole(...PROSPECTS), supplierController.addProspect);
 
 router.patch('/prospects/:id',
-  auth, requireRole(...MANAGES_UP), validateIntId, supplierController.updateProspect);
+  auth, requireRole(...PROSPECTS), validateIntId, supplierController.updateProspect);
 
 router.post('/prospects/:id/delete',
-  auth, requireRole(...MANAGES_UP), validateIntId, supplierController.removeProspect);
+  auth, requireRole(...PROSPECTS), validateIntId, supplierController.removeProspect);
 
 router.post('/prospects/:id/convert',
-  auth, requireRole(...MANAGES_UP), validateIntId, supplierController.convertProspect);
+  auth, requireRole(...WRITERS), validateIntId, supplierController.convertProspect);
 
 // ── Suppliers ─────────────────────────────────────────────────
 router.get('/',
   auth, requireRole(...READERS), supplierController.list);
 
 router.post('/',
-  auth, requireRole(...MANAGES_UP), supplierController.register);
+  auth, requireRole(...WRITERS), supplierController.register);
 
 router.get('/:id',
   auth, requireRole(...READERS), validateIntId, supplierController.getOne);
 
 router.patch('/:id',
-  auth, requireRole(...MANAGES_UP), validateIntId, supplierController.update);
+  auth, requireRole(...WRITERS), validateIntId, supplierController.update);
 
 router.patch('/:id/status',
-  auth, requireRole(...MANAGES_UP), validateIntId, supplierController.setStatus);
+  auth, requireRole(...WRITERS), validateIntId, supplierController.setStatus);
+
+// Admin-only — see the matching note in product.routes.js.
+router.delete('/:id',
+  auth, requireRole(ROLES.ADMIN), validateIntId, supplierController.remove);
 
 export default router;

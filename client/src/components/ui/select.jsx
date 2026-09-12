@@ -4,7 +4,46 @@ import { Select as SelectPrimitive } from "@base-ui/react/select"
 import { cn } from "@/lib/utils"
 import { ChevronDownIcon, CheckIcon, ChevronUpIcon } from "lucide-react"
 
-const Select = SelectPrimitive.Root
+// Walks the JSX for SelectItem descendants and collects value -> label.
+// The children are readable even while the popup is closed and
+// unmounted, which a render-time registry inside SelectItem would not
+// be — the trigger renders first, and that is exactly where the label
+// is needed.
+const collectItemLabels = (node, into) => {
+  React.Children.forEach(node, (child) => {
+    if (!React.isValidElement(child)) return;
+    if (child.type === SelectItem) {
+      if (child.props?.value !== undefined && child.props.value !== null) {
+        into[String(child.props.value)] = child.props.children;
+      }
+      return;
+    }
+    if (child.props?.children) collectItemLabels(child.props.children, into);
+  });
+};
+
+/**
+ * Base UI's Select.Value renders the VALUE unless Root is given an
+ * `items` map — unlike Radix, which renders the selected item's text.
+ * This wrapper builds that map from the SelectItem children, so every
+ * existing call site shows a label without changing.
+ *
+ * A caller may still pass `items` explicitly; that wins.
+ */
+function Select({ items, children, ...props }) {
+  const derived = React.useMemo(() => {
+    if (items) return items;
+    const map = {};
+    collectItemLabels(children, map);
+    return Object.keys(map).length > 0 ? map : undefined;
+  }, [items, children]);
+
+  return (
+    <SelectPrimitive.Root items={derived} {...props}>
+      {children}
+    </SelectPrimitive.Root>
+  );
+}
 
 function SelectGroup({
   className,

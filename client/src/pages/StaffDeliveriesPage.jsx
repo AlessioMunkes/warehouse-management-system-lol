@@ -24,6 +24,8 @@ import DeliveryNotePDF from '../features/procurement/components/DeliveryNotePDF'
 import { Notice } from '../features/staff/components/StepPrimitives';
 import receivingAPI from '../services/receivingAPI';
 import { STAFF } from '../routes/paths';
+import Paged from '../features/staff/components/Paged';
+import usePaged from '../features/staff/hooks/usePaged';
 
 const RANGES = [
   { key: 'today', label: 'Today' },
@@ -76,6 +78,8 @@ export default function StaffDeliveriesPage() {
     return () => { cancelled = true; };
   }, [range]);
 
+  const paged = usePaged(deliveries);
+
   const openPdf = async (id) => {
     setOpeningId(id);
     setError(null);
@@ -125,7 +129,7 @@ export default function StaffDeliveriesPage() {
           </div>
         ) : (
           <div className="stf-list">
-            {deliveries.map((delivery) => {
+            {paged.slice.map((delivery) => {
               const badge = badgeFor(delivery);
               return (
                 <div key={delivery.id} className="stf-row is-static">
@@ -157,6 +161,8 @@ export default function StaffDeliveriesPage() {
             })}
           </div>
         )}
+
+        <Paged {...paged} noun="deliveries" />
       </div>
 
       {pdfDelivery ? (

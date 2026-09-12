@@ -19,6 +19,7 @@ import StaffDispatchHistoryPage                    from './pages/StaffDispatchHi
 import ReceiptsPage                                from './pages/ReceiptsPage';
 import InventoryManagementPage                     from './pages/InventoryManagementPage';
 import ManagerDashboardPage                         from './pages/ManagerDashboardPage';
+import { ToastProvider }                             from './components/ui/toast';
 import StockLedgerPage                               from './pages/StockLedgerPage';
 import AdminActivityScreen                         from './pages/AdminActivityScreen';
 import TaskDashboard from './pages/TaskDashboardPage';
@@ -31,8 +32,8 @@ import BeneficiaryDirectoryPage                     from './pages/BeneficiaryDir
 import ImpactReportPage                             from './pages/ImpactReportPage';
 import PickingSlipManagementPage                    from './pages/PickingSlipManagementPage';
 import UserDirectoryPage                            from './pages/UserDirectoryPage';
+import VolunteerManagementPage                       from './pages/VolunteerManagementPage';
 import ProductManagementPage                        from './pages/ProductManagementPage';
-import DocumentsPage                                 from './pages/DocumentsPage';
 import VolunteerEventsPage                        from './pages/VolunteerEventsPage';
 import VolunteerEventWorkspacePage                from './pages/VolunteerEventWorkspacePage';
 import CommunityRequestsPage                       from './pages/CommunityRequestsPage';
@@ -47,6 +48,7 @@ import { ReviewPage as DonationReviewPage }         from './pages/ReviewPage';
 const App = () => (
   <AuthProvider>
     <BrowserRouter>
+      <ToastProvider>
       <Routes>
         {/* Public */}
         <Route path="/"      element={<LandingPage />} />
@@ -62,6 +64,10 @@ const App = () => (
         <Route element={<ProtectedRoute roles={['admin']} shell />}>
           <Route path={ADMIN.dashboard} element={<AdminActivityScreen />} />
           <Route path={ADMIN.suppliers} element={<SupplierDirectoryPage />} />
+          {/* Admin only, matching product.routes.js. A manager reaching
+              this by URL used to get a working editor for rows the
+              server would now refuse to change. */}
+          <Route path={ADMIN.products}  element={<ProductManagementPage />} />
           <Route path={ADMIN.donationManagement} element={<DonationManagementPage />} />
           <Route path={ADMIN.section18aManagement} element={<Section18AManagementPage />} />
           {/* Account provisioning. Every route in user.routes.js is
@@ -102,11 +108,6 @@ const App = () => (
           <Route path={STAFF.receipts} element={<ReceiptsPage />} />
           <Route path={STAFF.beneficiaries} element={<BeneficiaryDirectoryPage />} />
           <Route path={STAFF.pickingSlips} element={<PickingSlipManagementPage />} />
-          <Route path={STAFF.documents} element={<DocumentsPage />} />
-          {/* Manager-reachable but not primary — see
-              ProductManagementPage.jsx's own role gating for the
-              actual write-permission split. */}
-          <Route path={ADMIN.products}  element={<ProductManagementPage />} />
         </Route>
 
         {/* The warehouse worker's dashboard. Split out of the block
@@ -194,6 +195,7 @@ const App = () => (
         {/* Catch-all */}
         <Route path="*" element={<PageNotFound />} />
       </Routes>
+      </ToastProvider>
     </BrowserRouter>
   </AuthProvider>
 );

@@ -1,38 +1,25 @@
 // ─────────────────────────────────────────────────────────────
 // features/purchaseOrders/components/PurchaseOrderList.jsx
 //
-// The manager's PO table. Same Table + Badge treatment as the supplier
-// directory, so the two manager screens read as one app.
+// The manager's PO table. Renders through MasterDataTable now, so the
+// sort arrows, the click-to-open row and the never-scrolls-sideways
+// layout are the same ones Products, Suppliers, Users and the guest log
+// use — one table behaviour in the app rather than five.
+//
+// The columns themselves live in poColumns.jsx, and the page owns the
+// view state (useTableView), because the Columns control belongs up in
+// the toolbar beside the tabs and the status filter rather than
+// floating above the table on its own.
+//
+// The "Open" button is gone. The whole row opens the order, which is
+// what the row looked like it did anyway — and a button in its own
+// column was costing width the estimated value needed.
 // ─────────────────────────────────────────────────────────────
-import { Badge }  from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
-import { OPEN_PO_STATUSES } from '@/services/purchaseOrderAPI';
+import MasterDataTable from '@/features/masterdata/components/MasterDataTable';
 
-// Same formatter as SupplierDirectoryPage — en-ZA, and an em dash for
-// nothing recorded rather than a blank cell that reads as a bug.
-const fmtDate = (value) =>
-  value
-    ? new Date(value).toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' })
-    : '—';
-
-const money = (value) =>
-  `R ${Number(value || 0).toLocaleString('en-ZA', {
-    minimumFractionDigits: 2, maximumFractionDigits: 2,
-  })}`;
-
-// BR-07C: returned and follow-up-required are the two the manager is
-// meant to notice, so they get the destructive badge rather than
-// sitting quietly in a list of six greys.
-const badgeVariant = (status) => {
-  if (status === 'returned' || status === 'follow_up_required') return 'destructive';
-  if (status === 'completed') return 'secondary';
-  return 'outline';
-};
-
-export default function PurchaseOrderList({ purchaseOrders, selectedId, onSelect }) {
+export default function PurchaseOrderList({
+  purchaseOrders, selectedId, onSelect, columns, sort, onToggleSort,
+}) {
   if (!purchaseOrders.length) {
     return (
       <p className="py-8 text-center text-sm text-muted-foreground">
@@ -42,49 +29,16 @@ export default function PurchaseOrderList({ purchaseOrders, selectedId, onSelect
   }
 
   return (
-    <div className="overflow-x-auto rounded-[4px] border-2">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>PO number</TableHead>
-            <TableHead>Supplier</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Expected</TableHead>
-            <TableHead className="text-right">Lines</TableHead>
-            <TableHead className="text-right">Estimated</TableHead>
-            <TableHead className="w-[80px]" />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {purchaseOrders.map((po) => (
-            <TableRow
-              key={po.id}
-              data-state={po.id === selectedId ? 'selected' : undefined}
-            >
-              <TableCell className="font-medium">{po.poNumber}</TableCell>
-              <TableCell>{po.supplierName}</TableCell>
-              <TableCell>
-                <Badge variant={badgeVariant(po.status)}>{po.statusLabel}</Badge>
-                {/* An instalment count only means something while the
-                    order is still open — BR-07A partial receipts. */}
-                {po.receiptCount > 0 && OPEN_PO_STATUSES.includes(po.status) ? (
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    {po.receiptCount} received
-                  </span>
-                ) : null}
-              </TableCell>
-              <TableCell>{fmtDate(po.expectedDeliveryDate)}</TableCell>
-              <TableCell className="text-right">{po.lineCount}</TableCell>
-              <TableCell className="text-right">{money(po.estimatedValue)}</TableCell>
-              <TableCell>
-                <Button type="button" variant="ghost" size="sm" onClick={() => onSelect(po.id)}>
-                  Open
-                </Button>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+    <div className="rounded-[4px] border-2">
+      <MasterDataTable
+        columns={columns}
+        rows={purchaseOrders}
+        sort={sort}
+        onToggleSort={onToggleSort}
+        onOpenRow={(po) => onSelect(po.id)}
+        // Keeps the selected-row highlight the detail panel relies on.
+        rowAttrs={(po) => (po.id === selectedId ? { 'data-state': 'selected' } : {})}
+      />
     </div>
   );
 }

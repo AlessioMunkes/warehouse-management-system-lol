@@ -4,9 +4,11 @@
 // product.service.js is mocked, so these tests exercise only the
 // auth / requireRole / validateIntId chain in product.routes.js plus
 // product.controller.js's response shaping — same split
-// user.routes.test.js uses. Reads are open to warehouse staff, writes
-// are manager+admin only — the one difference from user.routes.js's
-// admin-only-everywhere gate.
+// user.routes.test.js uses. Reads are open to warehouse staff; writes
+// are ADMIN ONLY. A product row decides what every other module can
+// count, pick and receive, so editing one is a master-data decision.
+// The manager's write into stock is the adjustment, which lives on
+// stock.routes.js with its own ledger row.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import request from 'supertest';
@@ -37,8 +39,11 @@ const cookieFor = (role, overrides = {}) => {
 };
 
 const READ_ROLES  = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
-const WRITE_ROLES = [ROLES.MANAGER, ROLES.ADMIN];
-const NON_WRITE_ROLES = [ROLES.WORKER, 'finance'];
+const WRITE_ROLES = [ROLES.ADMIN];
+// MANAGER moves down here, which is the whole change: the it.each
+// blocks below now assert that a manager is refused a create, an edit
+// and a status flip.
+const NON_WRITE_ROLES = [ROLES.WORKER, ROLES.MANAGER, 'finance'];
 
 const PRODUCT_BODY = {
   name: 'Maize meal 10kg', sku: 'MM-10KG', defaultUnit: 'bag',
@@ -130,13 +135,13 @@ describe('product controller — responses', () => {
   });
 
   it('returns 201 for a newly created product', async () => {
-    const res = await request(app).post(BASE).set('Cookie', cookieFor(ROLES.MANAGER)).send(PRODUCT_BODY);
+    const res = await request(app).post(BASE).set('Cookie', cookieFor(ROLES.ADMIN)).send(PRODUCT_BODY);
     expect(res.status).toBe(201);
   });
 
   it('preserves a 4xx message from the service', async () => {
     serviceMock.createProduct.mockRejectedValue(withStatus(409, 'A product with that name already exists.'));
-    const res = await request(app).post(BASE).set('Cookie', cookieFor(ROLES.MANAGER)).send(PRODUCT_BODY);
+    const res = await request(app).post(BASE).set('Cookie', cookieFor(ROLES.ADMIN)).send(PRODUCT_BODY);
     expect(res.status).toBe(409);
     expect(res.body.message).toBe('A product with that name already exists.');
   });

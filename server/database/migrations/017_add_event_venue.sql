@@ -1,7 +1,0 @@
-BEGIN;
-
-ALTER TABLE public.love_activism_events
-  ADD COLUMN IF NOT EXISTS venue_name VARCHAR(200),
-  ADD COLUMN IF NOT EXISTS address VARCHAR(500);
-
-COMMIT;

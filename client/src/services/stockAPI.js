@@ -53,6 +53,30 @@ const toProduct = (row) => ({
   isShortfall: Boolean(row.is_shortfall),
   isLowStock:  Boolean(row.is_low_stock),
   updatedAt:   row.updated_at ?? null,
+
+  // Catalogue fields, for the summary panel. Not rendered as columns —
+  // the table is already full — but they are why the panel can stand
+  // in for the Products screen.
+  //
+  // defaultUnit is what the catalogue says this product is counted in;
+  // `unit` above is what the ledger has actually been accumulating.
+  // They are normally equal, and a difference is worth seeing rather
+  // than papering over, so both are kept.
+  category:     row.category ?? "",
+  storageType:  row.storage_type ?? "",
+  isPerishable: row.is_perishable === undefined ? undefined : Boolean(row.is_perishable),
+  // NUMERIC over the wire is a string. Number(null) is 0, and a weight
+  // nobody recorded is not zero — same guard as expectedLeadTimeDays.
+  weightKg:     row.weight_kg === null || row.weight_kg === undefined
+                  ? null
+                  : Number(row.weight_kg),
+  defaultUnit:  row.default_unit ?? "",
+  // Read by the purchase-order form to fill a line's cost. Null means
+  // nobody has priced it, and the form leaves the cost blank rather
+  // than writing a confident zero onto an order.
+  unitCost:     row.unit_cost === null || row.unit_cost === undefined
+                  ? null
+                  : Number(row.unit_cost),
 });
 
 const toMovement = (row) => ({
@@ -174,7 +198,27 @@ export const getLedgerActors = async () => {
   return (body.data ?? []).map((r) => ({ id: r.id, name: r.name || "Unknown" }));
 };
 
+// ── GET /api/stock/trends ─────────────────────────────────────
+// { [productId]: number[] } — the balance at the end of each day,
+// oldest first. Products that have never moved are absent, and the
+// table renders those as a dash rather than a flat line.
+export const getStockTrends = async (days) => {
+  const qs   = days ? `?days=${encodeURIComponent(days)}` : "";
+  const body = await apiGet(`/api/stock/trends${qs}`);
+  const series = body.data?.series ?? {};
+
+  // Keys arrive as strings (JSON object keys always are) but products
+  // are keyed by integer id everywhere else, so the lookup in the
+  // table would silently miss. Normalise once, here.
+  const out = {};
+  for (const [productId, points] of Object.entries(series)) {
+    out[Number(productId)] = (points ?? []).map(Number);
+  }
+  return out;
+};
+
 export default {
   getManifest, getMovements, adjustStock,
   getLedger, getReconciliation, getLedgerActors,
+  getStockTrends,
 };

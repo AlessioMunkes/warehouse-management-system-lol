@@ -15,6 +15,8 @@
 // Note the DEV check rather than `|| fallback`: VITE_API_URL is baked
 // in at BUILD time, so an unset variable in a production build would
 // otherwise leave every request pointing at the developer's localhost.
+import { reportReach, reportUnreachable } from './connection';
+
 export const API_BASE =
   import.meta.env.VITE_API_URL ??
   (import.meta.env.DEV ? '' : '');
@@ -85,6 +87,12 @@ const handleResponse = async (res) => {
     data = {};
   }
 
+  // We got an answer, so the server is there. A 400 or a 500 is a
+  // server refusing us, not a warehouse with no signal — saying "no
+  // signal" here would send a worker looking for a wifi problem that
+  // does not exist.
+  reportReach();
+
   if (!res.ok) {
     if (res.status === 401 && onUnauthorized) onUnauthorized(data.message);
 
@@ -150,6 +158,22 @@ export const apiPatch = async (endpoint, body = {}) => {
       credentials: 'include',
       headers:     { 'Content-Type': 'application/json' },
       body:        JSON.stringify(body),
+    });
+  } catch {
+    throw networkError();
+  }
+  return handleResponse(res);
+};
+
+// Deletion on this system is never a SQL DELETE — see migration 019 —
+// but DELETE is still the honest verb for what the admin is asking
+// for, and routing it through apiPatch with a flag would hide that.
+export const apiDelete = async (endpoint) => {
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${endpoint}`, {
+      method:      'DELETE',
+      credentials: 'include',
     });
   } catch {
     throw networkError();

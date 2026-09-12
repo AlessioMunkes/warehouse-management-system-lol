@@ -25,7 +25,7 @@
 // not appear and cannot be ordered. If that bites, the fix belongs in
 // the stock repository, not here.
 // ─────────────────────────────────────────────────────────────
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth }   from '../context/AuthContext';
 import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
 import PurchaseOrderForm   from '../features/purchaseOrders/components/PurchaseOrderForm';
@@ -38,6 +38,10 @@ import stockAPI    from '../services/stockAPI';
 import { Button }   from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Plus }     from 'lucide-react';
+
+import useTableView from '../features/masterdata/hooks/useTableView';
+import ColumnToggle  from '../features/masterdata/components/ColumnToggle';
+import { PO_COLUMNS } from '../features/purchaseOrders/components/poColumns';
 
 const CAN_MANAGE = ['manager', 'admin'];
 
@@ -79,6 +83,13 @@ export default function PurchaseOrdersPage() {
   const [error, setError]         = useState(null);
   const [formError, setFormError] = useState(null);
   const [invalidProductIds, setInvalidProductIds] = useState([]);
+
+  // Sorting and column visibility, from the same hook every other table
+  // in the app reads. The status filter below stays a <select> and
+  // stays server-side: there are seven statuses, and seven pills across
+  // a toolbar that already carries two tabs is not a filter any more —
+  // it is a second row of tabs.
+  const view = useTableView('purchaseOrders', PO_COLUMNS);
 
   const loadPurchaseOrders = useCallback(async () => {
     const rows = await purchaseOrderAPI.getPurchaseOrders({ status: statusFilter });
@@ -147,6 +158,8 @@ export default function PurchaseOrdersPage() {
     ? purchaseOrders.filter((po) => po.status !== 'completed' && po.status !== 'returned')
     : purchaseOrders;
 
+  const sortedVisible = useMemo(() => view.sortRows(visible), [visible, view]);
+
   return (
     <ManagerLayout>
       <main className="mx-auto w-full max-w-5xl px-4 py-6">
@@ -211,6 +224,14 @@ export default function PurchaseOrdersPage() {
                   <option key={value} value={value}>{label}</option>
                 ))}
               </select>
+
+              <ColumnToggle
+                idPrefix="po"
+                columns={view.availableColumns}
+                hidden={view.hidden}
+                onToggle={view.toggleColumn}
+                onReset={view.resetColumns}
+              />
             </div>
 
             {error ? (
@@ -237,9 +258,12 @@ export default function PurchaseOrdersPage() {
                 ) : null}
 
                 <PurchaseOrderList
-                  purchaseOrders={visible}
+                  purchaseOrders={sortedVisible}
                   selectedId={selected?.id ?? null}
                   onSelect={open}
+                  columns={view.visibleColumns}
+                  sort={view.sort}
+                  onToggleSort={view.toggleSort}
                 />
               </div>
             )}

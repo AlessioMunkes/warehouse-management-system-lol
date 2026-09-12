@@ -10,7 +10,9 @@ import StockHealthBar from "../features/InventoryManagement/components/StockHeal
 import StockManifestTable from "../features/InventoryManagement/components/StockManifestTable";
 import AdjustStockModal from "../features/InventoryManagement/components/AdjustStockModal";
 import MovementHistory from "../features/InventoryManagement/components/MovementHistory";
-import { getManifest, getMovements, adjustStock } from "../services/stockAPI";
+import StockItemSummary from "../features/InventoryManagement/components/StockItemSummary";
+import { getManifest, getMovements, adjustStock, getStockTrends } from "../services/stockAPI";
+import { useToast } from "@/components/ui/toastContext";
 
 const CAN_ADJUST = ["manager", "admin"];
 
@@ -29,7 +31,23 @@ export default function InventoryManagementPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [adjustingProduct, setAdjustingProduct] = useState(null);
 
+  // 30-day sparkline series, keyed by product id. Loaded alongside
+  // the manifest but never blocking it: a failure here costs one
+  // column, and the stock numbers are the reason the page exists.
+  const [trends, setTrends] = useState({});
+
+  const toast = useToast();
+
   // Movement history drawer state
+  // The summary panel. It borrows the same movement fetch the history
+  // drawer uses rather than adding a second one — same endpoint, same
+  // product, and two in-flight copies of one list is how they end up
+  // disagreeing.
+  const [summaryFor, setSummaryFor] = useState(null);
+  const [summaryMovements, setSummaryMovements] = useState([]);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState(null);
+
   const [historyFor, setHistoryFor] = useState(null);
   const [movements, setMovements] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -60,6 +78,14 @@ export default function InventoryManagementPage() {
     };
 
     loadManifest();
+
+    // Deliberately not awaited with the manifest and deliberately
+    // swallowing its error: the sparkline column degrades to dashes
+    // if this fails, which is a smaller loss than a blank screen.
+    getStockTrends(30)
+      .then((series) => { if (!cancelled) setTrends(series); })
+      .catch(() => {});
+
     return () => {
       cancelled = true;
     };
@@ -79,15 +105,69 @@ export default function InventoryManagementPage() {
     }
   }, []);
 
+  // ── Undo ───────────────────────────────────────────────────
+  // Posts the inverse delta. It does NOT delete the original
+  // movement, and it must not: stock_movements is the audit trail
+  // the reconciliation screen balances against, and a ledger you can
+  // quietly edit is not a ledger. The reversal is its own row, with a
+  // reason that says what it reverses.
+  //
+  // The reason is prefixed rather than reused, which also keeps the
+  // movement type honest — "Undo of: Spillage" does not match the
+  // WASTAGE_REASONS list in stock.repository.js, so undoing a wastage
+  // entry is filed as an adjustment. Reversing a loss is not itself
+  // a loss.
+  const undoAdjustment = async (payload, productName) => {
+    try {
+      await adjustStock({
+        productId:     payload.productId,
+        quantityDelta: -Number(payload.quantityDelta),
+        unit:          payload.unit,
+        reason:        `Undo of: ${payload.reason}`,
+      });
+      await reloadManifest();
+      toast({
+        variant: "success",
+        title: `Reversed the adjustment to ${productName}`,
+        description: "The reversal is recorded as its own movement — the original entry stays in the ledger.",
+      });
+    } catch (err) {
+      toast({
+        variant: "error",
+        title: "Could not undo that adjustment",
+        description: err.message || "The original adjustment is unchanged.",
+      });
+    }
+  };
+
   // ── Adjustment Handler ─────────────────────────────────────
   const handleAdjustSave = async (payload) => {
     setIsSaving(true);
     try {
       await adjustStock(payload);
       await reloadManifest();
+
+      // Read the name before the modal closes and clears it.
+      const product = products.find((p) => p.id === payload.productId);
+      const name    = product?.name ?? "this product";
+      const delta   = Number(payload.quantityDelta);
+      const unit    = payload.unit || product?.unit || "";
+
+      toast({
+        variant: "success",
+        title: `${delta < 0 ? "Removed" : "Added"} ${Math.abs(delta)} ${unit} — ${name}`.trim(),
+        description: payload.reason,
+        action: { label: "Undo", onClick: () => undoAdjustment(payload, name) },
+      });
       return true;
     } catch (err) {
-      alert(err.message || "Failed to save stock adjustment.");
+      // Was window.alert(), which blocks the whole tab and cannot be
+      // read by anything assistive.
+      toast({
+        variant: "error",
+        title: "Could not save that adjustment",
+        description: err.message || "Nothing was changed.",
+      });
       return false;
     } finally {
       setIsSaving(false);
@@ -95,6 +175,23 @@ export default function InventoryManagementPage() {
   };
 
   // ── Movement History Handler ──────────────────────────────
+  const handleOpenSummary = async (product) => {
+    setSummaryFor(product);
+    setSummaryMovements([]);
+    setSummaryError(null);
+    setSummaryLoading(true);
+    try {
+      setSummaryMovements(await getMovements(product.id));
+    } catch (err) {
+      // The panel still shows every figure and every catalogue fact —
+      // only the chart is missing — so this reports itself in place
+      // rather than closing the panel or blanking it.
+      setSummaryError(err.message || "Could not load the movement history for this product.");
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
+
   const handleViewHistory = async (product) => {
     setHistoryFor(product);
     setMovements([]);
@@ -152,8 +249,10 @@ export default function InventoryManagementPage() {
             products={products}
             isLoading={isLoading}
             canAdjust={canAdjust}
+            trends={trends}
             onAdjust={(prod) => setAdjustingProduct(prod)}
             onViewHistory={handleViewHistory}
+            onOpenSummary={handleOpenSummary}
           />
         </div>
       </main>
@@ -165,6 +264,21 @@ export default function InventoryManagementPage() {
           onSave={handleAdjustSave}
           onClose={() => setAdjustingProduct(null)}
           isSaving={isSaving}
+        />
+      )}
+
+      {/* Item summary — what the row was pointing at all along */}
+      {summaryFor && (
+        <StockItemSummary
+          product={summaryFor}
+          movements={summaryMovements}
+          isLoading={summaryLoading}
+          error={summaryError}
+          canAdjust={canAdjust}
+          canEditCatalogue={user?.role === 'admin'}
+          onAdjust={(p) => { setSummaryFor(null); setAdjustingProduct(p); }}
+          onViewHistory={(p) => { setSummaryFor(null); handleViewHistory(p); }}
+          onClose={() => setSummaryFor(null)}
         />
       )}
 

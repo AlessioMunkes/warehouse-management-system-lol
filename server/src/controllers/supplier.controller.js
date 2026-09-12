@@ -140,12 +140,27 @@ const convertProspect = async (req, res) => {
   }
 };
 
+// ── DELETE /api/suppliers/:id ─────────────────────────────────
+// Not a SQL DELETE — purchase_orders and delivery_notes reference
+// suppliers ON DELETE RESTRICT, which is the note above setStatus. This
+// removes the supplier from the directory and every picker and leaves
+// the referenced row intact.
+const remove = async (req, res) => {
+  try {
+    const data = await supplierService.archiveSupplier(req.params.id, req.user.id);
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    respondError(res, err, 'archiveSupplier', 'Failed to delete supplier.');
+  }
+};
+
 export default {
   list,
   getOne,
   register,
   update,
   setStatus,
+  remove,
   listProspects,
   addProspect,
   updateProspect,

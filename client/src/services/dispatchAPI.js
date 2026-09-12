@@ -33,6 +33,7 @@
 // common case is that the count matched.
 // ─────────────────────────────────────────────────────────────
 import { API_BASE, newIdempotencyKey } from './api';
+import { queueIfOffline } from './outbox';
 
 const BASE_URL = `${API_BASE}/api/dispatch`;
 
@@ -164,7 +165,7 @@ export const getGateQueue = (dispatchDate) =>
 // disagree about whether a pallet needs a manager's authorisation.
 export const getGateView = (slipId) => request(`/${slipId}`);
 
-// ── POST /api/dispatch/:id/collect ────────────────────────────
+// ── POST /api/dispatch/:id/collect ───────────────────
 // lines is a SPARSE override map: [{ itemId, loadedQuantity,
 // varianceReason }]. Any line not named keeps its packed quantity, so
 // staff never have to retype twenty numbers to say "it all matched".
@@ -172,21 +173,47 @@ export const getGateView = (slipId) => request(`/${slipId}`);
 // signature is a base64 PNG data URL. It is not optional — BR-13
 // makes it the proof of collection that replaces the paper register,
 // and the server rejects a collection without one.
-export const recordCollection = (
+//
+// With no signal this returns { queued: true, label } instead of the
+// note: the collection is held on this device and sent when the
+// server can be reached again.
+export const recordCollection = async (
   slipId,
   { driverName, signature, vehicleReg, lines, idempotencyKey, overrideReason } = {}
-) =>
-  request(`/${slipId}/collect`, {
-    method: 'POST',
-    body: JSON.stringify({
-      driverName,
-      signature,
-      vehicleReg:     vehicleReg || null,
-      lines:          lines || [],
-      idempotencyKey: idempotencyKey || null,
-      overrideReason: overrideReason || null,
-    }),
-  });
+) => {
+  const body = {
+    driverName,
+    signature,
+    vehicleReg:     vehicleReg || null,
+    lines:          lines || [],
+    idempotencyKey: idempotencyKey || null,
+    overrideReason: overrideReason || null,
+  };
+
+  try {
+    return await request(`/${slipId}/collect`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    // Same bargain as receiving: the driver has gone, the pallet has
+    // gone, and the signature is the only record of it. It waits on
+    // the phone rather than being lost.
+    //
+    // The endpoint is written out in full here because the queue
+    // flushes through apiPost, which knows nothing about this file's
+    // BASE_URL.
+    if (await queueIfOffline(err, {
+      endpoint: `/api/dispatch/${slipId}/collect`,
+      body,
+      kind: 'collection',
+      label: `Pallet ${slipId}`,
+    })) {
+      return { queued: true, label: `Pallet ${slipId}` };
+    }
+    throw err;
+  }
+};
 
 // ── GET /api/dispatch/notes/:eventId ──────────────────────────
 // The proof-of-collection document. Keyed on a dispatch_events id,

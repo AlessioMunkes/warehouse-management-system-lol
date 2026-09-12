@@ -23,11 +23,9 @@
 // conversation, not a catalog edit.
 // ─────────────────────────────────────────────────────────────
 
-// The storage-area vocabulary is shared with the delivery service,
-// which validates put-away locations against it, so it is declared
-// once in constants/ and re-exported here to keep this catalog's flat
-// shape for its own consumers.
-import { STORAGE_AREAS }  from '../../constants/storageAreas.js';
+// The movement_type vocabulary is shared with the stock service,
+// which validates ledger filters against it, so it is declared once in
+// constants/ and re-exported here to keep this catalog's flat shape.
 import { MOVEMENT_TYPES } from '../../constants/movementTypes.js';
 
 // ── Enum values (confirmed from pg_enum, 22 Aug 2026) ─────────
