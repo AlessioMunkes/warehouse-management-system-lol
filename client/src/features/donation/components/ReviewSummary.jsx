@@ -5,7 +5,7 @@
 // display), SectionPicker (worker picks which sections are wrong),
 // EditSectionDialog (renders just the picked sections for correction).
 // ─────────────────────────────────────────────────────────────
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 import { CategorySelector } from "./CategorySelector";
@@ -19,6 +19,7 @@ const CATEGORY_LABELS = {
   add_on_food: "Add-on food",
   non_recipe_food: "Non-recipe food",
   non_food: "Non-food",
+  manager_review: "Manager Review",
 };
 
 const SECTION_LABELS = {
@@ -75,11 +76,28 @@ export function ReviewSummary({ draft }) {
             <span className="stf-row-title">Donor Details</span>
             <span className="stf-row-meta">
               {draft.donorConsentGiven
-                ? `Consent given · ${draft.donorName || "—"} · ${draft.donorContact || "—"}`
+                ? [
+                  draft.donorName || "—",
+                  draft.donorType ? draft.donorType.replace("_", " ") : "Type not selected",
+                  draft.donorContactNumber || "No contact number",
+                  draft.donorContact || "No email",
+                ].join(" · ")
                 : "No consent given"}
             </span>
           </div>
         </div>
+
+        {draft.donorConsentGiven && (
+          <div className="stf-row is-static">
+            <div className="stf-row-main">
+              <span className="stf-row-title">Section 18A donor details</span>
+              <span className="stf-row-meta">
+                {draft.donorAddress || "No address"} · Tax ref: {draft.donorTaxReference || "—"} ·{" "}
+                {draft.donorIdNumber || "No identification or registration number"}
+              </span>
+            </div>
+          </div>
+        )}
 
         <div className="stf-row is-static">
           <div className="stf-row-main">
@@ -95,6 +113,10 @@ export function ReviewSummary({ draft }) {
 // ── SectionPicker — NEW, added to this file ─────────────────────
 export function SectionPicker({ open, onOpenChange, onContinue }) {
   const [picked, setPicked] = useState([]);
+
+  useEffect(() => {
+    if (!open) setPicked([]);
+  }, [open]);
 
   const toggle = (section) =>
     setPicked((prev) =>
@@ -140,8 +162,32 @@ export function SectionPicker({ open, onOpenChange, onContinue }) {
 
 // ── EditSectionDialog — NEW, added to this file ─────────────────
 export function EditSectionDialog({ open, onOpenChange, sections, draft, updateDraft }) {
+  const [localDraft, setLocalDraft] = useState(draft);
+
+  useEffect(() => {
+    if (open) setLocalDraft(draft);
+  }, [draft, open]);
+
+  const updateLocalDraft = (patch) => setLocalDraft((prev) => ({ ...prev, ...patch }));
+  const closeWithoutSaving = () => {
+    setLocalDraft(draft);
+    onOpenChange(false);
+  };
+  const handleOpenChange = (nextOpen) => {
+    if (!nextOpen) {
+      closeWithoutSaving();
+      return;
+    }
+    onOpenChange(true);
+  };
+  const handleCancel = () => closeWithoutSaving();
+  const handleSave = () => {
+    updateDraft(localDraft);
+    onOpenChange(false);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="stf-shell" style={{ maxHeight: "80vh", overflowY: "auto" }}>
         <DialogHeader>
           <DialogTitle>Fix: {sections.map((s) => SECTION_LABELS[s]).join(", ")}</DialogTitle>
@@ -150,46 +196,56 @@ export function EditSectionDialog({ open, onOpenChange, sections, draft, updateD
         <div className="stf-step-body">
           {sections.includes("category") && (
             <CategorySelector
-            
-              value={draft.category}
-              onChange={(v) => updateDraft({ category: v })}
+              value={localDraft.category}
+              onChange={(v) => updateLocalDraft({ category: v })}
             />
           )}
           {sections.includes("items") && (
             <DonationItemsList
-              items={draft.items}
-              onChange={(items) => updateDraft({ items })}
+              items={localDraft.items}
+              onChange={(items) => updateLocalDraft({ items })}
             />
           )}
           {sections.includes("value") && (
             <ValueProgrammeFields
-              estimatedValueZar={draft.estimatedValueZar}
-              programmeCode={draft.programmeCode}
-              onChange={updateDraft}
+              estimatedValueZar={localDraft.estimatedValueZar}
+              programmeCode={localDraft.programmeCode}
+              onChange={updateLocalDraft}
             />
           )}
           {sections.includes("donor") && (
             <>
               <DonorConsentSection
-                consentGiven={draft.donorConsentGiven}
-                onChange={(v) => updateDraft({ donorConsentGiven: v })}
+                consentGiven={localDraft.donorConsentGiven}
+                onChange={(v) => updateLocalDraft({ donorConsentGiven: v })}
               />
-              <DonorInfoFields
-                donorName={draft.donorName}
-                donorContact={draft.donorContact}
-                donorTaxReference={draft.donorTaxReference}
-                disabled={!draft.donorConsentGiven}
-                onChange={updateDraft}
-              />
+              {localDraft.donorConsentGiven === true && (
+                <DonorInfoFields
+                  donorName={localDraft.donorName}
+                  donorContact={localDraft.donorContact}
+                  donorTaxReference={localDraft.donorTaxReference}
+                  donorType={localDraft.donorType}
+                  donorAddress={localDraft.donorAddress}
+                  donorContactNumber={localDraft.donorContactNumber}
+                  donorTradingName={localDraft.donorTradingName}
+                  donorIdType={localDraft.donorIdType}
+                  donorIdCountry={localDraft.donorIdCountry}
+                  donorIdNumber={localDraft.donorIdNumber}
+                  onChange={updateLocalDraft}
+                />
+              )}
             </>
           )}
           {sections.includes("notes") && (
-            <NotesField notes={draft.notes} onChange={(notes) => updateDraft({ notes })} />
+            <NotesField notes={localDraft.notes} onChange={(notes) => updateLocalDraft({ notes })} />
           )}
         </div>
 
         <DialogFooter>
-          <button className="stf-btn stf-btn-primary" onClick={() => onOpenChange(false)}>
+          <button className="stf-btn stf-btn-secondary" onClick={handleCancel}>
+            Cancel
+          </button>
+          <button className="stf-btn stf-btn-primary" onClick={handleSave}>
             Save
           </button>
         </DialogFooter>

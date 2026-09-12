@@ -22,6 +22,12 @@ const repoMock = {
   resolveUnmatchedItem:   vi.fn(),
   reclassifyDonation:     vi.fn(),
   listSection18AQueue:    vi.fn(),
+  getSection18ASettings:  vi.fn(),
+  getSection18ACertificateByDonationId: vi.fn(),
+  createSection18ACertificate: vi.fn(),
+  listEmailHistory:       vi.fn(),
+  getEmailLogById:        vi.fn(),
+  logDonationEmail:       vi.fn(),
   getDonationEvents:      vi.fn(),
 };
 
@@ -29,8 +35,16 @@ const routeMock = {
   determineRouting: vi.fn(),
 };
 
+const emailMock = {
+  sendEmail: vi.fn(),
+};
+
 vi.mock('../src/repositories/donation.repository.js', () => ({ default: repoMock }));
 vi.mock('../src/lib/donationRouting.js', () => ({ determineRouting: routeMock.determineRouting }));
+vi.mock('../src/providers/email.provider.js', () => ({ default: emailMock }));
+vi.mock('../src/services/certificateSettings.service.js', () => ({
+  default: { getSettings: vi.fn() },
+}));
 
 const module = await import('../src/services/donation.service.js');
 const donationService = module.default;
@@ -53,6 +67,38 @@ beforeEach(() => {
   repoMock.getLocationIdForArea.mockResolvedValue(1);
   repoMock.createDonation.mockResolvedValue({ donationId: 1, warnings: [] });
   repoMock.getDonationById.mockResolvedValue({ id: 1, category: 'recipe_food' });
+  repoMock.getSection18ASettings.mockResolvedValue({
+    certificate_prefix: 'LOL-S18A',
+    pbo_name: 'Ladles of Love',
+    pbo_number: 'PBO-PLACEHOLDER',
+    section18a_reference: 'SECTION-18A-PLACEHOLDER',
+    pba_declaration: 'Approved PBA declaration.',
+  });
+  repoMock.getSection18ACertificateByDonationId.mockResolvedValue(null);
+  repoMock.createSection18ACertificate.mockImplementation(async ({ buildPdf, ...args }) => {
+    const pdf = await buildPdf({ certificateNumber: 'LOL-S18A-000001', issueDate: '2026-09-11' });
+    return {
+      certificate: {
+        id: 10,
+        donation_id: args.donationId,
+        certificate_number: 'LOL-S18A-000001',
+        issue_date: '2026-09-11',
+        pdf_content: pdf.buffer,
+        pdf_filename: pdf.filename,
+        pdf_content_type: pdf.contentType,
+      },
+    };
+  });
+  repoMock.listEmailHistory.mockResolvedValue([]);
+  repoMock.getEmailLogById.mockResolvedValue(null);
+  repoMock.logDonationEmail.mockImplementation(async (entry) => ({
+    id: 100,
+    ...entry,
+    sent_at: entry.status === 'SENT' ? '2026-09-11T00:00:00.000Z' : null,
+  }));
+
+  // Mock email provider to return success by default
+  emailMock.sendEmail.mockResolvedValue({ sent: true, messageId: 'msg-123', threadId: 'thread-1' });
   routeMock.determineRouting.mockImplementation(async ({ productId }) => {
     if (productId === 3) {
       return {
@@ -300,10 +346,97 @@ describe('createDonation — records rather than refuses', () => {
     expect(repoMock.createDonation).toHaveBeenCalledTimes(1);
   });
 
+  it('passes generated line numbers through to donation item creation', async () => {
+    await donationService.createDonation(validBody({
+      items: [
+        { productId: 3, description: 'Rice', quantity: 25, unit: 'kg' },
+        { productId: 3, description: 'Beans', quantity: 10, unit: 'kg' },
+      ],
+    }), USER_ID);
+
+    expect(repoMock.createDonation.mock.calls[0][0].items.map((item) => item.lineNo)).toEqual([1, 2]);
+  });
+
   it('records a donation with no donor details at all', async () => {
     await expect(donationService.createDonation(validBody({
       donorName: undefined, donorContact: undefined, donorTaxReference: undefined,
     }), USER_ID)).resolves.toBeTruthy();
+  });
+
+  it('sends a thank-you email after recording a named donor with a valid email', async () => {
+    repoMock.getDonationById.mockResolvedValue({
+      id: 1,
+      donation_category: 'recipe_food',
+      estimated_value_zar: 500,
+      donor_name: 'Donor One',
+      donor_contact: 'donor@example.org',
+      donor_consent_given: true,
+      section_18a_status: 'not_qualifying',
+      section_18a_qualifying: false,
+      items: [],
+    });
+
+    const result = await donationService.createDonation(validBody({
+      donorName: 'Donor One',
+      donorContact: 'donor@example.org',
+      donorConsentGiven: true,
+    }), USER_ID);
+
+    expect(result.emailResults).toHaveLength(1);
+    expect(repoMock.logDonationEmail).toHaveBeenCalledWith(expect.objectContaining({
+      donationId: 1,
+      emailType: 'THANK_YOU',
+      recipient: 'donor@example.org',
+      status: 'SENT',
+    }));
+  });
+
+  it('skips all email for anonymous donors or invalid donor emails', async () => {
+    repoMock.getDonationById.mockResolvedValue({
+      id: 1,
+      donor_name: '',
+      donor_contact: 'not-an-email',
+      section_18a_status: 'not_qualifying',
+      items: [],
+    });
+
+    const result = await donationService.createDonation(validBody(), USER_ID);
+
+    expect(result.emailResults).toEqual([]);
+    expect(repoMock.logDonationEmail).not.toHaveBeenCalled();
+  });
+
+  it('sends a separate Section 18A email with a generated certificate attachment', async () => {
+    repoMock.getDonationById.mockResolvedValue({
+      id: 42,
+      donation_category: 'recipe_food',
+      estimated_value_zar: 5000,
+      donor_name: 'Pick n Pay',
+      donor_contact: 'tax@example.test',
+      donor_tax_reference: '9012345678',
+      donor_consent_given: true,
+      section_18a_status: 'queued',
+      section_18a_qualifying: true,
+      received_at: '2026-09-10T10:00:00.000Z',
+      items: [{ line_no: 1, description: 'Rice', quantity: 25, unit: 'kg', estimated_value_zar: 5000 }],
+    });
+
+    const result = await donationService.createDonation(validBody({
+      estimatedValueZar: 5000,
+      donorName: 'Pick n Pay',
+      donorContact: 'tax@example.test',
+      donorTaxReference: '9012345678',
+      donorConsentGiven: true,
+    }), USER_ID);
+
+    expect(result.emailResults.map((row) => row.emailType)).toEqual(['THANK_YOU', 'SECTION_18A']);
+    expect(repoMock.createSection18ACertificate).toHaveBeenCalledTimes(1);
+    expect(repoMock.logDonationEmail).toHaveBeenCalledWith(expect.objectContaining({
+      donationId: 42,
+      emailType: 'SECTION_18A',
+      recipient: 'tax@example.test',
+      status: 'SENT',
+    }));
   });
 
   it('records add-on food even when there are no eligible ECDs to split across', async () => {
@@ -467,5 +600,214 @@ describe('reclassifyDonation', () => {
       1, { category: 'add_on_food', reason: 'Edible after all' }, USER_ID
     );
     expect(result.requiresStockReview).toBe(false);
+  });
+});
+
+describe('Section 18A certificate engine', () => {
+  const queuedDonation = {
+    id: 42,
+    donation_category: 'recipe_food',
+    estimated_value_zar: 5000,
+    donor_name: 'Pick n Pay',
+    donor_contact: 'tax@example.test',
+    donor_tax_reference: '9012345678',
+    donor_consent_given: true,
+    section_18a_status: 'queued',
+    section_18a_qualifying: true,
+    received_at: '2026-09-10T10:00:00.000Z',
+    items: [{ line_no: 1, description: 'Rice', quantity: 25, unit: 'kg', estimated_value_zar: 5000 }],
+  };
+
+  it('generates and stores a certificate for a queued qualifying donation', async () => {
+    repoMock.getDonationById.mockResolvedValue(queuedDonation);
+
+    const certificate = await donationService.generateSection18ACertificate(42, USER_ID);
+
+    expect(certificate.certificate_number).toBe('LOL-S18A-000001');
+    expect(repoMock.createSection18ACertificate).toHaveBeenCalled();
+    const write = repoMock.createSection18ACertificate.mock.calls[0][0];
+    expect(write.donorSnapshot).toEqual({
+      name: 'Pick n Pay',
+      contact: 'tax@example.test',
+      taxReference: '9012345678',
+    });
+  });
+
+  it('rejects duplicate certificate generation', async () => {
+    repoMock.getDonationById.mockResolvedValue(queuedDonation);
+    repoMock.getSection18ACertificateByDonationId.mockResolvedValue({ id: 99 });
+
+    await expect(donationService.generateSection18ACertificate(42, USER_ID))
+      .rejects.toMatchObject({ status: 409 });
+  });
+
+  it('requires donor consent and tax details before generation', async () => {
+    repoMock.getDonationById.mockResolvedValue({
+      ...queuedDonation,
+      donor_consent_given: false,
+      donor_tax_reference: '',
+    });
+
+    await expect(donationService.generateSection18ACertificate(42, USER_ID))
+      .rejects.toMatchObject({ status: 400 });
+  });
+
+  it('downloads an existing generated PDF without creating another certificate', async () => {
+    repoMock.getSection18ACertificateByDonationId.mockResolvedValue({
+      certificate_number: 'LOL-S18A-000001',
+      pdf_content: Buffer.from('%PDF-1.4'),
+      pdf_filename: 'section-18a-LOL-S18A-000001.pdf',
+      pdf_content_type: 'application/pdf',
+    });
+
+    const file = await donationService.downloadSection18ACertificate(42, USER_ID);
+
+    expect(file.filename).toBe('section-18a-LOL-S18A-000001.pdf');
+    expect(repoMock.createSection18ACertificate).not.toHaveBeenCalled();
+  });
+
+  it('resends a Section 18A email without regenerating an existing certificate', async () => {
+    repoMock.getEmailLogById.mockResolvedValue({
+      id: 5,
+      donation_id: 42,
+      email_type: 'section18a_certificate',
+    });
+    repoMock.getDonationById.mockResolvedValue({ ...queuedDonation, section_18a_status: 'issued' });
+    repoMock.getSection18ACertificateByDonationId.mockResolvedValue({
+      id: 99,
+      certificate_number: 'LOL-S18A-000001',
+      pdf_content: Buffer.from('%PDF-1.4'),
+      pdf_filename: 'section-18a-LOL-S18A-000001.pdf',
+      pdf_content_type: 'application/pdf',
+    });
+
+    const result = await donationService.resendDonationEmail(5, USER_ID);
+
+    expect(result.emailType).toBe('SECTION_18A');
+    expect(repoMock.createSection18ACertificate).not.toHaveBeenCalled();
+  });
+});
+
+describe('Persistent Email History — donation emails', () => {
+  const thankYouDonation = {
+    id: 7,
+    donation_category: 'recipe_food',
+    estimated_value_zar: 500,
+    donor_name: 'Donor One',
+    donor_contact: 'donor@example.org',
+    donor_consent_given: true,
+    section_18a_status: 'not_qualifying',
+    section_18a_qualifying: false,
+    items: [],
+  };
+
+  it('persists a successful Thank-you send with Gmail IDs and sender', async () => {
+    repoMock.getDonationById.mockResolvedValue(thankYouDonation);
+    emailMock.sendEmail.mockResolvedValue({ sent: true, messageId: 'gmail-1', threadId: 'thread-9' });
+
+    await donationService.createDonation({
+      category: 'recipe_food',
+      estimatedValueZar: 500,
+      donorName: 'Donor One',
+      donorContact: 'donor@example.org',
+      donorConsentGiven: true,
+      items: [{ description: 'Rice', quantity: 1, unit: 'kg' }],
+    }, USER_ID);
+
+    expect(repoMock.logDonationEmail).toHaveBeenCalledWith(expect.objectContaining({
+      donationId: 7,
+      emailType: 'THANK_YOU',
+      recipientEmail: 'donor@example.org',
+      recipientName: 'Donor One',
+      subject: 'Thank you for your donation',
+      status: 'SENT',
+      gmailMessageId: 'gmail-1',
+      gmailThreadId: 'thread-9',
+      sentByUserId: USER_ID,
+    }));
+  });
+
+  it('persists a failed send instead of throwing', async () => {
+    repoMock.getDonationById.mockResolvedValue(thankYouDonation);
+    emailMock.sendEmail.mockResolvedValue({ sent: false, reason: 'Gmail API send failed.' });
+
+    const result = await donationService.createDonation({
+      category: 'recipe_food',
+      estimatedValueZar: 500,
+      donorName: 'Donor One',
+      donorContact: 'donor@example.org',
+      donorConsentGiven: true,
+      items: [{ description: 'Rice', quantity: 1, unit: 'kg' }],
+    }, USER_ID);
+
+    expect(result.emailResults).toHaveLength(1);
+    expect(repoMock.logDonationEmail).toHaveBeenCalledWith(expect.objectContaining({
+      donationId: 7,
+      emailType: 'THANK_YOU',
+      status: 'FAILED',
+      errorMessage: 'Gmail API send failed.',
+    }));
+  });
+
+  it('logs exactly once per send (no duplicate persistence)', async () => {
+    repoMock.getDonationById.mockResolvedValue(thankYouDonation);
+    emailMock.sendEmail.mockResolvedValue({ sent: true, messageId: 'gmail-2', threadId: 'thread-2' });
+
+    await donationService.createDonation({
+      category: 'recipe_food',
+      estimatedValueZar: 500,
+      donorName: 'Donor One',
+      donorContact: 'donor@example.org',
+      donorConsentGiven: true,
+      items: [{ description: 'Rice', quantity: 1, unit: 'kg' }],
+    }, USER_ID);
+
+    // One send → one email row. The provider itself is the single send
+    // point, and logDonationEmail the single persist point.
+    expect(emailMock.sendEmail).toHaveBeenCalledTimes(1);
+    expect(repoMock.logDonationEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('retrieves history newest-first with search and filters passed through', async () => {
+    const rows = [
+      { id: 3, donation_id: 7, email_type: 'THANK_YOU', status: 'SENT', created_at: '2026-09-12T10:00:00.000Z' },
+      { id: 2, donation_id: 8, email_type: 'SECTION_18A', status: 'FAILED', created_at: '2026-09-11T10:00:00.000Z' },
+      { id: 1, donation_id: 7, email_type: 'THANK_YOU', status: 'SENT', created_at: '2026-09-10T10:00:00.000Z' },
+    ];
+    repoMock.listEmailHistory.mockResolvedValue(rows);
+
+    const history = await donationService.listEmailHistory({
+      search: 'donor@example.org',
+      emailType: 'THANK_YOU',
+      status: 'SENT',
+    });
+
+    expect(repoMock.listEmailHistory).toHaveBeenCalledWith({
+      search: 'donor@example.org',
+      emailType: 'THANK_YOU',
+      status: 'SENT',
+      limit: 200,
+      offset: 0,
+    });
+    expect(history.map((row) => row.id)).toEqual([3, 2, 1]);
+  });
+
+  it('resends legacy thank_you rows without regenerating anything', async () => {
+    repoMock.getEmailLogById.mockResolvedValue({
+      id: 9,
+      donation_id: 7,
+      email_type: 'thank_you',
+    });
+    repoMock.getDonationById.mockResolvedValue(thankYouDonation);
+
+    const result = await donationService.resendDonationEmail(9, USER_ID);
+
+    expect(result.emailType).toBe('THANK_YOU');
+    expect(repoMock.createSection18ACertificate).not.toHaveBeenCalled();
+    expect(repoMock.logDonationEmail).toHaveBeenCalledWith(expect.objectContaining({
+      emailType: 'THANK_YOU',
+      status: 'SENT',
+      sentByUserId: USER_ID,
+    }));
   });
 });

@@ -10,14 +10,6 @@ import { ProductMatchCombobox } from "./ProductMatchComboBox";
 
 const UNITS = ["kg", "g", "l", "ml", "each", "bag", "box", "crate", "punnet"];
 
-// Same four BR-10 categories as CategorySelector.jsx — keep in sync.
-const ITEM_CATEGORIES = [
-  { value: "recipe_food",     label: "Recipe food" },
-  { value: "add_on_food",     label: "Add-on food" },
-  { value: "non_recipe_food", label: "Non-recipe food" },
-  { value: "non_food",        label: "Non-food" },
-];
-
 // ── Description ──────────────────────────────────────────────
 const descriptionMessage = (v) => {
   if (!v?.trim()) return { valid: false, message: "A description is required." };
@@ -33,30 +25,32 @@ const quantityMessage = (v) => {
 };
 
 const DonationItemRow = forwardRef(function DonationItemRow(
-  { item, onChange, onRemove, canRemove },
+  { item, onChange, onRemove, canRemove, error = {} },
   ref
 ) {
   const [touched, setTouched] = useState({});
 
   const descInputRef = useRef(null);
   const qtyInputRef = useRef(null);
+  const unitInputRef = useRef(null);
 
   const markTouched = (field) =>
     setTouched((prev) => ({ ...prev, [field]: true }));
 
   const descState = descriptionMessage(item.description);
   const qtyState = quantityMessage(item.quantity);
+  const descriptionError = error?.description;
+  const quantityError = error?.quantity;
+  const unitError = error?.unit;
+  const showDescriptionError = Boolean(touched.description || descriptionError);
+  const showQuantityError = Boolean(touched.quantity || quantityError);
+  const showUnitError = Boolean(touched.unit || unitError);
 
   // Expose validation check & focus mechanism to parent component
   useImperativeHandle(ref, () => ({
     validateAndFocus: () => {
       // Mark fields as touched so validation errors show up visually.
-      // NOTE: requestedCategory is deliberately NOT validated here —
-      // leaving the BR-10 category blank on an unmatched item is a
-      // supported path: the backend creates a warehouse_manager_flags
-      // row (+ inactive placeholder product) and defers classification
-      // to a manager instead of failing the submit.
-      setTouched({ description: true, quantity: true });
+      setTouched({ description: true, quantity: true, unit: true });
 
       if (!descState.valid) {
         descInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -67,6 +61,12 @@ const DonationItemRow = forwardRef(function DonationItemRow(
       if (!qtyState.valid) {
         qtyInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
         qtyInputRef.current?.focus();
+        return false;
+      }
+
+      if (!item.unit) {
+        unitInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        unitInputRef.current?.focus();
         return false;
       }
 
@@ -82,7 +82,7 @@ const DonationItemRow = forwardRef(function DonationItemRow(
           <input
             ref={descInputRef}
             className={`stf-input is-text ${
-              !touched.description ? "" : descState.valid ? "is-valid" : "is-flagged"
+              !showDescriptionError ? "" : !descriptionError && descState.valid ? "is-valid" : "is-flagged"
             }`}
             value={item.description}
             onChange={(e) => {
@@ -92,12 +92,12 @@ const DonationItemRow = forwardRef(function DonationItemRow(
             onBlur={() => markTouched("description")}
             placeholder="e.g. Rice"
           />
-          {touched.description && (
+          {showDescriptionError && (
             <span
-              className={`stf-field-hint ${descState.valid ? "is-valid-msg" : ""}`}
-              style={!descState.valid ? { color: "var(--stf-attention)" } : undefined}
+              className={`stf-field-hint ${!descriptionError && descState.valid ? "is-valid-msg" : ""}`}
+              style={!descriptionError && descState.valid ? undefined : { color: "var(--stf-attention)" }}
             >
-              {descState.message}
+              {descriptionError || descState.message}
             </span>
           )}
         </div>
@@ -107,7 +107,7 @@ const DonationItemRow = forwardRef(function DonationItemRow(
           <input
             ref={qtyInputRef}
             className={`stf-input ${
-              !touched.quantity ? "" : qtyState.valid ? "is-valid" : "is-flagged"
+              !showQuantityError ? "" : !quantityError && qtyState.valid ? "is-valid" : "is-flagged"
             }`}
             type="number"
             min="0"
@@ -119,12 +119,12 @@ const DonationItemRow = forwardRef(function DonationItemRow(
             onBlur={() => markTouched("quantity")}
             placeholder="0"
           />
-          {touched.quantity && (
+          {showQuantityError && (
             <span
-              className={`stf-field-hint ${qtyState.valid ? "is-valid-msg" : ""}`}
-              style={!qtyState.valid ? { color: "var(--stf-attention)" } : undefined}
+              className={`stf-field-hint ${!quantityError && qtyState.valid ? "is-valid-msg" : ""}`}
+              style={!quantityError && qtyState.valid ? undefined : { color: "var(--stf-attention)" }}
             >
-              {qtyState.message}
+              {quantityError || qtyState.message}
             </span>
           )}
         </div>
@@ -132,15 +132,26 @@ const DonationItemRow = forwardRef(function DonationItemRow(
         <div className="stf-field">
           <span className="stf-field-label">Unit</span>
           <select
+            ref={unitInputRef}
             className="stf-select"
             value={item.unit}
-            onChange={(e) => onChange({ ...item, unit: e.target.value })}
+            onChange={(e) => {
+              markTouched("unit");
+              onChange({ ...item, unit: e.target.value });
+            }}
+            onBlur={() => markTouched("unit")}
+            aria-invalid={Boolean(unitError)}
           >
             <option value="" disabled>Select unit</option>
             {UNITS.map((u) => (
               <option key={u} value={u}>{u}</option>
             ))}
           </select>
+          {showUnitError && (
+            <span className="stf-field-hint" style={{ color: "var(--stf-attention)" }}>
+              {unitError || "A unit is required."}
+            </span>
+          )}
         </div>
 
         <div className="stf-field">
@@ -152,29 +163,6 @@ const DonationItemRow = forwardRef(function DonationItemRow(
               onChange({ ...item, productId, productLabel })
             }
           />
-          {!item.productId && (
-            <>
-              {/* Progressive disclosure: only unmatched items are offered a
-                  manual category — a matched product routes via its own
-                  default. The category is OPTIONAL now: leaving it blank is
-                  the manager-review path, not a validation error. */}
-              <span className="stf-field-label">What kind of item is this? (optional)</span>
-              <select
-                className="stf-select"
-                value={item.requestedCategory || ""}
-                onChange={(e) => onChange({ ...item, requestedCategory: e.target.value })}
-              >
-                <option value="">Leave blank for manager review</option>
-                {ITEM_CATEGORIES.map((c) => (
-                  <option key={c.value} value={c.value}>{c.label}</option>
-                ))}
-              </select>
-              <span className="stf-field-hint">
-                Not sure which category fits? Leave it blank — this item will be
-                sent to a warehouse manager to classify.
-              </span>
-            </>
-          )}
         </div>
       </div>
 
@@ -193,7 +181,7 @@ const DonationItemRow = forwardRef(function DonationItemRow(
 });
 
 export const DonationItemsList = forwardRef(function DonationItemsList(
-  { items, onChange },
+  { items, onChange, itemErrors = {} },
   ref
 ) {
   const rowRefs = useRef([]);
@@ -243,6 +231,7 @@ export const DonationItemsList = forwardRef(function DonationItemsList(
             onChange={(updated) => updateItem(item.id, updated)}
             onRemove={() => removeItem(item.id)}
             canRemove={items.length > 1}
+            error={itemErrors[item.id]}
           />
         ))}
       </div>

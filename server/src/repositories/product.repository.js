@@ -387,6 +387,7 @@ const searchProductsByName = async (term, { limit = 10 } = {}) => {
     SELECT id, name, stock_keeping_unit AS sku, weight_kg
     FROM products
     WHERE is_active = true
+      AND stock_keeping_unit NOT ILIKE 'PENDING-%'
       AND name ILIKE $1
     ORDER BY name ASC
     LIMIT $2;

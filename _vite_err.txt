@@ -1,0 +1,501 @@
+[2m06:01:31[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/login[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1193:18)
+    at afterConnectMultiple (node:net:1783:7)
+[2m06:49:33[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\features\taskdashboard\components\navSections.js: Identifier 'Mail' has already been declared. (29:2)
+
+[0m [90m 27 |[39m   [33mScrollText[39m[33m,[39m
+ [90m 28 |[39m   [33mMail[39m[33m,[39m
+[31m[1m>[22m[39m[90m 29 |[39m   [33mMail[39m[33m,[39m
+ [90m    |[39m   [31m[1m^[22m[39m
+ [90m 30 |[39m } [36mfrom[39m [32m'lucide-react'[39m[33m;[39m
+ [90m 31 |[39m [36mimport[39m { [33mSTAFF[39m[33m,[39m [33mADMIN[39m[33m,[39m [33mVOLUNTEERS[39m[33m,[39m [33mPACKING[39m } [36mfrom[39m [32m'../../../routes/paths'[39m[33m;[39m
+ [90m 32 |[39m[0m
+[2m06:49:33[22m [31m[1m[vite][22m[39m [31mInternal server error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\features\taskdashboard\components\navSections.js: Identifier 'Mail' has already been declared. (29:2)
+
+[0m [90m 27 |[31m   [33mScrollText[31m[33m,[31m
+ [90m 28 |[31m   [33mMail[31m[33m,[31m
+[31m[1m>[22m[31m[90m 29 |[31m   [33mMail[31m[33m,[31m
+ [90m    |[31m   [31m[1m^[22m[31m
+ [90m 30 |[31m } [36mfrom[31m [32m'lucide-react'[31m[33m;[31m
+ [90m 31 |[31m [36mimport[31m { [33mSTAFF[31m[33m,[31m [33mADMIN[31m[33m,[31m [33mVOLUNTEERS[31m[33m,[31m [33mPACKING[31m } [36mfrom[31m [32m'../../../routes/paths'[31m[33m;[31m
+ [90m 32 |[31m[0m[39m
+[2m06:49:33[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\features\taskdashboard\components\navSections.js: Identifier 'Mail' has already been declared. (29:2)
+
+[0m [90m 27 |[39m   [33mScrollText[39m[33m,[39m
+ [90m 28 |[39m   [33mMail[39m[33m,[39m
+[31m[1m>[22m[39m[90m 29 |[39m   [33mMail[39m[33m,[39m
+ [90m    |[39m   [31m[1m^[22m[39m
+ [90m 30 |[39m } [36mfrom[39m [32m'lucide-react'[39m[33m;[39m
+ [90m 31 |[39m [36mimport[39m { [33mSTAFF[39m[33m,[39m [33mADMIN[39m[33m,[39m [33mVOLUNTEERS[39m[33m,[39m [33mPACKING[39m } [36mfrom[39m [32m'../../../routes/paths'[39m[33m;[39m
+ [90m 32 |[39m[0m
+[2m06:49:40[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\features\taskdashboard\components\navSections.js: Identifier 'Mail' has already been declared. (29:2)
+
+[0m [90m 27 |[39m   [33mScrollText[39m[33m,[39m
+ [90m 28 |[39m   [33mMail[39m[33m,[39m
+[31m[1m>[22m[39m[90m 29 |[39m   [33mMail[39m[33m,[39m
+ [90m    |[39m   [31m[1m^[22m[39m
+ [90m 30 |[39m } [36mfrom[39m [32m'lucide-react'[39m[33m;[39m
+ [90m 31 |[39m [36mimport[39m { [33mSTAFF[39m[33m,[39m [33mADMIN[39m[33m,[39m [33mVOLUNTEERS[39m[33m,[39m [33mPACKING[39m } [36mfrom[39m [32m'../../../routes/paths'[39m[33m;[39m
+ [90m 32 |[39m[0m
+[2m06:49:40[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\features\taskdashboard\components\navSections.js: Identifier 'Mail' has already been declared. (29:2)
+
+[0m [90m 27 |[39m   [33mScrollText[39m[33m,[39m
+ [90m 28 |[39m   [33mMail[39m[33m,[39m
+[31m[1m>[22m[39m[90m 29 |[39m   [33mMail[39m[33m,[39m
+ [90m    |[39m   [31m[1m^[22m[39m
+ [90m 30 |[39m } [36mfrom[39m [32m'lucide-react'[39m[33m;[39m
+ [90m 31 |[39m [36mimport[39m { [33mSTAFF[39m[33m,[39m [33mADMIN[39m[33m,[39m [33mVOLUNTEERS[39m[33m,[39m [33mPACKING[39m } [36mfrom[39m [32m'../../../routes/paths'[39m[33m;[39m
+ [90m 32 |[39m[0m
+[2m06:49:41[22m [31m[1m[vite][22m[39m [31mInternal server error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\features\taskdashboard\components\navSections.js: Identifier 'Mail' has already been declared. (29:2)
+
+[0m [90m 27 |[31m   [33mScrollText[31m[33m,[31m
+ [90m 28 |[31m   [33mMail[31m[33m,[31m
+[31m[1m>[22m[31m[90m 29 |[31m   [33mMail[31m[33m,[31m
+ [90m    |[31m   [31m[1m^[22m[31m
+ [90m 30 |[31m } [36mfrom[31m [32m'lucide-react'[31m[33m;[31m
+ [90m 31 |[31m [36mimport[31m { [33mSTAFF[31m[33m,[31m [33mADMIN[31m[33m,[31m [33mVOLUNTEERS[31m[33m,[31m [33mPACKING[31m } [36mfrom[31m [32m'../../../routes/paths'[31m[33m;[31m
+ [90m 32 |[31m[0m[39m
+[2m06:49:54[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\features\taskdashboard\components\navSections.js: Unexpected token (28:0)
+
+[0m [90m 26 |[39m   [33mPhoneCall[39m[33m,[39m
+ [90m 27 |[39m   [33mScrollText[39m[33m,[39m
+[31m[1m>[22m[39m[90m 28 |[39m [32m`  Mail,[39m
+ [90m    |[39m [31m[1m^[22m[39m
+ [90m 29 |[39m [32m  Mail[39m
+ [90m 30 |[39m [32m} from 'lucide-react';[39m
+ [90m 31 |[39m [32mimport { STAFF, ADMIN, VOLUNTEERS, PACKING } from '../../../routes/paths';[39m[0m
+[2m06:49:54[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\features\taskdashboard\components\navSections.js: Unexpected token (28:0)
+
+[0m [90m 26 |[39m   [33mPhoneCall[39m[33m,[39m
+ [90m 27 |[39m   [33mScrollText[39m[33m,[39m
+[31m[1m>[22m[39m[90m 28 |[39m [32m`  Mail,[39m
+ [90m    |[39m [31m[1m^[22m[39m
+ [90m 29 |[39m [32m  Mail[39m
+ [90m 30 |[39m [32m} from 'lucide-react';[39m
+ [90m 31 |[39m [32mimport { STAFF, ADMIN, VOLUNTEERS, PACKING } from '../../../routes/paths';[39m[0m
+[2m06:49:54[22m [31m[1m[vite][22m[39m [31mInternal server error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\features\taskdashboard\components\navSections.js: Unexpected token (28:0)
+
+[0m [90m 26 |[31m   [33mPhoneCall[31m[33m,[31m
+ [90m 27 |[31m   [33mScrollText[31m[33m,[31m
+[31m[1m>[22m[31m[90m 28 |[31m [32m`  Mail,[31m
+ [90m    |[31m [31m[1m^[22m[31m
+ [90m 29 |[31m [32m  Mail[31m
+ [90m 30 |[31m [32m} from 'lucide-react';[31m
+ [90m 31 |[31m [32mimport { STAFF, ADMIN, VOLUNTEERS, PACKING } from '../../../routes/paths';[31m[0m[39m
+[2m06:59:25[22m [31m[1m[vite][22m[39m [31mInternal server error: Can't resolve './receipts.css' in 'C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\styles'[39m
+  Plugin: [35m@tailwindcss/vite:generate:serve[39m
+  File: [36mC:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/src/styles/index.css[39m
+      at finishWithoutResolve (C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\Resolver.js:952:18)
+      at C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\Resolver.js:1048:13
+      at C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\Resolver.js:1132:5
+      at eval (eval at create (C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:15:1)
+      at C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\Resolver.js:1132:5
+      at eval (eval at create (C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:27:1)
+      at C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\DescriptionFilePlugin.js:94:43
+      at C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\Resolver.js:1132:5
+      at eval (eval at create (C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:15:1)
+      at C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\Resolver.js:1132:5
+      at eval (eval at create (C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:15:1)
+      at C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\Resolver.js:1132:5
+      at eval (eval at create (C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:16:1)
+      at C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\Resolver.js:1132:5
+      at eval (eval at create (C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:27:1)
+      at C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\DescriptionFilePlugin.js:94:43
+      at C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\Resolver.js:1132:5
+      at eval (eval at create (C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:16:1)
+      at C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\Resolver.js:1132:5
+      at eval (eval at create (C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:15:1)
+      at C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\DirectoryExistsPlugin.js:52:15
+      at SyncAsyncFileSystemDecorator.stat (C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\SyncAsyncFileSystemDecorator.js:66:34)
+      at C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\DirectoryExistsPlugin.js:35:9
+      at Hook.eval [as callAsync] (eval at create (C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:7:1)
+      at Resolver.doResolve (C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\Resolver.js:1129:16)
+      at C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\ConditionalPlugin.js:42:14
+      at _next0 (eval at create (C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:8:1)
+      at eval (eval at create (C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:30:1)
+      at C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\Resolver.js:1132:5
+      at eval (eval at create (C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:16:1)
+      at C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\Resolver.js:1132:5
+      at eval (eval at create (C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:15:1)
+      at C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\Resolver.js:1132:5
+      at eval (eval at create (C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:15:1)
+      at C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\FileExistsPlugin.js:50:14
+      at SyncAsyncFileSystemDecorator.stat (C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\SyncAsyncFileSystemDecorator.js:66:34)
+      at C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\FileExistsPlugin.js:33:8
+      at Hook.eval [as callAsync] (eval at create (C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:7:1)
+      at Resolver.doResolve (C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\Resolver.js:1129:16)
+      at C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\NextPlugin.js:30:14
+      at Hook.eval [as callAsync] (eval at create (C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:7:1)
+      at Resolver.doResolve (C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\Resolver.js:1129:16)
+      at C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\AppendPlugin.js:40:14
+      at _next1 (eval at create (C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:8:1)
+      at eval (eval at create (C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:31:1)
+      at C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\Resolver.js:1132:5
+      at eval (eval at create (C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:15:1)
+      at C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\Resolver.js:1132:5
+      at eval (eval at create (C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\tapable\lib\HookCodeFactory.js:31:10), <anonymous>:15:1)
+      at C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\node_modules\enhanced-resolve\lib\FileExistsPlugin.js:50:14
+[33m[vite:css][postcss] @import must precede all other statements (besides @charset or empty @layer)
+4062 |    unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2...
+4063 |  }
+4064 |  @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
+     |  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+4065 |  @layer base {
+4066 |    :root {[39m
+[33m[vite:css][postcss] @import must precede all other statements (besides @charset or empty @layer)
+4062 |    unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2...
+4063 |  }
+4064 |  @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
+     |  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+4065 |  @layer base {
+4066 |    :root {[39m
+[33mAssets in public directory cannot be imported from JavaScript.
+If you intend to import that asset, put the file in the src directory, and use [36m/src/icons/receiving-icon.svg[33m instead of [36m/public/icons/receiving-icon.svg[33m.
+If you intend to use the URL of that asset, use [36m/icons/receiving-icon.svg?url[33m.[39m
+[33mAssets in public directory cannot be imported from JavaScript.
+If you intend to import that asset, put the file in the src directory, and use [36m/src/icons/packing-icon.svg[33m instead of [36m/public/icons/packing-icon.svg[33m.
+If you intend to use the URL of that asset, use [36m/icons/packing-icon.svg?url[33m.[39m
+[33mAssets in public directory cannot be imported from JavaScript.
+If you intend to import that asset, put the file in the src directory, and use [36m/src/icons/decanting-icon.svg[33m instead of [36m/public/icons/decanting-icon.svg[33m.
+If you intend to use the URL of that asset, use [36m/icons/decanting-icon.svg?url[33m.[39m
+[33mAssets in public directory cannot be imported from JavaScript.
+If you intend to import that asset, put the file in the src directory, and use [36m/src/icons/dispatch-icon.svg[33m instead of [36m/public/icons/dispatch-icon.svg[33m.
+If you intend to use the URL of that asset, use [36m/icons/dispatch-icon.svg?url[33m.[39m
+[33mAssets in public directory cannot be imported from JavaScript.
+If you intend to import that asset, put the file in the src directory, and use [36m/src/icons/reporting-icon.svg[33m instead of [36m/public/icons/reporting-icon.svg[33m.
+If you intend to use the URL of that asset, use [36m/icons/reporting-icon.svg?url[33m.[39m
+[33mAssets in public directory cannot be imported from JavaScript.
+If you intend to import that asset, put the file in the src directory, and use [36m/src/icons/donation-Icon.svg.jpg[33m instead of [36m/public/icons/donation-Icon.svg.jpg[33m.
+If you intend to use the URL of that asset, use [36m/icons/donation-Icon.svg.jpg?url[33m.[39m
+[33m[vite:css][postcss] @import must precede all other statements (besides @charset or empty @layer)
+4062 |    unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2...
+4063 |  }
+4064 |  @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
+     |  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+4065 |  @layer base {
+4066 |    :root {[39m
+[2m07:02:33[22m [31m[1m[vite][22m[39m [31mInternal server error: Failed to resolve import "./pages/Section18AManagementPage" from "src/App.jsx". Does the file exist?[39m
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/src/App.jsx[39m:32:56
+[33m  30 |  import EvaluateRoutingPage from "./pages/EvaluateRoutingPage";
+  31 |  import DonationManagementPage from "./pages/DonationManagementPage";
+  32 |  import Section18AManagementPage from "./pages/Section18AManagementPage";
+     |                                        ^
+  33 |  import BeneficiaryDirectoryPage from "./pages/BeneficiaryDirectoryPage";
+  34 |  import ImpactReportPage from "./pages/ImpactReportPage";[39m
+      at TransformPluginContext._formatLog (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:30416:39)
+      at TransformPluginContext.error (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:30413:14)
+      at normalizeUrl (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:27438:18)
+      at async file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:27506:30
+      at async Promise.all (index 30)
+      at async TransformPluginContext.transform (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:27474:4)
+      at async EnvironmentPluginContainer.transform (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:30201:14)
+      at async loadAndTransform (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:20124:26)
+[2m07:02:33[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: Failed to resolve import "./pages/Section18AManagementPage" from "src/App.jsx". Does the file exist?
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/src/App.jsx[39m:32:56
+[33m  30 |  import EvaluateRoutingPage from "./pages/EvaluateRoutingPage";
+  31 |  import DonationManagementPage from "./pages/DonationManagementPage";
+  32 |  import Section18AManagementPage from "./pages/Section18AManagementPage";
+     |                                        ^
+  33 |  import BeneficiaryDirectoryPage from "./pages/BeneficiaryDirectoryPage";
+  34 |  import ImpactReportPage from "./pages/ImpactReportPage";[39m
+[2m07:02:33[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: Failed to resolve import "./pages/Section18AManagementPage" from "src/App.jsx". Does the file exist?
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/src/App.jsx[39m:32:56
+[33m  30 |  import EvaluateRoutingPage from "./pages/EvaluateRoutingPage";
+  31 |  import DonationManagementPage from "./pages/DonationManagementPage";
+  32 |  import Section18AManagementPage from "./pages/Section18AManagementPage";
+     |                                        ^
+  33 |  import BeneficiaryDirectoryPage from "./pages/BeneficiaryDirectoryPage";
+  34 |  import ImpactReportPage from "./pages/ImpactReportPage";[39m
+[2m07:11:07[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: Failed to resolve import "./pages/Section18AManagementPage" from "src/App.jsx". Does the file exist?
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/src/App.jsx[39m:32:56
+[33m  30 |  import EvaluateRoutingPage from "./pages/EvaluateRoutingPage";
+  31 |  import DonationManagementPage from "./pages/DonationManagementPage";
+  32 |  import Section18AManagementPage from "./pages/Section18AManagementPage";
+     |                                        ^
+  33 |  import BeneficiaryDirectoryPage from "./pages/BeneficiaryDirectoryPage";
+  34 |  import ImpactReportPage from "./pages/ImpactReportPage";[39m
+[2m07:11:07[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: Failed to resolve import "./pages/Section18AManagementPage" from "src/App.jsx". Does the file exist?
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/src/App.jsx[39m:32:56
+[33m  30 |  import EvaluateRoutingPage from "./pages/EvaluateRoutingPage";
+  31 |  import DonationManagementPage from "./pages/DonationManagementPage";
+  32 |  import Section18AManagementPage from "./pages/Section18AManagementPage";
+     |                                        ^
+  33 |  import BeneficiaryDirectoryPage from "./pages/BeneficiaryDirectoryPage";
+  34 |  import ImpactReportPage from "./pages/ImpactReportPage";[39m
+[2m07:11:08[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: Failed to resolve import "./pages/Section18AManagementPage" from "src/App.jsx". Does the file exist?
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/src/App.jsx[39m:32:56
+[33m  30 |  import EvaluateRoutingPage from "./pages/EvaluateRoutingPage";
+  31 |  import DonationManagementPage from "./pages/DonationManagementPage";
+  32 |  import Section18AManagementPage from "./pages/Section18AManagementPage";
+     |                                        ^
+  33 |  import BeneficiaryDirectoryPage from "./pages/BeneficiaryDirectoryPage";
+  34 |  import ImpactReportPage from "./pages/ImpactReportPage";[39m
+[2m07:11:08[22m [31m[1m[vite][22m[39m [31mInternal server error: Failed to resolve import "./pages/Section18AManagementPage" from "src/App.jsx". Does the file exist?[39m
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/src/App.jsx[39m:32:56
+[33m  30 |  import EvaluateRoutingPage from "./pages/EvaluateRoutingPage";
+  31 |  import DonationManagementPage from "./pages/DonationManagementPage";
+  32 |  import Section18AManagementPage from "./pages/Section18AManagementPage";
+     |                                        ^
+  33 |  import BeneficiaryDirectoryPage from "./pages/BeneficiaryDirectoryPage";
+  34 |  import ImpactReportPage from "./pages/ImpactReportPage";[39m
+      at TransformPluginContext._formatLog (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:30416:39)
+      at TransformPluginContext.error (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:30413:14)
+      at normalizeUrl (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:27438:18)
+      at async file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:27506:30
+      at async Promise.all (index 30)
+      at async TransformPluginContext.transform (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:27474:4)
+      at async EnvironmentPluginContainer.transform (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:30201:14)
+      at async loadAndTransform (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:20124:26)
+[2m07:11:26[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: Failed to resolve import "./pages/Section18AManagementPage" from "src/App.jsx". Does the file exist?
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/src/App.jsx[39m:32:56
+[33m  30 |  import EvaluateRoutingPage from "./pages/EvaluateRoutingPage";
+  31 |  import DonationManagementPage from "./pages/DonationManagementPage";
+  32 |  import Section18AManagementPage from "./pages/Section18AManagementPage";
+     |                                        ^
+  33 |  import BeneficiaryDirectoryPage from "./pages/BeneficiaryDirectoryPage";
+  34 |  import ImpactReportPage from "./pages/ImpactReportPage";[39m
+[2m07:11:27[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: Failed to resolve import "./pages/Section18AManagementPage" from "src/App.jsx". Does the file exist?
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/src/App.jsx[39m:32:56
+[33m  30 |  import EvaluateRoutingPage from "./pages/EvaluateRoutingPage";
+  31 |  import DonationManagementPage from "./pages/DonationManagementPage";
+  32 |  import Section18AManagementPage from "./pages/Section18AManagementPage";
+     |                                        ^
+  33 |  import BeneficiaryDirectoryPage from "./pages/BeneficiaryDirectoryPage";
+  34 |  import ImpactReportPage from "./pages/ImpactReportPage";[39m
+[2m07:11:27[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\pages\GmailSettingsPage.jsx: Unexpected token (106:0)
+
+[0m [90m 104 |[39m     }
+ [90m 105 |[39m   }[33m;[39m
+[31m[1m>[22m[39m[90m 106 |[39m
+ [90m     |[39m [31m[1m^[22m[39m[0m
+[2m07:11:27[22m [31m[1m[vite][22m[39m [31mInternal server error: Failed to resolve import "./pages/Section18AManagementPage" from "src/App.jsx". Does the file exist?[39m
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/src/App.jsx[39m:32:56
+[33m  30 |  import EvaluateRoutingPage from "./pages/EvaluateRoutingPage";
+  31 |  import DonationManagementPage from "./pages/DonationManagementPage";
+  32 |  import Section18AManagementPage from "./pages/Section18AManagementPage";
+     |                                        ^
+  33 |  import BeneficiaryDirectoryPage from "./pages/BeneficiaryDirectoryPage";
+  34 |  import ImpactReportPage from "./pages/ImpactReportPage";[39m
+      at TransformPluginContext._formatLog (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:30416:39)
+      at TransformPluginContext.error (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:30413:14)
+      at normalizeUrl (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:27438:18)
+      at async file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:27506:30
+      at async Promise.all (index 30)
+      at async TransformPluginContext.transform (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:27474:4)
+      at async EnvironmentPluginContainer.transform (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:30201:14)
+      at async loadAndTransform (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:20124:26)
+      at async viteTransformMiddleware (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:24604:20)
+[2m07:11:27[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\pages\GmailSettingsPage.jsx: Unexpected token (106:0)
+
+[0m [90m 104 |[39m     }
+ [90m 105 |[39m   }[33m;[39m
+[31m[1m>[22m[39m[90m 106 |[39m
+ [90m     |[39m [31m[1m^[22m[39m[0m
+[2m07:11:27[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: Failed to resolve import "./pages/Section18AManagementPage" from "src/App.jsx". Does the file exist?
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/src/App.jsx[39m:32:56
+[33m  30 |  import EvaluateRoutingPage from "./pages/EvaluateRoutingPage";
+  31 |  import DonationManagementPage from "./pages/DonationManagementPage";
+  32 |  import Section18AManagementPage from "./pages/Section18AManagementPage";
+     |                                        ^
+  33 |  import BeneficiaryDirectoryPage from "./pages/BeneficiaryDirectoryPage";
+  34 |  import ImpactReportPage from "./pages/ImpactReportPage";[39m
+[2m07:11:27[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: Failed to resolve import "./pages/Section18AManagementPage" from "src/App.jsx". Does the file exist?
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/src/App.jsx[39m:32:56
+[33m  30 |  import EvaluateRoutingPage from "./pages/EvaluateRoutingPage";
+  31 |  import DonationManagementPage from "./pages/DonationManagementPage";
+  32 |  import Section18AManagementPage from "./pages/Section18AManagementPage";
+     |                                        ^
+  33 |  import BeneficiaryDirectoryPage from "./pages/BeneficiaryDirectoryPage";
+  34 |  import ImpactReportPage from "./pages/ImpactReportPage";[39m
+[2m07:11:27[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\pages\GmailSettingsPage.jsx: Unexpected token (106:0)
+
+[0m [90m 104 |[39m     }
+ [90m 105 |[39m   }[33m;[39m
+[31m[1m>[22m[39m[90m 106 |[39m
+ [90m     |[39m [31m[1m^[22m[39m[0m
+[2m07:11:48[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: Failed to resolve import "./pages/Section18AManagementPage" from "src/App.jsx". Does the file exist?
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/src/App.jsx[39m:32:56
+[33m  30 |  import EvaluateRoutingPage from "./pages/EvaluateRoutingPage";
+  31 |  import DonationManagementPage from "./pages/DonationManagementPage";
+  32 |  import Section18AManagementPage from "./pages/Section18AManagementPage";
+     |                                        ^
+  33 |  import BeneficiaryDirectoryPage from "./pages/BeneficiaryDirectoryPage";
+  34 |  import ImpactReportPage from "./pages/ImpactReportPage";[39m
+[2m07:11:48[22m [31m[1m[vite][22m[39m [31mInternal server error: Failed to resolve import "./pages/Section18AManagementPage" from "src/App.jsx". Does the file exist?[39m
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/src/App.jsx[39m:32:56
+[33m  30 |  import EvaluateRoutingPage from "./pages/EvaluateRoutingPage";
+  31 |  import DonationManagementPage from "./pages/DonationManagementPage";
+  32 |  import Section18AManagementPage from "./pages/Section18AManagementPage";
+     |                                        ^
+  33 |  import BeneficiaryDirectoryPage from "./pages/BeneficiaryDirectoryPage";
+  34 |  import ImpactReportPage from "./pages/ImpactReportPage";[39m
+      at TransformPluginContext._formatLog (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:30416:39)
+      at TransformPluginContext.error (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:30413:14)
+      at normalizeUrl (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:27438:18)
+      at async file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:27506:30
+      at async Promise.all (index 30)
+      at async TransformPluginContext.transform (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:27474:4)
+      at async EnvironmentPluginContainer.transform (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:30201:14)
+      at async loadAndTransform (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:20124:26)
+[2m07:11:48[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\pages\GmailSettingsPage.jsx: Unterminated JSX contents. (184:15)
+
+[0m [90m 182 |[39m             [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 183 |[39m           [33m<[39m[33m/[39m[33mCardContent[39m[33m>[39m
+[31m[1m>[22m[39m[90m 184 |[39m         [33m<[39m[33m/[39m[33mCard[39m[33m>[39m
+ [90m     |[39m                [31m[1m^[22m[39m
+ [90m 185 |[39m
+ [90m 186 |[39m[0m
+[2m07:11:55[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: Failed to resolve import "./pages/Section18AManagementPage" from "src/App.jsx". Does the file exist?
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/src/App.jsx[39m:32:56
+[33m  30 |  import EvaluateRoutingPage from "./pages/EvaluateRoutingPage";
+  31 |  import DonationManagementPage from "./pages/DonationManagementPage";
+  32 |  import Section18AManagementPage from "./pages/Section18AManagementPage";
+     |                                        ^
+  33 |  import BeneficiaryDirectoryPage from "./pages/BeneficiaryDirectoryPage";
+  34 |  import ImpactReportPage from "./pages/ImpactReportPage";[39m
+[2m07:11:55[22m [31m[1m[vite][22m[39m [31mInternal server error: Failed to resolve import "./pages/Section18AManagementPage" from "src/App.jsx". Does the file exist?[39m
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mC:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/src/App.jsx[39m:32:56
+[33m  30 |  import EvaluateRoutingPage from "./pages/EvaluateRoutingPage";
+  31 |  import DonationManagementPage from "./pages/DonationManagementPage";
+  32 |  import Section18AManagementPage from "./pages/Section18AManagementPage";
+     |                                        ^
+  33 |  import BeneficiaryDirectoryPage from "./pages/BeneficiaryDirectoryPage";
+  34 |  import ImpactReportPage from "./pages/ImpactReportPage";[39m
+      at TransformPluginContext._formatLog (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:30416:39)
+      at TransformPluginContext.error (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:30413:14)
+      at normalizeUrl (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:27438:18)
+      at async file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:27506:30
+      at async Promise.all (index 30)
+      at async TransformPluginContext.transform (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:27474:4)
+      at async EnvironmentPluginContainer.transform (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:30201:14)
+      at async loadAndTransform (file:///C:/Users/abukw/Documents/Projects/warehouse-management-system-lol/client/node_modules/vite/dist/node/chunks/node.js:20124:26)
+[2m07:11:55[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\pages\GmailSettingsPage.jsx: Expected corresponding JSX closing tag for <Button>. (207:6)
+
+[0m [90m 205 |[39m           [33m<[39m[33m/[39m[33mCardContent[39m[33m>[39m
+ [90m 206 |[39m         [33m<[39m[33m/[39m[33mCard[39m[33m>[39m
+[31m[1m>[22m[39m[90m 207 |[39m       [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m     |[39m       [31m[1m^[22m[39m
+ [90m 208 |[39m
+ [90m 209 |[39m       [33m<[39m[33mAlertDialog[39m open[33m=[39m{confirmDisconnectOpen} onOpenChange[33m=[39m{setConfirmDisconnectOpen}[33m>[39m
+ [90m 210 |[39m         [33m<[39m[33mAlertDialogContent[39m[33m>[39m[0m
+[2m07:18:41[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\pages\GmailSettingsPage.jsx: Expected corresponding JSX closing tag for <Button>. (207:6)
+
+[0m [90m 205 |[39m           [33m<[39m[33m/[39m[33mCardContent[39m[33m>[39m
+ [90m 206 |[39m         [33m<[39m[33m/[39m[33mCard[39m[33m>[39m
+[31m[1m>[22m[39m[90m 207 |[39m       [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m     |[39m       [31m[1m^[22m[39m
+ [90m 208 |[39m
+ [90m 209 |[39m       [33m<[39m[33mAlertDialog[39m open[33m=[39m{confirmDisconnectOpen} onOpenChange[33m=[39m{setConfirmDisconnectOpen}[33m>[39m
+ [90m 210 |[39m         [33m<[39m[33mAlertDialogContent[39m[33m>[39m[0m
+[2m07:18:42[22m [31m[1m[vite][22m[39m [31mInternal server error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\pages\GmailSettingsPage.jsx: Expected corresponding JSX closing tag for <Button>. (207:6)
+
+[0m [90m 205 |[31m           [33m<[31m[33m/[31m[33mCardContent[31m[33m>[31m
+ [90m 206 |[31m         [33m<[31m[33m/[31m[33mCard[31m[33m>[31m
+[31m[1m>[22m[31m[90m 207 |[31m       [33m<[31m[33m/[31m[33mdiv[31m[33m>[31m
+ [90m     |[31m       [31m[1m^[22m[31m
+ [90m 208 |[31m
+ [90m 209 |[31m       [33m<[31m[33mAlertDialog[31m open[33m=[31m{confirmDisconnectOpen} onOpenChange[33m=[31m{setConfirmDisconnectOpen}[33m>[31m
+ [90m 210 |[31m         [33m<[31m[33mAlertDialogContent[31m[33m>[31m[0m[39m
+[2m07:19:37[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\pages\GmailSettingsPage.jsx: Expected corresponding JSX closing tag for <Button>. (207:6)
+
+[0m [90m 205 |[39m           [33m<[39m[33m/[39m[33mCardContent[39m[33m>[39m
+ [90m 206 |[39m         [33m<[39m[33m/[39m[33mCard[39m[33m>[39m
+[31m[1m>[22m[39m[90m 207 |[39m       [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m     |[39m       [31m[1m^[22m[39m
+ [90m 208 |[39m
+ [90m 209 |[39m       [33m<[39m[33mAlertDialog[39m open[33m=[39m{confirmDisconnectOpen} onOpenChange[33m=[39m{setConfirmDisconnectOpen}[33m>[39m
+ [90m 210 |[39m         [33m<[39m[33mAlertDialogContent[39m[33m>[39m[0m
+[2m07:19:39[22m [31m[1m[vite][22m[39m [31mInternal server error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\pages\GmailSettingsPage.jsx: Expected corresponding JSX closing tag for <Button>. (207:6)
+
+[0m [90m 205 |[31m           [33m<[31m[33m/[31m[33mCardContent[31m[33m>[31m
+ [90m 206 |[31m         [33m<[31m[33m/[31m[33mCard[31m[33m>[31m
+[31m[1m>[22m[31m[90m 207 |[31m       [33m<[31m[33m/[31m[33mdiv[31m[33m>[31m
+ [90m     |[31m       [31m[1m^[22m[31m
+ [90m 208 |[31m
+ [90m 209 |[31m       [33m<[31m[33mAlertDialog[31m open[33m=[31m{confirmDisconnectOpen} onOpenChange[33m=[31m{setConfirmDisconnectOpen}[33m>[31m
+ [90m 210 |[31m         [33m<[31m[33mAlertDialogContent[31m[33m>[31m[0m[39m
+[2m14:32:28[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\pages\Section18AManagementPage.jsx: Unexpected token (132:0)
+
+[0m [90m 130 |[39m   [36mconst[39m activeTab [33m=[39m [33mTABS[39m[33m.[39mfind((item) [33m=>[39m item[33m.[39mid [33m===[39m tab) [33m||[39m [33mTABS[39m[[35m0[39m][33m;[39m
+ [90m 131 |[39m   [36mconst[39m getEmailStatusConfig [33m=[39m (status) [33m=>[39m [33mEMAIL_STATUS_CONFIG[39m[status] [33m||[39m [33mEMAIL_STATUS_CONFIG[39m[33m.[39mpending[33m;[39m
+[31m[1m>[22m[39m[90m 132 |[39m
+ [90m     |[39m [31m[1m^[22m[39m[0m
+[2m14:32:28[22m [31m[1m[vite][22m[39m [31mInternal server error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\pages\Section18AManagementPage.jsx: Unexpected token (132:0)
+
+[0m [90m 130 |[31m   [36mconst[31m activeTab [33m=[31m [33mTABS[31m[33m.[31mfind((item) [33m=>[31m item[33m.[31mid [33m===[31m tab) [33m||[31m [33mTABS[31m[[35m0[31m][33m;[31m
+ [90m 131 |[31m   [36mconst[31m getEmailStatusConfig [33m=[31m (status) [33m=>[31m [33mEMAIL_STATUS_CONFIG[31m[status] [33m||[31m [33mEMAIL_STATUS_CONFIG[31m[33m.[31mpending[33m;[31m
+[31m[1m>[22m[31m[90m 132 |[31m
+ [90m     |[31m [31m[1m^[22m[31m[0m[39m
+[2m14:32:45[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\pages\Section18AManagementPage.jsx: Unterminated JSX contents. (155:10)
+
+[0m [90m 153 |[39m         {error [33m&&[39m (
+ [90m 154 |[39m           [33m<[39m[33mdiv[39m className[33m=[39m[32m"mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"[39m role[33m=[39m[32m"alert"[39m[33m>[39m{error}[33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+[31m[1m>[22m[39m[90m 155 |[39m         )}
+ [90m     |[39m           [31m[1m^[22m[39m
+ [90m 156 |[39m[0m
+[2m14:32:46[22m [31m[1m[vite][22m[39m [31mInternal server error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\pages\Section18AManagementPage.jsx: Unterminated JSX contents. (155:10)
+
+[0m [90m 153 |[31m         {error [33m&&[31m (
+ [90m 154 |[31m           [33m<[31m[33mdiv[31m className[33m=[31m[32m"mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"[31m role[33m=[31m[32m"alert"[31m[33m>[31m{error}[33m<[31m[33m/[31m[33mdiv[31m[33m>[31m
+[31m[1m>[22m[31m[90m 155 |[31m         )}
+ [90m     |[31m           [31m[1m^[22m[31m
+ [90m 156 |[31m[0m[39m
+[2m14:33:08[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\pages\Section18AManagementPage.jsx: Unterminated JSX contents. (212:14)
+
+[0m [90m 210 |[39m                 [33m<[39m[33m/[39m[33mCard[39m[33m>[39m
+ [90m 211 |[39m               [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+[31m[1m>[22m[39m[90m 212 |[39m             )}
+ [90m     |[39m               [31m[1m^[22m[39m
+ [90m 213 |[39m[0m
+[2m14:33:08[22m [31m[1m[vite][22m[39m [31mInternal server error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\pages\Section18AManagementPage.jsx: Unterminated JSX contents. (212:14)
+
+[0m [90m 210 |[31m                 [33m<[31m[33m/[31m[33mCard[31m[33m>[31m
+ [90m 211 |[31m               [33m<[31m[33m/[31m[33mdiv[31m[33m>[31m
+[31m[1m>[22m[31m[90m 212 |[31m             )}
+ [90m     |[31m               [31m[1m^[22m[31m
+ [90m 213 |[31m[0m[39m
+[2m14:34:20[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\pages\Section18AManagementPage.jsx: Unterminated JSX contents. (220:22)
+
+[0m [90m 218 |[39m                   [33m<[39m[33mCard[39m className[33m=[39m[32m"rounded-[12px] border border-[#e9e3dd] shadow-sm"[39m[33m>[39m[33m<[39m[33mCardContent[39m className[33m=[39m[32m"pt-4"[39m[33m>[39m[33m<[39m[33mp[39m className[33m=[39m[32m"text-sm font-medium text-muted-foreground"[39m[33m>[39m[33mFailed[39m[33m<[39m[33m/[39m[33mp[39m[33m>[39m[33m<[39m[33mp[39m className[33m=[39m[32m"mt-1 text-2xl font-semibold text-red-600"[39m[33m>[39m{emailHistory[33m.[39mfilter((e) [33m=>[39m e[33m.[39mstatus [33m===[39m [32m'failed'[39m [33m||[39m e[33m.[39mstatus [33m===[39m [32m'bounced'[39m)[33m.[39mlength}[33m<[39m[33m/[39m[33mp[39m[33m>[39m[33m<[39m[33m/[39m[33mCardContent[39m[33m>[39m[33m<[39m[33m/[39m[33mCard[39m[33m>[39m
+ [90m 219 |[39m                   [33m<[39m[33mCard[39m className[33m=[39m[32m"rounded-[12px] border border-[#e9e3dd] shadow-sm"[39m[33m>[39m[33m<[39m[33mCardContent[39m className[33m=[39m[32m"pt-4"[39m[33m>[39m[33m<[39m[33mp[39m className[33m=[39m[32m"text-sm font-medium text-muted-foreground"[39m[33m>[39m[33mPending[39m[33m<[39m[33m/[39m[33mp[39m[33m>[39m[33m<[39m[33mp[39m className[33m=[39m[32m"mt-1 text-2xl font-semibold text-amber-600"[39m[33m>[39m{emailHistory[33m.[39mfilter((e) [33m=>[39m e[33m.[39mstatus [33m===[39m [32m'pending'[39m)[33m.[39mlength}[33m<[39m[33m/[39m[33mp[39m[33m>[39m[33m<[39m[33m/[39m[33mCardContent[39m[33m>[39m[33m<[39m[33m/[39m[33mCard[39m[33m>[39m
+[31m[1m>[22m[39m[90m 220 |[39m                 [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m     |[39m                       [31m[1m^[22m[39m
+ [90m 221 |[39m[0m
+[2m14:34:20[22m [31m[1m[vite][22m[39m [31mInternal server error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\pages\Section18AManagementPage.jsx: Unterminated JSX contents. (220:22)
+
+[0m [90m 218 |[31m                   [33m<[31m[33mCard[31m className[33m=[31m[32m"rounded-[12px] border border-[#e9e3dd] shadow-sm"[31m[33m>[31m[33m<[31m[33mCardContent[31m className[33m=[31m[32m"pt-4"[31m[33m>[31m[33m<[31m[33mp[31m className[33m=[31m[32m"text-sm font-medium text-muted-foreground"[31m[33m>[31m[33mFailed[31m[33m<[31m[33m/[31m[33mp[31m[33m>[31m[33m<[31m[33mp[31m className[33m=[31m[32m"mt-1 text-2xl font-semibold text-red-600"[31m[33m>[31m{emailHistory[33m.[31mfilter((e) [33m=>[31m e[33m.[31mstatus [33m===[31m [32m'failed'[31m [33m||[31m e[33m.[31mstatus [33m===[31m [32m'bounced'[31m)[33m.[31mlength}[33m<[31m[33m/[31m[33mp[31m[33m>[31m[33m<[31m[33m/[31m[33mCardContent[31m[33m>[31m[33m<[31m[33m/[31m[33mCard[31m[33m>[31m
+ [90m 219 |[31m                   [33m<[31m[33mCard[31m className[33m=[31m[32m"rounded-[12px] border border-[#e9e3dd] shadow-sm"[31m[33m>[31m[33m<[31m[33mCardContent[31m className[33m=[31m[32m"pt-4"[31m[33m>[31m[33m<[31m[33mp[31m className[33m=[31m[32m"text-sm font-medium text-muted-foreground"[31m[33m>[31m[33mPending[31m[33m<[31m[33m/[31m[33mp[31m[33m>[31m[33m<[31m[33mp[31m className[33m=[31m[32m"mt-1 text-2xl font-semibold text-amber-600"[31m[33m>[31m{emailHistory[33m.[31mfilter((e) [33m=>[31m e[33m.[31mstatus [33m===[31m [32m'pending'[31m)[33m.[31mlength}[33m<[31m[33m/[31m[33mp[31m[33m>[31m[33m<[31m[33m/[31m[33mCardContent[31m[33m>[31m[33m<[31m[33m/[31m[33mCard[31m[33m>[31m
+[31m[1m>[22m[31m[90m 220 |[31m                 [33m<[31m[33m/[31m[33mdiv[31m[33m>[31m
+ [90m     |[31m                       [31m[1m^[22m[31m
+ [90m 221 |[31m[0m[39m
+[2m14:34:46[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m Pre-transform error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\pages\Section18AManagementPage.jsx: Unterminated JSX contents. (247:14)
+
+[0m [90m 245 |[39m                 [33m<[39m[33m/[39m[33mCard[39m[33m>[39m
+ [90m 246 |[39m               [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+[31m[1m>[22m[39m[90m 247 |[39m             )}
+ [90m     |[39m               [31m[1m^[22m[39m
+ [90m 248 |[39m[0m
+[2m14:34:47[22m [31m[1m[vite][22m[39m [31mInternal server error: [BabelError] C:\Users\abukw\Documents\Projects\warehouse-management-system-lol\client\src\pages\Section18AManagementPage.jsx: Unterminated JSX contents. (247:14)
+
+[0m [90m 245 |[31m                 [33m<[31m[33m/[31m[33mCard[31m[33m>[31m
+ [90m 246 |[31m               [33m<[31m[33m/[31m[33mdiv[31m[33m>[31m
+[31m[1m>[22m[31m[90m 247 |[31m             )}
+ [90m     |[31m               [31m[1m^[22m[31m
+ [90m 248 |[31m[0m[39m

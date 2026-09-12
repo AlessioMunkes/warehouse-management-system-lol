@@ -8,8 +8,9 @@
 
 // In production the API is served from the SAME origin as this app
 // (Express serves client/dist), so an empty base gives relative URLs
-// like /api/login. In dev, Vite runs on :5173 and the API on :5000,
-// so we need the absolute origin.
+// like /api/login. In dev, Vite runs on :5173 and proxies /api/* to
+// the backend on :5000 — using a relative base keeps requests same-origin
+// and avoids CORS preflight failures.
 //
 // Note the DEV check rather than `|| fallback`: VITE_API_URL is baked
 // in at BUILD time, so an unset variable in a production build would
@@ -18,7 +19,7 @@ import { reportReach, reportUnreachable } from './connection';
 
 export const API_BASE =
   import.meta.env.VITE_API_URL ??
-  (import.meta.env.DEV ? 'http://localhost:5000' : '');
+  (import.meta.env.DEV ? '' : '');
 
 // ── Idempotency keys ──────────────────────────────────────────
 // Lives here rather than in one feature's API module because three
@@ -75,6 +76,7 @@ export const setUnauthorizedHandler = (fn) => { onUnauthorized = fn; };
 // cases must be handled differently: one means log out, the other
 // means wait.
 const handleResponse = async (res) => {
+  console.log("[API] handleResponse()", res.status);
   // Not every non-2xx response is JSON — a proxy timeout or the SPA
   // fallback returns HTML, and res.json() would throw a parse error
   // that masks the real status.
@@ -96,6 +98,7 @@ const handleResponse = async (res) => {
 
     const error = new Error(data.message || `Request failed (${res.status}).`);
     error.status = res.status;
+    error.errors = data.errors || {};
     throw error;
   }
   return data;
@@ -106,9 +109,7 @@ const handleResponse = async (res) => {
 // DNS failure, connection refused). These errors get no `.status`,
 // which is how callers distinguish them from a real server refusal.
 const networkError = () => {
-  // The one place the app learns it has lost the server. Everything
-  // the worker sees about being offline starts here.
-  reportUnreachable();
+  console.error("[API] network error");
   const error = new Error('Could not reach the server. Check your connection and try again.');
   error.isNetworkError = true;
   return error;
@@ -131,14 +132,17 @@ export const apiGet = async (endpoint) => {
 
 // ── POST ──────────────────────────────────────────────────────
 export const apiPost = async (endpoint, body) => {
+  console.log("[API] apiPost()", endpoint, body);
   let res;
   try {
+    console.log("[API] fetch starting");
     res = await fetch(`${API_BASE}${endpoint}`, {
       method:      'POST',
       credentials: 'include',
       headers:     { 'Content-Type': 'application/json' },
       body:        JSON.stringify(body),
     });
+    console.log("[API] fetch completed", res.status);
   } catch {
     throw networkError();
   }

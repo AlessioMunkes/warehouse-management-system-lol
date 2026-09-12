@@ -18,7 +18,30 @@
 // isShortfall in the stock repository: a flag, not an error.
 // ─────────────────────────────────────────────────────────────
 import { determineRouting } from '../lib/donationRouting.js';
+import {
+  validateDonorName,
+  validateCompanyName,
+  validateEmail,
+  validateSaPhone,
+  validateCountry,
+  validateProvince,
+  validateCity,
+  validatePostalCode,
+  validateStreetAddress,
+  validateSaIdNumber,
+  validatePassportNumber,
+  validateTaxReference,
+  validatePboNumber,
+  validateDescription,
+  validateQuantity,
+  validateMoney,
+  validateIsoDate,
+  donationFingerprint,
+} from '../lib/validation/donationIntake.js';
 import donationModel from '../repositories/donation.repository.js';
+import certificateSettingsService from './certificateSettings.service.js';
+import emailProvider from '../providers/email.provider.js';
+import pdfProvider from '../providers/pdf.provider.js';
 
 // ── fail ───────────────────────────────────────────────────────
 // Mirrors stock.service.js and picking.service.js. Without a
@@ -183,6 +206,7 @@ const normaliseItem = (raw, index) => {
   const description = String(raw?.description || '').trim();
   const quantity    = Number(raw?.quantity);
   const unit        = String(raw?.unit || '').trim().toLowerCase();
+  const lineNo      = raw?.lineNo ?? raw?.line_no ?? index + 1;
 
   if (!description) fail(400, `A description is required for ${label}.`);
   if (!Number.isFinite(quantity) || quantity <= 0)
@@ -225,15 +249,150 @@ const normaliseItem = (raw, index) => {
     estimatedValueZar = parsed;
   }
 
-  return { productId, description, quantity, unit, locationId, estimatedValueZar };
+  return { lineNo, productId, description, quantity, unit, locationId, estimatedValueZar };
+};
+
+// ── Validate donor-supplied fields (production-grade intake rules) ─
+// Backend is the source of truth; frontend mirrors these exact rules.
+// Throws 400 with structured `err.details` ({ field: message }) on failure.
+// Never weakens the three required fields / unit / category rules below.
+const validateDonorFields = (data) => {
+  const errors = {};
+  const clean = {};
+  const consent = data?.donorConsentGiven === true;
+  const anonymous = data?.isAnonymousDonation === true || data?.anonymous === true;
+  const donorType = String(data?.donorType || '').trim();
+  const isCompany = donorType === 'company' || donorType === 'trust' || donorType === 'other';
+
+  if (consent && !anonymous) {
+    const nameCheck = isCompany
+      ? validateCompanyName(data?.donorName ?? data?.companyName, {})
+      : validateDonorName(data?.donorName, {});
+    if (nameCheck.error) errors.donorName = nameCheck.error;
+    else clean.donorName = nameCheck.value;
+
+    if (data?.donorTradingName !== undefined && String(data.donorTradingName).trim() !== '') {
+      const t = validateCompanyName(data.donorTradingName, {});
+      if (t.error) errors.donorTradingName = t.error;
+      else clean.donorTradingName = t.value;
+    }
+
+    const e = validateEmail(data?.donorContact ?? data?.donorEmail, { required: false });
+    if (e.error) errors.donorContact = e.error;
+    else clean.donorContact = e.value;
+
+    const ph = validateSaPhone(data?.donorContactNumber ?? data?.donorPhone, { required: false });
+    if (ph.error) errors.donorContactNumber = ph.error;
+    else clean.donorContactNumber = ph.value;
+
+    const tx = validateTaxReference(data?.donorTaxReference, { required: false });
+    if (tx.error) errors.donorTaxReference = tx.error;
+    else clean.donorTaxReference = tx.value;
+
+    const co = validateCountry(data?.donorCountry ?? data?.country, { required: false });
+    if (co.error) errors.donorCountry = co.error;
+    else clean.donorCountry = co.value;
+
+    const pr = validateProvince(data?.donorProvince ?? data?.province, { country: clean.donorCountry ?? '' });
+    if (pr.error) errors.donorProvince = pr.error;
+    else if (pr.value) clean.donorProvince = pr.value;
+
+    const ci = validateCity(data?.donorCity ?? data?.city, { required: false });
+    if (ci.error) errors.donorCity = ci.error;
+    else clean.donorCity = ci.value;
+
+    const pc = validatePostalCode(data?.donorPostalCode ?? data?.postalCode, { country: clean.donorCountry ?? '', required: false });
+    if (pc.error) errors.donorPostalCode = pc.error;
+    else clean.donorPostalCode = pc.value;
+
+    const st = validateStreetAddress(data?.donorAddress ?? data?.streetAddress, { required: false });
+    if (st.error) errors.donorAddress = st.error;
+    else clean.donorAddress = st.value;
+
+    if (!isCompany) {
+      const idType = String(data?.donorIdType || '').trim();
+      const idVal = String(data?.donorIdNumber ?? '').trim();
+      if (idType === 'passport') {
+        const p = validatePassportNumber(data?.donorIdNumber, { required: false });
+        if (p.error) errors.donorIdNumber = p.error;
+        else clean.donorIdNumber = p.value;
+      } else if (idType === 'south_african_id' || /^\d*$/.test(idVal)) {
+        const id = validateSaIdNumber(data?.donorIdNumber, { required: false });
+        if (id.error) errors.donorIdNumber = id.error;
+        else clean.donorIdNumber = id.value;
+      } else if (idType) {
+        const d = validateDescription(data?.donorIdNumber, { required: false, field: 'Identification number' });
+        if (d.error) errors.donorIdNumber = d.error;
+        else clean.donorIdNumber = d.value;
+      }
+      const ic = validateCountry(data?.donorIdCountry, {});
+      if (ic.error) errors.donorIdCountry = ic.error;
+      else if (ic.value) clean.donorIdCountry = ic.value;
+    }
+
+    if (data?.donorPboNumber !== undefined && String(data.donorPboNumber).trim() !== '') {
+      const p = validatePboNumber(data.donorPboNumber, {});
+      if (p.error) errors.donorPboNumber = p.error;
+      else clean.donorPboNumber = p.value;
+    }
+  } else {
+    // No consent / anonymous: validate anything supplied, require nothing.
+    if (data?.donorContact !== undefined && String(data.donorContact).trim() !== '') {
+      const e = validateEmail(data.donorContact, {});
+      if (e.error) errors.donorContact = e.error;
+    }
+    if (data?.donorContactNumber !== undefined && String(data.donorContactNumber).trim() !== '') {
+      const p = validateSaPhone(data.donorContactNumber, {});
+      if (p.error) errors.donorContactNumber = p.error;
+    }
+  }
+
+  if (data?.donationDate !== undefined && String(data.donationDate).trim() !== '') {
+    const dt = validateIsoDate(data.donationDate, { allowFuture: false, field: 'Donation date' });
+    if (dt.error) errors.donationDate = dt.error;
+    else clean.donationDate = dt.value;
+  }
+
+  if (data?.notes !== undefined && data?.notes !== null && String(data.notes).trim() !== '') {
+    const v = String(data.notes).trim();
+    if (v.length > 2000) errors.notes = 'Notes must be 2000 characters or fewer.';
+    else clean.notes = v;
+  }
+
+  if (Object.keys(errors).length) {
+    const err = new Error('Donation validation failed.');
+    err.status = 400;
+    err.details = errors;
+    // Duplicate-prevention hint: warn (do not block) on likely re-submit.
+    try {
+      err.duplicateFingerprint = donationFingerprint({
+        donorKey: clean.donorName || data?.donorName || '',
+        items: Array.isArray(data?.items) ? data.items : [],
+        donationDate: clean.donationDate || data?.donationDate || '',
+      });
+    } catch { /* fingerprint is best-effort */ }
+    throw err;
+  }
+  return clean;
 };
 
 // ── Create a donation ─────────────────────────────────────────
 const createDonation = async (data, userId) => {
+  // Production-grade intake validation FIRST (backend = source of truth).
+  // Throws 400 with err.details ({ field: message }) on failure.
+  const donorClean = validateDonorFields(data);
+
   const {
     category, programmeCode, estimatedValueZar, donorName, donorContact,
-    donorTaxReference, donorConsentGiven, notes, idempotencyKey, items,
+    donorTaxReference, donorConsentGiven, idempotencyKey, items,
   } = data || {};
+  // Use sanitised donor values where present, else raw trimmed values.
+  const cleanName = donorClean.donorName ?? (typeof donorName === 'string' ? donorName.trim() : donorName);
+  const cleanContact = (donorClean.donorContact ?? (typeof donorContact === 'string' ? donorContact.trim().toLowerCase() : donorContact));
+  const cleanTax = donorClean.donorTaxReference ?? donorTaxReference;
+  const cleanPhone = donorClean.donorContactNumber;
+  const cleanNotes = donorClean.notes ?? data?.notes;
+  const cleanDate = donorClean.donationDate;
 
   // ── The three required fields, and nothing else ─────────────
   if (!category || !CATEGORIES.includes(category))
@@ -242,9 +401,10 @@ const createDonation = async (data, userId) => {
   if (estimatedValueZar === undefined || estimatedValueZar === null || estimatedValueZar === '')
     fail(400, 'An estimated value is required (BR-09). Enter 0 if the donation has no assessable value.');
 
-  const value = Number(estimatedValueZar);
-  if (!Number.isFinite(value) || value < 0)
-    fail(400, 'Estimated value must be zero or more.');
+  // validateMoney already enforced: numeric, >= 0, max 2 decimals.
+  const moneyCheck = validateMoney(estimatedValueZar, { required: true, field: 'Estimated value' });
+  if (moneyCheck.error) fail(400, moneyCheck.error);
+  const value = moneyCheck.value;
 
   if (!Array.isArray(items) || items.length === 0)
     fail(400, 'At least one donated item is required.');
@@ -277,7 +437,7 @@ const createDonation = async (data, userId) => {
 
   const threshold        = await donationModel.getSection18AThreshold();
   const section18aStatus = evaluateSection18A({
-    estimatedValueZar: value, donorName, donorTaxReference, donorConsentGiven, threshold,
+    estimatedValueZar: value, donorName: cleanName, donorTaxReference: cleanTax, donorConsentGiven, threshold,
   });
 
   // ── Add-on food: compute the split before writing ───────────
@@ -391,17 +551,20 @@ const createDonation = async (data, userId) => {
     category,
     programmeId,
     estimatedValueZar:    value,
-    donorName:            consented ? (String(donorName || '').trim() || null) : null,
-    donorContact:         consented ? (String(donorContact || '').trim() || null) : null,
-    donorTaxReference:    consented ? (String(donorTaxReference || '').trim() || null) : null,
+    donorName:            consented ? (cleanName ? String(cleanName).trim() || null : null) : null,
+    donorContact:         consented ? (cleanContact ? String(cleanContact).trim().toLowerCase() || null : null) : null,
+    donorTaxReference:    consented ? (cleanTax ? String(cleanTax).trim() || null : null) : null,
     donorConsentGiven:    consented,
-    notes:                String(notes || '').trim() || null,
+    notes:                (cleanNotes !== undefined && cleanNotes !== null ? String(cleanNotes).trim() : '') || null,
     idempotencyKey:       idempotencyKey || null,
     section18aStatus,
     section18aQualifying: toQualifyingFlag(section18aStatus),
     receivedBy:           userId,       // from the JWT — never trusted from the frontend
     items:                routed,
   });
+
+  // Duplicate-prevention hint (warn, do not block): attach a fingerprint
+  // so the frontend can warn on a likely double-capture.
 
   // Lost the ON CONFLICT race — another request wrote this key first.
   if (result.duplicate) {
@@ -412,13 +575,458 @@ const createDonation = async (data, userId) => {
 
   const donation = await donationModel.getDonationById(result.donationId);
 
+  // Emails run after the donation is durably recorded and never roll it
+  // back. A failure to send or log is surfaced in emailResults — the
+  // donation completion is not affected.
+  const emailResults = [];
+  if (!result.duplicate) {
+    // Genuinely non-blocking: anything the email path throws (settings,
+    // PDF, cert write, logging) must never turn a recorded donation into
+    // a 500 — the throw itself IS the failed attempt, so record it.
+    let thankYou = null;
+    try {
+      // sendThankYouEmail → logEmailAttempt is the single Gmail send +
+      // persist point (email.provider → gmail.service). It already
+      // records SENT and FAILED rows itself — no second logDonationEmail
+      // here, otherwise one send produces two history rows.
+      thankYou = await sendThankYouEmail(donation, userId);
+    } catch (err) {
+      console.error('[createDonation:thankYouEmail]', err.message);
+    }
+    if (thankYou) emailResults.push(thankYou);
+
+    let section18a = null;
+    try {
+      section18a = await sendSection18ACertificateEmail(donation, userId);
+    } catch (err) {
+      console.error('[createDonation:section18aEmail]', err.message);
+    }
+    if (section18a) emailResults.push(section18a);
+  }
+
   return {
     donation,
     warnings: [...warnings, ...(result.warnings || [])],
     duplicate: false,
+    emailResults,
   };
 };
 
+// ─────────────────────────────────────────────────────────────
+// Donation emails (thank-you + Section 18A certificate)
+//
+// Both emails run AFTER the donation is durably recorded and never
+// roll it back. A failure to send or log is surfaced in emailResults
+// for the caller, exactly the "record first, notify second" shape the
+// rest of this file follows. Anonymous donors and donors without a
+// valid email are simply skipped, not errored.
+// ─────────────────────────────────────────────────────────────
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const donorEmailFor = (donation) => {
+  const email = String(donation?.donor_contact || '').trim();
+  if (!email || !EMAIL_RE.test(email)) return null;
+  return email;
+};
+
+// Logs one send attempt. This is the SINGLE Gmail send + persist point
+// for Donation emails: email.provider.sendEmail (→ gmail.service.sendEmail)
+// is called only here, and every outcome — SENT and FAILED — is written
+// via donationModel.logDonationEmail. Callers must not add their own
+// logDonationEmail fallback or one send produces two history rows.
+const logEmailAttempt = async ({ donation, donationId, donorId = null, certificateId = null, emailType, recipient, recipientName = null, subject, email, sentByUserId = null }) => {
+  const resolvedDonationId = donation?.id ?? donationId;
+  const resolvedRecipientName = recipientName || donation?.donor_name || null;
+  const resolvedDonorId = donorId ?? donation?.donor_id ?? null;
+  try {
+    const result = await emailProvider.sendEmail({
+      to: recipient,
+      subject,
+      text: email.text,
+      html: email.html,
+      attachments: email.attachments,
+    }, null);
+    const success = Boolean(result && result.sent === true);
+    return await donationModel.logDonationEmail({
+      donationId: resolvedDonationId,
+      donorId: resolvedDonorId,
+      certificateId,
+      emailType,
+      recipient,
+      recipientEmail: recipient,
+      recipientName: resolvedRecipientName,
+      subject,
+      status: success ? 'sent' : 'failed',
+      providerMessageId: success ? (result.messageId || null) : null,
+      gmailMessageId: success ? (result.messageId || null) : null,
+      gmailThreadId: success ? (result.threadId || null) : null,
+      errorMessage: success ? null : (result.reason || result.error || 'Provider reported a failure.'),
+      sentByUserId,
+    });
+  } catch (err) {
+    return await donationModel.logDonationEmail({
+      donationId: resolvedDonationId,
+      donorId: resolvedDonorId,
+      certificateId,
+      emailType,
+      recipient,
+      recipientEmail: recipient,
+      recipientName: resolvedRecipientName,
+      subject,
+      status: 'failed',
+      errorMessage: err.message,
+      sentByUserId,
+    });
+  }
+};
+
+// ── Email helpers ───────────────────────────────────────────────
+// Brand colours (from client/src/styles/staff.css) used for inline styles
+const BRAND = {
+  ink: '#2b3336',
+  inkDeep: '#171b1c',
+  accent: '#ef3a40',
+  accentDeep: '#d42d33',
+  gold: '#979168',
+  goldDeep: '#8a8058',
+  sand: '#e9e3dd',
+  border: '#ddd4c8',
+  text: '#5c5c5c',
+  textSub: '#6f6a5e',
+  textMeta: '#8b8578',
+  white: '#ffffff',
+  accentDeep: '#d42d33',
+  goldDeep: '#8a8058',
+  attention: '#8a3227',
+  attentionBg: '#f6efe9',
+  attentionBorder: '#e2d3c6',
+  fontDisplay: '"Montserrat", "Inter", system-ui, -apple-system, sans-serif',
+  fontSans: '"Inter", system-ui, -apple-system, sans-serif',
+  radius: '12px',
+  radiusSm: '8px',
+};
+
+const buildEmailLayout = ({ title, body, footer }) => {
+  const style = `
+    margin:0;padding:0;font-family:${BRAND.fontSans};background:${BRAND.sand};color:${BRAND.text};line-height:1.6;
+  `;
+  const container = `
+    max-width:600px;margin:0 auto;padding:24px;background:${BRAND.white};border-radius:${BRAND.radius};border:1px solid ${BRAND.border};
+  `;
+  const header = `
+    padding:24px 24px 16px;border-bottom:1px solid ${BRAND.border};text-align:center;
+  `;
+  const titleStyle = `
+    margin:0;font-family:${BRAND.fontDisplay};font-size:24px;font-weight:700;color:${BRAND.ink};
+  `;
+  const bodyStyle = `
+    padding:24px;color:${BRAND.text};font-size:16px;line-height:1.7;
+  `;
+  const footerStyle = `
+    padding:16px 24px;border-top:1px solid ${BRAND.border};text-align:center;font-size:13px;color:${BRAND.textMeta};
+  `;
+  const linkStyle = `color:${BRAND.accent};text-decoration:none;`;
+  const buttonStyle = `
+    display:inline-block;padding:12px 24px;background:${BRAND.accent};color:${BRAND.white};
+    border-radius:${BRAND.radiusSm};font-weight:600;text-decoration:none;
+  `;
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${title}</title>
+</head>
+<body style="${style}">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;">
+    <tr>
+      <td align="center" style="padding:24px 12px;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="${container}">
+          <tr>
+            <td style="${header}">
+              <h1 style="${titleStyle}">${title}</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="${bodyStyle}">${body}</td>
+          </tr>
+          <tr>
+            <td style="${footerStyle}">${footer}</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+};
+
+const getRoutingMessage = (category) => {
+  switch (category) {
+    case 'recipe_food':
+      return 'Your donation will help us prepare nutritious cooked meals that will be served to people and families in our communities.';
+    case 'non_recipe_food':
+      return 'Your donation will be sorted and packed into food parcels that support vulnerable households and community organisations.';
+    case 'add_on_food':
+      return 'Your donation will be combined with other essential food items to create complete food parcels for families in need.';
+    case 'non_food':
+      return 'Your donation will support our programmes with essential everyday items that help our beneficiaries beyond food alone.';
+    default:
+      return 'Your donation will be used where it is needed most.';
+  }
+};
+
+const generateThankYouEmailContent = (donation) => {
+  const donorName = donation.donor_name || 'Friend';
+  const reference = donationReferenceFor(donation);
+  const routingMessage = getRoutingMessage(donation.donation_category);
+
+  const text = `Dear ${donorName},\n\nThank you for your generous donation (reference ${reference}).\n\n${routingMessage}\n\nYour support helps Ladles of Love continue its work.\n\nWarm regards,\nLadles of Love`;
+
+  const body = `
+    <p style="margin:0 0 16px;font-size:16px;">Dear ${donorName},</p>
+    <p style="margin:0 0 16px;font-size:16px;">Thank you for your generous donation (reference <strong>${reference}</strong>).</p>
+    <p style="margin:0 0 16px;font-size:16px;">${routingMessage}</p>
+    <p style="margin:0 0 16px;font-size:16px;">Your support helps Ladles of Love continue its work.</p>
+    <p style="margin:0 0 8px;font-size:16px;">Warm regards,</p>
+    <p style="margin:0;font-size:16px;font-weight:600;color:${BRAND.ink};">Ladles of Love</p>
+  `;
+
+  const footer = `Sent by Ladles of Love · ${new Date().toLocaleDateString()}`;
+
+  const html = buildEmailLayout({
+    title: 'Thank you for your donation',
+    body,
+    footer,
+  });
+
+  return { text: `Dear ${donorName},\n\nThank you for your generous donation (reference ${reference}).\n\n${routingMessage}\n\nYour support helps Ladles of Love continue its work.\n\nWarm regards,\nLadles of Love`, html };
+};
+
+const generateSection18ACertificateEmailContent = (donation, certificate, settings) => {
+  const donorName = donation.donor_name || 'Donor';
+  const certNumber = certificate.certificate_number;
+  const orgName = settings?.organisation_name || 'Ladles of Love';
+  const pboName = settings?.pbo_name || '';
+  const pboNumber = settings?.pbo_number || '';
+  const section18aRef = settings?.section18a_reference || '';
+  const orgAddress = settings?.organisation_address || '';
+  const contactEmail = settings?.contact_email || '';
+  const contactPhone = settings?.contact_phone || '';
+
+  const text = `Dear ${donorName},\n\nThank you for your generous support of ${orgName}.\n\nYour donation qualified for a Section 18A tax certificate. Please find your certificate (${certNumber}) attached as a PDF.\n\nThis certificate may be used when preparing your South African tax return, where applicable.\n\nIf you have any questions or notice any issues with the certificate, please contact us:\n${orgName}\n${orgAddress}\nEmail: ${contactEmail}\nPhone: ${contactPhone}\n\nWarm regards,\n${orgName}`;
+
+  const body = `
+    <p style="margin:0 0 16px;font-size:16px;">Dear ${donorName},</p>
+    <p style="margin:0 0 16px;font-size:16px;">Thank you for your generous support of <strong>${orgName}</strong>.</p>
+    <p style="margin:0 0 16px;font-size:16px;">Your donation qualified for a Section 18A tax certificate. Please find your certificate (<strong>${certNumber}</strong>) attached as a PDF.</p>
+    <p style="margin:0 0 16px;font-size:16px;">This certificate may be used when preparing your South African tax return, where applicable.</p>
+    <p style="margin:0 0 16px;font-size:16px;">If you have any questions or notice any issues with the certificate, please contact us:</p>
+    <ul style="margin:0 0 16px;padding-left:20px;font-size:16px;">
+      <li>${orgName}</li>
+      ${orgAddress ? `<li>${orgAddress}</li>` : ''}
+      ${contactEmail ? `<li>Email: <a href="mailto:${contactEmail}" style="color:${BRAND.accent};">${contactEmail}</a></li>` : ''}
+      ${contactPhone ? `<li>Phone: ${contactPhone}</li>` : ''}
+    </ul>
+    <p style="margin:0 0 8px;font-size:16px;">Warm regards,</p>
+    <p style="margin:0;font-size:16px;font-weight:600;color:${BRAND.ink};">${orgName}</p>
+  `;
+
+  const footer = `
+    <p style="margin:0 0 8px;font-size:13px;color:${BRAND.textMeta};">${orgName}</p>
+    ${pboName ? `<p style="margin:0 0 4px;font-size:13px;color:${BRAND.textMeta};">PBO: ${pboName}</p>` : ''}
+    ${pboNumber ? `<p style="margin:0 0 4px;font-size:13px;color:${BRAND.textMeta};">PBO Number: ${pboNumber}</p>` : ''}
+    ${section18aRef ? `<p style="margin:0 0 4px;font-size:13px;color:${BRAND.textMeta};">Section 18A Reference: ${section18aRef}</p>` : ''}
+    ${orgAddress ? `<p style="margin:0 0 4px;font-size:13px;color:${BRAND.textMeta};">${orgAddress}</p>` : ''}
+    ${contactEmail ? `<p style="margin:0 0 4px;font-size:13px;color:${BRAND.textMeta};">Email: <a href="mailto:${contactEmail}" style="${ 'color:'+BRAND.accent+';text-decoration:none;' }">${contactEmail}</a></p>` : ''}
+    ${contactPhone ? `<p style="margin:0 0 4px;font-size:13px;color:${BRAND.textMeta};">Phone: ${contactPhone}</p>` : ''}
+  `;
+
+  const html = buildEmailLayout({
+    title: 'Your Section 18A tax certificate',
+    body,
+    footer,
+  });
+
+  return {
+    text: `Dear ${donorName},\n\nThank you for your generous support of ${orgName}.\n\nYour donation qualified for a Section 18A tax certificate. Please find your certificate (${certNumber}) attached as a PDF.\n\nThis certificate may be used when preparing your South African tax return, where applicable.\n\nIf you have any questions or notice any issues with the certificate, please contact us:\n${orgName}\n${orgAddress}\nEmail: ${contactEmail}\nPhone: ${contactPhone}\n\nWarm regards,\n${orgName}`,
+    html,
+    attachments: [{
+      filename: certificate.pdf_filename,
+      content: certificate.pdf_content,
+      contentType: certificate.pdf_content_type,
+    }],
+  };
+};
+
+const donationReferenceFor = (donation) =>
+  donation.section_18a_certificate_ref || `DON-${donation.id}`;
+
+const sendThankYouEmail = async (donation, sentByUserId = null) => {
+  const recipient = donorEmailFor(donation);
+  if (!recipient) return null;
+  const emailContent = generateThankYouEmailContent(donation);
+  return await logEmailAttempt({
+    donation,
+    donationId: donation.id,
+    emailType: 'thank_you',
+    recipient,
+    subject: 'Thank you for your donation',
+    email: {
+      text: emailContent.text,
+      html: emailContent.html,
+    },
+    sentByUserId,
+  });
+};
+// Returns the existing certificate for the donation, or creates a new
+// one if none exists yet. Never regenerates one that is already there.
+const getOrCreateSection18ACertificate = async (donation, actorId) => {
+  const existing = await donationModel.getSection18ACertificateByDonationId(donation.id);
+  if (existing) return existing;
+  // Load organisation settings from the dedicated certificate settings service.
+  // This ensures we use the persistent, database-backed settings from
+  // certificate_settings table instead of hardcoded values.
+  const settings = await certificateSettingsService.getSettings();
+
+  const donorSnapshot = {
+    name:         donation.donor_name,
+    contact:      donation.donor_contact,
+    taxReference: donation.donor_tax_reference,
+  };
+  const donationSnapshot = {
+    id:                  donation.id,
+    donation_category:   donation.donation_category,
+    estimated_value_zar: donation.estimated_value_zar,
+    received_at:         donation.received_at,
+    items:               donation.items || [],
+  };
+
+  const { certificate } = await donationModel.createSection18ACertificate({
+    donationId:   donation.id,
+    issuedBy:     actorId,
+    settings,
+    donorSnapshot,
+    donationSnapshot,
+    buildPdf: async ({ certificateNumber, issueDate }) =>
+      pdfProvider.generateSection18APdf({
+        certificateNumber,
+        issueDate,
+        settings,
+        donor:     donorSnapshot,
+        donation:  donationSnapshot,
+      }),
+  });
+
+  return certificate;
+};
+
+const sendSection18ACertificateEmail = async (donation, actorId) => {
+  if (donation.section_18a_status !== 'queued' && donation.section_18a_status !== 'issued') {
+    return null;
+  }
+  const recipient = donorEmailFor(donation);
+  if (!recipient) return null;
+
+  // Certificate creation touches the PDF lib, settings and a DB write, and
+  // can throw (misconfigured settings, PDF failure). That must surface as a
+  // failed email-log row — recoverable via the email-history resend path —
+  // and never as an uncaught exception that 500s the recorded donation.
+  // This logDonationEmail is the only direct write outside logEmailAttempt:
+  // it covers the pre-send failure where there is no Gmail attempt to log.
+  let certificate;
+  try {
+    certificate = await getOrCreateSection18ACertificate(donation, actorId);
+  } catch (err) {
+    return await donationModel.logDonationEmail({
+      donation,
+      donationId: donation.id,
+      emailType: 'section18a_certificate',
+      recipient,
+      recipientEmail: recipient,
+      recipientName: donation.donor_name || null,
+      subject: 'Your Section 18A tax certificate',
+      status: 'FAILED',
+      errorMessage: err.message,
+      sentByUserId: actorId ?? null,
+    });
+  }
+
+  const settings = await donationModel.getSection18ASettings();
+  const emailContent = generateSection18ACertificateEmailContent(donation, certificate, settings);
+
+  return await logEmailAttempt({
+    donation,
+    donationId:    donation.id,
+    certificateId: certificate.id,
+   emailType: 'section18a_certificate',
+    recipient,
+    subject: 'Your Section 18A tax certificate',
+    email: emailContent,
+    sentByUserId: actorId ?? null,
+  });
+};
+
+const generateSection18ACertificate = async (donationId, userId) => {
+  const donation = await donationModel.getDonationById(donationId);
+  if (!donation) fail(404, 'Donation not found.');
+
+  if (await donationModel.getSection18ACertificateByDonationId(donationId)) {
+    fail(409, 'A Section 18A certificate already exists for this donation.');
+  }
+  if (!donation.donor_consent_given || !String(donation.donor_tax_reference || '').trim()) {
+    fail(400, 'Donor consent and tax reference are required to issue a certificate.');
+  }
+  if (donation.section_18a_status !== 'queued' && donation.section_18a_status !== 'issued') {
+    fail(400, 'This donation is not ready for a Section 18A certificate.');
+  }
+
+  return await getOrCreateSection18ACertificate(donation, userId);
+};
+
+const downloadSection18ACertificate = async (donationId) => {
+  const certificate = await donationModel.getSection18ACertificateByDonationId(donationId);
+  if (!certificate) fail(404, 'No Section 18A certificate exists for this donation.');
+  return {
+    buffer:            certificate.pdf_content,
+    filename:          certificate.pdf_filename,
+    contentType:       certificate.pdf_content_type,
+    certificateNumber: certificate.certificate_number,
+  };
+};
+
+const listEmailHistory = async ({ search = null, emailType = null, status = null, limit = 200, offset = 0 } = {}) =>
+  // History is served from the database only — Gmail is never queried.
+  await donationModel.listEmailHistory({ search, emailType, status, limit, offset });
+
+const normaliseEmailType = (value) => {
+  const v = String(value || '');
+  if (v === 'thank_you' || v === 'THANK_YOU') return 'THANK_YOU';
+  if (v === 'section18a_certificate' || v === 'SECTION_18A') return 'SECTION_18A';
+  return v;
+};
+
+const resendDonationEmail = async (emailLogId, userId) => {
+  const log = await donationModel.getEmailLogById(emailLogId);
+  if (!log) fail(404, 'Email log not found.');
+
+  const donation = await donationModel.getDonationById(log.donation_id);
+  if (!donation) fail(404, 'Donation not found.');
+
+  const emailType = normaliseEmailType(log.email_type);
+
+  if (emailType === 'THANK_YOU') {
+    const sent = await sendThankYouEmail(donation, null);
+    return { ...log, ...(sent || {}), emailType };
+  }
+  if (emailType === 'SECTION_18A') {
+    const sent = await sendSection18ACertificateEmail(donation, userId);
+    return { ...log, ...(sent || {}), emailType };
+  }
+
+  fail(400, `Cannot resend email of unsupported type "${log.email_type}".`);
+};
 // ── Reads ─────────────────────────────────────────────────────
 const listDonations = async (range) => {
   const valid = ['today', 'week', 'month', 'all'];
@@ -502,6 +1110,36 @@ const reclassifyDonation = async (donationId, data, userId) => {
   };
 };
 
+// ── Section 18A Certificate Settings ─────────────────────────
+// Single-row settings table (id = 1). getSettings returns the current
+// configuration; updateSettings validates and persists changes.
+const getSection18ASettings = async () => {
+  const settings = await donationModel.getSection18ASettings();
+  if (!settings) {
+    fail(404, 'Section 18A settings have not been initialized.');
+  }
+  return settings;
+};
+
+const updateSection18ASettings = async (payload) => {
+  // Validate email format if provided
+  if (payload.contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.contactEmail)) {
+    fail(400, 'Invalid contact email format.');
+  }
+
+  const settings = await donationModel.updateSection18ASettings({
+    organisationName: payload.organisationName,
+    organisationAddress: payload.organisationAddress,
+    contactName: payload.contactName,
+    contactEmail: payload.contactEmail,
+    contactPhone: payload.contactPhone,
+    pbaDeclaration: payload.pbaDeclaration,
+    certificatePrefix: payload.certificatePrefix,
+  });
+
+  return settings;
+};
+
 export default {
   createDonation,
   listDonations,
@@ -509,8 +1147,14 @@ export default {
   getDonationEvents,
   listUnmatchedItems,
   listSection18AQueue,
+  listEmailHistory,
+  resendDonationEmail,
+  generateSection18ACertificate,
+  downloadSection18ACertificate,
   resolveUnmatchedItem,
   reclassifyDonation,
+  getSection18ASettings,
+  updateSection18ASettings,
   CATEGORIES,
   ALLOWED_UNITS,
   PROGRAMME_CODES,

@@ -1,0 +1,409 @@
+
+> warehouse-management-system-lol@0.0.0 dev
+> vite
+
+[2m05:50:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m Re-optimizing dependencies because lockfile has changed
+
+  [32m[1mVITE[22m v8.1.5[39m  [2mready in [0m[1m2888[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5173[22m/[39m
+[2m  [32m➜[39m  [1mNetwork[22m[2m: use [22m[1m--host[22m[2m to expose[22m
+[2m[32m  ➜[39m[22m[2m  press [22m[1mh + enter[22m[2m to show help[22m
+[2m05:50:34[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [optimizer] bundling dependencies...
+[2m06:47:51[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/styles/index.css[22m
+[2m06:47:55[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/styles/index.css[22m
+[2m06:48:39[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/components/layout/ProtectedRoute.jsx, /src/pages/DecantingPage.jsx, /src/pages/StaffDeliveriesPage.jsx, /src/pages/StaffDecantingRecordsPage.jsx, /src/pages/DispatchPage.jsx, /src/pages/StaffDispatchHistoryPage.jsx, /src/pages/DonationDetailsPage.jsx, /src/pages/ReviewPage.jsx, /src/pages/LoginPage.jsx, /src/pages/TaskDashboardPage.jsx, /src/pages/AdminActivityScreen.jsx, /src/pages/ManagerDashboardPage.jsx, /src/pages/VolunteerEventsPage.jsx and 12 more[22m
+[2m06:48:42[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/taskdashboard/components/ManagerLayout.jsx, /src/features/taskdashboard/components/AppNav.jsx[22m
+[2m06:48:43[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/taskdashboard/components/ManagerLayout.jsx, /src/features/taskdashboard/components/AppNav.jsx[22m
+[2m06:48:53[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/taskdashboard/components/ManagerLayout.jsx, /src/features/taskdashboard/components/AppNav.jsx[22m
+[2m06:49:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/taskdashboard/components/ManagerLayout.jsx, /src/features/taskdashboard/components/AppNav.jsx[22m
+[2m06:49:40[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/taskdashboard/components/ManagerLayout.jsx, /src/features/taskdashboard/components/AppNav.jsx[22m
+[2m06:49:54[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/taskdashboard/components/ManagerLayout.jsx, /src/features/taskdashboard/components/AppNav.jsx[22m
+[2m06:50:35[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/taskdashboard/components/ManagerLayout.jsx, /src/features/taskdashboard/components/AppNav.jsx[22m
+[2m06:50:46[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/taskdashboard/components/ManagerLayout.jsx, /src/features/taskdashboard/components/AppNav.jsx[22m
+[2m06:50:50[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/taskdashboard/components/ManagerLayout.jsx, /src/features/taskdashboard/components/AppNav.jsx[22m
+[2m06:51:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/taskdashboard/components/ManagerLayout.jsx, /src/features/taskdashboard/components/AppNav.jsx[22m
+[2m06:58:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donationManagement/components/CertificateSettingsTab.jsx[22m
+[2m06:58:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donationManagement/components/EmailHistoryTab.jsx[22m
+[2m06:58:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/Section18AManagementPage.jsx, /src/features/donationManagement/components/DonationAdminNav.jsx[22m
+[2m06:58:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/Section18AManagementPage.jsx[22m
+[2m06:58:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donationManagement/components/DonationAdminNav.jsx[22m
+[2m06:58:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donationManagement/components/IssuedCertificatesTab.jsx[22m
+[2m06:58:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m06:58:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m06:58:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m06:58:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donationManagement/components/Section18AReviewDialog.jsx[22m
+[2m06:58:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m06:58:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m06:58:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donationManagement/components/Section18ASummaryCards.jsx[22m
+[2m06:58:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donationManagement/components/Section18ATab.jsx[22m
+[2m06:58:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/GmailSettingsPage.jsx[22m
+[2m06:58:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/Section18AManagementPage.jsx, /src/styles/index.css[22m
+[2m06:58:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/GmailSettingsPage.jsx[22m
+[2m06:58:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m06:58:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donationManagement/components/Section18ATab.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/InventoryManagement/components/LedgerTable.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/InventoryManagement/components/ReconciliationPanel.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/beneficiaries/components/BeneficiaryForm.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/communityRequests/components/CommunityRequestForm.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/decanting/components/DecantingSheetPDF.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/dispatch/components/DispatchNotePDF.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/notifications/components/NotificationBell.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/products/components/ProductForm.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/purchaseOrders/components/PurchaseOrderDetail.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/purchaseOrders/components/PurchaseOrderForm.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/purchaseOrders/components/PurchaseOrderLines.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/receipts/components/DispatchNotePDF.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/purchaseOrders/components/PurchaseOrderList.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/purchaseOrders/components/PurchaseOrderLines.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/ReceiptsPage.jsx, /src/features/procurement/components/DeliveryNotePDF.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/receipts/components/PdfShell.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/receipts/components/ReceiptFilters.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/receipts/components/ReceiptsTable.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/receipts/components/StatusPill.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/decanting/components/DecantingFlow.jsx, /src/features/dispatch/components/PalletCheck.jsx, /src/features/procurement/components/ReceivingFlow.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/features/staff/hooks/usePdfDocument.js[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/taskdashboard/components/ActionCard.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/users/components/UserForm.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/taskdashboard/components/AppNav.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/taskdashboard/components/DashboardGreeting.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/taskdashboard/components/DonutStat.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/taskdashboard/components/ManagerLayout.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/InventoryManagementPage.jsx, /src/features/InventoryManagement/components/StockHealthBar.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/taskdashboard/components/StatTile.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/features/taskdashboard/components/navSections.js[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/volunteerManagement/components/AttendanceSummary.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/volunteerManagement/components/BookingTable.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/volunteerManagement/components/EventFormDialog.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/volunteerManagement/components/SyncStatusCard.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/volunteerManagement/components/TimeslotPanel.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/volunteerManagement/components/WalkInDialog.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/BeneficiaryDirectoryPage.jsx, /src/styles/index.css[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/CommunityRequestsPage.jsx, /src/styles/index.css[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/DocumentsPage.jsx, /src/styles/index.css[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/ImpactReportPage.jsx, /src/styles/index.css[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/ManagerDashboardPage.jsx, /src/styles/index.css[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/PickingSlipManagementPage.jsx, /src/styles/index.css[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/ProductManagementPage.jsx, /src/styles/index.css[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/PurchaseOrdersPage.jsx, /src/styles/index.css[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/ReceiptsPage.jsx, /src/styles/index.css[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/StaffDecantingRecordsPage.jsx, /src/styles/index.css[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/StaffDeliveriesPage.jsx, /src/styles/index.css[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/StaffDispatchHistoryPage.jsx, /src/styles/index.css[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/StockLedgerPage.jsx, /src/styles/index.css[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/UserDirectoryPage.jsx, /src/styles/index.css[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/VolunteerEventsPage.jsx, /src/styles/index.css[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/VolunteerEventWorkspacePage.jsx, /src/styles/index.css[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/services/beneficiaryAPI.js[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/services/communityRequestAPI.js[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/TaskDashboardPage.jsx, /src/pages/AdminActivityScreen.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/services/notificationAPI.js[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/services/productAPI.js[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/services/purchaseOrderAPI.js[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/AdminActivityScreen.jsx[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/services/volunteerManagementAPI.js[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/styles/deliveryNotePDF.css[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m06:59:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/layout/ProtectedRoute.jsx, /src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/components/ui/dialog.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/InventoryManagement/components/MovementHistory.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/decanting/components/DecantingFlow.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/dispatch/components/GateQueue.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donationManagement/components/FlaggedItemsTab.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donationManagement/components/ReconciliationTab.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/staff/components/StepPrimitives.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/layout/ProtectedRoute.jsx, /src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/components/layout/StaffShell.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/AdminActivityScreen.jsx, /src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/components/ui/dialog.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/InventoryManagement/components/StockManifestTable.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/InventoryManagement/components/MovementHistory.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/InventoryManagement/components/StockHealthBar.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/dispatch/components/PalletCheck.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/decanting/components/DecantingFlow.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/dispatch/components/GateQueue.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donationManagement/components/FlaggedItemsTab.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donationManagement/components/ReconciliationTab.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donationManagement/components/ReconciliationTab.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/procurement/components/DeliveryNotePDF.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/procurement/components/ReceivingFlow.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/procurement/components/SignaturePad.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/taskdashboard/components/TopNavBar.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/components/layout/ProtectedRoute.jsx, /src/pages/DecantingPage.jsx, /src/pages/DispatchPage.jsx, /src/pages/DonationDetailsPage.jsx, /src/pages/ReviewPage.jsx, /src/pages/LoginPage.jsx, /src/pages/TaskDashboardPage.jsx, /src/pages/AdminActivityScreen.jsx, /src/pages/ReceivingPage.jsx, /src/pages/ProcurementDashboard.jsx, /src/features/decanting/components/TaskGrid.jsx, /src/pages/PackingPage.jsx, /src/pages/PackingStaffPage.jsx, /src/components/layout/StaffTabBar.jsx and 3 more[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/context/AuthContext.jsx, /src/pages/GuestLoginPage.jsx, /src/pages/ProcurementDashboard.jsx, /src/pages/DecantingPage.jsx, /src/features/decanting/components/DecantingPlanner.jsx, /src/features/decanting/components/DecantingFlow.jsx, /src/features/procurement/components/ReceivingFlow.jsx, /src/features/dispatch/components/PalletCheck.jsx, /src/features/dispatch/components/GateQueue.jsx, /src/pages/InventoryManagementPage.jsx, /src/pages/ReportingPage.jsx and 8 more[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/CategoryRoutingRulesPage.jsx, /src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/DispatchPage.jsx, /src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/DonationClassificationPage.jsx, /src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/DonationDetailsPage.jsx, /src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/DecantingPage.jsx, /src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/DonationManagementPage.jsx, /src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/EvaluateRoutingPage.jsx, /src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/InventoryManagementPage.jsx, /src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/ReceivingPage.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/ReportingPage.jsx, /src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/ReviewPage.jsx, /src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/SupplierDirectoryPage.jsx, /src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/TaskDashboardPage.jsx, /src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/DecantingPage.jsx, /src/features/decanting/components/DecantingPlanner.jsx, /src/features/decanting/components/DecantingFlow.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/dispatch/components/PalletCheck.jsx, /src/features/dispatch/components/GateQueue.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/ReviewPage.jsx, /src/features/donation/components/ProductMatchComboBox.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/AdminActivityScreen.jsx, /src/pages/DonationManagementPage.jsx, /src/features/donationManagement/components/FlaggedItemsTab.jsx, /src/features/donationManagement/components/ReconciliationTab.jsx, /src/pages/DonationClassificationPage.jsx, /src/features/donationAdmin/components/DonationClassificationTable.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/AdminActivityScreen.jsx, /src/pages/DonationManagementPage.jsx, /src/features/donationManagement/components/FlaggedItemsTab.jsx, /src/features/donationManagement/components/ReconciliationTab.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/packing/components/PackingDetail.jsx, /src/features/packing/components/PackingBoard.jsx, /src/features/packing/components/StaffSlipFlow.jsx, /src/features/packing/components/StaffSlipList.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/procurement/components/ReceivingFlow.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/InventoryManagementPage.jsx[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/staff.css, /src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m06:59:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m06:59:29[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [optimizer] bundling dependencies...
+[2m06:59:33[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mdependency optimized: [33mhtml2canvas[32m[39m
+[2m06:59:33[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32moptimized dependencies changed. reloading[39m
+[2m07:02:30[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m07:02:30[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m07:02:30[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m07:02:30[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/styles/index.css[22m
+[2m07:02:30[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/layout/ProtectedRoute.jsx, /src/styles/index.css[22m
+[2m07:02:30[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/components/ui/dialog.jsx[22m
+[2m07:02:30[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/components/layout/StaffShell.jsx[22m
+[2m07:02:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/components/ui/dialog.jsx[22m
+[2m07:02:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/decanting/components/DecantingFlow.jsx[22m
+[2m07:02:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/InventoryManagement/components/MovementHistory.jsx[22m
+[2m07:02:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/InventoryManagement/components/StockHealthBar.jsx[22m
+[2m07:02:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/InventoryManagement/components/StockManifestTable.jsx[22m
+[2m07:02:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donationManagement/components/FlaggedItemsTab.jsx[22m
+[2m07:02:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/features/InventoryManagement/components/ReconciliationPanel.jsx[22m
+[2m07:02:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/features/InventoryManagement/components/LedgerTable.jsx[22m
+[2m07:02:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donationManagement/components/ReconciliationTab.jsx[22m
+[2m07:02:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/procurement/components/DeliveryNotePDF.jsx[22m
+[2m07:02:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/decanting/components/DecantingFlow.jsx[22m
+[2m07:02:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/dispatch/components/GateQueue.jsx[22m
+[2m07:02:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/dispatch/components/PalletCheck.jsx[22m
+[2m07:02:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/staff/components/StepPrimitives.jsx[22m
+[2m07:02:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donationManagement/components/FlaggedItemsTab.jsx[22m
+[2m07:02:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donationManagement/components/ReconciliationTab.jsx[22m
+[2m07:02:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/features/decanting/components/DecantingSheetPDF.jsx[22m
+[2m07:02:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/features/dispatch/components/DispatchNotePDF.jsx[22m
+[2m07:02:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donationManagement/components/ReconciliationTab.jsx[22m
+[2m07:02:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/procurement/components/DeliveryNotePDF.jsx[22m
+[2m07:02:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/procurement/components/ReceivingFlow.jsx[22m
+[2m07:02:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/procurement/components/SignaturePad.jsx[22m
+[2m07:02:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/AdminActivityScreen.jsx, /src/styles/index.css[22m
+[2m07:02:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/staff/components/StepPrimitives.jsx[22m
+[2m07:02:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/taskdashboard/components/TaskGrid.jsx[22m
+[2m07:02:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/taskdashboard/components/TopNavBar.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/features/staff/hooks/useCoachmark.js[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/features/staff/hooks/usePdfDocument.js[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/features/taskdashboard/components/AppNav.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/features/taskdashboard/components/ActionCard.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/features/taskdashboard/components/DonutStat.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/features/taskdashboard/components/DashboardGreeting.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/features/taskdashboard/components/ManagerLayout.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/features/taskdashboard/components/navSections.js[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/features/taskdashboard/components/shellContext.js[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/features/taskdashboard/components/StatTile.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/components/layout/ProtectedRoute.jsx, /src/pages/DonationDetailsPage.jsx, /src/pages/ReviewPage.jsx, /src/pages/LoginPage.jsx, /src/pages/TaskDashboardPage.jsx, /src/pages/AdminActivityScreen.jsx, /src/pages/ProcurementDashboard.jsx, /src/features/decanting/components/TaskGrid.jsx, /src/pages/PackingPage.jsx, /src/pages/PackingStaffPage.jsx, /src/components/layout/StaffTabBar.jsx, /src/features/procurement/components/TaskNavGrid.jsx and 2 more[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/context/AuthContext.jsx, /src/pages/GuestLoginPage.jsx, /src/pages/ProcurementDashboard.jsx, /src/pages/DecantingPage.jsx, /src/features/decanting/components/DecantingPlanner.jsx, /src/features/decanting/components/DecantingFlow.jsx, /src/features/procurement/components/ReceivingFlow.jsx, /src/features/dispatch/components/PalletCheck.jsx, /src/features/dispatch/components/GateQueue.jsx, /src/pages/InventoryManagementPage.jsx, /src/pages/ReportingPage.jsx and 8 more[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/AdminActivityScreen.jsx, /src/styles/index.css[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/CategoryRoutingRulesPage.jsx, /src/styles/index.css[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/DecantingPage.jsx, /src/styles/index.css[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/DonationDetailsPage.jsx, /src/styles/index.css[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/DispatchPage.jsx, /src/styles/index.css[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/DonationClassificationPage.jsx, /src/styles/index.css[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/DonationManagementPage.jsx, /src/styles/index.css[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/EvaluateRoutingPage.jsx, /src/styles/index.css[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/InventoryManagementPage.jsx, /src/styles/index.css[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/ManagerActivityScreen.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/ReceivingPage.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/ReviewPage.jsx, /src/styles/index.css[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/ReportingPage.jsx, /src/styles/index.css[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/TaskDashboardPage.jsx, /src/styles/index.css[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/SupplierDirectoryPage.jsx, /src/styles/index.css[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/pages/BeneficiaryDirectoryPage.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/pages/CommunityRequestsPage.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/pages/DocumentsPage.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/pages/ImpactReportPage.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/pages/ManagerDashboardPage.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/pages/PickingSlipManagementPage.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/pages/ProductManagementPage.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/pages/PurchaseOrdersPage.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/pages/ReceiptsPage.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/pages/StaffDecantingRecordsPage.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/pages/StaffDeliveriesPage.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/pages/StaffDispatchHistoryPage.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/pages/StockLedgerPage.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/pages/UserDirectoryPage.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/pages/VolunteerEventsPage.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/pages/VolunteerEventWorkspacePage.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/components/layout/ProtectedRoute.jsx, /src/pages/DonationDetailsPage.jsx, /src/pages/ReviewPage.jsx, /src/pages/LoginPage.jsx, /src/pages/TaskDashboardPage.jsx, /src/pages/AdminActivityScreen.jsx, /src/pages/ProcurementDashboard.jsx, /src/features/decanting/components/TaskGrid.jsx, /src/pages/PackingPage.jsx, /src/pages/PackingStaffPage.jsx, /src/components/layout/StaffTabBar.jsx, /src/features/procurement/components/TaskNavGrid.jsx and 2 more[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/context/AuthContext.jsx, /src/pages/GuestLoginPage.jsx, /src/pages/ProcurementDashboard.jsx, /src/pages/DecantingPage.jsx, /src/features/decanting/components/DecantingPlanner.jsx, /src/features/decanting/components/DecantingFlow.jsx, /src/features/procurement/components/ReceivingFlow.jsx, /src/features/dispatch/components/PalletCheck.jsx, /src/features/dispatch/components/GateQueue.jsx, /src/pages/InventoryManagementPage.jsx, /src/pages/ReportingPage.jsx and 8 more[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/DecantingPage.jsx, /src/features/decanting/components/DecantingPlanner.jsx, /src/features/decanting/components/DecantingFlow.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/dispatch/components/PalletCheck.jsx, /src/features/dispatch/components/GateQueue.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/ReviewPage.jsx, /src/features/donation/components/ProductMatchComboBox.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/AdminActivityScreen.jsx, /src/features/donationManagement/components/FlaggedItemsTab.jsx, /src/features/donationManagement/components/ReconciliationTab.jsx, /src/features/donationManagement/components/PendingDonationsTab.jsx, /src/pages/DonationClassificationPage.jsx, /src/features/donationAdmin/components/DonationClassificationTable.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/AdminActivityScreen.jsx, /src/features/donationManagement/components/FlaggedItemsTab.jsx, /src/features/donationManagement/components/ReconciliationTab.jsx, /src/features/donationManagement/components/PendingDonationsTab.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/packing/components/PackingDetail.jsx, /src/features/packing/components/PackingBoard.jsx, /src/features/packing/components/StaffSlipFlow.jsx, /src/features/packing/components/StaffSlipList.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/procurement/components/ReceivingFlow.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/InventoryManagementPage.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/staff.css, /src/styles/index.css[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/services/beneficiaryAPI.js[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/services/communityRequestAPI.js[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/services/dashboardAPI.js[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/services/notificationAPI.js[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/services/productAPI.js[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/services/purchaseOrderAPI.js[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/services/userAPI.js[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/services/volunteerManagementAPI.js[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/styles/deliveryNotePDF.css[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/styles/receipts.css[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/tests/PdfShellPortal.test.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/tests/StockLedgerPage.test.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/tests/VolunteerEventsPage.test.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/tests/VolunteerEventWorkspacePage.test.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/tests/VolunteerManagementAPI.test.jsx[22m
+[2m07:02:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/tests/VolunteerRouting.test.jsx[22m
+[2m07:11:05[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/services/gmailAPI.js[22m
+[2m07:11:26[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/pages/GmailSettingsPage.jsx[22m
+[2m07:11:46[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/pages/GmailSettingsPage.jsx[22m
+[2m07:11:54[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/pages/GmailSettingsPage.jsx[22m
+[2m07:18:40[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/pages/Section18AManagementPage.jsx[22m
+[2m07:19:36[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donation/context/DonationDraftProvider.jsx, /src/pages/DonationDetailsPage.jsx, /src/pages/ReviewPage.jsx[22m
+[2m07:19:53[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/GmailSettingsPage.jsx[22m
+[2m07:21:59[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donation/components/DonationSection.jsx[22m
+[2m07:23:31[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/DonationDetailsPage.jsx, /src/styles/index.css[22m
+[2m07:24:43[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/DonationDetailsPage.jsx, /src/styles/index.css[22m
+[2m07:25:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donation/components/ReviewSummary.jsx[22m
+[2m07:25:55[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donation/components/ReviewSummary.jsx[22m
+[2m07:26:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/ReviewPage.jsx, /src/features/donation/components/ProductMatchComboBox.jsx[22m
+[2m07:28:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/staff.css, /src/styles/index.css[22m
+[2m07:29:30[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/DonationDetailsPage.jsx, /src/styles/index.css[22m
+[2m07:30:13[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donation/components/DonationItemsList.jsx[22m
+[2m07:30:29[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donation/components/DonationItemsList.jsx[22m
+[2m07:30:53[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donation/components/DonationItemsList.jsx[22m
+[2m07:31:36[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donation/components/DonationItemsList.jsx[22m
+[2m07:31:55[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donation/components/DonationItemsList.jsx[22m
+[2m07:32:27[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donation/components/DonationItemsList.jsx[22m
+[2m07:33:09[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donation/components/DonationItemsList.jsx[22m
+[2m07:33:27[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donation/components/DonationItemsList.jsx[22m
+[2m07:33:46[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donation/components/ValueProgrammeFields.jsx[22m
+[2m07:34:10[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donation/components/ValueProgrammeFields.jsx[22m
+[2m07:34:29[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donation/components/ValueProgrammeFields.jsx[22m
+[2m07:41:17[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donation/context/DonationDraftProvider.jsx, /src/pages/DonationDetailsPage.jsx, /src/pages/ReviewPage.jsx[22m
+[2m07:41:36[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/DonationDetailsPage.jsx, /src/styles/index.css[22m
+[2m07:42:18[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/DonationDetailsPage.jsx, /src/styles/index.css[22m
+[2m07:42:53[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/DonationDetailsPage.jsx, /src/styles/index.css[22m
+[2m07:43:14[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/DonationDetailsPage.jsx, /src/styles/index.css[22m
+[2m07:43:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/ReviewPage.jsx, /src/styles/index.css[22m
+[2m07:44:00[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/ReviewPage.jsx, /src/styles/index.css[22m
+[2m07:46:03[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donation/components/DonationSection.jsx[22m
+[2m08:22:11[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/styles/index.css[22m
+[2m08:22:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/styles/index.css[22m
+[2m08:22:28[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/components/layout/ProtectedRoute.jsx, /src/pages/DonationDetailsPage.jsx, /src/pages/ReviewPage.jsx, /src/pages/LoginPage.jsx, /src/pages/TaskDashboardPage.jsx, /src/pages/AdminActivityScreen.jsx, /src/pages/ProcurementDashboard.jsx, /src/features/decanting/components/TaskGrid.jsx, /src/pages/PackingPage.jsx, /src/pages/PackingStaffPage.jsx, /src/components/layout/StaffTabBar.jsx, /src/features/procurement/components/TaskNavGrid.jsx and 13 more[22m
+[2m08:22:30[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/taskdashboard/components/AppNav.jsx, /src/features/taskdashboard/components/ManagerLayout.jsx[22m
+[2m08:22:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/taskdashboard/components/AppNav.jsx, /src/features/taskdashboard/components/ManagerLayout.jsx[22m
+[2m08:22:36[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/taskdashboard/components/AppNav.jsx, /src/features/taskdashboard/components/ManagerLayout.jsx[22m
+[2m08:22:39[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/AdminActivityScreen.jsx, /src/styles/index.css[22m
+[2m08:22:41[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/AdminActivityScreen.jsx, /src/styles/index.css[22m
+[2m08:22:46[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/AdminActivityScreen.jsx, /src/styles/index.css[22m
+[2m08:22:49[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/AdminActivityScreen.jsx, /src/styles/index.css[22m
+[2m08:22:52[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/AdminActivityScreen.jsx, /src/styles/index.css[22m
+[2m08:22:57[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/AdminActivityScreen.jsx, /src/styles/index.css[22m
+[2m08:23:01[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m08:23:09[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m08:24:07[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/styles/index.css[22m
+[2m08:24:10[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/AdminActivityScreen.jsx, /src/styles/index.css[22m
+[2m08:24:13[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/taskdashboard/components/AppNav.jsx, /src/features/taskdashboard/components/ManagerLayout.jsx[22m
+[2m08:31:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/AdminActivityScreen.jsx, /src/styles/index.css[22m
+[2m08:31:36[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/AdminActivityScreen.jsx, /src/styles/index.css[22m
+[2m08:31:38[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/taskdashboard/components/AppNav.jsx, /src/features/taskdashboard/components/ManagerLayout.jsx[22m
+[2m08:31:41[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m08:31:44[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m08:32:33[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/AdminActivityScreen.jsx, /src/styles/index.css[22m
+[2m08:32:36[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/taskdashboard/components/AppNav.jsx, /src/features/taskdashboard/components/ManagerLayout.jsx[22m
+[2m08:33:27[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/taskdashboard/components/AppNav.jsx, /src/features/taskdashboard/components/ManagerLayout.jsx[22m
+[2m08:36:39[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/styles/index.css[22m
+[2m08:36:43[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/styles/index.css[22m
+[2m08:36:46[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/taskdashboard/components/AppNav.jsx, /src/features/taskdashboard/components/ManagerLayout.jsx[22m
+[2m08:39:55[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m08:42:54[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m08:44:50[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/DonationClassificationPage.jsx, /src/styles/index.css[22m
+[2m08:44:50[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/CategoryRoutingRulesPage.jsx, /src/styles/index.css[22m
+[2m08:44:50[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/EvaluateRoutingPage.jsx, /src/styles/index.css[22m
+[2m08:44:50[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m08:44:50[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m08:44:50[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css[22m
+[2m08:48:24[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/features/donationAdmin/hooks/useDonationClassification.js[22m
+[2m08:48:24[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donationAdmin/components/DonationClassificationTable.jsx[22m
+[2m08:48:24[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/services/categoryRoutingAPI.js[22m
+[2m08:48:24[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donationAdmin/components/CategoryRoutingEditor.jsx[22m
+[2m08:48:24[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donationAdmin/components/CategoryRoutingTable.jsx[22m
+[2m08:48:24[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/services/routingEvaluationAPI.js[22m
+[2m08:48:24[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donationAdmin/components/RoutingDecisionTrail.jsx[22m
+[2m08:51:03[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/AdminActivityScreen.jsx, /src/styles/index.css[22m
+[2m08:53:53[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/features/donationManagement/components/FlaggedItemsTab.jsx[22m
+[2m08:53:57[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/AdminActivityScreen.jsx, /src/features/donationManagement/components/FlaggedItemsTab.jsx, /src/features/donationManagement/components/ReconciliationTab.jsx, /src/features/donationManagement/components/PendingDonationsTab.jsx, /src/pages/DonationManagementPage.jsx[22m
+[2m13:50:47[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/AdminActivityScreen.jsx, /src/features/donationManagement/components/FlaggedItemsTab.jsx, /src/features/donationManagement/components/ReconciliationTab.jsx, /src/features/donationManagement/components/PendingDonationsTab.jsx, /src/pages/DonationManagementPage.jsx[22m
+[2m14:32:04[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/Section18AManagementPage.jsx, /src/styles/index.css[22m
+[2m14:32:04[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/Section18AManagementPage.jsx, /src/styles/index.css[22m
+[2m14:32:28[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/styles/index.css[22m
+[2m14:32:45[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/styles/index.css[22m
+[2m14:33:08[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/styles/index.css[22m
+[2m14:34:20[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/styles/index.css[22m
+[2m14:34:46[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/styles/index.css[22m
+[2m14:36:08[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/styles/index.css[22m
+[2m14:40:25[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/Section18AManagementPage.jsx, /src/styles/index.css[22m
+[2m14:46:57[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/Section18AManagementPage.jsx, /src/styles/index.css[22m
+[2m14:49:01[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/Section18AManagementPage.jsx, /src/styles/index.css[22m
+[2m14:49:02[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/Section18AManagementPage.jsx, /src/styles/index.css[22m
+[2m15:18:01[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/Section18AManagementPage.jsx, /src/styles/index.css[22m
+[2m15:18:36[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/Section18AManagementPage.jsx, /src/styles/index.css[22m
+[2m15:19:49[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/Section18AManagementPage.jsx, /src/styles/index.css[22m
+[2m15:20:00[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/Section18AManagementPage.jsx, /src/styles/index.css[22m
+[2m15:20:43[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/Section18AManagementPage.jsx, /src/styles/index.css[22m
+[2m15:31:17[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/GmailSettingsPage.jsx[22m
+[2m15:32:03[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/GmailSettingsPage.jsx[22m
+[2m15:32:16[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/GmailSettingsPage.jsx[22m
+[2m15:32:44[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/GmailSettingsPage.jsx[22m
+[2m15:33:00[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/GmailSettingsPage.jsx[22m
+[2m15:37:17[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/GmailSettingsPage.jsx[22m
+[2m15:37:27[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/GmailSettingsPage.jsx[22m
+[2m15:37:43[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/GmailSettingsPage.jsx[22m
+[2m15:37:54[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/Section18AManagementPage.jsx, /src/styles/index.css[22m
+[2m15:38:04[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/Section18AManagementPage.jsx, /src/styles/index.css[22m
+[2m15:38:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/pages/Section18AManagementPage.jsx, /src/styles/index.css[22m
+[2m15:43:39[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/GmailSettingsPage.jsx[22m
+[2m15:45:23[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/GmailSettingsPage.jsx[22m
+[2m15:45:45[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/GmailSettingsPage.jsx[22m
+[2m15:46:07[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/GmailSettingsPage.jsx[22m
+[2m15:57:39[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/context/AuthContext.jsx, /src/pages/GuestLoginPage.jsx, /src/pages/ProcurementDashboard.jsx, /src/pages/DecantingPage.jsx, /src/features/decanting/components/DecantingPlanner.jsx, /src/features/decanting/components/DecantingFlow.jsx, /src/pages/StaffDecantingRecordsPage.jsx, /src/features/procurement/components/ReceivingFlow.jsx, /src/pages/StaffDeliveriesPage.jsx, /src/pages/ReceiptsPage.jsx, /src/pages/DocumentsPage.jsx and 28 more[22m
+[2m15:57:49[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/context/AuthContext.jsx[22m Could not Fast Refresh ("useAuth" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m15:57:49[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.jsx, /src/pages/GuestHomePage.jsx, /src/components/layout/ProtectedRoute.jsx, /src/pages/ProcurementPage.jsx, /src/pages/DecantingPage.jsx, /src/pages/PackingSelectPage.jsx, /src/pages/InventoryManagementPage.jsx, /src/pages/LoginPage.jsx, /src/pages/GuestLoginPage.jsx, /src/pages/TaskDashboardPage.jsx, /src/pages/AdminActivityScreen.jsx, /src/pages/SupplierDirectoryPage.jsx, /src/pages/ProcurementDashboard.jsx, /src/features/decanting/components/PageHeader.jsx and 17 more[22m
+[2m15:57:55[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/AdminActivityScreen.jsx, /src/features/donationManagement/components/FlaggedItemsTab.jsx, /src/features/donationManagement/components/ReconciliationTab.jsx, /src/features/donationManagement/components/PendingDonationsTab.jsx, /src/pages/DonationManagementPage.jsx, /src/pages/Section18AManagementPage.jsx[22m
+[2m15:57:58[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/index.css, /src/pages/AdminActivityScreen.jsx, /src/features/donationManagement/components/FlaggedItemsTab.jsx, /src/features/donationManagement/components/ReconciliationTab.jsx, /src/features/donationManagement/components/PendingDonationsTab.jsx, /src/pages/DonationManagementPage.jsx, /src/pages/Section18AManagementPage.jsx[22m

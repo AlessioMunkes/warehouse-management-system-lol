@@ -13,7 +13,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 //import { MobileBottomNav } from "@/components/layout/MoileBottomNav"; // pending teammate
 
-import { useDonationDraft } from "../features/donation/context/DonationDraftContext";
+import { useDonationDraft, validateDonationDraft } from "../features/donation/context/DonationDraftContext";
 import { DONATIONS } from "../routes/paths";
 import { DonationRail } from "../features/donation/components/DonationRail";
 import { ReviewSummary, SectionPicker, EditSectionDialog } from "../features/donation/components/ReviewSummary";
@@ -41,6 +41,13 @@ export function ReviewPage() {
   };
 
   const handleSubmit = async () => {
+    const validation = validateDonationDraft(draft);
+    if (!validation.valid) {
+      setSubmitError("Please fix the highlighted fields before submitting.");
+      navigate(DONATIONS.new, { state: { donationValidation: validation } });
+      return;
+    }
+
     setSubmitting(true);
     setSubmitError(null);
     try {
@@ -57,7 +64,21 @@ export function ReviewPage() {
       });
       setCompletionOpen(true);
     } catch (err) {
-      setSubmitError(err.message || "Failed to record donation.");
+      const backendValidation = mapBackendValidationErrors(err.errors || {}, draft);
+      if (Object.keys(backendValidation.errors).length > 0 || Object.keys(backendValidation.itemErrors).length > 0) {
+        setSubmitError(err.message || "Please fix the highlighted fields.");
+        navigate(DONATIONS.new, {
+          state: {
+            donationValidation: {
+              valid: false,
+              errors: backendValidation.errors,
+              itemErrors: backendValidation.itemErrors,
+            },
+          },
+        });
+      } else {
+        setSubmitError(err.message || "Failed to record donation.");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -72,7 +93,7 @@ export function ReviewPage() {
   const handleGoHome = () => {
     resetDraft();
     setCompletionOpen(false);
-    navigate("/");
+    navigate("/noc");
   };
 
   const today = new Date().toLocaleDateString("en-ZA", {
@@ -154,3 +175,39 @@ export function ReviewPage() {
     </div>
   );
 }
+
+const mapBackendValidationErrors = (errors, draft = {}) => {
+  const fieldMap = {
+    donationCategory: "category",
+    category: "category",
+    estimatedValueZar: "value",
+    value: "value",
+    donorConsentGiven: "donorConsentGiven",
+    donorType: "donorType",
+    donorName: "donorName",
+    donorAddress: "donorAddress",
+    donorContactNumber: "donorContactNumber",
+    donorContact: "donorContact",
+    donorEmail: "donorContact",
+    donorTaxReference: "donorTaxReference",
+    donorIdType: "donorIdType",
+    donorIdCountry: "donorIdCountry",
+    donorIdNumber: "donorIdNumber",
+    notes: "notes",
+  };
+  const mapped = {};
+  const itemErrors = {};
+
+  Object.entries(errors || {}).forEach(([key, message]) => {
+    const itemMatch = key.match(/^items\.(.+?)\.(description|quantity|unit)$/);
+    if (itemMatch) {
+      const [, itemRef, field] = itemMatch;
+      const itemId = draft.items?.[Number(itemRef)]?.id || itemRef;
+      itemErrors[itemId] = { ...(itemErrors[itemId] || {}), [field]: message };
+      return;
+    }
+    mapped[fieldMap[key] || key] = message;
+  });
+
+  return { errors: mapped, itemErrors };
+};

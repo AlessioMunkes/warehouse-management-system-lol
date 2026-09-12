@@ -50,9 +50,15 @@ const createDonation = async (req, res) => {
   } catch (err) {
     console.error('[createDonation]', err.message);
     const status = err.status || 500;
+    // Structured validation errors (err.details: { field: message }) are
+    // passed through on 4xx so the gate can highlight exactly which field
+    // failed. Always attach the duplicate-prevention fingerprint hint when
+    // the service computed one, so the UI can warn (not block) on re-submit.
     res.status(status).json({
       success: false,
       message: status < 500 ? err.message : 'Failed to record donation.',
+      ...(err.details ? { errors: err.details } : {}),
+      ...(err.duplicateFingerprint ? { duplicateFingerprint: err.duplicateFingerprint } : {}),
     });
   }
 };
@@ -88,6 +94,84 @@ const listSection18AQueue = async (req, res) => {
     res.status(status).json({
       success: false,
       message: status < 500 ? err.message : 'Failed to retrieve the Section 18A queue.',
+    });
+  }
+};
+
+const listEmailHistory = async (req, res) => {
+  try {
+    // Served from the DB only — Gmail is never queried for history.
+    const { search = null, emailType = null, type = null, status = null, limit = 200, offset = 0 } = req.query || {};
+    const emails = await donationService.listEmailHistory({
+      search,
+      emailType: emailType ?? type,
+      status,
+      limit,
+      offset,
+    });
+    res.status(200).json({ success: true, data: emails });
+  } catch (err) {
+    console.error('[listEmailHistory]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to retrieve donation email history.',
+    });
+  }
+};
+
+const resendDonationEmail = async (req, res) => {
+  try {
+    const email = await donationService.resendDonationEmail(req.params.emailId, req.user.id);
+    res.status(200).json({ success: true, data: email });
+  } catch (err) {
+    console.error('[resendDonationEmail]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to resend donation email.',
+    });
+  }
+};
+
+// POST /api/donations/:id/section-18a/certificate
+// Generates and stores the certificate PDF for a queued donation.
+const generateSection18ACertificate = async (req, res) => {
+  try {
+    const certificate = await donationService.generateSection18ACertificate(req.params.id, req.user.id);
+    res.status(201).json({ success: true, data: {
+      id: certificate.id,
+      donation_id: certificate.donation_id,
+      certificate_number: certificate.certificate_number,
+      issue_date: certificate.issue_date,
+      pdf_filename: certificate.pdf_filename,
+    } });
+  } catch (err) {
+    console.error('[generateSection18ACertificate]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to generate the Section 18A certificate.',
+    });
+  }
+};
+
+// GET /api/donations/:id/section-18a/certificate
+// Existing download action target. If the certificate has not been
+// generated yet, the service generates and stores it first.
+const downloadSection18ACertificate = async (req, res) => {
+  try {
+    const file = await donationService.downloadSection18ACertificate(req.params.id, req.user.id);
+    res.status(200);
+    res.setHeader('Content-Type', file.contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${file.filename}"`);
+    res.send(file.buffer);
+  } catch (err) {
+    console.error('[downloadSection18ACertificate]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to download the Section 18A certificate.',
     });
   }
 };
@@ -162,13 +246,52 @@ const reclassifyDonation = async (req, res) => {
   }
 };
 
+// ── Section 18A Certificate Settings ─────────────────────────
+// GET /api/donations/admin/section-18a/settings
+// Returns the single-row settings record.
+const getSection18ASettings = async (req, res) => {
+  try {
+    const settings = await donationService.getSection18ASettings();
+    res.status(200).json({ success: true, data: settings });
+  } catch (err) {
+    console.error('[getSection18ASettings]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to retrieve Section 18A settings.',
+    });
+  }
+};
+
+// PUT /api/donations/admin/section-18a/settings
+// Updates the single-row settings record.
+const updateSection18ASettings = async (req, res) => {
+  try {
+    const settings = await donationService.updateSection18ASettings(req.body);
+    res.status(200).json({ success: true, data: settings });
+  } catch (err) {
+    console.error('[updateSection18ASettings]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to update Section 18A settings.',
+    });
+  }
+};
+
 export default {
   listDonations,
   createDonation,
   listUnmatchedItems,
   listSection18AQueue,
+  listEmailHistory,
+  resendDonationEmail,
+  generateSection18ACertificate,
+  downloadSection18ACertificate,
   resolveUnmatchedItem,
   getDonationById,
   getDonationEvents,
   reclassifyDonation,
+  getSection18ASettings,
+  updateSection18ASettings,
 };

@@ -26,10 +26,8 @@ import TaskDashboard from './pages/TaskDashboardPage';
 import SupplierDirectoryPage                       from './pages/SupplierDirectoryPage';
 import PurchaseOrdersPage                          from './pages/PurchaseOrdersPage';
 import ReportingPage                               from './pages/ReportingPage';
-import CategoryRoutingRulesPage                    from './pages/CategoryRoutingRulesPage';
-import DonationClassificationPage                 from './pages/DonationClassificationPage';
-import EvaluateRoutingPage                         from './pages/EvaluateRoutingPage';
 import DonationManagementPage                      from './pages/DonationManagementPage';
+import Section18AManagementPage                    from './pages/Section18AManagementPage';
 import BeneficiaryDirectoryPage                     from './pages/BeneficiaryDirectoryPage';
 import ImpactReportPage                             from './pages/ImpactReportPage';
 import PickingSlipManagementPage                    from './pages/PickingSlipManagementPage';
@@ -39,6 +37,7 @@ import ProductManagementPage                        from './pages/ProductManagem
 import VolunteerEventsPage                        from './pages/VolunteerEventsPage';
 import VolunteerEventWorkspacePage                from './pages/VolunteerEventWorkspacePage';
 import CommunityRequestsPage                       from './pages/CommunityRequestsPage';
+import GmailSettingsPage                           from './pages/GmailSettingsPage';
 
 // Donations — new feature, own draft context scoped to just these
 // two routes (see features/donation/context/DonationDraftProvider.jsx)
@@ -63,14 +62,6 @@ const App = () => (
             session (Products moved out of this block below; Users
             and Suppliers stay here). */}
         <Route element={<ProtectedRoute roles={['admin']} shell />}>
-          {/* The admin landing screen. LoginPage.jsx redirects every
-              admin here, and this grid is the only navigation to
-              Category Routing, Donation Classification, Explain Routing
-              and Donation Management. PR #52 repointed this path at
-              ManagerDashboardPage and called the grid superseded — but
-              that dashboard's sidebar listed none of those four, so the
-              screens became URL-only. Its own Dashboard tile leads to
-              ManagerDashboardPage, which is still at /manager. */}
           <Route path={ADMIN.dashboard} element={<AdminActivityScreen />} />
           <Route path={ADMIN.suppliers} element={<SupplierDirectoryPage />} />
           {/* Admin only, matching product.routes.js. A manager reaching
@@ -78,24 +69,16 @@ const App = () => (
               server would now refuse to change. */}
           <Route path={ADMIN.products}  element={<ProductManagementPage />} />
           <Route path={ADMIN.donationManagement} element={<DonationManagementPage />} />
+          <Route path={ADMIN.section18aManagement} element={<Section18AManagementPage />} />
           {/* Account provisioning. Every route in user.routes.js is
               requireRole(ADMIN), so this was unreachable while it sat in
               a manager-only block — the client gate now matches the
               server instead of contradicting it. */}
           <Route path={ADMIN.users} element={<UserDirectoryPage />} />
-          {/* Admin-only here, although the endpoints behind it allow
-              manager too (LOG_READERS in volunteer.routes.js). The
-              server's list is the real control; this route is about
-              where the app steers people, and the admin owns the
-              screen. A manager who needs it can be given a link. */}
-          <Route path={ADMIN.volunteers} element={<VolunteerManagementPage />} />
-          {/* These three sat outside every guard, labelled "temporary
-              test access ... without login". That reached staging, where
-              anyone who knew the URL could open them. The server routes
-              behind them were always gated; the screens now are too. */}
-          <Route path={ADMIN.categoryRouting} element={<CategoryRoutingRulesPage />} />
-          <Route path={ADMIN.donationClassification} element={<DonationClassificationPage />} />
-          <Route path={ADMIN.evaluateRouting} element={<EvaluateRoutingPage />} />
+          {/* Gmail integration for donation thank-you emails. The page's
+              server routes are requireRole(ADMIN), so it sits in this
+              admin-only block rather than the manager/admin one. */}
+          <Route path={ADMIN.emailIntegration} element={<GmailSettingsPage />} />
         </Route>
 
         {/* Protected — manager and admin.

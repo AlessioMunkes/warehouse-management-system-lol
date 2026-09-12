@@ -20,10 +20,18 @@ async function apiPost(path, payload) {
     body: JSON.stringify(payload),
   });
 
-  const json = await res.json();
+  let json;
+  try {
+    json = await res.json();
+  } catch {
+    json = {};
+  }
 
   if (!res.ok || !json.success) {
-    throw new Error(json.message || "Request failed.");
+    const error = new Error(json.message || `Request failed (${res.status}).`);
+    error.status = res.status;
+    error.errors = json.errors || {};
+    throw error;
   }
 
   return json.data;
@@ -37,6 +45,13 @@ export async function createDonation(draft) {
     donorName: draft.donorName,
     donorContact: draft.donorContact,
     donorTaxReference: draft.donorTaxReference,
+    donorType: draft.donorType || undefined,
+    donorAddress: draft.donorAddress || undefined,
+    donorContactNumber: draft.donorContactNumber || undefined,
+    donorTradingName: draft.donorTradingName || undefined,
+    donorIdType: draft.donorIdType || undefined,
+    donorIdCountry: draft.donorIdCountry || undefined,
+    donorIdNumber: draft.donorIdNumber || undefined,
     donorConsentGiven: draft.donorConsentGiven === true,
     notes: draft.notes,
     idempotencyKey: draft.idempotencyKey,
@@ -58,18 +73,23 @@ export async function createDonation(draft) {
 // draftSnapshot is archival/audit-only (nothing downstream parses it),
 // so stringifying the whole draft at submit time is exactly right.
 //
-// Items with no productId must carry requestedCategory so the backend's
-// determineRouting can classify them; otherwise they can neither
-// auto-resolve nor create a manager flag (flags.product_id is NOT NULL)
-// and the submit fails.
 export async function createPendingDonation(draft) {
+  const managerReview = draft.category === "manager_review";
+  const donationCategory = managerReview ? null : draft.category;
   const payload = {
     donorName: draft.donorName,
     donorContact: draft.donorContact,
     donorTaxReference: draft.donorTaxReference,
+    donorType: draft.donorType || undefined,
+    donorAddress: draft.donorAddress || undefined,
+    donorContactNumber: draft.donorContactNumber || undefined,
+    donorTradingName: draft.donorTradingName || undefined,
+    donorIdType: draft.donorIdType || undefined,
+    donorIdCountry: draft.donorIdCountry || undefined,
+    donorIdNumber: draft.donorIdNumber || undefined,
     donorConsentGiven: draft.donorConsentGiven === true,
     estimatedValueZar: Number(draft.estimatedValueZar) || 0,
-    donationCategory: draft.category,
+    donationCategory,
     notes: draft.notes,
     idempotencyKey: draft.idempotencyKey,
     draftSnapshot: JSON.stringify({
@@ -82,7 +102,7 @@ export async function createPendingDonation(draft) {
       quantity: Number(i.quantity),
       unit: i.unit,
       productId: i.productId ?? null,
-      requestedCategory: i.requestedCategory || null,
+      requestedCategory: i.productId ? null : donationCategory,
     })),
   };
 

@@ -32,6 +32,10 @@ import beneficiaryRouter from './src/routes/beneficiary.routes.js';
 import notificationRouter from './src/routes/notification.routes.js';
 import loveActivismRouter   from './src/routes/loveActivism.routes.js';
 import communityRequestRouter from './src/routes/communityRequest.routes.js';
+import gmailRouter from './src/routes/gmail.routes.js';
+import certificateSettingsRouter from './src/routes/certificateSettings.routes.js';
+
+console.log('[server] gmailRouter loaded:', typeof gmailRouter, gmailRouter ? 'OK' : 'UNDEFINED');
 
 // ── Validate required secrets exist at startup ───────────────
 if (!process.env.JWT_SECRET) {
@@ -42,6 +46,10 @@ if (!process.env.JWT_SECRET) {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app  = express();
+app.use((req, res, next) => {
+  console.log(`[REQ] ${req.method} ${req.originalUrl}`);
+  next();
+});
 const port = process.env.PORT || 5000;
 const defaultClientOrigins = new Set([
   'http://localhost:5173',
@@ -49,9 +57,17 @@ const defaultClientOrigins = new Set([
 ]);
 
 const isAllowedClientOrigin = (origin) => {
+  console.log(`[CORS] Incoming origin: ${origin}`);
+  console.log(`[CORS] CLIENT_ORIGIN: ${process.env.CLIENT_ORIGIN}`);
   if (!origin) return true;
-  if (process.env.CLIENT_ORIGIN) return origin === process.env.CLIENT_ORIGIN;
-  return defaultClientOrigins.has(origin);
+  if (process.env.CLIENT_ORIGIN) {
+    const allowed = origin === process.env.CLIENT_ORIGIN;
+    console.log(`[CORS] Match CLIENT_ORIGIN: ${allowed}`);
+    return allowed;
+  }
+  const allowed = defaultClientOrigins.has(origin);
+  console.log(`[CORS] Match default origins: ${allowed}`);
+  return allowed;
 };
 
 // helmet sets 11 HTTP headers that protect against common attacks.
@@ -131,6 +147,8 @@ app.use('/api/beneficiaries', beneficiaryRouter);
 app.use('/api/notifications', notificationRouter);
 app.use('/api/love-activism', loveActivismRouter);
 app.use('/api/community-requests', communityRequestRouter);
+app.use('/api/gmail', gmailRouter);
+app.use('/api/certificate-settings', certificateSettingsRouter);
 
 // ── SPA fallback (production only) ────────────────────────────
 // Any non-/api path falls through to index.html so React Router can
@@ -158,4 +176,7 @@ app.use((err, req, res, next) => {
 // ── Start ─────────────────────────────────────────────────────
 app.listen(port, () => {
   console.log(`[server] Running on http://localhost:${port}`);
+  console.log(`[env] CLIENT_ORIGIN: ${process.env.CLIENT_ORIGIN}`);
+  console.log(`[env] PORT: ${process.env.PORT || 5000}`);
+  console.log(`[env] JWT_SECRET exists: ${!!process.env.JWT_SECRET}`);
 });

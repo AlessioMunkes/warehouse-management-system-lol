@@ -81,10 +81,14 @@ const LoginPage = () => {
         break;
     }
   };
-
+ 
   const handleSubmit = async (e) => {
+    
+    console.log("[LOGIN] handleSubmit fired");
     e.preventDefault();
-    setError("");
+
+    console.log("[LOGIN] username:", username);
+    console.log("[LOGIN] password length:", password.length);
 
     if (!username.trim()) {
       setError("Username is required.");
@@ -97,9 +101,12 @@ const LoginPage = () => {
 
     setIsLoading(true);
     try {
+      console.log("[LOGIN] calling AuthContext.login()");
       const loggedInUser = await login(username.trim(), password);
+      console.log("[LOGIN] AuthContext.login() returned", loggedInUser);
       redirectByRole(loggedInUser);
     } catch (err) {
+      console.error("[LOGIN] handleSubmit caught:", err);
       setError(getLoginErrorMessage(err));
     } finally {
       setIsLoading(false);

@@ -7,8 +7,8 @@
 // accounts and volunteers, the master data every other module reads,
 // and where donations end up. It is deliberately NOT the manager
 // dashboard — beneficiaries, picking slips and purchase orders are the
-// manager's day, and burying the four donation screens among them was
-// how they went unnoticed in the first place.
+// manager's day, and burying donation workflows among them made the
+// remaining admin screens easy to overlook.
 //
 // D6/Q2: the Donation Management badge is a single DEDUPLICATED count —
 // unlinked flags plus pending donations needing attention, with
@@ -18,7 +18,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
 import {
-  Users2, HandHeart, Package, Truck, Gift, Tags, Route, AlertTriangle,
+  Users2, HandHeart, Package, Truck, Gift, AlertTriangle, ScrollText,
 } from 'lucide-react';
 import DashboardGreeting from '../features/taskdashboard/components/DashboardGreeting';
 import StatTile from '../features/taskdashboard/components/StatTile';
@@ -30,12 +30,9 @@ import dashboardAPI from '../services/dashboardAPI';
 import { getUsers } from '../services/userAPI';
 import { ADMIN, VOLUNTEERS } from '../routes/paths';
 
-const API_BASE = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:5000' : '');
-
 export default function AdminActivityScreen() {
   const { user } = useAuth();
 
-  const [pendingReviewCount, setPendingReviewCount] = useState(0);
   const [donationMgmtCount, setDonationMgmtCount] = useState(null);
   const [summary, setSummary] = useState(null);
   const [userCount, setUserCount] = useState(null);
@@ -43,21 +40,6 @@ export default function AdminActivityScreen() {
 
   useEffect(() => {
     let isActive = true;
-
-    const loadPendingReviewCount = async () => {
-      try {
-        const response = await fetch(`${API_BASE}/api/donations/admin/pending-classifications?countOnly=true`, {
-          method: 'GET',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-        });
-        if (!response.ok) return;
-        const payload = await response.json();
-        if (isActive) setPendingReviewCount(Number(payload.count || 0));
-      } catch {
-        if (isActive) setPendingReviewCount(0);
-      }
-    };
 
     const loadDonationMgmtCount = async () => {
       try {
@@ -70,7 +52,6 @@ export default function AdminActivityScreen() {
       }
     };
 
-    void loadPendingReviewCount();
     void loadDonationMgmtCount();
 
     // Catalog health, which is master data an admin owns.
@@ -93,7 +74,6 @@ export default function AdminActivityScreen() {
     ? [
         summary.lowStockCount > 0 ? `${summary.lowStockCount} low on stock` : null,
         donationMgmtCount > 0 ? `${donationMgmtCount} in the donation queue` : null,
-        pendingReviewCount > 0 ? `${pendingReviewCount} awaiting classification` : null,
       ].filter(Boolean).join(' · ') || 'nothing needs your attention'
     : null;
 
@@ -147,22 +127,13 @@ export default function AdminActivityScreen() {
       </h2>
       <div className="grid gap-3 sm:grid-cols-2">
         <ActionCard
-          to={ADMIN.donationManagement} icon={Gift} title="Donation Management"
+          to={ADMIN.donationManagement} icon={Gift} title="Classification Queue"
           description="Pending donations and flagged items waiting on a decision."
           badge={donationMgmtCount > 0 ? `Needs attention (${donationMgmtCount})` : null}
         />
         <ActionCard
-          to={ADMIN.donationClassification} icon={Tags} title="Donation Classification"
-          description="Set the category a product counts as when it is donated."
-          badge={pendingReviewCount > 0 ? `Needs Review (${pendingReviewCount})` : null}
-        />
-        <ActionCard
-          to={ADMIN.categoryRouting} icon={Route} title="Category Routing Rules"
-          description="Where each donation category is stored and what happens to it."
-        />
-        <ActionCard
-          to={ADMIN.evaluateRouting} icon={Route} title="Explain Donation Routing"
-          description="Trace why a specific item routed the way it did."
+          to={ADMIN.section18aManagement} icon={ScrollText} title="Section 18A Management"
+          description="Review donations that qualify for tax certificates."
         />
       </div>
     </div>

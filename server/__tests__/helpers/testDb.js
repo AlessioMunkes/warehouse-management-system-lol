@@ -8,8 +8,17 @@ import pool from '../../src/config/db.js';
 
 const TEST_PREFIX = 'itest_';
 const uniqueSuffix = () => `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+const donationAuditEntityId = (donationId) =>
+  `00000000-0000-0000-0000-${String(donationId).padStart(12, '0')}`;
 
-const created = { userIds: [], productIds: [], flagIds: [], persistentUserIds:[] };
+const created = {
+  userIds: [],
+  productIds: [],
+  flagIds: [],
+  donationIds: [],
+  pendingDonationIds: [],
+  persistentUserIds: [],
+};
 
 /**
  * Creates a real row in public.users (not auth.users — repositories
@@ -33,6 +42,7 @@ export const createTestUser = async (role, { persistent = false } = {}) => {
 
 export const cleanupPersistentUsers = async () => {
   if (created.persistentUserIds?.length) {
+    await pool.query('UPDATE donation_routing_defaults SET set_by = NULL WHERE set_by = ANY($1)', [created.persistentUserIds]);
     await pool.query('DELETE FROM users WHERE id = ANY($1)', [created.persistentUserIds]);
     created.persistentUserIds.length = 0;
   }
@@ -47,6 +57,18 @@ export const trackProductIds = (ids = []) => {
 export const trackFlagIds = (ids = []) => {
   ids.filter(Boolean).forEach((id) => {
    if (!created.flagIds.includes(id)) created.flagIds.push(id);
+  });
+};
+
+export const trackDonationIds = (ids = []) => {
+  ids.filter(Boolean).forEach((id) => {
+   if (!created.donationIds.includes(id)) created.donationIds.push(id);
+  });
+};
+
+export const trackPendingDonationIds = (ids = []) => {
+  ids.filter(Boolean).forEach((id) => {
+   if (!created.pendingDonationIds.includes(id)) created.pendingDonationIds.push(id);
   });
 };
 
@@ -96,13 +118,40 @@ export const restoreCategoryRouting = async (snapshot) => {
  * products.id, so they go first; products before users.
  */
 export const cleanupTestData = async () => {
+  if (created.pendingDonationIds.length) {
+    await pool.query('DELETE FROM pending_donation_items WHERE pending_donation_id = ANY($1)', [created.pendingDonationIds]);
+    await pool.query('DELETE FROM warehouse_manager_flags WHERE pending_donation_id = ANY($1)', [created.pendingDonationIds]);
+    await pool.query('DELETE FROM pending_donations WHERE id = ANY($1)', [created.pendingDonationIds]);
+    created.pendingDonationIds.length = 0;
+  }
   if (created.flagIds.length) {
     await pool.query('DELETE FROM warehouse_manager_flags WHERE id = ANY($1)', [created.flagIds]);
     created.flagIds.length = 0;
   }
+  if (created.donationIds.length) {
+    await pool.query(
+      `DELETE FROM audit_log
+       WHERE entity_type = 'donation'
+         AND entity_id = ANY($1::uuid[])`,
+      [created.donationIds.map(donationAuditEntityId)]
+    );
+    await pool.query(
+      `DELETE FROM stock_movements
+       WHERE reason = 'Donation received'
+         AND product_id IN (
+           SELECT product_id FROM donation_items WHERE donation_id = ANY($1)
+         )`,
+      [created.donationIds]
+    );
+    await pool.query('DELETE FROM donation_allocations WHERE donation_item_id IN (SELECT id FROM donation_items WHERE donation_id = ANY($1))', [created.donationIds]);
+    await pool.query('DELETE FROM donation_items WHERE donation_id = ANY($1)', [created.donationIds]);
+    await pool.query('DELETE FROM donations WHERE id = ANY($1)', [created.donationIds]);
+    created.donationIds.length = 0;
+  }
   if (created.productIds.length) {
     await pool.query('DELETE FROM warehouse_manager_flags WHERE product_id = ANY($1)', [created.productIds]);
     await pool.query('DELETE FROM donation_routing_defaults WHERE product_id = ANY($1)', [created.productIds]);
+    await pool.query('DELETE FROM stock_movements WHERE product_id = ANY($1)', [created.productIds]);
     await pool.query('DELETE FROM stock_levels WHERE product_id = ANY($1)', [created.productIds]);
     await pool.query('DELETE FROM products WHERE id = ANY($1)', [created.productIds]);
     created.productIds.length = 0;

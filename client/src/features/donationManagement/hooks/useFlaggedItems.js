@@ -1,7 +1,7 @@
 // Data hook for the Flagged Items tab. Keeps the fetch of
 // pending_classification flags plus the resolve submissions in one place,
-// mirroring useDonationClassification: the component gets the loaded rows
-// and a resolve() it can call; pendingIds holds whichever flag is mid-request.
+// so the component gets the loaded rows and a resolve() it can call;
+// pendingIds holds whichever flag is mid-request.
 //
 // resolveFlag() returns the unified endpoint's response so the caller can
 // read result.status / result.committed / result.finalized to say the right

@@ -143,11 +143,9 @@ export const VOLUNTEERS = {
 export const ADMIN = {
   dashboard: '/admin',
   suppliers: '/admin/suppliers',
-  categoryRouting: '/admin/category-routing',
-  donationClassification: '/admin/donation-classification',
-  evaluateRouting: '/admin/evaluate-routing',
   donationManagement: '/admin/donation-management',
+  section18aManagement: '/admin/section-18a',
   users:     '/admin/users',
   products:  '/admin/products',
-  volunteers: '/admin/volunteers',
+  emailIntegration: '/admin/email-integration',
 };
