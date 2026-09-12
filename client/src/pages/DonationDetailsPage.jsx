@@ -8,13 +8,15 @@
 // DonationItemsList). Donor fields conditionally rendered based on
 // consent, not just disabled.
 // ─────────────────────────────────────────────────────────────
-import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { useRef, useState } from "react";
+import { useEffect } from "react";
 //import { MobileBottomNav } from "@/components/layout/MoileBottomNav"; // pending teammate
 
-import { useDonationDraft } from "../features/donation/context/DonationDraftContext";
+import { useDonationDraft, validateDonationDraft } from "../features/donation/context/DonationDraftContext";
 import { DONATIONS } from "../routes/paths";
 import { DonationRail } from "../features/donation/components/DonationRail";
+import { CategorySelector } from "../features/donation/components/CategorySelector";
 import { DonationItemsList } from "../features/donation/components/DonationItemsList";
 import { ValueProgrammeFields } from "../features/donation/components/ValueProgrammeFields";
 import { DonorConsentSection, DonorInfoFields } from "../features/donation/components/DonationSection";
@@ -22,47 +24,66 @@ import { NotesField } from "../features/donation/components/NotesField";
 
 export function DonationDetailsPage() {
   const navigate = useNavigate();
-  const { draft, updateDraft } = useDonationDraft();
-  const [errors, setErrors] = useState({});
-  const [itemErrors, setItemErrors] = useState({});
+  const location = useLocation();
+  const { draft, updateDraft, resetDraft } = useDonationDraft();
+  const [errors, setErrors] = useState(location.state?.donationValidation?.errors || {});
+  const [itemErrors, setItemErrors] = useState(location.state?.donationValidation?.itemErrors || {});
+  const itemsRef = useRef(null);
 
-  // Category is no longer a field on this form (removed — see
-  // CategorySelector removal note), so it's dropped from validation.
-  // Donor consent/info still has no hard validation — "no consent" is
-  // a valid answer, not an incomplete field.
-  const validate = () => {
-    const next = {};
-
-    if (draft.estimatedValueZar === "" || Number(draft.estimatedValueZar) < 0) {
-      next.value = "An estimated value is required (enter 0 if none).";
-    }
-    // Only validate donor email if consent was given AND something was
-  // actually typed — an empty field shouldn't block submission (donor
-  // email presumably isn't itself mandatory even when consent is yes,
-  // just optional contact info — adjust if that's wrong).
-  if (draft.donorConsentGiven === true && draft.donorContact.trim()) {
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailPattern.test(draft.donorContact.trim())) {
-      next.donorContact = "Enter a valid email address.";
-    }
-  }
-
-    const nextItemErrors = {};
-    draft.items.forEach((item) => {
-      const rowErrors = {};
-      if (!item.description.trim()) rowErrors.description = "Description required.";
-      if (!item.quantity || Number(item.quantity) <= 0) rowErrors.quantity = "Enter a quantity.";
-      if (Object.keys(rowErrors).length) nextItemErrors[item.id] = rowErrors;
-    });
-
-    setErrors(next);
-    setItemErrors(nextItemErrors);
-    return Object.keys(next).length === 0 && Object.keys(nextItemErrors).length === 0;
+  const focusFirstInvalidField = (nextErrors, nextItemErrors) => {
+    window.setTimeout(() => {
+      if (nextErrors.category) {
+        document.querySelector('[aria-label="Donation category"] [role="radio"]')?.focus();
+        return;
+      }
+      if (Object.keys(nextItemErrors || {}).length && itemsRef.current?.validate) {
+        itemsRef.current.validate();
+        return;
+      }
+      const fieldByError = {
+        value: '#estimated-value-zar',
+        estimatedValueZar: '#estimated-value-zar',
+        donorConsentGiven: '[aria-label="Donor consent"] [role="radio"]',
+        donorType: '#donor-type',
+        donorName: '#donor-name',
+        donorAddress: '#donor-address',
+        donorContactNumber: '#donor-contact-number',
+        donorContact: '#donor-email',
+        donorTaxReference: '#donor-tax-reference',
+        donorIdType: '#donor-id-type',
+        donorIdCountry: '#donor-id-country',
+        donorIdNumber: '#donor-id-number',
+        notes: '#donation-notes',
+      };
+      const firstKey = Object.keys(nextErrors || {})[0];
+      const target = document.querySelector(fieldByError[firstKey] || '[aria-invalid="true"]');
+      target?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+      target?.focus?.();
+    }, 0);
   };
 
   const handleNext = () => {
-    if (validate()) navigate(DONATIONS.review);
+    const { errors: nextErrors, itemErrors: nextItemErrors, valid } = validateDonationDraft(draft);
+    setErrors(nextErrors);
+    setItemErrors(nextItemErrors);
+    if (!valid) {
+      focusFirstInvalidField(nextErrors, nextItemErrors);
+      return;
+    }
+    if (valid) navigate(DONATIONS.review);
   };
+
+  const handleCancel = () => {
+    resetDraft();
+    navigate("/");
+  };
+
+  useEffect(() => {
+    const validation = location.state?.donationValidation;
+    if (validation && !validation.valid) {
+      focusFirstInvalidField(validation.errors || {}, validation.itemErrors || {});
+    }
+  }, [location.state]);
 
   const today = new Date().toLocaleDateString("en-ZA", {
     day: "numeric", month: "long", year: "numeric",
@@ -84,7 +105,14 @@ export function DonationDetailsPage() {
             <h1 className="stf-step-title">Record a Donation</h1>
           </div>
 
+          <CategorySelector
+            value={draft.category}
+            onChange={(category) => updateDraft({ category })}
+            error={errors.category}
+          />
+
           <DonationItemsList
+            ref={itemsRef}
             items={draft.items}
             onChange={(items) => updateDraft({ items })}
             itemErrors={itemErrors}
@@ -100,6 +128,7 @@ export function DonationDetailsPage() {
           <DonorConsentSection
             consentGiven={draft.donorConsentGiven}
             onChange={(v) => updateDraft({ donorConsentGiven: v })}
+            error={errors.donorConsentGiven}
           />
 
           {draft.donorConsentGiven === true && (
@@ -107,8 +136,15 @@ export function DonationDetailsPage() {
               donorName={draft.donorName}
               donorContact={draft.donorContact}
               donorTaxReference={draft.donorTaxReference}
+              donorType={draft.donorType}
+              donorAddress={draft.donorAddress}
+              donorContactNumber={draft.donorContactNumber}
+              donorTradingName={draft.donorTradingName}
+              donorIdType={draft.donorIdType}
+              donorIdCountry={draft.donorIdCountry}
+              donorIdNumber={draft.donorIdNumber}
               onChange={updateDraft}
-              error={errors.donorContact}
+              errors={errors}
             />
           )}
 
@@ -126,10 +162,11 @@ export function DonationDetailsPage() {
           <NotesField
             notes={draft.notes}
             onChange={(notes) => updateDraft({ notes })}
+            error={errors.notes}
           />
 
           <div className="stf-actions is-row">
-            <button className="stf-btn stf-btn-secondary" onClick={() => navigate("/")}>
+            <button className="stf-btn stf-btn-secondary" onClick={handleCancel}>
               Cancel
             </button>
             <button className="stf-btn stf-btn-primary" onClick={handleNext}>

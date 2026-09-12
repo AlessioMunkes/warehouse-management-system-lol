@@ -35,8 +35,16 @@ const routeMock = {
   determineRouting: vi.fn(),
 };
 
+const emailMock = {
+  sendEmail: vi.fn(),
+};
+
 vi.mock('../src/repositories/donation.repository.js', () => ({ default: repoMock }));
 vi.mock('../src/lib/donationRouting.js', () => ({ determineRouting: routeMock.determineRouting }));
+vi.mock('../src/providers/email.provider.js', () => ({ default: emailMock }));
+vi.mock('../src/services/certificateSettings.service.js', () => ({
+  default: { getSettings: vi.fn() },
+}));
 
 const module = await import('../src/services/donation.service.js');
 const donationService = module.default;
@@ -86,8 +94,11 @@ beforeEach(() => {
   repoMock.logDonationEmail.mockImplementation(async (entry) => ({
     id: 100,
     ...entry,
-    sent_at: entry.status === 'sent' ? '2026-09-11T00:00:00.000Z' : null,
+    sent_at: entry.status === 'SENT' ? '2026-09-11T00:00:00.000Z' : null,
   }));
+
+  // Mock email provider to return success by default
+  emailMock.sendEmail.mockResolvedValue({ sent: true, messageId: 'msg-123', threadId: 'thread-1' });
   routeMock.determineRouting.mockImplementation(async ({ productId }) => {
     if (productId === 3) {
       return {
@@ -335,6 +346,17 @@ describe('createDonation — records rather than refuses', () => {
     expect(repoMock.createDonation).toHaveBeenCalledTimes(1);
   });
 
+  it('passes generated line numbers through to donation item creation', async () => {
+    await donationService.createDonation(validBody({
+      items: [
+        { productId: 3, description: 'Rice', quantity: 25, unit: 'kg' },
+        { productId: 3, description: 'Beans', quantity: 10, unit: 'kg' },
+      ],
+    }), USER_ID);
+
+    expect(repoMock.createDonation.mock.calls[0][0].items.map((item) => item.lineNo)).toEqual([1, 2]);
+  });
+
   it('records a donation with no donor details at all', async () => {
     await expect(donationService.createDonation(validBody({
       donorName: undefined, donorContact: undefined, donorTaxReference: undefined,
@@ -363,9 +385,9 @@ describe('createDonation — records rather than refuses', () => {
     expect(result.emailResults).toHaveLength(1);
     expect(repoMock.logDonationEmail).toHaveBeenCalledWith(expect.objectContaining({
       donationId: 1,
-      emailType: 'thank_you',
+      emailType: 'THANK_YOU',
       recipient: 'donor@example.org',
-      status: 'sent',
+      status: 'SENT',
     }));
   });
 
@@ -407,13 +429,13 @@ describe('createDonation — records rather than refuses', () => {
       donorConsentGiven: true,
     }), USER_ID);
 
-    expect(result.emailResults.map((row) => row.emailType)).toEqual(['thank_you', 'section18a_certificate']);
+    expect(result.emailResults.map((row) => row.emailType)).toEqual(['THANK_YOU', 'SECTION_18A']);
     expect(repoMock.createSection18ACertificate).toHaveBeenCalledTimes(1);
     expect(repoMock.logDonationEmail).toHaveBeenCalledWith(expect.objectContaining({
       donationId: 42,
-      emailType: 'section18a_certificate',
+      emailType: 'SECTION_18A',
       recipient: 'tax@example.test',
-      status: 'sent',
+      status: 'SENT',
     }));
   });
 
@@ -661,7 +683,131 @@ describe('Section 18A certificate engine', () => {
 
     const result = await donationService.resendDonationEmail(5, USER_ID);
 
-    expect(result.emailType).toBe('section18a_certificate');
+    expect(result.emailType).toBe('SECTION_18A');
     expect(repoMock.createSection18ACertificate).not.toHaveBeenCalled();
+  });
+});
+
+describe('Persistent Email History — donation emails', () => {
+  const thankYouDonation = {
+    id: 7,
+    donation_category: 'recipe_food',
+    estimated_value_zar: 500,
+    donor_name: 'Donor One',
+    donor_contact: 'donor@example.org',
+    donor_consent_given: true,
+    section_18a_status: 'not_qualifying',
+    section_18a_qualifying: false,
+    items: [],
+  };
+
+  it('persists a successful Thank-you send with Gmail IDs and sender', async () => {
+    repoMock.getDonationById.mockResolvedValue(thankYouDonation);
+    emailMock.sendEmail.mockResolvedValue({ sent: true, messageId: 'gmail-1', threadId: 'thread-9' });
+
+    await donationService.createDonation({
+      category: 'recipe_food',
+      estimatedValueZar: 500,
+      donorName: 'Donor One',
+      donorContact: 'donor@example.org',
+      donorConsentGiven: true,
+      items: [{ description: 'Rice', quantity: 1, unit: 'kg' }],
+    }, USER_ID);
+
+    expect(repoMock.logDonationEmail).toHaveBeenCalledWith(expect.objectContaining({
+      donationId: 7,
+      emailType: 'THANK_YOU',
+      recipientEmail: 'donor@example.org',
+      recipientName: 'Donor One',
+      subject: 'Thank you for your donation',
+      status: 'SENT',
+      gmailMessageId: 'gmail-1',
+      gmailThreadId: 'thread-9',
+      sentByUserId: USER_ID,
+    }));
+  });
+
+  it('persists a failed send instead of throwing', async () => {
+    repoMock.getDonationById.mockResolvedValue(thankYouDonation);
+    emailMock.sendEmail.mockResolvedValue({ sent: false, reason: 'Gmail API send failed.' });
+
+    const result = await donationService.createDonation({
+      category: 'recipe_food',
+      estimatedValueZar: 500,
+      donorName: 'Donor One',
+      donorContact: 'donor@example.org',
+      donorConsentGiven: true,
+      items: [{ description: 'Rice', quantity: 1, unit: 'kg' }],
+    }, USER_ID);
+
+    expect(result.emailResults).toHaveLength(1);
+    expect(repoMock.logDonationEmail).toHaveBeenCalledWith(expect.objectContaining({
+      donationId: 7,
+      emailType: 'THANK_YOU',
+      status: 'FAILED',
+      errorMessage: 'Gmail API send failed.',
+    }));
+  });
+
+  it('logs exactly once per send (no duplicate persistence)', async () => {
+    repoMock.getDonationById.mockResolvedValue(thankYouDonation);
+    emailMock.sendEmail.mockResolvedValue({ sent: true, messageId: 'gmail-2', threadId: 'thread-2' });
+
+    await donationService.createDonation({
+      category: 'recipe_food',
+      estimatedValueZar: 500,
+      donorName: 'Donor One',
+      donorContact: 'donor@example.org',
+      donorConsentGiven: true,
+      items: [{ description: 'Rice', quantity: 1, unit: 'kg' }],
+    }, USER_ID);
+
+    // One send → one email row. The provider itself is the single send
+    // point, and logDonationEmail the single persist point.
+    expect(emailMock.sendEmail).toHaveBeenCalledTimes(1);
+    expect(repoMock.logDonationEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('retrieves history newest-first with search and filters passed through', async () => {
+    const rows = [
+      { id: 3, donation_id: 7, email_type: 'THANK_YOU', status: 'SENT', created_at: '2026-09-12T10:00:00.000Z' },
+      { id: 2, donation_id: 8, email_type: 'SECTION_18A', status: 'FAILED', created_at: '2026-09-11T10:00:00.000Z' },
+      { id: 1, donation_id: 7, email_type: 'THANK_YOU', status: 'SENT', created_at: '2026-09-10T10:00:00.000Z' },
+    ];
+    repoMock.listEmailHistory.mockResolvedValue(rows);
+
+    const history = await donationService.listEmailHistory({
+      search: 'donor@example.org',
+      emailType: 'THANK_YOU',
+      status: 'SENT',
+    });
+
+    expect(repoMock.listEmailHistory).toHaveBeenCalledWith({
+      search: 'donor@example.org',
+      emailType: 'THANK_YOU',
+      status: 'SENT',
+      limit: 200,
+      offset: 0,
+    });
+    expect(history.map((row) => row.id)).toEqual([3, 2, 1]);
+  });
+
+  it('resends legacy thank_you rows without regenerating anything', async () => {
+    repoMock.getEmailLogById.mockResolvedValue({
+      id: 9,
+      donation_id: 7,
+      email_type: 'thank_you',
+    });
+    repoMock.getDonationById.mockResolvedValue(thankYouDonation);
+
+    const result = await donationService.resendDonationEmail(9, USER_ID);
+
+    expect(result.emailType).toBe('THANK_YOU');
+    expect(repoMock.createSection18ACertificate).not.toHaveBeenCalled();
+    expect(repoMock.logDonationEmail).toHaveBeenCalledWith(expect.objectContaining({
+      emailType: 'THANK_YOU',
+      status: 'SENT',
+      sentByUserId: USER_ID,
+    }));
   });
 });

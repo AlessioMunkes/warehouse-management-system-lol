@@ -9,10 +9,9 @@
 // The admin list used to be the manager list plus an Admin section,
 // which said admin is a manager with extra powers. users.role does not
 // work that way here: an admin looks after accounts, suppliers, the
-// product catalog and how donations are routed, while beneficiaries,
+// product catalog and donation management, while beneficiaries,
 // picking slips, purchase orders and reporting are the manager's daily
-// work. Showing an admin all of it buried the four screens only they
-// can open.
+// work. The admin list keeps those responsibilities visible.
 //
 // The manager routes stay reachable by URL for an admin — App.jsx gates
 // them to ['manager','admin'] because the server does the same — this
@@ -21,7 +20,7 @@
 import {
   LayoutDashboard, Users2, ClipboardList, ShoppingCart,
   BarChart3, HeartHandshake, Package, Truck, FileText,
-  Gift, Route, Tags, HandHeart, Boxes, ReceiptText,
+  Gift, HandHeart, Boxes, ReceiptText,
   PackageOpen, PackageCheck, FlaskConical, ClipboardCheck, HandCoins,
   PhoneCall,
   ScrollText,
@@ -87,9 +86,6 @@ const ADMIN_SECTIONS = [
     items: [
       { to: ADMIN.donationManagement, label: 'Classification Queue', icon: Gift },
       { to: ADMIN.section18aManagement, label: 'Section 18A Management', icon: ScrollText },
-      { to: ADMIN.donationClassification, label: 'Donation Classification', icon: Tags },
-      { to: ADMIN.categoryRouting, label: 'Category Routing', icon: Route },
-      { to: ADMIN.evaluateRouting, label: 'Explain Routing', icon: Route },
       { to: ADMIN.emailIntegration, label: 'Email Integration', icon: Mail },
     ],
   },

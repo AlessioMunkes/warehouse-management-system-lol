@@ -14,10 +14,11 @@
 // database's own CHECK constraint, not a friendly 400.
 // ─────────────────────────────────────────────────────────────
 const CATEGORIES = [
-  { value: "recipe_food",     label: "Recipe food",     hint: "Matches an active ECD recipe" },
+  { value: "recipe_food",     label: "Recipe Food",     hint: "Matches an active ECD recipe" },
   { value: "add_on_food",     label: "Add-on food",     hint: "Split across ECD centres automatically" },
-  { value: "non_recipe_food", label: "Non-recipe food", hint: "Routed to the soup kitchen" },
+  { value: "non_recipe_food", label: "Non-recipe Food", hint: "Routed to the soup kitchen" },
   { value: "non_food",        label: "Non-food",        hint: "Stored or routed externally" },
+  { value: "manager_review",  label: "Manager Review",  hint: "Requires a warehouse manager to classify" },
 ];
 
 export function CategorySelector({ value, onChange, error }) {

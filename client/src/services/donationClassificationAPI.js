@@ -1,6 +1,6 @@
-// This API wrapper keeps the donation admin product-classification calls in one place.
-// It mirrors the project pattern used elsewhere: the page code calls a thin service and
-// the service handles the authenticated fetch, JSON parsing, and server error conversion.
+// This API wrapper keeps donation product-classification calls in one place.
+// It mirrors the project pattern used elsewhere: authenticated fetches,
+// JSON parsing, and server error conversion are handled here.
 
 export const PRODUCT_CLASSIFICATION_CATEGORIES = [
   'recipe_food',
@@ -9,7 +9,7 @@ export const PRODUCT_CLASSIFICATION_CATEGORIES = [
   'non_food',
 ];
 
-const API_BASE = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:5000' : '');
+const API_BASE = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? '' : '');
 
 const parseResponse = async (response) => {
   let payload;

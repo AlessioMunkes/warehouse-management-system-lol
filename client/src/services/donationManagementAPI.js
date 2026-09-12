@@ -7,7 +7,7 @@ export { PRODUCT_CLASSIFICATION_CATEGORIES } from './donationClassificationAPI';
 export const PENDING_DONATION_STATUSES = ['awaiting_resolution', 'committing', 'commit_failed', 'commit_incomplete'];
 export const RECONCILIATION_STATUSES = ['commit_failed', 'commit_incomplete'];
 
-const API_BASE = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:5000' : '');
+const API_BASE = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? '' : '');
 
 const parseResponse = async (response) => {
   let payload;
@@ -107,8 +107,16 @@ const donationManagementAPI = {
     return Array.isArray(body.data) ? body.data : [];
   },
 
-  async getEmailHistory() {
-    const response = await fetch(`${API_BASE}/api/donations/section-18a/emails`, {
+  async getEmailHistory({ search = null, emailType = null, status = null, limit = 200, offset = 0 } = {}) {
+    // Served from the DB only — Gmail is never queried for history.
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (emailType) params.set('emailType', emailType);
+    if (status) params.set('status', status);
+    if (limit) params.set('limit', String(limit));
+    if (offset) params.set('offset', String(offset));
+    const query = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetch(`${API_BASE}/api/donations/section-18a/emails${query}`, {
       method: 'GET',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -146,6 +154,43 @@ const donationManagementAPI = {
       '_blank',
       'noopener'
     );
+  },
+
+  async generateCertificate(donationId) {
+    const response = await fetch(
+      `${API_BASE}/api/donations/${encodeURIComponent(donationId)}/section-18a/certificate`,
+      {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+
+    const body = await parseResponse(response);
+    return body.data;
+  },
+
+  async getCertificateSettings() {
+    const response = await fetch(`${API_BASE}/api/donations/admin/section-18a/settings`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const body = await parseResponse(response);
+    return body.data ?? null;
+  },
+
+  async updateCertificateSettings(payload) {
+    const response = await fetch(`${API_BASE}/api/donations/admin/section-18a/settings`, {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const body = await parseResponse(response);
+    return body.data;
   },
 };
 

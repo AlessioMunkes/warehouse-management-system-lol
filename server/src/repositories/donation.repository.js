@@ -550,6 +550,42 @@ const getSection18ASettings = async (client = pool) => {
   return result.rows[0] || null;
 };
 
+const updateSection18ASettings = async (settings, client = pool) => {
+  const {
+    organisationName,
+    organisationAddress,
+    contactName,
+    contactEmail,
+    contactPhone,
+    pbaDeclaration,
+    certificatePrefix,
+  } = settings;
+
+  const result = await client.query(
+    `UPDATE section18a_settings
+     SET organisation_name = $1,
+         organisation_address = $2,
+         contact_name = $3,
+         contact_email = $4,
+         contact_phone = $5,
+         pba_declaration = $6,
+         certificate_prefix = $7,
+         updated_at = NOW()
+     WHERE id = 1
+     RETURNING *`,
+    [
+      organisationName ?? '',
+      organisationAddress ?? '',
+      contactName ?? '',
+      contactEmail ?? '',
+      contactPhone ?? '',
+      pbaDeclaration ?? '',
+      certificatePrefix ?? 'S18A',
+    ]
+  );
+  return result.rows[0] || null;
+};
+
 const getSection18ACertificateByDonationId = async (donationId) => {
   const result = await pool.query(
     `SELECT *
@@ -560,14 +596,64 @@ const getSection18ACertificateByDonationId = async (donationId) => {
   return result.rows[0] || null;
 };
 
-const listEmailHistory = async () => {
+const listEmailHistory = async ({ search = null, emailType = null, status = null, limit = 200, offset = 0 } = {}) => {
+  // History comes from the database only — Gmail is never queried.
+  // Newest first. Optional free-text search across recipient, donor,
+  // donation ID and subject, plus exact filters on type / status.
+  const conditions = [];
+  const params = [];
+
+  const like = (value) => `%${String(value).trim()}%`;
+
+  if (search !== null && search !== undefined && String(search).trim() !== '') {
+    const term = String(search).trim();
+    params.push(like(term), like(term), like(term), like(term));
+    const base = params.length - 3;
+    conditions.push(
+      `(COALESCE(l.recipient_email, l.recipient, '') ILIKE $${base} ` +
+      `OR COALESCE(d.donor_name, '') ILIKE $${base + 1} ` +
+      `OR COALESCE(l.subject, '') ILIKE $${base + 2} ` +
+      `OR CAST(l.donation_id AS TEXT) ILIKE $${base + 3})`
+    );
+  }
+
+  if (emailType !== null && emailType !== undefined && String(emailType).trim() !== '') {
+    // Accept both canonical (THANK_YOU) and legacy (thank_you) spellings.
+    const normalised = String(emailType).trim().toUpperCase() === 'THANK_YOU' || String(emailType).trim() === 'thank_you'
+      ? ['THANK_YOU', 'thank_you']
+      : String(emailType).trim().toUpperCase() === 'SECTION_18A' || String(emailType).trim() === 'section18a_certificate'
+        ? ['SECTION_18A', 'section18a_certificate']
+        : [String(emailType).trim()];
+    params.push(normalised);
+    conditions.push(`l.email_type = ANY($${params.length})`);
+  }
+
+  if (status !== null && status !== undefined && String(status).trim() !== '') {
+    // Accept both canonical (SENT) and legacy (sent) spellings.
+    const upper = String(status).trim().toUpperCase();
+    params.push([upper, upper.toLowerCase()]);
+    conditions.push(`l.status = ANY($${params.length})`);
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const safeLimit = Number.isInteger(Number(limit)) && Number(limit) > 0
+    ? Math.min(Number(limit), 500)
+    : 200;
+  const safeOffset = Number.isInteger(Number(offset)) && Number(offset) >= 0
+    ? Number(offset)
+    : 0;
+  params.push(safeLimit, safeOffset);
+
   const result = await pool.query(
     `SELECT l.*, c.certificate_number, d.donor_name
      FROM donation_email_logs l
      LEFT JOIN section18a_certificates c ON c.id = l.certificate_id
      LEFT JOIN donations d ON d.id = l.donation_id
+     ${where}
      ORDER BY l.created_at DESC, l.id DESC
-     LIMIT 200`
+     LIMIT $${params.length - 1} OFFSET $${params.length}`,
+    params
   );
   return result.rows;
 };
@@ -585,22 +671,57 @@ const getEmailLogById = async (id) => {
 
 const logDonationEmail = async ({
   donationId,
+  donorId = null,
   certificateId = null,
   emailType,
   recipient,
+  recipientEmail = null,
+  recipientName = null,
   subject,
   status,
   providerMessageId = null,
+  gmailMessageId = null,
+  gmailThreadId = null,
   errorMessage = null,
+  sentByUserId = null,
 }) => {
+  // Single persist point for every Donation Thank-you / Section 18A
+  // attempt — success and failure alike. Canonical vocabulary going
+  // forward is THANK_YOU | SECTION_18A and SENT | FAILED | PENDING.
+const canonicalType =
+  emailType === 'thank_you'
+    ? 'THANK_YOU'
+    : emailType === 'section18a_certificate'
+      ? 'SECTION_18A'
+      : emailType;
+
+const canonicalStatus =
+  status === 'sent'
+    ? 'SENT'
+    : status === 'failed'
+      ? 'FAILED'
+      :status;
+     
+  const resolvedRecipientEmail = recipientEmail || recipient || null;
+  const resolvedGmailMessageId = gmailMessageId || providerMessageId || null;
+  console.log("canonicalType:", canonicalType);
+  console.log("canonicalStatus:", canonicalStatus);
   const result = await pool.query(
     `INSERT INTO donation_email_logs
-       (donation_id, certificate_id, email_type, recipient, subject, status,
-        provider_message_id, error_message, sent_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
-             CASE WHEN $6 = 'sent' THEN NOW() ELSE NULL END)
+       (donation_id, donor_id, certificate_id, email_type,
+        recipient, recipient_email, recipient_name, subject, status,
+        provider_message_id, gmail_message_id, gmail_thread_id,
+        error_message, sent_by_user_id, sent_at)
+     VALUES ($1, $2, $3, $4,
+             COALESCE($6, $5), $6, $7, $8, $9,
+             COALESCE($11, $10), $11, $12,
+             $13, $14,
+           CASE WHEN $9 = 'SENT' THEN NOW() ELSE NULL END)
      RETURNING *`,
-    [donationId, certificateId, emailType, recipient, subject, status, providerMessageId, errorMessage]
+    [donationId, donorId, certificateId, canonicalType,
+     recipient, resolvedRecipientEmail, recipientName, subject, canonicalStatus,
+     providerMessageId, resolvedGmailMessageId, gmailThreadId,
+     errorMessage, sentByUserId]
   );
   return result.rows[0];
 };
@@ -733,6 +854,7 @@ export default {
   reclassifyDonation,
   listSection18AQueue,
   getSection18ASettings,
+  updateSection18ASettings,
   getSection18ACertificateByDonationId,
   createSection18ACertificate,
   listEmailHistory,

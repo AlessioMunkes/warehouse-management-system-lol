@@ -366,6 +366,8 @@
   color: var(--stf-ink);
   font: 400 16px/1 var(--stf-font-sans);
 }
+.stf-select:focus { border-color: var(--stf-accent); }
+.stf-select.is-flagged { border-color: var(--stf-attention); }
 
 /* ── Choice list ─────────────────────────────────────────────────── */
 /* Tap targets instead of a dropdown: on the floor, picking "cold room"

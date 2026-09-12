@@ -323,4 +323,16 @@ describe('donation controller — responses', () => {
       .set('Cookie', cookieFor(ROLES.MANAGER)).send({ productId: 3 });
     expect(res.status).toBe(409);
   });
+it('returns field-specific structured errors on a validation 400', async () => {
+    serviceMock.createDonation.mockRejectedValue(
+      Object.assign(withStatus(400, 'Donation validation failed.'), {
+        details: { donorContact: 'Email address is not in a valid format.' },
+        duplicateFingerprint: 'donor#2026-09-10#',
+      })
+    );
+    const res = await request(app).post(BASE).set('Cookie', cookieFor(ROLES.WORKER)).send(BODY);
+    expect(res.status).toBe(400);
+    expect(res.body.errors.donorContact).toBe('Email address is not in a valid format.');
+    expect(res.body.duplicateFingerprint).toBe('donor#2026-09-10#');
+  });
 });

@@ -86,7 +86,7 @@ export function CompletionDialog({ open, result, onRecordAnother, onGoHome }) {
 
         <DialogFooter>
           <button className="stf-btn stf-btn-secondary" onClick={onGoHome}>
-            Go to Home
+            Go to Taskboard
           </button>
           <button className="stf-btn stf-btn-primary" onClick={onRecordAnother}>
             Record another

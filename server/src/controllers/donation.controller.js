@@ -50,9 +50,15 @@ const createDonation = async (req, res) => {
   } catch (err) {
     console.error('[createDonation]', err.message);
     const status = err.status || 500;
+    // Structured validation errors (err.details: { field: message }) are
+    // passed through on 4xx so the gate can highlight exactly which field
+    // failed. Always attach the duplicate-prevention fingerprint hint when
+    // the service computed one, so the UI can warn (not block) on re-submit.
     res.status(status).json({
       success: false,
       message: status < 500 ? err.message : 'Failed to record donation.',
+      ...(err.details ? { errors: err.details } : {}),
+      ...(err.duplicateFingerprint ? { duplicateFingerprint: err.duplicateFingerprint } : {}),
     });
   }
 };
@@ -94,7 +100,15 @@ const listSection18AQueue = async (req, res) => {
 
 const listEmailHistory = async (req, res) => {
   try {
-    const emails = await donationService.listEmailHistory();
+    // Served from the DB only — Gmail is never queried for history.
+    const { search = null, emailType = null, type = null, status = null, limit = 200, offset = 0 } = req.query || {};
+    const emails = await donationService.listEmailHistory({
+      search,
+      emailType: emailType ?? type,
+      status,
+      limit,
+      offset,
+    });
     res.status(200).json({ success: true, data: emails });
   } catch (err) {
     console.error('[listEmailHistory]', err.message);
@@ -232,6 +246,39 @@ const reclassifyDonation = async (req, res) => {
   }
 };
 
+// ── Section 18A Certificate Settings ─────────────────────────
+// GET /api/donations/admin/section-18a/settings
+// Returns the single-row settings record.
+const getSection18ASettings = async (req, res) => {
+  try {
+    const settings = await donationService.getSection18ASettings();
+    res.status(200).json({ success: true, data: settings });
+  } catch (err) {
+    console.error('[getSection18ASettings]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to retrieve Section 18A settings.',
+    });
+  }
+};
+
+// PUT /api/donations/admin/section-18a/settings
+// Updates the single-row settings record.
+const updateSection18ASettings = async (req, res) => {
+  try {
+    const settings = await donationService.updateSection18ASettings(req.body);
+    res.status(200).json({ success: true, data: settings });
+  } catch (err) {
+    console.error('[updateSection18ASettings]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to update Section 18A settings.',
+    });
+  }
+};
+
 export default {
   listDonations,
   createDonation,
@@ -245,4 +292,6 @@ export default {
   getDonationById,
   getDonationEvents,
   reclassifyDonation,
+  getSection18ASettings,
+  updateSection18ASettings,
 };
