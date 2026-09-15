@@ -122,9 +122,20 @@ export const AuthProvider = ({ children }) => {
   };
 
   // ── Logout ────────────────────────────────────────────────────
+  // Guests and staff end their sessions at different endpoints.
+  //
+  // /api/login/logout only clears the cookie. For a guest that is not
+  // enough: their visit also has to be closed, or signed_out_at stays
+  // null forever and their hours never reach the volunteer-hours report.
+  // /api/volunteers/sign-out stamps the visit AND clears the same cookie,
+  // taking the volunteer id from the token rather than from us.
   const logout = async () => {
+    const endpoint = user?.role === 'guest'
+      ? '/api/volunteers/sign-out'
+      : '/api/login/logout';
+
     try {
-      await apiPost('/api/login/logout', {});
+      await apiPost(endpoint, {});
     } catch {
       // If the server is unreachable, still clear local state — the
       // user asked to be logged out and must not stay logged in on a
