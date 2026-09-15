@@ -178,10 +178,21 @@ export default function PickingSlipManagementPage() {
 
   useEffect(() => {
     let cancelled = false;
-    setIsLoading(true);
-    loadSlips().finally(() => { if (!cancelled) setIsLoading(false); });
+    fetchPickingSlips({ dispatchDate: viewDate })
+      .then((rows) => {
+        if (!cancelled) {
+          setSlips(rows);
+          setError(null);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message || 'Could not load picking slips.');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
     return () => { cancelled = true; };
-  }, [loadSlips]);
+  }, [viewDate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -397,12 +408,12 @@ export default function PickingSlipManagementPage() {
                 <InputGroupInput
                   placeholder="Search by beneficiary name"
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) => { setIsLoading(true); setSearch(e.target.value); }}
                 />
               </InputGroup>
               <Input
                 type="date" value={viewDate} className="w-auto"
-                onChange={(e) => setViewDate(e.target.value)}
+                onChange={(e) => { setIsLoading(true); setViewDate(e.target.value); }}
               />
             </div>
 

@@ -17,8 +17,7 @@ export default function useFlaggedItems() {
   const [error, setError] = useState('');
   const [pendingFlagIds, setPendingFlagIds] = useState([]);
 
-  const refresh = useCallback(async () => {
-    setIsLoading(true);
+  const load = useCallback(async () => {
     setError('');
 
     try {
@@ -31,9 +30,25 @@ export default function useFlaggedItems() {
     }
   }, []);
 
+  const refresh = useCallback(async () => {
+    setIsLoading(true);
+    await load();
+  }, [load]);
+
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    let cancelled = false;
+    donationManagementAPI.getFlaggedItems()
+      .then((rows) => {
+        if (!cancelled) setItems(rows);
+      })
+      .catch((loadError) => {
+        if (!cancelled) setError(loadError.message || 'Could not load flagged items.');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const resolveFlag = useCallback(async (flagId, payload) => {
     const normalizedId = Number(flagId);

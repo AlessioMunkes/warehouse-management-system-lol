@@ -5,7 +5,7 @@
 // display), SectionPicker (worker picks which sections are wrong),
 // EditSectionDialog (renders just the picked sections for correction).
 // ─────────────────────────────────────────────────────────────
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 import { CategorySelector } from "./CategorySelector";
@@ -113,10 +113,12 @@ export function ReviewSummary({ draft }) {
 // ── SectionPicker — NEW, added to this file ─────────────────────
 export function SectionPicker({ open, onOpenChange, onContinue }) {
   const [picked, setPicked] = useState([]);
+  const [wasOpen, setWasOpen] = useState(open);
 
-  useEffect(() => {
+  if (open !== wasOpen) {
+    setWasOpen(open);
     if (!open) setPicked([]);
-  }, [open]);
+  }
 
   const toggle = (section) =>
     setPicked((prev) =>
@@ -163,10 +165,14 @@ export function SectionPicker({ open, onOpenChange, onContinue }) {
 // ── EditSectionDialog — NEW, added to this file ─────────────────
 export function EditSectionDialog({ open, onOpenChange, sections, draft, updateDraft }) {
   const [localDraft, setLocalDraft] = useState(draft);
+  const [prevDraft, setPrevDraft] = useState(draft);
+  const [wasOpen, setWasOpen] = useState(open);
 
-  useEffect(() => {
+  if (open !== wasOpen || (open && draft !== prevDraft)) {
+    setWasOpen(open);
+    setPrevDraft(draft);
     if (open) setLocalDraft(draft);
-  }, [draft, open]);
+  }
 
   const updateLocalDraft = (patch) => setLocalDraft((prev) => ({ ...prev, ...patch }));
   const closeWithoutSaving = () => {

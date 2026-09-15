@@ -151,7 +151,7 @@ const savePendingDonationItemFlagLink = async (flagId, pendingDonationId, pendin
   );
 };
 
-const attemptCommitForPendingDonation = async (pendingDonationId) => {
+const attemptCommitForPendingDonation = async (pendingDonationId, { returnPendingDonation = false } = {}) => {
   const pendingDonation = await pendingDonationRepository.getPendingDonationById(pendingDonationId);
   if (!pendingDonation) {
     throw new Error(`Pending donation ${pendingDonationId} was not found while committing.`);
@@ -159,13 +159,13 @@ const attemptCommitForPendingDonation = async (pendingDonationId) => {
 
   const acceptedItems = (pendingDonation.items || []).filter((item) => item.status === 'resolved');
   if (acceptedItems.length === 0) {
-    await pendingDonationRepository.updatePendingDonationStatus(
+    const committed = await pendingDonationRepository.updatePendingDonationStatus(
       pendingDonationId,
       'committed',
       { committed_at: new Date() },
       pool
     );
-    return { pendingDonationId, donationId: pendingDonation.committed_donation_id ?? null, committed: true };
+    return committed || { pendingDonationId, donationId: pendingDonation.committed_donation_id ?? null, committed: true };
   }
 
   const payload = buildDonationPayloadFromPending(pendingDonation);
@@ -228,6 +228,9 @@ const attemptCommitForPendingDonation = async (pendingDonationId) => {
       client2.release();
     }
 
+    if (returnPendingDonation) {
+      return await pendingDonationRepository.getPendingDonationById(pendingDonationId, pool);
+    }
     return { pendingDonationId, donationId, committed: true };
   } catch (error) {
     await pendingDonationRepository.updatePendingDonationStatus(
@@ -243,10 +246,6 @@ const attemptCommitForPendingDonation = async (pendingDonationId) => {
 
 export const createPendingDonationFromIntake = async (payload = {}) => {
   const data = payload || {};
-  console.log("1. Before createPendingDonation");
-  console.log("2. Pending donation created");
-  
-  console.log("Incoming estimatedValueZar:", data.estimatedValueZar);
   const items = Array.isArray(data.items) ? data.items : [];
   const idempotencyKey = data.idempotencyKey ?? data.idempotency_key ?? null;
   const client = await pool.connect();
@@ -267,27 +266,24 @@ export const createPendingDonationFromIntake = async (payload = {}) => {
     }
 
     const pendingDonation = await pendingDonationRepository.createPendingDonation(
-  {
-    donorName: data.donorName ?? data.donor_name ?? null,
-    donorContact: data.donorContact ?? data.donor_contact ?? null,
-    donorTaxReference: data.donorTaxReference ?? data.donor_tax_reference ?? null,
-    donorConsentGiven: data.donorConsentGiven ?? data.donor_consent_given ?? null,
-    estimatedValueZar: data.estimatedValueZar ?? data.estimated_value_zar ?? null,
-    donationCategory: data.donationCategory ?? data.donation_category ?? null,
-    programmeId: data.programmeId ?? data.programme_id ?? null,
-    notes: data.notes ?? null,
-    section18aStatus: data.section18aStatus ?? data.section_18a_status ?? null,
-    section18aQualifying: data.section18aQualifying ?? data.section_18a_qualifying ?? null,
-    draftSnapshot: data.draftSnapshot ?? data.draft_snapshot ?? null,
-    idempotencyKey,
-    createdBy: data.createdBy ?? data.created_by ?? null,
-  },
-  client
-);
+      {
+        donorName: data.donorName ?? data.donor_name ?? null,
+        donorContact: data.donorContact ?? data.donor_contact ?? null,
+        donorTaxReference: data.donorTaxReference ?? data.donor_tax_reference ?? null,
+        donorConsentGiven: data.donorConsentGiven ?? data.donor_consent_given ?? null,
+        estimatedValueZar: data.estimatedValueZar ?? data.estimated_value_zar ?? null,
+        donationCategory: data.donationCategory ?? data.donation_category ?? null,
+        programmeId: data.programmeId ?? data.programme_id ?? null,
+        notes: data.notes ?? null,
+        section18aStatus: data.section18aStatus ?? data.section_18a_status ?? null,
+        section18aQualifying: data.section18aQualifying ?? data.section_18a_qualifying ?? null,
+        draftSnapshot: data.draftSnapshot ?? data.draft_snapshot ?? null,
+        idempotencyKey,
+        createdBy: data.createdBy ?? data.created_by ?? null,
+      },
+      client
+    );
 
-console.log("3. Pending donation created:", pendingDonation.id);
-    
-  console.log("Saved pending donation:", pendingDonation);
     if (!pendingDonation) {
       // Lost the insert race — another request wrote this key first.
       await client.query('ROLLBACK');
@@ -400,18 +396,8 @@ console.log("3. Pending donation created:", pendingDonation.id);
     await client.query('COMMIT');
 
     const result = await pendingDonationRepository.getPendingDonationById(pendingDonation.id, pool);
-    console.log("3. Before attemptCommit");
     if (unresolvedCount === 0 && result) {
-      console.log("4. Before attemptCommit");
-
-try {
-  await attemptCommitForPendingDonation(pendingDonation.id);
-  console.log("5. After attemptCommit");
-} catch (err) {
-  console.error("attemptCommitForPendingDonation failed:", err);
-  throw err;
-}
-     
+      return await attemptCommitForPendingDonation(pendingDonation.id, { returnPendingDonation: true });
     }
 
     return result || finalPendingDonation;

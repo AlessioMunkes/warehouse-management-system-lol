@@ -18,7 +18,7 @@
 // operational number (kilograms per meal) nobody here can invent; it
 // has to come from the NGO.
 // ─────────────────────────────────────────────────────────────
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
 import ReportChart    from '../features/reporting/components/ReportChart';
 import { runReport }  from '../services/reportingAPI';
@@ -47,30 +47,36 @@ const ImpactPanel = ({ title, metric, dimensions, defaultDimension }) => {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
-    setLoading(true); setError(null); setMissingFactor(false);
-    try {
-      const res = await runReport({
-        metric, dimension, filters: {}, dateRange: resolvePreset(preset),
+  useEffect(() => {
+    let cancelled = false;
+    runReport({
+      metric, dimension, filters: {}, dateRange: resolvePreset(preset),
+    })
+      .then((res) => {
+        if (!cancelled) {
+          setReport(res.data ?? res);
+          setError(null);
+          setMissingFactor(false);
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        if (err.status === MISSING_FACTOR_STATUS) setMissingFactor(true);
+        else setError(err.message);
+        setReport(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
       });
-      setReport(res.data ?? res);
-    } catch (err) {
-      if (err.status === MISSING_FACTOR_STATUS) setMissingFactor(true);
-      else setError(err.message);
-      setReport(null);
-    } finally {
-      setLoading(false);
-    }
+    return () => { cancelled = true; };
   }, [metric, dimension, preset]);
-
-  useEffect(() => { load(); }, [load]);
 
   return (
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0">
         <CardTitle>{title}</CardTitle>
         <div className="flex gap-2">
-          <Select value={dimension} onValueChange={setDimension}>
+          <Select value={dimension} onValueChange={(value) => { setLoading(true); setDimension(value); }}>
             <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
               {dimensions.map((d) => (
@@ -78,7 +84,7 @@ const ImpactPanel = ({ title, metric, dimensions, defaultDimension }) => {
               ))}
             </SelectContent>
           </Select>
-          <Select value={preset} onValueChange={setPreset}>
+          <Select value={preset} onValueChange={(value) => { setLoading(true); setPreset(value); }}>
             <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
             <SelectContent>
               {RANGE_PRESETS.map((p) => (

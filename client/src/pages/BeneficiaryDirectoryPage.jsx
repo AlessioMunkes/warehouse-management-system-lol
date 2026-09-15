@@ -148,10 +148,21 @@ export default function BeneficiaryDirectoryPage() {
 
   useEffect(() => {
     let cancelled = false;
-    setIsLoading(true);
-    loadBeneficiaries().finally(() => { if (!cancelled) setIsLoading(false); });
+    beneficiaryAPI.getBeneficiaries({ includeInactive, search })
+      .then((rows) => {
+        if (!cancelled) {
+          setBeneficiaries(rows);
+          setError(null);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message || 'Could not load beneficiaries.');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
     return () => { cancelled = true; };
-  }, [loadBeneficiaries]);
+  }, [includeInactive, search]);
 
   const open = async (id) => {
     setError(null);
@@ -251,7 +262,7 @@ export default function BeneficiaryDirectoryPage() {
                     <InputGroupInput
                       placeholder="Search by name or contact"
                       value={search}
-                      onChange={(e) => setSearch(e.target.value)}
+                      onChange={(e) => { setIsLoading(true); setSearch(e.target.value); }}
                     />
                   </InputGroup>
 
@@ -259,7 +270,7 @@ export default function BeneficiaryDirectoryPage() {
                     <Checkbox
                       id="include-inactive"
                       checked={includeInactive}
-                      onCheckedChange={(v) => setIncludeInactive(Boolean(v))}
+                      onCheckedChange={(v) => { setIsLoading(true); setIncludeInactive(Boolean(v)); }}
                     />
                     <FieldLabel htmlFor="include-inactive" className="font-normal">
                       Show inactive

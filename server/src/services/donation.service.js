@@ -656,7 +656,7 @@ const logEmailAttempt = async ({ donation, donationId, donorId = null, certifica
       recipientEmail: recipient,
       recipientName: resolvedRecipientName,
       subject,
-      status: success ? 'sent' : 'failed',
+      status: success ? 'SENT' : 'FAILED',
       providerMessageId: success ? (result.messageId || null) : null,
       gmailMessageId: success ? (result.messageId || null) : null,
       gmailThreadId: success ? (result.threadId || null) : null,
@@ -673,7 +673,7 @@ const logEmailAttempt = async ({ donation, donationId, donorId = null, certifica
       recipientEmail: recipient,
       recipientName: resolvedRecipientName,
       subject,
-      status: 'failed',
+      status: 'FAILED',
       errorMessage: err.message,
       sentByUserId,
     });
@@ -870,7 +870,7 @@ const sendThankYouEmail = async (donation, sentByUserId = null) => {
   return await logEmailAttempt({
     donation,
     donationId: donation.id,
-    emailType: 'thank_you',
+    emailType: 'THANK_YOU',
     recipient,
     subject: 'Thank you for your donation',
     email: {
@@ -888,7 +888,7 @@ const getOrCreateSection18ACertificate = async (donation, actorId) => {
   // Load organisation settings from the dedicated certificate settings service.
   // This ensures we use the persistent, database-backed settings from
   // certificate_settings table instead of hardcoded values.
-  const settings = await certificateSettingsService.getSettings();
+  const certificateSettings = await certificateSettingsService.getSettings();
 
   const donorSnapshot = {
     name:         donation.donor_name,
@@ -906,14 +906,14 @@ const getOrCreateSection18ACertificate = async (donation, actorId) => {
   const { certificate } = await donationModel.createSection18ACertificate({
     donationId:   donation.id,
     issuedBy:     actorId,
-    settings,
+    settings:     certificateSettings,
     donorSnapshot,
     donationSnapshot,
     buildPdf: async ({ certificateNumber, issueDate }) =>
       pdfProvider.generateSection18APdf({
         certificateNumber,
         issueDate,
-        settings,
+        settings: certificateSettings,
         donor:     donorSnapshot,
         donation:  donationSnapshot,
       }),
@@ -942,7 +942,7 @@ const sendSection18ACertificateEmail = async (donation, actorId) => {
     return await donationModel.logDonationEmail({
       donation,
       donationId: donation.id,
-      emailType: 'section18a_certificate',
+      emailType: 'SECTION_18A',
       recipient,
       recipientEmail: recipient,
       recipientName: donation.donor_name || null,
@@ -953,14 +953,14 @@ const sendSection18ACertificateEmail = async (donation, actorId) => {
     });
   }
 
-  const settings = await donationModel.getSection18ASettings();
-  const emailContent = generateSection18ACertificateEmailContent(donation, certificate, settings);
+  const emailSettings = await donationModel.getSection18ASettings();
+  const emailContent = generateSection18ACertificateEmailContent(donation, certificate, emailSettings);
 
   return await logEmailAttempt({
     donation,
     donationId:    donation.id,
     certificateId: certificate.id,
-   emailType: 'section18a_certificate',
+    emailType: 'SECTION_18A',
     recipient,
     subject: 'Your Section 18A tax certificate',
     email: emailContent,
@@ -1017,7 +1017,7 @@ const resendDonationEmail = async (emailLogId, userId) => {
   const emailType = normaliseEmailType(log.email_type);
 
   if (emailType === 'THANK_YOU') {
-    const sent = await sendThankYouEmail(donation, null);
+    const sent = await sendThankYouEmail(donation, userId);
     return { ...log, ...(sent || {}), emailType };
   }
   if (emailType === 'SECTION_18A') {
@@ -1114,11 +1114,11 @@ const reclassifyDonation = async (donationId, data, userId) => {
 // Single-row settings table (id = 1). getSettings returns the current
 // configuration; updateSettings validates and persists changes.
 const getSection18ASettings = async () => {
-  const settings = await donationModel.getSection18ASettings();
-  if (!settings) {
+  const section18ASettings = await donationModel.getSection18ASettings();
+  if (!section18ASettings) {
     fail(404, 'Section 18A settings have not been initialized.');
   }
-  return settings;
+  return section18ASettings;
 };
 
 const updateSection18ASettings = async (payload) => {
@@ -1127,7 +1127,7 @@ const updateSection18ASettings = async (payload) => {
     fail(400, 'Invalid contact email format.');
   }
 
-  const settings = await donationModel.updateSection18ASettings({
+  const updatedSettings = await donationModel.updateSection18ASettings({
     organisationName: payload.organisationName,
     organisationAddress: payload.organisationAddress,
     contactName: payload.contactName,
@@ -1137,7 +1137,7 @@ const updateSection18ASettings = async (payload) => {
     certificatePrefix: payload.certificatePrefix,
   });
 
-  return settings;
+  return updatedSettings;
 };
 
 export default {
