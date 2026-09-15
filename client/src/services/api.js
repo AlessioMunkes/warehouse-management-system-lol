@@ -15,7 +15,7 @@
 // Note the DEV check rather than `|| fallback`: VITE_API_URL is baked
 // in at BUILD time, so an unset variable in a production build would
 // otherwise leave every request pointing at the developer's localhost.
-import { reportReach, reportUnreachable } from './connection';
+import { reportReach, /* reportUnreachable */ } from './connection';
 
 export const API_BASE =
   import.meta.env.VITE_API_URL ??

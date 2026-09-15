@@ -32,7 +32,7 @@ import BeneficiaryDirectoryPage                     from './pages/BeneficiaryDir
 import ImpactReportPage                             from './pages/ImpactReportPage';
 import PickingSlipManagementPage                    from './pages/PickingSlipManagementPage';
 import UserDirectoryPage                            from './pages/UserDirectoryPage';
-import VolunteerManagementPage                       from './pages/VolunteerManagementPage';
+// import VolunteerManagementPage                    from './pages/VolunteerManagementPage';
 import ProductManagementPage                        from './pages/ProductManagementPage';
 import VolunteerEventsPage                        from './pages/VolunteerEventsPage';
 import VolunteerEventWorkspacePage                from './pages/VolunteerEventWorkspacePage';

@@ -19,7 +19,7 @@
 // ─────────────────────────────────────────────────────────────
 import {
   LayoutDashboard, Users2, ClipboardList, ShoppingCart,
-  BarChart3, HeartHandshake, Package, Truck, FileText,
+  BarChart3, HeartHandshake, Package, Truck, /* FileText, */
   Gift, HandHeart, Boxes, ReceiptText,
   PackageOpen, PackageCheck, FlaskConical, ClipboardCheck, HandCoins,
   PhoneCall,
@@ -84,7 +84,7 @@ const ADMIN_SECTIONS = [
   {
     label: 'Logs',
     items: [
-      { to: ADMIN.volunteers, label: 'Volunteer Management', icon: HandHeart },
+      { to: VOLUNTEERS.events, label: 'Volunteer Management', icon: HandHeart },
     ],
   },
   {

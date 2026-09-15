@@ -27,6 +27,7 @@
 // which validates ledger filters against it, so it is declared once in
 // constants/ and re-exported here to keep this catalog's flat shape.
 import { MOVEMENT_TYPES } from '../../constants/movementTypes.js';
+import { STORAGE_AREAS } from '../../constants/storageAreas.js';
 
 // ── Enum values (confirmed from pg_enum, 22 Aug 2026) ─────────
 export const COHORTS = ['week1', 'week2'];

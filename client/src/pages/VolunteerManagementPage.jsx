@@ -189,8 +189,11 @@ export default function VolunteerManagementPage() {
   // keystroke would otherwise let an earlier reply overwrite a later one.
   useEffect(() => {
     let cancelled = false;
-    setIsLoading(true);
-    loadVisits().finally(() => { if (!cancelled) setIsLoading(false); });
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      setIsLoading(true);
+      loadVisits().finally(() => { if (!cancelled) setIsLoading(false); });
+    });
     return () => { cancelled = true; };
   }, [loadVisits]);
 
