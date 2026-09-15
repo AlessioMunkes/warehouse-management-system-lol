@@ -445,6 +445,38 @@ const procurementSpend = async ({ dimension, filters, dateRange }) => {
   return rows2series(rows);
 };
 
+// Average price paid per unit, not total spend — spend rising because
+// more was bought is a different story from price rising per unit,
+// and procurement_spend alone cannot tell them apart. SUM(spend) /
+// SUM(quantity) per bucket, not AVG(unit_price) per line: a weighted
+// average, so one large cheap delivery cannot be out-voted by ten
+// small expensive ones.
+const unitPriceTrend = async ({ dimension, filters, dateRange }) => {
+  const dim = receivingDimension(dimension);
+  const params = [dateRange.from, dateRange.to];
+  const where = [
+    `dn.delivery_date BETWEEN $1::date AND $2::date`,
+    `poi.unit_price IS NOT NULL`,
+    `dni.received_quantity > 0`,
+    ...receivingFilters(filters, params),
+  ];
+  const { rows } = await pool.query(
+    `SELECT ${dim.expr} AS label,
+            ROUND((SUM(dni.received_quantity * poi.unit_price)
+                   / NULLIF(SUM(dni.received_quantity), 0))::numeric, 2) AS value
+       FROM delivery_note_items dni
+       JOIN delivery_notes dn ON dn.id = dni.delivery_note_id
+       JOIN purchase_order_items poi ON poi.id = dni.purchase_order_item_id
+       JOIN suppliers s ON s.id = dn.supplier_id
+       JOIN products p ON p.id = dni.product_id
+      WHERE ${where.join(' AND ')}
+      ${dim.group ? `GROUP BY ${dim.group}` : ''}
+      ORDER BY ${orderFor(dimension)}`,
+    params
+  );
+  return rows2series(rows);
+};
+
 // ══ Donations ══════════════════════════════════════════════════
 // received_at is timestamptz — sastDate() is mandatory here.
 // NO DONOR DIMENSION. donor_name, donor_contact and
@@ -711,7 +743,7 @@ export default {
   childrenReached, mealsEnabled, adultsReached, paperSaved, compostProcessed,
   dispatchVolume, collectionCompliance,
   repeatNonCollections, decantingWastage,
-  goodsReceived, receivingDiscrepancyRate, unresolvedDiscrepancies, procurementSpend,
+  goodsReceived, receivingDiscrepancyRate, unresolvedDiscrepancies, procurementSpend, unitPriceTrend,
   donationValue, section18aPipeline,
   stockOnHand, lowStockItems, stockMovementVolume, stockCountVariance,
   pickingFlagRate, communityRequestOutcomes, volunteerHours,

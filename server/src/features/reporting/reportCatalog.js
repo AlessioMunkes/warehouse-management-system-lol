@@ -296,6 +296,24 @@ export const METRICS = {
     caveat: 'Excludes received lines with no purchase order price on record.',
   },
 
+  // Distinct from procurement_spend on purpose: spend rising because
+  // more was bought is a different story from the price per unit
+  // rising, and a manager watching for the second cannot see it in
+  // the first. product dimension listed before month, matching
+  // picking_flag_rate's reasoning: a price trend is only useful once
+  // you know which product it is.
+  unit_price_trend: {
+    id: 'unit_price_trend', label: 'Unit price trend', temporal: 'range',
+    description:
+      'The average price paid per unit received, weighted by quantity so one large ' +
+      'cheap delivery cannot be outvoted by several small expensive ones.',
+    repoFn: 'unitPriceTrend', unit: 'ZAR/unit',
+    dimensions: ['product', 'none', 'month', 'supplier'],
+    filters: ['supplier_id', 'product_id'],
+    defaultChart: 'hbar',
+    caveat: 'Excludes received lines with no purchase order price on record.',
+  },
+
   // ══ Donations ══════════════════════════════════════════════
   donation_value: {
     id: 'donation_value', label: 'Donation value received', temporal: 'range',

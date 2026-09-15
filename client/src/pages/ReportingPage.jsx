@@ -1,9 +1,16 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/pages/ReportingPage.jsx
 //
-// Reporting and Analytics. Manager view only — App.jsx gates the
+// Operations Analytics. Manager view only — App.jsx gates the
 // route, and every /api/reporting endpoint is
 // requireRole(MANAGER, ADMIN).
+//
+// OPERATIONS, NOT IMPACT.
+// Beneficiary-facing numbers (children/adults served, meals enabled,
+// paper saved, compost processed) live on their own Impact Calculator
+// page — this one is the day-to-day running of the warehouse: what
+// moved, what it cost, what broke. Keeping them apart means neither
+// screen has to caveat itself around the other's audience.
 //
 // THE ASK BOX SITS ABOVE THE BUILDER, NOT INSTEAD OF IT
 // A manager opening the page to check a standing figure should not
@@ -13,25 +20,46 @@
 // the API key lapses after handover the input disappears and the
 // dropdowns carry on.
 //
+// TRENDS ARE A SHORTCUT INTO THE BUILDER, NOT A SEPARATE FEATURE.
+// Four pre-picked metrics render small on open so the page never
+// looks like an empty form waiting to be told what to look at —
+// "Explore" hands the same metric to the builder below, which is the
+// one place every metric in the catalog is actually reachable.
+//
 // THE RESOLVED-SPEC LINE IS THE TRUST MECHANISM
 // Every result restates, in plain English, the question that was
 // actually answered — generated server-side, so the AI path and the
 // dropdown path describe a spec identically. A question the model
 // misreads is visible before anyone acts on the number.
 // ─────────────────────────────────────────────────────────────
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
 import { Skeleton } from '@/components/ui/skeleton';
 import AskBox        from '../features/reporting/components/AskBox';
 import ReportBuilder from '../features/reporting/components/ReportBuilder';
 import ReportChart   from '../features/reporting/components/ReportChart';
+import TrendCard     from '../features/reporting/components/TrendCard';
 import DataUpload   from '../features/reporting/components/DataUpload';
 import { resolvePreset, DEFAULT_PRESET } from '../features/reporting/dateRanges';
 import { getCatalog, runReport } from '../services/reportingAPI';
+import { Truck, TrendingUp, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 const CHARCOAL = '#2b3336';
 const MUTED    = '#676767';
 const BORDER   = '#e9e3dd';
+
+// Four pre-picked, genuinely useful signals — not an exhaustive list
+// (the builder below has all eighteen), just the ones worth seeing
+// without asking. unit_price_trend covers "prices"; there is no
+// substitute-goods metric here because nothing in the schema tracks
+// product substitution — inventing one would be a chart with no real
+// data behind it, which is worse than not showing it.
+const TRENDS = [
+  { metricId: 'dispatch_volume',   label: 'Food dispatched',       icon: Truck,         dimension: 'month' },
+  { metricId: 'unit_price_trend',  label: 'Unit price trend',      icon: TrendingUp,    dimension: 'product' },
+  { metricId: 'collection_compliance', label: 'Collection compliance', icon: CheckCircle2, dimension: 'month' },
+  { metricId: 'low_stock_items',   label: 'Items below reorder level', icon: AlertTriangle, dimension: 'product' },
+];
 
 export default function ReportingPage() {
   const [catalog, setCatalog]     = useState(null);
@@ -43,6 +71,7 @@ export default function ReportingPage() {
   const [report, setReport] = useState(null);
   const [busy, setBusy]     = useState(false);
   const [error, setError]   = useState(null);
+  const builderRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,6 +99,14 @@ export default function ReportingPage() {
     setDimension(next?.dimensions[0].id ?? 'none');
     setFilters({});
     setReport(null);
+  };
+
+  // A trend card's "Explore" button hands its metric to the same
+  // builder every other metric goes through, then scrolls it into
+  // view — one code path for "pick a metric," not two.
+  const handleExplore = (id) => {
+    handleMetricChange(id);
+    builderRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const handleFilterChange = (key, value) =>
@@ -127,42 +164,52 @@ export default function ReportingPage() {
 
   return (
     <ManagerLayout>
-      <main className="px-4 sm:px-6 py-6 max-w-3xl mx-auto text-[#2b3336] font-['Montserrat',sans-serif]">
+      <main className="px-4 sm:px-6 py-6 max-w-5xl mx-auto text-[#2b3336] font-['Montserrat',sans-serif]">
         <header className="mb-5">
-          <h1 className="text-2xl font-bold tracking-tight">Reporting and analytics</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Operations analytics</h1>
           <p className="mt-1 text-sm" style={{ color: MUTED }}>
-            Figures come from what was recorded at the gate, not what was planned.
+            Figures come from what was recorded at the gate, not what was planned. Looking
+            for beneficiary impact instead? See Impact Report in the sidebar.
           </p>
         </header>
 
         {!catalog && !error && (
-          <div className="space-y-3">
-            <Skeleton className="h-24 w-full rounded-[4px]" />
-            <Skeleton className="h-40 w-full rounded-[4px]" />
-          </div>
-        )}
-
-        {catalog?.aiEnabled && (
-          <div className="mb-4">
-            <AskBox onReport={handleAIReport} />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-40 w-full rounded-[4px]" />)}
           </div>
         )}
 
         {catalog && (
-          <ReportBuilder
-            catalog={catalog}
-            metricId={metricId}
-            dimension={dimension}
-            preset={preset}
-            filters={filters}
-            onMetricChange={handleMetricChange}
-            onDimensionChange={setDimension}
-            onPresetChange={setPreset}
-            onFilterChange={handleFilterChange}
-            onRun={run}
-            busy={busy}
-          />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {TRENDS.map((t) => (
+              <TrendCard key={t.metricId} {...t} onExplore={handleExplore} />
+            ))}
+          </div>
         )}
+
+        {catalog?.aiEnabled && (
+          <div className="mt-6">
+            <AskBox onReport={handleAIReport} />
+          </div>
+        )}
+
+        <div ref={builderRef} className="mt-6 scroll-mt-4">
+          {catalog && (
+            <ReportBuilder
+              catalog={catalog}
+              metricId={metricId}
+              dimension={dimension}
+              preset={preset}
+              filters={filters}
+              onMetricChange={handleMetricChange}
+              onDimensionChange={setDimension}
+              onPresetChange={setPreset}
+              onFilterChange={handleFilterChange}
+              onRun={run}
+              busy={busy}
+            />
+          )}
+        </div>
 
         {error && (
           <div

@@ -27,6 +27,14 @@ import {
 
 const RED = '#ef3a40', CHARCOAL = '#2b3336', BORDER = '#e9e3dd', MUTED = '#676767';
 
+// One rotation, reused everywhere a chart needs more than one colour —
+// same palette ManagerDashboardPage.jsx's DONUT_COLORS uses, so a bar
+// chart and a donut on the dashboard never disagree about what colour
+// means "third category." A single-series trend (LineView) stays on
+// plain RED: rotating hue along a time axis would read as categories
+// changing, not one thing moving.
+const PALETTE = [CHARCOAL, RED, '#c9a86a', '#6b8f71', '#8a8a8a'];
+
 // Percentages keep a decimal; counts and weights read better whole.
 // "94.7 children" would be nonsense on screen.
 const fmt = (value, unit) =>
@@ -65,7 +73,7 @@ const BarView = ({ series, unit }) => {
         const y = H - PAD_B - h;
         return (
           <g key={row.label}>
-            <rect x={x} y={y} width={barW} height={h} rx="3" fill={RED} />
+            <rect x={x} y={y} width={barW} height={h} rx="3" fill={PALETTE[i % PALETTE.length]} />
             {/* Printed value: ACC-03, height is never the only carrier. */}
             <text x={x + barW / 2} y={y - 6} textAnchor="middle"
                   fontSize="12" fontWeight="600" fill={CHARCOAL}>
@@ -108,7 +116,13 @@ const HBarView = ({ series, unit }) => {
             <text x="0" y={y + 15} fontSize="12" fill={CHARCOAL}>
               {truncate(humanise(row.label), 22)}
             </text>
-            <rect x={x} y={y + 4} width={Math.max(w, 2)} height="16" rx="3" fill={RED} />
+            {/* Negative values (below reorder level) stay RED regardless
+                of row — "this far under threshold" is a warning, not a
+                category, and rotating hue there would blunt the signal.
+                A normal all-positive ranked breakdown rotates the shared
+                palette instead, same as BarView. */}
+            <rect x={x} y={y + 4} width={Math.max(w, 2)} height="16" rx="3"
+                  fill={hasNeg ? RED : PALETTE[i % PALETTE.length]} />
             <text x={W} y={y + 16} textAnchor="end"
                   fontSize="12" fontWeight="600" fill={CHARCOAL}>
               {fmt(row.value, unit)}{row.meta?.unit ? ` ${row.meta.unit}` : ''}
@@ -214,7 +228,11 @@ const downloadCSV = (report, dimensionLabel) => {
   URL.revokeObjectURL(url);
 };
 
-export default function ReportChart({ report, dimensionLabel = 'Category' }) {
+// compact drops the "view as table" / "export CSV" row for a small
+// preview card (TrendCard.jsx) — the aria-label summary below still
+// carries every value to assistive tech regardless, so this is a
+// visual simplification, not an accessibility trade-off.
+export default function ReportChart({ report, dimensionLabel = 'Category', compact = false }) {
   const [asTable, setAsTable] = useState(false);
   const { series, chartType, meta } = report;
   const unit = meta?.unit ?? '';
@@ -244,6 +262,7 @@ export default function ReportChart({ report, dimensionLabel = 'Category' }) {
           : <Chart series={series} unit={unit} />}
       </div>
 
+      {compact ? null : (
       <div className="mt-4 flex flex-wrap gap-2">
         <Button type="button" variant="outline" size="sm"
                 onClick={() => setAsTable((v) => !v)} aria-pressed={asTable}>
@@ -254,6 +273,7 @@ export default function ReportChart({ report, dimensionLabel = 'Category' }) {
           Export CSV
         </Button>
       </div>
+      )}
     </div>
   );
 }
