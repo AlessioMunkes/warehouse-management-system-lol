@@ -79,8 +79,16 @@ export default function ReportingPage() {
       .then((res) => {
         if (cancelled) return;
         const data = res.data ?? res;
-        setCatalog(data);
-        const first = data.metrics?.[0];
+        // Impact metrics (children/adults reached, meals enabled, paper
+        // saved, compost processed) are excluded here, not just styled
+        // differently — this page is Operations Analytics, and those
+        // five belong on the Impact Calculator page. Filtering at the
+        // one place this catalog is stored means every consumer below
+        // (the dropdown, the auto-selected first metric) inherits the
+        // exclusion for free rather than each having to remember it.
+        const operational = { ...data, metrics: data.metrics.filter((m) => !m.impactOnly) };
+        setCatalog(operational);
+        const first = operational.metrics[0];
         if (first) {
           setMetricId(first.id);
           setDimension(first.dimensions[0].id);

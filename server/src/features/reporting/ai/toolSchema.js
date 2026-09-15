@@ -15,16 +15,29 @@
 // the model can answer questions about it on the next restart.
 // ─────────────────────────────────────────────────────────────
 import {
-  METRICS, METRIC_IDS, DIMENSIONS, COHORTS, BENEFICIARY_KINDS,
+  METRICS, DIMENSIONS, COHORTS, BENEFICIARY_KINDS,
   MOVEMENT_TYPES, DONATION_CATEGORIES, MAX_RANK_LIMIT,
 } from '../reportCatalog.js';
 
 const STRING = 'STRING', INTEGER = 'INTEGER', ARRAY = 'ARRAY', OBJECT = 'OBJECT';
 
-// Union of every dimension any metric declares. Per-metric legality
-// is enforced by validateSpec — encoding it here would need one
-// function per metric and a far larger prompt.
-const ALL_DIMENSIONS = [...new Set(Object.values(METRICS).flatMap((m) => m.dimensions))];
+// The ask box is only ever rendered on the Operations Analytics page —
+// there is no AI box on the Impact Calculator. Grounding the model in
+// operational metrics only means a manager typing an impact-shaped
+// question ("how many children did we reach?") into the operations ask
+// box gets told that lives on a different screen, rather than the
+// model quietly answering it here and blurring the split those two
+// screens exist to keep. See buildSystemPrompt's IMPACT REPORTS
+// section for how the model is told what exists without being able to
+// run it.
+const OPERATIONAL_METRICS   = Object.values(METRICS).filter((m) => !m.impactOnly);
+const OPERATIONAL_METRIC_IDS = OPERATIONAL_METRICS.map((m) => m.id);
+const IMPACT_METRICS = Object.values(METRICS).filter((m) => m.impactOnly);
+
+// Union of every dimension any OPERATIONAL metric declares.
+// Per-metric legality is enforced by validateSpec — encoding it here
+// would need one function per metric and a far larger prompt.
+const ALL_DIMENSIONS = [...new Set(OPERATIONAL_METRICS.flatMap((m) => m.dimensions))];
 
 export const buildTools = () => ([
   {
@@ -35,7 +48,7 @@ export const buildTools = () => ([
     parameters: {
       type: OBJECT,
       properties: {
-        metric:    { type: STRING, enum: METRIC_IDS, description: 'Which report to run.' },
+        metric:    { type: STRING, enum: OPERATIONAL_METRIC_IDS, description: 'Which report to run.' },
         dimension: {
           type: STRING, enum: ALL_DIMENSIONS,
           description:
@@ -82,13 +95,15 @@ export const buildSystemPrompt = (todayISO) => {
   const live  = [];
   const timed = [];
 
-  for (const m of Object.values(METRICS)) {
+  for (const m of OPERATIONAL_METRICS) {
     const dims = m.dimensions.map((d) => `${d} (${DIMENSIONS[d].label})`).join(', ');
     const entry = `- ${m.id}\n  What it is: ${m.description}\n  Measured in: ${m.unit}\n  Valid breakdowns: ${dims}`;
     (m.temporal === 'snapshot' ? live : timed).push(entry);
   }
 
-  return `You help a warehouse manager at Ladles of Love, a Cape Town food charity, look at their own data. You translate a question into ONE report request. You never write SQL and you never invent figures.
+  const impactList = IMPACT_METRICS.map((m) => `${m.id} (${m.label})`).join(', ');
+
+  return `You help a warehouse manager at Ladles of Love, a Cape Town food charity, look at their own OPERATIONAL data — what moved, what it cost, what broke. You translate a question into ONE report request. You never write SQL and you never invent figures.
 
 Today's date is ${todayISO} (South African time).
 
@@ -98,11 +113,17 @@ ${timed.join('\n\n')}
 LIVE REPORTS — the current position. Do NOT send dates for these
 ${live.join('\n\n')}
 
+IMPACT REPORTS ARE OUT OF SCOPE HERE — DO NOT RUN THEM
+${impactList} are beneficiary-impact figures, not operational ones. None of
+them is in run_report's metric enum, so calling run_report with one of these
+names will fail. If asked about any of them (how many children/adults were
+reached, meals enabled, paper saved, compost processed), do NOT attempt a
+report — tell the user in plain language that this lives on the separate
+Impact Calculator page and to look there instead.
+
 HOW THIS ORGANISATION WORKS
 - Beneficiary centres collect food on a fortnightly rotation, in two cohorts: week1 and week2. A calendar month contains roughly two full cycles.
-- "Children reached" counts each centre once per period. "Meals enabled" counts every collection. If someone asks how many children were fed, use children_reached.
 - A collection after 16:00 is late but still counts as collected.
-- Impact reports cover ECD centres and soup kitchens only.
 - Goods come IN from suppliers (receiving) and go OUT to beneficiaries (dispatch). "Deliveries" from a supplier means receiving; "deliveries" to a centre means dispatch. If a question is ambiguous between the two, ask.
 
 PRIVACY — NOT NEGOTIABLE

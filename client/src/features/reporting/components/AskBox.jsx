@@ -20,11 +20,16 @@ import { Input } from '@/components/ui/input';
 
 const MUTED = '#676767';
 
+// Operational questions only — this box is scoped to Operations
+// Analytics (see toolSchema.js's OPERATIONAL_METRICS), so a suggestion
+// here should never be one the model has been told to redirect
+// elsewhere. Impact questions ("how many children did we reach")
+// belong on the Impact Calculator page.
 const SUGGESTIONS = [
-  'How many children did we reach last month?',
   'Which centres keep missing collections?',
   'Show dispatched food by month',
   'Is decanting wastage getting worse?',
+  'What are our unit prices trending toward?',
 ];
 
 export default function AskBox({ onReport, disabled }) {

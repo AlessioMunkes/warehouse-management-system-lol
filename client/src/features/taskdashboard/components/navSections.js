@@ -24,7 +24,7 @@ import {
   Gift, Route, Tags, HandHeart, Boxes, ReceiptText,
   PackageOpen, PackageCheck, FlaskConical, ClipboardCheck, HandCoins,
   PhoneCall,
-  ScrollText,
+  ScrollText, Sprout,
 } from 'lucide-react';
 import { STAFF, ADMIN, VOLUNTEERS, PACKING } from '../../../routes/paths';
 
@@ -48,6 +48,7 @@ const WORKER_SECTIONS = [
       { to: STAFF.dispatch, label: 'Dispatch', icon: ClipboardCheck },
       { to: STAFF.donation, label: 'Donation Intake', icon: HandCoins },
       { to: STAFF.communityRequests, label: 'Benevolent Requests', icon: PhoneCall },
+      { to: STAFF.feedTheSoil, label: 'Feed the Soil', icon: Sprout },
     ],
   },
 ];
@@ -122,6 +123,7 @@ const MANAGER_SECTIONS = [
     label: 'Warehouse',
     items: [
       { to: STAFF.donation, label: 'Donation Intake', icon: HandCoins },
+      { to: STAFF.feedTheSoil, label: 'Feed the Soil', icon: Sprout },
     ],
   },
   {
@@ -134,8 +136,8 @@ const MANAGER_SECTIONS = [
     label: 'Insights',
     items: [
       { to: STAFF.stockLedger, label: 'Stock Ledger', icon: ScrollText },
-      { to: STAFF.reporting, label: 'Reporting', icon: BarChart3 },
-      { to: STAFF.impactReport, label: 'Impact Report', icon: HeartHandshake },
+      { to: STAFF.reporting, label: 'Operations Reports', icon: BarChart3 },
+      { to: STAFF.impactReport, label: 'Impact Reports', icon: HeartHandshake },
     ],
   },
 ];

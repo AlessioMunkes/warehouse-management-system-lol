@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate }  from 'react-router-dom';
 import { AuthProvider }                            from './context/AuthContext';
 import ProtectedRoute                              from './components/layout/ProtectedRoute';
-import { PACKING, STAFF, DONATIONS, DONATION_INTAKE_ROLES, ADMIN, VOLUNTEERS, VOLUNTEER_MANAGEMENT_ROLES, COMMUNITY_REQUEST_ROLES } from './routes/paths';
+import { PACKING, STAFF, DONATIONS, DONATION_INTAKE_ROLES, ADMIN, VOLUNTEERS, VOLUNTEER_MANAGEMENT_ROLES, COMMUNITY_REQUEST_ROLES, FEED_THE_SOIL_ROLES } from './routes/paths';
 import LandingPage                                 from './pages/LandingPage';
 import LoginPage                                   from './pages/LoginPage';
 import GuestLoginPage                              from './pages/GuestLoginPage';
@@ -39,6 +39,7 @@ import ProductManagementPage                        from './pages/ProductManagem
 import VolunteerEventsPage                        from './pages/VolunteerEventsPage';
 import VolunteerEventWorkspacePage                from './pages/VolunteerEventWorkspacePage';
 import CommunityRequestsPage                       from './pages/CommunityRequestsPage';
+import FeedTheSoilPage                              from './pages/FeedTheSoilPage';
 
 // Donations — new feature, own draft context scoped to just these
 // two routes (see features/donation/context/DonationDraftProvider.jsx)
@@ -194,6 +195,12 @@ const App = () => (
             /api/community-requests route. Log only — no stock movement. */}
         <Route element={<ProtectedRoute roles={COMMUNITY_REQUEST_ROLES} shell />}>
           <Route path={STAFF.communityRequests} element={<CommunityRequestsPage />} />
+        </Route>
+
+        {/* Feed the Soil kit logging. Warehouse staff and up, mirroring
+            STAFF_UP on every /api/collection-kits route. */}
+        <Route element={<ProtectedRoute roles={FEED_THE_SOIL_ROLES} shell />}>
+          <Route path={STAFF.feedTheSoil} element={<FeedTheSoilPage />} />
         </Route>
 
         {/* Guest-only */}

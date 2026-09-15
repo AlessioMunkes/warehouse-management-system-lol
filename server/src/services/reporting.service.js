@@ -48,6 +48,12 @@ const getCatalog = () => ({
     caveat: m.caveat,
     dimensions: m.dimensions.map((d) => ({ id: d, label: DIMENSIONS[d].label })),
     filters: m.filters,
+    // The Operations Analytics page filters this out of its own
+    // builder/dropdown; the Impact Calculator page never reads the
+    // catalog at all, it hard-codes its five metric ids. Exposed here
+    // so the operations page does not have to hard-code the opposite
+    // list to know what to hide.
+    impactOnly: Boolean(m.impactOnly),
   })),
 });
 
@@ -64,7 +70,22 @@ const runReport = async (input) => {
     throw fail(500, `Report "${metric.label}" is not implemented (${metric.repoFn}).`);
   }
 
-  let series = await fn(spec);
+  // A metric can depend on a table that only exists once its own
+  // migration has run — collection_kits for compost_processed is the
+  // current example. Postgres' 42P01 (undefined_table) is the one
+  // failure mode worth distinguishing from a genuine server bug: it
+  // means "not set up yet," not "something is broken," and deserves
+  // the same kind of actionable 503 the missing-factor case gets
+  // below rather than a raw 500 that reads as the feature crashing.
+  let series;
+  try {
+    series = await fn(spec);
+  } catch (err) {
+    if (err.code === '42P01') {
+      throw fail(503, `"${metric.label}" hasn't been set up yet — its database table doesn't exist. Run the pending migration for this feature.`);
+    }
+    throw err;
+  }
 
   const meta = {
     unit: metric.unit,

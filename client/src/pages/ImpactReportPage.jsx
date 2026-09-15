@@ -26,36 +26,39 @@
 //
 // COMPOST PROCESSED READS FROM collection_kits.
 // A genuinely new, minimal table — see
-// server/src/repositories/collectionKit.repository.js. The "Log a
-// Feed the Soil kit" dialog on this page is the real logging
-// mechanism, seeded with a few dummy rows for the demo per instruction
-// to start with dummy data.
+// server/src/repositories/collectionKit.repository.js. The real
+// logging mechanism (log a kit out, mark it returned) lives on its
+// own staff module page, FeedTheSoilPage.jsx — a warehouse-floor
+// action belongs with Donation Intake and Benevolent Requests, not
+// buried in a dialog on a manager-facing reporting screen. This page
+// only links to it and reads the number it produces.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
 import ReportChart    from '../features/reporting/components/ReportChart';
 import CountUp         from '../features/reporting/components/CountUp';
 import ImpactCalculatorPDF from '../features/reporting/components/ImpactCalculatorPDF';
 import { runReport }  from '../services/reportingAPI';
 import reportingAPI   from '../services/reportingAPI';
-import collectionKitAPI from '../services/collectionKitAPI';
 import { RANGE_PRESETS, DEFAULT_PRESET, resolvePreset } from '../features/reporting/dateRanges';
+import { STAFF } from '../routes/paths';
 
 import {
   Card, CardContent, CardHeader, CardTitle,
 } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
 import {
-  FileText, Baby, UserRound, Sprout, Download, Plus, Settings2,
+  FileText, Baby, UserRound, Sprout, Download, Settings2,
 } from 'lucide-react';
 
 const DIMENSION_LABELS = {
@@ -94,8 +97,13 @@ const StatCard = ({ def, stat }) => {
         <div className="min-w-0">
           {!stat ? (
             <Skeleton className="h-8 w-20" />
-          ) : stat.missingFactor ? (
-            <p className="text-sm text-muted-foreground">Needs a factor set</p>
+          ) : stat.notReady ? (
+            // 503 covers two different "not ready yet" cases (a
+            // missing conversion factor, or — for compost_processed —
+            // a migration that hasn't run) with different messages;
+            // showing the server's own text rather than one hard-coded
+            // label keeps this accurate for both.
+            <p className="text-sm text-muted-foreground">{stat.message || 'Not set up yet'}</p>
           ) : stat.error ? (
             <p className="text-sm text-[#ef3a40]">Couldn't load</p>
           ) : (
@@ -107,64 +115,6 @@ const StatCard = ({ def, stat }) => {
         </div>
       </CardContent>
     </Card>
-  );
-};
-
-const LogKitDialog = ({ onLogged }) => {
-  const [open, setOpen] = useState(false);
-  const [kitLabel, setKitLabel] = useState('');
-  const [location, setLocation] = useState('');
-  const [kg, setKg] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setBusy(true); setError(null);
-    try {
-      await collectionKitAPI.logKitOut({ kitLabel, location, kgFoodWasteCollected: Number(kg) });
-      setKitLabel(''); setLocation(''); setKg('');
-      setOpen(false);
-      onLogged?.();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm">
-          <Plus /> Log a Feed the Soil kit
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Log a kit going out</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={submit} className="space-y-3">
-          <div>
-            <Label htmlFor="kit-label">Kit / bucket label</Label>
-            <Input id="kit-label" value={kitLabel} onChange={(e) => setKitLabel(e.target.value)} required />
-          </div>
-          <div>
-            <Label htmlFor="kit-location">Location (optional)</Label>
-            <Input id="kit-location" value={location} onChange={(e) => setLocation(e.target.value)} />
-          </div>
-          <div>
-            <Label htmlFor="kit-kg">Kilograms of food waste collected</Label>
-            <Input id="kit-kg" type="number" min="0" step="0.1" value={kg}
-                   onChange={(e) => setKg(e.target.value)} required />
-          </div>
-          {error && <p className="text-sm text-[#ef3a40]">{error}</p>}
-          <DialogFooter>
-            <Button type="submit" disabled={busy}>{busy ? 'Logging…' : 'Log kit'}</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   );
 };
 
@@ -307,7 +257,6 @@ export default function ImpactReportPage() {
   const [preset, setPreset] = useState(DEFAULT_PRESET);
   const [stats, setStats] = useState({});
   const [pdfOpen, setPdfOpen] = useState(false);
-  const [kitReloadKey, setKitReloadKey] = useState(0);
 
   const dateRange = resolvePreset(preset);
 
@@ -320,7 +269,7 @@ export default function ImpactReportPage() {
           const report = res.data ?? res;
           return [def.metric, { value: report.total ?? 0, caveat: report.meta?.caveat }];
         } catch (err) {
-          if (err.status === MISSING_FACTOR_STATUS) return [def.metric, { missingFactor: true }];
+          if (err.status === MISSING_FACTOR_STATUS) return [def.metric, { notReady: true, message: err.message }];
           return [def.metric, { error: true }];
         }
       }));
@@ -328,7 +277,7 @@ export default function ImpactReportPage() {
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preset, kitReloadKey]);
+  }, [preset]);
 
   const pdfStats = STAT_DEFS.map((def) => {
     const s = stats[def.metric];
@@ -336,8 +285,8 @@ export default function ImpactReportPage() {
       label: def.label,
       unit: def.unit,
       value: s?.value ?? 0,
-      available: Boolean(s && !s.missingFactor && !s.error),
-      caveat: s?.caveat ?? (s?.missingFactor ? 'Needs a conversion factor on record.' : ''),
+      available: Boolean(s && !s.notReady && !s.error),
+      caveat: s?.caveat ?? (s?.notReady ? s.message : ''),
     };
   });
 
@@ -375,7 +324,18 @@ export default function ImpactReportPage() {
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
-          <LogKitDialog onLogged={() => setKitReloadKey((k) => k + 1)} />
+          {/* Logging a kit is a warehouse-floor action, not a reporting
+              one — it lives on its own staff module page (see
+              FeedTheSoilPage.jsx) alongside Donation Intake and
+              Benevolent Requests, not buried in a dialog here.
+              buttonVariants applied directly to the Link rather than
+              Button's own `asChild` — Button wraps Base UI's
+              ButtonPrimitive, which does not merge onto a child the
+              way Radix's Slot does, so `asChild` here would render a
+              real nested <button> around the <a>. */}
+          <Link to={STAFF.feedTheSoil} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+            <Sprout /> Log a Feed the Soil kit
+          </Link>
           <AdjustFactorsDialog />
         </div>
 
