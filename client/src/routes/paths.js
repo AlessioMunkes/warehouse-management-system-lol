@@ -121,6 +121,19 @@ export const DONATIONS = {
 // change this one with it — they are two halves of the same rule.
 export const DONATION_INTAKE_ROLES = ['warehouse_worker', 'manager', 'admin'];
 
+// Every role that works the warehouse floor — the task dashboard and the
+// four staff flows (receiving, packing, decanting, dispatch).
+//
+// Client-side mirror of ALL_ROLES in server/src/routes/picking.routes.js
+// and its equivalents on the decanting/dispatch/delivery routes.
+//
+// 'guest' is deliberately absent and must stay absent. These route groups
+// previously carried no roles at all, and ProtectedRoute skips its check
+// entirely when `roles` is undefined — so a signed-in guest rendered the
+// worker surface. The API refused the data, but the screens still drew.
+// Guests get /guest-home and the slip flow, never the floor.
+export const STAFF_ROLES = ['warehouse_worker', 'manager', 'admin'];
+
 // Client-side mirror of STAFF_UP in
 // server/src/routes/communityRequest.routes.js (BR-01: "Warehouse
 // Staff or higher"). Two halves of the same rule — change them together.

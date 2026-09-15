@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate }  from 'react-router-dom';
 import { AuthProvider }                            from './context/AuthContext';
 import ProtectedRoute                              from './components/layout/ProtectedRoute';
-import { PACKING, STAFF, DONATIONS, DONATION_INTAKE_ROLES, ADMIN, VOLUNTEERS, VOLUNTEER_MANAGEMENT_ROLES, COMMUNITY_REQUEST_ROLES } from './routes/paths';
+import { PACKING, STAFF, DONATIONS, DONATION_INTAKE_ROLES, ADMIN, VOLUNTEERS, VOLUNTEER_MANAGEMENT_ROLES, COMMUNITY_REQUEST_ROLES, STAFF_ROLES } from './routes/paths';
 import LandingPage                                 from './pages/LandingPage';
 import LoginPage                                   from './pages/LoginPage';
 import GuestLoginPage                              from './pages/GuestLoginPage';
@@ -130,12 +130,18 @@ const App = () => (
         {/* The warehouse worker's dashboard. Split out of the block
             below so it can take the shell: the four flows underneath it
             are StaffShell screens and must not. */}
-        <Route element={<ProtectedRoute shell />}>
+        <Route element={<ProtectedRoute roles={STAFF_ROLES} shell />}>
           <Route path="/noc" element={<TaskDashboard />} />
         </Route>
 
-        {/* Protected — any logged-in user */}
-        <Route element={<ProtectedRoute />}>
+        {/* Protected — warehouse floor staff.
+            Was `<ProtectedRoute />` with no roles. ProtectedRoute skips its
+            role check when `roles` is undefined, so "any logged-in user"
+            included a signed-in guest, who could render packing, decanting,
+            procurement and dispatch by typing the URL. Scoped to STAFF_ROLES
+            so the client agrees with the server, which already refuses a
+            guest on every one of these endpoints. */}
+        <Route element={<ProtectedRoute roles={STAFF_ROLES} />}>
           <Route path="/noc/decanting" element={<DecantingPage />} />
           <Route path={STAFF.decantingRecords} element={<StaffDecantingRecordsPage />} />
 
