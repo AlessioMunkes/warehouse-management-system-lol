@@ -23,12 +23,19 @@
 // so a second run creates nothing and reports 0 created. Safe to run
 // twice; safe to run after a partial failure.
 //
-// Usage, from the repo root:
-//   node server/scripts/seed-guest-test-slips.js
-//   node server/scripts/seed-guest-test-slips.js --date=2026-09-16
-//   node server/scripts/seed-guest-test-slips.js --dry-run
+// Run it from server/, NOT from the repo root:
 //
-// Reads DATABASE_URL from server/.env, like the other scripts here.
+//   cd server
+//   node scripts/seed-guest-test-slips.js --dry-run
+//   node scripts/seed-guest-test-slips.js
+//   node scripts/seed-guest-test-slips.js --date=2026-09-16
+//
+// `import 'dotenv/config'` resolves .env against the working directory,
+// and the only .env is server/.env — from the repo root the script exits
+// on "Missing required environment variable: DATABASE_URL" before it
+// does anything. Same convention as _access-check.mjs alongside it.
+//
+// --dry-run reports what it would act on and stops before any write.
 // ─────────────────────────────────────────────────────────────
 import 'dotenv/config';
 import pool           from '../src/config/db.js';
