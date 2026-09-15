@@ -4,7 +4,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { apiPost } from '../services/api';
 import logo from '../assets/Batches_Logo.jpeg';
 import Log_In_Background from '../assets/Log_In_Background.jpg';
 
@@ -36,24 +35,40 @@ const GuestLoginPage = () => {
 
   const [name, setName] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // There used to be a second, fire-and-forget POST to
+  // /api/volunteers/sign-in right here, on the reasoning that a failed
+  // audit write must not lock a volunteer out at the gate. But
+  // loginAsGuest posts to that same endpoint, and the endpoint INSERTS —
+  // so every arrival created two `volunteers` rows. The session bound to
+  // the second; the first was orphaned, permanently open (nothing ever
+  // sets its signed_out_at), counted as a separate arrival in the guest
+  // log, and double-counted in volunteer hours.
+  //
+  // One call now, and it is the one that creates the session.
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim()) {
       setError('Name is required.');
       return;
     }
+    if (isSubmitting) return; // a double tap is two arrivals otherwise
 
-    // Fire-and-forget for now — a failed audit write must never lock
-    // a volunteer out of the system at the gate.
+    setIsSubmitting(true);
+    setError('');
+
+    // Navigate only on success. Sign-in IS the session: if it fails there
+    // is no cookie and no volunteer row, so continuing to /guest-home
+    // would strand someone on a screen where every request 401s.
     try {
-      await apiPost('/api/volunteers/sign-in', { name: name.trim() });
+      await loginAsGuest(name.trim());
+      navigate('/guest-home', { replace: true });
     } catch (err) {
-      console.error('Guest sign-in not recorded:', err);
+      console.error('Guest sign-in failed:', err);
+      setError(err?.message || 'Could not sign you in. Please try again.');
+      setIsSubmitting(false);
     }
-
-    loginAsGuest(name.trim());
-    navigate('/guest-home', { replace: true });
   };
 
   return (
@@ -115,8 +130,8 @@ const GuestLoginPage = () => {
               </div>
 
               {/* Primary sign-in button */}
-              <Button type="submit" className="login-btn-primary">
-                LOGIN
+              <Button type="submit" className="login-btn-primary" disabled={isSubmitting}>
+                {isSubmitting ? 'SIGNING IN…' : 'LOGIN'}
               </Button>
 
               {/* Back to employee sign-in */}
