@@ -49,7 +49,7 @@ export const SidebarNav = ({ sections, pathname, homeTo, onNavigate }) => (
       </div>
     </Link>
 
-    <nav className="flex flex-1 flex-col gap-5 overflow-y-auto">
+    <nav className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto">
       {sections.map((section) => (
         <div key={section.label}>
           <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">

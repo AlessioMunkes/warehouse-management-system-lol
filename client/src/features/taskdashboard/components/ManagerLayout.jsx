@@ -113,15 +113,23 @@ function ManagerLayoutShell({ children }) {
   return (
    <ShellContext.Provider value={true}>
     <ReducedMotionContext.Provider value={{ reducedMotion, setReducedMotion }}>
-    <div className="flex min-h-screen bg-[#faf8f5]">
+    {/* h-screen + overflow-hidden, not min-h-screen: min-h-screen let this
+        wrapper grow taller than the viewport, so the whole page (sidebar
+        included) scrolled together in document flow and <main>'s own
+        overflow-y-auto never had a bounded parent to engage against.
+        Pinning the wrapper to the viewport height, plus min-h-0 on the flex
+        children below (flex items refuse to shrink under their content by
+        default), is what makes only <main> scroll while the sidebar and
+        top bar hold still. */}
+    <div className="flex h-screen overflow-hidden bg-[#faf8f5]">
       {/* ── Sidebar ─────────────────────────────────────────── */}
       <aside className="hidden w-56 shrink-0 flex-col border-r border-[#e9e3dd] bg-white px-3 py-4 sm:flex">
         <SidebarNav sections={sections} pathname={location.pathname} homeTo={homeTo} />
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {/* ── Top bar ───────────────────────────────────────── */}
-        <header className="flex items-center gap-3 border-b border-[#e9e3dd] bg-white px-4 py-2.5">
+        <header className="shrink-0 flex items-center gap-3 border-b border-[#e9e3dd] bg-white px-4 py-2.5">
           {/* Same breakpoint as the sidebar above, so exactly one of the
               two is ever on screen. */}
           <AppNavDrawer className="sm:hidden" />
@@ -189,7 +197,7 @@ function ManagerLayoutShell({ children }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
       </div>
 
       <LogoutConfirmDialog
