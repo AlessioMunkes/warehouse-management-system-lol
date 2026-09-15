@@ -141,6 +141,85 @@ const dispatchVolume = (spec) => dispatchedKgQuery({ ...spec, impactOnly: false 
 // measurement stays inspectable and a factor change needs no re-query.
 const mealsEnabled   = (spec) => dispatchedKgQuery({ ...spec, impactOnly: true });
 
+// Soup kitchens only, forced rather than left to the caller — this is
+// not a general "pick a beneficiary kind" report, it IS the adults
+// number. NFR-20 keeps dignity kitchens out of impact reporting
+// entirely, so there is no other beneficiary kind this could mean.
+const adultsReached = (spec) => dispatchedKgQuery({
+  ...spec,
+  impactOnly: false,
+  filters: { ...spec.filters, beneficiary_kind: 'soup_kitchen' },
+});
+
+// ══ Paper saved ════════════════════════════════════════════════
+// Three tables, one UNION, because a "digital document" here is
+// whichever of three different features produced one — a delivery
+// note, a dispatch note (collected_at IS NOT NULL, since a flagged
+// non-collection never produces a note to view or print), or a
+// decanting sheet. All three write timestamptz columns via NOW(), so
+// every branch goes through sastDate() — the file header's TIMEZONE
+// warning applies here as much as anywhere else.
+const paperDimension = (dimension) => {
+  switch (dimension) {
+    case 'none':  return { expr: `'Total'`,               group: null };
+    case 'month': return { expr: bucketMonth('bucket_date'), group: bucketMonth('bucket_date') };
+    case 'week':  return { expr: bucketWeek('bucket_date'),  group: bucketWeek('bucket_date') };
+    default: throw new Error(`Unsupported dimension: ${dimension}`);
+  }
+};
+
+const paperSaved = async ({ dimension, dateRange }) => {
+  const dim = paperDimension(dimension);
+  const params = [dateRange.from, dateRange.to, COLLECTED_STATUSES];
+  const { rows } = await pool.query(
+    `WITH docs AS (
+       SELECT ${sastDate('created_at')} AS bucket_date FROM delivery_notes
+        WHERE ${sastDate('created_at')} BETWEEN $1::date AND $2::date
+       UNION ALL
+       SELECT ${sastDate('collected_at')} AS bucket_date FROM dispatch_events
+        WHERE status = ANY($3::text[]) AND collected_at IS NOT NULL
+          AND ${sastDate('collected_at')} BETWEEN $1::date AND $2::date
+       UNION ALL
+       SELECT ${sastDate('created_at')} AS bucket_date FROM decanting_records
+        WHERE ${sastDate('created_at')} BETWEEN $1::date AND $2::date
+     )
+     SELECT ${dim.expr} AS label, COUNT(*)::numeric AS value
+       FROM docs
+       ${dim.group ? `GROUP BY ${dim.group}` : ''}
+       ORDER BY 1`,
+    params
+  );
+  return rows2series(rows);
+};
+
+// ══ Feed the Soil / compost ══════════════════════════════════════
+// A kit only counts once it is marked returned WITH a measured
+// kg_compost_returned — a kit still out is compost that has not
+// happened yet, not a number to estimate.
+const compostDimension = (dimension) => {
+  switch (dimension) {
+    case 'none':  return { expr: `'Total'`,               group: null };
+    case 'month': return { expr: bucketMonth('bucket_date'), group: bucketMonth('bucket_date') };
+    default: throw new Error(`Unsupported dimension: ${dimension}`);
+  }
+};
+
+const compostProcessed = async ({ dimension, dateRange }) => {
+  const dim = compostDimension(dimension);
+  const params = [dateRange.from, dateRange.to];
+  const { rows } = await pool.query(
+    `SELECT ${dim.expr} AS label, COALESCE(SUM(kg_compost_returned), 0)::numeric AS value
+       FROM (SELECT ${sastDate('returned_at')} AS bucket_date, kg_compost_returned
+               FROM collection_kits
+              WHERE status = 'returned'
+                AND ${sastDate('returned_at')} BETWEEN $1::date AND $2::date) t
+       ${dim.group ? `GROUP BY ${dim.group}` : ''}
+       ORDER BY 1`,
+    params
+  );
+  return rows2series(rows);
+};
+
 // Denominator is every slip that reached the gate. Cancelled slips
 // are excluded — a cancelled pallet was never a collection anyone
 // failed to make. Pending and in-progress are excluded too: not yet
@@ -629,7 +708,8 @@ const getFactor = async (key) => {
 };
 
 export default {
-  childrenReached, mealsEnabled, dispatchVolume, collectionCompliance,
+  childrenReached, mealsEnabled, adultsReached, paperSaved, compostProcessed,
+  dispatchVolume, collectionCompliance,
   repeatNonCollections, decantingWastage,
   goodsReceived, receivingDiscrepancyRate, unresolvedDiscrepancies, procurementSpend,
   donationValue, section18aPipeline,

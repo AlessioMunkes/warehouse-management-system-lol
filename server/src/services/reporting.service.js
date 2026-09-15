@@ -9,6 +9,7 @@
 // answered.
 // ─────────────────────────────────────────────────────────────
 import repo             from '../repositories/reporting.repository.js';
+import factorRepo       from '../repositories/reportingFactor.repository.js';
 import cache            from '../features/reporting/reportCache.js';
 import { validateSpec } from '../features/reporting/specValidator.js';
 import aiProvider       from '../features/reporting/ai/provider.js';
@@ -117,4 +118,25 @@ const runReport = async (input) => {
   return payload;
 };
 
-export default { getCatalog, runReport, todayISO };
+// A positive-or-zero number, not an empty payload — a factor of 0
+// would silently zero out every meals/adults figure it feeds, and
+// that is worth rejecting at the door rather than debugging later.
+const setFactor = async ({ factorKey, value, unit, sourceNote, actorId }) => {
+  if (!factorRepo.FACTOR_KEYS.includes(factorKey)) {
+    throw fail(400, `Unknown factor "${factorKey}". Known factors: ${factorRepo.FACTOR_KEYS.join(', ')}.`);
+  }
+  const num = Number(value);
+  if (!Number.isFinite(num) || num <= 0) {
+    throw fail(400, 'value must be a positive number.');
+  }
+  const factor = await factorRepo.setFactor({ factorKey, value: num, unit, sourceNote, actorId });
+  // Every cached report using this factor is now stale — the whole
+  // cache is cleared rather than trying to guess which keys touched
+  // it, since a factor edit is rare and the cache is cheap to rebuild.
+  cache.clear();
+  return factor;
+};
+
+const getFactorHistory = (factorKey) => factorRepo.listFactorHistory(factorKey);
+
+export default { getCatalog, runReport, todayISO, setFactor, getFactorHistory };

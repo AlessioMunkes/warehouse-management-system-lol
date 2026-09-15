@@ -146,6 +146,49 @@ export const METRICS = {
     caveat: 'Estimate based on the kilograms-to-meals factor on record.',
   },
 
+  // adultsReached deliberately does NOT extend IMPACT_BENEFICIARY_KINDS
+  // to include dignity kitchens — NFR-20 excludes them from impact
+  // reporting by design (per the project's own visit notes: "dignity
+  // kitchens don't require an impact report"). This metric is scoped to
+  // soup kitchens specifically, forced in the repository regardless of
+  // what filter a caller passes — it is not a general "pick any
+  // beneficiary kind" report, it IS the soup-kitchen number.
+  adults_reached: {
+    id: 'adults_reached', label: 'Adults reached', temporal: 'range',
+    description:
+      'Estimated adults served through soup kitchens. Converted from kilograms ' +
+      'dispatched to soup kitchens using a factor the manager can edit, the same ' +
+      'way meals enabled works. Dignity kitchens and ECDs are not counted here.',
+    repoFn: 'adultsReached', unit: 'adults',
+    dimensions: ['none', 'month', 'week', 'cohort'],
+    filters: ['cohort'],
+    defaultChart: 'line', impactOnly: true, factorKey: 'kg_to_adults_served',
+    caveat: 'Estimate based on the kilograms-to-adults-served factor on record. Soup kitchens only.',
+  },
+
+  paper_saved: {
+    id: 'paper_saved', label: 'Paper saved', temporal: 'range',
+    description:
+      'Delivery notes, dispatch notes and decanting sheets generated digitally ' +
+      'instead of on paper. One record here is one physical page that was not ' +
+      'printed, copied or hand-filled the old way.',
+    repoFn: 'paperSaved', unit: 'documents',
+    dimensions: ['none', 'month', 'week'], filters: [],
+    defaultChart: 'line', impactOnly: true,
+    caveat: 'Counts delivery notes, dispatch notes and decanting sheets created in the period.',
+  },
+
+  compost_processed: {
+    id: 'compost_processed', label: 'Compost processed', temporal: 'range',
+    description:
+      'Kilograms of food waste turned into compost through Feed the Soil — logged ' +
+      'per collection kit when it goes out and again when it comes back.',
+    repoFn: 'compostProcessed', unit: 'kg',
+    dimensions: ['none', 'month'], filters: [],
+    defaultChart: 'line', impactOnly: true,
+    caveat: 'Only kits marked returned are counted; kits still out are not.',
+  },
+
   // ══ Dispatch ═══════════════════════════════════════════════
   dispatch_volume: {
     id: 'dispatch_volume', label: 'Food dispatched', temporal: 'range',

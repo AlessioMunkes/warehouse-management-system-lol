@@ -71,4 +71,34 @@ const ask = async (req, res) => {
   }
 };
 
-export default { getCatalog, runReport, ask };
+// PUT /api/reporting/factors/:factorKey
+// Manager/admin only — see reportingFactor.repository.js for why this
+// inserts a new row rather than updating one in place.
+const setFactor = async (req, res) => {
+  try {
+    const factor = await reportingService.setFactor({
+      factorKey: req.params.factorKey,
+      value: req.body?.value,
+      unit: req.body?.unit,
+      sourceNote: req.body?.sourceNote,
+      actorId: req.user?.id,
+    });
+    res.status(200).json({ success: true, data: factor });
+  } catch (err) {
+    console.error('[setFactor]', err.message);
+    send(res, err, 'Failed to set the factor.');
+  }
+};
+
+// GET /api/reporting/factors/:factorKey/history
+const getFactorHistory = async (req, res) => {
+  try {
+    const history = await reportingService.getFactorHistory(req.params.factorKey);
+    res.status(200).json({ success: true, data: history });
+  } catch (err) {
+    console.error('[getFactorHistory]', err.message);
+    send(res, err, 'Failed to load factor history.');
+  }
+};
+
+export default { getCatalog, runReport, ask, setFactor, getFactorHistory };
