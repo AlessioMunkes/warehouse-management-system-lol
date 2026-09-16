@@ -84,7 +84,14 @@ const openOrder86 = async (user) => {
   await screen.findByText('Apples (Bulk Bag)');
 };
 
-describe('receiving: the order list', () => {
+// QUARANTINED by 38-restore-serena-worker-view.sh.
+//
+// These assert the TaskPage/WorkList worker view from 0b9d215 and
+// 2679ada, which the restore of Serena's dual view (b6cc201) rolled
+// back. They are not broken — they test a screen that is no longer
+// there. Delete this block, or rewrite it against the dual view, once
+// the team has settled which worker view ships.
+describe.skip('receiving: the order list', () => {
   it('asks for every open order, with no supplier', async () => {
     render(<ReceivingFlow />);
     await waitFor(() => expect(receivingAPI.getPurchaseOrders).toHaveBeenCalled());
@@ -133,7 +140,14 @@ describe('receiving: the order list', () => {
   });
 });
 
-describe('receiving: every line has to be ticked', () => {
+// QUARANTINED by 38-restore-serena-worker-view.sh.
+//
+// These assert the TaskPage/WorkList worker view from 0b9d215 and
+// 2679ada, which the restore of Serena's dual view (b6cc201) rolled
+// back. They are not broken — they test a screen that is no longer
+// there. Delete this block, or rewrite it against the dual view, once
+// the team has settled which worker view ships.
+describe.skip('receiving: every line has to be ticked', () => {
   it('says how many ticks are outstanding', async () => {
     const user = userEvent.setup();
     await openOrder86(user);
