@@ -112,9 +112,19 @@ describe('createEventWithInitialTimeslot', () => {
     expect(eventRepoMock.createEvent).not.toHaveBeenCalled();
   });
 
-  it('rejects date mismatches before creating records', async () => {
+  it('accepts an initial timeslot on a different date than eventDate', async () => {
     spaceRepoMock.findById.mockResolvedValueOnce(SPACE);
-    await expect(svc.createEventWithInitialTimeslot({ ...payload, startTime: '2026-10-02T09:00:00Z', endTime: '2026-10-02T10:00:00Z' }, ACTOR)).rejects.toMatchObject({ status: 400 });
+    eventRepoMock.createEvent.mockResolvedValueOnce(EVENT);
+    timeslotRepoMock.findPotentialOverlaps.mockResolvedValueOnce([]);
+    timeslotRepoMock.createTimeslot.mockResolvedValueOnce({ ...TIMESLOT, start_time: '2026-10-02T09:00:00Z', end_time: '2026-10-02T10:00:00Z' });
+    const result = await svc.createEventWithInitialTimeslot({ ...payload, startTime: '2026-10-02T09:00:00Z', endTime: '2026-10-02T10:00:00Z' }, ACTOR);
+    expect(result.timeslots).toHaveLength(1);
+    expect(eventRepoMock.createEvent).toHaveBeenCalled();
+  });
+
+  it('rejects an initial timeslot when start and end are on different dates', async () => {
+    spaceRepoMock.findById.mockResolvedValueOnce(SPACE);
+    await expect(svc.createEventWithInitialTimeslot({ ...payload, startTime: '2026-10-01T23:00:00Z', endTime: '2026-10-02T01:00:00Z' }, ACTOR)).rejects.toMatchObject({ status: 400 });
     expect(eventRepoMock.createEvent).not.toHaveBeenCalled();
   });
 
@@ -171,10 +181,20 @@ describe('bookEventSpaceAndTimeslots', () => {
     spaceRepoMock.findById.mockResolvedValueOnce(SPACE);
     await expect(svc.bookEventSpaceAndTimeslots('e1', { spaceId: 's1', timeslots: [{ startTime: '2026-10-01T10:00:00Z', endTime: '2026-10-01T09:00:00Z', capacity: 5 }] }, ACTOR)).rejects.toMatchObject({ status: 400 });
   });
-  it('rejects timeslots outside the event date', async () => {
+  it('accepts timeslots on a different date than eventDate (booking flow)', async () => {
     eventRepoMock.findById.mockResolvedValueOnce(EVENT);
     spaceRepoMock.findById.mockResolvedValueOnce(SPACE);
-    await expect(svc.bookEventSpaceAndTimeslots('e1', { spaceId: 's1', timeslots: [{ startTime: '2026-10-02T09:00:00Z', endTime: '2026-10-02T10:00:00Z', capacity: 5 }] }, ACTOR)).rejects.toMatchObject({ status: 400 });
+    timeslotRepoMock.findPotentialOverlaps.mockResolvedValueOnce([]);
+    timeslotRepoMock.createTimeslot.mockResolvedValueOnce({ ...TIMESLOT, start_time: '2026-10-02T09:00:00Z', end_time: '2026-10-02T10:00:00Z' });
+    const result = await svc.bookEventSpaceAndTimeslots('e1', { spaceId: 's1', timeslots: [{ startTime: '2026-10-02T09:00:00Z', endTime: '2026-10-02T10:00:00Z', capacity: 5 }] }, ACTOR);
+    expect(result).toHaveLength(1);
+    expect(timeslotRepoMock.createTimeslot).toHaveBeenCalled();
+  });
+
+  it('rejects timeslots when start and end are on different dates', async () => {
+    eventRepoMock.findById.mockResolvedValueOnce(EVENT);
+    spaceRepoMock.findById.mockResolvedValueOnce(SPACE);
+    await expect(svc.bookEventSpaceAndTimeslots('e1', { spaceId: 's1', timeslots: [{ startTime: '2026-10-01T23:00:00Z', endTime: '2026-10-02T01:00:00Z', capacity: 5 }] }, ACTOR)).rejects.toMatchObject({ status: 400 });
     expect(timeslotRepoMock.createTimeslot).not.toHaveBeenCalled();
   });
   it('rejects overlapping timeslots', async () => {
@@ -213,10 +233,20 @@ describe('updateEventBooking', () => {
     await expect(svc.updateEventBooking('e1', { timeslotId: 't1', capacity: 20 }, ACTOR)).rejects.toMatchObject({ status: 404 });
     expect(timeslotRepoMock.updateTimeslot).not.toHaveBeenCalled();
   });
-  it('rejects updates that move a timeslot outside the event date', async () => {
+  it('accepts updates that move a timeslot to a different date than eventDate', async () => {
     eventRepoMock.findById.mockResolvedValueOnce(EVENT);
     timeslotRepoMock.findById.mockResolvedValueOnce(TIMESLOT);
-    await expect(svc.updateEventBooking('e1', { timeslotId: 't1', startTime: '2026-10-02T09:00:00Z', endTime: '2026-10-02T10:00:00Z' }, ACTOR)).rejects.toMatchObject({ status: 400 });
+    timeslotRepoMock.findPotentialOverlaps.mockResolvedValueOnce([]);
+    timeslotRepoMock.updateTimeslot.mockResolvedValueOnce({ ...TIMESLOT, start_time: '2026-10-02T09:00:00Z', end_time: '2026-10-02T10:00:00Z' });
+    const result = await svc.updateEventBooking('e1', { timeslotId: 't1', startTime: '2026-10-02T09:00:00Z', endTime: '2026-10-02T10:00:00Z' }, ACTOR);
+    expect(result.start_time).toBe('2026-10-02T09:00:00Z');
+    expect(timeslotRepoMock.updateTimeslot).toHaveBeenCalled();
+  });
+
+  it('rejects updates when start and end are on different dates', async () => {
+    eventRepoMock.findById.mockResolvedValueOnce(EVENT);
+    timeslotRepoMock.findById.mockResolvedValueOnce(TIMESLOT);
+    await expect(svc.updateEventBooking('e1', { timeslotId: 't1', startTime: '2026-10-01T23:00:00Z', endTime: '2026-10-02T01:00:00Z' }, ACTOR)).rejects.toMatchObject({ status: 400 });
     expect(timeslotRepoMock.updateTimeslot).not.toHaveBeenCalled();
   });
   it('rejects overlapping timeslots in the submitted form', async () => {
