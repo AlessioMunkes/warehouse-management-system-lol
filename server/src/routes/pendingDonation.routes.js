@@ -20,12 +20,7 @@ router.post(
 router.post(
   '/pending/flags/:flagId/resolve',
   auth,
-  // Admin-only, matching the Donation Management page gate (D5) and
-  // retry-commit below. MANAGERS_UP here was an oversight, not a design:
-  // no manager-facing UI ever called this endpoint (the page has always
-  // been admin-gated), and the old Unrecognized Item Review Queue page
-  // that used the manager-permitted PUT .../finalize path has been retired.
-  requireRole(...ADMIN_ONLY),
+  requireRole(...MANAGERS_UP),
   validateIntParam('flagId'),
   pendingDonationController.resolvePendingDonationFlag
 );

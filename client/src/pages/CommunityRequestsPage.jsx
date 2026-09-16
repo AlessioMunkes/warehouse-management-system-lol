@@ -177,10 +177,24 @@ export default function CommunityRequestsPage() {
   // state.
   useEffect(() => {
     let cancelled = false;
-    setIsLoading(true);
-    load().finally(() => { if (!cancelled) setIsLoading(false); });
+    communityRequestAPI.getRequests({
+      outcome: outcomeFilter === 'all' ? '' : outcomeFilter,
+      search,
+    })
+      .then((rows) => {
+        if (!cancelled) {
+          setRequests(rows);
+          setError(null);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message || 'Could not load requests.');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
     return () => { cancelled = true; };
-  }, [load]);
+  }, [outcomeFilter, search]);
 
   const create = async (payload) => {
     setBusy(true); setFormError(null);
@@ -264,11 +278,11 @@ export default function CommunityRequestsPage() {
                   <InputGroupInput
                     placeholder="Search by item or caller name"
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={(e) => { setIsLoading(true); setSearch(e.target.value); }}
                   />
                 </InputGroup>
 
-                <Select value={outcomeFilter} onValueChange={setOutcomeFilter}>
+                <Select value={outcomeFilter} onValueChange={(value) => { setIsLoading(true); setOutcomeFilter(value); }}>
                   <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All outcomes</SelectItem>

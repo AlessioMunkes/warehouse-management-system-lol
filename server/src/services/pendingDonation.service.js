@@ -1,8 +1,11 @@
 import pool from '../config/db.js';
 import { determineRouting } from '../lib/donationRouting.js';
+import { logAudit } from '../repositories/auditLog.repository.js';
 import pendingDonationRepository from '../repositories/pendingDonation.repository.js';
+import productRepository from '../repositories/product.repository.js';
 import donationAdminService from './donationAdmin.service.js';
 import donationService from './donation.service.js';
+import { validateEmail } from '../lib/validation/donationIntake.part1.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -12,6 +15,10 @@ const fail = (status, message) => {
 
 const normalisePendingItem = (raw = {}, index = 0) => {
   const item = raw || {};
+  const rawStatus = item.status ?? 'awaiting_resolution';
+  const status = rawStatus === 'PENDING_PRODUCT_REVIEW'
+    ? 'pending_product_review'
+    : String(rawStatus).toLowerCase();
   return {
     lineNo: item.lineNo ?? item.line_no ?? index + 1,
     description: String(item.description ?? '').trim(),
@@ -20,13 +27,29 @@ const normalisePendingItem = (raw = {}, index = 0) => {
     unit: item.unit ?? null,
     estimatedValueZar: item.estimatedValueZar ?? item.estimated_value_zar ?? null,
     requestedCategory: item.requestedCategory ?? item.requested_category ?? null,
-    status: item.status ?? 'awaiting_resolution',
+    status,
     flagId: item.flagId ?? item.flag_id ?? null,
     source: item.source ?? null,
     resolvedCategory: item.resolvedCategory ?? item.resolved_category ?? null,
     routingStatus: item.routingStatus ?? item.routing_status ?? null,
     storageAreaHint: item.storageAreaHint ?? item.storage_area_hint ?? null,
+    unknownProduct: item.unknownProduct ?? item.unknown_product ?? false,
+    weightKg: item.weightKg ?? item.weight_kg ?? null,
+    expiryDate: item.expiryDate ?? item.expiry_date ?? null,
   };
+};
+
+const REVIEW_DECISIONS = new Set(['match_existing_product', 'create_product', 'move_to_non_food']);
+const REVIEW_ROUTE_CATEGORIES = new Set(['recipe_food', 'add_on_food', 'non_recipe_food']);
+
+const normalizeReviewDecision = (value) => String(value || '').trim().toLowerCase();
+
+const resolveReviewCategory = (category) => {
+  const normalized = String(category || '').trim();
+  if (!REVIEW_ROUTE_CATEGORIES.has(normalized)) {
+    fail(400, 'Route must be one of: recipe_food, add_on_food, non_recipe_food.');
+  }
+  return normalized;
 };
 
 // NOTE: no fallback to the donation-level category here — by design
@@ -56,17 +79,45 @@ const buildDonationPayloadFromPending = (pendingDonation) => {
     return sum + (Number.isFinite(value) ? value : 0);
   }, 0);
 
+  // A pending donation may legitimately carry no donation-level category
+  // (it can be blank at intake) while each resolved item carries its own
+  // resolved_category. On commit the donation row still requires one, so
+  // derive it from the accepted items when the donation-level is blank.
+  // If items disagree (mixed categories), give up and let the commit fail
+  // loudly rather than silently picking one — a mixed donation needs a
+  // manager decision, not a guess. Coerce a blank/empty string to null.
+  const rawDonationCategory =
+    pendingDonation.donation_category ?? pendingDonation.donationCategory ?? null;
+  const donationCategory =
+    (rawDonationCategory !== null && String(rawDonationCategory).trim() !== '')
+      ? rawDonationCategory
+      : null;
+
+  const acceptedResolved = acceptedItems
+    .map((item) => item.resolved_category ?? item.resolvedCategory ?? null)
+    .filter((value) => value !== null && String(value).trim() !== '');
+
+  const category = donationCategory
+    ?? (acceptedResolved.length > 0 && new Set(acceptedResolved).size === 1
+      ? acceptedResolved[0]
+      : null);
+  const pendingValue = Number(pendingDonation.estimated_value_zar ?? pendingDonation.estimatedValueZar ?? 0);
+  const estimatedValueZar = totalValue > 0
+    ? totalValue
+    : (Number.isFinite(pendingValue) ? pendingValue : 0);
+
   return {
-    category: pendingDonation.donation_category ?? pendingDonation.donationCategory ?? null,
+    category,
     programmeId: pendingDonation.programme_id ?? pendingDonation.programmeId ?? null,
-    estimatedValueZar: totalValue,
+    estimatedValueZar,
     donorName: pendingDonation.donor_name ?? pendingDonation.donorName ?? null,
     donorContact: pendingDonation.donor_contact ?? pendingDonation.donorContact ?? null,
     donorTaxReference: pendingDonation.donor_tax_reference ?? pendingDonation.donorTaxReference ?? null,
     donorConsentGiven: pendingDonation.donor_consent_given ?? pendingDonation.donorConsentGiven ?? null,
     notes: pendingDonation.notes ?? null,
     idempotencyKey: pendingDonation.idempotency_key ?? pendingDonation.idempotencyKey ?? null,
-    items: acceptedItems.map((item) => ({
+    items: acceptedItems.map((item, index) => ({
+      lineNo: item.line_no ?? item.lineNo ?? index + 1,
       description: item.description,
       productId: item.product_id ?? item.productId ?? null,
       quantity: Number(item.quantity),
@@ -76,7 +127,7 @@ const buildDonationPayloadFromPending = (pendingDonation) => {
       routingStatus: item.routing_status ?? item.routingStatus ?? 'allocated',
       routedCategory: item.resolved_category ?? item.resolvedCategory ?? null,
       routingOutcome: item.routing_status ?? item.routingStatus ?? 'allocated',
-      routedSource: item.source ?? 'pending_donation',
+      routedSource: item.source ?? 'pending_manual_review',
       allocations: [],
     })),
   };
@@ -85,8 +136,63 @@ const buildDonationPayloadFromPending = (pendingDonation) => {
 const sortPendingItemsByLine = (items = []) =>
   [...items].sort((a, b) => Number(a.line_no ?? a.lineNo ?? 0) - Number(b.line_no ?? b.lineNo ?? 0));
 
-const sortDonationItemsById = (items = []) =>
-  [...items].sort((a, b) => Number(a.id) - Number(b.id));
+const sortDonationItemsByLine = (items = []) =>
+  [...items].sort((a, b) => Number(a.line_no ?? a.lineNo ?? 0) - Number(b.line_no ?? b.lineNo ?? 0));
+
+const validateIntakePayload = (data = {}) => {
+  const errors = {};
+  const itemErrors = {};
+  const valueRaw = data.estimatedValueZar ?? data.estimated_value_zar ?? 0;
+  const value = Number(valueRaw);
+  if (!Number.isFinite(value) || value < 0) errors.estimatedValueZar = 'Estimated value must be 0 or greater.';
+
+  const snapshot = typeof data.draftSnapshot === 'string'
+    ? (() => { try { return JSON.parse(data.draftSnapshot)?.draft ?? {}; } catch { return {}; } })()
+    : data.draftSnapshot?.draft ?? {};
+  const phasePayload = data.isFood !== undefined
+    || data.is_food !== undefined
+    || snapshot.isFood !== undefined
+    || snapshot.phase === 'donation-phase-1-4';
+  const isFood = data.isFood ?? data.is_food ?? snapshot.isFood;
+  if (phasePayload && isFood !== true && isFood !== false) errors.isFood = 'Food selection is required.';
+
+  const donorName = String(data.donorName ?? data.donor_name ?? '').trim();
+  const donorContact = String(data.donorContact ?? data.donor_contact ?? '').trim();
+  const donorConsentGiven = data.donorConsentGiven ?? data.donor_consent_given;
+  if (phasePayload && donorName && !donorContact) errors.donorContact = 'Donor email is required unless the donor is anonymous.';
+  if (phasePayload && donorConsentGiven === true) {
+    const email = validateEmail(donorContact, { required: true });
+    if (email.error) errors.donorContact = email.error;
+  } else if (phasePayload && donorContact) {
+    const email = validateEmail(donorContact, { required: false });
+    if (email.error) errors.donorContact = email.error;
+  }
+
+  const items = Array.isArray(data.items) ? data.items : [];
+  if (phasePayload && items.length === 0) errors.items = 'At least one donated item is required.';
+  items.forEach((item, index) => {
+    const row = {};
+    const quantity = Number(item?.quantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) row.quantity = 'Quantity must be greater than zero.';
+    if (phasePayload && !String(item?.unit ?? '').trim()) row.unit = 'A unit is required.';
+    if (phasePayload && isFood === true && !item?.productId && item?.unknownProduct !== true && item?.status !== 'PENDING_PRODUCT_REVIEW') {
+      row.product = 'Select a product or mark this line as an unknown product.';
+    }
+    if (Object.keys(row).length) itemErrors[index] = row;
+  });
+
+  if (Object.keys(errors).length || Object.keys(itemErrors).length) {
+    const err = new Error('Please fix the highlighted fields.');
+    err.status = 400;
+    err.errors = { ...errors };
+    Object.entries(itemErrors).forEach(([index, row]) => {
+      Object.entries(row).forEach(([field, message]) => {
+        err.errors[`items.${index}.${field}`] = message;
+      });
+    });
+    throw err;
+  }
+};
 
 const assertDonationItemPairingIsComplete = (pendingItems, donationItems, context) => {
   if (pendingItems.length !== donationItems.length) {
@@ -98,7 +204,7 @@ const assertDonationItemPairingIsComplete = (pendingItems, donationItems, contex
 
 const linkPendingItemsToDonationItems = async (pendingItems, donationItems, client, context) => {
   const pendingAcceptedOrder = sortPendingItemsByLine(pendingItems);
-  const donationItemOrder = sortDonationItemsById(donationItems);
+  const donationItemOrder = sortDonationItemsByLine(donationItems);
   assertDonationItemPairingIsComplete(pendingAcceptedOrder, donationItemOrder, context);
 
   for (const [index, pendingItem] of pendingAcceptedOrder.entries()) {
@@ -123,7 +229,7 @@ const savePendingDonationItemFlagLink = async (flagId, pendingDonationId, pendin
   );
 };
 
-const attemptCommitForPendingDonation = async (pendingDonationId) => {
+const attemptCommitForPendingDonation = async (pendingDonationId, { returnPendingDonation = false } = {}) => {
   const pendingDonation = await pendingDonationRepository.getPendingDonationById(pendingDonationId);
   if (!pendingDonation) {
     throw new Error(`Pending donation ${pendingDonationId} was not found while committing.`);
@@ -131,19 +237,18 @@ const attemptCommitForPendingDonation = async (pendingDonationId) => {
 
   const acceptedItems = (pendingDonation.items || []).filter((item) => item.status === 'resolved');
   if (acceptedItems.length === 0) {
-    await pendingDonationRepository.updatePendingDonationStatus(
+    const committed = await pendingDonationRepository.updatePendingDonationStatus(
       pendingDonationId,
       'committed',
       { committed_at: new Date() },
       pool
     );
-    return { pendingDonationId, donationId: pendingDonation.committed_donation_id ?? null, committed: true };
+    return committed || { pendingDonationId, donationId: pendingDonation.committed_donation_id ?? null, committed: true };
   }
 
   const payload = buildDonationPayloadFromPending(pendingDonation);
   const donationCreatorUserId = pendingDonation.created_by ?? pendingDonation.createdBy ?? null;
   let donationId = null;
-  let committedDonationIdPersisted = false;
 
   try {
     const created = await donationService.createDonation(payload, donationCreatorUserId);
@@ -167,7 +272,6 @@ const attemptCommitForPendingDonation = async (pendingDonationId) => {
         throw new Error(`Pending donation ${pendingDonationId} was no longer in committing state.`);
       }
       await client.query('COMMIT');
-      committedDonationIdPersisted = true;
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
@@ -196,28 +300,23 @@ const attemptCommitForPendingDonation = async (pendingDonationId) => {
       await client2.query('COMMIT');
     } catch (error) {
       await client2.query('ROLLBACK');
-      await pendingDonationRepository.updatePendingDonationStatus(
-        pendingDonationId,
-        'commit_incomplete',
-        { commit_incomplete_at: new Date() },
-        pool
-      );
       console.error(`[pendingDonation.service] Commit finalization failed after real donation created for pending donation ${pendingDonationId}:`, error);
       throw error;
     } finally {
       client2.release();
     }
 
+    if (returnPendingDonation) {
+      return await pendingDonationRepository.getPendingDonationById(pendingDonationId, pool);
+    }
     return { pendingDonationId, donationId, committed: true };
   } catch (error) {
-    if (!committedDonationIdPersisted) {
-      await pendingDonationRepository.updatePendingDonationStatus(
-        pendingDonationId,
-        'commit_failed',
-        { commit_failed_at: new Date() },
-        pool
-      );
-    }
+    await pendingDonationRepository.updatePendingDonationStatus(
+      pendingDonationId,
+      'commit_failed',
+      { commit_failed_at: new Date() },
+      pool
+    );
     console.error(`[pendingDonation.service] Failed to commit pending donation ${pendingDonationId}:`, error);
     throw error;
   }
@@ -226,10 +325,25 @@ const attemptCommitForPendingDonation = async (pendingDonationId) => {
 export const createPendingDonationFromIntake = async (payload = {}) => {
   const data = payload || {};
   const items = Array.isArray(data.items) ? data.items : [];
+  const idempotencyKey = data.idempotencyKey ?? data.idempotency_key ?? null;
   const client = await pool.connect();
 
   try {
     await client.query('BEGIN');
+
+    // Retried submit: the draft context deliberately reuses the same
+    // idempotency key (network blip, double tap, lost response). Answer
+    // with the original pending donation instead of hitting the unique
+    // index and 500ing — same contract as createDonation/createDelivery.
+    if (idempotencyKey) {
+      const existing = await pendingDonationRepository.findPendingDonationIdByIdempotencyKey(idempotencyKey, client);
+      if (existing) {
+        await client.query('COMMIT');
+        return await pendingDonationRepository.getPendingDonationById(existing.id, pool);
+      }
+    }
+
+    validateIntakePayload(data);
 
     const pendingDonation = await pendingDonationRepository.createPendingDonation(
       {
@@ -244,14 +358,21 @@ export const createPendingDonationFromIntake = async (payload = {}) => {
         section18aStatus: data.section18aStatus ?? data.section_18a_status ?? null,
         section18aQualifying: data.section18aQualifying ?? data.section_18a_qualifying ?? null,
         draftSnapshot: data.draftSnapshot ?? data.draft_snapshot ?? null,
-        idempotencyKey: data.idempotencyKey ?? data.idempotency_key ?? null,
+        idempotencyKey,
         createdBy: data.createdBy ?? data.created_by ?? null,
       },
       client
     );
 
     if (!pendingDonation) {
+      // Lost the insert race — another request wrote this key first.
       await client.query('ROLLBACK');
+      if (idempotencyKey) {
+        const existing = await pendingDonationRepository.findPendingDonationIdByIdempotencyKey(idempotencyKey, pool);
+        if (existing) {
+          return await pendingDonationRepository.getPendingDonationById(existing.id, pool);
+        }
+      }
       throw new Error('Failed to create pending donation row.');
     }
 
@@ -263,7 +384,16 @@ export const createPendingDonationFromIntake = async (payload = {}) => {
       // No donation-level fallback: a blank item category always flags
       // for manager review (BR-10 decision), even when the donation
       // itself has a valid category.
-      const routingPlan = await routePendingItem(item);
+      const forceProductReview = item.status === 'pending_product_review' || item.unknownProduct === true;
+      const routingPlan = forceProductReview
+        ? {
+      source: 'pending_manual_review',
+      resolvedCategory: null,
+      routingStatus: 'pending_product_review',
+      storageAreaHint: null,
+      shouldFlag: true,
+    }
+        : await routePendingItem(item);
       const persistedItem = {
         ...item,
         source: routingPlan.source ?? item.source ?? null,
@@ -356,7 +486,7 @@ export const createPendingDonationFromIntake = async (payload = {}) => {
 
     const result = await pendingDonationRepository.getPendingDonationById(pendingDonation.id, pool);
     if (unresolvedCount === 0 && result) {
-      await attemptCommitForPendingDonation(result.id);
+      return await attemptCommitForPendingDonation(pendingDonation.id, { returnPendingDonation: true });
     }
 
     return result || finalPendingDonation;
@@ -371,6 +501,7 @@ export const createPendingDonationFromIntake = async (payload = {}) => {
 
 export const resolveFlagAndMaybeCommit = async (flagId, resolution = {}) => {
   const data = resolution || {};
+  const reviewDecision = normalizeReviewDecision(data.decision);
   const accepted = data.accepted === true;
   const reason = data.reason ?? null;
   const resolvedBy = data.resolvedBy ?? data.resolved_by ?? null;
@@ -378,8 +509,11 @@ export const resolveFlagAndMaybeCommit = async (flagId, resolution = {}) => {
   if (!flagId) {
     fail(400, 'Flag ID is required.');
   }
-  if (!accepted && !reason) {
+  if (!reviewDecision && !accepted && !reason) {
     fail(400, 'A rejection reason is required when a flag is rejected.');
+  }
+  if (reviewDecision && !REVIEW_DECISIONS.has(reviewDecision)) {
+    fail(400, 'Decision must be one of: match_existing_product, create_product, move_to_non_food.');
   }
 
   const client = await pool.connect();
@@ -425,35 +559,148 @@ export const resolveFlagAndMaybeCommit = async (flagId, resolution = {}) => {
     const pendingDonation = await pendingDonationRepository.getPendingDonationById(pendingDonationId, client);
     const item = (pendingDonation?.items || []).find((row) => row.flag_id === flag.id || row.id === flag.pending_donation_item_id);
     const finalCategory = data.category ?? item?.resolved_category ?? item?.requested_category ?? null;
+    const pendingItemId = flag.pending_donation_item_id ?? item?.id ?? null;
+
+    if (!pendingItemId) {
+      await client.query('ROLLBACK');
+      fail(404, 'No pending donation item is linked to this flag.');
+    }
+
+    if (reviewDecision) {
+      let productId = null;
+      let resolvedCategory = finalCategory;
+      let routingStatus = 'accepted';
+      let auditAction = reviewDecision.toUpperCase();
+
+      if (reviewDecision === 'match_existing_product') {
+        productId = Number(data.productId ?? data.product_id);
+        if (!Number.isInteger(productId) || productId <= 0) {
+          await client.query('ROLLBACK');
+          fail(400, 'A valid productId is required when matching an existing product.');
+        }
+        const productDefault = await productRepository.getProductRoutingDefault(productId);
+        resolvedCategory = data.category
+          ? resolveReviewCategory(data.category)
+          : (productDefault?.donation_category || resolvedCategory || pendingDonation?.donation_category || null);
+        if (!resolvedCategory) {
+          await client.query('ROLLBACK');
+          fail(400, 'Matched products require an existing route default or a submitted category.');
+        }
+        await productRepository.upsertProductRoutingDefault({
+          productId,
+          donationCategory: resolvedCategory,
+          setBy: resolvedBy,
+        }, client);
+      }
+
+      if (reviewDecision === 'create_product') {
+        const productName = String(data.product?.name ?? data.name ?? item?.description ?? '').trim();
+        if (!productName) {
+          await client.query('ROLLBACK');
+          fail(400, 'Product name is required.');
+        }
+        resolvedCategory = resolveReviewCategory(data.product?.category ?? data.category);
+        const finalizedClassification = await donationAdminService.finalizePendingClassification({
+          flagId,
+          name: productName,
+          sku: data.product?.sku || data.sku || `PENDING-${flagId}`,
+          storageType: 'dry',
+          defaultUnit: item?.unit || 'kg',
+          category: resolvedCategory,
+          updatedBy: resolvedBy,
+        }, client);
+        productId = finalizedClassification?.flag?.product_id ?? flag.product_id ?? null;
+      } else {
+        await pendingDonationRepository.resolveWarehouseManagerFlag(
+          flagId,
+          { productId: reviewDecision === 'match_existing_product' ? productId : null },
+          client
+        );
+      }
+
+      if (reviewDecision === 'move_to_non_food') {
+        resolvedCategory = 'non_food';
+        routingStatus = 'non_food';
+        auditAction = 'MOVE_TO_NON_FOOD';
+      }
+
+      await pendingDonationRepository.markPendingItemResolved(
+        pendingItemId,
+        {
+          productId,
+          resolvedCategory,
+          routingStatus,
+          storageAreaHint: data.storageAreaHint ?? null,
+          resolvedBy,
+        },
+        client
+      );
+
+      await logAudit(client, {
+        entityType: 'pending_product_review',
+        entityId: flagId,
+        action: auditAction,
+        actorId: resolvedBy,
+        before: { status: flag.status, product_id: flag.product_id },
+        after: {
+          status: 'resolved',
+          product_id: productId,
+          pending_donation_id: pendingDonationId,
+          pending_donation_item_id: pendingItemId,
+          resolved_category: resolvedCategory,
+        },
+      });
+
+      const pendingDonationRow = await pendingDonationRepository.lockPendingDonationForUpdate(pendingDonationId, client);
+      const remainingUnresolved = await pendingDonationRepository.countUnresolvedFlagsForPendingDonation(pendingDonationId, client);
+
+      await pendingDonationRepository.updatePendingDonationStatus(
+        pendingDonationId,
+        remainingUnresolved === 0 ? 'committing' : 'awaiting_resolution',
+        {},
+        client
+      );
+
+      await client.query('COMMIT');
+
+      if (remainingUnresolved === 0 && pendingDonationRow) {
+        return await attemptCommitForPendingDonation(pendingDonationId);
+      }
+
+      return {
+        pendingDonationId,
+        status: remainingUnresolved === 0 ? 'committing' : 'awaiting_resolution',
+        flagId,
+        finalized: true,
+      };
+    }
 
     if (accepted && !finalCategory) {
       await client.query('ROLLBACK');
       fail(400, 'Accepted pending-donation resolutions require a category.');
     }
 
+    const requestedName = String(data.name || item?.description || '').trim();
+
     // Pass our own transaction client: we hold SELECT ... FOR UPDATE on the
     // flag row, so finalizePendingClassification must run on THIS connection
     // or its UPDATE self-deadlocks against our lock from a second connection.
-    await donationAdminService.finalizePendingClassification({
+    const finalizedClassification = await donationAdminService.finalizePendingClassification({
       flagId,
-      name: item?.description || `Pending donation item ${flagId}`,
-      sku: `PENDING-${flagId}`,
+      name: requestedName || `Pending donation item ${flagId}`,
+      sku: data.sku || `PENDING-${flagId}`,
       storageType: 'dry',
       defaultUnit: item?.unit || 'kg',
       category: finalCategory,
       updatedBy: resolvedBy,
     }, client);
 
-    const pendingItemId = flag.pending_donation_item_id ?? item?.id ?? null;
-    if (!pendingItemId) {
-      await client.query('ROLLBACK');
-      fail(404, 'No pending donation item is linked to this flag.');
-    }
-
     if (accepted) {
+      const resolvedProductId = finalizedClassification?.flag?.product_id ?? flag.product_id ?? null;
       await pendingDonationRepository.markPendingItemResolved(
         pendingItemId,
         {
+          productId: resolvedProductId,
           resolvedCategory: finalCategory,
           routingStatus: data.routingStatus ?? 'accepted',
           storageAreaHint: data.storageAreaHint ?? null,
@@ -543,7 +790,15 @@ export const retryCommit = async (pendingDonationId) => {
   if (pendingDonation.status === 'commit_incomplete') {
     const acceptedItems = (pendingDonation.items || []).filter((item) => item.status === 'resolved');
     const committedDonationId = pendingDonation.committed_donation_id ?? null;
-    if (!committedDonationId) fail(409, 'Pending donation is in commit_incomplete but has no committed_donation_id.');
+    if (!committedDonationId) {
+      await pendingDonationRepository.updatePendingDonationStatus(
+        pendingDonationId,
+        'committing',
+        {},
+        pool
+      );
+      return await attemptCommitForPendingDonation(pendingDonationId);
+    }
 
     const donationItems = await pendingDonationRepository.listDonationItemsForDonation(committedDonationId, pool);
 

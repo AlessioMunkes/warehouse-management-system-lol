@@ -106,10 +106,14 @@ export const AuthProvider = ({ children }) => {
 
   // ── Login ─────────────────────────────────────────────────────
   const login = async (username, password) => {
+    console.log("[AUTH] login()", username);
+    console.log("[AUTH] calling apiPost");
     const data = await apiPost('/api/login', { username, password });
+    console.log("[AUTH] apiPost returned", data);
     writeCachedUser(data.user);
     setUser(data.user);
     setSessionMessage(null);
+    console.log("[AUTH] returning user", data.user);
     return data.user;
   };
 

@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import donationManagementAPI, { RECONCILIATION_STATUSES } from '@/services/donationManagementAPI';
 
-export default function useReconciliationQueue() {
+export default function useReconciliationQueue(statuses = RECONCILIATION_STATUSES) {
   const [items, setItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -25,14 +25,14 @@ export default function useReconciliationQueue() {
     setError('');
 
     try {
-      const rows = await donationManagementAPI.getPendingDonations(RECONCILIATION_STATUSES);
+      const rows = await donationManagementAPI.getPendingDonations(statuses);
       setItems(rows);
     } catch (loadError) {
       setError(loadError.message || 'Could not load the reconciliation queue.');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [statuses]);
 
   useEffect(() => {
     void refresh();

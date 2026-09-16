@@ -4,7 +4,7 @@
  * This page provides the detailed workspace for managing a single volunteer event.
  * It loads and displays all related data for one event including:
  *   - Event details (name, date, venue, description, status)
- *   - Timeslot management (create, edit, close, cancel timeslots)
+ *   - Schedule and capacity information
  *   - Booking management (view bookings, register walk-ins)
  *   - Attendance tracking (check-in/check-out volunteers)
  *   - VMS sync status (monitor and retry synchronization with external system)
@@ -43,8 +43,6 @@ export default function VolunteerEventWorkspacePage() {
   const [summaries, setSummaries] = useState([]);
   const [sync, setSync] = useState(null);
   const [spaces, setSpaces] = useState([]);
-  const [spacesLoading, setSpacesLoading] = useState(true);
-  const [spacesError, setSpacesError] = useState('');
   const [isLoading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -80,15 +78,6 @@ export default function VolunteerEventWorkspacePage() {
     try { await applyData(); } catch (err) { setError(err.message); } finally { setLoading(false); }
   }, [applyData]);
 
-  // Spaces have their own retry state because a failed picker should not hide
-  // bookings or attendance that were loaded successfully.
-  const loadSpaces = useCallback(async () => {
-    setSpacesLoading(true); setSpacesError('');
-    try { setSpaces(await volunteerManagementAPI.getSpaces()); }
-    catch (err) { setSpacesError(err.message); }
-    finally { setSpacesLoading(false); }
-  }, []);
-
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
@@ -99,16 +88,12 @@ export default function VolunteerEventWorkspacePage() {
   }, [applyData]);
 
   useEffect(() => {
-    if (!canManage) {
-      return undefined;
-    }
     let cancelled = false;
     volunteerManagementAPI.getSpaces()
       .then((rows) => { if (!cancelled) setSpaces(rows); })
-      .catch((err) => { if (!cancelled) setSpacesError(err.message); })
-      .finally(() => { if (!cancelled) setSpacesLoading(false); });
+      .catch(() => { if (!cancelled) setSpaces([]); });
     return () => { cancelled = true; };
-  }, [canManage]);
+  }, []);
 
   // Timeslot and sync mutations all refresh the workspace from server truth.
   const mutate = async (operation, message) => {
@@ -117,23 +102,6 @@ export default function VolunteerEventWorkspacePage() {
     catch (err) { setError(err.message); return false; }
     finally { setBusy(false); }
   };
-
-  const createTimeslot = (payload) => mutate(() => volunteerManagementAPI.createEventBooking(eventId, payload), 'Timeslot added and VMS publication started.');
-  const createSpace = async (payload) => {
-    setBusy(true); setError('');
-    try {
-      const created = await volunteerManagementAPI.createSpace(payload);
-      await loadSpaces();
-      setSuccess('Space added.');
-      return created;
-    } catch (err) {
-      setError(err.message);
-      return null;
-    } finally { setBusy(false); }
-  };
-  const updateTimeslot = (timeslotId, payload) => mutate(() => volunteerManagementAPI.updateTimeslot(eventId, timeslotId, payload), 'Timeslot updated.');
-  const closeTimeslot = (timeslotId) => mutate(() => volunteerManagementAPI.closeTimeslot(timeslotId), 'Timeslot closed.');
-  const cancelTimeslot = (timeslotId) => mutate(() => volunteerManagementAPI.cancelTimeslot(timeslotId), 'Timeslot cancelled.');
 
   const createWalkIn = async (timeslotId, payload) => {
     setBusy(true); setWalkInError(''); setSuccess('');
@@ -161,7 +129,7 @@ export default function VolunteerEventWorkspacePage() {
       {/* Keep all workspace panels backed by the same event snapshot. */}
       {isLoading ? <div role="status" aria-label="Loading event workspace" className="grid gap-4"><Skeleton className="h-28 w-full" /><Skeleton className="h-64 w-full" /><Skeleton className="h-64 w-full" /></div> : event ? <>
         <Card><CardContent className="p-5 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3"><div><h1 className="text-2xl font-black">{event.name}</h1><p className="text-sm text-muted-foreground mt-1">{formatDate(event.eventDate)}</p>{event.venueName && <p className="mt-2 text-sm font-semibold">{event.venueName}</p>}{event.address && <p className="text-sm text-muted-foreground">{event.address}</p>}{event.description && <p className="mt-3 text-sm">{event.description}</p>}</div><Badge variant="outline">{event.statusLabel}</Badge></CardContent></Card>
-        {canManage && <TimeslotPanel timeslots={workspace.timeslots} capacityBySlot={capacityBySlot} spaces={spaces} spacesLoading={spacesLoading} spacesError={spacesError} onRetrySpaces={loadSpaces} onCreateSpace={createSpace} busy={busy} canEdit={eventIsActive} onCreate={createTimeslot} onUpdate={updateTimeslot} onClose={closeTimeslot} onCancel={cancelTimeslot} />}
+        <TimeslotPanel timeslots={workspace.timeslots} capacityBySlot={capacityBySlot} spaces={spaces} />
         <BookingTable bookings={bookings} timeslots={workspace.timeslots} spaces={spaces} attendanceByBooking={attendanceByBooking} summaries={summaries} busyBookingId={busyBookingId} canAddWalkIn={canManage && eventIsActive} canRecordAttendance={canRecordAttendance && event.status !== 'CANCELLED'} onCheckIn={(id) => setAttendance(id, true)} onCheckOut={(id) => setAttendance(id, false)} onAddWalkIn={() => { setWalkInError(''); setWalkInOpen(true); }} />
         {canManage && <SyncStatusCard sync={sync} busy={busy} onRetry={retrySync} />}
       </> : !error ? <p className="py-12 text-center text-sm text-muted-foreground">Event not found.</p> : null}

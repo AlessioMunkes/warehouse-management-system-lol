@@ -17,7 +17,7 @@
 // successful submit (clearDraft in ReceivingFlow / PalletCheck), so a
 // finished job leaves nothing behind to offer.
 // ─────────────────────────────────────────────────────────────
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { listDrafts, clearDraft } from '../hooks/useDraft';
 import { STAFF } from '../../../routes/paths';
@@ -66,12 +66,10 @@ const sinceWords = (at) => {
 };
 
 export default function UnfinishedWork() {
-  const [drafts, setDrafts] = useState([]);
-
   // Read once on mount. localStorage does not notify this tab about
   // its own writes, and re-reading on an interval would be polling a
   // thing that only changes when the worker leaves this screen.
-  useEffect(() => { setDrafts(listDrafts()); }, []);
+  const [drafts, setDrafts] = useState(() => listDrafts());
 
   const items = drafts
     .map((draft) => ({ draft, ...(describe(draft) ?? {}) }))

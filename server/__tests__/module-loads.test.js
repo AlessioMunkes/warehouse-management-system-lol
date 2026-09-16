@@ -50,6 +50,8 @@ describe('every source module parses', () => {
     // entire point.
     const stripped = source
       .replace(/^\s*import\s[^;]*;?\s*$/gm, '')
+      .replace(/^\s*export\s+\*\s+from\s+['"][^'"]+['"];?\s*$/gm, '')
+      .replace(/^\s*export\s+\{[^}]+\}\s+from\s+['"][^'"]+['"];?\s*$/gm, '')
       .replace(/^\s*export\s+default\s+/gm, 'void ')
       .replace(/^\s*export\s+/gm, '');
     expect(() => new vm.Script(stripped, { filename: full })).not.toThrow();

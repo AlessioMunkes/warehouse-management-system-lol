@@ -208,10 +208,21 @@ export default function ProductManagementPage() {
   // overwrite fresher state.
   useEffect(() => {
     let cancelled = false;
-    setIsLoading(true);
-    loadProducts().finally(() => { if (!cancelled) setIsLoading(false); });
+    productAPI.getProducts({ includeInactive, search })
+      .then((rows) => {
+        if (!cancelled) {
+          setProducts(rows);
+          setError(null);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message || 'Could not load products.');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
     return () => { cancelled = true; };
-  }, [loadProducts]);
+  }, [includeInactive, search]);
 
   const open = async (id) => {
     setError(null);
@@ -330,7 +341,7 @@ export default function ProductManagementPage() {
                     <InputGroupInput
                       placeholder="Search by name, SKU or category"
                       value={search}
-                      onChange={(e) => setSearch(e.target.value)}
+                      onChange={(e) => { setIsLoading(true); setSearch(e.target.value); }}
                     />
                   </InputGroup>
 
@@ -338,7 +349,7 @@ export default function ProductManagementPage() {
                     <Checkbox
                       id="include-inactive"
                       checked={includeInactive}
-                      onCheckedChange={(v) => setIncludeInactive(Boolean(v))}
+                      onCheckedChange={(v) => { setIsLoading(true); setIncludeInactive(Boolean(v)); }}
                     />
                     <FieldLabel htmlFor="include-inactive" className="font-normal">
                       Show inactive

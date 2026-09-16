@@ -7,6 +7,7 @@ const handleError = (res, label, fallbackMessage) => (err) => {
   return res.status(status).json({
     success: false,
     message: status < 500 ? err.message : fallbackMessage,
+    ...(err.errors ? { errors: err.errors } : {}),
   });
 };
 

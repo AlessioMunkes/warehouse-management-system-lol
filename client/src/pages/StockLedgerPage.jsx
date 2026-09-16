@@ -111,7 +111,6 @@ export default function StockLedgerPage() {
   // ── First page, and every refetch when a filter changes ────
   useEffect(() => {
     let cancelled = false;
-    setIsLoading(true);
 
     getLedger({ ...filters(), limit: 50 })
       .then((res) => {
@@ -177,12 +176,14 @@ export default function StockLedgerPage() {
   };
 
   const toggleType = (value) => {
+    setIsLoading(true);
     setTypes((prev) =>
       prev.includes(value) ? prev.filter((t) => t !== value) : [...prev, value],
     );
   };
 
   const resetFilters = () => {
+    setIsLoading(true);
     setRange("30");
     setProductId("");
     setPerformedBy("");
@@ -234,7 +235,7 @@ export default function StockLedgerPage() {
                 Period
                 <select
                   value={range}
-                  onChange={(e) => setRange(e.target.value)}
+                  onChange={(e) => { setIsLoading(true); setRange(e.target.value); }}
                   className="h-9 rounded-md border bg-background px-2 text-sm"
                 >
                   {RANGES.map((r) => (
@@ -247,7 +248,7 @@ export default function StockLedgerPage() {
                 Product
                 <select
                   value={productId}
-                  onChange={(e) => setProductId(e.target.value)}
+                  onChange={(e) => { setIsLoading(true); setProductId(e.target.value); }}
                   className="h-9 max-w-[220px] rounded-md border bg-background px-2 text-sm"
                 >
                   <option value="">All products</option>
@@ -261,7 +262,7 @@ export default function StockLedgerPage() {
                 Recorded by
                 <select
                   value={performedBy}
-                  onChange={(e) => setPerformedBy(e.target.value)}
+                  onChange={(e) => { setIsLoading(true); setPerformedBy(e.target.value); }}
                   className="h-9 rounded-md border bg-background px-2 text-sm"
                 >
                   <option value="">Anyone</option>

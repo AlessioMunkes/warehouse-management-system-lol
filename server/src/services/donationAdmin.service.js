@@ -75,9 +75,30 @@ class DonationAdminService {
       fail(404, `No pending classification found for flag ${normalizedFlagId}.`);
     }
 
-    const productId = Number(flagRes.rows[0].product_id);
+    const placeholderProductId = Number(flagRes.rows[0].product_id);
 
-    const productResult = await client.query(
+    const existingProductResult = await client.query(
+      `SELECT id, name, stock_keeping_unit AS sku, storage_type, default_unit, is_active
+       FROM products
+       WHERE LOWER(name) = LOWER($1)
+         AND id <> $2
+       LIMIT 1;`,
+      [trimmedName, placeholderProductId]
+    );
+
+    const existingProduct = existingProductResult.rows[0] || null;
+    const productId = existingProduct ? Number(existingProduct.id) : placeholderProductId;
+
+    if (existingProduct) {
+      await client.query(
+        `UPDATE warehouse_manager_flags
+         SET product_id = $1
+         WHERE id = $2;`,
+        [productId, normalizedFlagId]
+      );
+    }
+
+    const productResult = existingProduct ? { rows: [existingProduct] } : await client.query(
       `UPDATE products
        SET name = $1,
            stock_keeping_unit = $2,
@@ -86,7 +107,7 @@ class DonationAdminService {
            is_active = true
        WHERE id = $5
        RETURNING id, name, stock_keeping_unit AS sku, storage_type, default_unit, is_active;`,
-      [trimmedName, normalizedSku, normalizedStorageType, normalizedDefaultUnit, productId]
+      [trimmedName, normalizedSku, normalizedStorageType, normalizedDefaultUnit, placeholderProductId]
     );
 
     const result = await client.query(

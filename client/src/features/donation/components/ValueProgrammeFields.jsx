@@ -17,16 +17,19 @@ const valueMessage = (v) => {
   return { valid: true, message: "Looks good." };
 };
 
-export function ValueProgrammeFields({ estimatedValueZar, programmeCode, onChange }) {
+export function ValueProgrammeFields({ estimatedValueZar, programmeCode, onChange, error }) {
   const [touched, setTouched] = useState(false);
   const state = valueMessage(estimatedValueZar);
+  const showValidation = touched || Boolean(error);
+  const message = error || state.message;
 
   return (
     <div className="stf-step-body">
       <div className="stf-field">
         <span className="stf-field-label">Estimated value (ZAR)</span>
         <input
-          className={`stf-input ${!touched ? "" : state.valid ? "is-valid" : "is-flagged"}`}
+          id="estimated-value-zar"
+          className={`stf-input ${!showValidation ? "" : state.valid && !error ? "is-valid" : "is-flagged"}`}
           type="number"
           min="0"
           step="0.01"
@@ -38,12 +41,12 @@ export function ValueProgrammeFields({ estimatedValueZar, programmeCode, onChang
           onBlur={() => setTouched(true)}
           placeholder="0.00"
         />
-        {touched ? (
+        {showValidation ? (
           <span
-            className={`stf-field-hint ${state.valid ? "is-valid-msg" : ""}`}
-            style={!state.valid ? { color: "var(--stf-attention)" } : undefined}
+            className={`stf-field-hint ${state.valid && !error ? "is-valid-msg" : ""}`}
+            style={state.valid && !error ? undefined : { color: "var(--stf-attention)" }}
           >
-            {state.message}
+            {message}
           </span>
         ) : (
           <span className="stf-field-hint">

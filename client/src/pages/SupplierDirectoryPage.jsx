@@ -317,10 +317,28 @@ export default function SupplierDirectoryPage() {
   // fresher state.
   useEffect(() => {
     let cancelled = false;
-    setIsLoading(true);
-    reload().finally(() => { if (!cancelled) setIsLoading(false); });
+    const request = tab === 'suppliers'
+      ? supplierAPI.getSuppliers({ includeInactive, search })
+      : supplierAPI.getProspects();
+    request
+      .then((rows) => {
+        if (cancelled) return;
+        if (tab === 'suppliers') setSuppliers(rows);
+        else setProspects(rows);
+        setError(null);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err.message || (tab === 'suppliers'
+            ? 'Could not load suppliers.'
+            : 'Could not load prospects.'));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
     return () => { cancelled = true; };
-  }, [reload]);
+  }, [tab, includeInactive, search]);
 
   const open = async (id) => {
     setError(null);
@@ -429,7 +447,7 @@ export default function SupplierDirectoryPage() {
             <button
               key={t.id}
               type="button"
-              onClick={() => { setTab(t.id); setSelected(null); setMode('list'); }}
+              onClick={() => { setIsLoading(true); setTab(t.id); setSelected(null); setMode('list'); }}
               className={
                 tab === t.id
                   ? 'border-b-2 border-foreground px-4 py-2 text-sm font-medium'
@@ -496,7 +514,7 @@ export default function SupplierDirectoryPage() {
                     <InputGroupInput
                       placeholder="Search by name, category or agreement reference"
                       value={search}
-                      onChange={(e) => setSearch(e.target.value)}
+                      onChange={(e) => { setIsLoading(true); setSearch(e.target.value); }}
                     />
                   </InputGroup>
 
@@ -504,7 +522,7 @@ export default function SupplierDirectoryPage() {
                     <Checkbox
                       id="include-inactive"
                       checked={includeInactive}
-                      onCheckedChange={(v) => setIncludeInactive(Boolean(v))}
+                      onCheckedChange={(v) => { setIsLoading(true); setIncludeInactive(Boolean(v)); }}
                     />
                     <FieldLabel htmlFor="include-inactive" className="font-normal">
                       Show inactive

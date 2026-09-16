@@ -47,7 +47,7 @@ export default function ReportingPage() {
   useEffect(() => {
     let cancelled = false;
     getCatalog()
-      .then((res) => {
+      .then(async (res) => {
         if (cancelled) return;
         const data = res.data ?? res;
         setCatalog(data);
@@ -55,6 +55,20 @@ export default function ReportingPage() {
         if (first) {
           setMetricId(first.id);
           setDimension(first.dimensions[0].id);
+          setBusy(true);
+          try {
+            const reportRes = await runReport({
+              metric: first.id,
+              dimension: first.dimensions[0].id,
+              filters: {},
+              dateRange: resolvePreset(DEFAULT_PRESET),
+            });
+            if (!cancelled) setReport(reportRes.data ?? reportRes);
+          } catch (err) {
+            if (!cancelled) setError(err.message);
+          } finally {
+            if (!cancelled) setBusy(false);
+          }
         }
       })
       .catch((err) => !cancelled && setError(err.message));
@@ -112,14 +126,6 @@ export default function ReportingPage() {
       setFilters(aiReport.spec.filters ?? {});
     }
   };
-
-  // Run the first report automatically once the catalog lands, so
-  // the page opens with something on it. Render's free tier
-  // cold-starts, and a blank screen while it wakes reads as broken.
-  useEffect(() => {
-    if (catalog && metricId && !report && !busy && !error) run();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [catalog, metricId]);
 
   const metric = catalog?.metrics.find((m) => m.id === metricId);
   const dimensionLabel =

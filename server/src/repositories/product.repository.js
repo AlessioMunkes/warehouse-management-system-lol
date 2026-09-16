@@ -373,8 +373,8 @@ const getProductRoutingDefault = async (productId) => {
 };
 
 /**
- * Searches active products by (partial, case-insensitive) name for the
- * staff intake "match to stock item" combobox. Wildcard metacharacters
+ * Searches active products by (partial, case-insensitive) name or SKU for
+ * the staff intake "match to stock item" combobox. Wildcard metacharacters
  * in the term are escaped so a literal "%" or "_" in what staff typed is
  * matched literally, not as a pattern. Returns at most `limit` rows.
  */
@@ -387,12 +387,61 @@ const searchProductsByName = async (term, { limit = 10 } = {}) => {
     SELECT id, name, stock_keeping_unit AS sku, weight_kg
     FROM products
     WHERE is_active = true
-      AND name ILIKE $1
+      AND stock_keeping_unit NOT ILIKE 'PENDING-%'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM warehouse_manager_flags wmf
+        WHERE wmf.product_id = products.id
+          AND wmf.status IN ('pending', 'pending_classification')
+      )
+      AND (name ILIKE $1 OR stock_keeping_unit ILIKE $1)
     ORDER BY name ASC
     LIMIT $2;
   `;
   const result = await pool.query(query, [`%${escaped}%`, limit]);
-  return result.rows;
+  if (result.rows.length > 0) return result.rows;
+
+  const candidates = await pool.query(
+    `SELECT id, name, stock_keeping_unit AS sku, weight_kg
+     FROM products
+     WHERE is_active = true
+       AND stock_keeping_unit NOT ILIKE 'PENDING-%'
+       AND NOT EXISTS (
+         SELECT 1
+         FROM warehouse_manager_flags wmf
+         WHERE wmf.product_id = products.id
+           AND wmf.status IN ('pending', 'pending_classification')
+       )
+     ORDER BY name ASC
+     LIMIT 250;`
+  );
+  const needle = trimmed.toLowerCase();
+  const distance = (a, b) => {
+    const dp = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+    for (let j = 1; j <= b.length; j += 1) dp[0][j] = j;
+    for (let i = 1; i <= a.length; i += 1) {
+      for (let j = 1; j <= b.length; j += 1) {
+        dp[i][j] = Math.min(
+          dp[i - 1][j] + 1,
+          dp[i][j - 1] + 1,
+          dp[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+        );
+      }
+    }
+    return dp[a.length][b.length];
+  };
+
+  return candidates.rows
+    .map((row) => {
+      const haystack = `${row.name ?? ''} ${row.sku ?? ''}`.toLowerCase();
+      const words = haystack.split(/[^a-z0-9]+/).filter(Boolean);
+      const score = Math.min(...words.map((word) => distance(needle, word)));
+      return { row, score };
+    })
+    .filter(({ score }) => score <= Math.max(2, Math.floor(needle.length / 3)))
+    .sort((a, b) => a.score - b.score || a.row.name.localeCompare(b.row.name))
+    .slice(0, limit)
+    .map(({ row }) => row);
 };
 
 const getPendingClassifications = async ({ countOnly = false } = {}) => {
@@ -415,8 +464,12 @@ const getPendingClassifications = async ({ countOnly = false } = {}) => {
       wmf.pending_donation_item_id,
       pd.donor_name AS donor_name,
       pd.donation_category AS donation_category,
+      pd.created_at AS donation_date,
+      pd.draft_snapshot AS draft_snapshot,
       pii.description AS item_description,
+      pii.line_no AS line_no,
       pii.unit AS item_unit,
+      pii.quantity AS item_quantity,
       donation_items_agg.items AS donation_items
     FROM products p
     JOIN warehouse_manager_flags wmf ON wmf.product_id = p.id

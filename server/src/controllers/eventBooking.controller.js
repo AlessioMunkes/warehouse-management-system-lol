@@ -65,6 +65,26 @@ const getTimeslotsForEvent = async (req, res, next) => {
   }
 };
 
+// ── POST /api/love-activism/events/with-initial-timeslot ──────
+const createEventWithInitialTimeslot = async (req, res, next) => {
+  try {
+    const result = await eventBookingService.createEventWithInitialTimeslot(req.body, req.user);
+    res.status(201).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ── POST /api/love-activism/timeslots/validate ────────────────
+const validateTimeslotAvailability = async (req, res, next) => {
+  try {
+    const result = await eventBookingService.validateTimeslotAvailability(req.body);
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // ── PATCH /api/love-activism/timeslots/:timeslotId/close ─────
 const closeTimeslot = async (req, res, next) => {
   try {
@@ -97,9 +117,11 @@ const getCapacitySummary = async (req, res, next) => {
 
 export default {
   bookEventSpaceAndTimeslots,
+  createEventWithInitialTimeslot,
   updateEventBooking,
   getEventBooking,
   getTimeslotsForEvent,
+  validateTimeslotAvailability,
   closeTimeslot,
   cancelTimeslot,
   getCapacitySummary,

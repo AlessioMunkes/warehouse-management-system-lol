@@ -1,4 +1,4 @@
-// ─────────────────────────────────────────────────────────────
+﻿// ─────────────────────────────────────────────────────────────
 // features/donationManagement/components/FlaggedItemsTab.jsx
 //
 // The Flagged Items tab of the Donation Management page. Renders one
@@ -15,7 +15,7 @@
 // resolves it, so we badge those rows as placeholders.
 // ─────────────────────────────────────────────────────────────
 import { useState } from 'react';
-import { Loader2, RefreshCw, X } from 'lucide-react';
+import { ChevronDown, Loader2, RefreshCw } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -29,8 +29,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { PRODUCT_CLASSIFICATION_CATEGORIES } from '@/services/donationManagementAPI';
+import { ProductMatchCombobox } from '@/features/donation/components/ProductMatchComboBox';
 import useFlaggedItems from '../hooks/useFlaggedItems';
 
 const formatCategoryLabel = (category = '') =>
@@ -51,20 +51,57 @@ const resolveMessage = (result = {}) => {
 
 const isPlaceholder = (row = {}) =>
   String(row.name || '').startsWith('[Unclassified]') || row.is_active === false;
+
+const REVIEW_ROUTES = [
+  { value: 'recipe_food', label: 'Recipe Food' },
+  { value: 'add_on_food', label: 'ECD Add-on' },
+  { value: 'non_recipe_food', label: 'Soup Kitchen Add-on' },
+];
+
+const formatDate = (value) => {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleDateString();
+};
+
+const parseSnapshot = (snapshot) => {
+  if (!snapshot) return null;
+  if (typeof snapshot === 'object') return snapshot;
+  try {
+    return JSON.parse(snapshot);
+  } catch {
+    return null;
+  }
+};
+
+const getSnapshotItem = (flag = {}) => {
+  const snapshot = parseSnapshot(flag.draft_snapshot);
+  const items = Array.isArray(snapshot?.items) ? snapshot.items : [];
+  return items.find((item) =>
+    Number(item.lineNo ?? item.line_no) === Number(flag.line_no)
+    || String(item.description || '').trim() === String(flag.item_description || '').trim()
+  ) || null;
+};
+
 const IntakeFlagRow = ({ flag, busy, onResolve }) => {
-  const [category, setCategory] = useState(flag.donation_category || '');
-  const [rejectReason, setRejectReason] = useState('');
+  const [isOpen, setIsOpen] = useState(false);
+  const [selectedProductId, setSelectedProductId] = useState(null);
+  const [selectedProductName, setSelectedProductName] = useState('');
+  const [selectedProductCategory, setSelectedProductCategory] = useState('');
+  const [newProductName, setNewProductName] = useState(flag.item_description || flag.name || '');
+  const [newProductBrand, setNewProductBrand] = useState('');
+  const [newProductCategory, setNewProductCategory] = useState(flag.donation_category || '');
   const [message, setMessage] = useState('');
 
-  const handleAccept = async () => {
-    if (!category) return;
-    const result = await onResolve(flag.flag_id, { accepted: true, category });
-    if (result) setMessage(resolveMessage(result));
-  };
+  const snapshotItem = getSnapshotItem(flag);
+  const qty = flag.item_quantity ?? snapshotItem?.quantity ?? '-';
+  const weight = snapshotItem?.weight ?? snapshotItem?.weightKg ?? snapshotItem?.weight_kg ?? flag.quantity_kg ?? '-';
+  const expiry = snapshotItem?.expiryDate ?? snapshotItem?.expiry_date ?? null;
+  const donationLabel = flag.pending_donation_id ? `Donation #${flag.pending_donation_id}` : 'Donation';
 
-  const handleReject = async () => {
-    if (!rejectReason.trim()) return;
-    const result = await onResolve(flag.flag_id, { accepted: false, reason: rejectReason.trim() });
+  const resolve = async (payload) => {
+    const result = await onResolve(flag.flag_id, payload);
     if (result) setMessage(resolveMessage(result));
   };
 
@@ -79,13 +116,18 @@ const IntakeFlagRow = ({ flag, busy, onResolve }) => {
               {flag.item_description || flag.name || 'Unnamed item'}
             </span>
           </div>
-          <span className="text-xs text-muted-foreground">
-            {flag.quantity_kg != null ? `${flag.quantity_kg} kg` : ''}
-          </span>
+          <Button type="button" variant="outline" size="sm" onClick={() => setIsOpen((value) => !value)}>
+            <ChevronDown className={`mr-1 transition-transform ${isOpen ? 'rotate-180' : ''}`} /> Review
+          </Button>
         </div>
-        <p className="text-xs text-muted-foreground">
-          {[flag.donor_name, flag.donation_category].filter(Boolean).join(' · ') || '—'}
-        </p>
+        <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-4">
+          <span><strong className="text-[#2b3336]">Donation:</strong> {donationLabel}</span>
+          <span><strong className="text-[#2b3336]">Donor:</strong> {flag.donor_name || '-'}</span>
+          <span><strong className="text-[#2b3336]">Qty:</strong> {qty}</span>
+          <span><strong className="text-[#2b3336]">Weight:</strong> {weight === '-' ? '-' : `${weight} kg`}</span>
+          <span><strong className="text-[#2b3336]">Expiry:</strong> {formatDate(expiry)}</span>
+          <span><strong className="text-[#2b3336]">Date:</strong> {formatDate(flag.donation_date || flag.flagged_at)}</span>
+        </div>
       </CardHeader>
 
       <CardContent className="pt-4">
@@ -128,43 +170,93 @@ const IntakeFlagRow = ({ flag, busy, onResolve }) => {
           </div>
         ) : null}
 
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="w-[220px] bg-[#f8f5f2]" aria-label="Resolution category">
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                {PRODUCT_CLASSIFICATION_CATEGORIES.map((cat) => (
-                  <SelectItem key={cat} value={cat}>{formatCategoryLabel(cat)}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button type="button" onClick={handleAccept} disabled={!category || busy}>
-              {busy ? <Loader2 className="animate-spin" /> : null} Accept
-            </Button>
-          </div>
+        {isOpen ? (
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="rounded-[8px] border border-[#e9e3dd] p-3">
+              <h3 className="text-sm font-semibold text-[#2b3336]">Match Existing Product</h3>
+              <div className="mt-3">
+                <ProductMatchCombobox
+                  value={selectedProductId}
+                  label={selectedProductName}
+                  onSelect={(id, label) => {
+                    setSelectedProductId(id);
+                    setSelectedProductName(label);
+                  }}
+                />
+              </div>
+              <div className="mt-3">
+                <Select value={selectedProductCategory} onValueChange={setSelectedProductCategory}>
+                  <SelectTrigger className="bg-[#f8f5f2]" aria-label="Existing product route">
+                    <SelectValue placeholder="Choose route" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {REVIEW_ROUTES.map((route) => (
+                      <SelectItem key={route.value} value={route.value}>{route.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                type="button"
+                className="mt-3"
+                onClick={() => resolve({
+                  decision: 'match_existing_product',
+                  productId: selectedProductId,
+                  category: selectedProductCategory,
+                })}
+                disabled={!selectedProductId || !selectedProductCategory || busy}
+              >
+                {busy ? <Loader2 className="animate-spin" /> : null} Link Product
+              </Button>
+            </div>
 
-          <div className="grid gap-2">
-            <Textarea
-              aria-label="Rejection reason"
-              placeholder="Reason for rejection (required to reject)"
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              rows={2}
-            />
-            <div>
+            <div className="rounded-[8px] border border-[#e9e3dd] p-3">
+              <h3 className="text-sm font-semibold text-[#2b3336]">Create Product</h3>
+              <div className="mt-3 grid gap-3">
+                <Input aria-label="New product name" value={newProductName} onChange={(e) => setNewProductName(e.target.value)} />
+                <Input aria-label="Brand" placeholder="Brand (optional)" value={newProductBrand} onChange={(e) => setNewProductBrand(e.target.value)} />
+                <Select value={newProductCategory} onValueChange={setNewProductCategory}>
+                  <SelectTrigger className="bg-[#f8f5f2]" aria-label="Product route">
+                    <SelectValue placeholder="Choose route" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {REVIEW_ROUTES.map((route) => (
+                      <SelectItem key={route.value} value={route.value}>{route.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                type="button"
+                className="mt-3"
+                onClick={() => resolve({
+                  decision: 'create_product',
+                  product: {
+                    name: newProductName.trim(),
+                    brand: newProductBrand.trim() || null,
+                    category: newProductCategory,
+                  },
+                })}
+                disabled={!newProductName.trim() || !newProductCategory || busy}
+              >
+                {busy ? <Loader2 className="animate-spin" /> : null} Save Product
+              </Button>
+            </div>
+
+            <div className="rounded-[8px] border border-[#e9e3dd] p-3">
+              <h3 className="text-sm font-semibold text-[#2b3336]">Move to Non-Food</h3>
               <Button
                 type="button"
                 variant="outline"
-                onClick={handleReject}
-                disabled={!rejectReason.trim() || busy}
+                className="mt-3"
+                onClick={() => resolve({ decision: 'move_to_non_food' })}
+                disabled={busy}
               >
-                {busy ? <Loader2 className="animate-spin" /> : <X className="mr-1" />} Reject
+                {busy ? <Loader2 className="animate-spin" /> : null} Move to Non-Food
               </Button>
             </div>
           </div>
-        </div>
+        ) : null}
       </CardContent>
     </Card>
   );
@@ -242,10 +334,10 @@ const LegacyFlagRow = ({ flag, busy, onResolve }) => {
             <Input className="mt-1 bg-[#f8f5f2]" value={defaultUnit} onChange={(e) => setDefaultUnit(e.target.value)} />
           </label>
           <label className="text-sm font-medium text-[#2b3336] sm:col-span-2">
-            Donation category
+            Route
             <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="mt-1 w-full bg-[#f8f5f2]" aria-label="Donation category">
-                <SelectValue placeholder="Select category" />
+              <SelectTrigger className="mt-1 w-full bg-[#f8f5f2]" aria-label="Route">
+                <SelectValue placeholder="Select route" />
               </SelectTrigger>
               <SelectContent>
                 {PRODUCT_CLASSIFICATION_CATEGORIES.map((cat) => (
@@ -258,7 +350,7 @@ const LegacyFlagRow = ({ flag, busy, onResolve }) => {
 
         <div className="mt-4 flex justify-end">
           <Button type="button" onClick={handleResolve} disabled={busy || !name.trim()}>
-            {busy ? <Loader2 className="animate-spin" /> : null} Resolve and finalize
+            {busy ? <Loader2 className="animate-spin" /> : null} Resolve
           </Button>
         </div>
       </CardContent>
@@ -280,16 +372,6 @@ const ErrorBanner = ({ message, onRetry }) => (
   </div>
 );
 
-// Part C — filter values. NOTE: this queue only contains UNRESOLVED flags,
-// so no row carries a final routing outcome yet. What exists per row is
-// donation_category (the BR-10 four-value enum) on donation-linked rows —
-// standalone rows and rows whose donor left the category blank have none.
-// The filter therefore works on donation_category, with an explicit
-// "No category yet" bucket so awaiting-review rows are never silently
-// dropped. Default (no filter) shows everything, as before.
-const CATEGORY_FILTER_ALL = 'all';
-const CATEGORY_FILTER_NONE = 'none';
-
 export default function FlaggedItemsTab() {
   const {
     items,
@@ -299,14 +381,6 @@ export default function FlaggedItemsTab() {
     refresh,
     resolveFlag,
   } = useFlaggedItems();
-
-  const [categoryFilter, setCategoryFilter] = useState(CATEGORY_FILTER_ALL);
-
-  const filteredItems = items.filter((flag) => {
-    if (categoryFilter === CATEGORY_FILTER_ALL) return true;
-    if (categoryFilter === CATEGORY_FILTER_NONE) return !flag.donation_category;
-    return flag.donation_category === categoryFilter;
-  });
 
   const handleResolve = async (flagId, payload) => {
     const result = await resolveFlag(flagId, payload);
@@ -319,23 +393,9 @@ export default function FlaggedItemsTab() {
     <div className="mt-6 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          {categoryFilter === CATEGORY_FILTER_ALL
-            ? `${items.length} flagged item${items.length === 1 ? '' : 's'} awaiting review.`
-            : `${filteredItems.length} of ${items.length} flagged item${items.length === 1 ? '' : 's'} shown.`}
+          {items.length} product review item{items.length === 1 ? '' : 's'} awaiting review.
         </p>
         <div className="flex items-center gap-2">
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-[240px] bg-[#f8f5f2]" aria-label="Filter by category">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={CATEGORY_FILTER_ALL}>All categories</SelectItem>
-              {PRODUCT_CLASSIFICATION_CATEGORIES.map((cat) => (
-                <SelectItem key={cat} value={cat}>{formatCategoryLabel(cat)}</SelectItem>
-              ))}
-              <SelectItem value={CATEGORY_FILTER_NONE}>No category yet</SelectItem>
-            </SelectContent>
-          </Select>
           <Button type="button" variant="outline" size="sm" onClick={refresh} disabled={isLoading}>
             <RefreshCw className={`mr-1 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
           </Button>
@@ -354,19 +414,13 @@ export default function FlaggedItemsTab() {
 
       {!isLoading && items.length === 0 && !error ? (
         <div className="rounded-[12px] border border-dashed border-[#d9d1cb] bg-white p-8 text-center text-sm text-muted-foreground">
-          No flagged items pending review.
+          No pending product reviews.
         </div>
       ) : null}
 
-      {!isLoading && items.length > 0 && filteredItems.length === 0 && !error ? (
-        <div className="rounded-[12px] border border-dashed border-[#d9d1cb] bg-white p-8 text-center text-sm text-muted-foreground">
-          No flagged items match this category filter.
-        </div>
-      ) : null}
-
-      {!isLoading && filteredItems.length > 0 && !error ? (
+      {!isLoading && items.length > 0 && !error ? (
         <div className="space-y-4">
-          {filteredItems.map((flag) =>
+          {items.map((flag) =>
             flag.pending_donation_id != null ? (
               <IntakeFlagRow key={flag.flag_id} flag={flag} busy={busyFor(flag.flag_id)} onResolve={handleResolve} />
             ) : (

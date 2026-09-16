@@ -58,7 +58,7 @@ const ErrorBanner = ({ message, onRetry }) => (
   </div>
 );
 
-const ReconciliationRow = ({ donation, busy, rowError, onRetry }) => {
+const ReconciliationRow = ({ donation, busy, rowError, onRetry, actionLabel = 'Retry' }) => {
   const meta = statusMeta(donation.status);
   const isIncomplete = donation.status === 'commit_incomplete';
   const totalItems = donation.item_counts?.total ?? (donation.items || []).length;
@@ -81,7 +81,7 @@ const ReconciliationRow = ({ donation, busy, rowError, onRetry }) => {
             </div>
           </div>
           <Button type="button" size="sm" onClick={() => onRetry(donation.id)} disabled={busy}>
-            {busy ? <Loader2 className="mr-1 animate-spin" /> : null} Retry commit
+            {busy ? <Loader2 className="mr-1 animate-spin" /> : null} {actionLabel}
           </Button>
         </div>
       </CardHeader>
@@ -95,7 +95,12 @@ const ReconciliationRow = ({ donation, busy, rowError, onRetry }) => {
   );
 };
 
-export default function ReconciliationTab() {
+export default function ReconciliationTab({
+  statuses,
+  summaryText,
+  emptyText = 'Nothing needs reconciling right now.',
+  actionLabel = 'Retry',
+}) {
   const {
     items,
     isLoading,
@@ -104,15 +109,16 @@ export default function ReconciliationTab() {
     rowErrors,
     refresh,
     retryCommit,
-  } = useReconciliationQueue();
+  } = useReconciliationQueue(statuses);
 
   const busyFor = (id) => retryingIds.includes(Number(id));
+  const summary = summaryText || `${items.length} donation${items.length === 1 ? '' : 's'} stuck in a commit failure state.`;
 
   return (
     <div className="mt-6 space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {items.length} donation{items.length === 1 ? '' : 's'} stuck in a commit failure state.
+          {summary}
         </p>
         <Button type="button" variant="outline" size="sm" onClick={refresh} disabled={isLoading}>
           <RefreshCw className={`mr-1 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
@@ -130,7 +136,7 @@ export default function ReconciliationTab() {
 
       {!isLoading && items.length === 0 && !error ? (
         <div className="rounded-[12px] border border-dashed border-[#d9d1cb] bg-white p-8 text-center text-sm text-muted-foreground">
-          Nothing needs reconciling right now.
+          {emptyText}
         </div>
       ) : null}
 
@@ -143,6 +149,7 @@ export default function ReconciliationTab() {
               busy={busyFor(donation.id)}
               rowError={rowErrors[donation.id]}
               onRetry={retryCommit}
+              actionLabel={actionLabel}
             />
           ))}
         </div>

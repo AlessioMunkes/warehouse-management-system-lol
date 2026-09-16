@@ -16,7 +16,7 @@
 // bench tablet, which is what makes "3 of 9 collected" a fact you can
 // act on rather than a number above a scroll.
 // ──────────────────────────────────────────────────────
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 export const DEFAULT_PAGE_SIZE = 8;
 
@@ -29,16 +29,17 @@ export default function usePaged(items, pageSize = DEFAULT_PAGE_SIZE) {
   const total = list.length;
   const pages = Math.max(1, Math.ceil(total / pageSize));
 
-  // A filter that shortens the list can leave the viewer stranded on a
-  // page that no longer exists, which renders as an empty list with no
-  // explanation. Clamp instead.
-  useEffect(() => {
-    if (page > pages) setPage(pages);
-  }, [page, pages]);
-
   const current = Math.min(page, pages);
   const start   = (current - 1) * pageSize;
   const slice   = list.slice(start, start + pageSize);
+  const setClampedPage = useCallback((nextPage) => {
+    setPage((previous) => {
+      const raw = typeof nextPage === 'function' ? nextPage(previous) : nextPage;
+      const parsed = Number(raw);
+      if (!Number.isFinite(parsed)) return previous;
+      return Math.min(pages, Math.max(1, Math.trunc(parsed)));
+    });
+  }, [pages]);
 
   return {
     slice,
@@ -47,8 +48,8 @@ export default function usePaged(items, pageSize = DEFAULT_PAGE_SIZE) {
     total,
     from: total === 0 ? 0 : start + 1,
     to: Math.min(start + pageSize, total),
-    setPage,
-    next: () => setPage((p) => Math.min(pages, p + 1)),
-    prev: () => setPage((p) => Math.max(1, p - 1)),
+    setPage: setClampedPage,
+    next: () => setClampedPage((p) => p + 1),
+    prev: () => setClampedPage((p) => p - 1),
   };
 }

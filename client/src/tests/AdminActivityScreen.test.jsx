@@ -1,13 +1,13 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/tests/AdminActivityScreen.test.jsx
 //
-// Covers the D6/Q2 dashboard badge: the Donation Management tile shows one
+// Covers the D6/Q2 dashboard badge: the Classification Queue tile shows one
 // DEDUPLICATED attention count — legacy/unlinked flags + pending donations
 // needing attention — computed by donationManagementAPI.getAttentionCounts().
 // The intake-linked flags that belong to one of the counted pending
 // donations are deliberately NOT counted again (see the comment on
-// getAttentionCounts). The existing "Needs Review (N)" tile is asserted
-// to be unaffected.
+// getAttentionCounts). The admin landing page no longer exposes the retired
+// Donation Classification, Category Routing, or Explain Routing screens.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
@@ -76,12 +76,6 @@ const renderScreen = () =>
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // The "Needs Review" tile fetches countOnly=true via raw fetch; keep it
-  // silent and at 0 so its assertions are deterministic.
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ count: 0 }) }))
-  );
 });
 
 describe('AdminActivityScreen — Donation Management badge (D6/Q2)', () => {
@@ -134,10 +128,10 @@ describe('AdminActivityScreen — Donation Management badge (D6/Q2)', () => {
     });
     expect(screen.queryByText(/Needs attention/)).not.toBeInTheDocument();
     // The tile itself still renders.
-    expect(screen.getByText('Donation Management')).toBeInTheDocument();
+    expect(screen.getByText('Classification Queue')).toBeInTheDocument();
   });
 
-  it('leaves the separate "Needs Review" tile badge untouched', async () => {
+  it('keeps the remaining donation admin screens available', async () => {
     getFlaggedItemsMock.mockResolvedValue([legacyFlag(1)]);
     getPendingDonationsMock.mockResolvedValue([pendingDonation(21, 'awaiting_resolution')]);
 
@@ -146,7 +140,10 @@ describe('AdminActivityScreen — Donation Management badge (D6/Q2)', () => {
     await waitFor(() => {
       expect(screen.getByText('Needs attention (2)')).toBeInTheDocument();
     });
-    expect(screen.queryByText('Needs Review (2)')).not.toBeInTheDocument();
-    expect(screen.getByText(/Category Routing/)).toBeInTheDocument();
+    expect(screen.getByText('Classification Queue')).toBeInTheDocument();
+    expect(screen.getByText('Section 18A Management')).toBeInTheDocument();
+    expect(screen.queryByText(/Donation Classification/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Category Routing/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Explain Routing/)).not.toBeInTheDocument();
   });
 });

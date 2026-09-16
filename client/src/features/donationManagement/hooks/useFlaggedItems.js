@@ -1,7 +1,7 @@
 // Data hook for the Flagged Items tab. Keeps the fetch of
 // pending_classification flags plus the resolve submissions in one place,
-// mirroring useDonationClassification: the component gets the loaded rows
-// and a resolve() it can call; pendingIds holds whichever flag is mid-request.
+// so the component gets the loaded rows and a resolve() it can call;
+// pendingIds holds whichever flag is mid-request.
 //
 // resolveFlag() returns the unified endpoint's response so the caller can
 // read result.status / result.committed / result.finalized to say the right
@@ -17,8 +17,7 @@ export default function useFlaggedItems() {
   const [error, setError] = useState('');
   const [pendingFlagIds, setPendingFlagIds] = useState([]);
 
-  const refresh = useCallback(async () => {
-    setIsLoading(true);
+  const load = useCallback(async () => {
     setError('');
 
     try {
@@ -31,9 +30,25 @@ export default function useFlaggedItems() {
     }
   }, []);
 
+  const refresh = useCallback(async () => {
+    setIsLoading(true);
+    await load();
+  }, [load]);
+
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    let cancelled = false;
+    donationManagementAPI.getFlaggedItems()
+      .then((rows) => {
+        if (!cancelled) setItems(rows);
+      })
+      .catch((loadError) => {
+        if (!cancelled) setError(loadError.message || 'Could not load flagged items.');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const resolveFlag = useCallback(async (flagId, payload) => {
     const normalizedId = Number(flagId);

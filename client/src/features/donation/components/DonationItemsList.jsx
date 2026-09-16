@@ -1,254 +1,154 @@
-
-// ─────────────────────────────────────────────────────────────
-// features/donation/components/DonationItemsList.jsx
-// UPDATED: Added forwardRef/useImperativeHandle to expose a 
-// validateAndFocus() method to parent components. When called,
-// it marks fields touched and auto-focuses/scrolls to the first error.
-// ─────────────────────────────────────────────────────────────
-import { useState, useRef, useImperativeHandle, forwardRef } from "react";
+import { forwardRef, useImperativeHandle, useRef } from "react";
 import { ProductMatchCombobox } from "./ProductMatchComboBox";
 
-const UNITS = ["kg", "g", "l", "ml", "each", "bag", "box", "crate", "punnet"];
+const blankItem = () => ({
+  id: crypto.randomUUID(),
+  description: "",
+  quantity: "",
+  weight: "",
+  expiryDate: "",
+  productId: null,
+  productLabel: "",
+  unknownProduct: false,
+});
 
-// Same four BR-10 categories as CategorySelector.jsx — keep in sync.
-const ITEM_CATEGORIES = [
-  { value: "recipe_food",     label: "Recipe food" },
-  { value: "add_on_food",     label: "Add-on food" },
-  { value: "non_recipe_food", label: "Non-recipe food" },
-  { value: "non_food",        label: "Non-food" },
-];
+const fieldInvalid = (error) => Boolean(error);
 
-// ── Description ──────────────────────────────────────────────
-const descriptionMessage = (v) => {
-  if (!v?.trim()) return { valid: false, message: "A description is required." };
-  return { valid: true, message: "Looks good." };
-};
-
-// ── Quantity ──────────────────────────────────────────────────
-const quantityMessage = (v) => {
-  if (v === "" || v === undefined || v === null) return { valid: false, message: "A quantity is required." };
-  if (Number.isNaN(Number(v))) return { valid: false, message: "Enter a number, not text." };
-  if (Number(v) <= 0) return { valid: false, message: "Quantity must be greater than zero." };
-  return { valid: true, message: "Looks good." };
-};
-
-const DonationItemRow = forwardRef(function DonationItemRow(
-  { item, onChange, onRemove, canRemove },
-  ref
-) {
-  const [touched, setTouched] = useState({});
-
-  const descInputRef = useRef(null);
-  const qtyInputRef = useRef(null);
-
-  const markTouched = (field) =>
-    setTouched((prev) => ({ ...prev, [field]: true }));
-
-  const descState = descriptionMessage(item.description);
-  const qtyState = quantityMessage(item.quantity);
-
-  // Expose validation check & focus mechanism to parent component
-  useImperativeHandle(ref, () => ({
-    validateAndFocus: () => {
-      // Mark fields as touched so validation errors show up visually.
-      // NOTE: requestedCategory is deliberately NOT validated here —
-      // leaving the BR-10 category blank on an unmatched item is a
-      // supported path: the backend creates a warehouse_manager_flags
-      // row (+ inactive placeholder product) and defers classification
-      // to a manager instead of failing the submit.
-      setTouched({ description: true, quantity: true });
-
-      if (!descState.valid) {
-        descInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-        descInputRef.current?.focus();
-        return false;
-      }
-
-      if (!qtyState.valid) {
-        qtyInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-        qtyInputRef.current?.focus();
-        return false;
-      }
-
-      return true;
-    },
-  }));
-
+function DonationItemRow({ item, onChange, onRemove, canRemove, error = {}, isFood }) {
+  const productName = item.productLabel || item.description || "";
   return (
     <div className="stf-row stf-row--check">
       <div className="stf-row-main">
-        <div className="stf-field">
-          <span className="stf-field-label">Description</span>
-          <input
-            ref={descInputRef}
-            className={`stf-input is-text ${
-              !touched.description ? "" : descState.valid ? "is-valid" : "is-flagged"
-            }`}
-            value={item.description}
-            onChange={(e) => {
-              markTouched("description");
-              onChange({ ...item, description: e.target.value });
-            }}
-            onBlur={() => markTouched("description")}
-            placeholder="e.g. Rice"
-          />
-          {touched.description && (
-            <span
-              className={`stf-field-hint ${descState.valid ? "is-valid-msg" : ""}`}
-              style={!descState.valid ? { color: "var(--stf-attention)" } : undefined}
-            >
-              {descState.message}
-            </span>
-          )}
-        </div>
+        {isFood ? (
+          <div className="stf-field">
+            <span className="stf-field-label">Product Search</span>
+            <ProductMatchCombobox
+              value={item.productId}
+              label={item.productLabel}
+              onSelect={(productId, productLabel) =>
+                onChange({
+                  ...item,
+                  productId,
+                  productLabel,
+                  description: productLabel || item.description,
+                  unknownProduct: false,
+                })
+              }
+            />
+            {error.product && <span className="stf-field-hint" style={{ color: "var(--stf-attention)" }}>{error.product}</span>}
+            {!item.productId && (
+              <button
+                type="button"
+                className="stf-btn stf-btn-secondary"
+                onClick={() => onChange({ ...item, productId: null, productLabel: "", unknownProduct: true })}
+              >
+                Mark as Unknown Product
+              </button>
+            )}
+            {item.unknownProduct && !item.productId && (
+              <input
+                className={`stf-input is-text ${fieldInvalid(error.description) ? "is-flagged" : ""}`}
+                value={item.description}
+                onChange={(e) => onChange({ ...item, description: e.target.value })}
+                placeholder="Unknown product description"
+                aria-label="Unknown product description"
+                aria-invalid={fieldInvalid(error.description)}
+              />
+            )}
+            {error.description && <span className="stf-field-hint" style={{ color: "var(--stf-attention)" }}>{error.description}</span>}
+          </div>
+        ) : (
+          <div className="stf-field">
+            <span className="stf-field-label">Product</span>
+            <input
+              className={`stf-input is-text ${fieldInvalid(error.description) ? "is-flagged" : ""}`}
+              value={productName}
+              onChange={(e) => onChange({ ...item, description: e.target.value, productLabel: "", productId: null })}
+              placeholder="e.g. Blankets"
+              aria-label="Product"
+              aria-invalid={fieldInvalid(error.description)}
+            />
+            <span className="stf-field-hint">Saved as NON_FOOD.</span>
+            {error.description && <span className="stf-field-hint" style={{ color: "var(--stf-attention)" }}>{error.description}</span>}
+          </div>
+        )}
 
         <div className="stf-field">
           <span className="stf-field-label">Quantity</span>
           <input
-            ref={qtyInputRef}
-            className={`stf-input ${
-              !touched.quantity ? "" : qtyState.valid ? "is-valid" : "is-flagged"
-            }`}
+            className={`stf-input ${fieldInvalid(error.quantity) ? "is-flagged" : ""}`}
             type="number"
             min="0"
             value={item.quantity}
-            onChange={(e) => {
-              markTouched("quantity");
-              onChange({ ...item, quantity: e.target.value });
-            }}
-            onBlur={() => markTouched("quantity")}
-            placeholder="0"
+            onChange={(e) => onChange({ ...item, quantity: e.target.value })}
+            aria-label="Quantity"
+            aria-invalid={fieldInvalid(error.quantity)}
           />
-          {touched.quantity && (
-            <span
-              className={`stf-field-hint ${qtyState.valid ? "is-valid-msg" : ""}`}
-              style={!qtyState.valid ? { color: "var(--stf-attention)" } : undefined}
-            >
-              {qtyState.message}
-            </span>
-          )}
+          {error.quantity && <span className="stf-field-hint" style={{ color: "var(--stf-attention)" }}>{error.quantity}</span>}
         </div>
 
         <div className="stf-field">
           <span className="stf-field-label">Unit</span>
           <select
-            className="stf-select"
+            className={`stf-select ${fieldInvalid(error.unit) ? "is-flagged" : ""}`}
             value={item.unit}
             onChange={(e) => onChange({ ...item, unit: e.target.value })}
+            aria-label="Unit"
+            aria-invalid={fieldInvalid(error.unit)}
           >
-            <option value="" disabled>Select unit</option>
-            {UNITS.map((u) => (
+            <option value="">Select unit</option>
+            {['kg', 'g', 'l', 'ml', 'each', 'bag', 'box', 'crate', 'punnet'].map(u => (
               <option key={u} value={u}>{u}</option>
             ))}
           </select>
+          {error.unit && <span className="stf-field-hint" style={{ color: "var(--stf-attention)" }}>{error.unit}</span>}
         </div>
 
-        <div className="stf-field">
-          <span className="stf-field-label">Match to stock item (optional)</span>
-          <ProductMatchCombobox
-            value={item.productId}
-            label={item.productLabel}
-            onSelect={(productId, productLabel) =>
-              onChange({ ...item, productId, productLabel })
-            }
-          />
-          {!item.productId && (
-            <>
-              {/* Progressive disclosure: only unmatched items are offered a
-                  manual category — a matched product routes via its own
-                  default. The category is OPTIONAL now: leaving it blank is
-                  the manager-review path, not a validation error. */}
-              <span className="stf-field-label">What kind of item is this? (optional)</span>
-              <select
-                className="stf-select"
-                value={item.requestedCategory || ""}
-                onChange={(e) => onChange({ ...item, requestedCategory: e.target.value })}
-              >
-                <option value="">Leave blank for manager review</option>
-                {ITEM_CATEGORIES.map((c) => (
-                  <option key={c.value} value={c.value}>{c.label}</option>
-                ))}
-              </select>
-              <span className="stf-field-hint">
-                Not sure which category fits? Leave it blank — this item will be
-                sent to a warehouse manager to classify.
-              </span>
-            </>
-          )}
-        </div>
       </div>
 
       {canRemove && (
-        <button
-          type="button"
-          className="stf-btn stf-btn-secondary"
-          onClick={onRemove}
-          aria-label="Remove this item"
-        >
+        <button type="button" className="stf-btn stf-btn-secondary" onClick={onRemove} aria-label="Remove this item">
           Remove item
         </button>
       )}
     </div>
   );
-});
+}
 
 export const DonationItemsList = forwardRef(function DonationItemsList(
-  { items, onChange },
+  { items, onChange, itemErrors = {}, isFood },
   ref
 ) {
-  const rowRefs = useRef([]);
-
-  const updateItem = (id, updated) =>
-    onChange(items.map((it) => (it.id === id ? updated : it)));
-
-  const addItem = () =>
-    onChange([
-      ...items,
-      {
-        id: crypto.randomUUID(),
-        description: "",
-        quantity: "",
-        unit: "",
-        productId: null,
-        productLabel: "",
-        requestedCategory: "",
-      },
-    ]);
-
+  const containerRef = useRef(null);
+  const updateItem = (id, updated) => onChange(items.map((it) => (it.id === id ? updated : it)));
+  const addItem = () => onChange([...items, blankItem()]);
   const removeItem = (id) => onChange(items.filter((it) => it.id !== id));
 
-  // Expose container validation to parent multi-step form
   useImperativeHandle(ref, () => ({
     validate: () => {
-      for (let i = 0; i < items.length; i++) {
-        const rowRef = rowRefs.current[i];
-        if (rowRef && !rowRef.validateAndFocus()) {
-          return false; // Stop at first invalid field found
-        }
-      }
-      return true; // All valid
+      containerRef.current?.querySelector('[aria-invalid="true"]')?.focus?.();
+      return !containerRef.current?.querySelector('[aria-invalid="true"]');
     },
   }));
 
   return (
-    <div className="stf-step-body">
-      <div className="stf-field-label">Items</div>
-
+    <div className="stf-step-body" ref={containerRef}>
+      <div className="stf-field-label">Donation Items</div>
       <div className="stf-list">
-        {items.map((item, index) => (
+        {items.map((item) => (
           <DonationItemRow
             key={item.id}
-            ref={(el) => (rowRefs.current[index] = el)}
             item={item}
+            isFood={isFood}
             onChange={(updated) => updateItem(item.id, updated)}
             onRemove={() => removeItem(item.id)}
             canRemove={items.length > 1}
+            error={itemErrors[item.id]}
           />
         ))}
       </div>
-
       <button type="button" className="stf-btn stf-btn-secondary" onClick={addItem}>
-        + Add another item
+        Add Item
       </button>
     </div>
   );

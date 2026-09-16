@@ -116,7 +116,27 @@ export default function PurchaseOrdersPage() {
     }
   }, [loadPurchaseOrders]);
 
-  useEffect(() => { reload(); }, [reload]);
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      purchaseOrderAPI.getPurchaseOrders({ status: statusFilter }),
+      supplierAPI.getSuppliers(),
+      stockAPI.getManifest(),
+    ])
+      .then(([pos, sups, prods]) => {
+        if (cancelled) return;
+        setPurchaseOrders(pos);
+        setSuppliers(sups);
+        setProducts(prods);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [statusFilter]);
 
   const open = async (id) => {
     setError(null);
@@ -215,7 +235,7 @@ export default function PurchaseOrdersPage() {
                   this is for chasing one specific state. */}
               <select
                 value={statusFilter}
-                onChange={(e) => { setStatusFilter(e.target.value); setSelected(null); }}
+                onChange={(e) => { setLoading(true); setStatusFilter(e.target.value); setSelected(null); }}
                 className="ml-auto mb-1 rounded-[4px] border-2 px-2 py-1 text-sm"
                 aria-label="Filter by status"
               >

@@ -12,6 +12,7 @@
 import express from 'express';
 import auth, { requireRole, ROLES } from '../middleware/auth.middleware.js';
 import donationAdminController from '../controllers/donation.admin.js';
+import donationController from '../controllers/donation.controller.js';
 
 const router = express.Router();
 
@@ -115,6 +116,24 @@ router.post(
   auth,
   requireRole(...ADMIN_OR_MANAGER),
   donationAdminController.evaluateRouting
+);
+
+// ── Section 18A Certificate Settings ─────────────────────────
+// Configuration surface for certificate templates and email defaults.
+// Single-row table (id = 1), so GET returns the current settings and
+// PUT updates them. Manager+admin access.
+router.get(
+  '/section-18a/settings',
+  auth,
+  requireRole(...ADMIN_OR_MANAGER),
+  donationController.getSection18ASettings
+);
+
+router.put(
+  '/section-18a/settings',
+  auth,
+  requireRole(...ADMIN_OR_MANAGER),
+  donationController.updateSection18ASettings
 );
 
 export default router;

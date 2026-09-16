@@ -42,16 +42,10 @@ export function ProductMatchCombobox({ value, label, onSelect }) {
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     const trimmed = term.trim();
-    if (!trimmed) {
-      setResults([]);
-      setIsSearching(false);
-      setSearchError(null);
-      setIsOpen(false);
-      return;
-    }
+    if (!trimmed) return;
 
-    setIsSearching(true);
     debounceRef.current = setTimeout(async () => {
+      setIsSearching(true);
       try {
         const rows = await searchProducts(trimmed);
         setResults(rows);
@@ -103,7 +97,17 @@ export function ProductMatchCombobox({ value, label, onSelect }) {
         placeholder="Search stock items..."
         value={term}
         aria-label="Search stock items"
-        onChange={(e) => setTerm(e.target.value)}
+        onChange={(e) => {
+          const nextTerm = e.target.value;
+          setTerm(nextTerm);
+          if (!nextTerm.trim()) {
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+            setResults([]);
+            setIsSearching(false);
+            setSearchError(null);
+            setIsOpen(false);
+          }
+        }}
         onFocus={() => {
           if (results.length > 0) setIsOpen(true);
         }}

@@ -106,13 +106,18 @@ const findPotentialOverlaps = async (
   excludeTimeslotId = null,
   client = pool
 ) => {
-  const params = [eventId, spaceId, endTime, startTime];
+  const params = [];
   const where = [
-    'event_id = $1',
-    'space_id = $2',
-    'start_time < $3',
-    'end_time > $4',
+    `space_id = $${params.push(spaceId)}`,
+    `start_time < $${params.push(endTime)}`,
+    `end_time > $${params.push(startTime)}`,
+    `status <> 'CANCELLED'`,
   ];
+
+  if (eventId !== null && eventId !== undefined) {
+    params.push(eventId);
+    where.push(`event_id = $${params.length}`);
+  }
 
   if (excludeTimeslotId !== null) {
     params.push(excludeTimeslotId);

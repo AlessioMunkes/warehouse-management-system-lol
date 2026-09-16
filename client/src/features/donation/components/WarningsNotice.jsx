@@ -41,7 +41,7 @@ export function CompletionDialog({ open, result, onRecordAnother, onGoHome }) {
 
   return (
     <Dialog open={open}>
-      <DialogContent className="stf-shell">
+      <DialogContent className="stf-shell" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>
             {pendingReview ? "Donation received — pending manager review" : "Donation recorded"}
@@ -86,7 +86,7 @@ export function CompletionDialog({ open, result, onRecordAnother, onGoHome }) {
 
         <DialogFooter>
           <button className="stf-btn stf-btn-secondary" onClick={onGoHome}>
-            Go to Home
+            Go to Taskboard
           </button>
           <button className="stf-btn stf-btn-primary" onClick={onRecordAnother}>
             Record another

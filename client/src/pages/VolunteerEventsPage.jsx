@@ -12,7 +12,7 @@
  * Access is restricted to users with VOLUNTEER_MANAGEMENT_ROLES.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { CalendarDays, CheckCircle2, Pencil, Plus, XCircle } from 'lucide-react';
 import EventFormDialog from '../features/volunteerManagement/components/EventFormDialog';
@@ -33,6 +33,7 @@ import {
 // Terminal events remain visible for history, but no longer expose edit or
 // lifecycle actions that would be invalid after completion/cancellation.
 const terminalStatuses = new Set(['COMPLETED', 'CANCELLED']);
+const openStatuses = new Set(['DRAFT', 'SCHEDULED', 'PUBLISHED']);
 
 const displayDate = (value) => {
   if (!value) return 'Date not set';
@@ -47,6 +48,22 @@ const ErrorBanner = ({ message, onRetry }) => (
   </div>
 );
 
+const eventDateValue = (event) => String(event.eventDate ?? '').slice(0, 10);
+
+const eventSearchText = (event) => [
+  event.name,
+  event.venueName,
+  event.address,
+  event.description,
+].join(' ').toLowerCase();
+
+const matchesStatus = (event, statusFilter) => {
+  if (statusFilter === 'open') return openStatuses.has(event.status);
+  if (statusFilter === 'cancelled') return event.status === 'CANCELLED';
+  if (statusFilter === 'completed') return event.status === 'COMPLETED';
+  return true;
+};
+
 export default function VolunteerEventsPage() {
   const navigate = useNavigate();
   const [events, setEvents] = useState([]);
@@ -55,9 +72,44 @@ export default function VolunteerEventsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [formError, setFormError] = useState('');
+  const [spaces, setSpaces] = useState([]);
+  const [spacesLoading, setSpacesLoading] = useState(false);
+  const [spacesError, setSpacesError] = useState('');
   const [busy, setBusy] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
   const [actionError, setActionError] = useState('');
+  const [search, setSearch] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [sortDirection, setSortDirection] = useState('asc');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  const visibleEvents = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return [...events]
+      .filter((event) => {
+        const date = eventDateValue(event);
+        if (query && !eventSearchText(event).includes(query)) return false;
+        if (fromDate && (!date || date < fromDate)) return false;
+        if (toDate && (!date || date > toDate)) return false;
+        return matchesStatus(event, statusFilter);
+      })
+      .sort((a, b) => {
+        const left = eventDateValue(a) || '9999-12-31';
+        const right = eventDateValue(b) || '9999-12-31';
+        return sortDirection === 'asc' ? left.localeCompare(right) : right.localeCompare(left);
+      });
+  }, [events, fromDate, search, sortDirection, statusFilter, toDate]);
+
+  const filtersActive = Boolean(search || fromDate || toDate || statusFilter !== 'all' || sortDirection !== 'asc');
+
+  const clearFilters = () => {
+    setSearch('');
+    setFromDate('');
+    setToDate('');
+    setSortDirection('asc');
+    setStatusFilter('all');
+  };
 
   // Shared reload path used after mutations and by the visible retry action.
   const loadEvents = useCallback(async () => {
@@ -81,10 +133,23 @@ export default function VolunteerEventsPage() {
     return () => { cancelled = true; };
   }, []);
 
+  const loadSpaces = useCallback(async () => {
+    setSpacesLoading(true);
+    setSpacesError('');
+    try {
+      setSpaces(await volunteerManagementAPI.getSpaces());
+    } catch (err) {
+      setSpacesError(err.message);
+    } finally {
+      setSpacesLoading(false);
+    }
+  }, []);
+
   const openCreate = () => {
     setEditing(null);
     setFormError('');
     setFormOpen(true);
+    loadSpaces();
   };
 
   const openEdit = (event) => {
@@ -99,11 +164,13 @@ export default function VolunteerEventsPage() {
     setBusy(true);
     setFormError('');
     try {
+      let created = null;
       if (editing) await volunteerManagementAPI.updateEvent(editing.id, payload);
-      else await volunteerManagementAPI.createEvent(payload);
+      else created = await volunteerManagementAPI.createEventWithInitialTimeslot(payload);
       setFormOpen(false);
       setEditing(null);
       await loadEvents();
+      if (created?.event?.id) navigate(VOLUNTEERS.event(created.event.id));
     } catch (err) {
       setFormError(err.message);
     } finally {
@@ -165,13 +232,55 @@ export default function VolunteerEventsPage() {
                 <Button type="button" onClick={openCreate}><Plus /> Create event</Button>
               </div>
             ) : !loadError ? (
+              <div className="grid gap-4">
+                <div className="grid gap-3 rounded-md border bg-muted/20 p-4 md:grid-cols-2 lg:grid-cols-6">
+                  <div className="grid gap-2 lg:col-span-2">
+                    <label htmlFor="event-search" className="text-sm font-medium">Search events</label>
+                    <input id="event-search" className="h-9 rounded-md border bg-background px-3 text-sm" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Name, venue, address or description" />
+                  </div>
+                  <div className="grid gap-2">
+                    <label htmlFor="event-from-date" className="text-sm font-medium">From date</label>
+                    <input id="event-from-date" className="h-9 rounded-md border bg-background px-3 text-sm" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+                  </div>
+                  <div className="grid gap-2">
+                    <label htmlFor="event-to-date" className="text-sm font-medium">To date</label>
+                    <input id="event-to-date" className="h-9 rounded-md border bg-background px-3 text-sm" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+                  </div>
+                  <div className="grid gap-2">
+                    <label htmlFor="event-status-filter" className="text-sm font-medium">Status</label>
+                    <select id="event-status-filter" className="h-9 rounded-md border bg-background px-3 text-sm" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                      <option value="all">All Events</option>
+                      <option value="open">Open Events</option>
+                      <option value="cancelled">Cancelled</option>
+                      <option value="completed">Completed</option>
+                    </select>
+                  </div>
+                  <div className="grid gap-2">
+                    <label htmlFor="event-sort" className="text-sm font-medium">Sort</label>
+                    <select id="event-sort" className="h-9 rounded-md border bg-background px-3 text-sm" value={sortDirection} onChange={(e) => setSortDirection(e.target.value)}>
+                      <option value="asc">Earliest to Latest</option>
+                      <option value="desc">Latest to Earliest</option>
+                    </select>
+                  </div>
+                  <div className="flex items-end lg:col-span-6">
+                    <Button type="button" variant="outline" onClick={clearFilters} disabled={!filtersActive}>Clear Filters</Button>
+                  </div>
+                </div>
+                {visibleEvents.length === 0 ? (
+                  <div className="py-12 text-center">
+                    <CalendarDays className="mx-auto mb-3 h-9 w-9 text-muted-foreground" aria-hidden="true" />
+                    <p className="font-semibold">No events match your filters</p>
+                    <p className="text-sm text-muted-foreground mt-1 mb-4">Adjust your search, dates or status to see more events.</p>
+                    <Button type="button" variant="outline" onClick={clearFilters}>Clear Filters</Button>
+                  </div>
+                ) : (
               <div className="overflow-x-auto rounded-md border">
                 <Table>
                   <TableHeader><TableRow>
                     <TableHead>Event</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead>
                   </TableRow></TableHeader>
                   <TableBody>
-                    {events.map((event) => {
+                    {visibleEvents.map((event) => {
                       const terminal = terminalStatuses.has(event.status);
                       return (
                         <TableRow key={event.id}>
@@ -198,6 +307,8 @@ export default function VolunteerEventsPage() {
                   </TableBody>
                 </Table>
               </div>
+                )}
+              </div>
             ) : null}
           </CardContent>
         </Card>
@@ -210,6 +321,11 @@ export default function VolunteerEventsPage() {
           event={editing}
           busy={busy}
           error={formError}
+          spaces={spaces}
+          spacesLoading={spacesLoading}
+          spacesError={spacesError}
+          onRetrySpaces={loadSpaces}
+          onValidateTime={volunteerManagementAPI.validateTimeslot}
           onOpenChange={setFormOpen}
           onSubmit={saveEvent}
         />

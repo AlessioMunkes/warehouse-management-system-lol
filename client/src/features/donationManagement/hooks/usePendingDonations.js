@@ -13,8 +13,7 @@ export default function usePendingDonations() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const refresh = useCallback(async () => {
-    setIsLoading(true);
+  const load = useCallback(async () => {
     setError('');
 
     try {
@@ -27,9 +26,25 @@ export default function usePendingDonations() {
     }
   }, []);
 
+  const refresh = useCallback(async () => {
+    setIsLoading(true);
+    await load();
+  }, [load]);
+
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    let cancelled = false;
+    donationManagementAPI.getPendingDonations(PENDING_DONATION_STATUSES)
+      .then((rows) => {
+        if (!cancelled) setItems(rows);
+      })
+      .catch((loadError) => {
+        if (!cancelled) setError(loadError.message || 'Could not load pending donations.');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   return {
     items,

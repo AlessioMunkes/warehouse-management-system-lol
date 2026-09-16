@@ -206,10 +206,21 @@ export default function UserDirectoryPage() {
   // fresher state.
   useEffect(() => {
     let cancelled = false;
-    setIsLoading(true);
-    loadUsers().finally(() => { if (!cancelled) setIsLoading(false); });
+    userAPI.getUsers({ includeInactive, search })
+      .then((rows) => {
+        if (!cancelled) {
+          setUsers(rows);
+          setError(null);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message || 'Could not load users.');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
     return () => { cancelled = true; };
-  }, [loadUsers]);
+  }, [includeInactive, search]);
 
   const open = async (id) => {
     setError(null);
@@ -327,7 +338,7 @@ export default function UserDirectoryPage() {
                   <InputGroupInput
                     placeholder="Search by username or name"
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={(e) => { setIsLoading(true); setSearch(e.target.value); }}
                   />
                 </InputGroup>
 
@@ -335,7 +346,7 @@ export default function UserDirectoryPage() {
                   <Checkbox
                     id="include-inactive"
                     checked={includeInactive}
-                    onCheckedChange={(v) => setIncludeInactive(Boolean(v))}
+                    onCheckedChange={(v) => { setIsLoading(true); setIncludeInactive(Boolean(v)); }}
                   />
                   <FieldLabel htmlFor="include-inactive" className="font-normal">
                     Show inactive
