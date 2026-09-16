@@ -78,14 +78,15 @@ describe('pending donation routes', () => {
     expect(serviceMock.createPendingDonationFromIntake).not.toHaveBeenCalled();
   });
 
-  it('restricts flag resolution to admin only and attributes resolution to the session user', async () => {
+  it('allows managers/admins to resolve flags and attributes resolution to the session user', async () => {
     const managerResolve = await request(app)
       .post(`${BASE}/flags/7/resolve`)
-      .set('Cookie', cookieFor(ROLES.MANAGER))
+      .set('Cookie', cookieFor(ROLES.MANAGER, { id: 77 }))
       .send({ accepted: true, category: 'recipe_food', resolvedBy: 999 });
 
-    expect(managerResolve.status).toBe(403);
-    expect(serviceMock.resolveFlagAndMaybeCommit).not.toHaveBeenCalled();
+    expect(managerResolve.status).toBe(200);
+    expect(serviceMock.resolveFlagAndMaybeCommit).toHaveBeenCalledTimes(1);
+    expect(serviceMock.resolveFlagAndMaybeCommit.mock.calls[0][1].resolvedBy).toBe(77);
 
     const adminResolve = await request(app)
       .post(`${BASE}/flags/7/resolve`)
@@ -94,9 +95,9 @@ describe('pending donation routes', () => {
 
     expect(adminResolve.status).toBe(200);
     // The body-supplied resolvedBy must never win over the session user.
-    expect(serviceMock.resolveFlagAndMaybeCommit).toHaveBeenCalledTimes(1);
-    expect(serviceMock.resolveFlagAndMaybeCommit.mock.calls[0][0]).toBe(7);
-    expect(serviceMock.resolveFlagAndMaybeCommit.mock.calls[0][1].resolvedBy).toBe(88);
+    expect(serviceMock.resolveFlagAndMaybeCommit).toHaveBeenCalledTimes(2);
+    expect(serviceMock.resolveFlagAndMaybeCommit.mock.calls[1][0]).toBe(7);
+    expect(serviceMock.resolveFlagAndMaybeCommit.mock.calls[1][1].resolvedBy).toBe(88);
   });
 
   it('restricts retry and reconciliation to admin only', async () => {

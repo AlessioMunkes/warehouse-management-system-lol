@@ -261,8 +261,8 @@ describe('validateDonationPayload', () => {
     expect(r.valid).toBe(false);
     expect(r.errors.donorName).toBeTruthy();
     expect(r.errors.donorContact).toBeTruthy();
-    expect(r.errors.donorContactNumber).toBeTruthy();
-    expect(r.errors.donorTaxReference).toBeTruthy();
+    expect(r.errors.donorContactNumber).toBeUndefined();
+    expect(r.errors.donorTaxReference).toBeUndefined();
     expect(r.errors.itemErrors[0]).toBeTruthy();
   });
 });

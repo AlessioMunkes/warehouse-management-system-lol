@@ -8,22 +8,13 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
-import { CategorySelector } from "./CategorySelector";
+
 import { DonationItemsList } from "./DonationItemsList";
 import { ValueProgrammeFields } from "./ValueProgrammeFields";
 import { DonorConsentSection, DonorInfoFields } from "./DonationSection";
 import { NotesField } from "./NotesField";
 
-const CATEGORY_LABELS = {
-  recipe_food: "Recipe food",
-  add_on_food: "Add-on food",
-  non_recipe_food: "Non-recipe food",
-  non_food: "Non-food",
-  manager_review: "Manager Review",
-};
-
 const SECTION_LABELS = {
-  category: "Category",
   items: "Items",
   value: "Value & Programme",
   donor: "Donor Details",
@@ -35,17 +26,6 @@ const SECTIONS = Object.keys(SECTION_LABELS);
 export function ReviewSummary({ draft }) {
   return (
     <div className="stf-step-body">
-      <div className="stf-list">
-        <div className="stf-row is-static">
-          <div className="stf-row-main">
-            <span className="stf-row-title">Category</span>
-            <span className="stf-row-meta">
-              {CATEGORY_LABELS[draft.category] || "Not selected"}
-            </span>
-          </div>
-        </div>
-      </div>
-
       <div className="stf-field-label">Items</div>
       <div className="stf-list">
         {draft.items.map((item) => (
@@ -78,16 +58,19 @@ export function ReviewSummary({ draft }) {
               {draft.donorConsentGiven
                 ? [
                   draft.donorName || "—",
-                  draft.donorType ? draft.donorType.replace("_", " ") : "Type not selected",
-                  draft.donorContactNumber || "No contact number",
-                  draft.donorContact || "No email",
+                  draft.donorContact || draft.contactDetails || "No email",
+                  "Section 18A requested",
                 ].join(" · ")
-                : "No consent given"}
+                : [
+                  draft.donorName || "Anonymous donor",
+                  draft.donorContact || draft.contactDetails || "No email",
+                  "No Section 18A",
+                ].join(" Â· ")}
             </span>
           </div>
         </div>
 
-        {draft.donorConsentGiven && (
+        {draft.__showLegacySection18AIntake === true && (
           <div className="stf-row is-static">
             <div className="stf-row-main">
               <span className="stf-row-title">Section 18A donor details</span>
@@ -200,12 +183,6 @@ export function EditSectionDialog({ open, onOpenChange, sections, draft, updateD
         </DialogHeader>
 
         <div className="stf-step-body">
-          {sections.includes("category") && (
-            <CategorySelector
-              value={localDraft.category}
-              onChange={(v) => updateLocalDraft({ category: v })}
-            />
-          )}
           {sections.includes("items") && (
             <DonationItemsList
               items={localDraft.items}
@@ -232,7 +209,6 @@ export function EditSectionDialog({ open, onOpenChange, sections, draft, updateD
                   donorTaxReference={localDraft.donorTaxReference}
                   donorType={localDraft.donorType}
                   donorAddress={localDraft.donorAddress}
-                  donorContactNumber={localDraft.donorContactNumber}
                   donorTradingName={localDraft.donorTradingName}
                   donorIdType={localDraft.donorIdType}
                   donorIdCountry={localDraft.donorIdCountry}

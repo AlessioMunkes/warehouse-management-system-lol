@@ -21,8 +21,8 @@ import donationManagementAPI, { RECONCILIATION_STATUSES } from '@/services/donat
 const TABS = [
   {
     id: 'awaiting-classification',
-    label: 'Awaiting Classification',
-    description: 'These donations need a category before they can be processed.',
+    label: 'Pending Product Review',
+    description: 'These donations have entered products that need a manager decision.',
     icon: ClipboardList,
   },
   {
@@ -99,8 +99,8 @@ export default function DonationManagementPage() {
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
           <Card className="rounded-[12px] border border-[#e9e3dd] shadow-sm">
             <CardContent className="pt-4">
-              <p className="text-sm font-medium text-[#2b3336]">Awaiting Classification</p>
-              <p className="mt-1 text-xs text-muted-foreground">These donations need a category before they can be processed.</p>
+              <p className="text-sm font-medium text-[#2b3336]">Pending Product Review</p>
+              <p className="mt-1 text-xs text-muted-foreground">These donations have entered products that need a manager decision.</p>
               <Badge variant="outline" className="mt-3 inline-flex rounded-[6px] px-2 py-0 text-[11px]">
                 {counts['awaiting-classification']}
               </Badge>

@@ -15,7 +15,6 @@ const { createPendingDonation } = await import('../services/donationAPI');
 
 const validDraft = () => ({
   ...emptyDraft(),
-  category: 'recipe_food',
   items: [{
     id: 'line-1',
     description: 'Rice',
@@ -23,10 +22,14 @@ const validDraft = () => ({
     unit: 'kg',
     productId: 12,
     productLabel: 'Rice',
-    requestedCategory: '',
+    unknownProduct: false,
   }],
   estimatedValueZar: '250',
-  donorConsentGiven: false,
+  isFood: true,
+  donorName: 'Donor',
+  donorContact: 'donor@example.com',
+  contactMethod: 'email',
+  contactDetails: 'donor@example.com',
 });
 
 function LocationProbe({ onChange }) {
@@ -60,12 +63,40 @@ function renderDonationFlow({ draft = validDraft(), updateDraft = vi.fn(), reset
 }
 
 describe('Donation backend validation UX', () => {
+  it('moves from donation intake to the donation summary page when valid', async () => {
+    const user = userEvent.setup();
+    const onLocation = vi.fn();
+
+    render(
+      <MemoryRouter initialEntries={['/donations/new']}>
+        <DonationDraftContext.Provider value={{
+          draft: validDraft(),
+          updateDraft: vi.fn(),
+          resetDraft: vi.fn(),
+          emptyItem: vi.fn(),
+        }}>
+          <LocationProbe onChange={onLocation} />
+          <Routes>
+            <Route path="/donations/new" element={<DonationDetailsPage />} />
+            <Route path="/donations/new/review" element={<p>Donation summary page</p>} />
+          </Routes>
+        </DonationDraftContext.Provider>
+      </MemoryRouter>
+    );
+
+    await user.click(screen.getByRole('button', { name: /^Next$/i }));
+
+    expect(await screen.findByText('Donation summary page')).toBeInTheDocument();
+    await waitFor(() => expect(onLocation).toHaveBeenLastCalledWith(
+      expect.objectContaining({ pathname: '/donations/new/review' })
+    ));
+  });
+
   it('maps backend field errors onto visible fields without clearing entered values', async () => {
     const user = userEvent.setup();
     const onLocation = vi.fn();
     createPendingDonation.mockRejectedValueOnce(Object.assign(new Error('Please fix the highlighted fields.'), {
       errors: {
-        donationCategory: 'A donation category is required.',
         estimatedValueZar: 'Estimated value must be 0 or greater.',
         donorContact: 'Enter a valid email address.',
         'items.0.quantity': 'Quantity must be greater than zero.',
@@ -76,9 +107,8 @@ describe('Donation backend validation UX', () => {
 
     await user.click(screen.getByRole('button', { name: /Yes, submit/i }));
 
-    expect(await screen.findByText('A donation category is required.')).toBeInTheDocument();
-    expect(screen.getByText('Estimated value must be 0 or greater.')).toBeInTheDocument();
-    expect(screen.getByText('Quantity must be greater than zero.')).toBeInTheDocument();
+    expect(await screen.findAllByText('Estimated value must be 0 or greater.')).not.toHaveLength(0);
+    expect(screen.getAllByText('Quantity must be greater than zero.')).not.toHaveLength(0);
     expect(screen.getAllByDisplayValue('Rice').length).toBeGreaterThan(0);
     expect(screen.getByDisplayValue('10')).toBeInTheDocument();
     expect(screen.getByDisplayValue('250')).toBeInTheDocument();
@@ -86,7 +116,6 @@ describe('Donation backend validation UX', () => {
     await waitFor(() => expect(onLocation).toHaveBeenLastCalledWith(
       expect.objectContaining({ pathname: '/donations/new' })
     ));
-    await waitFor(() => expect(screen.getByRole('radio', { name: /^Recipe FoodMatches/i })).toHaveFocus());
   });
 });
 

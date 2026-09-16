@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
@@ -78,60 +78,54 @@ describe('VolunteerEventPage workspace', () => {
     expect(await screen.findByRole('heading', { name: 'Mandela Day' })).toBeInTheDocument();
   });
 
-  it('creates a timeslot booking and refreshes capacity', async () => {
-    const user = userEvent.setup(); renderPage();
-    await screen.findByRole('heading', { name: 'Mandela Day' });
-    await user.click(screen.getByLabelText('Space'));
-    await user.click(screen.getByRole('option', { name: /Community Hall/ }));
-    fireEvent.change(screen.getByLabelText('Start'), { target: { value: '2026-10-10T11:00' } });
-    fireEvent.change(screen.getByLabelText('End'), { target: { value: '2026-10-10T13:00' } });
-    await user.type(screen.getByLabelText('Capacity'), '15');
-    await user.click(screen.getByRole('button', { name: 'Add timeslot' }));
-    await waitFor(() => expect(api.createEventBooking).toHaveBeenCalledWith('e1', expect.objectContaining({ spaceId: 's1', timeslots: [expect.objectContaining({ capacity: 15 })] })));
-    await waitFor(() => expect(api.getCapacity).toHaveBeenCalledTimes(2));
-  });
-
-  it('creates and selects a manually entered space', async () => {
-    const user = userEvent.setup(); renderPage();
-    await screen.findByRole('heading', { name: 'Mandela Day' });
-    await user.type(screen.getByLabelText('New space name'), 'Kitchen');
-    await user.type(screen.getByLabelText('New space location'), 'Warehouse');
-    await user.click(screen.getByRole('button', { name: 'Add space' }));
-    await waitFor(() => expect(api.createSpace).toHaveBeenCalledWith({ spaceName: 'Kitchen', location: 'Warehouse' }));
-    expect(api.getSpaces).toHaveBeenCalledTimes(2);
-  });
-
-  it('shows space loading and empty states', async () => {
-    let resolveSpaces;
-    api.getSpaces.mockReturnValueOnce(new Promise((resolve) => { resolveSpaces = resolve; }));
+  it('keeps event setup read-only in the workspace', async () => {
     renderPage();
-    expect(await screen.findByText('Loading spaces…')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Add timeslot' })).toBeDisabled();
-    resolveSpaces([]);
-    expect(await screen.findByText('No active event spaces are available.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Add timeslot' })).toBeDisabled();
-  });
-
-  it('shows a space error and retries only the space list', async () => {
-    const user = userEvent.setup();
-    api.getSpaces.mockRejectedValueOnce(new Error('Spaces unavailable.')).mockResolvedValueOnce([{ id: 's1', name: 'Community Hall', location: '', isActive: true }]);
-    renderPage();
-    expect(await screen.findByText('Spaces unavailable.')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Try spaces again' }));
-    expect(await screen.findByText('Select a space')).toBeInTheDocument();
-    expect(api.getSpaces).toHaveBeenCalledTimes(2);
+    await screen.findByRole('heading', { name: 'Mandela Day' });
+    expect(screen.getByText('Schedule and capacity')).toBeInTheDocument();
+    expect(screen.getByText('Capacity 10')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add timeslot' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add space' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
+    expect(api.createEventBooking).not.toHaveBeenCalled();
+    expect(api.createSpace).not.toHaveBeenCalled();
   });
 
   it('registers a walk-in without external IDs and refreshes booking and capacity data', async () => {
     const user = userEvent.setup(); renderPage();
     await user.click(await screen.findByRole('button', { name: 'Register walk-in' }));
     await user.type(screen.getByLabelText('First name'), 'Lebo');
-    await user.type(screen.getByLabelText('Last name'), 'M');
+    await user.type(screen.getByLabelText(/Last name/), 'M');
     await user.click(screen.getByRole('button', { name: 'Register walk-in' }));
     await waitFor(() => expect(api.createWalkIn).toHaveBeenCalledWith('t1', { volunteerFirstName: 'Lebo', volunteerLastName: 'M' }));
     expect(api.createWalkIn.mock.calls[0][1]).not.toHaveProperty('externalBookingId');
     await waitFor(() => expect(api.getEventBookings).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(api.getCapacity).toHaveBeenCalledTimes(2));
+  });
+
+  it('registers a walk-in without optional last name', async () => {
+    const user = userEvent.setup(); renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Register walk-in' }));
+    expect(screen.getByLabelText(/Last name/)).toBeInTheDocument();
+    await user.type(screen.getByLabelText('First name'), 'Lebo');
+    await user.click(screen.getByRole('button', { name: 'Register walk-in' }));
+    await waitFor(() => expect(api.createWalkIn).toHaveBeenCalledWith('t1', { volunteerFirstName: 'Lebo', volunteerLastName: null }));
+  });
+
+  it('shows walk-in validation summary and field-level errors', async () => {
+    const user = userEvent.setup(); renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Register walk-in' }));
+    await user.selectOptions(screen.getByLabelText('Timeslot'), '');
+    await user.click(screen.getByRole('button', { name: 'Register walk-in' }));
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('Please fix the following:');
+    expect(alert).toHaveTextContent('Timeslot is required.');
+    expect(alert).toHaveTextContent('First name is required.');
+    expect(screen.getByLabelText('Timeslot')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByLabelText('First name')).toHaveAttribute('aria-invalid', 'true');
+    expect(api.createWalkIn).not.toHaveBeenCalled();
   });
 
   it('checks in a booking and refreshes attendance summary', async () => {

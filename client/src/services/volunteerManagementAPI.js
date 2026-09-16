@@ -90,6 +90,14 @@ export const createEvent = async (payload) => unwrap(
   await apiPost(`${BASE}/events`, payload)
 );
 
+export const createEventWithInitialTimeslot = async (payload) => {
+  const body = await apiPost(`${BASE}/events/with-initial-timeslot`, payload);
+  return {
+    event: toVolunteerEvent(body.data?.event ?? {}),
+    timeslots: (body.data?.timeslots ?? []).map(toTimeslot),
+  };
+};
+
 export const updateEvent = async (eventId, payload) => unwrap(
   await apiPatch(`${BASE}/events/${eventId}`, payload)
 );
@@ -122,6 +130,14 @@ export const getEventBooking = async (eventId) => {
 export const createEventBooking = async (eventId, payload) => {
   const body = await apiPost(`${BASE}/events/${eventId}/booking`, payload);
   return (body.data ?? []).map(toTimeslot);
+};
+
+export const validateTimeslot = async (payload) => {
+  const body = await apiPost(`${BASE}/timeslots/validate`, payload);
+  return {
+    available: Boolean(body.data?.available),
+    conflicts: body.data?.conflicts ?? [],
+  };
 };
 
 export const updateTimeslot = async (eventId, timeslotId, changes) => {
@@ -194,6 +210,7 @@ export default {
   getEvents,
   getEvent,
   createEvent,
+  createEventWithInitialTimeslot,
   updateEvent,
   cancelEvent,
   completeEvent,
@@ -201,6 +218,7 @@ export default {
   createSpace,
   getEventBooking,
   createEventBooking,
+  validateTimeslot,
   updateTimeslot,
   closeTimeslot,
   cancelTimeslot,

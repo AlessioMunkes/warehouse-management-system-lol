@@ -101,45 +101,49 @@ export function ReviewPage() {
   });
 
   return (
-    <div className="stf-shell">
-
+    <div className="stf-shell donation-intake-shell">
       <div className="stf-crumb">
         <span>Donations / Review Donation</span>
         <span className="stf-crumb-meta">{today}</span>
       </div>
 
-      <main className="stf-main">
+      <main className="stf-main donation-intake-main">
         <DonationRail currentStep={1} />
 
-        <div className="stf-step">
+        <section className="stf-step donation-intake-card">
           <div className="stf-step-head">
             <h1 className="stf-step-title">Review Donation</h1>
             <p className="stf-step-sub">Does everything look okay?</p>
           </div>
 
           {submitError && (
-            <div className="stf-notice is-warn">
-              <span className="stf-notice-mark">!</span>
-              <div className="stf-notice-body">{submitError}</div>
+            <div className="stf-notice is-warn" role="alert">
+              <span className="stf-notice-mark" aria-hidden="true">!</span>
+              <div className="stf-notice-body">
+                <strong>{submitError}</strong>
+              </div>
             </div>
           )}
 
           <ReviewSummary draft={draft} />
 
-          <div className="stf-actions is-row">
+          <div className="stf-actions is-row donation-intake-actions">
             <button
+              type="button"
               className="stf-btn stf-btn-secondary"
               onClick={() => navigate(DONATIONS.new)}
             >
               Back
             </button>
             <button
+              type="button"
               className="stf-btn stf-btn-warn"
               onClick={() => setPickerOpen(true)}
             >
               No, fix something
             </button>
             <button
+              type="button"
               className="stf-btn stf-btn-primary"
               onClick={handleSubmit}
               disabled={submitting}
@@ -147,7 +151,7 @@ export function ReviewPage() {
               {submitting ? "Recording..." : "Yes, submit"}
             </button>
           </div>
-        </div>
+        </section>
       </main>
 
       <SectionPicker
@@ -186,7 +190,6 @@ const mapBackendValidationErrors = (errors, draft = {}) => {
     donorType: "donorType",
     donorName: "donorName",
     donorAddress: "donorAddress",
-    donorContactNumber: "donorContactNumber",
     donorContact: "donorContact",
     donorEmail: "donorContact",
     donorTaxReference: "donorTaxReference",
@@ -199,7 +202,7 @@ const mapBackendValidationErrors = (errors, draft = {}) => {
   const itemErrors = {};
 
   Object.entries(errors || {}).forEach(([key, message]) => {
-    const itemMatch = key.match(/^items\.(.+?)\.(description|quantity|unit)$/);
+    const itemMatch = key.match(/^items\.(.+?)\.(description|quantity|unit|product)$/);
     if (itemMatch) {
       const [, itemRef, field] = itemMatch;
       const itemId = draft.items?.[Number(itemRef)]?.id || itemRef;

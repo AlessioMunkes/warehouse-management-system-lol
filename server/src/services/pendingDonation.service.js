@@ -1,8 +1,11 @@
 import pool from '../config/db.js';
 import { determineRouting } from '../lib/donationRouting.js';
+import { logAudit } from '../repositories/auditLog.repository.js';
 import pendingDonationRepository from '../repositories/pendingDonation.repository.js';
+import productRepository from '../repositories/product.repository.js';
 import donationAdminService from './donationAdmin.service.js';
 import donationService from './donation.service.js';
+import { validateEmail } from '../lib/validation/donationIntake.part1.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -12,6 +15,10 @@ const fail = (status, message) => {
 
 const normalisePendingItem = (raw = {}, index = 0) => {
   const item = raw || {};
+  const rawStatus = item.status ?? 'awaiting_resolution';
+  const status = rawStatus === 'PENDING_PRODUCT_REVIEW'
+    ? 'pending_product_review'
+    : String(rawStatus).toLowerCase();
   return {
     lineNo: item.lineNo ?? item.line_no ?? index + 1,
     description: String(item.description ?? '').trim(),
@@ -20,13 +27,29 @@ const normalisePendingItem = (raw = {}, index = 0) => {
     unit: item.unit ?? null,
     estimatedValueZar: item.estimatedValueZar ?? item.estimated_value_zar ?? null,
     requestedCategory: item.requestedCategory ?? item.requested_category ?? null,
-    status: item.status ?? 'awaiting_resolution',
+    status,
     flagId: item.flagId ?? item.flag_id ?? null,
     source: item.source ?? null,
     resolvedCategory: item.resolvedCategory ?? item.resolved_category ?? null,
     routingStatus: item.routingStatus ?? item.routing_status ?? null,
     storageAreaHint: item.storageAreaHint ?? item.storage_area_hint ?? null,
+    unknownProduct: item.unknownProduct ?? item.unknown_product ?? false,
+    weightKg: item.weightKg ?? item.weight_kg ?? null,
+    expiryDate: item.expiryDate ?? item.expiry_date ?? null,
   };
+};
+
+const REVIEW_DECISIONS = new Set(['match_existing_product', 'create_product', 'move_to_non_food']);
+const REVIEW_ROUTE_CATEGORIES = new Set(['recipe_food', 'add_on_food', 'non_recipe_food']);
+
+const normalizeReviewDecision = (value) => String(value || '').trim().toLowerCase();
+
+const resolveReviewCategory = (category) => {
+  const normalized = String(category || '').trim();
+  if (!REVIEW_ROUTE_CATEGORIES.has(normalized)) {
+    fail(400, 'Route must be one of: recipe_food, add_on_food, non_recipe_food.');
+  }
+  return normalized;
 };
 
 // NOTE: no fallback to the donation-level category here — by design
@@ -104,7 +127,7 @@ const buildDonationPayloadFromPending = (pendingDonation) => {
       routingStatus: item.routing_status ?? item.routingStatus ?? 'allocated',
       routedCategory: item.resolved_category ?? item.resolvedCategory ?? null,
       routingOutcome: item.routing_status ?? item.routingStatus ?? 'allocated',
-      routedSource: item.source ?? 'pending_donation',
+      routedSource: item.source ?? 'pending_manual_review',
       allocations: [],
     })),
   };
@@ -115,6 +138,61 @@ const sortPendingItemsByLine = (items = []) =>
 
 const sortDonationItemsByLine = (items = []) =>
   [...items].sort((a, b) => Number(a.line_no ?? a.lineNo ?? 0) - Number(b.line_no ?? b.lineNo ?? 0));
+
+const validateIntakePayload = (data = {}) => {
+  const errors = {};
+  const itemErrors = {};
+  const valueRaw = data.estimatedValueZar ?? data.estimated_value_zar ?? 0;
+  const value = Number(valueRaw);
+  if (!Number.isFinite(value) || value < 0) errors.estimatedValueZar = 'Estimated value must be 0 or greater.';
+
+  const snapshot = typeof data.draftSnapshot === 'string'
+    ? (() => { try { return JSON.parse(data.draftSnapshot)?.draft ?? {}; } catch { return {}; } })()
+    : data.draftSnapshot?.draft ?? {};
+  const phasePayload = data.isFood !== undefined
+    || data.is_food !== undefined
+    || snapshot.isFood !== undefined
+    || snapshot.phase === 'donation-phase-1-4';
+  const isFood = data.isFood ?? data.is_food ?? snapshot.isFood;
+  if (phasePayload && isFood !== true && isFood !== false) errors.isFood = 'Food selection is required.';
+
+  const donorName = String(data.donorName ?? data.donor_name ?? '').trim();
+  const donorContact = String(data.donorContact ?? data.donor_contact ?? '').trim();
+  const donorConsentGiven = data.donorConsentGiven ?? data.donor_consent_given;
+  if (phasePayload && donorName && !donorContact) errors.donorContact = 'Donor email is required unless the donor is anonymous.';
+  if (phasePayload && donorConsentGiven === true) {
+    const email = validateEmail(donorContact, { required: true });
+    if (email.error) errors.donorContact = email.error;
+  } else if (phasePayload && donorContact) {
+    const email = validateEmail(donorContact, { required: false });
+    if (email.error) errors.donorContact = email.error;
+  }
+
+  const items = Array.isArray(data.items) ? data.items : [];
+  if (phasePayload && items.length === 0) errors.items = 'At least one donated item is required.';
+  items.forEach((item, index) => {
+    const row = {};
+    const quantity = Number(item?.quantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) row.quantity = 'Quantity must be greater than zero.';
+    if (phasePayload && !String(item?.unit ?? '').trim()) row.unit = 'A unit is required.';
+    if (phasePayload && isFood === true && !item?.productId && item?.unknownProduct !== true && item?.status !== 'PENDING_PRODUCT_REVIEW') {
+      row.product = 'Select a product or mark this line as an unknown product.';
+    }
+    if (Object.keys(row).length) itemErrors[index] = row;
+  });
+
+  if (Object.keys(errors).length || Object.keys(itemErrors).length) {
+    const err = new Error('Please fix the highlighted fields.');
+    err.status = 400;
+    err.errors = { ...errors };
+    Object.entries(itemErrors).forEach(([index, row]) => {
+      Object.entries(row).forEach(([field, message]) => {
+        err.errors[`items.${index}.${field}`] = message;
+      });
+    });
+    throw err;
+  }
+};
 
 const assertDonationItemPairingIsComplete = (pendingItems, donationItems, context) => {
   if (pendingItems.length !== donationItems.length) {
@@ -265,6 +343,8 @@ export const createPendingDonationFromIntake = async (payload = {}) => {
       }
     }
 
+    validateIntakePayload(data);
+
     const pendingDonation = await pendingDonationRepository.createPendingDonation(
       {
         donorName: data.donorName ?? data.donor_name ?? null,
@@ -304,7 +384,16 @@ export const createPendingDonationFromIntake = async (payload = {}) => {
       // No donation-level fallback: a blank item category always flags
       // for manager review (BR-10 decision), even when the donation
       // itself has a valid category.
-      const routingPlan = await routePendingItem(item);
+      const forceProductReview = item.status === 'pending_product_review' || item.unknownProduct === true;
+      const routingPlan = forceProductReview
+        ? {
+      source: 'pending_manual_review',
+      resolvedCategory: null,
+      routingStatus: 'pending_product_review',
+      storageAreaHint: null,
+      shouldFlag: true,
+    }
+        : await routePendingItem(item);
       const persistedItem = {
         ...item,
         source: routingPlan.source ?? item.source ?? null,
@@ -412,6 +501,7 @@ export const createPendingDonationFromIntake = async (payload = {}) => {
 
 export const resolveFlagAndMaybeCommit = async (flagId, resolution = {}) => {
   const data = resolution || {};
+  const reviewDecision = normalizeReviewDecision(data.decision);
   const accepted = data.accepted === true;
   const reason = data.reason ?? null;
   const resolvedBy = data.resolvedBy ?? data.resolved_by ?? null;
@@ -419,8 +509,11 @@ export const resolveFlagAndMaybeCommit = async (flagId, resolution = {}) => {
   if (!flagId) {
     fail(400, 'Flag ID is required.');
   }
-  if (!accepted && !reason) {
+  if (!reviewDecision && !accepted && !reason) {
     fail(400, 'A rejection reason is required when a flag is rejected.');
+  }
+  if (reviewDecision && !REVIEW_DECISIONS.has(reviewDecision)) {
+    fail(400, 'Decision must be one of: match_existing_product, create_product, move_to_non_food.');
   }
 
   const client = await pool.connect();
@@ -466,6 +559,121 @@ export const resolveFlagAndMaybeCommit = async (flagId, resolution = {}) => {
     const pendingDonation = await pendingDonationRepository.getPendingDonationById(pendingDonationId, client);
     const item = (pendingDonation?.items || []).find((row) => row.flag_id === flag.id || row.id === flag.pending_donation_item_id);
     const finalCategory = data.category ?? item?.resolved_category ?? item?.requested_category ?? null;
+    const pendingItemId = flag.pending_donation_item_id ?? item?.id ?? null;
+
+    if (!pendingItemId) {
+      await client.query('ROLLBACK');
+      fail(404, 'No pending donation item is linked to this flag.');
+    }
+
+    if (reviewDecision) {
+      let productId = null;
+      let resolvedCategory = finalCategory;
+      let routingStatus = 'accepted';
+      let auditAction = reviewDecision.toUpperCase();
+
+      if (reviewDecision === 'match_existing_product') {
+        productId = Number(data.productId ?? data.product_id);
+        if (!Number.isInteger(productId) || productId <= 0) {
+          await client.query('ROLLBACK');
+          fail(400, 'A valid productId is required when matching an existing product.');
+        }
+        const productDefault = await productRepository.getProductRoutingDefault(productId);
+        resolvedCategory = data.category
+          ? resolveReviewCategory(data.category)
+          : (productDefault?.donation_category || resolvedCategory || pendingDonation?.donation_category || null);
+        if (!resolvedCategory) {
+          await client.query('ROLLBACK');
+          fail(400, 'Matched products require an existing route default or a submitted category.');
+        }
+        await productRepository.upsertProductRoutingDefault({
+          productId,
+          donationCategory: resolvedCategory,
+          setBy: resolvedBy,
+        }, client);
+      }
+
+      if (reviewDecision === 'create_product') {
+        const productName = String(data.product?.name ?? data.name ?? item?.description ?? '').trim();
+        if (!productName) {
+          await client.query('ROLLBACK');
+          fail(400, 'Product name is required.');
+        }
+        resolvedCategory = resolveReviewCategory(data.product?.category ?? data.category);
+        const finalizedClassification = await donationAdminService.finalizePendingClassification({
+          flagId,
+          name: productName,
+          sku: data.product?.sku || data.sku || `PENDING-${flagId}`,
+          storageType: 'dry',
+          defaultUnit: item?.unit || 'kg',
+          category: resolvedCategory,
+          updatedBy: resolvedBy,
+        }, client);
+        productId = finalizedClassification?.flag?.product_id ?? flag.product_id ?? null;
+      } else {
+        await pendingDonationRepository.resolveWarehouseManagerFlag(
+          flagId,
+          { productId: reviewDecision === 'match_existing_product' ? productId : null },
+          client
+        );
+      }
+
+      if (reviewDecision === 'move_to_non_food') {
+        resolvedCategory = 'non_food';
+        routingStatus = 'non_food';
+        auditAction = 'MOVE_TO_NON_FOOD';
+      }
+
+      await pendingDonationRepository.markPendingItemResolved(
+        pendingItemId,
+        {
+          productId,
+          resolvedCategory,
+          routingStatus,
+          storageAreaHint: data.storageAreaHint ?? null,
+          resolvedBy,
+        },
+        client
+      );
+
+      await logAudit(client, {
+        entityType: 'pending_product_review',
+        entityId: flagId,
+        action: auditAction,
+        actorId: resolvedBy,
+        before: { status: flag.status, product_id: flag.product_id },
+        after: {
+          status: 'resolved',
+          product_id: productId,
+          pending_donation_id: pendingDonationId,
+          pending_donation_item_id: pendingItemId,
+          resolved_category: resolvedCategory,
+        },
+      });
+
+      const pendingDonationRow = await pendingDonationRepository.lockPendingDonationForUpdate(pendingDonationId, client);
+      const remainingUnresolved = await pendingDonationRepository.countUnresolvedFlagsForPendingDonation(pendingDonationId, client);
+
+      await pendingDonationRepository.updatePendingDonationStatus(
+        pendingDonationId,
+        remainingUnresolved === 0 ? 'committing' : 'awaiting_resolution',
+        {},
+        client
+      );
+
+      await client.query('COMMIT');
+
+      if (remainingUnresolved === 0 && pendingDonationRow) {
+        return await attemptCommitForPendingDonation(pendingDonationId);
+      }
+
+      return {
+        pendingDonationId,
+        status: remainingUnresolved === 0 ? 'committing' : 'awaiting_resolution',
+        flagId,
+        finalized: true,
+      };
+    }
 
     if (accepted && !finalCategory) {
       await client.query('ROLLBACK');
@@ -486,12 +694,6 @@ export const resolveFlagAndMaybeCommit = async (flagId, resolution = {}) => {
       category: finalCategory,
       updatedBy: resolvedBy,
     }, client);
-
-    const pendingItemId = flag.pending_donation_item_id ?? item?.id ?? null;
-    if (!pendingItemId) {
-      await client.query('ROLLBACK');
-      fail(404, 'No pending donation item is linked to this flag.');
-    }
 
     if (accepted) {
       const resolvedProductId = finalizedClassification?.flag?.product_id ?? flag.product_id ?? null;

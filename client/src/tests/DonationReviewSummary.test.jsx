@@ -34,7 +34,7 @@ function ReviewHarness() {
       <EditSectionDialog
         open={open}
         onOpenChange={setOpen}
-        sections={['category']}
+        sections={[]}
         draft={draft}
         updateDraft={(patch) => setDraft((current) => ({ ...current, ...patch }))}
       />
@@ -44,33 +44,21 @@ function ReviewHarness() {
 }
 
 describe('Donation review summary edit flow', () => {
-  it('updates the summary only after saving a category edit', async () => {
-    const user = userEvent.setup();
-    const { container } = render(<ReviewHarness />);
+  it('does not show donation category in the review summary', () => {
+    render(<ReviewHarness />);
 
-    const summaryCategory = () => container.querySelector('.stf-row-meta')?.textContent;
-    expect(summaryCategory()).toBe('Recipe food');
-
-    await user.click(screen.getByRole('radio', { name: /^Non-foodStored/i }));
-    expect(summaryCategory()).toBe('Recipe food');
-
-    await user.click(screen.getByRole('button', { name: 'Save' }));
-    expect(summaryCategory()).toBe('Non-food');
+    expect(screen.queryByText('Category')).not.toBeInTheDocument();
+    expect(screen.queryByText('Recipe food')).not.toBeInTheDocument();
   });
 
-  it('discards unsaved category edits on cancel', async () => {
+  it('does not expose category edit controls in the correction dialog', async () => {
     const user = userEvent.setup();
-    const { container } = render(<ReviewHarness />);
-    const summaryCategory = () => container.querySelector('.stf-row-meta')?.textContent;
+    render(<ReviewHarness />);
 
-    await user.click(screen.getByRole('radio', { name: /^Non-foodStored/i }));
+    expect(screen.queryByRole('radio', { name: /^Recipe Food/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: /^Non-food/i })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
-
-    expect(summaryCategory()).toBe('Recipe food');
-
-    await user.click(screen.getByRole('button', { name: 'Open editor' }));
-    expect(screen.getByRole('radio', { name: /^Recipe FoodMatches/i })).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByRole('radio', { name: /^Non-foodStored/i })).toHaveAttribute('aria-checked', 'false');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });
 

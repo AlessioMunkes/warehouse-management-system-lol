@@ -134,6 +134,35 @@ const resendDonationEmail = async (req, res) => {
   }
 };
 
+const getSection18AForm = async (req, res) => {
+  try {
+    const form = await donationService.getSection18AFormByToken(req.params.token);
+    res.status(200).json({ success: true, data: form });
+  } catch (err) {
+    console.error('[getSection18AForm]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to retrieve the Section 18A form.',
+    });
+  }
+};
+
+const submitSection18AForm = async (req, res) => {
+  try {
+    const result = await donationService.submitSection18AForm(req.params.token, req.body);
+    res.status(201).json({ success: true, data: result });
+  } catch (err) {
+    console.error('[submitSection18AForm]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to submit the Section 18A form.',
+      ...(err.details ? { errors: err.details } : {}),
+    });
+  }
+};
+
 // POST /api/donations/:id/section-18a/certificate
 // Generates and stores the certificate PDF for a queued donation.
 const generateSection18ACertificate = async (req, res) => {
@@ -286,6 +315,8 @@ export default {
   listSection18AQueue,
   listEmailHistory,
   resendDonationEmail,
+  getSection18AForm,
+  submitSection18AForm,
   generateSection18ACertificate,
   downloadSection18ACertificate,
   resolveUnmatchedItem,

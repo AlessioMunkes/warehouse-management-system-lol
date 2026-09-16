@@ -38,6 +38,7 @@ import VolunteerEventsPage                        from './pages/VolunteerEventsP
 import VolunteerEventWorkspacePage                from './pages/VolunteerEventWorkspacePage';
 import CommunityRequestsPage                       from './pages/CommunityRequestsPage';
 import GmailSettingsPage                           from './pages/GmailSettingsPage';
+import Section18AFormPage                         from './pages/Section18AFormPage';
 
 // Donations — new feature, own draft context scoped to just these
 // two routes (see features/donation/context/DonationDraftProvider.jsx)
@@ -54,6 +55,7 @@ const App = () => (
         <Route path="/"      element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/guest" element={<GuestLoginPage />} />
+        <Route path="/section-18a/:token" element={<Section18AFormPage />} />
          
         
         {/* ── Admin only ─────────────────────────────────────

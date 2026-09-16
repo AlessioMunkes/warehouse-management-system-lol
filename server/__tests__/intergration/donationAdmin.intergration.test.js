@@ -349,6 +349,30 @@ describe('GET /api/donations/admin/products-with-defaults', () => {
   });
 });
 
+describe('GET /api/donations/intake/products/search', () => {
+  it('finds active stock items by SKU as well as name', async () => {
+    const product = await createTestProduct();
+
+    const byName = await request(intakeApp)
+      .get('/api/donations/intake/products/search')
+      .query({ name: product.name.slice(0, 12) })
+      .set('Cookie', authCookie(worker));
+    expect(byName.status).toBe(200);
+    expect(byName.body.data).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: product.id, name: product.name, sku: product.sku })])
+    );
+
+    const bySku = await request(intakeApp)
+      .get('/api/donations/intake/products/search')
+      .query({ name: product.sku.slice(0, 12) })
+      .set('Cookie', authCookie(worker));
+    expect(bySku.status).toBe(200);
+    expect(bySku.body.data).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: product.id, name: product.name, sku: product.sku })])
+    );
+  });
+});
+
 describe('PUT /api/donations/admin/products/:id/classification', () => {
   it('sets and reads back a classification', async () => {
     const product = await createTestProduct();

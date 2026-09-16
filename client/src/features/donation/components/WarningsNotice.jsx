@@ -41,7 +41,7 @@ export function CompletionDialog({ open, result, onRecordAnother, onGoHome }) {
 
   return (
     <Dialog open={open}>
-      <DialogContent className="stf-shell">
+      <DialogContent className="stf-shell" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>
             {pendingReview ? "Donation received — pending manager review" : "Donation recorded"}

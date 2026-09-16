@@ -1,8 +1,8 @@
 // server/__tests__/eventBooking.vmsSync.test.js
 // Phase 4 targeted tests: EventBookingService post-commit wiring.
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-const eventRepoMock = { findById: vi.fn() };
-const spaceRepoMock = { findById: vi.fn() };
+const eventRepoMock = { findById: vi.fn(), createEvent: vi.fn() };
+const spaceRepoMock = { findById: vi.fn(), findByName: vi.fn(), createSpace: vi.fn() };
 const slotMock = { findById: vi.fn(), findByEventId: vi.fn(), createTimeslot: vi.fn(), updateTimeslot: vi.fn(), findPotentialOverlaps: vi.fn() };
 const bookMock = { countConfirmedByTimeslot: vi.fn() };
 const auditMock = vi.fn();
@@ -21,10 +21,21 @@ vi.mock('../src/config/db.js', () => ({ default: poolMock }));
 const mod = await import('../src/services/eventBooking.service.js');
 const svc = mod.default;
 const ACTOR = { id: 5 };
-const EVENT = { event_id: 'e1' };
+const EVENT = { event_id: 'e1', event_date: '2026-10-01' };
 const SPACE = { space_id: 's1', is_active: true };
 const SLOT = { timeslot_id: 't1', event_id: 'e1', space_id: 's1', start_time: '2026-10-01T09:00:00Z', end_time: '2026-10-01T10:00:00Z', capacity: 10, status: 'OPEN' };
 beforeEach(() => { vi.clearAllMocks(); order = []; released = false; poolMock.connect.mockImplementation(async () => makeClient()); queueSyncMock.mockResolvedValue({ sync_status: 'PENDING' }); syncEntityMock.mockResolvedValue({ sync_status: 'SYNCED' }); });
+const combinedPayload = {
+  eventName: 'Drive',
+  description: 'Pack food boxes',
+  eventDate: '2026-10-01',
+  venueName: 'Warehouse',
+  address: '1 Main Road',
+  spaceId: 's1',
+  startTime: SLOT.start_time,
+  endTime: SLOT.end_time,
+  capacity: 10,
+};
 describe('no external call before commit', () => {
   it('queues PENDING in-txn then syncs post-commit after release', async () => {
     eventRepoMock.findById.mockResolvedValueOnce(EVENT);
@@ -40,6 +51,57 @@ describe('no external call before commit', () => {
     expect(syncAtCall.order).toContain('COMMIT');
     expect(syncAtCall.released).toBe(true);
   });
+  it('atomic creation queues in-txn and syncs once post-commit', async () => {
+    spaceRepoMock.findById.mockResolvedValueOnce(SPACE);
+    eventRepoMock.createEvent.mockResolvedValueOnce(EVENT);
+    slotMock.findPotentialOverlaps.mockResolvedValueOnce([]);
+    slotMock.createTimeslot.mockResolvedValueOnce(SLOT);
+    let syncAtCall = null;
+    syncEntityMock.mockImplementationOnce(async () => { syncAtCall = { order: [...order], released }; return { sync_status: 'SYNCED' }; });
+    const result = await svc.createEventWithInitialTimeslot(combinedPayload, ACTOR);
+    expect(result).toEqual({ event: EVENT, timeslots: [SLOT] });
+    expect(queueSyncMock).toHaveBeenCalledTimes(1);
+    expect(queueSyncMock).toHaveBeenCalledWith('event_booking', 'e1', expect.anything());
+    expect(syncEntityMock).toHaveBeenCalledTimes(1);
+    expect(syncEntityMock).toHaveBeenCalledWith('event_booking', 'e1');
+    expect(syncAtCall.order).toContain('COMMIT');
+    expect(syncAtCall.released).toBe(true);
+  });
+  it('multi-timeslot atomic creation still queues and syncs exactly once', async () => {
+    spaceRepoMock.findById.mockResolvedValueOnce(SPACE).mockResolvedValueOnce(SPACE);
+    eventRepoMock.createEvent.mockResolvedValueOnce(EVENT);
+    slotMock.findPotentialOverlaps.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    slotMock.createTimeslot
+      .mockResolvedValueOnce(SLOT)
+      .mockResolvedValueOnce({ ...SLOT, timeslot_id: 't2', start_time: '2026-10-01T10:30:00Z', end_time: '2026-10-01T11:30:00Z' });
+    await svc.createEventWithInitialTimeslot({
+      ...combinedPayload,
+      space: { mode: 'existing', spaceId: 's1' },
+      timeslots: [
+        { startTime: SLOT.start_time, endTime: SLOT.end_time, capacity: 10 },
+        { startTime: '2026-10-01T10:30:00Z', endTime: '2026-10-01T11:30:00Z', capacity: 10 },
+      ],
+    }, ACTOR);
+    expect(queueSyncMock).toHaveBeenCalledTimes(1);
+    expect(syncEntityMock).toHaveBeenCalledTimes(1);
+    expect(syncEntityMock).toHaveBeenCalledWith('event_booking', 'e1');
+  });
+});
+describe('validateTimeslotAvailability', () => {
+  it('does not create records, queue sync, or call VMS', async () => {
+    spaceRepoMock.findById.mockResolvedValueOnce(SPACE);
+    slotMock.findPotentialOverlaps.mockResolvedValueOnce([]);
+    const result = await svc.validateTimeslotAvailability({
+      eventDate: '2026-10-01',
+      spaceId: 's1',
+      startTime: SLOT.start_time,
+      endTime: SLOT.end_time,
+    });
+    expect(result).toEqual({ available: true, conflicts: [] });
+    expect(slotMock.createTimeslot).not.toHaveBeenCalled();
+    expect(queueSyncMock).not.toHaveBeenCalled();
+    expect(syncEntityMock).not.toHaveBeenCalled();
+  });
 });
 describe('local transaction rollback => no VMS call', () => {
   it('rolls back on overlap and never syncs', async () => {
@@ -50,6 +112,16 @@ describe('local transaction rollback => no VMS call', () => {
     expect(queueSyncMock).not.toHaveBeenCalled();
     expect(syncEntityMock).not.toHaveBeenCalled();
     expect(slotMock.createTimeslot).not.toHaveBeenCalled();
+  });
+  it('rolls back atomic creation when sync queue fails and never calls VMS', async () => {
+    spaceRepoMock.findById.mockResolvedValueOnce(SPACE);
+    eventRepoMock.createEvent.mockResolvedValueOnce(EVENT);
+    slotMock.findPotentialOverlaps.mockResolvedValueOnce([]);
+    slotMock.createTimeslot.mockResolvedValueOnce(SLOT);
+    queueSyncMock.mockRejectedValueOnce(new Error('queue failed'));
+    await expect(svc.createEventWithInitialTimeslot(combinedPayload, ACTOR)).rejects.toThrow('queue failed');
+    expect(order).toContain('ROLLBACK');
+    expect(syncEntityMock).not.toHaveBeenCalled();
   });
 });
 describe('post-commit VMS failure preserves local records', () => {
@@ -62,6 +134,17 @@ describe('post-commit VMS failure preserves local records', () => {
     const result = await svc.bookEventSpaceAndTimeslots('e1', { spaceId: 's1', timeslots: [{ startTime: SLOT.start_time, endTime: SLOT.end_time, capacity: 10 }] }, ACTOR);
     expect(result).toHaveLength(1);
     expect(syncEntityMock).toHaveBeenCalled();
+  });
+  it('returns atomic local result even when post-commit sync fails', async () => {
+    spaceRepoMock.findById.mockResolvedValueOnce(SPACE);
+    eventRepoMock.createEvent.mockResolvedValueOnce(EVENT);
+    slotMock.findPotentialOverlaps.mockResolvedValueOnce([]);
+    slotMock.createTimeslot.mockResolvedValueOnce(SLOT);
+    syncEntityMock.mockRejectedValueOnce(new Error('VMS down'));
+    const result = await svc.createEventWithInitialTimeslot(combinedPayload, ACTOR);
+    expect(result).toEqual({ event: EVENT, timeslots: [SLOT] });
+    expect(order).toContain('COMMIT');
+    expect(syncEntityMock).toHaveBeenCalledWith('event_booking', 'e1');
   });
   it('retries do not recreate source records', async () => {
     eventRepoMock.findById.mockResolvedValueOnce(EVENT);

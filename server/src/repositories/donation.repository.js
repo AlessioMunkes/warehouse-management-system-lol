@@ -541,6 +541,78 @@ const listSection18AQueue = async () => {
   return result.rows;
 };
 
+const saveSection18AFormToken = async ({ donationId, tokenHash, expiresAt }, client = pool) => {
+  await client.query(
+    `ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_token_hash TEXT`
+  );
+  await client.query(
+    `ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_token_expires_at TIMESTAMPTZ`
+  );
+  await client.query(
+    `ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_submitted_at TIMESTAMPTZ`
+  );
+
+  const result = await client.query(
+    `UPDATE donations
+     SET section_18a_form_token_hash = $1,
+         section_18a_form_token_expires_at = $2
+     WHERE id = $3
+     RETURNING id, section_18a_form_token_hash, section_18a_form_token_expires_at`,
+    [tokenHash, expiresAt, donationId]
+  );
+  return result.rows[0] || null;
+};
+
+const getDonationBySection18AFormTokenHash = async (tokenHash, client = pool) => {
+  await client.query(
+    `ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_token_hash TEXT`
+  );
+  await client.query(
+    `ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_token_expires_at TIMESTAMPTZ`
+  );
+  await client.query(
+    `ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_submitted_at TIMESTAMPTZ`
+  );
+
+  const result = await client.query(
+    `SELECT *
+     FROM donations
+     WHERE section_18a_form_token_hash = $1
+     LIMIT 1`,
+    [tokenHash]
+  );
+  return result.rows[0] || null;
+};
+
+const saveSection18AFormSubmission = async ({ donationId, formData }, client = pool) => {
+  await client.query(
+    `ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_submitted_at TIMESTAMPTZ`
+  );
+  await client.query(
+    `ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_donor_form JSONB`
+  );
+
+  const result = await client.query(
+    `UPDATE donations
+     SET donor_name = $1,
+         donor_contact = $2,
+         donor_tax_reference = $3,
+         donor_consent_given = TRUE,
+         section_18a_donor_form = $4,
+         section_18a_form_submitted_at = NOW()
+     WHERE id = $5
+     RETURNING *`,
+    [
+      formData.fullNameOrCompanyName,
+      formData.email,
+      formData.incomeTaxNumber,
+      formData,
+      donationId,
+    ]
+  );
+  return result.rows[0] || null;
+};
+
 const getSection18ASettings = async (client = pool) => {
   const result = await client.query(
     `SELECT *
@@ -726,20 +798,21 @@ const canonicalStatus =
   return result.rows[0];
 };
 
-const nextSection18ACertificateNumber = async (client, prefix) => {
+const nextSection18ACertificateNumber = async (client, prefix, year = new Date().getFullYear()) => {
+  const base = `${prefix}-${year}`;
   const result = await client.query(
     `SELECT certificate_number
      FROM section18a_certificates
      WHERE certificate_number LIKE $1
      ORDER BY id DESC
      LIMIT 1`,
-    [`${prefix}-%`]
+    [`${base}-%`]
   );
 
   const previous = result.rows[0]?.certificate_number || '';
-  const lastNumber = Number(previous.slice(prefix.length + 1));
+  const lastNumber = Number(previous.slice(base.length + 1));
   const nextNumber = Number.isFinite(lastNumber) ? lastNumber + 1 : 1;
-  return `${prefix}-${String(nextNumber).padStart(6, '0')}`;
+  return `${base}-${String(nextNumber).padStart(6, '0')}`;
 };
 
 const createSection18ACertificate = async ({
@@ -775,9 +848,10 @@ const createSection18ACertificate = async ({
     }
 
     await client.query(`SELECT pg_advisory_xact_lock(hashtext('section18a_certificate_number'))`);
-    const prefix = settings.certificate_prefix || 'S18A';
-    const certificateNumber = await nextSection18ACertificateNumber(client, prefix);
     const issueDate = new Date().toISOString().slice(0, 10);
+    const prefix = settings.certificate_prefix || '18A';
+    const year = issueDate.slice(0, 4);
+    const certificateNumber = await nextSection18ACertificateNumber(client, prefix, year);
     const pdf = await buildPdf({ certificateNumber, issueDate });
 
     const inserted = await client.query(
@@ -805,7 +879,8 @@ const createSection18ACertificate = async ({
       `UPDATE donations
        SET section_18a_status = 'issued',
            section_18a_certificate_ref = $1,
-           section_18a_issued_at = NOW()
+           section_18a_issued_at = NOW(),
+           section_18a_form_token_hash = NULL
        WHERE id = $2`,
       [certificateNumber, donationId]
     );
@@ -855,6 +930,9 @@ export default {
   listSection18AQueue,
   getSection18ASettings,
   updateSection18ASettings,
+  saveSection18AFormToken,
+  getDonationBySection18AFormTokenHash,
+  saveSection18AFormSubmission,
   getSection18ACertificateByDonationId,
   createSection18ACertificate,
   listEmailHistory,

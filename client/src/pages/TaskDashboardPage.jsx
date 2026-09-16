@@ -46,6 +46,10 @@ export default function TaskDashboardPage() {
   const { user } = useAuth();
   const [work, setWork] = useState(null);
   const [loading, setLoading] = useState(true);
+  const role = String(user?.role || '').toLowerCase();
+  const visibleTasks = TASKS.filter((task) =>
+    task.to !== STAFF.donation || (role !== 'manager' && role !== 'admin')
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -90,7 +94,7 @@ export default function TaskDashboardPage() {
         Start a task
       </h2>
       <div className="grid gap-3 sm:grid-cols-2">
-        {TASKS.map((task) => <ActionCard key={task.to} {...task} />)}
+        {visibleTasks.map((task) => <ActionCard key={task.to} {...task} />)}
       </div>
     </div>
   );

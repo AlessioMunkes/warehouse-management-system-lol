@@ -8,7 +8,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState, useCallback } from 'react';
 import {
-  FileText, Mail, Settings, Download, RefreshCw, Send,
+  FileText, Mail, Settings, Download, Send,
   CheckCircle2, XCircle, Clock, AlertTriangle, Loader2,
 } from 'lucide-react';
 import { TopNavbar } from '../features/taskdashboard/components/TopNavBar';
@@ -53,7 +53,6 @@ export default function Section18AManagementPage() {
   const [actionLoading, setActionLoading] = useState(null);
   const [feedback, setFeedback] = useState(null);
   const [confirmResend, setConfirmResend] = useState(null);
-  const [confirmGenerate, setConfirmGenerate] = useState(null);
   const [emailSearch, setEmailSearch] = useState('');
   const [emailTypeFilter, setEmailTypeFilter] = useState('');
   const [emailStatusFilter, setEmailStatusFilter] = useState('');
@@ -105,21 +104,6 @@ export default function Section18AManagementPage() {
     }, 300);
     return () => clearTimeout(timer);
   }, [emailSearch, emailTypeFilter, emailStatusFilter, loadEmailHistory, tab]);
-
-  const handleGenerateCertificate = async (donationId) => {
-    setActionLoading(`generate-${donationId}`);
-    setConfirmGenerate(null);
-    setFeedback(null);
-    try {
-      await donationManagementAPI.generateCertificate(donationId);
-      setFeedback({ type: 'success', message: 'Certificate generated successfully.' });
-      await loadData();
-    } catch (err) {
-      setFeedback({ type: 'error', message: err.message || 'Failed to generate certificate.' });
-    } finally {
-      setActionLoading(null);
-    }
-  };
 
   const handleDownloadCertificate = (donationId) => {
     donationManagementAPI.downloadCertificate(donationId);
@@ -204,31 +188,59 @@ export default function Section18AManagementPage() {
                       <div className="overflow-x-auto">
                         <Table>
                           <TableHeader>
-                            <TableRow><TableHead>Donation</TableHead><TableHead>Donor</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead></TableRow>
+                            <TableRow>
+                              <TableHead>Donation</TableHead>
+                              <TableHead>Donor</TableHead>
+                              <TableHead>Date</TableHead>
+                              <TableHead>Amount</TableHead>
+                              <TableHead>Donation Status</TableHead>
+                              <TableHead>Section 18A Status</TableHead>
+                              <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {certificateQueue.map((item) => (
-                              <TableRow key={item.id}>
-                                <TableCell className="font-medium">{item.reference || item.id}</TableCell>
-                                <TableCell>{item.donorName || item.donor_name || '—'}</TableCell>
-                                <TableCell>{item.createdAt ? new Date(item.createdAt).toLocaleDateString() : item.date || '—'}</TableCell>
-                                <TableCell><Badge variant={item.certificateGenerated || item.certificate_generated ? 'default' : 'outline'} className="rounded-[6px] px-2 py-0 text-[11px]">{item.certificateGenerated || item.certificate_generated ? 'Generated' : 'Pending'}</Badge></TableCell>
-                                <TableCell className="text-right">
-                                  <div className="flex justify-end gap-2">
-                                    {(item.certificateGenerated || item.certificate_generated) ? (<>
-                                      <Button variant="outline" size="sm" onClick={() => handleDownloadCertificate(item.id)}><Download className="mr-1 h-3 w-3" />Download</Button>
-                                      <Button variant="ghost" size="sm" onClick={() => setConfirmGenerate(item)} disabled={actionLoading === `generate-${item.id}`}>
-                                        {actionLoading === `generate-${item.id}` ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-1 h-3 w-3" />}Regenerate
-                                      </Button>
-                                    </>) : (
-                                      <Button size="sm" onClick={() => setConfirmGenerate(item)} disabled={actionLoading === `generate-${item.id}`}>
-                                        {actionLoading === `generate-${item.id}` ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <FileText className="mr-1 h-3 w-3" />}Generate
-                                      </Button>
-                                    )}
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))}
+                            {certificateQueue.map((item) => {
+                              const hasCert = Boolean(item.certificateGenerated || item.certificate_generated || item.section_18a_certificate_ref || item.certificate_number);
+                              const formattedDate = item.received_at
+                                ? new Date(item.received_at).toLocaleDateString()
+                                : item.createdAt
+                                  ? new Date(item.createdAt).toLocaleDateString()
+                                  : item.date || '—';
+                              const formattedAmount = item.estimated_value_zar != null
+                                ? `R${Number(item.estimated_value_zar).toFixed(2)}`
+                                : item.amount != null
+                                  ? `R${item.amount}`
+                                  : '—';
+                              const statusText = item.section_18a_status || (hasCert ? 'Generated' : 'Pending');
+
+                              const donationStatusText = item.status || item.donation_status || '—';
+
+                              return (
+                                <TableRow key={item.id}>
+                                  <TableCell className="font-medium">{item.reference || item.id}</TableCell>
+                                  <TableCell>{item.donorName || item.donor_name || '—'}</TableCell>
+                                  <TableCell>{formattedDate}</TableCell>
+                                  <TableCell>{formattedAmount}</TableCell>
+                                  <TableCell>{donationStatusText}</TableCell>
+                                  <TableCell>
+                                    <Badge variant={hasCert ? 'default' : 'outline'} className="rounded-[6px] px-2 py-0 text-[11px]">
+                                      {statusText}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <div className="flex justify-end gap-2">
+                                      {hasCert ? (
+                                        <Button variant="outline" size="sm" onClick={() => handleDownloadCertificate(item.id)}>
+                                          <Download className="mr-1 h-3 w-3" />Download
+                                        </Button>
+                                      ) : (
+                                        <span className="text-xs text-muted-foreground">—</span>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
                           </TableBody>
                         </Table>
                       </div>
@@ -329,12 +341,6 @@ export default function Section18AManagementPage() {
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Resend Email?</AlertDialogTitle><AlertDialogDescription>This will send the donation email to <strong>{confirmResend?.recipient_email || confirmResend?.recipientEmail || confirmResend?.recipient || 'the recipient'}</strong> again.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => confirmResend && handleResendEmail(confirmResend.id)}>Resend Email</AlertDialogAction></AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      <AlertDialog open={!!confirmGenerate} onOpenChange={() => setConfirmGenerate(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>{confirmGenerate?.certificateGenerated || confirmGenerate?.certificate_generated ? 'Regenerate Certificate?' : 'Generate Certificate?'}</AlertDialogTitle><AlertDialogDescription>{confirmGenerate?.certificateGenerated || confirmGenerate?.certificate_generated ? 'This will create a new Section 18A certificate and replace the existing one.' : 'This will generate a Section 18A tax certificate for this donation.'}</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => confirmGenerate && handleGenerateCertificate(confirmGenerate.id)}>{confirmGenerate?.certificateGenerated || confirmGenerate?.certificate_generated ? 'Regenerate' : 'Generate'}</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>

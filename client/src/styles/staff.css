@@ -327,6 +327,95 @@
 }
 .stf-btn-warn:hover:not([disabled]) { background: var(--stf-attention-bg); }
 
+/* Donation intake uses the same staff task primitives as Dispatch,
+   with only layout glue scoped to the donation page. */
+.donation-intake-shell {
+  padding-bottom: 0;
+}
+
+.donation-intake-main {
+  max-width: 760px;
+}
+
+.donation-intake-card {
+  padding: 18px;
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+}
+
+.donation-intake-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.donation-intake-choice {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.donation-intake-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.donation-intake-option {
+  min-height: var(--stf-field);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  color: var(--stf-ink);
+  font: 700 15px/1 var(--stf-font-display);
+  cursor: pointer;
+}
+
+.donation-intake-option:hover {
+  border-color: var(--stf-gold);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.14);
+}
+
+.donation-intake-option.is-chosen {
+  border-color: var(--stf-accent);
+  box-shadow: inset 0 0 0 1px var(--stf-accent);
+}
+
+.donation-intake-option input {
+  accent-color: var(--stf-accent);
+}
+
+.donation-intake-items {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.donation-intake-actions {
+  padding-top: 18px;
+  border-top: 1px solid var(--stf-border);
+}
+
+.donation-intake-error {
+  color: var(--stf-attention);
+}
+
+.donation-intake-error-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+@media (min-width: 720px) {
+  .donation-intake-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* ── Fields ──────────────────────────────────────────────────────── */
 .stf-field { display: flex; flex-direction: column; gap: 7px; }
 .stf-field-label {

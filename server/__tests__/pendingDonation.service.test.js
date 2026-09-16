@@ -20,6 +20,7 @@ const pendingRepoMock = {
   lockWarehouseManagerFlagForUpdate: vi.fn(),
   createWarehouseManagerFlag: vi.fn(),
   updateWarehouseManagerFlagPendingDonationLink: vi.fn(),
+  resolveWarehouseManagerFlag: vi.fn(),
   countUnresolvedFlagsForPendingDonation: vi.fn(),
   setPendingDonationCommittedId: vi.fn(),
   markPendingItemResolved: vi.fn(),
@@ -27,6 +28,15 @@ const pendingRepoMock = {
   markPendingItemRejected: vi.fn(),
   listDonationItemsForDonation: vi.fn(),
   listPendingDonationsByStatus: vi.fn(),
+};
+
+const productRepoMock = {
+  getProductRoutingDefault: vi.fn(),
+  upsertProductRoutingDefault: vi.fn(),
+};
+
+const auditRepoMock = {
+  logAudit: vi.fn(),
 };
 
 const donationServiceMock = {
@@ -48,6 +58,8 @@ const donationAdminServiceMock = {
 
 vi.mock('../src/config/db.js', () => ({ default: poolMock }));
 vi.mock('../src/repositories/pendingDonation.repository.js', () => ({ default: pendingRepoMock }));
+vi.mock('../src/repositories/product.repository.js', () => ({ default: productRepoMock }));
+vi.mock('../src/repositories/auditLog.repository.js', () => auditRepoMock);
 vi.mock('../src/repositories/donation.repository.js', () => ({ default: donationModelMock }));
 vi.mock('../src/lib/donationRouting.js', () => ({ determineRouting: routingMock.determineRouting }));
 vi.mock('../src/services/donationAdmin.service.js', () => ({ default: donationAdminServiceMock }));
@@ -73,8 +85,11 @@ beforeEach(() => {
   pendingRepoMock.getPendingDonationById.mockReset();
   pendingRepoMock.findPendingDonationIdByIdempotencyKey.mockResolvedValue(null);
   pendingRepoMock.updatePendingDonationStatus.mockResolvedValue({ id: 10 });
+  pendingRepoMock.resolveWarehouseManagerFlag.mockResolvedValue({ id: 1, status: 'resolved' });
   pendingRepoMock.markPendingItemCommitted.mockResolvedValue({ id: 1 });
   pendingRepoMock.setPendingDonationCommittedId.mockResolvedValue({ id: 10, committed_donation_id: 20 });
+  productRepoMock.getProductRoutingDefault.mockResolvedValue({ donation_category: 'recipe_food' });
+  auditRepoMock.logAudit.mockResolvedValue({ id: 1 });
   donationModelMock.getSection18AThreshold.mockResolvedValue(1000);
   routingMock.determineRouting.mockResolvedValue({
     category: 'recipe_food',
@@ -611,6 +626,127 @@ describe('resolveFlagAndMaybeCommit — legacy (unlinked) flag passthrough', () 
     expect(pendingRepoMock.markPendingItemResolved).toHaveBeenCalledWith(
       100,
       expect.objectContaining({ productId: 999, resolvedCategory: 'recipe_food' }),
+      client
+    );
+  });
+
+  it('matches an intake flag to an existing product and audits the manager decision', async () => {
+    const client = makeClient();
+    poolMock.connect.mockResolvedValueOnce(client);
+    pendingRepoMock.lockWarehouseManagerFlagForUpdate.mockResolvedValue({
+      id: 64,
+      product_id: 300,
+      status: 'pending_classification',
+      pending_donation_id: 10,
+      pending_donation_item_id: 100,
+    });
+    pendingRepoMock.getPendingDonationById.mockResolvedValue({
+      id: 10,
+      donation_category: null,
+      items: [{ id: 100, flag_id: 64, description: 'Mystery tin', unit: 'kg' }],
+    });
+    productRepoMock.getProductRoutingDefault.mockResolvedValue(null);
+    productRepoMock.upsertProductRoutingDefault.mockResolvedValue({ product_id: 999, donation_category: 'add_on_food' });
+    pendingRepoMock.lockPendingDonationForUpdate.mockResolvedValue({ id: 10 });
+    pendingRepoMock.countUnresolvedFlagsForPendingDonation.mockResolvedValue(1);
+
+    await pendingDonationService.resolveFlagAndMaybeCommit(64, {
+      decision: 'match_existing_product',
+      productId: 999,
+      category: 'add_on_food',
+      resolvedBy: 7,
+    });
+
+    expect(productRepoMock.upsertProductRoutingDefault).toHaveBeenCalledWith(
+      { productId: 999, donationCategory: 'add_on_food', setBy: 7 },
+      client
+    );
+    expect(pendingRepoMock.resolveWarehouseManagerFlag).toHaveBeenCalledWith(64, { productId: 999 }, client);
+    expect(pendingRepoMock.markPendingItemResolved).toHaveBeenCalledWith(
+      100,
+      expect.objectContaining({ productId: 999, resolvedCategory: 'add_on_food', resolvedBy: 7 }),
+      client
+    );
+    expect(auditRepoMock.logAudit).toHaveBeenCalledWith(
+      client,
+      expect.objectContaining({
+        entityType: 'pending_product_review',
+        entityId: 64,
+        action: 'MATCH_EXISTING_PRODUCT',
+        actorId: 7,
+      })
+    );
+  });
+
+  it('moves an intake flag to non-food without finalizing a product', async () => {
+    const client = makeClient();
+    poolMock.connect.mockResolvedValueOnce(client);
+    pendingRepoMock.lockWarehouseManagerFlagForUpdate.mockResolvedValue({
+      id: 65,
+      product_id: 300,
+      status: 'pending_classification',
+      pending_donation_id: 10,
+      pending_donation_item_id: 100,
+    });
+    pendingRepoMock.getPendingDonationById.mockResolvedValue({
+      id: 10,
+      items: [{ id: 100, flag_id: 65, description: 'Blanket', unit: 'each' }],
+    });
+    pendingRepoMock.lockPendingDonationForUpdate.mockResolvedValue({ id: 10 });
+    pendingRepoMock.countUnresolvedFlagsForPendingDonation.mockResolvedValue(1);
+
+    await pendingDonationService.resolveFlagAndMaybeCommit(65, {
+      decision: 'move_to_non_food',
+      resolvedBy: 7,
+    });
+
+    expect(donationAdminServiceMock.finalizePendingClassification).not.toHaveBeenCalled();
+    expect(pendingRepoMock.resolveWarehouseManagerFlag).toHaveBeenCalledWith(65, { productId: null }, client);
+    expect(pendingRepoMock.markPendingItemResolved).toHaveBeenCalledWith(
+      100,
+      expect.objectContaining({ productId: null, resolvedCategory: 'non_food', routingStatus: 'non_food' }),
+      client
+    );
+  });
+
+  it('creates a reviewed product through the existing finalize path and links it', async () => {
+    const client = makeClient();
+    poolMock.connect.mockResolvedValueOnce(client);
+    pendingRepoMock.lockWarehouseManagerFlagForUpdate.mockResolvedValue({
+      id: 66,
+      product_id: 300,
+      status: 'pending_classification',
+      pending_donation_id: 10,
+      pending_donation_item_id: 100,
+    });
+    pendingRepoMock.getPendingDonationById.mockResolvedValue({
+      id: 10,
+      items: [{ id: 100, flag_id: 66, description: 'New soup mix', unit: 'kg' }],
+    });
+    donationAdminServiceMock.finalizePendingClassification.mockResolvedValue({
+      flag: { id: 66, product_id: 888, status: 'resolved' },
+    });
+    pendingRepoMock.lockPendingDonationForUpdate.mockResolvedValue({ id: 10 });
+    pendingRepoMock.countUnresolvedFlagsForPendingDonation.mockResolvedValue(1);
+
+    await pendingDonationService.resolveFlagAndMaybeCommit(66, {
+      decision: 'create_product',
+      product: { name: 'New soup mix', brand: 'Local', category: 'non_recipe_food' },
+      resolvedBy: 7,
+    });
+
+    expect(donationAdminServiceMock.finalizePendingClassification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        flagId: 66,
+        name: 'New soup mix',
+        category: 'non_recipe_food',
+        updatedBy: 7,
+      }),
+      client
+    );
+    expect(pendingRepoMock.markPendingItemResolved).toHaveBeenCalledWith(
+      100,
+      expect.objectContaining({ productId: 888, resolvedCategory: 'non_recipe_food' }),
       client
     );
   });

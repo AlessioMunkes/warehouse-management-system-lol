@@ -19,6 +19,8 @@ const serviceMock = {
   listSection18AQueue:  vi.fn(),
   listEmailHistory:     vi.fn(),
   resendDonationEmail:  vi.fn(),
+  getSection18AFormByToken: vi.fn(),
+  submitSection18AForm: vi.fn(),
   generateSection18ACertificate: vi.fn(),
   downloadSection18ACertificate: vi.fn(),
   resolveUnmatchedItem: vi.fn(),
@@ -64,6 +66,8 @@ beforeEach(() => {
   serviceMock.listSection18AQueue.mockResolvedValue([]);
   serviceMock.listEmailHistory.mockResolvedValue([]);
   serviceMock.resendDonationEmail.mockResolvedValue({ id: 2, status: 'sent' });
+  serviceMock.getSection18AFormByToken.mockResolvedValue({ donationId: 1, completed: false });
+  serviceMock.submitSection18AForm.mockResolvedValue({ donationId: 1, status: 'GENERATED' });
   serviceMock.generateSection18ACertificate.mockResolvedValue({
     id: 10,
     donation_id: 1,
@@ -112,6 +116,16 @@ describe('donation routes — authentication', () => {
     const forged = jwt.sign({ id: 9, role: ROLES.ADMIN }, 'wrong-secret', { expiresIn: '1h' });
     const res = await request(app).get(BASE).set('Cookie', [`wms_token=${forged}`]);
     expect(res.status).toBe(401);
+  });
+
+  it('allows donor Section 18A form links without WMS authentication', async () => {
+    const get = await request(app).get(`${BASE}/section-18a/form/token-1`);
+    const post = await request(app).post(`${BASE}/section-18a/form/token-1`).send({ donorType: 'individual' });
+
+    expect(get.status).toBe(200);
+    expect(post.status).toBe(201);
+    expect(serviceMock.getSection18AFormByToken).toHaveBeenCalledWith('token-1');
+    expect(serviceMock.submitSection18AForm).toHaveBeenCalledWith('token-1', { donorType: 'individual' });
   });
 });
 

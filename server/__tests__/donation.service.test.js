@@ -22,6 +22,9 @@ const repoMock = {
   resolveUnmatchedItem:   vi.fn(),
   reclassifyDonation:     vi.fn(),
   listSection18AQueue:    vi.fn(),
+  saveSection18AFormToken: vi.fn(),
+  getDonationBySection18AFormTokenHash: vi.fn(),
+  saveSection18AFormSubmission: vi.fn(),
   getSection18ASettings:  vi.fn(),
   getSection18ACertificateByDonationId: vi.fn(),
   createSection18ACertificate: vi.fn(),
@@ -47,6 +50,7 @@ vi.mock('../src/services/certificateSettings.service.js', () => ({
 }));
 
 const module = await import('../src/services/donation.service.js');
+const { default: certificateSettingsServiceMock } = await import('../src/services/certificateSettings.service.js');
 const donationService = module.default;
 const { splitByChildCount, evaluateSection18A, resolveRouting } = module;
 
@@ -74,6 +78,13 @@ beforeEach(() => {
     section18a_reference: 'SECTION-18A-PLACEHOLDER',
     pba_declaration: 'Approved PBA declaration.',
   });
+  certificateSettingsServiceMock.getSettings.mockResolvedValue({
+    organisation_name: 'Ladles of Love',
+    pbo_number: 'PBO-PLACEHOLDER',
+    section18a_reference: 'SECTION-18A-PLACEHOLDER',
+    contact_email: 'tax@example.org',
+    contact_phone: '0210000000',
+  });
   repoMock.getSection18ACertificateByDonationId.mockResolvedValue(null);
   repoMock.createSection18ACertificate.mockImplementation(async ({ buildPdf, ...args }) => {
     const pdf = await buildPdf({ certificateNumber: 'LOL-S18A-000001', issueDate: '2026-09-11' });
@@ -96,6 +107,9 @@ beforeEach(() => {
     ...entry,
     sent_at: entry.status === 'SENT' ? '2026-09-11T00:00:00.000Z' : null,
   }));
+  repoMock.saveSection18AFormToken.mockResolvedValue({ id: 1 });
+  repoMock.getDonationBySection18AFormTokenHash.mockResolvedValue(null);
+  repoMock.saveSection18AFormSubmission.mockResolvedValue(null);
 
   // Mock email provider to return success by default
   emailMock.sendEmail.mockResolvedValue({ sent: true, messageId: 'msg-123', threadId: 'thread-1' });
@@ -406,7 +420,7 @@ describe('createDonation — records rather than refuses', () => {
     expect(repoMock.logDonationEmail).not.toHaveBeenCalled();
   });
 
-  it('sends a separate Section 18A email with a generated certificate attachment', async () => {
+  it('sends a thank-you email with a secure Section 18A form link for qualifying donations', async () => {
     repoMock.getDonationById.mockResolvedValue({
       id: 42,
       donation_category: 'recipe_food',
@@ -429,11 +443,16 @@ describe('createDonation — records rather than refuses', () => {
       donorConsentGiven: true,
     }), USER_ID);
 
-    expect(result.emailResults.map((row) => row.emailType)).toEqual(['THANK_YOU', 'SECTION_18A']);
-    expect(repoMock.createSection18ACertificate).toHaveBeenCalledTimes(1);
+    expect(result.emailResults.map((row) => row.emailType)).toEqual(['THANK_YOU']);
+    expect(repoMock.saveSection18AFormToken).toHaveBeenCalledWith(expect.objectContaining({
+      donationId: 42,
+      tokenHash: expect.any(String),
+      expiresAt: expect.any(Date),
+    }));
+    expect(repoMock.createSection18ACertificate).not.toHaveBeenCalled();
     expect(repoMock.logDonationEmail).toHaveBeenCalledWith(expect.objectContaining({
       donationId: 42,
-      emailType: 'SECTION_18A',
+      emailType: 'THANK_YOU',
       recipient: 'tax@example.test',
       status: 'SENT',
     }));
@@ -630,6 +649,7 @@ describe('Section 18A certificate engine', () => {
       name: 'Pick n Pay',
       contact: 'tax@example.test',
       taxReference: '9012345678',
+      section18aForm: null,
     });
   });
 
@@ -685,6 +705,127 @@ describe('Section 18A certificate engine', () => {
 
     expect(result.emailType).toBe('SECTION_18A');
     expect(repoMock.createSection18ACertificate).not.toHaveBeenCalled();
+  });
+
+  it('submits the secure donor form, generates the PDF, emails it and returns GENERATED', async () => {
+    repoMock.getDonationBySection18AFormTokenHash.mockResolvedValue({
+      ...queuedDonation,
+      section_18a_form_token_expires_at: '2099-01-01T00:00:00.000Z',
+    });
+    repoMock.saveSection18AFormSubmission.mockResolvedValue({
+      ...queuedDonation,
+      donor_name: 'Pick n Pay Pty Ltd',
+      donor_contact: 'tax@example.test',
+      donor_tax_reference: '9012345678',
+      section_18a_form: {
+        donorType: 'company',
+        fullNameOrCompanyName: 'Pick n Pay Pty Ltd',
+        registrationNumber: 'REG-1',
+        incomeTaxNumber: '9012345678',
+        email: 'tax@example.test',
+        phone: '0210000000',
+        physicalAddress: '1 Main Road',
+        postalAddress: 'PO Box 1',
+        declarationAccepted: true,
+      },
+    });
+    repoMock.getSection18ACertificateByDonationId
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: 10,
+        donation_id: 42,
+        certificate_number: 'LOL-S18A-000001',
+        issue_date: '2026-09-11',
+        pdf_content: Buffer.from('%PDF-1.4'),
+        pdf_filename: 'section-18a-LOL-S18A-000001.pdf',
+        pdf_content_type: 'application/pdf',
+      });
+
+    const result = await donationService.submitSection18AForm('secure-token', {
+      donorType: 'company',
+      fullNameOrCompanyName: 'Pick n Pay Pty Ltd',
+      registrationNumber: 'REG-1',
+      incomeTaxNumber: '9012345678',
+      email: 'tax@example.test',
+      phone: '0210000000',
+      physicalAddress: '1 Main Road',
+      postalAddress: 'PO Box 1',
+      declarationAccepted: true,
+    });
+
+    expect(result.status).toBe('issued');
+    expect(repoMock.saveSection18AFormSubmission).toHaveBeenCalled();
+    expect(repoMock.createSection18ACertificate).toHaveBeenCalledTimes(1);
+    expect(certificateSettingsServiceMock.getSettings).toHaveBeenCalled();
+    expect(repoMock.getSection18ASettings).not.toHaveBeenCalled();
+    expect(emailMock.sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'tax@example.test',
+        attachments: [expect.objectContaining({ contentType: 'application/pdf' })],
+      }),
+      null
+    );
+  });
+
+  it('logs one failed Section 18A email if email preparation fails after certificate creation', async () => {
+    repoMock.getDonationBySection18AFormTokenHash.mockResolvedValue({
+      ...queuedDonation,
+      section_18a_form_token_expires_at: '2099-01-01T00:00:00.000Z',
+    });
+    repoMock.saveSection18AFormSubmission.mockResolvedValue({
+      ...queuedDonation,
+      donor_name: 'Pick n Pay Pty Ltd',
+      donor_contact: 'tax@example.test',
+      donor_tax_reference: '9012345678',
+    });
+    repoMock.getSection18ACertificateByDonationId
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: 10,
+        donation_id: 42,
+        certificate_number: 'LOL-S18A-000001',
+        pdf_content: Buffer.from('%PDF-1.4'),
+        pdf_filename: 'section-18a-LOL-S18A-000001.pdf',
+        pdf_content_type: 'application/pdf',
+      });
+    certificateSettingsServiceMock.getSettings
+      .mockResolvedValueOnce({ organisation_name: 'Ladles of Love' })
+      .mockRejectedValueOnce(new Error('settings unavailable'));
+
+    const result = await donationService.submitSection18AForm('secure-token', {
+      donorType: 'company',
+      fullNameOrCompanyName: 'Pick n Pay Pty Ltd',
+      registrationNumber: 'REG-1',
+      incomeTaxNumber: '9012345678',
+      email: 'tax@example.test',
+      phone: '0210000000',
+      physicalAddress: '1 Main Road',
+      postalAddress: 'PO Box 1',
+      declarationAccepted: true,
+    });
+
+    expect(result.status).toBe('issued');
+    expect(emailMock.sendEmail).not.toHaveBeenCalled();
+    expect(repoMock.logDonationEmail).toHaveBeenCalledTimes(1);
+    expect(repoMock.logDonationEmail).toHaveBeenCalledWith(expect.objectContaining({
+      donationId: 42,
+      certificateId: 10,
+      emailType: 'SECTION_18A',
+      status: 'FAILED',
+      errorMessage: 'settings unavailable',
+    }));
+  });
+
+  it('validates required Section 18A donor form fields', async () => {
+    await expect(donationService.submitSection18AForm('secure-token', {}))
+      .rejects.toMatchObject({
+        status: 400,
+        details: expect.objectContaining({
+          donorType: 'This field is required.',
+          idOrRegistration: 'ID number or registration number is required.',
+          declarationAccepted: 'Declaration must be accepted.',
+        }),
+      });
   });
 });
 

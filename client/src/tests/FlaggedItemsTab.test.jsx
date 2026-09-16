@@ -1,11 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import FlaggedItemsTab from '../features/donationManagement/components/FlaggedItemsTab';
 
 const mockUseFlaggedItems = vi.fn();
 
 vi.mock('../features/donationManagement/hooks/useFlaggedItems', () => ({
   default: (...args) => mockUseFlaggedItems(...args),
+}));
+
+vi.mock('../features/donation/components/ProductMatchComboBox', () => ({
+  ProductMatchCombobox: ({ onSelect }) => (
+    <button type="button" onClick={() => onSelect(777, 'Rice 5kg')}>
+      Pick Rice
+    </button>
+  ),
 }));
 
 const INTAKE_FLAG = {
@@ -21,7 +30,13 @@ const INTAKE_FLAG = {
   donor_name: 'Donor A',
   donation_category: 'non_recipe_food',
   item_description: 'Mystery item',
+  item_quantity: 4,
   item_unit: 'kg',
+  donation_date: '2026-09-01T10:00:00.000Z',
+  draft_snapshot: JSON.stringify({
+    items: [{ lineNo: 1, description: 'Mystery item', quantity: 4, weight: 3, expiryDate: '2026-10-01' }],
+  }),
+  line_no: 1,
 };
 
 const LEGACY_FLAG = {
@@ -80,7 +95,8 @@ describe('FlaggedItemsTab', () => {
     expect(screen.queryByText('SKU')).not.toBeInTheDocument();
   });
 
-  it('accepts an intake flag through the unified resolve call', async () => {
+  it('links an intake flag to an existing product through the product review decision', async () => {
+    const user = userEvent.setup();
     const resolveFlag = vi.fn().mockResolvedValue({
       pendingDonationId: 21,
       status: 'awaiting_resolution',
@@ -91,25 +107,37 @@ describe('FlaggedItemsTab', () => {
 
     render(<FlaggedItemsTab />);
 
-    // Category preselected from the enriched donation_category, so Classify is live.
-    fireEvent.click(screen.getByRole('button', { name: 'Classify' }));
+    await user.click(screen.getByRole('button', { name: /Review/i }));
+    await user.click(screen.getByRole('button', { name: 'Pick Rice' }));
+    await user.click(screen.getByRole('combobox', { name: 'Existing product route' }));
+    await user.click(screen.getByRole('option', { name: 'ECD Add-on' }));
+    await user.click(screen.getByRole('button', { name: /Link Product/i }));
 
     await waitFor(() => {
-      expect(resolveFlag).toHaveBeenCalledWith(1, { accepted: true, category: 'non_recipe_food' });
+      expect(resolveFlag).toHaveBeenCalledWith(1, {
+        decision: 'match_existing_product',
+        productId: 777,
+        category: 'add_on_food',
+      });
     });
     expect(await screen.findByText('Awaiting further resolutions.')).toBeInTheDocument();
   });
 
   it('shows a  committing confirmation when the classify resolves the last open flag', async () => {
+    const user = userEvent.setup();
     mockUseFlaggedItems.mockReturnValue(baseHook({ resolveFlag: vi.fn().mockResolvedValue({ pendingDonationId: 21, status: 'committing', flagId: 1, finalized: true }) }));
 
     render(<FlaggedItemsTab />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Classify' }));
+    await user.click(screen.getByRole('button', { name: /Review/i }));
+    await user.click(screen.getByRole('button', { name: 'Pick Rice' }));
+    await user.click(screen.getByRole('combobox', { name: 'Existing product route' }));
+    await user.click(screen.getByRole('option', { name: 'ECD Add-on' }));
+    await user.click(screen.getByRole('button', { name: /Link Product/i }));
     expect(await screen.findByText('Donation now committing.')).toBeInTheDocument();
   });
 
-  it('keeps the Reject button disabled until a reason is typed, then rejects', async () => {
+  it('creates a product with route details from an intake flag', async () => {
     const resolveFlag = vi.fn().mockResolvedValue({
       pendingDonationId: 21,
       status: 'awaiting_resolution',
@@ -120,15 +148,40 @@ describe('FlaggedItemsTab', () => {
 
     render(<FlaggedItemsTab />);
 
-    const rejectButton = screen.getByRole('button', { name: 'Reject' });
-    expect(rejectButton).toBeDisabled();
-
-    fireEvent.change(screen.getByLabelText('Rejection reason'), { target: { value: 'Damaged beyond use' } });
-    expect(rejectButton).toBeEnabled();
-
-    fireEvent.click(rejectButton);
+    fireEvent.click(screen.getByRole('button', { name: /Review/i }));
+    fireEvent.change(screen.getByLabelText('New product name'), { target: { value: 'Mystery Soup Mix' } });
+    fireEvent.change(screen.getByLabelText('Brand'), { target: { value: 'Ladles' } });
+    fireEvent.click(screen.getByLabelText('Product route'));
+    fireEvent.click(screen.getAllByText('Soup Kitchen Add-on').at(-1));
+    fireEvent.click(screen.getByRole('button', { name: /Save Product/i }));
     await waitFor(() => {
-      expect(resolveFlag).toHaveBeenCalledWith(1, { accepted: false, reason: 'Damaged beyond use' });
+      expect(resolveFlag).toHaveBeenCalledWith(1, {
+        decision: 'create_product',
+        product: {
+          name: 'Mystery Soup Mix',
+          brand: 'Ladles',
+          category: 'non_recipe_food',
+        },
+      });
+    });
+  });
+
+  it('moves an intake flag to non-food without creating a product', async () => {
+    const resolveFlag = vi.fn().mockResolvedValue({
+      pendingDonationId: 21,
+      status: 'awaiting_resolution',
+      flagId: 1,
+      finalized: true,
+    });
+    mockUseFlaggedItems.mockReturnValue(baseHook({ resolveFlag }));
+
+    render(<FlaggedItemsTab />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Review/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Move to Non-Food/i }));
+
+    await waitFor(() => {
+      expect(resolveFlag).toHaveBeenCalledWith(1, { decision: 'move_to_non_food' });
     });
   });
 
@@ -162,6 +215,6 @@ describe('FlaggedItemsTab', () => {
     mockUseFlaggedItems.mockReturnValue(baseHook({ items: [] }));
     render(<FlaggedItemsTab />);
 
-    expect(screen.getByText('No flagged items pending review.')).toBeInTheDocument();
+    expect(screen.getByText('No pending product reviews.')).toBeInTheDocument();
   });
 });

@@ -49,7 +49,6 @@ const makeClient = ({ onQuery } = {}) => {
   return client;
 };
 
-const sqlOf = (client) => client.calls.map((c) => c.sql);
 const findCall = (client, re) => client.calls.find((c) => re.test(c.sql));
 
 beforeEach(() => vi.clearAllMocks());
@@ -108,6 +107,59 @@ describe('findByEventAndSpace', () => {
     expect(select.params).toEqual([
       '11111111-1111-1111-1111-111111111111',
       '22222222-2222-2222-2222-222222222222',
+    ]);
+  });
+});
+
+describe('findPotentialOverlaps', () => {
+  it('finds overlaps for a specific event and space', async () => {
+    const client = makeClient({ onQuery: () => ({ rows: [CREATED_ROW] }) });
+
+    const result = await findPotentialOverlaps(
+      '11111111-1111-1111-1111-111111111111',
+      '22222222-2222-2222-2222-222222222222',
+      '2026-09-10T10:00:00Z',
+      '2026-09-10T12:00:00Z',
+      '33333333-3333-3333-3333-333333333333',
+      client
+    );
+
+    expect(result).toEqual([CREATED_ROW]);
+    const select = findCall(client, /^SELECT/i);
+    expect(select.sql).toContain('space_id = $1');
+    expect(select.sql).toContain('start_time < $2');
+    expect(select.sql).toContain('end_time > $3');
+    expect(select.sql).toContain("status <> 'CANCELLED'");
+    expect(select.sql).toContain('event_id = $4');
+    expect(select.sql).toContain('timeslot_id <> $5');
+    expect(select.params).toEqual([
+      '22222222-2222-2222-2222-222222222222',
+      '2026-09-10T12:00:00Z',
+      '2026-09-10T10:00:00Z',
+      '11111111-1111-1111-1111-111111111111',
+      '33333333-3333-3333-3333-333333333333',
+    ]);
+  });
+
+  it('can find space overlaps without an event id for availability checks', async () => {
+    const client = makeClient({ onQuery: () => ({ rows: [] }) });
+
+    await findPotentialOverlaps(
+      null,
+      '22222222-2222-2222-2222-222222222222',
+      '2026-09-10T10:00:00Z',
+      '2026-09-10T12:00:00Z',
+      null,
+      client
+    );
+
+    const select = findCall(client, /^SELECT/i);
+    expect(select.sql).not.toContain('event_id =');
+    expect(select.sql).toContain("status <> 'CANCELLED'");
+    expect(select.params).toEqual([
+      '22222222-2222-2222-2222-222222222222',
+      '2026-09-10T12:00:00Z',
+      '2026-09-10T10:00:00Z',
     ]);
   });
 });

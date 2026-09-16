@@ -7,7 +7,7 @@ vi.mock('../features/taskdashboard/components/TopNavBar', () => ({
 }));
 
 vi.mock('../features/donationManagement/components/FlaggedItemsTab', () => ({
-  default: () => <div>Awaiting Classification Tab</div>,
+  default: () => <div>Pending Product Review Tab</div>,
 }));
 
 vi.mock('../features/donationManagement/components/ReconciliationTab', () => ({
@@ -30,15 +30,15 @@ describe('DonationManagementPage', () => {
     vi.clearAllMocks();
   });
 
-  it('renders the title, tab strip and the Awaiting Classification tab by default', async () => {
+  it('renders the title, tab strip and the Pending Product Review tab by default', async () => {
     render(<DonationManagementPage />);
 
     expect(screen.getByText('Classification Queue')).toBeInTheDocument();
-    expect(screen.getByText('Awaiting Classification', { selector: 'button' })).toBeInTheDocument();
+    expect(screen.getByText('Pending Product Review', { selector: 'button' })).toBeInTheDocument();
     expect(screen.getByText('Reconciliation', { selector: 'button' })).toBeInTheDocument();
     expect(screen.getByText('Processing Failed', { selector: 'button' })).toBeInTheDocument();
-    expect(screen.getByText('Awaiting Classification Tab')).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByRole('tab', { name: /Awaiting Classification 2/ })).toBeInTheDocument());
+    expect(screen.getByText('Pending Product Review Tab')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole('tab', { name: /Pending Product Review 2/ })).toBeInTheDocument());
   });
 
   it('renders the reconciliation queue when selected', () => {

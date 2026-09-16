@@ -45,6 +45,7 @@ router.get('/spaces', auth, requireRole(...MANAGERS_UP), eventSpaceController.li
 router.post('/spaces', auth, requireRole(...MANAGERS_UP), eventSpaceController.createSpace);
 
 // ── Events ────────────────────────────────────────────────────
+router.post('/events/with-initial-timeslot', auth, requireRole(...MANAGERS_UP), eventBookingController.createEventWithInitialTimeslot);
 router.post('/events', auth, requireRole(...MANAGERS_UP), loveActivismEventController.createEvent);
 router.get('/events', auth, requireRole(...ALL_ROLES), loveActivismEventController.listEvents);
 router.get('/events/:eventId', auth, requireRole(...ALL_ROLES), loveActivismEventController.getEvent);
@@ -57,6 +58,7 @@ router.post('/events/:eventId/booking', auth, requireRole(...MANAGERS_UP), event
 router.get('/events/:eventId/booking', auth, requireRole(...ALL_ROLES), eventBookingController.getEventBooking);
 router.patch('/events/:eventId/booking', auth, requireRole(...MANAGERS_UP), eventBookingController.updateEventBooking);
 router.get('/events/:eventId/timeslots', auth, requireRole(...ALL_ROLES), eventBookingController.getTimeslotsForEvent);
+router.post('/timeslots/validate', auth, requireRole(...MANAGERS_UP), eventBookingController.validateTimeslotAvailability);
 router.patch('/timeslots/:timeslotId/close', auth, requireRole(...MANAGERS_UP), eventBookingController.closeTimeslot);
 router.patch('/timeslots/:timeslotId/cancel', auth, requireRole(...MANAGERS_UP), eventBookingController.cancelTimeslot);
 router.get('/timeslots/:timeslotId/capacity', auth, requireRole(...ALL_ROLES), eventBookingController.getCapacitySummary);

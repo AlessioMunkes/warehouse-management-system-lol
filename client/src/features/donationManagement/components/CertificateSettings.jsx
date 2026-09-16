@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/context/AuthContext';
 import { getSettings, createSettings, updateSettings, deleteSettings } from '@/services/section18aSettingsAPI';
+import lolLogo from '@/assets/LOL_Logo.jpg';
 
 const FIELD_GROUPS = [
   {
@@ -35,12 +36,15 @@ const FIELD_GROUPS = [
     description: 'Organisation details used on certificates.',
     fields: [
       { name: 'organisationName', label: 'Organisation Name', type: 'input', required: true },
+      { name: 'logoUrl', label: 'Logo', type: 'input' },
       { name: 'pboNumber', label: 'PBO Number', type: 'input', required: true },
+      { name: 'npoNumber', label: 'NPO Number', type: 'input' },
       { name: 'section18AReference', label: 'Section 18A Reference', type: 'input', required: true },
       { name: 'physicalAddress', label: 'Physical Address', type: 'textarea' },
       { name: 'postalAddress', label: 'Postal Address', type: 'textarea' },
       { name: 'contactEmail', label: 'Contact Email', type: 'email', required: true },
       { name: 'contactPhone', label: 'Contact Phone', type: 'text' },
+      { name: 'website', label: 'Website', type: 'text' },
     ],
   },
   {
@@ -57,6 +61,7 @@ const FIELD_GROUPS = [
     description: 'Default text for certificate templates.',
     fields: [
       { name: 'footerText', label: 'Footer Text', type: 'textarea' },
+      { name: 'certificatePrefix', label: 'Certificate Prefix', type: 'input' },
       { name: 'signatureName', label: 'Signature Name', type: 'input', required: true },
       { name: 'signatureTitle', label: 'Signature Title', type: 'input' },
       { name: 'defaultAcknowledgementMessage', label: 'Default Acknowledgement Message', type: 'textarea' },
@@ -65,8 +70,8 @@ const FIELD_GROUPS = [
 ];
 
 const ALL_FIELDS = FIELD_GROUPS.flatMap((g) => g.fields);
-const EMPTY_FORM = ALL_FIELDS.reduce((acc, f) => (acc[f.name] = '', acc), {});
-const normalizeSettings = (data) => ({ ...EMPTY_FORM, ...(data || {}) });
+const EMPTY_FORM = ALL_FIELDS.reduce((acc, f) => (acc[f.name] = f.name === 'logoUrl' ? lolLogo : '', acc), {});
+const normalizeSettings = (data) => ({ ...EMPTY_FORM, ...(data || {}), logoUrl: (data && data.logoUrl) ? data.logoUrl : lolLogo });
 
 const firstErrorMessage = (err, fallback) => {
   const fieldMessages = Object.values(err?.errors || {}).filter(Boolean);

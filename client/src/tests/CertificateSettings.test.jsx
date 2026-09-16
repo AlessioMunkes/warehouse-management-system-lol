@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import CertificateSettings from '../features/donationManagement/components/CertificateSettings';
+import lolLogo from '../assets/LOL_Logo.jpg';
 
 vi.mock('../context/AuthContext', () => ({
   useAuth: () => ({ user: { role: 'manager' } }),
@@ -40,7 +41,13 @@ const editAndSave = async () => {
   await user.click(screen.getByRole('button', { name: /Save/i }));
 };
 
-describe('CertificateSettings save loading state', () => {
+describe('CertificateSettings', () => {
+  it('uses LOL_Logo as the preset/default settings logo when logoUrl is omitted', async () => {
+    render(<CertificateSettings />);
+    const logoInput = await screen.findByLabelText(/^Logo$/i);
+    expect(logoInput).toHaveValue(lolLogo);
+  });
+
   it('clears the Save loading state after a successful update', async () => {
     api.updateSettings.mockResolvedValue({ ...settings, organisationName: 'Ladles Updated' });
 

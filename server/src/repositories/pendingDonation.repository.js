@@ -275,6 +275,24 @@ const updateWarehouseManagerFlagPendingDonationLink = async (flagId, { pendingDo
   return result.rows[0] || null;
 };
 
+const resolveWarehouseManagerFlag = async (flagId, { productId } = {}, client = pool) => {
+  const result = await client.query(
+    `UPDATE warehouse_manager_flags
+      SET product_id = COALESCE($1, product_id),
+          status = 'resolved',
+          updated_at = NOW()
+      WHERE id = $2
+        AND status IN ('pending', 'pending_classification')
+      RETURNING *;`,
+    [
+      productId ?? null,
+      flagId,
+    ]
+  );
+
+  return result.rows[0] || null;
+};
+
 const countUnresolvedFlagsForPendingDonation = async (pendingDonationId, client) => {
   if (!client) {
     throw new Error('countUnresolvedFlagsForPendingDonation requires an explicit client instance.');
@@ -452,6 +470,7 @@ export default {
   lockWarehouseManagerFlagForUpdate,
   createWarehouseManagerFlag,
   updateWarehouseManagerFlagPendingDonationLink,
+  resolveWarehouseManagerFlag,
   countUnresolvedFlagsForPendingDonation,
   setPendingDonationCommittedId,
   markPendingItemResolved,

@@ -13,6 +13,8 @@ const RECEIVERS_UP = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN]; // record donat
 const MANAGERS_UP  = [ROLES.MANAGER, ROLES.ADMIN];               // resolve unmatched lines / reclassify — both can move stock
 
 // ── Static paths before /:id to prevent shadowing ────────────
+router.get('/section-18a/form/:token', donationController.getSection18AForm);
+router.post('/section-18a/form/:token', donationController.submitSection18AForm);
 router.get('/unmatched',   auth, requireRole(...MANAGERS_UP), donationController.listUnmatchedItems);
 router.get('/section-18a', auth, requireRole(...MANAGERS_UP), donationController.listSection18AQueue);
 router.get('/section-18a/emails', auth, requireRole(...MANAGERS_UP), donationController.listEmailHistory);
