@@ -37,10 +37,25 @@ const GuestDonePage = () => {
   const summary = state?.summary ?? null;
   const name = displayName(user?.firstName);
 
+  // Navigate BEFORE clearing the session, not after.
+  //
+  // This screen sits inside ProtectedRoute, which renders
+  // <Navigate to="/login"> the moment the user becomes null. Awaiting
+  // logout() first therefore handed the volunteer to the staff login —
+  // "EMPLOYEE LOG IN · AUTHORISED PERSONNEL ONLY" — as the last thing
+  // they saw after giving up their morning. Leaving the protected route
+  // first means that redirect never has a chance to fire.
+  //
+  // The landing page, not /guest: it carries "I'm volunteering today",
+  // so a volunteer coming back tomorrow has a way in, and it reads as
+  // the front door rather than a form.
+  //
+  // logout() is still awaited so the visit is properly signed out; it
+  // just is not what decides where they end up.
   const signOut = async () => {
     setBusy(true);
+    navigate('/', { replace: true });
     await logout();               // closes the visit AND clears the cookie
-    navigate('/guest', { replace: true });
   };
 
   // Reached without state — a refresh, or a direct link. Say thank you

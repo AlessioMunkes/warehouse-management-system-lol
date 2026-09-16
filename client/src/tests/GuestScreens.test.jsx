@@ -247,7 +247,9 @@ describe('(e) the thank-you and contribution summary', () => {
     <MemoryRouter initialEntries={[{ pathname: '/guest/done', state }]}>
       <Routes>
         <Route path="/guest/done" element={<GuestDonePage />} />
-        <Route path="/guest" element={<div>Signed out</div>} />
+        <Route path="/" element={<div>Landing page</div>} />
+        <Route path="/login" element={<div>Employee log in</div>} />
+        <Route path="/guest" element={<div>Guest log in</div>} />
       </Routes>
     </MemoryRouter>
   );
@@ -277,6 +279,17 @@ describe('(e) the thank-you and contribution summary', () => {
   it('ends in sign-out', async () => {
     renderDone({ summary });
     expect(await screen.findByRole('button', { name: /sign out/i })).toBeInTheDocument();
+  });
+
+  // A volunteer who has just finished a shift must not be handed the
+  // staff login ("EMPLOYEE LOG IN - AUTHORISED PERSONNEL ONLY"). They
+  // go to the landing page, which carries "I'm volunteering today".
+  it('sends the volunteer to the landing page, never the staff login', async () => {
+    renderDone({ summary });
+    (await screen.findByRole('button', { name: /sign out/i })).click();
+
+    expect(await screen.findByText('Landing page')).toBeInTheDocument();
+    expect(screen.queryByText('Employee log in')).not.toBeInTheDocument();
   });
 
   it('thanks them properly even with no summary to show', async () => {

@@ -176,7 +176,10 @@ const GuestHomePage = () => {
           </>
         )}
 
-        <Button variant="ghost" onClick={async () => { await logout(); navigate('/guest'); }}>
+        {/* Navigate first, then log out — see the note in
+            GuestDonePage.signOut. Clearing the session while still on a
+            protected route hands the volunteer to the staff login. */}
+        <Button variant="ghost" onClick={async () => { navigate('/', { replace: true }); await logout(); }}>
           I’m finished for today
         </Button>
 
