@@ -76,8 +76,23 @@ beforeEach(() => {
   slipAccessRepo.listUnclaimedForDate.mockResolvedValue([previewRow]);
   slipAccessRepo.volunteerHoldsSlip.mockResolvedValue(true);
   slipAccessRepo.findSlipIdForVolunteer.mockResolvedValue(132);
+  // A REALISTIC raw row: claimForVolunteer does `RETURNING *`, so it is
+  // snake_case, beneficiary_name is the slip's own null copy (not the
+  // COALESCEd ECD name), and dispatch_date is the Date node-postgres
+  // builds — not the ::text the preview query asks for.
+  //
+  // The earlier fixture here was preview-shaped, which masked a real bug:
+  // the claim response came back with beneficiaryName null, the date a
+  // day early in UTC, and itemCount/isClaimed missing.
   slipAccessRepo.claimForVolunteer.mockResolvedValue({
-    slip: { ...previewRow, status: 'in_progress', assigned_volunteer_id: '7' },
+    slip: {
+      id: 132,
+      status: 'in_progress',
+      assigned_to: null,
+      assigned_volunteer_id: '7',
+      beneficiary_name: null,
+      dispatch_date: new Date('2026-09-15T22:00:00.000Z'),
+    },
     alreadyMine: false,
   });
   poolQuery.mockResolvedValue({
@@ -180,6 +195,28 @@ describe('POST /api/slip/:token/claim', () => {
     expect(res.body.data.user).toMatchObject({ id: '7', firstName: 'Thabo Mokoena', role: 'guest' });
     expect(String(res.headers['set-cookie'])).toContain('wms_token=');
     expect(slipAccessRepo.claimForVolunteer).toHaveBeenCalledWith({ slipId: 132, volunteerId: '7' });
+  });
+
+  // The claim response is what the guest screen renders straight after
+  // scanning, so it has to carry the same fields the preview did. It
+  // once did not: the raw RETURNING row was run back through the
+  // preview shaper, which reads snake_case, and quietly produced a null
+  // beneficiary, yesterday's date, and two missing fields.
+  it('returns the full preview shape, not the raw claimed row', async () => {
+    const res = await request(app)
+      .post(`/api/slip/${TOKEN}/claim`)
+      .send({ name: 'Thabo Mokoena' });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.slip).toEqual({
+      id: 132,
+      beneficiaryName: 'Little Angels Educare',   // COALESCEd, not the slip's null
+      beneficiaryKind: 'ecd',
+      dispatchDate: '2026-09-16',                 // the calendar day, not a UTC timestamp
+      itemCount: 9,
+      status: 'in_progress',                      // the one thing the claim changed
+      isClaimed: true,
+    });
   });
 
   // The integration boundary: guests live in `volunteers`, always with

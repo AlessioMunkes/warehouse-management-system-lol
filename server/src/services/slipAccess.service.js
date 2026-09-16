@@ -121,7 +121,21 @@ const claim = async ({ token, code, name }) => {
   if (result.takenByStaff)    fail(409, 'A staff member is already packing that pallet. Ask them for another one.');
   if (result.takenByVolunteer) fail(409, 'Someone else is already packing that pallet. Ask a staff member for another one.');
 
-  return { volunteer, slip: toPreview({ ...result.slip, ...preview, status: result.slip.status }) };
+  // `preview` is ALREADY a toPreview() result — camelCase, with
+  // beneficiary_name COALESCEd to the ECD name and dispatch_date cast to
+  // text. `result.slip` is a raw `RETURNING *` row: snake_case, a null
+  // beneficiary_name, and a dispatch_date that node-postgres has turned
+  // into a Date.
+  //
+  // Running the raw row back through toPreview() (which reads
+  // snake_case) produced a response with beneficiaryName null, the
+  // dispatch date a day early in UTC, and itemCount/isClaimed missing
+  // altogether. Take the preview as built and override only what the
+  // claim actually changed.
+  return {
+    volunteer,
+    slip: { ...preview, status: result.slip.status, isClaimed: true },
+  };
 };
 
 // ── 1.4 Today's unclaimed pallets ─────────────────────────────
