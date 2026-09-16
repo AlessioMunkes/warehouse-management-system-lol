@@ -162,6 +162,32 @@ columns that cannot hold a volunteer id.
 **Never write a volunteer id into an int4 actor column.** Add a short comment at
 every such site saying why, so the next reader does not "fix" it.
 
+### Integration boundary — the Love Activism / VMS stack is not ours
+
+`love_activism_events`, `event_spaces`, `event_timeslots`,
+`volunteer_bookings`, `attendance` and `vms_sync` belong to another team member
+and to a live integration with a partner team building the Volunteer Management
+System.
+
+**The guest picking flow must never read from or write to those six tables.**
+Not a join, not a lookup, not a "harmless" read. They are someone else's surface
+and a partner contract, and a change that looks free from here can break a sync
+we do not control.
+
+Guest sign-in writes only to `volunteers`, always with `source = 'guest_login'`.
+Do not invent other `source` values. That column is the only seam that will
+later let anyone tell a walk-in guest from a VMS-booked volunteer; a second
+spelling of the same idea destroys the distinction quietly and there is no way
+to reconstruct it afterwards.
+
+**Known open issue — explicitly NOT to be solved here.** The same human being
+can exist twice: as a `volunteers` row (int8, from our guest sign-in) and as a
+`volunteer_bookings` row (uuid, VMS-synced), with nothing joining them. Someone
+who books through the VMS and then signs in at the gate is two records. That is
+a real problem, it is known, and reconciling it is not this brief's job. Do not
+design around it, do not add a join, do not add a matching heuristic on name.
+Leave it visible.
+
 ### Reuse the existing event vocabulary
 
 Guest actions emit `assigned`, `item_confirmed`, `item_flagged`, `completed` —
@@ -401,6 +427,32 @@ A scannable QR for a slip's `/slip/:token` URL, printable from the manager slip
 view, with the 6-character short code printed legibly beneath it in large type.
 Use a small, well-maintained library; tell me which and why before adding the
 dependency.
+
+### Two QR systems in one warehouse
+
+The partner VMS **also** uses QR codes, for volunteer attendance check-in. Both
+systems will be printed on paper, in the same warehouse, on the same day, and
+scanned by the same people — many of them first-time or older volunteers who
+have no reason to know there are two systems, and no way to tell two black
+squares apart.
+
+A volunteer who scans ours believing they have checked in for their shift has
+not checked in. They may not discover that until they are marked absent.
+
+So the printed poster must:
+
+- **State plainly what scanning it does.** "SCAN TO OPEN THIS PALLET" — in those
+  terms, in large type, above the code, not in a caption underneath it.
+- **Identify which pallet it belongs to** on the paper itself: the beneficiary
+  name and the dispatch date, legible without scanning anything. Someone holding
+  two posters must be able to tell them apart by eye.
+- **Never use wording that could be read as checking in or signing on.** Avoid
+  "check in", "sign in", "scan here to start", "register", "arrival", and
+  anything else that sounds like attendance. This includes the on-screen copy
+  the scan lands on, not only the paper.
+
+This constraint outranks visual tidiness. If the clearest wording is less
+elegant than the alternative, use the clearest wording.
 
 ---
 
