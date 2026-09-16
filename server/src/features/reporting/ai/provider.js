@@ -39,9 +39,17 @@ export const isEnabled = () => Boolean(process.env.GEMINI_API_KEY);
 export const providerName = () =>
   `google:${process.env.GEMINI_MODEL || DEFAULT_MODEL}`;
 
-const fail = (status, message) => {
+// `code` is additive and optional: the message and status are
+// unchanged, so reporting reads exactly as before. It exists because
+// these messages are written for the REPORTING screen — they end
+// "use the report builder below", which is nonsense in the help
+// panel, where there is no report builder. The code lets a second
+// caller say the same thing in its own words without either of them
+// parsing the other's prose.
+const fail = (status, message, code) => {
   const err = new Error(message);
   err.status = status;
+  if (code) err.code = code;
   return err;
 };
 
@@ -97,7 +105,7 @@ const oneAttempt = async ({ url, apiKey, body }) => {
 // failure mode to handle.
 export const callWithTools = async ({ systemPrompt, userMessage, tools }) => {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw fail(503, 'The AI assistant is not configured.');
+  if (!apiKey) throw fail(503, 'The AI assistant is not configured.', 'model_missing');
 
   const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
@@ -141,23 +149,23 @@ export const callWithTools = async ({ systemPrompt, userMessage, tools }) => {
   // the controller passes 502/503/504 text through to the screen.
   // Each one says whether waiting will help.
   if (last.status === 429) {
-    throw fail(429, 'The AI assistant has hit its usage limit for now. Use the report builder below.');
+    throw fail(429, 'The AI assistant has hit its usage limit for now. Use the report builder below.', 'rate_limit');
   }
   if (last.status === 503 || last.status === 500) {
-    throw fail(503, 'The AI assistant is busy right now — this usually clears in a minute. Try again, or use the report builder below.');
+    throw fail(503, 'The AI assistant is busy right now — this usually clears in a minute. Try again, or use the report builder below.', 'busy');
   }
   if (last.status === 504 || last.timedOut) {
-    throw fail(504, 'The AI assistant took too long to respond. Try again, or use the report builder below.');
+    throw fail(504, 'The AI assistant took too long to respond. Try again, or use the report builder below.', 'timeout');
   }
   if (last.networkError) {
-    throw fail(502, 'Could not reach the AI assistant. Check the connection, or use the report builder below.');
+    throw fail(502, 'Could not reach the AI assistant. Check the connection, or use the report builder below.', 'unreachable');
   }
   if (last.status === 404) {
     // Distinct because the fix is a config change, not a retry — and
     // this is how the last model retirement surfaced.
-    throw fail(502, 'The configured AI model is not available. Check GEMINI_MODEL on the server.');
+    throw fail(502, 'The configured AI model is not available. Check GEMINI_MODEL on the server.', 'model_missing');
   }
-  throw fail(502, 'The AI assistant returned an error.');
+  throw fail(502, 'The AI assistant returned an error.', 'error');
 };
 
 export default { isEnabled, providerName, callWithTools };

@@ -14,6 +14,7 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { homeForRole } from '../../features/taskdashboard/components/navSections';
 import ManagerLayout from '../../features/taskdashboard/components/ManagerLayout';
+import AssistantLauncher from '../../features/assistant/components/AssistantLauncher';
 
 // `shell` wraps the whole group in the app shell — sidebar on desktop,
 // hamburger drawer on a phone — so a route group opts in with one word
@@ -51,8 +52,27 @@ const ProtectedRoute = ({ roles, shell = false } = {}) => {
     return <Navigate to={user.role === 'guest' ? '/guest-home' : homeForRole(user.role)} replace />;
   }
 
-  // All good — render the child route
-  return shell ? <ManagerLayout><Outlet /></ManagerLayout> : <Outlet />;
+  // All good — render the child route.
+  //
+  // The help launcher rides along here rather than in either shell:
+  // this is the one component EVERY signed-in route passes through,
+  // including the four staff flows that use StaffShell instead of
+  // ManagerLayout. One mount, whole app, and it is absent from the
+  // landing and login pages for free because they are outside any
+  // ProtectedRoute.
+  //
+  // Not for guests. A guest is a volunteer signed in with a first
+  // name for one event; they see a single screen, and the server
+  // refuses them the endpoint anyway (assistant.routes.js), so
+  // offering the button would be offering a dead end.
+  const content = shell ? <ManagerLayout><Outlet /></ManagerLayout> : <Outlet />;
+
+  return (
+    <>
+      {content}
+      {user.role !== 'guest' && <AssistantLauncher />}
+    </>
+  );
 };
 
 export default ProtectedRoute;
