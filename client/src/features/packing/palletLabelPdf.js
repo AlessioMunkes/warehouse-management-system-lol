@@ -1,0 +1,224 @@
+// ─────────────────────────────────────────────────────────────
+// client/src/features/packing/palletLabelPdf.js
+//
+// The printable QR label a manager tapes to a pallet, and that a Love
+// Activist scans to open it (BR-22).
+//
+// ── WHY THIS DOES NOT USE usePdfDocument.js ──────────────────
+// Every other PDF here (delivery note, dispatch note, decanting sheet)
+// goes through usePdfDocument: html2canvas rasterises a DOM node and
+// the PNG is embedded in a jsPDF page. That is the right tool for a
+// document that is already a laid-out table. It is the wrong tool for
+// this, for four reasons:
+//
+//   1. A QR is read by a camera. Scan reliability depends on crisp
+//      module edges, and that pipeline captures at scale:2 of CSS
+//      pixels and then resamples to A4 millimetres. Every resample
+//      softens exactly the edges the scan depends on. Drawing the
+//      modules as vector rectangles gives mathematically exact edges
+//      at any print size, on any printer.
+//
+//   2. PdfShell.jsx's own "LONGER TERM" note already says this is the
+//      better path: "Rasterising a DOM node is the fragile way to make
+//      a PDF ... jsPDF can draw them directly from the data." A label
+//      is five strings and one graphic — the easiest possible case.
+//
+//   3. The batch is one page per pallet. Rasterising would embed a
+//      full-page PNG per slip; twenty pallets is twenty large images in
+//      one file. Drawn directly, the whole batch is a few KB.
+//
+//   4. That pipeline needs a mounted, visible DOM node to rasterise.
+//      The batch has no DOM — it runs straight from the slip rows.
+//
+// Same jsPDF dependency as everything else. No second PDF library.
+//
+// ── NOT STORED ───────────────────────────────────────────────
+// Generated on demand from public_token, which is already on the row.
+// Nothing is persisted. The token never changes, so a reprint is
+// byte-identical, and there is no stored file that can go stale against
+// a regenerated slip and send a volunteer to the wrong pallet.
+// ─────────────────────────────────────────────────────────────
+// Named import, not the default. jspdf v4's default export is an object
+// of its various classes; `jsPDF` is the constructor. The other PDF
+// files here use the default import and work because the bundler's CJS
+// interop papers over it — the named form is simply correct, and it also
+// runs under plain node, which is what makes this module testable
+// without a browser.
+import { jsPDF } from 'jspdf';
+import qrcode from 'qrcode-generator';
+
+// ── Page geometry, in mm ──────────────────────────────────────
+// A4 portrait. The QR is the point of the page, so it gets the space:
+// a small code marooned in white is both hard to scan and a waste of
+// paper.
+const PAGE_W = 210;
+const PAGE_H = 297;
+const MARGIN = 18;
+
+// ~15cm square. Sized to fill the printable width (210 - 2x18 = 174mm)
+// with a margin either side, rather than to some arbitrary number. A
+// small code marooned on a mostly blank A4 page is both harder to scan
+// and a waste of a sheet of paper; this makes the page look deliberate
+// and is comfortably readable standing over a pallet.
+const QR_SIZE = 150;
+
+// Error correction level Q (25%).
+//
+// Not the usual M. This is taped to a pallet, handled all day, scuffed,
+// and torn at a corner by the time someone scans it. Q keeps it
+// readable with a quarter of the code damaged, for a slightly denser
+// grid that costs nothing at this print size.
+const ECC_LEVEL = 'Q';
+
+// Type number 0 = "pick the smallest version that fits". A slip URL is
+// short, so this stays a low-density grid with large modules.
+const TYPE_NUMBER = 0;
+
+// The last 6 hex characters of the uuid, which is what the short-code
+// lookup matches on. Printed under the QR as the fallback for anyone
+// who cannot scan — a volunteer with no camera, a cracked lens, or no
+// idea what a QR code is.
+export const shortCodeOf = (token) => String(token || '').slice(-6).toLowerCase();
+
+// The URL the QR resolves to. Absolute, because the scan happens in a
+// camera app with no page context.
+export const slipUrlFor = (token, origin) =>
+  `${origin || window.location.origin}/slip/${token}`;
+
+// ── The QR itself ─────────────────────────────────────────────
+// Drawn as one filled rectangle per dark module. jsPDF rectangles are
+// vector, so the code stays exact at any zoom and on any printer,
+// rather than being an image of a code.
+//
+// Modules are drawn at a deliberately over-wide size (a hair over the
+// exact module pitch) so neighbouring dark modules meet with no hairline
+// gap between them. Some PDF rasterisers leave a white seam between
+// exactly-adjacent fills, and a seam through a QR is read as light
+// modules — the one artefact that actually breaks a scan.
+const drawQr = (pdf, text, x, y, size) => {
+  const qr = qrcode(TYPE_NUMBER, ECC_LEVEL);
+  qr.addData(text);
+  qr.make();
+
+  const count = qr.getModuleCount();
+  const pitch = size / count;
+  const fill = pitch * 1.02;
+
+  pdf.setFillColor(0, 0, 0);
+  for (let row = 0; row < count; row += 1) {
+    for (let col = 0; col < count; col += 1) {
+      if (qr.isDark(row, col)) {
+        pdf.rect(x + col * pitch, y + row * pitch, fill, fill, 'F');
+      }
+    }
+  }
+  return { moduleCount: count };
+};
+
+// Wrap a long beneficiary name onto at most two lines rather than
+// letting jsPDF run it off the page. A name that still will not fit is
+// shrunk a step, never truncated — a volunteer matches the label to the
+// pallet by this name.
+const drawBeneficiary = (pdf, name, centreX, y, maxWidth) => {
+  let size = 26;
+  let lines = pdf.splitTextToSize(name, maxWidth);
+
+  while (lines.length > 2 && size > 16) {
+    size -= 2;
+    pdf.setFontSize(size);
+    lines = pdf.splitTextToSize(name, maxWidth);
+  }
+
+  pdf.setFontSize(size);
+  pdf.setFont('helvetica', 'bold');
+  lines.slice(0, 2).forEach((line, i) => {
+    pdf.text(line, centreX, y + i * (size * 0.42), { align: 'center' });
+  });
+  return y + (Math.min(lines.length, 2) - 1) * (size * 0.42);
+};
+
+// ── One label, one page ───────────────────────────────────────
+const drawLabel = (pdf, slip, origin) => {
+  const centreX = PAGE_W / 2;
+  const token = slip.public_token;
+  const url = slipUrlFor(token, origin);
+  const code = shortCodeOf(token);
+
+  // 1. What scanning this does.
+  //
+  // The partner VMS also prints QR codes, for volunteer attendance
+  // check-in, and both end up on paper in the same warehouse on the
+  // same day scanned by the same people. Someone who scans this
+  // believing they have checked in for a shift has NOT checked in, and
+  // may not find out until they are marked absent.
+  //
+  // So this says what it does, in these words, above the code — never
+  // "check in", "sign in", "register" or "arrival".
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(19);
+  pdf.setTextColor(0, 0, 0);
+  pdf.text('SCAN TO OPEN THIS PALLET', centreX, MARGIN + 8, { align: 'center' });
+
+  // 2. Who the food is for — large, so the label can be matched to the
+  //    pallet standing in front of you without scanning anything.
+  const nameBottom = drawBeneficiary(
+    pdf,
+    slip.beneficiary_name || slip.ecd_name || 'Community partner',
+    centreX, MARGIN + 26, PAGE_W - MARGIN * 2,
+  );
+
+  // 3. The code itself, centred, given the room.
+  const qrY = nameBottom + 12;
+  drawQr(pdf, url, centreX - QR_SIZE / 2, qrY, QR_SIZE);
+
+  // 4. The typed fallback, large and legible. This is the accessibility
+  //    route for anyone who cannot scan, so it is not shrunk to make
+  //    space for anything else.
+  const codeY = qrY + QR_SIZE + 18;
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(12);
+  pdf.setTextColor(60, 60, 60);
+  pdf.text('Cannot scan? Open the app and type this code:', centreX, codeY, { align: 'center' });
+
+  pdf.setFont('courier', 'bold');
+  pdf.setFontSize(40);
+  pdf.setTextColor(0, 0, 0);
+  pdf.text(code, centreX, codeY + 18, { align: 'center' });
+
+  // 5. Dispatch date.
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(13);
+  pdf.setTextColor(60, 60, 60);
+  pdf.text(`Going out: ${slip.dispatch_date_display || slip.dispatch_date || ''}`,
+    centreX, PAGE_H - MARGIN, { align: 'center' });
+};
+
+// ── Public API ────────────────────────────────────────────────
+// Both actions return a jsPDF instance rather than opening it, so the
+// caller decides (and so this is testable without a browser window).
+export const buildLabelPdf = (slips, { origin } = {}) => {
+  const pdf = new jsPDF('p', 'mm', 'a4');
+  const usable = (slips || []).filter((s) => s && s.public_token);
+
+  usable.forEach((slip, i) => {
+    if (i > 0) pdf.addPage();
+    drawLabel(pdf, slip, origin);
+  });
+
+  return { pdf, pageCount: usable.length, skipped: (slips || []).length - usable.length };
+};
+
+// Opens in the browser's own PDF viewer — no forced download. Matches
+// usePdfDocument.openPdf, so printing a label behaves like printing a
+// delivery note. The manager saves it themselves if they want to keep
+// it; nothing is stored server-side.
+export const openLabelPdf = (slips, { origin } = {}) => {
+  const { pdf, pageCount, skipped } = buildLabelPdf(slips, { origin });
+  if (pageCount === 0) return { opened: false, pageCount, skipped };
+
+  const blobUrl = pdf.output('bloburl');
+  const opened = window.open(blobUrl, '_blank');
+  return { opened: Boolean(opened), pageCount, skipped };
+};
+
+export default { buildLabelPdf, openLabelPdf, shortCodeOf, slipUrlFor };

@@ -112,6 +112,16 @@ const getSlips = async ({ dispatchDate, cohort, status, assignedTo }) => {
     `SELECT
        ps.id,
        ps.dispatch_date,
+       -- The calendar day as text, for anything that must PRINT the
+       -- date rather than compute with it. ps.dispatch_date itself is a
+       -- Date by the time node-postgres is done with it, and JSON
+       -- serialises that as the previous day in UTC — the defect that
+       -- has already reached a volunteer's screen twice. Additive: the
+       -- existing column is untouched for existing callers.
+       ps.dispatch_date::text AS dispatch_date_iso,
+       -- BR-22. The stable per-slip token behind the printed QR label.
+       -- Read-only here; nothing in the app ever writes it.
+       ps.public_token,
        ps.cohort,
        ps.pallet_ref,
        ps.status,

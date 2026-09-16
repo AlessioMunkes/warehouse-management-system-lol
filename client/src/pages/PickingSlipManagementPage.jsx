@@ -49,7 +49,8 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Search, CalendarPlus, PackagePlus, X, ArrowLeft } from 'lucide-react';
+import { Search, CalendarPlus, PackagePlus, X, ArrowLeft, QrCode, Printer } from 'lucide-react';
+import { openLabelPdf } from '../features/packing/palletLabelPdf';
 
 const COHORT_OPTIONS = [
   { value: 'week1', label: 'Week 1' },
@@ -151,6 +152,7 @@ export default function PickingSlipManagementPage() {
 
   const [viewDate, setViewDate] = useState(todayISO());
   const [search, setSearch] = useState('');
+  const [labelError, setLabelError] = useState(null);
   const [slips, setSlips] = useState([]);
   const [selected, setSelected] = useState(null);
   const [assignChoice, setAssignChoice] = useState('');
@@ -231,6 +233,44 @@ export default function PickingSlipManagementPage() {
       setMode('list');
     } catch (err) { setAdHocError(err.message); } finally { setAdHocBusy(false); }
   };
+
+  // ── BR-22 pallet labels ─────────────────────────────────────
+  // Generated on demand from public_token, which is already on each
+  // row, and never stored. The token does not change, so a reprint is
+  // byte-identical; a stored PDF could go stale against a regenerated
+  // slip and send a volunteer to the wrong pallet.
+  const printLabels = (rows, emptyMessage) => {
+    setLabelError(null);
+
+    const withToken = rows.filter((r) => r.public_token);
+    if (withToken.length === 0) {
+      setLabelError(emptyMessage);
+      return;
+    }
+
+    const { opened, skipped } = openLabelPdf(
+      withToken.map((r) => ({
+        public_token: r.public_token,
+        ecd_name: r.ecd_name,
+        beneficiary_name: r.beneficiary_name,
+        // The plain calendar day. r.dispatch_date is a timestamp that
+        // reads as the previous day once a timezone is applied to it.
+        dispatch_date_display: r.dispatch_date_iso,
+      })),
+    );
+
+    if (!opened) {
+      setLabelError('Pop-up blocked — allow pop-ups for this site to open the labels.');
+    } else if (skipped > 0) {
+      setLabelError(`${skipped} slip${skipped === 1 ? '' : 's'} had no label code and were left out.`);
+    }
+  };
+
+  const printAllLabels = () =>
+    printLabels(filteredSlips, 'There are no slips to print labels for on this date.');
+
+  const printOneLabel = (slip) =>
+    printLabels([slip], 'This slip has no label code yet.');
 
   const filteredSlips = search.trim()
     ? slips.filter((s) => s.ecd_name.toLowerCase().includes(search.trim().toLowerCase()))
@@ -391,6 +431,28 @@ export default function PickingSlipManagementPage() {
 
         {mode === 'list' ? (
           <div className="mt-6 space-y-4">
+            {/* BR-22 pallet labels.
+                Deliberately on its own row, BELOW the two buttons above
+                and ABOVE the search bar. That row creates slips; this
+                acts on slips that already exist, and sitting alongside
+                them would read as a third way to create one.
+                Covers exactly the slips the list is showing, because it
+                prints from filteredSlips - the same rows, same date. */}
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                type="button" variant="outline"
+                onClick={printAllLabels}
+                disabled={filteredSlips.length === 0}
+              >
+                <QrCode />
+                Print pallet labels ({filteredSlips.length})
+              </Button>
+              <p className="text-sm text-muted-foreground">
+                One page per pallet, for {viewDate}. Tape each to its pallet before volunteers arrive.
+              </p>
+            </div>
+            {labelError ? <p className="text-sm text-destructive">{labelError}</p> : null}
+
             <div className="flex flex-wrap items-center gap-3">
               <InputGroup className="min-w-56 flex-1">
                 <InputGroupAddon align="inline-start"><Search /></InputGroupAddon>
@@ -440,6 +502,7 @@ export default function PickingSlipManagementPage() {
                             <TableHead>Assigned to</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Items</TableHead>
+                            <TableHead className="text-right">Label</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -453,6 +516,18 @@ export default function PickingSlipManagementPage() {
                               <TableCell><Badge variant="outline">{slip.status}</Badge></TableCell>
                               <TableCell className="text-muted-foreground">
                                 {slip.confirmed_items}/{slip.total_items}
+                              </TableCell>
+                              {/* For a slip added late, or a label torn
+                                  off mid-week. stopPropagation so printing
+                                  does not also open the slip detail. */}
+                              <TableCell className="text-right">
+                                <Button
+                                  type="button" variant="ghost" size="sm"
+                                  aria-label={`Print the pallet label for ${slip.ecd_name}`}
+                                  onClick={(e) => { e.stopPropagation(); printOneLabel(slip); }}
+                                >
+                                  <Printer />
+                                </Button>
                               </TableCell>
                             </TableRow>
                           ))}
