@@ -26,7 +26,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   GuestShell, GuestScreen, Button, Notice, HelpNote,
 } from '../features/guest/components/GuestPrimitives';
-import { formatDay, firstNameOf } from '../features/guest/guestFormat';
+import { formatDay, displayName, beneficiaryKind as beneficiaryKindOf } from '../features/guest/guestFormat';
 
 const GuestDonePage = () => {
   const { state } = useLocation();
@@ -35,7 +35,7 @@ const GuestDonePage = () => {
   const [busy, setBusy] = useState(false);
 
   const summary = state?.summary ?? null;
-  const name = firstNameOf(user?.firstName);
+  const name = displayName(user?.firstName);
 
   const signOut = async () => {
     setBusy(true);
@@ -69,7 +69,7 @@ const GuestDonePage = () => {
     itemsPacked, itemsFlagged, unitsPacked,
   } = summary;
 
-  const kind = beneficiaryKind === 'ecd' ? 'creche' : (beneficiaryKind || 'community partner');
+  const kind = beneficiaryKindOf(beneficiaryKind);
 
   return (
     <GuestShell>
@@ -109,7 +109,7 @@ const GuestDonePage = () => {
           <h2 className="gst-card-title">Where it’s going</h2>
           <p className="gst-card-meta" style={{ color: 'var(--gst-ink)' }}>
             This pallet goes to <strong>{beneficiary}</strong>
-            {kind ? `, a ${kind}` : ''}
+            {`, ${kind.article} ${kind.noun}`}
             {childCount ? <> that feeds <strong>{childCount} children</strong></> : ''}
             . It leaves {formatDay(dispatchDate)}.
           </p>

@@ -34,7 +34,7 @@ import {
   GuestShell, GuestScreen, PlaceBar, Button, ButtonRow, Notice,
   StatusPill, Progress, Counter, HelpNote, Loading,
 } from '../features/guest/components/GuestPrimitives';
-import { formatDay, firstNameOf } from '../features/guest/guestFormat';
+import { formatDay, displayName } from '../features/guest/guestFormat';
 
 // Plain words. No "variance", no "SKU", no "cohort" — ACC-09.
 const PROBLEM_REASONS = [
@@ -300,7 +300,7 @@ const GuestPackPage = () => {
             disabled={busy}
             onClick={() => act(
               () => confirmItem(slip.id, current.id, qty),
-              `${current.product_name} — packed. Nice one, ${firstNameOf(user?.firstName)}.`,
+              `${current.product_name} — packed. Nice one, ${displayName(user?.firstName)}.`,
             )}
           >
             {busy ? 'Saving…' : 'Packed it'}
@@ -318,9 +318,9 @@ const GuestPackPage = () => {
             <summary style={{ minHeight: 'var(--gst-tap)', display: 'flex', alignItems: 'center', cursor: 'pointer', fontWeight: 700 }}>
               What you’ve done so far ({done})
             </summary>
-            <ul style={{ listStyle: 'none', margin: '0.75rem 0 0', padding: 0 }} className="gst-stack-tight">
+            <ul className="gst-done-list gst-stack-tight">
               {items.filter((i) => i.status !== 'pending').map((i) => (
-                <li key={i.id} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'center' }}>
+                <li key={i.id} className="gst-done-row">
                   <span>{i.product_name}</span>
                   <StatusPill status={i.status} />
                 </li>

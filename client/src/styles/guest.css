@@ -30,10 +30,11 @@
       StaffSlipFlow shows a whole pallet at once on purpose — an
       experienced packer needs it. A first-timer needs one thing.
 
-   3. WARMER. Cream rather than sand, and the illustrated/organic
-      touches NFR-06 asks for: a soft blob behind the hero, a hand-drawn
-      underline on the greeting. Small and cheap, never decorative
-      enough to get in the way.
+   3. WARMER. Cream rather than sand, and the warmth NFR-06 asks for
+      carried by the copy, the palette and the type — plus one small
+      editorial touch, the hand-drawn underline on the greeting, which
+      marks the volunteer's own name and so is doing a job.
+      There is deliberately NO abstract decorative shape: see .gst-hero.
 
    ── Accessibility, ACC-01 to ACC-10 ───────────────────────────────────
    ACC-01/02  WCAG 2.1 AA. Every pairing below is checked against the
@@ -121,17 +122,25 @@
 /* ── Masthead ─────────────────────────────────────────────────── */
 .gst-masthead {
   display: flex;
+  flex-wrap: wrap;            /* "LOVE ACTIVIST" drops below rather than off */
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 0.25rem 1rem;
   padding: 0.875rem 1.25rem;
   background: var(--gst-ink);
   color: var(--gst-white);
 }
 .gst-masthead-brand {
+  min-width: 0;               /* flex items default to min-width:auto and refuse
+                                 to shrink below their text, which pushed the
+                                 second brand off the right edge at 360px */
   font: 700 0.9375rem/1.2 var(--gst-font-display);
   letter-spacing: 0.02em;
   text-transform: uppercase;
+  /* "LADLES·OF·LOVE" contains no spaces, so it is a single unbreakable
+     token: min-width:0 lets the box shrink but the text still spills.
+     At 200% zoom on a 320px screen it was clipped by 39px. */
+  overflow-wrap: anywhere;
 }
 .gst-masthead-brand span { color: var(--gst-accent); }
 
@@ -146,34 +155,40 @@
   font-size: 0.9375rem;
   color: var(--gst-text-sub);
 }
+.gst-place > * { min-width: 0; }
 .gst-place-strong { font-weight: 700; color: var(--gst-ink); }
 
 /* ── Hero ─────────────────────────────────────────────────────── */
-.gst-hero { position: relative; padding: 0.5rem 0 0.25rem; }
+.gst-hero { padding: 0.5rem 0 0.25rem; }
 
-/* The organic blob NFR-06 asks for. Purely decorative, hidden from
-   assistive tech, and the layout does not depend on it. */
-.gst-hero::before {
-  content: "";
-  position: absolute;
-  z-index: 0;
-  top: -1.5rem; left: -3rem;
-  width: 12rem; height: 12rem;
-  background: var(--gst-sand);
-  border-radius: 58% 42% 47% 53% / 45% 51% 49% 55%;
-  opacity: 0.75;
-}
-.gst-hero > * { position: relative; z-index: 1; }
+/* A decorative blob used to sit behind every heading here: an
+   absolutely positioned pseudo-element, 12rem across, offset off the
+   left edge of the page.
+   REMOVED OUTRIGHT — not resized, not repositioned, not replaced.
+   It marked nothing, grouped nothing and separated nothing: the same
+   shape on every guest screen, carrying no meaning. It also painted
+   UNDER the heading and the "For <beneficiary>" line, tinting their
+   background and pulling those pairings off the contrast ratios this
+   file documents at the top. It cost ACC-02 and bought nothing.
+   NFR-06's warmth is carried by the copy, the palette and the type,
+   which are already doing that job. Do not reintroduce a decorative
+   shape here. */
 
+/* Long words wrap rather than push the page wide. Names are now shown
+   in full ("Corporate group (Old Mutual)"), and a product name or a
+   beneficiary can be longer than 360px of heading. */
 .gst-title {
   margin: 0;
   font: 700 clamp(1.75rem, 6vw, 2.25rem)/1.15 var(--gst-font-display);
   color: var(--gst-ink);
   letter-spacing: -0.01em;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 .gst-title-sm { font-size: clamp(1.375rem, 5vw, 1.625rem); }
 
 .gst-lede {
+  overflow-wrap: break-word;
   margin: 0.625rem 0 0;
   font-size: 1.0625rem;
   color: var(--gst-text);
@@ -199,10 +214,11 @@
 
 .gst-card-title {
   margin: 0 0 0.25rem;
+  overflow-wrap: break-word;
   font: 700 1.125rem/1.25 var(--gst-font-display);
   color: var(--gst-ink);
 }
-.gst-card-meta { margin: 0; font-size: 0.9375rem; color: var(--gst-text-sub); }
+.gst-card-meta { margin: 0; font-size: 0.9375rem; color: var(--gst-text-sub); overflow-wrap: break-word; }
 
 /* A whole card that is a tap target (choose-a-pallet list). */
 .gst-card-button {
@@ -230,6 +246,8 @@
   border-radius: var(--gst-radius-pill);
   font: 700 1.0625rem/1.2 var(--gst-font-display);
   cursor: pointer;
+  min-width: 0;
+  overflow-wrap: break-word;
   transition: background-color 0.15s ease, transform 0.1s ease;
 }
 .gst-btn:active { transform: scale(0.98); }
@@ -252,7 +270,11 @@
 }
 .gst-btn-ghost:hover:not(:disabled) { border-color: var(--gst-ink); }
 
-.gst-btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+/* minmax(0, 1fr), not 1fr. A grid track sized 1fr still has an automatic
+   MINIMUM of its content, so "There's a problem" widened its column past
+   half the row and pushed the whole grid off the screen. minmax(0, 1fr)
+   lets the track shrink and the label wrap inside its 56px button. */
+.gst-btn-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
 @media (max-width: 24rem) { .gst-btn-row { grid-template-columns: 1fr; } }
 
 /* ── Fields ───────────────────────────────────────────────────── */
@@ -295,6 +317,7 @@
 .gst-counter-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .gst-counter-value {
   flex: 1 1 auto;
+  min-width: 0;
   min-height: var(--gst-tap);
   display: flex; align-items: center; justify-content: center;
   border: 2px solid var(--gst-border);
@@ -307,6 +330,7 @@
 /* ── Status (ACC-03: mark + word, never colour alone) ─────────── */
 .gst-state {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.4rem;
   padding: 0.3rem 0.7rem;
@@ -319,6 +343,27 @@
 .gst-state-done    { background: var(--gst-good-bg); color: var(--gst-good); border-color: #c5ddd0; }
 .gst-state-problem { background: var(--gst-attention-bg); color: var(--gst-attention); border-color: #e2d3c6; }
 .gst-state-todo    { background: var(--gst-sand); color: var(--gst-text-sub); border-color: var(--gst-border); }
+
+/* ── "What you've done so far" list ───────────────────────────── */
+/* Was inline flex styles on the <li>. A long product name beside a
+   status pill overflowed the row at 200% zoom (clipped by 73px),
+   because both flex children default to min-width:auto. The name is
+   allowed to shrink and wrap; the pill never shrinks, because a
+   half-width "Packed" is worse than a wrapped product name. */
+.gst-done-list { list-style: none; margin: 0.75rem 0 0; padding: 0; }
+.gst-done-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+}
+.gst-done-row > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+/* The pill may yield as a last resort. flex:0 0 auto kept it rigid, and
+   at 320px with 200% zoom the card's own padding left less room than
+   the pill wanted, overflowing the row by 18px. It shrinks only after
+   the product name has already given up everything it can. */
+.gst-done-row .gst-state { flex: 0 1 auto; min-width: 0; }
 
 /* ── Notices ──────────────────────────────────────────────────── */
 .gst-notice {
@@ -336,8 +381,9 @@
 /* ── Progress ─────────────────────────────────────────────────── */
 .gst-progress-meta {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 0.25rem 1rem;
   font-size: 0.9375rem;
   font-weight: 700;
   color: var(--gst-ink);
@@ -360,8 +406,12 @@
 /* ── Contribution summary ─────────────────────────────────────── */
 .gst-figure {
   display: block;
-  font: 700 clamp(3rem, 14vw, 4.5rem)/1 var(--gst-font-display);
+  /* vw-based floor, not a rem floor. A rem floor scales WITH browser
+     zoom, so at 200% two of these no longer fit side by side; a vw
+     floor stays tied to the screen, which is what must be fitted. */
+  font: 700 clamp(2rem, 12vw, 4.5rem)/1 var(--gst-font-display);
   color: var(--gst-accent);
+  overflow-wrap: anywhere;
 }
 .gst-figure-label {
   display: block;
@@ -369,9 +419,13 @@
   font-size: 1rem;
   color: var(--gst-text-sub);
 }
+/* auto-fit + minmax(min(100%, 8rem), 1fr): two side by side when there
+   is room, one per row when there is not — which is what 200% zoom on a
+   320px screen is. The min() stops the track demanding 8rem on a screen
+   narrower than that. */
 .gst-figure-row {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
   gap: 1rem;
   text-align: center;
 }

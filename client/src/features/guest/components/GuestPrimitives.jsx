@@ -17,7 +17,7 @@
 //   "no dead ends" — HelpNote belongs on every screen
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useRef } from 'react';
-import { formatDay } from '../guestFormat';
+import { formatDay, foodForPhrase } from '../guestFormat';
 import '../../../styles/guest.css';
 
 // ── Shell ─────────────────────────────────────────────────────
@@ -161,12 +161,11 @@ export const Counter = ({ label, value, onChange, min = 0 }) => (
 // An empty pallet says so in words HERE, rather than the screen
 // rendering "0 items" and leaving a first-timer to interpret it.
 export const PalletCard = ({ slip, onClick, actionLabel }) => {
-  const kind = slip.beneficiaryKind === 'ecd' ? 'creche' : slip.beneficiaryKind;
   const body = (
     <>
       <h2 className="gst-card-title">{slip.beneficiaryName || 'A community partner'}</h2>
       <p className="gst-card-meta">
-        {kind ? <>Food for a {kind}</> : 'Food parcel'}
+        {foodForPhrase(slip.beneficiaryKind)}
         {' · '}
         {slip.itemCount === 0
           ? 'Nothing listed on it yet'

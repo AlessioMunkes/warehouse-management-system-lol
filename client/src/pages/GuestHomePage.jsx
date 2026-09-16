@@ -28,8 +28,7 @@ import {
 import {
   GuestShell, GuestScreen, Button, Notice, PalletCard, HelpNote, Loading,
 } from '../features/guest/components/GuestPrimitives';
-
-const firstNameOf = (full) => (full || '').trim().split(/\s+/)[0] || 'there';
+import { displayName } from '../features/guest/guestFormat';
 
 const GuestHomePage = () => {
   const { user, logout } = useAuth();
@@ -102,7 +101,7 @@ const GuestHomePage = () => {
     }
   };
 
-  const name = firstNameOf(user?.firstName);
+  const name = displayName(user?.firstName);
 
   return (
     <GuestShell>
