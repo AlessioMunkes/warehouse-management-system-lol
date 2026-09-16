@@ -19,6 +19,7 @@ import volunteerRouter   from './src/routes/volunteer.routes.js';
 import decantingRouter   from './src/routes/decanting.routes.js';
 import stockRouter       from './src/routes/stock.routes.js';
 import pickingRouter     from './src/routes/picking.routes.js';
+import slipRouter        from './src/routes/slip.routes.js';
 import donationRouter    from './src/routes/donation.routes.js';
 import pendingDonationRouter from './src/routes/pendingDonation.routes.js';
 import dispatchRouter    from './src/routes/dispatch.routes.js';
@@ -132,6 +133,11 @@ app.use('/api/volunteers', loginRateLimiter, volunteerRouter);
 app.use('/api/decanting',  decantingRouter);
 app.use('/api/stock',      stockRouter);
 app.use('/api/picking',    pickingRouter);
+// BR-22 guest slip access. Rate limiting is applied per-route inside
+// this router rather than here: the public lookups need it, the
+// authenticated guest routes do not, and the limiter it uses counts
+// only failures so a warehouse behind one NAT address is not locked out.
+app.use('/api/slip',       slipRouter);
 app.use('/api/dispatch',   dispatchRouter);
 app.use('/api/donations',  pendingDonationRouter);
 app.use('/api/donations',  donationRouter);

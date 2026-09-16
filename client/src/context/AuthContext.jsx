@@ -125,10 +125,36 @@ export const AuthProvider = ({ children }) => {
     return data.user;
   };
 
+  // Claiming a pallet from a QR code also creates the session: the
+  // server inserts the volunteer and sets the same wms_token cookie in
+  // one response. This adopts that user without a second round trip.
+  //
+  // Not a login function — it does not call anything. It is how a
+  // screen that already holds a freshly minted session hands it to the
+  // context, so the rest of the app stops thinking nobody is signed in.
+  const refreshFromClaim = (claimedUser) => {
+    if (!claimedUser) return null;
+    writeCachedUser(claimedUser);
+    setUser(claimedUser);
+    setSessionMessage(null);
+    return claimedUser;
+  };
+
   // ── Logout ────────────────────────────────────────────────────
+  // Guests and staff end their sessions at different endpoints.
+  //
+  // /api/login/logout only clears the cookie. For a guest that is not
+  // enough: their visit also has to be closed, or signed_out_at stays
+  // null forever and their hours never reach the volunteer-hours report.
+  // /api/volunteers/sign-out stamps the visit AND clears the same cookie,
+  // taking the volunteer id from the token rather than from us.
   const logout = async () => {
+    const endpoint = user?.role === 'guest'
+      ? '/api/volunteers/sign-out'
+      : '/api/login/logout';
+
     try {
-      await apiPost('/api/login/logout', {});
+      await apiPost(endpoint, {});
     } catch {
       // If the server is unreachable, still clear local state — the
       // user asked to be logged out and must not stay logged in on a
@@ -141,7 +167,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider
-      value={{ user, login, loginAsGuest, logout, isLoading, isOffline, sessionMessage }}
+      value={{ user, login, loginAsGuest, refreshFromClaim, logout, isLoading, isOffline, sessionMessage }}
     >
       {children}
     </AuthContext.Provider>

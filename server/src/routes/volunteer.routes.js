@@ -101,6 +101,54 @@ router.get('/',
     }
   });
 
+// ── POST /api/volunteers/sign-out ─────────────────────────────
+// A Love Activist ending their OWN visit.
+//
+// The id comes from the JWT and never from the request body or the URL.
+// A guest token is the only proof of identity a guest has, so accepting
+// an id from the client would let anyone holding any guest session close
+// anyone else's visit — and signed_out_at feeds both the volunteer-hours
+// metric and a record that is partly a safety document (who is still in
+// the building).
+//
+// This is the reason 6 of 7 volunteer rows sat permanently open: the only
+// writer was the manager-only route below, and guest logout merely
+// cleared the cookie. Reporting's volunteer-hours series requires
+// signed_out_at IS NOT NULL, so almost nothing counted.
+//
+// Declared BEFORE '/:id/sign-out' for clarity. The two cannot actually
+// collide — one path segment versus two — but the static-before-param
+// ordering is the convention in picking.routes.js and worth keeping.
+//
+// Clears the cookie as well: this ends the session, so leaving a valid
+// 12-hour token in the browser after the visit is closed would let a
+// signed-out guest keep making requests. session.route.js already
+// rejects a guest whose visit is closed, but that check should not be
+// the only thing standing between them and the API.
+router.post('/sign-out',
+  auth, requireRole(ROLES.GUEST),
+  async (req, res) => {
+    try {
+      const id = req.user.id;
+      const updated = await volunteerRepo.signOutVolunteer(id);
+
+      res.clearCookie(AUTH_COOKIE, authCookieOptions());
+
+      // Already closed, or the row is gone. Either way the visit is not
+      // open and the cookie is cleared, so this is a no-op rather than an
+      // error — a volunteer pressing logout twice has done nothing wrong.
+      if (!updated) {
+        const existing = await volunteerRepo.getVolunteerById(id);
+        return res.status(200).json({ success: true, data: existing ?? null });
+      }
+
+      return res.status(200).json({ success: true, data: updated });
+    } catch (error) {
+      console.error('[volunteers:self-sign-out]', error.message);
+      return res.status(500).json({ success: false, message: 'Failed to sign you out.' });
+    }
+  });
+
 // ── POST /api/volunteers/:id/sign-out ─────────────────────────
 // Closes an open visit and stamps signed_out_at — the writer that has
 // never existed. See the note at the top of volunteer.repository.js:
