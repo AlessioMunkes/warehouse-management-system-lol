@@ -17,7 +17,7 @@ import { describe, it, expect } from 'vitest';
 // eslint config is browser-global, where Buffer is not defined.
 import { Buffer } from 'node:buffer';
 import {
-  buildLabelPdf, shortCodeOf, slipUrlFor, publicAppOrigin,
+  buildLabelPdf, shortCodeOf, slipUrlFor, publicAppOrigin, isReachableByPhone,
 } from '../features/packing/palletLabelPdf';
 
 const TOKEN = '0f574c6f-a6c1-4f12-827d-d64424a8ea04';
@@ -79,6 +79,43 @@ describe('publicAppOrigin', () => {
   it('strips a trailing slash so the URL has no double slash', () => {
     expect(slipUrlFor('tok', 'https://x.test/')).toBe('https://x.test/slip/tok');
     expect(slipUrlFor('tok', 'https://x.test//')).toBe('https://x.test/slip/tok');
+  });
+});
+
+// A label is scanned by a phone on mobile data. Anything it cannot
+// reach produces a label that looks perfect and fails in the warehouse.
+describe('isReachableByPhone', () => {
+  it.each([
+    'https://wms-lol.onrender.com',
+    'https://wms.ladlesoflove.org.za',
+    'http://wms.example.co.za:8080',
+  ])('treats %s as reachable', (origin) => {
+    expect(isReachableByPhone(origin)).toBe(true);
+  });
+
+  it.each([
+    ['dev server',        'http://localhost:5173'],
+    ['loopback ip',       'http://127.0.0.1:5173'],
+    ['all-interfaces',    'http://0.0.0.0:3000'],
+    ['ipv6 loopback',     'http://[::1]:5173'],
+    ['office LAN /24',    'http://192.168.1.14:5173'],
+    ['private 10/8',      'http://10.0.0.7:5173'],
+    ['private 172.16/12', 'http://172.20.3.4:5173'],
+    ['link-local',        'http://169.254.10.2'],
+    ['bonjour name',      'http://hussain-laptop.local:5173'],
+    ['bare machine name', 'http://hussain-laptop:5173'],
+    ['nothing at all',    ''],
+    ['not an address',    'not-a-url'],
+  ])('treats %s as NOT reachable', (_label, origin) => {
+    expect(isReachableByPhone(origin)).toBe(false);
+  });
+
+  // 172.16-31 is private; 172.15 and 172.32 are not.
+  it('gets the edges of the 172.16/12 block right', () => {
+    expect(isReachableByPhone('http://172.15.0.1')).toBe(true);
+    expect(isReachableByPhone('http://172.16.0.1')).toBe(false);
+    expect(isReachableByPhone('http://172.31.255.1')).toBe(false);
+    expect(isReachableByPhone('http://172.32.0.1')).toBe(true);
   });
 });
 
@@ -163,5 +200,62 @@ describe('buildLabelPdf', () => {
     const { pdf } = buildLabelPdf([slip()], { origin: 'https://wms.example.org' });
     expect(pdf).toBeTruthy();
     expect(slipUrlFor(TOKEN, 'https://wms.example.org')).toMatch(/^https:\/\/.+\/slip\/[0-9a-f-]{36}$/);
+  });
+});
+
+// The manager screen must not show the address. Managers are not
+// technical: a URL tells them nothing they can act on, and it is the
+// least useful thing on that screen. What they get is whether the
+// labels will work, in plain words.
+describe('manager screen copy', () => {
+  const pageSource = async () => {
+    const { readFileSync } = await import('node:fs');
+    const { fileURLToPath } = await import('node:url');
+    return readFileSync(
+      fileURLToPath(new URL('../pages/PickingSlipManagementPage.jsx', import.meta.url)), 'utf8');
+  };
+
+  it('never renders the origin in visible copy', async () => {
+    const src = await pageSource();
+    // The origin may be computed and passed around; it must not be
+    // interpolated into anything the manager reads.
+    expect(src).not.toMatch(/Codes will open/);
+    // Rendered as a JSX child is forbidden; inside a template literal
+    // for the title attribute is explicitly allowed, hence the
+    // "not preceded by $" lookbehind.
+    expect(src).not.toMatch(/(?<!\$)\{publicAppOrigin\(\)\}/);
+    expect(src).not.toMatch(/(?<!\$)\{labelOrigin\}/);
+  });
+
+  it('keeps the address available to a developer', async () => {
+    const src = await pageSource();
+    // title attribute for inspection, console line on generate.
+    expect(src).toMatch(/title=\{`Labels would point at/);
+    expect(src).toMatch(/console\.warn/);
+  });
+
+  it('warns in plain language, with no jargon', async () => {
+    const src = await pageSource();
+    const warning = src.slice(src.indexOf('These labels will only work'), src.indexOf('would not be able to open their pallet'));
+
+    expect(warning).toContain('only work on this computer');
+    for (const jargon of ['localhost', 'origin', 'URL', 'http', 'port', 'server', 'host']) {
+      expect(warning.toLowerCase()).not.toContain(jargon.toLowerCase());
+    }
+  });
+
+  // ACC-03: the mark and the sentence both carry the meaning.
+  it('pairs an icon with the words, not colour alone', async () => {
+    const src = await pageSource();
+    expect(src).toMatch(/AlertTriangle/);
+    expect(src).toMatch(/aria-hidden="true"/);
+  });
+
+  // Someone testing the flow has to be able to generate one.
+  it('does not disable the button when labels are unreachable', async () => {
+    const src = await pageSource();
+    const button = src.slice(src.indexOf('onClick={printAllLabels}'), src.indexOf('Print pallet labels'));
+    expect(button).toContain('disabled={filteredSlips.length === 0}');
+    expect(button).not.toContain('labelsReachable');
   });
 });

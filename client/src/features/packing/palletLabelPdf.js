@@ -112,6 +112,51 @@ export const publicAppOrigin = () => {
   return String(configured || fromBrowser).replace(/\/+$/, '');
 };
 
+// ── Will a printed label actually work? ───────────────────────
+// A label is scanned by a volunteer's phone, on the warehouse wi-fi or
+// on mobile data. That phone can only reach a publicly routable host.
+// If the manager is printing from a dev server, or from a machine on
+// the office LAN, the code resolves to an address that exists only on
+// THAT computer — the label looks perfect and simply fails when scanned.
+//
+// The system knows which case it is in, so it should say so rather than
+// printing an address at a manager and leaving them to work it out.
+//
+// Deliberately a allow-nothing-by-default check on the HOST only: an
+// unfamiliar host is treated as reachable, because the failure mode of
+// a false warning (a manager doubts a label that is fine) is milder
+// than the alternative wording implies, and a real deployment must not
+// be nagged.
+const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1', '[::1]']);
+
+export const isReachableByPhone = (origin) => {
+  const value = String(origin || '').trim();
+  if (!value) return false;                 // nothing to point at
+
+  let host;
+  try {
+    host = new URL(value).hostname.toLowerCase();
+  } catch {
+    return false;                           // not a usable address
+  }
+
+  if (LOCAL_HOSTNAMES.has(host)) return false;
+  if (host.endsWith('.local')) return false;          // mDNS / Bonjour
+  if (host.endsWith('.internal')) return false;
+
+  // RFC1918 private ranges + link-local: reachable from the office LAN,
+  // not from a phone on mobile data, and not from a visitor's phone.
+  if (/^10\./.test(host)) return false;
+  if (/^192\.168\./.test(host)) return false;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(host)) return false;
+  if (/^169\.254\./.test(host)) return false;
+
+  // A bare hostname with no dot is a LAN machine name, not a domain.
+  if (!host.includes('.')) return false;
+
+  return true;
+};
+
 // The URL the QR resolves to. Absolute, because the scan happens in a
 // camera app that has no page context to resolve a relative path
 // against.

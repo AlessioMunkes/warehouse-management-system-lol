@@ -49,8 +49,8 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Search, CalendarPlus, PackagePlus, X, ArrowLeft, QrCode, Printer } from 'lucide-react';
-import { openLabelPdf, publicAppOrigin } from '../features/packing/palletLabelPdf';
+import { Search, CalendarPlus, PackagePlus, X, ArrowLeft, QrCode, Printer, AlertTriangle } from 'lucide-react';
+import { openLabelPdf, publicAppOrigin, isReachableByPhone } from '../features/packing/palletLabelPdf';
 
 const COHORT_OPTIONS = [
   { value: 'week1', label: 'Week 1' },
@@ -235,6 +235,12 @@ export default function PickingSlipManagementPage() {
   };
 
   // ── BR-22 pallet labels ─────────────────────────────────────
+  // The origin is derived once per render. It is used to decide whether
+  // to warn, and passed to the generator — but it is never shown to the
+  // manager, who cannot act on an address. See the warning block below.
+  const labelOrigin = publicAppOrigin();
+  const labelsReachable = isReachableByPhone(labelOrigin);
+
   // Generated on demand from public_token, which is already on each
   // row, and never stored. The token does not change, so a reprint is
   // byte-identical; a stored PDF could go stale against a regenerated
@@ -259,8 +265,19 @@ export default function PickingSlipManagementPage() {
         // reads as the previous day once a timezone is applied to it.
         dispatch_date_display: r.dispatch_date_iso,
       })),
-      { origin: publicAppOrigin() },
+      { origin: labelOrigin },
     );
+
+    // For a developer, not the manager: the address is deliberately
+    // absent from the visible copy, so leave a trace somewhere a
+    // developer will actually look.
+    if (!labelsReachable) {
+      console.warn(
+        `[pallet labels] Generated against "${labelOrigin}", which a phone on mobile data cannot reach. `
+        + 'These labels will not scan outside this machine. '
+        + 'Set VITE_PUBLIC_APP_ORIGIN to override the printed address.',
+      );
+    }
 
     if (!opened) {
       setLabelError('Pop-up blocked — allow pop-ups for this site to open the labels.');
@@ -450,17 +467,39 @@ export default function PickingSlipManagementPage() {
                 <QrCode />
                 Print pallet labels ({filteredSlips.length})
               </Button>
-              {/* The destination is shown, not assumed. A label pointing
-                  at a host that is not reachable from a phone looks
-                  correct on paper and only fails when a volunteer scans
-                  it in the warehouse — by which time the stack is taped
-                  to the pallets. */}
               <p className="text-sm text-muted-foreground">
                 One page per pallet, for {viewDate}. Tape each to its pallet before volunteers arrive.
-                <br />
-                Codes will open <span className="font-mono">{publicAppOrigin()}/slip/…</span>
               </p>
             </div>
+            {/* Whether the labels will actually work, in words a manager
+                can act on. Not the address itself: a URL tells a
+                non-technical reader nothing, and it is the least useful
+                thing on this screen.
+
+                The real address stays available to a developer through
+                the title attribute and a console line on print — it is
+                just not in the visible copy.
+
+                ACC-03: the icon and the sentence both carry the meaning,
+                so this reads correctly in greyscale and to a colour-blind
+                manager. Colour is the third signal, never the only one.
+
+                Printing is NOT blocked — someone testing the flow has to
+                be able to generate one. */}
+            {!labelsReachable ? (
+              <p
+                className="flex items-start gap-2 rounded-md bg-muted/50 px-3 py-2 text-sm text-destructive"
+                title={`Labels would point at ${labelOrigin || 'an address this app could not determine'}`}
+              >
+                <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                <span>
+                  <strong>These labels will only work on this computer.</strong>{' '}
+                  Please don’t print them for the warehouse — a volunteer scanning one
+                  would not be able to open their pallet.
+                </span>
+              </p>
+            ) : null}
+
             {labelError ? <p className="text-sm text-destructive">{labelError}</p> : null}
 
             <div className="flex flex-wrap items-center gap-3">
