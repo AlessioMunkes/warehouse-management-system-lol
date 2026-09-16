@@ -31,6 +31,8 @@ const slipAccessRepo = {
   claimForVolunteer:      vi.fn(),
   findSlipIdForVolunteer: vi.fn(),
   volunteerHoldsSlip:     vi.fn(),
+  getVolunteerById:       vi.fn(),
+  getPreviewById:         vi.fn(),
 };
 vi.mock('../src/repositories/slipAccess.repository.js', () => ({
   default: slipAccessRepo,
@@ -76,6 +78,10 @@ beforeEach(() => {
   slipAccessRepo.listUnclaimedForDate.mockResolvedValue([previewRow]);
   slipAccessRepo.volunteerHoldsSlip.mockResolvedValue(true);
   slipAccessRepo.findSlipIdForVolunteer.mockResolvedValue(132);
+  // getMySlip merges the calendar day and the COALESCEd beneficiary name
+  // from the preview read, because getSlipById returns ps.* and its
+  // dispatch_date is a Date that serialises to the previous day in UTC.
+  slipAccessRepo.getPreviewById.mockResolvedValue(previewRow);
   // A REALISTIC raw row: claimForVolunteer does `RETURNING *`, so it is
   // snake_case, beneficiary_name is the slip's own null copy (not the
   // COALESCEd ECD name), and dispatch_date is the Date node-postgres
@@ -265,6 +271,59 @@ describe('POST /api/slip/:token/claim', () => {
     expect(res.status).toBe(201);
   });
 
+  // Entry path 3: signed in at the gate, then picked a pallet off the
+  // list. That volunteer is already in the building and must not be
+  // recorded as arriving twice — the Phase 0.1 bug, through another door.
+  it('reuses an existing guest session instead of creating a second volunteer', async () => {
+    slipAccessRepo.getVolunteerById.mockResolvedValue({
+      id: '7', full_name: 'Thabo Mokoena', signed_in_at: '2026-09-16T07:00:00Z',
+    });
+
+    const res = await request(app)
+      .post(`/api/slip/${TOKEN}/claim`)
+      .set('Cookie', authCookie(GUEST))
+      .send({});
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.user.id).toBe('7');
+
+    // No INSERT, and the claim bound to the session's volunteer.
+    const sql = poolQuery.mock.calls.map(([q]) => String(q)).join('\n');
+    expect(sql).not.toMatch(/INSERT INTO volunteers/i);
+    expect(slipAccessRepo.claimForVolunteer).toHaveBeenCalledWith({ slipId: 132, volunteerId: '7' });
+  });
+
+  it('does not demand a name when the session already has one', async () => {
+    slipAccessRepo.getVolunteerById.mockResolvedValue({ id: '7', full_name: 'Thabo' });
+    const res = await request(app)
+      .post(`/api/slip/${TOKEN}/claim`)
+      .set('Cookie', authCookie(GUEST))
+      .send({});
+    expect(res.status).toBe(201);
+  });
+
+  // A staff cookie must not be mistaken for a guest session: that id is
+  // a users.id and would be bound into assigned_volunteer_id.
+  it('ignores a staff session and creates a volunteer as normal', async () => {
+    const res = await request(app)
+      .post(`/api/slip/${TOKEN}/claim`)
+      .set('Cookie', authCookie(MANAGER))
+      .send({ name: 'Thabo' });
+
+    expect(res.status).toBe(201);
+    expect(slipAccessRepo.getVolunteerById).not.toHaveBeenCalled();
+    expect(poolQuery.mock.calls.map(([q]) => String(q)).join('\n')).toMatch(/INSERT INTO volunteers/i);
+  });
+
+  it('treats a signed-out session as no session', async () => {
+    slipAccessRepo.getVolunteerById.mockResolvedValue(null);   // row gone or signed out
+    const res = await request(app)
+      .post(`/api/slip/${TOKEN}/claim`)
+      .set('Cookie', authCookie(GUEST))
+      .send({});
+    expect(res.status).toBe(401);
+  });
+
   it('404s a claim against an unknown token', async () => {
     slipAccessRepo.getPreviewByToken.mockResolvedValue(null);
     const res = await request(app).post(`/api/slip/${TOKEN}/claim`).send({ name: 'Thabo' });
@@ -314,6 +373,27 @@ describe('GET /api/slip/mine', () => {
     expect(res.body.data).not.toHaveProperty('packer_name');
     expect(res.body.data).not.toHaveProperty('public_token');
     expect(res.body.data).not.toHaveProperty('generated_by');
+  });
+
+  // getSlipById selects ps.*, so its dispatch_date is the Date
+  // node-postgres builds, which JSON serialises as the PREVIOUS day in
+  // UTC ("2026-09-15T22:00:00.000Z" for a 2026-09-16 slip). The packing
+  // screen would tell a volunteer the pallet goes out yesterday. Caught
+  // by a live smoke test, not by a mock — hence this.
+  it('returns the calendar day, not a UTC timestamp', async () => {
+    pickingRepo.getSlipById.mockResolvedValue({
+      id: 132, status: 'in_progress', assigned_volunteer_id: '7',
+      dispatch_date: new Date('2026-09-15T22:00:00.000Z'),   // what ps.* really gives
+      beneficiary_name: null,
+      items: [],
+    });
+
+    const res = await request(app).get('/api/slip/mine').set('Cookie', authCookie(GUEST));
+
+    expect(res.body.data.dispatch_date).toBe('2026-09-16');
+    expect(String(res.body.data.dispatch_date)).not.toContain('T');
+    // and the null slip-level name is filled from the ECD's
+    expect(res.body.data.beneficiary_name).toBe('Little Angels Educare');
   });
 
   it('404s when the guest holds nothing', async () => {

@@ -89,10 +89,24 @@ const resolveSlip = async ({ token, code }) => {
 // the claim fails, the volunteer row still stands: they ARE in the
 // building and the arrival record should say so, whether or not they
 // ended up packing anything.
-const claim = async ({ token, code, name }) => {
+// existingVolunteerId is set when the caller ALREADY has a guest session
+// — the volunteer who signed in at the gate, landed on the guest home
+// and picked a pallet off the list (entry path 3).
+//
+// Without it that path would insert a second volunteers row for a person
+// already in the building: the same double-arrival bug Phase 0.1 fixed
+// on the login screen, reintroduced by a different door. One human, one
+// row, however they reached the pallet.
+const claim = async ({ token, code, name, existingVolunteerId = null }) => {
   const trimmed = typeof name === 'string' ? name.trim() : '';
-  if (!trimmed)             fail(400, 'Please tell us your name so we can thank you.');
-  if (trimmed.length > 200) fail(400, 'That name is too long.');
+
+  // A name is required only when we are about to create the volunteer.
+  // An existing session already has one, and asking again would be
+  // asking someone to introduce themselves twice.
+  if (!existingVolunteerId) {
+    if (!trimmed)             fail(400, 'Please tell us your name so we can thank you.');
+    if (trimmed.length > 200) fail(400, 'That name is too long.');
+  }
 
   const preview = await resolveSlip({ token, code });
 
@@ -100,16 +114,24 @@ const claim = async ({ token, code, name }) => {
     fail(409, 'That pallet is already finished. Ask a staff member for another one.');
   }
 
-  // source is always 'guest_login'. It is the only seam that will later
-  // distinguish a walk-in from a VMS-booked volunteer — see the
-  // integration boundary in the brief.
-  const inserted = await pool.query(
-    `INSERT INTO volunteers (full_name, source)
-     VALUES ($1, 'guest_login')
-     RETURNING id, full_name, signed_in_at`,
-    [trimmed],
-  );
-  const volunteer = inserted.rows[0];
+  let volunteer;
+  if (existingVolunteerId) {
+    volunteer = await slipAccessRepo.getVolunteerById(existingVolunteerId);
+    // The token verified but the row is gone — treat it as no session
+    // rather than claiming against an id that no longer exists.
+    if (!volunteer) fail(401, 'Your visit has ended. Please sign in again.');
+  } else {
+    // source is always 'guest_login'. It is the only seam that will later
+    // distinguish a walk-in from a VMS-booked volunteer — see the
+    // integration boundary in the brief.
+    const inserted = await pool.query(
+      `INSERT INTO volunteers (full_name, source)
+       VALUES ($1, 'guest_login')
+       RETURNING id, full_name, signed_in_at`,
+      [trimmed],
+    );
+    volunteer = inserted.rows[0];
+  }
 
   const result = await slipAccessRepo.claimForVolunteer({
     slipId: preview.id,
@@ -138,6 +160,37 @@ const claim = async ({ token, code, name }) => {
   };
 };
 
+// ── Claim by id, for a guest already signed in ────────────────
+// Entry path 3's last step: they picked a pallet off the list this
+// server produced, so they hold no token and no printed code — there is
+// nothing for them to type and nothing to look one up by.
+//
+// Safe precisely because it is authenticated: the volunteer already
+// exists, so a slip id cannot be used to mint a session or to create an
+// arrival. The worst a tampered id can do is try to claim a different
+// pallet, which the same claimable/unclaimed guards refuse as they
+// would for any other route.
+const claimById = async (user, slipId) => {
+  const preview = await slipAccessRepo.getPreviewById(slipId);
+  if (!preview) fail(404, NOT_FOUND);
+
+  if (!slipAccessRepo.CLAIMABLE_STATUSES.includes(preview.status)) {
+    fail(409, 'That pallet is already finished. Ask a staff member for another one.');
+  }
+
+  const volunteer = await slipAccessRepo.getVolunteerById(user.id);
+  if (!volunteer) fail(401, 'Your visit has ended. Please sign in again.');
+
+  const result = await slipAccessRepo.claimForVolunteer({ slipId, volunteerId: user.id });
+
+  if (result.notFound)         fail(404, NOT_FOUND);
+  if (result.locked)           fail(409, 'That pallet is already finished. Ask a staff member for another one.');
+  if (result.takenByStaff)     fail(409, 'A staff member is already packing that pallet. Ask them for another one.');
+  if (result.takenByVolunteer) fail(409, 'Someone else is already packing that pallet. Ask a staff member for another one.');
+
+  return { slip: { ...toPreview(preview), status: result.slip.status, isClaimed: true } };
+};
+
 // ── 1.4 Today's unclaimed pallets ─────────────────────────────
 const listAvailable = async () => {
   const rows = await slipAccessRepo.listUnclaimedForDate(todayInSAST());
@@ -157,11 +210,32 @@ const getMySlip = async (user) => {
   const slip = await pickingRepository.getSlipById(slipId);
   if (!slip) fail(404, 'You have not picked a pallet yet.');
 
+  // getSlipById selects ps.*, so dispatch_date arrives as the Date
+  // node-postgres builds from a `date` column and serialises to JSON as
+  // UTC — "2026-09-15T22:00:00.000Z" for a 2026-09-16 slip. The packing
+  // screen would then tell a volunteer the pallet goes out YESTERDAY.
+  //
+  // This is the same defect the preview query fixed with ::text; it
+  // reaches here through a different repository that the staff flow also
+  // uses, so rather than change that shared shape, the calendar day and
+  // the COALESCEd beneficiary name are taken from the preview read,
+  // which already gets both right.
+  const preview = await slipAccessRepo.getPreviewById(slipId);
+
   // The full working view, minus the staff-facing extras. packer_name
   // is another worker's first name and has no business on a guest
   // screen; the generated/completed ids are staff user ids.
   const { packer_name, generated_by, completed_by, assigned_to, public_token, ...safe } = slip;
-  return safe;
+
+  return {
+    ...safe,
+    // The calendar day the warehouse means, not a timestamp.
+    dispatch_date:    preview?.dispatch_date ?? safe.dispatch_date,
+    // picking_slips.beneficiary_name is nullable and mostly null; the
+    // preview COALESCEs it to the ECD's name so the screen always has
+    // something real to put in "packing for ___".
+    beneficiary_name: preview?.beneficiary_name ?? safe.beneficiary_name ?? safe.ecd_name ?? null,
+  };
 };
 
 // Every guest write goes through here first: it proves the slip is
@@ -234,6 +308,7 @@ export default {
   getPreviewByToken,
   getPreviewByShortCode,
   claim,
+  claimById,
   listAvailable,
   getMySlip,
   confirmItem,

@@ -221,8 +221,35 @@ const volunteerHoldsSlip = async ({ slipId, volunteerId }) => {
   return held !== null && String(held) === String(volunteerId);
 };
 
+// Preview by slip id, for an authenticated guest claiming a pallet they
+// picked off the list this server just gave them. They never see or
+// type a token in that flow, so there is nothing to look one up by.
+const getPreviewById = async (slipId) => {
+  const { rows } = await pool.query(
+    `SELECT ${PREVIEW_COLUMNS}
+       FROM picking_slips ps
+       JOIN ecd_centres e ON e.id = ps.ecd_id
+      WHERE ps.id = $1`,
+    [slipId],
+  );
+  return rows[0] ?? null;
+};
+
+// Used when an existing guest session claims a pallet: the volunteer
+// already exists, so the claim binds to them rather than inserting.
+const getVolunteerById = async (id) => {
+  const { rows } = await pool.query(
+    `SELECT id, full_name, signed_in_at FROM volunteers
+      WHERE id = $1 AND signed_out_at IS NULL`,
+    [id],
+  );
+  return rows[0] ?? null;
+};
+
 export default {
   CLAIMABLE_STATUSES,
+  getPreviewById,
+  getVolunteerById,
   isUuid,
   isShortCode,
   getPreviewByToken,

@@ -14,7 +14,7 @@
 // slip from the token rather than from anything the client sends.
 // ─────────────────────────────────────────────────────────────
 import express from 'express';
-import auth, { requireRole, ROLES }        from '../middleware/auth.middleware.js';
+import auth, { requireRole, ROLES, optionalGuest } from '../middleware/auth.middleware.js';
 import { validateIntId, validateIntParam } from '../middleware/validate.middleware.js';
 import { publicSlipRateLimiter }           from '../middleware/rateLimiter.middleware.js';
 import slipAccessController                from '../controllers/slipAccess.controller.js';
@@ -29,6 +29,13 @@ const router = express.Router();
 // no QR code at all. Entry path 3, and the accessible one.
 router.get('/available', auth, requireRole(ROLES.GUEST), slipAccessController.listAvailable);
 
+// Entry path 3's claim: a signed-in guest picking a pallet off the list
+// above. Declared under a static 'claim/' prefix so a numeric id can
+// never be mistaken for a token by the public ':token' pattern.
+router.post('/claim/:id',
+  auth, requireRole(ROLES.GUEST), validateIntId,
+  slipAccessController.claimById);
+
 // 1.5 — the guest's own slip, resolved from their token. There is no
 // slip id in this URL on purpose: a guest cannot name a pallet, so
 // there is nothing to tamper with.
@@ -41,11 +48,11 @@ router.get('/code/:code', publicSlipRateLimiter, slipAccessController.getPreview
 
 // 1.3 — claim by short code or by token. Creates the volunteer, mints
 // the guest session, binds the slip.
-router.post('/code/:code/claim', publicSlipRateLimiter, slipAccessController.claim);
+router.post('/code/:code/claim', publicSlipRateLimiter, optionalGuest, slipAccessController.claim);
 
 // 1.1 — the preview a stranger holding a poster may see.
 router.get('/:token', publicSlipRateLimiter, slipAccessController.getPreviewByToken);
-router.post('/:token/claim', publicSlipRateLimiter, slipAccessController.claim);
+router.post('/:token/claim', publicSlipRateLimiter, optionalGuest, slipAccessController.claim);
 
 // ── Guest writes ──────────────────────────────────────────────
 // The slip id IS in these URLs, because an item belongs to a slip and

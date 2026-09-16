@@ -52,10 +52,14 @@ const getPreviewByShortCode = async (req, res) => {
 
 const claim = async (req, res) => {
   try {
+    // req.guest is set by optionalGuest when the caller already has a
+    // valid guest session — bind to that volunteer instead of creating
+    // a second row for someone already in the building.
     const { volunteer, slip } = await slipAccessService.claim({
       token: req.params.token ?? req.body?.token,
       code:  req.params.code  ?? req.body?.code,
       name:  req.body?.name,
+      existingVolunteerId: req.guest?.id ?? null,
     });
 
     const token = jwt.sign(
@@ -78,6 +82,17 @@ const claim = async (req, res) => {
     });
   } catch (error) {
     return handle(res, error, '[slip:claim]', 'Could not start that pallet.');
+  }
+};
+
+// Entry path 3: an already-signed-in guest picking off the list. No
+// token and no cookie minting — they already have a session.
+const claimById = async (req, res) => {
+  try {
+    const data = await slipAccessService.claimById(req.user, Number(req.params.id));
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    return handle(res, error, '[slip:claim-by-id]', 'Could not start that pallet.');
   }
 };
 
@@ -138,6 +153,7 @@ export default {
   getPreviewByToken,
   getPreviewByShortCode,
   claim,
+  claimById,
   listAvailable,
   getMySlip,
   confirmItem,
