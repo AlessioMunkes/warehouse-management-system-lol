@@ -116,8 +116,9 @@ be able to complete the entire flow. This is an accessibility requirement
 
 ### Guest write attribution — interim and deliberate
 
-For any guest action: leave `picking_slip_items.confirmed_by` NULL and
-`picking_events.actor_id` NULL, and record attribution in
+For any guest action, leave **all three** actor columns NULL —
+`picking_events.actor_id`, `picking_slip_items.confirmed_by` and
+`picking_slips.completed_by` — and record attribution in
 `picking_events.detail` jsonb as:
 
 ```json
@@ -129,12 +130,18 @@ volunteer id there would not fail loudly — it would silently collide with a re
 `users.id` and attribute a guest's action to an actual staff member. That is the
 worst available failure mode.
 
-**This is verified against the live database, not a theoretical risk.** Both
-actor columns carry foreign keys to `users(id)`:
+**There are THREE such columns, not two.** An earlier draft of this brief named
+only `actor_id` and `confirmed_by`. `picking_slips.completed_by` is the third —
+also int4, also FK to `users(id)`, written when a slip is closed, which is the
+last thing a guest does and therefore the one most likely to be missed.
+
+**This is verified against the live database, not a theoretical risk.** All
+three carry foreign keys to `users(id)`:
 
 ```
 picking_events_actor_id_fkey         FOREIGN KEY (actor_id)     REFERENCES users(id)
 picking_slip_items_confirmed_by_fkey FOREIGN KEY (confirmed_by) REFERENCES users(id)
+picking_slips_completed_by_fkey      FOREIGN KEY (completed_by) REFERENCES users(id)
 ```
 
 The FK does not save you — it *accepts* the bad write whenever the id happens to
@@ -156,11 +163,65 @@ outright.
 
 Note `picking_slips.assigned_volunteer_id` is bigint and already has
 `FOREIGN KEY (assigned_volunteer_id) REFERENCES volunteers(id) ON DELETE SET NULL`.
-That column is correctly typed and ready to use — it is only the two *actor*
+That column is correctly typed and ready to use — it is only the three *actor*
 columns that cannot hold a volunteer id.
+
+**Confirmed in production.** A live end-to-end claim on 2026-09-16 wrote exactly
+this shape. Note the contrast with the staff-generated events on the same slip:
+
+```
+ id | event_type     | actor_id | detail
+ 66 | generated      |        2 | {"item_count": 0, "dispatch_date": "2026-09-16"}
+ 67 | no_order_lines |        2 | {"dispatch_date": "2026-09-16"}
+ 68 | assigned       |   (null) | {"actor_type": "volunteer", "volunteer_id": "9"}
+```
+
+`volunteer_id` is a JSON **string** there, for the reason in the next section.
+Any reporting query reading it back must not assume a number.
 
 **Never write a volunteer id into an int4 actor column.** Add a short comment at
 every such site saying why, so the next reader does not "fix" it.
+
+### Ids are not all numbers — compare them as strings
+
+**Verified fact, and it will bite the frontend too.** node-postgres applies no
+type parser in this project (`server/src/config/db.js` sets none), so:
+
+| Column type | Example | JS type it arrives as |
+|---|---|---|
+| `int4` — `picking_slips.id`, `users.id` | `132` | **number** |
+| `int8` — `volunteers.id`, `picking_slips.assigned_volunteer_id` | `"7"` | **string** |
+
+Postgres returns int8 as text because a 64-bit integer does not fit in a JS
+number safely, and node-postgres refuses to lose precision silently.
+
+Consequences, all real:
+
+- A guest JWT carries `id: "7"`, a **string**, because it was minted from a
+  `RETURNING id` on `volunteers`. A staff JWT carries `id: 3`, a number.
+- `slip.assigned_volunteer_id !== user.id` is `"7" !== "7"` only by luck; the
+  moment one side comes from a different path it is `7 !== "7"`, which is
+  **true**, and the guest is refused. **Silently.** No error, no log, no 500 —
+  just a 403 that looks like a permissions bug and is not one.
+- `picking_events.detail->>'volunteer_id'` is stored as a JSON string (`"9"`,
+  not `9`). Reporting that joins on it must cast.
+
+**So every ownership comparison must be string-based**, on the backend and in
+Phase 2's frontend:
+
+```js
+String(a) === String(b)     // not ===, not !==, not ==
+```
+
+The backend already does this — `sameId()` in `picking.repository.js`, and the
+holder checks in `slipAccess.repository.js` — with tests covering both the
+string and number forms. **Phase 2 must do the same** anywhere it compares a
+volunteer id: deciding whether a slip in a list is "mine", matching an id from
+the session against one from an API response, or keying React lists by it.
+
+Do not "clean this up" by coercing volunteer ids to numbers at the edge. Above
+`2^53` that silently corrupts the value, and the whole reason Postgres sends
+text is to stop exactly that.
 
 ### Integration boundary — the Love Activism / VMS stack is not ours
 
