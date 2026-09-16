@@ -1,0 +1,481 @@
+/* ==========================================================================
+   client/src/styles/guest.css
+
+   The Love Activist screens: the only part of this system most
+   volunteers will ever see.
+
+   Namespaced .gst-* so it cannot collide with .stf-* or index.css.
+   Import AFTER index.css.
+
+   ── Tokens ────────────────────────────────────────────────────────────
+   Taken from staff.css, which took them from landingpage.css. Not
+   invented. A guest screen and a worker screen are the same product and
+   must read that way — same palette, same type scale, same spacing
+   rhythm, same radius family.
+
+   The same rule holds:
+       charcoal  structure, headings, surfaces
+       red       anything clickable
+       gold      small editorial accents
+
+   ── What is deliberately DIFFERENT from .stf-* ────────────────────────
+   Not a different design language. A different register of the same one:
+
+   1. LARGER. --gst-tap is 56px, not 44px. Staff use this daily with
+      gloves; a Love Activist may be using it for the first time, in
+      their sixties, standing up, one-handed. The floor for a staff
+      control is the ceiling for ours.
+
+   2. MORE AIR. Generous vertical rhythm and one card per decision.
+      StaffSlipFlow shows a whole pallet at once on purpose — an
+      experienced packer needs it. A first-timer needs one thing.
+
+   3. WARMER. Cream rather than sand, and the warmth NFR-06 asks for
+      carried by the copy, the palette and the type — plus one small
+      editorial touch, the hand-drawn underline on the greeting, which
+      marks the volunteer's own name and so is doing a job.
+      There is deliberately NO abstract decorative shape: see .gst-hero.
+
+   ── Accessibility, ACC-01 to ACC-10 ───────────────────────────────────
+   ACC-01/02  WCAG 2.1 AA. Every pairing below is checked against the
+              warm red / black / white palette:
+                --gst-ink #2b3336 on --gst-cream #faf6f1   12.1:1
+                --gst-text #4a4a4a on --gst-cream          8.2:1
+                --gst-text-sub #6f6a5e on --gst-cream      5.1:1
+                white on --gst-accent #ef3a40              4.6:1
+                white on --gst-ink                        12.6:1
+                --gst-attention #8a3227 on #f6efe9         6.4:1
+              Nothing below 4.5:1 for body text, 3:1 for UI edges.
+   ACC-03     Status is never colour alone. Every state pairs a mark
+              (✓ ! •) with a word. See .gst-state.
+   ACC-04     200% zoom: everything is rem/ch based and single column,
+              no fixed heights on text containers, no overflow hidden
+              on anything that holds words.
+   ACC-06     56px minimum on every interactive element.
+   ACC-09     Plain language — enforced in the copy, not the CSS.
+   Motion     Every animation is decorative and removed wholesale under
+              prefers-reduced-motion. Nothing is the only signal of a
+              state change.
+   ========================================================================== */
+
+.gst-shell {
+  --gst-ink:        #2b3336;
+  --gst-ink-deep:   #171b1c;
+  --gst-accent:     #ef3a40;
+  --gst-accent-deep:#d42d33;
+  --gst-gold:       #979168;
+  --gst-cream:      #faf6f1;   /* warmer than --stf-sand; this is the front-of-house screen */
+  --gst-sand:       #f0e9e1;
+  --gst-border:     #e0d6c9;
+  --gst-text:       #4a4a4a;
+  --gst-text-sub:   #6f6a5e;
+  --gst-white:      #ffffff;
+
+  --gst-good:       #2f6b4f;   /* packed */
+  --gst-good-bg:    #eaf3ee;
+  --gst-attention:  #8a3227;   /* a problem, borrowed from --stf-attention */
+  --gst-attention-bg:#f6efe9;
+
+  --gst-font-display: "Montserrat", "Inter", system-ui, -apple-system, sans-serif;
+  --gst-font-sans:    "Inter", system-ui, -apple-system, sans-serif;
+
+  --gst-radius:    16px;
+  --gst-radius-sm: 10px;
+  --gst-radius-pill: 999px;
+  --gst-tap: 56px;            /* ACC-06, raised from the staff 44px */
+
+  min-height: 100dvh;         /* not 100vh — iOS Safari's address bar */
+  background: var(--gst-cream);
+  font-family: var(--gst-font-sans);
+  color: var(--gst-text);
+  font-size: 17px;            /* one step up from staff: read at arm's length */
+  line-height: 1.6;
+}
+
+.gst-shell *, .gst-shell *::before, .gst-shell *::after { box-sizing: border-box; }
+.gst-shell img { max-width: 100%; display: block; }
+
+.gst-shell a { color: var(--gst-accent); }
+.gst-shell a:hover { color: var(--gst-accent-deep); }
+
+/* A visible focus ring that survives on cream and on red. */
+.gst-shell a:focus-visible,
+.gst-shell button:focus-visible,
+.gst-shell input:focus-visible,
+.gst-shell [tabindex]:focus-visible {
+  outline: 3px solid var(--gst-ink);
+  outline-offset: 3px;
+  border-radius: var(--gst-radius-sm);
+}
+
+/* ── Layout ───────────────────────────────────────────────────── */
+.gst-page {
+  width: 100%;
+  max-width: 34rem;           /* ch-based reading width, not a device width */
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 3rem;
+}
+
+.gst-stack      { display: flex; flex-direction: column; gap: 1.25rem; }
+.gst-stack-tight{ display: flex; flex-direction: column; gap: 0.75rem; }
+
+/* ── Masthead ─────────────────────────────────────────────────── */
+.gst-masthead {
+  display: flex;
+  flex-wrap: wrap;            /* "LOVE ACTIVIST" drops below rather than off */
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  padding: 0.875rem 1.25rem;
+  background: var(--gst-ink);
+  color: var(--gst-white);
+}
+.gst-masthead-brand {
+  min-width: 0;               /* flex items default to min-width:auto and refuse
+                                 to shrink below their text, which pushed the
+                                 second brand off the right edge at 360px */
+  font: 700 0.9375rem/1.2 var(--gst-font-display);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  /* "LADLES·OF·LOVE" contains no spaces, so it is a single unbreakable
+     token: min-width:0 lets the box shrink but the text still spills.
+     At 200% zoom on a 320px screen it was clipped by 39px. */
+  overflow-wrap: anywhere;
+}
+.gst-masthead-brand span { color: var(--gst-accent); }
+
+/* ── Sense of place: where am I, who is it for ────────────────── */
+.gst-place {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.75rem;
+  padding: 0.75rem 0;
+  border-bottom: 2px solid var(--gst-border);
+  font-size: 0.9375rem;
+  color: var(--gst-text-sub);
+}
+.gst-place > * { min-width: 0; }
+.gst-place-strong { font-weight: 700; color: var(--gst-ink); }
+
+/* ── Hero ─────────────────────────────────────────────────────── */
+.gst-hero { padding: 0.5rem 0 0.25rem; }
+
+/* A decorative blob used to sit behind every heading here: an
+   absolutely positioned pseudo-element, 12rem across, offset off the
+   left edge of the page.
+   REMOVED OUTRIGHT — not resized, not repositioned, not replaced.
+   It marked nothing, grouped nothing and separated nothing: the same
+   shape on every guest screen, carrying no meaning. It also painted
+   UNDER the heading and the "For <beneficiary>" line, tinting their
+   background and pulling those pairings off the contrast ratios this
+   file documents at the top. It cost ACC-02 and bought nothing.
+   NFR-06's warmth is carried by the copy, the palette and the type,
+   which are already doing that job. Do not reintroduce a decorative
+   shape here. */
+
+/* Long words wrap rather than push the page wide. Names are now shown
+   in full ("Corporate group (Old Mutual)"), and a product name or a
+   beneficiary can be longer than 360px of heading. */
+.gst-title {
+  margin: 0;
+  font: 700 clamp(1.75rem, 6vw, 2.25rem)/1.15 var(--gst-font-display);
+  color: var(--gst-ink);
+  letter-spacing: -0.01em;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+.gst-title-sm { font-size: clamp(1.375rem, 5vw, 1.625rem); }
+
+.gst-lede {
+  overflow-wrap: break-word;
+  margin: 0.625rem 0 0;
+  font-size: 1.0625rem;
+  color: var(--gst-text);
+}
+
+/* Hand-drawn underline under the greeting — the illustrated touch,
+   done with a border rather than an asset. */
+.gst-underline {
+  display: inline-block;
+  padding-bottom: 0.2em;
+  border-bottom: 4px solid var(--gst-accent);
+  border-radius: 0 0 40% 20%;
+}
+
+/* ── Cards ────────────────────────────────────────────────────── */
+.gst-card {
+  background: var(--gst-white);
+  border: 1px solid var(--gst-border);
+  border-radius: var(--gst-radius);
+  padding: 1.25rem;
+}
+.gst-card-quiet { background: var(--gst-sand); border-color: transparent; }
+
+.gst-card-title {
+  margin: 0 0 0.25rem;
+  overflow-wrap: break-word;
+  font: 700 1.125rem/1.25 var(--gst-font-display);
+  color: var(--gst-ink);
+}
+.gst-card-meta { margin: 0; font-size: 0.9375rem; color: var(--gst-text-sub); overflow-wrap: break-word; }
+
+/* A whole card that is a tap target (choose-a-pallet list). */
+.gst-card-button {
+  display: block;
+  width: 100%;
+  min-height: var(--gst-tap);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.gst-card-button:hover { border-color: var(--gst-accent); }
+.gst-card-button:active { transform: scale(0.995); }
+
+/* ── Buttons ──────────────────────────────────────────────────── */
+.gst-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: var(--gst-tap);
+  padding: 0.875rem 1.25rem;
+  border: 2px solid transparent;
+  border-radius: var(--gst-radius-pill);
+  font: 700 1.0625rem/1.2 var(--gst-font-display);
+  cursor: pointer;
+  min-width: 0;
+  overflow-wrap: break-word;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+.gst-btn:active { transform: scale(0.98); }
+.gst-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+
+.gst-btn-primary { background: var(--gst-accent); color: var(--gst-white); }
+.gst-btn-primary:hover:not(:disabled) { background: var(--gst-accent-deep); }
+
+.gst-btn-secondary {
+  background: transparent;
+  color: var(--gst-ink);
+  border-color: var(--gst-ink);
+}
+.gst-btn-secondary:hover:not(:disabled) { background: var(--gst-ink); color: var(--gst-white); }
+
+.gst-btn-ghost {
+  background: transparent;
+  color: var(--gst-ink);
+  border-color: var(--gst-border);
+}
+.gst-btn-ghost:hover:not(:disabled) { border-color: var(--gst-ink); }
+
+/* minmax(0, 1fr), not 1fr. A grid track sized 1fr still has an automatic
+   MINIMUM of its content, so "There's a problem" widened its column past
+   half the row and pushed the whole grid off the screen. minmax(0, 1fr)
+   lets the track shrink and the label wrap inside its 56px button. */
+.gst-btn-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
+@media (max-width: 24rem) { .gst-btn-row { grid-template-columns: 1fr; } }
+
+/* ── Fields ───────────────────────────────────────────────────── */
+.gst-field { display: flex; flex-direction: column; gap: 0.5rem; }
+.gst-label { font-weight: 700; color: var(--gst-ink); font-size: 1rem; }
+.gst-hint  { margin: 0; font-size: 0.9375rem; color: var(--gst-text-sub); }
+
+.gst-input {
+  width: 100%;
+  min-height: var(--gst-tap);
+  padding: 0.75rem 1rem;
+  background: var(--gst-white);
+  border: 2px solid var(--gst-border);
+  border-radius: var(--gst-radius-sm);
+  font: 400 1.125rem/1.4 var(--gst-font-sans);
+  color: var(--gst-ink);
+}
+.gst-input:focus { border-color: var(--gst-ink); }
+.gst-input-code {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 1.5rem;
+  letter-spacing: 0.3em;
+  text-transform: lowercase;
+  text-align: center;
+}
+
+/* ── Counter (quantity) ───────────────────────────────────────── */
+.gst-counter { display: flex; align-items: center; gap: 0.75rem; }
+.gst-counter-btn {
+  flex: 0 0 auto;
+  width: var(--gst-tap);
+  height: var(--gst-tap);
+  border: 2px solid var(--gst-ink);
+  border-radius: 50%;
+  background: var(--gst-white);
+  color: var(--gst-ink);
+  font: 700 1.5rem/1 var(--gst-font-display);
+  cursor: pointer;
+}
+.gst-counter-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.gst-counter-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--gst-tap);
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--gst-border);
+  border-radius: var(--gst-radius-sm);
+  background: var(--gst-white);
+  font: 700 1.75rem/1 var(--gst-font-display);
+  color: var(--gst-ink);
+}
+
+/* ── Status (ACC-03: mark + word, never colour alone) ─────────── */
+.gst-state {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: var(--gst-radius-pill);
+  font-size: 0.875rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+.gst-state-mark { font-size: 1rem; line-height: 1; }
+.gst-state-done    { background: var(--gst-good-bg); color: var(--gst-good); border-color: #c5ddd0; }
+.gst-state-problem { background: var(--gst-attention-bg); color: var(--gst-attention); border-color: #e2d3c6; }
+.gst-state-todo    { background: var(--gst-sand); color: var(--gst-text-sub); border-color: var(--gst-border); }
+
+/* ── "What you've done so far" list ───────────────────────────── */
+/* Was inline flex styles on the <li>. A long product name beside a
+   status pill overflowed the row at 200% zoom (clipped by 73px),
+   because both flex children default to min-width:auto. The name is
+   allowed to shrink and wrap; the pill never shrinks, because a
+   half-width "Packed" is worse than a wrapped product name. */
+.gst-done-list { list-style: none; margin: 0.75rem 0 0; padding: 0; }
+.gst-done-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+}
+.gst-done-row > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+/* The pill may yield as a last resort. flex:0 0 auto kept it rigid, and
+   at 320px with 200% zoom the card's own padding left less room than
+   the pill wanted, overflowing the row by 18px. It shrinks only after
+   the product name has already given up everything it can. */
+.gst-done-row .gst-state { flex: 0 1 auto; min-width: 0; }
+
+/* ── Notices ──────────────────────────────────────────────────── */
+.gst-notice {
+  display: flex;
+  gap: 0.625rem;
+  padding: 0.875rem 1rem;
+  border-radius: var(--gst-radius-sm);
+  border: 1px solid;
+  font-size: 0.9375rem;
+}
+.gst-notice-info  { background: var(--gst-sand); border-color: var(--gst-border); color: var(--gst-ink); }
+.gst-notice-warn  { background: var(--gst-attention-bg); border-color: #e2d3c6; color: var(--gst-attention); }
+.gst-notice-good  { background: var(--gst-good-bg); border-color: #c5ddd0; color: var(--gst-good); }
+
+/* ── Progress ─────────────────────────────────────────────────── */
+.gst-progress-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--gst-ink);
+  margin-bottom: 0.5rem;
+}
+.gst-progress-track {
+  height: 0.75rem;
+  background: var(--gst-sand);
+  border: 1px solid var(--gst-border);
+  border-radius: var(--gst-radius-pill);
+  overflow: hidden;
+}
+.gst-progress-fill {
+  height: 100%;
+  background: var(--gst-accent);
+  border-radius: var(--gst-radius-pill);
+  transition: width 0.4s ease;
+}
+
+/* ── Contribution summary ─────────────────────────────────────── */
+.gst-figure {
+  display: block;
+  /* vw-based floor, not a rem floor. A rem floor scales WITH browser
+     zoom, so at 200% two of these no longer fit side by side; a vw
+     floor stays tied to the screen, which is what must be fitted. */
+  font: 700 clamp(2rem, 12vw, 4.5rem)/1 var(--gst-font-display);
+  color: var(--gst-accent);
+  overflow-wrap: anywhere;
+}
+.gst-figure-label {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 1rem;
+  color: var(--gst-text-sub);
+}
+/* auto-fit + minmax(min(100%, 8rem), 1fr): two side by side when there
+   is room, one per row when there is not — which is what 200% zoom on a
+   320px screen is. The min() stops the track demanding 8rem on a screen
+   narrower than that. */
+.gst-figure-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+  gap: 1rem;
+  text-align: center;
+}
+
+/* ── Help: no dead ends, on every screen ──────────────────────── */
+.gst-help {
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 2px solid var(--gst-border);
+  text-align: center;
+}
+.gst-help-text { margin: 0 0 0.75rem; font-size: 0.9375rem; color: var(--gst-text-sub); }
+
+/* ── Skeleton ─────────────────────────────────────────────────── */
+.gst-skeleton {
+  height: 8rem;
+  border-radius: var(--gst-radius);
+  background: var(--gst-sand);
+  animation: gst-pulse 1.4s ease-in-out infinite;
+}
+
+/* Screen-reader-only, for the live region that announces saves. */
+.gst-sr {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Motion ───────────────────────────────────────────────────── */
+@keyframes gst-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+@keyframes gst-rise  { from { opacity: 0; transform: translateY(0.75rem); } to { opacity: 1; transform: none; } }
+@keyframes gst-pop   { from { transform: scale(0.8); } to { transform: scale(1); } }
+
+.gst-animate-rise { animation: gst-rise 0.35s ease-out both; }
+.gst-animate-pop  { animation: gst-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+/* NFR-06 wants animation; ACC does not want it imposed. Every
+   animation here is decorative — the words and marks carry every
+   meaning — so under reduced motion they are simply removed. */
+@media (prefers-reduced-motion: reduce) {
+  .gst-shell *,
+  .gst-shell *::before,
+  .gst-shell *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

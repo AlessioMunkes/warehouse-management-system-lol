@@ -1,11 +1,14 @@
 import { BrowserRouter, Routes, Route, Navigate }  from 'react-router-dom';
 import { AuthProvider }                            from './context/AuthContext';
 import ProtectedRoute                              from './components/layout/ProtectedRoute';
-import { PACKING, STAFF, DONATIONS, DONATION_INTAKE_ROLES, ADMIN, VOLUNTEERS, VOLUNTEER_MANAGEMENT_ROLES, COMMUNITY_REQUEST_ROLES } from './routes/paths';
+import { PACKING, STAFF, DONATIONS, DONATION_INTAKE_ROLES, ADMIN, VOLUNTEERS, VOLUNTEER_MANAGEMENT_ROLES, COMMUNITY_REQUEST_ROLES, STAFF_ROLES } from './routes/paths';
 import LandingPage                                 from './pages/LandingPage';
 import LoginPage                                   from './pages/LoginPage';
 import GuestLoginPage                              from './pages/GuestLoginPage';
 import GuestHomePage                               from './pages/GuestHomePage';
+import GuestPackPage                               from './pages/GuestPackPage';
+import GuestDonePage                               from './pages/GuestDonePage';
+import SlipPreviewPage                             from './pages/SlipPreviewPage';
 import PageNotFound                               from "./pages/PageNotFound";
 //import SelectNOCjob                                from './pages/SelectNOCjob';
 
@@ -55,6 +58,12 @@ const App = () => (
         <Route path="/"      element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/guest" element={<GuestLoginPage />} />
+        {/* BR-22: the stable public URL behind every pallet's QR code.
+            Deliberately OUTSIDE ProtectedRoute — the whole point is that
+            a volunteer holding a printed poster reaches it with no
+            account and no session. The preview it shows carries only
+            what is already printed on that poster. */}
+        <Route path="/slip/:token" element={<SlipPreviewPage />} />
          
         
         {/* ── Admin only ─────────────────────────────────────
@@ -130,12 +139,18 @@ const App = () => (
         {/* The warehouse worker's dashboard. Split out of the block
             below so it can take the shell: the four flows underneath it
             are StaffShell screens and must not. */}
-        <Route element={<ProtectedRoute shell />}>
+        <Route element={<ProtectedRoute roles={STAFF_ROLES} shell />}>
           <Route path="/noc" element={<TaskDashboard />} />
         </Route>
 
-        {/* Protected — any logged-in user */}
-        <Route element={<ProtectedRoute />}>
+        {/* Protected — warehouse floor staff.
+            Was `<ProtectedRoute />` with no roles. ProtectedRoute skips its
+            role check when `roles` is undefined, so "any logged-in user"
+            included a signed-in guest, who could render packing, decanting,
+            procurement and dispatch by typing the URL. Scoped to STAFF_ROLES
+            so the client agrees with the server, which already refuses a
+            guest on every one of these endpoints. */}
+        <Route element={<ProtectedRoute roles={STAFF_ROLES} />}>
           <Route path="/noc/decanting" element={<DecantingPage />} />
           <Route path={STAFF.decantingRecords} element={<StaffDecantingRecordsPage />} />
 
@@ -196,9 +211,11 @@ const App = () => (
           <Route path={STAFF.communityRequests} element={<CommunityRequestsPage />} />
         </Route>
 
-        {/* Guest-only */}
+        {/* Guest-only — the Love Activist screens. */}
         <Route element={<ProtectedRoute roles={['guest']} />}>
-          <Route path="/guest-home" element={<GuestHomePage />} />
+          <Route path="/guest-home"  element={<GuestHomePage />} />
+          <Route path="/guest/pack"  element={<GuestPackPage />} />
+          <Route path="/guest/done"  element={<GuestDonePage />} />
         </Route>
 
         {/* Redirects */}

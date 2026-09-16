@@ -558,7 +558,16 @@ The repository currently references `server/database/schema.sql` as the schema s
 
 Use the project's existing migration/schema mechanism.
 
-At the time of writing, the repository does **not** contain an implemented `server/database/migrations/` convention in the files inspected. Several code comments reference migrations by name, which suggests the team intends to use versioned migration files, but the migration tooling and folder structure must be confirmed against the live project before new migration files are created.
+**Corrected 2026-09-15.** This section previously said the repository contained no implemented `server/database/migrations/` convention. That was wrong — it reflected inspecting a branch where the directory was absent.
+
+There **is** an established convention. `server/database/migrations/` holds numbered `NNN_snake_case_description.sql` files, each wrapped in `BEGIN` / `COMMIT`, using `IF NOT EXISTS` / `ON CONFLICT DO NOTHING` so re-running is safe, and (for some) ending with a tail insert recording the migration in a ledger table.
+
+Which branch you are on decides whether you see them: `feature/user-management-fixes-hussain` carries 015–017 and `feature/DONATION_TESTS_CLEANUP` carries 019–022, while `staging/(DEVELOPMENT-TESTING)` and `main` carry none. Migrations 015–018 were deliberately removed from staging by `2679ada` because they belonged to a feature that was later rebuilt differently.
+
+Two caveats before adding a migration:
+
+- **There is no runner.** No npm script and nothing in `server/scripts/`. Migrations are applied by hand through `psql` or the Supabase SQL editor. The only written procedure is the footer of `server/database/test/volunteer_integration_test_bootstrap.sql`, and it is explicitly scoped to an isolated test database, never production.
+- **Ledger bookkeeping is inconsistent.** Two parallel tables exist in the live database: `public.schema_migrations` (001, 002 ×2 under a duplicated prefix, 003, 015, 016, plus two date-style ids) and `public.schema_migration_provenance` (010, 012, 013, 014), the latter referenced nowhere in the repo. No file exists for any of 001–014, and 017–022 record themselves in neither table. Confirm what has actually been applied against the live database before choosing a number — do not infer it from the files on your branch alone.
 
 Do **not**:
 

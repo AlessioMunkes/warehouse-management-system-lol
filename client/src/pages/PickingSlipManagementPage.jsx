@@ -49,7 +49,8 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Search, CalendarPlus, PackagePlus, X, ArrowLeft } from 'lucide-react';
+import { Search, CalendarPlus, PackagePlus, X, ArrowLeft, QrCode, Printer, AlertTriangle } from 'lucide-react';
+import { openLabelPdf, publicAppOrigin, isReachableByPhone } from '../features/packing/palletLabelPdf';
 
 const COHORT_OPTIONS = [
   { value: 'week1', label: 'Week 1' },
@@ -151,6 +152,7 @@ export default function PickingSlipManagementPage() {
 
   const [viewDate, setViewDate] = useState(todayISO());
   const [search, setSearch] = useState('');
+  const [labelError, setLabelError] = useState(null);
   const [slips, setSlips] = useState([]);
   const [selected, setSelected] = useState(null);
   const [assignChoice, setAssignChoice] = useState('');
@@ -231,6 +233,64 @@ export default function PickingSlipManagementPage() {
       setMode('list');
     } catch (err) { setAdHocError(err.message); } finally { setAdHocBusy(false); }
   };
+
+  // ── BR-22 pallet labels ─────────────────────────────────────
+  // The origin is derived once per render. It is used to decide whether
+  // to warn, and passed to the generator — but it is never shown to the
+  // manager, who cannot act on an address. See the warning block below.
+  const labelOrigin = publicAppOrigin();
+  const labelsReachable = isReachableByPhone(labelOrigin);
+
+  // Generated on demand from public_token, which is already on each
+  // row, and never stored. The token does not change, so a reprint is
+  // byte-identical; a stored PDF could go stale against a regenerated
+  // slip and send a volunteer to the wrong pallet.
+  const printLabels = (rows, emptyMessage) => {
+    setLabelError(null);
+
+    const withToken = rows.filter((r) => r.public_token);
+    if (withToken.length === 0) {
+      setLabelError(emptyMessage);
+      return;
+    }
+
+    // Origin passed explicitly rather than left to the module's default,
+    // so what a label points at is visible here at the call site.
+    const { opened, skipped } = openLabelPdf(
+      withToken.map((r) => ({
+        public_token: r.public_token,
+        ecd_name: r.ecd_name,
+        beneficiary_name: r.beneficiary_name,
+        // The plain calendar day. r.dispatch_date is a timestamp that
+        // reads as the previous day once a timezone is applied to it.
+        dispatch_date_display: r.dispatch_date_iso,
+      })),
+      { origin: labelOrigin },
+    );
+
+    // For a developer, not the manager: the address is deliberately
+    // absent from the visible copy, so leave a trace somewhere a
+    // developer will actually look.
+    if (!labelsReachable) {
+      console.warn(
+        `[pallet labels] Generated against "${labelOrigin}", which a phone on mobile data cannot reach. `
+        + 'These labels will not scan outside this machine. '
+        + 'Set VITE_PUBLIC_APP_ORIGIN to override the printed address.',
+      );
+    }
+
+    if (!opened) {
+      setLabelError('Pop-up blocked — allow pop-ups for this site to open the labels.');
+    } else if (skipped > 0) {
+      setLabelError(`${skipped} slip${skipped === 1 ? '' : 's'} had no label code and were left out.`);
+    }
+  };
+
+  const printAllLabels = () =>
+    printLabels(filteredSlips, 'There are no slips to print labels for on this date.');
+
+  const printOneLabel = (slip) =>
+    printLabels([slip], 'This slip has no label code yet.');
 
   const filteredSlips = search.trim()
     ? slips.filter((s) => s.ecd_name.toLowerCase().includes(search.trim().toLowerCase()))
@@ -391,6 +451,57 @@ export default function PickingSlipManagementPage() {
 
         {mode === 'list' ? (
           <div className="mt-6 space-y-4">
+            {/* BR-22 pallet labels.
+                Deliberately on its own row, BELOW the two buttons above
+                and ABOVE the search bar. That row creates slips; this
+                acts on slips that already exist, and sitting alongside
+                them would read as a third way to create one.
+                Covers exactly the slips the list is showing, because it
+                prints from filteredSlips - the same rows, same date. */}
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                type="button" variant="outline"
+                onClick={printAllLabels}
+                disabled={filteredSlips.length === 0}
+              >
+                <QrCode />
+                Print pallet labels ({filteredSlips.length})
+              </Button>
+              <p className="text-sm text-muted-foreground">
+                One page per pallet, for {viewDate}. Tape each to its pallet before volunteers arrive.
+              </p>
+            </div>
+            {/* Whether the labels will actually work, in words a manager
+                can act on. Not the address itself: a URL tells a
+                non-technical reader nothing, and it is the least useful
+                thing on this screen.
+
+                The real address stays available to a developer through
+                the title attribute and a console line on print — it is
+                just not in the visible copy.
+
+                ACC-03: the icon and the sentence both carry the meaning,
+                so this reads correctly in greyscale and to a colour-blind
+                manager. Colour is the third signal, never the only one.
+
+                Printing is NOT blocked — someone testing the flow has to
+                be able to generate one. */}
+            {!labelsReachable ? (
+              <p
+                className="flex items-start gap-2 rounded-md bg-muted/50 px-3 py-2 text-sm text-destructive"
+                title={`Labels would point at ${labelOrigin || 'an address this app could not determine'}`}
+              >
+                <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                <span>
+                  <strong>These labels will only work on this computer.</strong>{' '}
+                  Please don’t print them for the warehouse — a volunteer scanning one
+                  would not be able to open their pallet.
+                </span>
+              </p>
+            ) : null}
+
+            {labelError ? <p className="text-sm text-destructive">{labelError}</p> : null}
+
             <div className="flex flex-wrap items-center gap-3">
               <InputGroup className="min-w-56 flex-1">
                 <InputGroupAddon align="inline-start"><Search /></InputGroupAddon>
@@ -440,6 +551,7 @@ export default function PickingSlipManagementPage() {
                             <TableHead>Assigned to</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Items</TableHead>
+                            <TableHead className="text-right">Label</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -453,6 +565,18 @@ export default function PickingSlipManagementPage() {
                               <TableCell><Badge variant="outline">{slip.status}</Badge></TableCell>
                               <TableCell className="text-muted-foreground">
                                 {slip.confirmed_items}/{slip.total_items}
+                              </TableCell>
+                              {/* For a slip added late, or a label torn
+                                  off mid-week. stopPropagation so printing
+                                  does not also open the slip detail. */}
+                              <TableCell className="text-right">
+                                <Button
+                                  type="button" variant="ghost" size="sm"
+                                  aria-label={`Print the pallet label for ${slip.ecd_name}`}
+                                  onClick={(e) => { e.stopPropagation(); printOneLabel(slip); }}
+                                >
+                                  <Printer />
+                                </Button>
                               </TableCell>
                             </TableRow>
                           ))}
