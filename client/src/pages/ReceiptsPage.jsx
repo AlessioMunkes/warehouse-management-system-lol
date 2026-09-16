@@ -246,7 +246,7 @@ export default function ReceiptsPage() {
       // The note's own record number, matching the "#0011" on the document.
       // Padded so the column reads as a column rather than ragged text.
       render: (r) => (
-        <span className="font-mono text-xs text-[#676767]">
+        <span className="font-mono text-xs text-ink-soft">
           #{String(r.id).padStart(4, '0')}
         </span>
       ),
@@ -285,7 +285,7 @@ export default function ReceiptsPage() {
     {
       key: 'id', header: 'ID', sortKey: 'id',
       render: (r) => (
-        <span className="font-mono text-xs text-[#676767]">
+        <span className="font-mono text-xs text-ink-soft">
           #{String(r.dispatch_event_id).padStart(4, '0')}
         </span>
       ),
@@ -341,8 +341,8 @@ export default function ReceiptsPage() {
 
       <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
         <div className="mb-5">
-          <h1 className="text-2xl font-bold text-[#2b3336]">Receipts</h1>
-          <p className="mt-1 text-sm text-[#676767]">
+          <h1 className="text-2xl font-bold text-ink">Receipts</h1>
+          <p className="mt-1 text-sm text-ink-soft">
             Delivery notes for stock that came in, and dispatch notes for stock that went out.
           </p>
         </div>
@@ -352,7 +352,7 @@ export default function ReceiptsPage() {
             tabs.jsx, and adding one shadcn component for two buttons is
             more surface area than it earns. */}
         <div
-          className="mb-5 flex gap-2 border-b-2 border-[#e9e3dd]"
+          className="mb-5 flex gap-2 border-b-2 border-line"
           role="tablist"
           aria-label="Receipt type"
         >
@@ -365,8 +365,8 @@ export default function ReceiptsPage() {
               onClick={() => switchTab(t.id)}
               className={`-mb-0.5 border-b-4 px-4 py-2 text-left transition-colors ${
                 tab === t.id
-                  ? 'border-[#ef3a40] text-[#2b3336]'
-                  : 'border-transparent text-[#676767] hover:text-[#2b3336]'
+                  ? 'border-brand text-ink'
+                  : 'border-transparent text-ink-soft hover:text-ink'
               }`}
             >
               <span className="block text-sm font-bold">{t.label}</span>
@@ -404,14 +404,14 @@ export default function ReceiptsPage() {
             extra={tab === 'out' ? (
               <div>
                 <label
-                  className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-[#676767]"
+                  className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-ink-soft"
                   htmlFor="receipts-cohort"
                 >
                   Cohort
                 </label>
                 <select
                   id="receipts-cohort"
-                  className="w-full rounded-[4px] border-2 border-[#e9e3dd] bg-white px-3 py-2 text-sm text-[#2b3336] focus:border-[#2b3336] focus:outline-none"
+                  className="w-full rounded-[4px] border-2 border-line bg-surface px-3 py-2 text-sm text-ink focus:border-ink focus:outline-none"
                   value={cohort}
                   onChange={(e) => { setCohort(e.target.value); setOffset(0); }}
                 >
@@ -425,7 +425,7 @@ export default function ReceiptsPage() {
         </div>
 
         {openError && (
-          <div className="mb-4 rounded-[4px] border-2 border-[#ef3a40] bg-[#fdf1f1] p-3 text-sm text-[#2b3336]">
+          <div className="mb-4 rounded-[4px] border-2 border-brand bg-danger-soft p-3 text-sm text-ink">
             {openError}
           </div>
         )}
@@ -453,18 +453,18 @@ export default function ReceiptsPage() {
               type="button"
               disabled={offset === 0}
               onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-              className="rounded-[4px] border-2 border-[#2b3336] px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#2b3336] disabled:opacity-40"
+              className="rounded-[4px] border-2 border-ink px-4 py-2 text-xs font-bold uppercase tracking-wider text-ink disabled:opacity-40"
             >
               Previous
             </button>
-            <span className="text-xs text-[#676767]">
+            <span className="text-xs text-ink-soft">
               Page {currentPage} of {pageCount}
             </span>
             <button
               type="button"
               disabled={currentPage >= pageCount}
               onClick={() => setOffset(offset + PAGE_SIZE)}
-              className="rounded-[4px] border-2 border-[#2b3336] px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#2b3336] disabled:opacity-40"
+              className="rounded-[4px] border-2 border-ink px-4 py-2 text-xs font-bold uppercase tracking-wider text-ink disabled:opacity-40"
             >
               Next
             </button>
@@ -475,7 +475,7 @@ export default function ReceiptsPage() {
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="text-xs font-bold uppercase tracking-wider text-[#676767] hover:text-[#2b3336]"
+            className="text-xs font-bold uppercase tracking-wider text-ink-soft hover:text-ink"
           >
             ← Back
           </button>

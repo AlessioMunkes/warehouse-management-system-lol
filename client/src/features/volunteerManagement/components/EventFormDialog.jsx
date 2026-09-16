@@ -508,7 +508,7 @@ export default function EventFormDialog({
                       {validating ? 'Validating...' : 'Validate Times'}
                     </Button>
                   </div>
-                  {availability && <p role="status" className={availability.available ? 'text-sm font-medium text-green-700' : 'text-sm font-medium text-destructive'}>{availability.available ? 'OK ' : 'Warning '}{availabilityText(availability)}</p>}
+                  {availability && <p role="status" className={availability.available ? 'text-sm font-medium text-good' : 'text-sm font-medium text-destructive'}>{availability.available ? 'OK ' : 'Warning '}{availabilityText(availability)}</p>}
                   {validateError && <p role="alert" className="text-sm text-destructive">{validateError}</p>}
                 </div>
               </div>

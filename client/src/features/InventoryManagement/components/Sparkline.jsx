@@ -48,7 +48,7 @@ export default function Sparkline({ points, unit = '' }) {
   const [lastX, lastY] = coords[coords.length - 1];
 
   const delta = last - first;
-  const stroke = delta < 0 ? '#ef3a40' : delta > 0 ? '#2f855a' : '#9a9a9a';
+  const stroke = delta < 0 ? 'var(--brand)' : delta > 0 ? 'var(--good-ink)' : 'var(--ink-faint)';
 
   const round = (n) => Math.round(Number(n) * 100) / 100;
   const label =

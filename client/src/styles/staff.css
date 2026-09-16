@@ -2065,3 +2065,45 @@ button.stf-panel-head:disabled { cursor: default; }
   cursor: pointer;
 }
 .stf-resume .stf-resume-drop:hover { color: #8a3227; }
+
+/* @sentinel script-45-staff-dark */
+/* ══════════════════════════════════════════════════════════════════
+   DARK (script 45)
+
+   staff.css funnels almost everything through the --stf-* block at the
+   top, so the whole floor-staff shell turns over in one override.
+   The dozen rules below it are the stragglers that hardcode a hex.
+
+   The floor shell has no toggle of its own — the control lives in the
+   manager top bar, by the same argument the header of this file makes
+   about a 390px screen. This is here so that a manager or admin who
+   has chosen dark and then opens a task flow gets one app, not two.
+   ══════════════════════════════════════════════════════════════════ */
+.dark {
+  --stf-ink:        #eceeee;
+  --stf-ink-deep:   #ffffff;
+  --stf-accent:     #ff5257;
+  --stf-accent-deep:#ff7377;
+  --stf-gold:       #b5ae82;
+  --stf-gold-deep:  #c6bf92;
+  --stf-sand:       #14191a;
+  --stf-border:     #384447;
+  --stf-text:       #c9cfd0;
+  --stf-text-sub:   #a8b0b2;
+  --stf-text-meta:  #8d9698;
+  --stf-white:      #1c2325;
+
+  --stf-attention:      #ff9b8a;
+  --stf-attention-ink:  #ffb3a4;
+  --stf-attention-bg:   #2e211c;
+  --stf-attention-border: #4a352c;
+}
+
+.dark .stf-resume            { background: var(--stf-white); }
+.dark .stf-resume-name       { color: var(--stf-ink); }
+.dark .stf-resume-meta,
+.dark .stf-resume .stf-resume-drop { color: var(--stf-text-sub); }
+.dark .stf-resume-row + .stf-resume-row { border-top-color: var(--stf-border); }
+.dark .stf-resume .stf-resume-go { background: var(--stf-accent); color: #1a0d0e; }
+.dark .stf-resume .stf-resume-go:hover { background: var(--stf-accent-deep); color: #1a0d0e; }
+.dark .stf-resume .stf-resume-drop:hover { color: var(--stf-attention); }

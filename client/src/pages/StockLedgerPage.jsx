@@ -217,7 +217,7 @@ export default function StockLedgerPage() {
             aria-current={tab === t.id ? "page" : undefined}
             className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
               tab === t.id
-                ? "border-[#ef3a40] text-[#ef3a40]"
+                ? "border-brand text-brand"
                 : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -285,7 +285,7 @@ export default function StockLedgerPage() {
                         onClick={() => toggleType(t.value)}
                         className={`rounded-full border px-3 py-1 text-xs transition-colors ${
                           on
-                            ? "border-[#ef3a40] bg-[#fff4f2] text-[#ef3a40]"
+                            ? "border-brand bg-danger-soft text-brand"
                             : "border-input text-muted-foreground hover:text-foreground"
                         }`}
                       >
@@ -317,7 +317,7 @@ export default function StockLedgerPage() {
           </div>
 
           {error && (
-            <div className="rounded-md border border-[#ef3a40] bg-[#fff4f2] px-4 py-3 text-sm text-[#ef3a40]">
+            <div className="rounded-md border border-brand bg-danger-soft px-4 py-3 text-sm text-brand">
               {error}
             </div>
           )}
@@ -341,7 +341,7 @@ export default function StockLedgerPage() {
       {tab === "reconciliation" && (
         <>
           {reconError && (
-            <div className="rounded-md border border-[#ef3a40] bg-[#fff4f2] px-4 py-3 text-sm text-[#ef3a40]">
+            <div className="rounded-md border border-brand bg-danger-soft px-4 py-3 text-sm text-brand">
               {reconError}
             </div>
           )}

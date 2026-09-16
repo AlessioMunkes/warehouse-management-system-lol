@@ -106,13 +106,13 @@ const IntakeFlagRow = ({ flag, busy, onResolve }) => {
   };
 
   return (
-    <Card className="rounded-[12px] border border-[#e9e3dd] shadow-sm">
-      <CardHeader className="border-b border-[#e9e3dd] pb-3">
+    <Card className="rounded-[12px] border border-line shadow-sm">
+      <CardHeader className="border-b border-line pb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge className="bg-[#eef2f4] text-[#2b3336] hover:bg-[#eef2f4]">From a donation</Badge>
+            <Badge className="bg-chip text-ink hover:bg-chip">From a donation</Badge>
             {isPlaceholder(flag) ? <Badge variant="outline">Placeholder</Badge> : null}
-            <span className="text-sm font-medium text-[#2b3336]">
+            <span className="text-sm font-medium text-ink">
               {flag.item_description || flag.name || 'Unnamed item'}
             </span>
           </div>
@@ -121,18 +121,18 @@ const IntakeFlagRow = ({ flag, busy, onResolve }) => {
           </Button>
         </div>
         <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-4">
-          <span><strong className="text-[#2b3336]">Donation:</strong> {donationLabel}</span>
-          <span><strong className="text-[#2b3336]">Donor:</strong> {flag.donor_name || '-'}</span>
-          <span><strong className="text-[#2b3336]">Qty:</strong> {qty}</span>
-          <span><strong className="text-[#2b3336]">Weight:</strong> {weight === '-' ? '-' : `${weight} kg`}</span>
-          <span><strong className="text-[#2b3336]">Expiry:</strong> {formatDate(expiry)}</span>
-          <span><strong className="text-[#2b3336]">Date:</strong> {formatDate(flag.donation_date || flag.flagged_at)}</span>
+          <span><strong className="text-ink">Donation:</strong> {donationLabel}</span>
+          <span><strong className="text-ink">Donor:</strong> {flag.donor_name || '-'}</span>
+          <span><strong className="text-ink">Qty:</strong> {qty}</span>
+          <span><strong className="text-ink">Weight:</strong> {weight === '-' ? '-' : `${weight} kg`}</span>
+          <span><strong className="text-ink">Expiry:</strong> {formatDate(expiry)}</span>
+          <span><strong className="text-ink">Date:</strong> {formatDate(flag.donation_date || flag.flagged_at)}</span>
         </div>
       </CardHeader>
 
       <CardContent className="pt-4">
-        <div className="mb-4 rounded-[8px] bg-[#f7f3ee] p-3 text-sm text-[#4c5659]">
-          <strong className="text-[#2b3336]">Staff note:</strong>{' '}
+        <div className="mb-4 rounded-[8px] bg-canvas p-3 text-sm text-ink-soft">
+          <strong className="text-ink">Staff note:</strong>{' '}
           {flag.reason || 'No extra reason provided.'}
         </div>
 
@@ -141,11 +141,11 @@ const IntakeFlagRow = ({ flag, busy, onResolve }) => {
             line, not just the flagged line itself. Never shown on
             standalone rows (there is no donation behind them). */}
         {Array.isArray(flag.donation_items) && flag.donation_items.length > 0 ? (
-          <div className="mb-4 rounded-[8px] border border-[#e9e3dd] p-3">
+          <div className="mb-4 rounded-[8px] border border-line p-3">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Donation items ({flag.donation_items.length})
             </p>
-            <ul className="space-y-1 text-sm text-[#4c5659]">
+            <ul className="space-y-1 text-sm text-ink-soft">
               {flag.donation_items.map((item) => (
                 <li key={item.id} className="flex flex-wrap items-center gap-2">
                   <span className="text-xs text-muted-foreground">{item.line_no}.</span>
@@ -165,15 +165,15 @@ const IntakeFlagRow = ({ flag, busy, onResolve }) => {
         ) : null}
 
         {message ? (
-          <div className="mb-4 rounded-[8px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <div className="mb-4 rounded-[8px] border border-good bg-good-soft px-4 py-3 text-sm text-good">
             {message}
           </div>
         ) : null}
 
         {isOpen ? (
           <div className="grid gap-4 lg:grid-cols-3">
-            <div className="rounded-[8px] border border-[#e9e3dd] p-3">
-              <h3 className="text-sm font-semibold text-[#2b3336]">Match Existing Product</h3>
+            <div className="rounded-[8px] border border-line p-3">
+              <h3 className="text-sm font-semibold text-ink">Match Existing Product</h3>
               <div className="mt-3">
                 <ProductMatchCombobox
                   value={selectedProductId}
@@ -186,7 +186,7 @@ const IntakeFlagRow = ({ flag, busy, onResolve }) => {
               </div>
               <div className="mt-3">
                 <Select value={selectedProductCategory} onValueChange={setSelectedProductCategory}>
-                  <SelectTrigger className="bg-[#f8f5f2]" aria-label="Existing product route">
+                  <SelectTrigger className="bg-canvas" aria-label="Existing product route">
                     <SelectValue placeholder="Choose route" />
                   </SelectTrigger>
                   <SelectContent>
@@ -210,13 +210,13 @@ const IntakeFlagRow = ({ flag, busy, onResolve }) => {
               </Button>
             </div>
 
-            <div className="rounded-[8px] border border-[#e9e3dd] p-3">
-              <h3 className="text-sm font-semibold text-[#2b3336]">Create Product</h3>
+            <div className="rounded-[8px] border border-line p-3">
+              <h3 className="text-sm font-semibold text-ink">Create Product</h3>
               <div className="mt-3 grid gap-3">
                 <Input aria-label="New product name" value={newProductName} onChange={(e) => setNewProductName(e.target.value)} />
                 <Input aria-label="Brand" placeholder="Brand (optional)" value={newProductBrand} onChange={(e) => setNewProductBrand(e.target.value)} />
                 <Select value={newProductCategory} onValueChange={setNewProductCategory}>
-                  <SelectTrigger className="bg-[#f8f5f2]" aria-label="Product route">
+                  <SelectTrigger className="bg-canvas" aria-label="Product route">
                     <SelectValue placeholder="Choose route" />
                   </SelectTrigger>
                   <SelectContent>
@@ -243,8 +243,8 @@ const IntakeFlagRow = ({ flag, busy, onResolve }) => {
               </Button>
             </div>
 
-            <div className="rounded-[8px] border border-[#e9e3dd] p-3">
-              <h3 className="text-sm font-semibold text-[#2b3336]">Move to Non-Food</h3>
+            <div className="rounded-[8px] border border-line p-3">
+              <h3 className="text-sm font-semibold text-ink">Move to Non-Food</h3>
               <Button
                 type="button"
                 variant="outline"
@@ -284,13 +284,13 @@ const LegacyFlagRow = ({ flag, busy, onResolve }) => {
   };
 
   return (
-    <Card className="rounded-[12px] border border-[#e9e3dd] shadow-sm">
-      <CardHeader className="border-b border-[#e9e3dd] pb-3">
+    <Card className="rounded-[12px] border border-line shadow-sm">
+      <CardHeader className="border-b border-line pb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge className="bg-[#fdf1e7] text-[#2b3336] hover:bg-[#fdf1e7]">Standalone item</Badge>
+            <Badge className="bg-warn-soft text-ink hover:bg-warn-soft">Standalone item</Badge>
             {isPlaceholder(flag) ? <Badge variant="outline">Placeholder</Badge> : null}
-            <span className="text-sm font-medium text-[#2b3336]">
+            <span className="text-sm font-medium text-ink">
               {flag.name || 'Unnamed item'}
             </span>
           </div>
@@ -301,26 +301,26 @@ const LegacyFlagRow = ({ flag, busy, onResolve }) => {
       </CardHeader>
 
       <CardContent className="pt-4">
-        <div className="mb-4 rounded-[8px] bg-[#f7f3ee] p-3 text-sm text-[#4c5659]">
-          <strong className="text-[#2b3336]">Staff note:</strong>{' '}
+        <div className="mb-4 rounded-[8px] bg-canvas p-3 text-sm text-ink-soft">
+          <strong className="text-ink">Staff note:</strong>{' '}
           {flag.reason || 'No extra reason provided.'}
         </div>
 
         {message ? (
-          <div className="mb-4 rounded-[8px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <div className="mb-4 rounded-[8px] border border-good bg-good-soft px-4 py-3 text-sm text-good">
             {message}
           </div>
         ) : null}
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <label className="text-sm font-medium text-[#2b3336]">
+          <label className="text-sm font-medium text-ink">
             Item name
-            <Input className="mt-1 bg-[#f8f5f2]" value={name} onChange={(e) => setName(e.target.value)} />
+            <Input className="mt-1 bg-canvas" value={name} onChange={(e) => setName(e.target.value)} />
           </label>
-          <label className="text-sm font-medium text-[#2b3336]">
+          <label className="text-sm font-medium text-ink">
             Storage type
             <Select value={storageType} onValueChange={setStorageType}>
-              <SelectTrigger className="mt-1 w-full bg-[#f8f5f2]" aria-label="Storage type">
+              <SelectTrigger className="mt-1 w-full bg-canvas" aria-label="Storage type">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -329,14 +329,14 @@ const LegacyFlagRow = ({ flag, busy, onResolve }) => {
               </SelectContent>
             </Select>
           </label>
-          <label className="text-sm font-medium text-[#2b3336]">
+          <label className="text-sm font-medium text-ink">
             Default unit
-            <Input className="mt-1 bg-[#f8f5f2]" value={defaultUnit} onChange={(e) => setDefaultUnit(e.target.value)} />
+            <Input className="mt-1 bg-canvas" value={defaultUnit} onChange={(e) => setDefaultUnit(e.target.value)} />
           </label>
-          <label className="text-sm font-medium text-[#2b3336] sm:col-span-2">
+          <label className="text-sm font-medium text-ink sm:col-span-2">
             Route
             <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="mt-1 w-full bg-[#f8f5f2]" aria-label="Route">
+              <SelectTrigger className="mt-1 w-full bg-canvas" aria-label="Route">
                 <SelectValue placeholder="Select route" />
               </SelectTrigger>
               <SelectContent>
@@ -358,13 +358,13 @@ const LegacyFlagRow = ({ flag, busy, onResolve }) => {
   );
 };
 const ErrorBanner = ({ message, onRetry }) => (
-  <div className="flex flex-col items-start justify-between gap-3 rounded-[4px] border-2 border-[#ef3a40] bg-[#fff4f2] p-4 text-sm text-[#2b3336] shadow-sm sm:flex-row sm:items-center">
+  <div className="flex flex-col items-start justify-between gap-3 rounded-[4px] border-2 border-brand bg-danger-soft p-4 text-sm text-ink shadow-sm sm:flex-row sm:items-center">
     <span>{message}</span>
     {onRetry ? (
       <button
         type="button"
         onClick={onRetry}
-        className="text-xs font-semibold text-[#ef3a40] underline hover:text-[#2b3336] focus:outline-none sm:text-sm"
+        className="text-xs font-semibold text-brand underline hover:text-ink focus:outline-none sm:text-sm"
       >
         Try again
       </button>
@@ -413,7 +413,7 @@ export default function FlaggedItemsTab() {
       ) : null}
 
       {!isLoading && items.length === 0 && !error ? (
-        <div className="rounded-[12px] border border-dashed border-[#d9d1cb] bg-white p-8 text-center text-sm text-muted-foreground">
+        <div className="rounded-[12px] border border-dashed border-line-strong bg-surface p-8 text-center text-sm text-muted-foreground">
           No pending product reviews.
         </div>
       ) : null}

@@ -42,10 +42,16 @@ const BENEFICIARY_LABELS = {
 // One fixed palette, reused across every donut on this page rather
 // than each panel inventing its own — a legend only reads as
 // consistent if red always means the same kind of thing.
-const DONUT_COLORS = ['#2b3336', '#ef3a40', '#c9a86a', '#6b8f71', '#8a8a8a'];
+// Tokens rather than hex, so Healthy stock inverts with the theme:
+// charcoal on white in the light, near-white on charcoal in the dark.
+// As hex it was the one slice you could not see in dark mode, because
+// #2b3336 is almost exactly the colour of the card it sat on.
+const DONUT_COLORS = [
+  'var(--ink)', 'var(--brand)', 'var(--chart-tan)', 'var(--chart-sage)', 'var(--chart-grey)',
+];
 
 const ErrorBanner = ({ message }) => (
-  <div className="p-3 rounded-[4px] bg-[#fff4f2] border-2 border-[#ef3a40] text-[#2b3336] text-sm">
+  <div className="p-3 rounded-[4px] bg-danger-soft border-2 border-brand text-ink text-sm">
     {message}
   </div>
 );
@@ -67,7 +73,7 @@ const RankedBars = ({ rows, labelFor }) => {
             </div>
             <div className="mt-1 h-1.5 rounded-full bg-muted">
               <div
-                className="h-1.5 rounded-full bg-[#2b3336]"
+                className="h-1.5 rounded-full bg-ink"
                 style={{ width: `${(value / max) * 100}%` }}
               />
             </div>

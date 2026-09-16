@@ -479,3 +479,31 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* @sentinel script-45-guest-dark */
+/* ══════════════════════════════════════════════════════════════════
+   DARK (script 45)
+
+   The Love Activist screens, same one-block treatment as staff.css.
+   Warmer than the staff dark by the same margin the light theme is
+   warmer — this is the front-of-house screen and the cream was
+   deliberate, so the dark keeps a little of it.
+   ══════════════════════════════════════════════════════════════════ */
+.dark {
+  --gst-ink:        #f0eeec;
+  --gst-ink-deep:   #ffffff;
+  --gst-accent:     #ff5257;
+  --gst-accent-deep:#ff7377;
+  --gst-gold:       #b5ae82;
+  --gst-cream:      #17191a;
+  --gst-sand:       #20252a;
+  --gst-border:     #3b4247;
+  --gst-text:       #c9cbcd;
+  --gst-text-sub:   #a9adaf;
+  --gst-white:      #1e2326;
+
+  --gst-good:       #7fd6a0;
+  --gst-good-bg:    #16261d;
+  --gst-attention:  #ff9b8a;
+  --gst-attention-bg: #2e211c;
+}

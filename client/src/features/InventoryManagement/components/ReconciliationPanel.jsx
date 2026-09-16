@@ -49,11 +49,11 @@ export default function ReconciliationPanel({ data, isLoading }) {
 
   return (
     <div className="space-y-3">
-      <div className="rounded-md border border-[#ef3a40] bg-[#fff4f2] px-4 py-3">
-        <p className="text-sm font-medium text-[#ef3a40]">
+      <div className="rounded-md border border-brand bg-danger-soft px-4 py-3">
+        <p className="text-sm font-medium text-brand">
           {variances.length} product{variances.length === 1 ? "" : "s"} out of balance
         </p>
-        <p className="mt-1 text-xs text-[#8a2a2e]">
+        <p className="mt-1 text-xs text-danger">
           The quantity on hand does not equal the sum of recorded movements. Something
           changed a balance without writing to the ledger — start with the most recent
           movements for these products.
@@ -82,7 +82,7 @@ export default function ReconciliationPanel({ data, isLoading }) {
                 <TableCell className="text-right font-mono text-sm">{fmt(r.balance)} {r.unit}</TableCell>
                 <TableCell className="text-right font-mono text-sm">{fmt(r.ledgerSum)}</TableCell>
                 <TableCell className="text-right">
-                  <Badge variant="outline" className="border-[#ef3a40] font-mono text-[#ef3a40]">
+                  <Badge variant="outline" className="border-brand font-mono text-brand">
                     {r.variance > 0 ? "+" : ""}{fmt(r.variance)}
                   </Badge>
                 </TableCell>

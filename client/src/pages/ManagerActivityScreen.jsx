@@ -107,7 +107,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-[#2b3336] font-['Montserrat',sans-serif]">
+    <div className="min-h-screen bg-surface text-ink font-['Montserrat',sans-serif]">
       <TopNavbar
         reducedMovement={reducedMovement}
         onToggleMovement={setReducedMovement}
@@ -180,22 +180,22 @@ export default function Home() {
         open={Boolean(activeModalTask)}
         onOpenChange={(open) => !open && setActiveModalTask(null)}
       >
-        <DialogContent className="rounded-[4px] border-2 border-[#e9e3dd] bg-white max-w-md">
+        <DialogContent className="rounded-[4px] border-2 border-line bg-surface max-w-md">
           <DialogHeader className="space-y-2">
-            <div className="flex items-center gap-2 border-b border-[#e9e3dd] pb-3">
-              <span className="text-[#ef3a40] text-xl">ℹ</span>
-              <DialogTitle className="text-lg font-bold text-[#2b3336]">
+            <div className="flex items-center gap-2 border-b border-line pb-3">
+              <span className="text-brand text-xl">ℹ</span>
+              <DialogTitle className="text-lg font-bold text-ink">
                 {activeModalTask?.title?.toUpperCase()}
               </DialogTitle>
             </div>
-            <DialogDescription className="text-sm text-[#676767] leading-relaxed pt-2">
+            <DialogDescription className="text-sm text-ink-soft leading-relaxed pt-2">
               {activeModalTask?.noticeMessage || "This feature is currently unavailable or under development."}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="pt-4">
             <Button
               onClick={() => setActiveModalTask(null)}
-              className="w-full sm:w-auto bg-[#2b3336] hover:bg-black text-white font-bold text-xs tracking-wider rounded-[4px] px-6"
+              className="w-full sm:w-auto bg-ink hover:bg-ink/90 text-on-ink font-bold text-xs tracking-wider rounded-[4px] px-6"
             >
               GOT IT
             </Button>

@@ -42,7 +42,7 @@ const displayDate = (value) => {
 };
 
 const ErrorBanner = ({ message, onRetry }) => (
-  <div role="alert" className="p-4 rounded-[4px] bg-[#fff4f2] border-2 border-[#ef3a40] text-[#2b3336] text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+  <div role="alert" className="p-4 rounded-[4px] bg-danger-soft border-2 border-brand text-ink text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
     <span>{message}</span>
     {onRetry && <Button type="button" variant="outline" onClick={onRetry}>Try again</Button>}
   </div>
@@ -200,7 +200,7 @@ export default function VolunteerEventsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-[#2b3336] font-['Montserrat',sans-serif]">
+    <div className="min-h-screen bg-surface text-ink font-['Montserrat',sans-serif]">
       <main className="px-4 sm:px-6 py-6 max-w-6xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
           <div>

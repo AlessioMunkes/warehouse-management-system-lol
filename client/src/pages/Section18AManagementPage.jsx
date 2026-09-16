@@ -30,16 +30,16 @@ const TABS = [
 ];
 
 const EMAIL_STATUS_CONFIG = {
-  sent: { icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50', label: 'Sent' },
-  delivered: { icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50', label: 'Delivered' },
-  failed: { icon: XCircle, color: 'text-red-600', bg: 'bg-red-50', label: 'Failed' },
-  pending: { icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50', label: 'Pending' },
-  bounced: { icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50', label: 'Bounced' },
-  SENT: { icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50', label: 'Sent' },
-  DELIVERED: { icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50', label: 'Delivered' },
-  FAILED: { icon: XCircle, color: 'text-red-600', bg: 'bg-red-50', label: 'Failed' },
-  PENDING: { icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50', label: 'Pending' },
-  BOUNCED: { icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50', label: 'Bounced' },
+  sent: { icon: CheckCircle2, color: 'text-good', bg: 'bg-good-soft', label: 'Sent' },
+  delivered: { icon: CheckCircle2, color: 'text-good', bg: 'bg-good-soft', label: 'Delivered' },
+  failed: { icon: XCircle, color: 'text-danger', bg: 'bg-danger-soft', label: 'Failed' },
+  pending: { icon: Clock, color: 'text-warn', bg: 'bg-warn-soft', label: 'Pending' },
+  bounced: { icon: AlertTriangle, color: 'text-danger', bg: 'bg-danger-soft', label: 'Bounced' },
+  SENT: { icon: CheckCircle2, color: 'text-good', bg: 'bg-good-soft', label: 'Sent' },
+  DELIVERED: { icon: CheckCircle2, color: 'text-good', bg: 'bg-good-soft', label: 'Delivered' },
+  FAILED: { icon: XCircle, color: 'text-danger', bg: 'bg-danger-soft', label: 'Failed' },
+  PENDING: { icon: Clock, color: 'text-warn', bg: 'bg-warn-soft', label: 'Pending' },
+  BOUNCED: { icon: AlertTriangle, color: 'text-danger', bg: 'bg-danger-soft', label: 'Bounced' },
 };
 
 
@@ -142,7 +142,7 @@ export default function Section18AManagementPage() {
   const emailSentAtOf = (email) => email.sent_at ?? email.sentAt ?? email.created_at ?? email.createdAt ?? null;
 
   return (
-    <div className="min-h-screen bg-[#f8f5f2] text-[#2b3336] font-['Montserrat',sans-serif]">
+    <div className="min-h-screen bg-canvas text-ink font-['Montserrat',sans-serif]">
       <TopNavbar />
       <main className="mx-auto w-full max-w-6xl px-4 py-6">
         <h1 className="text-2xl font-medium">Section 18A Management</h1>
@@ -157,12 +157,12 @@ export default function Section18AManagementPage() {
         </div>
         <p className="mt-4 text-sm text-muted-foreground">{activeTab.description}</p>
         {feedback && (
-          <div className={`mt-4 rounded-lg border px-4 py-3 text-sm ${feedback.type === 'success' ? 'border-green-200 bg-green-50 text-green-800' : 'border-red-200 bg-red-50 text-red-800'}`} role="alert">
+          <div className={`mt-4 rounded-lg border px-4 py-3 text-sm ${feedback.type === 'success' ? 'border-good bg-good-soft text-good' : 'border-danger bg-danger-soft text-danger'}`} role="alert">
             {feedback.message}
           </div>
         )}
         {error && (
-          <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">{error}</div>
+          <div className="mt-4 rounded-lg border border-danger bg-danger-soft px-4 py-3 text-sm text-danger" role="alert">{error}</div>
         )}
         {loading ? (
           <div className="mt-8 flex items-center justify-center py-12">
@@ -173,7 +173,7 @@ export default function Section18AManagementPage() {
           <>
             {tab === 'certificates' && (
               <div className="mt-6">
-                <Card className="rounded-[12px] border border-[#e9e3dd] shadow-sm">
+                <Card className="rounded-[12px] border border-line shadow-sm">
                   <CardHeader>
                     <CardTitle>Certificate Queue</CardTitle>
                     <CardDescription>{certificateQueue.length} donation{certificateQueue.length !== 1 ? 's' : ''} in the Section 18A certificate queue.</CardDescription>
@@ -252,12 +252,12 @@ export default function Section18AManagementPage() {
             {tab === 'emails' && (
               <div className="mt-6 space-y-6">
                 <div className="grid gap-4 sm:grid-cols-4">
-                  <Card className="rounded-[12px] border border-[#e9e3dd] shadow-sm"><CardContent className="pt-4"><p className="text-sm font-medium text-muted-foreground">Total Emails</p><p className="mt-1 text-2xl font-semibold">{emailHistory.length}</p></CardContent></Card>
-                  <Card className="rounded-[12px] border border-[#e9e3dd] shadow-sm"><CardContent className="pt-4"><p className="text-sm font-medium text-muted-foreground">Sent</p><p className="mt-1 text-2xl font-semibold text-green-600">{emailHistory.filter((e) => ['sent', 'delivered', 'SENT', 'DELIVERED'].includes(e.status)).length}</p></CardContent></Card>
-                  <Card className="rounded-[12px] border border-[#e9e3dd] shadow-sm"><CardContent className="pt-4"><p className="text-sm font-medium text-muted-foreground">Failed</p><p className="mt-1 text-2xl font-semibold text-red-600">{emailHistory.filter((e) => ['failed', 'bounced', 'FAILED', 'BOUNCED'].includes(e.status)).length}</p></CardContent></Card>
-                  <Card className="rounded-[12px] border border-[#e9e3dd] shadow-sm"><CardContent className="pt-4"><p className="text-sm font-medium text-muted-foreground">Pending</p><p className="mt-1 text-2xl font-semibold text-amber-600">{emailHistory.filter((e) => ['pending', 'PENDING'].includes(e.status)).length}</p></CardContent></Card>
+                  <Card className="rounded-[12px] border border-line shadow-sm"><CardContent className="pt-4"><p className="text-sm font-medium text-muted-foreground">Total Emails</p><p className="mt-1 text-2xl font-semibold">{emailHistory.length}</p></CardContent></Card>
+                  <Card className="rounded-[12px] border border-line shadow-sm"><CardContent className="pt-4"><p className="text-sm font-medium text-muted-foreground">Sent</p><p className="mt-1 text-2xl font-semibold text-good">{emailHistory.filter((e) => ['sent', 'delivered', 'SENT', 'DELIVERED'].includes(e.status)).length}</p></CardContent></Card>
+                  <Card className="rounded-[12px] border border-line shadow-sm"><CardContent className="pt-4"><p className="text-sm font-medium text-muted-foreground">Failed</p><p className="mt-1 text-2xl font-semibold text-danger">{emailHistory.filter((e) => ['failed', 'bounced', 'FAILED', 'BOUNCED'].includes(e.status)).length}</p></CardContent></Card>
+                  <Card className="rounded-[12px] border border-line shadow-sm"><CardContent className="pt-4"><p className="text-sm font-medium text-muted-foreground">Pending</p><p className="mt-1 text-2xl font-semibold text-warn">{emailHistory.filter((e) => ['pending', 'PENDING'].includes(e.status)).length}</p></CardContent></Card>
                 </div>
-                <Card className="rounded-[12px] border border-[#e9e3dd] shadow-sm">
+                <Card className="rounded-[12px] border border-line shadow-sm">
                   <CardHeader><CardTitle>Email History</CardTitle><CardDescription>Real send history from the database — Thank-you and Section 18A emails, newest first.</CardDescription></CardHeader>
                   <CardContent>
                     <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -267,13 +267,13 @@ export default function Section18AManagementPage() {
                         placeholder="Search recipient, donor, donation ID, subject…"
                         value={emailSearch}
                         onChange={(e) => setEmailSearch(e.target.value)}
-                        className="w-full rounded-[8px] border border-[#e9e3dd] bg-white px-3 py-2 text-sm sm:max-w-xs"
+                        className="w-full rounded-[8px] border border-line bg-surface px-3 py-2 text-sm sm:max-w-xs"
                       />
                       <select
                         aria-label="Filter by email type"
                         value={emailTypeFilter}
                         onChange={(e) => setEmailTypeFilter(e.target.value)}
-                        className="rounded-[8px] border border-[#e9e3dd] bg-white px-3 py-2 text-sm"
+                        className="rounded-[8px] border border-line bg-surface px-3 py-2 text-sm"
                       >
                         <option value="">All types</option>
                         <option value="THANK_YOU">Thank you</option>
@@ -283,7 +283,7 @@ export default function Section18AManagementPage() {
                         aria-label="Filter by email status"
                         value={emailStatusFilter}
                         onChange={(e) => setEmailStatusFilter(e.target.value)}
-                        className="rounded-[8px] border border-[#e9e3dd] bg-white px-3 py-2 text-sm"
+                        className="rounded-[8px] border border-line bg-surface px-3 py-2 text-sm"
                       >
                         <option value="">All statuses</option>
                         <option value="SENT">Sent</option>

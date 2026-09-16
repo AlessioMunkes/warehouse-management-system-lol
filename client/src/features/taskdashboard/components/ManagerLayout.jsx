@@ -34,11 +34,13 @@ import { Input }  from '@/components/ui/input';
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from '@/components/ui/popover';
-import { Search, Plus, LogOut, EyeOff, Eye } from 'lucide-react';
+import { Search, Plus, LogOut, EyeOff, Eye, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import {
   ShellContext, useInsideShell,
   ReducedMotionContext, MOTION_KEY, readStoredMotion, applyMotionAttribute,
+  readStoredSidebar, writeStoredSidebar,
 } from './shellContext';
+import ThemeToggle from '@/components/layout/ThemeToggle';
 import { NAV_SECTIONS, homeForRole } from './navSections';
 import { SidebarNav, AppNavDrawer } from './AppNav';
 
@@ -89,6 +91,17 @@ function ManagerLayoutShell({ children }) {
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const [reducedMotion, setReducedMotionState] = useState(readStoredMotion);
+  // Seeded from storage at first render, not in an effect: an effect
+  // would paint the rail open and then snap it shut on every load.
+  const [sidebarCollapsed, setSidebarCollapsedState] = useState(readStoredSidebar);
+
+  // Functional update, so the keyboard shortcut below can share it
+  // without capturing a stale value in its one-time listener.
+  const toggleSidebar = () => setSidebarCollapsedState((previous) => {
+    const next = !previous;
+    writeStoredSidebar(next);
+    return next;
+  });
 
   const setReducedMotion = (next) => {
     setReducedMotionState(next);
@@ -99,6 +112,25 @@ function ManagerLayoutShell({ children }) {
   // On mount too, not only on change: a reload restores the value from
   // storage but nothing would have re-marked the document for CSS.
   useEffect(() => { applyMotionAttribute(reducedMotion); }, [reducedMotion]);
+
+  // Ctrl/⌘-B, the shortcut every editor-shaped app uses for this. On
+  // window rather than the button so it works wherever focus happens to
+  // be, and preventDefault because Ctrl-B is the browser's bookmark
+  // sidebar in Firefox.
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (event.key !== 'b' && event.key !== 'B') return;
+      if (!event.metaKey && !event.ctrlKey) return;
+      event.preventDefault();
+      setSidebarCollapsedState((previous) => {
+        const next = !previous;
+        writeStoredSidebar(next);
+        return next;
+      });
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   const roleLabel = user?.role ? ROLE_LABELS[user.role] ?? user.role : '';
   const sections = NAV_SECTIONS(user?.role);
@@ -113,18 +145,45 @@ function ManagerLayoutShell({ children }) {
   return (
    <ShellContext.Provider value={true}>
     <ReducedMotionContext.Provider value={{ reducedMotion, setReducedMotion }}>
-    <div className="flex min-h-screen bg-[#faf8f5]">
+    <div className="flex min-h-screen bg-canvas">
       {/* ── Sidebar ─────────────────────────────────────────── */}
-      <aside className="hidden w-56 shrink-0 flex-col border-r border-[#e9e3dd] bg-white px-3 py-4 sm:flex">
-        <SidebarNav sections={sections} pathname={location.pathname} homeTo={homeTo} />
+      <aside
+        className={`hidden shrink-0 flex-col border-r border-line bg-surface py-4 sm:flex ${
+          sidebarCollapsed ? 'w-16 px-2' : 'w-56 px-3'
+        } ${
+          // The width animates, unless the person has asked the app to
+          // stop moving — the same setting the eye button holds, two
+          // controls apart in the same bar.
+          reducedMotion ? '' : 'transition-[width] duration-200 ease-linear'
+        }`}
+      >
+        <SidebarNav
+          sections={sections}
+          pathname={location.pathname}
+          homeTo={homeTo}
+          collapsed={sidebarCollapsed}
+        />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* ── Top bar ───────────────────────────────────────── */}
-        <header className="flex items-center gap-3 border-b border-[#e9e3dd] bg-white px-4 py-2.5">
+        <header className="flex items-center gap-3 border-b border-line bg-surface px-4 py-2.5">
           {/* Same breakpoint as the sidebar above, so exactly one of the
               two is ever on screen. */}
           <AppNavDrawer className="sm:hidden" />
+
+          {/* The mirror of that breakpoint: below sm the nav IS the
+              drawer beside this, which has nothing to collapse. */}
+          <Button
+            type="button" variant="ghost" size="icon"
+            className="hidden sm:inline-flex"
+            onClick={toggleSidebar}
+            aria-pressed={sidebarCollapsed}
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={sidebarCollapsed ? 'Expand sidebar (Ctrl+B)' : 'Collapse sidebar (Ctrl+B)'}
+          >
+            {sidebarCollapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+          </Button>
 
           <div className="relative hidden max-w-xs flex-1 sm:block">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -169,6 +228,8 @@ function ManagerLayoutShell({ children }) {
             >
               {reducedMotion ? <EyeOff /> : <Eye />}
             </Button>
+
+            <ThemeToggle />
 
             <NotificationBell />
 

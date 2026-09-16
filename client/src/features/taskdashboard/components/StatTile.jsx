@@ -17,9 +17,9 @@ export default function StatTile({ icon: Icon, label, value, to, warn }) {
   const alarming = warn && Number(value) > 0;
 
   const content = (
-    <Card className={`h-full transition-colors ${alarming ? 'border-[#ef3a40]' : 'hover:border-[#cfc7bd]'}`}>
+    <Card className={`h-full transition-colors ${alarming ? 'border-brand' : 'hover:border-line-strong'}`}>
       <CardContent className="flex items-center gap-3 p-4">
-        <div className={`rounded-full p-2 ${alarming ? 'bg-[#fff4f2] text-[#ef3a40]' : 'bg-muted text-muted-foreground'}`}>
+        <div className={`rounded-full p-2 ${alarming ? 'bg-danger-soft text-brand' : 'bg-muted text-muted-foreground'}`}>
           <Icon className="size-5" />
         </div>
         <div>

@@ -176,6 +176,188 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.556 0 0);
+
+    /* ── Script 45: the stock tokens, pointed at the app's own
+       palette so a shadcn Card in the dark sits on the same dark as
+       everything around it. Only the .dark values are touched —
+       :root's are exactly as they shipped, which is what guarantees
+       light mode did not move. */
+    --background: var(--canvas);
+    --foreground: var(--ink);
+    --card: var(--surface);
+    --card-foreground: var(--ink);
+    --popover: var(--surface);
+    --popover-foreground: var(--ink);
+    --primary: var(--ink);
+    --primary-foreground: var(--on-ink);
+    --secondary: var(--surface-2);
+    --secondary-foreground: var(--ink);
+    --muted: var(--surface-2);
+    --muted-foreground: var(--ink-soft);
+    --accent: var(--surface-2);
+    --accent-foreground: var(--ink);
+    --destructive: var(--brand);
+    --border: var(--line);
+    --input: var(--line-strong);
+    --ring: var(--line-strong);
+    --sidebar: var(--surface);
+    --sidebar-foreground: var(--ink);
+    --sidebar-primary: var(--ink);
+    --sidebar-primary-foreground: var(--on-ink);
+    --sidebar-accent: var(--surface-2);
+    --sidebar-accent-foreground: var(--ink);
+    --sidebar-border: var(--line);
+    --sidebar-ring: var(--line-strong);
+
+    /* The older variable sets, so every rule already written against
+       them follows without being rewritten. */
+    --nectar-dark:  var(--ink);
+    --nectar-cream: var(--line);
+    --nectar-bg:    var(--canvas);
+    --nectar-olive: var(--gold);
+
+    --color-header-bg:        #10161a;
+    --color-header-text:      var(--ink);
+    --color-header-text-muted: var(--ink-soft);
+    --color-bg:        var(--canvas);
+    --color-card-bg:   var(--surface);
+    --color-card-border: var(--line);
+    --color-text:      var(--ink);
+    --color-text-muted: var(--ink-soft);
+    --color-maroon:      var(--ink);
+    --color-maroon-deep: #0d1112;
+    --color-lol-bg:    var(--canvas);
+    --color-lol-white: var(--surface);
+    --color-border:    var(--line);
+    --color-text-sub:  var(--ink-soft);
+    --color-text-meta: var(--ink-faint);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   THEME TOKENS — script 45
+
+   Read the :root block as an inventory, not a palette: every value in
+   it is a hex that was already somewhere in this app. The tokens were
+   introduced by giving ~460 hardcoded utility classes a name, so
+   `bg-[#faf8f5]` became `bg-canvas` and `--canvas` is `#faf8f5`.
+   Light mode therefore cannot have shifted.
+
+   .dark is the genuinely new palette, and it could be chosen freely:
+   `.dark` has existed in this file since the shadcn install and
+   nothing has ever put the class on the document, so no screen has
+   ever rendered with it.
+
+   Contrast, measured against the surface each token is actually used
+   on (WCAG AA is 4.5:1 for text, 3:1 for control edges):
+     ink        #eceeee  15.2:1      ink-soft    #a8b0b2  7.2:1
+     ink-faint  #8d9698   5.3:1      brand       #ff5257  5.6:1
+     gold       #b5ae82   7.1:1      line-strong #5e6e72  3.0:1
+   `line` is deliberately quieter than 3:1. It separates regions of
+   the same kind — the one case the rule exempts — and a card grid
+   ruled at 3:1 in the dark reads as a spreadsheet.
+
+   The one place dark mode is not a recolour but a flip: white on the
+   dark-mode brand red is 3.18:1 and fails. `--on-brand` therefore
+   goes DARK in the dark theme. That is why the old `text-white`
+   beside a red fill had to become `text-on-brand` rather than stay
+   white — see step 7.
+   ══════════════════════════════════════════════════════════════════ */
+@theme inline {
+    --color-canvas: var(--canvas);
+    --color-surface: var(--surface);
+    --color-surface-2: var(--surface-2);
+    --color-ink: var(--ink);
+    --color-ink-soft: var(--ink-soft);
+    --color-ink-faint: var(--ink-faint);
+    --color-on-ink: var(--on-ink);
+    --color-line: var(--line);
+    --color-line-strong: var(--line-strong);
+    --color-brand: var(--brand);
+    --color-brand-deep: var(--brand-deep);
+    --color-on-brand: var(--on-brand);
+    --color-gold: var(--gold);
+    --color-danger: var(--danger-ink);
+    --color-danger-soft: var(--danger-soft);
+    --color-warn: var(--warn-ink);
+    --color-warn-soft: var(--warn-soft);
+    --color-good: var(--good-ink);
+    --color-good-soft: var(--good-soft);
+    --color-info: var(--info-ink);
+    --color-info-soft: var(--info-soft);
+    --color-violet: var(--violet-ink);
+    --color-violet-soft: var(--violet-soft);
+    --color-chip: var(--chip);
+    --color-chart-tan: var(--chart-tan);
+    --color-chart-sage: var(--chart-sage);
+    --color-chart-grey: var(--chart-grey);
+}
+
+:root {
+    --canvas:      #faf8f5;   /* was bg-[#faf8f5] / #f8f5f2 / #faf8f6 / #f7f3ee / #fdfcfa */
+    --surface:     #ffffff;   /* was bg-white */
+    --surface-2:   #f3efe9;   /* was bg-[#f3efe9] / #eef2f4 / #e9e3dd */
+    --ink:         #2b3336;   /* was text-[#2b3336] — the brand ink, 82 sites */
+    --ink-soft:    #676767;   /* was text-[#676767] / #4c5659 */
+    --ink-faint:   #a39d8f;   /* was text-[#b9b3ac], --color-text-meta */
+    --on-ink:      #ffffff;   /* text sitting ON an ink fill */
+    --line:        #e9e3dd;   /* was border-[#e9e3dd] — 48 sites */
+    --line-strong: #d9d1cb;   /* was border-[#d9d1cb] / #cfc7bd */
+    --brand:       #ef3a40;
+    --brand-deep:  #d42d33;
+    --on-brand:    #ffffff;
+    --gold:        #979168;
+    --danger-ink:  #b42318;
+    --danger-soft: #fff4f2;
+    --warn-ink:    #9a4d00;
+    --warn-soft:   #fff4e5;
+    --good-ink:    #1d7a3a;
+    --good-soft:   #f2fbf5;
+    --info-ink:    #1563c0;
+    --info-soft:   #e8f0fe;
+    --violet-ink:  #5b2a86;
+    --violet-soft: #f3ecfb;
+    --chip:        #eef2f4;   /* the neutral badge on the donation screens */
+
+    /* The third, fourth and fifth slices of a donut. Light values are
+       ManagerDashboardPage's DONUT_COLORS verbatim. */
+    --chart-tan:   #c9a86a;
+    --chart-sage:  #6b8f71;
+    --chart-grey:  #8a8a8a;
+}
+
+.dark {
+    --canvas:      #14191a;
+    --surface:     #1c2325;
+    --surface-2:   #232b2e;
+    --ink:         #eceeee;
+    --ink-soft:    #a8b0b2;
+    --ink-faint:   #8d9698;
+    --on-ink:      #14191a;
+    --line:        #384447;
+    --line-strong: #5e6e72;
+    --brand:       #ff5257;   /* #ef3a40 is 4.5:1 on this canvas — lifted for headroom */
+    --brand-deep:  #ff7377;
+    --on-brand:    #1a0d0e;   /* NOT white: white on #ff5257 is 3.18:1 */
+    --gold:        #b5ae82;
+    --danger-ink:  #ff8a8a;
+    --danger-soft: #2e1e1f;
+    --warn-ink:    #f2c476;
+    --warn-soft:   #2c2419;
+    --good-ink:    #7fd6a0;
+    --good-soft:   #16261d;
+    --info-ink:    #8fbcf2;
+    --info-soft:   #172231;
+    --violet-ink:  #c4a2e8;
+    --violet-soft: #241c33;
+    --chip:        #2a3438;
+
+    /* Lifted off the dark card the same way --brand was. A slice is a
+       graphical object, so 3:1 against its ground is the bar. */
+    --chart-tan:   #d8bd85;
+    --chart-sage:  #8fbf97;
+    --chart-grey:  #9aa3a5;
+
+    color-scheme: dark;   /* scrollbars, form controls, the browser's own chrome */
 }
 
 /* ── Split layout (Login Mobile First) ────────────────────────── */
@@ -2304,3 +2486,100 @@ color:white;
     padding-right: 0.75rem;
   }
 }
+
+/* @sentinel script-45-dark-overrides */
+/* ══════════════════════════════════════════════════════════════════
+   DARK OVERRIDES (script 45)
+
+   Appended rather than edited in place. Everything above this comment
+   is exactly as it was, so light mode has nothing to regress to — a
+   rule that is not repeated below cannot have changed.
+
+   Only the rules that hardcode a colour need to be here. Anything
+   written against --color-*, --nectar-* or a shadcn token already
+   followed the theme at the top of this file.
+
+   Not here on purpose: .lol-landing (the public page, whose visitors
+   have no toggle) and everything in receipts.css / deliveryNotePDF.css
+   (printed on paper, and rasterised by html2canvas-pro, which is the
+   reason those files hold literal hex at all).
+   ══════════════════════════════════════════════════════════════════ */
+
+.dark body { background-color: var(--canvas); color: var(--ink); }
+
+/* ── Login (corrected in script 46) ────────────────────────────
+   .login-card is a TRANSPARENT wrapper; .login-card-body is the white
+   card. Script 45 styled the wrapper, so the page went dark, the text
+   went light, and the card underneath stayed white — every label on it
+   unreadable. The class list below is read off LoginPage.jsx rather
+   than guessed, which is what went wrong the first time.
+
+   .login-title, .login-label and the guest button carry no colour of
+   their own: they inherit from body, which the token layer already
+   turns over. They are absent here on purpose. */
+.dark .login-page,
+.dark .login-form-side       { background-color: var(--canvas); }
+.dark .login-card,
+.dark .login-card-header     { background-color: transparent; }
+.dark .login-card-body       { background: var(--surface);
+                               box-shadow: 0 8px 30px rgb(0 0 0 / 45%); }
+.dark .login-logo            { background: var(--surface); border-color: var(--line); }
+.dark .login-subtitle,
+.dark .login-forgot-link     { color: var(--ink-soft); }
+.dark .login-section-title,
+.dark .login-footer-meta,
+.dark .login-toggle-visibility { color: var(--ink-faint); }
+.dark .login-input,
+.dark .login-input-password  { background: var(--surface-2); color: var(--ink); }
+.dark .login-input::placeholder { color: var(--ink-faint); }
+.dark .login-notice-info     { background: var(--info-soft); border-color: var(--info-ink); color: var(--info-ink); }
+.dark .login-notice-error    { background: var(--danger-soft); border-color: var(--danger-ink); color: var(--danger-ink); }
+/* The red stays red, but it becomes the theme's red rather than the
+   literal #ef3a40 this rule hardcodes, so the app has one brand red per
+   theme. The text on it does not stay white: white on that red is
+   3.2:1 — see --on-brand in the token block above. */
+.dark .login-btn-primary,
+.dark .login-btn-primary:hover:not(:disabled) { background: var(--brand); color: var(--on-brand); }
+.dark .login-btn-guest:hover:not(:disabled) { background-color: rgb(255 255 255 / 6%); }
+
+/* The forgot-password modal, which sits on top of all of it. */
+.dark .forgot-modal-content  { background: var(--surface); color: var(--ink); }
+.dark .forgot-modal-title    { color: var(--ink); }
+.dark .forgot-modal-btn      { color: var(--on-brand); }
+
+/* ── The staff/manager top navbar (TopNavBar.jsx) ──────────────── */
+.dark .top-navbar            { background-color: var(--surface); border-bottom-color: var(--line); }
+.dark .top-navbar__brand-name,
+.dark .top-navbar__user-name { color: var(--ink); }
+.dark .top-navbar__brand-tagline,
+.dark .top-navbar__role      { color: var(--ink-soft); }
+.dark .top-navbar__divider   { background-color: var(--line); }
+
+/* ── Page header / programme select / modal / buttons ──────────── */
+.dark .page-header           { background-color: var(--surface); border-color: var(--line); }
+.dark .page-header h1,
+.dark .page-header h2        { color: var(--ink); }
+.dark .programme-select,
+.dark .modal,
+.dark .modal-content         { background-color: var(--surface); border-color: var(--line); color: var(--ink); }
+.dark .modal-overlay         { background-color: rgb(0 0 0 / 60%); }
+
+.dark .btn-secondary         { background-color: var(--surface-2); border-color: var(--line-strong); color: var(--ink); }
+.dark .btn-secondary:hover   { background-color: var(--line); }
+.dark .btn-ghost             { color: var(--ink-soft); }
+.dark .btn-ghost:hover       { background-color: var(--surface-2); color: var(--ink); }
+
+/* ── Tables and cards written in plain CSS ─────────────────────── */
+.dark .data-table            { background-color: var(--surface); color: var(--ink); }
+.dark .data-table th         { background-color: var(--surface-2); color: var(--ink-soft); border-color: var(--line); }
+.dark .data-table td         { border-color: var(--line); }
+.dark .data-table tr:hover td { background-color: var(--surface-2); }
+
+/* ── Status blocks (the blue/red notes around line 310 above) ──── */
+.dark .info-box              { background: var(--info-soft); border-color: var(--info-ink); color: var(--info-ink); }
+.dark .error-box             { background: var(--danger-soft); border-color: var(--danger-ink); color: var(--danger-ink); }
+
+/* ── Inventory stock health, which names its own colours ───────── */
+.dark .stock-text-emerald    { color: var(--good-ink); }
+.dark .stock-text-amber      { color: var(--warn-ink); }
+.dark .stock-text-rose       { color: var(--danger-ink); }

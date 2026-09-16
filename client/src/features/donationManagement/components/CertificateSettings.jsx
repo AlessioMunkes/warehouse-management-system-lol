@@ -268,8 +268,8 @@ export default function CertificateSettings() {
         <div
           role="status"
           className={`rounded-md border px-3 py-2 text-sm ${feedback.type === 'error'
-            ? 'border-red-200 bg-red-50 text-red-700'
-            : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}
+            ? 'border-danger bg-danger-soft text-danger'
+            : 'border-good bg-good-soft text-good'}`}
         >
           {feedback.message}
         </div>
@@ -328,7 +328,7 @@ export default function CertificateSettings() {
                           />
                         )}
                         {touched[field.name] && fieldErrors[field.name] && (
-                          <p className="text-xs text-red-600" role="alert">{fieldErrors[field.name]}</p>
+                          <p className="text-xs text-danger" role="alert">{fieldErrors[field.name]}</p>
                         )}
                       </div>
                     ))}

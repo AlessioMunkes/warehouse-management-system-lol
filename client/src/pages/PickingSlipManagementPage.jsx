@@ -60,13 +60,13 @@ const COHORT_OPTIONS = [
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
 const ErrorBanner = ({ message }) => (
-  <div className="p-4 rounded-[4px] bg-[#fff4f2] border-2 border-[#ef3a40] text-[#2b3336] text-sm">
+  <div className="p-4 rounded-[4px] bg-danger-soft border-2 border-brand text-ink text-sm">
     {message}
   </div>
 );
 
 const SuccessBanner = ({ message }) => (
-  <div className="p-4 rounded-[4px] bg-[#f0f9f0] border-2 border-[#3a8a3a] text-[#2b3336] text-sm">
+  <div className="p-4 rounded-[4px] bg-good-soft border-2 border-good text-ink text-sm">
     {message}
   </div>
 );

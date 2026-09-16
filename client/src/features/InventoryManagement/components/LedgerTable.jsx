@@ -26,8 +26,8 @@ const TYPE_LABEL = {
 // Tone follows what the movement means, not its sign: wastage is a
 // loss even though a manual correction downward is not.
 const TYPE_TONE = {
-  wastage:    "border-[#ef3a40] text-[#ef3a40]",
-  adjustment: "border-[#b8860b] text-[#8a6508]",
+  wastage:    "border-brand text-brand",
+  adjustment: "border-warn text-warn",
 };
 
 const fmtWhen = (iso) => {
@@ -102,7 +102,7 @@ export default function LedgerTable({ rows, isLoading }) {
                 </Badge>
               </TableCell>
               <TableCell
-                className={`text-right font-mono text-sm ${m.quantity < 0 ? "text-[#ef3a40]" : ""}`}
+                className={`text-right font-mono text-sm ${m.quantity < 0 ? "text-brand" : ""}`}
               >
                 {fmtQty(m.quantity)} {m.unit}
               </TableCell>

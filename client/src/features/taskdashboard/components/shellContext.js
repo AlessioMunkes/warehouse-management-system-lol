@@ -58,3 +58,32 @@ export const readStoredMotion = () => {
     return false;
   }
 };
+
+// ── The desktop sidebar's collapsed state ──────────────────────
+//
+// Same shape as the motion setting above: seeded once at mount,
+// persisted per device, and harmless when storage is blocked.
+//
+// No context and no document attribute, unlike reduced motion.
+// Nothing outside the shell reads this — the <aside> and its toggle
+// are siblings inside ManagerLayoutShell — so state there plus this
+// key is the whole feature. Reading it in a useState initialiser
+// rather than an effect is what stops the rail flashing open on
+// every page load for someone who keeps it closed.
+export const SIDEBAR_KEY = 'stf_sidebar_collapsed';
+
+export const readStoredSidebar = () => {
+  try {
+    return localStorage.getItem(SIDEBAR_KEY) === 'true';
+  } catch {
+    // Private mode, blocked storage — start expanded, which is the
+    // state that shows someone everything they can reach.
+    return false;
+  }
+};
+
+export const writeStoredSidebar = (collapsed) => {
+  try {
+    localStorage.setItem(SIDEBAR_KEY, String(collapsed));
+  } catch { /* nothing we can do */ }
+};

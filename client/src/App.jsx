@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate }  from 'react-router-dom';
 import { AuthProvider }                            from './context/AuthContext';
+import ThemeProvider                               from './components/layout/ThemeProvider';
 import ProtectedRoute                              from './components/layout/ProtectedRoute';
 import { PACKING, STAFF, DONATIONS, DONATION_INTAKE_ROLES, ADMIN, VOLUNTEERS, VOLUNTEER_MANAGEMENT_ROLES, COMMUNITY_REQUEST_ROLES, STAFF_ROLES } from './routes/paths';
 import LandingPage                                 from './pages/LandingPage';
@@ -51,6 +52,9 @@ import { ReviewPage as DonationReviewPage }         from './pages/ReviewPage';
 
 const App = () => (
   <AuthProvider>
+    {/* Above the router: the setting outlives any one route, and the
+        login screen is as entitled to it as the dashboard. */}
+    <ThemeProvider>
     <BrowserRouter>
       <ToastProvider>
       <Routes>
@@ -216,6 +220,7 @@ const App = () => (
       </Routes>
       </ToastProvider>
     </BrowserRouter>
+    </ThemeProvider>
   </AuthProvider>
 );
 

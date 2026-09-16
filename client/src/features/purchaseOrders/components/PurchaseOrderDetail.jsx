@@ -69,7 +69,7 @@ export default function PurchaseOrderDetail({ purchaseOrder: po, canManage, onAp
             enforces it in SQL — so if the status is returned, there is
             a reason and it belongs on screen. */}
         {po.statusReason ? (
-          <div className="rounded-[4px] border-2 border-[#ef3a40] bg-[#fff4f2] p-3 text-sm">
+          <div className="rounded-[4px] border-2 border-brand bg-danger-soft p-3 text-sm">
             <span className="font-semibold">{po.statusLabel}:</span> {po.statusReason}
           </div>
         ) : null}

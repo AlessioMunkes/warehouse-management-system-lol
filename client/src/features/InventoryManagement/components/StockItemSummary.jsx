@@ -52,8 +52,8 @@ const titleCase = (v) => {
 // under which "what is left" is a problem.
 const Figure = ({ label, value, tone = 'ink' }) => (
   <div className="min-w-0">
-    <dt className="text-xs text-[#676767]">{label}</dt>
-    <dd className={`text-lg font-semibold ${tone === 'warn' ? 'text-[#ef3a40]' : 'text-[#2b3336]'}`}>
+    <dt className="text-xs text-ink-soft">{label}</dt>
+    <dd className={`text-lg font-semibold ${tone === 'warn' ? 'text-brand' : 'text-ink'}`}>
       {value}
     </dd>
   </div>
@@ -61,8 +61,8 @@ const Figure = ({ label, value, tone = 'ink' }) => (
 
 const Fact = ({ label, value }) => (
   <div className="min-w-0">
-    <dt className="text-xs text-[#676767]">{label}</dt>
-    <dd className="break-words text-sm text-[#2b3336]">{value}</dd>
+    <dt className="text-xs text-ink-soft">{label}</dt>
+    <dd className="break-words text-sm text-ink">{value}</dd>
   </div>
 );
 
@@ -112,9 +112,9 @@ export default function StockItemSummary({
           </dl>
 
           <section>
-            <h3 className="mb-1 text-sm font-semibold text-[#2b3336]">Balance over time</h3>
+            <h3 className="mb-1 text-sm font-semibold text-ink">Balance over time</h3>
             {error ? (
-              <p className="py-4 text-sm text-[#ef3a40]">{error}</p>
+              <p className="py-4 text-sm text-brand">{error}</p>
             ) : isLoading ? (
               <Skeleton className="h-[150px] w-full" />
             ) : (
@@ -128,7 +128,7 @@ export default function StockItemSummary({
           </section>
 
           <section>
-            <h3 className="mb-2 text-sm font-semibold text-[#2b3336]">Catalogue</h3>
+            <h3 className="mb-2 text-sm font-semibold text-ink">Catalogue</h3>
             <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
               <Fact label="Category"     value={text(product.category)} />
               <Fact label="Default unit" value={text(product.defaultUnit || product.unit)} />

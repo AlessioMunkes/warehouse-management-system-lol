@@ -25,7 +25,7 @@ import {
 const SortArrow = ({ active, dir }) => (
   <span
     aria-hidden="true"
-    className={`ml-1 inline-block text-[9px] leading-none ${active ? 'text-[#ef3a40]' : 'text-[#b9b3ac]'}`}
+    className={`ml-1 inline-block text-[9px] leading-none ${active ? 'text-brand' : 'text-ink-faint'}`}
   >
     {active ? (dir === 'asc' ? '▲' : '▼') : '▼'}
   </span>
@@ -37,17 +37,17 @@ export default function ReceiptsTable({
 }) {
   if (error) {
     return (
-      <div className="rounded-[4px] border-2 border-[#ef3a40] bg-[#fdf1f1] p-6 text-center">
-        <p className="text-sm font-bold text-[#2b3336]">Could not load records</p>
-        <p className="mt-1 text-sm text-[#676767]">{error}</p>
+      <div className="rounded-[4px] border-2 border-brand bg-danger-soft p-6 text-center">
+        <p className="text-sm font-bold text-ink">Could not load records</p>
+        <p className="mt-1 text-sm text-ink-soft">{error}</p>
       </div>
     );
   }
 
   if (isLoading) {
     return (
-      <div className="rounded-[4px] border-2 border-[#e9e3dd] bg-white p-10 text-center">
-        <p className="text-xs font-bold uppercase tracking-wider text-[#676767]">
+      <div className="rounded-[4px] border-2 border-line bg-surface p-10 text-center">
+        <p className="text-xs font-bold uppercase tracking-wider text-ink-soft">
           Loading records…
         </p>
       </div>
@@ -56,8 +56,8 @@ export default function ReceiptsTable({
 
   if (!rows.length) {
     return (
-      <div className="rounded-[4px] border-2 border-[#e9e3dd] bg-white p-10 text-center">
-        <p className="text-sm text-[#676767]">{emptyMessage}</p>
+      <div className="rounded-[4px] border-2 border-line bg-surface p-10 text-center">
+        <p className="text-sm text-ink-soft">{emptyMessage}</p>
       </div>
     );
   }
@@ -69,10 +69,10 @@ export default function ReceiptsTable({
   };
 
   return (
-    <div className="rounded-[4px] border-2 border-[#e9e3dd] bg-white">
+    <div className="rounded-[4px] border-2 border-line bg-surface">
       <Table>
         <TableHeader>
-          <TableRow className="border-[#e9e3dd]">
+          <TableRow className="border-line">
             {columns.map((c) => {
               const active = c.sortKey && sort === c.sortKey;
               return (
@@ -81,13 +81,13 @@ export default function ReceiptsTable({
                   aria-sort={active ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'}
                   className={`p-0 text-[10px] font-bold uppercase tracking-wider ${
                     c.align === 'right' ? 'text-right' : ''
-                  } ${active ? 'text-[#2b3336]' : 'text-[#676767]'}`}
+                  } ${active ? 'text-ink' : 'text-ink-soft'}`}
                 >
                   {c.sortKey ? (
                     <button
                       type="button"
                       onClick={() => handleSort(c.sortKey)}
-                      className={`flex h-12 w-full items-center px-3 text-[10px] font-bold uppercase tracking-wider hover:text-[#2b3336] ${
+                      className={`flex h-12 w-full items-center px-3 text-[10px] font-bold uppercase tracking-wider hover:text-ink ${
                         c.align === 'right' ? 'justify-end' : 'justify-start'
                       }`}
                     >
@@ -107,20 +107,20 @@ export default function ReceiptsTable({
           {rows.map((row) => (
             <TableRow
               key={rowKey(row)}
-              className="cursor-pointer border-[#e9e3dd] hover:bg-[#faf8f6]"
+              className="cursor-pointer border-line hover:bg-canvas"
               onClick={() => onOpen(row)}
             >
               {columns.map((c) => (
                 <TableCell
                   key={c.key}
-                  className={`text-sm text-[#2b3336] ${c.align === 'right' ? 'text-right' : ''}`}
+                  className={`text-sm text-ink ${c.align === 'right' ? 'text-right' : ''}`}
                 >
                   {c.render(row)}
                 </TableCell>
               ))}
               <TableCell className="text-right">
                 <span
-                  className="rounded-[4px] border-2 border-[#2b3336] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#2b3336]"
+                  className="rounded-[4px] border-2 border-ink px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-ink"
                   aria-hidden="true"
                 >
                   View

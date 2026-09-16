@@ -163,7 +163,7 @@ export default function GmailSettingsPage() {
   const connected = Boolean(status?.connected);
 
   return (
-    <div className="min-h-screen bg-[#f8f5f2]">
+    <div className="min-h-screen bg-canvas">
       <TopNavbar />
       <div className="mx-auto max-w-3xl space-y-6 p-6">
         {displayFeedback && (
@@ -171,15 +171,15 @@ export default function GmailSettingsPage() {
             role="status"
             className={
               displayFeedback.type === 'success'
-                ? 'rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800'
-                : 'rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800'
+                ? 'rounded-md border border-good bg-good-soft px-4 py-3 text-sm text-good'
+                : 'rounded-md border border-danger bg-danger-soft px-4 py-3 text-sm text-danger'
             }
           >
             {displayFeedback.message}
           </div>
         )}
 
-        <Card className="rounded-lg border border-[#e9e3dd] shadow-sm">
+        <Card className="rounded-lg border border-line shadow-sm">
           <CardHeader>
             <CardTitle>Gmail Connection</CardTitle>
             <CardDescription>
@@ -197,16 +197,16 @@ export default function GmailSettingsPage() {
             {loading ? (
               <p className="text-sm text-muted-foreground">Checking Gmail connection status...</p>
             ) : statusError ? (
-              <p className="text-sm text-red-700">{statusError}</p>
+              <p className="text-sm text-danger">{statusError}</p>
             ) : (
               <dl className="grid gap-3 text-sm">
                 <div>
                   <dt className="font-medium text-muted-foreground">Gmail Status</dt>
                   <dd className="mt-1">
                     {connected ? (
-                      <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Connected</Badge>
+                      <Badge className="bg-good-soft text-good hover:bg-good-soft">Connected</Badge>
                     ) : (
-                      <Badge variant="outline" className="text-red-700 border-red-300">Disconnected</Badge>
+                      <Badge variant="outline" className="text-danger border-danger">Disconnected</Badge>
                     )}
                   </dd>
                 </div>
@@ -214,7 +214,7 @@ export default function GmailSettingsPage() {
                   <>
                     <div>
                       <dt className="font-medium text-muted-foreground">Connected Email Address</dt>
-                      <dd className="mt-1 break-words text-[#2b3336]">{status.email || 'Unknown'}</dd>
+                      <dd className="mt-1 break-words text-ink">{status.email || 'Unknown'}</dd>
                     </div>
                     <div>
                       <dt className="font-medium text-muted-foreground">Display Name</dt>
@@ -264,7 +264,7 @@ export default function GmailSettingsPage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-lg border border-[#e9e3dd] shadow-sm">
+        <Card className="rounded-lg border border-line shadow-sm">
           <CardHeader>
             <CardTitle>Send Test Email</CardTitle>
             <CardDescription>

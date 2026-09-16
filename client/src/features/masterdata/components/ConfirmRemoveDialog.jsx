@@ -101,13 +101,13 @@ export default function ConfirmRemoveDialog({
             </p>
           </div>
 
-          <div className="min-w-0 rounded-md border border-[#ef3a40]/40 bg-[#fff4f2] px-3 py-2">
-            <p className="font-semibold text-[#ef3a40]">Delete</p>
-            <p className="text-[#2b3336]">
+          <div className="min-w-0 rounded-md border border-brand/40 bg-danger-soft px-3 py-2">
+            <p className="font-semibold text-brand">Delete</p>
+            <p className="text-ink">
               That, and it leaves this screen for good.{' '}
               <span className="font-semibold">Cannot be undone.</span>
             </p>
-            <p className="mt-1 text-[#2b3336]">{historyNote}</p>
+            <p className="mt-1 text-ink">{historyNote}</p>
           </div>
         </div>
 
@@ -147,7 +147,7 @@ export default function ConfirmRemoveDialog({
             size="sm"
             disabled={busy}
             onClick={onDelete}
-            className="border-[#ef3a40] text-[#ef3a40] hover:bg-[#ef3a40] hover:text-white"
+            className="border-brand text-brand hover:bg-brand hover:text-on-brand"
           >
             <Trash2 />
             Delete permanently

@@ -87,12 +87,12 @@ const COLUMNS = [
 // SupplierDirectoryPage / InventoryManagementPage. One error style
 // per app.
 const ErrorBanner = ({ message, onRetry }) => (
-  <div className="p-4 rounded-[4px] bg-[#fff4f2] border-2 border-[#ef3a40] text-[#2b3336] text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+  <div className="p-4 rounded-[4px] bg-danger-soft border-2 border-brand text-ink text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
     <span>{message}</span>
     {onRetry ? (
       <button
         onClick={onRetry}
-        className="text-xs sm:text-sm font-semibold underline hover:text-[#ef3a40] focus:outline-none"
+        className="text-xs sm:text-sm font-semibold underline hover:text-brand focus:outline-none"
       >
         Try again
       </button>
@@ -146,7 +146,7 @@ const UserDetail = ({ targetUser, canManage, isSelf, onEdit, onToggleActive, onR
                 type="button"
                 variant="outline"
                 onClick={onRemove}
-                className="border-[#ef3a40] text-[#ef3a40] hover:bg-[#ef3a40] hover:text-white"
+                className="border-brand text-brand hover:bg-brand hover:text-on-brand"
               >
                 <Trash2 />
                 Delete

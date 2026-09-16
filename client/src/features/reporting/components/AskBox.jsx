@@ -18,7 +18,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-const MUTED = '#676767';
+const MUTED = 'var(--ink-soft)';
 
 const SUGGESTIONS = [
   'How many children did we reach last month?',
@@ -62,7 +62,7 @@ export default function AskBox({ onReport, disabled }) {
   const answerClarification = (option) => submit(`${question} (${option})`);
 
   return (
-    <div className="rounded-[4px] border-2 border-[#e9e3dd] bg-white p-4 sm:p-5">
+    <div className="rounded-[4px] border-2 border-line bg-surface p-4 sm:p-5">
       <label htmlFor="ask" className="block text-sm font-medium mb-2">
         Ask about your data
       </label>
@@ -81,7 +81,7 @@ export default function AskBox({ onReport, disabled }) {
           type="button"
           onClick={() => submit()}
           disabled={disabled || busy || !question.trim()}
-          className="bg-[#2b3336] hover:bg-black text-white font-bold text-xs tracking-wider rounded-[4px] px-5 shrink-0"
+          className="bg-ink hover:bg-ink/90 text-on-ink font-bold text-xs tracking-wider rounded-[4px] px-5 shrink-0"
         >
           {busy ? '…' : 'ASK'}
         </Button>
@@ -95,7 +95,7 @@ export default function AskBox({ onReport, disabled }) {
               type="button"
               onClick={() => submit(s)}
               disabled={disabled || busy}
-              className="rounded-full border border-[#e9e3dd] px-3 py-1.5 text-xs hover:border-[#2b3336] disabled:opacity-50"
+              className="rounded-full border border-line px-3 py-1.5 text-xs hover:border-ink disabled:opacity-50"
               style={{ color: MUTED }}
             >
               {s}
@@ -114,7 +114,7 @@ export default function AskBox({ onReport, disabled }) {
                 type="button"
                 onClick={() => answerClarification(o)}
                 disabled={busy}
-                className="rounded-full border-2 border-[#2b3336] px-3 py-1.5 text-xs font-medium hover:bg-[#2b3336] hover:text-white"
+                className="rounded-full border-2 border-ink px-3 py-1.5 text-xs font-medium hover:bg-ink hover:text-on-ink"
               >
                 {o}
               </button>
@@ -126,7 +126,7 @@ export default function AskBox({ onReport, disabled }) {
       {error && (
         <p role="alert" className="mt-3 text-sm">
           {/* Icon plus text, never colour alone — ACC-03. */}
-          <span aria-hidden="true" className="mr-2 font-bold text-[#ef3a40]">!</span>
+          <span aria-hidden="true" className="mr-2 font-bold text-brand">!</span>
           {error}
         </p>
       )}
