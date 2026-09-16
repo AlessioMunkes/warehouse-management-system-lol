@@ -122,10 +122,10 @@ export function ProductMatchCombobox({ value, label, onSelect }) {
         </button>
       ) : null}
       {isSearching ? (
-        <div style={{ fontSize: 12, color: "#676767", padding: "4px 0" }}>Searching…</div>
+        <div style={{ fontSize: 12, color: "var(--ink-soft)", padding: "4px 0" }}>Searching…</div>
       ) : null}
       {searchError ? (
-        <div style={{ fontSize: 12, color: "#ef3a40", padding: "4px 0" }}>{searchError}</div>
+        <div style={{ fontSize: 12, color: "var(--brand)", padding: "4px 0" }}>{searchError}</div>
       ) : null}
       {isOpen && results.length > 0 ? (
         <ul
@@ -138,7 +138,7 @@ export function ProductMatchCombobox({ value, label, onSelect }) {
             margin: 0,
             padding: "4px 0",
             listStyle: "none",
-            background: "#fff",
+            background: "var(--surface)",
             border: "1px solid #e9e3dd",
             borderRadius: 8,
             boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
@@ -163,8 +163,8 @@ export function ProductMatchCombobox({ value, label, onSelect }) {
                 }}
               >
                 <span style={{ fontWeight: 600 }}>{product.name}</span>
-                {product.sku ? <span style={{ color: "#676767" }}> · {product.sku}</span> : null}
-                {product.weight_kg != null ? <span style={{ color: "#676767" }}> · {product.weight_kg} kg</span> : null}
+                {product.sku ? <span style={{ color: "var(--ink-soft)" }}> · {product.sku}</span> : null}
+                {product.weight_kg != null ? <span style={{ color: "var(--ink-soft)" }}> · {product.weight_kg} kg</span> : null}
               </button>
             </li>
           ))}

@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/select';
 import ReportChart from './ReportChart';
 
-const CHARCOAL = '#2b3336', MUTED = '#676767', BORDER = '#e9e3dd', RED = '#ef3a40';
+const CHARCOAL = 'var(--ink)', MUTED = 'var(--ink-soft)', BORDER = 'var(--line)', RED = 'var(--brand)';
 
 const AGGREGATIONS = [
   { value: 'sum',     label: 'Total' },
@@ -145,7 +145,7 @@ export default function DataUpload() {
             style={{
               borderColor: dragging ? CHARCOAL : BORDER,
               color: MUTED,
-              background: dragging ? '#faf9f7' : 'transparent',
+              background: dragging ? 'var(--surface-2)' : 'transparent',
             }}
           >
             {busy ? 'Reading…' : 'Drop a CSV or Excel file here, or click to choose one'}

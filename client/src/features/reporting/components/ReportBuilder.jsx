@@ -141,13 +141,13 @@ export default function ReportBuilder({
           reading it sees exactly what the system thinks this report
           means. */}
       {metric?.description && (
-        <p className="mt-4 text-sm leading-relaxed" style={{ color: '#676767' }}>
+        <p className="mt-4 text-sm leading-relaxed" style={{ color: 'var(--ink-soft)' }}>
           {metric.description}
         </p>
       )}
 
       {isSnapshot && (
-        <p className="mt-2 text-xs" style={{ color: '#676767' }}>
+        <p className="mt-2 text-xs" style={{ color: 'var(--ink-soft)' }}>
           This is a live figure — it shows the current position, not a period.
         </p>
       )}

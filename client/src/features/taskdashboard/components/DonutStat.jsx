@@ -24,7 +24,11 @@ export default function DonutStat({ segments, centerLabel, centerValue }) {
       <svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`} className="shrink-0">
         <circle
           cx={SIZE / 2} cy={SIZE / 2} r={RADIUS}
-          fill="none" stroke="#e9e3dd" strokeWidth={STROKE}
+          fill="none" strokeWidth={STROKE}
+          // The unfilled part of the ring. style rather than a stroke=""
+          // attribute because a CSS variable in a presentation attribute
+          // is not something every browser this runs on has to agree on.
+          style={{ stroke: 'var(--line)' }}
         />
         {total > 0 ? segments.map((seg) => {
           const fraction = seg.value / total;
@@ -33,7 +37,8 @@ export default function DonutStat({ segments, centerLabel, centerValue }) {
             <circle
               key={seg.label}
               cx={SIZE / 2} cy={SIZE / 2} r={RADIUS}
-              fill="none" stroke={seg.color} strokeWidth={STROKE}
+              fill="none" strokeWidth={STROKE}
+              style={{ stroke: seg.color }}
               strokeDasharray={`${dash} ${CIRCUMFERENCE - dash}`}
               strokeDashoffset={-offset}
               transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}

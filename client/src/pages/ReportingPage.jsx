@@ -29,9 +29,9 @@ import DataUpload   from '../features/reporting/components/DataUpload';
 import { resolvePreset, DEFAULT_PRESET } from '../features/reporting/dateRanges';
 import { getCatalog, runReport } from '../services/reportingAPI';
 
-const CHARCOAL = '#2b3336';
-const MUTED    = '#676767';
-const BORDER   = '#e9e3dd';
+const CHARCOAL = 'var(--ink)';
+const MUTED    = 'var(--ink-soft)';
+const BORDER   = 'var(--line)';
 
 export default function ReportingPage() {
   const [catalog, setCatalog]     = useState(null);
@@ -174,7 +174,7 @@ export default function ReportingPage() {
           <div
             role="alert"
             className="mt-5 rounded-[4px] border-2 p-4 text-sm"
-            style={{ borderColor: '#ef3a40', color: CHARCOAL }}
+            style={{ borderColor: 'var(--brand)', color: CHARCOAL }}
           >
             <span aria-hidden="true" className="mr-2 font-bold text-brand">!</span>
             {error}

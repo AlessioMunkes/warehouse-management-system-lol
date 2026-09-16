@@ -24,10 +24,10 @@ import { buildSeries } from '../balanceSeries';
 // Brand ink and accent. Deliberately not the status red used for
 // "Shortfall" badges elsewhere — this line is identity ("the balance"),
 // not a judgement about it.
-const LINE   = '#ef3a40';
-const GRID   = '#e9e3dd';
-const INK    = '#2b3336';
-const MUTED  = '#676767';
+const LINE   = 'var(--brand)';
+const GRID   = 'var(--line)';
+const INK    = 'var(--ink)';
+const MUTED  = 'var(--ink-soft)';
 
 const PAD = { top: 12, right: 56, bottom: 22, left: 8 };
 const H = 150;
@@ -119,7 +119,7 @@ export default function BalanceChart({ movements, onHand, reorderAt = 0, unit = 
         {/* The endpoint, direct-labelled. The only value on the plot
             that gets a number of its own. */}
         <circle cx={x(last.t)} cy={y(last.v)} r="4"
-                fill={LINE} stroke="#ffffff" strokeWidth="2" />
+                fill={LINE} stroke="var(--surface)" strokeWidth="2" />
         <text x={x(last.t) + 8} y={y(last.v) + 4}
               fontSize="11" fontWeight="600" fill={INK}>
           {fmtNum(last.v)}{unit ? ` ${unit}` : ''}
@@ -137,7 +137,7 @@ export default function BalanceChart({ movements, onHand, reorderAt = 0, unit = 
             <line x1={x(active.t)} x2={x(active.t)} y1={PAD.top} y2={PAD.top + innerH}
                   stroke={INK} strokeWidth="1" strokeOpacity="0.25" />
             <circle cx={x(active.t)} cy={y(active.v)} r="4"
-                    fill={LINE} stroke="#ffffff" strokeWidth="2" />
+                    fill={LINE} stroke="var(--surface)" strokeWidth="2" />
           </g>
         ) : null}
 

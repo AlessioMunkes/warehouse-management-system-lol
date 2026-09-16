@@ -18,7 +18,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-const MUTED = '#676767';
+const MUTED = 'var(--ink-soft)';
 
 const SUGGESTIONS = [
   'How many children did we reach last month?',

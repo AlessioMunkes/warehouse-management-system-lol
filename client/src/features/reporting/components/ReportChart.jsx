@@ -25,7 +25,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 
-const RED = '#ef3a40', CHARCOAL = '#2b3336', BORDER = '#e9e3dd', MUTED = '#676767';
+const RED = 'var(--brand)', CHARCOAL = 'var(--ink)', BORDER = 'var(--line)', MUTED = 'var(--ink-soft)';
 
 // Percentages keep a decimal; counts and weights read better whole.
 // "94.7 children" would be nonsense on screen.
