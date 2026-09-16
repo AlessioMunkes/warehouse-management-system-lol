@@ -50,7 +50,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Search, CalendarPlus, PackagePlus, X, ArrowLeft, QrCode, Printer } from 'lucide-react';
-import { openLabelPdf } from '../features/packing/palletLabelPdf';
+import { openLabelPdf, publicAppOrigin } from '../features/packing/palletLabelPdf';
 
 const COHORT_OPTIONS = [
   { value: 'week1', label: 'Week 1' },
@@ -248,6 +248,8 @@ export default function PickingSlipManagementPage() {
       return;
     }
 
+    // Origin passed explicitly rather than left to the module's default,
+    // so what a label points at is visible here at the call site.
     const { opened, skipped } = openLabelPdf(
       withToken.map((r) => ({
         public_token: r.public_token,
@@ -257,6 +259,7 @@ export default function PickingSlipManagementPage() {
         // reads as the previous day once a timezone is applied to it.
         dispatch_date_display: r.dispatch_date_iso,
       })),
+      { origin: publicAppOrigin() },
     );
 
     if (!opened) {
@@ -447,8 +450,15 @@ export default function PickingSlipManagementPage() {
                 <QrCode />
                 Print pallet labels ({filteredSlips.length})
               </Button>
+              {/* The destination is shown, not assumed. A label pointing
+                  at a host that is not reachable from a phone looks
+                  correct on paper and only fails when a volunteer scans
+                  it in the warehouse — by which time the stack is taped
+                  to the pallets. */}
               <p className="text-sm text-muted-foreground">
                 One page per pallet, for {viewDate}. Tape each to its pallet before volunteers arrive.
+                <br />
+                Codes will open <span className="font-mono">{publicAppOrigin()}/slip/…</span>
               </p>
             </div>
             {labelError ? <p className="text-sm text-destructive">{labelError}</p> : null}

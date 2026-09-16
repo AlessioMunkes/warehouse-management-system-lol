@@ -17,7 +17,7 @@ import { describe, it, expect } from 'vitest';
 // eslint config is browser-global, where Buffer is not defined.
 import { Buffer } from 'node:buffer';
 import {
-  buildLabelPdf, shortCodeOf, slipUrlFor,
+  buildLabelPdf, shortCodeOf, slipUrlFor, publicAppOrigin,
 } from '../features/packing/palletLabelPdf';
 
 const TOKEN = '0f574c6f-a6c1-4f12-827d-d64424a8ea04';
@@ -54,6 +54,31 @@ describe('slipUrlFor', () => {
   it('builds the BR-22 slip URL the QR resolves to', () => {
     expect(slipUrlFor(TOKEN, 'https://wms.example.org'))
       .toBe(`https://wms.example.org/slip/${TOKEN}`);
+  });
+});
+
+// Where a printed label points is the one thing on the page that cannot
+// be checked by reading it — a dead host looks fine on paper and fails
+// in the warehouse. It must never be a literal.
+describe('publicAppOrigin', () => {
+  it('is never a hardcoded domain', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { fileURLToPath } = await import('node:url');
+    const src = readFileSync(
+      fileURLToPath(new URL('../features/packing/palletLabelPdf.js', import.meta.url)), 'utf8');
+
+    // No absolute http(s) URL may appear outside a comment.
+    const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    expect(code).not.toMatch(/https?:\/\/[a-z0-9.-]+/i);
+  });
+
+  it('derives from the browser origin when nothing is configured', () => {
+    expect(publicAppOrigin()).toBe('');   // no window in node, no env set
+  });
+
+  it('strips a trailing slash so the URL has no double slash', () => {
+    expect(slipUrlFor('tok', 'https://x.test/')).toBe('https://x.test/slip/tok');
+    expect(slipUrlFor('tok', 'https://x.test//')).toBe('https://x.test/slip/tok');
   });
 });
 

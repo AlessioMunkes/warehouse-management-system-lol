@@ -80,10 +80,43 @@ const TYPE_NUMBER = 0;
 // idea what a QR code is.
 export const shortCodeOf = (token) => String(token || '').slice(-6).toLowerCase();
 
+// ── Where a printed label points ──────────────────────────────
+// This is the one value on the page that cannot be checked by reading
+// it: a label pointing at a dead host looks perfectly fine until a
+// volunteer scans it in a warehouse.
+//
+// So it is DERIVED, never written down. Render deploys the API and the
+// client as one service from one origin (see render.yaml), so the page
+// doing the printing is already served from the host the label must
+// point at — window.location.origin is therefore right by construction
+// in every deployed environment, and stays right if the Render URL
+// changes or a custom domain is put in front of it.
+//
+// VITE_PUBLIC_APP_ORIGIN overrides it, for the one case the derivation
+// cannot cover: printing from one host for a volunteer who will scan on
+// another (a custom domain added in front of the Render URL, say).
+// Same shape as API_BASE in services/api.js.
+//
+// Resolves to:
+//   dev      http://localhost:5173   (the Vite origin — correct; the
+//                                     /slip route is a client route)
+//   Render   https://<service>.onrender.com
+//   override whatever VITE_PUBLIC_APP_ORIGIN is set to
+export const publicAppOrigin = () => {
+  const configured =
+    (typeof import.meta !== 'undefined' && import.meta.env?.VITE_PUBLIC_APP_ORIGIN) || '';
+  const fromBrowser =
+    (typeof window !== 'undefined' && window.location?.origin) || '';
+  // Trailing slash stripped, or the URL ends up with a double slash
+  // before /slip and some scanners present that as a different link.
+  return String(configured || fromBrowser).replace(/\/+$/, '');
+};
+
 // The URL the QR resolves to. Absolute, because the scan happens in a
-// camera app with no page context.
+// camera app that has no page context to resolve a relative path
+// against.
 export const slipUrlFor = (token, origin) =>
-  `${origin || window.location.origin}/slip/${token}`;
+  `${(origin || publicAppOrigin()).replace(/\/+$/, '')}/slip/${token}`;
 
 // ── The QR itself ─────────────────────────────────────────────
 // Drawn as one filled rectangle per dark module. jsPDF rectangles are
