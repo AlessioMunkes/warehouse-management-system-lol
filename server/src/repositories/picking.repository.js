@@ -35,6 +35,52 @@ const logEvent = async (client, slipId, eventType, actorId, detail = null) => {
   );
 };
 
+// ── Who is acting: staff or a guest ───────────────────────────
+// Staff are `users` rows; guests are `volunteers` rows. Two id spaces
+// that overlap, on one cookie, distinguished only by role — so the
+// actor has to carry its own type rather than being inferred from a
+// bare number.
+//
+// { type: 'user' | 'volunteer', id }
+//
+// Callers that pass the old `actorId` keep working unchanged: they are
+// staff by definition, because until guests existed there was nothing
+// else to be.
+const asActor = (actor, actorId) => actor ?? { type: 'user', id: actorId };
+const isVolunteer = (actor) => actor.type === 'volunteer';
+
+// NEVER write a volunteer id into actor_id / confirmed_by / completed_by.
+//
+// All three are int4 with a FOREIGN KEY to users(id), and volunteers.id
+// is int8. The FK does not protect us here — it ACCEPTS the write
+// whenever the number happens to exist in users, and the ranges overlap
+// badly: users run 1-346, volunteers run 1-7, and 6 of the 7 current
+// volunteers collide with a real staff account. Volunteer 1 is users
+// row 1, which is admin001. A guest packing a pallet would be recorded,
+// permanently and plausibly, as the administrator.
+//
+// So a guest's actor column is NULL and the attribution goes in the
+// jsonb detail instead, where there is no type to collide with. If you
+// are tempted to "fix" this by casting, read the FK first.
+const actorUserId = (actor) => (isVolunteer(actor) ? null : actor.id);
+
+const actorDetail = (actor, detail = null) =>
+  (isVolunteer(actor)
+    ? { ...(detail ?? {}), actor_type: 'volunteer', volunteer_id: actor.id }
+    : detail);
+
+// node-postgres hands back int8 as a STRING and int4 as a number, so a
+// volunteer id off the JWT is '7' while a slip id is 7. Comparing those
+// with !== is always true, which would forbid every guest write with no
+// visible reason. Compare as text.
+const sameId = (a, b) => a !== null && a !== undefined && b !== null && b !== undefined && String(a) === String(b);
+
+// The owner of a slip depends on who is asking: staff hold it through
+// assigned_to, guests through assigned_volunteer_id. Two columns, never
+// interchangeable.
+const slipOwnerFor = (actor, slip) =>
+  (isVolunteer(actor) ? slip.assigned_volunteer_id : slip.assigned_to);
+
 // ── Rotation anchor ────────────────────────────────────────────
 // The Monday of a known 'week1' week — the service layer uses this
 // to compute which cohort is active for any given dispatch date.
@@ -385,13 +431,14 @@ const assignSlip = async ({ slipId, packerId, actorId, canOverride = false }) =>
 // so the board and the slip can show it. Silently accepting a
 // mismatched confirm is how a short pallet reaches the gate looking
 // complete.
-const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReason, actorId, canOverride = false }) => {
+const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReason, actorId, actor, canOverride = false }) => {
+  const who = asActor(actor, actorId);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
     const slipResult = await client.query(
-      `SELECT id, status, assigned_to FROM picking_slips WHERE id = $1 FOR UPDATE`,
+      `SELECT id, status, assigned_to, assigned_volunteer_id FROM picking_slips WHERE id = $1 FOR UPDATE`,
       [slipId]
     );
     const slip = slipResult.rows[0];
@@ -409,7 +456,9 @@ const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReaso
     // Doing this here (rather than after setItemStatus returns) means a
     // refused packer cannot mutate the row at all. The FOR UPDATE above
     // also closes the race where a slip is reassigned mid-check.
-    if (!canOverride && slip.assigned_to !== actorId) {
+    // A guest is measured against assigned_volunteer_id, staff against
+    // assigned_to. The staff rule is unchanged.
+    if (!canOverride && !sameId(slipOwnerFor(who, slip), who.id)) {
       await client.query('ROLLBACK');
       return { forbidden: true, assignedTo: slip.assigned_to };
     }
@@ -423,7 +472,8 @@ const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReaso
            confirmed_at    = NOW()
        WHERE id = $5 AND picking_slip_id = $6
        RETURNING *, (packed_quantity - required_quantity) AS quantity_variance`,
-      [status, packedQuantity ?? null, flagReason ?? null, actorId, itemId, slipId]
+      // confirmed_by is NULL for a guest — see actorUserId above.
+      [status, packedQuantity ?? null, flagReason ?? null, actorUserId(who), itemId, slipId]
     );
 
     if (!result.rows[0]) { await client.query('ROLLBACK'); return { notFound: true }; }
@@ -442,15 +492,17 @@ const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReaso
       ? { required, packed, difference: Number(rawVariance) }
       : null;
 
+    // Same event vocabulary for guests as for staff. A guest_* event type
+    // would drop every guest action out of the existing reporting queries.
     await logEvent(
       client, slipId,
       status === 'flagged' ? 'item_flagged' : 'item_confirmed',
-      actorId,
-      { item_id: itemId, required_quantity: required, packed_quantity: packedQuantity, flag_reason: flagReason }
+      actorUserId(who),
+      actorDetail(who, { item_id: itemId, required_quantity: required, packed_quantity: packedQuantity, flag_reason: flagReason })
     );
 
     if (variance) {
-      await logEvent(client, slipId, 'item_variance', actorId, { item_id: itemId, ...variance });
+      await logEvent(client, slipId, 'item_variance', actorUserId(who), actorDetail(who, { item_id: itemId, ...variance }));
     }
 
     await client.query('COMMIT');
@@ -496,13 +548,14 @@ const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReaso
 // read anyway — a stable order makes the warning list reproducible
 // between runs, and it keeps this query shaped like the one in
 // dispatch.repository.collect() that does still lock.
-const completeSlip = async ({ slipId, palletRef, actorId, canOverride = false }) => {
+const completeSlip = async ({ slipId, palletRef, actorId, actor, canOverride = false }) => {
+  const who = asActor(actor, actorId);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
     const slipResult = await client.query(
-      `SELECT id, status, assigned_to FROM picking_slips WHERE id = $1 FOR UPDATE`,
+      `SELECT id, status, assigned_to, assigned_volunteer_id FROM picking_slips WHERE id = $1 FOR UPDATE`,
       [slipId]
     );
     const slip = slipResult.rows[0];
@@ -515,7 +568,7 @@ const completeSlip = async ({ slipId, palletRef, actorId, canOverride = false })
     // Same ownership rule as confirm/flag. Closing a pallet is what
     // makes it eligible for the gate, so it can't be looser than the
     // writes that lead up to it.
-    if (!canOverride && slip.assigned_to !== actorId) {
+    if (!canOverride && !sameId(slipOwnerFor(who, slip), who.id)) {
       await client.query('ROLLBACK');
       return { forbidden: true, assignedTo: slip.assigned_to };
     }
@@ -618,15 +671,18 @@ const completeSlip = async ({ slipId, palletRef, actorId, canOverride = false })
            pallet_ref   = COALESCE($2, pallet_ref)
        WHERE id = $3
        RETURNING *`,
-      [actorId, palletRef ?? null, slipId]
+      // completed_by is the third int4 FK to users(id), and carries the
+      // same hazard as actor_id and confirmed_by — NULL for a guest.
+      // assigned_volunteer_id already records which volunteer held it.
+      [actorUserId(who), palletRef ?? null, slipId]
     );
 
-    await logEvent(client, slipId, 'completed', actorId, { pallet_ref: palletRef });
+    await logEvent(client, slipId, 'completed', actorUserId(who), actorDetail(who, { pallet_ref: palletRef }));
     if (shortfalls.length > 0) {
-      await logEvent(client, slipId, 'stock_shortfall', actorId, { shortfalls });
+      await logEvent(client, slipId, 'stock_shortfall', actorUserId(who), actorDetail(who, { shortfalls }));
     }
     if (unitMismatches.length > 0) {
-      await logEvent(client, slipId, 'unit_mismatch', actorId, { unitMismatches });
+      await logEvent(client, slipId, 'unit_mismatch', actorUserId(who), actorDetail(who, { unitMismatches }));
     }
 
     await client.query('COMMIT');

@@ -25,7 +25,7 @@ const makeClient = (slip) => {
     release: vi.fn(),
     query: vi.fn(async (sql) => {
       calls.push(sql.replace(/\s+/g, ' ').trim());
-      if (/SELECT id, status, assigned_to FROM picking_slips/i.test(sql)) {
+      if (/SELECT id, status, assigned_to.*FROM picking_slips/i.test(sql)) {
         return { rows: slip ? [slip] : [] };
       }
       if (/UPDATE picking_slip_items/i.test(sql)) {
@@ -168,7 +168,7 @@ describe('setItemStatus — quantity variance', () => {
     const client = makeClient({ id: 1, status: 'in_progress', assigned_to: OWNER });
     client.query = vi.fn(async (s) => {
       client.calls.push(s.replace(/\s+/g, ' ').trim());
-      if (/SELECT id, status, assigned_to FROM picking_slips/i.test(s)) {
+      if (/SELECT id, status, assigned_to.*FROM picking_slips/i.test(s)) {
         return { rows: [{ id: 1, status: 'in_progress', assigned_to: OWNER }] };
       }
       if (/UPDATE picking_slip_items/i.test(s)) {
@@ -216,7 +216,7 @@ const assignClient = (slip) => {
     release: vi.fn(),
     query: vi.fn(async (sql) => {
       calls.push(sql.replace(/\s+/g, ' ').trim());
-      if (/SELECT id, status, assigned_to FROM picking_slips/i.test(sql)) {
+      if (/SELECT id, status, assigned_to.*FROM picking_slips/i.test(sql)) {
         return { rows: slip ? [slip] : [] };
       }
       if (/UPDATE picking_slips/i.test(sql)) {
