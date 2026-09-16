@@ -6,6 +6,9 @@ import LandingPage                                 from './pages/LandingPage';
 import LoginPage                                   from './pages/LoginPage';
 import GuestLoginPage                              from './pages/GuestLoginPage';
 import GuestHomePage                               from './pages/GuestHomePage';
+import GuestPackPage                               from './pages/GuestPackPage';
+import GuestDonePage                               from './pages/GuestDonePage';
+import SlipPreviewPage                             from './pages/SlipPreviewPage';
 import PageNotFound                               from "./pages/PageNotFound";
 //import SelectNOCjob                                from './pages/SelectNOCjob';
 
@@ -55,6 +58,12 @@ const App = () => (
         <Route path="/"      element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/guest" element={<GuestLoginPage />} />
+        {/* BR-22: the stable public URL behind every pallet's QR code.
+            Deliberately OUTSIDE ProtectedRoute — the whole point is that
+            a volunteer holding a printed poster reaches it with no
+            account and no session. The preview it shows carries only
+            what is already printed on that poster. */}
+        <Route path="/slip/:token" element={<SlipPreviewPage />} />
          
         
         {/* ── Admin only ─────────────────────────────────────
@@ -202,9 +211,11 @@ const App = () => (
           <Route path={STAFF.communityRequests} element={<CommunityRequestsPage />} />
         </Route>
 
-        {/* Guest-only */}
+        {/* Guest-only — the Love Activist screens. */}
         <Route element={<ProtectedRoute roles={['guest']} />}>
-          <Route path="/guest-home" element={<GuestHomePage />} />
+          <Route path="/guest-home"  element={<GuestHomePage />} />
+          <Route path="/guest/pack"  element={<GuestPackPage />} />
+          <Route path="/guest/done"  element={<GuestDonePage />} />
         </Route>
 
         {/* Redirects */}
