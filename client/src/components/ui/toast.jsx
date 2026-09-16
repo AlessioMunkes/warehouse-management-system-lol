@@ -83,7 +83,13 @@ export function ToastProvider({ children }) {
         aria-live="polite"
         aria-atomic="false"
         className="pointer-events-none fixed right-4 z-[100] flex w-[min(22rem,calc(100vw-2rem))] flex-col gap-2"
-        style={{ bottom: 'calc(var(--stf-tabbar-h, 0px) + 1rem)' }}
+        // --wms-assistant-h is published by AssistantLauncher, which
+        // also lives bottom-right, and has the MEASURED tab bar height
+        // baked into it. Two things this fixes: the help button no
+        // longer covers an Undo, and toasts no longer sit on top of
+        // the staff tab bar — --stf-tabbar-h is scoped to the staff
+        // shell's own element, so out here it has always been 0.
+        style={{ bottom: 'calc(var(--stf-tabbar-h, 0px) + var(--wms-assistant-h, 0px) + 1rem)' }}
       >
         {toasts.map((t) => {
           const { icon: Icon, cls } = VARIANT[t.variant] ?? VARIANT.default;
