@@ -119,7 +119,7 @@ export default function DataUpload() {
 
   return (
     <section
-      className="rounded-[4px] border-2 border-dashed bg-white p-4 sm:p-5"
+      className="rounded-[4px] border-2 border-dashed bg-surface p-4 sm:p-5"
       style={{ borderColor: BORDER }}
     >
       <header className="mb-3">

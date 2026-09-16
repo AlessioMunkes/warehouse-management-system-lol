@@ -103,7 +103,7 @@ const ImpactPanel = ({ title, metric, dimensions, defaultDimension }) => {
             number — ask whoever manages the reporting settings to set one.
           </p>
         ) : error ? (
-          <p className="rounded-[4px] border-2 border-[#ef3a40] bg-[#fff4f2] p-3 text-sm">{error}</p>
+          <p className="rounded-[4px] border-2 border-brand bg-danger-soft p-3 text-sm">{error}</p>
         ) : report ? (
           <>
             <p className="mb-3 text-sm text-muted-foreground">{report.description}</p>

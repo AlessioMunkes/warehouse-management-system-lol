@@ -45,7 +45,7 @@ const BENEFICIARY_LABELS = {
 const DONUT_COLORS = ['#2b3336', '#ef3a40', '#c9a86a', '#6b8f71', '#8a8a8a'];
 
 const ErrorBanner = ({ message }) => (
-  <div className="p-3 rounded-[4px] bg-[#fff4f2] border-2 border-[#ef3a40] text-[#2b3336] text-sm">
+  <div className="p-3 rounded-[4px] bg-danger-soft border-2 border-brand text-ink text-sm">
     {message}
   </div>
 );
@@ -67,7 +67,7 @@ const RankedBars = ({ rows, labelFor }) => {
             </div>
             <div className="mt-1 h-1.5 rounded-full bg-muted">
               <div
-                className="h-1.5 rounded-full bg-[#2b3336]"
+                className="h-1.5 rounded-full bg-ink"
                 style={{ width: `${(value / max) * 100}%` }}
               />
             </div>

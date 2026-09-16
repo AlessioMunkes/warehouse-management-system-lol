@@ -121,10 +121,10 @@ export default function VolunteerEventWorkspacePage() {
   const event = workspace?.event;
   const eventIsActive = event && !['COMPLETED', 'CANCELLED'].includes(event.status);
 
-  return <div className="min-h-screen bg-white text-[#2b3336] font-['Montserrat',sans-serif]">
+  return <div className="min-h-screen bg-surface text-ink font-['Montserrat',sans-serif]">
     <main className="px-4 sm:px-6 py-6 max-w-6xl mx-auto grid gap-6">
       <div><Link className={buttonVariants({ variant: 'outline' })} to={VOLUNTEERS.events}>Back to events</Link></div>
-      {error && <div role="alert" className="p-4 rounded-[4px] bg-[#fff4f2] border-2 border-[#ef3a40] text-sm flex justify-between gap-3"><span>{error}</span><Button variant="outline" onClick={refresh}>Try again</Button></div>}
+      {error && <div role="alert" className="p-4 rounded-[4px] bg-danger-soft border-2 border-brand text-sm flex justify-between gap-3"><span>{error}</span><Button variant="outline" onClick={refresh}>Try again</Button></div>}
       {success && <div role="status" className="rounded-md border bg-muted p-3 text-sm">{success}</div>}
       {/* Keep all workspace panels backed by the same event snapshot. */}
       {isLoading ? <div role="status" aria-label="Loading event workspace" className="grid gap-4"><Skeleton className="h-28 w-full" /><Skeleton className="h-64 w-full" /><Skeleton className="h-64 w-full" /></div> : event ? <>

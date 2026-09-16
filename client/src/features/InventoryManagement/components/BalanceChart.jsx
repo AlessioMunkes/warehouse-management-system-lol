@@ -44,7 +44,7 @@ export default function BalanceChart({ movements, onHand, reorderAt = 0, unit = 
 
   if (points.length === 0) {
     return (
-      <p className="py-6 text-center text-sm text-[#676767]">
+      <p className="py-6 text-center text-sm text-ink-soft">
         No movements recorded yet, so there is no history to plot.
       </p>
     );
@@ -157,7 +157,7 @@ export default function BalanceChart({ movements, onHand, reorderAt = 0, unit = 
         })}
       </svg>
 
-      <figcaption className="mt-1 min-h-5 text-xs text-[#676767]">
+      <figcaption className="mt-1 min-h-5 text-xs text-ink-soft">
         {active
           ? `${fmtDate(active.t)} · ${fmtNum(active.v)}${unit ? ` ${unit}` : ''}` +
             (active.movement

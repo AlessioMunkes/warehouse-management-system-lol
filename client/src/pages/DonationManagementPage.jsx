@@ -88,7 +88,7 @@ export default function DonationManagementPage() {
   const activeTab = TABS.find((item) => item.id === tab) || TABS[0];
 
   return (
-    <div className="min-h-screen bg-[#f8f5f2] text-[#2b3336] font-['Montserrat',sans-serif]">
+    <div className="min-h-screen bg-canvas text-ink font-['Montserrat',sans-serif]">
 
       <main className="mx-auto w-full max-w-5xl px-4 py-6">
         <h1 className="text-2xl font-medium">Classification Queue</h1>
@@ -97,27 +97,27 @@ export default function DonationManagementPage() {
         </p>
 
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
-          <Card className="rounded-[12px] border border-[#e9e3dd] shadow-sm">
+          <Card className="rounded-[12px] border border-line shadow-sm">
             <CardContent className="pt-4">
-              <p className="text-sm font-medium text-[#2b3336]">Pending Product Review</p>
+              <p className="text-sm font-medium text-ink">Pending Product Review</p>
               <p className="mt-1 text-xs text-muted-foreground">These donations have entered products that need a manager decision.</p>
               <Badge variant="outline" className="mt-3 inline-flex rounded-[6px] px-2 py-0 text-[11px]">
                 {counts['awaiting-classification']}
               </Badge>
             </CardContent>
           </Card>
-          <Card className="rounded-[12px] border border-[#e9e3dd] shadow-sm">
+          <Card className="rounded-[12px] border border-line shadow-sm">
             <CardContent className="pt-4">
-              <p className="text-sm font-medium text-[#2b3336]">Reconciliation</p>
+              <p className="text-sm font-medium text-ink">Reconciliation</p>
               <p className="mt-1 text-xs text-muted-foreground">These donations need to be checked because something doesn't match.</p>
               <Badge variant="outline" className="mt-3 inline-flex rounded-[6px] px-2 py-0 text-[11px]">
                 {counts.reconciliation}
               </Badge>
             </CardContent>
           </Card>
-          <Card className="rounded-[12px] border border-[#e9e3dd] shadow-sm">
+          <Card className="rounded-[12px] border border-line shadow-sm">
             <CardContent className="pt-4">
-              <p className="text-sm font-medium text-[#2b3336]">Processing Failed</p>
+              <p className="text-sm font-medium text-ink">Processing Failed</p>
               <p className="mt-1 text-xs text-muted-foreground">These donations couldn't be completed because of a system problem. Try processing them again.</p>
               <Badge variant="outline" className="mt-3 inline-flex rounded-[6px] px-2 py-0 text-[11px]">
                 {counts['processing-failed']}

@@ -21,9 +21,9 @@ const DEFAULT_DURATION = 4500;
 export const ACTION_DURATION = 9000;
 
 const VARIANT = {
-  default: { icon: Info,          cls: 'border-[#cfc7bd] bg-white' },
-  success: { icon: CheckCircle2,  cls: 'border-[#2f855a] bg-[#f2fbf5]' },
-  error:   { icon: AlertTriangle, cls: 'border-[#ef3a40] bg-[#fff4f2]' },
+  default: { icon: Info,          cls: 'border-line-strong bg-surface' },
+  success: { icon: CheckCircle2,  cls: 'border-good bg-good-soft' },
+  error:   { icon: AlertTriangle, cls: 'border-brand bg-danger-soft' },
 };
 
 export function ToastProvider({ children }) {
@@ -104,7 +104,7 @@ export function ToastProvider({ children }) {
                   <button
                     type="button"
                     onClick={() => { dismiss(t.id); t.action.onClick?.(); }}
-                    className="mt-2 text-xs font-semibold underline underline-offset-2 hover:text-[#ef3a40]"
+                    className="mt-2 text-xs font-semibold underline underline-offset-2 hover:text-brand"
                   >
                     {t.action.label}
                   </button>

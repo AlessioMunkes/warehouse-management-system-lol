@@ -40,6 +40,7 @@ import {
   ReducedMotionContext, MOTION_KEY, readStoredMotion, applyMotionAttribute,
   readStoredSidebar, writeStoredSidebar,
 } from './shellContext';
+import ThemeToggle from '@/components/layout/ThemeToggle';
 import { NAV_SECTIONS, homeForRole } from './navSections';
 import { SidebarNav, AppNavDrawer } from './AppNav';
 
@@ -144,10 +145,10 @@ function ManagerLayoutShell({ children }) {
   return (
    <ShellContext.Provider value={true}>
     <ReducedMotionContext.Provider value={{ reducedMotion, setReducedMotion }}>
-    <div className="flex min-h-screen bg-[#faf8f5]">
+    <div className="flex min-h-screen bg-canvas">
       {/* ── Sidebar ─────────────────────────────────────────── */}
       <aside
-        className={`hidden shrink-0 flex-col border-r border-[#e9e3dd] bg-white py-4 sm:flex ${
+        className={`hidden shrink-0 flex-col border-r border-line bg-surface py-4 sm:flex ${
           sidebarCollapsed ? 'w-16 px-2' : 'w-56 px-3'
         } ${
           // The width animates, unless the person has asked the app to
@@ -166,7 +167,7 @@ function ManagerLayoutShell({ children }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* ── Top bar ───────────────────────────────────────── */}
-        <header className="flex items-center gap-3 border-b border-[#e9e3dd] bg-white px-4 py-2.5">
+        <header className="flex items-center gap-3 border-b border-line bg-surface px-4 py-2.5">
           {/* Same breakpoint as the sidebar above, so exactly one of the
               two is ever on screen. */}
           <AppNavDrawer className="sm:hidden" />
@@ -227,6 +228,8 @@ function ManagerLayoutShell({ children }) {
             >
               {reducedMotion ? <EyeOff /> : <Eye />}
             </Button>
+
+            <ThemeToggle />
 
             <NotificationBell />
 

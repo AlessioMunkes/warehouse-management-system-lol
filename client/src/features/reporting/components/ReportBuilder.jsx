@@ -77,7 +77,7 @@ export default function ReportBuilder({
   const field = 'flex flex-col gap-1.5 min-w-0';
 
   return (
-    <div className="rounded-[4px] border-2 border-[#e9e3dd] bg-white p-4 sm:p-5">
+    <div className="rounded-[4px] border-2 border-line bg-surface p-4 sm:p-5">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 
         <div className={field}>
@@ -155,7 +155,7 @@ export default function ReportBuilder({
       <div className="mt-4">
         <Button
           type="button" onClick={onRun} disabled={busy || !metricId}
-          className="bg-[#2b3336] hover:bg-black text-white font-bold text-xs tracking-wider rounded-[4px] px-6"
+          className="bg-ink hover:bg-ink/90 text-on-ink font-bold text-xs tracking-wider rounded-[4px] px-6"
         >
           {busy ? 'RUNNING…' : 'RUN REPORT'}
         </Button>

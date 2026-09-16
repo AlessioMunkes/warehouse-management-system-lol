@@ -80,9 +80,9 @@ const itemStatusMeta = (status) =>
 const ItemStatusChip = ({ status }) => {
   const meta = itemStatusMeta(status);
   const base = 'inline-flex items-center rounded-[6px] px-2 py-0.5 text-xs font-medium';
-  if (meta.tone === 'success') return <span className={`${base} bg-[#e6f4ea] text-[#1d7a3a]`}>{meta.label}</span>;
-  if (meta.tone === 'danger') return <span className={`${base} bg-[#ffe3e3] text-[#b42318]`}>{meta.label}</span>;
-  return <span className={`${base} bg-[#eef2f4] text-[#2b3336]`}>{meta.label}</span>;
+  if (meta.tone === 'success') return <span className={`${base} bg-good-soft text-good`}>{meta.label}</span>;
+  if (meta.tone === 'danger') return <span className={`${base} bg-danger-soft text-danger`}>{meta.label}</span>;
+  return <span className={`${base} bg-chip text-ink`}>{meta.label}</span>;
 };
 
 const DonationStatusBadge = ({ donation, onStatusClick }) => {
@@ -94,7 +94,7 @@ const DonationStatusBadge = ({ donation, onStatusClick }) => {
       <button
         type="button"
         onClick={onStatusClick}
-        className="cursor-pointer rounded-[6px] bg-[#fff4e5] px-2.5 py-1 text-xs font-medium text-[#9a4d00] underline"
+        className="cursor-pointer rounded-[6px] bg-warn-soft px-2.5 py-1 text-xs font-medium text-warn underline"
       >
         {meta.label}
       </button>
@@ -102,11 +102,11 @@ const DonationStatusBadge = ({ donation, onStatusClick }) => {
   }
 
   if (donation.status === 'committing') {
-    return <Badge className="bg-[#e8f0fe] text-[#1563c0] hover:bg-[#e8f0fe]">Committing</Badge>;
+    return <Badge className="bg-info-soft text-info hover:bg-info-soft">Committing</Badge>;
   }
 
   return (
-    <Badge className="bg-[#eef2f4] text-[#2b3336] hover:bg-[#eef2f4]">{meta.label}</Badge>
+    <Badge className="bg-chip text-ink hover:bg-chip">{meta.label}</Badge>
   );
 };
 
@@ -114,13 +114,13 @@ const PendingItemRow = ({ item }) => {
   const isRejected = item.status === 'rejected';
 
   return (
-    <TableRow className={isRejected ? 'bg-[#faf8f6]' : undefined}>
+    <TableRow className={isRejected ? 'bg-canvas' : undefined}>
       <TableCell className="font-mono text-xs text-muted-foreground">{item.line_no}</TableCell>
       <TableCell>
         <div className="flex flex-col">
           <span className={isRejected ? 'line-through text-muted-foreground' : ''}>{item.description || item.name || '—'}</span>
           {isRejected && item.rejection_reason ? (
-            <span className="mt-1 text-xs text-[#b42318]">{item.rejection_reason}</span>
+            <span className="mt-1 text-xs text-danger">{item.rejection_reason}</span>
           ) : null}
         </div>
       </TableCell>
@@ -139,17 +139,17 @@ const PendingDonationCard = ({ donation, onStatusClick }) => {
   const counts = donation.item_counts || {};
 
   return (
-    <Card className="rounded-[12px] border border-[#e9e3dd] shadow-sm">
-      <CardHeader className="border-b border-[#e9e3dd] pb-3">
+    <Card className="rounded-[12px] border border-line shadow-sm">
+      <CardHeader className="border-b border-line pb-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium text-[#2b3336]">{donation.donor_name || '—'}</span>
+              <span className="text-sm font-medium text-ink">{donation.donor_name || '—'}</span>
               {donation.donation_category ? (
-                <Badge className="bg-[#eef2f4] text-[#2b3336] hover:bg-[#eef2f4]">{formatCategoryLabel(donation.donation_category)}</Badge>
+                <Badge className="bg-chip text-ink hover:bg-chip">{formatCategoryLabel(donation.donation_category)}</Badge>
               ) : null}
               {donation.section_18a_status ? (
-                <Badge className="bg-[#f3ecfb] text-[#5b2a86] hover:bg-[#f3ecfb]">
+                <Badge className="bg-violet-soft text-violet hover:bg-violet-soft">
                   Section 18A: {donation.section_18a_status}
                 </Badge>
               ) : null}
@@ -169,7 +169,7 @@ const PendingDonationCard = ({ donation, onStatusClick }) => {
       </CardHeader>
 
       <CardContent className="p-0">
-        <div className="px-4 py-2 text-xs text-muted-foreground border-b border-[#e9e3dd]">
+        <div className="px-4 py-2 text-xs text-muted-foreground border-b border-line">
           {counts.resolved ?? 0} resolved · {counts.awaiting_resolution ?? 0} awaiting · {counts.rejected ?? 0} rejected
         </div>
 
@@ -199,13 +199,13 @@ const PendingDonationCard = ({ donation, onStatusClick }) => {
 };
 
 const ErrorBanner = ({ message, onRetry }) => (
-  <div className="flex flex-col items-start justify-between gap-3 rounded-[4px] border-2 border-[#ef3a40] bg-[#fff4f2] p-4 text-sm text-[#2b3336] shadow-sm sm:flex-row sm:items-center">
+  <div className="flex flex-col items-start justify-between gap-3 rounded-[4px] border-2 border-brand bg-danger-soft p-4 text-sm text-ink shadow-sm sm:flex-row sm:items-center">
     <span>{message}</span>
     {onRetry ? (
       <button
         type="button"
         onClick={onRetry}
-        className="text-xs font-semibold text-[#ef3a40] underline hover:text-[#2b3336] focus:outline-none sm:text-sm"
+        className="text-xs font-semibold text-brand underline hover:text-ink focus:outline-none sm:text-sm"
       >
         Try again
       </button>
@@ -244,7 +244,7 @@ export default function PendingDonationsTab({ onReconcileTab }) {
       ) : null}
 
       {!isLoading && donations.length === 0 && !error ? (
-        <div className="rounded-[12px] border border-dashed border-[#d9d1cb] bg-white p-8 text-center text-sm text-muted-foreground">
+        <div className="rounded-[12px] border border-dashed border-line-strong bg-surface p-8 text-center text-sm text-muted-foreground">
           No pending donations match the current scope.
         </div>
       ) : null}

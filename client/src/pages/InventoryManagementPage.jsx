@@ -208,29 +208,29 @@ export default function InventoryManagementPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-[#2b3336] font-['Montserrat',sans-serif] flex flex-col">
+    <div className="min-h-screen bg-surface text-ink font-['Montserrat',sans-serif] flex flex-col">
       {/* 1. App Top Navigation Bar Header */}
 
       {/* 2. Main Content Container (Bounded at max-w-6xl for scannability) */}
       <main className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-6 sm:space-y-8 flex-1">
         
         {/* Page Heading Banner with Brand Accent Bar */}
-        <div className="border-l-4 border-[#ef3a40] pl-4 py-1">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#2b3336]">
+        <div className="border-l-4 border-brand pl-4 py-1">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink">
             Inventory Management
           </h1>
-          <p className="text-xs sm:text-sm text-[#676767] mt-1 font-normal">
+          <p className="text-xs sm:text-sm text-ink-soft mt-1 font-normal">
             Real-time stock manifest, manual distribution adjustments, and audit trail logs.
           </p>
         </div>
 
         {/* Global Fetch Error Banner */}
         {loadError && (
-          <div className="p-4 rounded-[4px] bg-[#fff4f2] border-2 border-[#ef3a40] text-[#2b3336] text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+          <div className="p-4 rounded-[4px] bg-danger-soft border-2 border-brand text-ink text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
             <span>{loadError}</span>
             <button
               onClick={reloadManifest}
-              className="text-xs sm:text-sm font-semibold underline hover:text-[#ef3a40] focus:outline-none"
+              className="text-xs sm:text-sm font-semibold underline hover:text-brand focus:outline-none"
             >
               Try again
             </button>
@@ -244,7 +244,7 @@ export default function InventoryManagementPage() {
         {/* No overflow-x-auto: the table is fixed-layout and fits its
             container now, so a scroll region here would only ever hide
             a regression rather than absorb one. */}
-        <div className="w-full rounded-[4px] border border-[#e9e3dd] shadow-sm bg-white">
+        <div className="w-full rounded-[4px] border border-line shadow-sm bg-surface">
           <StockManifestTable
             products={products}
             isLoading={isLoading}

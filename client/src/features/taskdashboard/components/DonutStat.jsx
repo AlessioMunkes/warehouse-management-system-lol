@@ -44,7 +44,7 @@ export default function DonutStat({ segments, centerLabel, centerValue }) {
         }) : null}
         <text
           x="50%" y="48%" textAnchor="middle" dominantBaseline="middle"
-          className="fill-[#2b3336]" style={{ fontSize: 22, fontWeight: 600 }}
+          className="fill-ink" style={{ fontSize: 22, fontWeight: 600 }}
         >
           {centerValue}
         </text>

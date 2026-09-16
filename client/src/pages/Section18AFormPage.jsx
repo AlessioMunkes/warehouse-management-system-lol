@@ -141,14 +141,14 @@ export default function Section18AFormPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f8f5f2] px-4 py-8 text-[#2b3336]">
-      <Card className="mx-auto max-w-3xl rounded-[12px] border border-[#e9e3dd]">
+    <main className="min-h-screen bg-canvas px-4 py-8 text-ink">
+      <Card className="mx-auto max-w-3xl rounded-[12px] border border-line">
         <CardHeader>
           <CardTitle>Section 18A Donor Details</CardTitle>
         </CardHeader>
         <CardContent>
           {metadata?.completed ? (
-            <div className="rounded-[8px] border border-emerald-200 bg-emerald-50 p-4 text-emerald-800">
+            <div className="rounded-[8px] border border-good bg-good-soft p-4 text-good">
               <CheckCircle className="mb-2" />
               {feedback || 'This Section 18A certificate has already been generated.'}
             </div>
@@ -218,8 +218,8 @@ export default function Section18AFormPage() {
                 <input type="checkbox" checked={form.declarationAccepted} onChange={(e) => update('declarationAccepted', e.target.checked)} />
                 <span>I declare that these Section 18A details are correct.</span>
               </label>
-              {errors.declarationAccepted ? <p className="text-sm text-red-600">{errors.declarationAccepted}</p> : null}
-              {feedback ? <p className="text-sm text-red-600">{feedback}</p> : null}
+              {errors.declarationAccepted ? <p className="text-sm text-danger">{errors.declarationAccepted}</p> : null}
+              {feedback ? <p className="text-sm text-danger">{feedback}</p> : null}
               <Button type="submit" disabled={saving}>{saving ? <Loader2 className="animate-spin" /> : null} Submit</Button>
             </form>
           )}
@@ -234,7 +234,7 @@ function Field({ label, error, children }) {
     <Label className="grid gap-1 text-sm font-medium">
       {label}
       {children}
-      {error ? <span className="text-xs text-red-600">{error}</span> : null}
+      {error ? <span className="text-xs text-danger">{error}</span> : null}
     </Label>
   );
 }

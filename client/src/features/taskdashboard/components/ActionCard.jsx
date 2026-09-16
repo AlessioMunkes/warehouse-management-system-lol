@@ -14,16 +14,16 @@ import { Card, CardContent } from '@/components/ui/card';
 export default function ActionCard({ to, icon: Icon, title, description, badge }) {
   return (
     <Link to={to} className="block h-full">
-      <Card className="h-full transition-colors hover:border-[#cfc7bd] hover:bg-[#fdfcfa]">
+      <Card className="h-full transition-colors hover:border-line-strong hover:bg-canvas">
         <CardContent className="flex h-full items-start gap-3 p-4">
-          <div className="mt-0.5 shrink-0 rounded-[6px] bg-[#f3efe9] p-2 text-[#2b3336]">
+          <div className="mt-0.5 shrink-0 rounded-[6px] bg-surface-2 p-2 text-ink">
             <Icon className="size-5" />
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="font-semibold leading-tight text-[#2b3336]">{title}</p>
+              <p className="font-semibold leading-tight text-ink">{title}</p>
               {badge ? (
-                <span className="rounded-full bg-[#fff4f2] px-2 py-0.5 text-[11px] font-medium text-[#ef3a40]">
+                <span className="rounded-full bg-danger-soft px-2 py-0.5 text-[11px] font-medium text-brand">
                   {badge}
                 </span>
               ) : null}

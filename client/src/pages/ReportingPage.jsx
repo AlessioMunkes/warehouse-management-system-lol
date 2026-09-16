@@ -133,7 +133,7 @@ export default function ReportingPage() {
 
   return (
     <ManagerLayout>
-      <main className="px-4 sm:px-6 py-6 max-w-3xl mx-auto text-[#2b3336] font-['Montserrat',sans-serif]">
+      <main className="px-4 sm:px-6 py-6 max-w-3xl mx-auto text-ink font-['Montserrat',sans-serif]">
         <header className="mb-5">
           <h1 className="text-2xl font-bold tracking-tight">Reporting and analytics</h1>
           <p className="mt-1 text-sm" style={{ color: MUTED }}>
@@ -176,7 +176,7 @@ export default function ReportingPage() {
             className="mt-5 rounded-[4px] border-2 p-4 text-sm"
             style={{ borderColor: '#ef3a40', color: CHARCOAL }}
           >
-            <span aria-hidden="true" className="mr-2 font-bold text-[#ef3a40]">!</span>
+            <span aria-hidden="true" className="mr-2 font-bold text-brand">!</span>
             {error}
           </div>
         )}
@@ -184,7 +184,7 @@ export default function ReportingPage() {
         {busy && !report && <Skeleton className="mt-5 h-64 w-full rounded-[4px]" />}
 
         {report && (
-          <section className="mt-5 rounded-[4px] border-2 bg-white p-4 sm:p-5"
+          <section className="mt-5 rounded-[4px] border-2 bg-surface p-4 sm:p-5"
                    style={{ borderColor: BORDER }}>
 
             <p className="text-sm font-medium" style={{ color: CHARCOAL }}>

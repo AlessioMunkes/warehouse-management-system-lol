@@ -649,7 +649,7 @@ export default function StockManifestTable({
                           type="button"
                           onClick={() => toggleSort(c.key)}
                           aria-label={`Sort by ${c.label}`}
-                          className={`flex w-full min-w-0 items-center gap-1 hover:text-[#2b3336] ${
+                          className={`flex w-full min-w-0 items-center gap-1 hover:text-ink ${
                             c.align === 'right' ? 'flex-row-reverse' : ''
                           }`}
                         >

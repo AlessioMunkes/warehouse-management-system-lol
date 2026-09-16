@@ -44,13 +44,13 @@ const resolvedItemCount = (donation) =>
   (donation.items || []).filter((item) => item.status === 'resolved' || item.status === 'committed').length;
 
 const ErrorBanner = ({ message, onRetry }) => (
-  <div className="flex flex-col items-start justify-between gap-3 rounded-[4px] border-2 border-[#ef3a40] bg-[#fff4f2] p-4 text-sm text-[#2b3336] shadow-sm sm:flex-row sm:items-center">
+  <div className="flex flex-col items-start justify-between gap-3 rounded-[4px] border-2 border-brand bg-danger-soft p-4 text-sm text-ink shadow-sm sm:flex-row sm:items-center">
     <span>{message}</span>
     {onRetry ? (
       <button
         type="button"
         onClick={onRetry}
-        className="text-xs font-semibold text-[#ef3a40] underline hover:text-[#2b3336] focus:outline-none sm:text-sm"
+        className="text-xs font-semibold text-brand underline hover:text-ink focus:outline-none sm:text-sm"
       >
         Try again
       </button>
@@ -64,13 +64,13 @@ const ReconciliationRow = ({ donation, busy, rowError, onRetry, actionLabel = 'R
   const totalItems = donation.item_counts?.total ?? (donation.items || []).length;
 
   return (
-    <Card className="rounded-[12px] border border-[#e9e3dd] shadow-sm">
-      <CardHeader className="border-b border-[#e9e3dd] pb-3">
+    <Card className="rounded-[12px] border border-line shadow-sm">
+      <CardHeader className="border-b border-line pb-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium text-[#2b3336]">{donation.donor_name || '—'}</span>
-              <Badge className="bg-[#fff4e5] text-[#9a4d00] hover:bg-[#fff4e5]">{meta.label}</Badge>
+              <span className="text-sm font-medium text-ink">{donation.donor_name || '—'}</span>
+              <Badge className="bg-warn-soft text-warn hover:bg-warn-soft">{meta.label}</Badge>
             </div>
             <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
               <span>{fmtValue(donation.estimated_value_zar)}</span>
@@ -135,7 +135,7 @@ export default function ReconciliationTab({
       ) : null}
 
       {!isLoading && items.length === 0 && !error ? (
-        <div className="rounded-[12px] border border-dashed border-[#d9d1cb] bg-white p-8 text-center text-sm text-muted-foreground">
+        <div className="rounded-[12px] border border-dashed border-line-strong bg-surface p-8 text-center text-sm text-muted-foreground">
           {emptyText}
         </div>
       ) : null}

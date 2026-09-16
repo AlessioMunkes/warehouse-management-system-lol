@@ -11,11 +11,11 @@
 // is bigger and works with one thumb.
 // ─────────────────────────────────────────────────────────────
 const FIELD =
-  'w-full rounded-[4px] border-2 border-[#e9e3dd] bg-white px-3 py-2 text-sm ' +
-  'text-[#2b3336] focus:border-[#2b3336] focus:outline-none';
+  'w-full rounded-[4px] border-2 border-line bg-surface px-3 py-2 text-sm ' +
+  'text-ink focus:border-ink focus:outline-none';
 
 const LABEL =
-  'block text-[10px] font-bold uppercase tracking-wider text-[#676767] mb-1';
+  'block text-[10px] font-bold uppercase tracking-wider text-ink-soft mb-1';
 
 export default function ReceiptFilters({
   from, to, onFromChange, onToChange,
@@ -30,7 +30,7 @@ export default function ReceiptFilters({
   const hasFilters = Boolean(from || to || status || entityValue || search);
 
   return (
-    <div className="rounded-[4px] border-2 border-[#e9e3dd] bg-white p-4">
+    <div className="rounded-[4px] border-2 border-line bg-surface p-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div>
           <label className={LABEL} htmlFor="receipts-from">From</label>
@@ -82,7 +82,7 @@ export default function ReceiptFilters({
           into the four-column grid makes it look like just another dropdown. */}
       <div className="mt-3">
         <label
-          className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-[#676767]"
+          className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-ink-soft"
           htmlFor="receipts-search"
         >
           Search
@@ -90,7 +90,7 @@ export default function ReceiptFilters({
         <input
           id="receipts-search"
           type="search"
-          className="w-full rounded-[4px] border-2 border-[#e9e3dd] bg-white px-3 py-2 text-sm text-[#2b3336] focus:border-[#2b3336] focus:outline-none"
+          className="w-full rounded-[4px] border-2 border-line bg-surface px-3 py-2 text-sm text-ink focus:border-ink focus:outline-none"
           placeholder={searchPlaceholder}
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
@@ -98,7 +98,7 @@ export default function ReceiptFilters({
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-3">
-        <p className="text-xs text-[#676767]">
+        <p className="text-xs text-ink-soft">
           {isLoading
             ? 'Loading…'
             : `${resultCount} record${resultCount === 1 ? '' : 's'}`}
@@ -107,7 +107,7 @@ export default function ReceiptFilters({
           <button
             type="button"
             onClick={onClear}
-            className="text-xs font-bold uppercase tracking-wider text-[#ef3a40] hover:underline"
+            className="text-xs font-bold uppercase tracking-wider text-brand hover:underline"
           >
             Clear filters
           </button>

@@ -38,8 +38,8 @@ const NavLink = ({ to, label, icon: Icon, active, collapsed, onNavigate }) => {
         collapsed ? 'justify-center px-0 py-2.5' : 'gap-2.5 px-3 py-2'
       } ${
         active
-          ? 'bg-[#2b3336] text-white font-medium'
-          : 'text-[#2b3336] hover:bg-[#f3efe9]'
+          ? 'bg-ink text-on-ink font-medium'
+          : 'text-ink hover:bg-surface-2'
       }`}
     >
       <Icon className="size-4 shrink-0" />
@@ -95,7 +95,7 @@ export const SidebarNav = ({ sections, pathname, homeTo, collapsed = false, onNa
               // first group, where it would just underline the logo.
               index === 0
                 ? null
-                : <div aria-hidden="true" className="mx-2 mb-3 border-t border-[#e9e3dd]" />
+                : <div aria-hidden="true" className="mx-2 mb-3 border-t border-line" />
             ) : (
               <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 {section.label}

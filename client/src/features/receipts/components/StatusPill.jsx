@@ -11,10 +11,10 @@
 import { Badge } from '@/components/ui/badge';
 
 const TONE = {
-  neutral: 'bg-[#e9e3dd] text-[#2b3336]',
-  good:    'bg-[#2b3336] text-white',
-  warn:    'bg-[#fdf1f1] text-[#ef3a40] border-[#ef3a40]',
-  muted:   'bg-white text-[#676767] border-[#e9e3dd]',
+  neutral: 'bg-line text-ink',
+  good:    'bg-ink text-on-ink',
+  warn:    'bg-danger-soft text-brand border-brand',
+  muted:   'bg-surface text-ink-soft border-line',
 };
 
 export default function StatusPill({ tone = 'neutral', children }) {
