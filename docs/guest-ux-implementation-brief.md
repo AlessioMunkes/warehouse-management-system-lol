@@ -308,6 +308,20 @@ the staff path.** Apply the attribution rule at every guest write site.
 **1.6 Staff-side volunteer assignment** (entry path 4) — let the existing assign
 endpoint set `assigned_volunteer_id` as well as `assigned_to`.
 
+> **DEFERRED — not dropped.** Held back from the Phase 1 implementation by
+> Hussain on 2026-09-16. It touches another team member's surface (the manager
+> packing board), and the two of them are doing it together in person.
+>
+> Entry path 4 is therefore the only one of the four not yet built. Paths 1–3
+> (QR token, short code, pick from today's unclaimed list) are complete.
+>
+> Nothing in Phase 1 blocks it: `assigned_volunteer_id` is already the column a
+> guest is bound through, `claimForVolunteer` in
+> `slipAccess.repository.js` is the model for the write, and the guest read and
+> write paths key off that column regardless of who set it. A staff assignment
+> that sets it will work with the guest flow as built, with no change on this
+> side.
+
 **1.7 Tests** for 1.1–1.6, including the negative cases: bad token, ambiguous
 short code, a guest reaching a slip that is not theirs, a guest reaching any
 staff endpoint, a double claim.
