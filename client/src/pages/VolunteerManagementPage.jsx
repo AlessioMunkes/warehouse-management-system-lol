@@ -211,7 +211,7 @@ export default function VolunteerManagementPage() {
   return (
     <ManagerLayout>
       <main className="mx-auto w-full max-w-5xl px-4 py-6">
-        <h1 className="text-2xl font-medium">Volunteer Management</h1>
+        <h1 className="text-2xl font-medium">Volunteer Log</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Everyone who has signed in at the door.
           {onSiteCount > 0

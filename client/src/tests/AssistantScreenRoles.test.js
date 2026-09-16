@@ -49,6 +49,7 @@ const CONSTANTS = { STAFF, ADMIN, PACKING, DONATIONS, VOLUNTEERS };
 // failing test with a name, not a silently different expectation.
 const ROLE_LISTS = {
   DONATION_INTAKE_ROLES:      ['warehouse_worker', 'manager', 'admin'],
+  STAFF_ROLES:                ['warehouse_worker', 'manager', 'admin'],
   COMMUNITY_REQUEST_ROLES:    ['warehouse_worker', 'manager', 'admin'],
   VOLUNTEER_MANAGEMENT_ROLES: ['manager', 'admin'],
 };
