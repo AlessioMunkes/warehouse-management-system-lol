@@ -267,7 +267,14 @@ const startASack = async (user) => {
   await user.click(screen.getByRole('button', { name: 'Next' }));
 };
 
-describe('DecantingFlow', () => {
+// QUARANTINED by 38-restore-serena-worker-view.sh.
+//
+// These assert the TaskPage/WorkList worker view from 0b9d215 and
+// 2679ada, which the restore of Serena's dual view (b6cc201) rolled
+// back. They are not broken — they test a screen that is no longer
+// there. Delete this block, or rewrite it against the dual view, once
+// the team has settled which worker view ships.
+describe.skip('DecantingFlow', () => {
   it('opens on picking the sack', () => {
     render(<DecantingFlow products={PRODUCTS} />);
     expect(screen.getByText('What are you decanting?')).toBeInTheDocument();
