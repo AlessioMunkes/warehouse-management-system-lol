@@ -28,7 +28,7 @@ import { useAuth } from '@/context/AuthContext';
 import donationManagementAPI from '../services/donationManagementAPI';
 import dashboardAPI from '../services/dashboardAPI';
 import { getUsers } from '../services/userAPI';
-import { ADMIN, VOLUNTEERS } from '../routes/paths';
+import { ADMIN } from '../routes/paths';
 
 export default function AdminActivityScreen() {
   const { user } = useAuth();
@@ -103,8 +103,8 @@ export default function AdminActivityScreen() {
           description="Create accounts, set roles, deactivate someone who has left."
         />
         <ActionCard
-          to={VOLUNTEERS.events} icon={HandHeart} title="Volunteer Management"
-          description="Love Activism events, the spaces they run in, and who checked in."
+          to={ADMIN.volunteerLog} icon={HandHeart} title="Volunteer Log"
+          description="Everyone who signed in at the door — arrival, departure, time on site."
         />
       </div>
 

@@ -161,4 +161,10 @@ export const ADMIN = {
   users:     '/admin/users',
   products:  '/admin/products',
   emailIntegration: '/admin/email-integration',
+  // The guest log — who signed in at the door, when they left, and
+  // how long they were on site. Its own admin path rather than a
+  // second view of /volunteers: that route is the coordinator's
+  // event workflow and belongs to the manager. Two screens, two
+  // audiences, two URLs.
+  volunteerLog: '/admin/volunteer-log',
 };

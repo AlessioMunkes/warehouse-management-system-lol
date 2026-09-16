@@ -36,7 +36,7 @@ import BeneficiaryDirectoryPage                     from './pages/BeneficiaryDir
 import ImpactReportPage                             from './pages/ImpactReportPage';
 import PickingSlipManagementPage                    from './pages/PickingSlipManagementPage';
 import UserDirectoryPage                            from './pages/UserDirectoryPage';
-// import VolunteerManagementPage                    from './pages/VolunteerManagementPage';
+import VolunteerManagementPage                      from './pages/VolunteerManagementPage';
 import ProductManagementPage                        from './pages/ProductManagementPage';
 import VolunteerEventsPage                        from './pages/VolunteerEventsPage';
 import VolunteerEventWorkspacePage                from './pages/VolunteerEventWorkspacePage';
@@ -94,6 +94,13 @@ const App = () => (
               server routes are requireRole(ADMIN), so it sits in this
               admin-only block rather than the manager/admin one. */}
           <Route path={ADMIN.emailIntegration} element={<GmailSettingsPage />} />
+          {/* The guest log. Admin-only on purpose: GET /api/volunteers
+              is requireRole(MANAGER, ADMIN), so a manager is not
+              refused by the server — but the manager's volunteer
+              screen is the event workflow at /volunteers, and giving
+              one role two volunteer screens is how these two got
+              confused in the first place. */}
+          <Route path={ADMIN.volunteerLog} element={<VolunteerManagementPage />} />
         </Route>
 
         {/* Protected — manager and admin.

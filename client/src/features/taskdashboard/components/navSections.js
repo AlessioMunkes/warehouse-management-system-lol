@@ -84,7 +84,7 @@ const ADMIN_SECTIONS = [
   {
     label: 'Logs',
     items: [
-      { to: VOLUNTEERS.events, label: 'Volunteer Management', icon: HandHeart },
+      { to: ADMIN.volunteerLog, label: 'Volunteer Log', icon: HandHeart },
     ],
   },
   {
