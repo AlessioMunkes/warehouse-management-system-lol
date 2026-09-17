@@ -28,7 +28,8 @@ import { logAudit } from './auditLog.repository.js';
 
 const INVITE_COLUMNS = `
   i.id, i.email, i.role, i.expires_at, i.accepted_at, i.revoked_at,
-  i.invited_by, i.created_at, i.last_sent_at, i.resend_count
+  i.invited_by, i.created_at, i.last_sent_at, i.resend_count,
+  i.email_status, i.email_error, i.email_attempted_at
 `;
 
 const USER_COLUMNS = `
@@ -271,6 +272,25 @@ const acceptInvite = async ({ inviteId, username, firstName, lastName, role, ema
   }
 };
 
+// Records the outcome of one email-send attempt. Deliberately its own
+// plain UPDATE, not part of createInvite/resendInvite's transaction —
+// the send happens after the invite already exists (see
+// userInvite.service.js), so there is nothing to roll back together.
+// No audit_log row: donation_email_logs is that flow's audit trail
+// for email attempts, and this migration was explicitly told not to
+// build an equivalent table for invites — a status column on the row
+// itself is the whole record here.
+const recordEmailAttempt = async (id, { status, error = null }) => {
+  await pool.query(
+    `UPDATE user_invites
+        SET email_status       = $2,
+            email_error        = $3,
+            email_attempted_at = now()
+      WHERE id = $1`,
+    [id, status, error]
+  );
+};
+
 export default {
   getById,
   getByTokenHash,
@@ -280,4 +300,5 @@ export default {
   resendInvite,
   revokeInvite,
   acceptInvite,
+  recordEmailAttempt,
 };

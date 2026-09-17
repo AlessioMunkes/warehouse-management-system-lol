@@ -1,13 +1,28 @@
 // ─────────────────────────────────────────────────────────────
 // server/src/services/userInvite.service.js
 //
-// Business rules for the email-invite flow (migration 023). The link
-// is the artefact: creating/resending an invite always returns the
-// raw token/URL to the caller so an admin can copy it, whether or not
-// the email send succeeds. This file never emails anything itself —
-// see userInvite.controller.js for where emailProvider.sendEmail is
-// called, deliberately kept out of this file so "the invite exists"
-// and "the email went out" can never be the same failure.
+// Business rules for the email-invite flow (migrations 023-024). The
+// link is the artefact: creating/resending an invite always returns
+// the raw token/URL to the caller so an admin can copy it, whether or
+// not the email send succeeds.
+//
+// EMAIL SEND IS GENUINELY NON-BLOCKING, same shape donation.service.js
+// uses for thank-you emails: the invite row is durably written FIRST
+// (inviteRepo.createInvite/resendInvite, its own transaction, already
+// committed), and only then does sendInviteEmail attempt a send —
+// wrapped in try/catch so that "the invite exists" and "the email
+// went out" can never be the same failure. A Gmail account may not be
+// connected in this environment at all (OAuth setup is currently
+// bound to one teammate's local tunnel) — that is a routine, expected
+// outcome here, not a bug to surface as a 500.
+//
+// THREE OUTCOMES, NOT TWO. emailProvider.sendEmail returns
+// { sent: true, stubbed: true, ... } when EMAIL_ENABLED=false — sent
+// is true but nothing was actually transmitted anywhere. Treating
+// that as "sent" would tell an admin an email went out when it did
+// not, so sendInviteEmail below collapses the provider's shape into
+// exactly one of 'sent' / 'stubbed' / 'failed' and that is what
+// persists to user_invites.email_status and reaches the client.
 //
 // TOKEN. crypto.randomBytes(32).toString('base64url'), SHA-256 hashed
 // before storage, expiry stored alongside — same shape as the Section
@@ -31,8 +46,9 @@
 // ─────────────────────────────────────────────────────────────
 import crypto from 'node:crypto';
 import bcrypt from 'bcrypt';
-import inviteRepo from '../repositories/userInvite.repository.js';
-import userRepo    from '../repositories/user.repository.js';
+import inviteRepo    from '../repositories/userInvite.repository.js';
+import userRepo      from '../repositories/user.repository.js';
+import emailProvider from '../providers/email.provider.js';
 import {
   fail, clean, validUsername, validFirstName, validLastName, validRole, validPassword,
 } from '../utils/userAccountFields.js';
@@ -51,6 +67,91 @@ const hashToken = (token) =>
 const generateToken = () => crypto.randomBytes(32).toString('base64url');
 
 const inviteUrl = (token) => `${inviteBaseUrl()}/invite/${encodeURIComponent(token)}`;
+
+// Display labels only — every stored/validated value stays
+// warehouse_worker, matching the live users.role CHECK constraint.
+const ROLE_LABELS = {
+  warehouse_worker: 'Worker',
+  manager:           'Manager',
+  admin:             'Admin',
+};
+
+const composeInviteEmail = ({ email, role, inviterName }, url) => {
+  const roleLabel = ROLE_LABELS[role] ?? role;
+  const from = inviterName ? `${inviterName} has` : 'You have been';
+  const expiresLine = 'This link expires in 7 days.';
+  const text = [
+    `${from} invited you to join as a ${roleLabel}.`,
+    '',
+    `Set up your account: ${url}`,
+    '',
+    expiresLine,
+  ].join('\n');
+  const html = `<p>${from} invited you to join as a <strong>${roleLabel}</strong>.</p>`
+    + `<p><a href="${url}">${url}</a></p>`
+    + `<p>${expiresLine}</p>`;
+  return {
+    to: email,
+    subject: `You've been invited to Ladles of Love Warehouse Management`,
+    text,
+    html,
+  };
+};
+
+// Wraps emailProvider.sendEmail and reduces its shape to exactly one
+// of 'sent' / 'stubbed' / 'failed' — see the file header for why
+// stubbed cannot be treated as sent. Never throws: any failure here
+// (a Gmail account not connected being the routine one — see file
+// header) is caught and reported as a 'failed' outcome, the same way
+// donation.service.js's sendThankYouEmail catches around its own
+// emailProvider.sendEmail call so a broken send can never fail the
+// request that created the record it describes.
+//
+// ALWAYS SENDS AS THE ORGANISATION ACCOUNT (userId = null to the
+// provider), never as the admin who clicked Invite/Resend — same as
+// every donation email (see logEmailAttempt in donation.service.js,
+// which hardcodes null regardless of who triggered the send). Gmail
+// OAuth in this project is currently one teammate's personal
+// connection, not something every admin has done individually; if
+// invites sent as the acting admin's own connection, this would only
+// ever work for that one person and 404 ("No Gmail connection found")
+// for everyone else.
+const sendInviteEmail = async (invite, url) => {
+  let outcome;
+  try {
+    // invite.invited_by is the original inviter, which is who the
+    // email should name — not the org account it actually sends from.
+    const inviter = invite.invited_by ? await userRepo.getUserById(invite.invited_by) : null;
+    const inviterName = inviter ? `${inviter.first_name} ${inviter.last_name}`.trim() : null;
+
+    const result = await emailProvider.sendEmail(
+      composeInviteEmail({ ...invite, inviterName }, url),
+      null
+    );
+    if (result?.stubbed) {
+      outcome = { status: 'stubbed', error: null };
+    } else if (result?.sent) {
+      outcome = { status: 'sent', error: null };
+    } else {
+      outcome = { status: 'failed', error: result?.error || result?.reason || 'Provider reported a failure.' };
+    }
+  } catch (err) {
+    // Not expected — email.provider.js catches its own errors — but
+    // an invite must survive this regardless of what threw.
+    outcome = { status: 'failed', error: err.message || 'Could not send the invite email.' };
+  }
+
+  const attemptedAt = new Date();
+  await inviteRepo.recordEmailAttempt(invite.id, outcome);
+
+  return {
+    status:      outcome.status,
+    sent:        outcome.status === 'sent',
+    stubbed:     outcome.status === 'stubbed',
+    error:       outcome.status === 'failed' ? outcome.error : null,
+    attemptedAt,
+  };
+};
 
 const validEmail = (value) => {
   const email = clean(value);
@@ -85,6 +186,11 @@ const toPublicInvite = (invite) => ({
   inviterName: invite.inviter_first_name
     ? `${invite.inviter_first_name} ${invite.inviter_last_name ?? ''}`.trim()
     : null,
+  // 'sent' | 'stubbed' | 'failed' | null (no attempt recorded yet —
+  // see migration 024's header for when that happens).
+  emailStatus:      invite.email_status ?? null,
+  emailError:       invite.email_error ?? null,
+  emailAttemptedAt: invite.email_attempted_at ?? null,
 });
 
 // ── Create ────────────────────────────────────────────────────
@@ -111,7 +217,23 @@ const createInvite = async (body, actorId) => {
     invitedBy: actorId,
   }, actorId);
 
-  return { invite: toPublicInvite(invite), token, url: inviteUrl(token) };
+  // The invite exists and is already committed above — everything
+  // from here on is best-effort. See sendInviteEmail's comment for
+  // why this can never turn a created invite into a failed request.
+  const url = inviteUrl(token);
+  const { status, sent, stubbed, error, attemptedAt } = await sendInviteEmail(invite, url);
+
+  return {
+    invite: {
+      ...toPublicInvite(invite),
+      emailStatus: status,
+      emailError: error,
+      emailAttemptedAt: attemptedAt.toISOString(),
+    },
+    token,
+    url,
+    email: { sent, stubbed, error },
+  };
 };
 
 // ── Read ──────────────────────────────────────────────────────
@@ -137,7 +259,20 @@ const resendInvite = async (rawId, actorId) => {
 
   if (!invite) throw fail(409, 'This invite is no longer pending.');
 
-  return { invite: toPublicInvite(invite), token, url: inviteUrl(token) };
+  const url = inviteUrl(token);
+  const { status, sent, stubbed, error, attemptedAt } = await sendInviteEmail(invite, url);
+
+  return {
+    invite: {
+      ...toPublicInvite(invite),
+      emailStatus: status,
+      emailError: error,
+      emailAttemptedAt: attemptedAt.toISOString(),
+    },
+    token,
+    url,
+    email: { sent, stubbed, error },
+  };
 };
 
 // ── Revoke ────────────────────────────────────────────────────
