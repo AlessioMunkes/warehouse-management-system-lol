@@ -15,7 +15,7 @@
 // Background Sync.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
-import { apiPost } from '../services/api';
+import { apiGet, apiPost } from '../services/api';
 import { isReachable, subscribe as subscribeConnection } from '../services/connection';
 import { flush, list, subscribe as subscribeOutbox } from '../services/outbox';
 
@@ -65,6 +65,16 @@ export default function useOutbox() {
     // `online` is in here on purpose: coming back online should
     // re-run this and fire the immediate attempt above.
   }, [pending.length, online, send]);
+
+  // With nothing queued, nothing above ever asks the server again, so
+  // a worker who walked back into range would keep seeing "No signal"
+  // until they happened to tap something. A cheap probe ends that.
+  useEffect(() => {
+    if (online) return undefined;
+    const probe = () => { apiGet('/api/health').catch(() => {}); };
+    const timer = setInterval(probe, 15000);
+    return () => clearInterval(timer);
+  }, [online]);
 
   const stuck = pending.filter((item) => item.error);
 

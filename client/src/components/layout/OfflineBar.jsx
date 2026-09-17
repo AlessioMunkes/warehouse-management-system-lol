@@ -27,11 +27,22 @@
 // the building.
 // ─────────────────────────────────────────────────────────────
 import useOutbox from '../../hooks/useOutbox';
+import { useServedFromCache } from '../../services/readCache';
+
+// "at 14:05" today, "on 12 Sep at 14:05" otherwise.
+const savedWords = (at) => {
+  const d = new Date(at);
+  const time = d.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
+  if (d.toDateString() === new Date().toDateString()) return `at ${time}`;
+  return `on ${d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })} at ${time}`;
+};
 
 const countOf = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
 export default function OfflineBar() {
   const { online, waiting, stuck, sending, send } = useOutbox();
+  const savedAt = useServedFromCache();
+  const savedNote = savedAt ? ` Showing what was saved ${savedWords(savedAt)}.` : '';
 
   // Everything is fine and nothing is waiting: say nothing.
   if (online && waiting === 0) return null;
@@ -54,6 +65,7 @@ export default function OfflineBar() {
           {waiting > 0
             ? `No signal. ${countOf(waiting, 'thing is', 'things are')} saved on this phone and will send when you are back in range.`
             : 'No signal. Your work is saved on this phone — carry on.'}
+          {savedNote}
         </span>
       </div>
     );

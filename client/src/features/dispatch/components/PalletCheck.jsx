@@ -43,6 +43,7 @@ import {
   ViewToggle, Coachmark,
 } from '../../staff/components/StepPrimitives';
 import useCoachmark from '../../staff/hooks/useCoachmark';
+import { readDraft, writeDraft, clearDraft } from '../../staff/hooks/useDraft';
 import { useAuth } from '../../../context/AuthContext';
 import dispatchAPI, { newIdempotencyKey } from '../../../services/dispatchAPI';
 import SignaturePad from '../../procurement/components/SignaturePad';
@@ -103,6 +104,8 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
   const [phase, setPhase] = useState('which');
   const [lineIndex, setLineIndex] = useState(0);
   const [lines, setLines] = useState([]);
+  // Which pallet `lines` belongs to — see the draft effect below.
+  const [linesKey, setLinesKey] = useState(null);
 
   const [overrideReason, setOverrideReason] = useState('');
   const [driverName, setDriverName] = useState('');
@@ -153,6 +156,10 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
       .then((view) => {
         if (cancelled) return;
         setGateView(view);
+        // A draft refills the numbers and the driver's details only —
+        // never the eligibility, which is the server's to decide and
+        // may have changed while the tablet slept.
+        const draft = readDraft(`dispatch-${palletId}`);
         setLines(
           (view.items || []).map((item) => ({
             itemId:   item.id,
@@ -161,9 +168,12 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
             unit:     item.unit,
             required: Number(item.required_quantity ?? 0),
             packed:   item.packed_quantity === null ? null : Number(item.packed_quantity),
-            loaded:   item.packed_quantity === null ? '' : String(item.packed_quantity),
+            loaded:   draft?.loaded?.[item.id] ?? (item.packed_quantity === null ? '' : String(item.packed_quantity)),
           }))
         );
+        setLinesKey(`dispatch-${palletId}`);
+        if (draft?.driverName) setDriverName(draft.driverName);
+        if (draft?.vehicleReg) setVehicleReg(draft.vehicleReg);
       })
       .catch((err) => { if (!cancelled) setLoadError(err.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -201,6 +211,22 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
     const timer = setTimeout(dismissCoachmark, 5000);
     return () => clearTimeout(timer);
   }, [showCoachmark, showToggle, dismissCoachmark]);
+
+  // ── Draft ───────────────────────────────────────────────────
+  // Saved only once the worker has started on the pallet, so opening
+  // one to look does not leave it on the unfinished list. Keyed by
+  // linesKey rather than palletId: when DispatchPage swaps pallets,
+  // palletId changes a render before the new pallet's lines arrive.
+  // Lost when d182c5c restored Serena's view; restored by script 49.
+  useEffect(() => {
+    const working = phase === 'count' || phase === 'check' || formOpen;
+    if (!working || !linesKey) return;
+    const loaded = {};
+    for (const line of lines) {
+      if (line.packed !== null && line.packed > 0) loaded[line.itemId] = line.loaded;
+    }
+    writeDraft(linesKey, { loaded, driverName, vehicleReg });
+  }, [phase, formOpen, linesKey, lines, driverName, vehicleReg]);
 
   const startCollection = () => {
     if (mode === 'full') { setFormOpen(true); return; }
@@ -244,6 +270,8 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
         overrideReason: needsOverride ? overrideReason : null,
       });
 
+      // Sent, or safely in the outbox — either way the draft's job is done.
+      if (linesKey) clearDraft(linesKey);
       setPhase('done');
       setFormOpen(false);
       // recordCollection's response already carries the full joined
