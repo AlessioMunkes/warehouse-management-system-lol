@@ -12,3 +12,9 @@ coverage/
 # Logs
 *.log
 output*.log
+# Local debug output (script 48)
+_*.txt
+debug-*.txt
+vite-*.txt
+$null
+*.bak-*

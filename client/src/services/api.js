@@ -69,6 +69,38 @@ export const newIdempotencyKey = () => {
 let onUnauthorized = null;
 export const setUnauthorizedHandler = (fn) => { onUnauthorized = fn; };
 
+// ── Server waking up ──────────────────────────────────────────
+// A 502/503 that did not come from Express means a proxy answered
+// because the app behind it was not there yet: Render waking a
+// sleeping free-tier service, or node --watch restarting Express in
+// dev (the Vite proxy marks that case with X-WMS-Starting). Express
+// itself always answers JSON, so a non-JSON 502/503 is the proxy.
+//
+// The request never reached the app, so repeating it is safe — but
+// this only retries reads and login, which change nothing if they run
+// twice. Other writes keep their own idempotency-key retry paths.
+const WAKE_STATUSES    = new Set([502, 503]);
+const WAKE_DELAYS_MS   = [1500, 3000, 5000];
+const WAKE_RETRY_POSTS = new Set(['/api/login']);
+
+const isWakeResponse = (res) => {
+  if (!WAKE_STATUSES.has(res.status) || !res.headers?.get) return false;
+  if (res.headers.get('x-wms-starting') === '1') return true;
+  return !(res.headers.get('content-type') || '').includes('application/json');
+};
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const fetchWaking = async (url, options) => {
+  let res = await fetch(url, options);
+  for (const delay of WAKE_DELAYS_MS) {
+    if (!isWakeResponse(res)) break;
+    await sleep(delay);
+    res = await fetch(url, options);
+  }
+  return res;
+};
+
 // ── Handle response — throw a clean error on non-2xx ─────────
 // The thrown error carries `.status`, because callers need to tell
 // "the server rejected this" (401/403/404) apart from "the request
@@ -76,7 +108,6 @@ export const setUnauthorizedHandler = (fn) => { onUnauthorized = fn; };
 // cases must be handled differently: one means log out, the other
 // means wait.
 const handleResponse = async (res) => {
-  console.log("[API] handleResponse()", res.status);
   // Not every non-2xx response is JSON — a proxy timeout or the SPA
   // fallback returns HTML, and res.json() would throw a parse error
   // that masks the real status.
@@ -96,7 +127,12 @@ const handleResponse = async (res) => {
   if (!res.ok) {
     if (res.status === 401 && onUnauthorized) onUnauthorized(data.message);
 
-    const error = new Error(data.message || `Request failed (${res.status}).`);
+    const error = new Error(
+      data.message
+      || (WAKE_STATUSES.has(res.status)
+        ? 'The server is starting up. Please try again in a moment.'
+        : `Request failed (${res.status}).`),
+    );
     error.status = res.status;
     error.errors = data.errors || {};
     throw error;
@@ -119,7 +155,7 @@ const networkError = () => {
 export const apiGet = async (endpoint) => {
   let res;
   try {
-    res = await fetch(`${API_BASE}${endpoint}`, {
+    res = await fetchWaking(`${API_BASE}${endpoint}`, {
       method:      'GET',
       credentials: 'include', // sends the httpOnly cookie automatically
       headers:     { 'Content-Type': 'application/json' },
@@ -132,17 +168,16 @@ export const apiGet = async (endpoint) => {
 
 // ── POST ──────────────────────────────────────────────────────
 export const apiPost = async (endpoint, body) => {
-  console.log("[API] apiPost()", endpoint, body);
+  // Never log `body` here: on /api/login it holds the password.
+  const send = WAKE_RETRY_POSTS.has(endpoint) ? fetchWaking : fetch;
   let res;
   try {
-    console.log("[API] fetch starting");
-    res = await fetch(`${API_BASE}${endpoint}`, {
+    res = await send(`${API_BASE}${endpoint}`, {
       method:      'POST',
       credentials: 'include',
       headers:     { 'Content-Type': 'application/json' },
       body:        JSON.stringify(body),
     });
-    console.log("[API] fetch completed", res.status);
   } catch {
     throw networkError();
   }
