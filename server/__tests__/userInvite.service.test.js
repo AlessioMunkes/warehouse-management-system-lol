@@ -1,11 +1,17 @@
 // ─────────────────────────────────────────────────────────────
 // server/__tests__/userInvite.service.test.js
 //
-// userInvite.repository.js and user.repository.js are mocked, so
-// these tests exercise the service's own rules: token expiry/
-// revoked/accepted handling, that role is taken from the invite and
-// never the accept request body, and username-collision handling at
-// accept time.
+// userInvite.repository.js, user.repository.js and email.provider.js
+// are all mocked, so these tests exercise the service's own rules:
+// token expiry/revoked/accepted handling, that role is taken from the
+// invite and never the accept request body, username-collision
+// handling at accept time, and that email.provider.js's three
+// possible outcomes (sent / stubbed / failed) are never conflated.
+//
+// email.provider.js MUST be mocked here. Left real, createInvite's
+// send attempt would fall through to the actual gmail.service.js path
+// — a real network call and a real DATABASE_URL query for a Gmail
+// connection row, on every single test run.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import crypto from 'node:crypto';
@@ -15,23 +21,30 @@ vi.mock('bcrypt', () => ({
 }));
 
 const inviteRepoMock = {
-  getById:        vi.fn(),
-  getByTokenHash:  vi.fn(),
-  findOpenByEmail: vi.fn(),
-  listPending:     vi.fn(),
-  createInvite:    vi.fn(),
-  resendInvite:    vi.fn(),
-  revokeInvite:    vi.fn(),
-  acceptInvite:    vi.fn(),
+  getById:            vi.fn(),
+  getByTokenHash:     vi.fn(),
+  findOpenByEmail:    vi.fn(),
+  listPending:        vi.fn(),
+  createInvite:       vi.fn(),
+  resendInvite:       vi.fn(),
+  revokeInvite:       vi.fn(),
+  acceptInvite:       vi.fn(),
+  recordEmailAttempt: vi.fn(),
 };
 
 const userRepoMock = {
   findUserByUsername: vi.fn(),
   findUserByEmail:    vi.fn(),
+  getUserById:        vi.fn(),
+};
+
+const emailProviderMock = {
+  sendEmail: vi.fn(),
 };
 
 vi.mock('../src/repositories/userInvite.repository.js', () => ({ default: inviteRepoMock }));
 vi.mock('../src/repositories/user.repository.js', () => ({ default: userRepoMock }));
+vi.mock('../src/providers/email.provider.js', () => ({ default: emailProviderMock }));
 
 const { default: userInviteService } = await import('../src/services/userInvite.service.js');
 
@@ -52,6 +65,11 @@ beforeEach(() => {
   inviteRepoMock.findOpenByEmail.mockResolvedValue(null);
   userRepoMock.findUserByEmail.mockResolvedValue(null);
   userRepoMock.findUserByUsername.mockResolvedValue(null);
+  userRepoMock.getUserById.mockResolvedValue({ id: ADMIN_ID, first_name: 'Sys', last_name: 'Admin' });
+  inviteRepoMock.recordEmailAttempt.mockResolvedValue(undefined);
+  // Default: a real send that succeeds. Individual tests override this
+  // to exercise stubbed/failed.
+  emailProviderMock.sendEmail.mockResolvedValue({ sent: true, messageId: 'msg-1' });
   inviteRepoMock.createInvite.mockImplementation(async (payload) => ({
     id: 10, email: payload.email, role: payload.role,
     expires_at: payload.expiresAt.toISOString(), accepted_at: null, revoked_at: null,
@@ -120,6 +138,82 @@ describe('createInvite', () => {
     expect(days).toBeGreaterThan(6.9);
     expect(days).toBeLessThan(7.1);
   });
+
+  // ── The three email outcomes ──────────────────────────────────
+  // The invite itself must exist and be returned successfully in
+  // every one of these — none is allowed to turn createInvite into a
+  // rejected promise.
+  describe('email send outcomes', () => {
+    it('reports sent:true when the provider genuinely sends', async () => {
+      emailProviderMock.sendEmail.mockResolvedValue({ sent: true, messageId: 'msg-1' });
+      const result = await userInviteService.createInvite({ email: 'jane@example.com', role: 'warehouse_worker' }, ADMIN_ID);
+      expect(result.email).toEqual({ sent: true, stubbed: false, error: null });
+      expect(result.invite.emailStatus).toBe('sent');
+      expect(inviteRepoMock.recordEmailAttempt).toHaveBeenCalledWith(10, { status: 'sent', error: null });
+    });
+
+    it('never reports stubbed as sent — EMAIL_ENABLED=false path', async () => {
+      emailProviderMock.sendEmail.mockResolvedValue({
+        sent: true, stubbed: true, messageId: 'stub-1', reason: 'Email disabled via EMAIL_ENABLED flag.',
+      });
+      const result = await userInviteService.createInvite({ email: 'jane@example.com', role: 'warehouse_worker' }, ADMIN_ID);
+      expect(result.email.sent).toBe(false);
+      expect(result.email.stubbed).toBe(true);
+      expect(result.invite.emailStatus).toBe('stubbed');
+      expect(inviteRepoMock.recordEmailAttempt).toHaveBeenCalledWith(10, { status: 'stubbed', error: null });
+    });
+
+    it('reports a clear failure — e.g. no Gmail account connected — without failing the invite', async () => {
+      emailProviderMock.sendEmail.mockResolvedValue({
+        sent: false, error: 'No organisation Gmail account is connected. An admin must connect Gmail first.',
+      });
+      const result = await userInviteService.createInvite({ email: 'jane@example.com', role: 'warehouse_worker' }, ADMIN_ID);
+      expect(result.invite.id).toBe(10); // the invite still exists
+      expect(result.token).toBeTypeOf('string'); // the link is still there
+      expect(result.email).toEqual({
+        sent: false, stubbed: false,
+        error: 'No organisation Gmail account is connected. An admin must connect Gmail first.',
+      });
+      expect(result.invite.emailStatus).toBe('failed');
+    });
+
+    // inviteRepo.createInvite's INSERT...RETURNING runs BEFORE the send
+    // is even attempted, so the raw row it returns always has
+    // email_error/email_attempted_at still null — toPublicInvite alone
+    // would silently show emailStatus: 'failed' next to emailError:
+    // null, which is not what actually happened. The response must
+    // reflect the send that was JUST attempted, not the pre-attempt
+    // snapshot.
+    it('the returned invite.emailError/emailAttemptedAt match the outcome just attempted, not the pre-send snapshot', async () => {
+      emailProviderMock.sendEmail.mockResolvedValue({ sent: false, error: 'boom' });
+      const before = Date.now();
+      const result = await userInviteService.createInvite({ email: 'jane@example.com', role: 'warehouse_worker' }, ADMIN_ID);
+      expect(result.invite.emailStatus).toBe('failed');
+      expect(result.invite.emailError).toBe('boom');
+      expect(new Date(result.invite.emailAttemptedAt).getTime()).toBeGreaterThanOrEqual(before);
+    });
+
+    it('survives the provider throwing outright, still returning the invite', async () => {
+      emailProviderMock.sendEmail.mockRejectedValue(new Error('ECONNRESET'));
+      const result = await userInviteService.createInvite({ email: 'jane@example.com', role: 'warehouse_worker' }, ADMIN_ID);
+      expect(result.invite.id).toBe(10);
+      expect(result.email.sent).toBe(false);
+      expect(result.email.error).toBe('ECONNRESET');
+    });
+
+    it('sends via the organisation account (userId=null to the provider), never as the acting admin', async () => {
+      await userInviteService.createInvite({ email: 'jane@example.com', role: 'warehouse_worker' }, ADMIN_ID);
+      expect(emailProviderMock.sendEmail).toHaveBeenCalledWith(expect.anything(), null);
+    });
+
+    it('names the original inviter in the email body, looked up by invited_by', async () => {
+      userRepoMock.getUserById.mockResolvedValue({ id: ADMIN_ID, first_name: 'Grizel', last_name: 'Goliath' });
+      await userInviteService.createInvite({ email: 'jane@example.com', role: 'warehouse_worker' }, ADMIN_ID);
+      expect(userRepoMock.getUserById).toHaveBeenCalledWith(ADMIN_ID);
+      const emailArg = emailProviderMock.sendEmail.mock.calls[0][0];
+      expect(emailArg.text).toContain('Grizel Goliath');
+    });
+  });
 });
 
 // ── resendInvite / revokeInvite ─────────────────────────────────
@@ -145,6 +239,13 @@ describe('resendInvite', () => {
     const first = await userInviteService.createInvite({ email: 'jane@example.com', role: 'warehouse_worker' }, ADMIN_ID);
     const result = await userInviteService.resendInvite(10, ADMIN_ID);
     expect(result.token).not.toBe(first.token);
+  });
+
+  it('attempts a fresh email send, same as create, and records its outcome', async () => {
+    emailProviderMock.sendEmail.mockResolvedValue({ sent: false, error: 'No organisation Gmail account is connected.' });
+    const result = await userInviteService.resendInvite(10, ADMIN_ID);
+    expect(result.email).toEqual({ sent: false, stubbed: false, error: 'No organisation Gmail account is connected.' });
+    expect(inviteRepoMock.recordEmailAttempt).toHaveBeenCalledWith(10, { status: 'failed', error: 'No organisation Gmail account is connected.' });
   });
 });
 
