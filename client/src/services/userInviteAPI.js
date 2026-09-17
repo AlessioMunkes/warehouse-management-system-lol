@@ -28,6 +28,13 @@ export const toInvite = (row) => ({
   // Only present when this row came from resolveInvite (the public
   // accept-page lookup) — undefined everywhere else.
   inviterName: row.inviterName ?? null,
+  // Persisted outcome of the last send attempt (migration 024):
+  // 'sent' | 'stubbed' | 'failed' | null. Lets the pending-invites
+  // list flag a failed or stubbed send on a later visit, not only in
+  // the moment right after Create/Resend.
+  emailStatus:      row.emailStatus ?? null,
+  emailError:       row.emailError ?? null,
+  emailAttemptedAt: row.emailAttemptedAt ?? null,
 });
 
 // The create/resend response carries the invite PLUS the one-time
@@ -37,10 +44,10 @@ const toInviteWithLink = (data) => ({
   invite: toInvite(data.invite ?? {}),
   token:  data.token,
   url:    data.url,
-  // Not present until the email-sending phase wires it up. Left as
-  // undefined rather than defaulted to any sent/failed value — the
-  // UI must never claim an email went out when nothing tried to send
-  // one.
+  // { sent, stubbed, error } from the server, or undefined if for any
+  // reason no attempt was made — left as-is rather than defaulted to
+  // any sent/failed value, so the UI can never claim an email went
+  // out when nothing tried to send one.
   email:  data.email,
 });
 

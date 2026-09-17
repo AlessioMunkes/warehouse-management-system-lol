@@ -23,12 +23,36 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Loader2, RefreshCw, Copy, Ban } from 'lucide-react';
+import { Loader2, RefreshCw, Copy, Ban, MailWarning, MailX } from 'lucide-react';
 
 const ROLE_LABELS = {
   warehouse_worker: 'Worker',
   manager:           'Manager',
   admin:             'Admin',
+};
+
+// Persisted from the last send attempt (migration 024) so a failed or
+// stubbed send is still visible on a later visit, not just in the
+// moment right after Create/Resend — see InviteResultPanel.jsx for
+// the fuller explanation of why 'stubbed' is never shown as success.
+const EmailStatusNote = ({ status, error }) => {
+  if (status === 'failed') {
+    return (
+      <p className="flex items-center gap-1 text-sm text-danger">
+        <MailWarning className="size-3.5" />
+        {`Last send failed${error ? `: ${error}` : ''}`}
+      </p>
+    );
+  }
+  if (status === 'stubbed') {
+    return (
+      <p className="flex items-center gap-1 text-sm text-muted-foreground">
+        <MailX className="size-3.5" />
+        Email sending is off in this environment
+      </p>
+    );
+  }
+  return null; // 'sent', or no attempt recorded — nothing to flag
 };
 
 const relativeExpiry = (iso) => {
@@ -76,6 +100,7 @@ export default function PendingInvitesSection({
                     {relativeExpiry(invite.expiresAt)}
                     {invite.resendCount > 0 ? ` · resent ${invite.resendCount}×` : ''}
                   </p>
+                  <EmailStatusNote status={invite.emailStatus} error={invite.emailError} />
                 </div>
 
                 <div className="flex flex-wrap gap-2">

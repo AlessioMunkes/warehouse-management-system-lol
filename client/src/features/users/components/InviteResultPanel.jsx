@@ -7,19 +7,31 @@
 // link is gone for good; getting another one means Resend, which
 // invalidates this one.
 //
-// SEND-STATUS HONESTY. `result.email` is undefined until the
-// email-sending phase is wired up server-side — see
-// userInviteAPI.js's toInviteWithLink. Three distinct states, not
-// two: no attempt (undefined), sent, and failed. The copy for each is
-// written so nobody reads "sent" when nothing was attempted, or
-// "failed" as if the invite itself failed — the invite exists either
-// way, independent of whether the email went anywhere.
+// SEND-STATUS HONESTY. Four distinct states, not two — collapsing any
+// of these into "sent" would tell an admin an email went out when it
+// did not:
+//   undefined — no attempt was made (should not happen once the
+//     backend always attempts a send, but this component does not
+//     assume that; absence is never presented as success)
+//   stubbed   — EMAIL_ENABLED=false server-side. The provider itself
+//     reports { sent: true, stubbed: true } for this case (see
+//     email.provider.js), which is why userInvite.service.js
+//     deliberately un-conflates "sent" and "stubbed" before this ever
+//     reaches the client — nothing was transmitted anywhere.
+//   sent      — a real message went out via the connected Gmail
+//     account.
+//   failed    — a real attempt was made (most commonly: no Gmail
+//     account is connected in this environment at all — Gmail OAuth
+//     here is currently one teammate's personal setup, not something
+//     every deployment has) and the provider reported an error.
+// In every state, the invite itself already exists and the link below
+// already works — the copy for each case says so.
 // ─────────────────────────────────────────────────────────────
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input }  from '@/components/ui/input';
 import { Field, FieldLabel } from '@/components/ui/field';
-import { Check, Copy, Mail, MailWarning } from 'lucide-react';
+import { Check, Copy, Mail, MailWarning, MailX } from 'lucide-react';
 import { useToast } from '@/components/ui/toastContext';
 import { copyToClipboard } from '@/lib/clipboard';
 
@@ -31,11 +43,17 @@ const ROLE_LABELS = {
 
 const SendStatus = ({ email }) => {
   if (email === undefined) {
-    // No send has been attempted at all — say so plainly rather than
-    // implying one was tried.
     return (
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
         Not emailed automatically yet. Copy the link below and send it however works best.
+      </p>
+    );
+  }
+  if (email?.stubbed) {
+    return (
+      <p className="flex items-center gap-2 text-sm text-muted-foreground">
+        <MailX className="size-4" />
+        Email sending is switched off in this environment. Copy the link below and send it directly.
       </p>
     );
   }
