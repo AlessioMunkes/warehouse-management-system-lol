@@ -18,7 +18,12 @@
 // versa (nothing, today — every manager-only screen is also
 // admin-reachable).
 //
-// Search is a placeholder, not wired to anything yet — cross-entity
+// Script 52: the disabled search box is gone from the top bar. It sat
+// there through every screen advertising something that does not
+// exist, and a control nobody can use is worse than no control.
+// The note below is kept for whoever builds the real one.
+//
+// (was) Search is a placeholder, not wired to anything yet — cross-entity
 // search (suppliers/products/beneficiaries/POs from one box) is a
 // real, larger feature flagged separately, not a fake input that
 // silently does nothing forever. It says so.
@@ -30,11 +35,10 @@ import { STAFF, ADMIN } from '../../../routes/paths';
 import NotificationBell from '../../notifications/components/NotificationBell';
 import LogoutConfirmDialog from '@/components/ui/log-out-dialog';
 import { Button } from '@/components/ui/button';
-import { Input }  from '@/components/ui/input';
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from '@/components/ui/popover';
-import { Search, Plus, LogOut, EyeOff, Eye, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Plus, LogOut, EyeOff, Eye, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import {
   ShellContext, useInsideShell,
   ReducedMotionContext, MOTION_KEY, readStoredMotion, applyMotionAttribute,
@@ -184,16 +188,6 @@ function ManagerLayoutShell({ children }) {
           >
             {sidebarCollapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
           </Button>
-
-          <div className="relative hidden max-w-xs flex-1 sm:block">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              className="pl-8"
-              placeholder="Search coming soon"
-              disabled
-              title="Cross-entity search isn't built yet — this is a placeholder, not a bug."
-            />
-          </div>
 
           <div className="ml-auto flex items-center gap-1">
             <Popover open={quickCreateOpen} onOpenChange={setQuickCreateOpen}>

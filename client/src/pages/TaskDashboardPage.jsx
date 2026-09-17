@@ -1,100 +1,102 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/pages/TaskDashboardPage.jsx
+// @sentinel script-51-task-dashboard-simple
+// @sentinel script-52-illustrated-icons
 //
-// The warehouse worker's dashboard.
+// The warehouse worker's home screen: the tasks they can start, and
+// nothing else.
 //
-// It was five tiles carrying the same five words as the sidebar beside
-// them. This leads with what is waiting — a sentence, then three counts
-// — and describes each task rather than naming it, because "Decanting"
-// tells a new volunteer nothing and "break bulk stock down into bags"
-// tells them everything.
+// It used to open with three counts from GET /api/dashboard/my-work
+// above the task cards. On the floor that is a row to read past on the
+// way to the one button you came for, so script 51 drops it — the
+// counts still live on the screens that can act on them (the packing
+// board, the gate queue). The fetch goes with it, so this page renders
+// with no network call and cannot show a spinner or a failed row
+// between someone and their job.
 //
-// The counts come from GET /api/dashboard/my-work and are advisory: a
-// failed load leaves the task cards working, because picking a job must
-// never depend on a stat row rendering.
+// The tiles are STAFF_TABS from the bottom bar, in the same order with
+// the same icons, so the four tasks look the same wherever they are
+// shown. Home is dropped — it is this screen. Donation intake is added
+// on the end for staff, and is hidden from managers and admins, who
+// reach it from their own sidebar.
 // ─────────────────────────────────────────────────────────────
-import { useEffect, useState } from 'react';
-import { ClipboardList, Truck, PackageCheck, PackageOpen, FlaskConical, ClipboardCheck, HandCoins } from 'lucide-react';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { HandCoins } from 'lucide-react';
+import { STAFF_TABS } from '../components/layout/staffTasks';
 import DashboardGreeting from '../features/taskdashboard/components/DashboardGreeting';
 import UnfinishedWork from '../features/staff/components/UnfinishedWork';
-import StatTile from '../features/taskdashboard/components/StatTile';
-import ActionCard from '../features/taskdashboard/components/ActionCard';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Card, CardContent } from '@/components/ui/card';
 import { useAuth } from '../context/AuthContext';
-import { STAFF, PACKING } from '../routes/paths';
-import dashboardAPI from '../services/dashboardAPI';
+import { STAFF } from '../routes/paths';
 
-// One line each, in the words the floor uses. These are what turn a
-// menu into a dashboard.
+// One line each, in the words the floor uses — "Decanting" tells a new
+// volunteer nothing, "break bulk stock down into bags" tells them
+// everything.
+const BLURBS = {
+  Receiving: 'Check a delivery in against its purchase order.',
+  Packing:   'Pack a picking slip and flag anything short.',
+  Decanting: 'Break bulk stock down into bags and record the weights.',
+  Dispatch:  'Hand a pallet over at the gate and capture the signature.',
+};
+
 const TASKS = [
-  { to: STAFF.receiving, icon: PackageOpen, title: 'Receiving',
-    description: 'Check a delivery in against its purchase order.' },
-  { to: PACKING.board, icon: PackageCheck, title: 'Packing',
-    description: 'Pack a picking slip and flag anything short.' },
-  { to: STAFF.decanting, icon: FlaskConical, title: 'Decanting',
-    description: 'Break bulk stock down into bags and record the weights.' },
-  { to: STAFF.dispatch, icon: ClipboardCheck, title: 'Dispatch',
-    description: 'Hand a pallet over at the gate and capture the signature.' },
-  { to: STAFF.donation, icon: HandCoins, title: 'Donation intake',
-    description: 'Log goods donated at the door.' },
-  // Receipts is manager-only and deliberately absent. The card and the
-  // route guard in App.jsx have to agree — a hidden card on an open
+  ...STAFF_TABS
+    .filter((tab) => tab.to !== STAFF.home)
+    .map((tab) => ({
+      to: tab.to, icon: tab.icon, image: tab.image,
+      title: tab.label, description: BLURBS[tab.label],
+    })),
+  { to: STAFF.donation, icon: HandCoins, image: '/icons/donate-icon.svg',
+    title: 'Donation intake', description: 'Log goods donated at the door.' },
+  // Receipts is manager-only and deliberately absent. The tile and the
+  // route guard in App.jsx have to agree — a hidden tile on an open
   // route is not access control, just a tidier way to lose track of one.
 ];
 
+function TaskTile({ to, icon: Icon, image, title, description }) {
+  // Same drawing as the tab bar, same fallback: a missing file shows
+  // the glyph rather than an empty box.
+  const [broken, setBroken] = useState(false);
+  return (
+    <Link to={to} className="block h-full">
+      <Card className="h-full transition-colors hover:border-brand hover:bg-canvas">
+        <CardContent className="flex h-full flex-col items-start gap-3 p-5">
+          <div className="stf-tile-icon rounded-[10px] bg-surface-2 p-2 text-brand">
+            {image && !broken ? (
+              <img src={image} alt="" aria-hidden="true" className="size-12 object-contain"
+                   onError={() => setBroken(true)} />
+            ) : (
+              <Icon className="size-8" />
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="text-lg font-semibold leading-tight text-ink">{title}</p>
+            <p className="mt-1 text-sm leading-snug text-muted-foreground">{description}</p>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
+  );
+}
+
 export default function TaskDashboardPage() {
   const { user } = useAuth();
-  const [work, setWork] = useState(null);
-  const [loading, setLoading] = useState(true);
   const role = String(user?.role || '').toLowerCase();
   const visibleTasks = TASKS.filter((task) =>
     task.to !== STAFF.donation || (role !== 'manager' && role !== 'admin')
   );
 
-  useEffect(() => {
-    let cancelled = false;
-    dashboardAPI.getMyWork()
-      .then((data) => { if (!cancelled) setWork(data); })
-      .catch(() => { if (!cancelled) setWork(null); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, []);
-
-  // The greeting says the state of the day in one line, so someone who
-  // reads nothing else still knows whether there is anything waiting.
-  const summaryLine = work
-    ? [
-        work.slipsToPack > 0 ? `${work.slipsToPack} ${work.slipsToPack === 1 ? 'slip' : 'slips'} to pack` : null,
-        work.deliveriesExpected > 0 ? `${work.deliveriesExpected} ${work.deliveriesExpected === 1 ? 'delivery' : 'deliveries'} expected` : null,
-        work.palletsAtGate > 0 ? `${work.palletsAtGate} at the gate` : null,
-      ].filter(Boolean).join(' · ') || 'nothing waiting right now'
-    : null;
-
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6">
-      <DashboardGreeting name={user?.firstName} summaryLine={summaryLine} />
+      <DashboardGreeting name={user?.firstName} summaryLine="Pick a task to get started" />
 
       {/* Renders nothing when there is nothing half-done, which is
           most days. */}
       <UnfinishedWork />
 
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {loading ? (
-          Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)
-        ) : work ? (
-          <>
-            <StatTile icon={ClipboardList} label="Slips to pack" value={work.slipsToPack} to={PACKING.board} warn />
-            <StatTile icon={Truck} label="Deliveries expected" value={work.deliveriesExpected} to={STAFF.receiving} />
-            <StatTile icon={PackageCheck} label="Pallets at the gate" value={work.palletsAtGate} to={STAFF.dispatch} warn />
-          </>
-        ) : null}
-      </div>
-
-      <h2 className="mt-8 mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        Start a task
-      </h2>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {visibleTasks.map((task) => <ActionCard key={task.to} {...task} />)}
+      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {visibleTasks.map((task) => <TaskTile key={task.to} {...task} />)}
       </div>
     </div>
   );

@@ -1,20 +1,36 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/components/layout/StaffShell.jsx
+// @sentinel script-49-staff-shell-in-app
 //
-// The frame every warehouse-staff page sits in: dark app bar,
-// breadcrumb line, the single content column, the tab bar, and the
-// doodle banner footer.
+// The frame every warehouse-staff task page sits in.
 //
-// Why this exists rather than reusing features/*/components/PageHeader:
-// that header is a desktop bar with a back arrow, an avatar, a status
-// pill and a logout modal — four things competing for the top of a
-// 390px screen. The staff pages need two: who is logged in, and the
-// way back out of a slip. Everything else moved to the tab bar.
+// Script 49: the floor flows now sit INSIDE the same app shell as the
+// dashboard, manager and admin screens (ManagerLayout — sidebar on a
+// desk, hamburger drawer on a phone, one top bar). Before this they
+// had their own dark app bar, a breadcrumb strip and a doodle footer,
+// so opening Receiving from the worker's dashboard felt like leaving
+// the app.
 //
-// PageHeader is untouched, so the manager screens keep it.
+// What moved where — nothing was dropped:
+//   dark app bar drawer        → ManagerLayout's drawer / sidebar
+//   "Less movement"            → the eye button in the top bar. Same
+//                                storage key (stf_reduced_motion) and
+//                                the same <html data-stf-motion>
+//                                attribute, so every staff.css rule
+//                                that honours it still does.
+//   "Log out"                  → the top bar's log-out button
+//   signed-in name             → the top bar
+//   back arrow (history -1)    → the arrow beside the page title
+//   crumb / onBack / actions / meta → the page header below
+//   bottom tab bar             → kept, phones only (below sm). At sm+
+//                                the sidebar lists the same four tasks.
+//
+// The props are unchanged, so none of the seven pages that render
+// this needed editing. ManagerLayout is idempotent, so a page that is
+// already inside a shell gets a passthrough rather than a second one.
 // ─────────────────────────────────────────────────────────────
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -22,17 +38,17 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useAuth } from '../../context/AuthContext';
-import useReducedMotion from '../../features/staff/hooks/useReducedMotion';
+import ManagerLayout from '../../features/taskdashboard/components/ManagerLayout';
 import StaffTabBar from './StaffTabBar';
 import OfflineBar from './OfflineBar';
-import { AppNavDrawer } from '../../features/taskdashboard/components/AppNav';
 
-// Both live in client/public/, the same convention the landing page
-// uses for /images/BatchesLogo.png and /icons/*.svg — plain URLs, no
-// Vite import needed for what is effectively brand furniture.
-const LOGO_URL   = '/images/BatchesLogo.png';
-const BANNER_URL = '/images/banner-doodles.png';
+// 'Packing / Little Stars ECD' → title 'Packing', sub 'Little Stars ECD'.
+// The first segment is the task, which is what the new-style pages put
+// in their heading; the rest is where in the task you are.
+const splitCrumb = (crumb) => {
+  const parts = String(crumb ?? '').split(' / ');
+  return { title: parts[0], sub: parts.slice(1).join(' / ') };
+};
 
 export default function StaffShell({
   crumb,          // 'Receiving' or 'Packing / Little Stars ECD'
@@ -40,101 +56,73 @@ export default function StaffShell({
   onBack,         // omit for a task's first screen
   backLabel = 'Back',
   // The task flows are a single phone-width column. The week planner
-  // inside Decanting is a two-column form that needs the room, so it
-  // asks for the wide column rather than getting its own chrome —
-  // one app bar, one tab bar, everywhere.
+  // inside Decanting is a two-column form that needs the room.
   wide = false,
-  actions,        // extra controls for the crumb row (e.g. a mode switch)
+  actions,        // extra controls for the header row (e.g. History)
   children,
 }) {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
-  const { reduced, toggle } = useReducedMotion();
-
-  const handleLogout = async () => {
-    await logout();
-    navigate('/login');
-  };
+  const { title, sub } = splitCrumb(crumb);
 
   return (
-    <div className="stf-shell">
-      <header className="stf-appbar">
-        <div className="stf-appbar-left">
-          {/* Everything the role can open. The tab bar below switches
-              between the four tasks; this reaches the rest without
-              backing out to /noc. No breakpoint on it — this shell has
-              no sidebar at any width. */}
-          <AppNavDrawer />
+    <ManagerLayout>
+      <div className="stf-shell is-in-app">
+        <OfflineBar />
 
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => navigate(-1)}
-                  aria-label="Go back"
-                >
-                  <ArrowLeft className="h-5 w-5" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Go back to previous page</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+        <main className={wide ? 'stf-main is-wide' : 'stf-main'}>
+          <header className="stf-page-head">
+            <div className="stf-page-head-left">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => navigate(-1)}
+                      aria-label="Go back"
+                    >
+                      <ArrowLeft className="h-5 w-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Go back to previous page</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
 
-          <div className="stf-appbar-brand">
-            <img className="stf-appbar-logo" src={LOGO_URL} alt="" aria-hidden="true" />
-            <span className="stf-appbar-name">Batches</span>
-            <span className="stf-appbar-prog">
-              {user?.firstName ? `${user.firstName} ${user.lastName ?? ''}`.trim() : 'Nourish Our Children'}
-            </span>
-          </div>
-        </div>
+              <div className="stf-page-head-text">
+                {onBack ? (
+                  // Same accessible name as the old crumb button, so the
+                  // in-flow "back" still announces where it goes and
+                  // what it leaves.
+                  <button
+                    type="button"
+                    className="stf-page-back"
+                    onClick={onBack}
+                    aria-label={`${backLabel} · ${crumb}`}
+                  >
+                    <ChevronLeft className="size-4" aria-hidden="true" />
+                    <span>{backLabel}</span>
+                  </button>
+                ) : null}
+                <p className="stf-page-title">{title}</p>
+                {sub ? <p className="stf-page-sub">{sub}</p> : null}
+              </div>
+            </div>
 
-        <div className="stf-appbar-actions">
-          {/* ACC-08. Labelled with what it does, not "reduce motion" —
-              the staff reading it are not describing an animation
-              system, they just want the screen to stop moving. */}
-          <button
-            type="button"
-            className="stf-appbar-btn"
-            aria-pressed={reduced}
-            onClick={toggle}
-          >
-            Less movement
-          </button>
-          <button type="button" className="stf-appbar-btn" onClick={handleLogout}>
-            Log out
-          </button>
-        </div>
-      </header>
+            {actions || meta ? (
+              <div className="stf-page-head-right">
+                {actions}
+                {meta ? <span className="stf-crumb-meta">{meta}</span> : null}
+              </div>
+            ) : null}
+          </header>
 
-      <div className="stf-crumb">
-        {onBack ? (
-          <button type="button" className="stf-crumb-back" onClick={onBack}>
-            {backLabel} · {crumb}
-          </button>
-        ) : (
-          <span>{crumb}</span>
-        )}
-        <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {actions}
-          {meta ? <span className="stf-crumb-meta">{meta}</span> : null}
-        </span>
+          {children}
+        </main>
+
+        <StaffTabBar />
       </div>
-
-      <OfflineBar />
-
-      <main className={wide ? 'stf-main is-wide' : 'stf-main'}>{children}</main>
-
-      <StaffTabBar />
-      <div
-        className="stf-footer"
-        aria-hidden="true"
-        style={{ backgroundImage: `url(${BANNER_URL})` }}
-      />
-    </div>
+    </ManagerLayout>
   );
 }

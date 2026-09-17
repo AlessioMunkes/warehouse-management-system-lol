@@ -22,11 +22,21 @@
 // same fields as one scrolling dialog instead of three screens.
 //
 // The one HARD block is an inactive ECD centre (BR-11) — nothing here
-// can get past that, for anyone. Two more (a pallet booked for
-// another day, or one packing hasn't closed off) need a manager's
-// typed reason to proceed; a warehouse worker sees why and is told to
-// find one, matching exactly what dispatch.service.js's collect()
-// itself enforces — this screen is not the source of truth for any of
+// can get past that, for anyone. One more (a pallet packing hasn't
+// closed off) needs a manager's typed reason to proceed; a warehouse
+// worker sees why and is told to find one, matching exactly what
+// dispatch.service.js's collect() itself enforces.
+//
+// Script 53: a pallet booked for another day is NOT one of those any
+// more. The server stopped gating on it — see the long note in
+// collect() — because a driver at the gate has already solved a
+// harder problem than the calendar, and the gate board deliberately
+// lists every outstanding pallet on any date, which makes nearly all
+// of them wrongDay. This screen was still refusing on its own, so a
+// worker was blocked at the gate by a rule the API would have
+// allowed. It now says the pallet was booked for another day and
+// lets them carry on; the server logs it as a wrong_day collection
+// with the date it was booked for, so BR-26 review still sees it — this screen is not the source of truth for any of
 // that, evaluateEligibility() on the server is, but disagreeing with
 // it here would just mean a worker fills in a whole form only to have
 // the server refuse it at the very last tap.
@@ -182,11 +192,26 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
   const currentLine = packedLines[lineIndex];
   const hasLines = packedLines.length > 0;
 
-  const needsOverride = eligibility.wrongDay || eligibility.slipNotPacked;
-  const overrideReasonText = [
-    eligibility.wrongDay ? `${gateView?.ecd_name} is booked for another day` : null,
-    eligibility.slipNotPacked ? 'packing has not closed this pallet off yet' : null,
-  ].filter(Boolean).join(', and ');
+  // Only what the server actually refuses. wrongDay is advisory: it is
+  // shown (below) and recorded server-side, but it stops nobody.
+  const needsOverride = eligibility.slipNotPacked;
+  const overrideReasonText = eligibility.slipNotPacked
+    ? 'packing has not closed this pallet off yet'
+    : '';
+  // The day it was booked for, in the words a gate uses — "booked for
+  // Tue 15 Sep" is checkable against the paperwork in the driver's
+  // hand; "booked for another day" is not.
+  const bookedForText = gateView?.dispatch_date
+    ? new Date(gateView.dispatch_date).toLocaleDateString('en-ZA', {
+        weekday: 'short', day: 'numeric', month: 'short',
+      })
+    : null;
+  const wrongDayNotice = eligibility.wrongDay ? (
+    <Notice>
+      {gateView?.ecd_name} was booked for {bookedForText || 'another day'}. You can still release
+      this pallet — the collection is recorded as an off-day one for the manager to see.
+    </Notice>
+  ) : null;
   const canStart = !eligibility.ecdInactive && (!needsOverride || (isManager(user) && overrideReason.trim()));
 
   const handleModeChange = (next) => {
@@ -306,6 +331,8 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
               cannot be released. Ask a manager to activate the centre first.
             </Notice>
           ) : null}
+
+          {!eligibility.ecdInactive ? wrongDayNotice : null}
 
           {!eligibility.ecdInactive && needsOverride ? (
             isManager(user) ? (
@@ -461,6 +488,7 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
               cannot be released. Ask manager to activate the centre first.
             </Notice>
           ) : null}
+          {!eligibility.ecdInactive ? wrongDayNotice : null}
           {!eligibility.ecdInactive && needsOverride && !isManager(user) ? (
             <Notice tone="warn">
               {overrideReasonText}. Ask a manager to authorise this collection at the gate.

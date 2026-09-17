@@ -2107,3 +2107,420 @@ button.stf-panel-head:disabled { cursor: default; }
 .dark .stf-resume .stf-resume-go { background: var(--stf-accent); color: #1a0d0e; }
 .dark .stf-resume .stf-resume-go:hover { background: var(--stf-accent-deep); color: #1a0d0e; }
 .dark .stf-resume .stf-resume-drop:hover { color: var(--stf-attention); }
+
+/* @sentinel script-49-worker-view-app-style */
+/* ══════════════════════════════════════════════════════════════════
+   SCRIPT 49 — THE FLOOR FLOWS IN THE APP'S OWN STYLE
+
+   StaffShell now renders inside ManagerLayout, the same shell as the
+   dashboard, manager and admin screens. This block makes what is
+   inside it read as the same app:
+
+     · every --stf-* token points at the app tokens in index.css
+       (--canvas, --surface, --ink, --line, --brand …). Those flip in
+       .dark on their own, so the script-45 .dark block above no
+       longer decides anything inside .stf-shell — these win by being
+       set on the nearer element.
+     · Inter everywhere, medium/semibold headings, like the dashboard.
+     · ink is the action colour (the shadcn default button and the
+       sidebar's active item); red now means "look at this" — short
+       counts, flags, failed requests — like StatTile and the
+       dashboard's error banner.
+     · no blue hover glows; hover is a stronger line, like ActionCard.
+
+   What is NOT changed: sizes. 44px tap targets, 48px buttons and
+   56px number fields stay (ACC-06, gloves on the floor). Only the
+   paint and the type family move.
+   ══════════════════════════════════════════════════════════════════ */
+.stf-shell {
+  --stf-ink:        var(--ink);
+  --stf-ink-deep:   var(--ink);
+  --stf-accent:     var(--ink);
+  --stf-accent-deep: color-mix(in srgb, var(--ink) 80%, transparent);
+  --stf-gold:       var(--line-strong);
+  --stf-gold-deep:  var(--ink-soft);
+  --stf-sand:       var(--canvas);
+  --stf-border:     var(--line);
+  --stf-text:       var(--ink);
+  --stf-text-sub:   var(--ink-soft);
+  --stf-text-meta:  var(--ink-faint);
+  --stf-white:      var(--surface);
+
+  --stf-attention:        var(--brand);
+  --stf-attention-ink:    var(--danger-ink);
+  --stf-attention-bg:     var(--danger-soft);
+  --stf-attention-border: color-mix(in srgb, var(--brand) 35%, transparent);
+
+  --stf-font-display: "Inter Variable", "Inter", system-ui, -apple-system, sans-serif;
+  --stf-font-sans:    "Inter Variable", "Inter", system-ui, -apple-system, sans-serif;
+
+  color: var(--ink);
+}
+
+/* ── Inside the app shell ───────────────────────────────────────── */
+/* ManagerLayout already fills the viewport and scrolls its own
+   <main>; a second 100dvh here would add a screen of empty scroll. */
+.stf-shell.is-in-app {
+  min-height: 0;
+  background: transparent;
+}
+
+/* The tab bar is the phone's navigation. From sm up the sidebar is on
+   screen with the same destinations, so the bar and the space kept
+   for it both go. --stf-tabbar-h drops to 0 too, which is what the
+   toast stack offsets itself by. */
+@media (min-width: 640px) {
+  .stf-shell.is-in-app {
+    --stf-tabbar-h: 0px;
+    padding-bottom: 0;
+  }
+  .stf-shell.is-in-app .stf-tabbar { display: none; }
+}
+
+/* Same outer rhythm as the dashboard pages: px-4 py-6, sm:px-6. */
+.stf-shell.is-in-app .stf-main {
+  padding: 24px 16px 32px;
+}
+@media (min-width: 640px) {
+  .stf-shell.is-in-app .stf-main { padding: 24px 24px 32px; }
+}
+
+/* ── Page header (replaces the crumb strip) ─────────────────────── */
+.stf-page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.stf-page-head-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+.stf-page-head-left > button { margin-top: 1px; margin-left: -8px; }
+.stf-page-head-text { min-width: 0; display: flex; flex-direction: column; }
+.stf-page-title {
+  margin: 0;
+  font-size: 1.5rem;          /* text-2xl */
+  line-height: 2rem;
+  font-weight: 500;           /* font-medium */
+  color: var(--ink);
+}
+.stf-page-sub {
+  margin: 4px 0 0;
+  font-size: 0.875rem;        /* text-sm */
+  line-height: 1.25rem;
+  color: var(--ink-soft);     /* text-muted-foreground */
+}
+.stf-page-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  align-self: flex-start;
+  min-height: 32px;
+  margin: -4px 0 2px -4px;
+  padding: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: 500 13px/1.2 var(--stf-font-sans);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.stf-page-back:hover { color: var(--ink); background: var(--surface-2); }
+.stf-page-head-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 36px;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+.stf-shell .stf-crumb-link {
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  font: 500 14px/1 var(--stf-font-sans);
+  color: var(--ink);
+  text-decoration: none;
+}
+.stf-shell .stf-crumb-link:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+/* ── Bottom tab bar, in shell paint ─────────────────────────────── */
+.stf-shell .stf-tabbar {
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  gap: 4px;
+  padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+}
+.stf-shell .stf-tab {
+  border-top: 0;
+  border-radius: 8px;
+  color: var(--ink-soft);
+  font: 500 11px/1.2 var(--stf-font-sans);
+}
+.stf-shell .stf-tab-glyph { opacity: 1; line-height: 0; }
+.stf-shell .stf-tab:hover { background: var(--surface-2); color: var(--ink); }
+.stf-shell .stf-tab.is-current { background: var(--ink); color: var(--on-ink); }
+
+/* ── Type: the dashboard's weights ──────────────────────────────── */
+.stf-shell .stf-step-title,
+.stf-shell .stf-task-title  { font-weight: 600; letter-spacing: -0.01em; }
+.stf-shell .stf-section-title,
+.stf-shell .stf-field-label,
+.stf-shell .stf-choice-label,
+.stf-shell .stf-row-title,
+.stf-shell .stf-row-value,
+.stf-shell .stf-formrow-title,
+.stf-shell .stf-counter-val,
+.stf-shell .stf-progress-count,
+.stf-shell .stf-qty-readout-val,
+.stf-shell .stf-input         { font-weight: 600; }
+.stf-shell .stf-input.is-text { font-weight: 400; }
+.stf-shell .stf-instruction-n { font-weight: 700; }
+.stf-shell .stf-field-label   { font-size: 13px; }
+
+/* ── Buttons: shadcn's default and outline ──────────────────────── */
+.stf-shell .stf-btn { font-weight: 500; }
+.stf-shell .stf-btn-primary { background: var(--ink); color: var(--on-ink); }
+.stf-shell .stf-btn-primary:hover:not([disabled]) {
+  background: color-mix(in srgb, var(--ink) 80%, transparent);
+}
+.stf-shell .stf-btn-secondary { background: var(--surface); border-width: 1px; }
+.stf-shell .stf-btn-secondary:hover:not([disabled]) {
+  background: var(--surface-2);
+  border-color: var(--line-strong);
+}
+.stf-shell .stf-btn-warn { border-width: 1px; }
+
+.stf-shell .stf-btn:hover:not([disabled]),
+.stf-shell .stf-choice:hover,
+.stf-shell .donation-intake-option:hover { box-shadow: none; }
+.stf-shell .stf-choice:hover,
+.stf-shell .donation-intake-option:hover { border-color: var(--line-strong); }
+.stf-shell .stf-choice.is-chosen,
+.stf-shell .donation-intake-option.is-chosen {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+
+/* One focus ring for everything, the shadcn one (ring-3 ring/30). */
+.stf-shell :is(button, a, input, select, textarea):focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--ring) 45%, transparent);
+  outline-offset: 2px;
+}
+.stf-shell .stf-input:focus,
+.stf-shell .stf-select:focus { border-color: var(--line-strong); }
+
+/* ── Inputs: shadcn's softer box ────────────────────────────────── */
+.stf-shell .stf-input,
+.stf-shell .stf-select,
+.stf-shell .stf-date-trigger,
+.stf-shell .stf-qty-readout,
+.stf-shell .stf-static-value { border-width: 1px; border-radius: 12px; }
+.stf-shell .stf-qty-readout,
+.stf-shell .stf-static-value { background: var(--surface-2); }
+
+/* Valid state: the theme's green, which flips in dark. */
+.stf-shell .stf-input.is-valid,
+.stf-shell .stf-input.is-valid:focus { border-color: var(--good-ink); }
+.stf-shell .stf-field-hint.is-valid-msg { color: var(--good-ink); }
+
+/* ── Surfaces: the dashboard Card, in tokens ────────────────────── */
+/* Script 21 copied the Card with literal rgb(43 51 54 / …), which is
+   a light-mode shadow on a dark page. */
+.stf-shell .stf-main > .stf-task,
+.stf-shell .stf-main > .stf-step {
+  border: 1px solid color-mix(in srgb, var(--ink) 6%, transparent);
+  box-shadow:
+    0 4px 6px -1px color-mix(in srgb, var(--ink) 8%, transparent),
+    0 2px 4px -2px color-mix(in srgb, var(--ink) 6%, transparent);
+}
+.stf-shell .stf-list,
+.stf-shell .stf-empty,
+.stf-shell .stf-instruction,
+.stf-shell .stf-formrow { border-radius: 16px; }
+.stf-shell .stf-formrow { border-width: 1px; }
+.stf-shell .stf-notice { border-radius: 0 12px 12px 0; }
+
+/* Segmented filters: shadcn tabs-ish, muted track, surface thumb. */
+.stf-shell .stf-segments { background: var(--surface-2); border-radius: 12px; }
+.stf-shell .stf-segment { font-weight: 500; border-radius: 9px; }
+.stf-shell .stf-segment.is-active {
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 14%, transparent);
+}
+.stf-shell .stf-segment-thumb {
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 14%, transparent);
+}
+
+/* Progress and step rail: ink fill, like the dashboard's bars. */
+.stf-shell .stf-rail-bar:not(.is-done) { background: var(--surface-2); }
+.stf-shell .stf-progress-track { background: var(--surface-2); }
+
+/* Badges: the dashboard's chips. */
+.stf-shell .stf-badge { background: var(--chip); color: var(--ink-soft); font-weight: 500; }
+.stf-shell .stf-badge.is-active { background: var(--surface-2); color: var(--ink); }
+.stf-shell .stf-badge.is-done   { background: var(--ink); color: var(--on-ink); }
+.stf-shell .stf-badge.is-warn   { background: var(--danger-soft); color: var(--danger-ink); }
+
+/* Coachmark: ink bubble, on-ink text (surface would be dark-on-light
+   in dark mode). */
+.stf-shell .stf-coachmark-body { color: var(--on-ink); }
+
+/* ── Resume card on the worker dashboard ────────────────────────── */
+/* It lives on /noc, outside .stf-shell, and holds literal hex; the
+   "Resume" button was the last red action on that page. */
+.stf-resume .stf-resume-go,
+.dark .stf-resume .stf-resume-go { background: var(--ink); color: var(--on-ink); }
+.stf-resume .stf-resume-go:hover,
+.dark .stf-resume .stf-resume-go:hover {
+  background: color-mix(in srgb, var(--ink) 80%, transparent);
+  color: var(--on-ink);
+}
+
+/* @sentinel script-50-worker-view-red-accents */
+/* ══════════════════════════════════════════════════════════════════
+   SCRIPT 50 — BRAND RED BACK ON THE ACTIONS
+
+   Script 49 made ink the action colour everywhere, which left the
+   floor flows black and white. The brand rule from landingpage.css
+   comes back: red is what you tap, and what shows progress.
+
+     · --stf-accent is --brand again, so every rule that already used
+       it (rail, progress fill, focused work-list line, counter/pager/
+       qty hovers, undo, signature clear) is red with no further edit.
+     · primary buttons, the chosen option, the current tab and the
+       resume button are red (script 49 had pinned those to ink).
+     · warnings move to --danger-ink, the darker red, so a flagged
+       line never reads as one more button (the original reason for
+       --stf-attention).
+
+   Text on red uses --on-brand, which is white in light and near-black
+   in dark (white on the dark theme's #ff5257 fails contrast).
+   ══════════════════════════════════════════════════════════════════ */
+.stf-shell {
+  --stf-accent:      var(--brand);
+  --stf-accent-deep: var(--brand-deep);
+
+  --stf-attention:        var(--danger-ink);
+  --stf-attention-border: color-mix(in srgb, var(--danger-ink) 30%, transparent);
+}
+
+/* Links stay ink — History and the in-flow back are navigation, not
+   the action on the screen. */
+.stf-shell a { color: var(--ink); }
+.stf-shell a:hover { color: var(--brand); }
+
+/* ── Primary action ─────────────────────────────────────────────── */
+.stf-shell .stf-btn-primary { background: var(--brand); color: var(--on-brand); }
+.stf-shell .stf-btn-primary:hover:not([disabled]) { background: var(--brand-deep); }
+.stf-shell .stf-btn-secondary:hover:not([disabled]) { border-color: var(--brand); }
+
+/* ── Choices ────────────────────────────────────────────────────── */
+.stf-shell .stf-choice.is-chosen,
+.stf-shell .donation-intake-option.is-chosen {
+  border-color: var(--brand);
+  box-shadow: inset 0 0 0 1px var(--brand);
+  background: color-mix(in srgb, var(--brand) 5%, var(--surface));
+}
+.stf-shell .donation-intake-option input { accent-color: var(--brand); }
+.stf-shell .stf-input:focus,
+.stf-shell .stf-select:focus { border-color: var(--brand); }
+.stf-shell .stf-input.is-flagged,
+.stf-shell .stf-select.is-flagged { border-color: var(--danger-ink); }
+
+/* The active filter segment gets a red underline, not a red fill —
+   filters are not the action. */
+.stf-shell .stf-segment.is-active { box-shadow: inset 0 -2px 0 var(--brand), 0 1px 2px color-mix(in srgb, var(--ink) 14%, transparent); }
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.stf-shell .stf-crumb-link:hover { border-color: var(--brand); color: var(--brand); background: var(--surface); }
+.stf-page-back:hover { color: var(--brand); }
+
+/* ── Tab bar ────────────────────────────────────────────────────── */
+.stf-shell .stf-tab.is-current {
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
+  color: var(--brand);
+}
+
+/* ── Badges ─────────────────────────────────────────────────────── */
+.stf-shell .stf-badge.is-active {
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  color: var(--brand);
+}
+
+/* ── Resume card on the worker dashboard (outside .stf-shell) ───── */
+.stf-resume .stf-resume-go,
+.dark .stf-resume .stf-resume-go { background: var(--brand); color: var(--on-brand); }
+.stf-resume .stf-resume-go:hover,
+.dark .stf-resume .stf-resume-go:hover { background: var(--brand-deep); color: var(--on-brand); }
+.stf-resume,
+.dark .stf-resume { border-left-color: var(--brand); }
+
+/* @sentinel script-51-tabbar-all-widths */
+/* ══════════════════════════════════════════════════════════════════
+   SCRIPT 51 — THE TAB BAR IS BACK ON EVERY WIDTH
+
+   Script 49 hid the bottom bar from sm up, on the reasoning that the
+   sidebar says the same thing. On the floor the bar is the thing
+   people actually hit, so it comes back at every width, alongside
+   the sidebar.
+
+   It is sticky inside the shell's own scroll box rather than fixed to
+   the window, so on a desk it spans the content and leaves the
+   sidebar alone; on a phone, where there is no sidebar, that is the
+   full width — which is where it always was.
+   ══════════════════════════════════════════════════════════════════ */
+.stf-shell.is-in-app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding-bottom: 0;
+}
+.stf-shell.is-in-app .stf-main { flex: 1 1 auto; }
+
+@media (min-width: 640px) {
+  .stf-shell.is-in-app {
+    /* script 49 zeroed this to reclaim the space the bar left */
+    --stf-tabbar-h: 60px;
+    padding-bottom: 0;
+  }
+  .stf-shell.is-in-app .stf-tabbar { display: flex; }
+}
+
+.stf-shell.is-in-app .stf-tabbar {
+  position: sticky;
+  left: auto;
+  right: auto;
+  bottom: 0;
+  margin-top: auto;
+}
+
+/* @sentinel script-52-illustrated-icons-dark */
+/* ══════════════════════════════════════════════════════════════════
+   SCRIPT 52 — THE ILLUSTRATED ICONS IN DARK MODE
+
+   The task drawings are line art with near-black outlines, so on the
+   dark theme they all but vanish. They keep their own colours and sit
+   on a light plate instead, which is what the packaging on a shelf
+   does anyway — no filter tricks, so the red van stays a red van.
+   ══════════════════════════════════════════════════════════════════ */
+.stf-tab-icon { width: 28px; height: 28px; opacity: 1; }
+.stf-tab:not(.is-current) .stf-tab-icon { opacity: 0.75; }
+
+.dark .stf-tab-icon,
+.dark .stf-tile-icon {
+  background: #f4f1ec;
+  border-radius: 8px;
+  padding: 2px;
+}
+.dark .stf-tile-icon { padding: 8px; border-radius: 10px; }
