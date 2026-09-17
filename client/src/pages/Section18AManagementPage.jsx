@@ -8,7 +8,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState, useCallback } from 'react';
 import {
-  FileText, Mail, Settings, Download, Send,
+  FileText, Mail, Settings, Send,
   CheckCircle2, XCircle, Clock, AlertTriangle, Loader2,
 } from 'lucide-react';
 import { TopNavbar } from '../features/taskdashboard/components/TopNavBar';
@@ -56,6 +56,12 @@ export default function Section18AManagementPage() {
   const [emailSearch, setEmailSearch] = useState('');
   const [emailTypeFilter, setEmailTypeFilter] = useState('');
   const [emailStatusFilter, setEmailStatusFilter] = useState('');
+  const [donorSearch, setDonorSearch] = useState('');
+  const [amountMin, setAmountMin] = useState('');
+  const [amountMax, setAmountMax] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [queueSort, setQueueSort] = useState('date-asc');
   const initialLoadDone = useRef(false);
 
   const loadData = useCallback(async () => {
@@ -105,10 +111,6 @@ export default function Section18AManagementPage() {
     return () => clearTimeout(timer);
   }, [emailSearch, emailTypeFilter, emailStatusFilter, loadEmailHistory, tab]);
 
-  const handleDownloadCertificate = (donationId) => {
-    donationManagementAPI.downloadCertificate(donationId);
-  };
-
   const handleResendEmail = async (emailId) => {
     setActionLoading(`resend-${emailId}`);
     setConfirmResend(null);
@@ -140,6 +142,41 @@ export default function Section18AManagementPage() {
   const emailRecipientOf = (email) => email.recipient_email || email.recipientEmail || email.recipient || '—';
   const emailDonationRefOf = (email) => email.donation_id ?? email.donationId ?? email.donationRef ?? email.donation_ref ?? '—';
   const emailSentAtOf = (email) => email.sent_at ?? email.sentAt ?? email.created_at ?? email.createdAt ?? null;
+  const queueDonorOf = (item) => item.donorName || item.donor_name || '';
+  const queueAmountOf = (item) => {
+    const amount = item.estimated_value_zar ?? item.amount;
+    const parsed = Number(amount);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+  const queueDateOf = (item) => item.received_at || item.createdAt || item.date || null;
+  const queueDateTimeOf = (item) => {
+    const raw = queueDateOf(item);
+    const time = raw ? new Date(raw).getTime() : NaN;
+    return Number.isFinite(time) ? time : 0;
+  };
+  const filteredCertificateQueue = certificateQueue
+    .filter((item) => {
+      const donor = queueDonorOf(item).toLowerCase();
+      const amount = queueAmountOf(item);
+      const dateTime = queueDateTimeOf(item);
+      const min = amountMin === '' ? null : Number(amountMin);
+      const max = amountMax === '' ? null : Number(amountMax);
+      const from = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null;
+      const to = dateTo ? new Date(`${dateTo}T23:59:59`).getTime() : null;
+
+      if (donorSearch.trim() && !donor.includes(donorSearch.trim().toLowerCase())) return false;
+      if (min !== null && Number.isFinite(min) && (amount === null || amount < min)) return false;
+      if (max !== null && Number.isFinite(max) && (amount === null || amount > max)) return false;
+      if (from !== null && Number.isFinite(from) && dateTime < from) return false;
+      if (to !== null && Number.isFinite(to) && dateTime > to) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      if (queueSort === 'amount-asc') return (queueAmountOf(a) ?? Infinity) - (queueAmountOf(b) ?? Infinity);
+      if (queueSort === 'amount-desc') return (queueAmountOf(b) ?? -Infinity) - (queueAmountOf(a) ?? -Infinity);
+      if (queueSort === 'date-desc') return queueDateTimeOf(b) - queueDateTimeOf(a);
+      return queueDateTimeOf(a) - queueDateTimeOf(b);
+    });
 
   return (
     <div className="min-h-screen bg-canvas text-ink font-['Montserrat',sans-serif]">
@@ -176,13 +213,31 @@ export default function Section18AManagementPage() {
                 <Card className="rounded-[12px] border border-line shadow-sm">
                   <CardHeader>
                     <CardTitle>Certificate Queue</CardTitle>
-                    <CardDescription>{certificateQueue.length} donation{certificateQueue.length !== 1 ? 's' : ''} in the Section 18A certificate queue.</CardDescription>
+                    <CardDescription>{filteredCertificateQueue.length} of {certificateQueue.length} donation{certificateQueue.length !== 1 ? 's' : ''} in the Section 18A certificate queue.</CardDescription>
                   </CardHeader>
                   <CardContent>
+                    <div className="mb-4 grid gap-3 md:grid-cols-[minmax(180px,1fr)_repeat(5,minmax(120px,auto))]">
+                      <input type="search" aria-label="Search by donor name" placeholder="Search donor name" value={donorSearch} onChange={(e) => setDonorSearch(e.target.value)} className="rounded-[8px] border border-line bg-surface px-3 py-2 text-sm" />
+                      <input type="number" aria-label="Minimum amount" placeholder="Min amount" value={amountMin} onChange={(e) => setAmountMin(e.target.value)} className="rounded-[8px] border border-line bg-surface px-3 py-2 text-sm" />
+                      <input type="number" aria-label="Maximum amount" placeholder="Max amount" value={amountMax} onChange={(e) => setAmountMax(e.target.value)} className="rounded-[8px] border border-line bg-surface px-3 py-2 text-sm" />
+                      <input type="date" aria-label="Date from" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="rounded-[8px] border border-line bg-surface px-3 py-2 text-sm" />
+                      <input type="date" aria-label="Date to" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="rounded-[8px] border border-line bg-surface px-3 py-2 text-sm" />
+                      <select aria-label="Sort certificate queue" value={queueSort} onChange={(e) => setQueueSort(e.target.value)} className="rounded-[8px] border border-line bg-surface px-3 py-2 text-sm">
+                        <option value="date-asc">Date: oldest first</option>
+                        <option value="date-desc">Date: newest first</option>
+                        <option value="amount-asc">Amount: low to high</option>
+                        <option value="amount-desc">Amount: high to low</option>
+                      </select>
+                    </div>
                     {certificateQueue.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-8 text-center">
                         <FileText className="h-12 w-12 text-muted-foreground/40" />
                         <p className="mt-3 text-sm text-muted-foreground">No certificates in the queue.</p>
+                      </div>
+                    ) : filteredCertificateQueue.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-8 text-center">
+                        <FileText className="h-12 w-12 text-muted-foreground/40" />
+                        <p className="mt-3 text-sm text-muted-foreground">No certificates match the current filters.</p>
                       </div>
                     ) : (
                       <div className="overflow-x-auto">
@@ -193,14 +248,10 @@ export default function Section18AManagementPage() {
                               <TableHead>Donor</TableHead>
                               <TableHead>Date</TableHead>
                               <TableHead>Amount</TableHead>
-                              <TableHead>Donation Status</TableHead>
-                              <TableHead>Section 18A Status</TableHead>
-                              <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {certificateQueue.map((item) => {
-                              const hasCert = Boolean(item.certificateGenerated || item.certificate_generated || item.section_18a_certificate_ref || item.certificate_number);
+                            {filteredCertificateQueue.map((item) => {
                               const formattedDate = item.received_at
                                 ? new Date(item.received_at).toLocaleDateString()
                                 : item.createdAt
@@ -211,9 +262,6 @@ export default function Section18AManagementPage() {
                                 : item.amount != null
                                   ? `R${item.amount}`
                                   : '—';
-                              const statusText = item.section_18a_status || (hasCert ? 'Generated' : 'Pending');
-
-                              const donationStatusText = item.status || item.donation_status || '—';
 
                               return (
                                 <TableRow key={item.id}>
@@ -221,23 +269,6 @@ export default function Section18AManagementPage() {
                                   <TableCell>{item.donorName || item.donor_name || '—'}</TableCell>
                                   <TableCell>{formattedDate}</TableCell>
                                   <TableCell>{formattedAmount}</TableCell>
-                                  <TableCell>{donationStatusText}</TableCell>
-                                  <TableCell>
-                                    <Badge variant={hasCert ? 'default' : 'outline'} className="rounded-[6px] px-2 py-0 text-[11px]">
-                                      {statusText}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell className="text-right">
-                                    <div className="flex justify-end gap-2">
-                                      {hasCert ? (
-                                        <Button variant="outline" size="sm" onClick={() => handleDownloadCertificate(item.id)}>
-                                          <Download className="mr-1 h-3 w-3" />Download
-                                        </Button>
-                                      ) : (
-                                        <span className="text-xs text-muted-foreground">—</span>
-                                      )}
-                                    </div>
-                                  </TableCell>
                                 </TableRow>
                               );
                             })}

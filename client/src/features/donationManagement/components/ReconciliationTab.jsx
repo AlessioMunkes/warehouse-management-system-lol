@@ -12,11 +12,13 @@
 // row already carries .items / .item_counts, letting commit_incomplete
 // rows show how many items got resolved before the commit failed.
 // ─────────────────────────────────────────────────────────────
+import { useState } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import useReconciliationQueue from '../hooks/useReconciliation';
 
@@ -39,6 +41,15 @@ const statusMeta = (status) => STATUS_META[status] || { label: status || '—' }
 
 const failureTimestamp = (donation) =>
   donation.status === 'commit_failed' ? donation.commit_failed_at : donation.commit_incomplete_at;
+
+const inDateRange = (value, fromValue, toValue) => {
+  const time = value ? new Date(value).getTime() : NaN;
+  const from = fromValue ? new Date(`${fromValue}T00:00:00`).getTime() : null;
+  const to = toValue ? new Date(`${toValue}T23:59:59`).getTime() : null;
+  if (from !== null && (!Number.isFinite(time) || time < from)) return false;
+  if (to !== null && (!Number.isFinite(time) || time > to)) return false;
+  return true;
+};
 
 const resolvedItemCount = (donation) =>
   (donation.items || []).filter((item) => item.status === 'resolved' || item.status === 'committed').length;
@@ -101,6 +112,9 @@ export default function ReconciliationTab({
   emptyText = 'Nothing needs reconciling right now.',
   actionLabel = 'Retry',
 }) {
+  const [donorSearch, setDonorSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const {
     items,
     isLoading,
@@ -112,6 +126,11 @@ export default function ReconciliationTab({
   } = useReconciliationQueue(statuses);
 
   const busyFor = (id) => retryingIds.includes(Number(id));
+  const filteredItems = items.filter((donation) => {
+    const donor = String(donation.donor_name || '').toLowerCase();
+    if (donorSearch.trim() && !donor.includes(donorSearch.trim().toLowerCase())) return false;
+    return inDateRange(failureTimestamp(donation), dateFrom, dateTo);
+  });
   const summary = summaryText || `${items.length} donation${items.length === 1 ? '' : 's'} stuck in a commit failure state.`;
 
   return (
@@ -123,6 +142,11 @@ export default function ReconciliationTab({
         <Button type="button" variant="outline" size="sm" onClick={refresh} disabled={isLoading}>
           <RefreshCw className={`mr-1 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
         </Button>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Input type="search" aria-label={`${actionLabel} queue donor search`} placeholder="Search donor name" value={donorSearch} onChange={(e) => setDonorSearch(e.target.value)} />
+        <Input type="date" aria-label={`${actionLabel} queue date from`} value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+        <Input type="date" aria-label={`${actionLabel} queue date to`} value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
       </div>
 
       {error ? <ErrorBanner message={error} onRetry={refresh} /> : null}
@@ -140,9 +164,15 @@ export default function ReconciliationTab({
         </div>
       ) : null}
 
-      {!isLoading && items.length > 0 && !error ? (
+      {!isLoading && items.length > 0 && filteredItems.length === 0 && !error ? (
+        <div className="rounded-[12px] border border-dashed border-line-strong bg-surface p-8 text-center text-sm text-muted-foreground">
+          No donations match the current filters.
+        </div>
+      ) : null}
+
+      {!isLoading && filteredItems.length > 0 && !error ? (
         <div className="space-y-4">
-          {items.map((donation) => (
+          {filteredItems.map((donation) => (
             <ReconciliationRow
               key={donation.id}
               donation={donation}

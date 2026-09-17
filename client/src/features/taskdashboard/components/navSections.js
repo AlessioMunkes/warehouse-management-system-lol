@@ -115,14 +115,6 @@ const MANAGER_SECTIONS = [
       { to: STAFF.communityRequests, label: 'Benevolent Requests', icon: PhoneCall },
     ],
   },
-  // Receiving, Packing, Decanting and Dispatch are reached through the
-  // staff shell rather than from here, so they are deliberately absent.
-  {
-    label: 'Warehouse',
-    items: [
-      { to: STAFF.donation, label: 'Donation Intake', icon: HandCoins },
-    ],
-  },
   {
     label: 'Volunteers',
     items: [

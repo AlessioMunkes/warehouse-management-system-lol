@@ -12,7 +12,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { TopNavbar } from '../features/taskdashboard/components/TopNavBar';
+//import { TopNavbar } from '../features/taskdashboard/components/TopNavBar';
 import gmailAPI from '../services/gmailAPI';
 import {
   AlertDialog,
@@ -164,7 +164,7 @@ export default function GmailSettingsPage() {
 
   return (
     <div className="min-h-screen bg-canvas">
-      <TopNavbar />
+   
       <div className="mx-auto max-w-3xl space-y-6 p-6">
         {displayFeedback && (
           <div

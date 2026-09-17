@@ -39,6 +39,10 @@ const auditRepoMock = {
   logAudit: vi.fn(),
 };
 
+const notificationRepoMock = {
+  createNotification: vi.fn(),
+};
+
 const donationServiceMock = {
   createDonation: vi.fn(),
   getDonationById: vi.fn(),
@@ -60,6 +64,7 @@ vi.mock('../src/config/db.js', () => ({ default: poolMock }));
 vi.mock('../src/repositories/pendingDonation.repository.js', () => ({ default: pendingRepoMock }));
 vi.mock('../src/repositories/product.repository.js', () => ({ default: productRepoMock }));
 vi.mock('../src/repositories/auditLog.repository.js', () => auditRepoMock);
+vi.mock('../src/repositories/notification.repository.js', () => notificationRepoMock);
 vi.mock('../src/repositories/donation.repository.js', () => ({ default: donationModelMock }));
 vi.mock('../src/lib/donationRouting.js', () => ({ determineRouting: routingMock.determineRouting }));
 vi.mock('../src/services/donationAdmin.service.js', () => ({ default: donationAdminServiceMock }));
@@ -90,6 +95,7 @@ beforeEach(() => {
   pendingRepoMock.setPendingDonationCommittedId.mockResolvedValue({ id: 10, committed_donation_id: 20 });
   productRepoMock.getProductRoutingDefault.mockResolvedValue({ donation_category: 'recipe_food' });
   auditRepoMock.logAudit.mockResolvedValue({ id: 1 });
+  notificationRepoMock.createNotification.mockResolvedValue(undefined);
   donationModelMock.getSection18AThreshold.mockResolvedValue(1000);
   routingMock.determineRouting.mockResolvedValue({
     category: 'recipe_food',
@@ -808,6 +814,78 @@ describe('pending donation commit finalization', () => {
 // a retried submit (network blip, double tap, lost response) must answer
 // with the original pending donation instead of 500ing on the unique index.
 describe('createPendingDonationFromIntake — idempotent replay', () => {
+  it('creates one donation review notification when intake leaves items awaiting review', async () => {
+    const client = makeClient();
+    poolMock.connect.mockResolvedValueOnce(client);
+    pendingRepoMock.createPendingDonation.mockResolvedValue({ id: 55 });
+    pendingRepoMock.createWarehouseManagerFlag.mockResolvedValue({ id: 501 });
+    pendingRepoMock.createPendingDonationItems.mockResolvedValue([
+      { id: 701, line_no: 1, status: 'awaiting_resolution', flag_id: 501 },
+    ]);
+    pendingRepoMock.getPendingDonationById.mockResolvedValue({
+      id: 55,
+      status: 'awaiting_resolution',
+      items: [{ id: 701, status: 'awaiting_resolution', flag_id: 501 }],
+    });
+
+    const result = await pendingDonationService.createPendingDonationFromIntake({
+      donorName: 'Review Donor',
+      donorContact: 'review@example.org',
+      idempotencyKey: 'KEY-REVIEW-1',
+      isFood: true,
+      createdBy: 7,
+      items: [{
+        description: 'Mystery tins',
+        productId: 900,
+        quantity: 3,
+        unit: 'kg',
+        status: 'PENDING_PRODUCT_REVIEW',
+      }],
+    });
+
+    expect(result.id).toBe(55);
+    expect(notificationRepoMock.createNotification).toHaveBeenCalledTimes(1);
+    expect(notificationRepoMock.createNotification).toHaveBeenCalledWith(
+      client,
+      expect.objectContaining({
+        type: 'donation_review',
+        entityType: 'pending_donation',
+        entityId: 55,
+      })
+    );
+    expect(notificationRepoMock.createNotification.mock.calls[0][1]).not.toHaveProperty('targetRoles');
+    expect(client.query.mock.calls.map((call) => call[0])).toContain('COMMIT');
+  });
+
+  it('does not create another donation review notification on idempotent replay', async () => {
+    const client = makeClient();
+    poolMock.connect.mockResolvedValueOnce(client);
+    pendingRepoMock.findPendingDonationIdByIdempotencyKey.mockResolvedValue({ id: 55 });
+    pendingRepoMock.getPendingDonationById.mockResolvedValue({
+      id: 55,
+      status: 'awaiting_resolution',
+      items: [{ id: 701, status: 'awaiting_resolution', flag_id: 501 }],
+    });
+
+    const result = await pendingDonationService.createPendingDonationFromIntake({
+      donorName: 'Retry Donor',
+      idempotencyKey: 'KEY-REVIEW-1',
+      isFood: true,
+      items: [{
+        description: 'Mystery tins',
+        productId: 900,
+        quantity: 3,
+        unit: 'kg',
+        status: 'PENDING_PRODUCT_REVIEW',
+      }],
+    });
+
+    expect(result.id).toBe(55);
+    expect(notificationRepoMock.createNotification).not.toHaveBeenCalled();
+    expect(pendingRepoMock.createPendingDonation).not.toHaveBeenCalled();
+    expect(client.query.mock.calls.map((call) => call[0])).toEqual(['BEGIN', 'COMMIT']);
+  });
+
   it('returns the original pending donation without writing again', async () => {
     const client = makeClient();
     poolMock.connect.mockResolvedValueOnce(client);

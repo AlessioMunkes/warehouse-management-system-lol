@@ -4,27 +4,45 @@
 
 import { apiGet, apiPost, apiPut } from './api';
 
+const withTimeout = async (request, timeoutMs = 30000) => {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await request(controller.signal);
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      const timeoutError = new Error('Request timed out. Please try again.');
+      timeoutError.status = 408;
+      timeoutError.isTimeout = true;
+      throw timeoutError;
+    }
+    throw err;
+  } finally {
+    window.clearTimeout(timer);
+  }
+};
+
 export const getSettings = async () => {
-  const body = await apiGet('/api/certificate-settings');
+  const body = await withTimeout((signal) => apiGet('/api/certificate-settings', { signal }));
   return body.data || null;
 };
 
 export const saveSettings = async (settings) => {
   try {
-    const body = await apiPut('/api/certificate-settings', settings);
+    const body = await withTimeout((signal) => apiPut('/api/certificate-settings', settings, { signal }));
     return body.data || null;
   } catch (err) {
     if (err.status !== 404) throw err;
   }
 
-  const body = await apiPost('/api/certificate-settings', settings);
+  const body = await withTimeout((signal) => apiPost('/api/certificate-settings', settings, { signal }));
   return body.data || null;
 };
 
 export const updateSettings = async (settings) => saveSettings(settings);
 
 export const createSettings = async (settings) => {
-  const body = await apiPost('/api/certificate-settings', settings);
+  const body = await withTimeout((signal) => apiPost('/api/certificate-settings', settings, { signal }));
   return body.data || null;
 };
 

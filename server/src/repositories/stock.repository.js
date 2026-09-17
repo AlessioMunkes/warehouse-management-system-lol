@@ -9,6 +9,7 @@
 // ─────────────────────────────────────────────────────────────
 import pool                  from '../config/db.js';
 import { committedStockSql } from './committedStock.sql.js';
+import { createNotification } from './notification.repository.js';
 
 // ── Adjust stock — the single write path for every stock change ──
 // Must be called with a client already inside BEGIN/COMMIT — either
@@ -57,21 +58,35 @@ const adjustStock = async (client, { productId, quantityDelta, unit = null, move
   }
 
   const existing = await client.query(
-    `SELECT quantity_on_hand, unit FROM stock_levels WHERE product_id = $1 FOR UPDATE`,
+    `SELECT sl.quantity_on_hand, sl.unit, COALESCE(sl.reorder_threshold, 0)::numeric AS reorder_threshold,
+            p.name AS product_name
+       FROM stock_levels sl
+       JOIN products p ON p.id = sl.product_id
+      WHERE sl.product_id = $1
+      FOR UPDATE`,
     [productId]
   );
 
   let before, resolvedUnit;
   let isUnitMismatch = false;
+  let reorderThreshold = 0;
+  let productName = null;
 
   if (existing.rows[0]) {
     before = Number(existing.rows[0].quantity_on_hand);
     resolvedUnit = existing.rows[0].unit;
+    reorderThreshold = Number(existing.rows[0].reorder_threshold);
+    productName = existing.rows[0].product_name;
     if (unit && unit !== resolvedUnit) isUnitMismatch = true;
   } else {
     if (!unit) throw new Error("Unit is required for a product's first stock movement.");
     before = 0;
     resolvedUnit = unit;
+    const product = await client.query(
+      `SELECT name FROM products WHERE id = $1`,
+      [productId]
+    );
+    productName = product.rows[0]?.name ?? null;
     await client.query(
       `INSERT INTO stock_levels (product_id, quantity_on_hand, unit) VALUES ($1, 0, $2)`,
       [productId, unit]
@@ -109,6 +124,16 @@ const adjustStock = async (client, { productId, quantityDelta, unit = null, move
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
     [productId, delta, resolvedUnit, movementType, referenceType, referenceId, reason, performedBy]
   );
+
+  if (reorderThreshold > 0 && before > reorderThreshold && after <= reorderThreshold) {
+    await createNotification(client, {
+      type: 'low_stock',
+      title: 'Low stock',
+      body: `${productName || 'A product'} is at or below its reorder threshold.`,
+      entityType: 'product',
+      entityId: productId,
+    });
+  }
 
   return { before, after, isShortfall: after < 0, isUnitMismatch };
 };

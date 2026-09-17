@@ -28,7 +28,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/context/AuthContext';
 import { getSettings, createSettings, updateSettings, deleteSettings } from '@/services/section18aSettingsAPI';
-import lolLogo from '@/assets/LOL_Logo.jpg';
+
+const ALLOWED_LOGO_TYPES = ['image/jpeg', 'image/png'];
 
 const FIELD_GROUPS = [
   {
@@ -36,7 +37,7 @@ const FIELD_GROUPS = [
     description: 'Organisation details used on certificates.',
     fields: [
       { name: 'organisationName', label: 'Organisation Name', type: 'input', required: true },
-      { name: 'logoUrl', label: 'Logo', type: 'input' },
+      { name: 'logoUrl', label: 'Logo', type: 'file' },
       { name: 'pboNumber', label: 'PBO Number', type: 'input', required: true },
       { name: 'npoNumber', label: 'NPO Number', type: 'input' },
       { name: 'section18AReference', label: 'Section 18A Reference', type: 'input', required: true },
@@ -70,8 +71,8 @@ const FIELD_GROUPS = [
 ];
 
 const ALL_FIELDS = FIELD_GROUPS.flatMap((g) => g.fields);
-const EMPTY_FORM = ALL_FIELDS.reduce((acc, f) => (acc[f.name] = f.name === 'logoUrl' ? lolLogo : '', acc), {});
-const normalizeSettings = (data) => ({ ...EMPTY_FORM, ...(data || {}), logoUrl: (data && data.logoUrl) ? data.logoUrl : lolLogo });
+const EMPTY_FORM = ALL_FIELDS.reduce((acc, f) => (acc[f.name] = '', acc), {});
+const normalizeSettings = (data) => ({ ...EMPTY_FORM, ...(data || {}) });
 
 const firstErrorMessage = (err, fallback) => {
   const fieldMessages = Object.values(err?.errors || {}).filter(Boolean);
@@ -90,6 +91,13 @@ const validateField = (name, value) => {
   return '';
 };
 
+const logoNameFor = (logoUrl) => {
+  if (!logoUrl) return '';
+  if (String(logoUrl).startsWith('data:image/png')) return 'Uploaded logo.png';
+  if (String(logoUrl).startsWith('data:image/jpeg')) return 'Uploaded logo.jpg';
+  return 'Saved logo';
+};
+
 export default function CertificateSettings() {
   const { user } = useAuth();
   const [settings, setSettings] = useState(null);
@@ -100,6 +108,7 @@ export default function CertificateSettings() {
   const [feedback, setFeedback] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
   const [touched, setTouched] = useState({});
+  const [logoFilename, setLogoFilename] = useState('');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showUnsavedChangesDialog, setShowUnsavedChangesDialog] = useState(false);
   const isMounted = useRef(true);
@@ -121,6 +130,35 @@ export default function CertificateSettings() {
     setFormData((prev) => ({ ...prev, [name]: value }));
     if (fieldErrors[name]) setFieldErrors((prev) => { const next = { ...prev }; delete next[name]; return next; });
   }, [fieldErrors]);
+
+  const handleLogoChange = useCallback((file) => {
+    setTouched((prev) => ({ ...prev, logoUrl: true }));
+    setFieldErrors((prev) => { const next = { ...prev }; delete next.logoUrl; return next; });
+
+    if (!file) {
+      setLogoFilename(logoNameFor(formData.logoUrl));
+      return;
+    }
+
+    const extensionOk = /\.(jpe?g|png)$/i.test(file.name);
+    if (!extensionOk || !ALLOWED_LOGO_TYPES.includes(file.type)) {
+      setLogoFilename('');
+      setFormData((prev) => ({ ...prev, logoUrl: '' }));
+      setFieldErrors((prev) => ({ ...prev, logoUrl: 'Logo must be a JPG or PNG file.' }));
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setLogoFilename(file.name);
+      setFormData((prev) => ({ ...prev, logoUrl: String(reader.result || '') }));
+    };
+    reader.onerror = () => {
+      setLogoFilename('');
+      setFieldErrors((prev) => ({ ...prev, logoUrl: 'Logo could not be read.' }));
+    };
+    reader.readAsDataURL(file);
+  }, [formData.logoUrl]);
 
   const handleBlur = useCallback((name) => {
     setTouched((prev) => ({ ...prev, [name]: true }));
@@ -147,13 +185,13 @@ export default function CertificateSettings() {
     setActionLoading('create');
     setFeedback(null);
     try {
-      await createSettings(formData);
-      const result = normalizeSettings(await getSettings());
+      const result = normalizeSettings(await createSettings(formData));
       if (!isMounted.current) return;
       setSettings(result);
       setInitialFormData(result);
       setFormData(result);
-      setFeedback({ type: 'success', message: 'Certificate settings created successfully.' });
+      setLogoFilename(logoNameFor(result.logoUrl));
+      setFeedback({ type: 'success', message: 'Settings saved.' });
     } catch (err) {
       if (!isMounted.current) return;
       setFeedback({ type: 'error', message: firstErrorMessage(err, 'Failed to create settings.') });
@@ -171,13 +209,13 @@ export default function CertificateSettings() {
     setActionLoading('update');
     setFeedback(null);
     try {
-      await updateSettings(formData);
-      const result = normalizeSettings(await getSettings());
+      const result = normalizeSettings(await updateSettings(formData));
       if (!isMounted.current) return;
       setSettings(result);
       setInitialFormData(result);
       setFormData(result);
-      setFeedback({ type: 'success', message: 'Certificate settings updated successfully.' });
+      setLogoFilename(logoNameFor(result.logoUrl));
+      setFeedback({ type: 'success', message: 'Settings saved.' });
     } catch (err) {
       if (!isMounted.current) return;
       setFeedback({ type: 'error', message: firstErrorMessage(err, 'Failed to update settings.') });
@@ -196,6 +234,7 @@ export default function CertificateSettings() {
       setSettings(null);
       setFormData({ ...EMPTY_FORM });
       setInitialFormData({ ...EMPTY_FORM });
+      setLogoFilename('');
       setFieldErrors({});
       setTouched({});
       setFeedback({ type: 'success', message: 'Certificate settings deleted successfully.' });
@@ -211,6 +250,7 @@ export default function CertificateSettings() {
     if (isDirty) setShowUnsavedChangesDialog(true);
     else {
       setFormData(initialFormData);
+      setLogoFilename(logoNameFor(initialFormData.logoUrl));
       setFieldErrors({});
       setTouched({});
       setFeedback(null);
@@ -220,11 +260,12 @@ export default function CertificateSettings() {
   const handleUnsavedChangesConfirm = useCallback(() => {
     setShowUnsavedChangesDialog(false);
     setFormData(initialFormData);
+    setLogoFilename(logoNameFor(initialFormData.logoUrl));
     setFieldErrors({});
     setTouched({});
     setFeedback(null);
     getSettings().then((data) => {
-      if (data) { const normalized = normalizeSettings(data); setSettings(normalized); setFormData(normalized); setInitialFormData(normalized); }
+      if (data) { const normalized = normalizeSettings(data); setSettings(normalized); setFormData(normalized); setInitialFormData(normalized); setLogoFilename(logoNameFor(normalized.logoUrl)); }
     }).catch(() => { setSettings(null); setFormData({ ...EMPTY_FORM }); setInitialFormData({ ...EMPTY_FORM }); });
   }, [initialFormData]);
 
@@ -245,6 +286,7 @@ export default function CertificateSettings() {
           setSettings(normalized);
           setFormData(normalized);
           setInitialFormData(normalized);
+          setLogoFilename(logoNameFor(normalized.logoUrl));
         }
       } catch (err) {
         if (active) setFeedback({ type: 'error', message: firstErrorMessage(err, 'Failed to load certificate settings.') });
@@ -316,6 +358,25 @@ export default function CertificateSettings() {
                             disabled={!hasWriteAccess}
                             aria-invalid={Boolean(fieldErrors[field.name])}
                           />
+                        ) : field.type === 'file' ? (
+                          <div className="space-y-2">
+                            <Input
+                              id={field.name}
+                              type="file"
+                              accept=".jpg,.jpeg,.png,image/jpeg,image/png"
+                              onChange={(e) => handleLogoChange(e.target.files?.[0] || null)}
+                              disabled={!hasWriteAccess}
+                              aria-invalid={Boolean(fieldErrors[field.name])}
+                            />
+                            {(logoFilename || formData.logoUrl) && (
+                              <div className="flex items-center gap-3">
+                                {formData.logoUrl && (
+                                  <img src={formData.logoUrl} alt="Selected logo preview" className="h-12 w-12 rounded-[6px] border border-line object-contain" />
+                                )}
+                                <span className="text-xs text-muted-foreground">{logoFilename || logoNameFor(formData.logoUrl)}</span>
+                              </div>
+                            )}
+                          </div>
                         ) : (
                           <Input
                             id={field.name}
@@ -355,10 +416,7 @@ export default function CertificateSettings() {
                       )}
                       <Button type="button" onClick={submit} disabled={busy || !isDirty}>
                         {actionLoading === 'update' ? (
-                          <>
-                            <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden="true" />
-                            Saving…
-                          </>
+                          'Saving...'
                         ) : (
                           <>
                             <Save className="mr-1.5 h-4 w-4" aria-hidden="true" />
@@ -370,10 +428,7 @@ export default function CertificateSettings() {
                   ) : (
                     <Button type="button" onClick={submit} disabled={busy}>
                       {actionLoading === 'create' ? (
-                        <>
-                          <Loader2 className="mr-1.5 h-4 w-4 animate-spin" aria-hidden="true" />
-                          Creating…
-                        </>
+                        'Saving...'
                       ) : (
                         <>
                           <Plus className="mr-1.5 h-4 w-4" aria-hidden="true" />
