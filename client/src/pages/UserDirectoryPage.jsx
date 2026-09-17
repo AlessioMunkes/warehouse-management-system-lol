@@ -22,7 +22,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth }   from '../context/AuthContext';
 import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
 import UserForm      from '../features/users/components/UserForm';
+import InviteForm    from '../features/users/components/InviteForm';
+import InviteResultPanel from '../features/users/components/InviteResultPanel';
+import PendingInvitesSection from '../features/users/components/PendingInvitesSection';
 import userAPI        from '../services/userAPI';
+import userInviteAPI  from '../services/userInviteAPI';
+import { copyToClipboard } from '../lib/clipboard';
+import { useToast } from '@/components/ui/toastContext';
 import ConfirmRemoveDialog from '../features/masterdata/components/ConfirmRemoveDialog';
 import useDetailFocus      from '../features/masterdata/hooks/useDetailFocus';
 import useTableView        from '../features/masterdata/hooks/useTableView';
@@ -181,6 +187,19 @@ export default function UserDirectoryPage() {
   const [error, setError] = useState(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
 
+  // ── Pending invites ────────────────────────────────────────
+  // Separate from `users` on purpose — see PendingInvitesSection's
+  // header comment. Not an account until accepted.
+  const [pendingInvites, setPendingInvites] = useState([]);
+  const [invitesLoading, setInvitesLoading] = useState(true);
+  const [inviteBusyId, setInviteBusyId] = useState(null);
+  // The one place a raw token/url is ever held client-side, and only
+  // until the admin dismisses it or leaves the page — nothing re-reads
+  // it from the server afterward (there is nothing to re-read; only
+  // the hash is stored).
+  const [inviteResult, setInviteResult] = useState(null);
+  const toast = useToast();
+
   const [detailRef, focusDetail] = useDetailFocus();
 
   // Role filter narrows first, then sort orders whatever is left — the
@@ -253,14 +272,79 @@ export default function UserDirectoryPage() {
     finally { setBusy(false); }
   };
 
-  const create = async (payload) => {
+  // ── Invites ───────────────────────────────────────────────
+  const loadInvites = useCallback(async () => {
+    try {
+      setPendingInvites(await userInviteAPI.getPendingInvites());
+    } catch (err) {
+      // A failed invite-list fetch does not block the (more important)
+      // user directory — surfaces via the toast instead of the page's
+      // main error banner.
+      toast({ variant: 'error', title: 'Could not load pending invites', description: err.message });
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    let cancelled = false;
+    userInviteAPI.getPendingInvites()
+      .then((rows) => { if (!cancelled) setPendingInvites(rows); })
+      .catch((err) => {
+        if (!cancelled) toast({ variant: 'error', title: 'Could not load pending invites', description: err.message });
+      })
+      .finally(() => { if (!cancelled) setInvitesLoading(false); });
+    return () => { cancelled = true; };
+  }, [toast]);
+
+  const createInvite = async (payload) => {
     setBusy(true); setError(null);
     try {
-      const created = await userAPI.createUser(payload);
+      const result = await userInviteAPI.createInvite(payload);
       setMode('list');
-      await loadUsers();
-      await open(created.id);
+      setInviteResult(result);
+      await loadInvites();
     } catch (err) { setError(err.message); } finally { setBusy(false); }
+  };
+
+  const resendInvite = async (invite) => {
+    setInviteBusyId(invite.id);
+    try {
+      const result = await userInviteAPI.resendInvite(invite.id);
+      setInviteResult(result);
+      await loadInvites();
+    } catch (err) {
+      toast({ variant: 'error', title: 'Could not resend that invite', description: err.message });
+    } finally { setInviteBusyId(null); }
+  };
+
+  // Same server call as resend — the only way to get a copyable link
+  // for an existing invite, since no raw token is stored to re-read.
+  // Differs from the Resend button only in what happens next: this
+  // copies straight to the clipboard instead of leaving the link
+  // panel open for a manual copy.
+  const copyInviteLink = async (invite) => {
+    setInviteBusyId(invite.id);
+    try {
+      const result = await userInviteAPI.resendInvite(invite.id);
+      const ok = await copyToClipboard(result.url);
+      setInviteResult(result);
+      await loadInvites();
+      toast(ok
+        ? { variant: 'success', title: 'Link copied', description: `A fresh link for ${invite.email} is on your clipboard.` }
+        : { variant: 'error', title: 'Could not copy automatically', description: 'The new link is shown below — copy it from there.' });
+    } catch (err) {
+      toast({ variant: 'error', title: 'Could not create a new link', description: err.message });
+    } finally { setInviteBusyId(null); }
+  };
+
+  const revokeInvite = async (invite) => {
+    setInviteBusyId(invite.id);
+    try {
+      await userInviteAPI.revokeInvite(invite.id);
+      await loadInvites();
+      toast({ variant: 'success', title: `Invite to ${invite.email} revoked` });
+    } catch (err) {
+      toast({ variant: 'error', title: 'Could not revoke that invite', description: err.message });
+    } finally { setInviteBusyId(null); }
   };
 
   const save = async (payload) => {
@@ -299,9 +383,14 @@ export default function UserDirectoryPage() {
         <div className="mt-6 space-y-6">
           {mode === 'create' ? (
             <Card>
-              <CardHeader><CardTitle>Create a user</CardTitle></CardHeader>
+              <CardHeader>
+                <CardTitle>Invite a user</CardTitle>
+              </CardHeader>
               <CardContent>
-                <UserForm onSubmit={create} onCancel={() => setMode('list')} busy={busy} />
+                <p className="mb-4 text-sm text-muted-foreground">
+                  They set their own username, name and password when they accept — you never see or choose their password.
+                </p>
+                <InviteForm onSubmit={createInvite} onCancel={() => setMode('list')} busy={busy} />
               </CardContent>
             </Card>
           ) : mode === 'edit' && selected ? (
@@ -373,12 +462,27 @@ export default function UserDirectoryPage() {
                 />
 
                 {canManage ? (
-                  <Button type="button" onClick={() => { setSelected(null); setMode('create'); }}>
+                  <Button type="button" onClick={() => { setSelected(null); setInviteResult(null); setMode('create'); }}>
                     <Plus />
-                    Create user
+                    Invite user
                   </Button>
                 ) : null}
               </div>
+
+              {inviteResult ? (
+                <InviteResultPanel result={inviteResult} onDismiss={() => setInviteResult(null)} />
+              ) : null}
+
+              {canManage ? (
+                <PendingInvitesSection
+                  invites={pendingInvites}
+                  loading={invitesLoading}
+                  busyId={inviteBusyId}
+                  onResend={resendInvite}
+                  onCopyLink={copyInviteLink}
+                  onRevoke={revokeInvite}
+                />
+              ) : null}
 
               <div ref={detailRef} tabIndex={-1} className="scroll-mt-6 outline-none">
                 {selected ? (
