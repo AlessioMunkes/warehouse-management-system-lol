@@ -1,0 +1,267 @@
+// ─────────────────────────────────────────────────────────────
+// client/src/features/dispatch/components/GateQueue.jsx
+//
+// The board at the gate, from GET /api/dispatch?scope=gate.
+//
+// Not just today: every pallet still outstanding on any date, plus
+// whatever was handled today. A pallet staged for Tuesday that nobody
+// fetched is still in the building on Thursday and has to be
+// releasable — the 16:00 sweep marks it not_collected but leaves it
+// collectable as a late collection.
+//
+// WHAT CHANGED
+// This used to make two calls to the PICKING endpoints and treat a
+// slip with status 'complete' as "waiting" and status 'collected' as
+// "done". Neither was right. A pallet's gate state lives in
+// dispatch_events, not in picking_slips.status, and 'collected' is
+// not a picking slip status at all — the value is 'dispatched' — so
+// the "collected today" count was permanently zero and a collected
+// pallet just disappeared off the screen with nothing to show for it.
+//
+// One call now returns the whole day: awaiting, collected, late, and
+// written off, each row carrying dispatch_status. Rows are keyed on
+// picking_slip_id, not id.
+//
+// Everything still awaiting is shown; only an already-COMPLETED
+// dispatch survives for a centre that has since gone inactive — the
+// pallet already left, and the centre's current status doesn't
+// rewrite that history. A centre with nothing awaiting it (BR-11's
+// hard block) has no reason to occupy a row on the working queue at
+// all, so those are filtered out entirely rather than shown greyed
+// out with an explanation nobody standing at the gate can act on.
+//
+// BR-12 (wrong collection day) is no longer missing: the server
+// computes it per pallet and returns it in the gate view's
+// eligibility object, which PalletCheck reads. It is not surfaced on
+// the board because a pallet booked for another day should not be in
+// this list in the first place — if one appears, opening it
+// explains why.
+// ─────────────────────────────────────────────────────────────
+import { useEffect, useState } from 'react';
+import useListSearch from '../../staff/hooks/useListSearch';
+import ListTools, { FilterSegments, NoMatches } from '../../staff/components/ListTools';
+import dispatchAPI from '../../../services/dispatchAPI';
+import { Notice } from '../../staff/components/StepPrimitives';
+import Paged from '../../staff/components/Paged';
+import usePaged from '../../staff/hooks/usePaged';
+
+// The four states a row can be in, and how each reads on the floor.
+// Kept as one table so the label, the styling and the "can you open
+// it?" decision cannot drift apart.
+// 16:00 SAST is when the sweep writes off whatever is still standing
+// (BR-14). Computed in Africa/Johannesburg rather than from the
+// tablet's own clock: a device left on another timezone would other-
+// wise count down to the wrong moment, and this is the one number on
+// the screen a worker might act on.
+const CUTOFF_HOUR = 16;
+
+const sastHourMinute = () => {
+  const parts = new Intl.DateTimeFormat('en-ZA', {
+    timeZone: 'Africa/Johannesburg',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(new Date());
+  const get = (type) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return { hour: get('hour'), minute: get('minute') };
+};
+
+const cutoffNote = () => {
+  const { hour, minute } = sastHourMinute();
+  const left = CUTOFF_HOUR * 60 - (hour * 60 + minute);
+  if (left <= 0) return 'past the 16:00 cut-off';
+  const h = Math.floor(left / 60);
+  const m = left % 60;
+  return h > 0 ? `${h}h ${m}m to the 16:00 cut-off` : `${m}m to the 16:00 cut-off`;
+};
+
+const STATE = {
+  awaiting:       { label: 'Waiting for collection', tone: '',           openable: true  },
+  collected:      { label: 'Collected',              tone: ' is-static', openable: false },
+  late_collected: { label: 'Collected (late)',       tone: ' is-static', openable: false },
+  // Openable. The 16:00 sweep records that a day ended without this
+  // pallet leaving; it does not put the pallet out of reach. A driver
+  // arriving at 16:40 is collecting the same food off the same floor,
+  // so the row opens and the collection runs normally — it is filed
+  // as 'late_collected' afterwards. Marked warn so it still reads as
+  // an exception on the board, but not is-static, which is what made
+  // it un-tappable.
+  not_collected:  { label: 'Not collected',          tone: ' is-warn',   openable: true  },
+  cancelled:      { label: 'Cancelled',              tone: ' is-static', openable: false },
+};
+
+const stateOf = (row) => STATE[row.dispatch_status] || STATE.awaiting;
+
+// Centre, pallet reference, driver and cohort in one haystack. At a
+// gate the thing a worker has been told is usually one of those and
+// never reliably the same one — a driver says a name, a note says a
+// pallet number.
+//
+// Module level, so its identity is stable and useListSearch's memo
+// does not recompute on every keystroke of an unrelated render.
+const searchText = (row) => [
+  row.ecd_name, row.pallet_ref, row.driver_name, row.cohort,
+].filter(Boolean).join(' ');
+
+// Time formatted for a glance, not a report.
+const timeOf = (value) => {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
+};
+
+export default function GateQueue({ onOpenPallet }) {
+  const [rows, setRows]       = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    dispatchAPI.getGateQueue()
+      .then((board) => {
+        if (cancelled) return;
+        // Hide a centre with nothing outstanding — see the header
+        // comment above. A completed dispatch is kept regardless of
+        // the centre's current status.
+        const visible = (board || []).filter((row) =>
+          row.ecd_is_active !== false ||
+          ['collected', 'late_collected'].includes(row.dispatch_status)
+        );
+        setRows(visible);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message || 'Could not load the gate queue.');
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+
+    return () => { cancelled = true; };
+  }, []);
+
+  const done    = rows.filter((r) => ['collected', 'late_collected'].includes(r.dispatch_status));
+  const waiting = rows.filter((r) => stateOf(r).openable);
+
+  const search = useListSearch(rows, searchText);
+  const [only, setOnly] = useState('all');
+
+  const visible = search.filtered.filter((row) => {
+    if (only === 'waiting') return stateOf(row).openable;
+    if (only === 'done') return ['collected', 'late_collected'].includes(row.dispatch_status);
+    return true;
+  });
+
+  // Paged over what is actually on screen. The summary line above
+  // still counts the whole board on purpose — "3 of 9 collected" is a
+  // fact about the day, and it should not change because someone
+  // typed in the search box.
+  const paged = usePaged(visible);
+
+  const summary = rows.length === 0
+    ? 'Nothing waiting for collection.'
+    : `${done.length} of ${rows.length} collected · ${waiting.length} still waiting`;
+
+  return (
+    <section className="stf-step">
+      <div className="stf-step-head">
+        <h1 className="stf-step-title" tabIndex={-1}>At the gate</h1>
+        <p className="stf-step-sub">{summary}</p>
+      </div>
+
+      {error ? <Notice tone="warn">{error}</Notice> : null}
+
+      {!loading && rows.length > 0 ? (
+        <ListTools
+          id="stf-gate-search"
+          query={search.query}
+          onQuery={search.setQuery}
+          placeholder="Search by centre, pallet or driver"
+        >
+          <FilterSegments
+            label="Show"
+            value={only}
+            onChange={setOnly}
+            options={[
+              { key: 'all',     label: 'All',       count: rows.length },
+              { key: 'waiting', label: 'Waiting',   count: waiting.length },
+              { key: 'done',    label: 'Collected', count: done.length },
+            ]}
+          />
+        </ListTools>
+      ) : null}
+
+      {loading ? (
+        <div className="stf-skeleton" aria-label="Loading" />
+      ) : rows.length === 0 ? (
+        <div className="stf-empty">No pallets are waiting for collection.</div>
+      ) : visible.length === 0 ? (
+        <NoMatches
+          query={search.query}
+          onClear={() => { search.setQuery(''); setOnly('all'); }}
+          noun="pallets"
+        />
+      ) : (
+        <div className="stf-list">
+          {paged.slice.map((row) => {
+            const state    = stateOf(row);
+            const openable = state.openable;
+            const at       = timeOf(row.collected_at);
+
+            // What the second line says, in order of what matters
+            // most to someone standing at a gate.
+            let meta;
+            if (row.dispatch_status === 'not_collected') {
+              // Was "Awaiting late collection. Written off at 16:00."
+              // on every such row at any hour and with no date, which
+              // reads at 22:41 as though it had just happened. What a
+              // person at the gate needs to know is what collecting it
+              // now actually does.
+              meta = 'Written off as not collected. Collecting it now records a late collection.';
+            } else if (at) {
+              meta = `${state.label} at ${at}${row.driver_name ? ` · ${row.driver_name}` : ''}`;
+              // The centre going inactive afterwards doesn't rewrite
+              // this pallet's history — it's shown here purely as
+              // information, never as a reason to hide a completed row.
+              if (row.ecd_is_active === false) meta += ' · Centre now inactive';
+            } else {
+              const flags = [];
+              if (Number(row.flagged_items) > 0)  flags.push(`${row.flagged_items} flagged`);
+              if (Number(row.variance_items) > 0) flags.push(`${row.variance_items} short or over`);
+              // The live cut-off, which is the thing that changes while
+              // someone is standing there. Static text saying 16:00 tells
+              // a worker nothing they cannot read off the wall clock.
+              meta = [`${row.total_items} items ready for dispatch`, ...flags, cutoffNote()].join(' · ');
+            }
+
+            const open = () => onOpenPallet(row.picking_slip_id);
+
+            return (
+              <div
+                key={row.picking_slip_id}
+                className={`stf-row${state.tone}`}
+                role={openable ? 'button' : undefined}
+                tabIndex={openable ? 0 : undefined}
+                onClick={openable ? open : undefined}
+                onKeyDown={
+                  openable
+                    ? (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+                      }
+                    : undefined
+                }
+              >
+                <span className="stf-row-main">
+                  <span className="stf-row-title">
+                    {row.ecd_name}
+                    {row.pallet_ref ? ` · ${row.pallet_ref}` : ''}
+                  </span>
+                  <span className="stf-row-meta">{meta}</span>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <Paged {...paged} noun="pallets" />
+    </section>
+  );
+}

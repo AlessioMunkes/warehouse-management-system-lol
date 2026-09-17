@@ -46,7 +46,7 @@ const cookieFor = (role, overrides = {}) => {
 };
 
 // ── Role groups, mirroring decanting.routes.js ────────────────
-const ALL_ROLES    = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN, ROLES.FINANCE];
+const ALL_ROLES    = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 const RECEIVERS_UP = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 
 const PLAN   = { product: 'Rice', bags: [{ sizeKg: 2, count: 12 }], wastageKg: 0.3 };
@@ -116,7 +116,8 @@ describe('decanting routes — role enforcement', () => {
   });
 
   it.each(ALL_ROLES)('%s can run a calculation preview', async (role) => {
-    // /calculate is deliberately open to finance — it writes nothing.
+    // /calculate is deliberately open to every warehouse role — it
+    // writes nothing.
     const res = await request(app)
       .post(`${BASE}/calculate`)
       .set('Cookie', cookieFor(role))
@@ -132,10 +133,10 @@ describe('decanting routes — role enforcement', () => {
     expect(res.status).toBe(201);
   });
 
-  it('finance is refused the write path with 403, not 401', async () => {
+  it('an unassignable role is refused the write path with 403, not 401', async () => {
     const res = await request(app)
       .post(BASE)
-      .set('Cookie', cookieFor(ROLES.FINANCE))
+      .set('Cookie', cookieFor('finance'))
       .send({ productId: 1, actualWeightKg: 25 });
 
     expect(res.status).toBe(403);
@@ -216,7 +217,7 @@ describe('decanting routes — controller passes the right arguments', () => {
   it('passes weekOf through to the weekly report', async () => {
     await request(app)
       .get(`${BASE}/report?weekOf=2026-07-27`)
-      .set('Cookie', cookieFor(ROLES.FINANCE));
+      .set('Cookie', cookieFor(ROLES.MANAGER));
 
     expect(decantingServiceMock.getWeeklyProcurementReport).toHaveBeenCalledWith('2026-07-27');
   });

@@ -1,102 +1,146 @@
+// ─────────────────────────────────────────────────────────────
+// server/src/controllers/delivery.controller.js
+//
+// Thin HTTP layer for goods-in. All business logic and validation
+// lives in delivery.service.js — controllers here only pull data off
+// the request, call the service, and shape the response.
+//
+// Error handling: delivery.service.js now attaches a `.status` to
+// every error it throws (see the `fail()` helper at the top of that
+// file), so every catch block below reads `err.status` directly, the
+// same convention dispatch, donation, picking and stock already use.
+//
+// This replaces status-by-string-matching. The old version asked
+// `err.message.includes('required') ? 400 : 500`, which meant a line
+// that did not belong to the purchase order, or a duplicated line,
+// came back as a 500 — a server fault — while also echoing the raw
+// message in the body, which is the one thing the 5xx branch is
+// supposed to prevent. Unrecognised errors (no `.status`, e.g. the
+// database blew up) still fall back to 500 with a generic message so
+// nothing internal leaks.
+// ─────────────────────────────────────────────────────────────
 import deliveryService from '../services/delivery.service.js';
 
-// GET /api/deliveries?range=today|week|month|all
+// Every handler answers the same way, so the shape is written once.
+const respondWithError = (res, err, label, fallback) => {
+  console.error(`[${label}]`, err.message);
+  const status = err.status || 500;
+  res.status(status).json({
+    success: false,
+    message: status < 500 ? err.message : fallback,
+  });
+};
+
+// ── GET /api/deliveries ──────────────────────────────────────
+// Query: range | from | to | supplierId | status | limit | offset
+// Returns { rows, total, limit, offset } inside the usual envelope, so the
+// client reads res.data.rows. The whole query object is handed to the service,
+// which validates it — the controller stays a passthrough, same as every other
+// handler in this file.
 const getDeliveries = async (req, res) => {
   try {
-    const range     = req.query.range || 'all';
-    const deliveries = await deliveryService.getDeliveries(range);
-    res.json({ success: true, data: deliveries });
+    const result = await deliveryService.getDeliveries(req.query);
+    res.json({ success: true, data: result });
   } catch (err) {
-    console.error('[getDeliveries]', err.message);
-    res.status(500).json({ success: false, message: 'Failed to retrieve deliveries.' });
+    respondWithError(res, err, 'getDeliveries', 'Failed to retrieve deliveries.');
   }
 };
 
-// GET /api/deliveries/:id
+// ── GET /api/deliveries/supplier-options ─────────────────────
+// Only the suppliers that actually have delivery notes, for the archive's
+// filter dropdown.
+const getSupplierOptions = async (req, res) => {
+  try {
+    const suppliers = await deliveryService.getSupplierOptions();
+    res.json({ success: true, data: suppliers });
+  } catch (err) {
+    respondWithError(res, err, 'getSupplierOptions', 'Failed to retrieve supplier options.');
+  }
+};
+
+// ── GET /api/deliveries/:id ──────────────────────────────────
 const getDeliveryById = async (req, res) => {
   try {
     const delivery = await deliveryService.getDeliveryById(req.params.id);
     res.json({ success: true, data: delivery });
   } catch (err) {
-    console.error('[getDeliveryById]', err.message);
-    const status = err.message === 'Delivery not found.' ? 404 : 500;
-    res.status(status).json({ success: false, message: err.message });
+    respondWithError(res, err, 'getDeliveryById', 'Failed to retrieve delivery.');
   }
 };
 
-// POST /api/deliveries
+// ── POST /api/deliveries ─────────────────────────────────────
+// Body: { supplierId, deliveryDate, purchaseOrderId, signatureData,
+//         poCompleted?, lineItems[], idempotencyKey? }
+//
+// 201 for a newly recorded delivery; 200 for a replay, the same
+// "a retry is not a failure" rule donation intake and the dispatch
+// gate use. The response carries `duplicate` so the client can say
+// "already recorded" rather than "saved" — the goods only came in
+// once and the receipt should not claim otherwise.
 const createDelivery = async (req, res) => {
   try {
-    const delivery = await deliveryService.createDelivery(req.body, req.user.id);
-    res.status(201).json({ success: true, data: delivery });
+    const result = await deliveryService.createDelivery(req.body, req.user.id);
+    res.status(result.duplicate ? 200 : 201).json({
+      success: true,
+      data: {
+        ...result.note,
+        warnings:  result.warnings,
+        duplicate: result.duplicate,
+      },
+    });
   } catch (err) {
-    console.error('[createDelivery]', err.message);
-    const status = err.message.includes('required') ? 400 : 500;
-    res.status(status).json({ success: false, message: err.message });
+    respondWithError(res, err, 'createDelivery', 'Failed to record delivery.');
   }
 };
 
-// GET /api/deliveries/suppliers
+// ── GET /api/deliveries/suppliers?openOrdersOnly=true ────────
 const getSuppliers = async (req, res) => {
   try {
-    const suppliers = await deliveryService.getSuppliers();
+    const suppliers = await deliveryService.getSuppliers(req.query.openOrdersOnly === 'true');
     res.json({ success: true, data: suppliers });
   } catch (err) {
-    console.error('[getSuppliers]', err.message);
-    res.status(500).json({ success: false, message: 'Failed to retrieve suppliers.' });
+    respondWithError(res, err, 'getSuppliers', 'Failed to retrieve suppliers.');
   }
 };
 
-// GET /api/deliveries/drivers?supplierId=1
-const getDrivers = async (req, res) => {
-  try {
-    const drivers = await deliveryService.getDrivers(req.query.supplierId);
-    res.json({ success: true, data: drivers });
-  } catch (err) {
-    console.error('[getDrivers]', err.message);
-    res.status(500).json({ success: false, message: 'Failed to retrieve drivers.' });
-  }
-};
-
-// GET /api/deliveries/products
+// ── GET /api/deliveries/products ─────────────────────────────
 const getProducts = async (req, res) => {
   try {
     const products = await deliveryService.getProducts();
     res.json({ success: true, data: products });
   } catch (err) {
-    console.error('[getProducts]', err.message);
-    res.status(500).json({ success: false, message: 'Failed to retrieve products.' });
+    respondWithError(res, err, 'getProducts', 'Failed to retrieve products.');
   }
 };
 
-// GET /api/deliveries/purchase-orders?supplierId=1
+// ── GET /api/deliveries/purchase-orders?supplierId=1 ─────────
 const getPurchaseOrders = async (req, res) => {
   try {
-    const orders = await deliveryService.getPurchaseOrdersBySupplier(req.query.supplierId);
+    // Without supplierId this is every open order, for the receiving
+    // screen's search; with it, that supplier's open orders as before.
+    const orders = await deliveryService.listOpenPurchaseOrders(req.query.supplierId);
     res.json({ success: true, data: orders });
   } catch (err) {
-    console.error('[getPurchaseOrders]', err.message);
-    res.status(400).json({ success: false, message: err.message });
+    respondWithError(res, err, 'getPurchaseOrders', 'Failed to retrieve purchase orders.');
   }
 };
 
-// GET /api/deliveries/purchase-orders/:id/items
+// ── GET /api/deliveries/purchase-orders/:id/items ────────────
 const getPurchaseOrderItems = async (req, res) => {
   try {
     const items = await deliveryService.getPurchaseOrderItems(req.params.id);
     res.json({ success: true, data: items });
   } catch (err) {
-    console.error('[getPurchaseOrderItems]', err.message);
-    res.status(400).json({ success: false, message: err.message });
+    respondWithError(res, err, 'getPurchaseOrderItems', 'Failed to retrieve purchase order items.');
   }
 };
 
 export default {
   getDeliveries,
+  getSupplierOptions,
   getDeliveryById,
   createDelivery,
   getSuppliers,
-  getDrivers,
   getProducts,
   getPurchaseOrders,
   getPurchaseOrderItems,

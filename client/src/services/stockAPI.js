@@ -13,12 +13,13 @@
 //      hands it { success, data } where it expected an array, and
 //      the manifest silently renders as empty. We return .data.
 //
-//   2. Casting NUMERIC columns. quantity_on_hand, reorder_threshold
-//      and stock_movements.quantity are NUMERIC in Postgres, and
-//      node-postgres returns NUMERIC as a STRING to avoid float
-//      precision loss. Without a cast, "-5" < 0 is false (string
-//      compare), so a shortfall never shows its badge, and
-//      "100" + 25 concatenates to "10025" in any arithmetic.
+//   2. Casting NUMERIC columns. quantity_on_hand, committed,
+//      available, reorder_threshold and stock_movements.quantity are
+//      all NUMERIC in Postgres, and node-postgres returns NUMERIC as
+//      a STRING to avoid float precision loss. Without a cast,
+//      "-5" < 0 is false (string compare), so a shortfall never shows
+//      its badge, and "100" + 25 concatenates to "10025" in any
+//      arithmetic.
 //
 // The API speaks snake_case; the components already speak camelCase
 // (onHand, reorderAt). Mapping happens here rather than in the page
@@ -27,18 +28,55 @@
 import { apiGet, apiPost } from "./api";
 
 // ── Row mappers ───────────────────────────────────────────────
+// Three quantities, and they mean different things:
+//
+//   onHand    — what is physically inside the building
+//   committed — packed onto a pallet, closed, not yet collected
+//   available — onHand minus committed; what can still be promised
+//
+// The gap between them is a day or two of staged pallets standing in
+// the dispatch area. Showing only onHand is what made the inventory
+// screen and the packing screen disagree about how much rice there
+// was. See server/src/repositories/committedStock.sql.js.
 const toProduct = (row) => ({
   id:          row.id,
   name:        row.name,
   sku:         row.sku,
   unit:        row.unit || "",
   onHand:      Number(row.quantity_on_hand ?? 0),
+  committed:   Number(row.committed ?? 0),
+  available:   Number(row.available ?? row.quantity_on_hand ?? 0),
   reorderAt:   Number(row.reorder_threshold ?? 0),
-  // The repository already computes these in SQL so every screen
-  // agrees on what "low" means — don't recompute them in the UI.
+  // The repository already computes these in SQL, from AVAILABLE
+  // rather than on hand, so every screen agrees on what "low" means —
+  // don't recompute them in the UI.
   isShortfall: Boolean(row.is_shortfall),
   isLowStock:  Boolean(row.is_low_stock),
   updatedAt:   row.updated_at ?? null,
+
+  // Catalogue fields, for the summary panel. Not rendered as columns —
+  // the table is already full — but they are why the panel can stand
+  // in for the Products screen.
+  //
+  // defaultUnit is what the catalogue says this product is counted in;
+  // `unit` above is what the ledger has actually been accumulating.
+  // They are normally equal, and a difference is worth seeing rather
+  // than papering over, so both are kept.
+  category:     row.category ?? "",
+  storageType:  row.storage_type ?? "",
+  isPerishable: row.is_perishable === undefined ? undefined : Boolean(row.is_perishable),
+  // NUMERIC over the wire is a string. Number(null) is 0, and a weight
+  // nobody recorded is not zero — same guard as expectedLeadTimeDays.
+  weightKg:     row.weight_kg === null || row.weight_kg === undefined
+                  ? null
+                  : Number(row.weight_kg),
+  defaultUnit:  row.default_unit ?? "",
+  // Read by the purchase-order form to fill a line's cost. Null means
+  // nobody has priced it, and the form leaves the cost blank rather
+  // than writing a confident zero onto an order.
+  unitCost:     row.unit_cost === null || row.unit_cost === undefined
+                  ? null
+                  : Number(row.unit_cost),
 });
 
 const toMovement = (row) => ({
@@ -76,4 +114,111 @@ export const adjustStock = async ({ productId, quantityDelta, unit, reason }) =>
   return body.data;
 };
 
-export default { getManifest, getMovements, adjustStock };
+// ── Ledger row ────────────────────────────────────────────────
+// balanceAfter is that product's running balance immediately after
+// this movement, computed server-side over its full history — it is
+// NOT affected by the filters in the UI, and must not be recomputed
+// here from the visible rows.
+const toLedgerRow = (row) => ({
+  id:              row.id,
+  productId:       row.product_id,
+  productName:     row.product_name,
+  sku:             row.sku,
+  quantity:        Number(row.quantity ?? 0),
+  balanceAfter:    Number(row.balance_after ?? 0),
+  unit:            row.unit || "",
+  movementType:    row.movement_type,
+  referenceType:   row.reference_type,
+  referenceId:     row.reference_id,
+  reason:          row.reason,
+  performedByName: row.performed_by_name || "Unknown",
+  createdAt:       row.created_at,
+});
+
+const toReconciliationRow = (row) => ({
+  id:            row.id,
+  name:          row.name,
+  sku:           row.sku,
+  unit:          row.unit || "",
+  balance:       Number(row.balance ?? 0),
+  ledgerSum:     Number(row.ledger_sum ?? 0),
+  variance:      Number(row.variance ?? 0),
+  movementCount: Number(row.movement_count ?? 0),
+});
+
+// ── GET /api/stock/ledger ─────────────────────────────────────
+// Filters are omitted from the query string when empty rather than
+// sent as "", because the server treats an empty string as absent but
+// there is no reason to make it prove that on every request.
+export const getLedger = async ({
+  from, to, productId, performedBy, movementTypes, referenceType, limit, cursor,
+} = {}) => {
+  const params = new URLSearchParams();
+  if (from)          params.set("from", from);
+  if (to)            params.set("to", to);
+  if (productId)     params.set("productId", String(productId));
+  if (performedBy)   params.set("performedBy", String(performedBy));
+  if (referenceType) params.set("referenceType", referenceType);
+  if (limit)         params.set("limit", String(limit));
+  if (cursor)        params.set("cursor", cursor);
+  if (movementTypes && movementTypes.length) {
+    params.set("movementType", movementTypes.join(","));
+  }
+
+  const qs   = params.toString();
+  const body = await apiGet(`/api/stock/ledger${qs ? `?${qs}` : ""}`);
+  const data = body.data ?? {};
+
+  return {
+    movements:  (data.movements ?? []).map(toLedgerRow),
+    nextCursor: data.nextCursor ?? null,
+    summary: {
+      totalIn:       Number(data.summary?.total_in ?? 0),
+      totalOut:      Number(data.summary?.total_out ?? 0),
+      netChange:     Number(data.summary?.net_change ?? 0),
+      movementCount: Number(data.summary?.movement_count ?? 0),
+      productCount:  Number(data.summary?.product_count ?? 0),
+    },
+  };
+};
+
+// ── GET /api/stock/ledger/reconciliation ──────────────────────
+export const getReconciliation = async () => {
+  const body = await apiGet("/api/stock/ledger/reconciliation");
+  const data = body.data ?? {};
+  return {
+    products:  (data.products ?? []).map(toReconciliationRow),
+    variances: (data.variances ?? []).map(toReconciliationRow),
+  };
+};
+
+// ── GET /api/stock/ledger/actors ──────────────────────────────
+export const getLedgerActors = async () => {
+  const body = await apiGet("/api/stock/ledger/actors");
+  return (body.data ?? []).map((r) => ({ id: r.id, name: r.name || "Unknown" }));
+};
+
+// ── GET /api/stock/trends ─────────────────────────────────────
+// { [productId]: number[] } — the balance at the end of each day,
+// oldest first. Products that have never moved are absent, and the
+// table renders those as a dash rather than a flat line.
+export const getStockTrends = async (days) => {
+  const qs   = days ? `?days=${encodeURIComponent(days)}` : "";
+  const body = await apiGet(`/api/stock/trends${qs}`);
+  const series = body.data?.series ?? {};
+
+  // Keys arrive as strings (JSON object keys always are) but products
+  // are keyed by integer id everywhere else, so the lookup in the
+  // table would silently miss. Normalise once, here.
+  const out = {};
+  for (const [productId, points] of Object.entries(series)) {
+    out[Number(productId)] = (points ?? []).map(Number);
+  }
+  return out;
+};
+
+export default {
+  getManifest, getMovements, adjustStock,
+  getLedger, getReconciliation, getLedgerActors,
+  getStockTrends,
+};

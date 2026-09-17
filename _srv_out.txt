@@ -1,0 +1,6 @@
+
+> backend@1.0.0 start
+> node index.js
+
+[server] Running on http://localhost:5000
+[db] Connected

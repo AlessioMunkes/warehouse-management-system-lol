@@ -31,7 +31,7 @@ const cookieFor = (role, overrides = {}) => {
   return [`wms_token=${token}`];
 };
 
-const ALL_ROLES   = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN, ROLES.FINANCE];
+const ALL_ROLES   = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 const MANAGERS_UP = [ROLES.MANAGER, ROLES.ADMIN];
 
 const MANIFEST = [{ id: 1, name: 'Rice', quantity_on_hand: 100, is_shortfall: false }];
@@ -102,7 +102,7 @@ describe('stock routes — role enforcement', () => {
     expect(res.status).toBe(200);
   });
 
-  it.each([ROLES.WORKER, ROLES.FINANCE])('%s cannot adjust stock manually', async (role) => {
+  it.each([ROLES.WORKER, 'finance'])('%s cannot adjust stock manually', async (role) => {
     // Manual adjustment rewrites the ledger — managers and admins only.
     const res = await request(app).post(`${BASE}/adjust`)
       .set('Cookie', cookieFor(role)).send(BODY);

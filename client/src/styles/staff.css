@@ -1,0 +1,2109 @@
+/* ==========================================================================
+   client/src/styles/staff.css
+
+   Chrome for the four warehouse-staff task pages: receiving, packing,
+   decanting, dispatch.
+
+   Everything is namespaced .stf-* so it cannot collide with index.css,
+   which every existing screen depends on. Import it AFTER index.css.
+
+   ── Tokens ────────────────────────────────────────────────────────────
+   Taken from landingpage.css, not invented, so a staff page and the
+   front door read as one product. The landing page's own rule is
+   followed here too:
+
+       charcoal  structure, headings, surfaces
+       red       anything clickable
+       gold      small editorial accents
+
+   One deliberate addition: --stf-attention, a deep brick used for
+   short counts, expired batches and quantity variances. Red is spoken
+   for by actions, and a warning that shares its colour with every
+   button is a warning nobody reads. The brick is visibly browner and
+   darker than --stf-accent so the two never read as the same thing —
+   and per ACC-03 the mark and the sentence carry the meaning anyway,
+   so colour is never the only signal.
+
+   ── Two rules the layouts are built on ────────────────────────────────
+   ACC-05  a multi-step task is sequential screens, one decision each.
+           .stf-rail is the indicator, kept deliberately quiet.
+   ACC-06  this is a PWA used on a phone in a warehouse, often with
+           gloves. Tap targets 44px minimum; numbers typed on the floor
+           are 56px.
+   ========================================================================== */
+
+.stf-shell {
+  /* Brand, from landingpage.css */
+  --stf-ink:        #2b3336;   /* --maroon      structure and headings */
+  --stf-ink-deep:   #171b1c;   /* --maroon-deep */
+  --stf-accent:     #ef3a40;   /* --accent      clickable */
+  --stf-accent-deep:#d42d33;   /* --accent-deep hover */
+  --stf-gold:       #979168;   /* --khaki       editorial accents */
+  --stf-gold-deep:  #8a8058;   /* --khaki-deep */
+  --stf-sand:       #e9e3dd;   /* --bg          page ground */
+  --stf-border:     #ddd4c8;   /* --border */
+  --stf-text:       #5c5c5c;   /* --text */
+  --stf-text-sub:   #6f6a5e;   /* --text-sub, darkened for 4.5:1 (ACC-02) */
+  --stf-text-meta:  #8b8578;   /* --text-meta, darkened for the same reason */
+  --stf-white:      #ffffff;
+
+  /* Staff-only */
+  --stf-attention:  #8a3227;
+  --stf-attention-ink: #6d2a20;
+  --stf-attention-bg:  #f6efe9;
+  --stf-attention-border: #e2d3c6;
+
+  --stf-font-display: "Montserrat", "Inter", system-ui, -apple-system, sans-serif;
+  --stf-font-sans:    "Inter", system-ui, -apple-system, sans-serif;
+
+  --stf-radius:   12px;   /* tighter than the landing page's 16px: these
+                             are controls in a column, not marketing cards */
+  --stf-radius-sm: 8px;
+  --stf-radius-pill: 999px;
+  --stf-tap:   44px;
+  --stf-field: 56px;
+
+  /* 100dvh, not 100vh: on iOS Safari the address bar makes 100vh taller
+     than the visible viewport, which pushed the tab bar below the fold
+     on exactly the device this is built for. */
+  /* The tab bar's height, used twice: once to size the bar, once to
+     pad the shell so content is never hidden behind it. */
+  --stf-tabbar-h: 60px;
+
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  padding-bottom: calc(var(--stf-tabbar-h) + env(safe-area-inset-bottom));
+  background: var(--stf-sand);
+  font-family: var(--stf-font-sans);
+  color: var(--stf-text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.stf-shell img { max-width: 100%; display: block; }
+.stf-shell a { color: var(--stf-accent); text-decoration: none; }
+.stf-shell a:hover { color: var(--stf-accent-deep); text-decoration: underline; }
+.stf-shell a:focus-visible,
+.stf-shell button:focus-visible {
+  outline: 3px solid var(--stf-accent);
+  outline-offset: 2px;
+}
+
+/* ── App bar ─────────────────────────────────────────────────────── */
+.stf-appbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  /* Sits under the notch without the brand row colliding with the
+     status bar. */
+  padding-top: max(10px, env(safe-area-inset-top));
+  background: var(--stf-ink);
+  color: var(--stf-white);
+}
+
+.stf-appbar-left  { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.stf-appbar-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.stf-appbar-logo  { width: 30px; height: 30px; object-fit: contain; flex-shrink: 0; }
+.stf-appbar-name  { font-family: var(--stf-font-display); font-size: 14px; font-weight: 700; color: var(--stf-white); }
+.stf-appbar-prog  {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.72);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.stf-appbar-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+
+.stf-appbar-btn {
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--stf-radius-pill);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+  font: 600 12px/1 var(--stf-font-sans);
+  cursor: pointer;
+}
+.stf-appbar-btn:hover { background: rgba(255, 255, 255, 0.14); }
+.stf-appbar-btn[aria-pressed='true'] { border-color: rgba(255, 255, 255, 0.6); }
+
+/* ── Breadcrumb row ──────────────────────────────────────────────── */
+.stf-crumb {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--stf-border);
+  background: var(--stf-white);
+  font-size: 12px;
+  color: var(--stf-text-sub);
+}
+.stf-crumb-back {
+  min-height: 32px;
+  border: 0;
+  background: none;
+  padding: 4px 0;
+  font: 700 12px/1.4 var(--stf-font-sans);
+  color: var(--stf-accent);
+  cursor: pointer;
+  text-align: left;
+}
+.stf-crumb-back:hover { color: var(--stf-accent-deep); text-decoration: underline; }
+.stf-crumb-meta { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* An action link in the crumb row (e.g. Receiving's "History") — in
+   the persistent header rather than inline page content, so it stays
+   reachable and visible regardless of scroll position or which
+   screen/dialog is currently showing. */
+.stf-crumb-link {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  font: 700 12px/1.4 var(--stf-font-sans);
+  color: var(--stf-accent);
+  white-space: nowrap;
+}
+.stf-crumb-link:hover { color: var(--stf-accent-deep); }
+.stf-crumb-link i { font-size: 14px; }
+
+/* The single column every task page lays out in. Same column on a phone
+   and on a bench tablet — the tablet gets more air, not a denser layout
+   to relearn. */
+.stf-main {
+  flex: 1;
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 18px 18px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* The week planner inside Decanting is a two-column form, not a task
+   flow. It keeps the same chrome and takes the room it needs. */
+.stf-main.is-wide { max-width: 1200px; }
+
+/* ── Bottom tab bar ──────────────────────────────────────────────── */
+/* How staff move between the four tasks. A sidebar collapses behind a
+   hamburger at this width, hiding all four destinations behind a tap;
+   on a phone held one-handed the thumb is already at the bottom. */
+.stf-tabbar {
+  /* Fixed, not sticky. Sticky pins to the bottom of the scroll box, and
+     the doodle footer sits inside that box after the bar — so the bar
+     stopped 52px short of the window with a white gap beneath it. */
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  min-height: var(--stf-tabbar-h);
+  display: flex;
+  align-items: stretch;
+  border-top: 1px solid var(--stf-border);
+  background: var(--stf-white);
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 20;
+}
+
+.stf-tab {
+  flex: 1;
+  min-height: var(--stf-tap);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 2px;
+  border: 0;
+  border-top: 2px solid transparent;
+  background: none;
+  color: var(--stf-text-sub);
+  font: 600 10px/1.2 var(--stf-font-sans);
+  cursor: pointer;
+}
+.stf-tab-icon  { width: 24px; height: 24px; object-fit: contain; opacity: 0.55; }
+.stf-tab-glyph { font-size: 18px; line-height: 24px; opacity: 0.55; }
+.stf-tab.is-current { border-top-color: var(--stf-accent); color: var(--stf-ink); }
+.stf-tab.is-current .stf-tab-icon,
+.stf-tab.is-current .stf-tab-glyph { opacity: 1; }
+
+/* ── Doodle footer ───────────────────────────────────────────────── */
+.stf-footer {
+  height: 52px;
+  border-top: 1px solid var(--stf-border);
+  background: var(--stf-sand) center / contain no-repeat;
+}
+
+/* ── Step rail (ACC-05) ──────────────────────────────────────────── */
+/* Four thin bars and a quiet line of text. Not a numbered wizard
+   header: staff need to know roughly where they are, not to navigate a
+   diagram. Red, because the filled bars are the one thing on the rail
+   that changes. */
+.stf-rail { display: flex; flex-direction: column; gap: 9px; }
+.stf-rail-bars { display: flex; gap: 5px; }
+.stf-rail-bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--stf-border);
+  transition: background 180ms ease;
+}
+.stf-rail-bar.is-done { background: var(--stf-accent); }
+.stf-rail-meta {
+  display: flex; justify-content: space-between; gap: 12px;
+  font-size: 12px; color: var(--stf-text-sub);
+}
+
+/* ── Step screen ─────────────────────────────────────────────────── */
+.stf-step      { display: flex; flex-direction: column; gap: 20px; }
+.stf-step-head { display: flex; flex-direction: column; gap: 6px; }
+.stf-step-title {
+  margin: 0;
+  font-family: var(--stf-font-display);
+  font-size: clamp(1.3rem, 4.5vw, 1.5rem);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--stf-ink);
+  text-wrap: pretty;
+}
+.stf-step-sub  { margin: 0; font-size: 14px; line-height: 1.5; color: var(--stf-text-sub); text-wrap: pretty; }
+.stf-step-body { display: flex; flex-direction: column; gap: 16px; }
+
+/* ── Actions ─────────────────────────────────────────────────────── */
+/* One action per screen commits the step; anything else is outlined and
+   sits under it. Both the same height, so a pair never reads as two
+   different kinds of control. Pill and 44px+, matching the landing
+   page's buttons. */
+.stf-actions { display: flex; flex-direction: column; gap: 10px; }
+.stf-actions.is-row { flex-direction: row; }
+.stf-actions.is-row > * { flex: 1; }
+
+.stf-btn {
+  min-height: 48px;
+  padding: 0 24px;
+  border: 1.5px solid transparent;
+  border-radius: var(--stf-radius-pill);
+  font: 600 15px/1 var(--stf-font-sans);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+.stf-btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+.stf-btn {
+  transition: background 150ms ease, border-color 150ms ease,
+              box-shadow 150ms ease, transform 100ms ease;
+}
+.stf-btn-primary { background: var(--stf-accent); color: var(--stf-white); }
+.stf-btn-primary:hover:not([disabled]) { background: var(--stf-accent-deep); }
+.stf-btn:hover:not([disabled]) {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18); /* blue-500 @ 18% */
+}
+.stf-btn:active:not([disabled]) {
+  transform: scale(0.97);
+}
+
+.stf-btn:focus-visible {
+  outline: 3px solid rgba(59, 130, 246, 0.6);
+  outline-offset: 2px;
+}
+.stf-btn-secondary {
+  background: var(--stf-white);
+  border-color: var(--stf-border);
+  color: var(--stf-ink);
+}
+.stf-btn-secondary:hover:not([disabled]) { background: var(--stf-sand); border-color: var(--stf-gold); }
+
+/* Used where the action is the way out of a problem — "flag shortage",
+   "something is wrong with this one". */
+.stf-btn-warn {
+  background: var(--stf-white);
+  border-color: var(--stf-attention);
+  color: var(--stf-attention-ink);
+}
+.stf-btn-warn:hover:not([disabled]) { background: var(--stf-attention-bg); }
+
+/* Donation intake uses the same staff task primitives as Dispatch,
+   with only layout glue scoped to the donation page. */
+.donation-intake-shell {
+  padding-bottom: 0;
+}
+
+.donation-intake-main {
+  max-width: 760px;
+}
+
+.donation-intake-card {
+  padding: 18px;
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+}
+
+.donation-intake-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.donation-intake-choice {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.donation-intake-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.donation-intake-option {
+  min-height: var(--stf-field);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  color: var(--stf-ink);
+  font: 700 15px/1 var(--stf-font-display);
+  cursor: pointer;
+}
+
+.donation-intake-option:hover {
+  border-color: var(--stf-gold);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.14);
+}
+
+.donation-intake-option.is-chosen {
+  border-color: var(--stf-accent);
+  box-shadow: inset 0 0 0 1px var(--stf-accent);
+}
+
+.donation-intake-option input {
+  accent-color: var(--stf-accent);
+}
+
+.donation-intake-items {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.donation-intake-actions {
+  padding-top: 18px;
+  border-top: 1px solid var(--stf-border);
+}
+
+.donation-intake-error {
+  color: var(--stf-attention);
+}
+
+.donation-intake-error-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+@media (min-width: 720px) {
+  .donation-intake-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ── Fields ──────────────────────────────────────────────────────── */
+.stf-field { display: flex; flex-direction: column; gap: 7px; }
+.stf-field-label {
+  font-family: var(--stf-font-display);
+  font-size: 12px; font-weight: 700;
+  color: var(--stf-ink);
+}
+.stf-field-hint { font-size: 12px; line-height: 1.5; color: var(--stf-text-sub); }
+
+.stf-input {
+  min-height: var(--stf-field);
+  width: 100%;
+  padding: 0 16px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  color: var(--stf-ink);
+  font: 700 26px/1 var(--stf-font-display);
+  font-variant-numeric: tabular-nums;
+}
+.stf-input:focus { border-color: var(--stf-accent); }
+.stf-input.is-flagged { border-color: var(--stf-attention); }
+.stf-input.is-text { font: 400 16px/1 var(--stf-font-sans); }
+
+/* iOS zooms the page in when a focused input is under 16px. Nothing
+   here is, but the rule is explicit so a future edit cannot bring it
+   back. */
+.stf-input, .stf-select { font-size: max(16px, 1em); }
+
+.stf-select {
+  min-height: var(--stf-field);
+  width: 100%;
+  padding: 0 14px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  color: var(--stf-ink);
+  font: 400 16px/1 var(--stf-font-sans);
+}
+.stf-select:focus { border-color: var(--stf-accent); }
+.stf-select.is-flagged { border-color: var(--stf-attention); }
+
+/* ── Choice list ─────────────────────────────────────────────────── */
+/* Tap targets instead of a dropdown: on the floor, picking "cold room"
+   from two visible options beats opening a menu. */
+.stf-choices { display: flex; flex-direction: column; gap: 10px; }
+.stf-choice {
+  width: 100%;
+  min-height: var(--stf-tap);
+  padding: 16px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+.stf-choice:hover { border-color: var(--stf-gold) ; 
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.14);
+
+}
+.stf-choice.is-chosen { border-color: var(--stf-accent); background: var(--stf-white); box-shadow: inset 0 0 0 1px var(--stf-accent); }
+.stf-choice-label { font-family: var(--stf-font-display); font-size: 16px; font-weight: 700; color: var(--stf-ink); }
+.stf-choice-meta  { font-size: 13px; color: var(--stf-text-sub); }
+
+/* ── Notices (ACC-03: a mark and a sentence, never colour alone) ─── */
+.stf-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--stf-border);
+  border-left: 4px solid var(--stf-gold);
+  border-radius: 0 var(--stf-radius) var(--stf-radius) 0;
+  background: var(--stf-white);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--stf-text);
+}
+.stf-notice.is-warn {
+  border-color: var(--stf-attention-border);
+  border-left-color: var(--stf-attention);
+  background: var(--stf-attention-bg);
+}
+.stf-notice-mark {
+  flex-shrink: 0;
+  width: 18px; height: 18px;
+  border: 1.5px solid var(--stf-gold-deep);
+  border-radius: 50%;
+  color: var(--stf-gold-deep);
+  font: 700 12px/15px var(--stf-font-display);
+  text-align: center;
+}
+.stf-notice.is-warn .stf-notice-mark,
+.stf-row.is-warn .stf-notice-mark {
+  border-color: var(--stf-attention);
+  color: var(--stf-attention);
+}
+.stf-notice-body { flex: 1; min-width: 0; }
+.stf-notice-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+
+/* ── List and rows ───────────────────────────────────────────────── */
+.stf-list {
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  overflow: hidden;
+  background: var(--stf-white);
+}
+.stf-row {
+  width: 100%;
+  min-height: var(--stf-tap);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--stf-border);
+  background: none;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.stf-row:last-child { border-bottom: 0; }
+.stf-row:hover { background: var(--stf-sand); }
+.stf-row.is-warn { background: var(--stf-attention-bg); }
+.stf-row.is-static { cursor: default; }
+.stf-row.is-static:hover { background: none; }
+.stf-row.is-warn.is-static:hover { background: var(--stf-attention-bg); }
+.stf-row-main  { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.stf-row-title { font-family: var(--stf-font-display); font-size: 15px; font-weight: 700; color: var(--stf-ink); }
+.stf-row-meta  { font-size: 12px; line-height: 1.45; color: var(--stf-text-sub); }
+.stf-row-value {
+  font-family: var(--stf-font-display);
+  font-size: 18px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--stf-ink);
+}
+
+/* .stf-row is otherwise a single-line horizontal button (see
+   ReceivingFlow, GateQueue). The dispatch gate check row packs a
+   3-column grid plus a conditional variance-reason field and hint
+   text into the same row, so it needs to stack vertically instead of
+   squeezing those extra lines onto the item's own line. */
+.stf-row--check {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  cursor: default;
+}
+.stf-row--check:hover { background: none; }
+.stf-row--check.is-warn:hover { background: var(--stf-attention-bg); }
+.stf-row--check .stf-row-main { width: 100%; }
+
+/* ── key: value captions ─────────────────────────────────────────── */
+.stf-kv     { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; font-size: 12px; color: var(--stf-text-sub); }
+.stf-kv-key { color: var(--stf-text-meta); }
+.stf-kv-val { color: var(--stf-ink); font-weight: 600; }
+
+/* ── Instruction numbers (decanting step 3) ──────────────────────── */
+/* Nothing to type on that screen, which is why these can be this big
+   and read from a metre away with both hands full. */
+.stf-instruction {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 20px;
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+}
+.stf-instruction-n {
+  min-width: 56px;
+  font-family: var(--stf-font-display);
+  font-size: 2.4rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--stf-ink);
+}
+.stf-instruction-l { font-size: 16px; color: var(--stf-text); }
+
+/* ── Signature ───────────────────────────────────────────────────── */
+.stf-sign-canvas {
+  width: 100%;
+  height: 170px;
+  border: 2px dashed var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+  /* Without this the browser treats the first drag as a page pan and
+     the driver's signature scrolls the screen instead. */
+  touch-action: none;
+  display: block;
+}
+/* ── Live field validity ──────────────────────────────────────────── */
+/* .is-flagged already exists for invalid state (red). Adding the
+   green counterpart for valid state, shown live as the worker types
+   or moves to the next field — not just after a submit attempt. */
+.stf-input.is-valid {
+  border-color: #22a55a; /* matches --color-header... green already used
+                             for the "online" status dot in index.css */
+}
+
+.stf-input.is-valid:focus {
+  border-color: #22a55a;
+}
+/* ── Valid-state hint text ────────────────────────────────────────── */
+.stf-field-hint.is-valid-msg {
+  color: #1a7d42; /* darker than the border green, for 4.5:1 text contrast */
+}
+
+
+/* ── Counter ─────────────────────────────────────────────────────── */
+.stf-counter { display: flex; align-items: center; gap: 12px; }
+.stf-counter-btn {
+  width: 48px; height: 48px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: 50%;
+  background: var(--stf-white);
+  font: 400 22px/1 var(--stf-font-sans);
+  color: var(--stf-ink);
+  cursor: pointer;
+}
+.stf-counter-btn:hover { border-color: var(--stf-accent); color: var(--stf-accent); }
+.stf-counter-val {
+  min-width: 44px; text-align: center;
+  font-family: var(--stf-font-display);
+  font-size: 22px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--stf-ink);
+}
+
+/* ── Progress bar (packing) ──────────────────────────────────────── */
+.stf-progress { display: flex; align-items: center; gap: 14px; }
+.stf-progress-track { flex: 1; height: 10px; border-radius: 5px; background: var(--stf-border); overflow: hidden; }
+.stf-progress-fill  { height: 100%; background: var(--stf-accent); transition: width 240ms ease; }
+.stf-progress-count {
+  font-family: var(--stf-font-display);
+  font-size: 13px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--stf-ink);
+}
+
+/* ── Quiet states ────────────────────────────────────────────────── */
+.stf-empty {
+  padding: 24px 20px;
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+  font-size: 14px; line-height: 1.6;
+  color: var(--stf-text-sub);
+}
+.stf-skeleton { height: 56px; border-radius: var(--stf-radius); background: var(--stf-border); }
+
+/* ── Segmented tabs ──────────────────────────────────────────────── */
+/* For a board with a few named subsets (packing's "assigned to me /
+   spare / done") — not the bottom .stf-tab task bar, which is
+   navigation between the four tasks, not filters within one of them. */
+.stf-segments {
+  display: flex; gap: 4px;
+  padding: 3px;
+  background: var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+}
+.stf-segment {
+  flex: 1;
+  min-height: var(--stf-tap);
+  padding: 8px 10px;
+  border: none;
+  border-radius: calc(var(--stf-radius-sm) - 3px);
+  background: transparent;
+  font: 600 13px/1.3 var(--stf-font-sans);
+  color: var(--stf-text-sub);
+  cursor: pointer;
+}
+.stf-segment.is-active { background: var(--stf-white); color: var(--stf-ink); }
+
+/* ── View toggle (Guided / Form) ───────────────────────────────────
+   Same .stf-segments shell as the filter tabs above, but a full pill
+   rather than their softer corners, and sized to its labels rather
+   than stretched to fill the row — this is the one place in the app
+   asking to look like booking.com's compact List/Grid switch, not the
+   full-width filter-tab language used everywhere else (nor the
+   full-width block this looked like before: a fixed 50/50 split only
+   works for two equal-width segments, which forced the whole control
+   to stretch to make that true). The thumb's width and position come
+   from JS measuring the real button (see ViewToggle in
+   StepPrimitives.jsx) — CSS here only draws it. */
+.stf-toggle-block {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.stf-toggle {
+  position: relative;
+  display: inline-flex;
+  width: auto;
+  border-radius: var(--stf-radius-pill);
+}
+.stf-toggle .stf-segment {
+  flex: none;
+  padding: 10px 18px;
+  position: relative;
+  z-index: 1;
+  border-radius: var(--stf-radius-pill);
+  background: transparent; /* the thumb draws the active background now */
+}
+.stf-segment-thumb {
+  position: absolute;
+  top: 3px; bottom: 3px; left: 0;
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-white);
+  box-shadow: 0 1px 2px rgba(43, 51, 54, 0.14);
+  transition: transform 220ms cubic-bezier(0.4, 0, 0.2, 1), width 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 0;
+}
+
+/* One line naming whichever option is currently active, left-aligned
+   under the (now content-sized) pill. Not a title-attribute tooltip:
+   this is read with a thumb, not a mouse, and title never shows on a
+   tap. */
+.stf-toggle-hint { margin: 0; font-size: 12px; color: var(--stf-text-sub); }
+
+/* ── Coachmark (first-run nudge toward the view toggle) ───────────
+   Anchored to whatever wraps the toggle (.stf-toggle-anchor gives it
+   position: relative), not fixed to the viewport — it only ever
+   needs to point at one control, right below it. */
+.stf-toggle-anchor {
+  position: relative;
+  /* .stf-main is a flex column; a direct child stretches to its full
+     width by default. This is the actual direct child (ViewToggle's
+     own .stf-toggle-block sits inside it), so the override belongs
+     here, not one level down. Right-aligned to match the booking.com
+     reference this control was modelled on. */
+  align-self: flex-end;
+}
+.stf-coachmark {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  max-width: 190px;
+}
+.stf-coachmark-arrow {
+  flex-shrink: 0;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--stf-ink);
+  animation: stf-coachmark-bounce 1.2s ease-in-out infinite;
+}
+.stf-coachmark-body {
+  border: 0;
+  border-radius: var(--stf-radius-sm);
+  padding: 8px 10px;
+  background: var(--stf-ink);
+  color: var(--stf-white);
+  font: 600 12px/1.4 var(--stf-font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+@keyframes stf-coachmark-bounce {
+  0%, 100% { transform: translateY(-2px); }
+  50%      { transform: translateY(2px); }
+}
+
+/* ── Full-form line row (Receiving's "Form" mode) ──────────────────
+   One card per order line holding everything the guided flow spreads
+   across two screens (count, then put-away) — the point of this mode
+   is that none of it is hidden behind a Next button. */
+.stf-formrows { display: flex; flex-direction: column; gap: 12px; }
+.stf-formrow {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+}
+.stf-formrow.is-warn { border-color: var(--stf-attention-border); }
+.stf-formrow-head  { display: flex; flex-direction: column; gap: 2px; }
+.stf-formrow-title { font-family: var(--stf-font-display); font-size: 15px; font-weight: 700; color: var(--stf-ink); }
+.stf-formrow-meta  { font-size: 12px; color: var(--stf-text-sub); }
+
+/* ── Status badge ────────────────────────────────────────────────── */
+.stf-badge {
+  display: inline-flex; align-items: center;
+  padding: 4px 9px;
+  border-radius: var(--stf-radius-pill);
+  font: 600 11px/1.2 var(--stf-font-sans);
+  letter-spacing: 0.02em;
+  background: var(--stf-border);
+  color: var(--stf-text-sub);
+  white-space: nowrap;
+}
+.stf-badge.is-active  { background: var(--stf-sand); color: var(--stf-ink); }
+.stf-badge.is-done     { background: var(--stf-ink); color: var(--stf-white); }
+.stf-badge.is-warn     { background: var(--stf-attention-bg); color: var(--stf-attention-ink); }
+
+/* ── Select field ─────────────────────────────────────────────────── */
+/* .stf-select itself already exists (donation forms use it) — this
+   file only adds the wrapper spacing to match .stf-field's rhythm,
+   which SelectField in StepPrimitives.jsx already relies on. */
+
+/* ── Date field ───────────────────────────────────────────────────── */
+/* The real <input type="date"> is kept in the document (so
+   showPicker() and native validation still work) but visually
+   collapsed — the button is what a worker actually sees and taps. */
+.stf-date-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: var(--stf-field);
+  padding: 0 16px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  color: var(--stf-ink);
+  font: 400 16px/1 var(--stf-font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+.stf-date-trigger:hover { border-color: var(--stf-gold); }
+.stf-date-trigger i { font-size: 18px; color: var(--stf-text-sub); }
+.stf-date-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* ── Quantity readout + edit (Form mode) ─────────────────────────── */
+/* Pre-filled from the order, shown as a plain value rather than an
+   open input — most deliveries match the order exactly, so an
+   always-editable field on every one of a dozen lines is a dozen
+   chances to bump a number by accident. Edit is one deliberate tap
+   away instead. */
+.stf-qty-readout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: var(--stf-field);
+  padding: 0 16px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-sand);
+}
+.stf-qty-readout-val {
+  font: 700 22px/1 var(--stf-font-display);
+  color: var(--stf-ink);
+  font-variant-numeric: tabular-nums;
+}
+.stf-qty-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--stf-tap);
+  padding: 0 14px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-white);
+  color: var(--stf-ink);
+  font: 600 13px/1 var(--stf-font-sans);
+}
+.stf-qty-edit-btn:hover { border-color: var(--stf-accent); color: var(--stf-accent); }
+.stf-qty-edit-btn i { font-size: 15px; }
+
+/* ── Signature field ──────────────────────────────────────────────── */
+/* Wraps SignaturePad, which is shared with the manager side and takes
+   its class names as props precisely so it can look native here
+   instead of borrowing the manager page's plain-link styling. */
+.stf-signature-field { display: flex; flex-direction: column; gap: 8px; }
+.stf-signature-actions { display: flex; justify-content: flex-end; }
+.stf-signature-clear {
+  min-height: var(--stf-tap);
+  padding: 0 4px;
+  border: none;
+  background: none;
+  color: var(--stf-accent);
+  font: 600 13px/1 var(--stf-font-sans);
+}
+.stf-signature-clear:hover { color: var(--stf-accent-deep); text-decoration: underline; }
+
+/* ── Form-mode dialog (the "one scrolling form") ─────────────────── */
+/* Chrome (centering, backdrop blur, close button) comes from the
+   shared Dialog component; these three just lay out its inside —
+   a fixed head, a scrollable field stack, and a footer that stays put
+   so the submit button is reachable without scrolling back up. */
+.stf-dialog-head {
+  padding: 20px 20px 0;
+}
+.stf-dialog-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 20px;
+}
+.stf-dialog-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.stf-dialog-footer {
+  padding: 14px 20px;
+  border-top: 1px solid var(--stf-border);
+  background: var(--stf-white);
+}
+
+/* ── Static (read-only) field value ──────────────────────────────── */
+/* Looks like an input's box without inviting a tap — for a value the
+   screen already knows (who's signed in) rather than one someone
+   needs to choose. */
+.stf-static-value {
+  display: flex;
+  align-items: center;
+  min-height: var(--stf-field);
+  padding: 0 16px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-sand);
+  color: var(--stf-ink);
+  font: 600 16px/1 var(--stf-font-sans);
+}
+
+/* History's own link now lives in the crumb bar (.stf-crumb-link,
+   above StaffShell.jsx's block) instead of here — inline page content
+   scrolls out of view and, worse, sits behind the Form dialog once
+   that's open, so it isn't reachable from both modes at all times. */
+
+.stf-sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+/* ── Section divider ──────────────────────────────────────────────── */
+/* A quiet horizontal rule between form sections (Category / Items /
+   Value & Programme / Donor / Notes) — visually separates chunks
+   without needing to wrap each one in its own Card component. */
+.stf-divider {
+  border: none;
+  border-top: 1px solid var(--stf-border);
+  margin: 4px 0;
+}
+
+/* ── Donation intake: item rows & stock search ──────────────────── */
+/* Classes for the search-first item-entry row used on the donation
+   intake form. Visual language mirrors the existing .stf-field /
+   .stf-input / .stf-btn / .stf-row patterns above — same tokens,
+   radius steps, tap targets, and font stack — so a staff member
+   can't tell these rules came from a different .jsx file. */
+
+.stf-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.stf-section-title {
+  margin: 0 0 8px;
+  font-family: var(--stf-font-display);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--stf-ink);
+}
+
+.stf-item-row {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+}
+
+.stf-item-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.stf-item-row-title {
+  font-family: var(--stf-font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--stf-ink);
+}
+
+.stf-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--stf-tap);
+  min-height: var(--stf-tap);
+  padding: 0;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  color: var(--stf-text-sub);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.stf-icon-btn:hover {
+  background: var(--stf-sand);
+  border-color: var(--stf-accent);
+  color: var(--stf-accent);
+}
+.stf-icon-btn:focus-visible {
+  outline: 2px solid rgba(59, 130, 246, 0.6);
+  outline-offset: 2px;
+}
+
+.stf-search-input {
+  position: relative;
+}
+.stf-search-input input {
+  min-height: var(--stf-tap);
+  width: 100%;
+  padding: 0 14px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  color: var(--stf-ink);
+  font: 400 16px/1 var(--stf-font-sans);
+  font-size: max(16px, 1em);
+}
+.stf-search-input input:focus {
+  border-color: var(--stf-accent);
+  outline: none;
+}
+
+.stf-search-results {
+  position: absolute;
+  z-index: 30;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin: 4px 0 0;
+  padding: 4px 0;
+  list-style: none;
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  max-height: 220px;
+  overflow-y: auto;
+}
+.stf-search-results li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+}
+.stf-search-results li:not(:last-child) {
+  border-bottom: 1px solid var(--stf-border);
+}
+.stf-search-results li:hover {
+  background: var(--stf-sand);
+}
+.stf-search-results li > span:first-child {
+  font-weight: 600;
+  color: var(--stf-ink);
+}
+.stf-search-result-category {
+  font-size: 13px;
+  color: var(--stf-text-sub);
+}
+
+.stf-btn-small {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1.5px solid transparent;
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-accent);
+  color: var(--stf-white);
+  font: 600 13px/1 var(--stf-font-sans);
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+.stf-btn-small:hover {
+  background: var(--stf-accent-deep);
+}
+.stf-btn-small:active {
+  transform: scale(0.97);
+}
+.stf-btn-small:focus-visible {
+  outline: 2px solid rgba(59, 130, 246, 0.6);
+  outline-offset: 2px;
+}
+
+.stf-btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 24px;
+  border: 1.5px solid var(--stf-accent);
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-white);
+  color: var(--stf-accent);
+  font: 600 15px/1 var(--stf-font-sans);
+  gap: 8px;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.stf-btn-outline:hover {
+  background: var(--stf-accent);
+  color: var(--stf-white);
+}
+.stf-btn-outline:active {
+  transform: scale(0.97);
+}
+.stf-btn-outline:focus-visible {
+  outline: 3px solid rgba(59, 130, 246, 0.6);
+  outline-offset: 2px;
+}
+
+.is-full { width: 100%; }
+
+.stf-manual-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.stf-manual-fields input,
+.stf-manual-fields select {
+  min-height: var(--stf-field);
+  width: 100%;
+  padding: 0 14px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  color: var(--stf-ink);
+  font-size: max(16px, 1em);
+}
+.stf-manual-fields input[type="number"] {
+  font: 700 26px/1 var(--stf-font-display);
+  font-variant-numeric: tabular-nums;
+}
+.stf-manual-fields input[type="text"],
+.stf-manual-fields select {
+  font: 400 16px/1 var(--stf-font-sans);
+}
+.stf-manual-fields input:focus,
+.stf-manual-fields select:focus {
+  border-color: var(--stf-accent);
+  outline: none;
+}
+.stf-field-row {
+  display: flex;
+  gap: 16px;
+}
+.stf-field-row > div {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.stf-hint {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--stf-text-sub);
+}
+.stf-hint-success {
+  color: #1a7d42;
+}
+.stf-error {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--stf-attention);
+  display: inline-block;
+  padding: 4px 8px;
+  border: 1px solid var(--stf-attention);
+  border-radius: 4px;
+  margin-top: 4px;
+}
+
+/* ── Less Movement / Reduced Motion Accessibility Mode ── */
+
+body.reduced-movement *,
+body.reduced-movement *::before,
+body.reduced-movement *::after {
+  /* Disable all smooth animations & transforms */
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+  transform: none !important;
+}
+
+/* Hide non-essential decorative animations/icons when active */
+body.reduced-movement .animated-bg,
+body.reduced-movement .pulse-animation,
+body.reduced-movement .decorative-icon {
+  display: none !important;
+}
+/* ── ACC-08 · reduced motion ─────────────────────────────────────── */
+/* Honoured from the OS setting, and from the in-app "Less movement"
+   toggle, which sets data-stf-motion="reduced" on <html> so it also
+   covers a shared tablet whose OS setting nobody can change. */
+@media (prefers-reduced-motion: reduce) {
+  .stf-rail-bar, .stf-progress-fill, .stf-btn, .stf-choice, .stf-segment-thumb { transition: none !important; }
+  .stf-coachmark-arrow { animation: none !important; }
+}
+[data-stf-motion='reduced'] .stf-rail-bar,
+[data-stf-motion='reduced'] .stf-progress-fill,
+[data-stf-motion='reduced'] .stf-btn,
+[data-stf-motion='reduced'] .stf-choice,
+[data-stf-motion='reduced'] .stf-segment-thumb { transition: none !important; }
+[data-stf-motion='reduced'] .stf-coachmark-arrow { animation: none !important; }
+
+/* ── Bench tablet ────────────────────────────────────────────────── */
+/* Same column, more air. Deliberately not a wider table: the staff who
+   use the tablet are the staff who use the phone. */
+@media (min-width: 720px) {
+  .stf-main { max-width: 620px; padding: 28px 24px 40px; }
+  .stf-tab { font-size: 11px; }
+  .stf-tab-icon { width: 28px; height: 28px; }
+  .stf-instruction-n { font-size: 2.8rem; }
+}
+
+
+/* ── Task page (TaskPage.jsx) ──────────────────────────────────
+   The container that replaced the dialog both staff flows used to
+   render into. Full width of the shell rather than a 560px box, with
+   the head and the commit bar pinned so neither scrolls away from a
+   worker halfway down a nine-line delivery. */
+.stf-task {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+}
+.stf-task-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--stf-sand);
+  padding: 16px 0 12px;
+  border-bottom: 1px solid var(--stf-border);
+}
+.stf-task-title {
+  font-family: var(--stf-font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--stf-ink);
+  margin: 0;
+}
+.stf-task-title:focus-visible { outline: 2px solid var(--stf-accent); outline-offset: 3px; }
+.stf-task-sub { margin: 4px 0 0; font-size: 14px; color: var(--stf-text-sub); }
+
+.stf-task-cols { display: block; padding: 12px 0 16px; }
+.stf-task-main { min-width: 0; }
+.stf-task-side { margin-top: 16px; }
+
+/* Two panes only where there is width for two panes. Below this the
+   device is a phone or a bench tablet and the side pane is simply the
+   next thing down the page. */
+@media (min-width: 1024px) {
+  .stf-task-cols {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 24px;
+    align-items: start;
+  }
+  .stf-task-side {
+    margin-top: 0;
+    position: sticky;
+    top: 92px;
+  }
+}
+
+.stf-task-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: var(--stf-sand);
+  border-top: 1px solid var(--stf-border);
+  padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
+}
+.stf-task-note {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--stf-attention-ink);
+}
+
+/* On a wide screen the commit lives in the side pane, so the sticky
+   footer would be a second copy of it taking up the bottom of the
+   page for nothing. */
+@media (min-width: 1024px) {
+  .stf-task-foot.is-side-commit { display: none; }
+}
+
+/* ── Work list (WorkList.jsx) ──────────────────────────────────
+   One row per line: what it is on the left, the number on the right,
+   about 56px tall. The card-per-line shape this replaced was ~135px,
+   which is what made nine lines a scroll instead of a screen. */
+.stf-wl { display: flex; flex-direction: column; gap: 8px; }
+
+.stf-wl-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.stf-wl-count { font-size: 13px; color: var(--stf-text-sub); }
+.stf-wl-accept {
+  min-height: var(--stf-tap);
+  padding: 0 16px;
+  border: 1px solid var(--stf-ink);
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-white);
+  font-family: var(--stf-font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--stf-ink);
+  cursor: pointer;
+}
+.stf-wl-accept:hover { background: var(--stf-ink); color: var(--stf-white); }
+
+.stf-wl-rows {
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+  overflow: hidden;
+}
+.stf-wl-row { border-bottom: 1px solid var(--stf-border); }
+.stf-wl-row:last-child { border-bottom: 0; }
+.stf-wl-row.is-warn { background: var(--stf-attention-bg); }
+/* The focused row in Guided. A left bar rather than a colour swap,
+   so it never collides with the warn state a varied line already
+   carries — ACC-03, never colour alone. */
+.stf-wl-row.is-focus { box-shadow: inset 3px 0 0 var(--stf-accent); }
+
+.stf-wl-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: 6px 10px;
+}
+.stf-wl-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  padding: 4px 0;
+  font-family: inherit;
+}
+.stf-wl-text { min-width: 0; display: flex; flex-direction: column; }
+.stf-wl-title {
+  font-family: var(--stf-font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--stf-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stf-wl-meta {
+  font-size: 12px;
+  color: var(--stf-text-meta);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stf-wl-mark {
+  flex: 0 0 auto;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  background: var(--stf-attention);
+  color: var(--stf-white);
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stf-wl-qty { flex: 0 0 auto; display: flex; align-items: center; gap: 4px; }
+.stf-wl-step {
+  width: var(--stf-tap);
+  height: var(--stf-tap);
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  font-size: 20px;
+  line-height: 1;
+  color: var(--stf-ink);
+  cursor: pointer;
+}
+.stf-wl-step:hover { background: var(--stf-sand); }
+.stf-wl-input {
+  width: 84px;
+  min-height: var(--stf-tap);
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  text-align: center;
+  font-family: var(--stf-font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--stf-ink);
+}
+.stf-wl-input.is-flagged { border-color: var(--stf-attention); }
+
+/* The accordion. Only the focused line opens, so put-away location,
+   use-by date and the variance notice are present when they matter
+   and invisible when they do not. */
+.stf-wl-detail {
+  padding: 4px 10px 14px;
+  border-top: 1px dashed var(--stf-border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Summary card, for the side pane ──────────────────────── */
+.stf-summary {
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.stf-summary-title {
+  font-family: var(--stf-font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--stf-ink);
+  margin: 0;
+}
+
+
+/* ── Script 21 ─────────────────────────────────────────────────
+   Appended rather than edited into the blocks above, so this script
+   and 17/19/20 never fight over the same anchor.
+
+   ── 1 · THE WIDTH ──────────────────────────────────────────────
+   .stf-main caps every staff page at 520px, 620px above 720px wide.
+   `.stf-main.is-wide` has existed since Decanting's week planner
+   needed the room — and NOTHING in the codebase ever passed the
+   `wide` flag that turns it on. That is the whole of the reported
+   "you didn't use all the white space": on a 1315px laptop the work
+   sat in a 570px strip with product names truncated to "A..", and
+   TaskPage's two-pane layout at 1024px could never fire because its
+   own container was 620px.
+
+   Keyed on :has() rather than a new prop: the page that needs the
+   width is the page that renders a TaskPage, so there is nothing for
+   a caller to remember and no way to add a fifth flow and forget.
+   :has() carries the specificity of its argument (0,2,0), so this
+   beats the bare .stf-main rules wherever they are, media query or
+   not — no !important and no source-order dependency.
+
+   The 1200px is the manager dashboard's own max-w-6xl (1152px)
+   rounded to the number .stf-main.is-wide already used, so a staff
+   page and a dashboard measure the same on the same screen. */
+.stf-main:has(.stf-task),
+.stf-main:has(> .stf-step) {
+  max-width: 1200px;
+}
+
+/* ── 2 · THE DASHBOARD SURFACE ──────────────────────────────────
+   "Apply the style from the dashboard to these pages."
+
+   The manager dashboards are shadcn Cards: white, rounded-4xl
+   (0.625rem x 2.6 = 26px), shadow-md, a 1px ring at 5% of the
+   foreground, and 24px of padding. Staff pages were bare content on
+   the sand ground, so the same app read as two products.
+
+   What is copied is the SURFACE, not the type system. The stf-*
+   scale exists because these screens are used on a phone with gloves
+   (ACC-06): 44px tap targets, 56px number fields, Montserrat
+   headings. Swapping that for the dashboard's 14px Inter would undo
+   the accessibility work to win a family resemblance. So: the
+   dashboard's card, the staff pages' contents. */
+.stf-main > .stf-task,
+.stf-main > .stf-step {
+  background: var(--stf-white);
+  border: 1px solid rgb(43 51 54 / 0.06);
+  border-radius: 24px;
+  box-shadow: 0 4px 6px -1px rgb(43 51 54 / 0.08), 0 2px 4px -2px rgb(43 51 54 / 0.06);
+  padding: 20px;
+}
+
+@media (min-width: 720px) {
+  .stf-main > .stf-task,
+  .stf-main > .stf-step {
+    padding: 24px;
+  }
+}
+
+/* The head and the foot are sticky, so they cannot simply inherit
+   the card's padding — they have to span the card's full width and
+   paint over what scrolls under them. Negative margins pull them out
+   to the card edge; the background changes from sand to white
+   because they are now ON the card.
+
+   The radius is repeated on both so that when neither is stuck they
+   sit flush in the card's corners, and when the head IS stuck it
+   reads as a floating header rather than a square patch. */
+.stf-main > .stf-task > .stf-task-head {
+  background: var(--stf-white);
+  margin: -20px -20px 0;
+  padding: 20px 20px 14px;
+  border-radius: 24px 24px 0 0;
+}
+.stf-main > .stf-task > .stf-task-foot {
+  background: var(--stf-white);
+  margin: 0 -20px -20px;
+  padding: 14px 20px calc(14px + env(safe-area-inset-bottom));
+  border-radius: 0 0 24px 24px;
+}
+
+@media (min-width: 720px) {
+  .stf-main > .stf-task > .stf-task-head {
+    margin: -24px -24px 0;
+    padding: 24px 24px 16px;
+  }
+  .stf-main > .stf-task > .stf-task-foot {
+    margin: 0 -24px -24px;
+    padding: 16px 24px calc(16px + env(safe-area-inset-bottom));
+  }
+}
+
+/* The side pane sticks under the sticky head. On the card that head
+   is taller than the 92px the original rule guessed at. */
+@media (min-width: 1024px) {
+  .stf-main > .stf-task .stf-task-side { top: 110px; }
+}
+
+/* Width is for the work, not for the prose. A list, a table and a
+   two-pane task all get better at 1200px; a heading, a paragraph and
+   a stack of fields get worse — 1200px of running text is unreadable
+   and a 1200px-wide input looks like a mistake. So the card takes the
+   room and the type inside it keeps a measure.
+
+   .stf-step-body is StepScreen's own wrapper for whatever the step
+   asks for, which is always fields or choices. The lists on the
+   history screens are NOT inside it — they are direct children of
+   .stf-step — so they still span the card. */
+.stf-main > .stf-step > .stf-step-head,
+.stf-main > .stf-step > .stf-step-body {
+  max-width: 760px;
+}
+
+/* ── 3 · GUIDED IS NOW A MODE YOU CAN SEE ───────────────────────
+   Reported as "there's no difference between guided and form view on
+   dispatch", and that was accurate: script 20 made Guided a focus
+   state over one shared list, which fixed the code duplication but
+   left the two modes rendering an identical screen with one extra
+   button. A left bar and an accordion is not a mode.
+
+   Guided now says where you are and what you are on. Everything
+   except the focused line is muted and compact; the focused line is
+   full contrast, bigger, and carries "Item 3 of 9".
+
+   Muted, not hidden and not disabled — the point of the rework was
+   that a worker can see the whole job and jump to the line they
+   actually want. Every row stays tappable, and tapping one moves the
+   focus to it. */
+.stf-wl.is-guided .stf-wl-row {
+  opacity: 0.5;
+  transition: opacity 0.15s ease;
+}
+.stf-wl.is-guided .stf-wl-row.is-focus {
+  opacity: 1;
+  border-color: var(--stf-accent);
+  box-shadow: 0 0 0 1px var(--stf-accent);
+}
+/* A line that is short or over keeps its contrast even when it is not
+   the line you are on. ACC-03 says the mark and the sentence carry
+   the meaning rather than colour — dimming both to 50% to make Guided
+   look like a mode would take the exception off the screen, which is
+   the one thing this list exists to surface. */
+.stf-wl.is-guided .stf-wl-row.is-warn { opacity: 0.85; }
+.stf-wl.is-guided .stf-wl-row.is-focus .stf-wl-title {
+  font-size: 17px;
+}
+/* 56px and 20px: the same "typed on the floor" sizing NumberField
+   uses (ACC-06). The collapsed rows keep the compact 44px field. */
+.stf-wl.is-guided .stf-wl-row.is-focus .stf-wl-input {
+  min-height: 56px;
+  font-size: 20px;
+}
+.stf-wl-pos {
+  display: block;
+  font: 700 11px/1.4 var(--stf-font-sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--stf-accent);
+  margin-bottom: 2px;
+}
+
+[data-stf-motion='reduced'] .stf-wl.is-guided .stf-wl-row { transition: none !important; }
+
+/* ── 3b · THE ROW ON A PHONE ────────────────────────────────────
+   Found by rendering it rather than by reading it. Two 44px steppers
+   and the number take about 176px of a 390px row, and .stf-wl-title
+   is `white-space: nowrap` with an ellipsis — so on a real phone the
+   product names came out as "Maize Me..." and "Tinned...", which is
+   the one thing on the row a worker has to be able to read. The
+   truncation was there from script 20; the wider card just made it
+   visible on the laptop instead.
+
+   Below 480px the number moves to its own line under the name. The
+   row gets taller, which is the correct trade: a 56px row that does
+   not say what it is saves nothing. */
+@media (max-width: 479px) {
+  .stf-wl-line { flex-wrap: wrap; row-gap: 6px; }
+  .stf-wl-main { flex: 1 0 100%; }
+  .stf-wl-qty  { margin-left: auto; }
+}
+
+/* ── 4 · PAGER (Paged.jsx) ──────────────────────────────────────
+   Under a list, not over it: the control belongs where the list
+   runs out. Hidden entirely at one page, so short lists are
+   unchanged. */
+.stf-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 2px 2px;
+}
+.stf-pager-btn {
+  min-height: var(--stf-tap);
+  padding: 0 16px;
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  font: 600 14px/1 var(--stf-font-sans);
+  color: var(--stf-ink);
+  cursor: pointer;
+}
+.stf-pager-btn:hover:not(:disabled) { border-color: var(--stf-accent); color: var(--stf-accent); }
+.stf-pager-btn:disabled { opacity: 0.4; cursor: default; }
+.stf-pager-count {
+  font: 500 13px/1.4 var(--stf-font-sans);
+  color: var(--stf-text-sub);
+  text-align: center;
+}
+
+/* ── 5 · PANELS (DecantingFlow) ─────────────────────────────────
+   Decanting's three parts on one page. Guided opens one at a time
+   and shows the others as a summary line; Form opens all three at
+   once. Same markup, same handlers, one code path — which is what
+   the dialog version was not. */
+.stf-panel {
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+  overflow: hidden;
+}
+.stf-panel + .stf-panel { margin-top: 12px; }
+.stf-panel.is-open { border-color: var(--stf-ink); }
+.stf-panel.is-locked { opacity: 0.55; }
+
+.stf-panel-head {
+  width: 100%;
+  min-height: var(--stf-tap);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: none;
+  border: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+button.stf-panel-head { cursor: pointer; }
+button.stf-panel-head:disabled { cursor: default; }
+
+.stf-panel-n {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--stf-sand);
+  color: var(--stf-ink);
+  font: 700 13px/1 var(--stf-font-sans);
+}
+.stf-panel.is-open .stf-panel-n { background: var(--stf-ink); color: var(--stf-white); }
+.stf-panel.is-done .stf-panel-n { background: var(--stf-gold); color: var(--stf-white); }
+
+.stf-panel-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.stf-panel-title {
+  font-family: var(--stf-font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--stf-ink);
+}
+.stf-panel-sum { font-size: 13px; color: var(--stf-text-sub); }
+
+.stf-panel-body {
+  padding: 4px 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+
+/* ── Script 22 ─────────────────────────────────────────────────
+   Appended after 21's block for the same reason 21 was appended
+   after everything else: no two scripts share an anchor.
+
+   ── 1 · CENTRE THE SELECTION SCREENS ───────────────────────────
+   Script 21 gave every staff page the full 1200px card and then
+   capped the type at 760px so a paragraph would not run the width of
+   a laptop. What it did not do was centre that 760px, so "Which
+   delivery is this?" and "What are you decanting?" sat hard left in
+   a wide card with a third of it empty.
+
+   Scoped with :has(> .stf-step-body) so it only catches a StepScreen
+   — a screen of questions. The history screens render their list as
+   a direct child of .stf-step with no body, and they want the whole
+   card. */
+.stf-main > .stf-step:has(> .stf-step-body) > .stf-step-head,
+.stf-main > .stf-step:has(> .stf-step-body) > .stf-step-body,
+.stf-main > .stf-step:has(> .stf-step-body) > .stf-actions {
+  width: 100%;
+  max-width: 760px;
+  margin-inline: auto;
+}
+
+/* ── 2 · THE NUMBER BEING CHECKED AGAINST ───────────────────────
+   Asked for directly. Worth stating the tension: staff.css's own rule
+   is charcoal for structure, red for anything clickable, gold for
+   accents — and this is a static number wearing the click colour. It
+   works because it is the ONLY static red on the row, so it still
+   reads as "this one number", not as "this is a button". If a second
+   static red ever appears next to it, both stop meaning anything. */
+.stf-wl-expected {
+  color: var(--stf-accent);
+  font-weight: 700;
+}
+
+/* ── 3 · GUIDED IS ONE ITEM NOW ─────────────────────────────────
+   Script 21 made Guided "focus one, dim the rest". This replaces
+   that with one line on screen at a time, which is what was asked
+   for. The dimming rules from 21 still apply to whatever is
+   rendered, so the single line — which is always the focused one —
+   is put back to full contrast here, including when it is also a
+   short or over line. */
+.stf-wl.is-guided .stf-wl-row,
+.stf-wl.is-guided .stf-wl-row.is-warn,
+.stf-wl.is-guided .stf-wl-row.is-focus {
+  opacity: 1;
+}
+
+/* One line has the whole card, so it can afford to be read at arm's
+   length on a bench. */
+.stf-wl.is-guided .stf-wl-line { min-height: 76px; padding: 12px 14px; }
+.stf-wl.is-guided .stf-wl-title { font-size: 19px; }
+.stf-wl.is-guided .stf-wl-meta  { font-size: 14px; }
+
+/* The pager. This is the part that stops one-at-a-time being the
+   trap the old Guided was: that version could only go forwards, one
+   StepScreen at a time, so a line you fumbled was gone. */
+.stf-wl-steps {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+}
+.stf-wl-step-btn {
+  min-height: var(--stf-tap);
+  padding: 0 16px;
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  font: 600 14px/1 var(--stf-font-sans);
+  color: var(--stf-ink);
+  cursor: pointer;
+}
+.stf-wl-step-btn:hover:not(:disabled) { border-color: var(--stf-accent); color: var(--stf-accent); }
+.stf-wl-step-btn:disabled { opacity: 0.4; cursor: default; }
+.stf-wl-steps-count {
+  font: 700 14px/1 var(--stf-font-display);
+  color: var(--stf-text-sub);
+  white-space: nowrap;
+}
+
+/* ── 4 · THE CONFIRM TICK ───────────────────────────────────────
+   Off (outline) and on (filled) differ by more than colour — the
+   border weight and the tick's own contrast change too, ACC-03. */
+.stf-wl-tick {
+  width: var(--stf-tap);
+  height: var(--stf-tap);
+  flex: 0 0 auto;
+  margin-left: 4px;
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  font-size: 18px;
+  line-height: 1;
+  color: var(--stf-text-meta);
+  cursor: pointer;
+}
+.stf-wl-tick:hover { border-color: var(--stf-ink); color: var(--stf-ink); }
+.stf-wl-tick.is-on {
+  border-color: var(--stf-ink);
+  background: var(--stf-ink);
+  color: var(--stf-white);
+}
+/* A hairline down the left edge, so a confirmed line is legible as
+   confirmed while scanning the column rather than only at the tick. */
+.stf-wl-row.is-confirmed { box-shadow: inset 3px 0 0 var(--stf-gold); }
+/* Focus still wins where both apply: in Guided the one line on screen
+   is always focused, and it may also be confirmed. */
+.stf-wl-row.is-confirmed.is-focus { box-shadow: inset 3px 0 0 var(--stf-accent); }
+
+/* ── 5 · SEARCH AND FILTERS (ListTools.jsx) ─────────────────────
+   Above the list, inside the same measure as the list itself. */
+.stf-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.stf-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.stf-search-icon {
+  position: absolute;
+  left: 12px;
+  font-size: 18px;
+  color: var(--stf-text-meta);
+  pointer-events: none;
+}
+.stf-search-input {
+  width: 100%;
+  min-height: var(--stf-tap);
+  padding: 10px 44px 10px 38px;
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  font: 500 15px/1.3 var(--stf-font-sans);
+  color: var(--stf-ink);
+}
+.stf-search-input::placeholder { color: var(--stf-text-meta); }
+.stf-search-input:focus-visible {
+  outline: 2px solid var(--stf-accent);
+  outline-offset: 1px;
+}
+/* The browser's own clear affordance is inconsistent across the
+   devices this runs on, so it is hidden and one is drawn instead. */
+.stf-search-input::-webkit-search-cancel-button { display: none; }
+.stf-search-clear {
+  position: absolute;
+  right: 4px;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: var(--stf-radius-sm);
+  background: none;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--stf-text-sub);
+  cursor: pointer;
+}
+.stf-search-clear:hover { color: var(--stf-ink); }
+.stf-tools-extra { display: flex; flex-direction: column; gap: 8px; }
+
+.stf-empty-line { margin: 0 0 12px; }
+
+
+
+/* ── Script 24 ─────────────────────────────────────────────────
+   The offline bar. Appended after 22's block, same rule as always:
+   no two scripts share an anchor.
+
+   Charcoal rather than red. Red in this design system means "you can
+   click this", and a red strip across the top of the screen reads as
+   an emergency — losing signal in a warehouse is a Tuesday, not a
+   disaster, and the whole point of the bar is to say "carry on".
+   The brick --stf-attention is kept for the one state that does need
+   a person: something the server refused. */
+.stf-netbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 18px;
+  background: var(--stf-ink);
+  color: var(--stf-white);
+  font: 500 13px/1.4 var(--stf-font-sans);
+}
+.stf-netbar.is-sending { background: var(--stf-gold-deep); }
+.stf-netbar.is-stuck   { background: var(--stf-attention); }
+
+.stf-netbar-text { text-wrap: pretty; }
+
+.stf-netbar-btn {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid rgb(255 255 255 / 0.5);
+  border-radius: var(--stf-radius-sm);
+  background: none;
+  font: 600 13px/1 var(--stf-font-sans);
+  color: var(--stf-white);
+  cursor: pointer;
+}
+.stf-netbar-btn:hover { background: rgb(255 255 255 / 0.12); }
+
+@media (min-width: 720px) {
+  .stf-netbar { padding: 10px 24px; font-size: 14px; }
+}
+
+
+/* ── Script 25 ─────────────────────────────────────────────────
+   Appended after 24's block. Same rule: no two scripts share an
+   anchor.
+
+   ── The undo strip ─────────────────────────────────────────────
+   Gold, not red. Red is the click colour in this design system and
+   the undo button is the only thing in the strip worth clicking, so
+   a red strip would put the emphasis on the wrong half. Gold is the
+   editorial accent, which is what "something just happened" is. */
+.stf-wl-undo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--stf-gold);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+}
+.stf-wl-undo-text {
+  font: 500 13px/1.4 var(--stf-font-sans);
+  color: var(--stf-text-sub);
+}
+.stf-wl-undo-btn {
+  flex: 0 0 auto;
+  min-height: var(--stf-tap);
+  padding: 0 16px;
+  border: 1px solid var(--stf-accent);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  font: 700 14px/1 var(--stf-font-sans);
+  color: var(--stf-accent);
+  cursor: pointer;
+}
+.stf-wl-undo-btn:hover { background: var(--stf-accent); color: var(--stf-white); }
+
+/* ── Unfinished work ───────────────────────────────────────────
+   On the manager-styled dashboard rather than a staff task page, so
+   this borrows the dashboard's card rather than the sand ground: the
+   same white, the same radius, the same hairline. The stf-* tokens
+   still supply the colours so it does not drift from the rest of the
+   staff work. */
+.stf-resume {
+  margin-top: 24px;
+  padding: 16px;
+  border: 1px solid rgb(43 51 54 / 0.06);
+  border-left: 3px solid var(--stf-gold);
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 4px 6px -1px rgb(43 51 54 / 0.08), 0 2px 4px -2px rgb(43 51 54 / 0.06);
+}
+.stf-resume-title {
+  margin: 0 0 10px;
+  font: 700 13px/1.3 "Montserrat", "Inter", system-ui, sans-serif;
+  color: #2b3336;
+}
+.stf-resume-list { list-style: none; margin: 0; padding: 0; }
+
+.stf-resume-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 0;
+}
+.stf-resume-row + .stf-resume-row { border-top: 1px dashed #ddd4c8; }
+
+.stf-resume-text { flex: 1 1 12rem; min-width: 0; display: flex; flex-direction: column; }
+.stf-resume-name { font: 600 15px/1.3 "Inter", system-ui, sans-serif; color: #2b3336; }
+.stf-resume-meta { font: 400 13px/1.4 "Inter", system-ui, sans-serif; color: #6f6a5e; }
+
+/* Scoped through the parent rather than the bare class: staff.css
+   line 85 is `.stf-shell a { color: var(--stf-accent) }`, which is
+   (0,1,1) and outranks a lone class. On a screen inside the staff
+   shell that painted this button red text on a red background —
+   invisible. Caught by rendering it, not by reading it. */
+.stf-resume .stf-resume-go {
+  flex: 0 0 auto;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 18px;
+  border-radius: 8px;
+  background: #ef3a40;
+  font: 700 14px/1 "Inter", system-ui, sans-serif;
+  color: #ffffff;
+  text-decoration: none;
+}
+.stf-resume .stf-resume-go:hover { background: #d42d33; color: #ffffff; }
+
+.stf-resume .stf-resume-drop {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  font: 500 13px/1 "Inter", system-ui, sans-serif;
+  color: #6f6a5e;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.stf-resume .stf-resume-drop:hover { color: #8a3227; }
+
+/* @sentinel script-45-staff-dark */
+/* ══════════════════════════════════════════════════════════════════
+   DARK (script 45)
+
+   staff.css funnels almost everything through the --stf-* block at the
+   top, so the whole floor-staff shell turns over in one override.
+   The dozen rules below it are the stragglers that hardcode a hex.
+
+   The floor shell has no toggle of its own — the control lives in the
+   manager top bar, by the same argument the header of this file makes
+   about a 390px screen. This is here so that a manager or admin who
+   has chosen dark and then opens a task flow gets one app, not two.
+   ══════════════════════════════════════════════════════════════════ */
+.dark {
+  --stf-ink:        #eceeee;
+  --stf-ink-deep:   #ffffff;
+  --stf-accent:     #ff5257;
+  --stf-accent-deep:#ff7377;
+  --stf-gold:       #b5ae82;
+  --stf-gold-deep:  #c6bf92;
+  --stf-sand:       #14191a;
+  --stf-border:     #384447;
+  --stf-text:       #c9cfd0;
+  --stf-text-sub:   #a8b0b2;
+  --stf-text-meta:  #8d9698;
+  --stf-white:      #1c2325;
+
+  --stf-attention:      #ff9b8a;
+  --stf-attention-ink:  #ffb3a4;
+  --stf-attention-bg:   #2e211c;
+  --stf-attention-border: #4a352c;
+}
+
+.dark .stf-resume            { background: var(--stf-white); }
+.dark .stf-resume-name       { color: var(--stf-ink); }
+.dark .stf-resume-meta,
+.dark .stf-resume .stf-resume-drop { color: var(--stf-text-sub); }
+.dark .stf-resume-row + .stf-resume-row { border-top-color: var(--stf-border); }
+.dark .stf-resume .stf-resume-go { background: var(--stf-accent); color: #1a0d0e; }
+.dark .stf-resume .stf-resume-go:hover { background: var(--stf-accent-deep); color: #1a0d0e; }
+.dark .stf-resume .stf-resume-drop:hover { color: var(--stf-attention); }

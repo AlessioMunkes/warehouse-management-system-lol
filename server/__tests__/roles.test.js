@@ -18,9 +18,8 @@ const deliveryServiceMock = {
   getDeliveryById:             vi.fn().mockResolvedValue({ id: 1 }),
   createDelivery:              vi.fn().mockResolvedValue({ id: 1 }),
   getSuppliers:                vi.fn(),
-  getDrivers:                  vi.fn(),
   getProducts:                 vi.fn(),
-  getPurchaseOrdersBySupplier: vi.fn(),
+  listOpenPurchaseOrders: vi.fn(),
   getPurchaseOrderItems:       vi.fn(),
 };
 
@@ -34,7 +33,6 @@ const signToken = (role) =>
 
 const validDeliveryBody = {
   supplierId:      1,
-  driverId:        1,
   deliveryDate:    '2026-07-18',
   purchaseOrderId: 1,
   signatureData:   'data:image/png;base64,xxx',
@@ -47,10 +45,11 @@ describe('Role-based access to /api/deliveries', () => {
   });
 
   it('returns 403 when a packer-level role tries to POST a delivery', async () => {
-    // The middleware's ROLES has no literal "packer" entry — ROLES.FINANCE is the
-    // closest match: read access to deliveries but no write access, hitting the
-    // same requireRole(...RECEIVERS_UP) rejection a packer role would hit.
-    const token = signToken(ROLES.FINANCE);
+    // The middleware's ROLES has no literal "packer" entry. 'finance' is
+    // a value users.role's CHECK does not permit, so a token carrying it
+    // hits exactly the requireRole(...RECEIVERS_UP) rejection a packer
+    // role would hit — which is the thing under test.
+    const token = signToken('finance');
     const res = await request(app)
       .post('/api/deliveries')
       .set('Cookie', [`wms_token=${token}`])

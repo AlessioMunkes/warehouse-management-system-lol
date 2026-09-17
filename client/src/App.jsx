@@ -1,57 +1,220 @@
 import { BrowserRouter, Routes, Route, Navigate }  from 'react-router-dom';
 import { AuthProvider }                            from './context/AuthContext';
+import ThemeProvider                               from './components/layout/ThemeProvider';
 import ProtectedRoute                              from './components/layout/ProtectedRoute';
-import { PACKING }                                 from './routes/paths';
+import { PACKING, STAFF, DONATIONS, DONATION_INTAKE_ROLES, ADMIN, VOLUNTEERS, VOLUNTEER_MANAGEMENT_ROLES, COMMUNITY_REQUEST_ROLES, STAFF_ROLES } from './routes/paths';
 import LandingPage                                 from './pages/LandingPage';
 import LoginPage                                   from './pages/LoginPage';
 import GuestLoginPage                              from './pages/GuestLoginPage';
 import GuestHomePage                               from './pages/GuestHomePage';
+import GuestPackPage                               from './pages/GuestPackPage';
+import GuestDonePage                               from './pages/GuestDonePage';
+import SlipPreviewPage                             from './pages/SlipPreviewPage';
+import PageNotFound                               from "./pages/PageNotFound";
+//import SelectNOCjob                                from './pages/SelectNOCjob';
 
-import SelectProgrammeScreen                       from './pages/SelectProgrammeScreen';
-import SelectNOCjob                                from './pages/SelectNOCjob';
-
-import ProcurementDashboard                        from './pages/ProcurementDashboard';
+import ProcurementPage                             from './pages/ProcurementPage';
+import StaffDeliveriesPage                         from './pages/StaffDeliveriesPage';
 import DecantingPage                               from './pages/DecantingPage';
-import PackingPage                                 from './pages/PackingPage';
+import StaffDecantingRecordsPage                   from './pages/StaffDecantingRecordsPage';
+import PackingSelectPage                           from './pages/PackingSelectPage';
+import DispatchPage                                from './pages/DispatchPage';
+import StaffDispatchHistoryPage                    from './pages/StaffDispatchHistoryPage';
+import ReceiptsPage                                from './pages/ReceiptsPage';
 import InventoryManagementPage                     from './pages/InventoryManagementPage';
+import ManagerDashboardPage                         from './pages/ManagerDashboardPage';
+import { ToastProvider }                             from './components/ui/toast';
+import StockLedgerPage                               from './pages/StockLedgerPage';
+import AdminActivityScreen                         from './pages/AdminActivityScreen';
+import TaskDashboard from './pages/TaskDashboardPage';
+import SupplierDirectoryPage                       from './pages/SupplierDirectoryPage';
+import PurchaseOrdersPage                          from './pages/PurchaseOrdersPage';
+import ReportingPage                               from './pages/ReportingPage';
+import DonationManagementPage                      from './pages/DonationManagementPage';
+import Section18AManagementPage                    from './pages/Section18AManagementPage';
+import BeneficiaryDirectoryPage                     from './pages/BeneficiaryDirectoryPage';
+import ImpactReportPage                             from './pages/ImpactReportPage';
+import PickingSlipManagementPage                    from './pages/PickingSlipManagementPage';
+import UserDirectoryPage                            from './pages/UserDirectoryPage';
+import VolunteerManagementPage                      from './pages/VolunteerManagementPage';
+import ProductManagementPage                        from './pages/ProductManagementPage';
+import VolunteerEventsPage                        from './pages/VolunteerEventsPage';
+import VolunteerEventWorkspacePage                from './pages/VolunteerEventWorkspacePage';
+import CommunityRequestsPage                       from './pages/CommunityRequestsPage';
+import GmailSettingsPage                           from './pages/GmailSettingsPage';
+import Section18AFormPage                         from './pages/Section18AFormPage';
+
+// Donations — new feature, own draft context scoped to just these
+// two routes (see features/donation/context/DonationDraftProvider.jsx)
+import { DonationDraftProvider }                   from './features/donation/context/DonationDraftProvider';
+import {DonationDetailsPage } from './pages/DonationDetailsPage';
+import { ReviewPage as DonationReviewPage }         from './pages/ReviewPage';
 
 const App = () => (
   <AuthProvider>
+    {/* Above the router: the setting outlives any one route, and the
+        login screen is as entitled to it as the dashboard. */}
+    <ThemeProvider>
     <BrowserRouter>
+      <ToastProvider>
       <Routes>
         {/* Public */}
         <Route path="/"      element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/guest" element={<GuestLoginPage />} />
-
-        {/* Protected — any logged-in user */}
-        <Route element={<ProtectedRoute />}>
-          <Route path="/programmes" element={<SelectProgrammeScreen />} />
-
-          {/* NOC: task select, then one route per task */}
-          <Route path="/noc"             element={<SelectNOCjob />} />
-          <Route path="/noc/procurement" element={<ProcurementDashboard />} />
-          <Route path="/noc/decanting"   element={<DecantingPage />} />
-
-          {/* Both packing paths come from routes/paths.js, which is
-              also what PackingPage navigates with — the board and the
-              route table can't drift apart again. */}
-          <Route path={PACKING.board}         element={<PackingPage />} />
-          <Route path={PACKING.detailPattern} element={<PackingPage />} />
-
-          <Route path="/noc/inventory"   element={<InventoryManagementPage />} />
+        <Route path="/section-18a/:token" element={<Section18AFormPage />} />
+        {/* BR-22: the stable public URL behind every pallet's QR code.
+            Deliberately OUTSIDE ProtectedRoute — the whole point is that
+            a volunteer holding a printed poster reaches it with no
+            account and no session. The preview it shows carries only
+            what is already printed on that poster. */}
+        <Route path="/slip/:token" element={<SlipPreviewPage />} />
+         
+        
+        {/* ── Admin only ─────────────────────────────────────
+            Account provisioning and supplier master data — not
+            reachable by managers, per explicit product decision this
+            session (Products moved out of this block below; Users
+            and Suppliers stay here). */}
+        <Route element={<ProtectedRoute roles={['admin']} shell />}>
+          <Route path={ADMIN.dashboard} element={<AdminActivityScreen />} />
+          <Route path={ADMIN.suppliers} element={<SupplierDirectoryPage />} />
+          {/* Admin only, matching product.routes.js. A manager reaching
+              this by URL used to get a working editor for rows the
+              server would now refuse to change. */}
+          <Route path={ADMIN.products}  element={<ProductManagementPage />} />
+          <Route path={ADMIN.donationManagement} element={<DonationManagementPage />} />
+          <Route path={ADMIN.section18aManagement} element={<Section18AManagementPage />} />
+          {/* Account provisioning. Every route in user.routes.js is
+              requireRole(ADMIN), so this was unreachable while it sat in
+              a manager-only block — the client gate now matches the
+              server instead of contradicting it. */}
+          <Route path={ADMIN.users} element={<UserDirectoryPage />} />
+          {/* Gmail integration for donation thank-you emails. The page's
+              server routes are requireRole(ADMIN), so it sits in this
+              admin-only block rather than the manager/admin one. */}
+          <Route path={ADMIN.emailIntegration} element={<GmailSettingsPage />} />
+          {/* The guest log. Admin-only on purpose: GET /api/volunteers
+              is requireRole(MANAGER, ADMIN), so a manager is not
+              refused by the server — but the manager's volunteer
+              screen is the event workflow at /volunteers, and giving
+              one role two volunteer screens is how these two got
+              confused in the first place. */}
+          <Route path={ADMIN.volunteerLog} element={<VolunteerManagementPage />} />
         </Route>
 
-        {/* ── Guest-only ────────────────────────────────────── */}
+        {/* Protected — manager and admin.
+            roles={['manager']} alone silently excluded admin here —
+            ProtectedRoute's role check is a strict allowlist with no
+            admin-bypass, so an admin account could not reach any of
+            these even though every one of their server routes is
+            requireRole(MANAGER, ADMIN). Fixed by listing both. */}
+        {/* 'admin' added: ProtectedRoute has no admin special case, so
+            roles={['manager']} was locking admins out of the manager screen,
+            inventory, reporting and purchase orders — while the server has
+            always treated MANAGERS_UP as [MANAGER, ADMIN]. The two now agree. */}
+        <Route element={<ProtectedRoute roles={['manager', 'admin']} shell />}>
+          <Route path="/manager"       element={<ManagerDashboardPage />} />
+        <Route path="/noc/inventory" element={<InventoryManagementPage />} />
+          {/* The warehouse-wide ledger. Manager/admin only, matching
+              requireRole(MANAGERS_UP) on all three /api/stock/ledger
+              routes — warehouse staff reach movement history through
+              the per-product drawer on the inventory screen. */}
+          <Route path={STAFF.stockLedger} element={<StockLedgerPage />} />
+          <Route path={STAFF.reporting} element={<ReportingPage />} />
+          <Route path={STAFF.impactReport} element={<ImpactReportPage />} />
+          <Route path={STAFF.purchaseOrders} element={<PurchaseOrdersPage />} />
+          {/* Past delivery notes and dispatch notes. Manager and admin only —
+              the server endpoints are gated to the same pair, so the two
+              cannot drift into a UI that hides a route anyone can still call. */}
+          <Route path={STAFF.receipts} element={<ReceiptsPage />} />
+          <Route path={STAFF.beneficiaries} element={<BeneficiaryDirectoryPage />} />
+          <Route path={STAFF.pickingSlips} element={<PickingSlipManagementPage />} />
+        </Route>
+
+        {/* The warehouse worker's dashboard. Split out of the block
+            below so it can take the shell: the four flows underneath it
+            are StaffShell screens and must not. */}
+        <Route element={<ProtectedRoute roles={STAFF_ROLES} shell />}>
+          <Route path="/noc" element={<TaskDashboard />} />
+        </Route>
+
+        {/* Protected — warehouse floor staff.
+            Was `<ProtectedRoute />` with no roles. ProtectedRoute skips its
+            role check when `roles` is undefined, so "any logged-in user"
+            included a signed-in guest, who could render packing, decanting,
+            procurement and dispatch by typing the URL. Scoped to STAFF_ROLES
+            so the client agrees with the server, which already refuses a
+            guest on every one of these endpoints. */}
+        <Route element={<ProtectedRoute roles={STAFF_ROLES} />}>
+          <Route path="/noc/decanting" element={<DecantingPage />} />
+          <Route path={STAFF.decantingRecords} element={<StaffDecantingRecordsPage />} />
+
+          {/* One URL per task, shared by managers and workers alike —
+              each page picks manager view vs. staff flow by role
+              internally (see ProcurementPage.jsx / PackingSelectPage.jsx
+              / DecantingPage.jsx). */}
+          <Route path={STAFF.receiving}       element={<ProcurementPage />} />
+          <Route path={STAFF.deliveries}      element={<StaffDeliveriesPage />} />
+          <Route path={PACKING.board}         element={<PackingSelectPage />} />
+          <Route path={PACKING.detailPattern} element={<PackingSelectPage />} />
+          <Route path={STAFF.dispatch}        element={<DispatchPage />} />
+          <Route path={STAFF.dispatchHistory} element={<StaffDispatchHistoryPage />} />
+          {/* Receipts lives in the manager block above — a worker who typed
+              the URL would otherwise reach it, tile or no tile. */}
+        </Route>
+
+        {/* Protected — donation intake, RECEIVERS_UP only.
+            Mirrors POST /api/donations in server/src/routes/donation.routes.js,
+            which is auth + requireRole(WORKER, MANAGER, ADMIN). Finance can
+            read the money side but does not intake stock, so it is excluded
+            here exactly as it is there — the client gate is a UX courtesy,
+            the server route is the actual control.
+
+            The draft context is mounted per-route rather than around the
+            block so the sessionStorage draft is scoped to the two intake
+            pages and cleared by navigating away from them. */}
+        <Route element={<ProtectedRoute roles={DONATION_INTAKE_ROLES} shell />}>
+          <Route
+            path={STAFF.donation}
+            element={
+              <DonationDraftProvider>
+                <DonationDetailsPage />
+              </DonationDraftProvider>
+            }
+          />
+          <Route
+            path={DONATIONS.review}
+            element={
+              <DonationDraftProvider>
+                <DonationReviewPage />
+              </DonationDraftProvider>
+            }
+          />
+        </Route>
+
+        {/* Volunteer Management — current coordinator workflow is available
+            to the two live management roles only. */}
+        <Route element={<ProtectedRoute roles={VOLUNTEER_MANAGEMENT_ROLES} shell />}>
+          <Route path={VOLUNTEERS.events} element={<VolunteerEventsPage />} />
+          <Route path={VOLUNTEERS.eventPattern} element={<VolunteerEventWorkspacePage />} />
+        </Route>
+
+        {/* Benevolent package request log (ADM-5.0 / BR-28). Warehouse
+            staff and up, mirroring STAFF_UP on every
+            /api/community-requests route. Log only — no stock movement. */}
+        <Route element={<ProtectedRoute roles={COMMUNITY_REQUEST_ROLES} shell />}>
+          <Route path={STAFF.communityRequests} element={<CommunityRequestsPage />} />
+        </Route>
+
+        {/* Guest-only — the Love Activist screens. */}
         <Route element={<ProtectedRoute roles={['guest']} />}>
-          <Route path="/guest-home" element={<GuestHomePage />} />
+          <Route path="/guest-home"  element={<GuestHomePage />} />
+          <Route path="/guest/pack"  element={<GuestPackPage />} />
+          <Route path="/guest/done"  element={<GuestDonePage />} />
         </Route>
 
-        {/* ── Redirects ─────────────────────────────────────── */}
-        {/* Old paths kept working so existing links don't break.
-            The packing pair covers the deep link too — without
-            :slipId, an old bookmark to a specific pallet would hit
-            the catch-all instead of the slip. */}
+        {/* Redirects */}
         <Route path="/inventory" element={<Navigate to="/noc/inventory" replace />} />
         <Route path="/decanting" element={<Navigate to="/noc/decanting" replace />} />
         <Route path="/programmes/noc/packing"
@@ -59,17 +222,12 @@ const App = () => (
         <Route path="/programmes/noc/packing/:slipId"
                element={<Navigate to={PACKING.board} replace />} />
 
-        {/* Catch-all. There used to be two of these plus a second "/"
-            route; React Router picks one by ranking, so the others
-            were dead code that read as if they did something.
-            Unknown paths go to the landing page, which is the front
-            door for staff, volunteers and visitors alike (warehouse
-            visit §6.1) and carries the login button — sending them to
-            /login instead made a typo'd URL look like a session error.
-            TODO: replace with a real 404 page. */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* Catch-all */}
+        <Route path="*" element={<PageNotFound />} />
       </Routes>
+      </ToastProvider>
     </BrowserRouter>
+    </ThemeProvider>
   </AuthProvider>
 );
 

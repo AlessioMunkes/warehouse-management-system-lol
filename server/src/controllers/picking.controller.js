@@ -167,6 +167,24 @@ const completeSlip = async (req, res) => {
   }
 };
 
+// ── Assignable workers ────────────────────────────────────────
+// GET /api/picking/workers
+// Returns: active warehouse_worker accounts (id + name only), for
+// AssignPickingSlipsPage.jsx's dropdown.
+const getAssignableWorkers = async (req, res) => {
+  try {
+    const workers = await pickingService.getAssignableWorkers(req.user);
+    res.status(200).json({ success: true, data: workers });
+  } catch (err) {
+    console.error('[getAssignableWorkers]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to retrieve assignable workers.',
+    });
+  }
+};
+
 export default {
   getSlips,
   getSlipById,
@@ -176,4 +194,5 @@ export default {
   confirmItem,
   flagItem,
   completeSlip,
+  getAssignableWorkers,
 };

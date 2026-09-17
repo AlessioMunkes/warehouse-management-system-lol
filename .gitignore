@@ -1,1 +1,14 @@
 .DS_Store
+node_modules/
+dist/
+build/
+coverage/
+
+# Local env. .env itself is intentionally NOT ignored-by-pattern here —
+# if you add one, add it explicitly.
+.env.local
+.env*.local
+
+# Logs
+*.log
+output*.log

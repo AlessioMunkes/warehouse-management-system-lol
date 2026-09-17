@@ -1,11 +1,12 @@
 // src/components/TaskNavGrid.jsx
 import { useNavigate, useLocation } from 'react-router-dom';
+import { STAFF, PACKING } from '../../../routes/paths';
 
 const NOC_TASKS = [
-  { label: 'Procurement', icon: 'truck', path: '/noc/procurement' },
-  { label: 'Decanting', icon: 'flask', path: '/decanting' },
-  { label: 'Packing', icon: 'package', path: '/programmes/noc/packing' },
-  { label: 'ECD collections', icon: 'heart-handshake', path: '/programmes/noc/ecd' },
+  { label: 'Procurement', icon: 'truck', path: STAFF.receiving },
+  { label: 'Decanting', icon: 'flask', path: STAFF.decanting },
+  { label: 'Packing', icon: 'package', path: PACKING.board },
+  { label: 'Dispatch', icon: 'heart-handshake', path: STAFF.dispatch },
 ];
 
 // Matches if either path fully contains the other's last meaningful

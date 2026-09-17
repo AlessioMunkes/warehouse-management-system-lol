@@ -3,9 +3,28 @@
 //
 // All SQL for the picking module.
 // No business logic here — only database queries.
+//
+// STOCK TIMING (changed — read this before editing completeSlip)
+// This module NO LONGER writes to stock_levels or stock_movements.
+// Stock is deducted at the dispatch gate, against what was actually
+// loaded into the vehicle, in dispatch.repository.collect().
+//
+// The old behaviour deducted at completeSlip. It kept slip state and
+// stock in one transaction, but it meant quantity_on_hand went
+// negative for food that was still standing on a pallet in the
+// staging area, and every uncollected pallet left a permanent
+// overstatement that Friday's count had to absorb.
+//
+// Packing now only READS stock, to warn the packer that the shelf may
+// not hold what the slip is asking for. That read is a flag, never a
+// block — see the note on completeSlip below.
+//
+// The `stockModel` import is deliberately gone. If you find yourself
+// adding it back, you are about to double-deduct.
 // ─────────────────────────────────────────────────────────────
-import pool       from '../config/db.js';
-import stockModel from './stock.repository.js';
+import pool                  from '../config/db.js';
+import { committedStockSql } from './committedStock.sql.js';
+import { createNotification } from './notification.repository.js';
 
 // ── Audit helper (used inside existing transactions) ──────────
 const logEvent = async (client, slipId, eventType, actorId, detail = null) => {
@@ -15,6 +34,52 @@ const logEvent = async (client, slipId, eventType, actorId, detail = null) => {
     [slipId, eventType, actorId, detail]
   );
 };
+
+// ── Who is acting: staff or a guest ───────────────────────────
+// Staff are `users` rows; guests are `volunteers` rows. Two id spaces
+// that overlap, on one cookie, distinguished only by role — so the
+// actor has to carry its own type rather than being inferred from a
+// bare number.
+//
+// { type: 'user' | 'volunteer', id }
+//
+// Callers that pass the old `actorId` keep working unchanged: they are
+// staff by definition, because until guests existed there was nothing
+// else to be.
+const asActor = (actor, actorId) => actor ?? { type: 'user', id: actorId };
+const isVolunteer = (actor) => actor.type === 'volunteer';
+
+// NEVER write a volunteer id into actor_id / confirmed_by / completed_by.
+//
+// All three are int4 with a FOREIGN KEY to users(id), and volunteers.id
+// is int8. The FK does not protect us here — it ACCEPTS the write
+// whenever the number happens to exist in users, and the ranges overlap
+// badly: users run 1-346, volunteers run 1-7, and 6 of the 7 current
+// volunteers collide with a real staff account. Volunteer 1 is users
+// row 1, which is admin001. A guest packing a pallet would be recorded,
+// permanently and plausibly, as the administrator.
+//
+// So a guest's actor column is NULL and the attribution goes in the
+// jsonb detail instead, where there is no type to collide with. If you
+// are tempted to "fix" this by casting, read the FK first.
+const actorUserId = (actor) => (isVolunteer(actor) ? null : actor.id);
+
+const actorDetail = (actor, detail = null) =>
+  (isVolunteer(actor)
+    ? { ...(detail ?? {}), actor_type: 'volunteer', volunteer_id: actor.id }
+    : detail);
+
+// node-postgres hands back int8 as a STRING and int4 as a number, so a
+// volunteer id off the JWT is '7' while a slip id is 7. Comparing those
+// with !== is always true, which would forbid every guest write with no
+// visible reason. Compare as text.
+const sameId = (a, b) => a !== null && a !== undefined && b !== null && b !== undefined && String(a) === String(b);
+
+// The owner of a slip depends on who is asking: staff hold it through
+// assigned_to, guests through assigned_volunteer_id. Two columns, never
+// interchangeable.
+const slipOwnerFor = (actor, slip) =>
+  (isVolunteer(actor) ? slip.assigned_volunteer_id : slip.assigned_to);
 
 // ── Rotation anchor ────────────────────────────────────────────
 // The Monday of a known 'week1' week — the service layer uses this
@@ -47,6 +112,16 @@ const getSlips = async ({ dispatchDate, cohort, status, assignedTo }) => {
     `SELECT
        ps.id,
        ps.dispatch_date,
+       -- The calendar day as text, for anything that must PRINT the
+       -- date rather than compute with it. ps.dispatch_date itself is a
+       -- Date by the time node-postgres is done with it, and JSON
+       -- serialises that as the previous day in UTC — the defect that
+       -- has already reached a volunteer's screen twice. Additive: the
+       -- existing column is untouched for existing callers.
+       ps.dispatch_date::text AS dispatch_date_iso,
+       -- BR-22. The stable per-slip token behind the printed QR label.
+       -- Read-only here; nothing in the app ever writes it.
+       ps.public_token,
        ps.cohort,
        ps.pallet_ref,
        ps.status,
@@ -152,9 +227,11 @@ const generateSlips = async ({ dispatchDate, cohort, generatedBy }) => {
         `INSERT INTO picking_slip_items (picking_slip_id, product_id, required_quantity, unit)
          SELECT $1, ol.product_id, ol.quantity, ol.unit
          FROM ecd_order_lines ol
+         JOIN products p ON p.id = ol.product_id
          WHERE ol.ecd_id = $2
            AND ol.effective_from <= $3::date
            AND (ol.effective_to IS NULL OR ol.effective_to >= $3::date)
+           AND p.archived_at IS NULL
          RETURNING id`,
         [slip.id, slip.ecd_id, dispatchDate]
       );
@@ -168,6 +245,16 @@ const generateSlips = async ({ dispatchDate, cohort, generatedBy }) => {
         emptySlips.push({ slipId: slip.id, ecdId: slip.ecd_id });
         await logEvent(client, slip.id, 'no_order_lines', generatedBy, { dispatch_date: dispatchDate });
       }
+    }
+
+    if (slips.rowCount > 0) {
+      await createNotification(client, {
+        type:  'picking_slips_generated',
+        title: `${slips.rowCount} picking slip${slips.rowCount === 1 ? '' : 's'} generated`,
+        body:  `${cohort}, ${dispatchDate}` +
+          (emptySlips.length ? ` — ${emptySlips.length} with no lines to check.` : '.'),
+        entityType: 'picking_slip_run',
+      });
     }
 
     await client.query('COMMIT');
@@ -191,7 +278,7 @@ const createSlip = async ({ ecdId, dispatchDate, cohort, generatedBy }) => {
     await client.query('BEGIN');
 
     const ecdCheck = await client.query(
-      `SELECT id FROM ecd_centres WHERE id = $1 AND is_active = TRUE AND approved_at IS NOT NULL`,
+      `SELECT id, name FROM ecd_centres WHERE id = $1 AND is_active = TRUE AND approved_at IS NOT NULL`,
       [ecdId]
     );
     if (!ecdCheck.rows[0]) { await client.query('ROLLBACK'); return { ecdNotFound: true }; }
@@ -212,9 +299,11 @@ const createSlip = async ({ ecdId, dispatchDate, cohort, generatedBy }) => {
       `INSERT INTO picking_slip_items (picking_slip_id, product_id, required_quantity, unit)
        SELECT $1, ol.product_id, ol.quantity, ol.unit
        FROM ecd_order_lines ol
+       JOIN products p ON p.id = ol.product_id
        WHERE ol.ecd_id = $2
          AND ol.effective_from <= $3::date
          AND (ol.effective_to IS NULL OR ol.effective_to >= $3::date)
+         AND p.archived_at IS NULL
        RETURNING id`,
       [slipId, ecdId, dispatchDate]
     );
@@ -228,6 +317,14 @@ const createSlip = async ({ ecdId, dispatchDate, cohort, generatedBy }) => {
       await logEvent(client, slipId, 'no_order_lines', generatedBy, { dispatch_date: dispatchDate });
     }
 
+    await createNotification(client, {
+      type:       'picking_slip_created',
+      title:      `Ad-hoc picking slip created for ${ecdCheck.rows[0].name}`,
+      body:       `${dispatchDate}${itemsResult.rowCount === 0 ? ' — no lines to check.' : '.'}`,
+      entityType: 'picking_slip',
+      entityId:   slipId,
+    });
+
     await client.query('COMMIT');
     return { slipId, itemCount: itemsResult.rowCount };
 
@@ -239,10 +336,41 @@ const createSlip = async ({ ecdId, dispatchDate, cohort, generatedBy }) => {
   }
 };
 
+// ── Which statuses can still be claimed ───────────────────────
+// A pallet is claimable while it is being built and no longer after
+// packing has closed it off. Kept next to assignSlip rather than in
+// the service because, like every other guard in this file, it has to
+// be evaluated INSIDE the row lock — a check in the service can be
+// overtaken between the read and the write.
+const CLAIMABLE_STATUSES = ['pending', 'in_progress'];
+
 // ── Claim a slip ──────────────────────────────────────────────
 // FOR UPDATE prevents two packers claiming the same pallet.
-// Returns null if someone else already holds it.
-const assignSlip = async ({ slipId, packerId, actorId }) => {
+//
+// TWO guards, and they are different things.
+//
+// STATUS. The UPDATE below sets status = 'in_progress'
+// unconditionally, so without a status guard claiming an already
+// CLOSED pallet silently reopened it. The damage from that is not
+// obvious: a reopened slip drops out of the dispatch board (which
+// filters on status IN ('complete','dispatched')) and out of
+// committedStockSql (which requires status = 'complete'), so a pallet
+// physically standing in the staging area stops being counted as
+// committed and its stock reads as available to the next packer. The
+// pallet also becomes editable again through setItemStatus, which
+// guards 'complete'/'dispatched' but has no say over how the slip got
+// back to 'in_progress'. Nobody may claim a closed pallet — not even
+// a manager. Reopening one is a deliberate act that deserves its own
+// endpoint, not a side effect of tapping Claim.
+//
+// OWNERSHIP. Taking a pallet off another packer is a legitimate thing
+// for a manager to do — a shift ends, someone goes home sick — and
+// picking.service.js has always documented it as supported. It was
+// not: canOverride did not exist here, so the conflict branch fired
+// for managers too and reassignment was impossible through the API.
+// canOverride now covers ownership only; the status guard above
+// applies to everybody.
+const assignSlip = async ({ slipId, packerId, actorId, canOverride = false }) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -253,9 +381,20 @@ const assignSlip = async ({ slipId, packerId, actorId }) => {
     );
     const slip = current.rows[0];
     if (!slip) { await client.query('ROLLBACK'); return { notFound: true }; }
-    if (slip.assigned_to && slip.assigned_to !== packerId) {
+
+    if (!CLAIMABLE_STATUSES.includes(slip.status)) {
       await client.query('ROLLBACK');
-      return { conflict: true };
+      return { locked: true, status: slip.status };
+    }
+
+    // Re-claiming a pallet you already hold is not a reassignment —
+    // it is a packer tapping the same button twice, and it succeeds
+    // quietly.
+    const isReassignment = Boolean(slip.assigned_to) && slip.assigned_to !== packerId;
+
+    if (isReassignment && !canOverride) {
+      await client.query('ROLLBACK');
+      return { conflict: true, assignedTo: slip.assigned_to };
     }
 
     const result = await client.query(
@@ -268,9 +407,22 @@ const assignSlip = async ({ slipId, packerId, actorId }) => {
       [packerId, slipId]
     );
 
-    await logEvent(client, slipId, 'assigned', actorId, { packer_id: packerId });
+    // A reassignment is recorded as an 'assigned' event carrying the
+    // previous holder in its detail, NOT as a new 'reassigned' event
+    // type. picking_events.event_type is constrained in the database,
+    // and a label the constraint has never seen would roll the whole
+    // transaction back at the one moment a manager is trying to
+    // unblock a stalled pallet. The detail column is JSONB and takes
+    // whatever it is given.
+    await logEvent(client, slipId, 'assigned', actorId, {
+      packer_id: packerId,
+      ...(isReassignment
+        ? { reassigned_from: slip.assigned_to, previous_status: slip.status }
+        : {}),
+    });
+
     await client.query('COMMIT');
-    return { slip: result.rows[0] };
+    return { slip: result.rows[0], reassignedFrom: isReassignment ? slip.assigned_to : null };
 
   } catch (err) {
     await client.query('ROLLBACK');
@@ -289,24 +441,34 @@ const assignSlip = async ({ slipId, packerId, actorId }) => {
 // so the board and the slip can show it. Silently accepting a
 // mismatched confirm is how a short pallet reaches the gate looking
 // complete.
-const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReason, actorId, canOverride = false }) => {
+const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReason, actorId, actor, canOverride = false }) => {
+  const who = asActor(actor, actorId);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
     const slipResult = await client.query(
-      `SELECT id, status, assigned_to FROM picking_slips WHERE id = $1 FOR UPDATE`,
+      `SELECT id, status, assigned_to, assigned_volunteer_id FROM picking_slips WHERE id = $1 FOR UPDATE`,
       [slipId]
     );
     const slip = slipResult.rows[0];
-    if (!slip)                     { await client.query('ROLLBACK'); return { notFound: true }; }
-    if (slip.status === 'complete'){ await client.query('ROLLBACK'); return { locked: true }; }
+    if (!slip) { await client.query('ROLLBACK'); return { notFound: true }; }
+
+    // 'dispatched' is included alongside 'complete': once the pallet
+    // has physically left the gate, editing the line it was built from
+    // would rewrite history the dispatch note was printed against.
+    if (slip.status === 'complete' || slip.status === 'dispatched') {
+      await client.query('ROLLBACK');
+      return { locked: true };
+    }
 
     // ── Authorisation, inside the lock and BEFORE the write ──
     // Doing this here (rather than after setItemStatus returns) means a
     // refused packer cannot mutate the row at all. The FOR UPDATE above
     // also closes the race where a slip is reassigned mid-check.
-    if (!canOverride && slip.assigned_to !== actorId) {
+    // A guest is measured against assigned_volunteer_id, staff against
+    // assigned_to. The staff rule is unchanged.
+    if (!canOverride && !sameId(slipOwnerFor(who, slip), who.id)) {
       await client.query('ROLLBACK');
       return { forbidden: true, assignedTo: slip.assigned_to };
     }
@@ -320,7 +482,8 @@ const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReaso
            confirmed_at    = NOW()
        WHERE id = $5 AND picking_slip_id = $6
        RETURNING *, (packed_quantity - required_quantity) AS quantity_variance`,
-      [status, packedQuantity ?? null, flagReason ?? null, actorId, itemId, slipId]
+      // confirmed_by is NULL for a guest — see actorUserId above.
+      [status, packedQuantity ?? null, flagReason ?? null, actorUserId(who), itemId, slipId]
     );
 
     if (!result.rows[0]) { await client.query('ROLLBACK'); return { notFound: true }; }
@@ -339,15 +502,17 @@ const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReaso
       ? { required, packed, difference: Number(rawVariance) }
       : null;
 
+    // Same event vocabulary for guests as for staff. A guest_* event type
+    // would drop every guest action out of the existing reporting queries.
     await logEvent(
       client, slipId,
       status === 'flagged' ? 'item_flagged' : 'item_confirmed',
-      actorId,
-      { item_id: itemId, required_quantity: required, packed_quantity: packedQuantity, flag_reason: flagReason }
+      actorUserId(who),
+      actorDetail(who, { item_id: itemId, required_quantity: required, packed_quantity: packedQuantity, flag_reason: flagReason })
     );
 
     if (variance) {
-      await logEvent(client, slipId, 'item_variance', actorId, { item_id: itemId, ...variance });
+      await logEvent(client, slipId, 'item_variance', actorUserId(who), actorDetail(who, { item_id: itemId, ...variance }));
     }
 
     await client.query('COMMIT');
@@ -365,48 +530,55 @@ const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReaso
 // The core rule: cannot complete while any line is still 'pending'.
 // Enforced inside the transaction, not in JS, so a race can't slip past it.
 //
-// Stock is deducted here, in the same transaction as the completion
-// write, so slip state and stock can never diverge. If a packed
-// quantity exceeds recorded stock, completion still succeeds — ECDs
-// can't go without food because a system count is off — but the
-// shortfall is logged as its own audit event and returned to the
-// caller so the UI can surface it as a warning for a manager to
-// reconcile via the manual adjustment screen.
+// STOCK IS NOT DEDUCTED HERE ANY MORE.
 //
-// Flagged lines are deducted too, whenever the packer recorded a
-// quantity. A flag usually means "short quantity — I packed 10 of the
-// 20", and those 10 physically leave the warehouse; deducting only
-// 'confirmed' lines silently overstated stock on every partial pack.
-// A flagged line with no recorded quantity (the packer didn't know)
-// is skipped — there is nothing to deduct.
+// It used to be. The reasoning then was that slip state and stock
+// should commit together, which is true as far as it goes — but it
+// forced quantity_on_hand to mean "on hand, minus anything anyone has
+// packed", which is not a number anybody can count. A packed pallet
+// stands in the staging area for one to two days, and roughly one in
+// ten is never collected, so the ledger drifted below the shelf every
+// single week and Friday's count spent its time reconciling the
+// difference. Deduction now happens at the gate against what was
+// actually loaded into the vehicle (dispatch.repository.collect), so
+// quantity_on_hand means exactly what the counters count.
 //
-// NOTE ON TIMING: stock leaves the ledger when the pallet is packed,
-// not when it is collected. The pallet is physically still on the
-// floor until the ECD driver arrives, and non-collections are common,
-// so an uncollected pallet leaves a standing negative in the ledger
-// against food that is still in the building. Every movement written
-// here carries reference_type 'picking_slip' + reference_id, so the
-// dispatch module can post a compensating movement when a pallet goes
-// uncollected. That reversal belongs in the dispatch module and is
-// not implemented yet — until it is, Friday's count will show a
-// positive variance for every uncollected pallet.
-const completeSlip = async ({ slipId, palletRef, actorId, canOverride = false }) => {
+// What this function does instead is READ availability and warn.
+// available = quantity_on_hand - committed, where committed is every
+// other packed-but-not-yet-dispatched pallet (committedStock.sql.js).
+// If this pallet's packed quantities exceed that, the packer and the
+// manager are told — but completion still succeeds. An ECD never goes
+// without food because a system count is off. Same rule as before,
+// same `shortfalls` shape on the response; only the meaning has
+// tightened, from "the ledger just went negative" to "the shelf may
+// not hold this".
+//
+// Because nothing is written to stock here, this transaction no
+// longer needs product_id-ordered row locks. Keep the ORDER BY on the
+// read anyway — a stable order makes the warning list reproducible
+// between runs, and it keeps this query shaped like the one in
+// dispatch.repository.collect() that does still lock.
+const completeSlip = async ({ slipId, palletRef, actorId, actor, canOverride = false }) => {
+  const who = asActor(actor, actorId);
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
     const slipResult = await client.query(
-      `SELECT id, status, assigned_to FROM picking_slips WHERE id = $1 FOR UPDATE`,
+      `SELECT id, status, assigned_to, assigned_volunteer_id FROM picking_slips WHERE id = $1 FOR UPDATE`,
       [slipId]
     );
     const slip = slipResult.rows[0];
-    if (!slip)                      { await client.query('ROLLBACK'); return { notFound: true }; }
-    if (slip.status === 'complete') { await client.query('ROLLBACK'); return { alreadyComplete: true }; }
+    if (!slip) { await client.query('ROLLBACK'); return { notFound: true }; }
+    if (slip.status === 'complete' || slip.status === 'dispatched') {
+      await client.query('ROLLBACK');
+      return { alreadyComplete: true };
+    }
 
-    // Same ownership rule as confirm/flag. Closing a pallet is the
-    // write that moves stock, so it can't be looser than the writes
-    // that lead up to it.
-    if (!canOverride && slip.assigned_to !== actorId) {
+    // Same ownership rule as confirm/flag. Closing a pallet is what
+    // makes it eligible for the gate, so it can't be looser than the
+    // writes that lead up to it.
+    if (!canOverride && !sameId(slipOwnerFor(who, slip), who.id)) {
       await client.query('ROLLBACK');
       return { forbidden: true, assignedTo: slip.assigned_to };
     }
@@ -422,43 +594,82 @@ const completeSlip = async ({ slipId, palletRef, actorId, canOverride = false })
       return { pendingItems: pending.rows[0].n };
     }
 
-    // Deduct packed quantities from stock in THIS transaction, so
-    // stock and slip state can never diverge. Locked in product_id
-    // order — matches the lock order any other caller of adjustStock
-    // (e.g. procurement) should also use, so two transactions touching
-    // the same two products can never deadlock against each other.
-    const packedItems = await client.query(
-      `SELECT product_id, packed_quantity, unit, status
-       FROM picking_slip_items
-       WHERE picking_slip_id = $1
-         AND status IN ('confirmed', 'flagged')
-         AND packed_quantity IS NOT NULL
-         AND packed_quantity > 0
-       ORDER BY product_id ASC`,
+    // ── Availability check (read-only) ──────────────────────────
+    // Totals are summed and compared by Postgres in NUMERIC. Summing
+    // packed_quantity across lines in JS is how DEFECT F got in; the
+    // comparison is done in SQL for the same reason.
+    //
+    // Lines for one product in different units are summed together,
+    // which is what the old adjustStock loop effectively did too (the
+    // ledger's established unit won). Any line whose unit differs from
+    // the ledger's is reported in unitMismatches so a human can decide
+    // which of the two is wrong.
+    //
+    // The exclusion of this slip from `committed` is belt-and-braces:
+    // its status is still 'in_progress' at this point so it would be
+    // excluded anyway, but that is an ordering coincidence, and
+    // ordering coincidences do not survive refactors.
+    const availability = await client.query(
+      `WITH packed AS (
+         SELECT
+           psi.product_id,
+           SUM(psi.packed_quantity)::numeric  AS packed_quantity,
+           ARRAY_AGG(DISTINCT psi.unit)       AS units
+         FROM picking_slip_items psi
+         WHERE psi.picking_slip_id = $1
+           AND psi.status IN ('confirmed', 'flagged')
+           AND psi.packed_quantity IS NOT NULL
+           AND psi.packed_quantity > 0
+         GROUP BY psi.product_id
+       )
+       SELECT
+         packed.product_id,
+         packed.packed_quantity,
+         packed.units,
+         p.name                                            AS product_name,
+         COALESCE(sl.quantity_on_hand, 0)::numeric         AS quantity_on_hand,
+         sl.unit                                           AS ledger_unit,
+         COALESCE(c.committed, 0)::numeric                 AS committed,
+         (COALESCE(sl.quantity_on_hand, 0) - COALESCE(c.committed, 0))::numeric AS available,
+         (packed.packed_quantity >
+            (COALESCE(sl.quantity_on_hand, 0) - COALESCE(c.committed, 0)))      AS is_shortfall
+       FROM packed
+       JOIN products p ON p.id = packed.product_id
+       LEFT JOIN stock_levels sl ON sl.product_id = packed.product_id
+       LEFT JOIN (${committedStockSql({ excludeSlipParam: '$1' })}) c
+              ON c.product_id = packed.product_id
+       ORDER BY packed.product_id ASC`,
       [slipId]
     );
 
-    const shortfalls    = [];
+    const shortfalls     = [];
     const unitMismatches = [];
-    for (const item of packedItems.rows) {
-      const { before, after, isShortfall, isUnitMismatch } = await stockModel.adjustStock(client, {
-        productId:     item.product_id,
-        quantityDelta: -item.packed_quantity,
-        unit:          item.unit,
-        movementType:  'picked',
-        referenceType: 'picking_slip',
-        referenceId:   slipId,
-        performedBy:   actorId,
-      });
-      if (isShortfall) {
-        shortfalls.push({ productId: item.product_id, onHand: before, required: Number(item.packed_quantity), after });
+
+    for (const row of availability.rows) {
+      if (row.is_shortfall) {
+        shortfalls.push({
+          productId:   row.product_id,
+          productName: row.product_name,
+          onHand:      Number(row.quantity_on_hand),
+          committed:   Number(row.committed),
+          available:   Number(row.available),
+          packed:      Number(row.packed_quantity),
+        });
       }
-      // The ledger's established unit wins, so the running total is
-      // still arithmetically sound — but a slip line in kg deducting
-      // from a ledger in units means one of the two is wrong, and
-      // that has to reach a human rather than vanish.
-      if (isUnitMismatch) {
-        unitMismatches.push({ productId: item.product_id, slipUnit: item.unit });
+
+      // A product with no stock_levels row has no established unit
+      // yet, so there is nothing to disagree with — the first
+      // movement against it (which will now be the dispatch) sets it.
+      if (row.ledger_unit) {
+        const mismatched = (row.units || []).filter((u) => u !== row.ledger_unit);
+        if (mismatched.length > 0) {
+          unitMismatches.push({
+            productId:   row.product_id,
+            productName: row.product_name,
+            slipUnits:   mismatched,
+            ledgerUnit:  row.ledger_unit,
+          });
+        }
       }
     }
 
@@ -470,15 +681,18 @@ const completeSlip = async ({ slipId, palletRef, actorId, canOverride = false })
            pallet_ref   = COALESCE($2, pallet_ref)
        WHERE id = $3
        RETURNING *`,
-      [actorId, palletRef ?? null, slipId]
+      // completed_by is the third int4 FK to users(id), and carries the
+      // same hazard as actor_id and confirmed_by — NULL for a guest.
+      // assigned_volunteer_id already records which volunteer held it.
+      [actorUserId(who), palletRef ?? null, slipId]
     );
 
-    await logEvent(client, slipId, 'completed', actorId, { pallet_ref: palletRef });
+    await logEvent(client, slipId, 'completed', actorUserId(who), actorDetail(who, { pallet_ref: palletRef }));
     if (shortfalls.length > 0) {
-      await logEvent(client, slipId, 'stock_shortfall', actorId, { shortfalls });
+      await logEvent(client, slipId, 'stock_shortfall', actorUserId(who), actorDetail(who, { shortfalls }));
     }
     if (unitMismatches.length > 0) {
-      await logEvent(client, slipId, 'unit_mismatch', actorId, { unitMismatches });
+      await logEvent(client, slipId, 'unit_mismatch', actorUserId(who), actorDetail(who, { unitMismatches }));
     }
 
     await client.query('COMMIT');
@@ -496,7 +710,24 @@ const completeSlip = async ({ slipId, palletRef, actorId, canOverride = false })
   }
 };
 
+// ── Assignable workers (manager-only lookup) ────────────────────
+// Deliberately narrow: id + name only, active warehouse_worker
+// accounts only. This is NOT a general users read — /api/users stays
+// admin-only account provisioning (see user.routes.js's own header
+// comment). This exists solely so AssignPickingSlipsPage.jsx's
+// dropdown has someone to assign a slip to.
+const getAssignableWorkers = async () => {
+  const { rows } = await pool.query(
+    `SELECT id, first_name, last_name
+       FROM users
+      WHERE role = 'warehouse_worker' AND is_active = true
+      ORDER BY first_name ASC, last_name ASC`
+  );
+  return rows;
+};
+
 export default {
+  CLAIMABLE_STATUSES,
   getCohortAnchor,
   getSlips,
   getSlipById,
@@ -505,4 +736,5 @@ export default {
   assignSlip,
   setItemStatus,
   completeSlip,
+  getAssignableWorkers,
 };

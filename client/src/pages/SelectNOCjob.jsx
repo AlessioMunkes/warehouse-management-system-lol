@@ -5,15 +5,21 @@ import { useState } from 'react';
 import { useNavigate }      from 'react-router-dom';
 import { useAuth }          from '../context/AuthContext';
 import logo                 from '../assets/LOL_Logo.jpg';
+import { STAFF, PACKING }   from '../routes/paths';
 
 // `to` is the route each task opens. A task with no `to` has no page
 // built yet and renders disabled, so the tile can't lead to a dead route.
+//
+// Procurement, packing and dispatch use the paths.js constants because
+// those routes now branch by role internally (see ProcurementPage.jsx /
+// PackingSelectPage.jsx) — a worker and a manager tapping the same
+// tile land on different shapes of the same task, not different URLs.
 const TASKS = [
-  { id: 'procurement', label: 'PROCUREMENT',  desc: 'SUPPLIER DELIVERIES & INTAKE', to: '/noc/procurement' },
-  { id: 'decanting',   label: 'DECANTING',    desc: 'VEGETABLE WEIGHING & BAGGING', to: '/noc/decanting' },
-  { id: 'packing',     label: 'PACKING',      desc: 'PALLET PACKING',               to: '/noc/packing' },
+  { id: 'procurement', label: 'PROCUREMENT',  desc: 'SUPPLIER DELIVERIES & INTAKE', to: STAFF.receiving },
+  { id: 'decanting',   label: 'DECANTING',    desc: 'VEGETABLE WEIGHING & BAGGING', to: STAFF.decanting },
+  { id: 'packing',     label: 'PACKING',      desc: 'PALLET PACKING',               to: PACKING.board },
   { id: 'inventory',   label: 'INVENTORY',    desc: 'STOCK LEVELS & ADJUSTMENTS',   to: '/noc/inventory' },
-  { id: 'ecdDispatch', label: 'ECD DISPATCH', desc: 'TUESDAY & THURSDAY DISPATCH',  to: null },
+  { id: 'ecdDispatch', label: 'ECD DISPATCH', desc: 'TUESDAY & THURSDAY DISPATCH',  to: STAFF.dispatch },
 ];
 
 const SelectNOCjob = () => {
@@ -25,8 +31,6 @@ const SelectNOCjob = () => {
     const task = TASKS.find((t) => t.id === selected);
     if (task?.to) navigate(task.to);
   };
-
-  const handleBack = () => navigate('/programmes');
 
   const handleLogout = async () => {
     await logout();
@@ -45,7 +49,6 @@ const SelectNOCjob = () => {
           </div>
         </div>
         <div style={{ display: 'flex', gap: '6px' }}>
-          <button onClick={handleBack}   className="btn-ghost">← BACK</button>
           <button onClick={handleLogout} className="btn-ghost">LOGOUT</button>
         </div>
       </div>

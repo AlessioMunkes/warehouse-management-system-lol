@@ -1,0 +1,12 @@
+[gmail.routes] Loading Gmail routes
+[gmail.routes] Gmail routes loaded: [
+  '/connect',
+  '/callback',
+  '/status',
+  '/disconnect',
+  '/test-email',
+  '/save-display-name'
+]
+[server] gmailRouter loaded: function OK
+[server] Running on http://localhost:5000
+[db] Connected

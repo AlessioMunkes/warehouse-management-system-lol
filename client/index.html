@@ -2,12 +2,23 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" />
-    
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- /icons/favicon.svg, not /favicon.svg. Commit ba3f2f8 moved the
+         file into public/icons/ and this link kept pointing at the old
+         path, so the tab icon 404'd silently from then on. -->
+    <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
+
+    <!-- Tabler icon webfont. StaffTabBar.jsx renders `ti ti-home`,
+         `ti ti-truck-delivery` and friends, so this is load-bearing.
+         There were two of these, and the other one omitted /dist/ —
+         a second CDN round trip for a path the package does not
+         publish. Worth pinning a version instead of @latest at some
+         point: a CDN tag that moves under you is a dependency you
+         did not agree to. -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
-    <title>warehouse-management-system-lol</title>
+
+    <title>Ladles of Love — Warehouse Management</title>
   </head>
   <body>
     <div id="root"></div>

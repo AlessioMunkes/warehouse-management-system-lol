@@ -16,14 +16,15 @@ import jwt     from 'jsonwebtoken';
 import { ROLES } from '../src/middleware/auth.middleware.js';
 
 const serviceMock = {
-  getSlips:      vi.fn(),
-  getSlipById:   vi.fn(),
-  generateSlips: vi.fn(),
-  createSlip:    vi.fn(),
-  assignSlip:    vi.fn(),
-  confirmItem:   vi.fn(),
-  flagItem:      vi.fn(),
-  completeSlip:  vi.fn(),
+  getSlips:             vi.fn(),
+  getSlipById:          vi.fn(),
+  generateSlips:        vi.fn(),
+  createSlip:           vi.fn(),
+  assignSlip:           vi.fn(),
+  confirmItem:          vi.fn(),
+  flagItem:             vi.fn(),
+  completeSlip:         vi.fn(),
+  getAssignableWorkers: vi.fn(),
 };
 
 vi.mock('../src/services/picking.service.js', () => ({ default: serviceMock }));
@@ -41,7 +42,7 @@ const cookieFor = (role, overrides = {}) => {
   return [`wms_token=${token}`];
 };
 
-const ALL_ROLES   = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN, ROLES.FINANCE];
+const ALL_ROLES   = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 const PACKERS_UP  = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 const MANAGERS_UP = [ROLES.MANAGER, ROLES.ADMIN];
 
@@ -65,6 +66,7 @@ beforeEach(() => {
   serviceMock.confirmItem.mockResolvedValue(ITEM);
   serviceMock.flagItem.mockResolvedValue(ITEM);
   serviceMock.completeSlip.mockResolvedValue(SLIP);
+  serviceMock.getAssignableWorkers.mockResolvedValue([{ id: 2, first_name: 'A', last_name: 'B' }]);
 });
 
 const endpoints = [
@@ -127,14 +129,14 @@ describe('picking routes — role enforcement', () => {
     expect(res.status).toBe(201);
   });
 
-  it.each([ROLES.WORKER, ROLES.FINANCE])('%s cannot generate slips', async (role) => {
+  it.each([ROLES.WORKER, 'finance'])('%s cannot generate slips', async (role) => {
     const res = await request(app).post(`${BASE}/generate`)
       .set('Cookie', cookieFor(role)).send({});
     expect(res.status).toBe(403);
     expect(serviceMock.generateSlips).not.toHaveBeenCalled();
   });
 
-  it.each([ROLES.WORKER, ROLES.FINANCE])('%s cannot create an ad-hoc slip', async (role) => {
+  it.each([ROLES.WORKER, 'finance'])('%s cannot create an ad-hoc slip', async (role) => {
     const res = await request(app).post(BASE).set('Cookie', cookieFor(role)).send({});
     expect(res.status).toBe(403);
     expect(serviceMock.createSlip).not.toHaveBeenCalled();
@@ -148,13 +150,13 @@ describe('picking routes — role enforcement', () => {
 
   it.each(['assign', 'complete'])('finance cannot %s a slip', async (action) => {
     const res = await request(app).post(`${BASE}/1/${action}`)
-      .set('Cookie', cookieFor(ROLES.FINANCE)).send({});
+      .set('Cookie', cookieFor('finance')).send({});
     expect(res.status).toBe(403);
   });
 
   it.each(['confirm', 'flag'])('finance cannot %s a line', async (action) => {
     const res = await request(app).post(`${BASE}/1/items/5/${action}`)
-      .set('Cookie', cookieFor(ROLES.FINANCE)).send({});
+      .set('Cookie', cookieFor('finance')).send({});
     expect(res.status).toBe(403);
   });
 
@@ -392,5 +394,31 @@ describe('regressions — previously known defects', () => {
       .set('Cookie', cookieFor(ROLES.WORKER)).send({ packedQuantity: 3 });
 
     expect(serviceMock.confirmItem).toHaveBeenCalledWith(1, 5, expect.anything(), expect.anything());
+  });
+});
+
+// ── GET /workers — manager-only lookup for assignment ──────────
+describe('picking routes — GET /workers', () => {
+  it('returns 401 with no cookie', async () => {
+    const res = await request(app).get(`${BASE}/workers`);
+    expect(res.status).toBe(401);
+  });
+
+  it.each(MANAGERS_UP)('%s can list assignable workers', async (role) => {
+    const res = await request(app).get(`${BASE}/workers`).set('Cookie', cookieFor(role));
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, data: [{ id: 2, first_name: 'A', last_name: 'B' }] });
+  });
+
+  it.each([ROLES.WORKER, 'finance'])('%s cannot list assignable workers', async (role) => {
+    const res = await request(app).get(`${BASE}/workers`).set('Cookie', cookieFor(role));
+    expect(res.status).toBe(403);
+    expect(serviceMock.getAssignableWorkers).not.toHaveBeenCalled();
+  });
+
+  it('is not shadowed by /:id', async () => {
+    await request(app).get(`${BASE}/workers`).set('Cookie', cookieFor(ROLES.MANAGER));
+    expect(serviceMock.getSlipById).not.toHaveBeenCalled();
+    expect(serviceMock.getAssignableWorkers).toHaveBeenCalledTimes(1);
   });
 });

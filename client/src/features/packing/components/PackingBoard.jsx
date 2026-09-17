@@ -6,9 +6,14 @@
 // component has no router dependency of its own.
 
 import { useState, useEffect } from "react";
+import useListSearch from "../../staff/hooks/useListSearch";
 import { fetchPickingSlips, assignSlip } from "../../../services/pickingAPI";
+import Paged from "../../staff/components/Paged";
+import usePaged from "../../staff/hooks/usePaged";
 
 const COHORT_LABELS = { week1: "Week 1", week2: "Week 2" };
+
+const slipText = (slip) => [slip.ecd_name, slip.packer_name].filter(Boolean).join(" ");
 
 const STATUS_BADGE = {
   pending: { className: "badge badge-pending", label: "Pending" },
@@ -120,6 +125,9 @@ export default function PackingBoard({ currentUser, onOpenSlip }) {
     }
   };
 
+  const search = useListSearch(slips, slipText);
+  const paged = usePaged(search.filtered);
+
   // The card is a div with role="button", so it has to answer Enter
   // and Space the way a real button does. A lot of the volunteers on
   // this floor are older or use assistive tech (warehouse visit §1.3),
@@ -145,6 +153,18 @@ export default function PackingBoard({ currentUser, onOpenSlip }) {
           <p>{error}</p>
         </div>
       )}
+
+      <div className="form-group mb-4">
+        <label className="form-label" htmlFor="slipSearch">Search</label>
+        <input
+          id="slipSearch"
+          type="search"
+          className="form-input"
+          placeholder="Centre or packer"
+          value={search.query}
+          onChange={(e) => search.setQuery(e.target.value)}
+        />
+      </div>
 
       <div className="form-grid-2 mb-6">
         <div className="form-group">
@@ -205,13 +225,16 @@ export default function PackingBoard({ currentUser, onOpenSlip }) {
 
       {loading ? (
         <p className="text-sm text-text-sub">Loading picking slips…</p>
-      ) : slips.length === 0 ? (
+      ) : search.filtered.length === 0 ? (
         <div className="info-notice">
-          <p>No picking slips match these filters. Try a different dispatch date.</p>
+          <p>
+            No picking slips match these filters. Try a different dispatch date
+            {search.searching ? ', or clear the search' : ''}.
+          </p>
         </div>
       ) : (
         <div>
-          {slips.map((slip) => {
+          {paged.slice.map((slip) => {
             const badge = STATUS_BADGE[slip.status] || STATUS_BADGE.pending;
             const assignedToMe = slip.assigned_to === currentUser?.id;
             const unassigned = !slip.assigned_to;
@@ -276,6 +299,7 @@ export default function PackingBoard({ currentUser, onOpenSlip }) {
               </div>
             );
           })}
+          <Paged {...paged} noun="pallets" />
         </div>
       )}
     </div>

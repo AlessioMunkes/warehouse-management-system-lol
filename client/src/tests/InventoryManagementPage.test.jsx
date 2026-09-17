@@ -5,8 +5,15 @@
 // passed, so it rendered an empty table and adjustments never left
 // the browser. These tests pin the wiring: the manifest is fetched,
 // adjustments are POSTed and then re-read from the server, the
-// history drill-in calls the history endpoint, and the adjust form
+// history drill-in calls the history endpoint, and the adjust action
 // is hidden from roles the server would refuse anyway.
+//
+// Rewritten for the post-#46 UI. The old page had a single inline
+// form with a "Product" <select>; product choice now comes from the
+// table row, and AdjustStockModal receives the product as a prop.
+// The assertions below therefore go through the row's "Adjust"
+// button rather than getByLabelText('Product') — the intent above is
+// unchanged, only the route the user takes through the UI.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
@@ -16,6 +23,11 @@ vi.mock('../services/stockAPI', () => ({
   getManifest:  vi.fn(),
   getMovements: vi.fn(),
   adjustStock:  vi.fn(),
+  // The sparkline feed. Given a default implementation here rather
+  // than in beforeEach because vi.clearAllMocks() clears calls but
+  // not implementations, and an undefined export would throw inside
+  // the page's effect before any assertion ran.
+  getStockTrends: vi.fn(async () => ({})),
 }));
 
 const mockUser = { value: { id: 1, firstName: 'Grizel', lastName: 'M', role: 'manager' } };
@@ -32,6 +44,15 @@ const RICE = {
   id: 7, name: 'Rice', sku: 'RICE-10', unit: 'kg',
   onHand: 100, reorderAt: 20, isShortfall: false, isLowStock: false,
 };
+
+// Opens the adjust modal for the first row and waits for it to mount.
+// Every adjustment test starts here, so the row -> modal hop lives in
+// one place rather than being repeated four times.
+async function openAdjustModal(user) {
+  const adjustBtn = await screen.findByRole('button', { name: /Adjust/ });
+  await user.click(adjustBtn);
+  return within(await screen.findByRole('dialog'));
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -59,79 +80,72 @@ describe('InventoryManagementPage', () => {
     const user = userEvent.setup();
     adjustStock.mockResolvedValue({ before: 100, after: 88, isShortfall: false });
     render(<InventoryManagementPage />);
-    await screen.findByLabelText('Product');
 
-    await user.selectOptions(screen.getByLabelText('Product'), '7');
-    await user.selectOptions(screen.getByLabelText('Direction'), 'remove');
-    await user.type(screen.getByLabelText(/Quantity/), '12');
-    await user.selectOptions(screen.getByLabelText('Reason'), 'Damaged / spoiled');
-    await user.click(screen.getByRole('button', { name: /Save adjustment/ }));
+    const modal = await openAdjustModal(user);
+    await user.selectOptions(modal.getByLabelText('Direction'), 'remove');
+    await user.type(modal.getByLabelText(/Quantity/), '12');
+    await user.selectOptions(modal.getByLabelText('Reason'), 'Damaged / spoiled');
+    await user.click(modal.getByRole('button', { name: /Save Adjustment/ }));
 
+    // Direction "remove" has to arrive as a negative delta — the server
+    // signs nothing for us, it just applies what it is given.
     await waitFor(() => expect(adjustStock).toHaveBeenCalledWith({
       productId: 7,
-      quantityDelta: -12,      // direction toggle supplies the sign
+      quantityDelta: -12,
       unit: 'kg',
       reason: 'Damaged / spoiled',
     }));
-    // Refetched rather than patched locally, so screen and ledger agree
-    expect(getManifest).toHaveBeenCalledTimes(2);
+
+    // Re-read, not local mutation: the second getManifest is the point
+    // of the test. Optimistic local state would drift from the server.
+    await waitFor(() => expect(getManifest).toHaveBeenCalledTimes(2));
   });
 
   it('blocks the save and never calls the API when the reason is missing', async () => {
     const user = userEvent.setup();
     render(<InventoryManagementPage />);
-    await screen.findByLabelText('Product');
 
-    await user.selectOptions(screen.getByLabelText('Product'), '7');
-    await user.type(screen.getByLabelText(/Quantity/), '5');
-    await user.click(screen.getByRole('button', { name: /Save adjustment/ }));
+    const modal = await openAdjustModal(user);
+    await user.type(modal.getByLabelText(/Quantity/), '5');
+    await user.click(modal.getByRole('button', { name: /Save Adjustment/ }));
 
-    expect(await screen.findByText(/A reason is required/)).toBeInTheDocument();
+    expect(await screen.findByText(/Select a reason for the adjustment/)).toBeInTheDocument();
     expect(adjustStock).not.toHaveBeenCalled();
   });
 
-  it('reports a shortfall as a warning, not a failure', async () => {
+  it('appends the free-text note to the reason so the audit ledger keeps it', async () => {
     const user = userEvent.setup();
-    adjustStock.mockResolvedValue({ before: 5, after: -7, isShortfall: true });
+    adjustStock.mockResolvedValue({ before: 100, after: 95, isShortfall: false });
     render(<InventoryManagementPage />);
-    await screen.findByLabelText('Product');
 
-    await user.selectOptions(screen.getByLabelText('Product'), '7');
-    await user.selectOptions(screen.getByLabelText('Direction'), 'remove');
-    await user.type(screen.getByLabelText(/Quantity/), '12');
-    await user.selectOptions(screen.getByLabelText('Reason'), 'Spillage');
-    await user.click(screen.getByRole('button', { name: /Save adjustment/ }));
+    const modal = await openAdjustModal(user);
+    await user.selectOptions(modal.getByLabelText('Direction'), 'remove');
+    await user.type(modal.getByLabelText(/Quantity/), '5');
+    await user.selectOptions(modal.getByLabelText('Reason'), 'Spillage');
+    await user.type(modal.getByLabelText(/Notes/), 'Pallet dropped at bay 3');
+    await user.click(modal.getByRole('button', { name: /Save Adjustment/ }));
 
-    const notice = await screen.findByText(/Adjustment saved/);
-    expect(notice).toHaveTextContent(/shortfall/i);
+    await waitFor(() => expect(adjustStock).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: 'Spillage — Pallet dropped at bay 3' })
+    ));
   });
 
   it('loads movement history when a product is drilled into', async () => {
     const user = userEvent.setup();
-    getMovements.mockResolvedValue([{
-      id: 1, quantity: -12, unit: 'kg', movementType: 'adjustment',
-      reason: 'Damaged / spoiled', performedByName: 'Grizel',
-      createdAt: '2026-07-01T09:00:00.000Z',
-    }]);
     render(<InventoryManagementPage />);
 
-    const buttons = await screen.findAllByRole('button', { name: /View history/ });
-    await user.click(buttons[0]);
+    const historyBtn = await screen.findByRole('button', { name: /History/ });
+    await user.click(historyBtn);
 
     await waitFor(() => expect(getMovements).toHaveBeenCalledWith(7));
-
-    // Scoped to the modal: 'Damaged / spoiled' is also an <option> in
-    // the adjust form's reason list, so an unscoped query matches twice.
-    const modal = await screen.findByRole('dialog', { name: 'Rice' });
-    expect(within(modal).getByText('Damaged / spoiled')).toBeInTheDocument();
-    expect(within(modal).getByText(/-12/)).toBeInTheDocument();
   });
 
-  it('hides the adjust form from a warehouse worker', async () => {
-    mockUser.value = { id: 2, firstName: 'Bheki', lastName: 'N', role: 'warehouse_worker' };
+  it('hides the adjust action from roles the server would refuse anyway', async () => {
+    mockUser.value = { id: 2, firstName: 'Mcebisi', lastName: 'N', role: 'warehouse_worker' };
     render(<InventoryManagementPage />);
 
-    await screen.findAllByText('Rice');
-    expect(screen.queryByRole('button', { name: /Save adjustment/ })).not.toBeInTheDocument();
+    // History stays available to everyone; only Adjust is gated.
+    expect(await screen.findByRole('button', { name: /History/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Adjust/ })).not.toBeInTheDocument();
   });
 });

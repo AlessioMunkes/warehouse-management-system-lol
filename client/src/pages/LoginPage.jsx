@@ -1,47 +1,94 @@
 // ─────────────────────────────────────────────────────────────
 // src/pages/LoginPage.jsx
 // ─────────────────────────────────────────────────────────────
-import { useState }           from 'react';
-import { useNavigate }        from 'react-router-dom';
-import { useAuth }            from '../context/AuthContext';
-import logo                   from '../assets/LOL_Logo.jpg';
-import Log_In_Background      from '../assets/Log_In_Background.jpg';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import logo from '../assets/Batches_Logo.jpeg';
+import { HugeiconsIcon } from '@hugeicons/react';
+import Log_In_Background from '../assets/Log_In_Background.jpg';
+import { STAFF, ADMIN } from '../routes/paths';
+
+// shadcn/ui components
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+
+import {
+  FavouriteIcon,
+  PackageIcon,
+  UserGroupIcon,
+  ClipboardIcon,
+  CookingPotIcon,
+} from '@hugeicons/core-free-icons';
 
 const LoginPage = () => {
-  const { login, sessionMessage } = useAuth();
-  const navigate   = useNavigate();
+  const { login } = useAuth();
+  const navigate = useNavigate();
 
-  const [username, setUsername]                     = useState('');
-  const [password, setPassword]                      = useState('');
-  const [showPassword, setShowPassword]               = useState(false);
-  const [error, setError]                             = useState('');
-  const [isLoading, setIsLoading]                     = useState(false);
-  const [showForgotPassword, setShowForgotPassword]   = useState(false);
+  // Image loading state
+  const [imageLoaded, setImageLoaded] = useState(false);
 
-  // err.status is set by services/api.js. Note this function already
-  // read it before that existed, so the status branches below were
-  // dead and every failure fell through to err.message.
+  // Form field state
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  // UI state
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+
   const getLoginErrorMessage = (err) => {
     if (err.isNetworkError || err.message === "Failed to fetch") {
       return "Could not reach the server. Check your connection and try again.";
     }
     if (err.status === 401) {
-      // Never distinguish "no such user" from "wrong password" — that
-      // would let an attacker enumerate valid usernames.
       return "Incorrect username or password.";
     }
     if (err.status === 403) {
-      // 403 is NOT a credential failure: the password was correct and
-      // the account is deactivated. Showing "incorrect password" here
-      // would send someone to reset a password that works fine.
       return err.message || "This account cannot be used to log in.";
     }
     return err.message || "Login failed. Please try again.";
   };
 
+  const redirectByRole = (loggedInUser) => {
+    switch (loggedInUser?.role) {
+      case "admin":
+        navigate(ADMIN.dashboard);
+        break;
+      case "manager":
+        navigate("/manager");
+        break;
+      default:
+        navigate(STAFF.home);
+        break;
+    }
+  };
+ 
   const handleSubmit = async (e) => {
+    
+    console.log("[LOGIN] handleSubmit fired");
     e.preventDefault();
-    setError("");
+
+    console.log("[LOGIN] username:", username);
+    console.log("[LOGIN] password length:", password.length);
 
     if (!username.trim()) {
       setError("Username is required.");
@@ -54,9 +101,12 @@ const LoginPage = () => {
 
     setIsLoading(true);
     try {
-      await login(username.trim(), password);
-      navigate("/programmes");
+      console.log("[LOGIN] calling AuthContext.login()");
+      const loggedInUser = await login(username.trim(), password);
+      console.log("[LOGIN] AuthContext.login() returned", loggedInUser);
+      redirectByRole(loggedInUser);
     } catch (err) {
+      console.error("[LOGIN] handleSubmit caught:", err);
       setError(getLoginErrorMessage(err));
     } finally {
       setIsLoading(false);
@@ -64,128 +114,137 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="page-split">
-      <div className="split-left">
-        <div className="brand-row">
-          <img src={logo} alt="Ladles of Love" className="brand-logo" />
-          <span className="brand-name"></span>
+    <div className="login-page">
+
+      {/* ── Left side: full-bleed photo with skeleton loader ── */}
+      <div className="login-image-side">
+        {!imageLoaded && (
+          <Skeleton className="login-image-skeleton" />
+        )}
+        <img
+          src={Log_In_Background}
+          alt="Login background"
+          onLoad={() => setImageLoaded(true)}
+          className={`login-bg-image ${imageLoaded ? 'is-loaded' : ''}`}
+        />
+      </div>
+
+      {/* ── Right side: logo, floating icons, and the login card ── */}
+      <div className="login-form-side">
+        <HugeiconsIcon icon={FavouriteIcon} size={32} className="login-floating-icon icon-1" />
+        <HugeiconsIcon icon={PackageIcon} size={24} className="login-floating-icon icon-2" />
+        <HugeiconsIcon icon={CookingPotIcon} size={28} className="login-floating-icon icon-3" />
+        <HugeiconsIcon icon={UserGroupIcon} size={36} className="login-floating-icon icon-4" />
+        <HugeiconsIcon icon={ClipboardIcon} size={20} className="login-floating-icon icon-5" />
+
+        {/* Brand logo sits above the card */}
+        <div className="login-logo-top">
+          <img src={logo} alt="Batches" className="login-logo" />
         </div>
 
-        <h1 className="hero-title">Welcome to Batches</h1>
-        <p className="hero-subtitle">A new and improved way of delivering love</p>
+        {/* ── Login card ── */}
+        <Card className="login-card">
+          <CardHeader className="login-card-header">
+            <CardTitle className="login-title">EMPLOYEE LOG IN</CardTitle>
+            <CardDescription className="login-subtitle">
+              Please fill in your details to continue
+            </CardDescription>
+          </CardHeader>
 
-        <div className="card">
-          <div className="card-header">
-            <h1 className="card-header-title">BATCHES LOG IN </h1>
-            <p className="card-header-sub">Please fill in your details to continue</p>
-          </div>
+          <CardContent className="login-card-body">
 
-          <div className="form-body">
-            <h2 className="section-title">EMPLOYEE SIGN IN</h2>
-
-            {/* Explains why the user is looking at a login screen they
-                did not navigate to — an expired or revoked session. A
-                failed login attempt takes precedence over it. */}
-            {!error && sessionMessage && (
-              <div className="info-notice">
-                <p>{sessionMessage}</p>
-              </div>
-            )}
-
+            {/* Error message shown only after invalid attempt */}
             {error && (
-              <div className="alert-error">
-                <p>⚠ {error.toUpperCase()}</p>
-              </div>
+              <div className="login-notice-error">⚠ {error.toUpperCase()}</div>
             )}
 
-            <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label className="form-label">USERNAME</label>
-                <input
+            <form onSubmit={handleSubmit} className="login-form">
+
+              {/* Username field */}
+              <div className="login-field">
+                <Label htmlFor="username" className="login-label">USERNAME</Label>
+                <Input
+                  id="username"
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="e.g. WORKER123"
                   autoComplete="username"
                   disabled={isLoading}
-                  className="form-input"
+                  className="login-input"
                 />
               </div>
 
-              <div className="form-group">
-                <label className="form-label">PASSWORD</label>
-                <div className="form-input-group">
-                  <input
+              {/* Password field */}
+              <div className="login-field">
+                <div className="login-field-row">
+                  <Label htmlFor="password" className="login-label">PASSWORD</Label>
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPassword(true)}
+                    className="login-forgot-link"
+                  >
+                    FORGOT PASSWORD?
+                  </button>
+                </div>
+                <div className="login-input-wrapper">
+                  <Input
+                    id="password"
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     autoComplete="current-password"
                     disabled={isLoading}
-                    className="form-input"
+                    className="login-input-password"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="btn-toggle-password"
+                    className="login-toggle-visibility"
                   >
                     {showPassword ? 'HIDE' : 'SHOW'}
                   </button>
                 </div>
               </div>
 
-              <div style={{ textAlign: 'right', marginBottom: '16px' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowForgotPassword(true)}
-                  className="btn-link"
-                >
-                  FORGOT PASSWORD?
-                </button>
-              </div>
+              {/* Buttons */}
+              <Button type="submit" disabled={isLoading} className="login-btn-primary">
+                {isLoading ? 'VERIFYING...' : 'LOG IN'}
+              </Button>
 
-              <button type="submit" disabled={isLoading} className="btn-primary-full">
-                {isLoading ? 'VERIFYING...' : 'LOGIN'}
-              </button>
-
-              <div style={{ marginTop: '10px' }}>
-                <button
-                  type="button"
-                  onClick={() => navigate('/guest')}
-                  className="btn-primary-full"
-                  style={{ backgroundColor: 'transparent', color: 'var(--color-maroon)', border: '1px solid var(--color-maroon)' }}
-                  disabled={isLoading}
-                >
-                  LOGIN AS GUEST
-                </button>
-              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => navigate('/guest')}
+                disabled={isLoading}
+                className="login-btn-guest"
+              >
+                LOG IN AS GUEST
+              </Button>
             </form>
 
-            <div className="footer-meta">AUTHORISED PERSONNEL ONLY</div>
-          </div>
-        </div>
+            <p className="login-footer-meta">AUTHORISED PERSONNEL ONLY</p>
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="split-right">
-        <img src={Log_In_Background} alt="" className="split-image" />
-      </div>
-
-      {showForgotPassword && (
-        <div className="modal-overlay" onClick={() => setShowForgotPassword(false)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <h3 className="modal-title">FORGOT PASSWORD?</h3>
-            <p className="modal-body">
+      {/* Forgot Password Modal */}
+      <Dialog open={showForgotPassword} onOpenChange={setShowForgotPassword}>
+        <DialogContent className="forgot-modal-content">
+          <DialogHeader>
+            <DialogTitle className="forgot-modal-title">FORGOT PASSWORD?</DialogTitle>
+            <DialogDescription className="forgot-modal-desc">
               Please contact your <strong>Warehouse Manager</strong> or{' '}
               <strong>Administrator</strong> to reset your password.
-            </p>
-            <button
-              onClick={() => setShowForgotPassword(false)}
-              className="btn-primary-full"
-            >
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="forgot-modal-footer">
+            <Button onClick={() => setShowForgotPassword(false)} className="forgot-modal-btn">
               GOT IT
-            </button>
-          </div>
-        </div>
-      )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -1,0 +1,942 @@
+// ─────────────────────────────────────────────────────────────
+// server/src/repositories/donation.repository.js
+//
+// All SQL for donation intake.
+// No business logic here — categories, the Section 18A evaluation and
+// the proportional split all arrive already decided from
+// donation.service.js.
+//
+// Written against the LIVE schema, not schema.sql (which is missing
+// roughly a dozen tables the code queries). Live column names are
+// used throughout: estimated_value_zar, description, received_at.
+//
+// Every stock change goes through stockModel.adjustStock with this
+// file's client, so a donation and the stock movement it caused
+// commit or roll back together.
+// ─────────────────────────────────────────────────────────────
+import pool       from '../config/db.js';
+import stockModel from './stock.repository.js';
+
+const donationAuditEntityId = (donationId) =>
+  `00000000-0000-0000-0000-${String(donationId).padStart(12, '0')}`;
+
+// ── Audit trail ───────────────────────────────────────────────
+// Writes to the shared audit_log rather than a donation-specific
+// table. audit_log already carries entity_type / entity_id / action /
+// actor_id / reason / before_data / after_data, which is exactly the
+// shape a BR-10 reclassification override needs. A second, parallel
+// trail would mean two places to look when reconstructing what
+// happened to a record.
+//
+// Takes the caller's client so the entry is part of the same
+// transaction — an audit row that survives a rolled-back donation
+// would describe something that never happened.
+const logAudit = async (client, { entityId, action, actorId, reason = null,
+                                  before = null, after = null }) => {
+  await client.query(
+    `INSERT INTO audit_log (entity_type, entity_id, action, actor_id, reason, before_data, after_data)
+     VALUES ('donation', $1, $2, $3, $4, $5, $6)`,
+    [donationAuditEntityId(entityId), action, actorId, reason, before, after]
+  );
+};
+
+// ── Section 18A threshold ─────────────────────────────────────
+// Read from donation_settings rather than hard-coded, because it is a
+// Ladles of Love policy figure that finance will change without a
+// deploy. Returns null when the settings row is missing, and the
+// service treats that as "cannot evaluate" rather than "qualifies".
+const getSection18AThreshold = async () => {
+  const result = await pool.query(
+    `SELECT section18a_threshold_value FROM donation_settings WHERE id = 1`
+  );
+  if (!result.rows[0]) return null;
+  return Number(result.rows[0].section18a_threshold_value);
+};
+
+// ── Active ECDs with their child counts ───────────────────────
+// Input to the add-on food proportional split (BR-10). Only centres
+// that are active AND approved are eligible, matching the test
+// picking.repository applies before generating a slip — an unapproved
+// centre must not receive a share.
+//
+// child_count is NULLABLE in the live schema, so the NULL guard is
+// load-bearing rather than decoration: a centre with an unrecorded
+// roll would otherwise contribute NULL to the total and poison the
+// whole split.
+const getEligibleEcdCentres = async () => {
+  const result = await pool.query(
+    `SELECT id, name, child_count
+     FROM ecd_centres
+     WHERE is_active = TRUE
+       AND approved_at IS NOT NULL
+       AND child_count IS NOT NULL
+       AND child_count > 0
+     ORDER BY id ASC`
+  );
+  return result.rows.map((r) => ({
+    id:         r.id,
+    name:       r.name,
+    childCount: Number(r.child_count),
+  }));
+};
+
+// ── Programme lookup ──────────────────────────────────────────
+// donations.programme_id is a real FK, so the service resolves a
+// programme code (NOC / FTS / LOVE_ACTIVISM) to an id rather than
+// trusting an id from the request body.
+const getProgrammeByCode = async (code) => {
+  const result = await pool.query(
+    `SELECT id, code, name FROM programmes WHERE code = $1 AND is_active = TRUE`,
+    [code]
+  );
+  return result.rows[0] || null;
+};
+
+// ── Idempotency lookup ────────────────────────────────────────
+// Called before a write. A retried submit from the gate must return
+// the original donation, not create a second one.
+const findByIdempotencyKey = async (key) => {
+  const result = await pool.query(
+    `SELECT id FROM donations WHERE idempotency_key = $1`,
+    [key]
+  );
+  return result.rows[0] || null;
+};
+
+// ── Create a donation ─────────────────────────────────────────
+// items arrive from the service already classified, with a
+// routingStatus decided and, for add-on food, an allocations array
+// attached. This function does not decide anything — it writes.
+//
+// Only lines whose routingStatus is 'allocated' AND which carry a
+// productId move stock. Everything else is recorded and left alone,
+// which is what keeps a donation of unknown goods from failing.
+const createDonation = async ({
+  category,
+  programmeId,
+  estimatedValueZar,
+  donorName,
+  donorContact,
+  donorTaxReference,
+  donorConsentGiven,
+  notes,
+  idempotencyKey,
+  section18aStatus,
+  section18aQualifying,
+  receivedBy,
+  items,
+}) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const donationResult = await client.query(
+      `INSERT INTO donations
+         (donation_category, programme_id, estimated_value_zar, donor_name, donor_contact,
+          donor_tax_reference, donor_consent_given, notes, idempotency_key,
+          section_18a_status, section_18a_qualifying, received_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
+       RETURNING id`,
+      [
+        category,
+        programmeId || null,
+        estimatedValueZar,
+        donorName || null,
+        donorContact || null,
+        donorTaxReference || null,
+        donorConsentGiven === true,
+        notes || null,
+        idempotencyKey || null,
+        section18aStatus,
+        section18aQualifying === true,
+        receivedBy,
+      ]
+    );
+
+    // ON CONFLICT DO NOTHING returns no row when the key already
+    // exists. That is the retried submit: nothing was written, so roll
+    // back and let the service answer with the original record.
+    // Checked here rather than relying on findByIdempotencyKey alone,
+    // because two taps can race past that read before either writes.
+    //
+    // The WHERE clause above is required, not optional: the unique
+    // index on idempotency_key is PARTIAL (WHERE idempotency_key IS
+    // NOT NULL), and Postgres will not infer a partial index as the
+    // conflict target unless the ON CONFLICT repeats its predicate.
+    // Without it every insert fails with 42P10.
+    if (!donationResult.rows[0]) {
+      await client.query('ROLLBACK');
+      return { duplicate: true };
+    }
+
+    const donationId = donationResult.rows[0].id;
+    const warnings   = [];
+
+    // adjustStock's contract: callers touching multiple products must
+    // lock them in product_id order or they deadlock against another
+    // transaction doing the same (see delivery.repository.createDelivery
+    // and picking.repository.completeSlip). Lines with no product sort
+    // last — they take no lock at all.
+    const ordered = [...items].sort((a, b) => (a.productId ?? Infinity) - (b.productId ?? Infinity));
+
+    for (const item of ordered) {
+      const itemResult = await client.query(
+        `INSERT INTO donation_items
+           (donation_id, product_id, line_no, description, quantity, unit,
+            estimated_value_zar, storage_location_id, routing_status,
+            routed_category, routing_outcome, routing_source)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         RETURNING id`,
+        [
+          donationId,
+          item.productId ?? null,
+          item.lineNo,
+          item.description,
+          item.quantity,
+          item.unit,
+          item.estimatedValueZar ?? null,
+          item.locationId ?? null,
+          item.routingStatus,
+          item.routedCategory ?? null,
+          item.routingOutcome ?? null,
+          item.routedSource ?? null,
+        ]
+      );
+
+      const donationItemId = itemResult.rows[0].id;
+
+      // ── Stock-bearing line ──────────────────────────────────
+      if (item.routingStatus === 'allocated' && item.productId) {
+        const res = await stockModel.adjustStock(client, {
+          productId:     item.productId,
+          quantityDelta: item.quantity,
+          unit:          item.unit,
+          movementType:  'donated',
+          referenceType: 'donation',
+          referenceId:   donationId,
+          performedBy:   receivedBy,
+        });
+
+        if (res.isUnitMismatch) {
+          warnings.push({
+            donationItemId,
+            productId: item.productId,
+            message: `Donated unit "${item.unit}" differs from the unit already on record for this product; stock was added in the recorded unit.`,
+          });
+        }
+      }
+
+      // ── Add-on food allocation plan ─────────────────────────
+      // Rows here are a plan for dispatch, not a stock movement.
+      // Same partial-index rule as the donations insert above: the
+      // unique index on (donation_item_id, ecd_id) is partial (WHERE
+      // ecd_id IS NOT NULL), so the predicate has to be repeated here
+      // or Postgres cannot infer the conflict target.
+      for (const alloc of item.allocations || []) {
+        await client.query(
+          `INSERT INTO donation_allocations
+             (donation_item_id, beneficiary_type, ecd_centre_id, child_count, allocated_quantity, unit)
+           VALUES ($1, 'ecd', $2, $3, $4, $5)
+           ON CONFLICT (donation_item_id, ecd_centre_id) WHERE ecd_centre_id IS NOT NULL DO NOTHING`,
+          [donationItemId, alloc.ecdId, alloc.childCount, alloc.allocatedQuantity, item.unit]
+        );
+      }
+    }
+
+    await logAudit(client, {
+      entityId: donationId,
+      action:   'donation_received',
+      actorId:  receivedBy,
+      after: {
+        category,
+        programme_id:        programmeId || null,
+        estimated_value_zar: estimatedValueZar,
+        item_count:          items.length,
+        section_18a_status:  section18aStatus,
+        unmatched_count:     items.filter((i) => i.routingStatus === 'unmatched').length,
+      },
+    });
+
+    await client.query('COMMIT');
+    return { donationId, warnings };
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+// ── One donation with its lines and allocations ───────────────
+const getDonationById = async (id) => {
+  const donationResult = await pool.query(
+    `SELECT d.*, u.first_name AS received_by_name,
+            p.code AS programme_code, p.name AS programme_name
+     FROM donations d
+     LEFT JOIN users u      ON u.id = d.received_by
+     LEFT JOIN programmes p ON p.id = d.programme_id
+     WHERE d.id = $1`,
+    [id]
+  );
+
+  // Returning null rather than an object — spreading an undefined row
+  // produces a truthy {} and the service's not-found check never fires
+  // (the bug fixed in delivery.repository.getDeliveryById).
+  if (!donationResult.rows[0]) return null;
+
+  const itemsResult = await pool.query(
+    `SELECT di.*, pr.name AS product_name, pr.stock_keeping_unit AS sku,
+            sl.name AS location_name
+     FROM donation_items di
+     LEFT JOIN products pr          ON pr.id = di.product_id
+     LEFT JOIN storage_locations sl ON sl.id = di.storage_location_id
+     WHERE di.donation_id = $1
+     ORDER BY di.id ASC`,
+    [id]
+  );
+
+  const allocationsResult = await pool.query(
+    `SELECT da.*, e.name AS ecd_name
+     FROM donation_allocations da
+     JOIN donation_items di  ON di.id = da.donation_item_id
+     LEFT JOIN ecd_centres e ON e.id = da.ecd_centre_id
+     WHERE di.donation_id = $1
+     ORDER BY da.donation_item_id ASC, e.name ASC`,
+    [id]
+  );
+
+  const byItem = new Map();
+  for (const row of allocationsResult.rows) {
+    if (!byItem.has(row.donation_item_id)) byItem.set(row.donation_item_id, []);
+    byItem.get(row.donation_item_id).push(row);
+  }
+
+  return {
+    ...donationResult.rows[0],
+    items: itemsResult.rows.map((row) => ({
+      ...row,
+      allocations: byItem.get(row.id) || [],
+    })),
+  };
+};
+
+// ── List donations by date range ──────────────────────────────
+// range: 'today' | 'week' | 'month' | 'all' — same vocabulary as
+// delivery.repository.getDeliveries so the two receiving screens
+// filter identically.
+//
+// Filters on received_at (timestamptz); the live table has no
+// separate intake_date column. date_trunc('day', NOW()) rather than
+// CURRENT_DATE because received_at carries a time.
+const listDonations = async (range = 'all') => {
+  let dateFilter = '';
+  if (range === 'today')      dateFilter = `AND d.received_at >= date_trunc('day', NOW())`;
+  else if (range === 'week')  dateFilter = `AND d.received_at >= NOW() - INTERVAL '7 days'`;
+  else if (range === 'month') dateFilter = `AND d.received_at >= NOW() - INTERVAL '30 days'`;
+
+  const result = await pool.query(
+    `SELECT
+       d.id, d.donation_category, d.estimated_value_zar, d.donor_name, d.received_at,
+       d.section_18a_status, d.section_18a_qualifying, d.created_at,
+       u.first_name AS received_by_name,
+       p.code       AS programme_code,
+       COUNT(di.id)                                                AS item_count,
+       COUNT(di.id) FILTER (WHERE di.routing_status = 'unmatched') AS unmatched_count
+     FROM donations d
+     LEFT JOIN users u           ON u.id = d.received_by
+     LEFT JOIN programmes p      ON p.id = d.programme_id
+     LEFT JOIN donation_items di ON di.donation_id = d.id
+     WHERE 1=1 ${dateFilter}
+     GROUP BY d.id, u.first_name, p.code
+     ORDER BY d.received_at DESC`
+  );
+  return result.rows;
+};
+
+// ── The manager's unmatched-item queue ────────────────────────
+// Lines accepted at the gate with no product code. Recording them is
+// what let the donation through; this is where they get fixed.
+const listUnmatchedItems = async () => {
+  const result = await pool.query(
+    `SELECT
+       di.id, di.donation_id, di.description, di.quantity, di.unit, di.location_id,
+       d.donation_category, d.received_at, d.donor_name
+     FROM donation_items di
+     JOIN donations d ON d.id = di.donation_id
+     WHERE di.routing_status = 'unmatched'
+     ORDER BY d.received_at ASC, di.id ASC`
+  );
+  return result.rows;
+};
+
+const getLocationIdForArea = async (area) => {
+  if (!area) return null;
+  const result = await pool.query(
+    `SELECT id
+     FROM storage_locations
+     WHERE area = $1 AND is_active = true
+     ORDER BY id ASC
+     LIMIT 1`,
+    [area]
+  );
+  return result.rows[0]?.id ?? null;
+};
+
+// ── Resolve one unmatched line ────────────────────────────────
+// A manager attaches the product a gate line could not be matched to.
+// This is the deferred half of intake: the stock movement that did not
+// happen at the gate happens now, in one transaction with the status
+// change, so a line can never read 'allocated' without a matching
+// stock_movements row.
+const resolveUnmatchedItem = async ({ donationItemId, productId, unit, locationId, resolvedBy }) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // FOR UPDATE on the item, not just a read: two managers working
+    // the queue at once would otherwise both pass the 'unmatched'
+    // check and both move stock for the same donated goods.
+    const itemResult = await client.query(
+      `SELECT di.id, di.donation_id, di.quantity, di.unit, di.routing_status,
+              di.storage_location_id, d.donation_category
+       FROM donation_items di
+       JOIN donations d ON d.id = di.donation_id
+       WHERE di.id = $1
+       FOR UPDATE OF di`,
+      [donationItemId]
+    );
+
+    const item = itemResult.rows[0];
+    if (!item) { await client.query('ROLLBACK'); return { itemNotFound: true }; }
+    if (item.routing_status !== 'unmatched') {
+      await client.query('ROLLBACK');
+      return { notUnmatched: true, currentStatus: item.routing_status };
+    }
+
+    const productCheck = await client.query(
+      `SELECT id FROM products WHERE id = $1 AND is_active = TRUE`,
+      [productId]
+    );
+    if (!productCheck.rows[0]) { await client.query('ROLLBACK'); return { productNotFound: true }; }
+
+    // Only recipe food goes into the ECD balance. An unmatched line on
+    // a soup-kitchen or non-food donation still gets its product
+    // attached — worth having for reporting — but attaching a code
+    // does not turn it into ECD stock.
+    const movesStock   = item.donation_category === 'recipe_food';
+    const newStatus    = movesStock ? 'allocated'
+                       : item.donation_category === 'non_recipe_food' ? 'awaiting_programme_stock'
+                       : 'not_stock_bearing';
+    const resolvedUnit = unit || item.unit;
+    let   stockOutcome = null;
+
+    if (movesStock) {
+      stockOutcome = await stockModel.adjustStock(client, {
+        productId,
+        quantityDelta: Number(item.quantity),
+        unit:          resolvedUnit,
+        movementType:  'donated',
+        referenceType: 'donation',
+        referenceId:   item.donation_id,
+        reason:        'Unmatched donation line resolved',
+        performedBy:   resolvedBy,
+      });
+    }
+
+    await client.query(
+      `UPDATE donation_items
+       SET product_id = $1, unit = $2, storage_location_id = COALESCE($3, storage_location_id),
+           routing_status = $4, resolved_by = $5, resolved_at = NOW()
+       WHERE id = $6`,
+      [productId, resolvedUnit, locationId ?? null, newStatus, resolvedBy, donationItemId]
+    );
+
+    await logAudit(client, {
+      entityId: item.donation_id,
+      action:   'donation_item_resolved',
+      actorId:  resolvedBy,
+      before:   { donation_item_id: donationItemId, product_id: null, routing_status: 'unmatched' },
+      after:    { donation_item_id: donationItemId, product_id: productId,
+                  routing_status: newStatus, moved_stock: movesStock },
+    });
+
+    await client.query('COMMIT');
+    return { resolved: true, movedStock: movesStock, stockOutcome };
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+// ── Reclassify a donation (BR-10 manager override) ────────────
+// Deliberately does NOT re-run the routing. Reversing stock that has
+// already moved, cancelling an allocation plan dispatch may have acted
+// on, and re-deriving a split from child counts that have since
+// changed are three separate problems, and doing them silently inside
+// a category change is how a balance ends up wrong with no trace. The
+// category and the override are recorded; correcting the stock is a
+// separate, visible manual adjustment.
+const reclassifyDonation = async ({ donationId, category, reason, actorId }) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const existing = await client.query(
+      `SELECT id, donation_category FROM donations WHERE id = $1 FOR UPDATE`,
+      [donationId]
+    );
+    if (!existing.rows[0]) { await client.query('ROLLBACK'); return { notFound: true }; }
+
+    const previous = existing.rows[0].donation_category;
+    if (previous === category) { await client.query('ROLLBACK'); return { unchanged: true }; }
+
+    await client.query(
+      `UPDATE donations SET donation_category = $1 WHERE id = $2`,
+      [category, donationId]
+    );
+
+    // before_data / after_data is exactly what audit_log is for — this
+    // is the BR-10 override and it has to be reconstructable later.
+    await logAudit(client, {
+      entityId: donationId,
+      action:   'donation_reclassified',
+      actorId,
+      reason,
+      before:   { category: previous },
+      after:    { category },
+    });
+
+    await client.query('COMMIT');
+    return { reclassified: true, from: previous, to: category };
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+// ── Section 18A work queue ────────────────────────────────────
+// Two statuses, deliberately together: 'queued' is ready to send to
+// QuickBooks, 'qualifying_pending_donor' is money that qualified but
+// has no donor to issue to. Finance needs both, because the second is
+// the recoverable case — someone can still phone the donor back.
+const listSection18AQueue = async () => {
+  const result = await pool.query(
+    `SELECT d.id, d.estimated_value_zar, d.donor_name, d.donor_contact, d.donor_tax_reference,
+            donor_consent_given, received_at, section_18a_status,
+            section_18a_certificate_ref, section_18a_issued_at,
+            c.certificate_number, c.issue_date
+     FROM donations d
+     LEFT JOIN section18a_certificates c ON c.donation_id = d.id
+     WHERE d.section_18a_status IN ('qualifying_pending_donor', 'queued', 'issued')
+     ORDER BY d.received_at ASC, d.id ASC`
+  );
+  return result.rows;
+};
+
+const saveSection18AFormToken = async ({ donationId, tokenHash, expiresAt }, client = pool) => {
+  await client.query(
+    `ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_token_hash TEXT`
+  );
+  await client.query(
+    `ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_token_expires_at TIMESTAMPTZ`
+  );
+  await client.query(
+    `ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_submitted_at TIMESTAMPTZ`
+  );
+
+  const result = await client.query(
+    `UPDATE donations
+     SET section_18a_form_token_hash = $1,
+         section_18a_form_token_expires_at = $2
+     WHERE id = $3
+     RETURNING id, section_18a_form_token_hash, section_18a_form_token_expires_at`,
+    [tokenHash, expiresAt, donationId]
+  );
+  return result.rows[0] || null;
+};
+
+const getDonationBySection18AFormTokenHash = async (tokenHash, client = pool) => {
+  await client.query(
+    `ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_token_hash TEXT`
+  );
+  await client.query(
+    `ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_token_expires_at TIMESTAMPTZ`
+  );
+  await client.query(
+    `ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_submitted_at TIMESTAMPTZ`
+  );
+
+  const result = await client.query(
+    `SELECT *
+     FROM donations
+     WHERE section_18a_form_token_hash = $1
+     LIMIT 1`,
+    [tokenHash]
+  );
+  return result.rows[0] || null;
+};
+
+const saveSection18AFormSubmission = async ({ donationId, formData }, client = pool) => {
+  await client.query(
+    `ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_form_submitted_at TIMESTAMPTZ`
+  );
+  await client.query(
+    `ALTER TABLE donations ADD COLUMN IF NOT EXISTS section_18a_donor_form JSONB`
+  );
+
+  const result = await client.query(
+    `UPDATE donations
+     SET donor_name = $1,
+         donor_contact = $2,
+         donor_tax_reference = $3,
+         donor_consent_given = TRUE,
+         section_18a_donor_form = $4,
+         section_18a_form_submitted_at = NOW()
+     WHERE id = $5
+     RETURNING *`,
+    [
+      formData.fullNameOrCompanyName,
+      formData.email,
+      formData.incomeTaxNumber,
+      formData,
+      donationId,
+    ]
+  );
+  return result.rows[0] || null;
+};
+
+const getSection18ASettings = async (client = pool) => {
+  const result = await client.query(
+    `SELECT *
+     FROM section18a_settings
+     WHERE id = 1`
+  );
+  return result.rows[0] || null;
+};
+
+const updateSection18ASettings = async (settings, client = pool) => {
+  const {
+    organisationName,
+    organisationAddress,
+    contactName,
+    contactEmail,
+    contactPhone,
+    pbaDeclaration,
+    certificatePrefix,
+  } = settings;
+
+  const result = await client.query(
+    `UPDATE section18a_settings
+     SET organisation_name = $1,
+         organisation_address = $2,
+         contact_name = $3,
+         contact_email = $4,
+         contact_phone = $5,
+         pba_declaration = $6,
+         certificate_prefix = $7,
+         updated_at = NOW()
+     WHERE id = 1
+     RETURNING *`,
+    [
+      organisationName ?? '',
+      organisationAddress ?? '',
+      contactName ?? '',
+      contactEmail ?? '',
+      contactPhone ?? '',
+      pbaDeclaration ?? '',
+      certificatePrefix ?? 'S18A',
+    ]
+  );
+  return result.rows[0] || null;
+};
+
+const getSection18ACertificateByDonationId = async (donationId) => {
+  const result = await pool.query(
+    `SELECT *
+     FROM section18a_certificates
+     WHERE donation_id = $1`,
+    [donationId]
+  );
+  return result.rows[0] || null;
+};
+
+const listEmailHistory = async ({ search = null, emailType = null, status = null, limit = 200, offset = 0 } = {}) => {
+  // History comes from the database only — Gmail is never queried.
+  // Newest first. Optional free-text search across recipient, donor,
+  // donation ID and subject, plus exact filters on type / status.
+  const conditions = [];
+  const params = [];
+
+  const like = (value) => `%${String(value).trim()}%`;
+
+  if (search !== null && search !== undefined && String(search).trim() !== '') {
+    const term = String(search).trim();
+    params.push(like(term), like(term), like(term), like(term));
+    const base = params.length - 3;
+    conditions.push(
+      `(COALESCE(l.recipient_email, l.recipient, '') ILIKE $${base} ` +
+      `OR COALESCE(d.donor_name, '') ILIKE $${base + 1} ` +
+      `OR COALESCE(l.subject, '') ILIKE $${base + 2} ` +
+      `OR CAST(l.donation_id AS TEXT) ILIKE $${base + 3})`
+    );
+  }
+
+  if (emailType !== null && emailType !== undefined && String(emailType).trim() !== '') {
+    // Accept both canonical (THANK_YOU) and legacy (thank_you) spellings.
+    const normalised = String(emailType).trim().toUpperCase() === 'THANK_YOU' || String(emailType).trim() === 'thank_you'
+      ? ['THANK_YOU', 'thank_you']
+      : String(emailType).trim().toUpperCase() === 'SECTION_18A' || String(emailType).trim() === 'section18a_certificate'
+        ? ['SECTION_18A', 'section18a_certificate']
+        : [String(emailType).trim()];
+    params.push(normalised);
+    conditions.push(`l.email_type = ANY($${params.length})`);
+  }
+
+  if (status !== null && status !== undefined && String(status).trim() !== '') {
+    // Accept both canonical (SENT) and legacy (sent) spellings.
+    const upper = String(status).trim().toUpperCase();
+    params.push([upper, upper.toLowerCase()]);
+    conditions.push(`l.status = ANY($${params.length})`);
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  const safeLimit = Number.isInteger(Number(limit)) && Number(limit) > 0
+    ? Math.min(Number(limit), 500)
+    : 200;
+  const safeOffset = Number.isInteger(Number(offset)) && Number(offset) >= 0
+    ? Number(offset)
+    : 0;
+  params.push(safeLimit, safeOffset);
+
+  const result = await pool.query(
+    `SELECT l.*, c.certificate_number, d.donor_name
+     FROM donation_email_logs l
+     LEFT JOIN section18a_certificates c ON c.id = l.certificate_id
+     LEFT JOIN donations d ON d.id = l.donation_id
+     ${where}
+     ORDER BY l.created_at DESC, l.id DESC
+     LIMIT $${params.length - 1} OFFSET $${params.length}`,
+    params
+  );
+  return result.rows;
+};
+
+const getEmailLogById = async (id) => {
+  const result = await pool.query(
+    `SELECT l.*, c.certificate_number
+     FROM donation_email_logs l
+     LEFT JOIN section18a_certificates c ON c.id = l.certificate_id
+     WHERE l.id = $1`,
+    [id]
+  );
+  return result.rows[0] || null;
+};
+
+const logDonationEmail = async ({
+  donationId,
+  donorId = null,
+  certificateId = null,
+  emailType,
+  recipient,
+  recipientEmail = null,
+  recipientName = null,
+  subject,
+  status,
+  providerMessageId = null,
+  gmailMessageId = null,
+  gmailThreadId = null,
+  errorMessage = null,
+  sentByUserId = null,
+}) => {
+  // Single persist point for every Donation Thank-you / Section 18A
+  // attempt — success and failure alike. Canonical vocabulary going
+  // forward is THANK_YOU | SECTION_18A and SENT | FAILED | PENDING.
+const canonicalType =
+  emailType === 'thank_you'
+    ? 'THANK_YOU'
+    : emailType === 'section18a_certificate'
+      ? 'SECTION_18A'
+      : emailType;
+
+const canonicalStatus =
+  status === 'sent'
+    ? 'SENT'
+    : status === 'failed'
+      ? 'FAILED'
+      :status;
+     
+  const resolvedRecipientEmail = recipientEmail || recipient || null;
+  const resolvedGmailMessageId = gmailMessageId || providerMessageId || null;
+  console.log("canonicalType:", canonicalType);
+  console.log("canonicalStatus:", canonicalStatus);
+  const result = await pool.query(
+    `INSERT INTO donation_email_logs
+       (donation_id, donor_id, certificate_id, email_type,
+        recipient, recipient_email, recipient_name, subject, status,
+        provider_message_id, gmail_message_id, gmail_thread_id,
+        error_message, sent_by_user_id, sent_at)
+     VALUES ($1, $2, $3, $4,
+             COALESCE($6, $5), $6, $7, $8, $9,
+             COALESCE($11, $10), $11, $12,
+             $13, $14,
+           CASE WHEN $9 = 'SENT' THEN NOW() ELSE NULL END)
+     RETURNING *`,
+    [donationId, donorId, certificateId, canonicalType,
+     recipient, resolvedRecipientEmail, recipientName, subject, canonicalStatus,
+     providerMessageId, resolvedGmailMessageId, gmailThreadId,
+     errorMessage, sentByUserId]
+  );
+  return result.rows[0];
+};
+
+const nextSection18ACertificateNumber = async (client, prefix, year = new Date().getFullYear()) => {
+  const base = `${prefix}-${year}`;
+  const result = await client.query(
+    `SELECT certificate_number
+     FROM section18a_certificates
+     WHERE certificate_number LIKE $1
+     ORDER BY id DESC
+     LIMIT 1`,
+    [`${base}-%`]
+  );
+
+  const previous = result.rows[0]?.certificate_number || '';
+  const lastNumber = Number(previous.slice(base.length + 1));
+  const nextNumber = Number.isFinite(lastNumber) ? lastNumber + 1 : 1;
+  return `${base}-${String(nextNumber).padStart(6, '0')}`;
+};
+
+const createSection18ACertificate = async ({
+  donationId,
+  issuedBy,
+  settings,
+  donorSnapshot,
+  donationSnapshot,
+  buildPdf,
+}) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const locked = await client.query(
+      `SELECT id, section_18a_status, section_18a_certificate_ref
+       FROM donations
+       WHERE id = $1
+       FOR UPDATE`,
+      [donationId]
+    );
+    if (!locked.rows[0]) { await client.query('ROLLBACK'); return { notFound: true }; }
+
+    const existing = await client.query(
+      `SELECT *
+       FROM section18a_certificates
+       WHERE donation_id = $1`,
+      [donationId]
+    );
+    if (existing.rows[0]) {
+      await client.query('ROLLBACK');
+      return { duplicate: true, certificate: existing.rows[0] };
+    }
+
+    await client.query(`SELECT pg_advisory_xact_lock(hashtext('section18a_certificate_number'))`);
+    const issueDate = new Date().toISOString().slice(0, 10);
+    const prefix = settings.certificate_prefix || '18A';
+    const year = issueDate.slice(0, 4);
+    const certificateNumber = await nextSection18ACertificateNumber(client, prefix, year);
+    const pdf = await buildPdf({ certificateNumber, issueDate });
+
+    const inserted = await client.query(
+      `INSERT INTO section18a_certificates
+         (donation_id, certificate_number, issue_date, issued_by,
+          settings_snapshot, donor_snapshot, donation_snapshot,
+          pdf_content, pdf_filename, pdf_content_type)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING *`,
+      [
+        donationId,
+        certificateNumber,
+        issueDate,
+        issuedBy,
+        settings,
+        donorSnapshot,
+        donationSnapshot,
+        pdf.buffer,
+        pdf.filename,
+        pdf.contentType,
+      ]
+    );
+
+    await client.query(
+      `UPDATE donations
+       SET section_18a_status = 'issued',
+           section_18a_certificate_ref = $1,
+           section_18a_issued_at = NOW(),
+           section_18a_form_token_hash = NULL
+       WHERE id = $2`,
+      [certificateNumber, donationId]
+    );
+
+    await logAudit(client, {
+      entityId: donationId,
+      action:   'section18a_certificate_issued',
+      actorId:  issuedBy,
+      after:    { certificate_number: certificateNumber, issue_date: issueDate },
+    });
+
+    await client.query('COMMIT');
+    return { certificate: inserted.rows[0] };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+// ── Audit trail for one donation ──────────────────────────────
+const getDonationEvents = async (donationId) => {
+  const result = await pool.query(
+    `SELECT a.*, u.first_name AS actor_name
+     FROM audit_log a
+     LEFT JOIN users u ON u.id = a.actor_id
+     WHERE a.entity_type = 'donation' AND a.entity_id = $1
+     ORDER BY a.created_at ASC`,
+    [donationAuditEntityId(donationId)]
+  );
+  return result.rows;
+};
+
+export default {
+  getSection18AThreshold,
+  getEligibleEcdCentres,
+  getProgrammeByCode,
+  findByIdempotencyKey,
+  createDonation,
+  getDonationById,
+  listDonations,
+  listUnmatchedItems,
+  getLocationIdForArea,
+  resolveUnmatchedItem,
+  reclassifyDonation,
+  listSection18AQueue,
+  getSection18ASettings,
+  updateSection18ASettings,
+  saveSection18AFormToken,
+  getDonationBySection18AFormTokenHash,
+  saveSection18AFormSubmission,
+  getSection18ACertificateByDonationId,
+  createSection18ACertificate,
+  listEmailHistory,
+  getEmailLogById,
+  logDonationEmail,
+  getDonationEvents,
+};
