@@ -43,6 +43,7 @@ import VolunteerEventWorkspacePage                from './pages/VolunteerEventWo
 import CommunityRequestsPage                       from './pages/CommunityRequestsPage';
 import GmailSettingsPage                           from './pages/GmailSettingsPage';
 import Section18AFormPage                         from './pages/Section18AFormPage';
+import InviteAcceptPage                            from './pages/InviteAcceptPage';
 
 // Donations — new feature, own draft context scoped to just these
 // two routes (see features/donation/context/DonationDraftProvider.jsx)
@@ -63,6 +64,9 @@ const App = () => (
         <Route path="/login" element={<LoginPage />} />
         <Route path="/guest" element={<GuestLoginPage />} />
         <Route path="/section-18a/:token" element={<Section18AFormPage />} />
+        {/* An invitee has no account and no session yet — the whole
+            point of this route. See InviteAcceptPage.jsx. */}
+        <Route path="/invite/:token" element={<InviteAcceptPage />} />
         {/* BR-22: the stable public URL behind every pallet's QR code.
             Deliberately OUTSIDE ProtectedRoute — the whole point is that
             a volunteer holding a printed poster reaches it with no
