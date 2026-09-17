@@ -73,6 +73,7 @@ import {
   ChoiceList, Notice, KeyValues, ViewToggle, Coachmark,
 } from '../../staff/components/StepPrimitives';
 import useCoachmark from '../../staff/hooks/useCoachmark';
+import { readDraft, writeDraft, clearDraft } from '../../staff/hooks/useDraft';
 import receivingAPI from '../../../services/receivingAPI';
 import { newIdempotencyKey } from '../../../services/api';
 import { useAuth } from '../../../context/AuthContext';
@@ -307,6 +308,29 @@ export default function ReceivingFlow({ onCrumbChange }) {
     return () => clearTimeout(timer);
   }, [showCoachmark, showToggle, dismissCoachmark]);
 
+  // ── Draft ───────────────────────────────────────────────────
+  // Keeps the count on the device, so a tablet that sleeps or a
+  // reload does not lose it. It refills the form; it never submits.
+  // UnfinishedWork lists these on the staff home screen.
+  //
+  // linesKey is set in the same update as the lines themselves, never
+  // from orderId: in Form mode orderId changes a tick before the new
+  // order's lines arrive, and keying off it would save the previous
+  // order's counts under the new order's name.
+  // Lost when d182c5c restored Serena's view; restored by script 49.
+  const [linesKey, setLinesKey] = useState(null);
+  useEffect(() => {
+    const working = phase === 'count' || phase === 'place' || phase === 'check' || formOpen;
+    if (!working || !linesKey || lines.length === 0) return;
+    const counted = {};
+    for (const line of lines) {
+      counted[line.purchaseOrderItemId] = {
+        counted: line.counted, location: line.location, useBy: line.useBy,
+      };
+    }
+    writeDraft(linesKey, { counted, deliveryDate });
+  }, [phase, formOpen, linesKey, lines, deliveryDate]);
+
   // ── Step 1 to 2 ─────────────────────────────────────────────
   // Takes the order id explicitly rather than reading `orderId` off
   // closure state: Form mode calls this straight from the order
@@ -318,8 +342,13 @@ export default function ReceivingFlow({ onCrumbChange }) {
     setError(null);
     try {
       const items = await receivingAPI.getPurchaseOrderItems(poId);
+      // Numbers only. The order's own lines always come from the
+      // server; a draft just fills in what was already counted.
+      const draft = readDraft(`receiving-${poId}`);
+      if (draft?.deliveryDate) setDeliveryDate(draft.deliveryDate);
       setLines(items.map((item) => {
         const fresh = isFreshProduct(item);
+        const saved = draft?.counted?.[item.purchase_order_item_id];
         return {
           purchaseOrderItemId: item.purchase_order_item_id,
           productId:  item.product_id,
@@ -330,11 +359,12 @@ export default function ReceivingFlow({ onCrumbChange }) {
           fresh,
           // Full form pre-fills; Guided starts every line empty
           // because the point of that mode is an active count.
-          counted:    mode === 'full' ? String(item.expected_quantity ?? '') : '',
-          location:   fresh ? 'cold_room' : 'dry_store',
-          useBy:      '',
+          counted:    saved?.counted ?? (mode === 'full' ? String(item.expected_quantity ?? '') : ''),
+          location:   saved?.location ?? (fresh ? 'cold_room' : 'dry_store'),
+          useBy:      saved?.useBy ?? '',
         };
       }));
+      setLinesKey(`receiving-${poId}`);
       setLineIndex(0);
       // Guided moves into its per-item sequence; Form mode has no
       // sequence to move into — the lines just appear further down
@@ -399,6 +429,8 @@ export default function ReceivingFlow({ onCrumbChange }) {
           };
         }),
       });
+      // Sent, or safely in the outbox — either way the draft's job is done.
+      if (linesKey) clearDraft(linesKey);
       setPhase('done');
       // Closing the dialog here is what actually ends Form mode's
       // pass through this flow. Without it, `lines` stays populated

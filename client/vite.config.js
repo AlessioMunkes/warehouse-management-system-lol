@@ -29,6 +29,27 @@ export default defineConfig({
       // download ~400 kB on install for users who never drop a file.
       workbox: {
         globIgnores: ['**/xlsx-*.js'],
+        // Workbox's default is js/css/html only, which left every font
+        // (Montserrat, Inter, the Tabler icons) uncached — the app
+        // opened offline with boxes for icons. woff2 only: every
+        // browser that can install this prefers it, and the ttf/woff
+        // copies are 3.6 MB of dead weight.
+        globPatterns: ['**/*.{js,css,html,woff2,webmanifest}'],
+        // Images are NOT precached: the task-card SVGs in public/icons
+        // are 300 KB–1.1 MB each (about 7 MB together), which would
+        // make installing the app an 11 MB download. Instead each one
+        // is kept the first time a screen shows it. The manifest icons
+        // and the apple-touch-icon are still precached (includeAssets).
+        runtimeCaching: [
+          {
+            urlPattern: ({ request, sameOrigin }) => sameOrigin && request.destination === 'image',
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'wms-images',
+              expiration: { maxEntries: 80, maxAgeSeconds: 30 * 24 * 60 * 60 },
+            },
+          },
+        ],
         // The main bundle is ~2.1 MB, just over Workbox's 2 MiB default.
         // Past that limit the build fails outright, and the app shell
         // would not be cached for offline use. 4 MiB leaves headroom;

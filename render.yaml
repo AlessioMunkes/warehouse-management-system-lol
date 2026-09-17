@@ -43,3 +43,22 @@ services:
         generateValue: true    # Render generates a strong random value
       - key: DB_SSL
         value: "true"
+      # The AI features. WITHOUT THIS KEY BOTH ARE SILENTLY OFF:
+      # provider.isEnabled() is Boolean(GEMINI_API_KEY), so the help
+      # panel answers "the help assistant is not switched on" and the
+      # reporting screen hides its ask-a-question box entirely. Nothing
+      # logs an error, because neither is a fault — they are features
+      # that were never configured.
+      #
+      # Declared here with sync:false rather than left undeclared, so
+      # the blueprint says the key EXISTS and has to be pasted in the
+      # dashboard. That is the whole difference between a handover that
+      # works and one where the next person finds two dead features.
+      - key: GEMINI_API_KEY
+        sync: false            # paste the Google AI Studio key in the dashboard
+      # Pinned rather than left to the code default, because a model
+      # name that is retired for new keys is how this last broke: the
+      # fix is one dashboard edit, but only if you know the knob is
+      # here. See provider.js.
+      - key: GEMINI_MODEL
+        value: gemini-3.6-flash

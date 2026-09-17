@@ -15,7 +15,7 @@
 // Note the DEV check rather than `|| fallback`: VITE_API_URL is baked
 // in at BUILD time, so an unset variable in a production build would
 // otherwise leave every request pointing at the developer's localhost.
-import { reportReach, /* reportUnreachable */ } from './connection';
+import { reportReach, reportUnreachable } from './connection';
 
 export const API_BASE =
   import.meta.env.VITE_API_URL ??
@@ -122,7 +122,9 @@ const handleResponse = async (res) => {
   // server refusing us, not a warehouse with no signal — saying "no
   // signal" here would send a worker looking for a wifi problem that
   // does not exist.
-  reportReach();
+  // A copy served from readCache.js (X-WMS-Cached-At) means the
+  // request did NOT reach the server — readCache has already said so.
+  if (!res.headers?.get?.('x-wms-cached-at')) reportReach();
 
   if (!res.ok) {
     if (res.status === 401 && onUnauthorized) onUnauthorized(data.message);
@@ -145,6 +147,9 @@ const handleResponse = async (res) => {
 // DNS failure, connection refused). These errors get no `.status`,
 // which is how callers distinguish them from a real server refusal.
 const networkError = () => {
+  // Commented out in 763fc3c to quiet an unused-import warning, which
+  // left the offline bar deaf to everything except aeroplane mode.
+  reportUnreachable();
   console.error("[API] network error");
   const error = new Error('Could not reach the server. Check your connection and try again.');
   error.isNetworkError = true;

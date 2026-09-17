@@ -24,6 +24,7 @@
 // ─────────────────────────────────────────────────────────────
 import { createContext, useContext, useEffect, useState } from 'react';
 import { apiGet, apiPost, setUnauthorizedHandler } from '../services/api';
+import { clearReadCache, setReadCacheScope } from '../services/readCache';
 
 const AuthContext = createContext(null);
 
@@ -45,13 +46,27 @@ const readCachedUser = () => {
   }
 };
 
+// Guests and staff live in different tables, so an id alone is not
+// a person — role:id is.
+const scopeOf = (user) => (user ? `${user.role}:${user.id}` : null);
+
 const writeCachedUser = (user) => {
+  // Every saved read on this device belongs to one person. A different
+  // person, or nobody, means none of it may be shown again.
+  const before = scopeOf(readCachedUser());
+  const after = scopeOf(user);
+  if (before !== after) clearReadCache();
+  setReadCacheScope(after);
   if (user) localStorage.setItem(CACHE_KEY, JSON.stringify(user));
   else      localStorage.removeItem(CACHE_KEY);
 };
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser]           = useState(readCachedUser);
+  const [user, setUser]           = useState(() => {
+    const cached = readCachedUser();
+    setReadCacheScope(scopeOf(cached));
+    return cached;
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(false);
   // Why the session ended, so the login screen can explain itself
@@ -106,14 +121,10 @@ export const AuthProvider = ({ children }) => {
 
   // ── Login ─────────────────────────────────────────────────────
   const login = async (username, password) => {
-    console.log("[AUTH] login()", username);
-    console.log("[AUTH] calling apiPost");
     const data = await apiPost('/api/login', { username, password });
-    console.log("[AUTH] apiPost returned", data);
     writeCachedUser(data.user);
     setUser(data.user);
     setSessionMessage(null);
-    console.log("[AUTH] returning user", data.user);
     return data.user;
   };
 
