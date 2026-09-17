@@ -1,5 +1,6 @@
 import usePdfDocument from '../../staff/hooks/usePdfDocument';
 import '../../../styles/deliveryNotePDF.css';
+import { fmtQty } from '../../../lib/quantity';
 
 // ─────────────────────────────────────────────────────────────
 // client/src/features/dispatch/components/DispatchNotePDF.jsx
@@ -154,10 +155,10 @@ const DispatchNotePDF = ({ note, onClose }) => {
                     <td className="pdf-table-product">{line.product_name || '—'}</td>
                     <td className="pdf-table-sku">{line.sku || '—'}</td>
                     <td className="pdf-table-center">
-                      {line.packed_quantity} {line.unit}
+                      {fmtQty(line.packed_quantity, line.unit)}
                     </td>
                     <td className="pdf-table-center">
-                      {line.loaded_quantity} {line.unit}
+                      {fmtQty(line.loaded_quantity, line.unit)}
                       {Number(line.loaded_quantity) !== Number(line.packed_quantity) ? ' *' : ''}
                     </td>
                   </tr>

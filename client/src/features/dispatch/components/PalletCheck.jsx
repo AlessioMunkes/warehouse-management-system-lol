@@ -55,6 +55,7 @@ import {
 import useCoachmark from '../../staff/hooks/useCoachmark';
 import { useAuth } from '../../../context/AuthContext';
 import dispatchAPI, { newIdempotencyKey } from '../../../services/dispatchAPI';
+import { qtyInput } from '../../../lib/quantity';
 import SignaturePad from '../../procurement/components/SignaturePad';
 import DispatchNotePDF from './DispatchNotePDF';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../components/ui/dialog';
@@ -171,7 +172,9 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
             unit:     item.unit,
             required: Number(item.required_quantity ?? 0),
             packed:   item.packed_quantity === null ? null : Number(item.packed_quantity),
-            loaded:   item.packed_quantity === null ? '' : String(item.packed_quantity),
+            // qtyInput, not String(): pg sends "1.000" and nobody wants
+            // to retype that into a box (script 54).
+            loaded:   item.packed_quantity === null ? '' : qtyInput(item.packed_quantity),
           }))
         );
       })

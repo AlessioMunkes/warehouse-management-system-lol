@@ -32,6 +32,7 @@ import {
 import { PRODUCT_CLASSIFICATION_CATEGORIES } from '@/services/donationManagementAPI';
 import { ProductMatchCombobox } from '@/features/donation/components/ProductMatchComboBox';
 import useFlaggedItems from '../hooks/useFlaggedItems';
+import { fmtQty } from '@/lib/quantity';
 
 const formatCategoryLabel = (category = '') =>
   category.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -151,7 +152,7 @@ const IntakeFlagRow = ({ flag, busy, onResolve }) => {
                   <span className="text-xs text-muted-foreground">{item.line_no}.</span>
                   <span>{item.description}</span>
                   <span className="text-xs text-muted-foreground">
-                    {item.quantity} {item.unit}
+                    {fmtQty(item.quantity, item.unit)}
                   </span>
                   {item.status && item.status !== 'awaiting_resolution' ? (
                     <Badge variant="outline" className="text-[10px]">
@@ -295,7 +296,7 @@ const LegacyFlagRow = ({ flag, busy, onResolve }) => {
             </span>
           </div>
           <span className="text-xs text-muted-foreground">
-            {flag.quantity_kg != null ? `${flag.quantity_kg} kg` : ''}
+            {flag.quantity_kg != null ? fmtQty(flag.quantity_kg, 'kg') : ''}
           </span>
         </div>
       </CardHeader>

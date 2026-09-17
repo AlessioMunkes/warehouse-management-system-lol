@@ -51,6 +51,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Search, CalendarPlus, PackagePlus, X, ArrowLeft, QrCode, Printer, AlertTriangle } from 'lucide-react';
 import { openLabelPdf, publicAppOrigin, isReachableByPhone } from '../features/packing/palletLabelPdf';
+import { fmtQty } from '../lib/quantity';
 
 const COHORT_OPTIONS = [
   { value: 'week1', label: 'Week 1' },
@@ -133,7 +134,7 @@ const SlipDetail = ({ slip, workers, assignChoice, onAssignChoice, onAssign, ass
             {slip.items.map((item) => (
               <TableRow key={item.id}>
                 <TableCell>{item.product_name}</TableCell>
-                <TableCell className="text-muted-foreground">{item.required_quantity} {item.unit}</TableCell>
+                <TableCell className="text-muted-foreground">{fmtQty(item.required_quantity, item.unit)}</TableCell>
                 <TableCell><Badge variant="outline">{item.status}</Badge></TableCell>
               </TableRow>
             ))}

@@ -20,6 +20,7 @@ import {
   fetchPickingSlip, assignSlip, confirmItem, flagItem, completeSlip,
 } from '../../../services/pickingAPI';
 import { Actions, Button, ChoiceList, Counter, Notice } from '../../staff/components/StepPrimitives';
+import { fmtQty } from '../../../lib/quantity';
 
 const COHORT_LABELS = { week1: 'Week 1', week2: 'Week 2' };
 const REASON_OPTIONS = [
@@ -238,8 +239,8 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
                   <span>
                     <span className="stf-row-title">{item.product_name}</span>
                     <span className="stf-row-meta">
-                      Required {item.required_quantity} {item.unit}
-                      {item.packed_quantity != null ? ` · Packed ${item.packed_quantity} ${item.unit}` : ''}
+                      Required {fmtQty(item.required_quantity, item.unit)}
+                      {item.packed_quantity != null ? ` · Packed ${fmtQty(item.packed_quantity, item.unit)}` : ''}
                       {item.flag_reason ? ` · ${item.flag_reason}` : ''}
                     </span>
                   </span>

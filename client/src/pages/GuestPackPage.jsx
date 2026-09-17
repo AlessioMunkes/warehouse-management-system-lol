@@ -35,6 +35,7 @@ import {
   StatusPill, Progress, Counter, HelpNote, Loading,
 } from '../features/guest/components/GuestPrimitives';
 import { formatDay, displayName } from '../features/guest/guestFormat';
+import { fmtQty } from '../lib/quantity';
 
 // Plain words. No "variance", no "SKU", no "cohort" — ACC-09.
 const PROBLEM_REASONS = [
@@ -269,7 +270,7 @@ const GuestPackPage = () => {
     <GuestShell>
       <GuestScreen
         title={current.product_name}
-        lede={`Put ${current.required_quantity} ${current.unit || ''} into the box.`.replace(/\s+/g, ' ')}
+        lede={`Put ${fmtQty(current.required_quantity, current.unit || '')} into the box.`.replace(/\s+/g, ' ')}
       >
         {/* Constant sense of place: what, for whom, how far through. */}
         <PlaceBar items={[
@@ -288,7 +289,7 @@ const GuestPackPage = () => {
           <p className="gst-card-meta">Item {done + 1} of {total}</p>
           <h2 className="gst-card-title" style={{ fontSize: '1.375rem' }}>{current.product_name}</h2>
           <p className="gst-card-meta">
-            You need <strong>{current.required_quantity} {current.unit || ''}</strong>.
+            You need <strong>{fmtQty(current.required_quantity, current.unit || '')}</strong>.
             Take from the oldest stock first.
           </p>
         </div>

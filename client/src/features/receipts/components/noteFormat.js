@@ -50,19 +50,14 @@ export const formatDateShort = (value) => {
 
 // Quantities arrive from pg as strings, because numeric does not fit in a JS
 // number safely and node-postgres refuses to guess. Number() them at the edge.
-export const qty = (value) => {
-  if (value === null || value === undefined || value === '') return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-};
+//
+// Script 54: both of these moved to lib/quantity.js — packing, the
+// gate, receiving and the ledger print quantities too, and two copies
+// of a formatter is how "1.000" ended up in a number box. Re-exported
+// here so every existing import of noteFormat keeps working.
+import { qty, fmtQty } from '../../../lib/quantity';
 
-export const fmtQty = (value, unit) => {
-  const n = qty(value);
-  if (n === null) return '—';
-  // Trim a trailing .00 without mangling 1.5
-  const text = Number.isInteger(n) ? String(n) : String(Number(n.toFixed(3)));
-  return unit ? `${text} ${unit}` : text;
-};
+export { qty, fmtQty };
 
 // ── Variance ─────────────────────────────────────────────────
 // Returns { diff, label, className } or null when the two match.

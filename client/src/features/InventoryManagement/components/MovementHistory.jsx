@@ -20,6 +20,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { fmtQty } from "../../../lib/quantity";
 
 // Import custom CSS
 import "../../../styles/index.css"; // Adjust path to match your folder structure
@@ -113,7 +114,7 @@ export default function MovementHistory({
                               : "badge-instock"
                           }
                         >
-                          {m.quantity > 0 ? `+${m.quantity}` : m.quantity}{" "}
+                          {m.quantity > 0 ? `+${fmtQty(m.quantity)}` : fmtQty(m.quantity)}{" "}
                           {m.unit}
                         </Badge>
                       </TableCell>

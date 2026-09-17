@@ -10,6 +10,7 @@
 // because it's a real decision point (stay vs go home), not an error.
 // ─────────────────────────────────────────────────────────────
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { fmtQty } from "@/lib/quantity";
 
 export function WarningsNotice({ warnings, onDismiss }) {
   if (!warnings || warnings.length === 0) return null;
@@ -59,7 +60,7 @@ export function CompletionDialog({ open, result, onRecordAnother, onGoHome }) {
               </p>
               {result.awaitingItems?.map((it) => (
                 <p key={it.id} style={{ margin: "6px 0 0" }}>
-                  • {it.description || "Untitled item"} — {it.quantity} {it.unit}
+                  • {it.description || "Untitled item"} — {fmtQty(it.quantity, it.unit)}
                 </p>
               ))}
               <p style={{ margin: "6px 0 0" }}>

@@ -78,6 +78,7 @@ import { newIdempotencyKey } from '../../../services/api';
 import { useAuth } from '../../../context/AuthContext';
 import SignaturePad from './SignaturePad';
 import DeliveryNotePDF from './DeliveryNotePDF';
+import { qtyInput } from '../../../lib/quantity';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../../components/ui/dialog';
 
 // Shared by both modes' final screen, right before the submit button.
@@ -330,7 +331,9 @@ export default function ReceivingFlow({ onCrumbChange }) {
           fresh,
           // Full form pre-fills; Guided starts every line empty
           // because the point of that mode is an active count.
-          counted:    mode === 'full' ? String(item.expected_quantity ?? '') : '',
+          // qtyInput, not String(): "30.000" in a box somebody is
+          // about to retype is noise (script 54).
+          counted:    mode === 'full' ? qtyInput(item.expected_quantity) : '',
           location:   fresh ? 'cold_room' : 'dry_store',
           useBy:      '',
         };
