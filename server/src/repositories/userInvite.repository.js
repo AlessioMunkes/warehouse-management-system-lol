@@ -46,10 +46,19 @@ const getById = async (id) => {
 
 // token_hash IS in this SELECT — this is the one read path that
 // legitimately needs it, to resolve an incoming raw token.
+//
+// Joined to the inviting admin's name — the accept page (an
+// unauthenticated stranger's first look at this system) says who
+// invited them, which the plain invite columns alone can't answer.
+// LEFT JOIN because invited_by is nullable and an invite must still
+// resolve if that admin's row is ever archived later.
 const getByTokenHash = async (tokenHash) => {
   const { rows } = await pool.query(
-    `SELECT ${INVITE_COLUMNS}, i.token_hash
+    `SELECT ${INVITE_COLUMNS}, i.token_hash,
+            inviter.first_name AS inviter_first_name,
+            inviter.last_name  AS inviter_last_name
        FROM user_invites i
+       LEFT JOIN users inviter ON inviter.id = i.invited_by
       WHERE i.token_hash = $1`,
     [tokenHash]
   );

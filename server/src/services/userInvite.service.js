@@ -80,6 +80,11 @@ const toPublicInvite = (invite) => ({
   resendCount: invite.resend_count,
   revokedAt:   invite.revoked_at ?? null,
   acceptedAt:  invite.accepted_at ?? null,
+  // Only present on rows read via getByTokenHash (the accept page's
+  // resolve call) — every other read path leaves both undefined.
+  inviterName: invite.inviter_first_name
+    ? `${invite.inviter_first_name} ${invite.inviter_last_name ?? ''}`.trim()
+    : null,
 });
 
 // ── Create ────────────────────────────────────────────────────
