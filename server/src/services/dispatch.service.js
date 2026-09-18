@@ -37,7 +37,15 @@ const STATUSES = ['awaiting', 'collected', 'late_collected', 'not_collected', 'c
 // the sponsor ever wants it configurable, move it to picking_settings
 // alongside cohort_anchor_monday rather than adding a second
 // settings mechanism.
-export const NON_COLLECTION_CUTOFF_HOUR = 16;
+//
+// Sponsor feedback (Milestone 2 change request log): "collections
+// generally happen on Thursdays at approximately 15:00" — the URS's
+// 16:00 cutoff was an hour later than the warehouse actually closes
+// the gate. Moved to 15:00 to match. This is the literal timing fix
+// only; it does NOT touch the deeper, separately-flagged discrepancy
+// below (fortnightly week1/week2 vs weekly tuesday/thursday cohorts),
+// which needs its own sponsor conversation.
+export const NON_COLLECTION_CUTOFF_HOUR = 15;
 
 // Signatures arrive as base64 PNG data URLs from a canvas, the same
 // way delivery notes already store them. A signature from a phone

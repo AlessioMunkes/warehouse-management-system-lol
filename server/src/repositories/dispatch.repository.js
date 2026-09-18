@@ -56,7 +56,7 @@ const logEvent = async (client, slipId, eventType, actorId, detail = null) => {
 //                    handled today. A pallet staged for Tuesday that
 //                    nobody fetched is still sitting in the building
 //                    on Thursday, and the gate has to be able to
-//                    release it — the 16:00 sweep marks it
+//                    release it — the 15:00 sweep marks it
 //                    not_collected but explicitly leaves it
 //                    collectable as a late collection.
 //   neither        — no date restriction at all.
@@ -288,7 +288,7 @@ const getGateView = async (slipId) => {
 // PWA queues the payload and replays it on reconnect. A replay finds
 // the existing event and returns it instead of deducting twice.
 //
-// Late collection is not a separate path. A pallet the 16:00 sweep
+// Late collection is not a separate path. A pallet the 15:00 sweep
 // already wrote off has a 'not_collected' event; if the driver turns
 // up afterwards this function updates that row to 'late_collected'
 // and deducts as normal. Because non-collection posted no movement,
@@ -532,7 +532,7 @@ const collect = async ({
   }
 };
 
-// ── The 16:00 sweep (BR-14) ───────────────────────────────────
+// ── The 15:00 sweep (BR-14) ───────────────────────────────────
 // Writes a 'not_collected' event for every packed pallet on the given
 // date that nobody has come for. No stock movement is posted, because
 // none was ever posted for the pallet — the goods just stop counting
@@ -574,7 +574,7 @@ const sweepNonCollections = async ({ dispatchDate, actorId }) => {
     if (swept.rowCount > 0) {
       await createNotification(client, {
         type:  'non_collections_flagged',
-        title: `${swept.rowCount} pallet${swept.rowCount === 1 ? '' : 's'} not collected by 16:00`,
+        title: `${swept.rowCount} pallet${swept.rowCount === 1 ? '' : 's'} not collected by 15:00`,
         body:  `${dispatchDate} — flagged automatically per BR-14.`,
         entityType: 'dispatch_sweep',
       });

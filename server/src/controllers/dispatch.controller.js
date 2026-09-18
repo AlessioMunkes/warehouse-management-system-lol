@@ -24,7 +24,7 @@ import dispatchService from '../services/dispatch.service.js';
 // date, plus handled today" — see getBoard in dispatch.service.js.
 // Returns: every packed pallet for the day, one row per slip, with
 // today's dispatch status baked in. May opportunistically run the
-// 16:00 non-collection sweep as a side effect (see the service).
+// 15:00 non-collection sweep as a side effect (see the service).
 const getBoard = async (req, res) => {
   try {
     const board = await dispatchService.getBoard(req.query, req.user);
@@ -57,7 +57,7 @@ const getHistory = async (req, res) => {
   }
 };
 
-// ── Run the 16:00 sweep on demand (manager only) ─────────────
+// ── Run the 15:00 sweep on demand (manager only) ─────────────
 // POST /api/dispatch/sweep
 // Body: { dispatchDate? } — defaults to today.
 // Returns: { flagged, slipIds } — every pallet just written off.

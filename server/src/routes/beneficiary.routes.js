@@ -37,4 +37,7 @@ router.patch('/:id/status',
 router.patch('/:id/approve',
   auth, requireRole(...MANAGES_UP), validateIntId, beneficiaryController.approve);
 
+router.patch('/:id/rollback-cohort',
+  auth, requireRole(...MANAGES_UP), validateIntId, beneficiaryController.rollbackCohort);
+
 export default router;
