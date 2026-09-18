@@ -14,7 +14,7 @@
 // never depend on a stat row rendering.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
-import { ClipboardList, Truck, PackageCheck, PackageOpen, FlaskConical, ClipboardCheck, HandCoins } from 'lucide-react';
+import { ClipboardList, Truck, PackageCheck, PackageOpen, FlaskConical, ClipboardCheck, HandCoins, Sprout } from 'lucide-react';
 import DashboardGreeting from '../features/taskdashboard/components/DashboardGreeting';
 import UnfinishedWork from '../features/staff/components/UnfinishedWork';
 import StatTile from '../features/taskdashboard/components/StatTile';
@@ -37,6 +37,8 @@ const TASKS = [
     description: 'Hand a pallet over at the gate and capture the signature.' },
   { to: STAFF.donation, icon: HandCoins, title: 'Donation intake',
     description: 'Log goods donated at the door.' },
+  { to: STAFF.feedTheSoil, icon: Sprout, title: 'Feed the Soil',
+    description: 'Log a kit of food waste going out or compost coming back.' },
   // Receipts is manager-only and deliberately absent. The card and the
   // route guard in App.jsx have to agree — a hidden card on an open
   // route is not access control, just a tidier way to lose track of one.

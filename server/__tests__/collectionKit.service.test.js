@@ -34,7 +34,7 @@ describe('logKitOut', () => {
   });
 
   it('defaults dateOut to today and passes the actor as loggedBy', async () => {
-    repoMock.logKitOut.mockResolvedValue({ id: 1, kit_label: 'Bucket A1' });
+    repoMock.logKitOut.mockResolvedValue({ ok: true, kit: { id: 1, kit_label: 'Bucket A1' } });
 
     await service.logKitOut({ kitLabel: 'Bucket A1', kgFoodWasteCollected: 12.5 }, ACTOR_ID);
 
@@ -46,11 +46,30 @@ describe('logKitOut', () => {
   });
 
   it('treats blank optional fields as null, not empty strings', async () => {
-    repoMock.logKitOut.mockResolvedValue({ id: 1 });
+    repoMock.logKitOut.mockResolvedValue({ ok: true, kit: { id: 1 } });
     await service.logKitOut({ kitLabel: 'Bucket A1', kgFoodWasteCollected: 5, location: '  ', notes: '' }, ACTOR_ID);
     const call = repoMock.logKitOut.mock.calls[0][0];
     expect(call.location).toBeNull();
     expect(call.notes).toBeNull();
+  });
+
+  it('returns the created kit on success', async () => {
+    const kit = { id: 1, kit_label: 'Bucket A1', status: 'out' };
+    repoMock.logKitOut.mockResolvedValue({ ok: true, kit });
+    const result = await service.logKitOut({ kitLabel: 'Bucket A1', kgFoodWasteCollected: 5 }, ACTOR_ID);
+    expect(result).toEqual(kit);
+  });
+
+  it('409s when the same kit label is already out, rather than logging a second one', async () => {
+    repoMock.logKitOut.mockResolvedValue({ ok: false, code: 'already_out', kitId: 7 });
+    await expect(service.logKitOut({ kitLabel: 'Bucket A1', kgFoodWasteCollected: 5 }, ACTOR_ID))
+      .rejects.toMatchObject({ status: 409 });
+  });
+
+  it('surfaces a missing collection_kits table as a 503, not a raw 500', async () => {
+    repoMock.logKitOut.mockRejectedValue(Object.assign(new Error('relation does not exist'), { code: '42P01' }));
+    await expect(service.logKitOut({ kitLabel: 'Bucket A1', kgFoodWasteCollected: 5 }, ACTOR_ID))
+      .rejects.toMatchObject({ status: 503 });
   });
 });
 

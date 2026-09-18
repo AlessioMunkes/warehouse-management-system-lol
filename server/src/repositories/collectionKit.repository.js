@@ -55,10 +55,23 @@ const listKits = async ({ status = null, limit = 100 } = {}) => {
   return rows;
 };
 
+// FOR UPDATE on the same-label check: two workers logging "Bucket A1"
+// out at the same moment must not both succeed — one bucket cannot be
+// out twice, and the list screen would otherwise show two open rows
+// for the same physical kit with no way to tell them apart.
 const logKitOut = async ({ kitLabel, location, dateOut, kgFoodWasteCollected, notes, loggedBy }) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+
+    const { rows: alreadyOut } = await client.query(
+      `SELECT id FROM collection_kits WHERE kit_label = $1 AND status = 'out' FOR UPDATE`,
+      [kitLabel]
+    );
+    if (alreadyOut[0]) {
+      await client.query('ROLLBACK');
+      return { ok: false, code: 'already_out', kitId: alreadyOut[0].id };
+    }
 
     const { rows } = await client.query(
       `INSERT INTO collection_kits
@@ -78,7 +91,7 @@ const logKitOut = async ({ kitLabel, location, dateOut, kgFoodWasteCollected, no
     });
 
     await client.query('COMMIT');
-    return kit;
+    return { ok: true, kit };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;

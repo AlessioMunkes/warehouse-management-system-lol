@@ -198,8 +198,10 @@ const App = () => (
         </Route>
 
         {/* Feed the Soil kit logging. Warehouse staff and up, mirroring
-            STAFF_UP on every /api/collection-kits route. */}
-        <Route element={<ProtectedRoute roles={FEED_THE_SOIL_ROLES} shell />}>
+            STAFF_UP on every /api/collection-kits route. No shell here —
+            FeedTheSoilPage picks ManagerLayout or StaffShell itself by
+            role, the same way DecantingPage does for /noc/decanting. */}
+        <Route element={<ProtectedRoute roles={FEED_THE_SOIL_ROLES} />}>
           <Route path={STAFF.feedTheSoil} element={<FeedTheSoilPage />} />
         </Route>
 

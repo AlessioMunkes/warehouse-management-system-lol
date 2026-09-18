@@ -418,6 +418,47 @@ CREATE TABLE community_requests (
                                   CHECK (outcome IN ('pending', 'fulfilled', 'declined')),
   created_at        TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
+
+-- ─────────────────────────────────────────────────────────────
+-- NEW: FEED THE SOIL — COLLECTION KITS
+-- Per the project's own warehouse visit notes: "Feed the soil - take
+-- food waste, turn to soil. goes to farmers, then we purchase
+-- (swapping food waste for compost - managing buckets)". A kit is one
+-- bucket's round trip: logged out with food waste, logged again on
+-- return with the compost that came back. Feeds the Impact
+-- Calculator's compost_processed metric (reporting.repository.js) —
+-- only rows with status = 'returned' count, and returned_at /
+-- kg_compost_returned are always set together, never independently.
+--
+-- This was implemented before this table was ever documented here —
+-- collection_kits already exists in the live database and the code
+-- in server/src/repositories/collectionKit.repository.js is what
+-- actually runs. Per this file's own disclaimer at the top, that
+-- code — not this block — is authoritative; this entry exists so the
+-- table is no longer undocumented, not to redefine it. It is written
+-- to match what the code assumes (integer id, not this file's usual
+-- UUID convention) rather than perpetuate a shape nothing uses.
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE collection_kits (
+  id                        SERIAL        PRIMARY KEY,
+  kit_label                 VARCHAR(200)  NOT NULL,
+  location                  VARCHAR(255),
+  date_out                  DATE          NOT NULL DEFAULT CURRENT_DATE,
+  kg_food_waste_collected   NUMERIC(10,3) NOT NULL CHECK (kg_food_waste_collected >= 0),
+  returned_at               TIMESTAMPTZ,
+  kg_compost_returned       NUMERIC(10,3) CHECK (kg_compost_returned >= 0),
+  status                    VARCHAR(20)   NOT NULL DEFAULT 'out'
+                                          CHECK (status IN ('out', 'returned')),
+  notes                     TEXT,
+  logged_by                 INTEGER       REFERENCES users(id),
+  created_at                TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_collection_kits_status ON collection_kits(status);
+-- One open ("out") row per kit label at a time — enforced in
+-- application code today (collectionKit.repository.js's logKitOut
+-- locks and checks this inside a transaction); a partial unique index
+-- would make it a hard constraint instead, worth doing once this
+-- table gets a real migration file.
 ```
 
 ## 5. Decanting & Inventory Management
@@ -655,4 +696,5 @@ CREATE TABLE bookings (
 | 9 | Added `dispatch_notes` table | §4.3 — proof of dispatch, mirrors delivery notes |
 | 10 | Added `guest_sessions` table | §6.2, §6.3 — session summaries for guest volunteers, scoped narrowly (full tracking stays with VMS) |
 | 11 | `ecd_centers.is_active` used for soft delete | §6.5 — historical dispatch records must survive ECD offboarding |
+| 12 | Added `collection_kits` table | Feed the Soil kit logging — implemented and live before it was ever documented here; backfilled to match the running code |
 
