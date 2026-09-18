@@ -279,9 +279,70 @@ const updatePurchaseOrderStatus = async (id, status, reason) => {
   }
 };
 
+// ── QuickBooks reference ─────────────────────────────────────
+// Sponsor feedback: QuickBooks integration was scoped to dispatch/
+// invoice only. The manual reference createPurchaseOrder already
+// accepts was write-once — there was no way to attach it once a PO
+// existed, which is the common case (the QBO number is only known
+// once the order has actually been entered into QuickBooks, after
+// it is raised here). This gives that same row an update path.
+//
+// Delete-then-insert rather than INSERT ... ON CONFLICT: no unique
+// index on (entity_type, entity_id) is defined anywhere in this
+// codebase's tracked schema, so an upsert can't safely assume one
+// exists. A null/blank quickbooksPoId clears the link (delete only,
+// no re-insert) — unlinking is a real state, not an error.
+const setQuickbooksReference = async (id, quickbooksPoId, actorId) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows } = await client.query(
+      `SELECT id FROM purchase_orders WHERE id = $1 FOR UPDATE`,
+      [id]
+    );
+    if (!rows[0]) {
+      await client.query('ROLLBACK');
+      return false;
+    }
+
+    await client.query(
+      `DELETE FROM quickbooks_object_map
+        WHERE entity_type = 'purchase_order' AND entity_id = $1`,
+      [id]
+    );
+
+    if (quickbooksPoId) {
+      await client.query(
+        `INSERT INTO quickbooks_object_map
+           (entity_type, entity_id, qbo_object_type, qbo_id)
+         VALUES ('purchase_order', $1, 'PurchaseOrder', $2)`,
+        [id, quickbooksPoId]
+      );
+    }
+
+    await logAudit(client, {
+      entityType: 'purchase_order',
+      entityId:   id,
+      action:     'quickbooks_ref_set',
+      actorId,
+      after:      { quickbooksPoId },
+    });
+
+    await client.query('COMMIT');
+    return true;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
 export default {
   createPurchaseOrder,
   listPurchaseOrders,
   getPurchaseOrderById,
   updatePurchaseOrderStatus,
+  setQuickbooksReference,
 };

@@ -39,4 +39,7 @@ router.get('/:id',
 router.patch('/:id/status',
   auth, requireRole(...MANAGES_UP), validateIntId, purchaseOrderController.setStatus);
 
+router.patch('/:id/quickbooks-ref',
+  auth, requireRole(...MANAGES_UP), validateIntId, purchaseOrderController.setQuickbooksReference);
+
 export default router;

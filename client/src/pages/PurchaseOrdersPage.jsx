@@ -154,6 +154,20 @@ export default function PurchaseOrdersPage() {
     } catch (err) { setError(err.message); }
   };
 
+  // Returns whether it succeeded rather than throwing, so the inline
+  // editor in PurchaseOrderDetail knows whether to close (success) or
+  // stay open with the draft intact (failure) — the ErrorBanner above
+  // already surfaces the message either way.
+  const setQuickbooksRef = async (quickbooksPoId) => {
+    setError(null);
+    try {
+      await purchaseOrderAPI.setQuickbooksReference(selected.id, quickbooksPoId);
+      await loadPurchaseOrders();
+      await open(selected.id);
+      return true;
+    } catch (err) { setError(err.message); return false; }
+  };
+
   const visible = tab === 'open'
     ? purchaseOrders.filter((po) => po.status !== 'completed' && po.status !== 'returned')
     : purchaseOrders;
@@ -253,6 +267,7 @@ export default function PurchaseOrdersPage() {
                     purchaseOrder={selected}
                     canManage={canManage}
                     onApprove={approve}
+                    onSetQuickbooksRef={setQuickbooksRef}
                     onClose={() => { setSelected(null); setMode('list'); }}
                   />
                 ) : null}

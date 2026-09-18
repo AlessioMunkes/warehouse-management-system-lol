@@ -245,9 +245,31 @@ const setPurchaseOrderStatus = async (rawId, body = {}) => {
   return repo.updatePurchaseOrderStatus(Number(rawId), status, reason);
 };
 
+// ── QuickBooks reference ─────────────────────────────────────
+// Same validation as buildPayload's quickbooksPoId at create time,
+// applied again here since this is now the second place a manager can
+// set it. An empty string clears the reference rather than being
+// rejected — a PO can go back to "not linked" if it was entered in
+// error.
+const setQuickbooksReference = async (rawId, body = {}, actorId) => {
+  if (!isPositiveInt(rawId)) throw fail(400, 'A valid purchase order ID is required.');
+  const id = Number(rawId);
+
+  const quickbooksPoId = clean(body.quickbooksPoId);
+  if (quickbooksPoId && quickbooksPoId.length > 50) {
+    throw fail(400, 'QuickBooks reference must be 50 characters or fewer.');
+  }
+
+  const found = await repo.setQuickbooksReference(id, quickbooksPoId, actorId);
+  if (!found) throw fail(404, 'Purchase order not found.');
+
+  return repo.getPurchaseOrderById(id);
+};
+
 export default {
   createPurchaseOrder,
   listPurchaseOrders,
   getPurchaseOrder,
   setPurchaseOrderStatus,
+  setQuickbooksReference,
 };

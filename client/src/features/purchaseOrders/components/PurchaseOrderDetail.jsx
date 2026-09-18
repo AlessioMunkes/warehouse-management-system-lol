@@ -11,15 +11,17 @@
 // the line, which is how BR-07A partial instalments work without a
 // separate receipts table — one PO, many delivery notes.
 // ─────────────────────────────────────────────────────────────
+import { useEffect, useState } from 'react';
 import { Badge }  from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input }  from '@/components/ui/input';
 import {
   Card, CardContent, CardHeader, CardTitle,
 } from '@/components/ui/card';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { X } from 'lucide-react';
+import { Pencil, X } from 'lucide-react';
 
 const fmtDate = (value) =>
   value
@@ -31,15 +33,41 @@ const money = (value) =>
     minimumFractionDigits: 2, maximumFractionDigits: 2,
   })}`;
 
-export default function PurchaseOrderDetail({ purchaseOrder: po, canManage, onApprove, onClose }) {
+export default function PurchaseOrderDetail({ purchaseOrder: po, canManage, onApprove, onSetQuickbooksRef, onClose }) {
   const facts = [
     ['Supplier',   po.supplierName],
     ['Status',     po.statusLabel],
     ['Expected',   fmtDate(po.expectedDeliveryDate)],
     ['Raised by',  po.createdByName || '—'],
     ['Raised on',  fmtDate(po.createdAt)],
-    ['QuickBooks', po.quickbooksPoId || 'Not linked'],
   ];
+
+  // The QBO reference is usually only known after this PO has already
+  // been raised here and then entered into QuickBooks separately, so
+  // it needs an edit path the other facts don't — kept out of the
+  // static list above for that reason. Local edit state resets off
+  // po.id: the panel re-renders in place when a manager switches
+  // between orders, and a stale draft from a previous PO must not
+  // survive that switch.
+  const [editingQbo, setEditingQbo] = useState(false);
+  const [qboDraft, setQboDraft]     = useState(po.quickbooksPoId || '');
+  const [qboBusy, setQboBusy]       = useState(false);
+
+  useEffect(() => {
+    setQboDraft(po.quickbooksPoId || '');
+    setEditingQbo(false);
+    setQboBusy(false);
+  }, [po.id]);
+
+  const saveQbo = async () => {
+    setQboBusy(true);
+    try {
+      const ok = await onSetQuickbooksRef(qboDraft.trim());
+      if (ok) setEditingQbo(false);
+    } finally {
+      setQboBusy(false);
+    }
+  };
 
   return (
     <Card>
@@ -63,6 +91,43 @@ export default function PurchaseOrderDetail({ purchaseOrder: po, canManage, onAp
               <dd>{value}</dd>
             </div>
           ))}
+
+          <div>
+            <dt className="text-muted-foreground">QuickBooks</dt>
+            {editingQbo ? (
+              <dd className="flex items-center gap-2">
+                <Input
+                  value={qboDraft}
+                  onChange={(e) => setQboDraft(e.target.value)}
+                  placeholder="QBO reference"
+                  maxLength={50}
+                  className="h-8"
+                  disabled={qboBusy}
+                />
+                <Button type="button" size="sm" onClick={saveQbo} disabled={qboBusy}>
+                  Save
+                </Button>
+                <Button
+                  type="button" variant="ghost" size="sm" disabled={qboBusy}
+                  onClick={() => { setQboDraft(po.quickbooksPoId || ''); setEditingQbo(false); }}
+                >
+                  Cancel
+                </Button>
+              </dd>
+            ) : (
+              <dd className="flex items-center gap-2">
+                {po.quickbooksPoId || 'Not linked'}
+                {canManage ? (
+                  <Button
+                    type="button" variant="ghost" size="icon-sm"
+                    onClick={() => setEditingQbo(true)} aria-label="Edit QuickBooks reference"
+                  >
+                    <Pencil />
+                  </Button>
+                ) : null}
+              </dd>
+            )}
+          </div>
         </dl>
 
         {/* BR-07B makes this mandatory on Returned, and migration 002

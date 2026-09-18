@@ -23,9 +23,11 @@
 // a number, so it needs no such care.
 //
 // There is no delete — nothing in the URS asks for a PO to be
-// destroyed. setPurchaseOrderStatus is the one update path, and it
-// only ever moves a PO through its states (BR-07B); it cannot edit
-// the lines, supplier, or anything else about it in place.
+// destroyed. setPurchaseOrderStatus and setQuickbooksReference are the
+// only update paths: the former only ever moves a PO through its
+// states (BR-07B), the latter only ever touches the QuickBooks
+// reference. Neither can edit the lines, supplier, or anything else
+// about it in place.
 // ─────────────────────────────────────────────────────────────
 import { apiGet, apiPost, apiPatch } from "./api";
 
@@ -135,7 +137,14 @@ export const setPurchaseOrderStatus = async (id, status, reason = null) => {
 
 export const approvePurchaseOrder = async (id) => setPurchaseOrderStatus(id, "approved");
 
+// ── PATCH /api/purchase-orders/:id/quickbooks-ref ───────────────
+// quickbooksPoId "" clears the reference — see purchaseOrder.service.js.
+export const setQuickbooksReference = async (id, quickbooksPoId) => {
+  const body = await apiPatch(`/api/purchase-orders/${id}/quickbooks-ref`, { quickbooksPoId });
+  return toPurchaseOrder(body.data ?? {});
+};
+
 export default {
   getPurchaseOrders, getPurchaseOrder, createPurchaseOrder,
-  setPurchaseOrderStatus, approvePurchaseOrder,
+  setPurchaseOrderStatus, approvePurchaseOrder, setQuickbooksReference,
 };
