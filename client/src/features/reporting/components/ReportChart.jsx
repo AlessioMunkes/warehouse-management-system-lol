@@ -205,7 +205,7 @@ const downloadCSV = (report, dimensionLabel) => {
   // an exported CSV is indistinguishable from a warehouse report the
   // moment it leaves this screen.
   const header = report.meta?.uploaded
-    ? [[`# Source: ${report.description} — uploaded file, not warehouse data`]]
+    ? [[`# Source: ${report.description} (uploaded file, not warehouse data)`]]
     : [];
 
   const rows = [

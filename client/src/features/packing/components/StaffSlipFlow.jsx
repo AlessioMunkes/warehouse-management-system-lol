@@ -220,7 +220,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
       </div>
 
       {items.length === 0 ? (
-        <Notice>This slip has no items — ask a manager to add order lines before this pallet goes out.</Notice>
+        <Notice>This slip has no items. Ask a manager to add order lines before this pallet goes out.</Notice>
       ) : (
         <div className="stf-list">
           {items.map((item) => {

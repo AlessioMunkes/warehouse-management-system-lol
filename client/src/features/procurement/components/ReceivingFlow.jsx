@@ -680,7 +680,7 @@ export default function ReceivingFlow({ onCrumbChange }) {
         <StepScreen
           title={queued ? 'Saved on this phone' : 'Delivery received'}
           sub={queued
-            ? 'There was no signal, so this is waiting on your phone. It sends itself as soon as you are back in range — the bar at the top says when it has gone. Do not count it again.'
+            ? 'There was no signal, so this is waiting on your phone. It sends itself as soon as you are back in range; the bar at the top says when it has gone. Do not count it again.'
             : 'The stock is on the system. You can put the next one in, or move on to packing.'}
           actions={
             <Actions>

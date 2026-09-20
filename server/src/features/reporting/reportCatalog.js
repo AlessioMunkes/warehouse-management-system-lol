@@ -121,7 +121,7 @@ export const METRICS = {
     description:
       'How many children received food. Counts each centre that actually collected ' +
       'once, using its registered child count. Because centres collect fortnightly, ' +
-      'a centre collecting twice in a month is still counted once — a headcount, ' +
+      'a centre collecting twice in a month is still counted once. A headcount, ' +
       'not a total of collections.',
     repoFn: 'childrenReached', unit: 'children',
     dimensions: ['none', 'month', 'cohort', 'ecd_centre'],
@@ -181,7 +181,7 @@ export const METRICS = {
   compost_processed: {
     id: 'compost_processed', label: 'Compost processed', temporal: 'range',
     description:
-      'Kilograms of compost collected through Feed the Soil — logged against a ' +
+      'Kilograms of compost collected through Feed the Soil, logged against a ' +
       'community member\'s collection kit each time it is weighed in.',
     repoFn: 'compostProcessed', unit: 'kg',
     dimensions: ['none', 'month'], filters: [],
@@ -194,7 +194,7 @@ export const METRICS = {
     id: 'dispatch_volume', label: 'Food dispatched', temporal: 'range',
     description:
       'Kilograms that physically left the warehouse, counted at the gate from what ' +
-      'staff loaded onto the vehicle — not what was packed onto the pallet earlier ' +
+      'staff loaded onto the vehicle, not what was packed onto the pallet earlier ' +
       'in the week.',
     repoFn: 'dispatchVolume', unit: 'kg',
     dimensions: ['none', 'month', 'week', 'cohort', 'product', 'programme', 'ecd_centre', 'beneficiary'],
@@ -207,8 +207,8 @@ export const METRICS = {
     id: 'collection_compliance', label: 'Collection compliance', temporal: 'range',
     description:
       'The percentage of prepared pallets that were actually collected. Late ' +
-      'collections count as collected — the food reached children, it just arrived ' +
-      'after four in the afternoon.',
+      'collections count as collected: the food reached children, it just arrived ' +
+      'after three in the afternoon.',
     repoFn: 'collectionCompliance', unit: '%',
     dimensions: ['none', 'month', 'cohort', 'ecd_centre'],
     filters: ['cohort', 'beneficiary_kind', 'ecd_id'],
@@ -259,8 +259,8 @@ export const METRICS = {
     id: 'receiving_discrepancy_rate', label: 'Delivery discrepancy rate', temporal: 'range',
     description:
       'How often what a supplier delivered did not match what was ordered, as a ' +
-      'percentage of their delivery lines. This is the supplier reliability report — ' +
-      'run it when asked which suppliers are a problem or who short-delivers.',
+      'percentage of their delivery lines. This is the supplier reliability report. ' +
+      'Run it when asked which suppliers are a problem or who short-delivers.',
     repoFn: 'receivingDiscrepancyRate', unit: '%',
     // supplier first: this is the supplier-reliability report, and a
     // single overall discrepancy rate is not something anyone acts on.
@@ -318,7 +318,7 @@ export const METRICS = {
   donation_value: {
     id: 'donation_value', label: 'Donation value received', temporal: 'range',
     description:
-      'The estimated rand value of donations received. Aggregate only — this report ' +
+      'The estimated rand value of donations received. Aggregate only; this report ' +
       'cannot be broken down by donor.',
     repoFn: 'donationValue', unit: 'ZAR',
     dimensions: ['none', 'month', 'category', 'programme'],
@@ -330,7 +330,7 @@ export const METRICS = {
   section18a_pipeline: {
     id: 'section18a_pipeline', label: 'Section 18A certificates', temporal: 'range',
     description:
-      'Where donations sit in the Section 18A tax certificate process — how many are ' +
+      'Where donations sit in the Section 18A tax certificate process: how many are ' +
       'issued, queued, waiting on donor details, or failed. This is the compliance ' +
       'view. Aggregate only, no donor names.',
     repoFn: 'section18aPipeline', unit: 'donations',
@@ -343,7 +343,7 @@ export const METRICS = {
   stock_on_hand: {
     id: 'stock_on_hand', label: 'Stock on hand', temporal: 'snapshot',
     description:
-      'What is in the warehouse right now. This is a live figure — it has no date ' +
+      'What is in the warehouse right now. This is a live figure; it has no date ' +
       'range and ignores any period asked for.',
     repoFn: 'stockOnHand', unit: 'units',
     dimensions: ['product', 'none'], filters: ['product_id', 'programme_id'],
@@ -369,7 +369,7 @@ export const METRICS = {
   stock_movement_volume: {
     id: 'stock_movement_volume', label: 'Stock movements', temporal: 'range',
     description:
-      'How much stock moved and why — received, picked, dispatched, decanted, ' +
+      'How much stock moved and why: received, picked, dispatched, decanted, ' +
       'donated, written off as wastage, or manually adjusted. Use this to see ' +
       'warehouse throughput or to check how much was adjusted by hand.',
     repoFn: 'stockMovementVolume', unit: 'units',
@@ -412,7 +412,7 @@ export const METRICS = {
     id: 'community_request_outcomes', label: 'Community requests', temporal: 'range',
     description:
       'Walk-in and phone-in requests for food from the public, and what happened to ' +
-      'them — pending, fulfilled, partially fulfilled, or declined (BR-28). ' +
+      'them: pending, fulfilled, partially fulfilled, or declined. ' +
       'Aggregate only, no caller details.',
     repoFn: 'communityRequestOutcomes', unit: 'requests',
     dimensions: ['outcome', 'month'], filters: [],
@@ -424,7 +424,7 @@ export const METRICS = {
   volunteer_hours: {
     id: 'volunteer_hours', label: 'Volunteer hours', temporal: 'range',
     description:
-      'Hours contributed by volunteers on site. Aggregate only — this report cannot ' +
+      'Hours contributed by volunteers on site. Aggregate only; this report cannot ' +
       'be broken down by individual volunteer.',
     repoFn: 'volunteerHours', unit: 'hours',
     dimensions: ['month', 'week', 'none'], filters: [],

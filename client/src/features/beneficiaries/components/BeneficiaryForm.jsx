@@ -111,7 +111,7 @@ export default function BeneficiaryForm({
           value={form.childCount ?? ''}
           onChange={set('childCount')}
         />
-        <FieldDescription>Leave blank if not yet known — used for impact reporting.</FieldDescription>
+        <FieldDescription>Leave blank if not yet known. Used for impact reporting.</FieldDescription>
       </Field>
 
       <Field orientation="horizontal">

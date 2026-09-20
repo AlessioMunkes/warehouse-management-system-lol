@@ -55,7 +55,7 @@ export default function ReconciliationPanel({ data, isLoading }) {
         </p>
         <p className="mt-1 text-xs text-[#8a2a2e]">
           The quantity on hand does not equal the sum of recorded movements. Something
-          changed a balance without writing to the ledger — start with the most recent
+          changed a balance without writing to the ledger. Start with the most recent
           movements for these products.
         </p>
       </div>

@@ -107,7 +107,7 @@ export default function DataUpload() {
 
   const report = built && {
     spec: { metric: `uploaded-${safeName}`, dimension: 'none', filters: {}, dateRange: null },
-    description: `From uploaded file: ${table.sourceName} — ${config.aggregation === 'count'
+    description: `From uploaded file: ${table.sourceName}, ${config.aggregation === 'count'
       ? 'row count' : `${config.aggregation} of ${config.valueColumn}`} by ${config.labelColumn}`,
     chartType: config.chartType,
     series: built.series,
@@ -247,10 +247,10 @@ export default function DataUpload() {
                   style={{ borderColor: BORDER, color: MUTED }}>
             {/* The line that stops this being mistaken for a system
                 report six months from now. */}
-            <p><strong>Source: {table.sourceName}</strong> — uploaded file, not warehouse data.</p>
+            <p><strong>Source: {table.sourceName}</strong> (uploaded file, not warehouse data)</p>
             <p>{table.rows.length.toLocaleString('en-ZA')} rows read.</p>
             {built?.trimmed && (
-              <p>Showing the top {built.series.length} groups only — the rest were left out.</p>
+              <p>Showing the top {built.series.length} groups only. The rest were left out.</p>
             )}
             {table.truncated && (
               <p>Only the first rows of a very large file were read.</p>
@@ -261,7 +261,7 @@ export default function DataUpload() {
               && built.usedRows < table.rows.length && (
               <p>
                 {table.rows.length - built.usedRows} row
-                {table.rows.length - built.usedRows === 1 ? '' : 's'} skipped — no number in
+                {table.rows.length - built.usedRows === 1 ? '' : 's'} skipped: no number in
                 “{config.valueColumn}”.
               </p>
             )}

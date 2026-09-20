@@ -82,7 +82,7 @@ export default function AdjustStockModal({
 
     const magnitude = Number(amount);
     const quantityDelta = direction === "remove" ? -magnitude : magnitude;
-    const fullReason = note.trim() ? `${reason} — ${note.trim()}` : reason;
+    const fullReason = note.trim() ? `${reason}: ${note.trim()}` : reason;
 
     const ok = await onSave({
       productId: product.id,
@@ -123,7 +123,7 @@ export default function AdjustStockModal({
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="adjust-modal-container">
         <DialogHeader>
-          <DialogTitle>Adjust Stock — {product.name}</DialogTitle>
+          <DialogTitle>Adjust stock · {product.name}</DialogTitle>
           <DialogDescription>
             SKU: {product.sku} · Currently {product.onHand} {product.unit} on
             hand. Manual adjustments are logged to the audit ledger.

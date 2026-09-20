@@ -44,7 +44,7 @@ export function CompletionDialog({ open, result, onRecordAnother, onGoHome }) {
       <DialogContent className="stf-shell">
         <DialogHeader>
           <DialogTitle>
-            {pendingReview ? "Donation received — pending manager review" : "Donation recorded"}
+            {pendingReview ? "Donation received, pending manager review" : "Donation recorded"}
           </DialogTitle>
         </DialogHeader>
 
@@ -59,7 +59,7 @@ export function CompletionDialog({ open, result, onRecordAnother, onGoHome }) {
               </p>
               {result.awaitingItems?.map((it) => (
                 <p key={it.id} style={{ margin: "6px 0 0" }}>
-                  • {it.description || "Untitled item"} — {it.quantity} {it.unit}
+                  • {it.description || "Untitled item"} ({it.quantity} {it.unit})
                 </p>
               ))}
               <p style={{ margin: "6px 0 0" }}>

@@ -271,7 +271,7 @@ export default function PickingSlipManagementPage() {
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
                 Creates one slip per approved, active beneficiary in the chosen cohort. Safe to
-                run twice — it skips any centre that already has a slip for that date.
+                run twice: it skips any centre that already has a slip for that date.
               </p>
               {genError ? <ErrorBanner message={genError} /> : null}
               {genResult ? (
@@ -279,7 +279,7 @@ export default function PickingSlipManagementPage() {
                   message={
                     `${genResult.created} slip(s) created.` +
                     (genResult.emptySlips?.length
-                      ? ` ${genResult.emptySlips.length} had no lines — check that centre's order first.`
+                      ? ` ${genResult.emptySlips.length} had no lines. Check that centre's order first.`
                       : '')
                   }
                 />

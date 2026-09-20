@@ -416,13 +416,13 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
           ) : null}
           {eligibility.writtenOff ? (
             <Notice>
-              This pallet was written off as not collected. It is still here — collecting it now
-              records a late collection, nothing else changes.
+              This pallet was written off as not collected. It is still here, and collecting it now
+              records a late collection; nothing else changes.
             </Notice>
           ) : null}
           {eligibility.wrongDay ? (
             <Notice>
-              {gateView.ecd_name} is booked for another day. Collecting it now still goes through —
+              {gateView.ecd_name} is booked for another day. Collecting it now still goes through;
               it&rsquo;s recorded as an off-schedule collection for your manager to see.
             </Notice>
           ) : null}

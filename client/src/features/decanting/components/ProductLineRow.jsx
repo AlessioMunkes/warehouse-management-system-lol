@@ -91,7 +91,7 @@ const ProductLineRow = ({
             onChange={(e) => handleField('actualBulkKg', e.target.value)}
           />
           <p className="form-helper-text">
-            Weigh it — sacks often hold less than the label says. Leave blank
+            Weigh it. Sacks often hold less than the label says. Leave blank
             only if it has not been weighed yet.
           </p>
         </div>

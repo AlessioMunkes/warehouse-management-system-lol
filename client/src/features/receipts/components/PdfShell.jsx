@@ -167,7 +167,7 @@ export default function PdfShell({ title, filename, onClose, children }) {
       const blobUrl = pdf.output('bloburl');
       const opened  = window.open(blobUrl, '_blank');
       if (!opened) {
-        setGenError('Pop-up blocked — allow pop-ups for this site, or use Print.');
+        setGenError('Pop-up blocked. Allow pop-ups for this site, or use Print.');
       }
     } catch (err) {
       // The real message. When this failed on every record the UI said only

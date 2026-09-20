@@ -160,7 +160,7 @@ function ItemDecisionPanel({ item, slipId, onUpdated }) {
     setError(null);
     try {
       const reason = detailText.trim()
-        ? `${selectedReason} — ${detailText.trim()}`
+        ? `${selectedReason}: ${detailText.trim()}`
         : selectedReason;
       await flagItem(
         slipId,

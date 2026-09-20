@@ -142,9 +142,9 @@ export default function StaffSlipList({ onOpenSlip }) {
         <div className="stf-skeleton" aria-label="Loading" />
       ) : rows.length === 0 ? (
         <div className="stf-empty">
-          {tab === 'mine' && 'Nothing assigned to you yet — waiting for slips from your manager, or claim one from Spare slips.'}
+          {tab === 'mine' && 'Nothing assigned to you yet. Claim one from Spare slips, or wait for your manager to assign one.'}
           {tab === 'spare' && 'No spare pallets right now. Check back once your manager assigns the next batch.'}
-          {tab === 'done' && "Nothing finished yet today — completed and collected pallets will show up here."}
+          {tab === 'done' && 'Nothing finished yet today. Completed and collected pallets will show up here.'}
         </div>
       ) : search.filtered.length === 0 ? (
         <NoMatches

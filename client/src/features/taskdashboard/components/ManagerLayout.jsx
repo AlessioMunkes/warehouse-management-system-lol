@@ -140,7 +140,7 @@ function ManagerLayoutShell({ children }) {
               className="pl-8"
               placeholder="Search coming soon"
               disabled
-              title="Cross-entity search isn't built yet — this is a placeholder, not a bug."
+              title="Coming soon"
             />
           </div>
 

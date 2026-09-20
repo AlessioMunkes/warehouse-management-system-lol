@@ -260,7 +260,7 @@ export default function ReportingPage() {
               {report.meta?.excludedLines > 0 && (
                 <p>
                   {report.meta.excludedLines} dispatch line
-                  {report.meta.excludedLines === 1 ? '' : 's'} excluded — not measured in kilograms.
+                  {report.meta.excludedLines === 1 ? '' : 's'} excluded, not measured in kilograms.
                 </p>
               )}
 

@@ -149,7 +149,7 @@ export default function DonationClassificationTable({
                     <TableCell className="font-medium text-[#2b3336]">{product.name}</TableCell>
                     <TableCell className="text-[#2b3336]">{product.sku}</TableCell>
                     <TableCell className="text-[#2b3336]">
-                      {product.donation_category ? formatCategoryLabel(product.donation_category) : '— unclassified —'}
+                      {product.donation_category ? formatCategoryLabel(product.donation_category) : 'Unclassified'}
                     </TableCell>
                     <TableCell>
                       {product.donation_category ? (

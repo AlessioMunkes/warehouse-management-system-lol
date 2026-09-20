@@ -48,7 +48,7 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
 
   return (
     <PdfShell
-      title={`DELIVERY NOTE #${delivery.id} — ${delivery.supplier_name || 'Unknown supplier'}`}
+      title={`DELIVERY NOTE #${delivery.id} - ${delivery.supplier_name || 'Unknown supplier'}`}
       filename={`delivery-note-${delivery.id}`}
       onClose={onClose}
     >
@@ -104,7 +104,7 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
         {isClosed ? (
           <>
             <p className="pdf-status-title pdf-status-title--complete">
-              Purchase order {delivery.po_number || `#${delivery.po_id}`} — closed off
+              Purchase order {delivery.po_number || `#${delivery.po_id}`}, closed off
             </p>
             <p className="pdf-status-body pdf-status-body--complete">
               Nothing further is expected against this order.
@@ -113,7 +113,7 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
         ) : (
           <>
             <p className="pdf-status-title pdf-status-title--pending">
-              Purchase order {delivery.po_number || `#${delivery.po_id}`} — still open
+              Purchase order {delivery.po_number || `#${delivery.po_id}`}, still open
             </p>
             <p className="pdf-status-body pdf-status-body--pending">
               This is delivery #{delivery.id} against the order. It has not been closed off

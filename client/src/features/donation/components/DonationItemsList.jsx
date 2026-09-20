@@ -170,7 +170,7 @@ const DonationItemRow = forwardRef(function DonationItemRow(
                 ))}
               </select>
               <span className="stf-field-hint">
-                Not sure which category fits? Leave it blank — this item will be
+                Not sure which category fits? Leave it blank and this item will be
                 sent to a warehouse manager to classify.
               </span>
             </>

@@ -148,7 +148,7 @@ export default function ReportBuilder({
 
       {isSnapshot && (
         <p className="mt-2 text-xs" style={{ color: '#676767' }}>
-          This is a live figure — it shows the current position, not a period.
+          This is a live figure. It shows the current position, not a period.
         </p>
       )}
 

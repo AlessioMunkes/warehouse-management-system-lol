@@ -180,7 +180,7 @@ export default function VolunteerEventsPage() {
                               {event.name}
                             </button>
                             {event.description && <p className="max-w-md truncate text-xs text-muted-foreground mt-1">{event.description}</p>}
-                            {event.venueName && <p className="text-xs text-muted-foreground mt-1">{event.venueName}{event.address ? ` — ${event.address}` : ''}</p>}
+                            {event.venueName && <p className="text-xs text-muted-foreground mt-1">{event.venueName}{event.address ? ` (${event.address})` : ''}</p>}
                           </TableCell>
                           <TableCell>{displayDate(event.eventDate)}</TableCell>
                           <TableCell><Badge variant="outline">{event.statusLabel}</Badge></TableCell>

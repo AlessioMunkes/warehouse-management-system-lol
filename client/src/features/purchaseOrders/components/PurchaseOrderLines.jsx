@@ -234,10 +234,9 @@ export default function PurchaseOrderLines({
       </div>
 
       <FieldDescription>
-        Quantity, weight and cost stay in step with each other using the
-        catalogue&rsquo;s weight and cost per item — change any one and the other
-        two follow. Prices are still only an estimate; the invoice is what
-        gets paid.
+        Quantity, weight and cost stay in step using the catalogue&rsquo;s weight and
+        cost per item. Change any one and the other two follow. Prices are
+        still an estimate; the invoice is what gets paid.
       </FieldDescription>
     </div>
   );

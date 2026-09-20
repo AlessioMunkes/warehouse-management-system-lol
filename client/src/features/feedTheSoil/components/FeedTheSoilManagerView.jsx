@@ -134,7 +134,7 @@ const LogCompostPanel = ({ kit, busy, error, onSubmit, onCancel }) => {
 
   return (
     <Card>
-      <CardHeader><CardTitle>Log compost — {kit.owner_name}</CardTitle></CardHeader>
+      <CardHeader><CardTitle>Log compost · {kit.owner_name}</CardTitle></CardHeader>
       <CardContent>
         <FieldGroup>
           {error ? <FieldError>{error}</FieldError> : null}
@@ -329,8 +329,8 @@ export default function FeedTheSoilManagerView() {
     <main className="mx-auto w-full max-w-5xl px-4 py-6">
       <h1 className="text-2xl font-medium">Feed the Soil</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Collection kits assigned to community members and the compost logged against each one —
-        the Impact Calculator's compost figure comes straight from what's logged here.
+        Collection kits assigned to community members and the compost logged against each one.
+        The Impact Calculator's compost figure comes straight from what's logged here.
       </p>
 
       {error ? <div className="mt-4"><ErrorBanner message={error} onRetry={tab === 'kits' ? loadKits : loadRecords} /></div> : null}

@@ -24,7 +24,7 @@ const PDF_LOGO_URL = '/images/pdf_logo.png';
 
 // Same warehouse block DeliveryNotePDF.jsx / DecantingSheetPDF.jsx use.
 const WAREHOUSE = {
-  name: 'Ladles of Love — Cape Town Warehouse',
+  name: 'Ladles of Love, Cape Town Warehouse',
   addressLines: ['Unit 4, Hewett Park', '17 Hewett Ave, Epping', 'Cape Town, 7460'],
   phone: '',
 };
@@ -47,7 +47,7 @@ const DispatchNotePDF = ({ note, onClose }) => {
   const additionalInfo = note.override_reason
     ? `This collection needed a manager's authorisation: ${note.override_reason}`
     : isLate
-      ? 'This pallet was written off at the 16:00 cut-off before the driver arrived. It was collected after that, and recorded as a late collection — the goods left the building normally.'
+      ? 'This pallet was written off at the 15:00 cut-off before the driver arrived. It was collected after that, and recorded as a late collection: the goods left the building normally.'
       : 'This pallet was collected on time and in full, matched against what packing recorded.';
 
   return (
@@ -56,7 +56,7 @@ const DispatchNotePDF = ({ note, onClose }) => {
       {/* Toolbar */}
       <div className="pdf-toolbar">
         <span className="pdf-toolbar-title">
-          DISPATCH NOTE #{note.id} — {note.ecd_name}
+          DISPATCH NOTE #{note.id} - {note.ecd_name}
         </span>
         <div className="pdf-toolbar-actions">
           {genError && <span className="pdf-toolbar-error">{genError}</span>}

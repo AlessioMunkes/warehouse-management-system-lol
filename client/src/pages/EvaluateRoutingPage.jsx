@@ -62,7 +62,7 @@ function buildDecisionTrail({ productId, category, result }) {
           : '2. Checked manually-provided category → ✗ None provided',
       },
     ],
-    summary: 'Result: UNCLASSIFIED — flagged for manual review',
+    summary: 'Result: UNCLASSIFIED, flagged for manual review',
   };
 }
 

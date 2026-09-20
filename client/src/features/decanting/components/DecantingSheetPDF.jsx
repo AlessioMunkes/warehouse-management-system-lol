@@ -23,7 +23,7 @@ const PDF_LOGO_URL = '/images/pdf_logo.png';
 // Same warehouse block DeliveryNotePDF.jsx uses — see that file's own
 // comment for why this is hardcoded rather than looked up.
 const WAREHOUSE = {
-  name: 'Ladles of Love — Cape Town Warehouse',
+  name: 'Ladles of Love, Cape Town Warehouse',
   addressLines: ['Unit 4, Hewett Park', '17 Hewett Ave, Epping', 'Cape Town, 7460'],
   phone: '',
 };
@@ -78,7 +78,7 @@ const DecantingSheetPDF = ({ record, onClose }) => {
       {/* Toolbar */}
       <div className="pdf-toolbar">
         <span className="pdf-toolbar-title">
-          DECANTING SHEET #{record.id} — Week of {formatDate(record.week_of)}
+          DECANTING SHEET #{record.id} - Week of {formatDate(record.week_of)}
         </span>
         <div className="pdf-toolbar-actions">
           {genError && <span className="pdf-toolbar-error">{genError}</span>}

@@ -415,7 +415,7 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
         <TextField id="fts-suburb" label="Suburb (optional)" value={suburb} onChange={setSuburb} placeholder="e.g. Delft" />
         <DateField id="fts-assigned" label="Date assigned" value={assignedAt} onChange={setAssignedAt} />
 
-        <Notice>Only the owner's first name and suburb are kept — no address or contact details.</Notice>
+        <Notice>Only the owner's name and suburb are kept. No address or contact details.</Notice>
       </TaskPage>
     );
   }
@@ -424,7 +424,7 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
   if (phase === 'log' && selectedKit) {
     return (
       <TaskPage
-        title={`Log compost — ${selectedKit.owner_name}`}
+        title={`Log compost · ${selectedKit.owner_name}`}
         sub={`Kit #${selectedKit.id}${selectedKit.suburb ? ` · ${selectedKit.suburb}` : ''}`}
         note={kgInvalid ? 'Still needed: the weight of compost collected.' : null}
         actions={

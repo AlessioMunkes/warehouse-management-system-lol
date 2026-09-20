@@ -46,7 +46,7 @@ const DispatchNotePDF = ({ note, onClose }) => {
 
   return (
     <PdfShell
-      title={`DISPATCH NOTE #${note.id} — ${note.ecd_name || 'Unknown beneficiary'}`}
+      title={`DISPATCH NOTE #${note.id} - ${note.ecd_name || 'Unknown beneficiary'}`}
       filename={`dispatch-note-${note.id}`}
       onClose={onClose}
     >
@@ -75,14 +75,14 @@ const DispatchNotePDF = ({ note, onClose }) => {
         <p className="pdf-status-body">
           {notCollected && (
             <>
-              Nobody collected this pallet. It was written off by the 16:00 sweep (BR-14).
-              No stock was deducted — the goods stopped counting as committed and read as
+              Nobody collected this pallet. It was written off by the 15:00 sweep (BR-14).
+              No stock was deducted: the goods stopped counting as committed and read as
               available again. It remains collectable as a late collection.
             </>
           )}
           {wasLate && (
             <>
-              This pallet was written off at 16:00 and collected afterwards. The collection
+              This pallet was written off at 15:00 and collected afterwards. The collection
               proceeded normally; nothing had been deducted, so nothing needed unwinding.
             </>
           )}
@@ -101,7 +101,7 @@ const DispatchNotePDF = ({ note, onClose }) => {
           </p>
           <p className="pdf-status-body">
             {note.override_reason}
-            {note.override_by_name ? ` — authorised by ${note.override_by_name}` : ''}
+            {note.override_by_name ? ` (authorised by ${note.override_by_name})` : ''}
           </p>
         </div>
       )}
@@ -201,7 +201,7 @@ const DispatchNotePDF = ({ note, onClose }) => {
             <tr>
               <td colSpan={6} className="pdf-table-empty">
                 {notCollected
-                  ? 'Nothing was loaded — this pallet was not collected.'
+                  ? 'Nothing was loaded. This pallet was not collected.'
                   : 'No lines on record'}
               </td>
             </tr>

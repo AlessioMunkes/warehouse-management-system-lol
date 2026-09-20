@@ -153,7 +153,7 @@ const AdjustFactorsDialog = () => {
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
             Meals enabled and adults served are estimated from kilograms dispatched using these
-            factors. Setting a new value here does not change past reports — it adds a new
+            factors. Setting a new value here does not change past reports; it adds a new
             figure that applies from today onward.
           </p>
           {FACTOR_DEFS.map((f) => (
@@ -232,7 +232,7 @@ const ImpactPanel = ({ title, metric, dimensions, defaultDimension }) => {
           <Skeleton className="h-40 w-full" />
         ) : missingFactor ? (
           <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-            This needs a conversion factor on record before it can show a number — use
+            This needs a conversion factor on record before it can show a number. Use
             "Adjust factors" above to set one.
           </p>
         ) : error ? (
@@ -297,9 +297,8 @@ export default function ImpactReportPage() {
           <div>
             <h1 className="text-2xl font-medium">Impact Calculator</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              What the warehouse achieved, at a glance. ECDs and soup kitchens only —
-              dignity kitchens don't require an impact report (confirmed in the project's
-              own visit notes).
+              What the warehouse achieved, at a glance. ECDs and soup kitchens only;
+              dignity kitchens don't require an impact report.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">

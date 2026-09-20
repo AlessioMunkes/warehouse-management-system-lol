@@ -39,7 +39,7 @@ export function DonorConsentSection({ consentGiven, onChange }) {
 
       <span className="stf-field-hint">
         Required to save donor details for a Section 18A tax certificate.
-        Without consent, the donation is still recorded — just without
+        Without consent, the donation is still recorded, just without
         the donor's personal details.
       </span>
     </div>
