@@ -190,6 +190,16 @@ export default function ReceivingFlow({ onCrumbChange }) {
   // as "that order does not exist".
   const visibleOrders = orderSearch.searching ? orderSearch.filtered : orders;
 
+  // Form's own order list, unlike Guided's: a worker choosing "Form"
+  // already picked a supplier from the dropdown right above, so an
+  // order list still mixing every other supplier's orders in looks
+  // answerable and isn't — nothing stops the wrong one being picked.
+  // Empty until a supplier is chosen, rather than showing everything
+  // and hoping the label text is enough of a guardrail.
+  const formOrders = supplierId
+    ? visibleOrders.filter((o) => String(o.supplier_id) === String(supplierId))
+    : [];
+
   // Picking an order is also picking its supplier. The submit payload
   // carries both and the server rejects a mismatch between them
   // (delivery.repository.js checks purchase_orders.supplier_id against
@@ -509,36 +519,19 @@ export default function ReceivingFlow({ onCrumbChange }) {
             placeholder="Search by order number, supplier or date"
           />
 
-          {visibleOrders.length > 0 ? (
-            // Same Guided/Form split as the supplier field above, and
-            // for the same reason: a handful of orders reads fine as
-            // tap targets, but this list runs to dozens on a busy
-            // week, and a dropdown — not an endless stack of rows — is
-            // the right control once it does. The search box above
-            // still narrows visibleOrders either way.
-            mode === 'guided' ? (
-              <ChoiceList
-                legend="Which order"
-                options={visibleOrders.map((o) => ({
-                  value: o.id,
-                  label: `Order ${o.id}`,
-                  // The supplier is in the meta now that this list can
-                  // span suppliers — "Order 86" alone is not enough to
-                  // pick the right one.
-                  meta: [
-                    o.supplier_name,
-                    o.expected_delivery_date
-                      ? `Due ${longDate(o.expected_delivery_date)}`
-                      : 'No due date given',
-                  ].filter(Boolean).join(' · '),
-                }))}
-                value={orderId}
-                onChange={selectOrder}
-                onActivate={startCounting}
-              />
-            ) : (
+          {/* A dropdown either way now — not the tap-target stack this
+              used to fall back to — but not the same list. Guided
+              searches every supplier's orders at once, because a
+              driver's note has an order number on it and nothing else
+              (see visibleOrders' own note above). Form expects the
+              supplier chosen just above to mean something: its order
+              list is scoped to that supplier only, and empty until one
+              is picked, rather than an order list a worker could still
+              pick the wrong supplier's line out of. */}
+          {mode === 'guided' ? (
+            visibleOrders.length > 0 ? (
               <SelectField
-                id="stf-full-order"
+                id="stf-guided-order"
                 label="Which order"
                 placeholder="Choose an order"
                 options={visibleOrders.map((o) => ({
@@ -552,22 +545,45 @@ export default function ReceivingFlow({ onCrumbChange }) {
                 value={orderId}
                 onChange={selectOrder}
               />
+            ) : orderSearch.searching ? (
+              <NoMatches
+                query={orderSearch.query}
+                onClear={() => orderSearch.setQuery('')}
+                noun="orders"
+              />
+            ) : (
+              <Notice>
+                There are no open orders to receive against right now. Ask your manager to approve
+                the order before you sign anything in.
+              </Notice>
             )
+          ) : !supplierId ? (
+            <Notice>Choose a supplier above to see its open orders.</Notice>
+          ) : formOrders.length > 0 ? (
+            <SelectField
+              id="stf-full-order"
+              label="Which order"
+              placeholder="Choose an order"
+              options={formOrders.map((o) => ({
+                value: o.id,
+                label: [
+                  `Order ${o.id}`,
+                  o.expected_delivery_date ? `Due ${longDate(o.expected_delivery_date)}` : 'No due date given',
+                ].filter(Boolean).join(' · '),
+              }))}
+              value={orderId}
+              onChange={selectOrder}
+            />
           ) : orderSearch.searching ? (
             <NoMatches
               query={orderSearch.query}
               onClear={() => orderSearch.setQuery('')}
               noun="orders"
             />
-          ) : supplierId ? (
+          ) : (
             <Notice>
               There is no open order for {supplierName} today. Ask your manager to check the order
               before you sign anything in.
-            </Notice>
-          ) : (
-            <Notice>
-              There are no open orders to receive against right now. Ask your manager to approve
-              the order before you sign anything in.
             </Notice>
           )}
         </StepScreen>

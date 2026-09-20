@@ -76,16 +76,7 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
             <p key={line} className="pdf-doc-address">{line}</p>
           ))}
         </div>
-        <div className="pdf-doc-header-right">
-          <img src={PDF_LOGO_URL} alt="" className="pdf-doc-logo" aria-hidden="true" />
-          <div>
-            <p className="pdf-doc-id-label">Record number</p>
-            <p className="pdf-doc-id">#{String(delivery.id).padStart(4, '0')}</p>
-            <p className="pdf-doc-id-label pdf-doc-id-label--spaced">
-              Recorded: {formatDateTime(delivery.created_at)}
-            </p>
-          </div>
-        </div>
+        <img src={PDF_LOGO_URL} alt="" className="pdf-doc-logo" aria-hidden="true" />
       </div>
 
       {/* ── Provenance warning ─────────────────────────────────
@@ -119,32 +110,25 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
         </div>
       )}
 
-      {/* ── PO status ──────────────────────────────────────── */}
-      <div className={`pdf-status-banner ${isClosed ? 'pdf-status-banner--complete' : 'pdf-status-banner--pending'}`}>
-        {isClosed ? (
-          <>
-            <p className="pdf-status-title pdf-status-title--complete">
-              Purchase order {delivery.po_number || `#${delivery.po_id}`}, closed off
-            </p>
-            <p className="pdf-status-body pdf-status-body--complete">
-              Nothing further is expected against this order.
-            </p>
-          </>
-        ) : (
-          <>
-            <p className="pdf-status-title pdf-status-title--pending">
-              Purchase order {delivery.po_number || `#${delivery.po_id}`}, still open
-            </p>
-            <p className="pdf-status-body pdf-status-body--pending">
-              This is delivery #{delivery.id} against the order. It has not been closed off
-              and further deliveries may still be recorded.
-            </p>
-          </>
-        )}
-      </div>
-
       {/* ── Meta ───────────────────────────────────────────── */}
+      {/* PO open/closed used to be its own red-or-grey banner above
+          this grid — full-width real estate for a fact that is
+          neutral information, not a flag, nine times out of ten
+          (an open PO just means more deliveries might follow). It's
+          the "Purchase order" field below now, same as record number
+          and recorded-at moved out of the header into this grid
+          rather than sitting in their own corner. A real delivery
+          note doesn't call out routine metadata with a warning
+          colour; only the discrepancy banner above earns that. */}
       <div className="pdf-meta-grid">
+        <div>
+          <p className="pdf-meta-label">Record number</p>
+          <p className="pdf-meta-value">#{String(delivery.id).padStart(4, '0')}</p>
+        </div>
+        <div>
+          <p className="pdf-meta-label">Recorded</p>
+          <p className="pdf-meta-value">{formatDateTime(delivery.created_at)}</p>
+        </div>
         <div>
           <p className="pdf-meta-label">Supplier</p>
           <p className="pdf-meta-value">{delivery.supplier_name || '—'}</p>
@@ -172,6 +156,7 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
           <p className="pdf-meta-label">Purchase order</p>
           <p className="pdf-meta-value">
             {delivery.po_number || `#${delivery.po_id || delivery.purchase_order_id || '—'}`}
+            {' · '}{isClosed ? 'Closed off' : 'Still open'}
           </p>
         </div>
       </div>
@@ -263,8 +248,12 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
           </p>
         </div>
         <div className="pdf-signature-block">
+          {/* No line here on purpose: the warehouse side has no
+              signature to collect, only who was signed in when the
+              delivery was recorded — a blank "sign here" rule under
+              a label nobody was ever going to sign read as an
+              unfinished document, not an intentionally empty one. */}
           <p className="pdf-signature-label">Received by (warehouse)</p>
-          <div className="pdf-signature-line" />
           <p className="pdf-signature-name">
             {delivery.received_by_name || 'Warehouse staff'} · {formatDate(delivery.delivery_date)}
           </p>

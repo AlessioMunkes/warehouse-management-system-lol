@@ -67,18 +67,7 @@ const DispatchNotePDF = ({ note, onClose }) => {
             <p key={line} className="pdf-doc-address">{line}</p>
           ))}
         </div>
-        <div className="pdf-doc-header-right">
-          <img src={PDF_LOGO_URL} alt="" className="pdf-doc-logo" aria-hidden="true" />
-          <div>
-            <p className="pdf-doc-id-label">Record number</p>
-            <p className="pdf-doc-id">#{String(note.id).padStart(4, '0')}</p>
-            <p className="pdf-doc-id-label pdf-doc-id-label--spaced">
-              {wasCollected
-                ? `Collected: ${formatDateTime(note.collected_at)}`
-                : `Flagged: ${formatDateTime(note.flagged_at)}`}
-            </p>
-          </div>
-        </div>
+        <img src={PDF_LOGO_URL} alt="" className="pdf-doc-logo" aria-hidden="true" />
       </div>
 
       {/* ── Outcome ────────────────────────────────────────── */}
@@ -134,6 +123,16 @@ const DispatchNotePDF = ({ note, onClose }) => {
       )}
 
       <div className="pdf-meta-grid">
+        <div>
+          <p className="pdf-meta-label">Record number</p>
+          <p className="pdf-meta-value">#{String(note.id).padStart(4, '0')}</p>
+        </div>
+        <div>
+          <p className="pdf-meta-label">{wasCollected ? 'Collected' : 'Flagged'}</p>
+          <p className="pdf-meta-value">
+            {formatDateTime(wasCollected ? note.collected_at : note.flagged_at)}
+          </p>
+        </div>
         <div>
           <p className="pdf-meta-label">Beneficiary</p>
           <p className="pdf-meta-value">{note.ecd_name || '—'}</p>
@@ -249,8 +248,10 @@ const DispatchNotePDF = ({ note, onClose }) => {
           </p>
         </div>
         <div className="pdf-signature-block">
+          {/* No line here on purpose — same reasoning as
+              DeliveryNotePDF's "Received by": the warehouse side has
+              no signature to collect, only who released the pallet. */}
           <p className="pdf-signature-label">Released by (warehouse)</p>
-          <div className="pdf-signature-line" />
           <p className="pdf-signature-name">
             {note.dispatched_by_name || 'Dispatch staff'} · {formatDate(note.dispatch_date)}
           </p>
