@@ -12,15 +12,24 @@
 // The counts come from GET /api/dashboard/my-work and are advisory: a
 // failed load leaves the task cards working, because picking a job must
 // never depend on a stat row rendering.
+//
+// Feed the Soil and Benevolent Requests are text links below the main
+// grid, not cards in it — same "every shift" vs "secondary" split
+// StaffTabBar.jsx draws between the bottom tab bar and its drawer.
+// Putting Feed the Soil in the grid as a full card (as this page used
+// to) contradicted that split by giving it the same weight as the five
+// tasks worked every day.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
-import { ClipboardList, Truck, PackageCheck, PackageOpen, FlaskConical, ClipboardCheck, HandCoins, Sprout } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ClipboardList, Truck, PackageCheck, PackageOpen, FlaskConical, ClipboardCheck, HandCoins, Menu } from 'lucide-react';
 import DashboardGreeting from '../features/taskdashboard/components/DashboardGreeting';
 import UnfinishedWork from '../features/staff/components/UnfinishedWork';
 import StatTile from '../features/taskdashboard/components/StatTile';
 import ActionCard from '../features/taskdashboard/components/ActionCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '../context/AuthContext';
+import useCoachmark from '../features/staff/hooks/useCoachmark';
 import { STAFF, PACKING } from '../routes/paths';
 import dashboardAPI from '../services/dashboardAPI';
 
@@ -29,25 +38,33 @@ import dashboardAPI from '../services/dashboardAPI';
 const TASKS = [
   { to: STAFF.receiving, icon: PackageOpen, title: 'Receiving',
     description: 'Check a delivery in against its purchase order.' },
+  { to: STAFF.donation, icon: HandCoins, title: 'Donation intake',
+    description: 'Log goods donated at the door.' },
   { to: PACKING.board, icon: PackageCheck, title: 'Packing',
     description: 'Pack a picking slip and flag anything short.' },
   { to: STAFF.decanting, icon: FlaskConical, title: 'Decanting',
     description: 'Break bulk stock down into bags and record the weights.' },
   { to: STAFF.dispatch, icon: ClipboardCheck, title: 'Dispatch',
     description: 'Hand a pallet over at the gate and capture the signature.' },
-  { to: STAFF.donation, icon: HandCoins, title: 'Donation intake',
-    description: 'Log goods donated at the door.' },
-  { to: STAFF.feedTheSoil, icon: Sprout, title: 'Feed the Soil',
-    description: 'Weigh in compost from a collection kit, or assign a new one.' },
   // Receipts is manager-only and deliberately absent. The card and the
   // route guard in App.jsx have to agree — a hidden card on an open
   // route is not access control, just a tidier way to lose track of one.
+];
+
+// Worked far less often than the five above — reached the same way
+// they're reached from every other staff screen, the hamburger drawer,
+// but surfaced here too as a plain link rather than making a worker
+// hunt for them on their first day.
+const SECONDARY_LINKS = [
+  { to: STAFF.communityRequests, label: 'Log a benevolent request' },
+  { to: STAFF.feedTheSoil,       label: 'Log compost' },
 ];
 
 export default function TaskDashboardPage() {
   const { user } = useAuth();
   const [work, setWork] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { show: showHamburgerHint, dismiss: dismissHamburgerHint } = useCoachmark('dashboard-hamburger');
 
   useEffect(() => {
     let cancelled = false;
@@ -70,6 +87,26 @@ export default function TaskDashboardPage() {
 
   return (
     <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6">
+      {/* Points at ManagerLayout's own hamburger trigger, top-left of
+          its header (AppNavDrawer, sm:hidden) — this page can't reach
+          into that header to measure it, so it's a fixed callout near
+          where that button always sits at mobile widths, same rough
+          approach StepPrimitives' Coachmark takes for its own anchor.
+          Hidden at the sm breakpoint the sidebar takes over, same as
+          the button it points to. */}
+      {showHamburgerHint ? (
+        <div className="fixed left-3 top-14 z-50 flex items-start gap-1.5 sm:hidden">
+          <Menu className="mt-0.5 size-4 -rotate-12 text-[#2b3336]" aria-hidden="true" />
+          <button
+            type="button"
+            onClick={dismissHamburgerHint}
+            className="rounded-[4px] bg-[#2b3336] px-2.5 py-1.5 text-xs font-medium text-white shadow-md"
+          >
+            Everything else lives in here
+          </button>
+        </div>
+      ) : null}
+
       <DashboardGreeting name={user?.firstName} summaryLine={summaryLine} />
 
       {/* Renders nothing when there is nothing half-done, which is
@@ -93,6 +130,18 @@ export default function TaskDashboardPage() {
       </h2>
       <div className="grid gap-3 sm:grid-cols-2">
         {TASKS.map((task) => <ActionCard key={task.to} {...task} />)}
+      </div>
+
+      <div className="mt-5 flex flex-wrap gap-x-5 gap-y-1.5">
+        {SECONDARY_LINKS.map((link) => (
+          <Link
+            key={link.to}
+            to={link.to}
+            className="text-sm text-muted-foreground underline decoration-dotted underline-offset-4 hover:text-[#2b3336]"
+          >
+            {link.label}
+          </Link>
+        ))}
       </div>
     </div>
   );
