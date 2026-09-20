@@ -197,7 +197,7 @@ const DispatchNotePDF = ({ note, onClose }) => {
                   <td className="pdf-table-center">{fmtQty(line.loaded_quantity)}</td>
                   <td className="pdf-table-center">{line.unit || '—'}</td>
                   <td className={`pdf-table-center ${v ? v.className : 'pdf-variance-none'}`}>
-                    {v ? v.label : 'Matched'}
+                    {v ? v.label : '0'}
                   </td>
                 </tr>,
                 v && line.variance_reason ? (
@@ -220,20 +220,20 @@ const DispatchNotePDF = ({ note, onClose }) => {
             </tr>
           )}
         </tbody>
+        {/* Totals in the table's own columns — see the same fix and
+            reasoning in DeliveryNotePDF.jsx. */}
+        {lines.length > 0 && (
+          <tfoot>
+            <tr className="pdf-table-foot">
+              <td colSpan={2} className="pdf-table-foot-label">Total</td>
+              <td className="pdf-table-center pdf-table-foot-value">{fmtQty(totalPacked)}</td>
+              <td className="pdf-table-center pdf-table-foot-value">{fmtQty(totalLoaded)}</td>
+              <td colSpan={2} />
+            </tr>
+          </tfoot>
+        )}
       </table>
 
-      {lines.length > 0 && (
-        <div className="pdf-totals-row">
-          <div className="pdf-total-block">
-            <p className="pdf-meta-label">Total packed</p>
-            <p className="pdf-meta-value">{fmtQty(totalPacked)}</p>
-          </div>
-          <div className="pdf-total-block">
-            <p className="pdf-meta-label">Total loaded</p>
-            <p className="pdf-meta-value">{fmtQty(totalLoaded)}</p>
-          </div>
-        </div>
-      )}
 
       <div className="pdf-signature-section">
         <div className="pdf-signature-block">
@@ -244,7 +244,7 @@ const DispatchNotePDF = ({ note, onClose }) => {
             <div className="pdf-signature-line" />
           )}
           <p className="pdf-signature-name">
-            {note.driver_name || 'Driver'} · {formatDate(note.dispatch_date)}
+            {note.driver_name || '—'} · {formatDate(note.dispatch_date)}
           </p>
         </div>
         <div className="pdf-signature-block">

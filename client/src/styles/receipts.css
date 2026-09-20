@@ -148,15 +148,21 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 24px;
-  padding-bottom: 18px;
-  border-bottom: 3px solid #2b3336;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #2b3336;
 }
 
+/* REVISED — was 26px/800, which a printed trade document reads as a
+   magazine masthead: the space at the top of a delivery note belongs
+   to the parties and the reference numbers, not the document's own
+   name. 16px/700 is the same register as a real POD's "DELIVERY NOTE"
+   stamp — present, not dominant. */
 .pdf-doc-title {
   margin: 0;
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: #2b3336;
 }
 
@@ -207,42 +213,65 @@
   flex-shrink: 0;
 }
 
-.pdf-doc-address { margin: 6px 0 0; font-size: 10px; line-height: 1.5; color: #676767; }
+/* REVISED — was 6px between every line with loose 1.5 leading, which
+   reads as web paragraph spacing rather than a mailing address. A real
+   address block sits tight: the gap belongs before the block, not
+   between its own lines. */
+.pdf-doc-address { margin: 1px 0 0; font-size: 10px; line-height: 1.3; color: #676767; }
+.pdf-doc-address:first-of-type { margin-top: 5px; }
 
 /* ── Status banner ────────────────────────────────────────── */
-/* REVISED — was a 4px coloured LEFT-BORDER accent bar, no manager
-   equivalent anywhere in the app ("this claude-looking bold red
-   line"). Manager's actual callout (ErrorBanner, used on a dozen
-   pages) is a plain border on all four sides, small 4px radius, light
-   tinted background — matched to that exactly, including dropping the
-   bold saturated heading colour for the same reason .stf-notice-mark
-   and .stf-error dropped it (see staff.css's own notes on both). */
+/* REVISED AGAIN — matching ErrorBanner (previous revision, see the
+   note this replaced) was still a filled, rounded, bordered box: on
+   paper that reads as a dismissible web alert regardless of which
+   app's alert convention it copies, and the tint is decoration a mono
+   printer or photocopier drops. A trade document flags an important
+   paragraph with RULES, not a coloured card — same idiom as a "NOTE:"
+   line in a printed spec sheet. No background, no radius; the accent
+   colour lives only in the rule itself, and the label matches the
+   document's other section labels (.pdf-items-title) instead of
+   reading as a heading of its own. */
 .pdf-status-banner {
-  margin: 18px 0;
-  padding: 12px 14px;
-  border: 1px solid #d8d4cd;
-  border-radius: 4px;
-  background: #f6f4f1;
+  margin: 14px 0;
+  padding: 8px 0;
+  border-top: 1px solid #2b3336;
+  border-bottom: 1px solid #2b3336;
+  background: none;
 }
 
-.pdf-status-banner--complete { border-color: #2b3336; background: #f1f4f2; }
-.pdf-status-banner--pending  { border-color: #ef3a40; background: #fdf1f1; }
-.pdf-status-banner--warning  { border-color: #ef3a40; background: #fdf1f1; }
+.pdf-status-banner--pending,
+.pdf-status-banner--warning { border-color: #ef3a40; }
 
-.pdf-status-title { margin: 0; font-size: 13px; font-weight: 700; color: #2b3336; }
-.pdf-status-title--complete { color: #2b3336; }
-.pdf-status-title--pending  { color: #2b3336; }
+.pdf-status-title {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #2b3336;
+}
 
-.pdf-status-body { margin: 4px 0 0; font-size: 12px; color: #676767; }
-.pdf-status-body--complete,
-.pdf-status-body--pending { color: #676767; }
+.pdf-status-body { margin: 3px 0 0; font-size: 12px; color: #2b3336; }
 
 /* ── Meta grid ────────────────────────────────────────────── */
+/* REVISED — was display:grid, 3 fixed columns. A delivery note has 8
+   fields, a dispatch note 11 — neither is a multiple of 3, so a rigid
+   3-column grid always leaves an empty cell somewhere in the last row
+   (8 into 9, 11 into 12) with nothing there to fill it. CSS multi-
+   column flows fields top-to-bottom and lets columns end at different
+   heights instead, same as a printed fact sheet or a resume's skill
+   list — no implied cell for a reader's eye to notice standing empty.
+   break-inside: avoid keeps a field's label from separating from its
+   own value across a column break. */
 .pdf-meta-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px 20px;
-  margin: 18px 0 24px;
+  columns: 3;
+  column-gap: 20px;
+  margin: 14px 0 20px;
+}
+
+.pdf-meta-grid > div {
+  break-inside: avoid;
+  margin-bottom: 12px;
 }
 
 .pdf-meta-label {
@@ -285,7 +314,14 @@
   vertical-align: top;
 }
 
-.pdf-table tbody tr:nth-child(even) td { background: #faf8f6; }
+/* REVISED — was also striping every even row #faf8f6 regardless of
+   content, alongside the variance row's own pink. Three treatments
+   (pink, grey, white) across three rows never let either one settle
+   into meaning something, and the decorative stripe was the one
+   fighting the meaningful one. Removed: now the ONLY row background
+   in the table is the variance highlight, so tint is unambiguous —
+   pink always means "differs from what was ordered", nothing else
+   does. */
 
 .pdf-table-center { text-align: center; }
 .pdf-table-product { font-weight: 600; }
@@ -306,43 +342,59 @@
 .pdf-variance-over  { color: #8a6d00; font-weight: 700; }
 .pdf-variance-none  { color: #676767; }
 
+/* REVISED — was tinted the same pink as the variance row it sits
+   under, so the two read as one continuous block with no visible
+   boundary, and its label (letter-spacing 0.06em, colour #2b3336) was
+   a third, one-off style next to .pdf-meta-label's 0.1em/#676767 and
+   the table header's own uppercase treatment. Plain background now
+   (the row above it already carries the pink), an indent so it reads
+   as an annotation attached to that row rather than a new one of its
+   own, and pdf-reason-label now matches .pdf-meta-label exactly. */
 .pdf-reason-row td {
-  padding: 6px 10px 10px;
+  padding: 4px 10px 10px 26px;
   font-size: 11px;
   color: #676767;
-  background: #fdf1f1 !important;
+  background: none;
   border-bottom: 1px solid #e9e3dd;
 }
 
 .pdf-reason-label {
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   font-size: 9px;
-  color: #2b3336;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #676767;
 }
 
 /* ── Totals ───────────────────────────────────────────────── */
-.pdf-totals-row {
-  display: flex;
-  justify-content: flex-end;
-  gap: 28px;
-  margin-top: 12px;
+/* A tfoot row in the table's own column grid now, not a separate
+   right-aligned block below it — see DeliveryNotePDF.jsx's and
+   DispatchNotePDF.jsx's own notes on why. */
+.pdf-table-foot td {
   padding-top: 10px;
   border-top: 2px solid #2b3336;
+  border-bottom: none;
+  font-weight: 700;
 }
-
-.pdf-total-block { text-align: right; }
+.pdf-table-foot-label {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #676767;
+}
+.pdf-table-foot-value { font-size: 13px; color: #2b3336; }
 
 /* ── Signatures ───────────────────────────────────────────── */
+/* margin-top tightened 36px → 24px as part of a general pass on the
+   gaps between sections — see the print-density note further down. */
 .pdf-signature-section {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 32px;
-  margin-top: 36px;
+  margin-top: 24px;
 }
 
-.pdf-signature-block { min-height: 90px; }
+.pdf-signature-block { min-height: 74px; }
 
 .pdf-signature-label {
   margin: 0 0 6px;
@@ -381,7 +433,7 @@
 
 /* ── Footer ───────────────────────────────────────────────── */
 .pdf-footer-stamp {
-  margin-top: 32px;
+  margin-top: 20px;
   padding-top: 12px;
   border-top: 1px solid #e9e3dd;
   text-align: center;
@@ -456,9 +508,9 @@
   .pdf-table       { page-break-inside: auto; }
   .pdf-table tr    { page-break-inside: avoid; break-inside: avoid; }
   .pdf-table thead { display: table-header-group; }
+  .pdf-table tfoot { display: table-footer-group; }
   .pdf-reason-row  { page-break-before: avoid; }
   .pdf-signature-section,
-  .pdf-status-banner,
-  .pdf-totals-row  { page-break-inside: avoid; break-inside: avoid; }
+  .pdf-status-banner { page-break-inside: avoid; break-inside: avoid; }
   .pdf-footer-stamp { page-break-before: avoid; }
 }

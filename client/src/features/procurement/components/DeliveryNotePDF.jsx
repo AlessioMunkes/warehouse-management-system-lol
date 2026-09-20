@@ -192,7 +192,7 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
                   <td className="pdf-table-center">{item.unit || '—'}</td>
                   {!fromPO && (
                     <td className={`pdf-table-center ${v ? v.className : 'pdf-variance-none'}`}>
-                      {v ? v.label : 'Matched'}
+                      {v ? v.label : '0'}
                     </td>
                   )}
                 </tr>,
@@ -217,22 +217,25 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
             </tr>
           )}
         </tbody>
+        {/* A tfoot row in the table's own columns, not a separate block
+            below it — the old .pdf-totals-row was a flex row right-
+            aligned to the page margin, which put "Total ordered"/
+            "Total received" under the Unit/Variance columns instead of
+            Ordered/Received. Summing a column only means something if
+            the sum sits in that column. */}
+        {items.length > 0 && (
+          <tfoot>
+            <tr className="pdf-table-foot">
+              <td colSpan={2} className="pdf-table-foot-label">Total</td>
+              <td className="pdf-table-center pdf-table-foot-value">{fmtQty(totalExpected)}</td>
+              {!fromPO && (
+                <td className="pdf-table-center pdf-table-foot-value">{fmtQty(totalReceived)}</td>
+              )}
+              <td colSpan={fromPO ? 1 : 2} />
+            </tr>
+          </tfoot>
+        )}
       </table>
-
-      {items.length > 0 && (
-        <div className="pdf-totals-row">
-          <div className="pdf-total-block">
-            <p className="pdf-meta-label">Total ordered</p>
-            <p className="pdf-meta-value">{fmtQty(totalExpected)}</p>
-          </div>
-          {!fromPO && (
-            <div className="pdf-total-block">
-              <p className="pdf-meta-label">Total received</p>
-              <p className="pdf-meta-value">{fmtQty(totalReceived)}</p>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* ── Signatures ─────────────────────────────────────── */}
       <div className="pdf-signature-section">
@@ -244,7 +247,7 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
             <div className="pdf-signature-line" />
           )}
           <p className="pdf-signature-name">
-            {delivery.driver_name || 'Driver'} · {formatDate(delivery.delivery_date)}
+            {delivery.driver_name || 'Not recorded'} · {formatDate(delivery.delivery_date)}
           </p>
         </div>
         <div className="pdf-signature-block">

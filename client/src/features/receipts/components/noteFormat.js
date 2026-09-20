@@ -68,6 +68,12 @@ export const fmtQty = (value, unit) => {
 // Returns { diff, label, className } or null when the two match.
 // Used by both notes: goods-in compares received against expected,
 // goods-out compares loaded against packed.
+//
+// label is a signed number ("-1", "+1"), not prose ("1 short",
+// "1 over") — a receiver reconciling a stack of these wants a column
+// they can sum, not a sentence they have to re-parse into a sign
+// first. The className still carries short-vs-over as a colour, so
+// the distinction isn't lost, only moved out of the text.
 export const variance = (actual, expected) => {
   const a = qty(actual);
   const e = qty(expected);
@@ -76,7 +82,7 @@ export const variance = (actual, expected) => {
   if (diff === 0) return null;
   return {
     diff,
-    label:     diff > 0 ? `${diff} over` : `${Math.abs(diff)} short`,
+    label:     diff > 0 ? `+${diff}` : String(diff),
     className: diff > 0 ? 'pdf-variance-over' : 'pdf-variance-short',
   };
 };
