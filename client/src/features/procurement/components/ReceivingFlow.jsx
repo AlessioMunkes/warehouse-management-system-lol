@@ -496,12 +496,20 @@ export default function ReceivingFlow({ onCrumbChange }) {
             </Actions>
           }
         >
-          {/* Guided keeps tap targets; Form uses the dropdown, which is
-              the right control once the list runs to dozens. Both write
-              the same supplierId. */}
+          {/* A dropdown either way now — was a ChoiceList stack in
+              Guided (tap targets read fine for four rows, but the
+              supplier directory doesn't stay four rows, and a stacked
+              list of full-width buttons is a lot of scroll for one
+              choice). Both still write the same supplierId; Guided
+              keeps its own data source (every supplier, not just ones
+              with an open order right now) rather than Form's
+              openSuppliers, since Guided's own order search below
+              already looks across every supplier's orders at once. */}
           {mode === 'guided' ? (
-            <ChoiceList
-              legend="Who it came from"
+            <SelectField
+              id="stf-guided-supplier"
+              label="Who it came from"
+              placeholder="Choose a supplier"
               options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
               value={supplierId}
               onChange={(value) => { setSupplierId(value); setOrderId(''); }}
