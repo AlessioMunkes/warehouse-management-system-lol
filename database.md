@@ -46,6 +46,14 @@ the header comment in `picking.repository.js`.
 but `stock_levels` remains one balance per product, so picking cannot yet allocate
 first-expiry-first-out. BR-06 is recorded, not enforced.
 
+- **019** — Expiry warnings (sponsor change request). No new column: a daily in-process
+  job (`server/src/jobs/expiryWarning.job.js`, started from `server/index.js`) sweeps
+  `delivery_note_items.expiry_date` and writes a `notifications` row (visible to every
+  manager, per the existing notifications convention) when a line enters the 14-day and
+  again the 7-day window, deduped against `notifications.entity_type = 'delivery_note_item_expiry'`.
+  Same "still open" limits as above apply — this warns on the receipt line's own expiry
+  date, not on remaining on-hand quantity, since there's no per-batch stock yet to warn on.
+
 ## Conventions
 
 - Primary keys are `UUID DEFAULT gen_random_uuid()` throughout, matching Supabase

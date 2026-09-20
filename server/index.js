@@ -33,6 +33,7 @@ import notificationRouter from './src/routes/notification.routes.js';
 import loveActivismRouter   from './src/routes/loveActivism.routes.js';
 import communityRequestRouter from './src/routes/communityRequest.routes.js';
 import collectionKitRouter from './src/routes/collectionKit.routes.js';
+import expiryWarningJob  from './src/jobs/expiryWarning.job.js';
 
 // ── Validate required secrets exist at startup ───────────────
 if (!process.env.JWT_SECRET) {
@@ -160,4 +161,5 @@ app.use((err, req, res, next) => {
 // ── Start ─────────────────────────────────────────────────────
 app.listen(port, () => {
   console.log(`[server] Running on http://localhost:${port}`);
+  expiryWarningJob.startExpiryWarningJob();
 });
