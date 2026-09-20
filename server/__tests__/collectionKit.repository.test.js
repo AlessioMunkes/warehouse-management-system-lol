@@ -147,6 +147,23 @@ describe('markDispatched', () => {
   });
 });
 
+describe('listKits', () => {
+  it('orders kits with a dispatched-only history to the bottom, like listRecords', async () => {
+    poolMock.query.mockResolvedValue({ rows: [] });
+    await repo.listKits({});
+    const [sql] = poolMock.query.mock.calls[0];
+    expect(sql).toMatch(/= 'dispatched'\) ASC/);
+  });
+
+  it('searches owner_name and suburb', async () => {
+    poolMock.query.mockResolvedValue({ rows: [] });
+    await repo.listKits({ search: 'Delft' });
+    const [sql, params] = poolMock.query.mock.calls[0];
+    expect(sql).toMatch(/owner_name ILIKE|suburb ILIKE/);
+    expect(params[0]).toBe('%Delft%');
+  });
+});
+
 describe('listRecords', () => {
   it('orders not-yet-dispatched records before dispatched ones', async () => {
     poolMock.query.mockResolvedValue({ rows: [] });

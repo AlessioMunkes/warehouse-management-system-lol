@@ -74,9 +74,14 @@ const createKit = async ({ ownerName, suburb, assignedAt, actorId }) => {
 };
 
 // ── List kits, each with its derived status ────────────────────
-// search matches owner_name or suburb — how a worker who knows whose
-// bucket is in front of them actually finds it; a numeric kit id is
-// the exception, not the rule.
+// search matches owner_name or suburb: how a worker who knows whose
+// bucket is in front of them actually finds it, even though the list
+// itself displays by kit code, not owner name.
+//
+// Same ordering principle as RECORD_ORDER: kits whose latest record
+// still needs dispatching (or that have no records at all yet) sort
+// first, fully settled ('dispatched') kits sink to the bottom, most
+// recent activity first within each group.
 const listKits = async ({ search = null } = {}) => {
   const params = [];
   const where = [];
@@ -99,7 +104,9 @@ const listKits = async ({ search = null } = {}) => {
           LIMIT 1
        ) latest ON TRUE
        ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-      ORDER BY k.id DESC`,
+      ORDER BY (COALESCE(latest.status, 'assigned') = 'dispatched') ASC,
+                COALESCE(latest.logged_at, k.assigned_at) DESC,
+                k.id DESC`,
     params
   );
   return rows;

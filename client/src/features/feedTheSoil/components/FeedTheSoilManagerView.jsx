@@ -13,6 +13,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
 import collectionKitAPI from '../../../services/collectionKitAPI';
+import formatKitCode from '../kitCode';
 
 import { Button }   from '@/components/ui/button';
 import { Badge }    from '@/components/ui/badge';
@@ -174,7 +175,7 @@ const KitDetail = ({ kit, onLogCompost, onDispatch, dispatchingId, onClose }) =>
       <div>
         <CardTitle>{kit.owner_name}</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Kit #{kit.id} · {kit.suburb || 'No suburb on record'} · assigned {fmtDate(kit.assigned_at)}
+          {formatKitCode(kit.id)} · {kit.suburb || 'No suburb on record'} · assigned {fmtDate(kit.assigned_at)}
         </p>
       </div>
       <StatusBadge status={kit.status} />
@@ -401,7 +402,7 @@ export default function FeedTheSoilManagerView() {
                     <TableBody>
                       {kits.map((k) => (
                         <TableRow key={k.id} className="cursor-pointer" onClick={() => openKit(k.id)}>
-                          <TableCell className="font-medium">#{k.id}</TableCell>
+                          <TableCell className="font-medium">{formatKitCode(k.id)}</TableCell>
                           <TableCell>{k.owner_name}</TableCell>
                           <TableCell className="text-muted-foreground">{k.suburb || '—'}</TableCell>
                           <TableCell><StatusBadge status={k.status} /></TableCell>
@@ -442,7 +443,7 @@ export default function FeedTheSoilManagerView() {
                       {records.map((r) => (
                         <TableRow key={r.id}>
                           <TableCell className="font-medium">{r.owner_name}</TableCell>
-                          <TableCell className="text-muted-foreground">#{r.kit_id}{r.suburb ? ` · ${r.suburb}` : ''}</TableCell>
+                          <TableCell className="text-muted-foreground">{formatKitCode(r.kit_id)}{r.suburb ? ` · ${r.suburb}` : ''}</TableCell>
                           <TableCell className="text-muted-foreground">{fmtDate(r.logged_at)}</TableCell>
                           <TableCell className="text-muted-foreground">{fmtKg(r.kg_compost)}</TableCell>
                           <TableCell>

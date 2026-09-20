@@ -37,6 +37,7 @@ import usePaged from '../../staff/hooks/usePaged';
 import Paged from '../../staff/components/Paged';
 import { readDraft, writeDraft, clearDraft } from '../../staff/hooks/useDraft';
 import collectionKitAPI from '../../../services/collectionKitAPI';
+import formatKitCode from '../kitCode';
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
@@ -256,7 +257,7 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
           {showOwner ? `${record.owner_name}${record.suburb ? ` · ${record.suburb}` : ''}` : fmtDate(record.logged_at)}
         </span>
         <span className="stf-row-meta">
-          {showOwner ? `Kit #${record.kit_id} · ${fmtDate(record.logged_at)} · ` : ''}
+          {showOwner ? `${formatKitCode(record.kit_id)} · ${fmtDate(record.logged_at)} · ` : ''}
           {fmtKg(record.kg_compost)}
           {record.status === 'dispatched' ? ` · dispatched ${fmtDateTime(record.dispatched_at)}` : ''}
           {record.logged_by_name ? ` · Logged by ${record.logged_by_name}` : ''}
@@ -330,10 +331,9 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openKit(kit.id); } }}
                 >
                   <span className="stf-row-main">
-                    <span className="stf-row-title">{kit.owner_name}</span>
+                    <span className="stf-row-title">{formatKitCode(kit.id)}</span>
                     <span className="stf-row-meta">
-                      Kit #{kit.id}{kit.suburb ? ` · ${kit.suburb}` : ''}
-                      {kit.last_logged_at ? ` · last logged ${fmtDate(kit.last_logged_at)}` : ''}
+                      {kit.last_logged_at ? `Last collected ${fmtDate(kit.last_logged_at)}` : 'Not yet collected'}
                     </span>
                   </span>
                   <StatusBadge status={kit.status} />
@@ -361,7 +361,7 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
     return (
       <TaskPage
         title={selectedKit.owner_name}
-        sub={`Kit #${selectedKit.id}${selectedKit.suburb ? ` · ${selectedKit.suburb}` : ''} · assigned ${fmtDate(selectedKit.assigned_at)}`}
+        sub={`${formatKitCode(selectedKit.id)}${selectedKit.suburb ? ` · ${selectedKit.suburb}` : ''} · assigned ${fmtDate(selectedKit.assigned_at)}`}
         actions={
           <Actions>
             <Button onClick={() => startLog(selectedKit)}>Log compost</Button>
@@ -425,7 +425,7 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
     return (
       <TaskPage
         title={`Log compost · ${selectedKit.owner_name}`}
-        sub={`Kit #${selectedKit.id}${selectedKit.suburb ? ` · ${selectedKit.suburb}` : ''}`}
+        sub={`${formatKitCode(selectedKit.id)}${selectedKit.suburb ? ` · ${selectedKit.suburb}` : ''}`}
         note={kgInvalid ? 'Still needed: the weight of compost collected.' : null}
         actions={
           <Actions>
