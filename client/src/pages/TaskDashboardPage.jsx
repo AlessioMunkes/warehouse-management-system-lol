@@ -63,6 +63,18 @@ export default function TaskDashboardPage() {
   const [loading, setLoading] = useState(true);
   const { show: showHamburgerHint, dismiss: dismissHamburgerHint } = useCoachmark('dashboard-hamburger');
 
+  // Same 5s auto-dismiss every other Coachmark in this app already
+  // has (DecantingFlow/ReceivingFlow/StaffSlipFlow's view-toggle
+  // hints) — missing here was the actual bug: with no timer, dismiss
+  // only ever fired on a tap, so the hint just sat on screen
+  // indefinitely instead of clearing itself after a few seconds like
+  // a first-visit hint should.
+  useEffect(() => {
+    if (!showHamburgerHint) return undefined;
+    const timer = setTimeout(dismissHamburgerHint, 5000);
+    return () => clearTimeout(timer);
+  }, [showHamburgerHint, dismissHamburgerHint]);
+
   useEffect(() => {
     let cancelled = false;
     dashboardAPI.getMyWork()

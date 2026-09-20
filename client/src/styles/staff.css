@@ -1278,18 +1278,42 @@ body.reduced-movement .decorative-icon {
 }
 /* ── ACC-08 · reduced motion ─────────────────────────────────────── */
 /* Honoured from the OS setting, and from the in-app "Less movement"
-   toggle, which sets data-stf-motion="reduced" on <html> so it also
-   covers a shared tablet whose OS setting nobody can change. */
+   toggle (useReducedMotion.js), which sets data-stf-motion="reduced"
+   on <html> so it also covers a shared tablet whose OS setting nobody
+   can change.
+
+   REVISED — this used to be five named selectors plus the coachmark
+   arrow, which is what let the coachmark "just freeze on screen"
+   instead of disappearing: the arrow's own bounce stopped (line
+   below still zeroes it out) but nothing here was ever the reason it
+   stayed visible — that was a separate bug, a missing auto-dismiss
+   timer, fixed in TaskDashboardPage.jsx. This blanket rule is a
+   genuine second thing worth having anyway: an enumerated list always
+   drifts behind whatever's actually animated in the file, the same
+   problem a completely separate, DEAD version of this same idea had
+   (body.reduced-movement, still in this file below, toggled only by
+   TopNavBar.jsx — a component nothing in App.jsx routes to any more).
+   `*` catches every current and future transition/animation without
+   needing its own entry. transform is deliberately left alone: it's
+   also how static things are centred here (translateY(-50%) etc.),
+   and a blanket transform: none would un-centre them, not just stop
+   motion. */
 @media (prefers-reduced-motion: reduce) {
-  .stf-rail-bar, .stf-progress-fill, .stf-btn, .stf-choice, .stf-segment-thumb { transition: none !important; }
-  .stf-coachmark-arrow { animation: none !important; }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
-[data-stf-motion='reduced'] .stf-rail-bar,
-[data-stf-motion='reduced'] .stf-progress-fill,
-[data-stf-motion='reduced'] .stf-btn,
-[data-stf-motion='reduced'] .stf-choice,
-[data-stf-motion='reduced'] .stf-segment-thumb { transition: none !important; }
-[data-stf-motion='reduced'] .stf-coachmark-arrow { animation: none !important; }
+[data-stf-motion='reduced'] *,
+[data-stf-motion='reduced'] *::before,
+[data-stf-motion='reduced'] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
 
 /* ── Bench tablet ────────────────────────────────────────────────── */
 /* Same column, more air. Deliberately not a wider table: the staff who
@@ -1689,7 +1713,9 @@ body.reduced-movement .decorative-icon {
   margin-bottom: 2px;
 }
 
-[data-stf-motion='reduced'] .stf-wl.is-guided .stf-wl-row { transition: none !important; }
+/* The old [data-stf-motion='reduced'] .stf-wl-row rule that used to
+   live here is now covered by the blanket reduced-motion rule near
+   the top of this file — every transition, this row's included. */
 
 /* ── 3b · THE ROW ON A PHONE ────────────────────────────────────
    Found by rendering it rather than by reading it. Two 44px steppers
