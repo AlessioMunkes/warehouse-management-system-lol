@@ -2129,73 +2129,91 @@ button.stf-panel-head:disabled { cursor: default; }
 }
 .stf-resume .stf-resume-drop:hover { color: #8a3227; }
 
-/* ── Worker dashboard task grid ──────────────────────────────────
-   Square tiles, two per row, each free-standing rather than implying
-   an order between them — see TaskDashboardPage.jsx's own note on why
-   this replaced a "journey" layout that was considered for it.
+/* ── Worker dashboard task path ────────────────────────────────
+   The round, connected-line layout from the other old storyboard —
+   explicitly asked for over the square tile grid this replaced (that
+   grid's own note on why a "journey" layout was passed over the
+   first time is now stale; see TaskPathNode.jsx for how this version
+   avoids the specific problem raised then — fake done/current/future
+   states — while keeping the round, connected shape.
 
-   Five tiles in two columns leaves the last one stranded alone in its
-   own row with an empty half beside it. Rather than adding a third
-   column (which would leave the SAME kind of gap on the row above —
-   two full rows of two, one row of one either way for any odd count)
-   the lone last tile spans the full row and switches to a wide
-   horizontal card instead, which reads as a deliberate "this one's
-   different" rather than a leftover. */
-.stf-task-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+   Five nodes, kept to one row: horizontal scroll rather than wrapping
+   to a second row, because a line connecting circles across a wrap
+   would either break or need routing logic a CSS ::before can't do
+   cleanly. -webkit-overflow-scrolling keeps it a finger-flick on the
+   tablet this app actually runs on, not a fight with a thin
+   scrollbar. */
+.stf-path-track {
+  display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 2px 8px;
+  margin: 0 -2px;
 }
-.stf-task-tile {
+.stf-path-node {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 84px;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 8px;
-  padding: 22px 12px;
-  border: 1px solid var(--stf-border);
-  border-radius: var(--stf-radius);
-  background: var(--stf-white);
+  gap: 6px;
+  padding: 0 4px;
   text-decoration: none;
-  transition: background 150ms ease, border-color 150ms ease;
 }
-.stf-task-tile:hover { background: var(--stf-sand); border-color: var(--stf-gold); }
-.stf-task-tile:last-child:nth-child(odd) {
-  grid-column: 1 / -1;
-  flex-direction: row;
-  align-items: center;
-  justify-content: flex-start;
-  text-align: left;
-  gap: 14px;
-  padding: 16px 20px;
+/* The connecting line: each node (but the first) draws a segment from
+   its own centre leftward to the previous node's centre. Works
+   because every node is the same flex width, so that distance is
+   always exactly one node's width. */
+.stf-path-node:not(:first-child)::before {
+  content: '';
+  position: absolute;
+  top: 27px;
+  right: 50%;
+  width: 100%;
+  height: 1.5px;
+  background: var(--stf-border);
+  z-index: 0;
 }
-.stf-task-tile:last-child:nth-child(odd) .stf-task-tile-text {
-  align-items: flex-start;
-  text-align: left;
-}
-.stf-task-tile-icon { width: 44px; height: 44px; object-fit: contain; }
-.stf-task-tile-text {
+.stf-path-circle {
+  position: relative;
+  z-index: 1;
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--stf-border);
+  background: var(--stf-white);
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 2px;
+  justify-content: center;
+  transition: border-color 150ms ease, background 150ms ease;
 }
-.stf-task-tile-title {
+.stf-path-node:hover .stf-path-circle { border-color: var(--stf-gold); background: var(--stf-sand); }
+.stf-path-circle img { width: 30px; height: 30px; object-fit: contain; }
+.stf-path-title {
   font-family: var(--stf-font-display);
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--stf-ink);
+  white-space: nowrap;
 }
-.stf-task-tile-meta { font-size: 12px; line-height: 1.4; color: var(--stf-text-sub); }
-.stf-task-tile-meta-skeleton {
-  width: 60%;
-  height: 12px;
-  border-radius: 6px;
+.stf-path-meta {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--stf-text-sub);
+  max-width: 90px;
+}
+.stf-path-meta-skeleton {
+  width: 70%;
+  height: 11px;
+  border-radius: 5px;
   background: var(--stf-field-bg);
 }
 
 /* Feed the Soil and Benevolent Requests — worked far less often than
-   the grid above, so plain links rather than tiles of their own
+   the path above, so plain links rather than nodes of their own
    weight. Left as the shell's default link colour (--stf-accent, see
    .stf-shell a) rather than muted grey: this file's own rule is red
    for anything clickable, and these are exactly that. */
