@@ -193,9 +193,11 @@ const paperSaved = async ({ dimension, dateRange }) => {
 };
 
 // ══ Feed the Soil / compost ══════════════════════════════════════
-// A kit only counts once it is marked returned WITH a measured
-// kg_compost_returned — a kit still out is compost that has not
-// happened yet, not a number to estimate.
+// Every logged weigh-in counts, dispatched or not — logging IS the
+// processing event (the kit was collected and weighed); dispatch to a
+// farmer is what happens to it afterward, a fulfilment detail with no
+// bearing on how much compost the programme actually produced. See
+// collectionKit.repository.js for the full lifecycle this reads from.
 const compostDimension = (dimension) => {
   switch (dimension) {
     case 'none':  return { expr: `'Total'`,               group: null };
@@ -208,11 +210,10 @@ const compostProcessed = async ({ dimension, dateRange }) => {
   const dim = compostDimension(dimension);
   const params = [dateRange.from, dateRange.to];
   const { rows } = await pool.query(
-    `SELECT ${dim.expr} AS label, COALESCE(SUM(kg_compost_returned), 0)::numeric AS value
-       FROM (SELECT ${sastDate('returned_at')} AS bucket_date, kg_compost_returned
-               FROM collection_kits
-              WHERE status = 'returned'
-                AND ${sastDate('returned_at')} BETWEEN $1::date AND $2::date) t
+    `SELECT ${dim.expr} AS label, COALESCE(SUM(kg_compost), 0)::numeric AS value
+       FROM (SELECT ${sastDate('logged_at')} AS bucket_date, kg_compost
+               FROM collection_kit_records
+              WHERE ${sastDate('logged_at')} BETWEEN $1::date AND $2::date) t
        ${dim.group ? `GROUP BY ${dim.group}` : ''}
        ORDER BY 1`,
     params

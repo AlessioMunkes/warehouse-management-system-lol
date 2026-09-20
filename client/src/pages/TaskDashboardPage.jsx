@@ -38,7 +38,7 @@ const TASKS = [
   { to: STAFF.donation, icon: HandCoins, title: 'Donation intake',
     description: 'Log goods donated at the door.' },
   { to: STAFF.feedTheSoil, icon: Sprout, title: 'Feed the Soil',
-    description: 'Log a kit of food waste going out or compost coming back.' },
+    description: 'Weigh in compost from a collection kit, or assign a new one.' },
   // Receipts is manager-only and deliberately absent. The card and the
   // route guard in App.jsx have to agree — a hidden card on an open
   // route is not access control, just a tidier way to lose track of one.

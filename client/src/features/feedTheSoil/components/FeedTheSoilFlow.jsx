@@ -1,31 +1,40 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/features/feedTheSoil/components/FeedTheSoilFlow.jsx
 //
-// The staff-floor shape of Feed the Soil kit logging: a list of kits
-// with Out/Returned segments (FilterSegments, the same control the
-// history screens use for date ranges), a "Log a kit going out"
-// action, and a return step opened by tapping an out kit. Built from
-// the same StepPrimitives/TaskPage vocabulary as DecantingFlow.jsx and
-// ReceivingFlow.jsx, so a worker who already knows one staff flow
-// already knows this one — the ManagerLayout table + shadcn Card forms
-// this replaces (see FeedTheSoilManagerView.jsx) were the wrong
-// vocabulary for a phone held with one hand at the compost skip.
+// The staff-floor shape of Feed the Soil kit tracking. The lifecycle,
+// corrected from an earlier "kit goes out, kit comes back" model that
+// had it backwards:
 //
-// NOT A MULTI-PANEL WIZARD.
-// Unlike decanting, there is nothing here to split into "weigh it,
-// then bag it, then count it back" — logging a kit or closing one out
-// is one small, flat form. TaskPage still earns its keep: a sticky
-// commit bar with a `note` naming what's missing beats a bare disabled
-// button, and `side` gives the worker a running summary of the kit
-// while they fill it in, the same reasons DecantingFlow uses it for
-// its own single "work" step.
+//   assign   a kit (bucket) is given to a community member — it stays
+//            with them, it is never checked back in
+//   log      the owner brings it in, ideally weekly, and the compost
+//            is weighed — one record per visit, logged against the
+//            same kit again and again over its life
+//   dispatch that logged compost eventually leaves for a farmer, a
+//            quick one-tap action on the record, independent of any
+//            others (no data exists on which farmer got how much from
+//            which record, so this does not invent a batch concept)
+//
+// Two top-level views, switched with FilterSegments (the same control
+// the history screens use for date ranges):
+//   Records  the flat, cross-kit list — what needs attention. Sorted
+//            server-side: not-yet-dispatched first, dispatched at the
+//            bottom, newest first within each group.
+//   Kits     search by owner or suburb, assign a new kit, or open one
+//            to see who owns it (name + suburb only — no address or
+//            contact details, by design) and its full log history.
+//
+// Built from the same StepPrimitives/TaskPage/usePaged vocabulary as
+// Receiving, Packing and Decanting.
 // ─────────────────────────────────────────────────────────────
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Actions, Button, TextField, DateField, NumberField, Notice, KeyValues,
 } from '../../staff/components/StepPrimitives';
 import TaskPage from '../../staff/components/TaskPage';
-import { FilterSegments } from '../../staff/components/ListTools';
+import ListTools, { FilterSegments } from '../../staff/components/ListTools';
+import usePaged from '../../staff/hooks/usePaged';
+import Paged from '../../staff/components/Paged';
 import { readDraft, writeDraft, clearDraft } from '../../staff/hooks/useDraft';
 import collectionKitAPI from '../../../services/collectionKitAPI';
 
@@ -43,289 +52,403 @@ const fmtDateTime = (value) =>
 
 const fmtKg = (value) => (value === null || value === undefined ? '—' : `${Number(value).toLocaleString('en-ZA')} kg`);
 
-const LOG_DRAFT_KEY = 'feedTheSoil-log';
+const STATUS_LABEL = { assigned: 'Assigned', logged: 'Logged', dispatched: 'Dispatched' };
+
+const STATUS_BADGE_CLASS = { logged: ' is-warn', dispatched: ' is-done' };
+
+const StatusBadge = ({ status }) => (
+  <span className={`stf-badge${STATUS_BADGE_CLASS[status] ?? ''}`}>
+    {STATUS_LABEL[status] ?? status}
+  </span>
+);
 
 export default function FeedTheSoilFlow({ onCrumbChange }) {
-  const [phase, setPhase] = useState('list'); // list | log | return | done
-  const [lastAction, setLastAction] = useState(null); // 'logged' | 'returned', for the done screen
+  // 'browse' (tab: records | kits) | 'kitDetail' | 'assign' | 'log'
+  const [phase, setPhase] = useState('browse');
+  const [tab, setTab] = useState('records');
+
+  const [records, setRecords] = useState([]);
+  const [recordsLoading, setRecordsLoading] = useState(true);
 
   const [kits, setKits] = useState([]);
-  const [segment, setSegment] = useState('out'); // out | returned
-  const [loading, setLoading] = useState(true);
-  const [listError, setListError] = useState(null);
+  const [kitsLoading, setKitsLoading] = useState(true);
+  const [kitSearch, setKitSearch] = useState('');
 
-  const [returningKit, setReturningKit] = useState(null);
+  const [browseError, setBrowseError] = useState(null);
+  const [dispatchingId, setDispatchingId] = useState(null);
+
+  const [selectedKit, setSelectedKit] = useState(null);
+  const [kitDetailLoading, setKitDetailLoading] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState(null);
 
-  // ── Log-a-kit form state ──────────────────────────────────
-  // Seeded empty here — startLog() below is the one entry point into
-  // this phase and re-reads any saved draft fresh every time, which
-  // also covers re-opening the form after Cancel, not just first load.
-  const [kitLabel, setKitLabel] = useState('');
-  const [location, setLocation] = useState('');
-  const [dateOut, setDateOut] = useState(todayISO());
-  const [wasteKg, setWasteKg] = useState('');
+  // ── Assign form state ─────────────────────────────────────
+  const [ownerName, setOwnerName] = useState('');
+  const [suburb, setSuburb] = useState('');
+  const [assignedAt, setAssignedAt] = useState(todayISO());
 
-  // ── Return form state ─────────────────────────────────────
-  const [compostKg, setCompostKg] = useState('');
+  // ── Log form state ────────────────────────────────────────
+  const [kgCompost, setKgCompost] = useState('');
+  const [loggedAt, setLoggedAt] = useState(todayISO());
+  const [notes, setNotes] = useState('');
 
-  useEffect(() => { onCrumbChange?.(phase === 'list' ? 'Kits' : phase === 'log' ? 'Log a kit' : phase === 'return' ? 'Mark returned' : 'Saved'); }, [phase, onCrumbChange]);
+  useEffect(() => {
+    const crumb = phase === 'kitDetail' ? (selectedKit ? `Kit / ${selectedKit.owner_name}` : 'Kit')
+      : phase === 'assign' ? 'Assign a kit'
+      : phase === 'log' ? 'Log compost'
+      : tab === 'records' ? 'Compost records' : 'Kits';
+    onCrumbChange?.(crumb);
+  }, [phase, tab, selectedKit, onCrumbChange]);
 
-  const load = useCallback(async () => {
-    setListError(null);
+  const loadRecords = useCallback(async () => {
+    setBrowseError(null);
     try {
-      const res = await collectionKitAPI.listKits();
+      const res = await collectionKitAPI.listRecords();
+      setRecords(res?.data ?? res ?? []);
+    } catch (err) {
+      setBrowseError(err.message || 'Could not load compost records.');
+    }
+  }, []);
+
+  const loadKits = useCallback(async (search) => {
+    setBrowseError(null);
+    try {
+      const res = await collectionKitAPI.listKits(search);
       setKits(res?.data ?? res ?? []);
     } catch (err) {
-      setListError(err.message || 'Could not load kits.');
+      setBrowseError(err.message || 'Could not load kits.');
     }
   }, []);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    load().finally(() => { if (!cancelled) setLoading(false); });
+    setRecordsLoading(true);
+    loadRecords().finally(() => { if (!cancelled) setRecordsLoading(false); });
     return () => { cancelled = true; };
-  }, [load]);
+  }, [loadRecords]);
 
-  // Persist the log-a-kit draft as it's typed, same as ReceivingFlow —
-  // a tablet that sleeps mid-entry should not cost a retyped label and
-  // weight. Cleared on submit or on leaving the form.
   useEffect(() => {
-    if (phase !== 'log') return;
-    writeDraft(LOG_DRAFT_KEY, { kitLabel, location, dateOut, wasteKg });
-  }, [phase, kitLabel, location, dateOut, wasteKg]);
+    let cancelled = false;
+    setKitsLoading(true);
+    loadKits(kitSearch).finally(() => { if (!cancelled) setKitsLoading(false); });
+    return () => { cancelled = true; };
+    // Deliberately not debounced, same reasoning as ListTools' own
+    // comment: the list is already in memory server-side and small.
+  }, [loadKits, kitSearch]);
 
-  const outKits = useMemo(() => kits.filter((k) => k.status === 'out'), [kits]);
-  const returnedKits = useMemo(() => kits.filter((k) => k.status === 'returned'), [kits]);
-  const visibleKits = segment === 'out' ? outKits : returnedKits;
+  const recordsPaged = usePaged(records);
+  const kitsPaged = usePaged(kits);
 
-  const startLog = () => {
-    const draft = readDraft(LOG_DRAFT_KEY);
-    setKitLabel(draft?.kitLabel ?? '');
-    setLocation(draft?.location ?? '');
-    setDateOut(draft?.dateOut ?? todayISO());
-    setWasteKg(draft?.wasteKg ?? '');
+  const openKit = async (id) => {
+    setPhase('kitDetail');
+    setKitDetailLoading(true);
+    setBrowseError(null);
+    try {
+      const res = await collectionKitAPI.getKit(id);
+      setSelectedKit(res?.data ?? res);
+    } catch (err) {
+      setBrowseError(err.message || 'Could not load this kit.');
+      setPhase('browse');
+    } finally {
+      setKitDetailLoading(false);
+    }
+  };
+
+  const backToBrowse = (targetTab) => {
+    setPhase('browse');
+    setFormError(null);
+    if (targetTab) setTab(targetTab);
+    loadKits(kitSearch);
+    loadRecords();
+  };
+
+  // ── Dispatch — inline, no screen change ────────────────────
+  const dispatchRecord = async (recordId) => {
+    setDispatchingId(recordId);
+    setBrowseError(null);
+    try {
+      await collectionKitAPI.markDispatched(recordId);
+      await loadRecords();
+      if (phase === 'kitDetail' && selectedKit) await openKit(selectedKit.id);
+    } catch (err) {
+      setBrowseError(err.message || 'Could not mark this record dispatched.');
+    } finally {
+      setDispatchingId(null);
+    }
+  };
+
+  // ── Assign a kit ───────────────────────────────────────────
+  const ASSIGN_DRAFT_KEY = 'feedTheSoil-assign';
+  const startAssign = () => {
+    const draft = readDraft(ASSIGN_DRAFT_KEY);
+    setOwnerName(draft?.ownerName ?? '');
+    setSuburb(draft?.suburb ?? '');
+    setAssignedAt(draft?.assignedAt ?? todayISO());
+    setFormError(null);
+    setPhase('assign');
+  };
+  useEffect(() => {
+    if (phase !== 'assign') return;
+    writeDraft(ASSIGN_DRAFT_KEY, { ownerName, suburb, assignedAt });
+  }, [phase, ownerName, suburb, assignedAt]);
+
+  const ownerMissing = !ownerName.trim();
+
+  const submitAssign = async () => {
+    if (ownerMissing) return;
+    setBusy(true);
+    setFormError(null);
+    try {
+      const res = await collectionKitAPI.createKit({ ownerName: ownerName.trim(), suburb: suburb.trim(), assignedAt });
+      clearDraft(ASSIGN_DRAFT_KEY);
+      const kit = res?.data ?? res;
+      await loadKits(kitSearch);
+      await openKit(kit.id);
+    } catch (err) {
+      setFormError(err.message || 'Could not assign the kit.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // ── Log compost ────────────────────────────────────────────
+  const logDraftKey = (kitId) => `feedTheSoil-log-${kitId}`;
+  const startLog = (kit) => {
+    setSelectedKit(kit);
+    const draft = readDraft(logDraftKey(kit.id));
+    setKgCompost(draft?.kgCompost ?? '');
+    setLoggedAt(draft?.loggedAt ?? todayISO());
+    setNotes(draft?.notes ?? '');
     setFormError(null);
     setPhase('log');
   };
+  useEffect(() => {
+    if (phase !== 'log' || !selectedKit) return;
+    writeDraft(logDraftKey(selectedKit.id), { kgCompost, loggedAt, notes });
+  }, [phase, selectedKit, kgCompost, loggedAt, notes]);
 
-  const startReturn = (kit) => {
-    setReturningKit(kit);
-    setCompostKg('');
-    setFormError(null);
-    setPhase('return');
-  };
-
-  const backToList = () => {
-    setPhase('list');
-    setReturningKit(null);
-    setFormError(null);
-  };
-
-  const labelMissing = !kitLabel.trim();
-  const wasteInvalid = wasteKg === '' || Number.isNaN(Number(wasteKg)) || Number(wasteKg) < 0;
-  const compostInvalid = compostKg === '' || Number.isNaN(Number(compostKg)) || Number(compostKg) < 0;
+  const kgInvalid = kgCompost === '' || Number.isNaN(Number(kgCompost)) || Number(kgCompost) < 0;
 
   const submitLog = async () => {
-    if (labelMissing || wasteInvalid) return;
+    if (!selectedKit || kgInvalid) return;
     setBusy(true);
     setFormError(null);
     try {
-      await collectionKitAPI.logKitOut({
-        kitLabel: kitLabel.trim(),
-        location: location.trim(),
-        dateOut,
-        kgFoodWasteCollected: Number(wasteKg),
+      await collectionKitAPI.logCompost(selectedKit.id, {
+        kgCompost: Number(kgCompost), loggedAt, notes: notes.trim(),
       });
-      clearDraft(LOG_DRAFT_KEY);
-      setLastAction('logged');
-      setPhase('done');
-      await load();
+      clearDraft(logDraftKey(selectedKit.id));
+      await loadRecords();
+      await openKit(selectedKit.id);
     } catch (err) {
-      setFormError(err.message || 'Could not log the kit.');
+      setFormError(err.message || 'Could not log the compost collected.');
     } finally {
       setBusy(false);
     }
   };
 
-  const submitReturn = async () => {
-    if (!returningKit || compostInvalid) return;
-    setBusy(true);
-    setFormError(null);
-    try {
-      await collectionKitAPI.markReturned(returningKit.id, Number(compostKg));
-      setLastAction('returned');
-      setPhase('done');
-      await load();
-    } catch (err) {
-      setFormError(err.message || 'Could not mark the kit returned.');
-    } finally {
-      setBusy(false);
-    }
-  };
+  // ── Records row ────────────────────────────────────────────
+  const RecordRow = ({ record, showOwner = true }) => (
+    <div className="stf-row is-static">
+      <span className="stf-row-main">
+        <span className="stf-row-title">
+          {showOwner ? `${record.owner_name}${record.suburb ? ` · ${record.suburb}` : ''}` : fmtDate(record.logged_at)}
+        </span>
+        <span className="stf-row-meta">
+          {showOwner ? `Kit #${record.kit_id} · ${fmtDate(record.logged_at)} · ` : ''}
+          {fmtKg(record.kg_compost)}
+          {record.status === 'dispatched' ? ` · dispatched ${fmtDateTime(record.dispatched_at)}` : ''}
+          {record.logged_by_name ? ` · Logged by ${record.logged_by_name}` : ''}
+        </span>
+      </span>
+      <StatusBadge status={record.status} />
+      {record.status === 'logged' ? (
+        <button
+          type="button" className="stf-btn stf-btn-secondary"
+          disabled={dispatchingId === record.id}
+          onClick={() => dispatchRecord(record.id)}
+        >
+          {dispatchingId === record.id ? 'Dispatching…' : 'Dispatch'}
+        </button>
+      ) : null}
+    </div>
+  );
 
-  // ── List ───────────────────────────────────────────────────
-  if (phase === 'list') {
+  // ── Records tab ────────────────────────────────────────────
+  if (phase === 'browse' && tab === 'records') {
+    return (
+      <TaskPage title="Feed the Soil" sub="Compost logged from every collection kit, most recent first. Dispatched records sink to the bottom.">
+        {browseError ? <Notice tone="warn">{browseError}</Notice> : null}
+        <FilterSegments label="View" value={tab} onChange={setTab} options={[{ key: 'records', label: 'Records' }, { key: 'kits', label: 'Kits' }]} />
+
+        {recordsLoading ? (
+          <div className="stf-skeleton" aria-label="Loading" />
+        ) : records.length === 0 ? (
+          <div className="stf-empty">No compost has been logged yet.</div>
+        ) : (
+          <>
+            <div className="stf-list">
+              {recordsPaged.slice.map((r) => <RecordRow key={r.id} record={r} />)}
+            </div>
+            <Paged {...recordsPaged} noun="records" />
+          </>
+        )}
+      </TaskPage>
+    );
+  }
+
+  // ── Kits tab ───────────────────────────────────────────────
+  if (phase === 'browse' && tab === 'kits') {
     return (
       <TaskPage
         title="Feed the Soil"
-        sub="Kits (buckets) of food waste swapped for compost. Log one going out, and again when it comes back."
-        actions={
-          <Actions>
-            <Button onClick={startLog}>Log a kit going out</Button>
-          </Actions>
-        }
+        sub="Every collection kit assigned to a community member."
+        actions={<Actions><Button onClick={startAssign}>Assign a kit</Button></Actions>}
       >
-        {listError ? <Notice tone="warn">{listError}</Notice> : null}
+        {browseError ? <Notice tone="warn">{browseError}</Notice> : null}
+        <FilterSegments label="View" value={tab} onChange={setTab} options={[{ key: 'records', label: 'Records' }, { key: 'kits', label: 'Kits' }]} />
 
-        <FilterSegments
-          label="Kit status"
-          value={segment}
-          onChange={setSegment}
-          options={[
-            { key: 'out', label: 'Out', count: outKits.length },
-            { key: 'returned', label: 'Returned', count: returnedKits.length },
-          ]}
+        <ListTools
+          id="fts-kit-search" query={kitSearch} onQuery={setKitSearch}
+          placeholder="Search by owner or suburb"
         />
 
-        {loading ? (
+        {kitsLoading ? (
           <div className="stf-skeleton" aria-label="Loading" />
-        ) : visibleKits.length === 0 ? (
+        ) : kits.length === 0 ? (
           <div className="stf-empty">
-            {segment === 'out' ? 'No kits are currently out.' : 'No kits have been marked returned yet.'}
+            {kitSearch ? `No kits match "${kitSearch}".` : 'No kits have been assigned yet.'}
           </div>
         ) : (
-          <div className="stf-list">
-            {visibleKits.map((kit) => (
-              <div
-                key={kit.id}
-                className={`stf-row${kit.status === 'out' ? '' : ' is-static'}`}
-                {...(kit.status === 'out' ? {
-                  role: 'button', tabIndex: 0,
-                  onClick: () => startReturn(kit),
-                  onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startReturn(kit); } },
-                } : {})}
-              >
-                <span className="stf-row-main">
-                  <span className="stf-row-title">{kit.kit_label}</span>
-                  <span className="stf-row-meta">
-                    {kit.location ? `${kit.location} · ` : ''}
-                    Out {fmtDate(kit.date_out)} · {fmtKg(kit.kg_food_waste_collected)} waste
-                    {kit.status === 'returned' ? ` · ${fmtKg(kit.kg_compost_returned)} compost back ${fmtDateTime(kit.returned_at)}` : ''}
-                    {kit.logged_by_name ? ` · Logged by ${kit.logged_by_name}` : ''}
+          <>
+            <div className="stf-list">
+              {kitsPaged.slice.map((kit) => (
+                <div
+                  key={kit.id} className="stf-row" role="button" tabIndex={0}
+                  onClick={() => openKit(kit.id)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openKit(kit.id); } }}
+                >
+                  <span className="stf-row-main">
+                    <span className="stf-row-title">{kit.owner_name}</span>
+                    <span className="stf-row-meta">
+                      Kit #{kit.id}{kit.suburb ? ` · ${kit.suburb}` : ''}
+                      {kit.last_logged_at ? ` · last logged ${fmtDate(kit.last_logged_at)}` : ''}
+                    </span>
                   </span>
-                </span>
-                {kit.status === 'out' ? (
-                  <button type="button" className="stf-btn stf-btn-secondary" onClick={() => startReturn(kit)}>
-                    Mark returned
+                  <StatusBadge status={kit.status} />
+                  <button
+                    type="button" className="stf-btn stf-btn-secondary"
+                    onClick={(e) => { e.stopPropagation(); startLog(kit); }}
+                  >
+                    Log compost
                   </button>
-                ) : null}
-              </div>
-            ))}
+                </div>
+              ))}
+            </div>
+            <Paged {...kitsPaged} noun="kits" />
+          </>
+        )}
+      </TaskPage>
+    );
+  }
+
+  // ── Kit detail ─────────────────────────────────────────────
+  if (phase === 'kitDetail') {
+    if (kitDetailLoading || !selectedKit) {
+      return <TaskPage title="Kit" sub="Loading…"><div className="stf-skeleton" aria-label="Loading" /></TaskPage>;
+    }
+    return (
+      <TaskPage
+        title={selectedKit.owner_name}
+        sub={`Kit #${selectedKit.id}${selectedKit.suburb ? ` · ${selectedKit.suburb}` : ''} · assigned ${fmtDate(selectedKit.assigned_at)}`}
+        actions={
+          <Actions>
+            <Button onClick={() => startLog(selectedKit)}>Log compost</Button>
+            <Button variant="secondary" onClick={() => backToBrowse('kits')}>Back to kits</Button>
+          </Actions>
+        }
+        side={
+          <div className="stf-summary">
+            <p className="stf-summary-title">This kit</p>
+            <KeyValues
+              pairs={[
+                ['Owner', selectedKit.owner_name],
+                ['Suburb', selectedKit.suburb || '—'],
+                ['Status', STATUS_LABEL[selectedKit.status] ?? selectedKit.status],
+                ['Assigned', fmtDate(selectedKit.assigned_at)],
+              ]}
+            />
+          </div>
+        }
+      >
+        {browseError ? <Notice tone="warn">{browseError}</Notice> : null}
+
+        {selectedKit.records.length === 0 ? (
+          <div className="stf-empty">No compost logged yet for this kit.</div>
+        ) : (
+          <div className="stf-list">
+            {selectedKit.records.map((r) => <RecordRow key={r.id} record={r} showOwner={false} />)}
           </div>
         )}
       </TaskPage>
     );
   }
 
-  // ── Log a kit ──────────────────────────────────────────────
-  if (phase === 'log') {
-    const commit = (
-      <Actions>
-        <Button disabled={busy || labelMissing || wasteInvalid} onClick={submitLog}>
-          {busy ? 'Logging' : 'Log kit'}
-        </Button>
-        <Button variant="secondary" onClick={backToList}>Cancel</Button>
-      </Actions>
-    );
-    const blockers = [];
-    if (labelMissing) blockers.push('the kit / bucket label');
-    if (wasteInvalid) blockers.push('the weight of food waste collected');
-
+  // ── Assign a kit ───────────────────────────────────────────
+  if (phase === 'assign') {
     return (
       <TaskPage
-        title="Log a kit going out"
-        sub="One entry per bucket, when it physically leaves with food waste."
-        note={blockers.length ? `Still needed: ${blockers.join(', ')}.` : null}
-        actions={commit}
-        side={
-          <div className="stf-summary">
-            <p className="stf-summary-title">This kit</p>
-            <KeyValues
-              pairs={[
-                ['Label', kitLabel || '—'],
-                ['Location', location || '—'],
-                ['Date out', fmtDate(dateOut)],
-                ['Waste', wasteKg ? `${wasteKg} kg` : '—'],
-              ]}
-            />
-          </div>
+        title="Assign a kit"
+        sub="A new collection kit given to a community member."
+        note={ownerMissing ? 'Still needed: the owner\'s name.' : null}
+        actions={
+          <Actions>
+            <Button disabled={busy || ownerMissing} onClick={submitAssign}>{busy ? 'Assigning' : 'Assign kit'}</Button>
+            <Button variant="secondary" onClick={() => backToBrowse('kits')}>Cancel</Button>
+          </Actions>
         }
       >
         {formError ? <Notice tone="warn">{formError}</Notice> : null}
 
-        <TextField
-          id="fts-label" label="Kit / bucket label" value={kitLabel}
-          onChange={setKitLabel} placeholder="e.g. Bucket A1"
-        />
-        <TextField
-          id="fts-location" label="Location (optional)" value={location}
-          onChange={setLocation} placeholder="e.g. Cape Town Warehouse"
-        />
-        <DateField id="fts-date" label="Date out" value={dateOut} onChange={setDateOut} />
-        <NumberField
-          id="fts-waste" label="Kilograms of food waste collected"
-          value={wasteKg} onChange={setWasteKg} flagged={wasteKg !== '' && wasteInvalid}
-        />
+        <TextField id="fts-owner" label="Owner's name" value={ownerName} onChange={setOwnerName} placeholder="e.g. Jane M." />
+        <TextField id="fts-suburb" label="Suburb (optional)" value={suburb} onChange={setSuburb} placeholder="e.g. Delft" />
+        <DateField id="fts-assigned" label="Date assigned" value={assignedAt} onChange={setAssignedAt} />
+
+        <Notice>Only the owner's first name and suburb are kept — no address or contact details.</Notice>
       </TaskPage>
     );
   }
 
-  // ── Mark a kit returned ────────────────────────────────────
-  if (phase === 'return' && returningKit) {
-    const commit = (
-      <Actions>
-        <Button disabled={busy || compostInvalid} onClick={submitReturn}>
-          {busy ? 'Saving' : 'Mark returned'}
-        </Button>
-        <Button variant="secondary" onClick={backToList}>Cancel</Button>
-      </Actions>
-    );
-
+  // ── Log compost ────────────────────────────────────────────
+  if (phase === 'log' && selectedKit) {
     return (
       <TaskPage
-        title={`Mark "${returningKit.kit_label}" returned`}
-        sub={`Went out ${fmtDate(returningKit.date_out)} with ${fmtKg(returningKit.kg_food_waste_collected)} of food waste.`}
-        note={compostInvalid ? 'Still needed: the weight of compost returned.' : null}
-        actions={commit}
+        title={`Log compost — ${selectedKit.owner_name}`}
+        sub={`Kit #${selectedKit.id}${selectedKit.suburb ? ` · ${selectedKit.suburb}` : ''}`}
+        note={kgInvalid ? 'Still needed: the weight of compost collected.' : null}
+        actions={
+          <Actions>
+            <Button disabled={busy || kgInvalid} onClick={submitLog}>{busy ? 'Logging' : 'Log compost'}</Button>
+            {/* Re-fetches rather than just flipping phase: "Log compost"
+                can be reached straight from a Kits-tab row, where
+                selectedKit is only the list shape (no .records yet) —
+                kitDetail needs the full one regardless of entry point. */}
+            <Button variant="secondary" onClick={() => openKit(selectedKit.id)}>Cancel</Button>
+          </Actions>
+        }
       >
         {formError ? <Notice tone="warn">{formError}</Notice> : null}
 
         <NumberField
-          id="fts-compost" label="Kilograms of compost returned"
-          value={compostKg} onChange={setCompostKg} flagged={compostKg !== '' && compostInvalid}
+          id="fts-kg" label="Kilograms of compost collected"
+          value={kgCompost} onChange={setKgCompost} flagged={kgCompost !== '' && kgInvalid}
         />
+        <DateField id="fts-logged" label="Date collected" value={loggedAt} onChange={setLoggedAt} />
+        <TextField id="fts-notes" label="Notes (optional)" value={notes} onChange={setNotes} />
       </TaskPage>
     );
   }
 
-  // ── Done ───────────────────────────────────────────────────
-  return (
-    <TaskPage
-      title="Saved"
-      sub={
-        lastAction === 'returned'
-          ? 'The compost is on the system and counts toward this month\'s Feed the Soil figure.'
-          : 'The kit is on the system as out with food waste.'
-      }
-      actions={
-        <Actions>
-          <Button onClick={backToList}>Back to kits</Button>
-        </Actions>
-      }
-    />
-  );
+  return null;
 }

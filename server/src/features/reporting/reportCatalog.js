@@ -181,12 +181,12 @@ export const METRICS = {
   compost_processed: {
     id: 'compost_processed', label: 'Compost processed', temporal: 'range',
     description:
-      'Kilograms of food waste turned into compost through Feed the Soil — logged ' +
-      'per collection kit when it goes out and again when it comes back.',
+      'Kilograms of compost collected through Feed the Soil — logged against a ' +
+      'community member\'s collection kit each time it is weighed in.',
     repoFn: 'compostProcessed', unit: 'kg',
     dimensions: ['none', 'month'], filters: [],
     defaultChart: 'line', impactOnly: true,
-    caveat: 'Only kits marked returned are counted; kits still out are not.',
+    caveat: 'Counts every logged weigh-in, whether or not it has been dispatched to a farmer yet.',
   },
 
   // ══ Dispatch ═══════════════════════════════════════════════

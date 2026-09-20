@@ -106,12 +106,12 @@ export const STAFF = {
   // Warehouse staff and up: every /api/community-requests route is
   // requireRole(WORKER, MANAGER, ADMIN), and this mirrors that.
   communityRequests: '/noc/community-requests',
-  // Feed the Soil kit logging (food waste swapped for compost).
+  // Feed the Soil kit tracking (food waste swapped for compost).
   // Warehouse staff and up, mirroring STAFF_UP on every
-  // /api/collection-kits route — a warehouse worker logs a kit going
-  // out and coming back the same way they log a community request; the
-  // Impact Calculator's compost_processed metric only reads from what
-  // gets logged here.
+  // /api/collection-kits route — a worker assigns a kit to a community
+  // member and logs the compost each time it's weighed in; the Impact
+  // Calculator's compost_processed metric only reads from what gets
+  // logged here.
   feedTheSoil: '/noc/feed-the-soil',
 };
 

@@ -77,15 +77,15 @@ describe('adultsReached', () => {
 });
 
 describe('compostProcessed', () => {
-  it('sums kg_compost_returned for returned kits only', async () => {
+  it('sums kg_compost across every logged record, dispatched or not', async () => {
     poolMock.query.mockResolvedValue({ rows: [{ label: 'Total', value: '16.5' }] });
 
     const result = await repo.compostProcessed({ dimension: 'none', dateRange: RANGE });
 
     const [sql, params] = poolMock.query.mock.calls[0];
-    expect(sql).toMatch(/FROM collection_kits/);
-    expect(sql).toMatch(/status = 'returned'/);
-    expect(sql).toMatch(/SUM\(kg_compost_returned\)/);
+    expect(sql).toMatch(/FROM collection_kit_records/);
+    expect(sql).not.toMatch(/status/);
+    expect(sql).toMatch(/SUM\(kg_compost\)/);
     expect(params).toEqual([RANGE.from, RANGE.to]);
     expect(result).toEqual([{ label: 'Total', value: 16.5 }]);
   });

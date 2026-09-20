@@ -2,116 +2,147 @@
 // server/__tests__/collectionKit.service.test.js
 //
 // collectionKit.repository.js is mocked, so these exercise the
-// service's own validation for Feed the Soil kit logging: kitLabel is
-// required, kg values must be non-negative numbers, an unknown/
-// already-returned kit fails with the right status on markReturned.
+// service's own validation for Feed the Soil kit tracking: ownerName
+// is required to assign a kit, kgCompost must be a non-negative
+// number to log compost, an unknown kit/record fails with the right
+// status, and a 42P01 from any path becomes a 503.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const repoMock = {
-  listKits:     vi.fn(),
-  logKitOut:    vi.fn(),
-  markReturned: vi.fn(),
+  createKit:      vi.fn(),
+  listKits:       vi.fn(),
+  getKitById:     vi.fn(),
+  logCompost:     vi.fn(),
+  markDispatched: vi.fn(),
+  listRecords:    vi.fn(),
 };
 vi.mock('../src/repositories/collectionKit.repository.js', () => ({ default: repoMock }));
 
 const { default: service } = await import('../src/services/collectionKit.service.js');
 
 const ACTOR_ID = 5;
+const missingTableError = () => Object.assign(new Error('relation does not exist'), { code: '42P01' });
 
 beforeEach(() => vi.clearAllMocks());
 
-describe('logKitOut', () => {
-  it('requires a kit label', async () => {
-    await expect(service.logKitOut({ kgFoodWasteCollected: 10 }, ACTOR_ID))
+describe('createKit', () => {
+  it('requires an owner name', async () => {
+    await expect(service.createKit({ suburb: 'Delft' }, ACTOR_ID))
       .rejects.toMatchObject({ status: 400 });
-    expect(repoMock.logKitOut).not.toHaveBeenCalled();
+    expect(repoMock.createKit).not.toHaveBeenCalled();
   });
 
-  it('rejects a negative kg value', async () => {
-    await expect(service.logKitOut({ kitLabel: 'Bucket A1', kgFoodWasteCollected: -1 }, ACTOR_ID))
-      .rejects.toMatchObject({ status: 400 });
+  it('defaults assignedAt to today and passes the owner/suburb through', async () => {
+    repoMock.createKit.mockResolvedValue({ id: 1, owner_name: 'Jane M.' });
+
+    await service.createKit({ ownerName: 'Jane M.', suburb: 'Delft' }, ACTOR_ID);
+
+    const call = repoMock.createKit.mock.calls[0][0];
+    expect(call.ownerName).toBe('Jane M.');
+    expect(call.suburb).toBe('Delft');
+    expect(call.actorId).toBe(ACTOR_ID);
+    expect(call.assignedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
-  it('defaults dateOut to today and passes the actor as loggedBy', async () => {
-    repoMock.logKitOut.mockResolvedValue({ ok: true, kit: { id: 1, kit_label: 'Bucket A1' } });
-
-    await service.logKitOut({ kitLabel: 'Bucket A1', kgFoodWasteCollected: 12.5 }, ACTOR_ID);
-
-    const call = repoMock.logKitOut.mock.calls[0][0];
-    expect(call.kitLabel).toBe('Bucket A1');
-    expect(call.kgFoodWasteCollected).toBe(12.5);
-    expect(call.loggedBy).toBe(ACTOR_ID);
-    expect(call.dateOut).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  it('treats a blank suburb as null, not an empty string', async () => {
+    repoMock.createKit.mockResolvedValue({ id: 1 });
+    await service.createKit({ ownerName: 'Jane M.', suburb: '  ' }, ACTOR_ID);
+    expect(repoMock.createKit.mock.calls[0][0].suburb).toBeNull();
   });
 
-  it('treats blank optional fields as null, not empty strings', async () => {
-    repoMock.logKitOut.mockResolvedValue({ ok: true, kit: { id: 1 } });
-    await service.logKitOut({ kitLabel: 'Bucket A1', kgFoodWasteCollected: 5, location: '  ', notes: '' }, ACTOR_ID);
-    const call = repoMock.logKitOut.mock.calls[0][0];
-    expect(call.location).toBeNull();
-    expect(call.notes).toBeNull();
-  });
-
-  it('returns the created kit on success', async () => {
-    const kit = { id: 1, kit_label: 'Bucket A1', status: 'out' };
-    repoMock.logKitOut.mockResolvedValue({ ok: true, kit });
-    const result = await service.logKitOut({ kitLabel: 'Bucket A1', kgFoodWasteCollected: 5 }, ACTOR_ID);
-    expect(result).toEqual(kit);
-  });
-
-  it('409s when the same kit label is already out, rather than logging a second one', async () => {
-    repoMock.logKitOut.mockResolvedValue({ ok: false, code: 'already_out', kitId: 7 });
-    await expect(service.logKitOut({ kitLabel: 'Bucket A1', kgFoodWasteCollected: 5 }, ACTOR_ID))
-      .rejects.toMatchObject({ status: 409 });
-  });
-
-  it('surfaces a missing collection_kits table as a 503, not a raw 500', async () => {
-    repoMock.logKitOut.mockRejectedValue(Object.assign(new Error('relation does not exist'), { code: '42P01' }));
-    await expect(service.logKitOut({ kitLabel: 'Bucket A1', kgFoodWasteCollected: 5 }, ACTOR_ID))
+  it('surfaces a missing table as a 503, not a raw 500', async () => {
+    repoMock.createKit.mockRejectedValue(missingTableError());
+    await expect(service.createKit({ ownerName: 'Jane M.' }, ACTOR_ID))
       .rejects.toMatchObject({ status: 503 });
   });
 });
 
-describe('markReturned', () => {
-  it('rejects a non-integer id', async () => {
-    await expect(service.markReturned('nope', { kgCompostReturned: 5 }, ACTOR_ID))
+describe('getKit', () => {
+  it('rejects a non-numeric id', async () => {
+    await expect(service.getKit('abc')).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('404s when the repository finds nothing', async () => {
+    repoMock.getKitById.mockResolvedValue(null);
+    await expect(service.getKit(999)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('returns the kit with its record history', async () => {
+    const kit = { id: 1, owner_name: 'Jane M.', status: 'logged', records: [] };
+    repoMock.getKitById.mockResolvedValue(kit);
+    await expect(service.getKit(1)).resolves.toEqual(kit);
+  });
+});
+
+describe('logCompost', () => {
+  it('rejects a non-numeric kit id', async () => {
+    await expect(service.logCompost('abc', { kgCompost: 5 }, ACTOR_ID))
       .rejects.toMatchObject({ status: 400 });
   });
 
-  it('rejects a negative compost value', async () => {
-    await expect(service.markReturned(1, { kgCompostReturned: -2 }, ACTOR_ID))
+  it('rejects a negative kg value', async () => {
+    await expect(service.logCompost(1, { kgCompost: -1 }, ACTOR_ID))
       .rejects.toMatchObject({ status: 400 });
   });
 
-  it('surfaces kit_not_found as 404', async () => {
-    repoMock.markReturned.mockResolvedValue({ ok: false, code: 'kit_not_found' });
-    await expect(service.markReturned(99, { kgCompostReturned: 5 }, ACTOR_ID))
+  it('404s when the kit does not exist', async () => {
+    repoMock.logCompost.mockResolvedValue({ ok: false, code: 'kit_not_found' });
+    await expect(service.logCompost(999, { kgCompost: 5 }, ACTOR_ID))
       .rejects.toMatchObject({ status: 404 });
   });
 
-  it('surfaces already_returned as 409', async () => {
-    repoMock.markReturned.mockResolvedValue({ ok: false, code: 'already_returned' });
-    await expect(service.markReturned(1, { kgCompostReturned: 5 }, ACTOR_ID))
-      .rejects.toMatchObject({ status: 409 });
+  it('defaults loggedAt to today and returns the created record', async () => {
+    const record = { id: 1, kit_id: 1, kg_compost: 5, status: 'logged' };
+    repoMock.logCompost.mockResolvedValue({ ok: true, record });
+
+    const result = await service.logCompost(1, { kgCompost: 5 }, ACTOR_ID);
+
+    expect(result).toEqual(record);
+    const call = repoMock.logCompost.mock.calls[0][0];
+    expect(call.loggedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(call.actorId).toBe(ACTOR_ID);
+  });
+});
+
+describe('markDispatched', () => {
+  it('rejects a non-numeric record id', async () => {
+    await expect(service.markDispatched('abc', ACTOR_ID)).rejects.toMatchObject({ status: 400 });
   });
 
-  it('returns the updated kit on success', async () => {
-    const kit = { id: 1, status: 'returned', kg_compost_returned: 5 };
-    repoMock.markReturned.mockResolvedValue({ ok: true, kit });
-    const result = await service.markReturned(1, { kgCompostReturned: 5 }, ACTOR_ID);
-    expect(result).toEqual(kit);
+  it('404s when the record does not exist', async () => {
+    repoMock.markDispatched.mockResolvedValue({ ok: false, code: 'record_not_found' });
+    await expect(service.markDispatched(999, ACTOR_ID)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('409s when the record is already dispatched', async () => {
+    repoMock.markDispatched.mockResolvedValue({ ok: false, code: 'already_dispatched' });
+    await expect(service.markDispatched(1, ACTOR_ID)).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('returns the updated record on success', async () => {
+    const record = { id: 1, status: 'dispatched' };
+    repoMock.markDispatched.mockResolvedValue({ ok: true, record });
+    await expect(service.markDispatched(1, ACTOR_ID)).resolves.toEqual(record);
+  });
+});
+
+describe('listRecords', () => {
+  it('rejects an invalid status filter', async () => {
+    await expect(service.listRecords({ status: 'out' })).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('accepts logged and dispatched as the only valid filters', async () => {
+    repoMock.listRecords.mockResolvedValue([]);
+    await service.listRecords({ status: 'logged' });
+    expect(repoMock.listRecords).toHaveBeenCalledWith({ status: 'logged', limit: 200 });
   });
 });
 
 describe('listKits', () => {
-  it('rejects an invalid status filter', async () => {
-    await expect(service.listKits({ status: 'lost' })).rejects.toMatchObject({ status: 400 });
-  });
-
-  it('passes a valid status filter through', async () => {
+  it('passes a search term through', async () => {
     repoMock.listKits.mockResolvedValue([]);
-    await service.listKits({ status: 'out' });
-    expect(repoMock.listKits).toHaveBeenCalledWith({ status: 'out', limit: 100 });
+    await service.listKits({ search: 'Delft' });
+    expect(repoMock.listKits).toHaveBeenCalledWith({ search: 'Delft' });
   });
 });

@@ -1,11 +1,12 @@
 // ─────────────────────────────────────────────────────────────
 // server/__tests__/collectionKit.repository.test.js
 //
-// collectionKit.repository.js had no repository-level test file
-// before this — the transaction/lock/audit logic in logKitOut and
-// markReturned was never exercised directly. Same fake-client-records-
-// every-statement approach beneficiary.rollbackCohort.repository.test.js
-// and purchaseOrder.setQuickbooksReference.repository.test.js use.
+// Repository-level tests for Feed the Soil kit tracking: assigning a
+// kit, logging a compost weigh-in, marking a record dispatched, and
+// the ordering rule every record list shares (not-yet-dispatched
+// first, dispatched at the bottom, newest first within each group).
+// Same fake-client-records-every-statement approach
+// beneficiary.rollbackCohort.repository.test.js uses.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
@@ -23,118 +24,176 @@ const makeClient = ({ onQuery } = {}) => {
 };
 
 let client;
-const poolMock = { connect: vi.fn(async () => client) };
+const poolMock = { connect: vi.fn(async () => client), query: vi.fn() };
 vi.mock('../src/config/db.js', () => ({ default: poolMock }));
 
 const { default: repo } = await import('../src/repositories/collectionKit.repository.js');
 
 beforeEach(() => vi.clearAllMocks());
 
-describe('logKitOut', () => {
-  it('inserts a new "out" row when the label is not already out', async () => {
+describe('createKit', () => {
+  it('inserts the kit and writes an "assigned" audit row', async () => {
     client = makeClient({
       onQuery: (sql, params) => {
-        if (/^SELECT id FROM collection_kits WHERE kit_label/i.test(sql)) return { rows: [] };
         if (/^INSERT INTO collection_kits/i.test(sql)) {
-          return { rows: [{ id: 1, kit_label: params[0], status: 'out' }] };
+          return { rows: [{ id: 1, owner_name: params[0], suburb: params[1] }] };
         }
         return { rows: [] };
       },
     });
 
-    const result = await repo.logKitOut({
-      kitLabel: 'Bucket A1', location: null, dateOut: '2026-01-01',
-      kgFoodWasteCollected: 10, notes: null, loggedBy: 5,
-    });
+    const kit = await repo.createKit({ ownerName: 'Jane M.', suburb: 'Delft', assignedAt: '2026-09-01', actorId: 5 });
 
-    expect(result).toEqual({ ok: true, kit: { id: 1, kit_label: 'Bucket A1', status: 'out' } });
-    const insert = client.calls.find((c) => /^INSERT INTO collection_kits/i.test(c.sql));
-    expect(insert).toBeDefined();
-  });
-
-  it('locks the matching row and refuses a second "out" for the same label', async () => {
-    client = makeClient({
-      onQuery: (sql) => {
-        if (/^SELECT id FROM collection_kits WHERE kit_label/i.test(sql)) return { rows: [{ id: 3 }] };
-        return { rows: [] };
-      },
-    });
-
-    const result = await repo.logKitOut({
-      kitLabel: 'Bucket A1', location: null, dateOut: '2026-01-01',
-      kgFoodWasteCollected: 10, notes: null, loggedBy: 5,
-    });
-
-    expect(result).toEqual({ ok: false, code: 'already_out', kitId: 3 });
-    expect(client.calls.some((c) => c.sql === 'ROLLBACK')).toBe(true);
-    expect(client.calls.some((c) => /^INSERT INTO collection_kits/i.test(c.sql))).toBe(false);
-    const select = client.calls.find((c) => /^SELECT id FROM collection_kits WHERE kit_label/i.test(c.sql));
-    expect(select.sql).toMatch(/FOR UPDATE/);
-  });
-
-  it('writes an audit row on success', async () => {
-    client = makeClient({
-      onQuery: (sql, params) => {
-        if (/^SELECT id FROM collection_kits WHERE kit_label/i.test(sql)) return { rows: [] };
-        if (/^INSERT INTO collection_kits/i.test(sql)) return { rows: [{ id: 1, kit_label: params[0] }] };
-        return { rows: [] };
-      },
-    });
-
-    await repo.logKitOut({
-      kitLabel: 'Bucket A1', location: null, dateOut: '2026-01-01',
-      kgFoodWasteCollected: 10, notes: null, loggedBy: 5,
-    });
-
+    expect(kit).toEqual({ id: 1, owner_name: 'Jane M.', suburb: 'Delft' });
     const audit = client.calls.find((c) => /INSERT INTO audit_log/i.test(c.sql));
     expect(audit).toBeDefined();
-    expect(audit.params).toContain('logged_out');
+    expect(audit.params).toContain('assigned');
   });
 });
 
-describe('markReturned', () => {
-  it('returns kit_not_found and rolls back when the id does not exist', async () => {
+describe('logCompost', () => {
+  it('returns kit_not_found and rolls back when the kit does not exist', async () => {
     client = makeClient({
       onQuery: (sql) => {
-        if (/^SELECT id, status FROM collection_kits/i.test(sql)) return { rows: [] };
+        if (/^SELECT id FROM collection_kits/i.test(sql)) return { rows: [] };
         return { rows: [] };
       },
     });
 
-    const result = await repo.markReturned({ id: 999, kgCompostReturned: 5, actorId: 5 });
+    const result = await repo.logCompost({ kitId: 999, kgCompost: 5, loggedAt: '2026-09-01', notes: null, actorId: 5 });
+
     expect(result).toEqual({ ok: false, code: 'kit_not_found' });
     expect(client.calls.some((c) => c.sql === 'ROLLBACK')).toBe(true);
+    expect(client.calls.some((c) => /^INSERT INTO collection_kit_records/i.test(c.sql))).toBe(false);
   });
 
-  it('returns already_returned and rolls back without a second write', async () => {
-    client = makeClient({
-      onQuery: (sql) => {
-        if (/^SELECT id, status FROM collection_kits/i.test(sql)) return { rows: [{ id: 1, status: 'returned' }] };
-        return { rows: [] };
-      },
-    });
-
-    const result = await repo.markReturned({ id: 1, kgCompostReturned: 5, actorId: 5 });
-    expect(result).toEqual({ ok: false, code: 'already_returned' });
-    expect(client.calls.some((c) => /^UPDATE collection_kits/i.test(c.sql))).toBe(false);
-  });
-
-  it('sets status, returned_at and kg_compost_returned together, plus an audit row', async () => {
+  it('inserts a "logged" record and writes an audit row', async () => {
     client = makeClient({
       onQuery: (sql, params) => {
-        if (/^SELECT id, status FROM collection_kits/i.test(sql)) return { rows: [{ id: 1, status: 'out' }] };
-        if (/^UPDATE collection_kits/i.test(sql)) {
-          return { rows: [{ id: 1, status: 'returned', kg_compost_returned: params[1] }] };
+        if (/^SELECT id FROM collection_kits/i.test(sql)) return { rows: [{ id: 1 }] };
+        if (/^INSERT INTO collection_kit_records/i.test(sql)) {
+          return { rows: [{ id: 10, kit_id: params[0], kg_compost: params[1], status: 'logged' }] };
         }
         return { rows: [] };
       },
     });
 
-    const result = await repo.markReturned({ id: 1, kgCompostReturned: 8.5, actorId: 5 });
+    const result = await repo.logCompost({ kitId: 1, kgCompost: 7.5, loggedAt: '2026-09-01', notes: null, actorId: 5 });
 
-    expect(result.ok).toBe(true);
-    expect(result.kit).toEqual({ id: 1, status: 'returned', kg_compost_returned: 8.5 });
+    expect(result).toEqual({ ok: true, record: { id: 10, kit_id: 1, kg_compost: 7.5, status: 'logged' } });
     const audit = client.calls.find((c) => /INSERT INTO audit_log/i.test(c.sql));
-    expect(audit.params).toContain('returned');
+    expect(audit.params).toContain('logged');
+  });
+});
+
+describe('markDispatched', () => {
+  it('returns record_not_found and rolls back when the record does not exist', async () => {
+    client = makeClient({
+      onQuery: (sql) => {
+        if (/^SELECT id, status FROM collection_kit_records/i.test(sql)) return { rows: [] };
+        return { rows: [] };
+      },
+    });
+
+    const result = await repo.markDispatched({ recordId: 999, actorId: 5 });
+    expect(result).toEqual({ ok: false, code: 'record_not_found' });
+    expect(client.calls.some((c) => c.sql === 'ROLLBACK')).toBe(true);
+  });
+
+  it('returns already_dispatched without a second write', async () => {
+    client = makeClient({
+      onQuery: (sql) => {
+        if (/^SELECT id, status FROM collection_kit_records/i.test(sql)) return { rows: [{ id: 10, status: 'dispatched' }] };
+        return { rows: [] };
+      },
+    });
+
+    const result = await repo.markDispatched({ recordId: 10, actorId: 5 });
+    expect(result).toEqual({ ok: false, code: 'already_dispatched' });
+    expect(client.calls.some((c) => /^UPDATE collection_kit_records/i.test(c.sql))).toBe(false);
+  });
+
+  it('sets status and dispatched_at, and writes an audit row', async () => {
+    client = makeClient({
+      onQuery: (sql) => {
+        if (/^SELECT id, status FROM collection_kit_records/i.test(sql)) return { rows: [{ id: 10, status: 'logged' }] };
+        if (/^UPDATE collection_kit_records/i.test(sql)) {
+          return { rows: [{ id: 10, status: 'dispatched' }] };
+        }
+        return { rows: [] };
+      },
+    });
+
+    const result = await repo.markDispatched({ recordId: 10, actorId: 5 });
+    expect(result).toEqual({ ok: true, record: { id: 10, status: 'dispatched' } });
+    const update = client.calls.find((c) => /^UPDATE collection_kit_records/i.test(c.sql));
+    expect(update.sql).toMatch(/dispatched_at = NOW\(\)/);
+    const audit = client.calls.find((c) => /INSERT INTO audit_log/i.test(c.sql));
+    expect(audit.params).toContain('dispatched');
+  });
+
+  it('locks the record row before reading its status', async () => {
+    client = makeClient({
+      onQuery: (sql) => {
+        if (/^SELECT id, status FROM collection_kit_records/i.test(sql)) return { rows: [{ id: 10, status: 'logged' }] };
+        if (/^UPDATE collection_kit_records/i.test(sql)) return { rows: [{ id: 10, status: 'dispatched' }] };
+        return { rows: [] };
+      },
+    });
+
+    await repo.markDispatched({ recordId: 10, actorId: 5 });
+    const select = client.calls.find((c) => /^SELECT id, status FROM collection_kit_records/i.test(c.sql));
+    expect(select.sql).toMatch(/FOR UPDATE/);
+  });
+});
+
+describe('listRecords', () => {
+  it('orders not-yet-dispatched records before dispatched ones', async () => {
+    poolMock.query.mockResolvedValue({ rows: [] });
+    await repo.listRecords({});
+    const [sql] = poolMock.query.mock.calls[0];
+    expect(sql).toMatch(/status = 'dispatched'\) ASC/);
+  });
+
+  it('joins the owning kit for owner_name and suburb', async () => {
+    poolMock.query.mockResolvedValue({ rows: [] });
+    await repo.listRecords({});
+    const [sql] = poolMock.query.mock.calls[0];
+    expect(sql).toMatch(/JOIN collection_kits k ON k\.id = r\.kit_id/);
+  });
+
+  it('filters by status when given one', async () => {
+    poolMock.query.mockResolvedValue({ rows: [] });
+    await repo.listRecords({ status: 'dispatched' });
+    const [sql, params] = poolMock.query.mock.calls[0];
+    expect(sql).toMatch(/r\.status = \$1/);
+    expect(params[0]).toBe('dispatched');
+  });
+});
+
+describe('getKitById', () => {
+  it('returns null when the kit does not exist', async () => {
+    poolMock.query.mockResolvedValueOnce({ rows: [] });
+    await expect(repo.getKitById(999)).resolves.toBeNull();
+  });
+
+  it('derives status "assigned" when the kit has no records', async () => {
+    poolMock.query
+      .mockResolvedValueOnce({ rows: [{ id: 1, owner_name: 'Jane M.', status: 'assigned' }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    const kit = await repo.getKitById(1);
+    expect(kit.status).toBe('assigned');
+    expect(kit.records).toEqual([]);
+  });
+
+  it('orders the kit\'s own record history the same way listRecords does', async () => {
+    poolMock.query
+      .mockResolvedValueOnce({ rows: [{ id: 1, status: 'logged' }] })
+      .mockResolvedValueOnce({ rows: [] });
+
+    await repo.getKitById(1);
+    const [historySql] = poolMock.query.mock.calls[1];
+    expect(historySql).toMatch(/status = 'dispatched'\) ASC/);
   });
 });

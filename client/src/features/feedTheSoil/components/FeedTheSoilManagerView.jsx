@@ -1,16 +1,15 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/features/feedTheSoil/components/FeedTheSoilManagerView.jsx
 //
-// The desktop, oversight-shaped view of Feed the Soil kit logging —
-// moved out of pages/FeedTheSoilPage.jsx verbatim (minus the
-// ManagerLayout wrapper, which the page now applies) so that page can
-// pick between this and the staff-floor flow (FeedTheSoilFlow.jsx) by
-// role, the same way DecantingPage.jsx picks between DecantingPlanner
-// and DecantingFlow.
+// The desktop, oversight-shaped view of Feed the Soil kit tracking —
+// same lifecycle as FeedTheSoilFlow.jsx (assign, log, dispatch), same
+// status naming, different vocabulary (Table/Card, not .stf-*) for
+// someone auditing at a desk rather than working a bucket by hand.
 //
-// A manager still gets the full table + Select filter — that's the
-// right shape for someone auditing every kit at a desk, not the
-// "hard to operate" complaint the staff flow exists to fix.
+// Two tabs, same split as the staff flow: Kits (assign, search, open
+// one for its owner info and full log history) and Records (the flat,
+// cross-kit list — not-yet-dispatched first, dispatched at the
+// bottom, exactly the order the server already returns).
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
 import collectionKitAPI from '../../../services/collectionKitAPI';
@@ -20,7 +19,7 @@ import { Badge }    from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input }    from '@/components/ui/input';
 import {
-  Field, FieldGroup, FieldLabel, FieldError,
+  Field, FieldGroup, FieldLabel, FieldError, FieldDescription,
 } from '@/components/ui/field';
 import {
   Card, CardContent, CardHeader, CardTitle,
@@ -28,13 +27,10 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus, Loader2, Search } from 'lucide-react';
 
-const STATUS_LABELS = { out: 'Out', returned: 'Returned' };
-const STATUS_BADGE  = { out: 'secondary', returned: 'default' };
+const STATUS_LABELS = { assigned: 'Assigned', logged: 'Logged', dispatched: 'Dispatched' };
+const STATUS_BADGE  = { assigned: 'outline', logged: 'secondary', dispatched: 'default' };
 
 const fmtDate = (value) =>
   value ? new Date(value).toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
@@ -48,69 +44,103 @@ const fmtDateTime = (value) =>
 
 const fmtKg = (value) => (value === null || value === undefined ? '—' : `${Number(value).toLocaleString('en-ZA')} kg`);
 
-// Same markup as the shared brand error banner used across the
-// directory-style pages (SupplierDirectoryPage, CommunityRequestsPage).
+const StatusBadge = ({ status }) => (
+  <Badge variant={STATUS_BADGE[status] ?? 'outline'}>{STATUS_LABELS[status] ?? status}</Badge>
+);
+
 const ErrorBanner = ({ message, onRetry }) => (
   <div className="p-4 rounded-[4px] bg-[#fff4f2] border-2 border-[#ef3a40] text-[#2b3336] text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
     <span>{message}</span>
     {onRetry ? (
-      <button
-        onClick={onRetry}
-        className="text-xs sm:text-sm font-semibold underline hover:text-[#ef3a40] focus:outline-none"
-      >
+      <button onClick={onRetry} className="text-xs sm:text-sm font-semibold underline hover:text-[#ef3a40] focus:outline-none">
         Try again
       </button>
     ) : null}
   </div>
 );
 
-// ── Log-a-kit panel ──────────────────────────────────────────
-const LogKitPanel = ({ busy, error, onSubmit, onCancel }) => {
-  const [kitLabel, setKitLabel] = useState('');
-  const [location, setLocation] = useState('');
-  const [dateOut, setDateOut] = useState(new Date().toISOString().slice(0, 10));
-  const [kg, setKg] = useState('');
-  const [touched, setTouched] = useState(false);
+const TABS = [
+  { id: 'kits',    label: 'Kits' },
+  { id: 'records', label: 'Records' },
+];
 
-  const labelMissing = !kitLabel.trim();
-  const kgInvalid = kg === '' || Number.isNaN(Number(kg)) || Number(kg) < 0;
+// ── Assign-a-kit panel ─────────────────────────────────────────
+const AssignKitPanel = ({ busy, error, onSubmit, onCancel }) => {
+  const [ownerName, setOwnerName] = useState('');
+  const [suburb, setSuburb] = useState('');
+  const [assignedAt, setAssignedAt] = useState(new Date().toISOString().slice(0, 10));
+  const [touched, setTouched] = useState(false);
+  const ownerMissing = !ownerName.trim();
 
   const submit = () => {
     setTouched(true);
-    if (labelMissing || kgInvalid) return;
-    onSubmit({ kitLabel: kitLabel.trim(), location: location.trim(), dateOut, kgFoodWasteCollected: Number(kg) });
+    if (ownerMissing) return;
+    onSubmit({ ownerName: ownerName.trim(), suburb: suburb.trim(), assignedAt });
   };
 
   return (
     <Card>
-      <CardHeader><CardTitle>Log a kit going out</CardTitle></CardHeader>
+      <CardHeader><CardTitle>Assign a kit</CardTitle></CardHeader>
       <CardContent>
         <FieldGroup>
           {error ? <FieldError>{error}</FieldError> : null}
 
-          <Field data-invalid={(touched && labelMissing) || undefined}>
-            <FieldLabel htmlFor="fts-label">Kit / bucket label</FieldLabel>
+          <Field data-invalid={(touched && ownerMissing) || undefined}>
+            <FieldLabel htmlFor="fts-owner">Owner's name</FieldLabel>
             <Input
-              id="fts-label" value={kitLabel} onChange={(e) => setKitLabel(e.target.value)}
-              onBlur={() => setTouched(true)} placeholder="e.g. Bucket A1"
-              aria-invalid={(touched && labelMissing) || undefined}
+              id="fts-owner" value={ownerName} onChange={(e) => setOwnerName(e.target.value)}
+              onBlur={() => setTouched(true)} placeholder="Jane M."
+              aria-invalid={(touched && ownerMissing) || undefined}
             />
-            {touched && labelMissing ? <FieldError>A kit label is required.</FieldError> : null}
+            {touched && ownerMissing ? <FieldError>An owner name is required.</FieldError> : null}
           </Field>
 
           <Field>
-            <FieldLabel htmlFor="fts-location">Location (optional)</FieldLabel>
-            <Input id="fts-location" value={location} onChange={(e) => setLocation(e.target.value)}
-                   placeholder="e.g. Cape Town Warehouse" />
+            <FieldLabel htmlFor="fts-suburb">Suburb</FieldLabel>
+            <Input id="fts-suburb" value={suburb} onChange={(e) => setSuburb(e.target.value)} placeholder="Delft" />
+            <FieldDescription>No street address or contact details are kept.</FieldDescription>
           </Field>
 
           <Field>
-            <FieldLabel htmlFor="fts-date">Date out</FieldLabel>
-            <Input id="fts-date" type="date" value={dateOut} onChange={(e) => setDateOut(e.target.value)} />
+            <FieldLabel htmlFor="fts-assigned">Date assigned</FieldLabel>
+            <Input id="fts-assigned" type="date" value={assignedAt} onChange={(e) => setAssignedAt(e.target.value)} />
           </Field>
+
+          <Field orientation="horizontal">
+            <Button type="button" onClick={submit} disabled={busy}>
+              {busy ? <Loader2 className="animate-spin" /> : null}
+              {busy ? 'Assigning' : 'Assign kit'}
+            </Button>
+            <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+          </Field>
+        </FieldGroup>
+      </CardContent>
+    </Card>
+  );
+};
+
+// ── Log-compost panel ────────────────────────────────────────
+const LogCompostPanel = ({ kit, busy, error, onSubmit, onCancel }) => {
+  const [kg, setKg] = useState('');
+  const [loggedAt, setLoggedAt] = useState(new Date().toISOString().slice(0, 10));
+  const [touched, setTouched] = useState(false);
+  const kgInvalid = kg === '' || Number.isNaN(Number(kg)) || Number(kg) < 0;
+
+  const submit = () => {
+    setTouched(true);
+    if (kgInvalid) return;
+    onSubmit({ kgCompost: Number(kg), loggedAt });
+  };
+
+  return (
+    <Card>
+      <CardHeader><CardTitle>Log compost — {kit.owner_name}</CardTitle></CardHeader>
+      <CardContent>
+        <FieldGroup>
+          {error ? <FieldError>{error}</FieldError> : null}
 
           <Field data-invalid={(touched && kgInvalid) || undefined}>
-            <FieldLabel htmlFor="fts-kg">Kilograms of food waste collected</FieldLabel>
+            <FieldLabel htmlFor="fts-kg">Kilograms of compost collected</FieldLabel>
             <Input
               id="fts-kg" type="number" min="0" step="0.1" value={kg}
               onChange={(e) => setKg(e.target.value)} onBlur={() => setTouched(true)}
@@ -119,10 +149,15 @@ const LogKitPanel = ({ busy, error, onSubmit, onCancel }) => {
             {touched && kgInvalid ? <FieldError>Enter a kilogram amount of 0 or more.</FieldError> : null}
           </Field>
 
+          <Field>
+            <FieldLabel htmlFor="fts-logged">Date collected</FieldLabel>
+            <Input id="fts-logged" type="date" value={loggedAt} onChange={(e) => setLoggedAt(e.target.value)} />
+          </Field>
+
           <Field orientation="horizontal">
             <Button type="button" onClick={submit} disabled={busy}>
               {busy ? <Loader2 className="animate-spin" /> : null}
-              {busy ? 'Logging' : 'Log kit'}
+              {busy ? 'Logging' : 'Log compost'}
             </Button>
             <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
           </Field>
@@ -132,106 +167,161 @@ const LogKitPanel = ({ busy, error, onSubmit, onCancel }) => {
   );
 };
 
-// ── Mark-returned panel ──────────────────────────────────────
-const ReturnKitPanel = ({ kit, busy, error, onSubmit, onCancel }) => {
-  const [kg, setKg] = useState('');
-  const [touched, setTouched] = useState(false);
-  const kgInvalid = kg === '' || Number.isNaN(Number(kg)) || Number(kg) < 0;
+// ── Kit detail ────────────────────────────────────────────────
+const KitDetail = ({ kit, onLogCompost, onDispatch, dispatchingId, onClose }) => (
+  <Card>
+    <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+      <div>
+        <CardTitle>{kit.owner_name}</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Kit #{kit.id} · {kit.suburb || 'No suburb on record'} · assigned {fmtDate(kit.assigned_at)}
+        </p>
+      </div>
+      <StatusBadge status={kit.status} />
+    </CardHeader>
+    <CardContent className="space-y-4">
+      <Button type="button" size="sm" onClick={() => onLogCompost(kit)}>Log compost</Button>
 
-  const submit = () => {
-    setTouched(true);
-    if (kgInvalid) return;
-    onSubmit(Number(kg));
-  };
+      {kit.records.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No compost logged for this kit yet.</p>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Date</TableHead>
+              <TableHead>Compost</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {kit.records.map((r) => (
+              <TableRow key={r.id}>
+                <TableCell>{fmtDate(r.logged_at)}</TableCell>
+                <TableCell>{fmtKg(r.kg_compost)}</TableCell>
+                <TableCell>
+                  <StatusBadge status={r.status} />
+                  {r.status === 'dispatched' ? (
+                    <span className="mt-1 block text-xs text-muted-foreground">{fmtDateTime(r.dispatched_at)}</span>
+                  ) : null}
+                </TableCell>
+                <TableCell className="text-right">
+                  {r.status === 'logged' ? (
+                    <Button
+                      type="button" variant="outline" size="sm"
+                      disabled={dispatchingId === r.id}
+                      onClick={() => onDispatch(r.id)}
+                    >
+                      {dispatchingId === r.id ? 'Dispatching…' : 'Dispatch'}
+                    </Button>
+                  ) : null}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Mark "{kit.kit_label}" returned</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <FieldGroup>
-          {error ? <FieldError>{error}</FieldError> : null}
-
-          <p className="text-sm text-muted-foreground">
-            Went out {fmtDate(kit.date_out)} with {fmtKg(kit.kg_food_waste_collected)} of food waste.
-          </p>
-
-          <Field data-invalid={(touched && kgInvalid) || undefined}>
-            <FieldLabel htmlFor="fts-return-kg">Kilograms of compost returned</FieldLabel>
-            <Input
-              id="fts-return-kg" type="number" min="0" step="0.1" value={kg}
-              onChange={(e) => setKg(e.target.value)} onBlur={() => setTouched(true)}
-              aria-invalid={(touched && kgInvalid) || undefined}
-            />
-            {touched && kgInvalid ? <FieldError>Enter a kilogram amount of 0 or more.</FieldError> : null}
-          </Field>
-
-          <Field orientation="horizontal">
-            <Button type="button" onClick={submit} disabled={busy}>
-              {busy ? <Loader2 className="animate-spin" /> : null}
-              {busy ? 'Saving' : 'Mark returned'}
-            </Button>
-            <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-          </Field>
-        </FieldGroup>
-      </CardContent>
-    </Card>
-  );
-};
+      <Button type="button" variant="ghost" size="sm" onClick={onClose}>Close</Button>
+    </CardContent>
+  </Card>
+);
 
 export default function FeedTheSoilManagerView() {
+  const [tab, setTab] = useState('kits');
+  const [mode, setMode] = useState('list'); // list | assign | log
+  const [selectedKit, setSelectedKit] = useState(null);
+
   const [kits, setKits] = useState([]);
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [mode, setMode] = useState('list');   // list | create
-  const [returning, setReturning] = useState(null); // kit being marked returned
+  const [kitSearch, setKitSearch] = useState('');
+  const [records, setRecords] = useState([]);
 
   const [isLoading, setIsLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [dispatchingId, setDispatchingId] = useState(null);
   const [error, setError] = useState(null);
   const [formError, setFormError] = useState(null);
 
-  const load = useCallback(async () => {
+  const loadKits = useCallback(async () => {
     setError(null);
     try {
-      const res = await collectionKitAPI.listKits(statusFilter === 'all' ? undefined : statusFilter);
-      setKits(res.data ?? res ?? []);
+      const res = await collectionKitAPI.listKits(kitSearch);
+      setKits(res?.data ?? res ?? []);
     } catch (err) {
       setError(err.message || 'Could not load kits.');
     }
-  }, [statusFilter]);
+  }, [kitSearch]);
+
+  const loadRecords = useCallback(async () => {
+    setError(null);
+    try {
+      const res = await collectionKitAPI.listRecords();
+      setRecords(res?.data ?? res ?? []);
+    } catch (err) {
+      setError(err.message || 'Could not load compost records.');
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
-    load().finally(() => { if (!cancelled) setIsLoading(false); });
+    const load = tab === 'kits' ? loadKits() : loadRecords();
+    load.finally(() => { if (!cancelled) setIsLoading(false); });
     return () => { cancelled = true; };
-  }, [load]);
+  }, [tab, loadKits, loadRecords]);
 
-  const logKit = async (payload) => {
+  const openKit = async (id) => {
+    setError(null);
+    try {
+      const res = await collectionKitAPI.getKit(id);
+      setSelectedKit(res?.data ?? res);
+      setMode('list');
+    } catch (err) {
+      setError(err.message || 'Could not load this kit.');
+    }
+  };
+
+  const assignKit = async (payload) => {
     setBusy(true); setFormError(null);
     try {
-      await collectionKitAPI.logKitOut(payload);
+      const res = await collectionKitAPI.createKit(payload);
+      const kit = res?.data ?? res;
       setMode('list');
-      await load();
+      await loadKits();
+      await openKit(kit.id);
     } catch (err) {
-      setFormError(err.message || 'Could not log the kit.');
+      setFormError(err.message || 'Could not assign the kit.');
     } finally {
       setBusy(false);
     }
   };
 
-  const markReturned = async (kgCompostReturned) => {
-    if (!returning) return;
+  const logCompost = async (payload) => {
+    if (!selectedKit) return;
     setBusy(true); setFormError(null);
     try {
-      await collectionKitAPI.markReturned(returning.id, kgCompostReturned);
-      setReturning(null);
-      await load();
+      await collectionKitAPI.logCompost(selectedKit.id, payload);
+      setMode('list');
+      await loadKits();
+      await openKit(selectedKit.id);
     } catch (err) {
-      setFormError(err.message || 'Could not mark the kit returned.');
+      setFormError(err.message || 'Could not log the compost collected.');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const dispatchRecord = async (recordId) => {
+    setDispatchingId(recordId);
+    setError(null);
+    try {
+      await collectionKitAPI.markDispatched(recordId);
+      await loadRecords();
+      if (selectedKit) await openKit(selectedKit.id);
+    } catch (err) {
+      setError(err.message || 'Could not mark this record dispatched.');
+    } finally {
+      setDispatchingId(null);
     }
   };
 
@@ -239,50 +329,57 @@ export default function FeedTheSoilManagerView() {
     <main className="mx-auto w-full max-w-5xl px-4 py-6">
       <h1 className="text-2xl font-medium">Feed the Soil</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Kits (buckets) of food waste swapped for compost. Log a kit when it goes out, and
-        again when it comes back — the Impact Calculator's compost figure comes straight
-        from what's logged here.
+        Collection kits assigned to community members and the compost logged against each one —
+        the Impact Calculator's compost figure comes straight from what's logged here.
       </p>
 
-      {error ? (
-        <div className="mt-4"><ErrorBanner message={error} onRetry={load} /></div>
-      ) : null}
+      {error ? <div className="mt-4"><ErrorBanner message={error} onRetry={tab === 'kits' ? loadKits : loadRecords} /></div> : null}
+
+      <div className="mt-5 flex gap-1 border-b">
+        {TABS.map((t) => (
+          <button
+            key={t.id} type="button"
+            onClick={() => { setTab(t.id); setMode('list'); setSelectedKit(null); }}
+            className={t.id === tab
+              ? 'border-b-2 border-foreground px-4 py-2 text-sm font-medium'
+              : 'px-4 py-2 text-sm text-muted-foreground'}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
       <div className="mt-6 space-y-6">
-        {mode === 'create' ? (
-          <LogKitPanel
-            busy={busy} error={formError}
-            onSubmit={logKit}
-            onCancel={() => { setMode('list'); setFormError(null); }}
+        {mode === 'assign' ? (
+          <AssignKitPanel busy={busy} error={formError} onSubmit={assignKit} onCancel={() => { setMode('list'); setFormError(null); }} />
+        ) : mode === 'log' && selectedKit ? (
+          <LogCompostPanel kit={selectedKit} busy={busy} error={formError} onSubmit={logCompost} onCancel={() => setMode('list')} />
+        ) : selectedKit ? (
+          <KitDetail
+            kit={selectedKit}
+            onLogCompost={() => setMode('log')}
+            onDispatch={dispatchRecord}
+            dispatchingId={dispatchingId}
+            onClose={() => setSelectedKit(null)}
           />
-        ) : returning ? (
-          <ReturnKitPanel
-            kit={returning} busy={busy} error={formError}
-            onSubmit={markReturned}
-            onCancel={() => { setReturning(null); setFormError(null); }}
-          />
-        ) : (
+        ) : tab === 'kits' ? (
           <>
             <div className="flex flex-wrap items-center gap-3">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All kits</SelectItem>
-                  <SelectItem value="out">Out</SelectItem>
-                  <SelectItem value="returned">Returned</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Button type="button" onClick={() => { setMode('create'); setFormError(null); }}>
-                <Plus />
-                Log a kit going out
+              <div className="relative flex-1 min-w-56">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  className="pl-8" placeholder="Search by owner or suburb"
+                  value={kitSearch} onChange={(e) => setKitSearch(e.target.value)}
+                />
+              </div>
+              <Button type="button" onClick={() => setMode('assign')}>
+                <Plus /> Assign a kit
               </Button>
             </div>
 
             {isLoading ? (
               <div className="space-y-3">
                 <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-24 w-full" />
                 <Skeleton className="h-24 w-full" />
               </div>
             ) : kits.length === 0 ? (
@@ -294,50 +391,74 @@ export default function FeedTheSoilManagerView() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Kit</TableHead>
-                        <TableHead>Location</TableHead>
-                        <TableHead>Out</TableHead>
-                        <TableHead>Waste collected</TableHead>
+                        <TableHead>Owner</TableHead>
+                        <TableHead>Suburb</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Compost returned</TableHead>
-                        <TableHead />
+                        <TableHead>Last logged</TableHead>
+                        <TableHead>Assigned</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {kits.map((k) => (
-                        <TableRow key={k.id}>
-                          <TableCell className="font-medium">{k.kit_label}</TableCell>
-                          <TableCell className="text-muted-foreground">{k.location || '—'}</TableCell>
-                          <TableCell className="whitespace-nowrap text-muted-foreground">
-                            {fmtDate(k.date_out)}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {fmtKg(k.kg_food_waste_collected)}
-                          </TableCell>
+                        <TableRow key={k.id} className="cursor-pointer" onClick={() => openKit(k.id)}>
+                          <TableCell className="font-medium">#{k.id}</TableCell>
+                          <TableCell>{k.owner_name}</TableCell>
+                          <TableCell className="text-muted-foreground">{k.suburb || '—'}</TableCell>
+                          <TableCell><StatusBadge status={k.status} /></TableCell>
+                          <TableCell className="text-muted-foreground">{fmtDate(k.last_logged_at)}</TableCell>
+                          <TableCell className="text-muted-foreground">{fmtDate(k.assigned_at)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
+          </>
+        ) : (
+          <>
+            {isLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-24 w-full" />
+              </div>
+            ) : records.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No compost has been logged yet.</p>
+            ) : (
+              <Card>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Owner</TableHead>
+                        <TableHead>Kit</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Compost</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {records.map((r) => (
+                        <TableRow key={r.id}>
+                          <TableCell className="font-medium">{r.owner_name}</TableCell>
+                          <TableCell className="text-muted-foreground">#{r.kit_id}{r.suburb ? ` · ${r.suburb}` : ''}</TableCell>
+                          <TableCell className="text-muted-foreground">{fmtDate(r.logged_at)}</TableCell>
+                          <TableCell className="text-muted-foreground">{fmtKg(r.kg_compost)}</TableCell>
                           <TableCell>
-                            <Badge variant={STATUS_BADGE[k.status] ?? 'outline'}>
-                              {STATUS_LABELS[k.status] ?? k.status}
-                            </Badge>
-                            {k.logged_by_name ? (
-                              <span className="mt-1 block text-xs text-muted-foreground">
-                                Logged by {k.logged_by_name}
-                              </span>
+                            <StatusBadge status={r.status} />
+                            {r.status === 'dispatched' ? (
+                              <span className="mt-1 block text-xs text-muted-foreground">{fmtDateTime(r.dispatched_at)}</span>
                             ) : null}
                           </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {k.status === 'returned' ? (
-                              <>
-                                {fmtKg(k.kg_compost_returned)}
-                                <span className="block text-xs">{fmtDateTime(k.returned_at)}</span>
-                              </>
-                            ) : '—'}
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap text-right">
-                            {k.status === 'out' ? (
+                          <TableCell className="text-right">
+                            {r.status === 'logged' ? (
                               <Button
                                 type="button" variant="outline" size="sm"
-                                onClick={() => { setReturning(k); setFormError(null); }}
+                                disabled={dispatchingId === r.id}
+                                onClick={() => dispatchRecord(r.id)}
                               >
-                                Mark returned
+                                {dispatchingId === r.id ? 'Dispatching…' : 'Dispatch'}
                               </Button>
                             ) : null}
                           </TableCell>
