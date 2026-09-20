@@ -82,6 +82,15 @@
   --stf-text-sub:   #6f6a5e;   /* --text-sub, darkened for 4.5:1 (ACC-02) */
   --stf-text-meta:  #8b8578;   /* --text-meta, darkened for the same reason */
   --stf-white:      #ffffff;
+  /* NEW — every text field, select and search box on the manager side
+     (components/ui/input.jsx, select.jsx) is a FILLED bg-input/50 box
+     with border-transparent — a light grey fill, no visible line,
+     until it's focused. staff fields were still solid white with a
+     visible border always on, which is why they read as a different
+     kind of control even after colour/radius/font matched. This is
+     that same fill: --input (oklch(0.922 0 0)) at 50% over white,
+     computed rather than eyeballed. */
+  --stf-field-bg:   #f2f2f2;
 
   /* Staff-only */
   --stf-attention:  #8a3227;
@@ -366,8 +375,17 @@
   transition: background 150ms ease, border-color 150ms ease,
               box-shadow 150ms ease, transform 100ms ease;
 }
-.stf-btn-primary { background: var(--stf-accent); color: var(--stf-white); }
-.stf-btn-primary:hover:not([disabled]) { background: var(--stf-accent-deep); }
+/* NEW — the primary CTA on the manager side ("Log a request",
+   "Assign a kit", "Resolve") is components/ui/button.jsx's default
+   variant, bg-primary: oklch(0.205 0 0), a near-black, not the brand
+   accent red. Red is still very much in the app (43 hits across
+   manager pages) but for alerts, borders and small marks — never as
+   a solid CTA fill. --stf-ink is close enough to that near-black
+   (#171717) to reuse rather than add a third dark token, and it is
+   already what the rest of this file calls "structure," which a
+   primary button is. */
+.stf-btn-primary { background: var(--stf-ink); color: var(--stf-white); }
+.stf-btn-primary:hover:not([disabled]) { background: var(--stf-ink-deep); }
 .stf-btn:hover:not([disabled]) {
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18); /* blue-500 @ 18% */
 }
@@ -408,9 +426,9 @@
   min-height: var(--stf-field);
   width: 100%;
   padding: 0 16px;
-  border: 1.5px solid var(--stf-border);
-  border-radius: var(--stf-radius-sm);
-  background: var(--stf-white);
+  border: 1.5px solid transparent;
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-field-bg);
   color: var(--stf-ink);
   font: 700 26px/1 var(--stf-font-display);
   font-variant-numeric: tabular-nums;
@@ -428,9 +446,9 @@
   min-height: var(--stf-field);
   width: 100%;
   padding: 0 14px;
-  border: 1.5px solid var(--stf-border);
-  border-radius: var(--stf-radius-sm);
-  background: var(--stf-white);
+  border: 1.5px solid transparent;
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-field-bg);
   color: var(--stf-ink);
   font: 400 16px/1 var(--stf-font-sans);
 }
@@ -815,9 +833,9 @@
   width: 100%;
   min-height: var(--stf-field);
   padding: 0 16px;
-  border: 1.5px solid var(--stf-border);
-  border-radius: var(--stf-radius-sm);
-  background: var(--stf-white);
+  border: 1.5px solid transparent;
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-field-bg);
   color: var(--stf-ink);
   font: 400 16px/1 var(--stf-font-sans);
   text-align: left;
@@ -1026,9 +1044,9 @@
   min-height: var(--stf-tap);
   width: 100%;
   padding: 0 14px;
-  border: 1.5px solid var(--stf-border);
-  border-radius: var(--stf-radius-sm);
-  background: var(--stf-white);
+  border: 1.5px solid transparent;
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-field-bg);
   color: var(--stf-ink);
   font: 400 16px/1 var(--stf-font-sans);
   font-size: max(16px, 1em);
@@ -1076,6 +1094,8 @@
   color: var(--stf-text-sub);
 }
 
+/* Same colour correction as .stf-btn-primary above — this is that
+   button's small size, not a different kind of action. */
 .stf-btn-small {
   display: inline-flex;
   align-items: center;
@@ -1084,14 +1104,14 @@
   padding: 0 12px;
   border: 1.5px solid transparent;
   border-radius: var(--stf-radius-sm);
-  background: var(--stf-accent);
+  background: var(--stf-ink);
   color: var(--stf-white);
   font: 600 13px/1 var(--stf-font-sans);
   cursor: pointer;
   transition: background 150ms ease, border-color 150ms ease;
 }
 .stf-btn-small:hover {
-  background: var(--stf-accent-deep);
+  background: var(--stf-ink-deep);
 }
 .stf-btn-small:active {
   transform: scale(0.97);
@@ -1101,24 +1121,30 @@
   outline-offset: 2px;
 }
 
+/* Manager's own "outline" button (components/ui/button.jsx's outline
+   variant, used for e.g. Benevolent Requests' "Claim") is neutral —
+   border-border, bg-background, text-foreground — never accent-
+   coloured. This used to be a red-bordered/red-text button, which had
+   no real equivalent on the manager side; now it matches
+   .stf-btn-secondary's already-correct neutral treatment. */
 .stf-btn-outline {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-height: 48px;
   padding: 0 24px;
-  border: 1.5px solid var(--stf-accent);
+  border: 1.5px solid var(--stf-border);
   border-radius: var(--stf-radius-pill);
   background: var(--stf-white);
-  color: var(--stf-accent);
+  color: var(--stf-ink);
   font: 600 15px/1 var(--stf-font-sans);
   gap: 8px;
   cursor: pointer;
   transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
 }
 .stf-btn-outline:hover {
-  background: var(--stf-accent);
-  color: var(--stf-white);
+  background: var(--stf-sand);
+  border-color: var(--stf-gold);
 }
 .stf-btn-outline:active {
   transform: scale(0.97);
@@ -1864,13 +1890,17 @@ button.stf-panel-head:disabled { cursor: default; }
   width: 100%;
   min-height: var(--stf-tap);
   padding: 10px 44px 10px 38px;
-  border: 1px solid var(--stf-border);
-  border-radius: var(--stf-radius-sm);
-  background: var(--stf-white);
+  border: 1px solid transparent;
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-field-bg);
   font: 500 15px/1.3 var(--stf-font-sans);
   color: var(--stf-ink);
 }
-.stf-search-input::placeholder { color: var(--stf-text-meta); }
+/* text-sub, not text-meta: text-meta was tuned against the old
+   --stf-sand/--stf-border fill this input no longer has — on the new
+   --stf-field-bg it only clears 3.28:1, under this file's own 4.5:1
+   goal (ACC-02). text-sub clears 4.81:1 on the same background. */
+.stf-search-input::placeholder { color: var(--stf-text-sub); }
 .stf-search-input:focus-visible {
   outline: 2px solid var(--stf-accent);
   outline-offset: 1px;
@@ -2025,12 +2055,12 @@ button.stf-panel-head:disabled { cursor: default; }
   align-items: center;
   padding: 0 18px;
   border-radius: 999px;
-  background: #ef3a40;
+  background: #2b3336;
   font: 700 14px/1 "Montserrat", "Open Sans", Helvetica, sans-serif;
   color: #ffffff;
   text-decoration: none;
 }
-.stf-resume .stf-resume-go:hover { background: #d42d33; color: #ffffff; }
+.stf-resume .stf-resume-go:hover { background: #171b1c; color: #ffffff; }
 
 .stf-resume .stf-resume-drop {
   flex: 0 0 auto;
