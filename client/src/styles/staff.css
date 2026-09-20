@@ -35,14 +35,18 @@
    User feedback: the staff module read as a visually different
    product from the manager/admin screens, and that was correct — this
    file applied the shared brand palette far more literally (warm
-   khaki backgrounds, a bold display face, a solid dark app bar) than
-   the manager side does. Colour, radius, typeface and the app bar are
-   now matched directly against what the manager screens actually
-   render (ManagerLayout.jsx's page background and border colour, the
-   rounded-[4px] every ErrorBanner uses, Montserrat throughout — index.css's
-   own body rule, not the Inter token it also defines but never applies)
-   rather than a generic guess. See each changed block's own note for
-   what moved and why.
+   khaki backgrounds, a bold display face, a solid dark app bar, sharp
+   4px corners) than the manager side does. Colour, radius, typeface
+   and the app bar are now matched directly against what the manager
+   screens actually render: ManagerLayout.jsx's page background and
+   border colour; Montserrat, index.css's own body rule, not the Inter
+   token it also defines but never applies; and — corrected after an
+   early guess sized everything off ErrorBanner's one-off rounded-[4px]
+   — the real radius of the components that build every manager
+   screen (Card, Button, Input, Select, Badge, all under
+   components/ui): rounded-4xl and rounded-3xl, genuinely round, not
+   sharp corners. See each changed block's own note for what moved and
+   why.
 
    WHAT DID NOT CHANGE, ON PURPOSE: tap target sizes (--stf-tap,
    --stf-field), the guided/form toggle, the bottom tab bar,
@@ -100,12 +104,22 @@
   --stf-font-display: "Montserrat", "Open Sans", Helvetica, sans-serif;
   --stf-font-sans:    "Montserrat", "Open Sans", Helvetica, sans-serif;
 
-  /* REVISED — 12px/8px was tighter than the landing page's 16px but
-     still rounder than anything on the manager side, which reads in
-     rounded-[4px] everywhere (every ErrorBanner, every card). Matched
-     to that directly rather than to a generic framework default. */
-  --stf-radius:   6px;
-  --stf-radius-sm: 4px;
+  /* REVISED (correction) — the previous version of this comment sized
+     these off ErrorBanner's hand-rolled rounded-[4px], on the claim
+     that it was what "every card" on the manager side does. It isn't:
+     ErrorBanner is a one-off raw div, but the components that actually
+     build every manager screen — Card, Button, Input, Select, Badge,
+     all from client/src/components/ui — round themselves far more,
+     via Tailwind's rounded-3xl/rounded-4xl utilities (checked each
+     one's own source). Against index.css's --radius: 0.625rem base,
+     rounded-4xl is 26px (Card, Button) and rounded-3xl is 22px (Input,
+     Select, Badge). That's the actual, dominant shape language a
+     manager or admin sees — search boxes, filter dropdowns, the
+     primary button, the card around every table — and it is
+     genuinely round, close to a pill, not a sharp 4px corner. These
+     two tokens now carry those two real values directly. */
+  --stf-radius:   26px;
+  --stf-radius-sm: 22px;
   --stf-radius-pill: 999px;
   --stf-tap:   44px;
   --stf-field: 56px;
@@ -1474,14 +1488,12 @@ body.reduced-movement .decorative-icon {
 /* ── 2 · THE DASHBOARD SURFACE ──────────────────────────────────
    "Apply the style from the dashboard to these pages."
 
-   REVISED — the 24px radius below was this pass's own guess at "what
-   a shadcn card looks like" (rounded-4xl, 0.625rem × 2.6), not a
-   measurement of what the manager screens actually render. What they
-   actually use, everywhere from ErrorBanner to every custom card on
-   ManagerLayout, is a hardcoded rounded-[4px] — sharp corners, not a
-   themed --radius scale at all. --stf-radius is set from that same
-   observed value now (see the token block), so this reads from it
-   instead of repeating its own guess.
+   REVISED (correction) — this had gone through two guesses already:
+   24px as a guess at rounded-4xl, then a "+2px" on top of a wrongly
+   shrunk --stf-radius after mistaking ErrorBanner's one-off 4px for
+   the card standard. --stf-radius now IS rounded-4xl's real value
+   (26px, see the token block), so this reads it directly with no
+   fudge added on top.
 
    What is copied is the SURFACE, not the type system. The stf-*
    scale exists because these screens are used on a phone with gloves
@@ -1493,7 +1505,7 @@ body.reduced-movement .decorative-icon {
 .stf-main > .stf-step {
   background: var(--stf-white);
   border: 1px solid rgb(43 51 54 / 0.06);
-  border-radius: calc(var(--stf-radius) + 2px);
+  border-radius: var(--stf-radius);
   box-shadow: 0 4px 6px -1px rgb(43 51 54 / 0.08), 0 2px 4px -2px rgb(43 51 54 / 0.06);
   padding: 20px;
 }
@@ -1518,13 +1530,13 @@ body.reduced-movement .decorative-icon {
   background: var(--stf-white);
   margin: -20px -20px 0;
   padding: 20px 20px 14px;
-  border-radius: calc(var(--stf-radius) + 2px) calc(var(--stf-radius) + 2px) 0 0;
+  border-radius: var(--stf-radius) var(--stf-radius) 0 0;
 }
 .stf-main > .stf-task > .stf-task-foot {
   background: var(--stf-white);
   margin: 0 -20px -20px;
   padding: 14px 20px calc(14px + env(safe-area-inset-bottom));
-  border-radius: 0 0 calc(var(--stf-radius) + 2px) calc(var(--stf-radius) + 2px);
+  border-radius: 0 0 var(--stf-radius) var(--stf-radius);
 }
 
 @media (min-width: 720px) {
@@ -1977,7 +1989,7 @@ button.stf-panel-head:disabled { cursor: default; }
   padding: 16px;
   border: 1px solid rgb(43 51 54 / 0.06);
   border-left: 3px solid var(--stf-gold);
-  border-radius: 8px;
+  border-radius: 26px;
   background: #ffffff;
   box-shadow: 0 4px 6px -1px rgb(43 51 54 / 0.08), 0 2px 4px -2px rgb(43 51 54 / 0.06);
 }
@@ -2012,7 +2024,7 @@ button.stf-panel-head:disabled { cursor: default; }
   display: inline-flex;
   align-items: center;
   padding: 0 18px;
-  border-radius: 4px;
+  border-radius: 999px;
   background: #ef3a40;
   font: 700 14px/1 "Montserrat", "Open Sans", Helvetica, sans-serif;
   color: #ffffff;

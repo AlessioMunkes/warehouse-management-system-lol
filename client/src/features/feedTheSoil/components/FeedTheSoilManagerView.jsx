@@ -3,13 +3,18 @@
 //
 // The desktop, oversight-shaped view of Feed the Soil kit tracking —
 // same lifecycle as FeedTheSoilFlow.jsx (assign, log, dispatch), same
-// status naming, different vocabulary (Table/Card, not .stf-*) for
-// someone auditing at a desk rather than working a bucket by hand.
+// status naming, same information architecture (a kit and a record
+// are different things to open), different vocabulary (Table/Card,
+// not .stf-*) for someone auditing at a desk rather than working a
+// bucket by hand.
 //
 // Two tabs, same split as the staff flow: Kits (assign, search, open
 // one for its owner info and full log history) and Records (the flat,
 // cross-kit list — not-yet-dispatched first, dispatched at the
-// bottom, exactly the order the server already returns).
+// bottom, exactly the order the server already returns). A list row
+// identifies a record by its kit only; date, weight and dispatch
+// destination live on the record's own detail, opened by clicking the
+// row, not repeated in the list.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
 import collectionKitAPI from '../../../services/collectionKitAPI';
@@ -168,14 +173,111 @@ const LogCompostPanel = ({ kit, busy, error, onSubmit, onCancel }) => {
   );
 };
 
+// ── Dispatch panel ───────────────────────────────────────────
+// A record needs a destination to count as dispatched — see
+// collectionKit.service.js's markDispatched. A one-tap action can't
+// capture that, so this is its own small step like Assign/Log.
+const DispatchPanel = ({ record, busy, error, onSubmit, onCancel }) => {
+  const [dispatchedTo, setDispatchedTo] = useState('');
+  const [touched, setTouched] = useState(false);
+  const missing = !dispatchedTo.trim();
+
+  const submit = () => {
+    setTouched(true);
+    if (missing) return;
+    onSubmit(dispatchedTo.trim());
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Mark dispatched · {formatKitCode(record.kit_id)}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <FieldGroup>
+          {error ? <FieldError>{error}</FieldError> : null}
+
+          <p className="text-sm text-muted-foreground">
+            {fmtKg(record.kg_compost)} collected {fmtDate(record.logged_at)}
+          </p>
+
+          <Field data-invalid={(touched && missing) || undefined}>
+            <FieldLabel htmlFor="fts-dispatch-to">Farmer or drop-off point</FieldLabel>
+            <Input
+              id="fts-dispatch-to" value={dispatchedTo} onChange={(e) => setDispatchedTo(e.target.value)}
+              onBlur={() => setTouched(true)} placeholder="e.g. Voorbrug Farm"
+              aria-invalid={(touched && missing) || undefined}
+            />
+            {touched && missing ? <FieldError>Where this compost went is required.</FieldError> : null}
+          </Field>
+
+          <Field orientation="horizontal">
+            <Button type="button" onClick={submit} disabled={busy}>
+              {busy ? <Loader2 className="animate-spin" /> : null}
+              {busy ? 'Marking dispatched' : 'Mark dispatched'}
+            </Button>
+            <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+          </Field>
+        </FieldGroup>
+      </CardContent>
+    </Card>
+  );
+};
+
+// ── Pick a kit to log against — reached from the Records tab,
+// where no kit is known yet. Reuses the Kits tab's own list.
+const LogPickKitPanel = ({ kits, isLoading, search, onSearch, onPick, onCancel }) => (
+  <Card>
+    <CardHeader><CardTitle>Log a collection</CardTitle></CardHeader>
+    <CardContent className="space-y-4">
+      <div className="relative">
+        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Input
+          className="pl-8" placeholder="Search by owner or suburb"
+          value={search} onChange={(e) => onSearch(e.target.value)}
+        />
+      </div>
+
+      {isLoading ? (
+        <Skeleton className="h-24 w-full" />
+      ) : kits.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No kits match.</p>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Kit</TableHead>
+              <TableHead>Owner</TableHead>
+              <TableHead>Suburb</TableHead>
+              <TableHead>Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {kits.map((k) => (
+              <TableRow key={k.id} className="cursor-pointer" onClick={() => onPick(k)}>
+                <TableCell className="font-medium">{formatKitCode(k.id)}</TableCell>
+                <TableCell>{k.owner_name}</TableCell>
+                <TableCell className="text-muted-foreground">{k.suburb || '—'}</TableCell>
+                <TableCell><StatusBadge status={k.status} /></TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
+
+      <Button type="button" variant="ghost" size="sm" onClick={onCancel}>Cancel</Button>
+    </CardContent>
+  </Card>
+);
+
 // ── Kit detail ────────────────────────────────────────────────
-const KitDetail = ({ kit, onLogCompost, onDispatch, dispatchingId, onClose }) => (
+const KitDetail = ({ kit, onLogCompost, onOpenRecord, onClose }) => (
   <Card>
     <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
       <div>
-        <CardTitle>{kit.owner_name}</CardTitle>
+        <CardTitle>Collection kit details</CardTitle>
         <p className="text-sm text-muted-foreground">
-          {formatKitCode(kit.id)} · {kit.suburb || 'No suburb on record'} · assigned {fmtDate(kit.assigned_at)}
+          {formatKitCode(kit.id)} · {kit.owner_name} · {kit.suburb || 'No suburb on record'} · assigned {fmtDate(kit.assigned_at)}
         </p>
       </div>
       <StatusBadge status={kit.status} />
@@ -190,56 +292,99 @@ const KitDetail = ({ kit, onLogCompost, onDispatch, dispatchingId, onClose }) =>
           <TableHeader>
             <TableRow>
               <TableHead>Date</TableHead>
-              <TableHead>Compost</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead />
             </TableRow>
           </TableHeader>
           <TableBody>
             {kit.records.map((r) => (
-              <TableRow key={r.id}>
+              <TableRow key={r.id} className="cursor-pointer" onClick={() => onOpenRecord(r.id)}>
                 <TableCell>{fmtDate(r.logged_at)}</TableCell>
-                <TableCell>{fmtKg(r.kg_compost)}</TableCell>
-                <TableCell>
-                  <StatusBadge status={r.status} />
-                  {r.status === 'dispatched' ? (
-                    <span className="mt-1 block text-xs text-muted-foreground">{fmtDateTime(r.dispatched_at)}</span>
-                  ) : null}
-                </TableCell>
-                <TableCell className="text-right">
-                  {r.status === 'logged' ? (
-                    <Button
-                      type="button" variant="outline" size="sm"
-                      disabled={dispatchingId === r.id}
-                      onClick={() => onDispatch(r.id)}
-                    >
-                      {dispatchingId === r.id ? 'Dispatching…' : 'Dispatch'}
-                    </Button>
-                  ) : null}
-                </TableCell>
+                <TableCell><StatusBadge status={r.status} /></TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       )}
 
-      <Button type="button" variant="ghost" size="sm" onClick={onClose}>Close</Button>
+      <Button type="button" variant="ghost" size="sm" onClick={onClose}>Back to kits</Button>
+    </CardContent>
+  </Card>
+);
+
+// ── Record detail ─────────────────────────────────────────────
+// What a record row opens into, whichever tab it was clicked from — a
+// record's own date, weight, status and (once dispatched) destination,
+// with the kit it belongs to shown as a reference, not the subject.
+const RecordDetail = ({ record, onDispatch, onOpenKit, onClose, backLabel }) => (
+  <Card>
+    <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+      <div>
+        <CardTitle>Compost record details</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          {formatKitCode(record.kit_id)} · {record.owner_name}{record.suburb ? ` · ${record.suburb}` : ''}
+        </p>
+      </div>
+      <StatusBadge status={record.status} />
+    </CardHeader>
+    <CardContent className="space-y-4">
+      <Table>
+        <TableBody>
+          <TableRow>
+            <TableCell className="text-muted-foreground">Date collected</TableCell>
+            <TableCell>{fmtDate(record.logged_at)}</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell className="text-muted-foreground">Weight</TableCell>
+            <TableCell>{fmtKg(record.kg_compost)}</TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell className="text-muted-foreground">Notes</TableCell>
+            <TableCell>{record.notes || '—'}</TableCell>
+          </TableRow>
+          {record.status === 'dispatched' ? (
+            <>
+              <TableRow>
+                <TableCell className="text-muted-foreground">Dispatched</TableCell>
+                <TableCell>{fmtDateTime(record.dispatched_at)}</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="text-muted-foreground">Sent to</TableCell>
+                <TableCell>{record.dispatched_to || '—'}</TableCell>
+              </TableRow>
+            </>
+          ) : null}
+        </TableBody>
+      </Table>
+
+      <div className="flex flex-wrap gap-2">
+        {record.status === 'logged' ? (
+          <Button type="button" size="sm" onClick={() => onDispatch(record)}>Mark dispatched</Button>
+        ) : null}
+        <Button type="button" variant="outline" size="sm" onClick={() => onOpenKit(record.kit_id)}>
+          View kit details
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={onClose}>{backLabel}</Button>
+      </div>
     </CardContent>
   </Card>
 );
 
 export default function FeedTheSoilManagerView() {
   const [tab, setTab] = useState('kits');
-  const [mode, setMode] = useState('list'); // list | assign | log
+  // 'list' | 'assign' | 'log' | 'logPickKit' | 'dispatch'
+  const [view, setView] = useState('list');
   const [selectedKit, setSelectedKit] = useState(null);
+  const [selectedRecord, setSelectedRecord] = useState(null);
+  // Where a record's "back" action returns to.
+  const [recordOrigin, setRecordOrigin] = useState('records');
 
   const [kits, setKits] = useState([]);
   const [kitSearch, setKitSearch] = useState('');
   const [records, setRecords] = useState([]);
+  const [recordSearch, setRecordSearch] = useState('');
 
   const [isLoading, setIsLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [dispatchingId, setDispatchingId] = useState(null);
   const [error, setError] = useState(null);
   const [formError, setFormError] = useState(null);
 
@@ -256,12 +401,12 @@ export default function FeedTheSoilManagerView() {
   const loadRecords = useCallback(async () => {
     setError(null);
     try {
-      const res = await collectionKitAPI.listRecords();
+      const res = await collectionKitAPI.listRecords({ search: recordSearch });
       setRecords(res?.data ?? res ?? []);
     } catch (err) {
       setError(err.message || 'Could not load compost records.');
     }
-  }, []);
+  }, [recordSearch]);
 
   useEffect(() => {
     let cancelled = false;
@@ -276,9 +421,23 @@ export default function FeedTheSoilManagerView() {
     try {
       const res = await collectionKitAPI.getKit(id);
       setSelectedKit(res?.data ?? res);
-      setMode('list');
+      setSelectedRecord(null);
+      setView('list');
     } catch (err) {
       setError(err.message || 'Could not load this kit.');
+    }
+  };
+
+  const openRecord = async (id, { fromKit = false } = {}) => {
+    setError(null);
+    try {
+      const res = await collectionKitAPI.getRecord(id);
+      setSelectedRecord(res?.data ?? res);
+      setSelectedKit(null);
+      setRecordOrigin(fromKit ? 'kit' : 'records');
+      setView('list');
+    } catch (err) {
+      setError(err.message || 'Could not load this record.');
     }
   };
 
@@ -287,7 +446,7 @@ export default function FeedTheSoilManagerView() {
     try {
       const res = await collectionKitAPI.createKit(payload);
       const kit = res?.data ?? res;
-      setMode('list');
+      setView('list');
       await loadKits();
       await openKit(kit.id);
     } catch (err) {
@@ -302,8 +461,8 @@ export default function FeedTheSoilManagerView() {
     setBusy(true); setFormError(null);
     try {
       await collectionKitAPI.logCompost(selectedKit.id, payload);
-      setMode('list');
-      await loadKits();
+      setView('list');
+      await loadRecords();
       await openKit(selectedKit.id);
     } catch (err) {
       setFormError(err.message || 'Could not log the compost collected.');
@@ -312,17 +471,27 @@ export default function FeedTheSoilManagerView() {
     }
   };
 
-  const dispatchRecord = async (recordId) => {
-    setDispatchingId(recordId);
-    setError(null);
+  const dispatchRecord = async (dispatchedTo) => {
+    if (!selectedRecord) return;
+    setBusy(true); setFormError(null);
     try {
-      await collectionKitAPI.markDispatched(recordId);
-      await loadRecords();
-      if (selectedKit) await openKit(selectedKit.id);
+      await collectionKitAPI.markDispatched(selectedRecord.id, dispatchedTo);
+      await openRecord(selectedRecord.id, { fromKit: recordOrigin === 'kit' });
     } catch (err) {
-      setError(err.message || 'Could not mark this record dispatched.');
+      setFormError(err.message || 'Could not mark this record dispatched.');
     } finally {
-      setDispatchingId(null);
+      setBusy(false);
+    }
+  };
+
+  const closeRecord = async () => {
+    setFormError(null);
+    if (recordOrigin === 'kit' && selectedRecord) {
+      await openKit(selectedRecord.kit_id);
+    } else {
+      setSelectedRecord(null);
+      setView('list');
+      await loadRecords();
     }
   };
 
@@ -340,7 +509,7 @@ export default function FeedTheSoilManagerView() {
         {TABS.map((t) => (
           <button
             key={t.id} type="button"
-            onClick={() => { setTab(t.id); setMode('list'); setSelectedKit(null); }}
+            onClick={() => { setTab(t.id); setView('list'); setSelectedKit(null); setSelectedRecord(null); }}
             className={t.id === tab
               ? 'border-b-2 border-foreground px-4 py-2 text-sm font-medium'
               : 'px-4 py-2 text-sm text-muted-foreground'}
@@ -351,17 +520,36 @@ export default function FeedTheSoilManagerView() {
       </div>
 
       <div className="mt-6 space-y-6">
-        {mode === 'assign' ? (
-          <AssignKitPanel busy={busy} error={formError} onSubmit={assignKit} onCancel={() => { setMode('list'); setFormError(null); }} />
-        ) : mode === 'log' && selectedKit ? (
-          <LogCompostPanel kit={selectedKit} busy={busy} error={formError} onSubmit={logCompost} onCancel={() => setMode('list')} />
+        {view === 'assign' ? (
+          <AssignKitPanel busy={busy} error={formError} onSubmit={assignKit} onCancel={() => { setView('list'); setFormError(null); }} />
+        ) : view === 'log' && selectedKit ? (
+          <LogCompostPanel kit={selectedKit} busy={busy} error={formError} onSubmit={logCompost} onCancel={() => setView('list')} />
+        ) : view === 'logPickKit' ? (
+          <LogPickKitPanel
+            kits={kits} isLoading={isLoading} search={kitSearch} onSearch={setKitSearch}
+            onPick={(kit) => { setSelectedKit(kit); setFormError(null); setView('log'); }}
+            onCancel={() => { setView('list'); setFormError(null); }}
+          />
+        ) : view === 'dispatch' && selectedRecord ? (
+          <DispatchPanel
+            record={selectedRecord} busy={busy} error={formError}
+            onSubmit={dispatchRecord}
+            onCancel={() => openRecord(selectedRecord.id, { fromKit: recordOrigin === 'kit' })}
+          />
+        ) : selectedRecord ? (
+          <RecordDetail
+            record={selectedRecord}
+            onDispatch={() => { setFormError(null); setView('dispatch'); }}
+            onOpenKit={openKit}
+            onClose={closeRecord}
+            backLabel={recordOrigin === 'kit' ? 'Back to kit' : 'Back to records'}
+          />
         ) : selectedKit ? (
           <KitDetail
             kit={selectedKit}
-            onLogCompost={() => setMode('log')}
-            onDispatch={dispatchRecord}
-            dispatchingId={dispatchingId}
-            onClose={() => setSelectedKit(null)}
+            onLogCompost={() => setView('log')}
+            onOpenRecord={(id) => openRecord(id, { fromKit: true })}
+            onClose={() => { setSelectedKit(null); loadKits(); }}
           />
         ) : tab === 'kits' ? (
           <>
@@ -373,7 +561,7 @@ export default function FeedTheSoilManagerView() {
                   value={kitSearch} onChange={(e) => setKitSearch(e.target.value)}
                 />
               </div>
-              <Button type="button" onClick={() => setMode('assign')}>
+              <Button type="button" onClick={() => setView('assign')}>
                 <Plus /> Assign a kit
               </Button>
             </div>
@@ -418,6 +606,19 @@ export default function FeedTheSoilManagerView() {
           </>
         ) : (
           <>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative flex-1 min-w-56">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  className="pl-8" placeholder="Search by owner or suburb"
+                  value={recordSearch} onChange={(e) => setRecordSearch(e.target.value)}
+                />
+              </div>
+              <Button type="button" onClick={() => { setFormError(null); setView('logPickKit'); }}>
+                <Plus /> Log a collection
+              </Button>
+            </div>
+
             {isLoading ? (
               <div className="space-y-3">
                 <Skeleton className="h-10 w-full" />
@@ -431,38 +632,17 @@ export default function FeedTheSoilManagerView() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Owner</TableHead>
                         <TableHead>Kit</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Compost</TableHead>
+                        <TableHead>Owner</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead />
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {records.map((r) => (
-                        <TableRow key={r.id}>
-                          <TableCell className="font-medium">{r.owner_name}</TableCell>
-                          <TableCell className="text-muted-foreground">{formatKitCode(r.kit_id)}{r.suburb ? ` · ${r.suburb}` : ''}</TableCell>
-                          <TableCell className="text-muted-foreground">{fmtDate(r.logged_at)}</TableCell>
-                          <TableCell className="text-muted-foreground">{fmtKg(r.kg_compost)}</TableCell>
-                          <TableCell>
-                            <StatusBadge status={r.status} />
-                            {r.status === 'dispatched' ? (
-                              <span className="mt-1 block text-xs text-muted-foreground">{fmtDateTime(r.dispatched_at)}</span>
-                            ) : null}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {r.status === 'logged' ? (
-                              <Button
-                                type="button" variant="outline" size="sm"
-                                disabled={dispatchingId === r.id}
-                                onClick={() => dispatchRecord(r.id)}
-                              >
-                                {dispatchingId === r.id ? 'Dispatching…' : 'Dispatch'}
-                              </Button>
-                            ) : null}
-                          </TableCell>
+                        <TableRow key={r.id} className="cursor-pointer" onClick={() => openRecord(r.id)}>
+                          <TableCell className="font-medium">{formatKitCode(r.kit_id)}</TableCell>
+                          <TableCell className="text-muted-foreground">{r.owner_name}{r.suburb ? ` · ${r.suburb}` : ''}</TableCell>
+                          <TableCell><StatusBadge status={r.status} /></TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
