@@ -27,6 +27,11 @@ router.post('/', auth, requireRole(...MANAGERS_UP),  pickingController.createSli
 // ── Single slip ───────────────────────────────────────────────
 router.get('/:id',           auth, requireRole(...ALL_ROLES),  validateIntId, pickingController.getSlipById);
 router.post('/:id/assign',   auth, requireRole(...PACKERS_UP), validateIntId, pickingController.assignSlip);
+// Manager-only, enforced in the service (matches the pattern of
+// packerId in /assign being manager-effective only) — the route
+// itself stays PACKERS_UP so a non-manager gets the service's own
+// 403 message rather than a generic route-level one.
+router.post('/:id/assign-second', auth, requireRole(...PACKERS_UP), validateIntId, pickingController.addSecondPacker);
 router.post('/:id/complete', auth, requireRole(...PACKERS_UP), validateIntId, pickingController.completeSlip);
 
 // ── Slip items ────────────────────────────────────────────────

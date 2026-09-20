@@ -183,6 +183,29 @@ const assignSlip = async (slipId, body, user) => {
   return result.slip;
 };
 
+// ── Add a second packer ─────────────────────────────────────────
+// Manager-only, same reasoning as naming someone else's primary
+// assignment above: deciding a pallet needs two hands is a staffing
+// call, not something a packer grants themselves or a colleague.
+const addSecondPacker = async (slipId, body, user) => {
+  if (!isManager(user)) fail(403, 'Only a manager can add a second packer.');
+
+  const parsed = Number(body.packerId);
+  if (!Number.isInteger(parsed) || parsed <= 0) fail(400, 'That is not a valid packer.');
+
+  const result = await pickingRepository.addSecondPacker({
+    slipId, packerId: parsed, actorId: user.id,
+  });
+
+  if (result.notFound) fail(404, 'Picking slip not found.');
+  if (result.locked) {
+    fail(409, LOCKED_REASON[result.status] || 'This pallet can no longer be changed.');
+  }
+  if (result.noPrimary) fail(409, 'Assign a primary packer before adding a second one.');
+  if (result.full) fail(409, 'This pallet already has two packers assigned.');
+  return result.slip;
+};
+
 // ── Confirm a line ────────────────────────────────────────────
 // Returns { ...item, variance } — variance is non-null when the
 // packer confirmed a quantity other than the one the slip asked for.
@@ -267,6 +290,7 @@ export default {
   generateSlips,
   createSlip,
   assignSlip,
+  addSecondPacker,
   confirmItem,
   flagItem,
   completeSlip,

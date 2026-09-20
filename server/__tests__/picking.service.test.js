@@ -21,6 +21,7 @@ const repoMock = {
   generateSlips:        vi.fn(),
   createSlip:           vi.fn(),
   assignSlip:           vi.fn(),
+  addSecondPacker:      vi.fn(),
   setItemStatus:        vi.fn(),
   completeSlip:         vi.fn(),
   getAssignableWorkers: vi.fn(),
@@ -64,6 +65,7 @@ beforeEach(() => {
   repoMock.generateSlips.mockResolvedValue({ created: 12 });
   repoMock.createSlip.mockResolvedValue({ slipId: 99, itemCount: 7 });
   repoMock.assignSlip.mockResolvedValue({ slip: SLIP });
+  repoMock.addSecondPacker.mockResolvedValue({ slip: { ...SLIP, assigned_to_2: WORKER2.id } });
   repoMock.setItemStatus.mockResolvedValue({ item: ITEM, assignedTo: 10 });
   repoMock.completeSlip.mockResolvedValue({ slip: SLIP });
 });
@@ -413,6 +415,53 @@ describe('assignSlip — claiming a pallet', () => {
   it('maps a slip already held by someone else to 409', async () => {
     repoMock.assignSlip.mockResolvedValueOnce({ conflict: true });
     await expectStatus(pickingService.assignSlip(1, {}, WORKER), 409);
+  });
+});
+
+// ── addSecondPacker ──────────────────────────────────────────────
+describe('addSecondPacker — a second packer on a pallet', () => {
+  it('lets a manager add a second packer', async () => {
+    await pickingService.addSecondPacker(1, { packerId: WORKER2.id }, MANAGER);
+    expect(repoMock.addSecondPacker).toHaveBeenCalledWith({
+      slipId: 1, packerId: WORKER2.id, actorId: MANAGER.id,
+    });
+  });
+
+  it('refuses a packer — deciding a pallet needs two hands is a staffing call', async () => {
+    await expect(pickingService.addSecondPacker(1, { packerId: WORKER2.id }, WORKER))
+      .rejects.toMatchObject({ status: 403 });
+    expect(repoMock.addSecondPacker).not.toHaveBeenCalled();
+  });
+
+  it.each([['abc'], [0], [-3], [1.5]])('rejects packerId %p with a 400', async (packerId) => {
+    await expect(pickingService.addSecondPacker(1, { packerId }, MANAGER))
+      .rejects.toMatchObject({ status: 400 });
+    expect(repoMock.addSecondPacker).not.toHaveBeenCalled();
+  });
+
+  it('maps a missing slip to 404', async () => {
+    repoMock.addSecondPacker.mockResolvedValueOnce({ notFound: true });
+    await expectStatus(pickingService.addSecondPacker(1, { packerId: WORKER2.id }, MANAGER), 404);
+  });
+
+  it('maps no-primary-yet to a 409 that says so', async () => {
+    repoMock.addSecondPacker.mockResolvedValueOnce({ noPrimary: true });
+    await expect(pickingService.addSecondPacker(1, { packerId: WORKER2.id }, MANAGER))
+      .rejects.toThrow(/primary packer/i);
+  });
+
+  it('maps an already-full pallet to a 409', async () => {
+    repoMock.addSecondPacker.mockResolvedValueOnce({ full: true, assignedTo2: WORKER2.id });
+    await expectStatus(pickingService.addSecondPacker(1, { packerId: 12 }, MANAGER), 409);
+  });
+
+  it.each([
+    ['complete',   /closed off by packing/i],
+    ['dispatched', /left the gate/i],
+  ])('refuses to add to a %s pallet, in words a manager can act on', async (status, message) => {
+    repoMock.addSecondPacker.mockResolvedValue({ locked: true, status });
+    await expect(pickingService.addSecondPacker(1, { packerId: WORKER2.id }, MANAGER))
+      .rejects.toThrow(message);
   });
 });
 

@@ -180,7 +180,11 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
 
   const locked = slip.status === 'complete' || slip.status === 'collected';
   const unassigned = !slip.assigned_to;
-  const assignedToMe = slip.assigned_to === currentUser?.id;
+  // Either packer on a dual-assigned pallet may work it — matches
+  // picking.repository.js's own ownership check, which the server
+  // already enforces either way; this only keeps the client's own
+  // gate from blocking someone the server would let through.
+  const assignedToMe = slip.assigned_to === currentUser?.id || slip.assigned_to_2 === currentUser?.id;
   const canEdit = manager || assignedToMe;
   const items = slip.items || [];
   const confirmed = items.filter((i) => i.status === 'confirmed').length;
@@ -290,7 +294,13 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
         </Actions>
       ) : (
         <p className="stf-kv">
-          <span><span className="stf-kv-key">Packing:</span> <span className="stf-kv-val">{slip.packer_name}{assignedToMe ? ' (you)' : ''}</span></span>
+          <span>
+            <span className="stf-kv-key">Packing:</span>{' '}
+            <span className="stf-kv-val">
+              {slip.packer_name}{slip.assigned_to === currentUser?.id ? ' (you)' : ''}
+              {slip.assigned_to_2 ? `, ${slip.packer_name_2}${slip.assigned_to_2 === currentUser?.id ? ' (you)' : ''}` : ''}
+            </span>
+          </span>
         </p>
       )}
 

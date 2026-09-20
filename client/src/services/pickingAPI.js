@@ -84,6 +84,16 @@ export async function assignSlip(slipId, packerId) {
   });
 }
 
+// POST /api/picking/:id/assign-second — add a second packer to a
+// slip that already has a primary one. Manager only (enforced
+// server-side) — see PickingSlipManagementPage.jsx, the only caller.
+export async function addSecondPacker(slipId, packerId) {
+  return request(`/${slipId}/assign-second`, {
+    method: 'POST',
+    body: JSON.stringify({ packerId }),
+  });
+}
+
 // POST /api/picking/generate — bulk-generate the week's slips
 // (manager only). Idempotent on the repository side.
 export async function generateSlips({ dispatchDate, cohort }) {

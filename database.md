@@ -527,6 +527,13 @@ CREATE TABLE picking_slips (
   recipe_id         UUID          REFERENCES recipes(id), -- only relevant when beneficiary_type = 'ecd'
   pallet_no         VARCHAR(50),
   assigned_to       UUID          REFERENCES users(id), -- NEW §3.1 — manager assigns to staff member/group
+  assigned_to_2     UUID          REFERENCES users(id), -- NEW — dual packing assignment (sponsor change request): an
+                                                         -- optional second packer, added once assigned_to already
+                                                         -- holds the slip. See picking.repository.js's addSecondPacker.
+                                                         -- (Per this file's own disclaimer, the live table's actual id
+                                                         -- types are what the code uses, not necessarily UUID as
+                                                         -- written here — this block was already stale for this table
+                                                         -- before this column was added.)
   qr_slug           VARCHAR(100)  UNIQUE,                -- NEW §3.5 — guest-accessible unique URL
   status            VARCHAR(20)   NOT NULL DEFAULT 'draft'
                                   CHECK (status IN ('draft', 'assigned', 'packed', 'dispatched')),
@@ -720,4 +727,5 @@ CREATE TABLE bookings (
 | 11 | `ecd_centers.is_active` used for soft delete | §6.5 — historical dispatch records must survive ECD offboarding |
 | 12 | Added `collection_kits` + `collection_kit_records` tables | Feed the Soil kit tracking — revised from an earlier out/returned model that had the real-world flow backwards (kits are assigned to and stay with community members, not checked in and out) |
 | 13 | Added `dispatched_to` to `collection_kit_records` | Feed the Soil — dispatch now records which farmer or drop-off point the compost went to |
+| 14 | Added `assigned_to_2` to `picking_slips` | Dual packing assignment (sponsor change request) — a slip can now have a second packer once a primary already holds it |
 
