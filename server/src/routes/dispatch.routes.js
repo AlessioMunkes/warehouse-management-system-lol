@@ -27,10 +27,6 @@ router.get('/history',          auth, requireRole(...ALL_ROLES),   dispatchContr
 // validateIntParam would 400 it if the id route matched first.
 // The receipts archive — manager and admin only. Working the gate stays open
 // to workers; reading back every collection ever made is a manager's view.
-//
-// /notes/:eventId is closed too. Nothing in the gate flow reads it: a
-// collection returns its own record from the POST, so no worker screen
-// regresses.
 router.get('/notes/options',
   auth, requireRole(...MANAGERS_UP),
   dispatchController.getDispatchBeneficiaryOptions
@@ -40,8 +36,14 @@ router.get('/notes',
   dispatchController.listDispatchNotes
 );
 
+// /notes/:eventId is NOT manager-only, unlike its two siblings above.
+// StaffDispatchHistoryPage.jsx ("View note" on a collected dispatch)
+// is an ALL_ROLES screen and calls this same endpoint — a worker
+// opening their own team's history hit a 403 here until this was
+// widened to match. The stale premise that "nothing in the gate flow
+// reads it" stopped being true the day that history page shipped.
 router.get('/notes/:eventId',
-  auth, requireRole(...MANAGERS_UP),
+  auth, requireRole(...ALL_ROLES),
   validateIntParam('eventId'),
   dispatchController.getDispatchNote
 );

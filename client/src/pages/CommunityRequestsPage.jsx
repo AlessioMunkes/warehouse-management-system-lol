@@ -18,13 +18,27 @@
 // a header with a one-line description, a search + filter + primary
 // button toolbar, the shared brand error banner, a Card-wrapped Table,
 // and an inline Card form for create / resolve. No new visual patterns.
+//
+// One route, two shapes, picked by role — the same pattern
+// FeedTheSoilPage.jsx and DecantingPage.jsx use. A manager gets the
+// desktop table below (CommunityRequestsManagerView, this file's
+// original body, moved verbatim). A warehouse worker gets
+// CommunityRequestFlow inside StaffShell — the phone-first tab bar
+// and app chrome every other floor task uses, which this page never
+// had: it always rendered <ManagerLayout> regardless of role, so a
+// worker got a desktop sidebar page with no bottom nav, and (when the
+// route also wrapped it in ManagerLayout via ProtectedRoute's shell
+// prop) a doubled-up sidebar whose drawer state fought itself.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
 import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
+import StaffShell from '../components/layout/StaffShell';
 import CommunityRequestForm from '../features/communityRequests/components/CommunityRequestForm';
+import CommunityRequestFlow from '../features/communityRequests/components/CommunityRequestFlow';
 import communityRequestAPI, {
   OUTCOMES, OUTCOME_LABELS, RESOLVE_OUTCOMES,
 } from '../services/communityRequestAPI';
+import { useAuth } from '../context/AuthContext';
 
 import {
   InputGroup, InputGroupAddon, InputGroupInput,
@@ -148,7 +162,9 @@ const ResolvePanel = ({ request, busy, error, onSubmit, onCancel }) => {
   );
 };
 
-export default function CommunityRequestsPage() {
+const isManager = (user) => user?.role === 'manager' || user?.role === 'admin';
+
+function CommunityRequestsManagerView() {
   const [requests, setRequests] = useState([]);
   const [search, setSearch] = useState('');
   const [outcomeFilter, setOutcomeFilter] = useState('all');
@@ -378,5 +394,20 @@ export default function CommunityRequestsPage() {
         </div>
       </main>
     </ManagerLayout>
+  );
+}
+
+export default function CommunityRequestsPage() {
+  const { user } = useAuth();
+  const [crumb, setCrumb] = useState('Log a request');
+
+  if (isManager(user)) {
+    return <CommunityRequestsManagerView />;
+  }
+
+  return (
+    <StaffShell crumb={`Benevolent Requests / ${crumb}`}>
+      <CommunityRequestFlow onCrumbChange={setCrumb} />
+    </StaffShell>
   );
 }

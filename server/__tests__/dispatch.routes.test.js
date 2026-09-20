@@ -107,19 +107,20 @@ describe('dispatch routes — authorisation', () => {
     expect(res.status).toBe(200);
   });
 
-  // The dispatch note moved behind MANAGERS_UP when the receipts archive
-  // became manager-only. This used to be it.each(ALL_ROLES) expecting 200.
-  //
-  // Note this departs from the URS, which says the dispatch note is viewable
-  // by staff, admin and management. The team took the narrower reading; the
-  // deviation belongs in the URS, not buried in a test.
-  it.each(MANAGERS_UP)('%s can read a dispatch note', async (role) => {
+  // Restored to match the URS ("the dispatch note is viewable by staff,
+  // admin and management"): the route had been narrowed to MANAGERS_UP
+  // when the manager-only receipts archive (/notes, /notes/options) was
+  // built, and /notes/:eventId got swept into that same gate by mistake
+  // even though it's a different, worker-reachable endpoint —
+  // StaffDispatchHistoryPage.jsx's "View note" button calls exactly this
+  // route and got a 403 for it.
+  it.each(ALL_ROLES)('%s can read a dispatch note', async (role) => {
     const res = await request(app).get(`${BASE}/notes/1`).set('Cookie', cookieFor(role));
     expect(res.status).toBe(200);
   });
 
-  it.each([ROLES.WORKER, 'finance'])('%s cannot read a dispatch note', async (role) => {
-    const res = await request(app).get(`${BASE}/notes/1`).set('Cookie', cookieFor(role));
+  it('finance cannot read a dispatch note', async () => {
+    const res = await request(app).get(`${BASE}/notes/1`).set('Cookie', cookieFor('finance'));
     expect(res.status).toBe(403);
   });
 
@@ -187,10 +188,8 @@ describe('dispatch routes — fixed paths are not swallowed by /:id', () => {
     expect(serviceMock.getGateView).not.toHaveBeenCalled();
   });
 
-  // Manager cookie: a worker is now refused before the controller runs, so
-  // this would assert nothing about routing.
   it('routes /notes/:eventId to getDispatchNote, not to getGateView', async () => {
-    await request(app).get(`${BASE}/notes/1`).set('Cookie', cookieFor(ROLES.MANAGER));
+    await request(app).get(`${BASE}/notes/1`).set('Cookie', cookieFor(ROLES.WORKER));
     expect(serviceMock.getDispatchNote).toHaveBeenCalled();
     expect(serviceMock.getGateView).not.toHaveBeenCalled();
   });

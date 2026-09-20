@@ -59,7 +59,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useState } from 'react';
 import {
-  StepRail, StepScreen, Actions, Button, NumberField, ChoiceList, Notice,
+  StepRail, StepScreen, Actions, Button, NumberField, SelectField, Notice,
   KeyValues, ViewToggle, Coachmark,
 } from '../../staff/components/StepPrimitives';
 import useCoachmark from '../../staff/hooks/useCoachmark';
@@ -390,19 +390,24 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
             placeholder="Search products"
           />
 
-          {productSearch.searching && productSearch.filtered.length === 0 ? (
-            <NoMatches
-              query={productSearch.query}
-              onClear={() => productSearch.setQuery('')}
-              noun="products"
-            />
-          ) : (
-            <ChoiceList
-              legend="Product"
+          {/* A dropdown, not the tap-target stack this used to be —
+              same reasoning as ReceivingFlow's order picker: the
+              catalogue runs to dozens of products with names long
+              enough to confuse, so it needs the search-then-pick
+              shape SelectField gives, in both Guided and Form.
+              There's no Guided/Form split here at all, unlike the
+              supplier picker on Receiving — that one stays ChoiceList
+              because it's four rows, not dozens. */}
+          {productSearch.filtered.length > 0 ? (
+            <SelectField
+              id="stf-decanting-product"
+              label="Product"
+              placeholder="Choose a product"
               options={productSearch.filtered.map((p) => ({
                 value: p.id,
-                label: p.name,
-                meta: p.weight_kg ? `Big sacks, about ${Number(p.weight_kg)} kg` : 'Bulk sacks',
+                label: p.weight_kg
+                  ? `${p.name} · big sacks, about ${Number(p.weight_kg)} kg`
+                  : `${p.name} · bulk sacks`,
               }))}
               value={productId}
               onChange={(value) => {
@@ -414,8 +419,15 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
                 setPanel('scale');
                 resetConfirmed();
               }}
-              onActivate={() => setPhase('work')}
             />
+          ) : productSearch.searching ? (
+            <NoMatches
+              query={productSearch.query}
+              onClear={() => productSearch.setQuery('')}
+              noun="products"
+            />
+          ) : (
+            <Notice>No products in the catalogue yet.</Notice>
           )}
         </StepScreen>
       )}

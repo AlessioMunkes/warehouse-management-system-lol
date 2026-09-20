@@ -161,10 +161,17 @@ const App = () => (
             here exactly as it is there — the client gate is a UX courtesy,
             the server route is the actual control.
 
+            No shell prop — DonationDetailsPage/ReviewPage wrap themselves in
+            the real StaffShell component now (see their own comments). They
+            used to render a hand-rolled .stf-shell div here AND get wrapped
+            in ManagerLayout by this route's old shell prop, which is the
+            "no bottom nav, sidebar behaves oddly" bug report: neither shell
+            was the one actually meant for this screen.
+
             The draft context is mounted per-route rather than around the
             block so the sessionStorage draft is scoped to the two intake
             pages and cleared by navigating away from them. */}
-        <Route element={<ProtectedRoute roles={DONATION_INTAKE_ROLES} shell />}>
+        <Route element={<ProtectedRoute roles={DONATION_INTAKE_ROLES} />}>
           <Route
             path={STAFF.donation}
             element={
@@ -192,8 +199,15 @@ const App = () => (
 
         {/* Benevolent package request log (ADM-5.0 / BR-28). Warehouse
             staff and up, mirroring STAFF_UP on every
-            /api/community-requests route. Log only — no stock movement. */}
-        <Route element={<ProtectedRoute roles={COMMUNITY_REQUEST_ROLES} shell />}>
+            /api/community-requests route. Log only — no stock movement.
+
+            No shell prop — CommunityRequestsPage picks ManagerLayout or
+            StaffShell itself by role now, the same way FeedTheSoilPage
+            does. It used to always render ManagerLayout (no worker-facing
+            view existed at all) while this route's own shell prop wrapped
+            it in a SECOND ManagerLayout — the doubled sidebar whose drawer
+            state fought itself. */}
+        <Route element={<ProtectedRoute roles={COMMUNITY_REQUEST_ROLES} />}>
           <Route path={STAFF.communityRequests} element={<CommunityRequestsPage />} />
         </Route>
 

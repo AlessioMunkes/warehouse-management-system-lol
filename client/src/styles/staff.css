@@ -1750,7 +1750,13 @@ button.stf-panel-head:disabled { cursor: default; }
   font: 700 13px/1 var(--stf-font-sans);
 }
 .stf-panel.is-open .stf-panel-n { background: var(--stf-ink); color: var(--stf-white); }
-.stf-panel.is-done .stf-panel-n { background: var(--stf-gold); color: var(--stf-white); }
+/* REVISED — was var(--stf-gold): a 26px, border-radius:999px pill
+   filled with khaki. That's exactly the "yellow accent and fill
+   colour in pills" the manager side doesn't have (its own done/closed
+   state is .stf-badge.is-done, filled --stf-ink, not gold). Matched
+   to that same convention rather than inventing a third "done"
+   colour. */
+.stf-panel.is-done .stf-panel-n { background: var(--stf-ink); color: var(--stf-white); }
 
 .stf-panel-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .stf-panel-title {

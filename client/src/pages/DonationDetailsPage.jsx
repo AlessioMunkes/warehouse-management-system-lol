@@ -7,10 +7,19 @@
 // driven item classification instead, handled inside
 // DonationItemsList). Donor fields conditionally rendered based on
 // consent, not just disabled.
+//
+// Wrapped in the real StaffShell component, not a hand-rolled
+// .stf-shell div: this page used to build its own bare markup, which
+// has no app bar, no drawer, and — the actual bug report — no bottom
+// tab bar (StaffTabBar lives inside StaffShell). Donation Intake has
+// no separate manager view (see routes/paths.js's DONATION_INTAKE_ROLES
+// comment — worker, manager and admin all use this same form), so
+// unlike FeedTheSoilPage/DecantingPage there's no role branch here:
+// StaffShell applies unconditionally.
 // ─────────────────────────────────────────────────────────────
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
-//import { MobileBottomNav } from "@/components/layout/MoileBottomNav"; // pending teammate
+import StaffShell from "../components/layout/StaffShell";
 
 import { useDonationDraft } from "../features/donation/context/DonationDraftContext";
 import { DONATIONS } from "../routes/paths";
@@ -69,77 +78,67 @@ export function DonationDetailsPage() {
   });
 
   return (
-    <div className="stf-shell">
+    <StaffShell crumb="Donations / Record a Donation" meta={today}>
+      <DonationRail currentStep={0} />
 
-      <div className="stf-crumb">
-        <span>Donations / Record a Donation</span>
-        <span className="stf-crumb-meta">{today}</span>
-      </div>
-
-      <main className="stf-main">
-        <DonationRail currentStep={0} />
-
-        <div className="stf-step">
-          <div className="stf-step-head">
-            <h1 className="stf-step-title">Record a Donation</h1>
-          </div>
-
-          <DonationItemsList
-            items={draft.items}
-            onChange={(items) => updateDraft({ items })}
-            itemErrors={itemErrors}
-          />
-
-          <ValueProgrammeFields
-            estimatedValueZar={draft.estimatedValueZar}
-            programmeCode={draft.programmeCode}
-            onChange={updateDraft}
-            error={errors.value}
-          />
-
-          <DonorConsentSection
-            consentGiven={draft.donorConsentGiven}
-            onChange={(v) => updateDraft({ donorConsentGiven: v })}
-          />
-
-          {draft.donorConsentGiven === true && (
-            <DonorInfoFields
-              donorName={draft.donorName}
-              donorContact={draft.donorContact}
-              donorTaxReference={draft.donorTaxReference}
-              onChange={updateDraft}
-              error={errors.donorContact}
-            />
-          )}
-
-          {draft.donorConsentGiven === false && (
-            <p className="stf-hint">
-              Donor details will not be recorded. This donation will not be
-              eligible for a Section 18A tax certificate.
-            </p>
-          )}
-
-          {draft.donorConsentGiven == null && (
-            <p className="stf-hint">Select an option above to continue.</p>
-          )}
-
-          <NotesField
-            notes={draft.notes}
-            onChange={(notes) => updateDraft({ notes })}
-          />
-
-          <div className="stf-actions is-row">
-            <button className="stf-btn stf-btn-secondary" onClick={() => navigate("/")}>
-              Cancel
-            </button>
-            <button className="stf-btn stf-btn-primary" onClick={handleNext}>
-              Next
-            </button>
-          </div>
+      <div className="stf-step">
+        <div className="stf-step-head">
+          <h1 className="stf-step-title">Record a Donation</h1>
         </div>
-      </main>
 
-      {/* <MobileBottomNav /> */}
-    </div>
+        <DonationItemsList
+          items={draft.items}
+          onChange={(items) => updateDraft({ items })}
+          itemErrors={itemErrors}
+        />
+
+        <ValueProgrammeFields
+          estimatedValueZar={draft.estimatedValueZar}
+          programmeCode={draft.programmeCode}
+          onChange={updateDraft}
+          error={errors.value}
+        />
+
+        <DonorConsentSection
+          consentGiven={draft.donorConsentGiven}
+          onChange={(v) => updateDraft({ donorConsentGiven: v })}
+        />
+
+        {draft.donorConsentGiven === true && (
+          <DonorInfoFields
+            donorName={draft.donorName}
+            donorContact={draft.donorContact}
+            donorTaxReference={draft.donorTaxReference}
+            onChange={updateDraft}
+            error={errors.donorContact}
+          />
+        )}
+
+        {draft.donorConsentGiven === false && (
+          <p className="stf-hint">
+            Donor details will not be recorded. This donation will not be
+            eligible for a Section 18A tax certificate.
+          </p>
+        )}
+
+        {draft.donorConsentGiven == null && (
+          <p className="stf-hint">Select an option above to continue.</p>
+        )}
+
+        <NotesField
+          notes={draft.notes}
+          onChange={(notes) => updateDraft({ notes })}
+        />
+
+        <div className="stf-actions is-row">
+          <button className="stf-btn stf-btn-secondary" onClick={() => navigate("/")}>
+            Cancel
+          </button>
+          <button className="stf-btn stf-btn-primary" onClick={handleNext}>
+            Next
+          </button>
+        </div>
+      </div>
+    </StaffShell>
   );
 }

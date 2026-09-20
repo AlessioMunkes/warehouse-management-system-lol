@@ -6,12 +6,13 @@
 // lets the worker correct specific sections via SectionPicker ->
 // EditSectionDialog, then submits. On success, shows CompletionDialog.
 //
-// UPDATED: same .stf-crumb + rail-inside-.stf-main fix as
-// DonationDetailsPage.jsx.
+// Wrapped in the real StaffShell component now — same fix and same
+// reasoning as DonationDetailsPage.jsx's own note: a hand-rolled
+// .stf-shell div has no app bar, no drawer and no bottom tab bar.
 // ─────────────────────────────────────────────────────────────
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-//import { MobileBottomNav } from "@/components/layout/MoileBottomNav"; // pending teammate
+import StaffShell from "../components/layout/StaffShell";
 
 import { useDonationDraft } from "../features/donation/context/DonationDraftContext";
 import { DONATIONS } from "../routes/paths";
@@ -80,54 +81,46 @@ export function ReviewPage() {
   });
 
   return (
-    <div className="stf-shell">
+    <StaffShell crumb="Donations / Review Donation" meta={today}>
+      <DonationRail currentStep={1} />
 
-      <div className="stf-crumb">
-        <span>Donations / Review Donation</span>
-        <span className="stf-crumb-meta">{today}</span>
-      </div>
-
-      <main className="stf-main">
-        <DonationRail currentStep={1} />
-
-        <div className="stf-step">
-          <div className="stf-step-head">
-            <h1 className="stf-step-title">Review Donation</h1>
-            <p className="stf-step-sub">Does everything look okay?</p>
-          </div>
-
-          {submitError && (
-            <div className="stf-notice is-warn">
-              <span className="stf-notice-mark">!</span>
-              <div className="stf-notice-body">{submitError}</div>
-            </div>
-          )}
-
-          <ReviewSummary draft={draft} />
-
-          <div className="stf-actions is-row">
-            <button
-              className="stf-btn stf-btn-secondary"
-              onClick={() => navigate(DONATIONS.new)}
-            >
-              Back
-            </button>
-            <button
-              className="stf-btn stf-btn-warn"
-              onClick={() => setPickerOpen(true)}
-            >
-              No, fix something
-            </button>
-            <button
-              className="stf-btn stf-btn-primary"
-              onClick={handleSubmit}
-              disabled={submitting}
-            >
-              {submitting ? "Recording..." : "Yes, submit"}
-            </button>
-          </div>
+      <div className="stf-step">
+        <div className="stf-step-head">
+          <h1 className="stf-step-title">Review Donation</h1>
+          <p className="stf-step-sub">Does everything look okay?</p>
         </div>
-      </main>
+
+        {submitError && (
+          <div className="stf-notice is-warn">
+            <span className="stf-notice-mark">!</span>
+            <div className="stf-notice-body">{submitError}</div>
+          </div>
+        )}
+
+        <ReviewSummary draft={draft} />
+
+        <div className="stf-actions is-row">
+          <button
+            className="stf-btn stf-btn-secondary"
+            onClick={() => navigate(DONATIONS.new)}
+          >
+            Back
+          </button>
+          <button
+            className="stf-btn stf-btn-warn"
+            onClick={() => setPickerOpen(true)}
+          >
+            No, fix something
+          </button>
+          <button
+            className="stf-btn stf-btn-primary"
+            onClick={handleSubmit}
+            disabled={submitting}
+          >
+            {submitting ? "Recording..." : "Yes, submit"}
+          </button>
+        </div>
+      </div>
 
       <SectionPicker
         open={pickerOpen}
@@ -149,8 +142,6 @@ export function ReviewPage() {
         onRecordAnother={handleRecordAnother}
         onGoHome={handleGoHome}
       />
-
-      {/* <MobileBottomNav /> */}
-    </div>
+    </StaffShell>
   );
 }
