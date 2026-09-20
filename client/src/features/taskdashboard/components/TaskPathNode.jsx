@@ -14,10 +14,14 @@
 // the same way — a plain outlined circle, no done/current/future
 // state — keeping the round, connected shape that was asked for
 // without inventing a sequence the floor doesn't actually follow.
+//
+// meta is a static instruction ("Pack a picking slip"), not a live
+// count any more — see TaskDashboardPage.jsx's own note — so there's
+// nothing to load and no skeleton state here.
 // ─────────────────────────────────────────────────────────────
 import { Link } from 'react-router-dom';
 
-export default function TaskPathNode({ to, icon, title, meta, loading }) {
+export default function TaskPathNode({ to, icon, title, meta }) {
   return (
     <Link to={to} className="stf-path-node">
       <span className="stf-path-circle">
@@ -29,11 +33,7 @@ export default function TaskPathNode({ to, icon, title, meta, loading }) {
         />
       </span>
       <span className="stf-path-title">{title}</span>
-      {loading ? (
-        <span className="stf-path-meta stf-path-meta-skeleton" aria-hidden="true" />
-      ) : meta ? (
-        <span className="stf-path-meta">{meta}</span>
-      ) : null}
+      {meta ? <span className="stf-path-meta">{meta}</span> : null}
     </Link>
   );
 }

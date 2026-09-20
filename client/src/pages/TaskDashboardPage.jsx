@@ -19,11 +19,12 @@
 // left off" idea from that same storyboard still exists — it's
 // UnfinishedWork, below.
 //
-// The counts come from GET /api/dashboard/my-work and are advisory: a
-// failed load leaves the task nodes working, because picking a job
-// must never depend on a stat row rendering. They're folded into each
-// node's own caption rather than a separate stat row up top — a count
-// only means something next to the task it belongs to.
+// Each node's caption used to be a live count from GET
+// /api/dashboard/my-work ("19 slips assigned to you"). Replaced with
+// a plain instruction — "Pack a picking slip" — on request: what to
+// do there, not a number that only means something once you already
+// know what the task is. Nothing on this page reads that endpoint any
+// more, so the fetch is gone too, not left in place unused.
 //
 // Feed the Soil and Benevolent Requests are text links below the
 // path, not nodes on it — same "every shift" vs "secondary" split
@@ -37,7 +38,7 @@
 // different reason (a two-column form needing the space); this page
 // just needs the room to not look stranded.
 // ─────────────────────────────────────────────────────────────
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import StaffShell from '../components/layout/StaffShell';
 import DashboardGreeting from '../features/taskdashboard/components/DashboardGreeting';
@@ -46,29 +47,28 @@ import TaskPathNode from '../features/taskdashboard/components/TaskPathNode';
 import { useAuth } from '../context/AuthContext';
 import useCoachmark from '../features/staff/hooks/useCoachmark';
 import { STAFF, PACKING } from '../routes/paths';
-import dashboardAPI from '../services/dashboardAPI';
 
-// Explicit plural forms rather than a naive "+s": "delivery" needs
-// "deliveries", not "deliverys".
-const count = (n, singular, plural) => `${n} ${n === 1 ? singular : plural}`;
-
-// Monday of the current week, in words — what decanting.service.js's
-// weekOf means, said the way a worker glancing at a card would read
-// it. Duplicated rather than imported from DecantingFlow.jsx, same
-// reasoning as that file's own note on why its date helpers aren't
-// shared across features.
-const weekOfCaption = () => {
-  const now = new Date();
-  const day = now.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  now.setDate(now.getDate() + diff);
-  return `Week of ${now.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}`;
-};
+// What to do there, not a number — see this file's own note above on
+// why the live counts were dropped.
+const TASKS = [
+  { to: STAFF.receiving, icon: 'receiving-icon', title: 'Receiving',
+    meta: 'Record incoming delivery' },
+  { to: STAFF.donation, icon: 'donate-icon', title: 'Donation intake',
+    meta: 'Log a donation' },
+  { to: PACKING.board, icon: 'packing-icon', title: 'Packing',
+    meta: 'Pack a picking slip' },
+  { to: STAFF.decanting, icon: 'decanting-icon', title: 'Decanting',
+    meta: 'Weigh and bag stock' },
+  { to: STAFF.dispatch, icon: 'dispatch-icon', title: 'Dispatch',
+    meta: 'Dispatch a pallet' },
+  // Receipts is manager-only and deliberately absent. The tile and
+  // the route guard in App.jsx have to agree — a hidden tile on an
+  // open route is not access control, just a tidier way to lose
+  // track of one.
+];
 
 export default function TaskDashboardPage() {
   const { user } = useAuth();
-  const [work, setWork] = useState(null);
-  const [loading, setLoading] = useState(true);
   const { show: showHamburgerHint, dismiss: dismissHamburgerHint } = useCoachmark('dashboard-hamburger');
 
   // Same 5s auto-dismiss every other Coachmark in this app already
@@ -82,42 +82,6 @@ export default function TaskDashboardPage() {
     const timer = setTimeout(dismissHamburgerHint, 5000);
     return () => clearTimeout(timer);
   }, [showHamburgerHint, dismissHamburgerHint]);
-
-  useEffect(() => {
-    let cancelled = false;
-    dashboardAPI.getMyWork()
-      .then((data) => { if (!cancelled) setWork(data); })
-      .catch(() => { if (!cancelled) setWork(null); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, []);
-
-  const TASKS = [
-    {
-      to: STAFF.receiving, icon: 'receiving-icon', title: 'Receiving',
-      meta: work ? `${count(work.deliveriesExpected, 'delivery', 'deliveries')} expected` : undefined,
-    },
-    {
-      to: STAFF.donation, icon: 'donate-icon', title: 'Donation intake',
-      meta: undefined,
-    },
-    {
-      to: PACKING.board, icon: 'packing-icon', title: 'Packing',
-      meta: work ? `${count(work.slipsToPack, 'slip', 'slips')} assigned to you` : undefined,
-    },
-    {
-      to: STAFF.decanting, icon: 'decanting-icon', title: 'Decanting',
-      meta: weekOfCaption(),
-    },
-    {
-      to: STAFF.dispatch, icon: 'dispatch-icon', title: 'Dispatch',
-      meta: work ? `${work.palletsAtGate} at the gate` : undefined,
-    },
-    // Receipts is manager-only and deliberately absent. The tile and
-    // the route guard in App.jsx have to agree — a hidden tile on an
-    // open route is not access control, just a tidier way to lose
-    // track of one.
-  ];
 
   return (
     <StaffShell crumb="Home" wide>
@@ -140,7 +104,7 @@ export default function TaskDashboardPage() {
 
       <div className="stf-path-track">
         {TASKS.map((task) => (
-          <TaskPathNode key={task.to} {...task} loading={loading} />
+          <TaskPathNode key={task.to} {...task} />
         ))}
       </div>
 

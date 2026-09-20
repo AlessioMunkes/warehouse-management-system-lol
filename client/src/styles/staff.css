@@ -2243,12 +2243,6 @@ button.stf-panel-head:disabled { cursor: default; }
   color: var(--stf-text-sub);
   max-width: 130px;
 }
-.stf-path-meta-skeleton {
-  width: 70%;
-  height: 12px;
-  border-radius: 6px;
-  background: var(--stf-field-bg);
-}
 
 /* Feed the Soil and Benevolent Requests — worked far less often than
    the path above, so plain links rather than nodes of their own
