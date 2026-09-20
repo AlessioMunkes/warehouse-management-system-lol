@@ -5,7 +5,7 @@ import '../../../styles/deliveryNotePDF.css';
 // client/src/features/decanting/components/DecantingSheetPDF.jsx
 //
 // The decanting equivalent of DeliveryNotePDF.jsx — same document
-// shell (.pdf-* classes, deliveryNotePDF.css), same html2canvas+jsPDF
+// shell (.pdfnote-* classes, deliveryNotePDF.css), same html2canvas+jsPDF
 // pipeline (usePdfDocument), adapted to what a decanting record
 // actually has instead of a delivery: no supplier, no signature (this
 // is an internal record with no external party to sign it), one or
@@ -61,10 +61,10 @@ const DecantingSheetPDF = ({ record, onClose }) => {
   const marginExceeded = lines.some((line) => line.within_margin === false);
 
   const status = flaggedWastage
-    ? { label: 'Wastage flagged', className: 'pdf-status-partial' }
+    ? { label: 'Wastage flagged', className: 'pdfnote-status-partial' }
     : marginExceeded
-      ? { label: 'Margin exceeded', className: 'pdf-status-partial' }
-      : { label: 'Within margin', className: 'pdf-status-complete' };
+      ? { label: 'Margin exceeded', className: 'pdfnote-status-partial' }
+      : { label: 'Within margin', className: 'pdfnote-status-complete' };
 
   const additionalInfo = flaggedWastage
     ? 'One or more lines lost more than usual to spillage or spoilage. A manager will review the wastage recorded below.'
@@ -73,15 +73,15 @@ const DecantingSheetPDF = ({ record, onClose }) => {
       : 'Every line on this sheet packed within the usual bagging margin, with no unusual wastage recorded.';
 
   return (
-    <div className="pdf-modal">
+    <div className="pdfnote-modal">
 
       {/* Toolbar */}
-      <div className="pdf-toolbar">
-        <span className="pdf-toolbar-title">
+      <div className="pdfnote-toolbar">
+        <span className="pdfnote-toolbar-title">
           DECANTING SHEET #{record.id} - Week of {formatDate(record.week_of)}
         </span>
-        <div className="pdf-toolbar-actions">
-          {genError && <span className="pdf-toolbar-error">{genError}</span>}
+        <div className="pdfnote-toolbar-actions">
+          {genError && <span className="pdfnote-toolbar-error">{genError}</span>}
           <button
             onClick={handleViewPdf}
             disabled={isGenerating}
@@ -94,92 +94,92 @@ const DecantingSheetPDF = ({ record, onClose }) => {
       </div>
 
       {/* Scrollable document */}
-      <div className="pdf-scroll-area">
-        <div className="pdf-document" ref={documentRef}>
+      <div className="pdfnote-scroll-area">
+        <div className="pdfnote-document" ref={documentRef}>
 
-          <div className="pdf-doc-header">
+          <div className="pdfnote-doc-header">
             <div>
-              <div className="pdf-doc-title-tick" />
-              <h1 className="pdf-doc-title">Decanting Sheet</h1>
+              <div className="pdfnote-doc-title-tick" />
+              <h1 className="pdfnote-doc-title">Decanting Sheet</h1>
             </div>
-            <img src={PDF_LOGO_URL} alt="" className="pdf-doc-logo" aria-hidden="true" />
+            <img src={PDF_LOGO_URL} alt="" className="pdfnote-doc-logo" aria-hidden="true" />
           </div>
-          <div className="pdf-doc-rule" />
+          <div className="pdfnote-doc-rule" />
 
           {/* No second party column — a decanting sheet has no
               external supplier or driver, just the warehouse and the
               record's own identifying details, so the meta box is the
               only thing on the right. */}
-          <div className="pdf-doc-parties">
-            <div className="pdf-doc-party-col">
-              <div className="pdf-doc-party">
-                <p className="pdf-doc-party-heading">{WAREHOUSE.name}</p>
+          <div className="pdfnote-doc-parties">
+            <div className="pdfnote-doc-party-col">
+              <div className="pdfnote-doc-party">
+                <p className="pdfnote-doc-party-heading">{WAREHOUSE.name}</p>
                 {WAREHOUSE.addressLines.map((line) => (
-                  <p key={line} className="pdf-doc-party-line">{line}</p>
+                  <p key={line} className="pdfnote-doc-party-line">{line}</p>
                 ))}
-                {WAREHOUSE.phone ? <p className="pdf-doc-party-line">{WAREHOUSE.phone}</p> : null}
+                {WAREHOUSE.phone ? <p className="pdfnote-doc-party-line">{WAREHOUSE.phone}</p> : null}
               </div>
             </div>
 
-            <div className="pdf-doc-meta-box">
-              <p className="pdf-doc-meta-line">
+            <div className="pdfnote-doc-meta-box">
+              <p className="pdfnote-doc-meta-line">
                 <span>Sheet no.</span>
                 <strong>#{String(record.id).padStart(4, '0')}</strong>
               </p>
-              <p className="pdf-doc-meta-line">
+              <p className="pdfnote-doc-meta-line">
                 <span>Week of</span>
                 <strong>{formatDate(record.week_of)}</strong>
               </p>
-              <p className="pdf-doc-meta-line">
+              <p className="pdfnote-doc-meta-line">
                 <span>Recorded</span>
                 <strong>{formatDate(record.created_at)}</strong>
               </p>
-              <p className="pdf-doc-meta-line">
+              <p className="pdfnote-doc-meta-line">
                 <span>Recorded by</span>
                 <strong>{record.recorded_by_name || 'Warehouse Worker'}</strong>
               </p>
-              <p className="pdf-doc-meta-line">
+              <p className="pdfnote-doc-meta-line">
                 <span>Status</span>
                 <strong className={status.className}>{status.label}</strong>
               </p>
             </div>
           </div>
 
-          <div className="pdf-doc-additional">
-            <p className="pdf-doc-section-heading">Additional information</p>
-            <p className="pdf-doc-additional-text">{additionalInfo}</p>
+          <div className="pdfnote-doc-additional">
+            <p className="pdfnote-doc-section-heading">Additional information</p>
+            <p className="pdfnote-doc-additional-text">{additionalInfo}</p>
           </div>
 
-          <table className="pdf-table">
+          <table className="pdfnote-table">
             <thead>
               <tr>
                 <th>Product</th>
-                <th className="pdf-table-center">Weighed</th>
-                <th className="pdf-table-center">Packed</th>
+                <th className="pdfnote-table-center">Weighed</th>
+                <th className="pdfnote-table-center">Packed</th>
                 <th>Bags</th>
-                <th className="pdf-table-center">Wastage</th>
+                <th className="pdfnote-table-center">Wastage</th>
               </tr>
             </thead>
             <tbody>
               {lines.length ? (
                 lines.map((line, i) => (
                   <tr key={line.id ?? i}>
-                    <td className="pdf-table-product">{line.product_name || '—'}</td>
-                    <td className="pdf-table-center">
+                    <td className="pdfnote-table-product">{line.product_name || '—'}</td>
+                    <td className="pdfnote-table-center">
                       {line.actual_bulk_kg != null ? `${line.actual_bulk_kg} kg` : '—'}
                     </td>
-                    <td className="pdf-table-center">
+                    <td className="pdfnote-table-center">
                       {line.packed_kg != null ? `${line.packed_kg} kg` : '—'}
                     </td>
-                    <td className="pdf-table-sku">{bagSummaryOf(line.bags)}</td>
-                    <td className="pdf-table-center">
+                    <td className="pdfnote-table-sku">{bagSummaryOf(line.bags)}</td>
+                    <td className="pdfnote-table-center">
                       {Number(line.wastage_kg || 0) > 0 ? `${line.wastage_kg} kg` : '—'}
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={5} className="pdf-table-empty">
+                  <td colSpan={5} className="pdfnote-table-empty">
                     No lines on record
                   </td>
                 </tr>
