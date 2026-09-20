@@ -2093,3 +2093,66 @@ button.stf-panel-head:disabled { cursor: default; }
   cursor: pointer;
 }
 .stf-resume .stf-resume-drop:hover { color: #8a3227; }
+
+/* ── Worker dashboard task grid ──────────────────────────────────
+   Square tiles, two per row, each free-standing rather than implying
+   an order between them — see TaskDashboardPage.jsx's own note on why
+   this replaced a "journey" layout that was considered for it. */
+.stf-task-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+.stf-task-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 22px 12px;
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+  text-decoration: none;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+.stf-task-tile:hover { background: var(--stf-sand); border-color: var(--stf-gold); }
+.stf-task-tile-icon { width: 44px; height: 44px; object-fit: contain; }
+.stf-task-tile-title {
+  font-family: var(--stf-font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--stf-ink);
+}
+.stf-task-tile-meta { font-size: 12px; line-height: 1.4; color: var(--stf-text-sub); }
+.stf-task-tile-meta-skeleton {
+  width: 60%;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--stf-field-bg);
+}
+
+/* Feed the Soil and Benevolent Requests — worked far less often than
+   the grid above, so plain links rather than tiles of their own
+   weight. Left as the shell's default link colour (--stf-accent, see
+   .stf-shell a) rather than muted grey: this file's own rule is red
+   for anything clickable, and these are exactly that. */
+.stf-dashboard-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* First-visit hint pointing at StaffShell's own hamburger trigger
+   (AppNavDrawer, first item in .stf-appbar-left). A fixed position
+   near where that button always sits, rather than a measured ref —
+   same rough-anchor approach StepPrimitives' Coachmark takes. */
+.stf-coachmark-fixed {
+  position: fixed;
+  left: 14px;
+  right: auto;
+  top: 60px;
+  z-index: 50;
+}

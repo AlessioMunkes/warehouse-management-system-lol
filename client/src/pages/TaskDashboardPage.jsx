@@ -1,64 +1,62 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/pages/TaskDashboardPage.jsx
 //
-// The warehouse worker's dashboard.
+// The warehouse worker's dashboard. Rebuilt inside StaffShell instead
+// of ManagerLayout — this page is functionally worker-only
+// (navSections.js's homeForRole only ever sends a warehouse_worker
+// here; a manager's real home is /manager), and the approved old
+// storyboards for it use StaffShell's own visual language: the doodle
+// banner footer, rounded square task tiles, no sidebar. ManagerLayout's
+// stat-tile row and full-width stacked cards were the wrong shell for
+// what this screen was always meant to look like.
 //
-// It was five tiles carrying the same five words as the sidebar beside
-// them. This leads with what is waiting — a sentence, then three counts
-// — and describes each task rather than naming it, because "Decanting"
-// tells a new volunteer nothing and "break bulk stock down into bags"
-// tells them everything.
+// Squares over a stacked list, and over a fixed 4-step "journey"
+// (the other old storyboard candidate, re-deliberated against the
+// app as it stands today): a worker doesn't move through Receiving →
+// Packing → Decanting → Dispatch in that order every day — a shift
+// might be packing-only, or dispatch-only — so a "you are here, step
+// 2 of 4" framing would claim an order that doesn't exist, and
+// Donation Intake (one of the five daily tasks, same weight as the
+// other four) has nowhere to sit in a 4-step line at all. Five
+// independent squares, each free-standing, matches how the floor
+// actually works. The "carry on where you left off" idea from that
+// same storyboard still exists — it's UnfinishedWork, below.
 //
 // The counts come from GET /api/dashboard/my-work and are advisory: a
-// failed load leaves the task cards working, because picking a job must
-// never depend on a stat row rendering.
+// failed load leaves the task cards working, because picking a job
+// must never depend on a stat row rendering. They're folded into each
+// tile's own caption now rather than a separate stat row up top — a
+// count only means something next to the task it belongs to.
 //
-// Feed the Soil and Benevolent Requests are text links below the main
-// grid, not cards in it — same "every shift" vs "secondary" split
+// Feed the Soil and Benevolent Requests are text links below the
+// grid, not tiles in it — same "every shift" vs "secondary" split
 // StaffTabBar.jsx draws between the bottom tab bar and its drawer.
-// Putting Feed the Soil in the grid as a full card (as this page used
-// to) contradicted that split by giving it the same weight as the five
-// tasks worked every day.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ClipboardList, Truck, PackageCheck, PackageOpen, FlaskConical, ClipboardCheck, HandCoins, Menu } from 'lucide-react';
+import StaffShell from '../components/layout/StaffShell';
 import DashboardGreeting from '../features/taskdashboard/components/DashboardGreeting';
 import UnfinishedWork from '../features/staff/components/UnfinishedWork';
-import StatTile from '../features/taskdashboard/components/StatTile';
-import ActionCard from '../features/taskdashboard/components/ActionCard';
-import { Skeleton } from '@/components/ui/skeleton';
+import TaskTile from '../features/taskdashboard/components/TaskTile';
 import { useAuth } from '../context/AuthContext';
 import useCoachmark from '../features/staff/hooks/useCoachmark';
 import { STAFF, PACKING } from '../routes/paths';
 import dashboardAPI from '../services/dashboardAPI';
 
-// One line each, in the words the floor uses. These are what turn a
-// menu into a dashboard.
-const TASKS = [
-  { to: STAFF.receiving, icon: PackageOpen, title: 'Receiving',
-    description: 'Check a delivery in against its purchase order.' },
-  { to: STAFF.donation, icon: HandCoins, title: 'Donation intake',
-    description: 'Log goods donated at the door.' },
-  { to: PACKING.board, icon: PackageCheck, title: 'Packing',
-    description: 'Pack a picking slip and flag anything short.' },
-  { to: STAFF.decanting, icon: FlaskConical, title: 'Decanting',
-    description: 'Break bulk stock down into bags and record the weights.' },
-  { to: STAFF.dispatch, icon: ClipboardCheck, title: 'Dispatch',
-    description: 'Hand a pallet over at the gate and capture the signature.' },
-  // Receipts is manager-only and deliberately absent. The card and the
-  // route guard in App.jsx have to agree — a hidden card on an open
-  // route is not access control, just a tidier way to lose track of one.
-];
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-// Worked far less often than the five above — reached the same way
-// they're reached from every other staff screen, the hamburger drawer,
-// but surfaced here too as a plain link rather than making a worker
-// hunt for them on their first day.
-const SECONDARY_LINKS = [
-  { to: STAFF.communityRequests, label: 'Log a benevolent request' },
-  { to: STAFF.feedTheSoil,       label: 'Log compost' },
-];
+// Monday of the current week, in words — what decanting.service.js's
+// weekOf means, said the way a worker glancing at a card would read
+// it. Duplicated rather than imported from DecantingFlow.jsx, same
+// reasoning as that file's own note on why its date helpers aren't
+// shared across features.
+const weekOfCaption = () => {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  now.setDate(now.getDate() + diff);
+  return `Week of ${now.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })}`;
+};
 
 export default function TaskDashboardPage() {
   const { user } = useAuth();
@@ -79,29 +77,45 @@ export default function TaskDashboardPage() {
   // reads nothing else still knows whether there is anything waiting.
   const summaryLine = work
     ? [
-        work.slipsToPack > 0 ? `${work.slipsToPack} ${work.slipsToPack === 1 ? 'slip' : 'slips'} to pack` : null,
-        work.deliveriesExpected > 0 ? `${work.deliveriesExpected} ${work.deliveriesExpected === 1 ? 'delivery' : 'deliveries'} expected` : null,
+        work.slipsToPack > 0 ? `${plural(work.slipsToPack, 'slip')} to pack` : null,
+        work.deliveriesExpected > 0 ? `${plural(work.deliveriesExpected, 'delivery')} expected` : null,
         work.palletsAtGate > 0 ? `${work.palletsAtGate} at the gate` : null,
       ].filter(Boolean).join(' · ') || 'nothing waiting right now'
     : null;
 
+  const TASKS = [
+    {
+      to: STAFF.receiving, icon: 'receiving-icon', title: 'Receiving',
+      meta: work ? `${plural(work.deliveriesExpected, 'delivery')} expected` : undefined,
+    },
+    {
+      to: STAFF.donation, icon: 'donate-icon', title: 'Donation intake',
+      meta: undefined,
+    },
+    {
+      to: PACKING.board, icon: 'packing-icon', title: 'Packing',
+      meta: work ? `${plural(work.slipsToPack, 'slip')} assigned to you` : undefined,
+    },
+    {
+      to: STAFF.decanting, icon: 'decanting-icon', title: 'Decanting',
+      meta: weekOfCaption(),
+    },
+    {
+      to: STAFF.dispatch, icon: 'dispatch-icon', title: 'Dispatch',
+      meta: work ? `${work.palletsAtGate} at the gate` : undefined,
+    },
+    // Receipts is manager-only and deliberately absent. The tile and
+    // the route guard in App.jsx have to agree — a hidden tile on an
+    // open route is not access control, just a tidier way to lose
+    // track of one.
+  ];
+
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6">
-      {/* Points at ManagerLayout's own hamburger trigger, top-left of
-          its header (AppNavDrawer, sm:hidden) — this page can't reach
-          into that header to measure it, so it's a fixed callout near
-          where that button always sits at mobile widths, same rough
-          approach StepPrimitives' Coachmark takes for its own anchor.
-          Hidden at the sm breakpoint the sidebar takes over, same as
-          the button it points to. */}
+    <StaffShell crumb="Home">
       {showHamburgerHint ? (
-        <div className="fixed left-3 top-14 z-50 flex items-start gap-1.5 sm:hidden">
-          <Menu className="mt-0.5 size-4 -rotate-12 text-[#2b3336]" aria-hidden="true" />
-          <button
-            type="button"
-            onClick={dismissHamburgerHint}
-            className="rounded-[4px] bg-[#2b3336] px-2.5 py-1.5 text-xs font-medium text-white shadow-md"
-          >
+        <div className="stf-coachmark stf-coachmark-fixed" role="status">
+          <span className="stf-coachmark-arrow" aria-hidden="true">&#8593;</span>
+          <button type="button" className="stf-coachmark-body" onClick={dismissHamburgerHint}>
             Everything else lives in here
           </button>
         </div>
@@ -113,36 +127,16 @@ export default function TaskDashboardPage() {
           most days. */}
       <UnfinishedWork />
 
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {loading ? (
-          Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)
-        ) : work ? (
-          <>
-            <StatTile icon={ClipboardList} label="Slips to pack" value={work.slipsToPack} to={PACKING.board} warn />
-            <StatTile icon={Truck} label="Deliveries expected" value={work.deliveriesExpected} to={STAFF.receiving} />
-            <StatTile icon={PackageCheck} label="Pallets at the gate" value={work.palletsAtGate} to={STAFF.dispatch} warn />
-          </>
-        ) : null}
-      </div>
-
-      <h2 className="mt-8 mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        Start a task
-      </h2>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {TASKS.map((task) => <ActionCard key={task.to} {...task} />)}
-      </div>
-
-      <div className="mt-5 flex flex-wrap gap-x-5 gap-y-1.5">
-        {SECONDARY_LINKS.map((link) => (
-          <Link
-            key={link.to}
-            to={link.to}
-            className="text-sm text-muted-foreground underline decoration-dotted underline-offset-4 hover:text-[#2b3336]"
-          >
-            {link.label}
-          </Link>
+      <div className="stf-task-grid">
+        {TASKS.map((task) => (
+          <TaskTile key={task.to} {...task} loading={loading} />
         ))}
       </div>
-    </div>
+
+      <div className="stf-dashboard-links">
+        <Link to={STAFF.communityRequests}>Log a benevolent request</Link>
+        <Link to={STAFF.feedTheSoil}>Log compost</Link>
+      </div>
+    </StaffShell>
   );
 }

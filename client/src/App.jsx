@@ -128,15 +128,14 @@ const App = () => (
           <Route path={STAFF.pickingSlips} element={<PickingSlipManagementPage />} />
         </Route>
 
-        {/* The warehouse worker's dashboard. Split out of the block
-            below so it can take the shell: the four flows underneath it
-            are StaffShell screens and must not. */}
-        <Route element={<ProtectedRoute shell />}>
-          <Route path="/noc" element={<TaskDashboard />} />
-        </Route>
-
         {/* Protected — any logged-in user */}
         <Route element={<ProtectedRoute />}>
+          {/* The warehouse worker's dashboard. No longer split into its
+              own shell='true' group — it wraps itself in StaffShell now,
+              same as the flows below it, rather than the ManagerLayout
+              sidebar it used to get here. See TaskDashboardPage.jsx's
+              own note on why. */}
+          <Route path="/noc" element={<TaskDashboard />} />
           <Route path="/noc/decanting" element={<DecantingPage />} />
           <Route path={STAFF.decantingRecords} element={<StaffDecantingRecordsPage />} />
 
