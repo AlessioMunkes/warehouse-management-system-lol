@@ -250,17 +250,28 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
   };
 
   // ── Records row ────────────────────────────────────────────
-  const RecordRow = ({ record, showOwner = true }) => (
-    <div className="stf-row is-static">
+  // showKit=true is the cross-kit view (the Records tab, and — same as
+  // the Kits tab — identifies by kit code, not owner name, and opens
+  // that kit's detail on tap). showKit=false is a kit's OWN history
+  // inside its detail screen, where the kit is already known, so the
+  // date carries the row instead and there is nothing further to open.
+  const RecordRow = ({ record, showKit = true, onOpen }) => (
+    <div
+      className={`stf-row${onOpen ? '' : ' is-static'}`}
+      {...(onOpen ? {
+        role: 'button', tabIndex: 0,
+        onClick: onOpen,
+        onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } },
+      } : {})}
+    >
       <span className="stf-row-main">
         <span className="stf-row-title">
-          {showOwner ? `${record.owner_name}${record.suburb ? ` · ${record.suburb}` : ''}` : fmtDate(record.logged_at)}
+          {showKit ? formatKitCode(record.kit_id) : fmtDate(record.logged_at)}
         </span>
         <span className="stf-row-meta">
-          {showOwner ? `${formatKitCode(record.kit_id)} · ${fmtDate(record.logged_at)} · ` : ''}
+          {showKit ? `${fmtDate(record.logged_at)} · ` : ''}
           {fmtKg(record.kg_compost)}
           {record.status === 'dispatched' ? ` · dispatched ${fmtDateTime(record.dispatched_at)}` : ''}
-          {record.logged_by_name ? ` · Logged by ${record.logged_by_name}` : ''}
         </span>
       </span>
       <StatusBadge status={record.status} />
@@ -268,7 +279,7 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
         <button
           type="button" className="stf-btn stf-btn-secondary"
           disabled={dispatchingId === record.id}
-          onClick={() => dispatchRecord(record.id)}
+          onClick={(e) => { e.stopPropagation(); dispatchRecord(record.id); }}
         >
           {dispatchingId === record.id ? 'Dispatching…' : 'Dispatch'}
         </button>
@@ -289,8 +300,11 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
           <div className="stf-empty">No compost has been logged yet.</div>
         ) : (
           <>
+            <p className="stf-summary-title">Compost records</p>
             <div className="stf-list">
-              {recordsPaged.slice.map((r) => <RecordRow key={r.id} record={r} />)}
+              {recordsPaged.slice.map((r) => (
+                <RecordRow key={r.id} record={r} onOpen={() => openKit(r.kit_id)} />
+              ))}
             </div>
             <Paged {...recordsPaged} noun="records" />
           </>
@@ -323,6 +337,7 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
           </div>
         ) : (
           <>
+            <p className="stf-summary-title">Collection kits</p>
             <div className="stf-list">
               {kitsPaged.slice.map((kit) => (
                 <div
@@ -360,8 +375,8 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
     }
     return (
       <TaskPage
-        title={selectedKit.owner_name}
-        sub={`${formatKitCode(selectedKit.id)}${selectedKit.suburb ? ` · ${selectedKit.suburb}` : ''} · assigned ${fmtDate(selectedKit.assigned_at)}`}
+        title="Collection kit details"
+        sub={`${formatKitCode(selectedKit.id)} · ${STATUS_LABEL[selectedKit.status] ?? selectedKit.status}`}
         actions={
           <Actions>
             <Button onClick={() => startLog(selectedKit)}>Log compost</Button>
@@ -370,12 +385,11 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
         }
         side={
           <div className="stf-summary">
-            <p className="stf-summary-title">This kit</p>
+            <p className="stf-summary-title">Owner</p>
             <KeyValues
               pairs={[
-                ['Owner', selectedKit.owner_name],
+                ['Name', selectedKit.owner_name],
                 ['Suburb', selectedKit.suburb || '—'],
-                ['Status', STATUS_LABEL[selectedKit.status] ?? selectedKit.status],
                 ['Assigned', fmtDate(selectedKit.assigned_at)],
               ]}
             />
@@ -384,11 +398,12 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
       >
         {browseError ? <Notice tone="warn">{browseError}</Notice> : null}
 
+        <p className="stf-summary-title">Collection records</p>
         {selectedKit.records.length === 0 ? (
           <div className="stf-empty">No compost logged yet for this kit.</div>
         ) : (
           <div className="stf-list">
-            {selectedKit.records.map((r) => <RecordRow key={r.id} record={r} showOwner={false} />)}
+            {selectedKit.records.map((r) => <RecordRow key={r.id} record={r} showKit={false} />)}
           </div>
         )}
       </TaskPage>
