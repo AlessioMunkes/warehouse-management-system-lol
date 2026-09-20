@@ -39,9 +39,10 @@
    the manager side does. Colour, radius, typeface and the app bar are
    now matched directly against what the manager screens actually
    render (ManagerLayout.jsx's page background and border colour, the
-   rounded-[4px] every ErrorBanner uses, Inter throughout) rather than
-   a generic guess. See each changed block's own note for what moved
-   and why.
+   rounded-[4px] every ErrorBanner uses, Montserrat throughout — index.css's
+   own body rule, not the Inter token it also defines but never applies)
+   rather than a generic guess. See each changed block's own note for
+   what moved and why.
 
    WHAT DID NOT CHANGE, ON PURPOSE: tap target sizes (--stf-tap,
    --stf-field), the guided/form toggle, the bottom tab bar,
@@ -84,13 +85,20 @@
   --stf-attention-bg:  #f6efe9;
   --stf-attention-border: #e2d3c6;
 
-  /* REVISED — Montserrat was the single biggest "this is a different
-     product" signal on a staff screen, more than colour ever was.
-     Manager screens are set entirely in Inter; numbers stay the same
-     size either way (ACC-06 is about size, not typeface), so nothing
-     about legibility on the floor changes here. */
-  --stf-font-display: "Inter", system-ui, -apple-system, sans-serif;
-  --stf-font-sans:    "Inter", system-ui, -apple-system, sans-serif;
+  /* REVISED (correction) — the previous version of this comment claimed
+     manager screens render in Inter and switched both tokens to it. That
+     was wrong: index.css sets `body { font-family: var(--font-montserrat) }`
+     globally, --font-family-display also points at Montserrat, and no
+     manager page applies Tailwind's font-sans utility to override that
+     default (checked every .jsx under pages/ and features/ — none do).
+     Inter is defined as a token in index.css but never actually reaches
+     the screen anywhere a manager or admin looks. Montserrat IS the
+     product's real display/body font, so that's what staff now matches —
+     same stack index.css uses, so no separate font files to load.
+     Numbers stay the same size either way (ACC-06 is about size, not
+     typeface), so nothing about legibility on the floor changes here. */
+  --stf-font-display: "Montserrat", "Open Sans", Helvetica, sans-serif;
+  --stf-font-sans:    "Montserrat", "Open Sans", Helvetica, sans-serif;
 
   /* REVISED — 12px/8px was tighter than the landing page's 16px but
      still rounder than anything on the manager side, which reads in
@@ -1975,7 +1983,7 @@ button.stf-panel-head:disabled { cursor: default; }
 }
 .stf-resume-title {
   margin: 0 0 10px;
-  font: 700 13px/1.3 "Inter", system-ui, sans-serif;
+  font: 700 13px/1.3 "Montserrat", "Open Sans", Helvetica, sans-serif;
   color: #2b3336;
 }
 .stf-resume-list { list-style: none; margin: 0; padding: 0; }
@@ -1990,8 +1998,8 @@ button.stf-panel-head:disabled { cursor: default; }
 .stf-resume-row + .stf-resume-row { border-top: 1px dashed #e9e3dd; }
 
 .stf-resume-text { flex: 1 1 12rem; min-width: 0; display: flex; flex-direction: column; }
-.stf-resume-name { font: 600 15px/1.3 "Inter", system-ui, sans-serif; color: #2b3336; }
-.stf-resume-meta { font: 400 13px/1.4 "Inter", system-ui, sans-serif; color: #6f6a5e; }
+.stf-resume-name { font: 600 15px/1.3 "Montserrat", "Open Sans", Helvetica, sans-serif; color: #2b3336; }
+.stf-resume-meta { font: 400 13px/1.4 "Montserrat", "Open Sans", Helvetica, sans-serif; color: #6f6a5e; }
 
 /* Scoped through the parent rather than the bare class: staff.css
    line 85 is `.stf-shell a { color: var(--stf-accent) }`, which is
@@ -2006,7 +2014,7 @@ button.stf-panel-head:disabled { cursor: default; }
   padding: 0 18px;
   border-radius: 4px;
   background: #ef3a40;
-  font: 700 14px/1 "Inter", system-ui, sans-serif;
+  font: 700 14px/1 "Montserrat", "Open Sans", Helvetica, sans-serif;
   color: #ffffff;
   text-decoration: none;
 }
@@ -2018,7 +2026,7 @@ button.stf-panel-head:disabled { cursor: default; }
   padding: 0 12px;
   border: 0;
   background: none;
-  font: 500 13px/1 "Inter", system-ui, sans-serif;
+  font: 500 13px/1 "Montserrat", "Open Sans", Helvetica, sans-serif;
   color: #6f6a5e;
   text-decoration: underline;
   cursor: pointer;
