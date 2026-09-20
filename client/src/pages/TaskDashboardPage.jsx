@@ -27,10 +27,13 @@
 // task is. Nothing on this page reads that endpoint any more, so the
 // fetch is gone too, not left in place unused.
 //
-// Feed the Soil and Benevolent Requests are text links below the
-// tasks, not items in the list — same "every shift" vs "secondary"
-// split StaffTabBar.jsx draws between the bottom tab bar and its
-// drawer.
+// Feed the Soil and Benevolent Requests used to sit below the grid as
+// plain text links — a visual-hierarchy claim ("these two are lesser
+// than the other five") the product doesn't actually make: they're
+// modules the same as receiving or dispatch, worked less often but
+// not less real, and a text link is both a smaller touch target and a
+// different affordance for the same class of action on one screen.
+// Same tile, same target size, same list, as everything else here.
 //
 // wide on StaffShell: the standard 520px column (every task flow uses
 // it) read as a small clump adrift on a bench tablet or a wide
@@ -41,7 +44,6 @@
 // just needs the room to not look stranded.
 // ─────────────────────────────────────────────────────────────
 import { useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import StaffShell from '../components/layout/StaffShell';
 import DashboardGreeting from '../features/taskdashboard/components/DashboardGreeting';
 import UnfinishedWork from '../features/staff/components/UnfinishedWork';
@@ -63,6 +65,10 @@ const TASKS = [
     meta: 'Portion bulk stock' },
   { to: STAFF.dispatch, icon: 'dispatch-icon', title: 'Dispatch',
     meta: 'Dispatch pallets' },
+  { to: STAFF.communityRequests, icon: 'benevolent-icon', title: 'Benevolent requests',
+    meta: 'Log a request' },
+  { to: STAFF.feedTheSoil, icon: 'fts-icon', title: 'Feed the Soil',
+    meta: 'Log compost' },
   // Receipts is manager-only and deliberately absent. The item and
   // the route guard in App.jsx have to agree — a hidden item on an
   // open route is not access control, just a tidier way to lose
@@ -108,11 +114,6 @@ export default function TaskDashboardPage() {
         {TASKS.map((task) => (
           <TaskNode key={task.to} {...task} />
         ))}
-      </div>
-
-      <div className="stf-dashboard-links">
-        <Link to={STAFF.communityRequests}>Log a benevolent request</Link>
-        <Link to={STAFF.feedTheSoil}>Log compost</Link>
       </div>
     </StaffShell>
   );

@@ -2165,13 +2165,17 @@ button.stf-panel-head:disabled { cursor: default; }
 
    Two shapes off one breakpoint, no JS: a stacked list of icon-left
    rows on a phone (matches every other list in this file), a row of
-   free-standing circles — no line, just five circles with air between
-   them — from tablet width up, where TaskDashboardPage.jsx's `wide`
-   prop (same one Decanting's week planner uses) gives them the room
-   to read as filling the page rather than a small clump adrift in it.
+   free-standing circles — no line, just circles with air between them
+   — from tablet width up, where TaskDashboardPage.jsx's `wide` prop
+   (same one Decanting's week planner uses) gives them the room to
+   read as filling the page rather than a small clump adrift in it.
    flex-wrap on the row rather than horizontal scroll: with no line to
    route across a wrap, wrapping to a second row is simply the better
-   fallback now if five don't fit one row. */
+   fallback now if all seven don't fit one row. Every module gets the
+   same tile and the same target size here, including Feed the Soil
+   and Benevolent Requests — they used to be smaller text links below
+   this grid, which claimed a hierarchy ("less important than the
+   other five") the product doesn't actually have. */
 .stf-tasks {
   display: flex;
   flex-direction: column;
@@ -2230,24 +2234,6 @@ button.stf-panel-head:disabled { cursor: default; }
   .stf-task-text { align-items: center; }
   .stf-task-title { white-space: nowrap; }
   .stf-task-meta { max-width: 130px; }
-}
-
-/* Feed the Soil and Benevolent Requests — worked far less often than
-   the tasks above, so plain links rather than items of their own
-   weight. Left as the shell's default link colour (--stf-accent, see
-   .stf-shell a) rather than muted grey: this file's own rule is red
-   for anything clickable, and these are exactly that. Centred rather
-   than left-aligned — flush-left read as an afterthought hanging off
-   the left edge under a page whose other content spans the full
-   width. */
-.stf-dashboard-links {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px 20px;
-  font-size: 14px;
-  font-weight: 600;
-  margin-top: 4px;
 }
 
 /* First-visit hint pointing at StaffShell's own hamburger trigger
