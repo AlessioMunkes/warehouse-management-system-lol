@@ -208,7 +208,12 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
 
   const step = STEP_META[phase];
   const weekOf = useMemo(() => mondayOfThisWeek(), []);
-  const showToggle = phase === 'work';
+  // Matches ReceivingFlow's own placement: visible from the first
+  // screen, not held back for the counting step. Hiding it until
+  // "work" read, from the floor, as though only Receiving had a
+  // Guided/Form choice at all — this one was there the whole time,
+  // just a screen later than the others.
+  const showToggle = phase !== 'done';
 
   useEffect(() => { onCrumbChange?.(step.label); }, [step.label, onCrumbChange]);
 

@@ -1,25 +1,34 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/components/layout/StaffTabBar.jsx
 //
-// How warehouse staff move between their four tasks.
+// How warehouse staff move between their five most-used tasks.
 //
 // This app is installed as a PWA and used on a phone, so the
 // navigation lives at the bottom where the thumb already is. A
 // sidebar was the other candidate and was rejected: on a phone it
-// has to collapse behind a hamburger, which hides all four
-// destinations behind a tap and gives no sense of where you are.
+// has to collapse behind a hamburger, which hides all destinations
+// behind a tap and gives no sense of where you are.
 //
 // The tab bar is present on EVERY staff page including mid-task, so
 // a packer interrupted by a driver at the gate can switch to
 // dispatch and come back. Task pages keep their own progress in
 // component state, and the step flows re-enter at step 1 — a
 // deliberate simplification for Milestone 3, noted in HANDOFF.md.
+//
+// NOT EVERY STAFF DESTINATION IS HERE. Feed the Soil and Benevolent
+// Requests are reached from the drawer (AppNavDrawer, in StaffShell's
+// app bar on every page) rather than this bar — they're worked far
+// less often than the five below, and this bar is the "every shift"
+// set, not the full list. Donation Intake IS one of the five: it's a
+// task worked as routinely as receiving or packing, not an occasional
+// one, so it belongs at the thumb rather than a tap away in the
+// drawer.
 // ─────────────────────────────────────────────────────────────
 import { useLocation, useNavigate } from 'react-router-dom';
 import { STAFF } from '../../routes/paths';
 
-// Order matches the shift: goods come in, get packed, get decanted,
-// go out.
+// Order matches the shift: goods come in (received, or donated),
+// get packed, get decanted, go out.
 //
 // Icons follow the landing page's convention — /icons/*.svg served from
 // client/public, the same as noc-icon.svg and the rest. The Canva task
@@ -32,6 +41,7 @@ const ICON_EXT = 'svg';
 const TABS = [
   { label: 'Home',      to: STAFF.home,      icon: null,               glyph: 'ti ti-home' },
   { label: 'Receiving', to: STAFF.receiving, icon: 'receiving-icon',   glyph: 'ti ti-truck-delivery' },
+  { label: 'Donation',  to: STAFF.donation,  icon: 'donate-icon',      glyph: 'ti ti-gift' },
   { label: 'Packing',   to: STAFF.packing,   icon: 'packing-icon',     glyph: 'ti ti-package' },
   { label: 'Decanting', to: STAFF.decanting, icon: 'decanting-icon',   glyph: 'ti ti-flask' },
   { label: 'Dispatch',  to: STAFF.dispatch,  icon: 'dispatch-icon',    glyph: 'ti ti-clipboard-check' },

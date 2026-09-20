@@ -192,7 +192,12 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
   }, [palletId]);
 
   const step = STEP_META[phase];
-  const showToggle = phase === 'work';
+  // Matches ReceivingFlow's own placement: visible from the first
+  // screen, not held back for the load-and-release step. Hiding it
+  // until "work" read, from the floor, as though only Receiving had
+  // a Guided/Form choice at all — this one was there the whole time,
+  // just a screen later than the others.
+  const showToggle = phase !== 'done';
   const eligibility = gateView?.eligibility || {};
 
   // Only lines that were actually packed can be loaded — the same
