@@ -16,13 +16,20 @@
        red       anything clickable
        gold      small editorial accents
 
-   One deliberate addition: --stf-attention, a deep brick used for
-   short counts, expired batches and quantity variances. Red is spoken
-   for by actions, and a warning that shares its colour with every
-   button is a warning nobody reads. The brick is visibly browner and
-   darker than --stf-accent so the two never read as the same thing —
-   and per ACC-03 the mark and the sentence carry the meaning anyway,
-   so colour is never the only signal.
+   REVISED — --stf-attention used to be a separate deep-brick colour
+   (#8a3227), kept apart from --stf-accent specifically because staff's
+   primary buttons used to BE --stf-accent (red) — a warning sharing
+   its colour with every button is a warning nobody reads. That
+   justification is gone: staff's primary buttons are --stf-ink
+   (near-black) now, matching the manager side, so red is free for
+   warnings again. --stf-attention now equals --stf-accent outright,
+   and --stf-attention-bg/-border/-ink are the exact values every
+   manager page's own error banner uses (ErrorBanner in
+   CommunityRequestsPage.jsx and a dozen others: border #ef3a40,
+   background #fff4f2, body text #2b3336) — not a separately-invented
+   khaki family with no manager equivalent at all. Per ACC-03 the mark
+   and the sentence still carry the meaning regardless, so colour was
+   never the only signal either way.
 
    ── Two rules the layouts are built on ────────────────────────────────
    ACC-05  a multi-step task is sequential screens, one decision each.
@@ -92,11 +99,13 @@
      computed rather than eyeballed. */
   --stf-field-bg:   #f2f2f2;
 
-  /* Staff-only */
-  --stf-attention:  #8a3227;
-  --stf-attention-ink: #6d2a20;
-  --stf-attention-bg:  #f6efe9;
-  --stf-attention-border: #e2d3c6;
+  /* Staff-only — see the REVISED note above the token block for why
+     these now equal the manager side's actual error-banner colours
+     rather than a separately-invented khaki family. */
+  --stf-attention:  #ef3a40;
+  --stf-attention-ink: #2b3336;
+  --stf-attention-bg:  #fff4f2;
+  --stf-attention-border: #ef3a40;
 
   /* REVISED (correction) — the previous version of this comment claimed
      manager screens render in Inter and switched both tokens to it. That
@@ -510,7 +519,12 @@
 .stf-notice.is-warn .stf-notice-mark,
 .stf-row.is-warn .stf-notice-mark {
   border-color: var(--stf-attention);
-  color: var(--stf-attention);
+  /* --stf-attention-ink, not --stf-attention: the "!" glyph is text-
+     sized (12px bold), and #ef3a40 is only 3.64:1 on this mark's
+     --stf-attention-bg background — passes the 3:1 a border needs,
+     fails the 4.5:1 text needs. The border itself stays the brand red
+     since a border only needs that 3:1. */
+  color: var(--stf-attention-ink);
 }
 .stf-notice-body { flex: 1; min-width: 0; }
 .stf-notice-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
@@ -1218,15 +1232,23 @@
 .stf-hint-success {
   color: #1a7d42;
 }
+/* REVISED — used to be a bordered, padded badge (1px border, 4px
+   radius) with no manager equivalent. Manager's own inline field
+   error (components/ui/field.jsx's FieldError) is plain coloured
+   text, no box — matched to that exactly.
+
+   NOT var(--stf-attention): #ef3a40 is 3.93:1 on white, which clears
+   the 3:1 a border or background needs but fails 4.5:1 for text.
+   Manager's FieldError doesn't use the brand red for this either —
+   its text-destructive resolves to #e7000b (4.77:1), a darker red
+   picked for exactly this reason. Matched to that value, not the
+   brand accent, for the same reason manager itself doesn't use one
+   red for everything. */
 .stf-error {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 400;
   line-height: 1.5;
-  color: var(--stf-attention);
-  display: inline-block;
-  padding: 4px 8px;
-  border: 1px solid var(--stf-attention);
-  border-radius: 4px;
+  color: #e7000b;
   margin-top: 4px;
 }
 
@@ -1429,7 +1451,11 @@ body.reduced-movement .decorative-icon {
   flex: 0 0 auto;
   width: 20px; height: 20px;
   border-radius: 50%;
-  background: var(--stf-attention);
+  /* NOT var(--stf-attention): white text at 13px bold on #ef3a40 is
+     3.93:1, under the 4.5:1 normal text needs. #e7000b is the same
+     darker red shadcn's own --destructive resolves to for exactly
+     this reason (see .stf-error's note) — white on it is 4.77:1. */
+  background: #e7000b;
   color: var(--stf-white);
   font-size: 13px;
   font-weight: 700;
@@ -1951,12 +1977,12 @@ button.stf-panel-head:disabled { cursor: default; }
    The offline bar. Appended after 22's block, same rule as always:
    no two scripts share an anchor.
 
-   Charcoal rather than red. Red in this design system means "you can
-   click this", and a red strip across the top of the screen reads as
-   an emergency — losing signal in a warehouse is a Tuesday, not a
-   disaster, and the whole point of the bar is to say "carry on".
-   The brick --stf-attention is kept for the one state that does need
-   a person: something the server refused. */
+   Charcoal rather than red for the normal "offline" state. Red in
+   this design system means "you can click this", and a red strip
+   across the top of the screen reads as an emergency — losing signal
+   in a warehouse is a Tuesday, not a disaster, and the whole point of
+   the bar is to say "carry on". Red is kept for the one state that
+   does need a person: something the server refused. */
 .stf-netbar {
   display: flex;
   align-items: center;
@@ -1968,7 +1994,10 @@ button.stf-panel-head:disabled { cursor: default; }
   font: 500 13px/1.4 var(--stf-font-sans);
 }
 .stf-netbar.is-sending { background: var(--stf-gold-deep); }
-.stf-netbar.is-stuck   { background: var(--stf-attention); }
+/* #e7000b, not var(--stf-attention): white text at 13px on #ef3a40
+   is 3.93:1, under the 4.5:1 this bar's own text needs — same fix as
+   .stf-wl-mark. */
+.stf-netbar.is-stuck   { background: #e7000b; }
 
 .stf-netbar-text { text-wrap: pretty; }
 
