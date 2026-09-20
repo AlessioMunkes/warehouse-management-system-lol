@@ -2168,23 +2168,35 @@ button.stf-panel-head:disabled { cursor: default; }
    would either break or need routing logic a CSS ::before can't do
    cleanly. -webkit-overflow-scrolling keeps it a finger-flick on the
    tablet this app actually runs on, not a fight with a thin
-   scrollbar. */
+   scrollbar.
+
+   REVISED — sized up (56px circles to 80px, everything under them to
+   match) and the page itself widened (TaskDashboardPage.jsx now
+   passes StaffShell's existing `wide` prop, the same one Decanting's
+   week planner uses) — the original sizing read as a small clump
+   adrift in the page rather than something that occupies it, most
+   visible on a bench tablet or a wide window where .stf-main had a
+   lot of room it wasn't using. Still phone-safe: min-width per node
+   only means the horizontal-scroll fallback above kicks in a little
+   sooner on the narrowest phones, which was already the fallback
+   design for this reason. */
 .stf-path-track {
   display: flex;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 4px 2px 8px;
+  padding: 4px 2px 12px;
   margin: 0 -2px;
+  gap: 4px;
 }
 .stf-path-node {
   position: relative;
   flex: 1 1 0;
-  min-width: 84px;
+  min-width: 108px;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 6px;
+  gap: 10px;
   padding: 0 4px;
   text-decoration: none;
 }
@@ -2195,7 +2207,7 @@ button.stf-panel-head:disabled { cursor: default; }
 .stf-path-node:not(:first-child)::before {
   content: '';
   position: absolute;
-  top: 27px;
+  top: 39px;
   right: 50%;
   width: 100%;
   height: 1.5px;
@@ -2205,8 +2217,8 @@ button.stf-panel-head:disabled { cursor: default; }
 .stf-path-circle {
   position: relative;
   z-index: 1;
-  width: 56px;
-  height: 56px;
+  width: 80px;
+  height: 80px;
   flex-shrink: 0;
   border-radius: 50%;
   border: 1.5px solid var(--stf-border);
@@ -2217,24 +2229,24 @@ button.stf-panel-head:disabled { cursor: default; }
   transition: border-color 150ms ease, background 150ms ease;
 }
 .stf-path-node:hover .stf-path-circle { border-color: var(--stf-gold); background: var(--stf-sand); }
-.stf-path-circle img { width: 30px; height: 30px; object-fit: contain; }
+.stf-path-circle img { width: 42px; height: 42px; object-fit: contain; }
 .stf-path-title {
   font-family: var(--stf-font-display);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--stf-ink);
   white-space: nowrap;
 }
 .stf-path-meta {
-  font-size: 11px;
-  line-height: 1.35;
+  font-size: 12px;
+  line-height: 1.4;
   color: var(--stf-text-sub);
-  max-width: 90px;
+  max-width: 130px;
 }
 .stf-path-meta-skeleton {
   width: 70%;
-  height: 11px;
-  border-radius: 5px;
+  height: 12px;
+  border-radius: 6px;
   background: var(--stf-field-bg);
 }
 
@@ -2242,13 +2254,18 @@ button.stf-panel-head:disabled { cursor: default; }
    the path above, so plain links rather than nodes of their own
    weight. Left as the shell's default link colour (--stf-accent, see
    .stf-shell a) rather than muted grey: this file's own rule is red
-   for anything clickable, and these are exactly that. */
+   for anything clickable, and these are exactly that. Centred rather
+   than left-aligned — flush-left read as an afterthought hanging off
+   the left edge under a page whose other content (the path track) is
+   spread across the full width. */
 .stf-dashboard-links {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 8px 20px;
   font-size: 14px;
   font-weight: 600;
+  margin-top: 4px;
 }
 
 /* First-visit hint pointing at StaffShell's own hamburger trigger

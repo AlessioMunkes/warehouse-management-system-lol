@@ -28,6 +28,14 @@
 // Feed the Soil and Benevolent Requests are text links below the
 // path, not nodes on it — same "every shift" vs "secondary" split
 // StaffTabBar.jsx draws between the bottom tab bar and its drawer.
+//
+// wide on StaffShell: the standard 520px column (every task flow uses
+// it) read as a small clump adrift on a bench tablet or a wide
+// window — plenty of room going unused on a page that isn't a
+// step-by-step flow needing a narrow, focused column in the first
+// place. Same prop Decanting's week planner already uses for its own,
+// different reason (a two-column form needing the space); this page
+// just needs the room to not look stranded.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -112,7 +120,7 @@ export default function TaskDashboardPage() {
   ];
 
   return (
-    <StaffShell crumb="Home">
+    <StaffShell crumb="Home" wide>
       {showHamburgerHint ? (
         <button
           type="button"
