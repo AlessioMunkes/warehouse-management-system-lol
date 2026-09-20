@@ -43,7 +43,9 @@ import useCoachmark from '../features/staff/hooks/useCoachmark';
 import { STAFF, PACKING } from '../routes/paths';
 import dashboardAPI from '../services/dashboardAPI';
 
-const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+// Explicit plural forms rather than a naive "+s": "delivery" needs
+// "deliveries", not "deliverys".
+const count = (n, singular, plural) => `${n} ${n === 1 ? singular : plural}`;
 
 // Monday of the current week, in words — what decanting.service.js's
 // weekOf means, said the way a worker glancing at a card would read
@@ -73,20 +75,10 @@ export default function TaskDashboardPage() {
     return () => { cancelled = true; };
   }, []);
 
-  // The greeting says the state of the day in one line, so someone who
-  // reads nothing else still knows whether there is anything waiting.
-  const summaryLine = work
-    ? [
-        work.slipsToPack > 0 ? `${plural(work.slipsToPack, 'slip')} to pack` : null,
-        work.deliveriesExpected > 0 ? `${plural(work.deliveriesExpected, 'delivery')} expected` : null,
-        work.palletsAtGate > 0 ? `${work.palletsAtGate} at the gate` : null,
-      ].filter(Boolean).join(' · ') || 'nothing waiting right now'
-    : null;
-
   const TASKS = [
     {
       to: STAFF.receiving, icon: 'receiving-icon', title: 'Receiving',
-      meta: work ? `${plural(work.deliveriesExpected, 'delivery')} expected` : undefined,
+      meta: work ? `${count(work.deliveriesExpected, 'delivery', 'deliveries')} expected` : undefined,
     },
     {
       to: STAFF.donation, icon: 'donate-icon', title: 'Donation intake',
@@ -94,7 +86,7 @@ export default function TaskDashboardPage() {
     },
     {
       to: PACKING.board, icon: 'packing-icon', title: 'Packing',
-      meta: work ? `${plural(work.slipsToPack, 'slip')} assigned to you` : undefined,
+      meta: work ? `${count(work.slipsToPack, 'slip', 'slips')} assigned to you` : undefined,
     },
     {
       to: STAFF.decanting, icon: 'decanting-icon', title: 'Decanting',
@@ -113,15 +105,17 @@ export default function TaskDashboardPage() {
   return (
     <StaffShell crumb="Home">
       {showHamburgerHint ? (
-        <div className="stf-coachmark stf-coachmark-fixed" role="status">
+        <button
+          type="button"
+          className="stf-coachmark stf-coachmark-fixed stf-coachmark-arrow-only"
+          onClick={dismissHamburgerHint}
+          aria-label="Dismiss hint: everything else is in the menu"
+        >
           <span className="stf-coachmark-arrow" aria-hidden="true">&#8593;</span>
-          <button type="button" className="stf-coachmark-body" onClick={dismissHamburgerHint}>
-            Everything else lives in here
-          </button>
-        </div>
+        </button>
       ) : null}
 
-      <DashboardGreeting name={user?.firstName} summaryLine={summaryLine} />
+      <DashboardGreeting name={user?.firstName} />
 
       {/* Renders nothing when there is nothing half-done, which is
           most days. */}

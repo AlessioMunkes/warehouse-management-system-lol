@@ -489,14 +489,20 @@
 .stf-choice-meta  { font-size: 13px; color: var(--stf-text-sub); }
 
 /* ── Notices (ACC-03: a mark and a sentence, never colour alone) ─── */
+/* REVISED — was a 4px coloured LEFT-BORDER accent (gold default,
+   red warn), asymmetric corner radius to match. No manager equivalent
+   anywhere in the app — its own real callout (ErrorBanner, used on a
+   dozen pages) is a plain border on all four sides, same radius as
+   everything else. Matched to that: a symmetric border, no accent
+   stripe. The icon mark (.stf-notice-mark) still carries the "this is
+   a warning" signal on its own, same as it always did. */
 .stf-notice {
   display: flex;
   align-items: flex-start;
   gap: 12px;
   padding: 14px 16px;
   border: 1px solid var(--stf-border);
-  border-left: 4px solid var(--stf-gold);
-  border-radius: 0 var(--stf-radius) var(--stf-radius) 0;
+  border-radius: var(--stf-radius);
   background: var(--stf-white);
   font-size: 13px;
   line-height: 1.55;
@@ -504,7 +510,6 @@
 }
 .stf-notice.is-warn {
   border-color: var(--stf-attention-border);
-  border-left-color: var(--stf-attention);
   background: var(--stf-attention-bg);
 }
 .stf-notice-mark {
@@ -2057,16 +2062,17 @@ button.stf-panel-head:disabled { cursor: default; }
 .stf-wl-undo-btn:hover { background: var(--stf-accent); color: var(--stf-white); }
 
 /* ── Unfinished work ───────────────────────────────────────────
-   On the manager-styled dashboard rather than a staff task page, so
-   this borrows the dashboard's card rather than the sand ground: the
-   same white, the same radius, the same hairline. The stf-* tokens
-   still supply the colours so it does not drift from the rest of the
-   staff work. */
+   Now on the worker dashboard inside StaffShell (see
+   TaskDashboardPage.jsx's own note on that move) — this still
+   borrows the plain white card look rather than the sand ground:
+   same white, same radius, same hairline. The gold left-border accent
+   this used to have is gone — same fix as .stf-notice and
+   .pdf-status-banner, no manager equivalent for a coloured accent
+   stripe on a card. */
 .stf-resume {
   margin-top: 24px;
   padding: 16px;
   border: 1px solid rgb(43 51 54 / 0.06);
-  border-left: 3px solid var(--stf-gold);
   border-radius: 26px;
   background: #ffffff;
   box-shadow: 0 4px 6px -1px rgb(43 51 54 / 0.08), 0 2px 4px -2px rgb(43 51 54 / 0.06);
@@ -2126,7 +2132,15 @@ button.stf-panel-head:disabled { cursor: default; }
 /* ── Worker dashboard task grid ──────────────────────────────────
    Square tiles, two per row, each free-standing rather than implying
    an order between them — see TaskDashboardPage.jsx's own note on why
-   this replaced a "journey" layout that was considered for it. */
+   this replaced a "journey" layout that was considered for it.
+
+   Five tiles in two columns leaves the last one stranded alone in its
+   own row with an empty half beside it. Rather than adding a third
+   column (which would leave the SAME kind of gap on the row above —
+   two full rows of two, one row of one either way for any odd count)
+   the lone last tile spans the full row and switches to a wide
+   horizontal card instead, which reads as a deliberate "this one's
+   different" rather than a leftover. */
 .stf-task-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -2146,7 +2160,26 @@ button.stf-panel-head:disabled { cursor: default; }
   transition: background 150ms ease, border-color 150ms ease;
 }
 .stf-task-tile:hover { background: var(--stf-sand); border-color: var(--stf-gold); }
+.stf-task-tile:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: left;
+  gap: 14px;
+  padding: 16px 20px;
+}
+.stf-task-tile:last-child:nth-child(odd) .stf-task-tile-text {
+  align-items: flex-start;
+  text-align: left;
+}
 .stf-task-tile-icon { width: 44px; height: 44px; object-fit: contain; }
+.stf-task-tile-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
 .stf-task-tile-title {
   font-family: var(--stf-font-display);
   font-size: 15px;
@@ -2184,4 +2217,15 @@ button.stf-panel-head:disabled { cursor: default; }
   right: auto;
   top: 60px;
   z-index: 50;
+}
+/* No text bubble here — an actual industry app's "look, the menu is
+   there" hint is just the animated arrow, not a callout you have to
+   read. Rendered as a plain button (not the usual div) so it stays
+   tappable to dismiss without needing its own label reading like a
+   sentence of UI copy. */
+.stf-coachmark-arrow-only {
+  border: 0;
+  background: none;
+  padding: 4px;
+  cursor: pointer;
 }
