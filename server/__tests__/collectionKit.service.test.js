@@ -13,6 +13,7 @@ const repoMock = {
   createKit:      vi.fn(),
   listKits:       vi.fn(),
   getKitById:     vi.fn(),
+  getRecordById:  vi.fn(),
   logCompost:     vi.fn(),
   markDispatched: vi.fn(),
   listRecords:    vi.fn(),
@@ -107,23 +108,54 @@ describe('logCompost', () => {
 
 describe('markDispatched', () => {
   it('rejects a non-numeric record id', async () => {
-    await expect(service.markDispatched('abc', ACTOR_ID)).rejects.toMatchObject({ status: 400 });
+    await expect(service.markDispatched('abc', { dispatchedTo: 'Voorbrug Farm' }, ACTOR_ID))
+      .rejects.toMatchObject({ status: 400 });
+  });
+
+  it('requires a dispatch destination', async () => {
+    await expect(service.markDispatched(1, {}, ACTOR_ID)).rejects.toMatchObject({ status: 400 });
+    expect(repoMock.markDispatched).not.toHaveBeenCalled();
+  });
+
+  it('treats a blank destination the same as a missing one', async () => {
+    await expect(service.markDispatched(1, { dispatchedTo: '   ' }, ACTOR_ID))
+      .rejects.toMatchObject({ status: 400 });
   });
 
   it('404s when the record does not exist', async () => {
     repoMock.markDispatched.mockResolvedValue({ ok: false, code: 'record_not_found' });
-    await expect(service.markDispatched(999, ACTOR_ID)).rejects.toMatchObject({ status: 404 });
+    await expect(service.markDispatched(999, { dispatchedTo: 'Voorbrug Farm' }, ACTOR_ID))
+      .rejects.toMatchObject({ status: 404 });
   });
 
   it('409s when the record is already dispatched', async () => {
     repoMock.markDispatched.mockResolvedValue({ ok: false, code: 'already_dispatched' });
-    await expect(service.markDispatched(1, ACTOR_ID)).rejects.toMatchObject({ status: 409 });
+    await expect(service.markDispatched(1, { dispatchedTo: 'Voorbrug Farm' }, ACTOR_ID))
+      .rejects.toMatchObject({ status: 409 });
   });
 
-  it('returns the updated record on success', async () => {
-    const record = { id: 1, status: 'dispatched' };
+  it('returns the updated record on success and passes the destination through', async () => {
+    const record = { id: 1, status: 'dispatched', dispatched_to: 'Voorbrug Farm' };
     repoMock.markDispatched.mockResolvedValue({ ok: true, record });
-    await expect(service.markDispatched(1, ACTOR_ID)).resolves.toEqual(record);
+    await expect(service.markDispatched(1, { dispatchedTo: 'Voorbrug Farm' }, ACTOR_ID)).resolves.toEqual(record);
+    expect(repoMock.markDispatched).toHaveBeenCalledWith({ recordId: 1, actorId: ACTOR_ID, dispatchedTo: 'Voorbrug Farm' });
+  });
+});
+
+describe('getRecord', () => {
+  it('rejects a non-numeric record id', async () => {
+    await expect(service.getRecord('abc')).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('404s when the repository finds nothing', async () => {
+    repoMock.getRecordById.mockResolvedValue(null);
+    await expect(service.getRecord(999)).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('returns the record', async () => {
+    const record = { id: 1, kit_id: 1, status: 'logged' };
+    repoMock.getRecordById.mockResolvedValue(record);
+    await expect(service.getRecord(1)).resolves.toEqual(record);
   });
 });
 
@@ -135,7 +167,13 @@ describe('listRecords', () => {
   it('accepts logged and dispatched as the only valid filters', async () => {
     repoMock.listRecords.mockResolvedValue([]);
     await service.listRecords({ status: 'logged' });
-    expect(repoMock.listRecords).toHaveBeenCalledWith({ status: 'logged', limit: 200 });
+    expect(repoMock.listRecords).toHaveBeenCalledWith({ status: 'logged', search: null, limit: 200 });
+  });
+
+  it('passes a search term through', async () => {
+    repoMock.listRecords.mockResolvedValue([]);
+    await service.listRecords({ search: 'Delft' });
+    expect(repoMock.listRecords).toHaveBeenCalledWith({ status: null, search: 'Delft', limit: 200 });
   });
 });
 

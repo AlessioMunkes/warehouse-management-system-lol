@@ -438,7 +438,9 @@ CREATE TABLE community_requests (
 -- Dispatch (compost handed to a farmer) is a manual action per record,
 -- independent of any others — there is no data on which farmer got
 -- how much from which record, so this deliberately does not invent a
--- batch/trip concept on top of that.
+-- batch/trip concept on top of that. dispatched_to names where that
+-- record's compost went (a farmer or drop-off point), required at
+-- the point of dispatch — see collectionKit.service.js's markDispatched.
 --
 -- Feeds the Impact Calculator's compost_processed metric
 -- (reporting.repository.js) — every logged record counts, dispatched
@@ -472,6 +474,7 @@ CREATE TABLE collection_kit_records (
   status         VARCHAR(20)   NOT NULL DEFAULT 'logged'
                                CHECK (status IN ('logged', 'dispatched')),
   dispatched_at  TIMESTAMPTZ,
+  dispatched_to  VARCHAR(150),
   notes          TEXT,
   logged_by      INTEGER       REFERENCES users(id),
   created_at     TIMESTAMPTZ   NOT NULL DEFAULT NOW()
@@ -716,4 +719,5 @@ CREATE TABLE bookings (
 | 10 | Added `guest_sessions` table | §6.2, §6.3 — session summaries for guest volunteers, scoped narrowly (full tracking stays with VMS) |
 | 11 | `ecd_centers.is_active` used for soft delete | §6.5 — historical dispatch records must survive ECD offboarding |
 | 12 | Added `collection_kits` + `collection_kit_records` tables | Feed the Soil kit tracking — revised from an earlier out/returned model that had the real-world flow backwards (kits are assigned to and stay with community members, not checked in and out) |
+| 13 | Added `dispatched_to` to `collection_kit_records` | Feed the Soil — dispatch now records which farmer or drop-off point the compost went to |
 

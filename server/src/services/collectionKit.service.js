@@ -99,12 +99,29 @@ const logCompost = async (rawKitId, payload, actorId) => {
   return result.record;
 };
 
-// ── Mark a record dispatched ─────────────────────────────────
-const markDispatched = async (rawRecordId, actorId) => {
+const getRecord = async (rawRecordId) => {
   const recordId = Number(rawRecordId);
   if (!isPositiveInt(recordId)) fail(400, 'A valid record id is required.');
 
-  const result = await runOrMissingTable(() => kitRepo.markDispatched({ recordId, actorId }));
+  const record = await runOrMissingTable(() => kitRepo.getRecordById(recordId));
+  if (!record) fail(404, 'Record not found.');
+  return record;
+};
+
+// ── Mark a record dispatched ─────────────────────────────────
+// dispatchedTo is required: "dispatched" only means something once
+// it says where the compost went, same reasoning logCompost applies
+// to kgCompost — an empty answer here is not a smaller version of the
+// real one, it is no answer.
+const markDispatched = async (rawRecordId, payload, actorId) => {
+  const recordId = Number(rawRecordId);
+  if (!isPositiveInt(recordId)) fail(400, 'A valid record id is required.');
+
+  const dispatchedTo = cleanText(payload?.dispatchedTo);
+  if (!dispatchedTo) fail(400, 'dispatchedTo is required.');
+  if (dispatchedTo.length > 150) fail(400, 'dispatchedTo must be 150 characters or fewer.');
+
+  const result = await runOrMissingTable(() => kitRepo.markDispatched({ recordId, actorId, dispatchedTo }));
   if (!result.ok && result.code === 'record_not_found') fail(404, 'Record not found.');
   if (!result.ok && result.code === 'already_dispatched') fail(409, 'This record was already marked dispatched.');
   return result.record;
@@ -117,7 +134,11 @@ const listRecords = async (filters = {}) => {
     fail(400, "status filter must be 'logged' or 'dispatched'.");
   }
   return runOrMissingTable(() =>
-    kitRepo.listRecords({ status, limit: filters.limit ? Number(filters.limit) : 200 }));
+    kitRepo.listRecords({
+      status,
+      search: cleanText(filters.search),
+      limit: filters.limit ? Number(filters.limit) : 200,
+    }));
 };
 
-export default { createKit, listKits, getKit, logCompost, markDispatched, listRecords };
+export default { createKit, listKits, getKit, getRecord, logCompost, markDispatched, listRecords };

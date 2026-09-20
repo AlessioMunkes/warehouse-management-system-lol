@@ -31,9 +31,17 @@
 -- commented out by default since there is no evidence this feature
 -- has any real production data yet.
 --
+-- dispatched_to WAS ADDED AFTER THE FIRST CORRECT VERSION SHIPPED.
+-- If you already ran that version, CREATE TABLE IF NOT EXISTS is a
+-- no-op for you and this column will not appear on its own — the
+-- ALTER TABLE just below the CREATE TABLE handles that case; it is
+-- also a no-op if the column is already there.
+--
 -- SAFE TO RUN AGAINST THE LIVE DATABASE.
 --   - CREATE TABLE IF NOT EXISTS: a no-op if these tables already
 --     exist in this shape.
+--   - The ALTER TABLE ADD COLUMN IF NOT EXISTS: a no-op if the column
+--     is already there.
 --   - The seed INSERTs are guarded to run only if collection_kits is
 --     currently EMPTY, so running this against a database that
 --     already has real kit data adds nothing and changes nothing.
@@ -71,10 +79,16 @@ CREATE TABLE IF NOT EXISTS collection_kit_records (
   status         VARCHAR(20)   NOT NULL DEFAULT 'logged'
                                CHECK (status IN ('logged', 'dispatched')),
   dispatched_at  TIMESTAMPTZ,
+  -- Which farmer or drop-off point the compost actually went to. Set
+  -- only alongside dispatched_at — logCompost.repository.js never
+  -- writes it, markDispatched always does.
+  dispatched_to  VARCHAR(150),
   notes          TEXT,
   logged_by      INTEGER       REFERENCES users(id),
   created_at     TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE collection_kit_records ADD COLUMN IF NOT EXISTS dispatched_to VARCHAR(150);
 
 CREATE INDEX IF NOT EXISTS idx_collection_kit_records_kit    ON collection_kit_records(kit_id);
 CREATE INDEX IF NOT EXISTS idx_collection_kit_records_status ON collection_kit_records(status);
@@ -96,23 +110,24 @@ SELECT * FROM (VALUES
 ) AS seed(owner_name, suburb, assigned_at)
 WHERE NOT EXISTS (SELECT 1 FROM collection_kits);
 
-INSERT INTO collection_kit_records (kit_id, kg_compost, logged_at, status, dispatched_at)
+INSERT INTO collection_kit_records (kit_id, kg_compost, logged_at, status, dispatched_at, dispatched_to)
 SELECT k.id, v.kg_compost, v.logged_at, v.status,
-       CASE WHEN v.status = 'dispatched' THEN (v.logged_at + 3)::timestamptz ELSE NULL END
+       CASE WHEN v.status = 'dispatched' THEN (v.logged_at + 3)::timestamptz ELSE NULL END,
+       CASE WHEN v.status = 'dispatched' THEN v.dispatched_to ELSE NULL END
   FROM collection_kits k
   JOIN (VALUES
-    ('Jane M.',   4.5::numeric,  DATE '2026-08-01', 'dispatched'),
-    ('Jane M.',   5.0::numeric,  DATE '2026-08-08', 'dispatched'),
-    ('Jane M.',   3.5::numeric,  DATE '2026-09-05', 'logged'),
-    ('Thabo N.',  6.0::numeric,  DATE '2026-08-02', 'dispatched'),
-    ('Thabo N.',  5.5::numeric,  DATE '2026-09-01', 'logged'),
-    ('Nomsa K.',  4.0::numeric,  DATE '2026-08-10', 'dispatched'),
-    ('Nomsa K.',  4.5::numeric,  DATE '2026-08-24', 'dispatched'),
-    ('Nomsa K.',  3.0::numeric,  DATE '2026-09-10', 'logged'),
-    ('Pieter V.', 7.0::numeric,  DATE '2026-08-15', 'dispatched'),
-    ('Ayesha P.', 5.5::numeric,  DATE '2026-08-20', 'logged'),
-    ('Ayesha P.', 6.5::numeric,  DATE '2026-09-12', 'logged')
-  ) AS v(owner_name, kg_compost, logged_at, status)
+    ('Jane M.',   4.5::numeric,  DATE '2026-08-01', 'dispatched', 'Voorbrug Farm'),
+    ('Jane M.',   5.0::numeric,  DATE '2026-08-08', 'dispatched', 'Voorbrug Farm'),
+    ('Jane M.',   3.5::numeric,  DATE '2026-09-05', 'logged',     NULL),
+    ('Thabo N.',  6.0::numeric,  DATE '2026-08-02', 'dispatched', 'Philippi Horticultural Area'),
+    ('Thabo N.',  5.5::numeric,  DATE '2026-09-01', 'logged',     NULL),
+    ('Nomsa K.',  4.0::numeric,  DATE '2026-08-10', 'dispatched', 'Voorbrug Farm'),
+    ('Nomsa K.',  4.5::numeric,  DATE '2026-08-24', 'dispatched', 'Philippi Horticultural Area'),
+    ('Nomsa K.',  3.0::numeric,  DATE '2026-09-10', 'logged',     NULL),
+    ('Pieter V.', 7.0::numeric,  DATE '2026-08-15', 'dispatched', 'Mitchells Plain Community Farm'),
+    ('Ayesha P.', 5.5::numeric,  DATE '2026-08-20', 'logged',     NULL),
+    ('Ayesha P.', 6.5::numeric,  DATE '2026-09-12', 'logged',     NULL)
+  ) AS v(owner_name, kg_compost, logged_at, status, dispatched_to)
     ON v.owner_name = k.owner_name
  WHERE NOT EXISTS (SELECT 1 FROM collection_kit_records);
 -- Sipho D. is left with no records — the "assigned, nothing logged

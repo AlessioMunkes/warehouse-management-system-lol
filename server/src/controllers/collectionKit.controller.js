@@ -54,7 +54,7 @@ const getKit = async (req, res) => {
   }
 };
 
-// GET /api/collection-kits/records?status=logged|dispatched
+// GET /api/collection-kits/records?status=logged|dispatched&search=
 const listRecords = async (req, res) => {
   try {
     const records = await kitService.listRecords(req.query);
@@ -62,6 +62,17 @@ const listRecords = async (req, res) => {
   } catch (err) {
     console.error('[listRecords]', err.message);
     send(res, err, 'Failed to load compost records.');
+  }
+};
+
+// GET /api/collection-kits/records/:recordId
+const getRecord = async (req, res) => {
+  try {
+    const record = await kitService.getRecord(req.params.recordId);
+    res.status(200).json({ success: true, data: record });
+  } catch (err) {
+    console.error('[getRecord]', err.message);
+    send(res, err, 'Failed to load this record.');
   }
 };
 
@@ -79,7 +90,7 @@ const logCompost = async (req, res) => {
 // PATCH /api/collection-kits/records/:recordId/dispatch
 const markDispatched = async (req, res) => {
   try {
-    const record = await kitService.markDispatched(req.params.recordId, req.user?.id);
+    const record = await kitService.markDispatched(req.params.recordId, req.body, req.user?.id);
     res.status(200).json({ success: true, data: record });
   } catch (err) {
     console.error('[markDispatched]', err.message);
@@ -87,4 +98,4 @@ const markDispatched = async (req, res) => {
   }
 };
 
-export default { createKit, listKits, getKit, listRecords, logCompost, markDispatched };
+export default { createKit, listKits, getKit, getRecord, listRecords, logCompost, markDispatched };

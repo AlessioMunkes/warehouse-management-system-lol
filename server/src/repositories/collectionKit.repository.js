@@ -131,7 +131,7 @@ const getKitById = async (id) => {
   if (!kit) return null;
 
   const { rows: records } = await pool.query(
-    `SELECT r.id, r.kg_compost, r.logged_at, r.status, r.dispatched_at, r.notes,
+    `SELECT r.id, r.kg_compost, r.logged_at, r.status, r.dispatched_at, r.dispatched_to, r.notes,
             u.first_name AS logged_by_name
        FROM collection_kit_records r
        LEFT JOIN users u ON u.id = r.logged_by
@@ -141,6 +141,24 @@ const getKitById = async (id) => {
   );
 
   return { ...kit, records };
+};
+
+// ── One record, with its owning kit's identity ───────────────────
+// The record-detail screen's fetch — same "open by id, refetch on
+// every visit" shape as getKitById, rather than trusting whatever
+// row shape a list screen happened to already hold in memory.
+const getRecordById = async (recordId) => {
+  const { rows } = await pool.query(
+    `SELECT r.id, r.kit_id, r.kg_compost, r.logged_at, r.status, r.dispatched_at, r.dispatched_to, r.notes,
+            k.owner_name, k.suburb,
+            u.first_name AS logged_by_name
+       FROM collection_kit_records r
+       JOIN collection_kits k ON k.id = r.kit_id
+       LEFT JOIN users u ON u.id = r.logged_by
+      WHERE r.id = $1`,
+    [recordId]
+  );
+  return rows[0] ?? null;
 };
 
 // ── Log a compost weigh-in against a kit ────────────────────────
@@ -188,7 +206,11 @@ const logCompost = async ({ kitId, kgCompost, loggedAt, notes, actorId }) => {
 // ── Mark one record dispatched ──────────────────────────────────
 // FOR UPDATE: two people dispatching the same record at once should
 // not both succeed — that compost only leaves the building once.
-const markDispatched = async ({ recordId, actorId }) => {
+// dispatchedTo names where it went (a farmer or a drop-off location)
+// — the one piece of the old "batching" idea worth keeping without
+// inventing a trip/batch record neither the data nor the workflow
+// supports: which record went where, not how much of a shared load.
+const markDispatched = async ({ recordId, actorId, dispatchedTo }) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -209,10 +231,10 @@ const markDispatched = async ({ recordId, actorId }) => {
 
     const { rows } = await client.query(
       `UPDATE collection_kit_records
-          SET status = 'dispatched', dispatched_at = NOW()
+          SET status = 'dispatched', dispatched_at = NOW(), dispatched_to = $2
         WHERE id = $1
-        RETURNING id, kit_id, kg_compost, logged_at, status, dispatched_at, notes`,
-      [recordId]
+        RETURNING id, kit_id, kg_compost, logged_at, status, dispatched_at, dispatched_to, notes`,
+      [recordId, dispatchedTo]
     );
     const record = rows[0];
 
@@ -239,15 +261,22 @@ const markDispatched = async ({ recordId, actorId }) => {
 // The main "what needs attention" view — not-yet-dispatched records
 // surface first, dispatched ones sink to the bottom, per the user's
 // own instruction. status filter narrows to one group when a screen
-// wants only history or only the outstanding queue.
-const listRecords = async ({ status = null, limit = 200 } = {}) => {
+// wants only history or only the outstanding queue. search matches
+// the owning kit's owner name or suburb — the same fields listKits
+// already searches, so both tabs find the same person by the same
+// typing.
+const listRecords = async ({ status = null, search = null, limit = 200 } = {}) => {
   const params = [];
   const where = [];
   if (status) { params.push(status); where.push(`r.status = $${params.length}`); }
+  if (search) {
+    params.push(`%${search}%`);
+    where.push(`(k.owner_name ILIKE $${params.length} OR k.suburb ILIKE $${params.length})`);
+  }
   params.push(limit);
 
   const { rows } = await pool.query(
-    `SELECT r.id, r.kit_id, r.kg_compost, r.logged_at, r.status, r.dispatched_at, r.notes,
+    `SELECT r.id, r.kit_id, r.kg_compost, r.logged_at, r.status, r.dispatched_at, r.dispatched_to, r.notes,
             k.owner_name, k.suburb,
             u.first_name AS logged_by_name
        FROM collection_kit_records r
@@ -262,5 +291,5 @@ const listRecords = async ({ status = null, limit = 200 } = {}) => {
 };
 
 export default {
-  createKit, listKits, getKitById, logCompost, markDispatched, listRecords,
+  createKit, listKits, getKitById, getRecordById, logCompost, markDispatched, listRecords,
 };

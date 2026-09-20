@@ -15,7 +15,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const service = {
-  createKit: vi.fn(), listKits: vi.fn(), getKit: vi.fn(),
+  createKit: vi.fn(), listKits: vi.fn(), getKit: vi.fn(), getRecord: vi.fn(),
   listRecords: vi.fn(), logCompost: vi.fn(), markDispatched: vi.fn(),
 };
 vi.mock('../src/services/collectionKit.service.js', () => ({ default: service }));

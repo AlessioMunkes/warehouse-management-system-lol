@@ -27,6 +27,9 @@ const STAFF_UP = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 router.get('/records',
   auth, requireRole(...STAFF_UP), kitController.listRecords);
 
+router.get('/records/:recordId',
+  auth, requireRole(...STAFF_UP), validateIntParam('recordId'), kitController.getRecord);
+
 router.patch('/records/:recordId/dispatch',
   auth, requireRole(...STAFF_UP), validateIntParam('recordId'), kitController.markDispatched);
 

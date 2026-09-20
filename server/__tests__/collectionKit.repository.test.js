@@ -95,7 +95,7 @@ describe('markDispatched', () => {
       },
     });
 
-    const result = await repo.markDispatched({ recordId: 999, actorId: 5 });
+    const result = await repo.markDispatched({ recordId: 999, actorId: 5, dispatchedTo: 'Voorbrug Farm' });
     expect(result).toEqual({ ok: false, code: 'record_not_found' });
     expect(client.calls.some((c) => c.sql === 'ROLLBACK')).toBe(true);
   });
@@ -108,26 +108,28 @@ describe('markDispatched', () => {
       },
     });
 
-    const result = await repo.markDispatched({ recordId: 10, actorId: 5 });
+    const result = await repo.markDispatched({ recordId: 10, actorId: 5, dispatchedTo: 'Voorbrug Farm' });
     expect(result).toEqual({ ok: false, code: 'already_dispatched' });
     expect(client.calls.some((c) => /^UPDATE collection_kit_records/i.test(c.sql))).toBe(false);
   });
 
-  it('sets status and dispatched_at, and writes an audit row', async () => {
+  it('sets status, dispatched_at and dispatched_to, and writes an audit row', async () => {
     client = makeClient({
       onQuery: (sql) => {
         if (/^SELECT id, status FROM collection_kit_records/i.test(sql)) return { rows: [{ id: 10, status: 'logged' }] };
         if (/^UPDATE collection_kit_records/i.test(sql)) {
-          return { rows: [{ id: 10, status: 'dispatched' }] };
+          return { rows: [{ id: 10, status: 'dispatched', dispatched_to: 'Voorbrug Farm' }] };
         }
         return { rows: [] };
       },
     });
 
-    const result = await repo.markDispatched({ recordId: 10, actorId: 5 });
-    expect(result).toEqual({ ok: true, record: { id: 10, status: 'dispatched' } });
+    const result = await repo.markDispatched({ recordId: 10, actorId: 5, dispatchedTo: 'Voorbrug Farm' });
+    expect(result).toEqual({ ok: true, record: { id: 10, status: 'dispatched', dispatched_to: 'Voorbrug Farm' } });
     const update = client.calls.find((c) => /^UPDATE collection_kit_records/i.test(c.sql));
     expect(update.sql).toMatch(/dispatched_at = NOW\(\)/);
+    expect(update.sql).toMatch(/dispatched_to = \$2/);
+    expect(update.params).toEqual([10, 'Voorbrug Farm']);
     const audit = client.calls.find((c) => /INSERT INTO audit_log/i.test(c.sql));
     expect(audit.params).toContain('dispatched');
   });
@@ -141,9 +143,24 @@ describe('markDispatched', () => {
       },
     });
 
-    await repo.markDispatched({ recordId: 10, actorId: 5 });
+    await repo.markDispatched({ recordId: 10, actorId: 5, dispatchedTo: 'Voorbrug Farm' });
     const select = client.calls.find((c) => /^SELECT id, status FROM collection_kit_records/i.test(c.sql));
     expect(select.sql).toMatch(/FOR UPDATE/);
+  });
+});
+
+describe('getRecordById', () => {
+  it('returns null when the record does not exist', async () => {
+    poolMock.query.mockResolvedValueOnce({ rows: [] });
+    await expect(repo.getRecordById(999)).resolves.toBeNull();
+  });
+
+  it('joins the owning kit for owner_name and suburb', async () => {
+    poolMock.query.mockResolvedValueOnce({ rows: [{ id: 10, kit_id: 1, owner_name: 'Jane M.' }] });
+    const record = await repo.getRecordById(10);
+    expect(record.owner_name).toBe('Jane M.');
+    const [sql] = poolMock.query.mock.calls[0];
+    expect(sql).toMatch(/JOIN collection_kits k ON k\.id = r\.kit_id/);
   });
 });
 
