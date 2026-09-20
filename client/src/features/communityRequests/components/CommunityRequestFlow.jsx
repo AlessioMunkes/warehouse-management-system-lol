@@ -20,6 +20,14 @@ import { useEffect, useState } from 'react';
 import communityRequestAPI, { RESOLVE_OUTCOMES, OUTCOME_LABELS } from '../../../services/communityRequestAPI';
 import CommunityRequestForm from './CommunityRequestForm';
 import { Notice, ChoiceList } from '../../staff/components/StepPrimitives';
+import ListTools, { NoMatches } from '../../staff/components/ListTools';
+import useListSearch from '../../staff/hooks/useListSearch';
+
+// Item and caller — matches the desktop table's own "Search by item or
+// caller name" (CommunityRequestsPage.jsx). Module level so its
+// identity is stable, same reasoning as every other *Text helper in
+// this codebase.
+const requestText = (r) => [r.itemsRequested, r.callerName].filter(Boolean).join(' ');
 
 const TABS = [
   { key: 'log',  label: 'Log a request' },
@@ -102,6 +110,7 @@ export default function CommunityRequestFlow({ onCrumbChange }) {
   const [resolveBusy, setResolveBusy] = useState(false);
   const [resolveError, setResolveError] = useState(null);
   const [reloadToken, setReloadToken] = useState(0);
+  const search = useListSearch(requests, requestText);
 
   useEffect(() => {
     onCrumbChange?.(tab === 'log' ? 'Log a request' : 'Open requests');
@@ -209,20 +218,40 @@ export default function CommunityRequestFlow({ onCrumbChange }) {
 
           {error ? <Notice tone="warn">{error}</Notice> : null}
 
+          {!loading && requests.length > 0 ? (
+            <ListTools
+              id="stf-cr-search"
+              query={search.query}
+              onQuery={search.setQuery}
+              placeholder="Search by item or caller name"
+            />
+          ) : null}
+
           {loading ? (
             <div className="stf-skeleton" aria-label="Loading" />
           ) : requests.length === 0 ? (
             <div className="stf-empty">
               Nothing open right now. Every request that's come in has been resolved.
             </div>
+          ) : search.filtered.length === 0 ? (
+            <NoMatches
+              query={search.query}
+              onClear={() => search.setQuery('')}
+              noun="requests"
+            />
           ) : (
             <div className="stf-list">
-              {requests.map((r) => (
+              {search.filtered.map((r) => (
                 <div key={r.id} className="stf-row is-static" style={{ flexWrap: 'wrap' }}>
                   <span className="stf-row-main">
                     <span className="stf-row-title">{r.callerName || 'Unnamed caller'}</span>
                     <span className="stf-row-meta">
-                      {r.itemsRequested} · {fmtDateTime(r.requestedAt)}
+                      {r.itemsRequested}
+                      {r.quantityNote ? ` · ${r.quantityNote}` : ''}
+                    </span>
+                    <span className="stf-row-meta">
+                      {fmtDateTime(r.requestedAt)}
+                      {r.callerContact ? ` · ${r.callerContact}` : ''}
                       {r.handledByName ? ` · Claimed by ${r.handledByName}` : ''}
                     </span>
                   </span>
