@@ -82,7 +82,7 @@ const runReport = async (input) => {
     series = await fn(spec);
   } catch (err) {
     if (err.code === '42P01') {
-      throw fail(503, `"${metric.label}" hasn't been set up yet — its database table doesn't exist. Run the pending migration for this feature.`);
+      throw fail(503, `"${metric.label}" hasn't been set up yet. Its database table doesn't exist yet: run the pending migration for this feature.`);
     }
     throw err;
   }

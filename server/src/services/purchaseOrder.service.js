@@ -88,7 +88,7 @@ const buildItems = (raw) => {
       throw fail(400, `Line ${position}: quantity must be a whole number above zero.`);
     }
     if (quantity > 1_000_000) {
-      throw fail(400, `Line ${position}: quantity looks like a typo — check it.`);
+      throw fail(400, `Line ${position}: quantity looks like a typo, check it.`);
     }
 
     // Optional and genuinely optional. Dry goods arrive in counted

@@ -6,9 +6,19 @@
 // ─────────────────────────────────────────────────────────────
 import kitService from '../services/collectionKit.service.js';
 
+// PASS_THROUGH matches reporting.controller.js's own convention: a
+// raw 500 hides its message because it might leak internals, but 503
+// (collection_kits/collection_kit_records not migrated yet — see
+// collectionKit.service.js's runOrMissingTable) is a deliberately
+// actionable message, not a fault to hide. Without this, the 503's
+// whole point — telling staff the table isn't set up yet instead of
+// a bare "Failed to load" — was silently thrown away.
+const PASS_THROUGH = new Set([502, 503, 504]);
+
 const send = (res, err, fallback) => {
   const status = err.status || 500;
-  res.status(status).json({ success: false, message: status < 500 ? err.message : fallback });
+  const showMessage = status < 500 || PASS_THROUGH.has(status);
+  res.status(status).json({ success: false, message: showMessage ? err.message : fallback });
 };
 
 // POST /api/collection-kits — assign a new kit to an owner

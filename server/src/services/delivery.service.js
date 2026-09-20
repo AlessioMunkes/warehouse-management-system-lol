@@ -265,7 +265,7 @@ const createDelivery = async (data, userId) => {
     const variance = received - expected;
 
     if (variance !== 0 && !String(line.discrepancyReason || '').trim()) {
-      fail(400, `A reason is required for ${po.product_name} — received ${received}, expected ${expected}.`);
+      fail(400, `A reason is required for ${po.product_name}: received ${received}, expected ${expected}.`);
     }
     if (variance !== 0) hasDiscrepancy = true;
 
@@ -291,7 +291,7 @@ const createDelivery = async (data, userId) => {
     if (po.is_perishable) {
       const raw = String(line.expiryDate || '').trim();
       if (!raw) {
-        fail(400, `A use-by date is required for ${po.product_name} — it is a perishable product.`);
+        fail(400, `A use-by date is required for ${po.product_name}, a perishable product.`);
       }
       if (!/^\d{4}-\d{2}-\d{2}$/.test(raw) || Number.isNaN(Date.parse(raw))) {
         fail(400, `Use-by date for ${po.product_name} must be a calendar date (YYYY-MM-DD).`);

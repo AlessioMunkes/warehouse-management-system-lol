@@ -221,7 +221,7 @@ const listProspects = async ({ status } = {}) => {
 // can type in is a lead that ends up on a Post-it.
 const addProspect = async (body, userId) => {
   const name = clean(body?.name);
-  if (!name) throw fail(400, 'A name is required — everything else can wait.');
+  if (!name) throw fail(400, 'A name is required. Everything else can wait.');
   if (name.length > 200) throw fail(400, 'Name must be 200 characters or fewer.');
 
   return repo.insertProspect({
@@ -279,7 +279,7 @@ const removeProspect = async (rawId) => {
   const existing = await repo.getProspectById(id);
   if (!existing) throw fail(404, 'Prospect not found.');
   if (existing.status === 'converted') {
-    throw fail(409, 'A converted prospect cannot be deleted — it is the record of where this supplier came from.');
+    throw fail(409, 'A converted prospect cannot be deleted. It is the record of where this supplier came from.');
   }
   await repo.deleteProspect(id);
   return { id, deleted: true };

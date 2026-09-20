@@ -51,7 +51,7 @@ const runOrMissingTable = async (fn) => {
     return await fn();
   } catch (err) {
     if (err.code === '42P01') {
-      fail(503, 'Feed the Soil kit tracking hasn\'t been set up yet — its database tables don\'t exist. Run the pending migration for this feature.');
+      fail(503, 'Feed the Soil kit tracking hasn\'t been set up yet. Its database tables don\'t exist yet: run the pending migration for this feature.');
     }
     throw err;
   }
