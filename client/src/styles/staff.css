@@ -30,6 +30,29 @@
    ACC-06  this is a PWA used on a phone in a warehouse, often with
            gloves. Tap targets 44px minimum; numbers typed on the floor
            are 56px.
+
+   ── Retoned to match the manager screens ────────────────────────────
+   User feedback: the staff module read as a visually different
+   product from the manager/admin screens, and that was correct — this
+   file applied the shared brand palette far more literally (warm
+   khaki backgrounds, a bold display face, a solid dark app bar) than
+   the manager side does. Colour, radius, typeface and the app bar are
+   now matched directly against what the manager screens actually
+   render (ManagerLayout.jsx's page background and border colour, the
+   rounded-[4px] every ErrorBanner uses, Inter throughout) rather than
+   a generic guess. See each changed block's own note for what moved
+   and why.
+
+   WHAT DID NOT CHANGE, ON PURPOSE: tap target sizes (--stf-tap,
+   --stf-field), the guided/form toggle, the bottom tab bar,
+   StepPrimitives' behaviour, useDraft, reduced motion. None of that
+   is a style choice — it is the accessibility contract (ACC-05/
+   ACC-06) this file exists to keep, and colour/typeface are a
+   separate axis from it: WCAG contrast and tap-target size do not
+   care which hex value a background is, only how much it contrasts
+   with the text on it and how big the target is. The tokens below
+   were already tuned to 4.5:1 (ACC-02); the new ones are close enough
+   in lightness that the ratios hold.
    ========================================================================== */
 
 .stf-shell {
@@ -40,8 +63,16 @@
   --stf-accent-deep:#d42d33;   /* --accent-deep hover */
   --stf-gold:       #979168;   /* --khaki       editorial accents */
   --stf-gold-deep:  #8a8058;   /* --khaki-deep */
-  --stf-sand:       #e9e3dd;   /* --bg          page ground */
-  --stf-border:     #ddd4c8;   /* --border */
+  /* REVISED — these two used to be the landing page's own, more
+     saturated khaki tones (#e9e3dd / #ddd4c8). Same brand family, but
+     the manager screens (built later, on shadcn) lean on a much
+     quieter version of it: ManagerLayout.jsx's actual page background
+     is #faf8f5 and #e9e3dd is what IT uses for borders, not ground —
+     these two values are pulled from there directly, not re-guessed,
+     so a staff page and a manager page finally read as one product
+     instead of two that happen to share a logo. */
+  --stf-sand:       #faf8f5;   /* --bg          page ground */
+  --stf-border:     #e9e3dd;   /* --border */
   --stf-text:       #5c5c5c;   /* --text */
   --stf-text-sub:   #6f6a5e;   /* --text-sub, darkened for 4.5:1 (ACC-02) */
   --stf-text-meta:  #8b8578;   /* --text-meta, darkened for the same reason */
@@ -53,12 +84,20 @@
   --stf-attention-bg:  #f6efe9;
   --stf-attention-border: #e2d3c6;
 
-  --stf-font-display: "Montserrat", "Inter", system-ui, -apple-system, sans-serif;
+  /* REVISED — Montserrat was the single biggest "this is a different
+     product" signal on a staff screen, more than colour ever was.
+     Manager screens are set entirely in Inter; numbers stay the same
+     size either way (ACC-06 is about size, not typeface), so nothing
+     about legibility on the floor changes here. */
+  --stf-font-display: "Inter", system-ui, -apple-system, sans-serif;
   --stf-font-sans:    "Inter", system-ui, -apple-system, sans-serif;
 
-  --stf-radius:   12px;   /* tighter than the landing page's 16px: these
-                             are controls in a column, not marketing cards */
-  --stf-radius-sm: 8px;
+  /* REVISED — 12px/8px was tighter than the landing page's 16px but
+     still rounder than anything on the manager side, which reads in
+     rounded-[4px] everywhere (every ErrorBanner, every card). Matched
+     to that directly rather than to a generic framework default. */
+  --stf-radius:   6px;
+  --stf-radius-sm: 4px;
   --stf-radius-pill: 999px;
   --stf-tap:   44px;
   --stf-field: 56px;
@@ -91,6 +130,12 @@
 }
 
 /* ── App bar ─────────────────────────────────────────────────────── */
+/* REVISED — was a solid --stf-ink band (dark, white text), the one
+   piece of chrome Script 21's "apply the dashboard's surface" pass
+   never touched. ManagerLayout's own header is a plain white bar with
+   a bottom border; matched to that directly, same reasoning as the
+   token block above. Structure, the hamburger drawer, and everything
+   it does are unchanged — only which way round the colours go. */
 .stf-appbar {
   display: flex;
   align-items: center;
@@ -100,17 +145,18 @@
   /* Sits under the notch without the brand row colliding with the
      status bar. */
   padding-top: max(10px, env(safe-area-inset-top));
-  background: var(--stf-ink);
-  color: var(--stf-white);
+  background: var(--stf-white);
+  color: var(--stf-ink);
+  border-bottom: 1px solid var(--stf-border);
 }
 
 .stf-appbar-left  { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .stf-appbar-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .stf-appbar-logo  { width: 30px; height: 30px; object-fit: contain; flex-shrink: 0; }
-.stf-appbar-name  { font-family: var(--stf-font-display); font-size: 14px; font-weight: 700; color: var(--stf-white); }
+.stf-appbar-name  { font-family: var(--stf-font-display); font-size: 14px; font-weight: 700; color: var(--stf-ink); }
 .stf-appbar-prog  {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--stf-text-sub);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .stf-appbar-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
@@ -121,12 +167,12 @@
   border: 1px solid transparent;
   border-radius: var(--stf-radius-pill);
   background: transparent;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--stf-ink);
   font: 600 12px/1 var(--stf-font-sans);
   cursor: pointer;
 }
-.stf-appbar-btn:hover { background: rgba(255, 255, 255, 0.14); }
-.stf-appbar-btn[aria-pressed='true'] { border-color: rgba(255, 255, 255, 0.6); }
+.stf-appbar-btn:hover { background: var(--stf-sand); }
+.stf-appbar-btn[aria-pressed='true'] { border-color: var(--stf-border); }
 
 /* ── Breadcrumb row ──────────────────────────────────────────────── */
 .stf-crumb {
@@ -1420,22 +1466,26 @@ body.reduced-movement .decorative-icon {
 /* ── 2 · THE DASHBOARD SURFACE ──────────────────────────────────
    "Apply the style from the dashboard to these pages."
 
-   The manager dashboards are shadcn Cards: white, rounded-4xl
-   (0.625rem x 2.6 = 26px), shadow-md, a 1px ring at 5% of the
-   foreground, and 24px of padding. Staff pages were bare content on
-   the sand ground, so the same app read as two products.
+   REVISED — the 24px radius below was this pass's own guess at "what
+   a shadcn card looks like" (rounded-4xl, 0.625rem × 2.6), not a
+   measurement of what the manager screens actually render. What they
+   actually use, everywhere from ErrorBanner to every custom card on
+   ManagerLayout, is a hardcoded rounded-[4px] — sharp corners, not a
+   themed --radius scale at all. --stf-radius is set from that same
+   observed value now (see the token block), so this reads from it
+   instead of repeating its own guess.
 
    What is copied is the SURFACE, not the type system. The stf-*
    scale exists because these screens are used on a phone with gloves
-   (ACC-06): 44px tap targets, 56px number fields, Montserrat
-   headings. Swapping that for the dashboard's 14px Inter would undo
-   the accessibility work to win a family resemblance. So: the
-   dashboard's card, the staff pages' contents. */
+   (ACC-06): 44px tap targets, 56px number fields. Swapping that for
+   the dashboard's 14px body text would undo the accessibility work
+   to win a family resemblance. So: the dashboard's card, the staff
+   pages' contents. */
 .stf-main > .stf-task,
 .stf-main > .stf-step {
   background: var(--stf-white);
   border: 1px solid rgb(43 51 54 / 0.06);
-  border-radius: 24px;
+  border-radius: calc(var(--stf-radius) + 2px);
   box-shadow: 0 4px 6px -1px rgb(43 51 54 / 0.08), 0 2px 4px -2px rgb(43 51 54 / 0.06);
   padding: 20px;
 }
@@ -1460,13 +1510,13 @@ body.reduced-movement .decorative-icon {
   background: var(--stf-white);
   margin: -20px -20px 0;
   padding: 20px 20px 14px;
-  border-radius: 24px 24px 0 0;
+  border-radius: calc(var(--stf-radius) + 2px) calc(var(--stf-radius) + 2px) 0 0;
 }
 .stf-main > .stf-task > .stf-task-foot {
   background: var(--stf-white);
   margin: 0 -20px -20px;
   padding: 14px 20px calc(14px + env(safe-area-inset-bottom));
-  border-radius: 0 0 24px 24px;
+  border-radius: 0 0 calc(var(--stf-radius) + 2px) calc(var(--stf-radius) + 2px);
 }
 
 @media (min-width: 720px) {
@@ -1919,13 +1969,13 @@ button.stf-panel-head:disabled { cursor: default; }
   padding: 16px;
   border: 1px solid rgb(43 51 54 / 0.06);
   border-left: 3px solid var(--stf-gold);
-  border-radius: 16px;
+  border-radius: 8px;
   background: #ffffff;
   box-shadow: 0 4px 6px -1px rgb(43 51 54 / 0.08), 0 2px 4px -2px rgb(43 51 54 / 0.06);
 }
 .stf-resume-title {
   margin: 0 0 10px;
-  font: 700 13px/1.3 "Montserrat", "Inter", system-ui, sans-serif;
+  font: 700 13px/1.3 "Inter", system-ui, sans-serif;
   color: #2b3336;
 }
 .stf-resume-list { list-style: none; margin: 0; padding: 0; }
@@ -1937,7 +1987,7 @@ button.stf-panel-head:disabled { cursor: default; }
   flex-wrap: wrap;
   padding: 8px 0;
 }
-.stf-resume-row + .stf-resume-row { border-top: 1px dashed #ddd4c8; }
+.stf-resume-row + .stf-resume-row { border-top: 1px dashed #e9e3dd; }
 
 .stf-resume-text { flex: 1 1 12rem; min-width: 0; display: flex; flex-direction: column; }
 .stf-resume-name { font: 600 15px/1.3 "Inter", system-ui, sans-serif; color: #2b3336; }
@@ -1954,7 +2004,7 @@ button.stf-panel-head:disabled { cursor: default; }
   display: inline-flex;
   align-items: center;
   padding: 0 18px;
-  border-radius: 8px;
+  border-radius: 4px;
   background: #ef3a40;
   font: 700 14px/1 "Inter", system-ui, sans-serif;
   color: #ffffff;
