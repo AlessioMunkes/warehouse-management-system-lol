@@ -189,6 +189,26 @@
   text-align: right;
 }
 
+/* Restores the letterhead (logo + warehouse address) the PdfShell
+   rewrite of DeliveryNotePDF/DispatchNotePDF dropped: the classes
+   moved from deliveryNotePDF.css into this file but pdf-doc-logo and
+   the address line were left behind, so a document that used to have
+   one printed without it. Sized for this file's own 26px title, not
+   deliveryNotePDF.css's 40px one — the two headers aren't the same
+   scale, so its 120px logo box would overpower this one. */
+.pdf-doc-header-right { display: flex; align-items: flex-start; gap: 14px; }
+
+.pdf-doc-logo {
+  max-height: 52px;
+  max-width: 100px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.pdf-doc-address { margin: 6px 0 0; font-size: 10px; line-height: 1.5; color: #676767; }
+
 /* ── Status banner ────────────────────────────────────────── */
 .pdf-status-banner {
   margin: 18px 0;

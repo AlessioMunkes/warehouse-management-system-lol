@@ -20,11 +20,26 @@
 //
 // The modal chrome and jsPDF export moved to features/receipts/
 // components/PdfShell.jsx, which the dispatch note shares.
+//
+// The letterhead (logo + warehouse address) moved with it and was
+// left out of the new header — restored below, same asset and
+// address deliveryNotePDF.css's older template used.
 // ─────────────────────────────────────────────────────────────
 import PdfShell from '../../receipts/components/PdfShell';
 import {
   formatDate, formatDateTime, fmtQty, variance, qty,
 } from '../../receipts/components/noteFormat';
+
+// A public asset, not an import — same convention StaffShell.jsx uses
+// for /images/BatchesLogo.png. Lives in client/public/images/.
+const PDF_LOGO_URL = '/images/pdf_logo.png';
+
+// Hardcoded to the one warehouse this app currently operates against.
+// A real multi-warehouse setup (a warehouses table, tracking which
+// location the signed-in session belongs to) would replace this with
+// a lookup — worth doing once there's more than one warehouse to pick
+// between, not before.
+const WAREHOUSE_ADDRESS = ['Unit 4, Hewett Park', '17 Hewett Ave, Epping', 'Cape Town, 7460'];
 
 // The PO states that mean nothing further is expected. 'received' is not
 // one of them — it is not in purchase_orders_status_check at all. See
@@ -57,14 +72,19 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
         <div>
           <h1 className="pdf-doc-title">DELIVERY NOTE</h1>
           <p className="pdf-doc-subtitle">Ladles of Love · Nourish Our Children</p>
-          <p className="pdf-doc-subtitle">Warehouse Management System</p>
+          {WAREHOUSE_ADDRESS.map((line) => (
+            <p key={line} className="pdf-doc-address">{line}</p>
+          ))}
         </div>
-        <div>
-          <p className="pdf-doc-id-label">Record number</p>
-          <p className="pdf-doc-id">#{String(delivery.id).padStart(4, '0')}</p>
-          <p className="pdf-doc-id-label pdf-doc-id-label--spaced">
-            Recorded: {formatDateTime(delivery.created_at)}
-          </p>
+        <div className="pdf-doc-header-right">
+          <img src={PDF_LOGO_URL} alt="" className="pdf-doc-logo" aria-hidden="true" />
+          <div>
+            <p className="pdf-doc-id-label">Record number</p>
+            <p className="pdf-doc-id">#{String(delivery.id).padStart(4, '0')}</p>
+            <p className="pdf-doc-id-label pdf-doc-id-label--spaced">
+              Recorded: {formatDateTime(delivery.created_at)}
+            </p>
+          </div>
         </div>
       </div>
 

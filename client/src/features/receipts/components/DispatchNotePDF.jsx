@@ -20,12 +20,20 @@
 // beneficiary on that date and cohort in one document. This is the
 // per-collection receipt. The run-level document is a separate
 // endpoint (/api/dispatch/runs/:date) and is not built yet.
+//
+// The letterhead (logo + warehouse address) DeliveryNotePDF used to
+// carry over from deliveryNotePDF.css's older template was never
+// added here when this note moved to PdfShell — restored below, same
+// asset and address DeliveryNotePDF.jsx uses.
 // ─────────────────────────────────────────────────────────────
 import PdfShell from './PdfShell';
 import {
   formatDate, formatDateTime, fmtQty, variance, qty,
   DISPATCH_STATUS_LABEL, BENEFICIARY_LABEL,
 } from './noteFormat';
+
+const PDF_LOGO_URL = '/images/pdf_logo.png';
+const WAREHOUSE_ADDRESS = ['Unit 4, Hewett Park', '17 Hewett Ave, Epping', 'Cape Town, 7460'];
 
 const COLLECTED = ['collected', 'late_collected'];
 
@@ -55,15 +63,21 @@ const DispatchNotePDF = ({ note, onClose }) => {
           <h1 className="pdf-doc-title">DISPATCH NOTE</h1>
           <p className="pdf-doc-subtitle">Ladles of Love · Nourish Our Children</p>
           <p className="pdf-doc-subtitle">Proof of collection</p>
+          {WAREHOUSE_ADDRESS.map((line) => (
+            <p key={line} className="pdf-doc-address">{line}</p>
+          ))}
         </div>
-        <div>
-          <p className="pdf-doc-id-label">Record number</p>
-          <p className="pdf-doc-id">#{String(note.id).padStart(4, '0')}</p>
-          <p className="pdf-doc-id-label pdf-doc-id-label--spaced">
-            {wasCollected
-              ? `Collected: ${formatDateTime(note.collected_at)}`
-              : `Flagged: ${formatDateTime(note.flagged_at)}`}
-          </p>
+        <div className="pdf-doc-header-right">
+          <img src={PDF_LOGO_URL} alt="" className="pdf-doc-logo" aria-hidden="true" />
+          <div>
+            <p className="pdf-doc-id-label">Record number</p>
+            <p className="pdf-doc-id">#{String(note.id).padStart(4, '0')}</p>
+            <p className="pdf-doc-id-label pdf-doc-id-label--spaced">
+              {wasCollected
+                ? `Collected: ${formatDateTime(note.collected_at)}`
+                : `Flagged: ${formatDateTime(note.flagged_at)}`}
+            </p>
+          </div>
         </div>
       </div>
 
