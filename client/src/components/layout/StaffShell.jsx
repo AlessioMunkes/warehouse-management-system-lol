@@ -37,6 +37,12 @@ const BANNER_URL = '/images/banner-doodles.png';
 export default function StaffShell({
   crumb,          // 'Receiving' or 'Packing / Little Stars ECD'
   meta,           // right-hand line: a date, a reference, a count
+  // { step, total } — a numbered step flow's progress, shown in the
+  // crumb row (see .stf-crumb-progress). Was its own StepRail block
+  // rendered inside the card by each flow; moved up here so the
+  // breadcrumb, progress and History share one row instead of three
+  // stacked ones. Omit entirely for a page with no steps.
+  progress,
   onBack,         // omit for a task's first screen
   backLabel = 'Back',
   // The task flows are a single phone-width column. The week planner
@@ -119,6 +125,26 @@ export default function StaffShell({
         ) : (
           <span>{crumb}</span>
         )}
+        {progress ? (
+          <div
+            className="stf-crumb-progress"
+            role="progressbar"
+            aria-valuemin={1}
+            aria-valuemax={progress.total}
+            aria-valuenow={progress.step}
+            aria-label={`Step ${progress.step} of ${progress.total}`}
+          >
+            <span className="stf-crumb-progress-bars">
+              {Array.from({ length: progress.total }, (_, i) => (
+                <span
+                  key={i}
+                  className={`stf-crumb-progress-bar${i < progress.step ? ' is-done' : ''}`}
+                />
+              ))}
+            </span>
+            <span className="stf-crumb-progress-label">Step {progress.step} of {progress.total}</span>
+          </div>
+        ) : null}
         <span style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {actions}
           {meta ? <span className="stf-crumb-meta">{meta}</span> : null}

@@ -21,7 +21,7 @@
 // ───────────────────────────────────────────────────────────
 import { useEffect, useRef } from 'react';
 
-export default function TaskPage({ title, sub, children, side, actions, note }) {
+export default function TaskPage({ title, sub, toggle, children, side, actions, note }) {
   const headingRef = useRef(null);
 
   // Same reason StepScreen does it: the heading changes when the task
@@ -34,6 +34,10 @@ export default function TaskPage({ title, sub, children, side, actions, note }) 
   return (
     <section className="stf-task">
       <header className="stf-task-head">
+        {/* Same mode toggle as StepScreen's — see .stf-card-toggle in
+            staff.css. Part of the sticky head here, so it stays with
+            the title rather than needing its own sticky coordination. */}
+        {toggle ? <div className="stf-card-toggle">{toggle}</div> : null}
         <h1 className="stf-task-title" ref={headingRef} tabIndex={-1}>{title}</h1>
         {sub ? <p className="stf-task-sub">{sub}</p> : null}
       </header>

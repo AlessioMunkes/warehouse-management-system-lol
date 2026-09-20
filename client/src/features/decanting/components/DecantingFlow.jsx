@@ -59,7 +59,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useState } from 'react';
 import {
-  StepRail, StepScreen, Actions, Button, NumberField, SelectField, Notice,
+  StepScreen, Actions, Button, NumberField, SelectField, Notice,
   KeyValues, ViewToggle, Coachmark,
 } from '../../staff/components/StepPrimitives';
 import useCoachmark from '../../staff/hooks/useCoachmark';
@@ -215,7 +215,13 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
   // just a screen later than the others.
   const showToggle = phase !== 'done';
 
-  useEffect(() => { onCrumbChange?.(step.label); }, [step.label, onCrumbChange]);
+  useEffect(() => {
+    onCrumbChange?.({
+      label: step.label,
+      step: phase === 'done' ? null : step.n,
+      total: phase === 'done' ? null : TOTAL_STEPS,
+    });
+  }, [step.label, step.n, phase, onCrumbChange]);
 
   useEffect(() => {
     if (!showCoachmark || !showToggle) return undefined;
@@ -357,19 +363,18 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
     </Actions>
   );
 
+  // Same as ReceivingFlow's own toggleControl — see that file's note.
+  const toggleControl = showToggle ? (
+    <>
+      <ViewToggle options={MODES} value={mode} onChange={handleModeChange} />
+      <Coachmark show={showCoachmark} onDismiss={dismissCoachmark}>
+        Tap here to switch view
+      </Coachmark>
+    </>
+  ) : null;
+
   return (
     <>
-      {showToggle ? (
-        <div className="stf-toggle-anchor">
-          <ViewToggle options={MODES} value={mode} onChange={handleModeChange} />
-          <Coachmark show={showCoachmark} onDismiss={dismissCoachmark}>
-            Tap here to switch view
-          </Coachmark>
-        </div>
-      ) : null}
-
-      {phase !== 'done' ? <StepRail step={step.n} total={TOTAL_STEPS} label={step.label} /> : null}
-
       {error ? <Notice tone="warn">{error}</Notice> : null}
 
       {/* ── 1 · Which sack ─────────────────────────────────── */}
@@ -377,6 +382,7 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
         <StepScreen
           title="What are you decanting?"
           sub="Pick the sack in front of you."
+          toggle={toggleControl}
           actions={
             <Actions>
               <Button disabled={!productId} onClick={() => setPhase('work')}>Next</Button>
@@ -437,6 +443,7 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
         <TaskPage
           title={product ? product.name : 'Decanting'}
           sub="Weigh the sack, fill the bags it works out to, then say what you actually got."
+          toggle={toggleControl}
           note={blockedNote}
           actions={commit}
           side={

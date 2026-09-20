@@ -33,7 +33,11 @@
 
    ── Two rules the layouts are built on ────────────────────────────────
    ACC-05  a multi-step task is sequential screens, one decision each.
-           .stf-rail is the indicator, kept deliberately quiet.
+           .stf-crumb-progress is the indicator for Receiving/Decanting/
+           Dispatch (kept deliberately quiet, in the crumb row rather
+           than its own block — see that class's own note); Donation
+           Intake's own rail (DonationRail.jsx) still uses .stf-rail
+           directly.
    ACC-06  this is a PWA used on a phone in a warehouse, often with
            gloves. Tap targets 44px minimum; numbers typed on the floor
            are 56px.
@@ -215,11 +219,16 @@
 .stf-appbar-btn[aria-pressed='true'] { border-color: var(--stf-border); }
 
 /* ── Breadcrumb row ──────────────────────────────────────────────── */
+/* flex-wrap added for .stf-crumb-progress: a third group (breadcrumb,
+   progress, actions) still lays out fine with space-between on a
+   normal-width screen, but wraps rather than crushing on a narrow one
+   instead of the row simply not fitting. */
 .stf-crumb {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 8px 12px;
   padding: 8px 16px;
   border-bottom: 1px solid var(--stf-border);
   background: var(--stf-white);
@@ -254,6 +263,28 @@
 }
 .stf-crumb-link:hover { color: var(--stf-accent-deep); }
 .stf-crumb-link i { font-size: 14px; }
+
+/* Step progress, now living in the crumb row instead of its own
+   StepRail block inside the card — "above it, a slim step strip
+   carries breadcrumb, progress and History on one 56px row." Replaces
+   StepRail's stacked bars-then-label layout: the label is redundant
+   here (the crumb text already names the step — "Receiving / Which
+   delivery"), so only the bars and the "Step X of Y" count remain. */
+.stf-crumb-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.stf-crumb-progress-bars { display: flex; gap: 4px; }
+.stf-crumb-progress-bar {
+  width: 20px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--stf-border);
+}
+.stf-crumb-progress-bar.is-done { background: var(--stf-accent); }
+.stf-crumb-progress-label { font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* The single column every task page lays out in. Same column on a phone
    and on a bench tablet — the tablet gets more air, not a denser layout
@@ -729,12 +760,22 @@
    works for two equal-width segments, which forced the whole control
    to stretch to make that true). The thumb's width and position come
    from JS measuring the real button (see ViewToggle in
-   StepPrimitives.jsx) — CSS here only draws it. */
+   StepPrimitives.jsx) — CSS here only draws it.
+
+   REVISED — pill and hint used to stack (hint below, left-aligned
+   under the pill). Now that ViewToggle only ever renders inside
+   .stf-card-toggle (see below), the hint IS that control's own
+   description sitting right beside it, same row — "The mode toggle
+   is a property of the form... the caption becomes that control's
+   description instead of a floating line of text." A stacked layout
+   read fine floating alone above the card; inline is what reads as
+   one control with a caption once it's a row inside the card's own
+   header. */
 .stf-toggle-block {
   display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
 }
 .stf-toggle {
   position: relative;
@@ -760,24 +801,32 @@
   z-index: 0;
 }
 
-/* One line naming whichever option is currently active, left-aligned
-   under the (now content-sized) pill. Not a title-attribute tooltip:
-   this is read with a thumb, not a mouse, and title never shows on a
-   tap. */
+/* One line naming whichever option is currently active, beside the
+   (content-sized) pill rather than under it — see .stf-toggle-block's
+   own note above. Not a title-attribute tooltip: this is read with a
+   thumb, not a mouse, and title never shows on a tap. */
 .stf-toggle-hint { margin: 0; font-size: 12px; color: var(--stf-text-sub); }
 
-/* ── Coachmark (first-run nudge toward the view toggle) ───────────
-   Anchored to whatever wraps the toggle (.stf-toggle-anchor gives it
-   position: relative), not fixed to the viewport — it only ever
-   needs to point at one control, right below it. */
-.stf-toggle-anchor {
+/* ── Card toggle row ───────────────────────────────────────────────
+   The mode toggle's own header strip inside a step card (StepScreen's
+   .stf-step-head, TaskPage's .stf-task-head) — was a lone floating
+   block (.stf-toggle-anchor) sitting above the card in .stf-main's own
+   flex column, right-aligned, with a StepRail progress bar rendered
+   BELOW it: three separate chrome rows before any actual content.
+   "the mode toggle is a property of the form, not of the app, so it
+   moves onto the card's own top edge where it has an obvious owner" —
+   the toggle is now the first thing inside whichever card is showing,
+   and the breadcrumb row carries the step progress instead (see
+   StaffShell's own .stf-crumb-progress).
+
+   position: relative is still what anchors the Coachmark — same job
+   .stf-toggle-anchor did, just on the row that now actually owns the
+   toggle. */
+.stf-card-toggle {
   position: relative;
-  /* .stf-main is a flex column; a direct child stretches to its full
-     width by default. This is the actual direct child (ViewToggle's
-     own .stf-toggle-block sits inside it), so the override belongs
-     here, not one level down. Right-aligned to match the booking.com
-     reference this control was modelled on. */
-  align-self: flex-end;
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--stf-border);
 }
 .stf-coachmark {
   position: absolute;

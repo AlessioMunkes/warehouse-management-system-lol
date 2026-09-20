@@ -32,7 +32,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useState } from 'react';
 import {
-  StepRail, StepScreen, Actions, Button, TextField, Notice, KeyValues,
+  StepScreen, Actions, Button, TextField, Notice, KeyValues,
   ViewToggle, Coachmark,
 } from '../../staff/components/StepPrimitives';
 import TaskPage from '../../staff/components/TaskPage';
@@ -94,7 +94,7 @@ const STEP_META = {
 const varianceReasonFor = (variance) =>
   variance === 0 ? null : variance < 0 ? 'Short count at dispatch' : 'Over count at dispatch';
 
-export default function PalletCheck({ palletId, onBack, onCollected }) {
+export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChange }) {
   const { user } = useAuth();
 
   const [gateView, setGateView] = useState(null);
@@ -198,6 +198,18 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
   // a Guided/Form choice at all — this one was there the whole time,
   // just a screen later than the others.
   const showToggle = phase !== 'done';
+
+  // DispatchPage never had this wired up at all before — its crumb was
+  // a static "Dispatch / this pallet" regardless of phase. Same
+  // pattern ReceivingFlow/DecantingFlow already report through:
+  // step/total omitted (no progress bar) once the collection is done.
+  useEffect(() => {
+    onCrumbChange?.({
+      label: step.label,
+      step: phase === 'done' ? null : step.n,
+      total: phase === 'done' ? null : TOTAL_STEPS,
+    });
+  }, [step.label, step.n, phase, onCrumbChange]);
   const eligibility = gateView?.eligibility || {};
 
   // Only lines that were actually packed can be loaded — the same
@@ -350,19 +362,18 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
     </Actions>
   );
 
+  // Same as ReceivingFlow's own toggleControl — see that file's note.
+  const toggleControl = showToggle ? (
+    <>
+      <ViewToggle options={MODES} value={mode} onChange={handleModeChange} />
+      <Coachmark show={showCoachmark} onDismiss={dismissCoachmark}>
+        Tap here to switch view
+      </Coachmark>
+    </>
+  ) : null;
+
   return (
     <>
-      {showToggle ? (
-        <div className="stf-toggle-anchor">
-          <ViewToggle options={MODES} value={mode} onChange={handleModeChange} />
-          <Coachmark show={showCoachmark} onDismiss={dismissCoachmark}>
-            Tap here to switch view
-          </Coachmark>
-        </div>
-      ) : null}
-
-      {phase !== 'done' ? <StepRail step={step.n} total={TOTAL_STEPS} label={step.label} /> : null}
-
       {error ? <Notice tone="warn">{error}</Notice> : null}
 
       {/* ── 1 · Which pallet ───────────────────────────────── */}
@@ -370,6 +381,7 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
         <StepScreen
           title={gateView.ecd_name}
           sub={gateView.pallet_ref ? `Pallet ${gateView.pallet_ref}` : 'Check the pallet before you release it.'}
+          toggle={toggleControl}
           actions={
             <Actions>
               <Button disabled={!canStart} onClick={startCollection}>Start the collection</Button>
@@ -439,6 +451,7 @@ export default function PalletCheck({ palletId, onBack, onCollected }) {
         <TaskPage
           title={gateView.ecd_name}
           sub="Check every line, then take the driver's name and signature."
+          toggle={toggleControl}
           note={blockedNote}
           actions={commit}
           side={

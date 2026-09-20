@@ -269,20 +269,22 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
   return (
     <section className="stf-step">
       <div className="stf-step-head">
+        {/* Same .stf-card-toggle treatment StepScreen/TaskPage give the
+            toggle now — this flow hand-rolls its own card instead of
+            using StepScreen, so the same markup goes here directly. */}
+        {canEdit && !locked && items.length > 0 ? (
+          <div className="stf-card-toggle">
+            <ViewToggle options={MODES} value={mode} onChange={handleModeChange} />
+            <Coachmark show={showCoachmark} onDismiss={dismissCoachmark}>
+              Tap here to switch view
+            </Coachmark>
+          </div>
+        ) : null}
         <h1 className="stf-step-title" tabIndex={-1}>{slip.ecd_name}</h1>
         <p className="stf-step-sub">
           {COHORT_LABELS[slip.cohort] || slip.cohort} · {slip.child_count} children · Take the oldest batch first.
         </p>
       </div>
-
-      {canEdit && !locked && items.length > 0 ? (
-        <div className="stf-toggle-anchor">
-          <ViewToggle options={MODES} value={mode} onChange={handleModeChange} />
-          <Coachmark show={showCoachmark} onDismiss={dismissCoachmark}>
-            Tap here to switch view
-          </Coachmark>
-        </div>
-      ) : null}
 
       {error ? <Notice tone="warn">{error}</Notice> : null}
 

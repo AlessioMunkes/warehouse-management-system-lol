@@ -12,37 +12,12 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-// ── Step rail ─────────────────────────────────────────────────
-// Four thin bars and a quiet line of text. Deliberately not a
-// numbered wizard header with chevrons: staff need to know roughly
-// where they are, not to navigate a diagram.
-export const StepRail = ({ step, total, label }) => (
-  <div className="stf-rail">
-    <div
-      className="stf-rail-bars"
-      role="progressbar"
-      aria-valuemin={1}
-      aria-valuemax={total}
-      aria-valuenow={step}
-      aria-label={`Step ${step} of ${total}: ${label}`}
-    >
-      {Array.from({ length: total }, (_, i) => (
-        <span key={i} className={`stf-rail-bar${i < step ? ' is-done' : ''}`} />
-      ))}
-    </div>
-    <div className="stf-rail-meta">
-      <span>{label}</span>
-      <span>Step {step} of {total}</span>
-    </div>
-  </div>
-);
-
 // ── Step screen ───────────────────────────────────────────────
 // Moving between steps replaces the whole screen, so focus has to
 // move deliberately. Without this a screen-reader user stays parked
 // on the button they just pressed — which no longer exists — and a
 // keyboard user starts again from the top of the document.
-export const StepScreen = ({ title, sub, children, actions }) => {
+export const StepScreen = ({ title, sub, toggle, children, actions }) => {
   const headingRef = useRef(null);
 
   useEffect(() => {
@@ -52,6 +27,10 @@ export const StepScreen = ({ title, sub, children, actions }) => {
   return (
     <section className="stf-step">
       <div className="stf-step-head">
+        {/* The mode toggle (Guided/Form), when this screen has one — see
+            .stf-card-toggle's own note in staff.css for why it lives
+            here now instead of floating above the card. */}
+        {toggle ? <div className="stf-card-toggle">{toggle}</div> : null}
         {/* tabIndex={-1} makes the heading focusable programmatically
             without putting it in the tab order. */}
         <h1 className="stf-step-title" ref={headingRef} tabIndex={-1}>{title}</h1>

@@ -37,7 +37,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useState } from 'react';
 import {
-  StepRail, StepScreen, Actions, Button, SelectField, DateField,
+  StepScreen, Actions, Button, SelectField, DateField,
   ChoiceList, Notice, KeyValues, ViewToggle, Coachmark,
 } from '../../staff/components/StepPrimitives';
 import TaskPage from '../../staff/components/TaskPage';
@@ -255,7 +255,16 @@ export default function ReceivingFlow({ onCrumbChange }) {
   }, []);
 
 
-  useEffect(() => { onCrumbChange?.(step.label); }, [step.label, onCrumbChange]);
+  // step/total omitted on the done screen — no progress bar makes sense
+  // once the task is finished (StepRail used to be hidden the same way,
+  // gated on phase !== 'done').
+  useEffect(() => {
+    onCrumbChange?.({
+      label: step.label,
+      step: phase === 'done' ? null : step.n,
+      total: phase === 'done' ? null : TOTAL_STEPS,
+    });
+  }, [step.label, step.n, phase, onCrumbChange]);
 
   const supplierName = useMemo(
     () => suppliers.find((s) => String(s.id) === String(supplierId))?.name ?? 'this supplier',
@@ -455,19 +464,22 @@ export default function ReceivingFlow({ onCrumbChange }) {
 
   if (loading) return <div className="stf-skeleton" aria-label="Loading" />;
 
+  // Built once and handed to whichever card is showing (StepScreen for
+  // 'which', TaskPage for 'work') as its own toggle prop — "the mode
+  // toggle is a property of the form, not of the app, so it moves onto
+  // the card's own top edge where it has an obvious owner." Not
+  // rendered at all on the done screen, same as before.
+  const toggleControl = phase !== 'done' ? (
+    <>
+      <ViewToggle options={MODES} value={mode} onChange={handleModeChange} />
+      <Coachmark show={showCoachmark} onDismiss={dismissCoachmark}>
+        Tap here to switch view
+      </Coachmark>
+    </>
+  ) : null;
+
   return (
     <>
-      {phase !== 'done' ? (
-        <div className="stf-toggle-anchor">
-          <ViewToggle options={MODES} value={mode} onChange={handleModeChange} />
-          <Coachmark show={showCoachmark} onDismiss={dismissCoachmark}>
-            Tap here to switch view
-          </Coachmark>
-        </div>
-      ) : null}
-
-      {phase !== 'done' ? <StepRail step={step.n} total={TOTAL_STEPS} label={step.label} /> : null}
-
       {error ? <Notice tone="warn">{error}</Notice> : null}
 
       {/* ── 1 · Which delivery ─────────────────────────────── */}
@@ -475,6 +487,7 @@ export default function ReceivingFlow({ onCrumbChange }) {
         <StepScreen
           title="Which delivery is this?"
           sub="The driver has a note with a number on it."
+          toggle={toggleControl}
           actions={
             <Actions>
               <Button disabled={!orderId || saving} onClick={() => startCounting(orderId)}>
@@ -588,6 +601,7 @@ export default function ReceivingFlow({ onCrumbChange }) {
         <TaskPage
           title={`${supplierName}${orderId ? ` · ${formatPoCode(orderId)}` : ''}`}
           sub="Check what is on the floor against the note, then sign it in."
+          toggle={toggleControl}
           note={blockedNote}
           actions={
             <Actions>
