@@ -229,7 +229,30 @@ const getPurchaseOrderById = async (id) => {
     [id]
   );
 
-  return { ...purchaseOrder, items };
+  // Every delivery actually recorded against this PO, oldest first —
+  // real events for the PO detail's timeline (order raised, then one
+  // entry per delivery, then wherever status sits today), not a
+  // fabricated status history. There is no per-transition log of past
+  // status changes (only status_changed_at, the most recent one), so
+  // the timeline is built from what's actually there: this table plus
+  // the PO's own created_at/status_changed_at.
+  const { rows: deliveries } = await pool.query(
+    `SELECT dn.id, dn.delivery_date, dn.status, dn.driver_name,
+            u.first_name AS received_by_name,
+            COALESCE(disc.discrepancy_count, 0) > 0 AS has_discrepancies
+       FROM delivery_notes dn
+       LEFT JOIN users u ON u.id = dn.received_by
+       LEFT JOIN LATERAL (
+         SELECT COUNT(*) FILTER (WHERE dni.discrepancy_quantity <> 0) AS discrepancy_count
+           FROM delivery_note_items dni
+          WHERE dni.delivery_note_id = dn.id
+       ) disc ON true
+      WHERE dn.purchase_order_id = $1
+      ORDER BY dn.delivery_date ASC, dn.id ASC`,
+    [id]
+  );
+
+  return { ...purchaseOrder, items, deliveries };
 };
 
 // ── Status transition ────────────────────────────────────────

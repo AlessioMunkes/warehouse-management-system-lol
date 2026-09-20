@@ -73,6 +73,18 @@ const toLine = (row) => ({
   receivedToDate: Number(row.received_to_date ?? 0),
 });
 
+// One real event: a delivery actually recorded against this PO. Not a
+// status-history entry — see purchaseOrder.repository.js's own note
+// on why there's no per-transition log to draw one from.
+const toDelivery = (row) => ({
+  id:               row.id,
+  deliveryDate:     row.delivery_date ?? null,
+  status:           row.status,
+  driverName:       row.driver_name ?? "",
+  receivedByName:   row.received_by_name ?? "",
+  hasDiscrepancies: Boolean(row.has_discrepancies),
+});
+
 export const toPurchaseOrder = (row) => ({
   id:                   row.id,
   poNumber:             row.po_number ?? "",
@@ -92,6 +104,7 @@ export const toPurchaseOrder = (row) => ({
   estimatedValue:       Number(row.estimated_value ?? 0),
   receiptCount:         Number(row.receipt_count ?? 0),
   items:                (row.items ?? []).map(toLine),
+  deliveries:           (row.deliveries ?? []).map(toDelivery),
 });
 
 // ── GET /api/purchase-orders ──────────────────────────────────

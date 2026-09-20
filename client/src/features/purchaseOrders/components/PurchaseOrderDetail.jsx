@@ -22,6 +22,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Pencil, X } from 'lucide-react';
+import PurchaseOrderTimeline from './PurchaseOrderTimeline';
 
 const fmtDate = (value) =>
   value
@@ -34,12 +35,14 @@ const money = (value) =>
   })}`;
 
 export default function PurchaseOrderDetail({ purchaseOrder: po, canManage, onApprove, onSetQuickbooksRef, onClose }) {
+  // "Raised by"/"Raised on" used to live here too — dropped now that
+  // the timeline below covers the same ground with more context
+  // (who, and what's happened since), not repeated in two places on
+  // the same card.
   const facts = [
     ['Supplier',   po.supplierName],
     ['Status',     po.statusLabel],
     ['Expected',   fmtDate(po.expectedDeliveryDate)],
-    ['Raised by',  po.createdByName || '—'],
-    ['Raised on',  fmtDate(po.createdAt)],
   ];
 
   // The QBO reference is usually only known after this PO has already
@@ -129,6 +132,11 @@ export default function PurchaseOrderDetail({ purchaseOrder: po, canManage, onAp
             )}
           </div>
         </dl>
+
+        <div>
+          <p className="text-sm text-muted-foreground">Timeline</p>
+          <PurchaseOrderTimeline purchaseOrder={po} />
+        </div>
 
         {/* BR-07B makes this mandatory on Returned, and migration 002
             enforces it in SQL — so if the status is returned, there is
