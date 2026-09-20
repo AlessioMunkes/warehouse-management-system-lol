@@ -125,8 +125,8 @@ describe('receiving: Guided\'s order list (cross-supplier)', () => {
     setMode('guided');
     render(<ReceivingFlow />);
     const select = await screen.findByRole('combobox', { name: /Which order/i });
-    expect(within(select).getByRole('option', { name: /Order 74/ })).toBeInTheDocument();
-    expect(within(select).getByRole('option', { name: /Order 86/ })).toBeInTheDocument();
+    expect(within(select).getByRole('option', { name: /PO-0074/ })).toBeInTheDocument();
+    expect(within(select).getByRole('option', { name: /PO-0086/ })).toBeInTheDocument();
   });
 
   it('names the supplier on each order, since the list spans suppliers', async () => {
@@ -141,11 +141,11 @@ describe('receiving: Guided\'s order list (cross-supplier)', () => {
     const user = userEvent.setup();
     render(<ReceivingFlow />);
     const select = await screen.findByRole('combobox', { name: /Which order/i });
-    within(select).getByRole('option', { name: /Order 74/ });
+    within(select).getByRole('option', { name: /PO-0074/ });
 
     await user.type(screen.getByLabelText(/Search by order number/), '86');
-    expect(within(select).getByRole('option', { name: /Order 86/ })).toBeInTheDocument();
-    expect(within(select).queryByRole('option', { name: /Order 74/ })).not.toBeInTheDocument();
+    expect(within(select).getByRole('option', { name: /PO-0086/ })).toBeInTheDocument();
+    expect(within(select).queryByRole('option', { name: /PO-0074/ })).not.toBeInTheDocument();
   });
 
   it('finds an order by the date on the note, written the way a person writes it', async () => {
@@ -153,11 +153,11 @@ describe('receiving: Guided\'s order list (cross-supplier)', () => {
     const user = userEvent.setup();
     render(<ReceivingFlow />);
     const select = await screen.findByRole('combobox', { name: /Which order/i });
-    within(select).getByRole('option', { name: /Order 74/ });
+    within(select).getByRole('option', { name: /PO-0074/ });
 
     await user.type(screen.getByLabelText(/Search by order number/), '16 august');
-    expect(within(select).getByRole('option', { name: /Order 74/ })).toBeInTheDocument();
-    expect(within(select).queryByRole('option', { name: /Order 86/ })).not.toBeInTheDocument();
+    expect(within(select).getByRole('option', { name: /PO-0074/ })).toBeInTheDocument();
+    expect(within(select).queryByRole('option', { name: /PO-0086/ })).not.toBeInTheDocument();
   });
 
   it('picking an order sets its supplier, so the payload is not half-empty', async () => {
@@ -186,8 +186,8 @@ describe('receiving: Form\'s order list (scoped to the chosen supplier)', () => 
     await user.selectOptions(supplierSelect, '2'); // Cape Cold Storage — owns order 86, not 74
 
     const orderSelect = await screen.findByRole('combobox', { name: /Which order/i });
-    expect(within(orderSelect).getByRole('option', { name: /Order 86/ })).toBeInTheDocument();
-    expect(within(orderSelect).queryByRole('option', { name: /Order 74/ })).not.toBeInTheDocument();
+    expect(within(orderSelect).getByRole('option', { name: /PO-0086/ })).toBeInTheDocument();
+    expect(within(orderSelect).queryByRole('option', { name: /PO-0074/ })).not.toBeInTheDocument();
   });
 
   it('reaches the same work screen order 86 does in Guided', async () => {

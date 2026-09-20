@@ -671,11 +671,20 @@
 /* ── Segmented tabs ──────────────────────────────────────────────── */
 /* For a board with a few named subsets (packing's "assigned to me /
    spare / done") — not the bottom .stf-tab task bar, which is
-   navigation between the four tasks, not filters within one of them. */
+   navigation between the four tasks, not filters within one of them.
+
+   REVISED — the track used to be --stf-border, the same warm khaki
+   the rest of the brand palette leans on. Fine as a hairline, too
+   present as a fill: next to the manager/admin side's neutral pill
+   surfaces it read as a yellow-tinted track behind a white pill,
+   not one clean control. --stf-field-bg is the same neutral fill
+   already used for every input/select/search box, so this now
+   matches those rather than introducing a third kind of "light"
+   background. */
 .stf-segments {
   display: flex; gap: 4px;
   padding: 3px;
-  background: var(--stf-border);
+  background: var(--stf-field-bg);
   border-radius: var(--stf-radius-sm);
 }
 .stf-segment {
@@ -803,13 +812,17 @@
 .stf-formrow-meta  { font-size: 12px; color: var(--stf-text-sub); }
 
 /* ── Status badge ────────────────────────────────────────────────── */
+/* REVISED — default fill was --stf-border (the same warm khaki as
+   .stf-segments' track, same fix, same reasoning): a neutral/pending
+   badge should read as a plain grey pill, the way Badge's own
+   secondary variant does on the manager side, not a tan one. */
 .stf-badge {
   display: inline-flex; align-items: center;
   padding: 4px 9px;
   border-radius: var(--stf-radius-pill);
   font: 600 11px/1.2 var(--stf-font-sans);
   letter-spacing: 0.02em;
-  background: var(--stf-border);
+  background: var(--stf-field-bg);
   color: var(--stf-text-sub);
   white-space: nowrap;
 }

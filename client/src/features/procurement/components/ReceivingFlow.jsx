@@ -53,6 +53,7 @@ import { newIdempotencyKey } from '../../../services/api';
 import { useAuth } from '../../../context/AuthContext';
 import SignaturePad from './SignaturePad';
 import DeliveryNotePDF from './DeliveryNotePDF';
+import formatPoCode from '../poCode';
 
 // Shared by both modes, right before the submit button. SignaturePad
 // is the manager side's own component — canvasClassName /
@@ -536,11 +537,7 @@ export default function ReceivingFlow({ onCrumbChange }) {
                 placeholder="Choose an order"
                 options={visibleOrders.map((o) => ({
                   value: o.id,
-                  label: [
-                    `Order ${o.id}`,
-                    o.supplier_name,
-                    o.expected_delivery_date ? `Due ${longDate(o.expected_delivery_date)}` : 'No due date given',
-                  ].filter(Boolean).join(' · '),
+                  label: [formatPoCode(o.id), o.supplier_name].filter(Boolean).join(' · '),
                 }))}
                 value={orderId}
                 onChange={selectOrder}
@@ -566,10 +563,7 @@ export default function ReceivingFlow({ onCrumbChange }) {
               placeholder="Choose an order"
               options={formOrders.map((o) => ({
                 value: o.id,
-                label: [
-                  `Order ${o.id}`,
-                  o.expected_delivery_date ? `Due ${longDate(o.expected_delivery_date)}` : 'No due date given',
-                ].filter(Boolean).join(' · '),
+                label: formatPoCode(o.id),
               }))}
               value={orderId}
               onChange={selectOrder}
@@ -592,7 +586,7 @@ export default function ReceivingFlow({ onCrumbChange }) {
       {/* ── 2 · Count and put away ─────────────────────────── */}
       {phase === 'work' && (
         <TaskPage
-          title={`${supplierName}${orderId ? ` · Order ${orderId}` : ''}`}
+          title={`${supplierName}${orderId ? ` · ${formatPoCode(orderId)}` : ''}`}
           sub="Check what is on the floor against the note, then sign it in."
           note={blockedNote}
           actions={
