@@ -510,25 +510,49 @@ export default function ReceivingFlow({ onCrumbChange }) {
           />
 
           {visibleOrders.length > 0 ? (
-            <ChoiceList
-              legend="Which order"
-              options={visibleOrders.map((o) => ({
-                value: o.id,
-                label: `Order ${o.id}`,
-                // The supplier is in the meta now that this list can
-                // span suppliers — "Order 86" alone is not enough to
-                // pick the right one.
-                meta: [
-                  o.supplier_name,
-                  o.expected_delivery_date
-                    ? `Due ${longDate(o.expected_delivery_date)}`
-                    : 'No due date given',
-                ].filter(Boolean).join(' · '),
-              }))}
-              value={orderId}
-              onChange={selectOrder}
-              onActivate={startCounting}
-            />
+            // Same Guided/Form split as the supplier field above, and
+            // for the same reason: a handful of orders reads fine as
+            // tap targets, but this list runs to dozens on a busy
+            // week, and a dropdown — not an endless stack of rows — is
+            // the right control once it does. The search box above
+            // still narrows visibleOrders either way.
+            mode === 'guided' ? (
+              <ChoiceList
+                legend="Which order"
+                options={visibleOrders.map((o) => ({
+                  value: o.id,
+                  label: `Order ${o.id}`,
+                  // The supplier is in the meta now that this list can
+                  // span suppliers — "Order 86" alone is not enough to
+                  // pick the right one.
+                  meta: [
+                    o.supplier_name,
+                    o.expected_delivery_date
+                      ? `Due ${longDate(o.expected_delivery_date)}`
+                      : 'No due date given',
+                  ].filter(Boolean).join(' · '),
+                }))}
+                value={orderId}
+                onChange={selectOrder}
+                onActivate={startCounting}
+              />
+            ) : (
+              <SelectField
+                id="stf-full-order"
+                label="Which order"
+                placeholder="Choose an order"
+                options={visibleOrders.map((o) => ({
+                  value: o.id,
+                  label: [
+                    `Order ${o.id}`,
+                    o.supplier_name,
+                    o.expected_delivery_date ? `Due ${longDate(o.expected_delivery_date)}` : 'No due date given',
+                  ].filter(Boolean).join(' · '),
+                }))}
+                value={orderId}
+                onChange={selectOrder}
+              />
+            )
           ) : orderSearch.searching ? (
             <NoMatches
               query={orderSearch.query}
