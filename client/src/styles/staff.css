@@ -2155,71 +2155,42 @@ button.stf-panel-head:disabled { cursor: default; }
 }
 .stf-resume .stf-resume-drop:hover { color: #8a3227; }
 
-/* ── Worker dashboard task path ────────────────────────────────
-   The round, connected-line layout from the other old storyboard —
-   explicitly asked for over the square tile grid this replaced (that
-   grid's own note on why a "journey" layout was passed over the
-   first time is now stale; see TaskPathNode.jsx for how this version
-   avoids the specific problem raised then — fake done/current/future
-   states — while keeping the round, connected shape.
+/* ── Worker dashboard tasks ───────────────────────────────────────
+   REVISED — was a single-row "path" with a connecting line between
+   circles, from the old storyboard reference. Dropped on request: a
+   line between the tasks reads as a route through them, in order —
+   Receiving, then Packing, then Decanting, then Dispatch — which
+   isn't true. A shift can be packing-only or dispatch-only, so
+   nothing here should look like it's claiming a sequence.
 
-   Five nodes, kept to one row: horizontal scroll rather than wrapping
-   to a second row, because a line connecting circles across a wrap
-   would either break or need routing logic a CSS ::before can't do
-   cleanly. -webkit-overflow-scrolling keeps it a finger-flick on the
-   tablet this app actually runs on, not a fight with a thin
-   scrollbar.
-
-   REVISED — sized up (56px circles to 80px, everything under them to
-   match) and the page itself widened (TaskDashboardPage.jsx now
-   passes StaffShell's existing `wide` prop, the same one Decanting's
-   week planner uses) — the original sizing read as a small clump
-   adrift in the page rather than something that occupies it, most
-   visible on a bench tablet or a wide window where .stf-main had a
-   lot of room it wasn't using. Still phone-safe: min-width per node
-   only means the horizontal-scroll fallback above kicks in a little
-   sooner on the narrowest phones, which was already the fallback
-   design for this reason. */
-.stf-path-track {
-  display: flex;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  padding: 4px 2px 12px;
-  margin: 0 -2px;
-  gap: 4px;
-}
-.stf-path-node {
-  position: relative;
-  flex: 1 1 0;
-  min-width: 108px;
+   Two shapes off one breakpoint, no JS: a stacked list of icon-left
+   rows on a phone (matches every other list in this file), a row of
+   free-standing circles — no line, just five circles with air between
+   them — from tablet width up, where TaskDashboardPage.jsx's `wide`
+   prop (same one Decanting's week planner uses) gives them the room
+   to read as filling the page rather than a small clump adrift in it.
+   flex-wrap on the row rather than horizontal scroll: with no line to
+   route across a wrap, wrapping to a second row is simply the better
+   fallback now if five don't fit one row. */
+.stf-tasks {
   display: flex;
   flex-direction: column;
+  gap: 4px;
+}
+.stf-task-item {
+  display: flex;
   align-items: center;
-  text-align: center;
-  gap: 10px;
-  padding: 0 4px;
+  gap: 16px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--stf-border);
   text-decoration: none;
 }
-/* The connecting line: each node (but the first) draws a segment from
-   its own centre leftward to the previous node's centre. Works
-   because every node is the same flex width, so that distance is
-   always exactly one node's width. */
-.stf-path-node:not(:first-child)::before {
-  content: '';
-  position: absolute;
-  top: 39px;
-  right: 50%;
-  width: 100%;
-  height: 1.5px;
-  background: var(--stf-border);
-  z-index: 0;
-}
-.stf-path-circle {
+.stf-task-item:last-child { border-bottom: 0; }
+.stf-task-icon {
   position: relative;
-  z-index: 1;
-  width: 80px;
-  height: 80px;
   flex-shrink: 0;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   border: 1.5px solid var(--stf-border);
   background: var(--stf-white);
@@ -2228,30 +2199,47 @@ button.stf-panel-head:disabled { cursor: default; }
   justify-content: center;
   transition: border-color 150ms ease, background 150ms ease;
 }
-.stf-path-node:hover .stf-path-circle { border-color: var(--stf-gold); background: var(--stf-sand); }
-.stf-path-circle img { width: 42px; height: 42px; object-fit: contain; }
-.stf-path-title {
+.stf-task-item:hover .stf-task-icon { border-color: var(--stf-gold); background: var(--stf-sand); }
+.stf-task-icon img { width: 30px; height: 30px; object-fit: contain; }
+.stf-task-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.stf-task-title {
   font-family: var(--stf-font-display);
   font-size: 15px;
   font-weight: 700;
   color: var(--stf-ink);
-  white-space: nowrap;
 }
-.stf-path-meta {
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--stf-text-sub);
-  max-width: 130px;
+.stf-task-meta { font-size: 12px; line-height: 1.4; color: var(--stf-text-sub); }
+
+@media (min-width: 640px) {
+  .stf-tasks {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 12px 4px;
+  }
+  .stf-task-item {
+    flex: 1 1 0;
+    min-width: 108px;
+    flex-direction: column;
+    text-align: center;
+    gap: 10px;
+    padding: 4px;
+    border-bottom: 0;
+  }
+  .stf-task-icon { width: 80px; height: 80px; }
+  .stf-task-icon img { width: 42px; height: 42px; }
+  .stf-task-text { align-items: center; }
+  .stf-task-title { white-space: nowrap; }
+  .stf-task-meta { max-width: 130px; }
 }
 
 /* Feed the Soil and Benevolent Requests — worked far less often than
-   the path above, so plain links rather than nodes of their own
+   the tasks above, so plain links rather than items of their own
    weight. Left as the shell's default link colour (--stf-accent, see
    .stf-shell a) rather than muted grey: this file's own rule is red
    for anything clickable, and these are exactly that. Centred rather
    than left-aligned — flush-left read as an afterthought hanging off
-   the left edge under a page whose other content (the path track) is
-   spread across the full width. */
+   the left edge under a page whose other content spans the full
+   width. */
 .stf-dashboard-links {
   display: flex;
   flex-wrap: wrap;
