@@ -304,6 +304,21 @@
    flow. It keeps the same chrome and takes the room it needs. */
 .stf-main.is-wide { max-width: 1200px; }
 
+/* Dashboard only (.stf-tasks is TaskDashboardPage's own direct child,
+   nothing else renders one) — reported as "weird spacing", which is
+   .stf-main's own flex:1 doing exactly what it should for every task
+   flow (top-anchor the content, leave any extra height as trailing
+   space so a long form or list has somewhere to scroll into) but
+   reading as an oversized, unexplained gap below a greeting and a row
+   of circles, the shortest thing any staff page renders. Centering is
+   scoped to this one page on purpose: a Receiving or Decanting screen
+   that centred itself would visibly re-center every time a field
+   error added or removed a line, which is a worse kind of movement
+   than a blank margin ever was. */
+.stf-main:has(> .stf-tasks) {
+  justify-content: center;
+}
+
 /* ── Bottom tab bar ──────────────────────────────────────────────── */
 /* How staff move between the four tasks. A sidebar collapses behind a
    hamburger at this width, hiding all four destinations behind a tap;
@@ -1408,11 +1423,18 @@ body.reduced-movement .decorative-icon {
 .stf-task-main { min-width: 0; }
 .stf-task-side { margin-top: 16px; }
 
-/* Two panes only where there is width for two panes. Below this the
-   device is a phone or a bench tablet and the side pane is simply the
-   next thing down the page. */
+/* Two panes only where there is width for two panes, AND only where a
+   TaskPage actually has a side pane to put there — .has-side, set by
+   TaskPage.jsx only when its `side` prop is passed. REVISED: this used
+   to apply to bare .stf-task-cols regardless, so a TaskPage with no
+   side (Feed the Soil's browse/kits screens use TaskPage for its
+   sticky head with no side content) still got grid-template-columns:
+   1fr 320px — a real second column reserved on screen with nothing
+   in it, showing as unexplained empty space beside a narrower-than-
+   expected card. Below 1024px the side pane (when there is one) is
+   simply the next thing down the page either way. */
 @media (min-width: 1024px) {
-  .stf-task-cols {
+  .stf-task-cols.has-side {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 320px;
     gap: 24px;

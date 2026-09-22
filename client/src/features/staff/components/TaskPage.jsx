@@ -42,7 +42,14 @@ export default function TaskPage({ title, sub, toggle, children, side, actions, 
         {sub ? <p className="stf-task-sub">{sub}</p> : null}
       </header>
 
-      <div className="stf-task-cols">
+      {/* has-side is what actually turns the two-column grid on above
+          1024px (see staff.css) — without it .stf-task-cols was still
+          display:grid, grid-template-columns: 1fr 320px regardless of
+          whether an aside existed to put in that second column, so a
+          TaskPage with no side prop (Feed the Soil's browse/kits
+          screens) reserved 320px of dead space on a wide screen for a
+          column that was never there. */}
+      <div className={`stf-task-cols${side ? ' has-side' : ''}`}>
         <div className="stf-task-main">{children}</div>
         {side ? <aside className="stf-task-side">{side}</aside> : null}
       </div>
