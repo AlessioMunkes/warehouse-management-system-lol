@@ -151,6 +151,23 @@ const adultsReached = (spec) => dispatchedKgQuery({
   filters: { ...spec.filters, beneficiary_kind: 'soup_kitchen' },
 });
 
+// Same shape as adultsReached, forced to dignity_kitchen instead —
+// see reportCatalog.js's dignity_kitchen_served entry for why this
+// exists as its own metric rather than widening IMPACT_BENEFICIARY_KINDS.
+const dignityKitchenServed = (spec) => dispatchedKgQuery({
+  ...spec,
+  impactOnly: false,
+  filters: { ...spec.filters, beneficiary_kind: 'dignity_kitchen' },
+});
+
+// Same shape again, forced to community — real dispatched kilograms
+// for walk-in/phone-in beneficiaries, not a count of logged requests.
+const communityServed = (spec) => dispatchedKgQuery({
+  ...spec,
+  impactOnly: false,
+  filters: { ...spec.filters, beneficiary_kind: 'community' },
+});
+
 // ══ Paper saved ════════════════════════════════════════════════
 // Three tables, one UNION, because a "digital document" here is
 // whichever of three different features produced one — a delivery
@@ -741,7 +758,8 @@ const getFactor = async (key) => {
 };
 
 export default {
-  childrenReached, mealsEnabled, adultsReached, paperSaved, compostProcessed,
+  childrenReached, mealsEnabled, adultsReached, dignityKitchenServed, communityServed,
+  paperSaved, compostProcessed,
   dispatchVolume, collectionCompliance,
   repeatNonCollections, decantingWastage,
   goodsReceived, receivingDiscrepancyRate, unresolvedDiscrepancies, procurementSpend, unitPriceTrend,

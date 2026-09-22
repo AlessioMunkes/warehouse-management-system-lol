@@ -1,11 +1,12 @@
 // ─────────────────────────────────────────────────────────────
 // server/__tests__/reporting.impactCalculator.repository.test.js
 //
-// Repository-level tests for the three Impact Calculator metrics
-// added to reporting.repository.js: paperSaved, adultsReached,
-// compostProcessed. No database — pool.query is mocked and each
-// test asserts the SQL shape and parameter binding, the same
-// approach reporting.catalog.test.js takes at the catalog level.
+// Repository-level tests for the Impact Calculator metrics added to
+// reporting.repository.js: paperSaved, adultsReached,
+// dignityKitchenServed, communityServed, compostProcessed. No
+// database — pool.query is mocked and each test asserts the SQL
+// shape and parameter binding, the same approach
+// reporting.catalog.test.js takes at the catalog level.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
@@ -72,6 +73,54 @@ describe('adultsReached', () => {
     const [sql] = poolMock.query.mock.calls[0];
     // impactClause() pushes an ARRAY[...] parameter for ecd+soup_kitchen;
     // this metric filters by a single beneficiary_kind value instead.
+    expect(sql).not.toMatch(/beneficiary_kind = ANY/);
+  });
+});
+
+describe('dignityKitchenServed', () => {
+  it('forces the beneficiary_kind filter to dignity_kitchen regardless of caller input', async () => {
+    poolMock.query.mockResolvedValue({ rows: [{ label: 'Total', value: '40' }] });
+
+    await repo.dignityKitchenServed({
+      dimension: 'none',
+      dateRange: RANGE,
+      filters: { beneficiary_kind: 'ecd' }, // an attempt to override — must lose
+    });
+
+    const [sql, params] = poolMock.query.mock.calls[0];
+    expect(sql).toMatch(/ps\.beneficiary_kind = \$\d+::beneficiary_type/);
+    expect(params).toContain('dignity_kitchen');
+    expect(params).not.toContain('ecd');
+  });
+
+  it('does not apply the ECD+soup-kitchen impact clause — it is dignity-kitchen only', async () => {
+    poolMock.query.mockResolvedValue({ rows: [] });
+    await repo.dignityKitchenServed({ dimension: 'none', dateRange: RANGE, filters: {} });
+    const [sql] = poolMock.query.mock.calls[0];
+    expect(sql).not.toMatch(/beneficiary_kind = ANY/);
+  });
+});
+
+describe('communityServed', () => {
+  it('forces the beneficiary_kind filter to community regardless of caller input', async () => {
+    poolMock.query.mockResolvedValue({ rows: [{ label: 'Total', value: '15' }] });
+
+    await repo.communityServed({
+      dimension: 'none',
+      dateRange: RANGE,
+      filters: { beneficiary_kind: 'soup_kitchen' }, // an attempt to override — must lose
+    });
+
+    const [sql, params] = poolMock.query.mock.calls[0];
+    expect(sql).toMatch(/ps\.beneficiary_kind = \$\d+::beneficiary_type/);
+    expect(params).toContain('community');
+    expect(params).not.toContain('soup_kitchen');
+  });
+
+  it('does not apply the ECD+soup-kitchen impact clause — it is community only', async () => {
+    poolMock.query.mockResolvedValue({ rows: [] });
+    await repo.communityServed({ dimension: 'none', dateRange: RANGE, filters: {} });
+    const [sql] = poolMock.query.mock.calls[0];
     expect(sql).not.toMatch(/beneficiary_kind = ANY/);
   });
 });

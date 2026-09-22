@@ -166,6 +166,48 @@ export const METRICS = {
     caveat: 'Estimate based on the kilograms-to-adults-served factor on record. Soup kitchens only.',
   },
 
+  // Same shape as adults_reached (real kg dispatched -> a manager-set
+  // factor), with beneficiary_kind forced to dignity_kitchen instead
+  // of soup_kitchen. NFR-20 keeps dignity kitchens out of THE impact
+  // report on purpose, but the org still wanted a rough, private sense
+  // of what they serve — dignity kitchens keep no headcount of their
+  // own, so this is deliberately a single aggregate estimate, never
+  // broken down by kitchen name (no 'ecd_centre'-equivalent dimension
+  // exists for it, and none should be added).
+  dignity_kitchen_served: {
+    id: 'dignity_kitchen_served', label: 'Dignity kitchen guests served (estimate)', temporal: 'range',
+    description:
+      'Estimated guests served through dignity kitchens, converted from kilograms ' +
+      'dispatched using a factor the manager can edit — the same way adults reached ' +
+      'works for soup kitchens. Dignity kitchens keep no headcount of their own, so this ' +
+      'is a rough aggregate estimate, never broken down by kitchen.',
+    repoFn: 'dignityKitchenServed', unit: 'people',
+    dimensions: ['none', 'month', 'week', 'cohort'],
+    filters: ['cohort'],
+    defaultChart: 'line', impactOnly: true, factorKey: 'kg_to_dignity_kitchen_served',
+    caveat: 'Estimate based on the kilograms-to-people factor for dignity kitchens on record. Aggregate only, never broken down by kitchen.',
+  },
+
+  // Walk-in and phone-in community requests already dispatch through
+  // the normal picking/dispatch flow tagged beneficiary_kind =
+  // 'community' — real kilograms, not a guess. That is a more honest
+  // "how many reached" figure than counting logged requests
+  // (community_request_outcomes below): a request that dispatched
+  // 40kg to a family is not the same as one that dispatched 4kg, and
+  // the request log itself keeps no headcount.
+  community_served: {
+    id: 'community_served', label: 'People served via community requests (estimate)', temporal: 'range',
+    description:
+      'Estimated people served through walk-in and phone-in community requests, ' +
+      'converted from kilograms actually dispatched using a factor the manager can edit. ' +
+      'Based on what left the warehouse, not on how many requests were logged.',
+    repoFn: 'communityServed', unit: 'people',
+    dimensions: ['none', 'month', 'week', 'cohort'],
+    filters: ['cohort'],
+    defaultChart: 'line', impactOnly: true, factorKey: 'kg_to_community_served',
+    caveat: 'Estimate based on the kilograms-to-people factor for community requests on record.',
+  },
+
   paper_saved: {
     id: 'paper_saved', label: 'Paper saved', temporal: 'range',
     description:

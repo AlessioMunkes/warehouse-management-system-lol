@@ -20,7 +20,9 @@ import { logAudit } from './auditLog.repository.js';
 // Closed set — not whatever key a request happens to send. New
 // factor-backed metrics add their key here, matching factorKey in
 // reportCatalog.js.
-export const FACTOR_KEYS = ['kg_to_meals', 'kg_to_adults_served'];
+export const FACTOR_KEYS = [
+  'kg_to_meals', 'kg_to_adults_served', 'kg_to_dignity_kitchen_served', 'kg_to_community_served',
+];
 
 const setFactor = async ({ factorKey, value, unit, sourceNote, actorId }) => {
   const client = await pool.connect();

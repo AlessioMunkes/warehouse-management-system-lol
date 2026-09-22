@@ -11,8 +11,12 @@
 //
 // NFR-20 / dignity kitchens: adults served is deliberately scoped to
 // soup kitchens only (reporting.repository.js's adultsReached forces
-// beneficiary_kind='soup_kitchen'). Dignity kitchens stay outside
-// impact reporting entirely, per the project's own visit notes.
+// beneficiary_kind='soup_kitchen'), and dignity kitchens stay out of
+// THE four headline numbers above, per the project's own visit notes.
+// They do appear, aggregate-only, in the "Beneficiaries by type"
+// comparison further down (dignity_kitchen_served, community_served)
+// — a rough estimate from real kilograms dispatched, requested
+// separately from NFR-20's own scope, never broken down by kitchen.
 //
 // PAPER SAVED IS REAL DATA, NOT AN ESTIMATE.
 // It counts rows already in delivery_notes, dispatch_events and
@@ -38,6 +42,7 @@ import { Link } from 'react-router-dom';
 import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
 import ReportChart    from '../features/reporting/components/ReportChart';
 import ImpactStatCard from '../features/reporting/components/ImpactStatCard';
+import BeneficiaryTypeChart from '../features/reporting/components/BeneficiaryTypeChart';
 import ImpactCalculatorPDF from '../features/reporting/components/ImpactCalculatorPDF';
 import { runReport }  from '../services/reportingAPI';
 import reportingAPI   from '../services/reportingAPI';
@@ -101,9 +106,33 @@ const STAT_DEFS = [
   },
 ];
 
+// The four beneficiary-type totals shown in BeneficiaryTypeChart,
+// below the headline cards. Children is fetched as part of STAT_DEFS
+// above and adults alongside it; only the two new estimates need
+// fetching for themselves (see EXTRA_METRIC_DEFS below) — all four
+// end up in the same `stats` object regardless of which array loaded
+// them, so this list only needs to say how to LABEL and colour each
+// one, not how to fetch it.
+const BENEFICIARY_TYPE_DEFS = [
+  { metric: 'children_reached', label: 'Children (ECD)', unit: 'children', color: '#ef3a40' },
+  { metric: 'adults_reached', label: 'Adults (soup kitchens)', unit: 'adults', color: '#c9a86a' },
+  { metric: 'dignity_kitchen_served', label: 'Dignity kitchens (estimate)', unit: 'people', color: '#6b8f71' },
+  { metric: 'community_served', label: 'Community requests (estimate)', unit: 'people', color: '#2b3336' },
+];
+
+// Fetched the same way as STAT_DEFS but not rendered as a poster
+// card — these two only feed BeneficiaryTypeChart, so they need no
+// image/staticCaption.
+const EXTRA_METRIC_DEFS = [
+  { metric: 'dignity_kitchen_served' },
+  { metric: 'community_served' },
+];
+
 const FACTOR_DEFS = [
-  { key: 'kg_to_meals',          label: 'Meals per kg dispatched' },
-  { key: 'kg_to_adults_served',  label: 'Adults served per kg dispatched (soup kitchens)' },
+  { key: 'kg_to_meals',                  label: 'Meals per kg dispatched' },
+  { key: 'kg_to_adults_served',          label: 'Adults served per kg dispatched (soup kitchens)' },
+  { key: 'kg_to_dignity_kitchen_served', label: 'Guests served per kg dispatched (dignity kitchens, estimate)' },
+  { key: 'kg_to_community_served',       label: 'People served per kg dispatched (community requests, estimate)' },
 ];
 
 const AdjustFactorsDialog = () => {
@@ -140,9 +169,10 @@ const AdjustFactorsDialog = () => {
         </DialogHeader>
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Meals enabled and adults served are estimated from kilograms dispatched using these
-            factors. Setting a new value here does not change past reports; it adds a new
-            figure that applies from today onward.
+            Every estimated figure on this page — meals enabled, adults served, and the two
+            beneficiary-type estimates below — is converted from kilograms dispatched using one
+            of these factors. Setting a new value here does not change past reports; it adds a
+            new figure that applies from today onward.
           </p>
           {FACTOR_DEFS.map((f) => (
             <div key={f.key} className="flex items-end gap-2">
@@ -290,7 +320,7 @@ export default function ImpactReportPage() {
     let cancelled = false;
     (async () => {
       const [results, monthlyRes] = await Promise.all([
-        Promise.all(STAT_DEFS.map(async (def) => {
+        Promise.all([...STAT_DEFS, ...EXTRA_METRIC_DEFS].map(async (def) => {
           try {
             const res = await runReport({ metric: def.metric, dimension: 'none', filters: {}, dateRange });
             const report = res.data ?? res;
@@ -392,6 +422,18 @@ export default function ImpactReportPage() {
           <AdjustFactorsDialog />
         </div>
 
+        <div className="mt-6">
+          <BeneficiaryTypeChart
+            items={BENEFICIARY_TYPE_DEFS.map((def) => ({ ...def, stat: stats[def.metric] }))}
+          />
+        </div>
+
+        {/* The two panels below already answer "how did this change
+            over time" per metric (each defaults to Month, a real
+            trend, since the ImpactPanel dimension fix above); the
+            comparison chart just above answers "who, by type" — kept
+            separate on purpose rather than trying to make one chart
+            do both jobs. */}
         <h2 className="mt-8 text-lg font-medium">Detailed breakdown</h2>
         <div className="mt-3 space-y-6">
           <ImpactPanel
