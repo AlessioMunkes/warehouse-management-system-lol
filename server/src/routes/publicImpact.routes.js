@@ -8,21 +8,28 @@
 // added here, it belongs in a different file instead.
 // ─────────────────────────────────────────────────────────────
 import express from 'express';
-import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
+import { rateLimit } from 'express-rate-limit';
 import publicImpactController from '../controllers/publicImpact.controller.js';
 
 const router = express.Router();
 
 // No req.user to key on here (unauthenticated), unlike
 // reporting.routes.js's own askLimiter — IP is the only identity
-// available. The service caches for 5 minutes regardless, so this
-// limit exists for abuse, not normal traffic.
+// available. No custom keyGenerator, matching
+// rateLimiter.middleware.js's own loginRateLimiter (the other
+// unauthenticated, IP-keyed limiter in this app): express-rate-limit's
+// own default keyGenerator already handles IP (including IPv6)
+// correctly on its own. An explicit `keyGenerator: ipKeyGenerator`
+// here threw on every request instead — ipKeyGenerator is a helper
+// for building a CUSTOM keyGenerator around, such as askLimiter's own
+// `req.user?.id ? ... : ipKeyGenerator(req, res)`, not a drop-in
+// keyGenerator by itself. The service caches for 5 minutes regardless,
+// so this limit exists for abuse, not normal traffic.
 const summaryLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 60,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
-  keyGenerator: ipKeyGenerator,
 });
 
 router.get('/impact-summary', summaryLimiter, publicImpactController.getSummary);
