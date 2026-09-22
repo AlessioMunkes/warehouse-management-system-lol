@@ -101,7 +101,7 @@ const STAT_DEFS = [
   },
   {
     metric: 'paper_saved', label: 'Paper saved',
-    unit: 'documents', color: '#2b3336', image: null,
+    unit: 'documents', color: '#2b3336', image: '/images/person-phone.svg',
     staticCaption: 'Delivery notes · dispatch · decanting',
   },
 ];
