@@ -15,6 +15,13 @@
 // into PDF pages by pixel height alone, with no idea where a section
 // starts or ends, so a page that isn't exactly one A4 page tall
 // bleeds into the next one.
+//
+// Page content is positioned with fixed margins, not flexbox
+// vertical centering — an earlier version tried to centre each
+// page's content in the available height and it did not survive
+// html2canvas, rendering with everything pinned to the top and the
+// whole rest of the page empty. See receipts.css's own note on
+// .pdf-poster-page.
 // ─────────────────────────────────────────────────────────────
 import PdfShell from '../../receipts/components/PdfShell';
 import { formatDate, formatDateTime } from '../../receipts/components/noteFormat';
@@ -40,7 +47,7 @@ const ImpactCalculatorPDF = ({ pdfStats, beneficiaryTypeStats, dateRange, onClos
     >
       <div className="pdf-poster">
         {/* ── Page 1: cover ─────────────────────────────────── */}
-        <div className="pdf-poster-page pdf-poster-cover">
+        <div className="pdf-poster-page">
           <div className="pdf-doc-header">
             <div>
               <h1 className="pdf-doc-title">IMPACT CALCULATOR</h1>

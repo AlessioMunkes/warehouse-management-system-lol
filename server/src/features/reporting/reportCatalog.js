@@ -184,7 +184,7 @@ export const METRICS = {
     dimensions: ['group_month', 'group', 'none', 'month', 'week', 'cohort'],
     filters: ['cohort'],
     defaultChart: 'grouped_bar', impactOnly: true, factorKey: 'kg_to_meals',
-    caveat: 'Estimate based on the kilograms-to-meals factor on record. Children, adults (soup kitchens) and households (community requests) only — dignity kitchens excluded.',
+    caveat: 'Estimate based on the kilograms-to-meals factor on record. Children, adults (soup kitchens) and households (community requests) only. Dignity kitchens excluded.',
   },
 
   // adultsReached deliberately does NOT extend IMPACT_BENEFICIARY_KINDS
