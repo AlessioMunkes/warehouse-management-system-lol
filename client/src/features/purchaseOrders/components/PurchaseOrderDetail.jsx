@@ -21,7 +21,11 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Pencil, X } from 'lucide-react';
+import {
+  AlertDialog, AlertDialogContent, AlertDialogDescription,
+  AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogCancel,
+} from '@/components/ui/alert-dialog';
+import { Pencil, Trash2, X } from 'lucide-react';
 import PurchaseOrderTimeline from './PurchaseOrderTimeline';
 
 const fmtDate = (value) =>
@@ -34,7 +38,31 @@ const money = (value) =>
     minimumFractionDigits: 2, maximumFractionDigits: 2,
   })}`;
 
-export default function PurchaseOrderDetail({ purchaseOrder: po, canManage, onApprove, onSetQuickbooksRef, onClose }) {
+export default function PurchaseOrderDetail({
+  purchaseOrder: po, canManage, onApprove, onSetQuickbooksRef, onEdit, onDelete, onClose,
+}) {
+  // Edit/Delete only make sense on a 'pending' order — see
+  // purchaseOrder.service.js's own guard on both. Same condition
+  // Approve already gates on, so this is one more button beside it,
+  // not a new rule to learn.
+  const canEditOrDelete = canManage && po.status === 'pending';
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting]           = useState(false);
+
+  // Same success-boolean convention as saveQbo below: the page owns
+  // the try/catch and the error banner, this only decides whether to
+  // close the dialog (success) or leave it open with the failure
+  // still visible behind it (failure).
+  const runDelete = async () => {
+    setDeleting(true);
+    try {
+      const ok = await onDelete();
+      if (ok) setConfirmDelete(false);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   // "Raised by"/"Raised on" used to live here too — dropped now that
   // the timeline below covers the same ground with more context
   // (who, and what's happened since), not repeated in two places on
@@ -194,12 +222,62 @@ export default function PurchaseOrderDetail({ purchaseOrder: po, canManage, onAp
           </div>
         ) : null}
 
-        {canManage && po.status === 'pending' ? (
-          <Button type="button" variant="outline" onClick={onApprove}>
-            Approve
-          </Button>
+        {canEditOrDelete ? (
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" onClick={onApprove}>
+              Approve
+            </Button>
+            <Button type="button" variant="outline" onClick={onEdit}>
+              <Pencil />
+              Edit
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setConfirmDelete(true)}
+              className="border-[#ef3a40] text-[#ef3a40] hover:bg-[#ef3a40] hover:text-white"
+            >
+              <Trash2 />
+              Delete
+            </Button>
+          </div>
         ) : null}
       </CardContent>
+
+      {/* Delete only ever reaches a 'pending' order (canEditOrDelete
+          already gates the button on that), so there is no "this will
+          also affect N deliveries" warning to give — nothing has
+          happened against this order yet. That is also why this is a
+          real, permanent delete rather than the archive/deactivate
+          pattern suppliers and products use: there is no history here
+          a soft delete would be protecting. */}
+      <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <AlertDialogContent className="gap-4 rounded-lg p-5 sm:max-w-md">
+          <AlertDialogHeader className="gap-1">
+            <AlertDialogTitle className="text-base">Delete this purchase order?</AlertDialogTitle>
+            <AlertDialogDescription className="font-medium text-foreground">
+              {po.poNumber} · {po.supplierName}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Nothing has been sent to the supplier or received against it yet.
+            This removes it for good — <span className="font-semibold text-foreground">cannot be undone.</span>
+          </p>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={deleting}
+              onClick={runDelete}
+              className="border-[#ef3a40] text-[#ef3a40] hover:bg-[#ef3a40] hover:text-white"
+            >
+              <Trash2 />
+              {deleting ? 'Deleting…' : 'Delete permanently'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

@@ -22,14 +22,15 @@
 // were free. expectedQuantity is INTEGER, which pg already returns as
 // a number, so it needs no such care.
 //
-// There is no delete — nothing in the URS asks for a PO to be
-// destroyed. setPurchaseOrderStatus and setQuickbooksReference are the
-// only update paths: the former only ever moves a PO through its
-// states (BR-07B), the latter only ever touches the QuickBooks
-// reference. Neither can edit the lines, supplier, or anything else
-// about it in place.
+// updatePurchaseOrder and deletePurchaseOrder both only ever reach a
+// 'pending' order server-side — see purchaseOrder.service.js. Nothing
+// has been sent to a supplier or received against a PO still in that
+// state, which is what makes an in-place edit or an outright delete
+// safe; setPurchaseOrderStatus (BR-07B's lifecycle) and
+// setQuickbooksReference are still the only paths once a PO has moved
+// past pending.
 // ─────────────────────────────────────────────────────────────
-import { apiGet, apiPost, apiPatch } from "./api";
+import { apiGet, apiPost, apiPatch, apiPut, apiDelete } from "./api";
 
 // ── BR-07B, for display ───────────────────────────────────────
 // Mirrors PO_STATUSES in server/src/services/purchaseOrder.service.js
@@ -157,7 +158,28 @@ export const setQuickbooksReference = async (id, quickbooksPoId) => {
   return toPurchaseOrder(body.data ?? {});
 };
 
+// ── PUT /api/purchase-orders/:id ────────────────────────────────
+// Same 400 carrying missingProductIds as createPurchaseOrder — the
+// server validates an edit exactly as hard as a fresh order.
+export const updatePurchaseOrder = async (id, payload) => {
+  try {
+    const body = await apiPut(`/api/purchase-orders/${id}`, payload);
+    return toPurchaseOrder(body.data ?? {});
+  } catch (err) {
+    if (err.status === 400 && err.missingProductIds) {
+      err.missingProductIds = err.missingProductIds.map(Number);
+    }
+    throw err;
+  }
+};
+
+// ── DELETE /api/purchase-orders/:id ─────────────────────────────
+export const deletePurchaseOrder = async (id) => {
+  await apiDelete(`/api/purchase-orders/${id}`);
+};
+
 export default {
   getPurchaseOrders, getPurchaseOrder, createPurchaseOrder,
   setPurchaseOrderStatus, approvePurchaseOrder, setQuickbooksReference,
+  updatePurchaseOrder, deletePurchaseOrder,
 };

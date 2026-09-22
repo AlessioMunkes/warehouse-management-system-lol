@@ -1153,6 +1153,19 @@ color:white;
 .btn-secondary:hover:not(:disabled) { background-color: var(--color-lol-bg); }
 .btn-secondary:disabled { color: var(--color-text-meta); cursor: not-allowed; }
 
+/* Decanting's week planner, and only it (features/decanting/components/
+   Button.jsx is its sole consumer — see that file's own note) — reported
+   as taking up too much room on a screen that is already a dense form of
+   many product rows. Everything but size still comes from .btn-primary/
+   .btn-secondary above; this only overrides height/padding/font-size, so
+   colour, hover and disabled states stay identical to every other button
+   in the app. */
+.decanting-btn {
+  height: 36px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+
 /* ── Programme / activity select ─────────────────────────────── */
 .programme-select-content {
   max-width: 640px;

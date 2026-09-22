@@ -154,6 +154,38 @@ export default function PurchaseOrdersPage() {
     } catch (err) { setError(err.message); }
   };
 
+  const update = async (payload) => {
+    setBusy(true); setFormError(null); setInvalidProductIds([]);
+    try {
+      const updated = await purchaseOrderAPI.updatePurchaseOrder(selected.id, payload);
+      await loadPurchaseOrders();
+      setSelected(updated);
+      setMode('detail');
+    } catch (err) {
+      setFormError(err.message);
+      if (err.missingProductIds) setInvalidProductIds(err.missingProductIds);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Boolean return, not a throw — PurchaseOrderDetail's confirm dialog
+  // reads it the same way setQuickbooksRef's caller does, to decide
+  // whether to close itself (true) or stay open over the error (false).
+  const remove = async () => {
+    setError(null);
+    try {
+      await purchaseOrderAPI.deletePurchaseOrder(selected.id);
+      await loadPurchaseOrders();
+      setSelected(null);
+      setMode('list');
+      return true;
+    } catch (err) {
+      setError(err.message);
+      return false;
+    }
+  };
+
   // Returns whether it succeeded rather than throwing, so the inline
   // editor in PurchaseOrderDetail knows whether to close (success) or
   // stay open with the draft intact (failure) — the ErrorBanner above
@@ -184,7 +216,7 @@ export default function PurchaseOrdersPage() {
               What we have asked suppliers for, and what has arrived.
             </p>
           </div>
-          {canManage && mode !== 'create' ? (
+          {canManage && mode !== 'create' && mode !== 'edit' ? (
             <Button
               type="button"
               onClick={() => { setMode('create'); setSelected(null); setFormError(null); }}
@@ -194,16 +226,27 @@ export default function PurchaseOrdersPage() {
           ) : null}
         </div>
 
-        {mode === 'create' ? (
+        {mode === 'create' || mode === 'edit' ? (
           <div className="mt-6">
             <PurchaseOrderForm
+              // Forces a remount (and so a fresh read of initialValue)
+              // whenever the target changes — create vs. edit, or one
+              // PO's edit vs. another's — rather than trying to react
+              // to a prop change inside the form's own state.
+              key={mode === 'edit' ? `edit-${selected?.id}` : 'create'}
               suppliers={suppliers}
               products={products}
               busy={busy}
               error={formError}
               invalidProductIds={invalidProductIds}
-              onSubmit={create}
-              onCancel={() => { setMode('list'); setFormError(null); setInvalidProductIds([]); }}
+              initialValue={mode === 'edit' ? selected : null}
+              submitLabel={mode === 'edit' ? 'Save changes' : undefined}
+              onSubmit={mode === 'edit' ? update : create}
+              onCancel={() => {
+                setMode(mode === 'edit' ? 'detail' : 'list');
+                setFormError(null);
+                setInvalidProductIds([]);
+              }}
             />
           </div>
         ) : (
@@ -268,6 +311,8 @@ export default function PurchaseOrdersPage() {
                     canManage={canManage}
                     onApprove={approve}
                     onSetQuickbooksRef={setQuickbooksRef}
+                    onEdit={() => { setMode('edit'); setFormError(null); setInvalidProductIds([]); }}
+                    onDelete={remove}
                     onClose={() => { setSelected(null); setMode('list'); }}
                   />
                 ) : null}

@@ -42,4 +42,14 @@ router.patch('/:id/status',
 router.patch('/:id/quickbooks-ref',
   auth, requireRole(...MANAGES_UP), validateIntId, purchaseOrderController.setQuickbooksReference);
 
+// Header + line edit, and outright removal — both restricted to a
+// 'pending' order by purchaseOrder.service.js, not by the role check
+// here. Same MANAGES_UP as create: editing/deleting a PO is the same
+// spend-control decision as raising one in the first place.
+router.put('/:id',
+  auth, requireRole(...MANAGES_UP), validateIntId, purchaseOrderController.update);
+
+router.delete('/:id',
+  auth, requireRole(...MANAGES_UP), validateIntId, purchaseOrderController.remove);
+
 export default router;
