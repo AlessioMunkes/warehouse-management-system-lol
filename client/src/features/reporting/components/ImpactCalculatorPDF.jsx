@@ -2,11 +2,14 @@
 // client/src/features/reporting/components/ImpactCalculatorPDF.jsx
 //
 // A shareable, poster-style export of the Impact Calculator — a
-// cover page, one full page per headline number (its own
-// illustration, its own elaborated caption and methodology note),
-// and a closing "beneficiaries by type" comparison page. Replaces an
-// earlier single-page table version that carried numbers but none of
-// the imagery or context the on-screen page has.
+// cover page carrying all four headline numbers as one 2x2 grid of
+// illustrated cards (same composition as the on-screen poster cards,
+// ImpactStatCard.jsx), plus a closing "beneficiaries by type"
+// comparison page. Replaces an earlier single-page table version that
+// carried numbers but none of the imagery, and a version after that
+// which gave each number its own full page — four numbers do not
+// need six pages between them, and each one mostly empty read as
+// broken rather than spacious.
 //
 // Each .pdf-poster-page is a fixed 794x1123px (A4 at 96dpi, matching
 // .pdf-document's own fixed 794px width) — see receipts.css's POSTER
@@ -65,40 +68,29 @@ const ImpactCalculatorPDF = ({ pdfStats, beneficiaryTypeStats, dateRange, onClos
             </div>
           </div>
 
-          <div className="pdf-poster-cover-stats">
+          <div className="pdf-poster-grid">
             {pdfStats.map((s) => (
-              <div key={s.label} className="pdf-poster-cover-stat">
-                <p className="pdf-poster-cover-stat-value" style={{ color: s.color }}>
-                  {s.available ? fmtNum(s.value) : '—'}
-                </p>
-                <p className="pdf-poster-cover-stat-label">{s.label}</p>
+              <div key={s.label} className="pdf-poster-card">
+                <div className="pdf-poster-illustration">
+                  {s.image ? <img src={s.image} alt="" /> : null}
+                </div>
+                <p className="pdf-poster-label">{s.label}</p>
+
+                {s.available ? (
+                  <>
+                    <p className="pdf-poster-value" style={{ color: s.color }}>{fmtNum(s.value)}</p>
+                    <p className="pdf-poster-unit">{s.unit}</p>
+                    {s.caption ? <p className="pdf-poster-caption">{s.caption}</p> : null}
+                  </>
+                ) : (
+                  <p className="pdf-poster-caption">{s.caveat || 'Not available for this period.'}</p>
+                )}
+
+                {s.available && s.caveat ? <p className="pdf-poster-caveat">{s.caveat}</p> : null}
               </div>
             ))}
           </div>
         </div>
-
-        {/* ── One page per headline number ─────────────────── */}
-        {pdfStats.map((s) => (
-          <div key={s.label} className="pdf-poster-page pdf-poster-stat">
-            <p className="pdf-poster-label">{s.label}</p>
-
-            <div className="pdf-poster-illustration">
-              {s.image ? <img src={s.image} alt="" /> : null}
-            </div>
-
-            {s.available ? (
-              <>
-                <p className="pdf-poster-value" style={{ color: s.color }}>{fmtNum(s.value)}</p>
-                <p className="pdf-poster-unit">{s.unit}</p>
-                {s.caption ? <p className="pdf-poster-caption">{s.caption}</p> : null}
-              </>
-            ) : (
-              <p className="pdf-poster-caption">{s.caveat || 'Not available for this period.'}</p>
-            )}
-
-            {s.available && s.caveat ? <p className="pdf-poster-caveat">{s.caveat}</p> : null}
-          </div>
-        ))}
 
         {/* ── Closing page: beneficiaries by type ──────────── */}
         {beneficiaryTypeStats?.length ? (
@@ -127,7 +119,7 @@ const ImpactCalculatorPDF = ({ pdfStats, beneficiaryTypeStats, dateRange, onClos
                 </div>
               ))}
             </div>
-            <p className="pdf-poster-caveat">
+            <p className="pdf-poster-footnote">
               Children are headcounted while adults are estimated, converted via kilograms
               dispatched per kitchen. Dignity kitchen guests and households are estimated the
               same way, per kitchen and per community request.
