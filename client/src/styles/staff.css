@@ -741,7 +741,27 @@
   font-size: 14px; line-height: 1.6;
   color: var(--stf-text-sub);
 }
-.stf-skeleton { height: 56px; border-radius: var(--stf-radius); background: var(--stf-border); }
+/* REVISED — was a flat, static block. The manager side's own loading
+   state (@/components/ui/skeleton.jsx) has carried Tailwind's
+   animate-pulse the whole time; this is the one place staff.css never
+   matched it, on a class used in 16 places across every worker flow
+   (Receiving, Decanting, Dispatch, Packing, Feed the Soil, Community
+   Requests). Same keyframe and timing as Tailwind's own animate-pulse
+   (2s cubic-bezier(0.4,0,0.6,1) infinite, 50% opacity at the midpoint)
+   rather than inventing a different one, so a loading state looks the
+   same whichever side of the app it's on. Frozen for reduced-motion
+   the same way every other animation in this file already is — the
+   blanket [data-stf-motion='reduced'] rule zeroes animation-duration
+   app-wide, nothing extra needed here. */
+.stf-skeleton {
+  height: 56px;
+  border-radius: var(--stf-radius);
+  background: var(--stf-border);
+  animation: stf-skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+@keyframes stf-skeleton-pulse {
+  50% { opacity: 0.5; }
+}
 
 /* ── Segmented tabs ──────────────────────────────────────────────── */
 /* For a board with a few named subsets (packing's "assigned to me /
