@@ -115,6 +115,41 @@ function LocationsMap({ locations }) {
   );
 }
 
+// ── Scroll reveal ─────────────────────────────────────────────
+// Same one-shot IntersectionObserver shape as CountUpStat below (spot
+// it, disconnect, done) rather than toggling visibility on every
+// scroll — a section fading in and out again as someone scrolls past
+// it twice reads as broken, not polished.
+//
+// The motion itself lives entirely in CSS, behind
+// @media (prefers-reduced-motion: no-preference) — see .lol-reveal in
+// landingpage.css. That means a reduced-motion visitor's .lol-reveal
+// elements have no opacity/transform rules at all and render exactly
+// as if this hook were never called; nothing here needs its own
+// reduced-motion branch.
+function useReveal(threshold = 0.15) {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return undefined;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        setVisible(true);
+        observer.disconnect();
+      },
+      { threshold }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [threshold]);
+
+  return [ref, visible];
+}
+
 // ── Count-up stat, animates 0 → value once scrolled into view ─
 function CountUpStat({ icon, value, suffix, label }) {
   const ref = useRef(null);
@@ -302,6 +337,19 @@ const LandingPage = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const firstMenuLinkRef        = useRef(null);
 
+  // One useReveal() per section below the hero, in page order — each
+  // is independent (its own observer, its own once-only trigger), not
+  // a single observer watching a list, so a section higher up the page
+  // finishing its animation has no bearing on one further down.
+  const [teamRef, teamVisible]             = useReveal();
+  const [programmesRef, programmesVisible] = useReveal();
+  const [impactRef, impactVisible]         = useReveal();
+  const [storyRef, storyVisible]           = useReveal();
+  // mapSectionRef, not mapRef — LocationsMap already has its own
+  // unrelated mapRef (the Leaflet instance) in its own scope below.
+  const [mapSectionRef, mapSectionVisible] = useReveal();
+  const [involvedRef, involvedVisible]     = useReveal();
+
   useEffect(() => {
     document.title = 'Batches for Ladles · Warehouse System';
     const t = setTimeout(() => setReady(true), 60);
@@ -425,7 +473,7 @@ const LandingPage = () => {
           </p>
         </section>
 
-        <section className="lol-team">
+        <section ref={teamRef} className={`lol-team lol-reveal${teamVisible ? ' is-visible' : ''}`}>
           <div className="lol-section-inner lol-team-grid">
             <div className="lol-team-photo">
               <WarehouseSlideshow photos={WAREHOUSE_PHOTOS} />
@@ -451,7 +499,11 @@ const LandingPage = () => {
           </div>
         </section>
 
-        <section className="lol-programmes" aria-labelledby="lol-programmes-title">
+        <section
+          ref={programmesRef}
+          className={`lol-programmes lol-reveal${programmesVisible ? ' is-visible' : ''}`}
+          aria-labelledby="lol-programmes-title"
+        >
           <div className="lol-section-inner">
             <div className="lol-programmes-intro">
               <div>
@@ -498,7 +550,11 @@ const LandingPage = () => {
         </section>
 
         {/* ── Impact counters — estimated figures, real data to follow ── */}
-        <section className="lol-impact" aria-labelledby="lol-impact-title">
+        <section
+          ref={impactRef}
+          className={`lol-impact lol-reveal${impactVisible ? ' is-visible' : ''}`}
+          aria-labelledby="lol-impact-title"
+        >
           <div className="lol-section-inner">
             <h2 id="lol-impact-title" className="lol-section-title lol-section-title-light">Our impact so far</h2>
             <div className="lol-impact-grid">
@@ -511,7 +567,7 @@ const LandingPage = () => {
         </section>
 
         {/* ── Our Why ──────────────────────────────────────────── */}
-        <section className="lol-story">
+        <section ref={storyRef} className={`lol-story lol-reveal${storyVisible ? ' is-visible' : ''}`}>
           <div className="lol-section-inner">
             <div className="lol-story-grid">
               <div className="lol-story-text">
@@ -569,7 +625,11 @@ const LandingPage = () => {
         </section>
 
         {/* ── Map ──────────────────────────────────────────────── */}
-        <section className="lol-map-section" aria-labelledby="lol-map-title">
+        <section
+          ref={mapSectionRef}
+          className={`lol-map-section lol-reveal${mapSectionVisible ? ' is-visible' : ''}`}
+          aria-labelledby="lol-map-title"
+        >
           <div className="lol-section-inner">
             <p className="lol-eyebrow">Where the food goes</p>
             <h2 id="lol-map-title" className="lol-section-title">Across three provinces</h2>
@@ -581,7 +641,7 @@ const LandingPage = () => {
           </div>
         </section>
 
-        <section className="lol-getinvolved">
+        <section ref={involvedRef} className={`lol-getinvolved lol-reveal${involvedVisible ? ' is-visible' : ''}`}>
           <div className="lol-section-inner">
             <p className="lol-eyebrow lol-eyebrow--on-dark">New here?</p>
             <h2 className="lol-section-title lol-section-title-light">

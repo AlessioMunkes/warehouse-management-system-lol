@@ -82,10 +82,21 @@
   background: var(--accent); color: #fff; border: none;
   border-radius: var(--radius-pill);
   font-weight: 600; font-size: 14px; cursor: pointer;
-  transition: background 0.15s ease;
+  /* transform added alongside background — same tactile press
+     feedback staff.css's own .stf-btn:active already gives every
+     button on the worker side, and the one pair of real CTA buttons
+     on the landing page was still missing it. */
+  transition: background 0.15s ease, transform 0.15s ease;
   white-space: nowrap;
 }
 .lol-btn-primary:hover { background: var(--accent-deep); }
+.lol-btn-primary:active, .lol-btn-secondary:active { transform: scale(0.97); }
+
+/* The arrow on the hero's "Log in" button nudges right on hover — a
+   small, standard affordance-of-direction cue, not a new visual
+   language: same icon, same stroke, already there. */
+.lol-hero-actions .lol-btn-primary .lol-icon { transition: transform 0.2s ease; }
+.lol-hero-actions .lol-btn-primary:hover .lol-icon { transform: translateX(3px); }
 
 /* Secondary (hero) — red-bordered so it reads red even sitting on a photo */
 .lol-btn-secondary {
@@ -96,7 +107,7 @@
   color: #fff;
   border-radius: var(--radius-pill);
   font-weight: 600; font-size: 14px; cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
   white-space: nowrap;
 }
 .lol-btn-secondary:hover { background: var(--accent); border-color: var(--accent); }
@@ -123,8 +134,26 @@
 
 /* Nav links now red, matching the login button next to them */
 .lol-nav-links { display: flex; align-items: center; gap: 1.85rem; }
-.lol-nav-link { font-size: 0.92rem; font-weight: 700; color: var(--accent); transition: color 0.15s ease; }
+.lol-nav-link {
+  position: relative;
+  font-size: 0.92rem; font-weight: 700; color: var(--accent); transition: color 0.15s ease;
+}
 .lol-nav-link:hover { color: var(--accent-deep); }
+/* An underline that sweeps in from the left on hover, rather than
+   appearing all at once — the same "arriving" quality as the reveal
+   and hero motion above, just fast (0.2s) and local to one link
+   instead of a whole section. right:100% (fully clipped) to right:0
+   (fully drawn) — the whole thing lives in one property, so it's a
+   single transition, not two things timed against each other. */
+.lol-nav-link::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 100%; bottom: -4px;
+  height: 2px;
+  background: var(--accent-deep);
+  transition: right 0.2s ease;
+}
+.lol-nav-link:hover::after { right: 0; }
 @media (max-width: 860px) { .lol-nav-links { display: none; } }
 
 /* ── Drawer (mobile only) ─────────────────────────────────── */
@@ -190,11 +219,57 @@
   text-shadow: 0 1px 10px rgba(0, 0, 0, 0.35);
 }
 .lol-hero-actions { display: flex; gap: 1rem; flex-wrap: wrap; }
+
+/* REVISED — LandingPage.jsx has set a `ready` state and added
+   .is-ready to the hero on a 60ms delay since this section was
+   written, with no CSS rule anywhere ever reading it — a fade-in that
+   was wired up in JS and never finished in CSS. Finished here: the
+   hero's own content starts a beat below and faded, settling into
+   place once .is-ready lands, the same "arrived, not popped in" motion
+   the reveal sections below use. Gated behind prefers-reduced-motion
+   the same way .lol-reveal is — see that rule's own note. */
+@media (prefers-reduced-motion: no-preference) {
+  .lol-hero-content {
+    opacity: 0;
+    transform: translateY(18px);
+    transition: opacity 0.7s ease 0.1s, transform 0.7s ease 0.1s;
+  }
+  .lol-hero.is-ready .lol-hero-content {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 .lol-proof-line {
   position: relative; z-index: 2; text-align: center;
   color: #ffffff; font-size: 1.05rem; font-weight: 500; letter-spacing: 0.02em;
   padding: 1.25rem 1.5rem;
   text-shadow: 0 1px 12px rgba(0, 0, 0, 0.5);
+}
+
+/* ── Scroll reveal ────────────────────────────────────────────
+   Applied to every section below the hero (useReveal() in
+   LandingPage.jsx) — each fades and settles up into place the first
+   time it's scrolled into view, then stays put; it does not replay on
+   a second pass, same reasoning CountUpStat's own count-up only fires
+   once.
+
+   Wrapped in prefers-reduced-motion: no-preference rather than an
+   explicit :where(reduce) override — for a visitor who has that
+   preference set, .lol-reveal picks up NO rule here at all, so the
+   section is opacity:1 the way it would be with no JS involved. That
+   also means a real failure (the observer never firing, a ref that
+   missed its node) fails safe: the fallback state for every visitor,
+   reduced-motion or not, is fully visible. */
+@media (prefers-reduced-motion: no-preference) {
+  .lol-reveal {
+    opacity: 0;
+    transform: translateY(28px);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+  }
+  .lol-reveal.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ── Organic divider — forced to true black regardless of the
