@@ -355,11 +355,21 @@
   font: 600 10px/1.2 var(--stf-font-sans);
   cursor: pointer;
 }
-.stf-tab-icon  { width: 24px; height: 24px; object-fit: contain; opacity: 0.55; }
-.stf-tab-glyph { font-size: 18px; line-height: 24px; opacity: 0.55; }
+.stf-tab-icon  { width: 24px; height: 24px; object-fit: contain; opacity: 0.55; transition: opacity 150ms ease, transform 150ms ease; }
+.stf-tab-glyph { font-size: 18px; line-height: 24px; opacity: 0.55; transition: opacity 150ms ease, transform 150ms ease; }
 .stf-tab.is-current { border-top-color: var(--stf-accent); color: var(--stf-ink); }
 .stf-tab.is-current .stf-tab-icon,
 .stf-tab.is-current .stf-tab-glyph { opacity: 1; }
+/* Every tab, current or not, on a mouse — the bar had no hover
+   feedback at all before this, only the permanent .is-current state.
+   Full opacity plus a small pop rather than opacity alone: a tab
+   sitting at opacity 1 already (the current one) still needs
+   something to show for a hover, and "lights up AND grows slightly"
+   is the ask. Icon and glyph only, not the tab's own border/colour —
+   those still belong to .is-current alone, so hovering a tab never
+   reads as though it were already selected. */
+.stf-tab:hover .stf-tab-icon,
+.stf-tab:hover .stf-tab-glyph { opacity: 1; transform: scale(1.1); }
 
 /* ── Doodle footer ───────────────────────────────────────────────── */
 .stf-footer {
