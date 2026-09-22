@@ -13,6 +13,7 @@
 // background while nobody is looking at it.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import notificationAPI from '../../../services/notificationAPI';
 import { Button } from '@/components/ui/button';
 import {
@@ -32,7 +33,29 @@ const timeAgo = (iso) => {
 
 const POLL_MS = 60_000;
 
+export const notificationDestination = (notification) => {
+  switch (notification?.type) {
+    case 'picking_slips_generated':
+      return '/noc/picking-slips';
+    case 'picking_slip_created':
+      return notification.entityId ? `/noc/packing/${notification.entityId}` : null;
+    case 'non_collections_flagged':
+      return '/noc/beneficiaries';
+    case 'purchase_order_needs_attention':
+      return '/noc/purchase-orders';
+    case 'low_stock':
+      return '/noc/inventory?status=lowstock';
+    case 'donation_review':
+      return '/admin/donation-management';
+    case 'section18a_email_failed':
+      return '/admin/section-18a';
+    default:
+      return null;
+  }
+};
+
 export default function NotificationBell() {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [items, setItems] = useState([]);
@@ -72,6 +95,15 @@ export default function NotificationBell() {
       refreshCount();
     } catch {
       /* the badge will self-correct on the next poll tick */
+    }
+  };
+
+  const openNotification = async (notification) => {
+    if (!notification.isRead) await markOneRead(notification.id);
+    const destination = notificationDestination(notification);
+    if (destination) {
+      setOpen(false);
+      navigate(destination);
     }
   };
 
@@ -118,7 +150,7 @@ export default function NotificationBell() {
               <button
                 key={n.id}
                 type="button"
-                onClick={() => !n.isRead && markOneRead(n.id)}
+                onClick={() => openNotification(n)}
                 className={`block w-full border-b px-3 py-2 text-left last:border-b-0 hover:bg-muted/50 ${n.isRead ? '' : 'bg-muted/30'}`}
               >
                 <div className="flex items-start gap-2">

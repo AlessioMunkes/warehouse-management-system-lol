@@ -39,6 +39,7 @@ import {
   donationFingerprint,
 } from '../lib/validation/donationIntake.js';
 import donationModel from '../repositories/donation.repository.js';
+import { createNotification } from '../repositories/notification.repository.js';
 import certificateSettingsService from './certificateSettings.service.js';
 import emailProvider from '../providers/email.provider.js';
 import pdfProvider from '../providers/pdf.provider.js';
@@ -930,6 +931,19 @@ const sendThankYouEmail = async (donation, sentByUserId = null) => {
     sentByUserId,
   });
 };
+
+const notifySection18AEmailFailed = async (donation) => {
+  await createNotification(pool, {
+    type: 'section18a_email_failed',
+    title: 'Section 18A email failed',
+    body: `Certificate email for donation #${donation.id} failed.`,
+    entityType: 'donation',
+    entityId: donation.id,
+    targetRoles: ['admin'],
+    avoidDuplicate: true,
+  });
+};
+
 // Returns the existing certificate for the donation, or creates a new
 // one if none exists yet. Never regenerates one that is already there.
 const getOrCreateSection18ACertificate = async (donation, actorId) => {
@@ -1101,7 +1115,7 @@ const sendSection18ACertificateEmail = async (donation, actorId) => {
     emailContent = generateSection18ACertificateEmailContent(donation, certificate, emailSettings);
   } catch (err) {
     console.error('[sendSection18ACertificateEmail:prepare]', err);
-    return await donationModel.logDonationEmail({
+    const failedLog = await donationModel.logDonationEmail({
       donation,
       donationId: donation.id,
       certificateId: certificate?.id ?? null,
@@ -1114,9 +1128,11 @@ const sendSection18ACertificateEmail = async (donation, actorId) => {
       errorMessage: err.message,
       sentByUserId: actorId ?? null,
     });
+    await notifySection18AEmailFailed(donation);
+    return failedLog;
   }
 
-  return await logEmailAttempt({
+  const sent = await logEmailAttempt({
     donation,
     donationId:    donation.id,
     certificateId: certificate.id,
@@ -1126,6 +1142,10 @@ const sendSection18ACertificateEmail = async (donation, actorId) => {
     email: emailContent,
     sentByUserId: actorId ?? null,
   });
+  if (sent?.status === 'FAILED') {
+    await notifySection18AEmailFailed(donation);
+  }
+  return sent;
 };
 
 const generateSection18ACertificate = async (donationId, userId) => {

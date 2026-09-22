@@ -4,6 +4,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useReducedMotion } from '../features/taskdashboard/components/shellContext';
 import { useAuth } from "../context/AuthContext";
 import StockHealthBar from "../features/InventoryManagement/components/StockHealthBar";
@@ -18,6 +19,8 @@ const CAN_ADJUST = ["manager", "admin"];
 
 export default function InventoryManagementPage() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const initialStatusFilter = searchParams.get("status") === "lowstock" ? "lowstock" : "all";
 
   // Accessibility toggle state for TopNavbar
   const { reducedMotion: reducedMovement } = useReducedMotion();
@@ -249,6 +252,7 @@ export default function InventoryManagementPage() {
             products={products}
             isLoading={isLoading}
             canAdjust={canAdjust}
+            initialStatusFilter={initialStatusFilter}
             trends={trends}
             onAdjust={(prod) => setAdjustingProduct(prod)}
             onViewHistory={handleViewHistory}

@@ -13,11 +13,11 @@ import notificationController       from '../controllers/notification.controller
 
 const router = express.Router();
 
-const MANAGERS_UP = [ROLES.MANAGER, ROLES.ADMIN];
+const STAFF_ROLES = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 
-router.get('/',              auth, requireRole(...MANAGERS_UP), notificationController.list);
-router.get('/unread-count',  auth, requireRole(...MANAGERS_UP), notificationController.unreadCount);
-router.post('/read-all',     auth, requireRole(...MANAGERS_UP), notificationController.markAllRead);
-router.patch('/:id/read',    auth, requireRole(...MANAGERS_UP), validateIntId, notificationController.markRead);
+router.get('/',              auth, requireRole(...STAFF_ROLES), notificationController.list);
+router.get('/unread-count',  auth, requireRole(...STAFF_ROLES), notificationController.unreadCount);
+router.post('/read-all',     auth, requireRole(...STAFF_ROLES), notificationController.markAllRead);
+router.patch('/:id/read',    auth, requireRole(...STAFF_ROLES), validateIntId, notificationController.markRead);
 
 export default router;

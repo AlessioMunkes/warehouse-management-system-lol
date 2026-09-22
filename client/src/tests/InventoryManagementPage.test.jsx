@@ -35,7 +35,10 @@ vi.mock('../context/AuthContext', () => ({
   useAuth: () => ({ user: mockUser.value, logout: vi.fn() }),
 }));
 
-vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn() }));
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => vi.fn(),
+  useSearchParams: () => [new URLSearchParams()],
+}));
 
 const { getManifest, getMovements, adjustStock } = await import('../services/stockAPI');
 const { default: InventoryManagementPage } = await import('../pages/InventoryManagementPage');

@@ -120,22 +120,24 @@ const networkError = () => {
 };
 
 // ── GET ───────────────────────────────────────────────────────
-export const apiGet = async (endpoint) => {
+export const apiGet = async (endpoint, options = {}) => {
   let res;
   try {
     res = await fetch(`${API_BASE}${endpoint}`, {
       method:      'GET',
       credentials: 'include', // sends the httpOnly cookie automatically
       headers:     { 'Content-Type': 'application/json' },
+      signal:      options.signal,
     });
-  } catch {
+  } catch (err) {
+    if (err.name === 'AbortError') throw err;
     throw networkError();
   }
   return handleResponse(res);
 };
 
 // ── POST ──────────────────────────────────────────────────────
-export const apiPost = async (endpoint, body) => {
+export const apiPost = async (endpoint, body, options = {}) => {
   console.log("[API] apiPost()", endpoint, body);
   let res;
   try {
@@ -145,9 +147,11 @@ export const apiPost = async (endpoint, body) => {
       credentials: 'include',
       headers:     { 'Content-Type': 'application/json' },
       body:        JSON.stringify(body),
+      signal:      options.signal,
     });
     console.log("[API] fetch completed", res.status);
-  } catch {
+  } catch (err) {
+    if (err.name === 'AbortError') throw err;
     throw networkError();
   }
   return handleResponse(res);
@@ -217,7 +221,7 @@ export const invalidateCache = (key) => cache.delete(key);
 // PUT is used by the attendance contract. It lives in the shared helper so
 // that future attendance components keep the same cookie, network-error and
 // session-expiry behaviour as every other API call.
-export const apiPut = async (endpoint, body = {}) => {
+export const apiPut = async (endpoint, body = {}, options = {}) => {
   let res;
   try {
     res = await fetch(`${API_BASE}${endpoint}`, {
@@ -225,8 +229,10 @@ export const apiPut = async (endpoint, body = {}) => {
       credentials: 'include',
       headers:     { 'Content-Type': 'application/json' },
       body:        JSON.stringify(body),
+      signal:      options.signal,
     });
-  } catch {
+  } catch (err) {
+    if (err.name === 'AbortError') throw err;
     throw networkError();
   }
   return handleResponse(res);

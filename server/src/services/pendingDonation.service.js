@@ -1,6 +1,7 @@
 import pool from '../config/db.js';
 import { determineRouting } from '../lib/donationRouting.js';
 import { logAudit } from '../repositories/auditLog.repository.js';
+import { createNotification } from '../repositories/notification.repository.js';
 import pendingDonationRepository from '../repositories/pendingDonation.repository.js';
 import productRepository from '../repositories/product.repository.js';
 import donationAdminService from './donationAdmin.service.js';
@@ -481,6 +482,18 @@ export const createPendingDonationFromIntake = async (payload = {}) => {
       {},
       client
     );
+
+    if (unresolvedCount > 0) {
+      await createNotification(client, {
+        type: 'donation_review',
+        title: `${unresolvedCount} donation item${unresolvedCount === 1 ? '' : 's'} need review`,
+        body: `Donation #${pendingDonation.id} is waiting in donation management.`,
+        entityType: 'pending_donation',
+        entityId: pendingDonation.id,
+        targetRoles: ['admin'],
+        avoidDuplicate: true,
+      });
+    }
 
     await client.query('COMMIT');
 
