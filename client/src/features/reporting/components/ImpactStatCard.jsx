@@ -15,11 +15,12 @@
 // photo, so it gets a small drawn document-stack instead of an empty
 // panel — see PaperGraphic below.
 //
-// The image tint behind each illustration is the stat's own colour at
-// low opacity, not a fixed neutral — "muted enough to fit the app's
-// own colour scheme" was the brief, and this is the same soft-tinted-
-// circle convention the app already uses for every stat icon badge
-// (ManagerDashboardPage's StatTile, this page's old StatCard).
+// The panel behind each illustration is a fixed warm off-white, the
+// same neutral the app already uses for card borders (#e9e3dd) — not
+// each stat's own colour at low opacity. That per-stat tint read as
+// an actual colour difference between cards (children's red came out
+// visibly pink next to the others), which fought the "poster" idea
+// of four cards that belong to one consistent set.
 // ─────────────────────────────────────────────────────────────
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
@@ -42,11 +43,8 @@ const PaperGraphic = () => (
   </div>
 );
 
-const Illustration = ({ src, alt, color }) => (
-  <div
-    className="relative hidden h-full min-h-[180px] w-full items-center justify-center overflow-hidden rounded-2xl sm:flex"
-    style={{ backgroundColor: `${color}14` }}
-  >
+const Illustration = ({ src, alt }) => (
+  <div className="relative hidden h-full min-h-[180px] w-full items-center justify-center overflow-hidden rounded-2xl bg-[#f7f4ef] ring-1 ring-black/5 sm:flex">
     {src ? (
       <img
         src={src}
@@ -90,7 +88,7 @@ export default function ImpactStatCard({ def, stat }) {
         </div>
 
         <div className="h-40 w-full sm:h-44 sm:w-44">
-          <Illustration src={image} alt="" color={def.color} />
+          <Illustration src={image} alt="" />
         </div>
       </CardContent>
     </Card>

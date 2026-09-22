@@ -49,6 +49,19 @@ const truncate = (s, n) => (String(s).length > n ? `${String(s).slice(0, n - 1)}
 const humanise = (s) =>
   String(s).replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
 
+// Month-dimension labels arrive as raw "YYYY-MM" buckets
+// (reporting.repository.js's bucketMonth) — humanise() alone leaves
+// that as "2026-09", which is exactly the kind of number-soup a chart
+// is supposed to replace. Every other dimension (cohort, beneficiary,
+// product name...) still goes through humanise().
+const MONTH_BUCKET = /^\d{4}-\d{2}$/;
+const formatLabel = (label) => {
+  if (!MONTH_BUCKET.test(label)) return humanise(label);
+  const [y, m] = String(label).split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, 1))
+    .toLocaleDateString('en-ZA', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+};
+
 const NumberView = ({ series, unit }) => (
   <div className="py-10 text-center">
     <div className="text-5xl sm:text-6xl font-bold tracking-tight" style={{ color: CHARCOAL }}>
@@ -81,7 +94,7 @@ const BarView = ({ series, unit }) => {
             </text>
             <text x={x + barW / 2} y={H - PAD_B + 18} textAnchor="middle"
                   fontSize="11" fill={MUTED}>
-              {truncate(humanise(row.label), 12)}
+              {truncate(formatLabel(row.label), 12)}
             </text>
           </g>
         );
@@ -114,7 +127,7 @@ const HBarView = ({ series, unit }) => {
         return (
           <g key={row.label}>
             <text x="0" y={y + 15} fontSize="12" fill={CHARCOAL}>
-              {truncate(humanise(row.label), 22)}
+              {truncate(formatLabel(row.label), 22)}
             </text>
             {/* Negative values (below reorder level) stay RED regardless
                 of row — "this far under threshold" is a warning, not a
@@ -166,7 +179,7 @@ const LineView = ({ series, unit }) => {
               </text>
               <text x={points[i].x} y={H - PAD_B + 18} textAnchor="middle"
                     fontSize="11" fill={MUTED}>
-                {truncate(row.label, 10)}
+                {truncate(formatLabel(row.label), 10)}
               </text>
             </>
           )}
@@ -187,7 +200,7 @@ const TableView = ({ series, unit, dimensionLabel }) => (
     <TableBody>
       {series.map((row) => (
         <TableRow key={row.label}>
-          <TableCell>{humanise(row.label)}</TableCell>
+          <TableCell>{formatLabel(row.label)}</TableCell>
           <TableCell className="text-right font-medium">
             {fmt(row.value, unit)}{row.meta?.unit ? ` ${row.meta.unit}` : ''}
           </TableCell>
@@ -252,7 +265,7 @@ export default function ReportChart({ report, dimensionLabel = 'Category', compa
   // One sentence summarising the chart, for screen readers. The
   // visual is marked presentational so it is not announced twice.
   const summary = `${report.description}. ` +
-    series.map((r) => `${humanise(r.label)}: ${fmt(r.value, unit)}`).join('. ');
+    series.map((r) => `${formatLabel(r.label)}: ${fmt(r.value, unit)}`).join('. ');
 
   return (
     <div>

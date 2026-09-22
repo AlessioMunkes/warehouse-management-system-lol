@@ -57,7 +57,9 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
-import { Sprout, Download, Settings2 } from 'lucide-react';
+import {
+  Sprout, Download, Settings2, Baby, Utensils,
+} from 'lucide-react';
 
 const DIMENSION_LABELS = {
   none: 'Total', month: 'Month', week: 'Week',
@@ -164,7 +166,25 @@ const AdjustFactorsDialog = () => {
   );
 };
 
-const ImpactPanel = ({ title, metric, dimensions, defaultDimension }) => {
+// A dimension picks what a chart is FOR, not just how it's grouped —
+// "no breakdown" is a single figure (NumberView), a time dimension is
+// a trend (LineView), anything else is a ranked comparison (BarView).
+// Before this, the panel always used the metric's own defaultChart
+// regardless of which dimension was selected, so children_reached
+// (defaultChart: 'number') rendered as a single NumberView even with
+// "Month" picked — a lone figure from just the first bucket in range,
+// which is exactly the "304 children, doesn't make sense" complaint:
+// there was no way to tell it was one month out of several, not a
+// total.
+const chartTypeForDimension = (dimension) => {
+  if (dimension === 'none') return 'number';
+  if (dimension === 'month' || dimension === 'week') return 'line';
+  return 'bar';
+};
+
+const ImpactPanel = ({
+  title, metric, dimensions, defaultDimension, icon: Icon, color,
+}) => {
   const [preset, setPreset] = useState(DEFAULT_PRESET);
   const [dimension, setDimension] = useState(defaultDimension);
   const [report, setReport] = useState(null);
@@ -177,6 +197,7 @@ const ImpactPanel = ({ title, metric, dimensions, defaultDimension }) => {
     try {
       const res = await runReport({
         metric, dimension, filters: {}, dateRange: resolvePreset(preset),
+        chartType: chartTypeForDimension(dimension),
       });
       setReport(res.data ?? res);
     } catch (err) {
@@ -191,9 +212,17 @@ const ImpactPanel = ({ title, metric, dimensions, defaultDimension }) => {
   useEffect(() => { load(); }, [load]);
 
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0">
-        <CardTitle>{title}</CardTitle>
+        <div className="flex items-center gap-3">
+          <div
+            className="flex size-9 shrink-0 items-center justify-center rounded-full"
+            style={{ backgroundColor: `${color}1a`, color }}
+          >
+            <Icon className="size-4" />
+          </div>
+          <CardTitle>{title}</CardTitle>
+        </div>
         <div className="flex gap-2">
           <Select value={dimension} onValueChange={setDimension}>
             <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
@@ -226,7 +255,9 @@ const ImpactPanel = ({ title, metric, dimensions, defaultDimension }) => {
         ) : report ? (
           <>
             <p className="mb-3 text-sm text-muted-foreground">{report.description}</p>
-            <ReportChart report={report} dimensionLabel={DIMENSION_LABELS[dimension] ?? dimension} />
+            <div className="rounded-xl bg-[#f7f4ef] p-4">
+              <ReportChart report={report} dimensionLabel={DIMENSION_LABELS[dimension] ?? dimension} />
+            </div>
             {report.meta?.caveat ? (
               <p className="mt-3 text-xs text-muted-foreground">{report.meta.caveat}</p>
             ) : null}
@@ -368,12 +399,16 @@ export default function ImpactReportPage() {
             metric="children_reached"
             dimensions={['none', 'month', 'cohort', 'ecd_centre']}
             defaultDimension="month"
+            icon={Baby}
+            color={STAT_DEFS[0].color}
           />
           <ImpactPanel
             title="Meals enabled"
             metric="meals_enabled"
             dimensions={['none', 'month', 'week', 'cohort', 'beneficiary']}
             defaultDimension="month"
+            icon={Utensils}
+            color="#2b3336"
           />
         </div>
       </main>
