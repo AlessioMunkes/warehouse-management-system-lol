@@ -99,6 +99,10 @@ const handleResponse = async (res) => {
     const error = new Error(data.message || `Request failed (${res.status}).`);
     error.status = res.status;
     error.errors = data.errors || {};
+    // Set only when the server sends one (currently just the invite
+    // accept/resolve 410s: 'expired' | 'revoked' | 'accepted') — lets a
+    // caller show distinct copy per cause instead of one generic message.
+    if (data.reason) error.reason = data.reason;
     throw error;
   }
   return data;

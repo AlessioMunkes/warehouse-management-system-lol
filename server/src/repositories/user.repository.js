@@ -92,6 +92,18 @@ const findUserByUsername = async (username, { excludeId = null } = {}) => {
   return rows[0] ?? null;
 };
 
+// Same case-insensitive reasoning as findUserByUsername. Used only by
+// userInvite.service.js to stop an admin inviting an address that
+// already belongs to an active account — narrower SELECT than
+// USER_COLUMNS because nothing else needs a user's email yet.
+const findUserByEmail = async (email) => {
+  const { rows } = await pool.query(
+    `SELECT id, username, email FROM users WHERE lower(email) = lower($1)`,
+    [email]
+  );
+  return rows[0] ?? null;
+};
+
 // ── Write ─────────────────────────────────────────────────────
 const insertUser = async (payload, actorId) => {
   const client = await pool.connect();
@@ -260,6 +272,7 @@ export default {
   listUsers,
   getUserById,
   findUserByUsername,
+  findUserByEmail,
   insertUser,
   updateUser,
   setUserActive,

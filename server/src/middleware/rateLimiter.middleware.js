@@ -57,4 +57,24 @@ export const publicSlipRateLimiter = rateLimit({
   },
 });
 
+// ── Public invite resolve/accept ────────────────────────────────
+// Unlike the slip short code, the invite token is 256 bits of
+// crypto.randomBytes — not worth guessing, so this isn't a brute-force
+// defence the way publicSlipRateLimiter is. It exists to stop the
+// accept endpoint (a write that creates an account) being hammered,
+// and to bound damage if a token ever leaks. Lower ceiling than the
+// slip limiter because there's no warehouse-full-of-volunteers-on-one-
+// NAT case to make room for here — one invitee, one link.
+export const publicInviteRateLimiter = rateLimit({
+  windowMs:        15 * 60 * 1000,
+  max:             20,
+  standardHeaders: 'draft-8',
+  legacyHeaders:   false,
+  skipSuccessfulRequests: true,
+  message: {
+    success: false,
+    message: 'Too many attempts. Please wait a few minutes, or ask your admin for help.',
+  },
+});
+
 export default loginRateLimiter;

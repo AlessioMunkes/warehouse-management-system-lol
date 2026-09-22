@@ -29,6 +29,12 @@ export default defineConfig({
       // download ~400 kB on install for users who never drop a file.
       workbox: {
         globIgnores: ['**/xlsx-*.js'],
+        // The main bundle was already within ~2.5 KB of the 2 MiB
+        // default when the invite feature added enough to cross it —
+        // this was never a comfortable margin, not something that
+        // feature broke on its own. 3 MiB gives real headroom instead
+        // of raising it by exactly the amount needed today.
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
       },
       includeAssets: [FAVICON_ASSET],
       manifest: {
