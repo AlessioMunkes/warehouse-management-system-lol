@@ -37,7 +37,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
 import ReportChart    from '../features/reporting/components/ReportChart';
-import CountUp         from '../features/reporting/components/CountUp';
+import ImpactStatCard from '../features/reporting/components/ImpactStatCard';
 import ImpactCalculatorPDF from '../features/reporting/components/ImpactCalculatorPDF';
 import { runReport }  from '../services/reportingAPI';
 import reportingAPI   from '../services/reportingAPI';
@@ -57,9 +57,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
-import {
-  FileText, Baby, UserRound, Sprout, Download, Settings2,
-} from 'lucide-react';
+import { Sprout, Download, Settings2 } from 'lucide-react';
 
 const DIMENSION_LABELS = {
   none: 'Total', month: 'Month', week: 'Week',
@@ -71,52 +69,40 @@ const MISSING_FACTOR_STATUS = 503;
 // One fixed palette entry per headline card — a card's colour never
 // changes meaning between renders, the same reasoning
 // ManagerDashboardPage.jsx's DONUT_COLORS follows.
+//
+// Order and captions match the poster-style layout: children/adults
+// on top, compost/paper below. Three of the four captions are static
+// because they're facts already true of how each number is computed
+// (see this file's own header note on each metric) — not filler text,
+// the actual provenance. children_reached's caption is the one
+// genuinely dynamic one (which month was strongest) and is filled in
+// below once the monthly breakdown loads.
 const STAT_DEFS = [
-  { metric: 'paper_saved',       label: 'Paper saved',       icon: FileText,  unit: 'documents', color: '#2b3336' },
-  { metric: 'children_reached',  label: 'Children served',   icon: Baby,      unit: 'children',  color: '#ef3a40' },
-  { metric: 'adults_reached',    label: 'Adults served',     icon: UserRound, unit: 'adults',    color: '#c9a86a' },
-  { metric: 'compost_processed', label: 'Compost processed', icon: Sprout,    unit: 'kg',        color: '#6b8f71' },
+  {
+    metric: 'children_reached', label: 'Children served',
+    unit: 'children', color: '#ef3a40', image: '/images/child-bowl.svg',
+  },
+  {
+    metric: 'adults_reached', label: 'Adults served',
+    unit: 'adults', color: '#c9a86a', image: '/images/person-waving.svg',
+    staticCaption: 'Soup kitchens only · estimated from kg',
+  },
+  {
+    metric: 'compost_processed', label: 'Compost processed',
+    unit: 'kg', color: '#6b8f71', image: '/images/farmer-compost.svg',
+    staticCaption: 'From Feed the Soil kits returned',
+  },
+  {
+    metric: 'paper_saved', label: 'Paper saved',
+    unit: 'documents', color: '#2b3336', image: null,
+    staticCaption: 'Delivery notes · dispatch · decanting',
+  },
 ];
 
 const FACTOR_DEFS = [
   { key: 'kg_to_meals',          label: 'Meals per kg dispatched' },
   { key: 'kg_to_adults_served',  label: 'Adults served per kg dispatched (soup kitchens)' },
 ];
-
-const StatCard = ({ def, stat }) => {
-  const Icon = def.icon;
-  return (
-    <Card>
-      <CardContent className="flex items-center gap-4 p-5">
-        <div
-          className="flex size-12 shrink-0 items-center justify-center rounded-full"
-          style={{ backgroundColor: `${def.color}1a`, color: def.color }}
-        >
-          <Icon className="size-6" />
-        </div>
-        <div className="min-w-0">
-          {!stat ? (
-            <Skeleton className="h-8 w-20" />
-          ) : stat.notReady ? (
-            // 503 covers two different "not ready yet" cases (a
-            // missing conversion factor, or — for compost_processed —
-            // a migration that hasn't run) with different messages;
-            // showing the server's own text rather than one hard-coded
-            // label keeps this accurate for both.
-            <p className="text-sm text-muted-foreground">{stat.message || 'Not set up yet'}</p>
-          ) : stat.error ? (
-            <p className="text-sm text-[#ef3a40]">Couldn't load</p>
-          ) : (
-            <p className="text-3xl font-bold tracking-tight" style={{ color: def.color }}>
-              <CountUp value={stat.value} /> <span className="text-base font-medium text-muted-foreground">{def.unit}</span>
-            </p>
-          )}
-          <p className="mt-0.5 text-sm text-muted-foreground">{def.label}</p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
 
 const AdjustFactorsDialog = () => {
   const [open, setOpen] = useState(false);
@@ -253,6 +239,15 @@ const ImpactPanel = ({ title, metric, dimensions, defaultDimension }) => {
   );
 };
 
+// children_reached's month dimension comes back "YYYY-MM"
+// (reporting.repository.js's bucketMonth) — a month name is what
+// reads as a caption ("267 in September"), not the raw bucket key.
+const monthName = (bucketKey) => {
+  const [y, m] = String(bucketKey).split('-').map(Number);
+  if (!y || !m) return bucketKey;
+  return new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('en-ZA', { month: 'long', timeZone: 'UTC' });
+};
+
 export default function ImpactReportPage() {
   const [preset, setPreset] = useState(DEFAULT_PRESET);
   const [stats, setStats] = useState({});
@@ -263,17 +258,45 @@ export default function ImpactReportPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const results = await Promise.all(STAT_DEFS.map(async (def) => {
-        try {
-          const res = await runReport({ metric: def.metric, dimension: 'none', filters: {}, dateRange });
-          const report = res.data ?? res;
-          return [def.metric, { value: report.total ?? 0, caveat: report.meta?.caveat }];
-        } catch (err) {
-          if (err.status === MISSING_FACTOR_STATUS) return [def.metric, { notReady: true, message: err.message }];
-          return [def.metric, { error: true }];
-        }
-      }));
-      if (!cancelled) setStats(Object.fromEntries(results));
+      const [results, monthlyRes] = await Promise.all([
+        Promise.all(STAT_DEFS.map(async (def) => {
+          try {
+            const res = await runReport({ metric: def.metric, dimension: 'none', filters: {}, dateRange });
+            const report = res.data ?? res;
+            return [def.metric, {
+              value: report.total ?? 0,
+              caveat: report.meta?.caveat,
+              caption: def.staticCaption,
+            }];
+          } catch (err) {
+            if (err.status === MISSING_FACTOR_STATUS) return [def.metric, { notReady: true, message: err.message }];
+            return [def.metric, { error: true }];
+          }
+        })),
+        // Children served is the one card with a dynamic caption ("267
+        // in September · strongest month yet") — real, not a guess: the
+        // same monthly breakdown the "Detailed breakdown" panel below
+        // already fetches for this metric, just fetched here too since
+        // that panel's own request is a separate component with its own
+        // state. Failure here just means no caption, not a broken page —
+        // the headline number itself already came back above.
+        runReport({ metric: 'children_reached', dimension: 'month', filters: {}, dateRange }).catch(() => null),
+      ]);
+
+      if (cancelled) return;
+
+      const byMetric = Object.fromEntries(results);
+      const monthlyReport = monthlyRes ? (monthlyRes.data ?? monthlyRes) : null;
+      const strongestMonth = monthlyReport?.series?.length
+        ? monthlyReport.series.reduce((best, row) => (row.value > (best?.value ?? -Infinity) ? row : best), null)
+        : null;
+
+      if (strongestMonth && byMetric.children_reached && !byMetric.children_reached.notReady && !byMetric.children_reached.error) {
+        byMetric.children_reached.caption =
+          `${Math.round(strongestMonth.value).toLocaleString('en-ZA')} in ${monthName(strongestMonth.label)} · strongest month yet`;
+      }
+
+      setStats(byMetric);
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -316,9 +339,9 @@ export default function ImpactReportPage() {
           </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
           {STAT_DEFS.map((def) => (
-            <StatCard key={def.metric} def={def} stat={stats[def.metric]} />
+            <ImpactStatCard key={def.metric} def={def} stat={stats[def.metric]} />
           ))}
         </div>
 
