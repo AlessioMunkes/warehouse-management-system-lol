@@ -4,6 +4,7 @@ import { useNavigate }                 from 'react-router-dom';
 import L                               from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import '../styles/landingpage.css';
+import { getPublicImpactSummary }      from '../services/publicImpactAPI';
 
 // ── Image fallback ───────────────────────────────────────────
 function ImgWithFallback({ src, alt, fallbackText, fallbackPath, className }) {
@@ -294,13 +295,17 @@ const CONTEXT_STATS = [
   { value: '18%', label: 'of SA households severely affected by child malnutrition' },
 ];
 
-// ── Impact counters — placeholder/estimated figures until we wire
-// these up to real reporting data. Update IMPACT_COUNTERS with real
-// numbers once available; the "(estimated)" note below can come out then.
-const IMPACT_COUNTERS = [
-  { id: 'paper',    icon: 'paper',  value: 18540, suffix: '',    label: 'sheets of paper saved by digital record-keeping' },
-  { id: 'compost',  icon: 'sprout', value: 9280,  suffix: ' kg', label: 'food waste turned into compost for local farms' },
-  { id: 'children', icon: 'bowl',   value: 6150,  suffix: '',    label: 'children fed through meals tracked in this system' },
+// ── Impact counters — real data, from the same numbers the Impact
+// Calculator shows (paper_saved / compost_processed / children_reached,
+// all-time), via publicImpactAPI.js's one unauthenticated route. This
+// array only carries the metadata that never changes (icon, suffix,
+// label) and the fallback shown if that fetch fails; the actual
+// number is merged in at render time from the fetched summary — see
+// the `impact` state below.
+const IMPACT_COUNTER_DEFS = [
+  { id: 'paper',    icon: 'paper',  suffix: '',    label: 'sheets of paper saved by digital record-keeping', fallback: 18540 },
+  { id: 'compost',  icon: 'sprout', suffix: ' kg', label: 'food waste turned into compost for local farms',  fallback: 9280 },
+  { id: 'children', icon: 'bowl',   suffix: '',    label: 'children fed through meals tracked in this system', fallback: 6150 },
 ];
 
 const WAREHOUSE_PHOTOS = [
@@ -349,6 +354,28 @@ const LandingPage = () => {
   // unrelated mapRef (the Leaflet instance) in its own scope below.
   const [mapSectionRef, mapSectionVisible] = useReveal();
   const [involvedRef, involvedVisible]     = useReveal();
+
+  // Real numbers, fetched once on mount. null until the fetch settles
+  // (success OR failure) — CountUpStat only animates once, the first
+  // time it scrolls into view, so it must never mount with a value
+  // that's still just a placeholder: nothing here would ever make it
+  // re-animate to the real number once one arrived late. Keeping this
+  // null through the whole request means the counters simply don't
+  // render until the true value (real or, on failure, the fallback)
+  // is already known — for a page load fast enough to matter, that
+  // happens well before anyone scrolls this far down anyway.
+  const [impact, setImpact] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPublicImpactSummary()
+      .then((data) => { if (!cancelled) setImpact(data); })
+      .catch(() => {
+        if (cancelled) return;
+        setImpact(Object.fromEntries(IMPACT_COUNTER_DEFS.map((c) => [c.id, c.fallback])));
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     document.title = 'Batches for Ladles · Warehouse System';
@@ -549,7 +576,8 @@ const LandingPage = () => {
           </div>
         </section>
 
-        {/* ── Impact counters — estimated figures, real data to follow ── */}
+        {/* ── Impact counters — real data, same numbers as the Impact
+            Calculator (see the `impact` fetch above) ── */}
         <section
           ref={impactRef}
           className={`lol-impact lol-reveal${impactVisible ? ' is-visible' : ''}`}
@@ -558,11 +586,18 @@ const LandingPage = () => {
           <div className="lol-section-inner">
             <h2 id="lol-impact-title" className="lol-section-title lol-section-title-light">Our impact so far</h2>
             <div className="lol-impact-grid">
-              {IMPACT_COUNTERS.map((c) => (
-                <CountUpStat key={c.id} icon={c.icon} value={c.value} suffix={c.suffix} label={c.label} />
+              {IMPACT_COUNTER_DEFS.map((c) => (
+                impact ? (
+                  <CountUpStat key={c.id} icon={c.icon} value={impact[c.id] ?? 0} suffix={c.suffix} label={c.label} />
+                ) : (
+                  <div key={c.id} className="lol-impact-stat">
+                    <Icon name={c.icon} size={28} />
+                    <span className="lol-impact-value">—</span>
+                    <span className="lol-impact-label">{c.label}</span>
+                  </div>
+                )
               ))}
             </div>
-            <p className="lol-impact-note">(Estimated figures: real counts coming soon.)</p>
           </div>
         </section>
 

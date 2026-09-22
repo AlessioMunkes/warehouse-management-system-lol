@@ -33,6 +33,7 @@ import notificationRouter from './src/routes/notification.routes.js';
 import loveActivismRouter   from './src/routes/loveActivism.routes.js';
 import communityRequestRouter from './src/routes/communityRequest.routes.js';
 import collectionKitRouter from './src/routes/collectionKit.routes.js';
+import publicImpactRouter from './src/routes/publicImpact.routes.js';
 import expiryWarningJob  from './src/jobs/expiryWarning.job.js';
 
 // ── Validate required secrets exist at startup ───────────────
@@ -134,6 +135,7 @@ app.use('/api/notifications', notificationRouter);
 app.use('/api/love-activism', loveActivismRouter);
 app.use('/api/community-requests', communityRequestRouter);
 app.use('/api/collection-kits', collectionKitRouter);
+app.use('/api/public',      publicImpactRouter);
 
 // ── SPA fallback (production only) ────────────────────────────
 // Any non-/api path falls through to index.html so React Router can

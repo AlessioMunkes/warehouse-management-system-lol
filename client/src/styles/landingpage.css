@@ -394,7 +394,6 @@
 .lol-impact-stat .lol-icon { color: var(--accent); }
 .lol-impact-value { font-family: var(--font-display); font-size: 2.4rem; font-weight: 700; }
 .lol-impact-label { font-size: 0.88rem; color: rgba(255, 255, 255, 0.75); line-height: 1.4; max-width: 32ch; }
-.lol-impact-note { margin-top: 2rem; font-size: 0.78rem; color: rgba(255, 255, 255, 0.5); }
 
 /* ── Map — real, interactive multi-pin map (Leaflet + OpenStreetMap).
    Every location is a real pin with its own popup, so the separate
