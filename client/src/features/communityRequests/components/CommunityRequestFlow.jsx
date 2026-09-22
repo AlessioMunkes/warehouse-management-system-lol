@@ -293,7 +293,7 @@ export default function CommunityRequestFlow({ onCrumbChange }) {
             <h1 className="stf-step-title" tabIndex={-1}>Log a request</h1>
             <p className="stf-step-sub">
               A member of the public phoned in or walked in asking for goods.
-              This only logs it — nothing here moves stock.
+              Log those requests here.
             </p>
           </div>
           <LogRequestForm onSubmit={handleLog} busy={logBusy} error={logError} />
