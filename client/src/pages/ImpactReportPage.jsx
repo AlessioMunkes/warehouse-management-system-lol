@@ -3,11 +3,13 @@
 //
 // The Impact Calculator — the headline view for the four numbers the
 // org actually shows people (paper saved, children served, adults
-// served, compost processed), plus the detailed breakdowns
-// (children_reached, meals_enabled) reportCatalog.js already fully
-// implements. Both live on one screen because they answer the same
-// underlying question at two different resolutions: "what did we
-// achieve" and "here's exactly how that breaks down."
+// served, compost processed), plus three detailed breakdowns
+// (children_reached, meals_served_by_group, compost_processed) that
+// reportCatalog.js fully implements. All three panels default to a
+// categorical dimension (a real bar chart with more than one bar) on
+// purpose, not Month — a dev database with one month of data renders
+// a Month trend as a single dot, which reads as broken even though
+// it isn't; Month/Week stay selectable for whoever wants the trend.
 //
 // NFR-20 / dignity kitchens: adults served is deliberately scoped to
 // soup kitchens only (reporting.repository.js's adultsReached forces
@@ -22,11 +24,13 @@
 // It counts rows already in delivery_notes, dispatch_events and
 // decanting_records — no new instrumentation, no factor, cannot 503.
 //
-// CHILDREN/ADULTS SERVED AND MEALS ENABLED CAN 503.
-// They need a reporting_factors row (kg_to_meals / kg_to_adults_served)
-// that has to come from the organisation — see MISSING_FACTOR_STATUS
-// below. The "Adjust factors" dialog on this page is the real, live
-// way to set one, rather than a gap only fixable by hand-editing SQL.
+// ADULTS SERVED AND MEALS SERVED CAN 503.
+// They need a reporting_factors row (kg_to_meals / kg_to_adults_served,
+// and for the two "Beneficiaries by type" estimates,
+// kg_to_dignity_kitchen_served / kg_to_community_served) that has to
+// come from the organisation — see MISSING_FACTOR_STATUS below. The
+// "Adjust factors" dialog on this page is the real, live way to set
+// one, rather than a gap only fixable by hand-editing SQL.
 //
 // COMPOST PROCESSED READS FROM collection_kits.
 // A genuinely new, minimal table — see
@@ -68,8 +72,18 @@ import {
 
 const DIMENSION_LABELS = {
   none: 'Total', month: 'Month', week: 'Week',
-  cohort: 'Cohort', ecd_centre: 'Beneficiary', beneficiary: 'Beneficiary type',
+  cohort: 'Cohort', ecd_centre: 'By name', beneficiary: 'Beneficiary type',
+  group: 'Beneficiary group', region: 'Region',
 };
+
+// Matches ReportBuilder.jsx's own COHORT options exactly — this page
+// deliberately doesn't read the shared catalog (see this file's own
+// header note), so the two values are restated here rather than
+// pulling in the whole catalog client for one filter.
+const COHORT_OPTIONS = [
+  { value: 'week1', label: 'Week 1' },
+  { value: 'week2', label: 'Week 2' },
+];
 
 const MISSING_FACTOR_STATUS = 503;
 
@@ -213,20 +227,24 @@ const chartTypeForDimension = (dimension) => {
 };
 
 const ImpactPanel = ({
-  title, metric, dimensions, defaultDimension, icon: Icon, color,
+  title, metric, dimensions, defaultDimension, filters: filterKeys = [], icon: Icon, color,
 }) => {
   const [preset, setPreset] = useState(DEFAULT_PRESET);
   const [dimension, setDimension] = useState(defaultDimension);
+  const [cohort, setCohort] = useState('all');
   const [report, setReport] = useState(null);
   const [missingFactor, setMissingFactor] = useState(false);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const hasCohortFilter = filterKeys.includes('cohort');
+
   const load = useCallback(async () => {
     setLoading(true); setError(null); setMissingFactor(false);
     try {
       const res = await runReport({
-        metric, dimension, filters: {}, dateRange: resolvePreset(preset),
+        metric, dimension, dateRange: resolvePreset(preset),
+        filters: hasCohortFilter && cohort !== 'all' ? { cohort } : {},
         chartType: chartTypeForDimension(dimension),
       });
       setReport(res.data ?? res);
@@ -237,7 +255,7 @@ const ImpactPanel = ({
     } finally {
       setLoading(false);
     }
-  }, [metric, dimension, preset]);
+  }, [metric, dimension, preset, cohort, hasCohortFilter]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -253,7 +271,18 @@ const ImpactPanel = ({
           </div>
           <CardTitle>{title}</CardTitle>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {hasCohortFilter ? (
+            <Select value={cohort} onValueChange={setCohort}>
+              <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All cohorts</SelectItem>
+                {COHORT_OPTIONS.map((c) => (
+                  <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : null}
           <Select value={dimension} onValueChange={setDimension}>
             <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -439,18 +468,28 @@ export default function ImpactReportPage() {
           <ImpactPanel
             title="Children reached"
             metric="children_reached"
-            dimensions={['none', 'month', 'cohort', 'ecd_centre']}
-            defaultDimension="month"
+            dimensions={['ecd_centre', 'cohort', 'month', 'none']}
+            defaultDimension="ecd_centre"
+            filters={['cohort']}
             icon={Baby}
             color={STAT_DEFS[0].color}
           />
           <ImpactPanel
-            title="Meals enabled"
-            metric="meals_enabled"
-            dimensions={['none', 'month', 'week', 'cohort', 'beneficiary']}
-            defaultDimension="month"
+            title="Meals served"
+            metric="meals_served_by_group"
+            dimensions={['group', 'ecd_centre', 'cohort', 'month', 'week', 'none']}
+            defaultDimension="group"
+            filters={['cohort']}
             icon={Utensils}
             color="#2b3336"
+          />
+          <ImpactPanel
+            title="Compost processed"
+            metric="compost_processed"
+            dimensions={['region', 'month', 'none']}
+            defaultDimension="region"
+            icon={Sprout}
+            color="#6b8f71"
           />
         </div>
       </main>

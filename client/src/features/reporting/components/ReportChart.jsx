@@ -24,6 +24,9 @@ import { Button } from '@/components/ui/button';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 
 const RED = '#ef3a40', CHARCOAL = '#2b3336', BORDER = '#e9e3dd', MUTED = '#676767';
 
@@ -213,7 +216,11 @@ const TableView = ({ series, unit, dimensionLabel }) => (
 // Built from the same series the table renders, so file and screen
 // cannot disagree. Quoted because ECD and product names contain
 // commas.
-const downloadCSV = (report, dimensionLabel) => {
+// Takes `series` separately from `report.series` so an on-screen sort
+// (bar/hbar only, see SORT_OPTIONS below) carries into the file — the
+// same "table is the CSV source, so the two cannot disagree" reasoning
+// this file's header already applies to the table toggle.
+const downloadCSV = (report, dimensionLabel, series) => {
   // Uploaded data gets a provenance line inside the file. Without it
   // an exported CSV is indistinguishable from a warehouse report the
   // moment it leaves this screen.
@@ -224,7 +231,7 @@ const downloadCSV = (report, dimensionLabel) => {
   const rows = [
     ...header,
     [dimensionLabel, report.meta?.unit ?? 'Value'],
-    ...report.series.map((r) => [r.label, r.value]),
+    ...series.map((r) => [r.label, r.value]),
   ];
   const csv = rows
     .map((cols) => cols.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))
@@ -241,16 +248,35 @@ const downloadCSV = (report, dimensionLabel) => {
   URL.revokeObjectURL(url);
 };
 
-// compact drops the "view as table" / "export CSV" row for a small
-// preview card (TrendCard.jsx) — the aria-label summary below still
-// carries every value to assistive tech regardless, so this is a
-// visual simplification, not an accessibility trade-off.
+// Sorting only makes sense for a categorical comparison (bar/hbar) —
+// a line's point order is time, and a number has nothing to sort.
+// 'desc' matches what the backend already returns for every
+// categorical dimension (orderFor()'s own default), so picking it as
+// the initial state changes nothing on first render; it only starts
+// mattering once someone picks a different one.
+const SORT_OPTIONS = [
+  { id: 'desc',  label: 'Highest first' },
+  { id: 'asc',   label: 'Lowest first' },
+  { id: 'alpha', label: 'A to Z' },
+];
+
+const sortSeries = (series, sort) => {
+  if (sort === 'desc') return [...series].sort((a, b) => b.value - a.value);
+  if (sort === 'asc')  return [...series].sort((a, b) => a.value - b.value);
+  return [...series].sort((a, b) => formatLabel(a.label).localeCompare(formatLabel(b.label)));
+};
+
+// compact drops the "view as table" / "export CSV" / sort row for a
+// small preview card (TrendCard.jsx) — the aria-label summary below
+// still carries every value to assistive tech regardless, so this is
+// a visual simplification, not an accessibility trade-off.
 export default function ReportChart({ report, dimensionLabel = 'Category', compact = false }) {
   const [asTable, setAsTable] = useState(false);
-  const { series, chartType, meta } = report;
+  const [sort, setSort] = useState('desc');
+  const { series: rawSeries, chartType, meta } = report;
   const unit = meta?.unit ?? '';
 
-  if (!series || series.length === 0) {
+  if (!rawSeries || rawSeries.length === 0) {
     return (
       <p className="py-10 text-center text-sm" style={{ color: MUTED }}>
         No data for this period. Try widening the date range, or check the report
@@ -258,6 +284,9 @@ export default function ReportChart({ report, dimensionLabel = 'Category', compa
       </p>
     );
   }
+
+  const sortable = chartType === 'bar' || chartType === 'hbar';
+  const series = sortable ? sortSeries(rawSeries, sort) : rawSeries;
 
   const Chart = { number: NumberView, bar: BarView, hbar: HBarView, line: LineView }[chartType]
     ?? BarView;
@@ -276,15 +305,27 @@ export default function ReportChart({ report, dimensionLabel = 'Category', compa
       </div>
 
       {compact ? null : (
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         <Button type="button" variant="outline" size="sm"
                 onClick={() => setAsTable((v) => !v)} aria-pressed={asTable}>
           {asTable ? 'View as chart' : 'View as table'}
         </Button>
         <Button type="button" variant="outline" size="sm"
-                onClick={() => downloadCSV(report, dimensionLabel)}>
+                onClick={() => downloadCSV(report, dimensionLabel, series)}>
           Export CSV
         </Button>
+        {sortable ? (
+          <Select value={sort} onValueChange={setSort}>
+            <SelectTrigger className="h-8 w-36 text-sm" aria-label="Sort order">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SORT_OPTIONS.map((o) => (
+                <SelectItem key={o.id} value={o.id}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
       </div>
       )}
     </div>

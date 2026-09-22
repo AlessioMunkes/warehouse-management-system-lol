@@ -76,6 +76,8 @@ export const DIMENSIONS = {
   category:       { id: 'category',       label: 'Category',          chart: 'bar'    },
   outcome:        { id: 'outcome',        label: 'Outcome',           chart: 'bar'    },
   s18a_status:    { id: 's18a_status',    label: 'Certificate status',chart: 'bar'    },
+  group:          { id: 'group',          label: 'Beneficiary group', chart: 'bar'    },
+  region:         { id: 'region',         label: 'Region',            chart: 'bar'    },
 };
 
 // ── Filters ───────────────────────────────────────────────────
@@ -144,6 +146,32 @@ export const METRICS = {
     filters: ['cohort', 'beneficiary_kind', 'programme_id'],
     defaultChart: 'line', impactOnly: true, factorKey: 'kg_to_meals',
     caveat: 'Estimate based on the kilograms-to-meals factor on record.',
+  },
+
+  // Answers "who, by category" rather than meals_enabled's own "how
+  // many total" — same kilograms-to-meals factor (no separate factor
+  // to set up), but grouped into three human categories instead of
+  // one running total, and widened to include community requests
+  // (meals_enabled stays ECD+soup-kitchen only, per NFR-20's impact
+  // clause). Dignity kitchens stay out of this one too — the org's
+  // "no impact report" boundary for them applies here the same way,
+  // they get their own separate, private estimate elsewhere on this
+  // page instead. 'group' folds the beneficiary_kind enum down to
+  // Children / Adults / Households rather than naming a specific
+  // ECD, soup kitchen or household — 'ecd_centre' is still offered
+  // as a dimension for whoever wants the named breakdown instead.
+  meals_served_by_group: {
+    id: 'meals_served_by_group', label: 'Meals served', temporal: 'range',
+    description:
+      'Estimated meals served, grouped by who received them: children (ECDs), adults ' +
+      '(soup kitchens) or households (community requests). Converted from kilograms ' +
+      'dispatched using the same factor meals enabled uses. Dignity kitchens are not ' +
+      'counted here — see the separate dignity kitchen estimate.',
+    repoFn: 'mealsServedByGroup', unit: 'meals',
+    dimensions: ['group', 'none', 'month', 'week', 'cohort', 'ecd_centre'],
+    filters: ['cohort'],
+    defaultChart: 'bar', impactOnly: true, factorKey: 'kg_to_meals',
+    caveat: 'Estimate based on the kilograms-to-meals factor on record. Children, adults (soup kitchens) and households (community requests) only — dignity kitchens excluded.',
   },
 
   // adultsReached deliberately does NOT extend IMPACT_BENEFICIARY_KINDS
@@ -224,11 +252,12 @@ export const METRICS = {
     id: 'compost_processed', label: 'Compost processed', temporal: 'range',
     description:
       'Kilograms of compost collected through Feed the Soil, logged against a ' +
-      'community member\'s collection kit each time it is weighed in.',
+      'community member\'s collection kit each time it is weighed in. Can be seen as a ' +
+      'running total, a monthly trend, or broken down by the suburb each kit is assigned to.',
     repoFn: 'compostProcessed', unit: 'kg',
-    dimensions: ['none', 'month'], filters: [],
-    defaultChart: 'line', impactOnly: true,
-    caveat: 'Counts every logged weigh-in, whether or not it has been dispatched to a farmer yet.',
+    dimensions: ['region', 'none', 'month'], filters: [],
+    defaultChart: 'bar', impactOnly: true,
+    caveat: 'Counts every logged weigh-in, whether or not it has been dispatched to a farmer yet. Region is the kit owner\'s registered suburb, not where the compost ends up.',
   },
 
   // ══ Dispatch ═══════════════════════════════════════════════
