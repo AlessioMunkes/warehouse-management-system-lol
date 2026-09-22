@@ -3,8 +3,8 @@
 //
 // A different question from any single metric on this page: not
 // "how much of X" but "who did the warehouse reach this period,
-// broken down by beneficiary type." Children is a real headcount;
-// adults/dignity-kitchen guests/community requests are all estimates
+// broken down by beneficiary type." Children are headcounted;
+// adults/dignity-kitchen guests/households are all estimates
 // converted from kilograms dispatched, each at its own manager-set
 // factor — mixing a real count with three estimates in one chart
 // would be dishonest without saying so, so every row prints its own
@@ -31,8 +31,9 @@ export default function BeneficiaryTypeChart({ items }) {
       <CardHeader>
         <CardTitle>Beneficiaries by type</CardTitle>
         <p className="mt-1 text-sm text-muted-foreground">
-          Who the warehouse reached this period. Children is a real headcount; the rest are
-          estimates converted from kilograms dispatched.
+          Who the warehouse reached this period. Children are headcounted while adults are
+          estimated, converted via kilograms dispatched per kitchen. Households are estimated
+          per community request.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">

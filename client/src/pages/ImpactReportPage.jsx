@@ -134,8 +134,8 @@ const STAT_DEFS = [
 const BENEFICIARY_TYPE_DEFS = [
   { metric: 'children_reached', label: 'Children (ECD)', unit: 'children', color: '#ef3a40' },
   { metric: 'adults_reached', label: 'Adults (soup kitchens)', unit: 'adults', color: '#c9a86a' },
-  { metric: 'dignity_kitchen_served', label: 'Dignity kitchens (estimate)', unit: 'people', color: '#6b8f71' },
-  { metric: 'community_served', label: 'Community requests (estimate)', unit: 'people', color: '#2b3336' },
+  { metric: 'dignity_kitchen_served', label: 'Dignity kitchens', unit: 'people', color: '#6b8f71' },
+  { metric: 'community_served', label: 'Households (community requests)', unit: 'people', color: '#2b3336' },
 ];
 
 // Fetched the same way as STAT_DEFS but not rendered as a poster
@@ -153,8 +153,8 @@ const EXTRA_METRIC_DEFS = [
 const FACTOR_DEFS = [
   { key: 'kg_to_meals',                  label: 'How many meals does 1 kg feed?' },
   { key: 'kg_to_adults_served',          label: 'How many soup kitchen adults does 1 kg feed?' },
-  { key: 'kg_to_dignity_kitchen_served', label: 'How many dignity kitchen guests does 1 kg feed? (estimate)' },
-  { key: 'kg_to_community_served',       label: 'How many people via community requests does 1 kg feed? (estimate)' },
+  { key: 'kg_to_dignity_kitchen_served', label: 'How many dignity kitchen guests does 1 kg feed?' },
+  { key: 'kg_to_community_served',       label: 'How many people via community requests does 1 kg feed?' },
 ];
 
 const AdjustFactorsDialog = () => {

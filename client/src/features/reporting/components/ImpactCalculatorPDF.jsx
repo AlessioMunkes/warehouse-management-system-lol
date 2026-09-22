@@ -121,8 +121,9 @@ const ImpactCalculatorPDF = ({ pdfStats, beneficiaryTypeStats, dateRange, onClos
               ))}
             </div>
             <p className="pdf-poster-caveat">
-              Children is a real headcount. Adults, dignity kitchen guests and community
-              requests are estimates converted from kilograms dispatched.
+              Children are headcounted while adults are estimated, converted via kilograms
+              dispatched per kitchen. Dignity kitchen guests and households are estimated the
+              same way, per kitchen and per community request.
             </p>
           </div>
         ) : null}
