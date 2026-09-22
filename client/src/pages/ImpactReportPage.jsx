@@ -3,13 +3,17 @@
 //
 // The Impact Calculator — the headline view for the four numbers the
 // org actually shows people (paper saved, children served, adults
-// served, compost processed), plus three detailed breakdowns
-// (children_reached, meals_served_by_group, compost_processed) that
-// reportCatalog.js fully implements. All three panels default to a
-// categorical dimension (a real bar chart with more than one bar) on
-// purpose, not Month — a dev database with one month of data renders
-// a Month trend as a single dot, which reads as broken even though
-// it isn't; Month/Week stay selectable for whoever wants the trend.
+// served, compost processed), plus two detailed breakdowns
+// (meals_served_by_group, compost_processed) that reportCatalog.js
+// fully implements. Children reached deliberately has no breakdown
+// panel of its own — the headline stat card above already IS that
+// number, and a second panel repeating it added nothing. Both panels
+// default to a categorical dimension (a real bar chart with more than
+// one bar) rather than Month — a dev database with one month of data
+// renders a Month trend as a single dot, which reads as broken even
+// though it isn't; Month/Week stay selectable for whoever wants them.
+// Meals served's own default, 'group_month', is both at once — three
+// beneficiary groups clustered per month, "compared over time."
 //
 // NFR-20 / dignity kitchens: adults served is deliberately scoped to
 // soup kitchens only (reporting.repository.js's adultsReached forces
@@ -29,7 +33,7 @@
 // and for the two "Beneficiaries by type" estimates,
 // kg_to_dignity_kitchen_served / kg_to_community_served) that has to
 // come from the organisation — see MISSING_FACTOR_STATUS below. The
-// "Adjust factors" dialog on this page is the real, live way to set
+// "Adjust estimates" dialog on this page is the real, live way to set
 // one, rather than a gap only fixable by hand-editing SQL.
 //
 // COMPOST PROCESSED READS FROM collection_kits.
@@ -67,13 +71,13 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
 import {
-  Sprout, Download, Settings2, Baby, Utensils,
+  Sprout, Download, Settings2, Utensils,
 } from 'lucide-react';
 
 const DIMENSION_LABELS = {
   none: 'Total', month: 'Month', week: 'Week',
   cohort: 'Cohort', ecd_centre: 'By name', beneficiary: 'Beneficiary type',
-  group: 'Beneficiary group', region: 'Region',
+  group: 'By group (this period)', group_month: 'By group, over time', region: 'Region',
 };
 
 // Matches ReportBuilder.jsx's own COHORT options exactly — this page
@@ -142,11 +146,15 @@ const EXTRA_METRIC_DEFS = [
   { metric: 'community_served' },
 ];
 
+// Phrased as direct questions rather than "X per kg dispatched" — the
+// underlying number is identical, but "how many meals does 1kg feed"
+// is what a manager who has never heard the word "factor" can
+// actually answer.
 const FACTOR_DEFS = [
-  { key: 'kg_to_meals',                  label: 'Meals per kg dispatched' },
-  { key: 'kg_to_adults_served',          label: 'Adults served per kg dispatched (soup kitchens)' },
-  { key: 'kg_to_dignity_kitchen_served', label: 'Guests served per kg dispatched (dignity kitchens, estimate)' },
-  { key: 'kg_to_community_served',       label: 'People served per kg dispatched (community requests, estimate)' },
+  { key: 'kg_to_meals',                  label: 'How many meals does 1 kg feed?' },
+  { key: 'kg_to_adults_served',          label: 'How many soup kitchen adults does 1 kg feed?' },
+  { key: 'kg_to_dignity_kitchen_served', label: 'How many dignity kitchen guests does 1 kg feed? (estimate)' },
+  { key: 'kg_to_community_served',       label: 'How many people via community requests does 1 kg feed? (estimate)' },
 ];
 
 const AdjustFactorsDialog = () => {
@@ -174,19 +182,19 @@ const AdjustFactorsDialog = () => {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button type="button" variant="outline" size="sm">
-          <Settings2 /> Adjust factors
+          <Settings2 /> Adjust estimates
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Conversion factors</DialogTitle>
+          <DialogTitle>How kilograms become people fed</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Every estimated figure on this page — meals enabled, adults served, and the two
-            beneficiary-type estimates below — is converted from kilograms dispatched using one
-            of these factors. Setting a new value here does not change past reports; it adds a
-            new figure that applies from today onward.
+            The warehouse only ever weighs what left in kilograms — it never counts plates or
+            people directly. Every "meals," "adults" or "people served" number on this page is
+            that weight multiplied by your answer below. Change an answer and every report from
+            today onward uses it; nothing already shown on this page changes.
           </p>
           {FACTOR_DEFS.map((f) => (
             <div key={f.key} className="flex items-end gap-2">
@@ -223,6 +231,7 @@ const AdjustFactorsDialog = () => {
 const chartTypeForDimension = (dimension) => {
   if (dimension === 'none') return 'number';
   if (dimension === 'month' || dimension === 'week') return 'line';
+  if (dimension === 'group_month') return 'grouped_bar';
   return 'bar';
 };
 
@@ -397,11 +406,19 @@ export default function ImpactReportPage() {
     return {
       label: def.label,
       unit: def.unit,
+      color: def.color,
+      image: def.image,
       value: s?.value ?? 0,
       available: Boolean(s && !s.notReady && !s.error),
+      caption: s?.caption,
       caveat: s?.caveat ?? (s?.notReady ? s.message : ''),
     };
   });
+
+  // Computed once, reused for both the on-screen chart and the PDF's
+  // own closing page — the same totals either way, so the two can
+  // never show a different number for "adults reached this period."
+  const beneficiaryTypeItems = BENEFICIARY_TYPE_DEFS.map((def) => ({ ...def, stat: stats[def.metric] }));
 
   return (
     <ManagerLayout>
@@ -426,6 +443,12 @@ export default function ImpactReportPage() {
             <Button type="button" variant="outline" size="sm" onClick={() => setPdfOpen(true)}>
               <Download /> Export PDF
             </Button>
+            {/* A config action, not a primary one — it belongs in the
+                same row as the other page-level controls, not as a
+                standalone button competing with the actual content
+                for attention. See AdjustFactorsDialog for the plainer
+                explanation now inside it. */}
+            <AdjustFactorsDialog />
           </div>
         </div>
 
@@ -435,67 +458,57 @@ export default function ImpactReportPage() {
           ))}
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          {/* Logging a kit is a warehouse-floor action, not a reporting
-              one — it lives on its own staff module page (see
-              FeedTheSoilPage.jsx) alongside Donation Intake and
-              Benevolent Requests, not buried in a dialog here.
-              buttonVariants applied directly to the Link rather than
-              Button's own `asChild` — Button wraps Base UI's
-              ButtonPrimitive, which does not merge onto a child the
-              way Radix's Slot does, so `asChild` here would render a
-              real nested <button> around the <a>. */}
-          <Link to={STAFF.feedTheSoil} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-            <Sprout /> Log a Feed the Soil kit
-          </Link>
-          <AdjustFactorsDialog />
-        </div>
-
         <div className="mt-6">
-          <BeneficiaryTypeChart
-            items={BENEFICIARY_TYPE_DEFS.map((def) => ({ ...def, stat: stats[def.metric] }))}
-          />
+          <BeneficiaryTypeChart items={beneficiaryTypeItems} />
         </div>
 
-        {/* The two panels below already answer "how did this change
-            over time" per metric (each defaults to Month, a real
-            trend, since the ImpactPanel dimension fix above); the
-            comparison chart just above answers "who, by type" — kept
-            separate on purpose rather than trying to make one chart
-            do both jobs. */}
         <h2 className="mt-8 text-lg font-medium">Detailed breakdown</h2>
         <div className="mt-3 space-y-6">
           <ImpactPanel
-            title="Children reached"
-            metric="children_reached"
-            dimensions={['ecd_centre', 'cohort', 'month', 'none']}
-            defaultDimension="ecd_centre"
-            filters={['cohort']}
-            icon={Baby}
-            color={STAT_DEFS[0].color}
-          />
-          <ImpactPanel
             title="Meals served"
             metric="meals_served_by_group"
-            dimensions={['group', 'ecd_centre', 'cohort', 'month', 'week', 'none']}
-            defaultDimension="group"
+            dimensions={['group_month', 'group', 'cohort', 'month', 'week', 'none']}
+            defaultDimension="group_month"
             filters={['cohort']}
             icon={Utensils}
             color="#2b3336"
           />
-          <ImpactPanel
-            title="Compost processed"
-            metric="compost_processed"
-            dimensions={['region', 'month', 'none']}
-            defaultDimension="region"
-            icon={Sprout}
-            color="#6b8f71"
-          />
+          <div>
+            {/* Logging a kit is a warehouse-floor action, not a
+                reporting one — it lives on its own staff module page
+                (see FeedTheSoilPage.jsx) alongside Donation Intake and
+                Benevolent Requests. It sits here, not up by Export PDF,
+                because "go log a kit" is only ever something someone
+                does in reaction to looking at this specific number.
+                buttonVariants applied directly to the Link rather than
+                Button's own `asChild` — Button wraps Base UI's
+                ButtonPrimitive, which does not merge onto a child the
+                way Radix's Slot does, so `asChild` here would render a
+                real nested <button> around the <a>. */}
+            <div className="mb-2 flex justify-end">
+              <Link to={STAFF.feedTheSoil} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+                <Sprout /> Log a Feed the Soil kit
+              </Link>
+            </div>
+            <ImpactPanel
+              title="Compost processed"
+              metric="compost_processed"
+              dimensions={['region', 'month', 'none']}
+              defaultDimension="region"
+              icon={Sprout}
+              color="#6b8f71"
+            />
+          </div>
         </div>
       </main>
 
       {pdfOpen ? (
-        <ImpactCalculatorPDF stats={pdfStats} dateRange={dateRange} onClose={() => setPdfOpen(false)} />
+        <ImpactCalculatorPDF
+          pdfStats={pdfStats}
+          beneficiaryTypeStats={beneficiaryTypeItems}
+          dateRange={dateRange}
+          onClose={() => setPdfOpen(false)}
+        />
       ) : null}
     </ManagerLayout>
   );

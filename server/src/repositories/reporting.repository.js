@@ -177,17 +177,31 @@ const communityServed = (spec) => dispatchedKgQuery({
 // unchanged, same as dispatchedKgQuery does.
 const MEALS_GROUP_KINDS = ['ecd', 'soup_kitchen', 'community'];
 
+const MEALS_GROUP_CASE = `CASE ps.beneficiary_kind::text
+                             WHEN 'ecd' THEN 'Children'
+                             WHEN 'soup_kitchen' THEN 'Adults'
+                             WHEN 'community' THEN 'Households'
+                           END`;
+
 const mealsServedByGroup = async ({ dimension, filters, dateRange }) => {
-  const dim = dimension === 'group'
-    ? {
-        expr: `CASE ps.beneficiary_kind::text
-                 WHEN 'ecd' THEN 'Children'
-                 WHEN 'soup_kitchen' THEN 'Adults'
-                 WHEN 'community' THEN 'Households'
-               END`,
-        group: `ps.beneficiary_kind`,
-      }
-    : slipDimension(dimension);
+  let dim;
+  if (dimension === 'group') {
+    dim = { expr: MEALS_GROUP_CASE, group: `ps.beneficiary_kind` };
+  } else if (dimension === 'group_month') {
+    // Packs both axes into one label ("2026-07|Children") rather than
+    // returning a second shape this feature's one chart component
+    // would have to special-case — see reportCatalog.js's CHART_TYPES
+    // note on grouped_bar. Ordered chronologically-then-by-group below
+    // rather than orderFor()'s usual value-DESC, since the client
+    // pivots this into month clusters and needs the months in
+    // calendar order, not ranked by size.
+    dim = {
+      expr: `${bucketMonth('ps.dispatch_date')} || '|' || ${MEALS_GROUP_CASE}`,
+      group: `${bucketMonth('ps.dispatch_date')}, ps.beneficiary_kind`,
+    };
+  } else {
+    dim = slipDimension(dimension);
+  }
 
   const params = [dateRange.from, dateRange.to];
   const where = [
@@ -206,7 +220,7 @@ const mealsServedByGroup = async ({ dimension, filters, dateRange }) => {
   LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
       WHERE ${where.join(' AND ')}
       ${dim.group ? `GROUP BY ${dim.group}` : ''}
-      ORDER BY ${orderFor(dimension)}`,
+      ORDER BY ${dimension === 'group_month' ? '1' : orderFor(dimension)}`,
     params
   );
   return rows2series(rows);

@@ -58,12 +58,32 @@ const humanise = (s) =>
 // is supposed to replace. Every other dimension (cohort, beneficiary,
 // product name...) still goes through humanise().
 const MONTH_BUCKET = /^\d{4}-\d{2}$/;
+
+// grouped_bar packs two axes into one label ("2026-07|Children" —
+// see reportCatalog.js's CHART_TYPES note) so it still fits the flat
+// [{label,value}] shape every chart type returns. GroupedBarView
+// below parses that itself for the chart; this handles it for the
+// table/CSV/screen-reader summary paths, which all just call
+// formatLabel() on whatever label they're given without knowing
+// which chart type produced it.
+const GROUP_MONTH = /^(\d{4}-\d{2})\|(.+)$/;
+
 const formatLabel = (label) => {
+  const groupMonth = GROUP_MONTH.exec(label);
+  if (groupMonth) return `${formatLabel(groupMonth[1])} – ${groupMonth[2]}`;
   if (!MONTH_BUCKET.test(label)) return humanise(label);
   const [y, m] = String(label).split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, 1))
     .toLocaleDateString('en-ZA', { month: 'short', year: 'numeric', timeZone: 'UTC' });
 };
+
+// Fixed colours for the one grouped_bar producer today
+// (meals_served_by_group) — matching BeneficiaryTypeChart.jsx's own
+// Children/Adults/Households colours exactly, so the two charts never
+// disagree about what a colour means. Any other group name (a future
+// grouped_bar metric) falls back to rotating the shared PALETTE.
+const GROUP_COLORS = { Children: RED, Adults: '#c9a86a', Households: CHARCOAL };
+const colorForGroup = (name, i) => GROUP_COLORS[name] ?? PALETTE[i % PALETTE.length];
 
 const NumberView = ({ series, unit }) => (
   <div className="py-10 text-center">
@@ -103,6 +123,71 @@ const BarView = ({ series, unit }) => {
         );
       })}
     </svg>
+  );
+};
+
+// One cluster per month, one bar per group within it — "compared
+// over time" rather than BarView's single snapshot. Parses the
+// "YYYY-MM|Group" labels grouped_bar reports use (see this file's own
+// GROUP_MONTH note above) into a month x group matrix here, since the
+// server keeps returning the same flat [{label,value}] shape every
+// other chart type does rather than inventing a second response
+// shape for this one.
+const GroupedBarView = ({ series, unit }) => {
+  const parsed = series.map((row) => {
+    const [month, group] = String(row.label).split('|');
+    return { month, group: group ?? 'Total', value: row.value };
+  });
+
+  const months = [...new Set(parsed.map((r) => r.month))].sort();
+  const groups = [...new Set(parsed.map((r) => r.group))];
+  const valueAt = (month, group) =>
+    parsed.find((r) => r.month === month && r.group === group)?.value ?? 0;
+
+  const max = Math.max(...parsed.map((r) => r.value), 0) || 1;
+  const W = 640, H = 240, PAD_B = 44, PAD_T = 24;
+  const clusterW = W / Math.max(months.length, 1);
+  const barGap = 3;
+  const barW = Math.min((clusterW - barGap * (groups.length + 1)) / groups.length, 28);
+  const groupsWidth = groups.length * barW + (groups.length - 1) * barGap;
+
+  return (
+    <div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="presentation">
+        <line x1="0" y1={H - PAD_B} x2={W} y2={H - PAD_B} stroke={BORDER} strokeWidth="1.5" />
+        {months.map((month) => {
+          const clusterX = month === months[0] ? 0 : months.indexOf(month) * clusterW;
+          const startX = clusterX + (clusterW - groupsWidth) / 2;
+          return (
+            <g key={month}>
+              {groups.map((group, gi) => {
+                const value = valueAt(month, group);
+                const h = ((value / max) * (H - PAD_B - PAD_T)) || 0;
+                const x = startX + gi * (barW + barGap);
+                const y = H - PAD_B - h;
+                return (
+                  <rect key={group} x={x} y={y} width={Math.max(barW, 2)} height={h} rx="2"
+                        fill={colorForGroup(group, gi)} />
+                );
+              })}
+              <text x={clusterX + clusterW / 2} y={H - PAD_B + 18} textAnchor="middle"
+                    fontSize="11" fill={MUTED}>
+                {truncate(formatLabel(month), 10)}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+        {groups.map((group, gi) => (
+          <span key={group} className="inline-flex items-center gap-1.5 text-xs" style={{ color: MUTED }}>
+            <span className="inline-block size-2.5 rounded-full" style={{ backgroundColor: colorForGroup(group, gi) }} />
+            {group}
+          </span>
+        ))}
+        {unit ? <span className="text-xs" style={{ color: MUTED }}>· in {unit}</span> : null}
+      </div>
+    </div>
   );
 };
 
@@ -288,8 +373,9 @@ export default function ReportChart({ report, dimensionLabel = 'Category', compa
   const sortable = chartType === 'bar' || chartType === 'hbar';
   const series = sortable ? sortSeries(rawSeries, sort) : rawSeries;
 
-  const Chart = { number: NumberView, bar: BarView, hbar: HBarView, line: LineView }[chartType]
-    ?? BarView;
+  const Chart = {
+    number: NumberView, bar: BarView, hbar: HBarView, line: LineView, grouped_bar: GroupedBarView,
+  }[chartType] ?? BarView;
 
   // One sentence summarising the chart, for screen readers. The
   // visual is marked presentational so it is not announced twice.

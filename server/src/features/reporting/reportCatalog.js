@@ -78,6 +78,7 @@ export const DIMENSIONS = {
   s18a_status:    { id: 's18a_status',    label: 'Certificate status',chart: 'bar'    },
   group:          { id: 'group',          label: 'Beneficiary group', chart: 'bar'    },
   region:         { id: 'region',         label: 'Region',            chart: 'bar'    },
+  group_month:    { id: 'group_month',    label: 'By month',          chart: 'grouped_bar' },
 };
 
 // ── Filters ───────────────────────────────────────────────────
@@ -95,7 +96,15 @@ export const FILTERS = {
   location_id:       { label: 'Storage location', values: null },
 };
 
-export const CHART_TYPES = ['number', 'line', 'bar', 'hbar'];
+// grouped_bar: several series clustered per time bucket (e.g.
+// children/adults/households, side by side, one cluster per month) —
+// see meals_served_by_group's 'group_month' dimension, the only
+// producer of this shape today. The label packs both axes into one
+// string ("2026-07|Children"), same flat [{label,value}] shape every
+// other chart type already returns; ReportChart.jsx splits it apart
+// client-side rather than this feature inventing a second response
+// shape for one chart type.
+export const CHART_TYPES = ['number', 'line', 'bar', 'hbar', 'grouped_bar'];
 
 // ── Cache tiers ───────────────────────────────────────────────
 // Render's free tier sleeps, so an in-process cache is cold on each
@@ -158,8 +167,12 @@ export const METRICS = {
   // they get their own separate, private estimate elsewhere on this
   // page instead. 'group' folds the beneficiary_kind enum down to
   // Children / Adults / Households rather than naming a specific
-  // ECD, soup kitchen or household — 'ecd_centre' is still offered
-  // as a dimension for whoever wants the named breakdown instead.
+  // ECD, soup kitchen or household — this metric deliberately does
+  // NOT offer a named/per-school breakdown at all; that already
+  // exists on children_reached for whoever needs it. 'group_month'
+  // is the same three categories AGAIN, but broken out per month
+  // rather than summed over the whole range — a grouped bar chart,
+  // "compared over time" rather than a single snapshot.
   meals_served_by_group: {
     id: 'meals_served_by_group', label: 'Meals served', temporal: 'range',
     description:
@@ -168,9 +181,9 @@ export const METRICS = {
       'dispatched using the same factor meals enabled uses. Dignity kitchens are not ' +
       'counted here — see the separate dignity kitchen estimate.',
     repoFn: 'mealsServedByGroup', unit: 'meals',
-    dimensions: ['group', 'none', 'month', 'week', 'cohort', 'ecd_centre'],
+    dimensions: ['group_month', 'group', 'none', 'month', 'week', 'cohort'],
     filters: ['cohort'],
-    defaultChart: 'bar', impactOnly: true, factorKey: 'kg_to_meals',
+    defaultChart: 'grouped_bar', impactOnly: true, factorKey: 'kg_to_meals',
     caveat: 'Estimate based on the kilograms-to-meals factor on record. Children, adults (soup kitchens) and households (community requests) only — dignity kitchens excluded.',
   },
 

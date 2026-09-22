@@ -148,6 +148,18 @@ describe('mealsServedByGroup', () => {
     expect(sql).toMatch(/GROUP BY ps\.beneficiary_kind/);
   });
 
+  it('packs month and group into one "YYYY-MM|Group" label when asked for "group_month"', async () => {
+    poolMock.query.mockResolvedValue({ rows: [{ label: '2026-06|Children', value: '40' }] });
+    await repo.mealsServedByGroup({ dimension: 'group_month', dateRange: RANGE, filters: {} });
+
+    const [sql] = poolMock.query.mock.calls[0];
+    expect(sql).toMatch(/to_char\(.*'YYYY-MM'\) \|\| '\|' \|\| CASE ps\.beneficiary_kind::text/);
+    expect(sql).toMatch(/GROUP BY to_char\(.*'YYYY-MM'\), ps\.beneficiary_kind/);
+    // Chronological, not orderFor()'s usual value-DESC — the client
+    // pivots this into month clusters and needs calendar order.
+    expect(sql).toMatch(/ORDER BY 1\s*$/);
+  });
+
   it('falls back to the shared slip dimensions for month/week/cohort/ecd_centre', async () => {
     poolMock.query.mockResolvedValue({ rows: [] });
     await repo.mealsServedByGroup({ dimension: 'ecd_centre', dateRange: RANGE, filters: {} });
