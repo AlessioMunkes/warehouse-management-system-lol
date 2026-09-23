@@ -130,6 +130,25 @@ const addSecondPacker = async (req, res) => {
   }
 };
 
+// ── Release a slip back to the floor ──────────────────────────────
+// POST /api/picking/:id/release
+// Manager only. Clears whoever holds the pallet and returns it to
+// 'pending' so it's spare/claimable again.
+// Returns: the updated slip.
+const releaseSlip = async (req, res) => {
+  try {
+    const slip = await pickingService.releaseSlip(req.params.id, req.user);
+    res.status(200).json({ success: true, data: slip });
+  } catch (err) {
+    console.error('[releaseSlip]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to release picking slip.',
+    });
+  }
+};
+
 // ── Confirm a line ───────────────────────────────────────────────
 // POST /api/picking/:id/items/:itemId/confirm
 // Body: { packedQuantity }
@@ -210,6 +229,7 @@ export default {
   createSlip,
   assignSlip,
   addSecondPacker,
+  releaseSlip,
   confirmItem,
   flagItem,
   completeSlip,

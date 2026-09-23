@@ -22,6 +22,7 @@ const repoMock = {
   createSlip:           vi.fn(),
   assignSlip:           vi.fn(),
   addSecondPacker:      vi.fn(),
+  releaseSlip:          vi.fn(),
   setItemStatus:        vi.fn(),
   completeSlip:         vi.fn(),
   getAssignableWorkers: vi.fn(),
@@ -462,6 +463,37 @@ describe('addSecondPacker — a second packer on a pallet', () => {
     repoMock.addSecondPacker.mockResolvedValue({ locked: true, status });
     await expect(pickingService.addSecondPacker(1, { packerId: WORKER2.id }, MANAGER))
       .rejects.toThrow(message);
+  });
+});
+
+// ── releaseSlip ───────────────────────────────────────────────
+describe('releaseSlip — returning a pallet to the floor', () => {
+  it('lets a manager release a claimed pallet', async () => {
+    await pickingService.releaseSlip(1, MANAGER);
+    expect(repoMock.releaseSlip).toHaveBeenCalledWith({ slipId: 1, actorId: MANAGER.id });
+  });
+
+  it('refuses a worker — releasing is a floor-management call, not a packer\'s own claim', async () => {
+    await expect(pickingService.releaseSlip(1, WORKER))
+      .rejects.toMatchObject({ status: 403 });
+    expect(repoMock.releaseSlip).not.toHaveBeenCalled();
+  });
+
+  it('maps a missing slip to 404', async () => {
+    repoMock.releaseSlip.mockResolvedValueOnce({ notFound: true });
+    await expectStatus(pickingService.releaseSlip(1, MANAGER), 404);
+  });
+
+  it('maps an unclaimed pallet to a 409 that says so', async () => {
+    repoMock.releaseSlip.mockResolvedValueOnce({ notClaimed: true, status: 'pending' });
+    await expect(pickingService.releaseSlip(1, MANAGER))
+      .rejects.toThrow(/not currently claimed/i);
+  });
+
+  it('resolves to the updated slip on success', async () => {
+    repoMock.releaseSlip.mockResolvedValueOnce({ slip: { id: 1, status: 'pending' } });
+    await expect(pickingService.releaseSlip(1, MANAGER))
+      .resolves.toEqual({ id: 1, status: 'pending' });
   });
 });
 

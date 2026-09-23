@@ -452,6 +452,63 @@ const addSecondPacker = async ({ slipId, packerId, actorId }) => {
   }
 };
 
+// ── Release a slip back to the floor ──────────────────────────
+// The other half of assignSlip: nothing until now could put
+// assigned_to back to NULL once it was set — assignSlip only ever
+// claims. This clears both packer slots and returns the slip to
+// 'pending' so it's spare/claimable again, replacing what used to be
+// a manager hand-picking a specific worker on the floor's behalf.
+//
+// Item-level progress (confirmed/flagged lines) is left untouched —
+// releasing is about who holds the pallet, not what's already been
+// packed on it, so the next claimant picks up where the last one left
+// off rather than starting the checklist over.
+const releaseSlip = async ({ slipId, actorId }) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const current = await client.query(
+      `SELECT id, status, assigned_to FROM picking_slips WHERE id = $1 FOR UPDATE`,
+      [slipId]
+    );
+    const slip = current.rows[0];
+    if (!slip) { await client.query('ROLLBACK'); return { notFound: true }; }
+
+    if (slip.status !== 'in_progress') {
+      await client.query('ROLLBACK');
+      return { notClaimed: true, status: slip.status };
+    }
+
+    const result = await client.query(
+      `UPDATE picking_slips
+       SET assigned_to = NULL, assigned_to_2 = NULL, status = 'pending'
+       WHERE id = $1
+       RETURNING *`,
+      [slipId]
+    );
+
+    // Reuses the 'assigned' event_type rather than adding a new one —
+    // same reasoning as the reassignment case above: event_type is a
+    // DB-level CHECK constraint, and a label it has never seen would
+    // roll back the one transaction a manager is relying on to free
+    // up a pallet.
+    await logEvent(client, slipId, 'assigned', actorId, {
+      packer_id: null,
+      released_from: slip.assigned_to,
+    });
+
+    await client.query('COMMIT');
+    return { slip: result.rows[0] };
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
 // ── Confirm or flag one line ──────────────────────────────────
 // Guarded on the parent slip's status so a completed slip can't be edited.
 //
@@ -748,6 +805,7 @@ export default {
   createSlip,
   assignSlip,
   addSecondPacker,
+  releaseSlip,
   setItemStatus,
   completeSlip,
   getAssignableWorkers,
