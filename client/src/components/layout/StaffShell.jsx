@@ -26,6 +26,7 @@ import { useAuth } from '../../context/AuthContext';
 import useReducedMotion from '../../features/staff/hooks/useReducedMotion';
 import useSpareSlipAlert from '../../features/staff/hooks/useSpareSlipAlert';
 import StaffTabBar from './StaffTabBar';
+import StaffNotificationBell from './StaffNotificationBell';
 import OfflineBar from './OfflineBar';
 import { AppNavDrawer } from '../../features/taskdashboard/components/AppNav';
 import { STAFF } from '../../routes/paths';
@@ -113,6 +114,11 @@ export default function StaffShell({
         </div>
 
         <div className="stf-appbar-actions">
+          {/* The worker's own notification history — see its own file
+              header for why this is a separate component from the
+              manager's NotificationBell rather than a shared one with
+              a role check inside it. */}
+          <StaffNotificationBell />
           {/* ACC-08. Labelled with what it does, not "reduce motion" —
               the staff reading it are not describing an animation
               system, they just want the screen to stop moving. */}

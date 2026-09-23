@@ -15,6 +15,9 @@ const serviceMock = {
   getUnreadCount:    vi.fn(),
   markRead:          vi.fn(),
   markAllRead:       vi.fn(),
+  listFloorNotifications: vi.fn(),
+  getFloorUnreadCount:    vi.fn(),
+  markAllFloorRead:       vi.fn(),
 };
 
 vi.mock('../src/services/notification.service.js', () => ({ default: serviceMock }));
@@ -39,6 +42,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   serviceMock.listNotifications.mockResolvedValue([{ id: 1, title: 'Test' }]);
   serviceMock.getUnreadCount.mockResolvedValue(3);
+  serviceMock.listFloorNotifications.mockResolvedValue([{ id: 2, title: 'Floor test' }]);
+  serviceMock.getFloorUnreadCount.mockResolvedValue(1);
 });
 
 describe('notification routes — authentication', () => {
@@ -72,6 +77,49 @@ describe('notification routes — parameter validation', () => {
     const res = await request(app).patch(`${BASE}/${id}/read`).set('Cookie', cookieFor(ROLES.MANAGER));
     expect(res.status).toBe(400);
     expect(serviceMock.markRead).not.toHaveBeenCalled();
+  });
+});
+
+describe('notification routes — /floor is open to any authenticated staff member', () => {
+  const floorEndpoints = [
+    ['get',   `${BASE}/floor`],
+    ['get',   `${BASE}/floor/unread-count`],
+    ['post',  `${BASE}/floor/read-all`],
+    ['patch', `${BASE}/floor/1/read`],
+  ];
+
+  it.each(floorEndpoints)('%s %s returns 401 with no cookie', async (method, path) => {
+    const res = await request(app)[method](path).send({});
+    expect(res.status).toBe(401);
+  });
+
+  it.each([ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN])('%s can read the floor feed', async (role) => {
+    const res = await request(app).get(`${BASE}/floor`).set('Cookie', cookieFor(role));
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, data: [{ id: 2, title: 'Floor test' }] });
+  });
+
+  it('a worker can read the floor unread count', async () => {
+    const res = await request(app).get(`${BASE}/floor/unread-count`).set('Cookie', cookieFor(ROLES.WORKER));
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, data: { count: 1 } });
+  });
+
+  it('a worker can mark all floor notifications read', async () => {
+    const res = await request(app).post(`${BASE}/floor/read-all`).set('Cookie', cookieFor(ROLES.WORKER));
+    expect(res.status).toBe(200);
+    expect(serviceMock.markAllFloorRead).toHaveBeenCalled();
+  });
+
+  it('a worker can mark one floor notification read, reusing the shared markRead', async () => {
+    const res = await request(app).patch(`${BASE}/floor/1/read`).set('Cookie', cookieFor(ROLES.WORKER));
+    expect(res.status).toBe(200);
+    expect(serviceMock.markRead).toHaveBeenCalled();
+  });
+
+  it('rejects an invalid id on /floor/:id/read the same as the manager route', async () => {
+    const res = await request(app).patch(`${BASE}/floor/abc/read`).set('Cookie', cookieFor(ROLES.WORKER));
+    expect(res.status).toBe(400);
   });
 });
 
