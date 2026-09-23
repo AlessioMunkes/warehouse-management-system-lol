@@ -1,12 +1,14 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/tests/PackingSpareSlips.test.jsx
 //
-// Spare slips render as the same stacked list "mine" and "done" use,
-// scoped to today via dispatchDate — a slip scheduled for another day
-// is not "available on the floor" yet — with a Claim button on every
-// row instead of a status badge. Claiming drops the slip out of the
-// spare pool for everyone (proven here by a reload that stops
-// returning it), matching the sponsor's exclusivity request.
+// Spare slips are what "Assigned to floor" shows — the tab a worker
+// lands on, ahead of their own "Assigned to me" — rendered as the same
+// stacked list "mine" and "done" use, scoped to today via dispatchDate
+// (a slip scheduled for another day is not "available on the floor"
+// yet), with a Claim button on every row instead of a status badge.
+// Claiming drops the slip out of the spare pool for everyone (proven
+// here by a reload that stops returning it), matching the sponsor's
+// exclusivity request.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
@@ -54,13 +56,11 @@ describe('StaffSlipList — spare slips', () => {
     expect(calls).toContainEqual({ dispatchDate: todayISO() });
   });
 
-  it('renders each spare pallet as its own row with a Claim button', async () => {
-    const user = userEvent.setup();
+  it('opens on "Assigned to floor" with each spare pallet as its own row and a Claim button', async () => {
     render(<StaffSlipList onOpenSlip={vi.fn()} />);
     await waitFor(() => expect(pickingAPI.fetchPickingSlips).toHaveBeenCalled());
 
-    await user.click(await screen.findByRole('tab', { name: /Spare slips/i }));
-
+    expect(await screen.findByRole('tab', { name: /Assigned to floor/i })).toHaveAttribute('aria-selected', 'true');
     expect(await screen.findByText(/Rainbow ECD/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Claim$/i })).toBeInTheDocument();
   });
@@ -69,8 +69,6 @@ describe('StaffSlipList — spare slips', () => {
     const user = userEvent.setup();
     render(<StaffSlipList onOpenSlip={vi.fn()} />);
     await waitFor(() => expect(pickingAPI.fetchPickingSlips).toHaveBeenCalled());
-
-    await user.click(await screen.findByRole('tab', { name: /Spare slips/i }));
     await screen.findByText(/Rainbow ECD/i);
 
     // A claimed slip stops coming back from the "spare" fetch — the
@@ -86,7 +84,7 @@ describe('StaffSlipList — spare slips', () => {
       expect(screen.getByRole('tab', { name: /Assigned to me/i })).toHaveAttribute('aria-selected', 'true')
     );
 
-    await user.click(screen.getByRole('tab', { name: /Spare slips/i }));
-    expect(screen.getByText(/No spare pallets for today/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: /Assigned to floor/i }));
+    expect(screen.getByText(/Nothing on the floor right now/i)).toBeInTheDocument();
   });
 });
