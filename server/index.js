@@ -1,7 +1,21 @@
 // ─────────────────────────────────────────────────────────────
 // server/index.js
 // ─────────────────────────────────────────────────────────────
-import 'dotenv/config';
+// Plain `import 'dotenv/config'` only auto-loads a file literally
+// named `.env` — but env.example, this file's own db.js error
+// message, and .gitignore's own `.env.local` entry all document
+// `.env.local` as the real convention here. A fresh checkout that
+// follows those instructions (cp env.example .env.local, fill it in)
+// got "Missing required environment variable: DATABASE_URL" forever,
+// because that file was never actually being read. .env.local is
+// loaded first so it wins on any key both files define; the second,
+// un-pathed call is a plain `.env` as a lower-priority fallback for
+// anyone who still has one — dotenv never overwrites a key
+// process.env already has, so this is additive, not a second source
+// of truth to keep in sync.
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
+dotenv.config();
 import express          from 'express';
 import cors             from 'cors';
 import path             from 'path';
