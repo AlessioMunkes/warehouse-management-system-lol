@@ -307,8 +307,8 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
           <span>
             <span className="stf-kv-key">Packing:</span>{' '}
             <span className="stf-kv-val">
-              {slip.packer_name}{slip.assigned_to === currentUser?.id ? ' (you)' : ''}
-              {slip.assigned_to_2 ? `, ${slip.packer_name_2}${slip.assigned_to_2 === currentUser?.id ? ' (you)' : ''}` : ''}
+              {slip.packer_name}
+              {slip.assigned_to_2 ? `, ${slip.packer_name_2}` : ''}
             </span>
           </span>
         </p>
