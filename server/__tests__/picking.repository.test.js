@@ -456,3 +456,93 @@ describe('releaseSlip', () => {
     expect(event[1][3]).toMatchObject({ packer_id: null, released_from: OWNER });
   });
 });
+
+// ── editSlip ──────────────────────────────────────────────────
+// Manager-only "fix it before it goes out": dispatch date, cohort,
+// and/or the whole product-line list, gated to 'pending' slips inside
+// the same row lock every other mutation in this file uses.
+const editClient = (slip, { conflict = false } = {}) => {
+  const calls = [];
+  return {
+    calls,
+    release: vi.fn(),
+    query: vi.fn(async (sql) => {
+      calls.push(sql.replace(/\s+/g, ' ').trim());
+      if (/SELECT id, ecd_id, status, dispatch_date, cohort FROM picking_slips/i.test(sql)) {
+        return { rows: slip ? [slip] : [] };
+      }
+      if (/SELECT id FROM picking_slips WHERE ecd_id/i.test(sql)) {
+        return { rows: conflict ? [{ id: 999 }] : [] };
+      }
+      if (/^SELECT \* FROM picking_slips WHERE id/i.test(sql)) {
+        return { rows: [{ id: 1, ...slip, status: 'pending' }] };
+      }
+      return { rows: [], rowCount: 1 };
+    }),
+  };
+};
+
+const edit = (client, over = {}) => {
+  poolMock.connect.mockResolvedValueOnce(client);
+  return pickingRepository.editSlip({ slipId: 1, actorId: OWNER, ...over });
+};
+
+const wroteSlip  = (c) => c.calls.some((s) => /^UPDATE picking_slips SET dispatch_date/i.test(s));
+const wroteItems = (c) => c.calls.some((s) => /^DELETE FROM picking_slip_items/i.test(s));
+
+describe('editSlip', () => {
+  const PENDING = { id: 1, ecd_id: 7, status: 'pending', dispatch_date: '2026-08-03', cohort: 'week1' };
+
+  it('updates dispatch date and cohort on a pending slip', async () => {
+    const client = editClient(PENDING);
+    const result = await edit(client, { dispatchDate: '2026-08-10', cohort: 'week2' });
+    expect(result.slip).toBeDefined();
+    expect(wroteSlip(client)).toBe(true);
+    expect(client.calls).toContain('COMMIT');
+  });
+
+  it('replaces the item list wholesale — delete then insert', async () => {
+    const client = editClient(PENDING);
+    await edit(client, {
+      items: [{ productId: 3, quantity: 5, unit: 'kg' }, { productId: 4, quantity: 2, unit: 'each' }],
+    });
+    expect(wroteItems(client)).toBe(true);
+    const inserts = client.calls.filter((s) => /^INSERT INTO picking_slip_items/i.test(s));
+    expect(inserts).toHaveLength(2);
+  });
+
+  it('refuses a slip that is already claimed', async () => {
+    const client = editClient({ ...PENDING, status: 'in_progress' });
+    const result = await edit(client, { dispatchDate: '2026-08-10', cohort: 'week2' });
+    expect(result).toMatchObject({ locked: true, status: 'in_progress' });
+    expect(wroteSlip(client)).toBe(false);
+    expect(client.calls).toContain('ROLLBACK');
+  });
+
+  it('refuses a date that collides with another slip for the same ECD', async () => {
+    const client = editClient(PENDING, { conflict: true });
+    const result = await edit(client, { dispatchDate: '2026-08-10', cohort: 'week1' });
+    expect(result).toMatchObject({ dateConflict: true });
+    expect(wroteSlip(client)).toBe(false);
+  });
+
+  it('returns notFound for a slip that does not exist', async () => {
+    const client = editClient(null);
+    const result = await edit(client, { items: [{ productId: 3, quantity: 5, unit: 'kg' }] });
+    expect(result).toMatchObject({ notFound: true });
+  });
+
+  it('locks the row before deciding anything', async () => {
+    const client = editClient(PENDING);
+    await edit(client, { items: [{ productId: 3, quantity: 5, unit: 'kg' }] });
+    expect(sql(client)[1]).toMatch(/FOR UPDATE/i);
+  });
+
+  it('logs the edit as a "generated" event with edited: true, not a new event type', async () => {
+    const client = editClient(PENDING);
+    await edit(client, { items: [{ productId: 3, quantity: 5, unit: 'kg' }] });
+    const event = client.query.mock.calls.find(([s]) => /INSERT INTO picking_events/i.test(s));
+    expect(event[1][1]).toBe('generated');
+    expect(event[1][3]).toMatchObject({ edited: true });
+  });
+});

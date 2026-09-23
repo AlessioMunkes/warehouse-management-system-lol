@@ -22,6 +22,7 @@ const serviceMock = {
   createSlip:           vi.fn(),
   assignSlip:           vi.fn(),
   releaseSlip:          vi.fn(),
+  editSlip:             vi.fn(),
   confirmItem:          vi.fn(),
   flagItem:             vi.fn(),
   completeSlip:         vi.fn(),
@@ -65,6 +66,7 @@ beforeEach(() => {
   serviceMock.createSlip.mockResolvedValue({ slipId: 99, itemCount: 7 });
   serviceMock.assignSlip.mockResolvedValue(SLIP);
   serviceMock.releaseSlip.mockResolvedValue(SLIP);
+  serviceMock.editSlip.mockResolvedValue(SLIP);
   serviceMock.confirmItem.mockResolvedValue(ITEM);
   serviceMock.flagItem.mockResolvedValue(ITEM);
   serviceMock.completeSlip.mockResolvedValue(SLIP);
@@ -75,7 +77,8 @@ const endpoints = [
   ['get',  BASE],
   ['post', BASE],
   ['post', `${BASE}/generate`],
-  ['get',  `${BASE}/1`],
+  ['get',   `${BASE}/1`],
+  ['patch', `${BASE}/1`],
   ['post', `${BASE}/1/assign`],
   ['post', `${BASE}/1/release`],
   ['post', `${BASE}/1/complete`],
@@ -397,6 +400,45 @@ describe('regressions — previously known defects', () => {
       .set('Cookie', cookieFor(ROLES.WORKER)).send({ packedQuantity: 3 });
 
     expect(serviceMock.confirmItem).toHaveBeenCalledWith(1, 5, expect.anything(), expect.anything());
+  });
+});
+
+// ── PATCH /:id — manager-only edit of a pending slip ────────────
+describe('picking routes — PATCH /:id', () => {
+  it.each(MANAGERS_UP)('%s can edit a slip', async (role) => {
+    const res = await request(app).patch(`${BASE}/1`)
+      .set('Cookie', cookieFor(role)).send({ dispatchDate: '2026-08-10', cohort: 'week2' });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, data: SLIP });
+  });
+
+  it.each([ROLES.WORKER, 'finance'])('%s cannot edit a slip', async (role) => {
+    const res = await request(app).patch(`${BASE}/1`)
+      .set('Cookie', cookieFor(role)).send({});
+    expect(res.status).toBe(403);
+    expect(serviceMock.editSlip).not.toHaveBeenCalled();
+  });
+
+  it.each(['abc', '0', '-1'])('rejects id "%s" with a 400', async (id) => {
+    const res = await request(app).patch(`${BASE}/${id}`)
+      .set('Cookie', cookieFor(ROLES.MANAGER)).send({});
+    expect(res.status).toBe(400);
+    expect(serviceMock.editSlip).not.toHaveBeenCalled();
+  });
+
+  it('passes the body through to the service', async () => {
+    const items = [{ productId: 3, quantity: 5, unit: 'kg' }];
+    await request(app).patch(`${BASE}/1`)
+      .set('Cookie', cookieFor(ROLES.MANAGER)).send({ items });
+    expect(serviceMock.editSlip).toHaveBeenCalledWith(1, { items }, expect.anything());
+  });
+
+  it('masks a raw failure with a generic message', async () => {
+    serviceMock.editSlip.mockRejectedValueOnce(new Error('relation "picking_slips" does not exist'));
+    const res = await request(app).patch(`${BASE}/1`)
+      .set('Cookie', cookieFor(ROLES.MANAGER)).send({});
+    expect(res.status).toBe(500);
+    expect(res.body.message).toBe('Failed to update picking slip.');
   });
 });
 

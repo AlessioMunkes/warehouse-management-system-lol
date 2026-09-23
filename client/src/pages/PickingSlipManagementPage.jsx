@@ -20,21 +20,23 @@
 // someone goes home sick, the wrong pallet got tapped. That is the
 // one assignment-related action this page offers.
 //
-// "Edit an existing slip" is NOT a button here on purpose: nothing in
-// picking.service.js supports rewriting a slip's lines or metadata
-// after creation — confirmItem/flagItem/completeSlip during packing,
-// and releaseSlip for returning a claim to the floor, are the only
-// mutations that exist. Listing + opening a slip to see its current
-// state is what this page offers instead; a real "edit" would need
-// new backend support first, not a client-side button pointed at
-// nothing.
+// Editing (dispatch date, cohort, product lines) is only reachable
+// while a slip is still 'pending' — the repository enforces this
+// inside the same row lock every other mutation here uses, since
+// 'pending' is also the only state where every item on the slip is
+// guaranteed to still be untouched (confirmItem/flagItem both require
+// the slip to already be claimed first). Once someone's picked it up,
+// the Edit button disappears from SlipDetail and editSlip would 409
+// anyway — a packer mid-count should never see their list rewritten
+// under them.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
 import ManagerLayout   from '../features/taskdashboard/components/ManagerLayout';
 import beneficiaryAPI from '../services/beneficiaryAPI';
+import productAPI from '../services/productAPI';
 import {
   fetchPickingSlips, fetchPickingSlip, fetchAssignableWorkers,
-  generateSlips, createSlip, releaseSlip, addSecondPacker,
+  generateSlips, createSlip, releaseSlip, editSlip, addSecondPacker,
 } from '../services/pickingAPI';
 
 import {
@@ -55,7 +57,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Search, CalendarPlus, PackagePlus, X, ArrowLeft } from 'lucide-react';
+import { Search, CalendarPlus, PackagePlus, X, ArrowLeft, Pencil, Plus, Trash2 } from 'lucide-react';
 
 const COHORT_OPTIONS = [
   { value: 'week1', label: 'Week 1' },
@@ -98,7 +100,7 @@ const SuccessBanner = ({ message }) => (
 // this page is for organising the queue, not pulling work out from
 // under whoever already finished it.
 const SlipDetail = ({
-  slip, releasing, onRelease,
+  slip, releasing, onRelease, onEdit,
   workers, secondChoice, onSecondChoice, onAddSecond, addingSecond, onClose,
 }) => (
   <Card>
@@ -109,9 +111,19 @@ const SlipDetail = ({
           {slip.cohort === 'week1' ? 'Week 1' : 'Week 2'} · {slip.dispatch_date}
         </p>
       </div>
-      <Button type="button" variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close">
-        <X />
-      </Button>
+      <div className="flex items-center gap-1">
+        {/* Only while pending — once claimed, a packer may already be
+            looking at these lines, same "don't pull the rug out"
+            reasoning as the release control below. */}
+        {slip.status === 'pending' ? (
+          <Button type="button" variant="ghost" size="sm" onClick={onEdit}>
+            <Pencil /> Edit
+          </Button>
+        ) : null}
+        <Button type="button" variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close">
+          <X />
+        </Button>
+      </div>
     </CardHeader>
     <CardContent className="space-y-4">
       <dl className="grid gap-3 text-sm sm:grid-cols-2">
@@ -186,10 +198,11 @@ const SlipDetail = ({
 );
 
 export default function PickingSlipManagementPage() {
-  const [mode, setMode] = useState('list'); // list | generate | create
+  const [mode, setMode] = useState('list'); // list | generate | create | edit
 
   const [beneficiaries, setBeneficiaries] = useState([]);
   const [workers, setWorkers] = useState([]);
+  const [products, setProducts] = useState([]);
 
   const [viewDate, setViewDate] = useState(todayISO());
   const [search, setSearch] = useState('');
@@ -209,6 +222,10 @@ export default function PickingSlipManagementPage() {
   const [adHocForm, setAdHocForm] = useState({ ecdId: '', dispatchDate: todayISO(), cohort: '', force: false });
   const [adHocBusy, setAdHocBusy] = useState(false);
   const [adHocError, setAdHocError] = useState(null);
+
+  const [editForm, setEditForm] = useState({ dispatchDate: '', cohort: '', force: false, items: [] });
+  const [editBusy, setEditBusy] = useState(false);
+  const [editError, setEditError] = useState(null);
 
   const loadSlips = useCallback(async () => {
     setError(null);
@@ -233,6 +250,9 @@ export default function PickingSlipManagementPage() {
       .catch(() => { /* surfaced inline only where the picker is used */ });
     fetchAssignableWorkers()
       .then((rows) => { if (!cancelled) setWorkers(rows); })
+      .catch(() => { /* surfaced inline only where the picker is used */ });
+    productAPI.getProducts({ includeInactive: false })
+      .then((rows) => { if (!cancelled) setProducts(rows); })
       .catch(() => { /* surfaced inline only where the picker is used */ });
     return () => { cancelled = true; };
   }, []);
@@ -263,6 +283,63 @@ export default function PickingSlipManagementPage() {
       await loadSlips();
       await openSlip(selected.id);
     } catch (err) { setError(err.message); } finally { setAddingSecond(false); }
+  };
+
+  // Pre-fills from the currently-open slip — editSlip's `items` fully
+  // replaces the line list, so the form always starts from exactly
+  // what's there today, not a blank sheet.
+  const openEdit = () => {
+    if (!selected) return;
+    setEditError(null);
+    setEditForm({
+      dispatchDate: selected.dispatch_date,
+      cohort: selected.cohort,
+      force: false,
+      items: (selected.items || []).map((item) => ({
+        productId: String(item.product_id),
+        quantity: String(item.required_quantity),
+      })),
+    });
+    setMode('edit');
+  };
+
+  const addEditLine = () => {
+    setEditForm((f) => ({ ...f, items: [...f.items, { productId: '', quantity: '' }] }));
+  };
+
+  const removeEditLine = (index) => {
+    setEditForm((f) => ({ ...f, items: f.items.filter((_, i) => i !== index) }));
+  };
+
+  const updateEditLine = (index, patch) => {
+    setEditForm((f) => ({
+      ...f,
+      items: f.items.map((line, i) => (i === index ? { ...line, ...patch } : line)),
+    }));
+  };
+
+  const runEditSlip = async () => {
+    if (!selected) return;
+    setEditBusy(true); setEditError(null);
+    try {
+      await editSlip(selected.id, {
+        dispatchDate: editForm.dispatchDate,
+        cohort: editForm.cohort,
+        force: editForm.force,
+        items: editForm.items.map((line) => {
+          const product = products.find((p) => String(p.id) === line.productId);
+          return {
+            productId: Number(line.productId),
+            quantity: Number(line.quantity),
+            unit: product?.defaultUnit || '',
+          };
+        }),
+      });
+      setViewDate(editForm.dispatchDate);
+      await loadSlips();
+      await openSlip(selected.id);
+      setMode('list');
+    } catch (err) { setEditError(err.message); } finally { setEditBusy(false); }
   };
 
   const runGenerate = async () => {
@@ -442,6 +519,101 @@ export default function PickingSlipManagementPage() {
           </Card>
         ) : null}
 
+        {mode === 'edit' && selected ? (
+          <Card className="mt-4">
+            <CardHeader><CardTitle>Edit slip — {selected.ecd_name}</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Only while this pallet is still on the floor, unclaimed — once someone picks it up, editing locks.
+              </p>
+              {editError ? <ErrorBanner message={editError} /> : null}
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field>
+                  <FieldLabel htmlFor="edit-date">Dispatch date</FieldLabel>
+                  <Input
+                    id="edit-date" type="date" value={editForm.dispatchDate}
+                    onChange={(e) => setEditForm((f) => ({ ...f, dispatchDate: e.target.value }))}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="edit-cohort">Cohort</FieldLabel>
+                  <Select
+                    value={editForm.cohort || undefined}
+                    onValueChange={(v) => setEditForm((f) => ({ ...f, cohort: v }))}
+                  >
+                    <SelectTrigger id="edit-cohort"><SelectValue placeholder="Select a cohort" /></SelectTrigger>
+                    <SelectContent>
+                      {COHORT_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
+              <Field orientation="horizontal">
+                <Checkbox
+                  id="edit-force"
+                  checked={editForm.force}
+                  onCheckedChange={(v) => setEditForm((f) => ({ ...f, force: Boolean(v) }))}
+                />
+                <FieldLabel htmlFor="edit-force" className="font-normal">
+                  This is a deliberate change outside the normal rotation
+                </FieldLabel>
+              </Field>
+
+              <div className="space-y-2">
+                <FieldLabel>Product lines</FieldLabel>
+                {editForm.items.map((line, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <Select
+                      value={line.productId || undefined}
+                      onValueChange={(v) => updateEditLine(index, { productId: v })}
+                    >
+                      <SelectTrigger className="flex-1"><SelectValue placeholder="Select a product" /></SelectTrigger>
+                      <SelectContent>
+                        {products.map((p) => (
+                          <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      type="number" min="0" step="any" className="w-24"
+                      value={line.quantity}
+                      onChange={(e) => updateEditLine(index, { quantity: e.target.value })}
+                      placeholder="Qty"
+                    />
+                    <span className="w-12 shrink-0 text-sm text-muted-foreground">
+                      {products.find((p) => String(p.id) === line.productId)?.defaultUnit || ''}
+                    </span>
+                    <Button
+                      type="button" variant="ghost" size="icon-sm"
+                      onClick={() => removeEditLine(index)} aria-label="Remove line"
+                    >
+                      <Trash2 />
+                    </Button>
+                  </div>
+                ))}
+                <Button type="button" variant="outline" size="sm" onClick={addEditLine}>
+                  <Plus /> Add product line
+                </Button>
+              </div>
+
+              <Field orientation="horizontal">
+                <Button
+                  type="button" onClick={runEditSlip}
+                  disabled={
+                    editBusy || !editForm.dispatchDate || !editForm.cohort ||
+                    editForm.items.length === 0 ||
+                    editForm.items.some((l) => !l.productId || !l.quantity || Number(l.quantity) <= 0)
+                  }
+                >
+                  {editBusy ? 'Saving' : 'Save changes'}
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setMode('list')}>Cancel</Button>
+              </Field>
+            </CardContent>
+          </Card>
+        ) : null}
+
         {mode === 'list' ? (
           <div className="mt-6 space-y-4">
             <div className="flex flex-wrap items-center gap-3">
@@ -473,6 +645,7 @@ export default function PickingSlipManagementPage() {
                     slip={selected}
                     releasing={releasing}
                     onRelease={release}
+                    onEdit={openEdit}
                     workers={workers}
                     secondChoice={secondChoice}
                     onSecondChoice={setSecondChoice}
