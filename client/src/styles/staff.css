@@ -642,6 +642,14 @@
 .stf-row--check.is-warn:hover { background: var(--stf-attention-bg); }
 .stf-row--check .stf-row-main { width: 100%; }
 
+/* The main line of a .stf-row--check row, when it also needs a badge
+   next to it (StaffSlipFlow.jsx's packing checklist) — restates
+   .stf-row's own default row layout (align-items: center, gap: 12px)
+   on this inner wrapper, since the outer .stf-row--check is in column
+   mode to make room for whatever stacks below (a Confirm/Flag panel,
+   here). */
+.stf-row-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; }
+
 /* ── key: value captions ─────────────────────────────────────────── */
 .stf-kv     { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; font-size: 12px; color: var(--stf-text-sub); }
 .stf-kv-key { color: var(--stf-text-meta); }
@@ -876,7 +884,15 @@
 .stf-coachmark {
   position: absolute;
   top: calc(100% + 4px);
-  right: 0;
+  /* left, not right — .stf-card-toggle is its own standalone row
+     holding only the toggle (StepScreen, TaskPage, this file all
+     render it that way, nothing else sharing the row to push it
+     right), and .stf-toggle-block is inline-flex, so the pill always
+     sits at the row's own left/start edge. right: 0 anchored this to
+     the far right of the WHOLE card header instead — visibly
+     disconnected from the toggle it's meant to be pointing at on any
+     card wider than the toggle pill itself, which is every card. */
+  left: 0;
   z-index: 30;
   display: flex;
   align-items: flex-start;

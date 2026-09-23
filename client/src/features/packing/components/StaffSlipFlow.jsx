@@ -339,9 +339,25 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
                 { className: 'stf-badge', label: 'Pending' };
 
               return (
-                <div key={item.id} className="stf-row is-static" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
-                  <span className="stf-row-main" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span>
+                <div key={item.id} className="stf-row is-static stf-row--check">
+                  {/* .stf-row--check already exists for exactly this
+                      shape (see DonationItemsList.jsx) — a row that
+                      stacks extra content below its main line instead
+                      of squeezing it onto one line.
+                      .stf-row-main is used exactly like this everywhere
+                      else it appears (StaffSlipList.jsx, ReviewSummary.jsx,
+                      FeedTheSoilFlow.jsx, CommunityRequestFlow.jsx): a
+                      sibling of the badge, not its parent — that's what
+                      gives title/meta their own column stack (its own
+                      CSS already does flex-direction: column) instead of
+                      the badge's row-level justify-content fighting it
+                      from one level too high. .stf-row-head restates
+                      .stf-row's own default row layout on an inner
+                      wrapper, since the outer .stf-row here is now in
+                      .stf-row--check's column mode to make room for the
+                      Confirm/Flag panel below. */}
+                  <span className="stf-row-head">
+                    <span className="stf-row-main">
                       {guidedActive ? (
                         <span className="stf-wl-pos">Item {activeGuidedIndex + 1} of {pendingItems.length}</span>
                       ) : null}
