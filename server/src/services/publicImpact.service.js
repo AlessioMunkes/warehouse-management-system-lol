@@ -24,6 +24,8 @@
 // unauthenticated.
 // ─────────────────────────────────────────────────────────────
 import repo from '../repositories/reporting.repository.js';
+import { runInWarehouse } from '../config/warehouseContext.js';
+import { warehouseCodes } from '../config/warehouses.js';
 
 // "So far" is cumulative, not a recent window — a marketing counter
 // that reset every quarter would undersell everything before it.
@@ -58,19 +60,42 @@ const safeTotal = async (fn, spec) => {
   }
 };
 
+// One warehouse's three totals.
+const siteTotals = async (spec) => {
+  const [paper, compost, children] = await Promise.all([
+    safeTotal(repo.paperSaved, spec),
+    safeTotal(repo.compostProcessed, spec),
+    safeTotal(repo.childrenReached, spec),
+  ]);
+  return { paper, compost, children };
+};
+
+// Multi-warehouse: the landing page speaks for Ladles of Love as a
+// whole, so it shows the organisation-wide total, each site's figures
+// added together. This is the ONLY place the system combines data
+// across warehouses, and it only ever combines these three counts.
+// Each site's own ECDs, compost and paper are separate, so summing
+// never double-counts. A site whose database is down contributes 0,
+// the same fallback safeTotal already applies per metric.
 const getPublicImpactSummary = async () => {
   if (cached && Date.now() - cachedAt < CACHE_TTL_MS) return cached;
 
   const dateRange = { from: ALL_TIME_FROM, to: todayISO() };
   const spec = { dimension: 'none', filters: {}, dateRange };
 
-  const [paper, compost, children] = await Promise.all([
-    safeTotal(repo.paperSaved, spec),
-    safeTotal(repo.compostProcessed, spec),
-    safeTotal(repo.childrenReached, spec),
-  ]);
+  const codes = warehouseCodes();
+  const parts = codes.length
+    ? await Promise.all(codes.map((code) => runInWarehouse(code, () => siteTotals(spec))))
+    : [await siteTotals(spec)];
 
-  const summary = { paper, compost, children };
+  const summary = parts.reduce(
+    (total, part) => ({
+      paper:    total.paper + part.paper,
+      compost:  total.compost + part.compost,
+      children: total.children + part.children,
+    }),
+    { paper: 0, compost: 0, children: 0 },
+  );
 
   cached = summary;
   cachedAt = Date.now();

@@ -103,6 +103,11 @@ const handleResponse = async (res) => {
     // accept/resolve 410s: 'expired' | 'revoked' | 'accepted') — lets a
     // caller show distinct copy per cause instead of one generic message.
     if (data.reason) error.reason = data.reason;
+    // Multi-warehouse: 'WAREHOUSE_REQUIRED' | 'WAREHOUSE_FORBIDDEN' |
+    // 'WAREHOUSE_INVALID', with the allowed codes when the server
+    // sends them. AuthContext uses these to pick or reset the site.
+    if (data.code) error.code = data.code;
+    if (Array.isArray(data.warehouses)) error.warehouses = data.warehouses;
     throw error;
   }
   return data;
@@ -217,6 +222,10 @@ export const cachedGet = async (key, ttlMs, fetcher) => {
 // return — e.g. receiving a delivery can flip a purchase order to
 // 'completed', which changes who has an open order to receive against.
 export const invalidateCache = (key) => cache.delete(key);
+
+// Everything cached belongs to one warehouse. Switching warehouse
+// empties it, or the next screen would show the last site's suppliers.
+export const clearApiCache = () => cache.clear();
 
 // PUT is used by the attendance contract. It lives in the shared helper so
 // that future attendance components keep the same cookie, network-error and

@@ -23,7 +23,10 @@
 //     via the handler registered on the api module.
 // ─────────────────────────────────────────────────────────────
 import { createContext, useContext, useEffect, useState } from 'react';
-import { apiGet, apiPost, setUnauthorizedHandler } from '../services/api';
+import { apiGet, apiPost, setUnauthorizedHandler, clearApiCache } from '../services/api';
+import {
+  getActiveWarehouse, setActiveWarehouse, clearActiveWarehouse, runWithWarehouse,
+} from '../services/warehouse';
 
 const AuthContext = createContext(null);
 
@@ -50,6 +53,41 @@ const writeCachedUser = (user) => {
   else      localStorage.removeItem(CACHE_KEY);
 };
 
+// ── Multi-warehouse ──────────────────────────────────────────────
+// With one database the server never names a warehouse, so all of
+// this is a no-op and requests carry no warehouse header.
+//
+// Staff: the selected warehouse follows what the server confirmed.
+// Guests: their session names its one warehouse, so they send none.
+const syncWarehouse = (user) => {
+  if (!user) return;
+  if (user.role === 'guest' || !user.warehouse) clearActiveWarehouse();
+  else setActiveWarehouse(user.warehouse);
+};
+
+// GET /api/me, recovering from a stale or missing warehouse choice:
+//   403 WAREHOUSE_FORBIDDEN  the saved site is no longer theirs: forget it
+//   400 WAREHOUSE_REQUIRED   several sites and none chosen on this
+//                            device: open the first. The badge in the
+//                            header shows which, and the switcher
+//                            changes it in one tap.
+const fetchMe = async () => {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await apiGet('/api/me');
+    } catch (err) {
+      if (attempt >= 2) throw err;
+      if (err.code === 'WAREHOUSE_FORBIDDEN' && getActiveWarehouse()) {
+        clearActiveWarehouse();
+      } else if (err.code === 'WAREHOUSE_REQUIRED' && err.warehouses?.length) {
+        setActiveWarehouse(err.warehouses[0]);
+      } else {
+        throw err;
+      }
+    }
+  }
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser]           = useState(readCachedUser);
   const [isLoading, setIsLoading] = useState(true);
@@ -64,8 +102,9 @@ export const AuthProvider = ({ children }) => {
 
     const verifySession = async () => {
       try {
-        const data = await apiGet('/api/me');
+        const data = await fetchMe();
         if (cancelled) return;
+        syncWarehouse(data.user);
         writeCachedUser(data.user);
         setUser(data.user);
         setIsOffline(false);
@@ -110,15 +149,55 @@ export const AuthProvider = ({ children }) => {
     console.log("[AUTH] calling apiPost");
     const data = await apiPost('/api/login', { username, password });
     console.log("[AUTH] apiPost returned", data);
-    writeCachedUser(data.user);
-    setUser(data.user);
+    let signedIn = data.user;
+
+    // Multi-warehouse: go back to the site last used on this device if
+    // this person can still use it, and read who they are THERE (their
+    // role can differ per site). Otherwise the server's default.
+    if (signedIn?.warehouses?.length) {
+      const preferred = getActiveWarehouse();
+      const allowed = signedIn.warehouses.map((w) => w.code);
+      if (preferred && preferred !== signedIn.warehouse && allowed.includes(preferred)) {
+        setActiveWarehouse(preferred);
+        signedIn = (await fetchMe()).user;
+      }
+    }
+
+    syncWarehouse(signedIn);
+    writeCachedUser(signedIn);
+    setUser(signedIn);
     setSessionMessage(null);
-    console.log("[AUTH] returning user", data.user);
-    return data.user;
+    console.log("[AUTH] returning user", signedIn);
+    return signedIn;
   };
 
-  const loginAsGuest = async (name) => {
-    const data = await apiPost('/api/volunteers/sign-in', { name });
+  // Multi-warehouse: move to another site this person can use. Clears
+  // everything cached for the old site and re-reads who they are at
+  // the new one, because their role there may differ. On failure the
+  // previous site stays selected and the error is thrown to the caller.
+  const switchWarehouse = async (code) => {
+    const previous = getActiveWarehouse();
+    if (!code || code === previous) return user;
+    setActiveWarehouse(code);
+    clearApiCache();
+    try {
+      const data = await apiGet('/api/me');
+      syncWarehouse(data.user);
+      writeCachedUser(data.user);
+      setUser(data.user);
+      return data.user;
+    } catch (err) {
+      setActiveWarehouse(previous);
+      clearApiCache();
+      throw err;
+    }
+  };
+
+  // warehouse: the site a volunteer picked on the sign-in page, in
+  // multi-warehouse mode. Sent with this one request only.
+  const loginAsGuest = async (name, warehouse = null) => {
+    const data = await runWithWarehouse(warehouse, () => apiPost('/api/volunteers/sign-in', { name }));
+    syncWarehouse(data.user);
     writeCachedUser(data.user);
     setUser(data.user);
     setSessionMessage(null);
@@ -134,6 +213,7 @@ export const AuthProvider = ({ children }) => {
   // context, so the rest of the app stops thinking nobody is signed in.
   const refreshFromClaim = (claimedUser) => {
     if (!claimedUser) return null;
+    syncWarehouse(claimedUser);
     writeCachedUser(claimedUser);
     setUser(claimedUser);
     setSessionMessage(null);
@@ -167,7 +247,7 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider
-      value={{ user, login, loginAsGuest, refreshFromClaim, logout, isLoading, isOffline, sessionMessage }}
+      value={{ user, login, loginAsGuest, refreshFromClaim, logout, switchWarehouse, isLoading, isOffline, sessionMessage }}
     >
       {children}
     </AuthContext.Provider>
