@@ -116,7 +116,7 @@ export const METRICS = {
     description:
       'How many children received food. Counts each centre that actually collected ' +
       'once, using its registered child count. Because centres collect fortnightly, ' +
-      'a centre collecting twice in a month is still counted once — a headcount, ' +
+      'a centre collecting twice in a month is still counted once. A headcount, ' +
       'not a total of collections.',
     repoFn: 'childrenReached', unit: 'children',
     dimensions: ['none', 'month', 'cohort', 'ecd_centre'],
@@ -141,12 +141,55 @@ export const METRICS = {
     caveat: 'Estimate based on the kilograms-to-meals factor on record.',
   },
 
+  // adultsReached deliberately does NOT extend IMPACT_BENEFICIARY_KINDS
+  // to include dignity kitchens — NFR-20 excludes them from impact
+  // reporting by design (per the project's own visit notes: "dignity
+  // kitchens don't require an impact report"). This metric is scoped to
+  // soup kitchens specifically, forced in the repository regardless of
+  // what filter a caller passes — it is not a general "pick any
+  // beneficiary kind" report, it IS the soup-kitchen number.
+  adults_reached: {
+    id: 'adults_reached', label: 'Adults reached', temporal: 'range',
+    description:
+      'Estimated adults served through soup kitchens. Converted from kilograms ' +
+      'dispatched to soup kitchens using a factor the manager can edit, the same ' +
+      'way meals enabled works. Dignity kitchens and ECDs are not counted here.',
+    repoFn: 'adultsReached', unit: 'adults',
+    dimensions: ['none', 'month', 'week', 'cohort'],
+    filters: ['cohort'],
+    defaultChart: 'line', impactOnly: true, factorKey: 'kg_to_adults_served',
+    caveat: 'Estimate based on the kilograms-to-adults-served factor on record. Soup kitchens only.',
+  },
+
+  paper_saved: {
+    id: 'paper_saved', label: 'Paper saved', temporal: 'range',
+    description:
+      'Delivery notes, dispatch notes and decanting sheets generated digitally ' +
+      'instead of on paper. One record here is one physical page that was not ' +
+      'printed, copied or hand-filled the old way.',
+    repoFn: 'paperSaved', unit: 'documents',
+    dimensions: ['none', 'month', 'week'], filters: [],
+    defaultChart: 'line', impactOnly: true,
+    caveat: 'Counts delivery notes, dispatch notes and decanting sheets created in the period.',
+  },
+
+  compost_processed: {
+    id: 'compost_processed', label: 'Compost processed', temporal: 'range',
+    description:
+      'Kilograms of compost collected through Feed the Soil, logged against a ' +
+      'community member\'s collection kit each time it is weighed in.',
+    repoFn: 'compostProcessed', unit: 'kg',
+    dimensions: ['none', 'month'], filters: [],
+    defaultChart: 'line', impactOnly: true,
+    caveat: 'Counts every logged weigh-in, whether or not it has been dispatched to a farmer yet.',
+  },
+
   // ══ Dispatch ═══════════════════════════════════════════════
   dispatch_volume: {
     id: 'dispatch_volume', label: 'Food dispatched', temporal: 'range',
     description:
       'Kilograms that physically left the warehouse, counted at the gate from what ' +
-      'staff loaded onto the vehicle — not what was packed onto the pallet earlier ' +
+      'staff loaded onto the vehicle, not what was packed onto the pallet earlier ' +
       'in the week.',
     repoFn: 'dispatchVolume', unit: 'kg',
     dimensions: ['none', 'month', 'week', 'cohort', 'product', 'programme', 'ecd_centre', 'beneficiary'],
@@ -159,8 +202,8 @@ export const METRICS = {
     id: 'collection_compliance', label: 'Collection compliance', temporal: 'range',
     description:
       'The percentage of prepared pallets that were actually collected. Late ' +
-      'collections count as collected — the food reached children, it just arrived ' +
-      'after four in the afternoon.',
+      'collections count as collected: the food reached children, it just arrived ' +
+      'after three in the afternoon.',
     repoFn: 'collectionCompliance', unit: '%',
     dimensions: ['none', 'month', 'cohort', 'ecd_centre'],
     filters: ['cohort', 'beneficiary_kind', 'ecd_id'],
@@ -211,8 +254,8 @@ export const METRICS = {
     id: 'receiving_discrepancy_rate', label: 'Delivery discrepancy rate', temporal: 'range',
     description:
       'How often what a supplier delivered did not match what was ordered, as a ' +
-      'percentage of their delivery lines. This is the supplier reliability report — ' +
-      'run it when asked which suppliers are a problem or who short-delivers.',
+      'percentage of their delivery lines. This is the supplier reliability report. ' +
+      'Run it when asked which suppliers are a problem or who short-delivers.',
     repoFn: 'receivingDiscrepancyRate', unit: '%',
     // supplier first: this is the supplier-reliability report, and a
     // single overall discrepancy rate is not something anyone acts on.
@@ -248,11 +291,29 @@ export const METRICS = {
     caveat: 'Excludes received lines with no purchase order price on record.',
   },
 
+  // Distinct from procurement_spend on purpose: spend rising because
+  // more was bought is a different story from the price per unit
+  // rising, and a manager watching for the second cannot see it in
+  // the first. product dimension listed before month, matching
+  // picking_flag_rate's reasoning: a price trend is only useful once
+  // you know which product it is.
+  unit_price_trend: {
+    id: 'unit_price_trend', label: 'Unit price trend', temporal: 'range',
+    description:
+      'The average price paid per unit received, weighted by quantity so one large ' +
+      'cheap delivery cannot be outvoted by several small expensive ones.',
+    repoFn: 'unitPriceTrend', unit: 'ZAR/unit',
+    dimensions: ['product', 'none', 'month', 'supplier'],
+    filters: ['supplier_id', 'product_id'],
+    defaultChart: 'hbar',
+    caveat: 'Excludes received lines with no purchase order price on record.',
+  },
+
   // ══ Donations ══════════════════════════════════════════════
   donation_value: {
     id: 'donation_value', label: 'Donation value received', temporal: 'range',
     description:
-      'The estimated rand value of donations received. Aggregate only — this report ' +
+      'The estimated rand value of donations received. Aggregate only; this report ' +
       'cannot be broken down by donor.',
     repoFn: 'donationValue', unit: 'ZAR',
     dimensions: ['none', 'month', 'category', 'programme'],
@@ -264,7 +325,7 @@ export const METRICS = {
   section18a_pipeline: {
     id: 'section18a_pipeline', label: 'Section 18A certificates', temporal: 'range',
     description:
-      'Where donations sit in the Section 18A tax certificate process — how many are ' +
+      'Where donations sit in the Section 18A tax certificate process: how many are ' +
       'issued, queued, waiting on donor details, or failed. This is the compliance ' +
       'view. Aggregate only, no donor names.',
     repoFn: 'section18aPipeline', unit: 'donations',
@@ -277,7 +338,7 @@ export const METRICS = {
   stock_on_hand: {
     id: 'stock_on_hand', label: 'Stock on hand', temporal: 'snapshot',
     description:
-      'What is in the warehouse right now. This is a live figure — it has no date ' +
+      'What is in the warehouse right now. This is a live figure; it has no date ' +
       'range and ignores any period asked for.',
     repoFn: 'stockOnHand', unit: 'units',
     dimensions: ['product', 'none'], filters: ['product_id', 'programme_id'],
@@ -303,7 +364,7 @@ export const METRICS = {
   stock_movement_volume: {
     id: 'stock_movement_volume', label: 'Stock movements', temporal: 'range',
     description:
-      'How much stock moved and why — received, picked, dispatched, decanted, ' +
+      'How much stock moved and why: received, picked, dispatched, decanted, ' +
       'donated, written off as wastage, or manually adjusted. Use this to see ' +
       'warehouse throughput or to check how much was adjusted by hand.',
     repoFn: 'stockMovementVolume', unit: 'units',
@@ -346,7 +407,7 @@ export const METRICS = {
     id: 'community_request_outcomes', label: 'Community requests', temporal: 'range',
     description:
       'Walk-in and phone-in requests for food from the public, and what happened to ' +
-      'them — pending, fulfilled, partially fulfilled, or declined (BR-28). ' +
+      'them: pending, fulfilled, partially fulfilled, or declined. ' +
       'Aggregate only, no caller details.',
     repoFn: 'communityRequestOutcomes', unit: 'requests',
     dimensions: ['outcome', 'month'], filters: [],
@@ -358,7 +419,7 @@ export const METRICS = {
   volunteer_hours: {
     id: 'volunteer_hours', label: 'Volunteer hours', temporal: 'range',
     description:
-      'Hours contributed by volunteers on site. Aggregate only — this report cannot ' +
+      'Hours contributed by volunteers on site. Aggregate only; this report cannot ' +
       'be broken down by individual volunteer.',
     repoFn: 'volunteerHours', unit: 'hours',
     dimensions: ['month', 'week', 'none'], filters: [],

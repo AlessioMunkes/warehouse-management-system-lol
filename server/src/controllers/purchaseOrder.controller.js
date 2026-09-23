@@ -62,4 +62,14 @@ const setStatus = async (req, res) => {
   }
 };
 
-export default { create, list, getOne, setStatus };
+// ── PATCH /api/purchase-orders/:id/quickbooks-ref ──────────────
+const setQuickbooksReference = async (req, res) => {
+  try {
+    const data = await purchaseOrderService.setQuickbooksReference(req.params.id, req.body, req.user.id);
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    respondError(res, err, 'setQuickbooksReference', 'Failed to update the QuickBooks reference.');
+  }
+};
+
+export default { create, list, getOne, setStatus, setQuickbooksReference };

@@ -58,7 +58,12 @@ export const approveBeneficiary = async (id) => {
   return toBeneficiary(body.data ?? {});
 };
 
+export const rollbackCohort = async (id) => {
+  const body = await apiPatch(`/api/beneficiaries/${id}/rollback-cohort`, {});
+  return toBeneficiary(body.data ?? {});
+};
+
 export default {
   getBeneficiaries, getBeneficiary, createBeneficiary,
-  updateBeneficiary, setBeneficiaryStatus, approveBeneficiary,
+  updateBeneficiary, setBeneficiaryStatus, approveBeneficiary, rollbackCohort,
 };

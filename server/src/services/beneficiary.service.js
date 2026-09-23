@@ -155,6 +155,22 @@ const approveBeneficiary = async (rawId) => {
   return repo.approveBeneficiary(id);
 };
 
+// ── Rollback to previous cohort ─────────────────────────────────
+// Sponsor feedback: when an ECD misses its collection, support moving
+// it to the other cohort so it picks up next week instead of waiting
+// out this fortnight. See beneficiary.repository.js's rollbackCohort
+// for the assumed "previous cohort = flip" behaviour and the flag
+// that the underlying fortnightly cohort model itself may need
+// sponsor confirmation.
+const rollbackCohort = async (rawId, actorId) => {
+  const id = requireId(rawId);
+
+  const existing = await repo.getBeneficiaryById(id);
+  if (!existing) throw fail(404, 'Beneficiary not found.');
+
+  return repo.rollbackCohort(id, actorId);
+};
+
 export default {
   listBeneficiaries,
   getBeneficiary,
@@ -162,4 +178,5 @@ export default {
   updateBeneficiary,
   setBeneficiaryStatus,
   approveBeneficiary,
+  rollbackCohort,
 };

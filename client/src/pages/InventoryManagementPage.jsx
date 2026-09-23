@@ -132,7 +132,7 @@ export default function InventoryManagementPage() {
       toast({
         variant: "success",
         title: `Reversed the adjustment to ${productName}`,
-        description: "The reversal is recorded as its own movement — the original entry stays in the ledger.",
+        description: "The reversal is recorded as its own movement. The original entry stays in the ledger.",
       });
     } catch (err) {
       toast({
@@ -158,7 +158,7 @@ export default function InventoryManagementPage() {
 
       toast({
         variant: "success",
-        title: `${delta < 0 ? "Removed" : "Added"} ${Math.abs(delta)} ${unit} — ${name}`.trim(),
+        title: `${delta < 0 ? "Removed" : "Added"} ${Math.abs(delta)} ${unit} of ${name}`.trim(),
         description: payload.reason,
         action: { label: "Undo", onClick: () => undoAdjustment(payload, name) },
       });

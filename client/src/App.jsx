@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate }  from 'react-router-dom';
 import { AuthProvider }                            from './context/AuthContext';
 import ThemeProvider                               from './components/layout/ThemeProvider';
 import ProtectedRoute                              from './components/layout/ProtectedRoute';
-import { PACKING, STAFF, DONATIONS, DONATION_INTAKE_ROLES, ADMIN, VOLUNTEERS, VOLUNTEER_MANAGEMENT_ROLES, COMMUNITY_REQUEST_ROLES, STAFF_ROLES } from './routes/paths';
+import { PACKING, STAFF, DONATIONS, DONATION_INTAKE_ROLES, ADMIN, VOLUNTEERS, VOLUNTEER_MANAGEMENT_ROLES, COMMUNITY_REQUEST_ROLES, STAFF_ROLES, FEED_THE_SOIL_ROLES } from './routes/paths';
 import LandingPage                                 from './pages/LandingPage';
 import LoginPage                                   from './pages/LoginPage';
 import GuestLoginPage                              from './pages/GuestLoginPage';
@@ -44,6 +44,7 @@ import CommunityRequestsPage                       from './pages/CommunityReques
 import GmailSettingsPage                           from './pages/GmailSettingsPage';
 import Section18AFormPage                         from './pages/Section18AFormPage';
 import InviteAcceptPage                            from './pages/InviteAcceptPage';
+import FeedTheSoilPage                              from './pages/FeedTheSoilPage';
 
 // Donations — new feature, own draft context scoped to just these
 // two routes (see features/donation/context/DonationDraftProvider.jsx)
@@ -136,13 +137,6 @@ const App = () => (
           <Route path={STAFF.pickingSlips} element={<PickingSlipManagementPage />} />
         </Route>
 
-        {/* The warehouse worker's dashboard. Split out of the block
-            below so it can take the shell: the four flows underneath it
-            are StaffShell screens and must not. */}
-        <Route element={<ProtectedRoute roles={STAFF_ROLES} shell />}>
-          <Route path="/noc" element={<TaskDashboard />} />
-        </Route>
-
         {/* Protected — warehouse floor staff.
             Was `<ProtectedRoute />` with no roles. ProtectedRoute skips its
             role check when `roles` is undefined, so "any logged-in user"
@@ -151,6 +145,12 @@ const App = () => (
             so the client agrees with the server, which already refuses a
             guest on every one of these endpoints. */}
         <Route element={<ProtectedRoute roles={STAFF_ROLES} />}>
+          {/* The warehouse worker's dashboard. No longer split into its
+              own shell='true' group — it wraps itself in StaffShell now,
+              same as the flows below it, rather than the ManagerLayout
+              sidebar it used to get here. See TaskDashboardPage.jsx's
+              own note on why. */}
+          <Route path="/noc" element={<TaskDashboard />} />
           <Route path="/noc/decanting" element={<DecantingPage />} />
           <Route path={STAFF.decantingRecords} element={<StaffDecantingRecordsPage />} />
 
@@ -175,10 +175,17 @@ const App = () => (
             here exactly as it is there — the client gate is a UX courtesy,
             the server route is the actual control.
 
+            No shell prop — DonationDetailsPage/ReviewPage wrap themselves in
+            the real StaffShell component now (see their own comments). They
+            used to render a hand-rolled .stf-shell div here AND get wrapped
+            in ManagerLayout by this route's old shell prop, which is the
+            "no bottom nav, sidebar behaves oddly" bug report: neither shell
+            was the one actually meant for this screen.
+
             The draft context is mounted per-route rather than around the
             block so the sessionStorage draft is scoped to the two intake
             pages and cleared by navigating away from them. */}
-        <Route element={<ProtectedRoute roles={DONATION_INTAKE_ROLES} shell />}>
+        <Route element={<ProtectedRoute roles={DONATION_INTAKE_ROLES} />}>
           <Route
             path={STAFF.donation}
             element={
@@ -206,9 +213,24 @@ const App = () => (
 
         {/* Benevolent package request log (ADM-5.0 / BR-28). Warehouse
             staff and up, mirroring STAFF_UP on every
-            /api/community-requests route. Log only — no stock movement. */}
-        <Route element={<ProtectedRoute roles={COMMUNITY_REQUEST_ROLES} shell />}>
+            /api/community-requests route. Log only — no stock movement.
+
+            No shell prop — CommunityRequestsPage picks ManagerLayout or
+            StaffShell itself by role now, the same way FeedTheSoilPage
+            does. It used to always render ManagerLayout (no worker-facing
+            view existed at all) while this route's own shell prop wrapped
+            it in a SECOND ManagerLayout — the doubled sidebar whose drawer
+            state fought itself. */}
+        <Route element={<ProtectedRoute roles={COMMUNITY_REQUEST_ROLES} />}>
           <Route path={STAFF.communityRequests} element={<CommunityRequestsPage />} />
+        </Route>
+
+        {/* Feed the Soil kit logging. Warehouse staff and up, mirroring
+            STAFF_UP on every /api/collection-kits route. No shell here —
+            FeedTheSoilPage picks ManagerLayout or StaffShell itself by
+            role, the same way DecantingPage does for /noc/decanting. */}
+        <Route element={<ProtectedRoute roles={FEED_THE_SOIL_ROLES} />}>
+          <Route path={STAFF.feedTheSoil} element={<FeedTheSoilPage />} />
         </Route>
 
         {/* Guest-only — the Love Activist screens. */}

@@ -106,6 +106,13 @@ export const STAFF = {
   // Warehouse staff and up: every /api/community-requests route is
   // requireRole(WORKER, MANAGER, ADMIN), and this mirrors that.
   communityRequests: '/noc/community-requests',
+  // Feed the Soil kit tracking (food waste swapped for compost).
+  // Warehouse staff and up, mirroring STAFF_UP on every
+  // /api/collection-kits route — a worker assigns a kit to a community
+  // member and logs the compost each time it's weighed in; the Impact
+  // Calculator's compost_processed metric only reads from what gets
+  // logged here.
+  feedTheSoil: '/noc/feed-the-soil',
 };
 
 // ── Donations ────────────────────────────────────────────────
@@ -138,6 +145,10 @@ export const STAFF_ROLES = ['warehouse_worker', 'manager', 'admin'];
 // server/src/routes/communityRequest.routes.js (BR-01: "Warehouse
 // Staff or higher"). Two halves of the same rule — change them together.
 export const COMMUNITY_REQUEST_ROLES = ['warehouse_worker', 'manager', 'admin'];
+
+// Client-side mirror of STAFF_UP in server/src/routes/collectionKit.routes.js.
+// Two halves of the same rule — change them together.
+export const FEED_THE_SOIL_ROLES = ['warehouse_worker', 'manager', 'admin'];
 
 // Volunteer Management is currently available to the two live roles that
 // perform the coordinator workflow. Keep this list shared by route guards and

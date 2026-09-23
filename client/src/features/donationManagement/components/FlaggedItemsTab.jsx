@@ -45,7 +45,7 @@ const isIntakeResponse = (result) =>
 
 const resolveMessage = (result = {}) => {
   if (!isIntakeResponse(result)) return 'Resolved.';
-  if (result.committed === true) return 'Donation now committing — all items resolved.';
+  if (result.committed === true) return 'Donation now committing. All items resolved.';
   if (result.status === 'committing') return 'Donation now committing.';
   return 'Awaiting further resolutions.';
 };

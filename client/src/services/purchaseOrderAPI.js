@@ -23,9 +23,11 @@
 // a number, so it needs no such care.
 //
 // There is no delete — nothing in the URS asks for a PO to be
-// destroyed. setPurchaseOrderStatus is the one update path, and it
-// only ever moves a PO through its states (BR-07B); it cannot edit
-// the lines, supplier, or anything else about it in place.
+// destroyed. setPurchaseOrderStatus and setQuickbooksReference are the
+// only update paths: the former only ever moves a PO through its
+// states (BR-07B), the latter only ever touches the QuickBooks
+// reference. Neither can edit the lines, supplier, or anything else
+// about it in place.
 // ─────────────────────────────────────────────────────────────
 import { apiGet, apiPost, apiPatch } from "./api";
 
@@ -71,6 +73,18 @@ const toLine = (row) => ({
   receivedToDate: Number(row.received_to_date ?? 0),
 });
 
+// One real event: a delivery actually recorded against this PO. Not a
+// status-history entry — see purchaseOrder.repository.js's own note
+// on why there's no per-transition log to draw one from.
+const toDelivery = (row) => ({
+  id:               row.id,
+  deliveryDate:     row.delivery_date ?? null,
+  status:           row.status,
+  driverName:       row.driver_name ?? "",
+  receivedByName:   row.received_by_name ?? "",
+  hasDiscrepancies: Boolean(row.has_discrepancies),
+});
+
 export const toPurchaseOrder = (row) => ({
   id:                   row.id,
   poNumber:             row.po_number ?? "",
@@ -90,6 +104,7 @@ export const toPurchaseOrder = (row) => ({
   estimatedValue:       Number(row.estimated_value ?? 0),
   receiptCount:         Number(row.receipt_count ?? 0),
   items:                (row.items ?? []).map(toLine),
+  deliveries:           (row.deliveries ?? []).map(toDelivery),
 });
 
 // ── GET /api/purchase-orders ──────────────────────────────────
@@ -135,7 +150,14 @@ export const setPurchaseOrderStatus = async (id, status, reason = null) => {
 
 export const approvePurchaseOrder = async (id) => setPurchaseOrderStatus(id, "approved");
 
+// ── PATCH /api/purchase-orders/:id/quickbooks-ref ───────────────
+// quickbooksPoId "" clears the reference — see purchaseOrder.service.js.
+export const setQuickbooksReference = async (id, quickbooksPoId) => {
+  const body = await apiPatch(`/api/purchase-orders/${id}/quickbooks-ref`, { quickbooksPoId });
+  return toPurchaseOrder(body.data ?? {});
+};
+
 export default {
   getPurchaseOrders, getPurchaseOrder, createPurchaseOrder,
-  setPurchaseOrderStatus, approvePurchaseOrder,
+  setPurchaseOrderStatus, approvePurchaseOrder, setQuickbooksReference,
 };

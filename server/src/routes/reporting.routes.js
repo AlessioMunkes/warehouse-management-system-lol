@@ -53,4 +53,7 @@ router.get ('/catalog', auth, requireRole(...MANAGERS_UP), reportingController.g
 router.post('/report',  auth, requireRole(...MANAGERS_UP), reportingController.runReport);
 router.post('/ask',     auth, requireRole(...MANAGERS_UP), askLimiter, reportingController.ask);
 
+router.put('/factors/:factorKey',         auth, requireRole(...MANAGERS_UP), reportingController.setFactor);
+router.get('/factors/:factorKey/history', auth, requireRole(...MANAGERS_UP), reportingController.getFactorHistory);
+
 export default router;

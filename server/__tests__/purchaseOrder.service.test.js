@@ -11,8 +11,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const repoMock = {
-  getPurchaseOrderById:     vi.fn(),
+  getPurchaseOrderById:      vi.fn(),
   updatePurchaseOrderStatus: vi.fn(),
+  setQuickbooksReference:    vi.fn(),
 };
 
 vi.mock('../src/repositories/purchaseOrder.repository.js', () => ({ default: repoMock }));
@@ -29,6 +30,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   repoMock.getPurchaseOrderById.mockResolvedValue(existingPO());
   repoMock.updatePurchaseOrderStatus.mockResolvedValue(existingPO({ status: 'approved' }));
+  repoMock.setQuickbooksReference.mockResolvedValue(true);
 });
 
 describe('setPurchaseOrderStatus', () => {
@@ -94,5 +96,39 @@ describe('setPurchaseOrderStatus', () => {
     const result = await purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status: 'approved' });
     expect(repoMock.updatePurchaseOrderStatus).not.toHaveBeenCalled();
     expect(result.status).toBe('approved');
+  });
+});
+
+describe('setQuickbooksReference', () => {
+  it('rejects a non-numeric id', async () => {
+    await expect(purchaseOrderService.setQuickbooksReference('abc', { quickbooksPoId: 'PO-1' }, 3))
+      .rejects.toMatchObject({ status: 400 });
+  });
+
+  it('rejects a reference over 50 characters', async () => {
+    await expect(purchaseOrderService.setQuickbooksReference(PO_ID, { quickbooksPoId: 'x'.repeat(51) }, 3))
+      .rejects.toMatchObject({ status: 400 });
+  });
+
+  it('404s when the purchase order does not exist', async () => {
+    repoMock.setQuickbooksReference.mockResolvedValue(false);
+    await expect(purchaseOrderService.setQuickbooksReference(PO_ID, { quickbooksPoId: 'PO-1' }, 3))
+      .rejects.toMatchObject({ status: 404 });
+  });
+
+  it('passes the trimmed reference and acting user through to the repository', async () => {
+    await purchaseOrderService.setQuickbooksReference(PO_ID, { quickbooksPoId: '  PO-99  ' }, 3);
+    expect(repoMock.setQuickbooksReference).toHaveBeenCalledWith(PO_ID, 'PO-99', 3);
+  });
+
+  it('clears the reference when given a blank value, rather than rejecting it', async () => {
+    await purchaseOrderService.setQuickbooksReference(PO_ID, { quickbooksPoId: '  ' }, 3);
+    expect(repoMock.setQuickbooksReference).toHaveBeenCalledWith(PO_ID, null, 3);
+  });
+
+  it('returns the freshly-read purchase order, not a bare acknowledgement', async () => {
+    repoMock.getPurchaseOrderById.mockResolvedValue(existingPO({ quickbooks_po_id: 'PO-99' }));
+    const result = await purchaseOrderService.setQuickbooksReference(PO_ID, { quickbooksPoId: 'PO-99' }, 3);
+    expect(result.quickbooks_po_id).toBe('PO-99');
   });
 });

@@ -1,103 +1,120 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/pages/TaskDashboardPage.jsx
-// @sentinel script-51-task-dashboard-simple
-// @sentinel script-52-illustrated-icons
 //
-// The warehouse worker's home screen: the tasks they can start, and
-// nothing else.
+// The warehouse worker's dashboard. Rebuilt inside StaffShell instead
+// of ManagerLayout — this page is functionally worker-only
+// (navSections.js's homeForRole only ever sends a warehouse_worker
+// here; a manager's real home is /manager), and the approved old
+// storyboards for it use StaffShell's own visual language: the doodle
+// banner footer, no sidebar. ManagerLayout's stat-tile row and
+// full-width stacked cards were the wrong shell for what this screen
+// was always meant to look like.
 //
-// It used to open with three counts from GET /api/dashboard/my-work
-// above the task cards. On the floor that is a row to read past on the
-// way to the one button you came for, so script 51 drops it — the
-// counts still live on the screens that can act on them (the packing
-// board, the gate queue). The fetch goes with it, so this page renders
-// with no network call and cannot show a spinner or a failed row
-// between someone and their job.
+// Task section is a stacked list of rows on a phone, a row of
+// free-standing circles from tablet width up — no connecting line
+// between them either way. See staff.css's .stf-tasks for why the
+// line from the original storyboard reference was tried and then
+// explicitly dropped: it reads as a fixed order for the day
+// (Receiving, then Packing, then Decanting, then Dispatch), which
+// isn't true — a shift can be packing-only or dispatch-only. The
+// "carry on where you left off" idea from that same storyboard still
+// exists — it's UnfinishedWork, below.
 //
-// The tiles are STAFF_TABS from the bottom bar, in the same order with
-// the same icons, so the four tasks look the same wherever they are
-// shown. Home is dropped — it is this screen. Donation intake is added
-// on the end for staff, and is hidden from managers and admins, who
-// reach it from their own sidebar.
+// Each item's caption used to be a live count from GET
+// /api/dashboard/my-work ("19 slips assigned to you"). Replaced with
+// a short instruction, three words or fewer — what to do there, not a
+// number that only means something once you already know what the
+// task is. Nothing on this page reads that endpoint any more, so the
+// fetch is gone too, not left in place unused.
+//
+// Feed the Soil and Benevolent Requests used to sit below the grid as
+// plain text links — a visual-hierarchy claim ("these two are lesser
+// than the other five") the product doesn't actually make: they're
+// modules the same as receiving or dispatch, worked less often but
+// not less real, and a text link is both a smaller touch target and a
+// different affordance for the same class of action on one screen.
+// Same tile, same target size, same list, as everything else here.
+//
+// wide on StaffShell: the standard 520px column (every task flow uses
+// it) read as a small clump adrift on a bench tablet or a wide
+// window — plenty of room going unused on a page that isn't a
+// step-by-step flow needing a narrow, focused column in the first
+// place. Same prop Decanting's week planner already uses for its own,
+// different reason (a two-column form needing the space); this page
+// just needs the room to not look stranded.
 // ─────────────────────────────────────────────────────────────
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { HandCoins } from 'lucide-react';
-import { STAFF_TABS } from '../components/layout/staffTasks';
+import { useEffect } from 'react';
+import StaffShell from '../components/layout/StaffShell';
 import DashboardGreeting from '../features/taskdashboard/components/DashboardGreeting';
 import UnfinishedWork from '../features/staff/components/UnfinishedWork';
-import { Card, CardContent } from '@/components/ui/card';
+import TaskNode from '../features/taskdashboard/components/TaskNode';
 import { useAuth } from '../context/AuthContext';
-import { STAFF } from '../routes/paths';
+import useCoachmark from '../features/staff/hooks/useCoachmark';
+import { STAFF, PACKING } from '../routes/paths';
 
-// One line each, in the words the floor uses — "Decanting" tells a new
-// volunteer nothing, "break bulk stock down into bags" tells them
-// everything.
-const BLURBS = {
-  Receiving: 'Check a delivery in against its purchase order.',
-  Packing:   'Pack a picking slip and flag anything short.',
-  Decanting: 'Break bulk stock down into bags and record the weights.',
-  Dispatch:  'Hand a pallet over at the gate and capture the signature.',
-};
-
+// What to do there, three words or fewer — see this file's own note
+// above on why the live counts were dropped.
 const TASKS = [
-  ...STAFF_TABS
-    .filter((tab) => tab.to !== STAFF.home)
-    .map((tab) => ({
-      to: tab.to, icon: tab.icon, image: tab.image,
-      title: tab.label, description: BLURBS[tab.label],
-    })),
-  { to: STAFF.donation, icon: HandCoins, image: '/icons/donate-icon.svg',
-    title: 'Donation intake', description: 'Log goods donated at the door.' },
-  // Receipts is manager-only and deliberately absent. The tile and the
-  // route guard in App.jsx have to agree — a hidden tile on an open
-  // route is not access control, just a tidier way to lose track of one.
+  { to: STAFF.receiving, icon: 'receiving-icon', title: 'Receiving',
+    meta: 'Record deliveries' },
+  { to: STAFF.donation, icon: 'donate-icon', title: 'Donation intake',
+    meta: 'Log donations' },
+  { to: PACKING.board, icon: 'packing-icon', title: 'Packing',
+    meta: 'Pack picking slips' },
+  { to: STAFF.decanting, icon: 'decanting-icon', title: 'Decanting',
+    meta: 'Portion bulk stock' },
+  { to: STAFF.dispatch, icon: 'dispatch-icon', title: 'Dispatch',
+    meta: 'Dispatch pallets' },
+  { to: STAFF.communityRequests, icon: 'benevolent-icon', title: 'Benevolent requests',
+    meta: 'Log a request' },
+  { to: STAFF.feedTheSoil, icon: 'fts-icon', title: 'Feed the Soil',
+    meta: 'Log compost' },
+  // Receipts is manager-only and deliberately absent. The item and
+  // the route guard in App.jsx have to agree — a hidden item on an
+  // open route is not access control, just a tidier way to lose
+  // track of one.
 ];
-
-function TaskTile({ to, icon: Icon, image, title, description }) {
-  // Same drawing as the tab bar, same fallback: a missing file shows
-  // the glyph rather than an empty box.
-  const [broken, setBroken] = useState(false);
-  return (
-    <Link to={to} className="block h-full">
-      <Card className="h-full transition-colors hover:border-brand hover:bg-canvas">
-        <CardContent className="flex h-full flex-col items-start gap-3 p-5">
-          <div className="stf-tile-icon rounded-[10px] bg-surface-2 p-2 text-brand">
-            {image && !broken ? (
-              <img src={image} alt="" aria-hidden="true" className="size-12 object-contain"
-                   onError={() => setBroken(true)} />
-            ) : (
-              <Icon className="size-8" />
-            )}
-          </div>
-          <div className="min-w-0">
-            <p className="text-lg font-semibold leading-tight text-ink">{title}</p>
-            <p className="mt-1 text-sm leading-snug text-muted-foreground">{description}</p>
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
-  );
-}
 
 export default function TaskDashboardPage() {
   const { user } = useAuth();
-  const role = String(user?.role || '').toLowerCase();
-  const visibleTasks = TASKS.filter((task) =>
-    task.to !== STAFF.donation || (role !== 'manager' && role !== 'admin')
-  );
+  const { show: showHamburgerHint, dismiss: dismissHamburgerHint } = useCoachmark('dashboard-hamburger');
+
+  // Same 5s auto-dismiss every other Coachmark in this app already
+  // has (DecantingFlow/ReceivingFlow/StaffSlipFlow's view-toggle
+  // hints) — missing here was the actual bug: with no timer, dismiss
+  // only ever fired on a tap, so the hint just sat on screen
+  // indefinitely instead of clearing itself after a few seconds like
+  // a first-visit hint should.
+  useEffect(() => {
+    if (!showHamburgerHint) return undefined;
+    const timer = setTimeout(dismissHamburgerHint, 5000);
+    return () => clearTimeout(timer);
+  }, [showHamburgerHint, dismissHamburgerHint]);
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6">
-      <DashboardGreeting name={user?.firstName} summaryLine="Pick a task to get started" />
+    <StaffShell crumb="Home" wide>
+      {showHamburgerHint ? (
+        <button
+          type="button"
+          className="stf-coachmark stf-coachmark-fixed stf-coachmark-arrow-only"
+          onClick={dismissHamburgerHint}
+          aria-label="Dismiss hint: everything else is in the menu"
+        >
+          <span className="stf-coachmark-arrow" aria-hidden="true">&#8593;</span>
+        </button>
+      ) : null}
+
+      <DashboardGreeting name={user?.firstName} />
 
       {/* Renders nothing when there is nothing half-done, which is
           most days. */}
       <UnfinishedWork />
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {visibleTasks.map((task) => <TaskTile key={task.to} {...task} />)}
+      <div className="stf-tasks">
+        {TASKS.map((task) => (
+          <TaskNode key={task.to} {...task} />
+        ))}
       </div>
-    </div>
+    </StaffShell>
   );
 }

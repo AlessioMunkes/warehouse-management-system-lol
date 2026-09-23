@@ -141,6 +141,86 @@ const dispatchVolume = (spec) => dispatchedKgQuery({ ...spec, impactOnly: false 
 // measurement stays inspectable and a factor change needs no re-query.
 const mealsEnabled   = (spec) => dispatchedKgQuery({ ...spec, impactOnly: true });
 
+// Soup kitchens only, forced rather than left to the caller — this is
+// not a general "pick a beneficiary kind" report, it IS the adults
+// number. NFR-20 keeps dignity kitchens out of impact reporting
+// entirely, so there is no other beneficiary kind this could mean.
+const adultsReached = (spec) => dispatchedKgQuery({
+  ...spec,
+  impactOnly: false,
+  filters: { ...spec.filters, beneficiary_kind: 'soup_kitchen' },
+});
+
+// ══ Paper saved ════════════════════════════════════════════════
+// Three tables, one UNION, because a "digital document" here is
+// whichever of three different features produced one — a delivery
+// note, a dispatch note (collected_at IS NOT NULL, since a flagged
+// non-collection never produces a note to view or print), or a
+// decanting sheet. All three write timestamptz columns via NOW(), so
+// every branch goes through sastDate() — the file header's TIMEZONE
+// warning applies here as much as anywhere else.
+const paperDimension = (dimension) => {
+  switch (dimension) {
+    case 'none':  return { expr: `'Total'`,               group: null };
+    case 'month': return { expr: bucketMonth('bucket_date'), group: bucketMonth('bucket_date') };
+    case 'week':  return { expr: bucketWeek('bucket_date'),  group: bucketWeek('bucket_date') };
+    default: throw new Error(`Unsupported dimension: ${dimension}`);
+  }
+};
+
+const paperSaved = async ({ dimension, dateRange }) => {
+  const dim = paperDimension(dimension);
+  const params = [dateRange.from, dateRange.to, COLLECTED_STATUSES];
+  const { rows } = await pool.query(
+    `WITH docs AS (
+       SELECT ${sastDate('created_at')} AS bucket_date FROM delivery_notes
+        WHERE ${sastDate('created_at')} BETWEEN $1::date AND $2::date
+       UNION ALL
+       SELECT ${sastDate('collected_at')} AS bucket_date FROM dispatch_events
+        WHERE status = ANY($3::text[]) AND collected_at IS NOT NULL
+          AND ${sastDate('collected_at')} BETWEEN $1::date AND $2::date
+       UNION ALL
+       SELECT ${sastDate('created_at')} AS bucket_date FROM decanting_records
+        WHERE ${sastDate('created_at')} BETWEEN $1::date AND $2::date
+     )
+     SELECT ${dim.expr} AS label, COUNT(*)::numeric AS value
+       FROM docs
+       ${dim.group ? `GROUP BY ${dim.group}` : ''}
+       ORDER BY 1`,
+    params
+  );
+  return rows2series(rows);
+};
+
+// ══ Feed the Soil / compost ══════════════════════════════════════
+// Every logged weigh-in counts, dispatched or not — logging IS the
+// processing event (the kit was collected and weighed); dispatch to a
+// farmer is what happens to it afterward, a fulfilment detail with no
+// bearing on how much compost the programme actually produced. See
+// collectionKit.repository.js for the full lifecycle this reads from.
+const compostDimension = (dimension) => {
+  switch (dimension) {
+    case 'none':  return { expr: `'Total'`,               group: null };
+    case 'month': return { expr: bucketMonth('bucket_date'), group: bucketMonth('bucket_date') };
+    default: throw new Error(`Unsupported dimension: ${dimension}`);
+  }
+};
+
+const compostProcessed = async ({ dimension, dateRange }) => {
+  const dim = compostDimension(dimension);
+  const params = [dateRange.from, dateRange.to];
+  const { rows } = await pool.query(
+    `SELECT ${dim.expr} AS label, COALESCE(SUM(kg_compost), 0)::numeric AS value
+       FROM (SELECT ${sastDate('logged_at')} AS bucket_date, kg_compost
+               FROM collection_kit_records
+              WHERE ${sastDate('logged_at')} BETWEEN $1::date AND $2::date) t
+       ${dim.group ? `GROUP BY ${dim.group}` : ''}
+       ORDER BY 1`,
+    params
+  );
+  return rows2series(rows);
+};
+
 // Denominator is every slip that reached the gate. Cancelled slips
 // are excluded — a cancelled pallet was never a collection anyone
 // failed to make. Pending and in-progress are excluded too: not yet
@@ -353,6 +433,38 @@ const procurementSpend = async ({ dimension, filters, dateRange }) => {
   const { rows } = await pool.query(
     `SELECT ${dim.expr} AS label,
             ROUND(SUM(dni.received_quantity * poi.unit_price)::numeric, 2) AS value
+       FROM delivery_note_items dni
+       JOIN delivery_notes dn ON dn.id = dni.delivery_note_id
+       JOIN purchase_order_items poi ON poi.id = dni.purchase_order_item_id
+       JOIN suppliers s ON s.id = dn.supplier_id
+       JOIN products p ON p.id = dni.product_id
+      WHERE ${where.join(' AND ')}
+      ${dim.group ? `GROUP BY ${dim.group}` : ''}
+      ORDER BY ${orderFor(dimension)}`,
+    params
+  );
+  return rows2series(rows);
+};
+
+// Average price paid per unit, not total spend — spend rising because
+// more was bought is a different story from price rising per unit,
+// and procurement_spend alone cannot tell them apart. SUM(spend) /
+// SUM(quantity) per bucket, not AVG(unit_price) per line: a weighted
+// average, so one large cheap delivery cannot be out-voted by ten
+// small expensive ones.
+const unitPriceTrend = async ({ dimension, filters, dateRange }) => {
+  const dim = receivingDimension(dimension);
+  const params = [dateRange.from, dateRange.to];
+  const where = [
+    `dn.delivery_date BETWEEN $1::date AND $2::date`,
+    `poi.unit_price IS NOT NULL`,
+    `dni.received_quantity > 0`,
+    ...receivingFilters(filters, params),
+  ];
+  const { rows } = await pool.query(
+    `SELECT ${dim.expr} AS label,
+            ROUND((SUM(dni.received_quantity * poi.unit_price)
+                   / NULLIF(SUM(dni.received_quantity), 0))::numeric, 2) AS value
        FROM delivery_note_items dni
        JOIN delivery_notes dn ON dn.id = dni.delivery_note_id
        JOIN purchase_order_items poi ON poi.id = dni.purchase_order_item_id
@@ -629,9 +741,10 @@ const getFactor = async (key) => {
 };
 
 export default {
-  childrenReached, mealsEnabled, dispatchVolume, collectionCompliance,
+  childrenReached, mealsEnabled, adultsReached, paperSaved, compostProcessed,
+  dispatchVolume, collectionCompliance,
   repeatNonCollections, decantingWastage,
-  goodsReceived, receivingDiscrepancyRate, unresolvedDiscrepancies, procurementSpend,
+  goodsReceived, receivingDiscrepancyRate, unresolvedDiscrepancies, procurementSpend, unitPriceTrend,
   donationValue, section18aPipeline,
   stockOnHand, lowStockItems, stockMovementVolume, stockCountVariance,
   pickingFlagRate, communityRequestOutcomes, volunteerHours,

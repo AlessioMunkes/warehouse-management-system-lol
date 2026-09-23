@@ -86,7 +86,7 @@ export const SidebarNav = ({ sections, pathname, homeTo, collapsed = false, onNa
         )}
       </Link>
 
-      <nav className="flex flex-1 flex-col gap-5 overflow-y-auto">
+      <nav className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto">
         {sections.map((section, index) => (
           <div key={section.label}>
             {collapsed ? (

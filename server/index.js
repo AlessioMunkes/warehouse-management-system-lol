@@ -37,6 +37,8 @@ import loveActivismRouter   from './src/routes/loveActivism.routes.js';
 import communityRequestRouter from './src/routes/communityRequest.routes.js';
 import gmailRouter from './src/routes/gmail.routes.js';
 import certificateSettingsRouter from './src/routes/certificateSettings.routes.js';
+import collectionKitRouter from './src/routes/collectionKit.routes.js';
+import expiryWarningJob  from './src/jobs/expiryWarning.job.js';
 
 console.log('[server] gmailRouter loaded:', typeof gmailRouter, gmailRouter ? 'OK' : 'UNDEFINED');
 
@@ -159,6 +161,7 @@ app.use('/api/love-activism', loveActivismRouter);
 app.use('/api/community-requests', communityRequestRouter);
 app.use('/api/gmail', gmailRouter);
 app.use('/api/certificate-settings', certificateSettingsRouter);
+app.use('/api/collection-kits', collectionKitRouter);
 
 // ── SPA fallback (production only) ────────────────────────────
 // Any non-/api path falls through to index.html so React Router can
@@ -189,4 +192,5 @@ app.listen(port, () => {
   console.log(`[env] CLIENT_ORIGIN: ${process.env.CLIENT_ORIGIN}`);
   console.log(`[env] PORT: ${process.env.PORT || 5000}`);
   console.log(`[env] JWT_SECRET exists: ${!!process.env.JWT_SECRET}`);
+  expiryWarningJob.startExpiryWarningJob();
 });

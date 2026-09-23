@@ -59,8 +59,8 @@ const formatCategoryLabel = (category = '') =>
 const DONATION_STATUS_META = {
   awaiting_resolution: { label: 'Awaiting resolution', variant: 'neutral' },
   committing: { label: 'Committing', variant: 'neutral' },
-  commit_failed: { label: 'Commit failed — reconcile', variant: 'warning' },
-  commit_incomplete: { label: 'Commit incomplete — reconcile', variant: 'warning' },
+  commit_failed: { label: 'Commit failed, reconcile', variant: 'warning' },
+  commit_incomplete: { label: 'Commit incomplete, reconcile', variant: 'warning' },
 };
 
 const donationStatusMeta = (status) =>

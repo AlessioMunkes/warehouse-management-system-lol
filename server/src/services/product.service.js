@@ -215,7 +215,7 @@ const updateProduct = async (id, data = {}) => {
   if (has('reorderThreshold'))  patch.reorderThreshold  = parseThreshold(data.reorderThreshold);
 
   if (!Object.keys(patch).length) {
-    fail(400, 'Nothing to update — send at least one field.');
+    fail(400, 'Nothing to update. Send at least one field.');
   }
 
   // Only worth checking when one of the two unique columns is moving.

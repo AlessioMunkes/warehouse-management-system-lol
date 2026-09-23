@@ -28,6 +28,9 @@
 // setProductActive() is separate from updateProduct().
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
+import { logAudit } from './auditLog.repository.js';
+
+const COHORT_FLIP = { week1: 'week2', week2: 'week1' };
 
 const UPDATABLE = {
   name:        'name',
@@ -145,6 +148,74 @@ const approveBeneficiary = async (id) => {
   return rows[0] ?? null;
 };
 
+// ── Cohort rollback ───────────────────────────────────────────
+// Sponsor feedback (Milestone 2 change request log): when an ECD
+// misses its collection, support moving it back to the previous
+// cohort/week rather than leaving the non-collection to sit until its
+// own cohort comes around again a fortnight later.
+//
+// ASSUMED BEHAVIOUR, FLAGGED FOR SPONSOR CONFIRMATION: with only two
+// cohorts (week1/week2), "the previous cohort" is read here as a flip
+// to the other one — that is the only "previous" a two-value rotation
+// has, and it is also the interpretation that actually helps: it
+// moves the centre into NEXT week's run instead of making it wait out
+// the rest of this fortnight. See dispatch.service.js's own note
+// (search "cohort_anchor_monday") — this whole fortnightly week1/week2
+// model may itself be wrong per the URS/database.md's weekly
+// tuesday/thursday design; that is a separate, larger question this
+// rollback does not attempt to resolve.
+//
+// Audited as its own action (not routed through the generic
+// updateBeneficiary PATCH, which writes no audit row at all) because
+// this one is a business-rule-driven change tied to a specific missed
+// collection, not an incidental edit — the "why" matters here.
+//
+// FOR UPDATE: two managers actioning the same non-collection at once
+// must not flip the cohort twice and land back where it started.
+const rollbackCohort = async (id, actorId) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows: existing } = await client.query(
+      `SELECT id, cohort FROM ecd_centres WHERE id = $1 FOR UPDATE`,
+      [id]
+    );
+    const before = existing[0];
+    if (!before) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+
+    const nextCohort = COHORT_FLIP[before.cohort];
+    const { rows } = await client.query(
+      `UPDATE ecd_centres SET cohort = $2::cohort_group
+        WHERE id = $1
+        RETURNING ${BENEFICIARY_COLUMNS.replace(/e\./g, '')}`,
+      [id, nextCohort]
+    );
+    const after = rows[0];
+
+    await logAudit(client, {
+      entityType: 'ecd_centre',
+      entityId:   id,
+      action:     'cohort_rollback',
+      actorId,
+      reason:     'Moved to the other cohort after a missed collection.',
+      before:     { cohort: before.cohort },
+      after:      { cohort: after.cohort },
+    });
+
+    await client.query('COMMIT');
+    return after;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
 export default {
   listBeneficiaries,
   getBeneficiaryById,
@@ -153,4 +224,5 @@ export default {
   updateBeneficiary,
   setBeneficiaryActive,
   approveBeneficiary,
+  rollbackCohort,
 };

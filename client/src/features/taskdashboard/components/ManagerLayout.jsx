@@ -35,10 +35,11 @@ import { STAFF, ADMIN } from '../../../routes/paths';
 import NotificationBell from '../../notifications/components/NotificationBell';
 import LogoutConfirmDialog from '@/components/ui/log-out-dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from '@/components/ui/popover';
-import { Plus, LogOut, EyeOff, Eye, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Plus, LogOut, EyeOff, Eye, PanelLeftClose, PanelLeftOpen, Search } from 'lucide-react';
 import {
   ShellContext, useInsideShell,
   ReducedMotionContext, MOTION_KEY, readStoredMotion, applyMotionAttribute,
@@ -149,7 +150,15 @@ function ManagerLayoutShell({ children }) {
   return (
    <ShellContext.Provider value={true}>
     <ReducedMotionContext.Provider value={{ reducedMotion, setReducedMotion }}>
-    <div className="flex min-h-screen bg-canvas">
+    {/* h-screen + overflow-hidden, not min-h-screen: min-h-screen let this
+        wrapper grow taller than the viewport, so the whole page (sidebar
+        included) scrolled together in document flow and <main>'s own
+        overflow-y-auto never had a bounded parent to engage against.
+        Pinning the wrapper to the viewport height, plus min-h-0 on the flex
+        children below (flex items refuse to shrink under their content by
+        default), is what makes only <main> scroll while the sidebar and
+        top bar hold still. */}
+    <div className="flex h-screen overflow-hidden bg-canvas">
       {/* ── Sidebar ─────────────────────────────────────────── */}
       <aside
         className={`hidden shrink-0 flex-col border-r border-line bg-surface py-4 sm:flex ${
@@ -169,9 +178,9 @@ function ManagerLayoutShell({ children }) {
         />
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {/* ── Top bar ───────────────────────────────────────── */}
-        <header className="flex items-center gap-3 border-b border-line bg-surface px-4 py-2.5">
+        <header className="shrink-0 flex items-center gap-3 border-b border-line bg-surface px-4 py-2.5">
           {/* Same breakpoint as the sidebar above, so exactly one of the
               two is ever on screen. */}
           <AppNavDrawer className="sm:hidden" />
@@ -188,6 +197,16 @@ function ManagerLayoutShell({ children }) {
           >
             {sidebarCollapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
           </Button>
+
+          <div className="relative hidden max-w-xs flex-1 sm:block">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="pl-8"
+              placeholder="Search coming soon"
+              disabled
+              title="Coming soon"
+            />
+          </div>
 
           <div className="ml-auto flex items-center gap-1">
             <Popover open={quickCreateOpen} onOpenChange={setQuickCreateOpen}>
@@ -244,7 +263,7 @@ function ManagerLayoutShell({ children }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto">{children}</main>
+        <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
       </div>
 
       <LogoutConfirmDialog

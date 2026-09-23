@@ -30,8 +30,8 @@ const DecantingPage = () => {
   const { user, logout } = useAuth();
 
   const [products, setProducts] = useState([]);
-  const [stepLabel, setStepLabel] = useState('What you are working with');
-  const handleCrumb = useCallback((label) => setStepLabel(label), []);
+  const [step, setStep] = useState({ label: 'What you are working with', step: 1, total: 2 });
+  const handleCrumb = useCallback((next) => setStep(next), []);
 
   // NOTE: reusing the procurement products endpoint as a stopgap —
   // decanting.service.js has getDecantableProducts commented out, so
@@ -60,7 +60,8 @@ const DecantingPage = () => {
 
   return (
     <StaffShell
-      crumb={`Decanting / ${stepLabel}`}
+      crumb={`Decanting / ${step.label}`}
+      progress={step.step ? { step: step.step, total: step.total } : null}
       actions={
         <Link to={STAFF.decantingRecords} className="stf-crumb-link">
           <i className="ti ti-history" aria-hidden="true" />

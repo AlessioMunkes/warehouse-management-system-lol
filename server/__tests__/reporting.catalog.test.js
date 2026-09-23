@@ -114,8 +114,12 @@ describe('tool schema stays in step with the catalog', () => {
   const tools = buildTools();
   const runReport = tools.find((t) => t.name === 'run_report');
 
-  it('offers exactly the catalog metrics', () => {
-    expect(runReport.parameters.properties.metric.enum.sort()).toEqual([...METRIC_IDS].sort());
+  // Operations vs impact must stay strictly separated — the ask box
+  // only ever renders on the Operations Analytics page, so it must not
+  // be able to name an impact metric even if asked.
+  it('offers exactly the catalog\'s operational metrics, excluding impact ones', () => {
+    const operationalIds = Object.values(METRICS).filter((m) => !m.impactOnly).map((m) => m.id);
+    expect(runReport.parameters.properties.metric.enum.sort()).toEqual(operationalIds.sort());
   });
 
   it('only offers dimensions some metric declares', () => {

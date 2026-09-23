@@ -229,7 +229,30 @@ const getPurchaseOrderById = async (id) => {
     [id]
   );
 
-  return { ...purchaseOrder, items };
+  // Every delivery actually recorded against this PO, oldest first —
+  // real events for the PO detail's timeline (order raised, then one
+  // entry per delivery, then wherever status sits today), not a
+  // fabricated status history. There is no per-transition log of past
+  // status changes (only status_changed_at, the most recent one), so
+  // the timeline is built from what's actually there: this table plus
+  // the PO's own created_at/status_changed_at.
+  const { rows: deliveries } = await pool.query(
+    `SELECT dn.id, dn.delivery_date, dn.status, dn.driver_name,
+            u.first_name AS received_by_name,
+            COALESCE(disc.discrepancy_count, 0) > 0 AS has_discrepancies
+       FROM delivery_notes dn
+       LEFT JOIN users u ON u.id = dn.received_by
+       LEFT JOIN LATERAL (
+         SELECT COUNT(*) FILTER (WHERE dni.discrepancy_quantity <> 0) AS discrepancy_count
+           FROM delivery_note_items dni
+          WHERE dni.delivery_note_id = dn.id
+       ) disc ON true
+      WHERE dn.purchase_order_id = $1
+      ORDER BY dn.delivery_date ASC, dn.id ASC`,
+    [id]
+  );
+
+  return { ...purchaseOrder, items, deliveries };
 };
 
 // ── Status transition ────────────────────────────────────────
@@ -279,9 +302,70 @@ const updatePurchaseOrderStatus = async (id, status, reason) => {
   }
 };
 
+// ── QuickBooks reference ─────────────────────────────────────
+// Sponsor feedback: QuickBooks integration was scoped to dispatch/
+// invoice only. The manual reference createPurchaseOrder already
+// accepts was write-once — there was no way to attach it once a PO
+// existed, which is the common case (the QBO number is only known
+// once the order has actually been entered into QuickBooks, after
+// it is raised here). This gives that same row an update path.
+//
+// Delete-then-insert rather than INSERT ... ON CONFLICT: no unique
+// index on (entity_type, entity_id) is defined anywhere in this
+// codebase's tracked schema, so an upsert can't safely assume one
+// exists. A null/blank quickbooksPoId clears the link (delete only,
+// no re-insert) — unlinking is a real state, not an error.
+const setQuickbooksReference = async (id, quickbooksPoId, actorId) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows } = await client.query(
+      `SELECT id FROM purchase_orders WHERE id = $1 FOR UPDATE`,
+      [id]
+    );
+    if (!rows[0]) {
+      await client.query('ROLLBACK');
+      return false;
+    }
+
+    await client.query(
+      `DELETE FROM quickbooks_object_map
+        WHERE entity_type = 'purchase_order' AND entity_id = $1`,
+      [id]
+    );
+
+    if (quickbooksPoId) {
+      await client.query(
+        `INSERT INTO quickbooks_object_map
+           (entity_type, entity_id, qbo_object_type, qbo_id)
+         VALUES ('purchase_order', $1, 'PurchaseOrder', $2)`,
+        [id, quickbooksPoId]
+      );
+    }
+
+    await logAudit(client, {
+      entityType: 'purchase_order',
+      entityId:   id,
+      action:     'quickbooks_ref_set',
+      actorId,
+      after:      { quickbooksPoId },
+    });
+
+    await client.query('COMMIT');
+    return true;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
 export default {
   createPurchaseOrder,
   listPurchaseOrders,
   getPurchaseOrderById,
   updatePurchaseOrderStatus,
+  setQuickbooksReference,
 };

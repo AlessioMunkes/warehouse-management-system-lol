@@ -6,12 +6,13 @@
 // lets the worker correct specific sections via SectionPicker ->
 // EditSectionDialog, then submits. On success, shows CompletionDialog.
 //
-// UPDATED: same .stf-crumb + rail-inside-.stf-main fix as
-// DonationDetailsPage.jsx.
+// Wrapped in the real StaffShell component now — same fix and same
+// reasoning as DonationDetailsPage.jsx's own note: a hand-rolled
+// .stf-shell div has no app bar, no drawer and no bottom tab bar.
 // ─────────────────────────────────────────────────────────────
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-//import { MobileBottomNav } from "@/components/layout/MoileBottomNav"; // pending teammate
+import StaffShell from "../components/layout/StaffShell";
 
 import { useDonationDraft, validateDonationDraft } from "../features/donation/context/DonationDraftContext";
 import { DONATIONS } from "../routes/paths";
@@ -101,58 +102,49 @@ export function ReviewPage() {
   });
 
   return (
-    <div className="stf-shell donation-intake-shell">
-      <div className="stf-crumb">
-        <span>Donations / Review Donation</span>
-        <span className="stf-crumb-meta">{today}</span>
+    <StaffShell crumb="Donations / Review Donation" meta={today}>
+      <DonationRail currentStep={1} />
+
+      <div className="stf-step">
+        <div className="stf-step-head">
+          <h1 className="stf-step-title">Review Donation</h1>
+          <p className="stf-step-sub">Does everything look okay?</p>
+        </div>
+
+        {submitError && (
+          <div className="stf-notice is-warn" role="alert">
+            <span className="stf-notice-mark" aria-hidden="true">!</span>
+            <div className="stf-notice-body"><strong>{submitError}</strong></div>
+          </div>
+        )}
+
+        <ReviewSummary draft={draft} />
+
+        <div className="stf-actions is-row">
+          <button
+            type="button"
+            className="stf-btn stf-btn-secondary"
+            onClick={() => navigate(DONATIONS.new)}
+          >
+            Back
+          </button>
+          <button
+            type="button"
+            className="stf-btn stf-btn-warn"
+            onClick={() => setPickerOpen(true)}
+          >
+            No, fix something
+          </button>
+          <button
+            type="button"
+            className="stf-btn stf-btn-primary"
+            onClick={handleSubmit}
+            disabled={submitting}
+          >
+            {submitting ? "Recording..." : "Yes, submit"}
+          </button>
+        </div>
       </div>
-
-      <main className="stf-main donation-intake-main">
-        <DonationRail currentStep={1} />
-
-        <section className="stf-step donation-intake-card">
-          <div className="stf-step-head">
-            <h1 className="stf-step-title">Review Donation</h1>
-            <p className="stf-step-sub">Does everything look okay?</p>
-          </div>
-
-          {submitError && (
-            <div className="stf-notice is-warn" role="alert">
-              <span className="stf-notice-mark" aria-hidden="true">!</span>
-              <div className="stf-notice-body">
-                <strong>{submitError}</strong>
-              </div>
-            </div>
-          )}
-
-          <ReviewSummary draft={draft} />
-
-          <div className="stf-actions is-row donation-intake-actions">
-            <button
-              type="button"
-              className="stf-btn stf-btn-secondary"
-              onClick={() => navigate(DONATIONS.new)}
-            >
-              Back
-            </button>
-            <button
-              type="button"
-              className="stf-btn stf-btn-warn"
-              onClick={() => setPickerOpen(true)}
-            >
-              No, fix something
-            </button>
-            <button
-              type="button"
-              className="stf-btn stf-btn-primary"
-              onClick={handleSubmit}
-              disabled={submitting}
-            >
-              {submitting ? "Recording..." : "Yes, submit"}
-            </button>
-          </div>
-        </section>
-      </main>
 
       <SectionPicker
         open={pickerOpen}
@@ -174,9 +166,7 @@ export function ReviewPage() {
         onRecordAnother={handleRecordAnother}
         onGoHome={handleGoHome}
       />
-
-      {/* <MobileBottomNav /> */}
-    </div>
+    </StaffShell>
   );
 }
 

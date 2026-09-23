@@ -46,6 +46,14 @@ the header comment in `picking.repository.js`.
 but `stock_levels` remains one balance per product, so picking cannot yet allocate
 first-expiry-first-out. BR-06 is recorded, not enforced.
 
+- **019** — Expiry warnings (sponsor change request). No new column: a daily in-process
+  job (`server/src/jobs/expiryWarning.job.js`, started from `server/index.js`) sweeps
+  `delivery_note_items.expiry_date` and writes a `notifications` row (visible to every
+  manager, per the existing notifications convention) when a line enters the 14-day and
+  again the 7-day window, deduped against `notifications.entity_type = 'delivery_note_item_expiry'`.
+  Same "still open" limits as above apply — this warns on the receipt line's own expiry
+  date, not on remaining on-hand quantity, since there's no per-batch stock yet to warn on.
+
 ## Conventions
 
 - Primary keys are `UUID DEFAULT gen_random_uuid()` throughout, matching Supabase
@@ -418,6 +426,69 @@ CREATE TABLE community_requests (
                                   CHECK (outcome IN ('pending', 'fulfilled', 'declined')),
   created_at        TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
+
+-- ─────────────────────────────────────────────────────────────
+-- FEED THE SOIL — COLLECTION KITS
+-- REVISED — an earlier version of this section (and the code it
+-- described) modelled a kit as something checked OUT with food waste
+-- and checked back IN with compost. That had the real flow backwards:
+-- a kit is a bucket ASSIGNED to a community member, who fills it and
+-- brings it IN on their own schedule (ideally weekly) for the compost
+-- to be weighed. It is never sent back out — it stays with its owner
+-- and gets logged again next time. This is that corrected shape.
+--
+-- collection_kits is the durable, owned asset. collection_kit_records
+-- is one row per weigh-in — a kit can be logged many times over its
+-- life. A kit's status ('assigned' / 'logged' / 'dispatched') is
+-- ALWAYS DERIVED from its latest record, never stored — see
+-- collectionKit.repository.js's listKits/getKitById.
+--
+-- Dispatch (compost handed to a farmer) is a manual action per record,
+-- independent of any others — there is no data on which farmer got
+-- how much from which record, so this deliberately does not invent a
+-- batch/trip concept on top of that. dispatched_to names where that
+-- record's compost went (a farmer or drop-off point), required at
+-- the point of dispatch — see collectionKit.service.js's markDispatched.
+--
+-- Feeds the Impact Calculator's compost_processed metric
+-- (reporting.repository.js) — every logged record counts, dispatched
+-- or not; logging IS the processing event, dispatch is what happens
+-- to it afterward.
+--
+-- Per this file's own disclaimer at the top, the code in
+-- server/src/repositories/collectionKit.repository.js is
+-- authoritative; this entry exists so the tables are documented, not
+-- to redefine them. Written to match what the code assumes (integer
+-- id, not this file's usual UUID convention) rather than perpetuate a
+-- shape nothing uses.
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE collection_kits (
+  id            SERIAL        PRIMARY KEY,
+  owner_name    VARCHAR(150)  NOT NULL,
+  -- Suburb only, never a full address or contact details — the
+  -- data-protection line drawn for this feature: enough to place a
+  -- kit roughly, nothing that identifies a home or how to reach
+  -- someone.
+  suburb        VARCHAR(150),
+  assigned_at   DATE          NOT NULL DEFAULT CURRENT_DATE,
+  created_at    TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE collection_kit_records (
+  id             SERIAL        PRIMARY KEY,
+  kit_id         INTEGER       NOT NULL REFERENCES collection_kits(id),
+  kg_compost     NUMERIC(10,3) NOT NULL CHECK (kg_compost >= 0),
+  logged_at      DATE          NOT NULL DEFAULT CURRENT_DATE,
+  status         VARCHAR(20)   NOT NULL DEFAULT 'logged'
+                               CHECK (status IN ('logged', 'dispatched')),
+  dispatched_at  TIMESTAMPTZ,
+  dispatched_to  VARCHAR(150),
+  notes          TEXT,
+  logged_by      INTEGER       REFERENCES users(id),
+  created_at     TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_collection_kit_records_kit    ON collection_kit_records(kit_id);
+CREATE INDEX idx_collection_kit_records_status ON collection_kit_records(status);
 ```
 
 ## 5. Decanting & Inventory Management
@@ -464,6 +535,13 @@ CREATE TABLE picking_slips (
   recipe_id         UUID          REFERENCES recipes(id), -- only relevant when beneficiary_type = 'ecd'
   pallet_no         VARCHAR(50),
   assigned_to       UUID          REFERENCES users(id), -- NEW §3.1 — manager assigns to staff member/group
+  assigned_to_2     UUID          REFERENCES users(id), -- NEW — dual packing assignment (sponsor change request): an
+                                                         -- optional second packer, added once assigned_to already
+                                                         -- holds the slip. See picking.repository.js's addSecondPacker.
+                                                         -- (Per this file's own disclaimer, the live table's actual id
+                                                         -- types are what the code uses, not necessarily UUID as
+                                                         -- written here — this block was already stale for this table
+                                                         -- before this column was added.)
   qr_slug           VARCHAR(100)  UNIQUE,                -- NEW §3.5 — guest-accessible unique URL
   status            VARCHAR(20)   NOT NULL DEFAULT 'draft'
                                   CHECK (status IN ('draft', 'assigned', 'packed', 'dispatched')),
@@ -655,4 +733,7 @@ CREATE TABLE bookings (
 | 9 | Added `dispatch_notes` table | §4.3 — proof of dispatch, mirrors delivery notes |
 | 10 | Added `guest_sessions` table | §6.2, §6.3 — session summaries for guest volunteers, scoped narrowly (full tracking stays with VMS) |
 | 11 | `ecd_centers.is_active` used for soft delete | §6.5 — historical dispatch records must survive ECD offboarding |
+| 12 | Added `collection_kits` + `collection_kit_records` tables | Feed the Soil kit tracking — revised from an earlier out/returned model that had the real-world flow backwards (kits are assigned to and stay with community members, not checked in and out) |
+| 13 | Added `dispatched_to` to `collection_kit_records` | Feed the Soil — dispatch now records which farmer or drop-off point the compost went to |
+| 14 | Added `assigned_to_2` to `picking_slips` | Dual packing assignment (sponsor change request) — a slip can now have a second packer once a primary already holds it |
 

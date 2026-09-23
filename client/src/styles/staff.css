@@ -16,20 +16,59 @@
        red       anything clickable
        gold      small editorial accents
 
-   One deliberate addition: --stf-attention, a deep brick used for
-   short counts, expired batches and quantity variances. Red is spoken
-   for by actions, and a warning that shares its colour with every
-   button is a warning nobody reads. The brick is visibly browner and
-   darker than --stf-accent so the two never read as the same thing —
-   and per ACC-03 the mark and the sentence carry the meaning anyway,
-   so colour is never the only signal.
+   REVISED — --stf-attention used to be a separate deep-brick colour
+   (#8a3227), kept apart from --stf-accent specifically because staff's
+   primary buttons used to BE --stf-accent (red) — a warning sharing
+   its colour with every button is a warning nobody reads. That
+   justification is gone: staff's primary buttons are --stf-ink
+   (near-black) now, matching the manager side, so red is free for
+   warnings again. --stf-attention now equals --stf-accent outright,
+   and --stf-attention-bg/-border/-ink are the exact values every
+   manager page's own error banner uses (ErrorBanner in
+   CommunityRequestsPage.jsx and a dozen others: border #ef3a40,
+   background #fff4f2, body text #2b3336) — not a separately-invented
+   khaki family with no manager equivalent at all. Per ACC-03 the mark
+   and the sentence still carry the meaning regardless, so colour was
+   never the only signal either way.
 
    ── Two rules the layouts are built on ────────────────────────────────
    ACC-05  a multi-step task is sequential screens, one decision each.
-           .stf-rail is the indicator, kept deliberately quiet.
+           .stf-crumb-progress is the indicator for Receiving/Decanting/
+           Dispatch (kept deliberately quiet, in the crumb row rather
+           than its own block — see that class's own note); Donation
+           Intake's own rail (DonationRail.jsx) still uses .stf-rail
+           directly.
    ACC-06  this is a PWA used on a phone in a warehouse, often with
            gloves. Tap targets 44px minimum; numbers typed on the floor
            are 56px.
+
+   ── Retoned to match the manager screens ────────────────────────────
+   User feedback: the staff module read as a visually different
+   product from the manager/admin screens, and that was correct — this
+   file applied the shared brand palette far more literally (warm
+   khaki backgrounds, a bold display face, a solid dark app bar, sharp
+   4px corners) than the manager side does. Colour, radius, typeface
+   and the app bar are now matched directly against what the manager
+   screens actually render: ManagerLayout.jsx's page background and
+   border colour; Montserrat, index.css's own body rule, not the Inter
+   token it also defines but never applies; and — corrected after an
+   early guess sized everything off ErrorBanner's one-off rounded-[4px]
+   — the real radius of the components that build every manager
+   screen (Card, Button, Input, Select, Badge, all under
+   components/ui): rounded-4xl and rounded-3xl, genuinely round, not
+   sharp corners. See each changed block's own note for what moved and
+   why.
+
+   WHAT DID NOT CHANGE, ON PURPOSE: tap target sizes (--stf-tap,
+   --stf-field), the guided/form toggle, the bottom tab bar,
+   StepPrimitives' behaviour, useDraft, reduced motion. None of that
+   is a style choice — it is the accessibility contract (ACC-05/
+   ACC-06) this file exists to keep, and colour/typeface are a
+   separate axis from it: WCAG contrast and tap-target size do not
+   care which hex value a background is, only how much it contrasts
+   with the text on it and how big the target is. The tokens below
+   were already tuned to 4.5:1 (ACC-02); the new ones are close enough
+   in lightness that the ratios hold.
    ========================================================================== */
 
 .stf-shell {
@@ -40,25 +79,69 @@
   --stf-accent-deep:#d42d33;   /* --accent-deep hover */
   --stf-gold:       #979168;   /* --khaki       editorial accents */
   --stf-gold-deep:  #8a8058;   /* --khaki-deep */
-  --stf-sand:       #e9e3dd;   /* --bg          page ground */
-  --stf-border:     #ddd4c8;   /* --border */
+  /* REVISED — these two used to be the landing page's own, more
+     saturated khaki tones (#e9e3dd / #ddd4c8). Same brand family, but
+     the manager screens (built later, on shadcn) lean on a much
+     quieter version of it: ManagerLayout.jsx's actual page background
+     is #faf8f5 and #e9e3dd is what IT uses for borders, not ground —
+     these two values are pulled from there directly, not re-guessed,
+     so a staff page and a manager page finally read as one product
+     instead of two that happen to share a logo. */
+  --stf-sand:       #faf8f5;   /* --bg          page ground */
+  --stf-border:     #e9e3dd;   /* --border */
   --stf-text:       #5c5c5c;   /* --text */
   --stf-text-sub:   #6f6a5e;   /* --text-sub, darkened for 4.5:1 (ACC-02) */
   --stf-text-meta:  #8b8578;   /* --text-meta, darkened for the same reason */
   --stf-white:      #ffffff;
+  /* NEW — every text field, select and search box on the manager side
+     (components/ui/input.jsx, select.jsx) is a FILLED bg-input/50 box
+     with border-transparent — a light grey fill, no visible line,
+     until it's focused. staff fields were still solid white with a
+     visible border always on, which is why they read as a different
+     kind of control even after colour/radius/font matched. This is
+     that same fill: --input (oklch(0.922 0 0)) at 50% over white,
+     computed rather than eyeballed. */
+  --stf-field-bg:   #f2f2f2;
 
-  /* Staff-only */
-  --stf-attention:  #8a3227;
-  --stf-attention-ink: #6d2a20;
-  --stf-attention-bg:  #f6efe9;
-  --stf-attention-border: #e2d3c6;
+  /* Staff-only — see the REVISED note above the token block for why
+     these now equal the manager side's actual error-banner colours
+     rather than a separately-invented khaki family. */
+  --stf-attention:  #ef3a40;
+  --stf-attention-ink: #2b3336;
+  --stf-attention-bg:  #fff4f2;
+  --stf-attention-border: #ef3a40;
 
-  --stf-font-display: "Montserrat", "Inter", system-ui, -apple-system, sans-serif;
-  --stf-font-sans:    "Inter", system-ui, -apple-system, sans-serif;
+  /* REVISED (correction) — the previous version of this comment claimed
+     manager screens render in Inter and switched both tokens to it. That
+     was wrong: index.css sets `body { font-family: var(--font-montserrat) }`
+     globally, --font-family-display also points at Montserrat, and no
+     manager page applies Tailwind's font-sans utility to override that
+     default (checked every .jsx under pages/ and features/ — none do).
+     Inter is defined as a token in index.css but never actually reaches
+     the screen anywhere a manager or admin looks. Montserrat IS the
+     product's real display/body font, so that's what staff now matches —
+     same stack index.css uses, so no separate font files to load.
+     Numbers stay the same size either way (ACC-06 is about size, not
+     typeface), so nothing about legibility on the floor changes here. */
+  --stf-font-display: "Montserrat", "Open Sans", Helvetica, sans-serif;
+  --stf-font-sans:    "Montserrat", "Open Sans", Helvetica, sans-serif;
 
-  --stf-radius:   12px;   /* tighter than the landing page's 16px: these
-                             are controls in a column, not marketing cards */
-  --stf-radius-sm: 8px;
+  /* REVISED (correction) — the previous version of this comment sized
+     these off ErrorBanner's hand-rolled rounded-[4px], on the claim
+     that it was what "every card" on the manager side does. It isn't:
+     ErrorBanner is a one-off raw div, but the components that actually
+     build every manager screen — Card, Button, Input, Select, Badge,
+     all from client/src/components/ui — round themselves far more,
+     via Tailwind's rounded-3xl/rounded-4xl utilities (checked each
+     one's own source). Against index.css's --radius: 0.625rem base,
+     rounded-4xl is 26px (Card, Button) and rounded-3xl is 22px (Input,
+     Select, Badge). That's the actual, dominant shape language a
+     manager or admin sees — search boxes, filter dropdowns, the
+     primary button, the card around every table — and it is
+     genuinely round, close to a pill, not a sharp 4px corner. These
+     two tokens now carry those two real values directly. */
+  --stf-radius:   26px;
+  --stf-radius-sm: 22px;
   --stf-radius-pill: 999px;
   --stf-tap:   44px;
   --stf-field: 56px;
@@ -91,6 +174,12 @@
 }
 
 /* ── App bar ─────────────────────────────────────────────────────── */
+/* REVISED — was a solid --stf-ink band (dark, white text), the one
+   piece of chrome Script 21's "apply the dashboard's surface" pass
+   never touched. ManagerLayout's own header is a plain white bar with
+   a bottom border; matched to that directly, same reasoning as the
+   token block above. Structure, the hamburger drawer, and everything
+   it does are unchanged — only which way round the colours go. */
 .stf-appbar {
   display: flex;
   align-items: center;
@@ -100,17 +189,18 @@
   /* Sits under the notch without the brand row colliding with the
      status bar. */
   padding-top: max(10px, env(safe-area-inset-top));
-  background: var(--stf-ink);
-  color: var(--stf-white);
+  background: var(--stf-white);
+  color: var(--stf-ink);
+  border-bottom: 1px solid var(--stf-border);
 }
 
 .stf-appbar-left  { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .stf-appbar-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .stf-appbar-logo  { width: 30px; height: 30px; object-fit: contain; flex-shrink: 0; }
-.stf-appbar-name  { font-family: var(--stf-font-display); font-size: 14px; font-weight: 700; color: var(--stf-white); }
+.stf-appbar-name  { font-family: var(--stf-font-display); font-size: 14px; font-weight: 700; color: var(--stf-ink); }
 .stf-appbar-prog  {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--stf-text-sub);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .stf-appbar-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
@@ -121,19 +211,24 @@
   border: 1px solid transparent;
   border-radius: var(--stf-radius-pill);
   background: transparent;
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--stf-ink);
   font: 600 12px/1 var(--stf-font-sans);
   cursor: pointer;
 }
-.stf-appbar-btn:hover { background: rgba(255, 255, 255, 0.14); }
-.stf-appbar-btn[aria-pressed='true'] { border-color: rgba(255, 255, 255, 0.6); }
+.stf-appbar-btn:hover { background: var(--stf-sand); }
+.stf-appbar-btn[aria-pressed='true'] { border-color: var(--stf-border); }
 
 /* ── Breadcrumb row ──────────────────────────────────────────────── */
+/* flex-wrap added for .stf-crumb-progress: a third group (breadcrumb,
+   progress, actions) still lays out fine with space-between on a
+   normal-width screen, but wraps rather than crushing on a narrow one
+   instead of the row simply not fitting. */
 .stf-crumb {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 8px 12px;
   padding: 8px 16px;
   border-bottom: 1px solid var(--stf-border);
   background: var(--stf-white);
@@ -168,6 +263,28 @@
 }
 .stf-crumb-link:hover { color: var(--stf-accent-deep); }
 .stf-crumb-link i { font-size: 14px; }
+
+/* Step progress, now living in the crumb row instead of its own
+   StepRail block inside the card — "above it, a slim step strip
+   carries breadcrumb, progress and History on one 56px row." Replaces
+   StepRail's stacked bars-then-label layout: the label is redundant
+   here (the crumb text already names the step — "Receiving / Which
+   delivery"), so only the bars and the "Step X of Y" count remain. */
+.stf-crumb-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.stf-crumb-progress-bars { display: flex; gap: 4px; }
+.stf-crumb-progress-bar {
+  width: 20px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--stf-border);
+}
+.stf-crumb-progress-bar.is-done { background: var(--stf-accent); }
+.stf-crumb-progress-label { font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* The single column every task page lays out in. Same column on a phone
    and on a bench tablet — the tablet gets more air, not a denser layout
@@ -298,8 +415,17 @@
   transition: background 150ms ease, border-color 150ms ease,
               box-shadow 150ms ease, transform 100ms ease;
 }
-.stf-btn-primary { background: var(--stf-accent); color: var(--stf-white); }
-.stf-btn-primary:hover:not([disabled]) { background: var(--stf-accent-deep); }
+/* NEW — the primary CTA on the manager side ("Log a request",
+   "Assign a kit", "Resolve") is components/ui/button.jsx's default
+   variant, bg-primary: oklch(0.205 0 0), a near-black, not the brand
+   accent red. Red is still very much in the app (43 hits across
+   manager pages) but for alerts, borders and small marks — never as
+   a solid CTA fill. --stf-ink is close enough to that near-black
+   (#171717) to reuse rather than add a third dark token, and it is
+   already what the rest of this file calls "structure," which a
+   primary button is. */
+.stf-btn-primary { background: var(--stf-ink); color: var(--stf-white); }
+.stf-btn-primary:hover:not([disabled]) { background: var(--stf-ink-deep); }
 .stf-btn:hover:not([disabled]) {
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18); /* blue-500 @ 18% */
 }
@@ -429,9 +555,9 @@
   min-height: var(--stf-field);
   width: 100%;
   padding: 0 16px;
-  border: 1.5px solid var(--stf-border);
-  border-radius: var(--stf-radius-sm);
-  background: var(--stf-white);
+  border: 1.5px solid transparent;
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-field-bg);
   color: var(--stf-ink);
   font: 700 26px/1 var(--stf-font-display);
   font-variant-numeric: tabular-nums;
@@ -449,9 +575,9 @@
   min-height: var(--stf-field);
   width: 100%;
   padding: 0 14px;
-  border: 1.5px solid var(--stf-border);
-  border-radius: var(--stf-radius-sm);
-  background: var(--stf-white);
+  border: 1.5px solid transparent;
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-field-bg);
   color: var(--stf-ink);
   font: 400 16px/1 var(--stf-font-sans);
 }
@@ -485,14 +611,20 @@
 .stf-choice-meta  { font-size: 13px; color: var(--stf-text-sub); }
 
 /* ── Notices (ACC-03: a mark and a sentence, never colour alone) ─── */
+/* REVISED — was a 4px coloured LEFT-BORDER accent (gold default,
+   red warn), asymmetric corner radius to match. No manager equivalent
+   anywhere in the app — its own real callout (ErrorBanner, used on a
+   dozen pages) is a plain border on all four sides, same radius as
+   everything else. Matched to that: a symmetric border, no accent
+   stripe. The icon mark (.stf-notice-mark) still carries the "this is
+   a warning" signal on its own, same as it always did. */
 .stf-notice {
   display: flex;
   align-items: flex-start;
   gap: 12px;
   padding: 14px 16px;
   border: 1px solid var(--stf-border);
-  border-left: 4px solid var(--stf-gold);
-  border-radius: 0 var(--stf-radius) var(--stf-radius) 0;
+  border-radius: var(--stf-radius);
   background: var(--stf-white);
   font-size: 13px;
   line-height: 1.55;
@@ -500,7 +632,6 @@
 }
 .stf-notice.is-warn {
   border-color: var(--stf-attention-border);
-  border-left-color: var(--stf-attention);
   background: var(--stf-attention-bg);
 }
 .stf-notice-mark {
@@ -515,7 +646,12 @@
 .stf-notice.is-warn .stf-notice-mark,
 .stf-row.is-warn .stf-notice-mark {
   border-color: var(--stf-attention);
-  color: var(--stf-attention);
+  /* --stf-attention-ink, not --stf-attention: the "!" glyph is text-
+     sized (12px bold), and #ef3a40 is only 3.64:1 on this mark's
+     --stf-attention-bg background — passes the 3:1 a border needs,
+     fails the 4.5:1 text needs. The border itself stays the brand red
+     since a border only needs that 3:1. */
+  color: var(--stf-attention-ink);
 }
 .stf-notice-body { flex: 1; min-width: 0; }
 .stf-notice-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
@@ -676,11 +812,20 @@
 /* ── Segmented tabs ──────────────────────────────────────────────── */
 /* For a board with a few named subsets (packing's "assigned to me /
    spare / done") — not the bottom .stf-tab task bar, which is
-   navigation between the four tasks, not filters within one of them. */
+   navigation between the four tasks, not filters within one of them.
+
+   REVISED — the track used to be --stf-border, the same warm khaki
+   the rest of the brand palette leans on. Fine as a hairline, too
+   present as a fill: next to the manager/admin side's neutral pill
+   surfaces it read as a yellow-tinted track behind a white pill,
+   not one clean control. --stf-field-bg is the same neutral fill
+   already used for every input/select/search box, so this now
+   matches those rather than introducing a third kind of "light"
+   background. */
 .stf-segments {
   display: flex; gap: 4px;
   padding: 3px;
-  background: var(--stf-border);
+  background: var(--stf-field-bg);
   border-radius: var(--stf-radius-sm);
 }
 .stf-segment {
@@ -706,12 +851,22 @@
    works for two equal-width segments, which forced the whole control
    to stretch to make that true). The thumb's width and position come
    from JS measuring the real button (see ViewToggle in
-   StepPrimitives.jsx) — CSS here only draws it. */
+   StepPrimitives.jsx) — CSS here only draws it.
+
+   REVISED — pill and hint used to stack (hint below, left-aligned
+   under the pill). Now that ViewToggle only ever renders inside
+   .stf-card-toggle (see below), the hint IS that control's own
+   description sitting right beside it, same row — "The mode toggle
+   is a property of the form... the caption becomes that control's
+   description instead of a floating line of text." A stacked layout
+   read fine floating alone above the card; inline is what reads as
+   one control with a caption once it's a row inside the card's own
+   header. */
 .stf-toggle-block {
   display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
 }
 .stf-toggle {
   position: relative;
@@ -737,24 +892,32 @@
   z-index: 0;
 }
 
-/* One line naming whichever option is currently active, left-aligned
-   under the (now content-sized) pill. Not a title-attribute tooltip:
-   this is read with a thumb, not a mouse, and title never shows on a
-   tap. */
+/* One line naming whichever option is currently active, beside the
+   (content-sized) pill rather than under it — see .stf-toggle-block's
+   own note above. Not a title-attribute tooltip: this is read with a
+   thumb, not a mouse, and title never shows on a tap. */
 .stf-toggle-hint { margin: 0; font-size: 12px; color: var(--stf-text-sub); }
 
-/* ── Coachmark (first-run nudge toward the view toggle) ───────────
-   Anchored to whatever wraps the toggle (.stf-toggle-anchor gives it
-   position: relative), not fixed to the viewport — it only ever
-   needs to point at one control, right below it. */
-.stf-toggle-anchor {
+/* ── Card toggle row ───────────────────────────────────────────────
+   The mode toggle's own header strip inside a step card (StepScreen's
+   .stf-step-head, TaskPage's .stf-task-head) — was a lone floating
+   block (.stf-toggle-anchor) sitting above the card in .stf-main's own
+   flex column, right-aligned, with a StepRail progress bar rendered
+   BELOW it: three separate chrome rows before any actual content.
+   "the mode toggle is a property of the form, not of the app, so it
+   moves onto the card's own top edge where it has an obvious owner" —
+   the toggle is now the first thing inside whichever card is showing,
+   and the breadcrumb row carries the step progress instead (see
+   StaffShell's own .stf-crumb-progress).
+
+   position: relative is still what anchors the Coachmark — same job
+   .stf-toggle-anchor did, just on the row that now actually owns the
+   toggle. */
+.stf-card-toggle {
   position: relative;
-  /* .stf-main is a flex column; a direct child stretches to its full
-     width by default. This is the actual direct child (ViewToggle's
-     own .stf-toggle-block sits inside it), so the override belongs
-     here, not one level down. Right-aligned to match the booking.com
-     reference this control was modelled on. */
-  align-self: flex-end;
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--stf-border);
 }
 .stf-coachmark {
   position: absolute;
@@ -808,13 +971,17 @@
 .stf-formrow-meta  { font-size: 12px; color: var(--stf-text-sub); }
 
 /* ── Status badge ────────────────────────────────────────────────── */
+/* REVISED — default fill was --stf-border (the same warm khaki as
+   .stf-segments' track, same fix, same reasoning): a neutral/pending
+   badge should read as a plain grey pill, the way Badge's own
+   secondary variant does on the manager side, not a tan one. */
 .stf-badge {
   display: inline-flex; align-items: center;
   padding: 4px 9px;
   border-radius: var(--stf-radius-pill);
   font: 600 11px/1.2 var(--stf-font-sans);
   letter-spacing: 0.02em;
-  background: var(--stf-border);
+  background: var(--stf-field-bg);
   color: var(--stf-text-sub);
   white-space: nowrap;
 }
@@ -838,9 +1005,9 @@
   width: 100%;
   min-height: var(--stf-field);
   padding: 0 16px;
-  border: 1.5px solid var(--stf-border);
-  border-radius: var(--stf-radius-sm);
-  background: var(--stf-white);
+  border: 1.5px solid transparent;
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-field-bg);
   color: var(--stf-ink);
   font: 400 16px/1 var(--stf-font-sans);
   text-align: left;
@@ -1049,9 +1216,9 @@
   min-height: var(--stf-tap);
   width: 100%;
   padding: 0 14px;
-  border: 1.5px solid var(--stf-border);
-  border-radius: var(--stf-radius-sm);
-  background: var(--stf-white);
+  border: 1.5px solid transparent;
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-field-bg);
   color: var(--stf-ink);
   font: 400 16px/1 var(--stf-font-sans);
   font-size: max(16px, 1em);
@@ -1099,6 +1266,8 @@
   color: var(--stf-text-sub);
 }
 
+/* Same colour correction as .stf-btn-primary above — this is that
+   button's small size, not a different kind of action. */
 .stf-btn-small {
   display: inline-flex;
   align-items: center;
@@ -1107,14 +1276,14 @@
   padding: 0 12px;
   border: 1.5px solid transparent;
   border-radius: var(--stf-radius-sm);
-  background: var(--stf-accent);
+  background: var(--stf-ink);
   color: var(--stf-white);
   font: 600 13px/1 var(--stf-font-sans);
   cursor: pointer;
   transition: background 150ms ease, border-color 150ms ease;
 }
 .stf-btn-small:hover {
-  background: var(--stf-accent-deep);
+  background: var(--stf-ink-deep);
 }
 .stf-btn-small:active {
   transform: scale(0.97);
@@ -1124,24 +1293,30 @@
   outline-offset: 2px;
 }
 
+/* Manager's own "outline" button (components/ui/button.jsx's outline
+   variant, used for e.g. Benevolent Requests' "Claim") is neutral —
+   border-border, bg-background, text-foreground — never accent-
+   coloured. This used to be a red-bordered/red-text button, which had
+   no real equivalent on the manager side; now it matches
+   .stf-btn-secondary's already-correct neutral treatment. */
 .stf-btn-outline {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-height: 48px;
   padding: 0 24px;
-  border: 1.5px solid var(--stf-accent);
+  border: 1.5px solid var(--stf-border);
   border-radius: var(--stf-radius-pill);
   background: var(--stf-white);
-  color: var(--stf-accent);
+  color: var(--stf-ink);
   font: 600 15px/1 var(--stf-font-sans);
   gap: 8px;
   cursor: pointer;
   transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
 }
 .stf-btn-outline:hover {
-  background: var(--stf-accent);
-  color: var(--stf-white);
+  background: var(--stf-sand);
+  border-color: var(--stf-gold);
 }
 .stf-btn-outline:active {
   transform: scale(0.97);
@@ -1202,15 +1377,23 @@
 .stf-hint-success {
   color: #1a7d42;
 }
+/* REVISED — used to be a bordered, padded badge (1px border, 4px
+   radius) with no manager equivalent. Manager's own inline field
+   error (components/ui/field.jsx's FieldError) is plain coloured
+   text, no box — matched to that exactly.
+
+   NOT var(--stf-attention): #ef3a40 is 3.93:1 on white, which clears
+   the 3:1 a border or background needs but fails 4.5:1 for text.
+   Manager's FieldError doesn't use the brand red for this either —
+   its text-destructive resolves to #e7000b (4.77:1), a darker red
+   picked for exactly this reason. Matched to that value, not the
+   brand accent, for the same reason manager itself doesn't use one
+   red for everything. */
 .stf-error {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 400;
   line-height: 1.5;
-  color: var(--stf-attention);
-  display: inline-block;
-  padding: 4px 8px;
-  border: 1px solid var(--stf-attention);
-  border-radius: 4px;
+  color: #e7000b;
   margin-top: 4px;
 }
 
@@ -1235,18 +1418,42 @@ body.reduced-movement .decorative-icon {
 }
 /* ── ACC-08 · reduced motion ─────────────────────────────────────── */
 /* Honoured from the OS setting, and from the in-app "Less movement"
-   toggle, which sets data-stf-motion="reduced" on <html> so it also
-   covers a shared tablet whose OS setting nobody can change. */
+   toggle (useReducedMotion.js), which sets data-stf-motion="reduced"
+   on <html> so it also covers a shared tablet whose OS setting nobody
+   can change.
+
+   REVISED — this used to be five named selectors plus the coachmark
+   arrow, which is what let the coachmark "just freeze on screen"
+   instead of disappearing: the arrow's own bounce stopped (line
+   below still zeroes it out) but nothing here was ever the reason it
+   stayed visible — that was a separate bug, a missing auto-dismiss
+   timer, fixed in TaskDashboardPage.jsx. This blanket rule is a
+   genuine second thing worth having anyway: an enumerated list always
+   drifts behind whatever's actually animated in the file, the same
+   problem a completely separate, DEAD version of this same idea had
+   (body.reduced-movement, still in this file below, toggled only by
+   TopNavBar.jsx — a component nothing in App.jsx routes to any more).
+   `*` catches every current and future transition/animation without
+   needing its own entry. transform is deliberately left alone: it's
+   also how static things are centred here (translateY(-50%) etc.),
+   and a blanket transform: none would un-centre them, not just stop
+   motion. */
 @media (prefers-reduced-motion: reduce) {
-  .stf-rail-bar, .stf-progress-fill, .stf-btn, .stf-choice, .stf-segment-thumb { transition: none !important; }
-  .stf-coachmark-arrow { animation: none !important; }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
-[data-stf-motion='reduced'] .stf-rail-bar,
-[data-stf-motion='reduced'] .stf-progress-fill,
-[data-stf-motion='reduced'] .stf-btn,
-[data-stf-motion='reduced'] .stf-choice,
-[data-stf-motion='reduced'] .stf-segment-thumb { transition: none !important; }
-[data-stf-motion='reduced'] .stf-coachmark-arrow { animation: none !important; }
+[data-stf-motion='reduced'] *,
+[data-stf-motion='reduced'] *::before,
+[data-stf-motion='reduced'] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
 
 /* ── Bench tablet ────────────────────────────────────────────────── */
 /* Same column, more air. Deliberately not a wider table: the staff who
@@ -1413,7 +1620,11 @@ body.reduced-movement .decorative-icon {
   flex: 0 0 auto;
   width: 20px; height: 20px;
   border-radius: 50%;
-  background: var(--stf-attention);
+  /* NOT var(--stf-attention): white text at 13px bold on #ef3a40 is
+     3.93:1, under the 4.5:1 normal text needs. #e7000b is the same
+     darker red shadcn's own --destructive resolves to for exactly
+     this reason (see .stf-error's note) — white on it is 4.77:1. */
+  background: #e7000b;
   color: var(--stf-white);
   font-size: 13px;
   font-weight: 700;
@@ -1511,22 +1722,24 @@ body.reduced-movement .decorative-icon {
 /* ── 2 · THE DASHBOARD SURFACE ──────────────────────────────────
    "Apply the style from the dashboard to these pages."
 
-   The manager dashboards are shadcn Cards: white, rounded-4xl
-   (0.625rem x 2.6 = 26px), shadow-md, a 1px ring at 5% of the
-   foreground, and 24px of padding. Staff pages were bare content on
-   the sand ground, so the same app read as two products.
+   REVISED (correction) — this had gone through two guesses already:
+   24px as a guess at rounded-4xl, then a "+2px" on top of a wrongly
+   shrunk --stf-radius after mistaking ErrorBanner's one-off 4px for
+   the card standard. --stf-radius now IS rounded-4xl's real value
+   (26px, see the token block), so this reads it directly with no
+   fudge added on top.
 
    What is copied is the SURFACE, not the type system. The stf-*
    scale exists because these screens are used on a phone with gloves
-   (ACC-06): 44px tap targets, 56px number fields, Montserrat
-   headings. Swapping that for the dashboard's 14px Inter would undo
-   the accessibility work to win a family resemblance. So: the
-   dashboard's card, the staff pages' contents. */
+   (ACC-06): 44px tap targets, 56px number fields. Swapping that for
+   the dashboard's 14px body text would undo the accessibility work
+   to win a family resemblance. So: the dashboard's card, the staff
+   pages' contents. */
 .stf-main > .stf-task,
 .stf-main > .stf-step {
   background: var(--stf-white);
   border: 1px solid rgb(43 51 54 / 0.06);
-  border-radius: 24px;
+  border-radius: var(--stf-radius);
   box-shadow: 0 4px 6px -1px rgb(43 51 54 / 0.08), 0 2px 4px -2px rgb(43 51 54 / 0.06);
   padding: 20px;
 }
@@ -1551,13 +1764,13 @@ body.reduced-movement .decorative-icon {
   background: var(--stf-white);
   margin: -20px -20px 0;
   padding: 20px 20px 14px;
-  border-radius: 24px 24px 0 0;
+  border-radius: var(--stf-radius) var(--stf-radius) 0 0;
 }
 .stf-main > .stf-task > .stf-task-foot {
   background: var(--stf-white);
   margin: 0 -20px -20px;
   padding: 14px 20px calc(14px + env(safe-area-inset-bottom));
-  border-radius: 0 0 24px 24px;
+  border-radius: 0 0 var(--stf-radius) var(--stf-radius);
 }
 
 @media (min-width: 720px) {
@@ -1640,7 +1853,9 @@ body.reduced-movement .decorative-icon {
   margin-bottom: 2px;
 }
 
-[data-stf-motion='reduced'] .stf-wl.is-guided .stf-wl-row { transition: none !important; }
+/* The old [data-stf-motion='reduced'] .stf-wl-row rule that used to
+   live here is now covered by the blanket reduced-motion rule near
+   the top of this file — every transition, this row's included. */
 
 /* ── 3b · THE ROW ON A PHONE ────────────────────────────────────
    Found by rendering it rather than by reading it. Two 44px steppers
@@ -1732,7 +1947,13 @@ button.stf-panel-head:disabled { cursor: default; }
   font: 700 13px/1 var(--stf-font-sans);
 }
 .stf-panel.is-open .stf-panel-n { background: var(--stf-ink); color: var(--stf-white); }
-.stf-panel.is-done .stf-panel-n { background: var(--stf-gold); color: var(--stf-white); }
+/* REVISED — was var(--stf-gold): a 26px, border-radius:999px pill
+   filled with khaki. That's exactly the "yellow accent and fill
+   colour in pills" the manager side doesn't have (its own done/closed
+   state is .stf-badge.is-done, filled --stf-ink, not gold). Matched
+   to that same convention rather than inventing a third "done"
+   colour. */
+.stf-panel.is-done .stf-panel-n { background: var(--stf-ink); color: var(--stf-white); }
 
 .stf-panel-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .stf-panel-title {
@@ -1885,13 +2106,17 @@ button.stf-panel-head:disabled { cursor: default; }
   width: 100%;
   min-height: var(--stf-tap);
   padding: 10px 44px 10px 38px;
-  border: 1px solid var(--stf-border);
-  border-radius: var(--stf-radius-sm);
-  background: var(--stf-white);
+  border: 1px solid transparent;
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-field-bg);
   font: 500 15px/1.3 var(--stf-font-sans);
   color: var(--stf-ink);
 }
-.stf-search-input::placeholder { color: var(--stf-text-meta); }
+/* text-sub, not text-meta: text-meta was tuned against the old
+   --stf-sand/--stf-border fill this input no longer has — on the new
+   --stf-field-bg it only clears 3.28:1, under this file's own 4.5:1
+   goal (ACC-02). text-sub clears 4.81:1 on the same background. */
+.stf-search-input::placeholder { color: var(--stf-text-sub); }
 .stf-search-input:focus-visible {
   outline: 2px solid var(--stf-accent);
   outline-offset: 1px;
@@ -1923,12 +2148,12 @@ button.stf-panel-head:disabled { cursor: default; }
    The offline bar. Appended after 22's block, same rule as always:
    no two scripts share an anchor.
 
-   Charcoal rather than red. Red in this design system means "you can
-   click this", and a red strip across the top of the screen reads as
-   an emergency — losing signal in a warehouse is a Tuesday, not a
-   disaster, and the whole point of the bar is to say "carry on".
-   The brick --stf-attention is kept for the one state that does need
-   a person: something the server refused. */
+   Charcoal rather than red for the normal "offline" state. Red in
+   this design system means "you can click this", and a red strip
+   across the top of the screen reads as an emergency — losing signal
+   in a warehouse is a Tuesday, not a disaster, and the whole point of
+   the bar is to say "carry on". Red is kept for the one state that
+   does need a person: something the server refused. */
 .stf-netbar {
   display: flex;
   align-items: center;
@@ -1940,7 +2165,10 @@ button.stf-panel-head:disabled { cursor: default; }
   font: 500 13px/1.4 var(--stf-font-sans);
 }
 .stf-netbar.is-sending { background: var(--stf-gold-deep); }
-.stf-netbar.is-stuck   { background: var(--stf-attention); }
+/* #e7000b, not var(--stf-attention): white text at 13px on #ef3a40
+   is 3.93:1, under the 4.5:1 this bar's own text needs — same fix as
+   .stf-wl-mark. */
+.stf-netbar.is-stuck   { background: #e7000b; }
 
 .stf-netbar-text { text-wrap: pretty; }
 
@@ -2000,23 +2228,24 @@ button.stf-panel-head:disabled { cursor: default; }
 .stf-wl-undo-btn:hover { background: var(--stf-accent); color: var(--stf-white); }
 
 /* ── Unfinished work ───────────────────────────────────────────
-   On the manager-styled dashboard rather than a staff task page, so
-   this borrows the dashboard's card rather than the sand ground: the
-   same white, the same radius, the same hairline. The stf-* tokens
-   still supply the colours so it does not drift from the rest of the
-   staff work. */
+   Now on the worker dashboard inside StaffShell (see
+   TaskDashboardPage.jsx's own note on that move) — this still
+   borrows the plain white card look rather than the sand ground:
+   same white, same radius, same hairline. The gold left-border accent
+   this used to have is gone — same fix as .stf-notice and
+   .pdf-status-banner, no manager equivalent for a coloured accent
+   stripe on a card. */
 .stf-resume {
   margin-top: 24px;
   padding: 16px;
   border: 1px solid rgb(43 51 54 / 0.06);
-  border-left: 3px solid var(--stf-gold);
-  border-radius: 16px;
+  border-radius: 26px;
   background: #ffffff;
   box-shadow: 0 4px 6px -1px rgb(43 51 54 / 0.08), 0 2px 4px -2px rgb(43 51 54 / 0.06);
 }
 .stf-resume-title {
   margin: 0 0 10px;
-  font: 700 13px/1.3 "Montserrat", "Inter", system-ui, sans-serif;
+  font: 700 13px/1.3 "Montserrat", "Open Sans", Helvetica, sans-serif;
   color: #2b3336;
 }
 .stf-resume-list { list-style: none; margin: 0; padding: 0; }
@@ -2028,11 +2257,11 @@ button.stf-panel-head:disabled { cursor: default; }
   flex-wrap: wrap;
   padding: 8px 0;
 }
-.stf-resume-row + .stf-resume-row { border-top: 1px dashed #ddd4c8; }
+.stf-resume-row + .stf-resume-row { border-top: 1px dashed #e9e3dd; }
 
 .stf-resume-text { flex: 1 1 12rem; min-width: 0; display: flex; flex-direction: column; }
-.stf-resume-name { font: 600 15px/1.3 "Inter", system-ui, sans-serif; color: #2b3336; }
-.stf-resume-meta { font: 400 13px/1.4 "Inter", system-ui, sans-serif; color: #6f6a5e; }
+.stf-resume-name { font: 600 15px/1.3 "Montserrat", "Open Sans", Helvetica, sans-serif; color: #2b3336; }
+.stf-resume-meta { font: 400 13px/1.4 "Montserrat", "Open Sans", Helvetica, sans-serif; color: #6f6a5e; }
 
 /* Scoped through the parent rather than the bare class: staff.css
    line 85 is `.stf-shell a { color: var(--stf-accent) }`, which is
@@ -2045,13 +2274,13 @@ button.stf-panel-head:disabled { cursor: default; }
   display: inline-flex;
   align-items: center;
   padding: 0 18px;
-  border-radius: 8px;
-  background: #ef3a40;
-  font: 700 14px/1 "Inter", system-ui, sans-serif;
+  border-radius: 999px;
+  background: #2b3336;
+  font: 700 14px/1 "Montserrat", "Open Sans", Helvetica, sans-serif;
   color: #ffffff;
   text-decoration: none;
 }
-.stf-resume .stf-resume-go:hover { background: #d42d33; color: #ffffff; }
+.stf-resume .stf-resume-go:hover { background: #171b1c; color: #ffffff; }
 
 .stf-resume .stf-resume-drop {
   flex: 0 0 auto;
@@ -2059,7 +2288,7 @@ button.stf-panel-head:disabled { cursor: default; }
   padding: 0 12px;
   border: 0;
   background: none;
-  font: 500 13px/1 "Inter", system-ui, sans-serif;
+  font: 500 13px/1 "Montserrat", "Open Sans", Helvetica, sans-serif;
   color: #6f6a5e;
   text-decoration: underline;
   cursor: pointer;
@@ -2524,3 +2753,107 @@ button.stf-panel-head:disabled { cursor: default; }
   padding: 2px;
 }
 .dark .stf-tile-icon { padding: 8px; border-radius: 10px; }
+
+/* ── Worker dashboard tasks ───────────────────────────────────────
+   REVISED — was a single-row "path" with a connecting line between
+   circles, from the old storyboard reference. Dropped on request: a
+   line between the tasks reads as a route through them, in order —
+   Receiving, then Packing, then Decanting, then Dispatch — which
+   isn't true. A shift can be packing-only or dispatch-only, so
+   nothing here should look like it's claiming a sequence.
+
+   Two shapes off one breakpoint, no JS: a stacked list of icon-left
+   rows on a phone (matches every other list in this file), a row of
+   free-standing circles — no line, just circles with air between them
+   — from tablet width up, where TaskDashboardPage.jsx's `wide` prop
+   (same one Decanting's week planner uses) gives them the room to
+   read as filling the page rather than a small clump adrift in it.
+   flex-wrap on the row rather than horizontal scroll: with no line to
+   route across a wrap, wrapping to a second row is simply the better
+   fallback now if all seven don't fit one row. Every module gets the
+   same tile and the same target size here, including Feed the Soil
+   and Benevolent Requests — they used to be smaller text links below
+   this grid, which claimed a hierarchy ("less important than the
+   other five") the product doesn't actually have. */
+.stf-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.stf-task-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--stf-border);
+  text-decoration: none;
+}
+.stf-task-item:last-child { border-bottom: 0; }
+.stf-task-icon {
+  position: relative;
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 1.5px solid var(--stf-border);
+  background: var(--stf-white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+.stf-task-item:hover .stf-task-icon { border-color: var(--stf-gold); background: var(--stf-sand); }
+.stf-task-icon img { width: 30px; height: 30px; object-fit: contain; }
+.stf-task-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.stf-task-title {
+  font-family: var(--stf-font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--stf-ink);
+}
+.stf-task-meta { font-size: 12px; line-height: 1.4; color: var(--stf-text-sub); }
+
+@media (min-width: 640px) {
+  .stf-tasks {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 12px 4px;
+  }
+  .stf-task-item {
+    flex: 1 1 0;
+    min-width: 108px;
+    flex-direction: column;
+    text-align: center;
+    gap: 10px;
+    padding: 4px;
+    border-bottom: 0;
+  }
+  .stf-task-icon { width: 80px; height: 80px; }
+  .stf-task-icon img { width: 42px; height: 42px; }
+  .stf-task-text { align-items: center; }
+  .stf-task-title { white-space: nowrap; }
+  .stf-task-meta { max-width: 130px; }
+}
+
+/* First-visit hint pointing at StaffShell's own hamburger trigger
+   (AppNavDrawer, first item in .stf-appbar-left). A fixed position
+   near where that button always sits, rather than a measured ref —
+   same rough-anchor approach StepPrimitives' Coachmark takes. */
+.stf-coachmark-fixed {
+  position: fixed;
+  left: 14px;
+  right: auto;
+  top: 60px;
+  z-index: 50;
+}
+/* No text bubble here — an actual industry app's "look, the menu is
+   there" hint is just the animated arrow, not a callout you have to
+   read. Rendered as a plain button (not the usual div) so it stays
+   tappable to dismiss without needing its own label reading like a
+   sentence of UI copy. */
+.stf-coachmark-arrow-only {
+  border: 0;
+  background: none;
+  padding: 4px;
+  cursor: pointer;
+}

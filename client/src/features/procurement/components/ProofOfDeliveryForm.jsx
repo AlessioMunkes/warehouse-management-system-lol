@@ -161,7 +161,7 @@ const ProofOfDeliveryForm = ({
       e.deliveryDate = 'Date cannot be in the future';
 
     if (!lineItems.length) {
-      e.lineItems = 'No items loaded — select a purchase order first';
+      e.lineItems = 'No items loaded. Select a purchase order first';
     } else if (lineItems.some((l) => isBlank(l) || Number(l.receivedQuantity) < 0)) {
       e.lineItems = 'Received quantity must be zero or more on every line';
     } else if (lineItems.some((l) => hasVariance(l) && !l.discrepancyReason.trim())) {
@@ -229,7 +229,7 @@ const ProofOfDeliveryForm = ({
 
           {/* ── Step 1: Supplier, Date ─────────────────────────── */}
           <div className="form-section">
-            <p className="form-section-label">STEP 1 — SUPPLIER</p>
+            <p className="form-section-label">STEP 1: SUPPLIER</p>
 
             <div className="form-grid-2">
               <div className="form-group">
@@ -267,7 +267,7 @@ const ProofOfDeliveryForm = ({
           {/* ── Step 2: Select Purchase Order ──────────────────── */}
           {supplierId && (
             <div className="form-section">
-              <p className="form-section-label">STEP 2 — SELECT PURCHASE ORDER</p>
+              <p className="form-section-label">STEP 2: SELECT PURCHASE ORDER</p>
 
               {loadingPOs && (
                 <p className="form-section-label">LOADING PURCHASE ORDERS...</p>
@@ -308,7 +308,7 @@ const ProofOfDeliveryForm = ({
           {/* ── Step 3: Confirm what actually arrived ──────────── */}
           {selectedPoId && (
             <div className="form-section">
-              <p className="form-section-label">STEP 3 — CONFIRM WHAT ARRIVED</p>
+              <p className="form-section-label">STEP 3: CONFIRM WHAT ARRIVED</p>
 
               {loadingItems ? (
                 <p className="form-section-label">LOADING ITEMS...</p>
@@ -378,7 +378,7 @@ const ProofOfDeliveryForm = ({
                                 color: 'var(--color-maroon)',
                               }}
                             >
-                              ⚠ {varianceLabel(item)} — {item.productName}
+                              ⚠ {varianceLabel(item)}: {item.productName}
                             </p>
 
                             {isOver(item) && (
@@ -395,7 +395,7 @@ const ProofOfDeliveryForm = ({
                                   Accept the surplus into stock ({acceptedQty(item)} {item.unit})
                                 </option>
                                 <option value="reject">
-                                  Reject the surplus — take {item.expectedQuantity} {item.unit} only
+                                  Reject the surplus, take {item.expectedQuantity} {item.unit} only
                                 </option>
                               </select>
                             )}
@@ -403,7 +403,7 @@ const ProofOfDeliveryForm = ({
                             <input
                               type="text"
                               className="form-input"
-                              placeholder="Reason — required (e.g. supplier short-shipped, crate damaged)"
+                              placeholder="Required reason, e.g. supplier short-shipped, crate damaged"
                               value={item.discrepancyReason}
                               onChange={(e) =>
                                 updateLine(item.purchaseOrderItemId, {
@@ -430,7 +430,7 @@ const ProofOfDeliveryForm = ({
                   <div className="info-notice">
                     <p>
                       ℹ QUANTITIES DEFAULT TO THE PURCHASE ORDER. EDIT ANY LINE THAT
-                      DIFFERS — WHAT IS ENTERED HERE IS WHAT GETS ADDED TO STOCK.
+                      DIFFERS. WHAT IS ENTERED HERE IS WHAT GETS ADDED TO STOCK.
                     </p>
                   </div>
 
@@ -438,7 +438,7 @@ const ProofOfDeliveryForm = ({
                     <div className="alert-error">
                       <p>
                         ⚠ {discrepancyCount} LINE{discrepancyCount > 1 ? 'S' : ''} DIFFER
-                        FROM THE ORDER — THIS DELIVERY WILL BE FLAGGED
+                        FROM THE ORDER. THIS DELIVERY WILL BE FLAGGED
                       </p>
                     </div>
                   )}
@@ -455,7 +455,7 @@ const ProofOfDeliveryForm = ({
           {selectedPoId && lineItems.length > 0 && (
             <div className="signature-section">
               <p className="form-section-label">
-                STEP 4 — DRIVER SIGNATURE <span className="form-required">*</span>
+                STEP 4: DRIVER SIGNATURE <span className="form-required">*</span>
               </p>
 
               <SignatureCanvas
@@ -471,7 +471,7 @@ const ProofOfDeliveryForm = ({
 
               <div className="signature-actions">
                 <span className={isSigned ? 'signature-signed' : 'signature-hint'}>
-                  {isSigned ? '✓ SIGNED' : 'SIGN ABOVE — DRIVER TO SIGN WITH FINGER OR MOUSE'}
+                  {isSigned ? '✓ SIGNED' : 'SIGN ABOVE: DRIVER TO SIGN WITH FINGER OR MOUSE'}
                 </span>
                 <button
                   type="button"

@@ -81,6 +81,16 @@ const sameId = (a, b) => a !== null && a !== undefined && b !== null && b !== un
 const slipOwnerFor = (actor, slip) =>
   (isVolunteer(actor) ? slip.assigned_volunteer_id : slip.assigned_to);
 
+// Who is allowed to work a slip. A guest volunteer is measured against
+// assigned_volunteer_id, staff against assigned_to — and, for staff,
+// also against assigned_to_2: dual assignment means two people are
+// genuinely allowed to pack the slip, not that one is a spectator.
+// The second-packer slot is a staff column, so it never widens what a
+// volunteer may touch.
+const canWorkSlip = (actor, slip) =>
+  sameId(slipOwnerFor(actor, slip), actor.id) ||
+  (!isVolunteer(actor) && sameId(slip.assigned_to_2, actor.id));
+
 // ── Rotation anchor ────────────────────────────────────────────
 // The Monday of a known 'week1' week — the service layer uses this
 // to compute which cohort is active for any given dispatch date.
@@ -106,7 +116,9 @@ const getSlips = async ({ dispatchDate, cohort, status, assignedTo }) => {
   if (dispatchDate) { params.push(dispatchDate); where.push(`ps.dispatch_date = $${params.length}`); }
   if (cohort)       { params.push(cohort);       where.push(`ps.cohort = $${params.length}`); }
   if (status)       { params.push(status);       where.push(`ps.status = $${params.length}`); }
-  if (assignedTo)   { params.push(assignedTo);   where.push(`ps.assigned_to = $${params.length}`); }
+  // Matches either slot — a worker requesting "mine" wants every slip
+  // they are on, whether they hold it alone or as the second packer.
+  if (assignedTo)   { params.push(assignedTo);   where.push(`(ps.assigned_to = $${params.length} OR ps.assigned_to_2 = $${params.length})`); }
 
   const result = await pool.query(
     `SELECT
@@ -126,10 +138,12 @@ const getSlips = async ({ dispatchDate, cohort, status, assignedTo }) => {
        ps.pallet_ref,
        ps.status,
        ps.assigned_to,
+       ps.assigned_to_2,
        e.name       AS ecd_name,
        e.child_count,
        e.last_collected_date,
-       u.first_name AS packer_name,
+       u.first_name  AS packer_name,
+       u2.first_name AS packer_name_2,
        COUNT(psi.id)                                          AS total_items,
        COUNT(psi.id) FILTER (WHERE psi.status = 'confirmed')  AS confirmed_items,
        COUNT(psi.id) FILTER (WHERE psi.status = 'flagged')    AS flagged_items,
@@ -139,10 +153,11 @@ const getSlips = async ({ dispatchDate, cohort, status, assignedTo }) => {
        )                                                      AS variance_items
      FROM picking_slips ps
      JOIN ecd_centres e ON e.id = ps.ecd_id
-     LEFT JOIN users u ON u.id = ps.assigned_to
+     LEFT JOIN users u  ON u.id = ps.assigned_to
+     LEFT JOIN users u2 ON u2.id = ps.assigned_to_2
      LEFT JOIN picking_slip_items psi ON psi.picking_slip_id = ps.id
      ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-     GROUP BY ps.id, e.name, e.child_count, e.last_collected_date, u.first_name
+     GROUP BY ps.id, e.name, e.child_count, e.last_collected_date, u.first_name, u2.first_name
      ORDER BY e.name ASC`,
     params
   );
@@ -159,10 +174,12 @@ const getSlipById = async (id) => {
        e.child_count,
        e.contact_name,
        e.last_collected_date,
-       u.first_name          AS packer_name
+       u.first_name           AS packer_name,
+       u2.first_name          AS packer_name_2
      FROM picking_slips ps
      JOIN ecd_centres e ON e.id = ps.ecd_id
-     LEFT JOIN users u ON u.id = ps.assigned_to
+     LEFT JOIN users u  ON u.id = ps.assigned_to
+     LEFT JOIN users u2 ON u2.id = ps.assigned_to_2
      WHERE ps.id = $1`,
     [id]
   );
@@ -432,6 +449,75 @@ const assignSlip = async ({ slipId, packerId, actorId, canOverride = false }) =>
   }
 };
 
+// ── Add a second packer ────────────────────────────────────────
+// Sponsor change request: a slip can be worked by two people "where
+// required" — a big pallet, someone training a new hire, a short-
+// staffed shift. Deliberately its own function rather than a second
+// call into assignSlip: a second packer is additive (the pallet
+// already has an owner and this names a helper), not a claim/conflict
+// decision the way the primary assignment is, so it doesn't belong in
+// the same conflict/reassignment branching.
+//
+// Requires a primary first (slip.assigned_to already set) — a helper
+// with nobody to help does not mean anything, and it keeps "who is
+// the primary" unambiguous for every other check in this file that
+// still only reads assigned_to (started_at, reassignment history,
+// etc.).
+const addSecondPacker = async ({ slipId, packerId, actorId }) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const current = await client.query(
+      `SELECT id, status, assigned_to, assigned_to_2 FROM picking_slips WHERE id = $1 FOR UPDATE`,
+      [slipId]
+    );
+    const slip = current.rows[0];
+    if (!slip) { await client.query('ROLLBACK'); return { notFound: true }; }
+
+    if (!CLAIMABLE_STATUSES.includes(slip.status)) {
+      await client.query('ROLLBACK');
+      return { locked: true, status: slip.status };
+    }
+
+    if (!slip.assigned_to) {
+      await client.query('ROLLBACK');
+      return { noPrimary: true };
+    }
+
+    // Already on it, one way or the other — quiet success, same as
+    // assignSlip tapping the same button twice.
+    if (slip.assigned_to === packerId || slip.assigned_to_2 === packerId) {
+      await client.query('ROLLBACK');
+      return { slip };
+    }
+
+    if (slip.assigned_to_2) {
+      await client.query('ROLLBACK');
+      return { full: true, assignedTo2: slip.assigned_to_2 };
+    }
+
+    const result = await client.query(
+      `UPDATE picking_slips SET assigned_to_2 = $1 WHERE id = $2 RETURNING *`,
+      [packerId, slipId]
+    );
+
+    await logEvent(client, slipId, 'assigned', actorId, {
+      packer_id: packerId,
+      second_packer: true,
+    });
+
+    await client.query('COMMIT');
+    return { slip: result.rows[0] };
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
 // ── Confirm or flag one line ──────────────────────────────────
 // Guarded on the parent slip's status so a completed slip can't be edited.
 //
@@ -448,7 +534,7 @@ const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReaso
     await client.query('BEGIN');
 
     const slipResult = await client.query(
-      `SELECT id, status, assigned_to, assigned_volunteer_id FROM picking_slips WHERE id = $1 FOR UPDATE`,
+      `SELECT id, status, assigned_to, assigned_to_2, assigned_volunteer_id FROM picking_slips WHERE id = $1 FOR UPDATE`,
       [slipId]
     );
     const slip = slipResult.rows[0];
@@ -466,9 +552,9 @@ const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReaso
     // Doing this here (rather than after setItemStatus returns) means a
     // refused packer cannot mutate the row at all. The FOR UPDATE above
     // also closes the race where a slip is reassigned mid-check.
-    // A guest is measured against assigned_volunteer_id, staff against
-    // assigned_to. The staff rule is unchanged.
-    if (!canOverride && !sameId(slipOwnerFor(who, slip), who.id)) {
+    // See canWorkSlip: the slip's owner for this kind of actor, or
+    // the second packer when the actor is staff.
+    if (!canOverride && !canWorkSlip(who, slip)) {
       await client.query('ROLLBACK');
       return { forbidden: true, assignedTo: slip.assigned_to };
     }
@@ -565,7 +651,7 @@ const completeSlip = async ({ slipId, palletRef, actorId, actor, canOverride = f
     await client.query('BEGIN');
 
     const slipResult = await client.query(
-      `SELECT id, status, assigned_to, assigned_volunteer_id FROM picking_slips WHERE id = $1 FOR UPDATE`,
+      `SELECT id, status, assigned_to, assigned_to_2, assigned_volunteer_id FROM picking_slips WHERE id = $1 FOR UPDATE`,
       [slipId]
     );
     const slip = slipResult.rows[0];
@@ -577,8 +663,8 @@ const completeSlip = async ({ slipId, palletRef, actorId, actor, canOverride = f
 
     // Same ownership rule as confirm/flag. Closing a pallet is what
     // makes it eligible for the gate, so it can't be looser than the
-    // writes that lead up to it.
-    if (!canOverride && !sameId(slipOwnerFor(who, slip), who.id)) {
+    // writes that lead up to it. Either packer may close it out.
+    if (!canOverride && !canWorkSlip(who, slip)) {
       await client.query('ROLLBACK');
       return { forbidden: true, assignedTo: slip.assigned_to };
     }
@@ -734,6 +820,7 @@ export default {
   generateSlips,
   createSlip,
   assignSlip,
+  addSecondPacker,
   setItemStatus,
   completeSlip,
   getAssignableWorkers,

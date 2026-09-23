@@ -6,7 +6,14 @@
 // deliberately ONE screen with a checklist rather than one screen per
 // item — the wireframe's packing mock is a list with a progress bar,
 // not a wizard, because a packer needs to see the whole pallet while
-// standing in front of it.
+// standing in front of it. That is Form mode, unchanged. Guided is new
+// here — see the MODES/readStoredMode block below, same convention
+// Receiving, Decanting and Dispatch already use: one pending item on
+// screen at a time, Previous/Next between them, everything else (done
+// or still pending) off screen until it is the one being decided. The
+// progress bar above the list is what says how much is left either
+// way, same as WorkList's own Guided mode leans on it rather than
+// showing dimmed rows for the rest of the job.
 //
 // Wraps the same confirmItem / flagItem / completeSlip endpoints the
 // manager's PackingDetail.jsx already uses — no new backend here, only
@@ -19,8 +26,24 @@ import { useEffect, useState } from 'react';
 import {
   fetchPickingSlip, assignSlip, confirmItem, flagItem, completeSlip,
 } from '../../../services/pickingAPI';
-import { Actions, Button, ChoiceList, Counter, Notice } from '../../staff/components/StepPrimitives';
 import { fmtQty } from '../../../lib/quantity';
+import {
+  Actions, Button, ChoiceList, Counter, Notice, ViewToggle, Coachmark,
+} from '../../staff/components/StepPrimitives';
+import useCoachmark from '../../staff/hooks/useCoachmark';
+
+const MODE_KEY = 'stf_packing_view_mode';
+const MODES = [
+  { value: 'guided', label: 'Guided', hint: 'One item at a time' },
+  { value: 'full',   label: 'Form',   hint: 'Every item at once' },
+];
+const readStoredMode = () => {
+  try {
+    return localStorage.getItem(MODE_KEY) === 'full' ? 'full' : 'guided';
+  } catch {
+    return 'guided';
+  }
+};
 
 const COHORT_LABELS = { week1: 'Week 1', week2: 'Week 2' };
 const REASON_OPTIONS = [
@@ -127,6 +150,10 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
   const [completeError, setCompleteError] = useState(null);
   const [reloadToken, setReloadToken] = useState(0);
 
+  const [mode, setMode] = useState(readStoredMode);
+  const [focusId, setFocusId] = useState(null);
+  const { show: showCoachmark, dismiss: dismissCoachmark } = useCoachmark('packing-view-toggle');
+
   useEffect(() => {
     let cancelled = false;
     fetchPickingSlip(slipId)
@@ -154,12 +181,65 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
 
   const locked = slip.status === 'complete' || slip.status === 'collected';
   const unassigned = !slip.assigned_to;
-  const assignedToMe = slip.assigned_to === currentUser?.id;
+  // Either packer on a dual-assigned pallet may work it — matches
+  // picking.repository.js's own ownership check, which the server
+  // already enforces either way; this only keeps the client's own
+  // gate from blocking someone the server would let through.
+  const assignedToMe = slip.assigned_to === currentUser?.id || slip.assigned_to_2 === currentUser?.id;
   const canEdit = manager || assignedToMe;
   const items = slip.items || [];
   const confirmed = items.filter((i) => i.status === 'confirmed').length;
   const flagged = items.filter((i) => i.status === 'flagged').length;
-  const pending = items.filter((i) => i.status === 'pending').length;
+  const pendingItems = items.filter((i) => i.status === 'pending');
+  const pending = pendingItems.length;
+
+  // Guided renders exactly one pending item, same as WorkList — so it
+  // always needs a focused one. The caller sets it on entering Guided
+  // (handleModeChange) or after a decision (advanceGuidedFocus); this
+  // is the safety net for a list that arrives after that, the same
+  // reason WorkList has its own.
+  const guidedIndex = pendingItems.findIndex((i) => i.id === focusId);
+  useEffect(() => {
+    if (mode === 'guided' && pendingItems.length > 0 && guidedIndex < 0) {
+      setFocusId(pendingItems[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, pendingItems.length, guidedIndex]);
+
+  const handleModeChange = (next) => {
+    setMode(next);
+    setFocusId(next === 'guided' ? (pendingItems[0]?.id ?? null) : null);
+    try { localStorage.setItem(MODE_KEY, next); } catch { /* nothing we can do */ }
+    dismissCoachmark();
+  };
+
+  const goToPending = (i) => { if (pendingItems[i]) setFocusId(pendingItems[i].id); };
+
+  // Guided shows exactly the one focused pending item and nothing
+  // else — not even already-decided ones — same as WorkList: the
+  // progress bar above already says how much of the pallet is done.
+  // Gated on the toggle actually being live: a locked/read-only view
+  // (a completed pallet pulled up for the record, someone else's slip
+  // with nothing left pending) has no focus to show and no action to
+  // take, so it always shows the full list regardless of the stored
+  // mode — otherwise a finished pallet with zero pending items would
+  // render an empty one.
+  const guidedActive = canEdit && !locked && items.length > 0 && mode === 'guided';
+  const activeGuidedIndex = guidedIndex >= 0 ? guidedIndex : 0;
+  const shownItems = guidedActive
+    ? (pendingItems[activeGuidedIndex] ? [pendingItems[activeGuidedIndex]] : [])
+    : items;
+
+  // Confirming or flagging the focused item IS "done with this one" in
+  // Guided — the same gesture WorkList's confirm tick uses to move on,
+  // computed against the pre-reload pendingItems since the item being
+  // decided is still in it at this point.
+  const advanceGuidedFocus = (decidedItemId) => {
+    if (mode !== 'guided') return;
+    const idx = pendingItems.findIndex((i) => i.id === decidedItemId);
+    const next = pendingItems[idx + 1] ?? pendingItems.find((i) => i.id !== decidedItemId);
+    setFocusId(next ? next.id : null);
+  };
 
   const handleClaim = async () => {
     setClaiming(true);
@@ -190,6 +270,17 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
   return (
     <section className="stf-step">
       <div className="stf-step-head">
+        {/* Same .stf-card-toggle treatment StepScreen/TaskPage give the
+            toggle now — this flow hand-rolls its own card instead of
+            using StepScreen, so the same markup goes here directly. */}
+        {canEdit && !locked && items.length > 0 ? (
+          <div className="stf-card-toggle">
+            <ViewToggle options={MODES} value={mode} onChange={handleModeChange} />
+            <Coachmark show={showCoachmark} onDismiss={dismissCoachmark}>
+              Tap here to switch view
+            </Coachmark>
+          </div>
+        ) : null}
         <h1 className="stf-step-title" tabIndex={-1}>{slip.ecd_name}</h1>
         <p className="stf-step-sub">
           {COHORT_LABELS[slip.cohort] || slip.cohort} · {slip.child_count} children · Take the oldest batch first.
@@ -206,7 +297,13 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
         </Actions>
       ) : (
         <p className="stf-kv">
-          <span><span className="stf-kv-key">Packing:</span> <span className="stf-kv-val">{slip.packer_name}{assignedToMe ? ' (you)' : ''}</span></span>
+          <span>
+            <span className="stf-kv-key">Packing:</span>{' '}
+            <span className="stf-kv-val">
+              {slip.packer_name}{slip.assigned_to === currentUser?.id ? ' (you)' : ''}
+              {slip.assigned_to_2 ? `, ${slip.packer_name_2}${slip.assigned_to_2 === currentUser?.id ? ' (you)' : ''}` : ''}
+            </span>
+          </span>
         </p>
       )}
 
@@ -221,36 +318,69 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
       </div>
 
       {items.length === 0 ? (
-        <Notice>This slip has no items — ask a manager to add order lines before this pallet goes out.</Notice>
+        <Notice>This slip has no items. Ask a manager to add order lines before this pallet goes out.</Notice>
       ) : (
-        <div className="stf-list">
-          {items.map((item) => {
-            const variance = hasQuantityVariance(item);
-            const showPanel = canEdit && !locked && item.status === 'pending';
-            const badge =
-              item.status === 'confirmed' && variance ? { className: 'stf-badge is-warn', label: 'Qty differs' } :
-              item.status === 'confirmed' ? { className: 'stf-badge is-done', label: 'Confirmed' } :
-              item.status === 'flagged'   ? { className: 'stf-badge is-warn', label: 'Flagged' } :
-              { className: 'stf-badge', label: 'Pending' };
+        <>
+          <div className="stf-list">
+            {shownItems.map((item) => {
+              const variance = hasQuantityVariance(item);
+              const showPanel = canEdit && !locked && item.status === 'pending';
+              const badge =
+                item.status === 'confirmed' && variance ? { className: 'stf-badge is-warn', label: 'Qty differs' } :
+                item.status === 'confirmed' ? { className: 'stf-badge is-done', label: 'Confirmed' } :
+                item.status === 'flagged'   ? { className: 'stf-badge is-warn', label: 'Flagged' } :
+                { className: 'stf-badge', label: 'Pending' };
 
-            return (
-              <div key={item.id} className="stf-row is-static" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
-                <span className="stf-row-main" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span>
-                    <span className="stf-row-title">{item.product_name}</span>
-                    <span className="stf-row-meta">
-                      Required {fmtQty(item.required_quantity, item.unit)}
-                      {item.packed_quantity != null ? ` · Packed ${fmtQty(item.packed_quantity, item.unit)}` : ''}
-                      {item.flag_reason ? ` · ${item.flag_reason}` : ''}
+              return (
+                <div key={item.id} className="stf-row is-static" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
+                  <span className="stf-row-main" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>
+                      {guidedActive ? (
+                        <span className="stf-wl-pos">Item {activeGuidedIndex + 1} of {pendingItems.length}</span>
+                      ) : null}
+                      <span className="stf-row-title">{item.product_name}</span>
+                      <span className="stf-row-meta">
+                        Required {fmtQty(item.required_quantity, item.unit)}
+                        {item.packed_quantity != null ? ` · Packed ${fmtQty(item.packed_quantity, item.unit)}` : ''}
+                        {item.flag_reason ? ` · ${item.flag_reason}` : ''}
+                      </span>
                     </span>
+                    <span className={badge.className}>{badge.label}</span>
                   </span>
-                  <span className={badge.className}>{badge.label}</span>
-                </span>
-                {showPanel ? <ItemDecisionPanel item={item} slipId={slip.id} onDone={reload} /> : null}
-              </div>
-            );
-          })}
-        </div>
+                  {showPanel ? (
+                    <ItemDecisionPanel
+                      item={item}
+                      slipId={slip.id}
+                      onDone={() => { advanceGuidedFocus(item.id); reload(); }}
+                    />
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+
+          {guidedActive && pendingItems.length > 1 ? (
+            <nav className="stf-wl-steps" aria-label="Move between items">
+              <button
+                type="button"
+                className="stf-wl-step-btn"
+                onClick={() => goToPending(activeGuidedIndex - 1)}
+                disabled={activeGuidedIndex <= 0}
+              >
+                Previous item
+              </button>
+              <span className="stf-wl-steps-count">{activeGuidedIndex + 1} / {pendingItems.length}</span>
+              <button
+                type="button"
+                className="stf-wl-step-btn"
+                onClick={() => goToPending(activeGuidedIndex + 1)}
+                disabled={activeGuidedIndex >= pendingItems.length - 1}
+              >
+                Next item
+              </button>
+            </nav>
+          ) : null}
+        </>
       )}
 
       {canEdit && !locked && items.length > 0 ? (

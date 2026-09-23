@@ -69,7 +69,7 @@ export default function CommunityRequestForm({
         />
         {itemsInvalid
           ? <FieldError>Describe what was requested.</FieldError>
-          : <FieldDescription>Free text — no stock code needed.</FieldDescription>}
+          : <FieldDescription>No stock code required.</FieldDescription>}
       </Field>
 
       <div className="grid gap-7 sm:grid-cols-2">
@@ -81,7 +81,6 @@ export default function CommunityRequestForm({
             onChange={set('callerName')}
             placeholder="Optional"
           />
-          <FieldDescription>Leave blank if they did not give one.</FieldDescription>
         </Field>
         <Field>
           <FieldLabel htmlFor="cr-caller-contact">Preferred contact</FieldLabel>
@@ -91,7 +90,6 @@ export default function CommunityRequestForm({
             onChange={set('callerContact')}
             placeholder="Phone, WhatsApp, email…"
           />
-          <FieldDescription>How to reach them about this request.</FieldDescription>
         </Field>
       </div>
 
@@ -104,7 +102,7 @@ export default function CommunityRequestForm({
             onChange={set('quantityNote')}
             placeholder="e.g. Enough for roughly 80 plates"
           />
-          <FieldDescription>In their words — no need for exact numbers.</FieldDescription>
+          <FieldDescription>Approximate is fine.</FieldDescription>
         </Field>
         <Field>
           <FieldLabel htmlFor="cr-requested-at">Date &amp; time of request</FieldLabel>
@@ -114,7 +112,7 @@ export default function CommunityRequestForm({
             value={form.requestedAt}
             onChange={set('requestedAt')}
           />
-          <FieldDescription>Leave blank to use now.</FieldDescription>
+          <FieldDescription>Defaults to now.</FieldDescription>
         </Field>
       </div>
 

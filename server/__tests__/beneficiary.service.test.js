@@ -17,6 +17,7 @@ const repoMock = {
   updateBeneficiary:   vi.fn(),
   setBeneficiaryActive: vi.fn(),
   approveBeneficiary:  vi.fn(),
+  rollbackCohort:      vi.fn(),
 };
 
 vi.mock('../src/repositories/beneficiary.repository.js', () => ({ default: repoMock }));
@@ -43,6 +44,7 @@ beforeEach(() => {
   repoMock.updateBeneficiary.mockResolvedValue(existingBeneficiary());
   repoMock.setBeneficiaryActive.mockResolvedValue(existingBeneficiary());
   repoMock.approveBeneficiary.mockResolvedValue(existingBeneficiary({ approved_at: '2026-08-01' }));
+  repoMock.rollbackCohort.mockResolvedValue(existingBeneficiary({ cohort: 'week2' }));
 });
 
 describe('listBeneficiaries', () => {
@@ -175,5 +177,24 @@ describe('approveBeneficiary', () => {
   it('approves an unapproved beneficiary', async () => {
     await beneficiaryService.approveBeneficiary(BENEFICIARY_ID);
     expect(repoMock.approveBeneficiary).toHaveBeenCalledWith(BENEFICIARY_ID);
+  });
+});
+
+describe('rollbackCohort', () => {
+  it('404s when the target beneficiary does not exist', async () => {
+    repoMock.getBeneficiaryById.mockResolvedValue(null);
+    await expect(beneficiaryService.rollbackCohort(BENEFICIARY_ID, 3)).rejects.toMatchObject({ status: 404 });
+    expect(repoMock.rollbackCohort).not.toHaveBeenCalled();
+  });
+
+  it('delegates the flip itself to the repository, with the acting user', async () => {
+    await beneficiaryService.rollbackCohort(BENEFICIARY_ID, 3);
+    expect(repoMock.rollbackCohort).toHaveBeenCalledWith(BENEFICIARY_ID, 3);
+  });
+
+  it('returns whatever the repository resolves to (including null if the row vanished mid-flight)', async () => {
+    repoMock.rollbackCohort.mockResolvedValue(null);
+    const result = await beneficiaryService.rollbackCohort(BENEFICIARY_ID, 3);
+    expect(result).toBeNull();
   });
 });

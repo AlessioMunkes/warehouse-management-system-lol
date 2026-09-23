@@ -291,7 +291,7 @@ const setStockMeta = async (client, { productId, seedUnit, unit = null, reorderT
     throw new Error('setStockMeta requires the caller\'s transaction client.');
   }
   if (!seedUnit) {
-    throw new Error('setStockMeta requires a seed unit — stock_levels.unit is NOT NULL.');
+    throw new Error('setStockMeta requires a seed unit. stock_levels.unit is NOT NULL.');
   }
 
   const { rows } = await client.query(
