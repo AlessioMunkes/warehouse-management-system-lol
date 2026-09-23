@@ -266,10 +266,69 @@ const setQuickbooksReference = async (rawId, body = {}, actorId) => {
   return repo.getPurchaseOrderById(id);
 };
 
+// ── Update (pending only) ──────────────────────────────────────
+// Reuses buildPayload/buildItems wholesale — an edit is validated
+// exactly as hard as a fresh order, because it produces the same
+// document a receiver will later check a delivery against.
+const updatePurchaseOrder = async (rawId, body, userId) => {
+  if (!isPositiveInt(rawId)) throw fail(400, 'A valid purchase order ID is required.');
+  const payload = buildPayload(body);
+  const result  = await repo.updatePurchaseOrder(Number(rawId), payload, userId);
+
+  if (!result.ok) {
+    if (result.code === 'not_found') throw fail(404, 'Purchase order not found.');
+    if (result.code === 'not_editable') {
+      throw fail(409,
+        `This purchase order is "${result.status}" and can no longer be edited — ` +
+        'only a pending order, not yet approved, can be changed.');
+    }
+    if (result.code === 'supplier_not_found') {
+      throw fail(404, 'That supplier no longer exists.');
+    }
+    if (result.code === 'supplier_inactive') {
+      throw fail(409,
+        `${result.supplier.name} is deactivated and cannot be ordered from. ` +
+        'Reactivate the supplier first.');
+    }
+    if (result.code === 'unknown_products') {
+      const err = fail(400,
+        'One or more items are not configured stock codes. ' +
+        'Add them under Configure Stock Codes first.');
+      err.missingProductIds = result.missing;
+      throw err;
+    }
+    throw fail(500, 'Failed to update the purchase order.');
+  }
+
+  return result.purchaseOrder;
+};
+
+// ── Delete (pending only, never received against) ─────────────
+const deletePurchaseOrder = async (rawId, userId) => {
+  if (!isPositiveInt(rawId)) throw fail(400, 'A valid purchase order ID is required.');
+  const result = await repo.deletePurchaseOrder(Number(rawId), userId);
+
+  if (!result.ok) {
+    if (result.code === 'not_found') throw fail(404, 'Purchase order not found.');
+    if (result.code === 'not_deletable') {
+      throw fail(409,
+        `This purchase order is "${result.status}" and can no longer be deleted — ` +
+        'only a pending order, not yet approved, can be removed. Mark it Returned instead.');
+    }
+    if (result.code === 'has_deliveries') {
+      throw fail(409,
+        'This purchase order already has deliveries recorded against it and cannot be deleted.');
+    }
+    throw fail(500, 'Failed to delete the purchase order.');
+  }
+};
+
 export default {
   createPurchaseOrder,
   listPurchaseOrders,
   getPurchaseOrder,
   setPurchaseOrderStatus,
+  updatePurchaseOrder,
+  deletePurchaseOrder,
   setQuickbooksReference,
 };

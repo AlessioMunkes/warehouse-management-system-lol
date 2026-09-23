@@ -38,6 +38,7 @@ import communityRequestRouter from './src/routes/communityRequest.routes.js';
 import gmailRouter from './src/routes/gmail.routes.js';
 import certificateSettingsRouter from './src/routes/certificateSettings.routes.js';
 import collectionKitRouter from './src/routes/collectionKit.routes.js';
+import publicImpactRouter from './src/routes/publicImpact.routes.js';
 import expiryWarningJob  from './src/jobs/expiryWarning.job.js';
 
 console.log('[server] gmailRouter loaded:', typeof gmailRouter, gmailRouter ? 'OK' : 'UNDEFINED');
@@ -162,6 +163,7 @@ app.use('/api/community-requests', communityRequestRouter);
 app.use('/api/gmail', gmailRouter);
 app.use('/api/certificate-settings', certificateSettingsRouter);
 app.use('/api/collection-kits', collectionKitRouter);
+app.use('/api/public',      publicImpactRouter);
 
 // ── SPA fallback (production only) ────────────────────────────
 // Any non-/api path falls through to index.html so React Router can

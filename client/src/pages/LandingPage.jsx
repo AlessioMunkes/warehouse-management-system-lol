@@ -4,6 +4,7 @@ import { useNavigate }                 from 'react-router-dom';
 import L                               from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import '../styles/landingpage.css';
+import { getPublicImpactSummary }      from '../services/publicImpactAPI';
 
 // ── Image fallback ───────────────────────────────────────────
 function ImgWithFallback({ src, alt, fallbackText, fallbackPath, className }) {
@@ -113,6 +114,41 @@ function LocationsMap({ locations }) {
       aria-label="Interactive map of Ladles of Love collection and drop-off points across Cape Town"
     />
   );
+}
+
+// ── Scroll reveal ─────────────────────────────────────────────
+// Same one-shot IntersectionObserver shape as CountUpStat below (spot
+// it, disconnect, done) rather than toggling visibility on every
+// scroll — a section fading in and out again as someone scrolls past
+// it twice reads as broken, not polished.
+//
+// The motion itself lives entirely in CSS, behind
+// @media (prefers-reduced-motion: no-preference) — see .lol-reveal in
+// landingpage.css. That means a reduced-motion visitor's .lol-reveal
+// elements have no opacity/transform rules at all and render exactly
+// as if this hook were never called; nothing here needs its own
+// reduced-motion branch.
+function useReveal(threshold = 0.15) {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return undefined;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) return;
+        setVisible(true);
+        observer.disconnect();
+      },
+      { threshold }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [threshold]);
+
+  return [ref, visible];
 }
 
 // ── Count-up stat, animates 0 → value once scrolled into view ─
@@ -259,13 +295,17 @@ const CONTEXT_STATS = [
   { value: '18%', label: 'of SA households severely affected by child malnutrition' },
 ];
 
-// ── Impact counters — placeholder/estimated figures until we wire
-// these up to real reporting data. Update IMPACT_COUNTERS with real
-// numbers once available; the "(estimated)" note below can come out then.
-const IMPACT_COUNTERS = [
-  { id: 'paper',    icon: 'paper',  value: 18540, suffix: '',    label: 'sheets of paper saved by digital record-keeping' },
-  { id: 'compost',  icon: 'sprout', value: 9280,  suffix: ' kg', label: 'food waste turned into compost for local farms' },
-  { id: 'children', icon: 'bowl',   value: 6150,  suffix: '',    label: 'children fed through meals tracked in this system' },
+// ── Impact counters — real data, from the same numbers the Impact
+// Calculator shows (paper_saved / compost_processed / children_reached,
+// all-time), via publicImpactAPI.js's one unauthenticated route. This
+// array only carries the metadata that never changes (icon, suffix,
+// label) and the fallback shown if that fetch fails; the actual
+// number is merged in at render time from the fetched summary — see
+// the `impact` state below.
+const IMPACT_COUNTER_DEFS = [
+  { id: 'paper',    icon: 'paper',  suffix: '',    label: 'sheets of paper saved by digital record-keeping', fallback: 18540 },
+  { id: 'compost',  icon: 'sprout', suffix: ' kg', label: 'food waste turned into compost for local farms',  fallback: 9280 },
+  { id: 'children', icon: 'bowl',   suffix: '',    label: 'children fed through meals tracked in this system', fallback: 6150 },
 ];
 
 const WAREHOUSE_PHOTOS = [
@@ -301,6 +341,41 @@ const LandingPage = () => {
   const [ready, setReady]       = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const firstMenuLinkRef        = useRef(null);
+
+  // One useReveal() per section below the hero, in page order — each
+  // is independent (its own observer, its own once-only trigger), not
+  // a single observer watching a list, so a section higher up the page
+  // finishing its animation has no bearing on one further down.
+  const [teamRef, teamVisible]             = useReveal();
+  const [programmesRef, programmesVisible] = useReveal();
+  const [impactRef, impactVisible]         = useReveal();
+  const [storyRef, storyVisible]           = useReveal();
+  // mapSectionRef, not mapRef — LocationsMap already has its own
+  // unrelated mapRef (the Leaflet instance) in its own scope below.
+  const [mapSectionRef, mapSectionVisible] = useReveal();
+  const [involvedRef, involvedVisible]     = useReveal();
+
+  // Real numbers, fetched once on mount. null until the fetch settles
+  // (success OR failure) — CountUpStat only animates once, the first
+  // time it scrolls into view, so it must never mount with a value
+  // that's still just a placeholder: nothing here would ever make it
+  // re-animate to the real number once one arrived late. Keeping this
+  // null through the whole request means the counters simply don't
+  // render until the true value (real or, on failure, the fallback)
+  // is already known — for a page load fast enough to matter, that
+  // happens well before anyone scrolls this far down anyway.
+  const [impact, setImpact] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPublicImpactSummary()
+      .then((data) => { if (!cancelled) setImpact(data); })
+      .catch(() => {
+        if (cancelled) return;
+        setImpact(Object.fromEntries(IMPACT_COUNTER_DEFS.map((c) => [c.id, c.fallback])));
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     document.title = 'Batches for Ladles · Warehouse System';
@@ -425,7 +500,7 @@ const LandingPage = () => {
           </p>
         </section>
 
-        <section className="lol-team">
+        <section ref={teamRef} className={`lol-team lol-reveal${teamVisible ? ' is-visible' : ''}`}>
           <div className="lol-section-inner lol-team-grid">
             <div className="lol-team-photo">
               <WarehouseSlideshow photos={WAREHOUSE_PHOTOS} />
@@ -451,7 +526,11 @@ const LandingPage = () => {
           </div>
         </section>
 
-        <section className="lol-programmes" aria-labelledby="lol-programmes-title">
+        <section
+          ref={programmesRef}
+          className={`lol-programmes lol-reveal${programmesVisible ? ' is-visible' : ''}`}
+          aria-labelledby="lol-programmes-title"
+        >
           <div className="lol-section-inner">
             <div className="lol-programmes-intro">
               <div>
@@ -497,21 +576,33 @@ const LandingPage = () => {
           </div>
         </section>
 
-        {/* ── Impact counters — estimated figures, real data to follow ── */}
-        <section className="lol-impact" aria-labelledby="lol-impact-title">
+        {/* ── Impact counters — real data, same numbers as the Impact
+            Calculator (see the `impact` fetch above) ── */}
+        <section
+          ref={impactRef}
+          className={`lol-impact lol-reveal${impactVisible ? ' is-visible' : ''}`}
+          aria-labelledby="lol-impact-title"
+        >
           <div className="lol-section-inner">
             <h2 id="lol-impact-title" className="lol-section-title lol-section-title-light">Our impact so far</h2>
             <div className="lol-impact-grid">
-              {IMPACT_COUNTERS.map((c) => (
-                <CountUpStat key={c.id} icon={c.icon} value={c.value} suffix={c.suffix} label={c.label} />
+              {IMPACT_COUNTER_DEFS.map((c) => (
+                impact ? (
+                  <CountUpStat key={c.id} icon={c.icon} value={impact[c.id] ?? 0} suffix={c.suffix} label={c.label} />
+                ) : (
+                  <div key={c.id} className="lol-impact-stat">
+                    <Icon name={c.icon} size={28} />
+                    <span className="lol-impact-value">—</span>
+                    <span className="lol-impact-label">{c.label}</span>
+                  </div>
+                )
               ))}
             </div>
-            <p className="lol-impact-note">(Estimated figures: real counts coming soon.)</p>
           </div>
         </section>
 
         {/* ── Our Why ──────────────────────────────────────────── */}
-        <section className="lol-story">
+        <section ref={storyRef} className={`lol-story lol-reveal${storyVisible ? ' is-visible' : ''}`}>
           <div className="lol-section-inner">
             <div className="lol-story-grid">
               <div className="lol-story-text">
@@ -569,7 +660,11 @@ const LandingPage = () => {
         </section>
 
         {/* ── Map ──────────────────────────────────────────────── */}
-        <section className="lol-map-section" aria-labelledby="lol-map-title">
+        <section
+          ref={mapSectionRef}
+          className={`lol-map-section lol-reveal${mapSectionVisible ? ' is-visible' : ''}`}
+          aria-labelledby="lol-map-title"
+        >
           <div className="lol-section-inner">
             <p className="lol-eyebrow">Where the food goes</p>
             <h2 id="lol-map-title" className="lol-section-title">Across three provinces</h2>
@@ -581,7 +676,7 @@ const LandingPage = () => {
           </div>
         </section>
 
-        <section className="lol-getinvolved">
+        <section ref={involvedRef} className={`lol-getinvolved lol-reveal${involvedVisible ? ' is-visible' : ''}`}>
           <div className="lol-section-inner">
             <p className="lol-eyebrow lol-eyebrow--on-dark">New here?</p>
             <h2 className="lol-section-title lol-section-title-light">

@@ -71,6 +71,9 @@ export const DIMENSIONS = {
   category:       { id: 'category',       label: 'Category',          chart: 'bar'    },
   outcome:        { id: 'outcome',        label: 'Outcome',           chart: 'bar'    },
   s18a_status:    { id: 's18a_status',    label: 'Certificate status',chart: 'bar'    },
+  group:          { id: 'group',          label: 'Beneficiary group', chart: 'bar'    },
+  region:         { id: 'region',         label: 'Region',            chart: 'bar'    },
+  group_month:    { id: 'group_month',    label: 'By month',          chart: 'grouped_bar' },
 };
 
 // ── Filters ───────────────────────────────────────────────────
@@ -88,7 +91,15 @@ export const FILTERS = {
   location_id:       { label: 'Storage location', values: null },
 };
 
-export const CHART_TYPES = ['number', 'line', 'bar', 'hbar'];
+// grouped_bar: several series clustered per time bucket (e.g.
+// children/adults/households, side by side, one cluster per month) —
+// see meals_served_by_group's 'group_month' dimension, the only
+// producer of this shape today. The label packs both axes into one
+// string ("2026-07|Children"), same flat [{label,value}] shape every
+// other chart type already returns; ReportChart.jsx splits it apart
+// client-side rather than this feature inventing a second response
+// shape for one chart type.
+export const CHART_TYPES = ['number', 'line', 'bar', 'hbar', 'grouped_bar'];
 
 // ── Cache tiers ───────────────────────────────────────────────
 // Render's free tier sleeps, so an in-process cache is cold on each
@@ -141,6 +152,36 @@ export const METRICS = {
     caveat: 'Estimate based on the kilograms-to-meals factor on record.',
   },
 
+  // Answers "who, by category" rather than meals_enabled's own "how
+  // many total" — same kilograms-to-meals factor (no separate factor
+  // to set up), but grouped into three human categories instead of
+  // one running total, and widened to include community requests
+  // (meals_enabled stays ECD+soup-kitchen only, per NFR-20's impact
+  // clause). Dignity kitchens stay out of this one too — the org's
+  // "no impact report" boundary for them applies here the same way,
+  // they get their own separate, private estimate elsewhere on this
+  // page instead. 'group' folds the beneficiary_kind enum down to
+  // Children / Adults / Households rather than naming a specific
+  // ECD, soup kitchen or household — this metric deliberately does
+  // NOT offer a named/per-school breakdown at all; that already
+  // exists on children_reached for whoever needs it. 'group_month'
+  // is the same three categories AGAIN, but broken out per month
+  // rather than summed over the whole range — a grouped bar chart,
+  // "compared over time" rather than a single snapshot.
+  meals_served_by_group: {
+    id: 'meals_served_by_group', label: 'Meals served', temporal: 'range',
+    description:
+      'Estimated meals served, grouped by who received them: children (ECDs), adults ' +
+      '(soup kitchens) or households (community requests). Converted from kilograms ' +
+      'dispatched using the same factor meals enabled uses. Dignity kitchens are not ' +
+      'counted here — see the separate dignity kitchen estimate.',
+    repoFn: 'mealsServedByGroup', unit: 'meals',
+    dimensions: ['group_month', 'group', 'none', 'month', 'week', 'cohort'],
+    filters: ['cohort'],
+    defaultChart: 'grouped_bar', impactOnly: true, factorKey: 'kg_to_meals',
+    caveat: 'Estimate based on the kilograms-to-meals factor on record. Children, adults (soup kitchens) and households (community requests) only. Dignity kitchens excluded.',
+  },
+
   // adultsReached deliberately does NOT extend IMPACT_BENEFICIARY_KINDS
   // to include dignity kitchens — NFR-20 excludes them from impact
   // reporting by design (per the project's own visit notes: "dignity
@@ -161,6 +202,48 @@ export const METRICS = {
     caveat: 'Estimate based on the kilograms-to-adults-served factor on record. Soup kitchens only.',
   },
 
+  // Same shape as adults_reached (real kg dispatched -> a manager-set
+  // factor), with beneficiary_kind forced to dignity_kitchen instead
+  // of soup_kitchen. NFR-20 keeps dignity kitchens out of THE impact
+  // report on purpose, but the org still wanted a rough, private sense
+  // of what they serve — dignity kitchens keep no headcount of their
+  // own, so this is deliberately a single aggregate estimate, never
+  // broken down by kitchen name (no 'ecd_centre'-equivalent dimension
+  // exists for it, and none should be added).
+  dignity_kitchen_served: {
+    id: 'dignity_kitchen_served', label: 'Dignity kitchen guests served (estimate)', temporal: 'range',
+    description:
+      'Estimated guests served through dignity kitchens, converted from kilograms ' +
+      'dispatched using a factor the manager can edit — the same way adults reached ' +
+      'works for soup kitchens. Dignity kitchens keep no headcount of their own, so this ' +
+      'is a rough aggregate estimate, never broken down by kitchen.',
+    repoFn: 'dignityKitchenServed', unit: 'people',
+    dimensions: ['none', 'month', 'week', 'cohort'],
+    filters: ['cohort'],
+    defaultChart: 'line', impactOnly: true, factorKey: 'kg_to_dignity_kitchen_served',
+    caveat: 'Estimate based on the kilograms-to-people factor for dignity kitchens on record. Aggregate only, never broken down by kitchen.',
+  },
+
+  // Walk-in and phone-in community requests already dispatch through
+  // the normal picking/dispatch flow tagged beneficiary_kind =
+  // 'community' — real kilograms, not a guess. That is a more honest
+  // "how many reached" figure than counting logged requests
+  // (community_request_outcomes below): a request that dispatched
+  // 40kg to a family is not the same as one that dispatched 4kg, and
+  // the request log itself keeps no headcount.
+  community_served: {
+    id: 'community_served', label: 'People served via community requests (estimate)', temporal: 'range',
+    description:
+      'Estimated people served through walk-in and phone-in community requests, ' +
+      'converted from kilograms actually dispatched using a factor the manager can edit. ' +
+      'Based on what left the warehouse, not on how many requests were logged.',
+    repoFn: 'communityServed', unit: 'people',
+    dimensions: ['none', 'month', 'week', 'cohort'],
+    filters: ['cohort'],
+    defaultChart: 'line', impactOnly: true, factorKey: 'kg_to_community_served',
+    caveat: 'Estimate based on the kilograms-to-people factor for community requests on record.',
+  },
+
   paper_saved: {
     id: 'paper_saved', label: 'Paper saved', temporal: 'range',
     description:
@@ -177,11 +260,12 @@ export const METRICS = {
     id: 'compost_processed', label: 'Compost processed', temporal: 'range',
     description:
       'Kilograms of compost collected through Feed the Soil, logged against a ' +
-      'community member\'s collection kit each time it is weighed in.',
+      'community member\'s collection kit each time it is weighed in. Can be seen as a ' +
+      'running total, a monthly trend, or broken down by the suburb each kit is assigned to.',
     repoFn: 'compostProcessed', unit: 'kg',
-    dimensions: ['none', 'month'], filters: [],
-    defaultChart: 'line', impactOnly: true,
-    caveat: 'Counts every logged weigh-in, whether or not it has been dispatched to a farmer yet.',
+    dimensions: ['region', 'none', 'month'], filters: [],
+    defaultChart: 'bar', impactOnly: true,
+    caveat: 'Counts every logged weigh-in, whether or not it has been dispatched to a farmer yet. Region is the kit owner\'s registered suburb, not where the compost ends up.',
   },
 
   // ══ Dispatch ═══════════════════════════════════════════════

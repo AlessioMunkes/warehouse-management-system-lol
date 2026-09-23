@@ -18,8 +18,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
 import communityRequestAPI, { RESOLVE_OUTCOMES, OUTCOME_LABELS } from '../../../services/communityRequestAPI';
-import CommunityRequestForm from './CommunityRequestForm';
-import { Notice, ChoiceList } from '../../staff/components/StepPrimitives';
+import { Notice, ChoiceList, TextField, Actions, Button } from '../../staff/components/StepPrimitives';
 import ListTools, { NoMatches } from '../../staff/components/ListTools';
 import useListSearch from '../../staff/hooks/useListSearch';
 
@@ -40,6 +39,98 @@ const fmtDateTime = (value) =>
         day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
       })
     : '—';
+
+// The phone-first equivalent of CommunityRequestForm.jsx — same
+// fields, same validation (itemsRequested is the only required one,
+// BR-28), same requestedAt null-mapping, but built on StepPrimitives'
+// .stf-* fields instead of the shadcn Field/Button/Input/Textarea the
+// original uses.
+//
+// WHY A SEPARATE FORM RATHER THAN REUSING THAT ONE
+// CommunityRequestForm.jsx is shared with the manager's desktop table
+// (CommunityRequestsPage.jsx) and is built on shadcn on purpose — the
+// manager's own vocabulary, same as every other manager form. Reused
+// as-is here, it put a shadcn button (Tailwind's font, index.css's
+// --primary) next to every other worker screen's .stf-btn-primary CTA
+// (staff.css's own --stf-ink, Montserrat) — close enough to read as
+// the same button and different enough that "Log request" and Feed
+// the Soil's "Log a collection" looked like two different systems
+// side by side, which is exactly what was reported. Same trade-off
+// DecantingFlow/DecantingPlanner and FeedTheSoilFlow/
+// FeedTheSoilManagerView already make: one small form per audience,
+// not one straddling both.
+function LogRequestForm({ onSubmit, busy, error }) {
+  const [form, setForm] = useState({
+    callerName: '', callerContact: '', itemsRequested: '', quantityNote: '', requestedAt: '',
+  });
+  const [touchedItems, setTouchedItems] = useState(false);
+
+  const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }));
+  const itemsMissing = !form.itemsRequested.trim();
+  const itemsInvalid = touchedItems && itemsMissing;
+
+  const submit = () => {
+    setTouchedItems(true);
+    if (itemsMissing) return;
+    onSubmit({ ...form, requestedAt: form.requestedAt === '' ? null : form.requestedAt });
+  };
+
+  return (
+    <>
+      {error ? <Notice tone="warn">{error}</Notice> : null}
+
+      <div className="stf-field">
+        <label className="stf-field-label" htmlFor="stf-cr-items">What was requested</label>
+        <textarea
+          id="stf-cr-items"
+          className="stf-input is-text"
+          style={{ minHeight: '72px', paddingTop: '12px', paddingBottom: '12px' }}
+          rows={3}
+          value={form.itemsRequested}
+          onChange={(e) => set('itemsRequested')(e.target.value)}
+          onBlur={() => setTouchedItems(true)}
+          placeholder="e.g. Samp, sugar beans, cooking oil"
+        />
+        <p className="stf-field-hint">
+          {itemsInvalid ? 'Describe what was requested.' : 'No stock code required.'}
+        </p>
+      </div>
+
+      <TextField
+        id="stf-cr-caller-name" label="Caller name"
+        value={form.callerName} onChange={set('callerName')}
+        placeholder="Optional"
+      />
+      <TextField
+        id="stf-cr-caller-contact" label="Preferred contact"
+        value={form.callerContact} onChange={set('callerContact')}
+        placeholder="Phone, WhatsApp, email…"
+      />
+      <TextField
+        id="stf-cr-quantity-note" label="Quantity note"
+        value={form.quantityNote} onChange={set('quantityNote')}
+        placeholder="e.g. Enough for roughly 80 plates"
+        hint="Approximate is fine."
+      />
+
+      <div className="stf-field">
+        <label className="stf-field-label" htmlFor="stf-cr-requested-at">Date &amp; time of request</label>
+        <input
+          id="stf-cr-requested-at"
+          className="stf-input is-text"
+          type="datetime-local"
+          value={form.requestedAt}
+          onChange={(e) => set('requestedAt')(e.target.value)}
+        />
+        <p className="stf-field-hint">Defaults to now.</p>
+      </div>
+
+      <Actions>
+        <Button disabled={busy} onClick={submit}>{busy ? 'Saving' : 'Log request'}</Button>
+      </Actions>
+    </>
+  );
+}
 
 // Same construction as NotesField.jsx in the donation flow — a
 // .stf-input textarea, not the single-line TextField from
@@ -202,10 +293,10 @@ export default function CommunityRequestFlow({ onCrumbChange }) {
             <h1 className="stf-step-title" tabIndex={-1}>Log a request</h1>
             <p className="stf-step-sub">
               A member of the public phoned in or walked in asking for goods.
-              This only logs it — nothing here moves stock.
+              Log those requests here.
             </p>
           </div>
-          <CommunityRequestForm onSubmit={handleLog} busy={logBusy} error={logError} />
+          <LogRequestForm onSubmit={handleLog} busy={logBusy} error={logError} />
         </>
       ) : (
         <>

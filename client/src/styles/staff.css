@@ -304,6 +304,21 @@
    flow. It keeps the same chrome and takes the room it needs. */
 .stf-main.is-wide { max-width: 1200px; }
 
+/* Dashboard only (.stf-tasks is TaskDashboardPage's own direct child,
+   nothing else renders one) — reported as "weird spacing", which is
+   .stf-main's own flex:1 doing exactly what it should for every task
+   flow (top-anchor the content, leave any extra height as trailing
+   space so a long form or list has somewhere to scroll into) but
+   reading as an oversized, unexplained gap below a greeting and a row
+   of circles, the shortest thing any staff page renders. Centering is
+   scoped to this one page on purpose: a Receiving or Decanting screen
+   that centred itself would visibly re-center every time a field
+   error added or removed a line, which is a worse kind of movement
+   than a blank margin ever was. */
+.stf-main:has(> .stf-tasks) {
+  justify-content: center;
+}
+
 /* ── Bottom tab bar ──────────────────────────────────────────────── */
 /* How staff move between the four tasks. A sidebar collapses behind a
    hamburger at this width, hiding all four destinations behind a tap;
@@ -340,11 +355,21 @@
   font: 600 10px/1.2 var(--stf-font-sans);
   cursor: pointer;
 }
-.stf-tab-icon  { width: 24px; height: 24px; object-fit: contain; opacity: 0.55; }
-.stf-tab-glyph { font-size: 18px; line-height: 24px; opacity: 0.55; }
+.stf-tab-icon  { width: 24px; height: 24px; object-fit: contain; opacity: 0.55; transition: opacity 150ms ease, transform 150ms ease; }
+.stf-tab-glyph { font-size: 18px; line-height: 24px; opacity: 0.55; transition: opacity 150ms ease, transform 150ms ease; }
 .stf-tab.is-current { border-top-color: var(--stf-accent); color: var(--stf-ink); }
 .stf-tab.is-current .stf-tab-icon,
 .stf-tab.is-current .stf-tab-glyph { opacity: 1; }
+/* Every tab, current or not, on a mouse — the bar had no hover
+   feedback at all before this, only the permanent .is-current state.
+   Full opacity plus a small pop rather than opacity alone: a tab
+   sitting at opacity 1 already (the current one) still needs
+   something to show for a hover, and "lights up AND grows slightly"
+   is the ask. Icon and glyph only, not the tab's own border/colour —
+   those still belong to .is-current alone, so hovering a tab never
+   reads as though it were already selected. */
+.stf-tab:hover .stf-tab-icon,
+.stf-tab:hover .stf-tab-glyph { opacity: 1; transform: scale(1.1); }
 
 /* ── Doodle footer ───────────────────────────────────────────────── */
 .stf-footer {
@@ -807,7 +832,27 @@
   font-size: 14px; line-height: 1.6;
   color: var(--stf-text-sub);
 }
-.stf-skeleton { height: 56px; border-radius: var(--stf-radius); background: var(--stf-border); }
+/* REVISED — was a flat, static block. The manager side's own loading
+   state (@/components/ui/skeleton.jsx) has carried Tailwind's
+   animate-pulse the whole time; this is the one place staff.css never
+   matched it, on a class used in 16 places across every worker flow
+   (Receiving, Decanting, Dispatch, Packing, Feed the Soil, Community
+   Requests). Same keyframe and timing as Tailwind's own animate-pulse
+   (2s cubic-bezier(0.4,0,0.6,1) infinite, 50% opacity at the midpoint)
+   rather than inventing a different one, so a loading state looks the
+   same whichever side of the app it's on. Frozen for reduced-motion
+   the same way every other animation in this file already is — the
+   blanket [data-stf-motion='reduced'] rule zeroes animation-duration
+   app-wide, nothing extra needed here. */
+.stf-skeleton {
+  height: 56px;
+  border-radius: var(--stf-radius);
+  background: var(--stf-border);
+  animation: stf-skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+@keyframes stf-skeleton-pulse {
+  50% { opacity: 0.5; }
+}
 
 /* ── Segmented tabs ──────────────────────────────────────────────── */
 /* For a board with a few named subsets (packing's "assigned to me /
@@ -1499,11 +1544,18 @@ body.reduced-movement .decorative-icon {
 .stf-task-main { min-width: 0; }
 .stf-task-side { margin-top: 16px; }
 
-/* Two panes only where there is width for two panes. Below this the
-   device is a phone or a bench tablet and the side pane is simply the
-   next thing down the page. */
+/* Two panes only where there is width for two panes, AND only where a
+   TaskPage actually has a side pane to put there — .has-side, set by
+   TaskPage.jsx only when its `side` prop is passed. REVISED: this used
+   to apply to bare .stf-task-cols regardless, so a TaskPage with no
+   side (Feed the Soil's browse/kits screens use TaskPage for its
+   sticky head with no side content) still got grid-template-columns:
+   1fr 320px — a real second column reserved on screen with nothing
+   in it, showing as unexplained empty space beside a narrower-than-
+   expected card. Below 1024px the side pane (when there is one) is
+   simply the next thing down the page either way. */
 @media (min-width: 1024px) {
-  .stf-task-cols {
+  .stf-task-cols.has-side {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 320px;
     gap: 24px;

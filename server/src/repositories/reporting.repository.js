@@ -151,6 +151,81 @@ const adultsReached = (spec) => dispatchedKgQuery({
   filters: { ...spec.filters, beneficiary_kind: 'soup_kitchen' },
 });
 
+// Same shape as adultsReached, forced to dignity_kitchen instead —
+// see reportCatalog.js's dignity_kitchen_served entry for why this
+// exists as its own metric rather than widening IMPACT_BENEFICIARY_KINDS.
+const dignityKitchenServed = (spec) => dispatchedKgQuery({
+  ...spec,
+  impactOnly: false,
+  filters: { ...spec.filters, beneficiary_kind: 'dignity_kitchen' },
+});
+
+// Same shape again, forced to community — real dispatched kilograms
+// for walk-in/phone-in beneficiaries, not a count of logged requests.
+const communityServed = (spec) => dispatchedKgQuery({
+  ...spec,
+  impactOnly: false,
+  filters: { ...spec.filters, beneficiary_kind: 'community' },
+});
+
+// Not built on dispatchedKgQuery/impactClause — that clause is fixed
+// to exactly ECD+soup-kitchen, and this metric widens that by one
+// (community) while still excluding dignity kitchens, which neither
+// impactOnly value expresses. 'group' folds beneficiary_kind to three
+// human categories (see reportCatalog.js's meals_served_by_group
+// entry for why); every other dimension reuses slipDimension()
+// unchanged, same as dispatchedKgQuery does.
+const MEALS_GROUP_KINDS = ['ecd', 'soup_kitchen', 'community'];
+
+const MEALS_GROUP_CASE = `CASE ps.beneficiary_kind::text
+                             WHEN 'ecd' THEN 'Children'
+                             WHEN 'soup_kitchen' THEN 'Adults'
+                             WHEN 'community' THEN 'Households'
+                           END`;
+
+const mealsServedByGroup = async ({ dimension, filters, dateRange }) => {
+  let dim;
+  if (dimension === 'group') {
+    dim = { expr: MEALS_GROUP_CASE, group: `ps.beneficiary_kind` };
+  } else if (dimension === 'group_month') {
+    // Packs both axes into one label ("2026-07|Children") rather than
+    // returning a second shape this feature's one chart component
+    // would have to special-case — see reportCatalog.js's CHART_TYPES
+    // note on grouped_bar. Ordered chronologically-then-by-group below
+    // rather than orderFor()'s usual value-DESC, since the client
+    // pivots this into month clusters and needs the months in
+    // calendar order, not ranked by size.
+    dim = {
+      expr: `${bucketMonth('ps.dispatch_date')} || '|' || ${MEALS_GROUP_CASE}`,
+      group: `${bucketMonth('ps.dispatch_date')}, ps.beneficiary_kind`,
+    };
+  } else {
+    dim = slipDimension(dimension);
+  }
+
+  const params = [dateRange.from, dateRange.to];
+  const where = [
+    `ps.dispatch_date BETWEEN $1::date AND $2::date`,
+    `de.status = ANY($${params.push(COLLECTED_STATUSES)}::text[])`,
+    `del.unit = 'kg'`,
+    `ps.beneficiary_kind = ANY($${params.push(MEALS_GROUP_KINDS)}::beneficiary_type[])`,
+    ...slipFilters(filters, params),
+  ];
+
+  const { rows } = await pool.query(
+    `SELECT ${dim.expr} AS label, SUM(del.loaded_quantity)::numeric AS value
+       FROM picking_slips ps
+       JOIN dispatch_events de ON de.picking_slip_id = ps.id
+       JOIN dispatch_event_lines del ON del.dispatch_event_id = de.id
+  LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
+      WHERE ${where.join(' AND ')}
+      ${dim.group ? `GROUP BY ${dim.group}` : ''}
+      ORDER BY ${dimension === 'group_month' ? '1' : orderFor(dimension)}`,
+    params
+  );
+  return rows2series(rows);
+};
+
 // ══ Paper saved ════════════════════════════════════════════════
 // Three tables, one UNION, because a "digital document" here is
 // whichever of three different features produced one — a delivery
@@ -198,10 +273,17 @@ const paperSaved = async ({ dimension, dateRange }) => {
 // farmer is what happens to it afterward, a fulfilment detail with no
 // bearing on how much compost the programme actually produced. See
 // collectionKit.repository.js for the full lifecycle this reads from.
+// 'region' needs collection_kits joined in (the owner's suburb, not
+// anything on collection_kit_records itself), so its expr references
+// the ck alias the query below only joins when a dimension asks for
+// it to matter — joining it unconditionally is harmless (LEFT JOIN,
+// one row per kit, no fan-out) and keeps this switch the only place
+// that knows which dimension needs which table.
 const compostDimension = (dimension) => {
   switch (dimension) {
-    case 'none':  return { expr: `'Total'`,               group: null };
-    case 'month': return { expr: bucketMonth('bucket_date'), group: bucketMonth('bucket_date') };
+    case 'none':   return { expr: `'Total'`,                        group: null };
+    case 'month':  return { expr: bucketMonth('bucket_date'),        group: bucketMonth('bucket_date') };
+    case 'region': return { expr: `COALESCE(ck.suburb, 'Unspecified')`, group: `COALESCE(ck.suburb, 'Unspecified')` };
     default: throw new Error(`Unsupported dimension: ${dimension}`);
   }
 };
@@ -211,11 +293,12 @@ const compostProcessed = async ({ dimension, dateRange }) => {
   const params = [dateRange.from, dateRange.to];
   const { rows } = await pool.query(
     `SELECT ${dim.expr} AS label, COALESCE(SUM(kg_compost), 0)::numeric AS value
-       FROM (SELECT ${sastDate('logged_at')} AS bucket_date, kg_compost
+       FROM (SELECT ${sastDate('logged_at')} AS bucket_date, kg_compost, kit_id
                FROM collection_kit_records
               WHERE ${sastDate('logged_at')} BETWEEN $1::date AND $2::date) t
+       LEFT JOIN collection_kits ck ON ck.id = t.kit_id
        ${dim.group ? `GROUP BY ${dim.group}` : ''}
-       ORDER BY 1`,
+       ORDER BY ${dimension === 'region' ? '2 DESC, 1' : '1'}`,
     params
   );
   return rows2series(rows);
@@ -741,7 +824,8 @@ const getFactor = async (key) => {
 };
 
 export default {
-  childrenReached, mealsEnabled, adultsReached, paperSaved, compostProcessed,
+  childrenReached, mealsEnabled, mealsServedByGroup, adultsReached, dignityKitchenServed, communityServed,
+  paperSaved, compostProcessed,
   dispatchVolume, collectionCompliance,
   repeatNonCollections, decantingWastage,
   goodsReceived, receivingDiscrepancyRate, unresolvedDiscrepancies, procurementSpend, unitPriceTrend,

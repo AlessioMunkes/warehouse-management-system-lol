@@ -122,8 +122,21 @@ export default function NotificationBell() {
       <PopoverTrigger asChild>
         <Button type="button" variant="ghost" size="icon" className="relative" aria-label="Notifications">
           <Bell />
+          {/* key={unreadCount} remounts this span every time the count
+              changes, which is what re-triggers the animation on a new
+              arrival rather than only on the badge's very first
+              appearance. Same animate-in/zoom-in-95 utilities (tw-
+              animate-css, already a dependency) the dialog/alert-dialog
+              primitives use for their own open transition. motion-safe:
+              rather than the data-open/data-closed pattern those
+              components use: there's no open/closed state here, just
+              "did the count just change", so the animation runs once on
+              mount and Tailwind's reduced-motion variant is the gate. */}
           {unreadCount > 0 ? (
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[10px] font-semibold text-on-brand">
+            <span
+              key={unreadCount}
+              className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[10px] font-semibold text-on-brand motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-200"
+            >
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           ) : null}

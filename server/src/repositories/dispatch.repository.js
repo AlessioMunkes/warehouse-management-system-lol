@@ -575,7 +575,7 @@ const sweepNonCollections = async ({ dispatchDate, actorId }) => {
       await createNotification(client, {
         type:  'non_collections_flagged',
         title: `${swept.rowCount} pallet${swept.rowCount === 1 ? '' : 's'} not collected by 15:00`,
-        body:  `${dispatchDate} — flagged automatically per BR-14.`,
+        body:  `Flagged automatically for ${dispatchDate}.`,
         entityType: 'dispatch_sweep',
       });
     }

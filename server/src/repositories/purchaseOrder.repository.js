@@ -362,10 +362,199 @@ const setQuickbooksReference = async (id, quickbooksPoId, actorId) => {
   }
 };
 
+// ── Update (pending only) ───────────────────────────────────────
+// Full header-and-lines replace, only ever reached for a 'pending'
+// order — see purchaseOrder.service.js's updatePurchaseOrder, which
+// is the actual gate. Nothing has been received against a pending
+// order yet (that's what 'pending' means: raised, not yet approved,
+// not yet sent to anyone), so there is no delivery_note_item pointing
+// at the old line rows and replace-all is safe — the same reasoning
+// deletePurchaseOrder below relies on. Supplier and products are
+// re-validated fresh, same as createPurchaseOrder: either could have
+// been deactivated in the time since the PO was first raised.
+const updatePurchaseOrder = async (id, payload, userId) => {
+  const { supplierId, expectedDeliveryDate, notes, items } = payload;
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows: existingRows } = await client.query(
+      `SELECT ${PO_COLUMNS.replace(/po\./g, '')} FROM purchase_orders WHERE id = $1 FOR UPDATE`,
+      [id]
+    );
+    const before = existingRows[0] ?? null;
+    if (!before) { await client.query('ROLLBACK'); return { ok: false, code: 'not_found' }; }
+    if (before.status !== 'pending') {
+      await client.query('ROLLBACK');
+      return { ok: false, code: 'not_editable', status: before.status };
+    }
+
+    const { rows: suppliers } = await client.query(
+      `SELECT id, name, is_active FROM suppliers WHERE id = $1 FOR SHARE`,
+      [supplierId]
+    );
+    const supplier = suppliers[0];
+    if (!supplier) {
+      await client.query('ROLLBACK');
+      return { ok: false, code: 'supplier_not_found' };
+    }
+    if (!supplier.is_active) {
+      await client.query('ROLLBACK');
+      return { ok: false, code: 'supplier_inactive', supplier };
+    }
+
+    const productIds = items.map((i) => i.productId);
+    const { rows: products } = await client.query(
+      `SELECT id, name, default_unit FROM products
+        WHERE id = ANY($1::int[]) AND is_active = true`,
+      [productIds]
+    );
+    if (products.length !== productIds.length) {
+      const found   = new Set(products.map((p) => p.id));
+      const missing = productIds.filter((id) => !found.has(id));
+      await client.query('ROLLBACK');
+      return { ok: false, code: 'unknown_products', missing };
+    }
+
+    const { rows: updated } = await client.query(
+      `UPDATE purchase_orders
+          SET supplier_id = $2, expected_delivery_date = $3, notes = $4
+        WHERE id = $1
+        RETURNING ${PO_COLUMNS.replace(/po\./g, '')}`,
+      [id, supplierId, expectedDeliveryDate, notes]
+    );
+    const purchaseOrder = updated[0];
+
+    // Replace-all rather than a diff: simpler, and safe only because
+    // 'pending' guarantees no delivery_note_item references these rows.
+    await client.query(`DELETE FROM purchase_order_items WHERE purchase_order_id = $1`, [id]);
+    const { rows: lines } = await client.query(
+      `INSERT INTO purchase_order_items
+         (purchase_order_id, product_id, expected_quantity, expected_weight_kg, unit_price)
+       SELECT $1::int, p, q, w, u
+         FROM unnest($2::int[], $3::int[], $4::numeric[], $5::numeric[])
+              AS t(p, q, w, u)
+       RETURNING id, product_id, expected_quantity, expected_weight_kg, unit_price`,
+      [
+        id,
+        productIds,
+        items.map((i) => i.expectedQuantity),
+        items.map((i) => i.expectedWeightKg ?? null),
+        items.map((i) => i.unitPrice ?? null),
+      ]
+    );
+
+    await logAudit(client, {
+      entityType: 'purchase_order',
+      entityId:   id,
+      action:     'updated',
+      actorId:    userId,
+      before,
+      after:      { ...purchaseOrder, items: lines },
+    });
+
+    await client.query('COMMIT');
+
+    const byId = new Map(products.map((p) => [p.id, p]));
+    return {
+      ok: true,
+      purchaseOrder: {
+        ...purchaseOrder,
+        supplier_name: supplier.name,
+        items: lines.map((l) => ({
+          ...l,
+          product_name: byId.get(l.product_id)?.name ?? null,
+          default_unit: byId.get(l.product_id)?.default_unit ?? null,
+        })),
+      },
+    };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+// ── Delete (pending only, never received against) ────────────────
+// Hard delete, unlike every other entity in this codebase (suppliers,
+// products, beneficiaries all archive instead). That convention exists
+// because those rows accumulate real history — past orders, past
+// deliveries, past collections — that has to survive the row being
+// taken out of pickers. A 'pending' purchase order has none of that:
+// no supplier has seen it (BR-07B's lifecycle starts at 'approved'),
+// and the has_deliveries check below confirms nothing has been
+// received against it either. There is nothing here a soft delete
+// would be protecting.
+const deletePurchaseOrder = async (id, actorId) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows: existingRows } = await client.query(
+      `SELECT id, status FROM purchase_orders WHERE id = $1 FOR UPDATE`,
+      [id]
+    );
+    const existing = existingRows[0] ?? null;
+    if (!existing) { await client.query('ROLLBACK'); return { ok: false, code: 'not_found' }; }
+    if (existing.status !== 'pending') {
+      await client.query('ROLLBACK');
+      return { ok: false, code: 'not_deletable', status: existing.status };
+    }
+
+    // Belt and braces alongside the status check above: a delivery
+    // recorded against this PO would also have moved its status off
+    // 'pending' (delivery.repository.js's createDelivery updates PO
+    // status on receipt), so this should never fire in practice — but
+    // it is the one fact that actually matters, and checking it
+    // directly costs one query against trusting a second-hand signal.
+    const { rows: deliveries } = await client.query(
+      `SELECT 1 FROM delivery_notes WHERE purchase_order_id = $1 LIMIT 1`,
+      [id]
+    );
+    if (deliveries.length) {
+      await client.query('ROLLBACK');
+      return { ok: false, code: 'has_deliveries' };
+    }
+
+    const { rows: beforeRows } = await client.query(
+      `SELECT ${PO_COLUMNS.replace(/po\./g, '')} FROM purchase_orders WHERE id = $1`,
+      [id]
+    );
+
+    await client.query(
+      `DELETE FROM quickbooks_object_map WHERE entity_type = 'purchase_order' AND entity_id = $1`,
+      [id]
+    );
+    await client.query(`DELETE FROM purchase_order_items WHERE purchase_order_id = $1`, [id]);
+    await client.query(`DELETE FROM purchase_orders WHERE id = $1`, [id]);
+
+    await logAudit(client, {
+      entityType: 'purchase_order',
+      entityId:   id,
+      action:     'deleted',
+      actorId:    actorId ?? null,
+      before:     beforeRows[0] ?? null,
+      after:      null,
+    });
+
+    await client.query('COMMIT');
+    return { ok: true };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
 export default {
   createPurchaseOrder,
   listPurchaseOrders,
   getPurchaseOrderById,
   updatePurchaseOrderStatus,
+  updatePurchaseOrder,
+  deletePurchaseOrder,
   setQuickbooksReference,
 };

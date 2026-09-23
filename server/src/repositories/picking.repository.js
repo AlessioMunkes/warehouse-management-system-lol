@@ -269,7 +269,7 @@ const generateSlips = async ({ dispatchDate, cohort, generatedBy }) => {
         type:  'picking_slips_generated',
         title: `${slips.rowCount} picking slip${slips.rowCount === 1 ? '' : 's'} generated`,
         body:  `${cohort}, ${dispatchDate}` +
-          (emptySlips.length ? ` — ${emptySlips.length} with no lines to check.` : '.'),
+          (emptySlips.length ? `. ${emptySlips.length} with no lines to check.` : '.'),
         entityType: 'picking_slip_run',
       });
     }
@@ -337,7 +337,7 @@ const createSlip = async ({ ecdId, dispatchDate, cohort, generatedBy }) => {
     await createNotification(client, {
       type:       'picking_slip_created',
       title:      `Ad-hoc picking slip created for ${ecdCheck.rows[0].name}`,
-      body:       `${dispatchDate}${itemsResult.rowCount === 0 ? ' — no lines to check.' : '.'}`,
+      body:       `${dispatchDate}${itemsResult.rowCount === 0 ? '. No lines to check.' : '.'}`,
       entityType: 'picking_slip',
       entityId:   slipId,
     });
