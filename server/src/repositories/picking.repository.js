@@ -509,6 +509,96 @@ const releaseSlip = async ({ slipId, actorId }) => {
   }
 };
 
+// ── Edit a pending slip ─────────────────────────────────────────
+// Manager-only "fix it before it goes out": dispatch date, cohort,
+// and/or the full set of product lines. Only reachable while the slip
+// is still 'pending' — which is also the only state where every item
+// on it is guaranteed to still be 'pending' too, since confirmItem/
+// flagItem both require the slip to already be claimed. So there's no
+// per-item lock to worry about here the way setItemStatus has to.
+//
+// `items`, when provided, REPLACES the slip's lines wholesale — the
+// client sends the whole edited list, this deletes what's there and
+// inserts what was sent, inside the same lock. Simpler and safer than
+// diffing adds/removes/quantity-changes against the old set, and
+// nothing yet references an item's own id externally at this stage —
+// no confirm/flag has happened on a pending slip.
+const editSlip = async ({ slipId, dispatchDate, cohort, items, actorId }) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const current = await client.query(
+      `SELECT id, ecd_id, status, dispatch_date, cohort FROM picking_slips WHERE id = $1 FOR UPDATE`,
+      [slipId]
+    );
+    const slip = current.rows[0];
+    if (!slip) { await client.query('ROLLBACK'); return { notFound: true }; }
+
+    if (slip.status !== 'pending') {
+      await client.query('ROLLBACK');
+      return { locked: true, status: slip.status };
+    }
+
+    if (dispatchDate || cohort) {
+      const nextDate = dispatchDate || slip.dispatch_date;
+      const nextCohort = cohort || slip.cohort;
+
+      // Same uniqueness this ECD's slips are created under
+      // (createSlip's ON CONFLICT (ecd_id, dispatch_date)) — moving a
+      // slip onto a date that already has one for this ECD is a
+      // conflict, not a silent merge.
+      const conflict = await client.query(
+        `SELECT id FROM picking_slips WHERE ecd_id = $1 AND dispatch_date = $2::date AND id != $3`,
+        [slip.ecd_id, nextDate, slipId]
+      );
+      if (conflict.rows[0]) {
+        await client.query('ROLLBACK');
+        return { dateConflict: true };
+      }
+
+      await client.query(
+        `UPDATE picking_slips SET dispatch_date = $1::date, cohort = $2::cohort_group WHERE id = $3`,
+        [nextDate, nextCohort, slipId]
+      );
+    }
+
+    if (items) {
+      await client.query(`DELETE FROM picking_slip_items WHERE picking_slip_id = $1`, [slipId]);
+      for (const item of items) {
+        await client.query(
+          `INSERT INTO picking_slip_items (picking_slip_id, product_id, required_quantity, unit)
+           VALUES ($1, $2, $3, $4)`,
+          [slipId, item.productId, item.quantity, item.unit]
+        );
+      }
+    }
+
+    // Reuses 'generated' rather than adding a new event_type — same
+    // reasoning as reusing 'assigned' for a release/reassignment:
+    // event_type is a DB-level CHECK constraint, and a label it has
+    // never seen would roll back the one transaction a manager is
+    // relying on to fix a mistake before it ships.
+    await logEvent(client, slipId, 'generated', actorId, {
+      edited: true,
+      dispatch_date: dispatchDate || undefined,
+      cohort: cohort || undefined,
+      item_count: items ? items.length : undefined,
+    });
+
+    const updated = await client.query(`SELECT * FROM picking_slips WHERE id = $1`, [slipId]);
+
+    await client.query('COMMIT');
+    return { slip: updated.rows[0] };
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
 // ── Confirm or flag one line ──────────────────────────────────
 // Guarded on the parent slip's status so a completed slip can't be edited.
 //
@@ -806,6 +896,7 @@ export default {
   assignSlip,
   addSecondPacker,
   releaseSlip,
+  editSlip,
   setItemStatus,
   completeSlip,
   getAssignableWorkers,

@@ -23,6 +23,7 @@ const repoMock = {
   assignSlip:           vi.fn(),
   addSecondPacker:      vi.fn(),
   releaseSlip:          vi.fn(),
+  editSlip:             vi.fn(),
   setItemStatus:        vi.fn(),
   completeSlip:         vi.fn(),
   getAssignableWorkers: vi.fn(),
@@ -69,6 +70,8 @@ beforeEach(() => {
   repoMock.addSecondPacker.mockResolvedValue({ slip: { ...SLIP, assigned_to_2: WORKER2.id } });
   repoMock.setItemStatus.mockResolvedValue({ item: ITEM, assignedTo: 10 });
   repoMock.completeSlip.mockResolvedValue({ slip: SLIP });
+  repoMock.releaseSlip.mockResolvedValue({ slip: { ...SLIP, status: 'pending', assigned_to: null } });
+  repoMock.editSlip.mockResolvedValue({ slip: { ...SLIP, status: 'pending' } });
 });
 
 afterEach(() => {
@@ -307,6 +310,87 @@ describe('createSlip — ad-hoc, manager only', () => {
     expect(repoMock.createSlip).toHaveBeenCalledWith(
       expect.objectContaining({ generatedBy: MANAGER.id })
     );
+  });
+});
+
+// ── editSlip ──────────────────────────────────────────────────
+describe('editSlip — pending slips only, manager only', () => {
+  const items = [{ productId: 3, quantity: 5, unit: 'kg' }];
+
+  it('lets a manager edit a pending slip\'s date and cohort', async () => {
+    await pickingService.editSlip(1, { dispatchDate: WEEK1_DATE, cohort: 'week1' }, MANAGER);
+    expect(repoMock.editSlip).toHaveBeenCalledWith(expect.objectContaining({
+      slipId: 1, dispatchDate: WEEK1_DATE, cohort: 'week1', actorId: MANAGER.id,
+    }));
+  });
+
+  it.each([[ROLES.WORKER, WORKER], ['finance', FINANCE]])(
+    '%s is refused with 403', async (_role, user) => {
+      await expectStatus(pickingService.editSlip(1, { dispatchDate: WEEK1_DATE, cohort: 'week1' }, user), 403);
+      expect(repoMock.editSlip).not.toHaveBeenCalled();
+    });
+
+  it('requires date and cohort together, not just one', async () => {
+    await expectStatus(pickingService.editSlip(1, { dispatchDate: WEEK1_DATE }, MANAGER), 400);
+    expect(repoMock.editSlip).not.toHaveBeenCalled();
+  });
+
+  it('enforces the rotation by default, same as creating a slip', async () => {
+    await expectStatus(pickingService.editSlip(1, { dispatchDate: WEEK1_DATE, cohort: 'week2' }, MANAGER), 400);
+  });
+
+  it('allows an off-rotation move when force is set', async () => {
+    await expect(pickingService.editSlip(1, { dispatchDate: WEEK1_DATE, cohort: 'week2', force: true }, MANAGER))
+      .resolves.toBeDefined();
+  });
+
+  it('accepts a clean product line list', async () => {
+    await pickingService.editSlip(1, { items }, MANAGER);
+    expect(repoMock.editSlip).toHaveBeenCalledWith(expect.objectContaining({
+      items: [{ productId: 3, quantity: 5, unit: 'kg' }],
+    }));
+  });
+
+  it('coerces numeric-string productId/quantity off the form', async () => {
+    await pickingService.editSlip(1, { items: [{ productId: '3', quantity: '5.5', unit: 'kg' }] }, MANAGER);
+    expect(repoMock.editSlip).toHaveBeenCalledWith(expect.objectContaining({
+      items: [{ productId: 3, quantity: 5.5, unit: 'kg' }],
+    }));
+  });
+
+  it('rejects an empty line list', async () => {
+    await expectStatus(pickingService.editSlip(1, { items: [] }, MANAGER), 400);
+    expect(repoMock.editSlip).not.toHaveBeenCalled();
+  });
+
+  it('rejects a line with no quantity', async () => {
+    await expectStatus(pickingService.editSlip(1, { items: [{ productId: 3, quantity: 0, unit: 'kg' }] }, MANAGER), 400);
+  });
+
+  it('rejects a line with an invalid product', async () => {
+    await expectStatus(pickingService.editSlip(1, { items: [{ productId: 'abc', quantity: 5, unit: 'kg' }] }, MANAGER), 400);
+  });
+
+  it('rejects the same product appearing twice', async () => {
+    await expectStatus(pickingService.editSlip(1, {
+      items: [{ productId: 3, quantity: 5, unit: 'kg' }, { productId: 3, quantity: 2, unit: 'kg' }],
+    }, MANAGER), 400);
+  });
+
+  it('maps a missing slip to 404', async () => {
+    repoMock.editSlip.mockResolvedValueOnce({ notFound: true });
+    await expectStatus(pickingService.editSlip(1, { items }, MANAGER), 404);
+  });
+
+  it('maps an already-claimed slip to a 409 that says so', async () => {
+    repoMock.editSlip.mockResolvedValueOnce({ locked: true, status: 'in_progress' });
+    await expect(pickingService.editSlip(1, { items }, MANAGER))
+      .rejects.toThrow(/already been claimed/i);
+  });
+
+  it('maps a dispatch-date conflict to 409', async () => {
+    repoMock.editSlip.mockResolvedValueOnce({ dateConflict: true });
+    await expectStatus(pickingService.editSlip(1, { dispatchDate: WEEK1_DATE, cohort: 'week1' }, MANAGER), 409);
   });
 });
 

@@ -149,6 +149,25 @@ const releaseSlip = async (req, res) => {
   }
 };
 
+// ── Edit a pending slip ────────────────────────────────────────────
+// PATCH /api/picking/:id
+// Body: { dispatchDate?, cohort?, force?, items?: [{ productId, quantity, unit }] }
+// Manager only, pending slips only.
+// Returns: the updated slip.
+const editSlip = async (req, res) => {
+  try {
+    const slip = await pickingService.editSlip(req.params.id, req.body, req.user);
+    res.status(200).json({ success: true, data: slip });
+  } catch (err) {
+    console.error('[editSlip]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to update picking slip.',
+    });
+  }
+};
+
 // ── Confirm a line ───────────────────────────────────────────────
 // POST /api/picking/:id/items/:itemId/confirm
 // Body: { packedQuantity }
@@ -230,6 +249,7 @@ export default {
   assignSlip,
   addSecondPacker,
   releaseSlip,
+  editSlip,
   confirmItem,
   flagItem,
   completeSlip,

@@ -26,6 +26,10 @@ router.post('/', auth, requireRole(...MANAGERS_UP),  pickingController.createSli
 
 // ── Single slip ───────────────────────────────────────────────
 router.get('/:id',           auth, requireRole(...ALL_ROLES),  validateIntId, pickingController.getSlipById);
+// Manager only, and only while the slip is still pending (enforced in
+// the service/repository) — dispatch date, cohort, and/or the whole
+// product-line list. See PickingSlipManagementPage.jsx.
+router.patch('/:id',         auth, requireRole(...MANAGERS_UP), validateIntId, pickingController.editSlip);
 router.post('/:id/assign',   auth, requireRole(...PACKERS_UP), validateIntId, pickingController.assignSlip);
 // Manager-only, enforced in the service (matches the pattern of
 // packerId in /assign being manager-effective only) — the route

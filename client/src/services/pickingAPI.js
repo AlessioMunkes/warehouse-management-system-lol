@@ -103,6 +103,20 @@ export async function releaseSlip(slipId) {
   return request(`/${slipId}/release`, { method: 'POST' });
 }
 
+// PATCH /api/picking/:id — manager only, and only while the slip is
+// still pending: dispatch date, cohort, and/or the whole product-line
+// list. `items`, when sent, REPLACES the slip's current lines — send
+// the full edited set, not a delta. See PickingSlipManagementPage.jsx,
+// the only caller.
+export async function editSlip(slipId, { dispatchDate, cohort, force, items } = {}) {
+  const body = {};
+  if (dispatchDate !== undefined) body.dispatchDate = dispatchDate;
+  if (cohort !== undefined)       body.cohort = cohort;
+  if (force !== undefined)        body.force = force;
+  if (items !== undefined)        body.items = items;
+  return request(`/${slipId}`, { method: 'PATCH', body: JSON.stringify(body) });
+}
+
 // POST /api/picking/generate — bulk-generate the week's slips
 // (manager only). Idempotent on the repository side.
 export async function generateSlips({ dispatchDate, cohort }) {

@@ -222,6 +222,57 @@ const releaseSlip = async (slipId, user) => {
   return result.slip;
 };
 
+// ── Edit a pending slip (manager only) ──────────────────────────
+// Dispatch date/cohort and/or the full product-line list. Only
+// reachable while the slip is 'pending' — the repository enforces
+// this inside the row lock, same guard shape as every other mutation
+// here; once it's claimed, a packer may already be looking at it.
+const editSlip = async (slipId, body, user) => {
+  if (!isManager(user)) fail(403, 'Only a manager can edit a picking slip.');
+
+  const { dispatchDate, cohort, items, force } = body;
+
+  if (dispatchDate !== undefined || cohort !== undefined) {
+    if (!dispatchDate || !cohort) fail(400, 'Both dispatch date and cohort are required together.');
+    await validateDispatchDate(dispatchDate, cohort, { allowOverride: force === true });
+  }
+
+  let cleanItems;
+  if (items !== undefined) {
+    if (!Array.isArray(items) || items.length === 0) fail(400, 'A slip needs at least one product line.');
+
+    cleanItems = items.map((line) => {
+      const productId = Number(line.productId);
+      const quantity  = Number(line.quantity);
+      if (!Number.isInteger(productId) || productId <= 0) fail(400, 'Invalid product on the slip.');
+      if (!Number.isFinite(quantity) || quantity <= 0)    fail(400, 'Every line needs a quantity greater than zero.');
+      if (!line.unit)                                     fail(400, 'Every line needs a unit.');
+      return { productId, quantity, unit: line.unit };
+    });
+
+    const seen = new Set();
+    for (const line of cleanItems) {
+      if (seen.has(line.productId)) fail(400, 'The same product appears twice on this slip.');
+      seen.add(line.productId);
+    }
+  }
+
+  const result = await pickingRepository.editSlip({
+    slipId,
+    dispatchDate: dispatchDate || undefined,
+    cohort: cohort || undefined,
+    items: cleanItems,
+    actorId: user.id,
+  });
+
+  if (result.notFound) fail(404, 'Picking slip not found.');
+  if (result.locked) {
+    fail(409, 'This pallet has already been claimed, so its date, cohort, and lines can no longer be edited.');
+  }
+  if (result.dateConflict) fail(409, 'This beneficiary already has a picking slip for that date.');
+  return result.slip;
+};
+
 // ── Confirm a line ────────────────────────────────────────────
 // Returns { ...item, variance } — variance is non-null when the
 // packer confirmed a quantity other than the one the slip asked for.
@@ -308,6 +359,7 @@ export default {
   assignSlip,
   addSecondPacker,
   releaseSlip,
+  editSlip,
   confirmItem,
   flagItem,
   completeSlip,
