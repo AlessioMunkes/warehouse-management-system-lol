@@ -30,12 +30,15 @@ import assistantRouter   from './src/routes/assistant.routes.js';
 import userRouter        from './src/routes/user.routes.js';
 import productRouter     from './src/routes/product.routes.js';
 import dashboardRouter   from './src/routes/dashboard.routes.js';
+import financeRouter     from './src/routes/finance.routes.js';
 import beneficiaryRouter from './src/routes/beneficiary.routes.js';
 import notificationRouter from './src/routes/notification.routes.js';
+import ecdCollectionReminderRouter from './src/routes/ecdCollectionReminder.routes.js';
 import loveActivismRouter   from './src/routes/loveActivism.routes.js';
 import communityRequestRouter from './src/routes/communityRequest.routes.js';
 import gmailRouter from './src/routes/gmail.routes.js';
 import certificateSettingsRouter from './src/routes/certificateSettings.routes.js';
+import { startEmailReminderScheduler } from './src/jobs/ecdCollectionReminder.job.js';
 
 console.log('[server] gmailRouter loaded:', typeof gmailRouter, gmailRouter ? 'OK' : 'UNDEFINED');
 
@@ -151,8 +154,10 @@ app.use('/api/assistant',  assistantRouter);
 app.use('/api/users',      userRouter);
 app.use('/api/products',   productRouter);
 app.use('/api/dashboard',  dashboardRouter);
+app.use('/api/finance',    financeRouter);
 app.use('/api/beneficiaries', beneficiaryRouter);
 app.use('/api/notifications', notificationRouter);
+app.use('/api/collection-reminders', ecdCollectionReminderRouter);
 app.use('/api/love-activism', loveActivismRouter);
 app.use('/api/community-requests', communityRequestRouter);
 app.use('/api/gmail', gmailRouter);
@@ -188,3 +193,7 @@ app.listen(port, () => {
   console.log(`[env] PORT: ${process.env.PORT || 5000}`);
   console.log(`[env] JWT_SECRET exists: ${!!process.env.JWT_SECRET}`);
 });
+
+if (process.env.NODE_ENV !== 'test' && process.env.ECD_REMINDER_SCHEDULER !== 'false') {
+  startEmailReminderScheduler();
+}

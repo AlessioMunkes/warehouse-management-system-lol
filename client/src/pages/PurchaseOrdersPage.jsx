@@ -26,6 +26,7 @@
 // the stock repository, not here.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth }   from '../context/AuthContext';
 import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
 import PurchaseOrderForm   from '../features/purchaseOrders/components/PurchaseOrderForm';
@@ -70,6 +71,7 @@ const ErrorBanner = ({ message, onRetry }) => (
 export default function PurchaseOrdersPage() {
   const { user } = useAuth();
   const canManage = CAN_MANAGE.includes(user?.role);
+  const [searchParams] = useSearchParams();
 
   const [tab, setTab]           = useState('open');
   const [statusFilter, setStatusFilter] = useState('');
@@ -116,6 +118,15 @@ export default function PurchaseOrdersPage() {
     }
   }, [loadPurchaseOrders]);
 
+  const open = useCallback(async (id) => {
+    setError(null);
+    try {
+      const po = await purchaseOrderAPI.getPurchaseOrder(id);
+      setSelected(po);
+      setMode('detail');
+    } catch (err) { setError(err.message); }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     Promise.all([
@@ -138,14 +149,11 @@ export default function PurchaseOrdersPage() {
     return () => { cancelled = true; };
   }, [statusFilter]);
 
-  const open = async (id) => {
-    setError(null);
-    try {
-      const po = await purchaseOrderAPI.getPurchaseOrder(id);
-      setSelected(po);
-      setMode('detail');
-    } catch (err) { setError(err.message); }
-  };
+  useEffect(() => {
+    const id = searchParams.get('id');
+    if (!id || String(selected?.id ?? '') === id) return;
+    open(id);
+  }, [open, searchParams, selected?.id]);
 
   const create = async (payload) => {
     setBusy(true); setFormError(null); setInvalidProductIds([]);

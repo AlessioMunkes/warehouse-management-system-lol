@@ -67,11 +67,11 @@ export async function createDonation(draft) {
 //
 export async function createPendingDonation(draft) {
   const donationCategory = draft.isFood === false ? "non_food" : null;
+  const wantsSection18A = draft.donorConsentGiven === true;
   const payload = {
     donorName: draft.donorName,
     donorContact: draft.donorContact || draft.contactDetails || "",
-    donorConsentGiven: draft.donorConsentGiven === true,
-    estimatedValueZar: Number(draft.estimatedValueZar) || 0,
+    donorConsentGiven: wantsSection18A,
     isFood: draft.isFood,
     donationCategory,
     notes: draft.notes,
@@ -94,6 +94,9 @@ export async function createPendingDonation(draft) {
 
     })),
   };
+  if (wantsSection18A) {
+    payload.estimatedValueZar = Number(draft.estimatedValueZar);
+  }
 
   return apiPost("/api/donations/pending", payload);
 }

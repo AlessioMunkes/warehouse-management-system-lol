@@ -18,6 +18,7 @@ export const toBeneficiary = (row) => ({
   name:              row.name,
   cohort:            row.cohort,
   contactName:       row.contact_name ?? "",
+  mobileNumber:      row.mobile_number ?? "",
   childCount:        row.child_count === null || row.child_count === undefined ? null : Number(row.child_count),
   isActive:          Boolean(row.is_active),
   approvedAt:        row.approved_at ?? null,

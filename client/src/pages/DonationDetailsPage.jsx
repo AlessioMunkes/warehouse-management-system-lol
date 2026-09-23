@@ -126,17 +126,19 @@ export function DonationDetailsPage() {
                   Yes
                 </label>
                 <label className={`donation-intake-option ${draft.donorConsentGiven === false ? "is-chosen" : ""}`}>
-                  <input name="section-18a" type="radio" checked={draft.donorConsentGiven === false} onChange={() => updateDraft({ donorConsentGiven: false })} />
+                  <input name="section-18a" type="radio" checked={draft.donorConsentGiven === false} onChange={() => updateDraft({ donorConsentGiven: false, estimatedValueZar: "" })} />
                   No
                 </label>
               </div>
               {errors.donorConsentGiven && <span className="stf-field-hint donation-intake-error">{errors.donorConsentGiven}</span>}
             </fieldset>
-            <div className="stf-field">
-              <label htmlFor="estimated-value-zar" className="stf-field-label">Estimated Donation Value</label>
-              <input id="estimated-value-zar" className={`stf-input ${errors.value ? "is-flagged" : ""}`} type="number" min="0" value={draft.estimatedValueZar} onChange={(e) => updateDraft({ estimatedValueZar: e.target.value })} aria-invalid={Boolean(errors.value)} />
-              {errors.value && <span className="stf-field-hint donation-intake-error">{errors.value}</span>}
-            </div>
+            {draft.donorConsentGiven === true && (
+              <div className="stf-field">
+                <label htmlFor="estimated-value-zar" className="stf-field-label">Estimated Donation Value</label>
+                <input id="estimated-value-zar" className={`stf-input ${errors.value ? "is-flagged" : ""}`} type="number" min="0" value={draft.estimatedValueZar} onChange={(e) => updateDraft({ estimatedValueZar: e.target.value })} aria-invalid={Boolean(errors.value)} />
+                {errors.value && <span className="stf-field-hint donation-intake-error">{errors.value}</span>}
+              </div>
+            )}
             <fieldset className="stf-field donation-intake-choice" aria-label="Food donation">
               <legend className="stf-field-label">Food?</legend>
               <div className="donation-intake-options">

@@ -76,6 +76,7 @@ const BeneficiaryDetail = ({ beneficiary, canManage, onEdit, onToggleActive, onA
     <CardContent className="space-y-5">
       <dl className="grid gap-3 text-sm sm:grid-cols-2">
         <div><dt className="text-muted-foreground">Contact</dt><dd>{beneficiary.contactName || '—'}</dd></div>
+        <div><dt className="text-muted-foreground">Mobile</dt><dd>{beneficiary.mobileNumber || '—'}</dd></div>
         <div><dt className="text-muted-foreground">Children served</dt><dd>{beneficiary.childCount ?? 'Not recorded'}</dd></div>
         <div><dt className="text-muted-foreground">Approved</dt><dd>{beneficiary.approvedAt ? fmtDate(beneficiary.approvedAt) : 'Not yet approved'}</dd></div>
         <div><dt className="text-muted-foreground">Last collection</dt><dd>{fmtDate(beneficiary.lastCollectedDate)}</dd></div>

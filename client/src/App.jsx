@@ -33,6 +33,7 @@ import ReportingPage                               from './pages/ReportingPage';
 import DonationManagementPage                      from './pages/DonationManagementPage';
 import Section18AManagementPage                    from './pages/Section18AManagementPage';
 import BeneficiaryDirectoryPage                     from './pages/BeneficiaryDirectoryPage';
+import EcdCollectionRemindersPage                  from './pages/EcdCollectionRemindersPage';
 import ImpactReportPage                             from './pages/ImpactReportPage';
 import PickingSlipManagementPage                    from './pages/PickingSlipManagementPage';
 import UserDirectoryPage                            from './pages/UserDirectoryPage';
@@ -42,6 +43,8 @@ import VolunteerEventsPage                        from './pages/VolunteerEventsP
 import VolunteerEventWorkspacePage                from './pages/VolunteerEventWorkspacePage';
 import CommunityRequestsPage                       from './pages/CommunityRequestsPage';
 import GmailSettingsPage                           from './pages/GmailSettingsPage';
+import FinanceWarehouseReportPage                  from './pages/FinanceWarehouseReportPage';
+import PublicFinanceReportPage                     from './pages/PublicFinanceReportPage';
 import Section18AFormPage                         from './pages/Section18AFormPage';
 
 // Donations — new feature, own draft context scoped to just these
@@ -62,6 +65,7 @@ const App = () => (
         <Route path="/"      element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/guest" element={<GuestLoginPage />} />
+        <Route path="/finance/report/:token" element={<PublicFinanceReportPage />} />
         <Route path="/section-18a/:token" element={<Section18AFormPage />} />
         {/* BR-22: the stable public URL behind every pallet's QR code.
             Deliberately OUTSIDE ProtectedRoute — the whole point is that
@@ -94,6 +98,7 @@ const App = () => (
               server routes are requireRole(ADMIN), so it sits in this
               admin-only block rather than the manager/admin one. */}
           <Route path={ADMIN.emailIntegration} element={<GmailSettingsPage />} />
+          <Route path={ADMIN.financeReport} element={<FinanceWarehouseReportPage />} />
           {/* The guest log. Admin-only on purpose: GET /api/volunteers
               is requireRole(MANAGER, ADMIN), so a manager is not
               refused by the server — but the manager's volunteer
@@ -129,6 +134,7 @@ const App = () => (
               cannot drift into a UI that hides a route anyone can still call. */}
           <Route path={STAFF.receipts} element={<ReceiptsPage />} />
           <Route path={STAFF.beneficiaries} element={<BeneficiaryDirectoryPage />} />
+          <Route path={STAFF.collectionReminders} element={<EcdCollectionRemindersPage />} />
           <Route path={STAFF.pickingSlips} element={<PickingSlipManagementPage />} />
         </Route>
 

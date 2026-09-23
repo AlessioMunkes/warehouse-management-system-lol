@@ -90,6 +90,7 @@ export const STAFF = {
   // screen in its own right, so it lives here rather than under
   // ADMIN — a manager reaches both from the same task set.
   beneficiaries: '/noc/beneficiaries',
+  collectionReminders: '/noc/collection-reminders',
   // POST /api/picking (createSlip), POST /api/picking/generate, and
   // assigning a slip to a specific worker (POST /api/picking/:id/assign
   // with a packerId, only honoured for a manager) are all
@@ -160,6 +161,7 @@ export const ADMIN = {
   section18aManagement: '/admin/section-18a',
   users:     '/admin/users',
   products:  '/admin/products',
+  financeReport: '/admin/finance-report',
   emailIntegration: '/admin/email-integration',
   // The guest log — who signed in at the door, when they left, and
   // how long they were on site. Its own admin path rather than a

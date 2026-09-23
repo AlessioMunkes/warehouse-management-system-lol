@@ -79,10 +79,22 @@ describe('Donation phase 1-4 intake', () => {
 
     const payload = JSON.parse(fetch.mock.calls[0][1].body);
     expect(payload.donorConsentGiven).toBe(true);
+    expect(payload.estimatedValueZar).toBe(100);
     expect(payload.donorContact).toBe('jane@example.com');
     expect(payload).not.toHaveProperty('donorTaxReference');
     expect(payload).not.toHaveProperty('donorAddress');
     expect(payload).not.toHaveProperty('donorIdNumber');
+  });
+
+  it('omits estimated value when Section 18A is no', async () => {
+    const fetch = vi.fn(okResponse);
+    vi.stubGlobal('fetch', fetch);
+
+    await createPendingDonation(draft({ donorConsentGiven: false, estimatedValueZar: '100' }));
+
+    const payload = JSON.parse(fetch.mock.calls[0][1].body);
+    expect(payload.donorConsentGiven).toBe(false);
+    expect(payload).not.toHaveProperty('estimatedValueZar');
   });
 
   it('keeps unknown food products pending review', async () => {

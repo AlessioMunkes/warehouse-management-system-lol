@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 //import { TopNavbar } from '../features/taskdashboard/components/TopNavBar';
 import gmailAPI from '../services/gmailAPI';
+import financeAPI from '../services/financeAPI';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,6 +49,9 @@ export default function GmailSettingsPage() {
   const [confirmDisconnectOpen, setConfirmDisconnectOpen] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [savingDisplayName, setSavingDisplayName] = useState(false);
+  const [financeRecipientEmail, setFinanceRecipientEmail] = useState('');
+  const [savingFinanceRecipient, setSavingFinanceRecipient] = useState(false);
+  const [sendingFinanceLink, setSendingFinanceLink] = useState(false);
   const oauthFeedbackShown = useRef(false);
 
   // Initial load. A separate effect refreshes the status after the OAuth
@@ -64,6 +68,12 @@ export default function GmailSettingsPage() {
           // Pre-fill the display name field from the stored value.
           if (nextStatus?.displayName) {
             setDisplayName(nextStatus.displayName);
+          }
+          try {
+            const financeSettings = await financeAPI.getFinanceEmailSettings();
+            if (!cancelled) setFinanceRecipientEmail(financeSettings?.recipientEmail || '');
+          } catch {
+            if (!cancelled) setFeedback({ type: 'error', message: 'Could not load Finance email settings.' });
           }
         }
       } catch (error) {
@@ -157,6 +167,44 @@ export default function GmailSettingsPage() {
       setFeedback({ type: 'error', message: error.message || 'Could not send test email.' });
     } finally {
       setSendingTest(false);
+    }
+  };
+
+  const handleSaveFinanceRecipient = async (event) => {
+    event.preventDefault();
+    setSavingFinanceRecipient(true);
+    setFeedback(null);
+    try {
+      const result = await financeAPI.saveFinanceEmailSettings({
+        recipientEmail: financeRecipientEmail.trim(),
+      });
+      setFinanceRecipientEmail(result?.recipientEmail || financeRecipientEmail.trim());
+      setFeedback({ type: 'success', message: 'Finance recipient saved.' });
+    } catch (error) {
+      setFeedback({ type: 'error', message: error.message || 'Could not save Finance recipient.' });
+    } finally {
+      setSavingFinanceRecipient(false);
+    }
+  };
+
+  const handleSendFinanceReportLink = async () => {
+    if (!financeRecipientEmail.trim()) {
+      setFeedback({
+        type: 'error',
+        message: 'Save a Finance recipient email before sending the report link.',
+      });
+      return;
+    }
+
+    setSendingFinanceLink(true);
+    setFeedback(null);
+    try {
+      await financeAPI.sendFinanceReportLink();
+      setFeedback({ type: 'success', message: 'Finance report link sent.' });
+    } catch (error) {
+      setFeedback({ type: 'error', message: error.message || 'Could not send Finance report link.' });
+    } finally {
+      setSendingFinanceLink(false);
     }
   };
 
@@ -288,6 +336,40 @@ export default function GmailSettingsPage() {
                 {sendingTest ? 'Sending...' : 'Send Test Email'}
               </Button>
             </form>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-lg border border-line shadow-sm">
+          <CardHeader>
+            <CardTitle>Finance Report Link</CardTitle>
+            <CardDescription>
+              Save the Finance recipient and send a secure read-only report link.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <form className="flex flex-col gap-4 sm:flex-row sm:items-end" onSubmit={handleSaveFinanceRecipient}>
+              <div className="flex-1 space-y-2">
+                <Label htmlFor="financeRecipientEmail">Finance recipient email</Label>
+                <Input
+                  id="financeRecipientEmail"
+                  type="email"
+                  value={financeRecipientEmail}
+                  onChange={(event) => setFinanceRecipientEmail(event.target.value)}
+                  placeholder="finance@example.org"
+                  required
+                />
+              </div>
+              <Button type="submit" variant="secondary" disabled={savingFinanceRecipient || !financeRecipientEmail.trim()}>
+                {savingFinanceRecipient ? 'Saving...' : 'Save Finance Recipient'}
+              </Button>
+            </form>
+            <Button
+              type="button"
+              onClick={handleSendFinanceReportLink}
+              disabled={sendingFinanceLink || !connected}
+            >
+              {sendingFinanceLink ? 'Sending...' : 'Send Finance Report Link'}
+            </Button>
           </CardContent>
         </Card>
       </div>

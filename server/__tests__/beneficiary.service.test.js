@@ -27,12 +27,12 @@ const BENEFICIARY_ID = 6;
 
 const existingBeneficiary = (over = {}) => ({
   id: BENEFICIARY_ID, name: 'Sunnyside ECD', cohort: 'week1',
-  contact_name: 'Jane Doe', child_count: 40,
+  contact_name: 'Jane Doe', mobile_number: null, child_count: 40,
   is_active: true, approved_at: null, last_collected_date: null, ...over,
 });
 
 const body = (over = {}) => ({
-  name: 'Sunnyside ECD', cohort: 'week1', contactName: 'Jane Doe', childCount: 40, ...over,
+  name: 'Sunnyside ECD', cohort: 'week1', contactName: 'Jane Doe', mobileNumber: '+27 82 123 4567', childCount: 40, ...over,
 });
 
 beforeEach(() => {
@@ -91,6 +91,16 @@ describe('createBeneficiary — validation', () => {
     expect(repoMock.insertBeneficiary).toHaveBeenCalledWith(expect.objectContaining({ childCount: null }));
   });
 
+  it('accepts a blank mobile number as null', async () => {
+    await beneficiaryService.createBeneficiary(body({ mobileNumber: '  ' }));
+    expect(repoMock.insertBeneficiary).toHaveBeenCalledWith(expect.objectContaining({ mobileNumber: null }));
+  });
+
+  it('rejects an invalid mobile number', async () => {
+    await expect(beneficiaryService.createBeneficiary(body({ mobileNumber: 'call me maybe' })))
+      .rejects.toMatchObject({ status: 400 });
+  });
+
   it('409s on a name clash', async () => {
     repoMock.findByName.mockResolvedValue(existingBeneficiary());
     await expect(beneficiaryService.createBeneficiary(body())).rejects.toMatchObject({ status: 409 });
@@ -119,6 +129,18 @@ describe('updateBeneficiary — partial patch semantics', () => {
     await beneficiaryService.updateBeneficiary(BENEFICIARY_ID, { contactName: 'New Contact' });
     const patch = repoMock.updateBeneficiary.mock.calls[0][1];
     expect(patch).toEqual({ contactName: 'New Contact' });
+  });
+
+  it('allows updating the mobile number independently', async () => {
+    await beneficiaryService.updateBeneficiary(BENEFICIARY_ID, { mobileNumber: '082 123 4567' });
+    const patch = repoMock.updateBeneficiary.mock.calls[0][1];
+    expect(patch).toEqual({ mobileNumber: '082 123 4567' });
+  });
+
+  it('allows clearing the mobile number', async () => {
+    await beneficiaryService.updateBeneficiary(BENEFICIARY_ID, { mobileNumber: '' });
+    const patch = repoMock.updateBeneficiary.mock.calls[0][1];
+    expect(patch).toEqual({ mobileNumber: null });
   });
 
   it('409s when renaming into a name someone else already has', async () => {
