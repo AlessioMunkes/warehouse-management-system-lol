@@ -2,7 +2,7 @@
 // client/src/tests/PackingSpareSlips.test.jsx
 //
 // Spare slips are what "Assigned to floor" shows — the tab a worker
-// lands on, ahead of their own "Assigned to me" — rendered as the same
+// lands on, ahead of their own "Claimed by me" — rendered as the same
 // stacked list "mine" and "done" use, scoped to today via dispatchDate
 // (a slip scheduled for another day is not "available on the floor"
 // yet), with a Claim button on every row instead of a status badge.
@@ -65,7 +65,7 @@ describe('StaffSlipList — spare slips', () => {
     expect(screen.getByRole('button', { name: /^Claim$/i })).toBeInTheDocument();
   });
 
-  it('claims a pallet and switches to "Assigned to me"', async () => {
+  it('claims a pallet and switches to "Claimed by me"', async () => {
     const user = userEvent.setup();
     render(<StaffSlipList onOpenSlip={vi.fn()} />);
     await waitFor(() => expect(pickingAPI.fetchPickingSlips).toHaveBeenCalled());
@@ -81,7 +81,7 @@ describe('StaffSlipList — spare slips', () => {
 
     await waitFor(() => expect(pickingAPI.assignSlip).toHaveBeenCalledWith(TODAY_SPARE.id));
     await waitFor(() =>
-      expect(screen.getByRole('tab', { name: /Assigned to me/i })).toHaveAttribute('aria-selected', 'true')
+      expect(screen.getByRole('tab', { name: /Claimed by me/i })).toHaveAttribute('aria-selected', 'true')
     );
 
     await user.click(screen.getByRole('tab', { name: /Assigned to floor/i }));

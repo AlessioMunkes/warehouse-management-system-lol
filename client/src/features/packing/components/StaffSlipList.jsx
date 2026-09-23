@@ -2,11 +2,11 @@
 // client/src/features/packing/components/StaffSlipList.jsx
 //
 // The packer's own board: what's on the floor waiting to be claimed,
-// what's already assigned to me, and what's already done. Opens on
-// "Assigned to floor" — a worker wants to see what's available to pick
-// up before they see what they've already got — not the whole
-// warehouse queue; the manager's board (PackingBoard.jsx, still at
-// /noc/packing) is where every filter and every slip lives.
+// what this worker has already claimed, and what's already done.
+// Opens on "Assigned to floor" — a worker wants to see what's
+// available to pick up before they see what they've already got —
+// not the whole warehouse queue; the manager's board (PackingBoard.jsx,
+// still at /noc/packing) is where every filter and every slip lives.
 //
 // "Spare" has no dedicated query param on the API — a slip is spare
 // simply because assigned_to is null — so it's a second fetch,
@@ -55,13 +55,14 @@ function badgeFor(slip) {
   return { className: 'stf-badge', label: 'Pending' };
 }
 
-// "Assigned to floor" first, not "Assigned to me" — a worker opening
+// Floor, then claimed, then done — the three states a pallet actually
+// moves through. "Assigned to floor" comes first: a worker opening
 // Packing wants to see what's available to pick up before they see
-// what they've already got. Same 'spare' key/data as before, this is
-// only the label and its position that moved.
+// what they've already got. Same 'spare'/'mine' keys and data as
+// before, only the labels and the order changed.
 const TABS = [
   { key: 'spare', label: 'Assigned to floor' },
-  { key: 'mine', label: 'Assigned to me' },
+  { key: 'mine', label: 'Claimed by me' },
   { key: 'done', label: 'Done' },
 ];
 
@@ -161,7 +162,7 @@ export default function StaffSlipList({ onOpenSlip }) {
         <div className="stf-skeleton" aria-label="Loading" />
       ) : rows.length === 0 ? (
         <div className="stf-empty">
-          {tab === 'mine' && 'Nothing assigned to you yet. Claim one from Assigned to floor, or wait for your manager to assign one.'}
+          {tab === 'mine' && "You haven't claimed anything yet. Claim one from Assigned to floor, or wait for your manager to assign one."}
           {tab === 'spare' && 'Nothing on the floor right now. Check back once your manager assigns the next batch.'}
           {tab === 'done' && 'Nothing finished yet today. Completed and collected pallets will show up here.'}
         </div>
