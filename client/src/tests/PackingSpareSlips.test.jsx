@@ -1,17 +1,15 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/tests/PackingSpareSlips.test.jsx
 //
-// Spare slips used to render as the same stacked list "mine" and
-// "done" use, unscoped by date, with a "Claim pallet" button on every
-// row. Two things changed: it's now a single dropdown (role
-// "combobox") plus one claim button, and the spare fetch is scoped to
-// today via dispatchDate — a slip scheduled for another day is not
-// "available on the floor" yet. Claiming drops the slip out of the
+// Spare slips render as the same stacked list "mine" and "done" use,
+// scoped to today via dispatchDate — a slip scheduled for another day
+// is not "available on the floor" yet — with a Claim button on every
+// row instead of a status badge. Claiming drops the slip out of the
 // spare pool for everyone (proven here by a reload that stops
 // returning it), matching the sponsor's exclusivity request.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('../services/pickingAPI', () => ({
@@ -56,26 +54,24 @@ describe('StaffSlipList — spare slips', () => {
     expect(calls).toContainEqual({ dispatchDate: todayISO() });
   });
 
-  it('renders spare pallets as a dropdown, not a stacked list of claim buttons', async () => {
+  it('renders each spare pallet as its own row with a Claim button', async () => {
     const user = userEvent.setup();
     render(<StaffSlipList onOpenSlip={vi.fn()} />);
     await waitFor(() => expect(pickingAPI.fetchPickingSlips).toHaveBeenCalled());
 
     await user.click(await screen.findByRole('tab', { name: /Spare slips/i }));
 
-    const select = await screen.findByRole('combobox', { name: /Choose a spare pallet/i });
-    expect(within(select).getByRole('option', { name: /Rainbow ECD/i })).toBeInTheDocument();
-    expect(screen.queryAllByRole('button', { name: /Claim pallet/i })).toHaveLength(1);
+    expect(await screen.findByText(/Rainbow ECD/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Claim$/i })).toBeInTheDocument();
   });
 
-  it('claims the selected pallet and switches to "Assigned to me"', async () => {
+  it('claims a pallet and switches to "Assigned to me"', async () => {
     const user = userEvent.setup();
     render(<StaffSlipList onOpenSlip={vi.fn()} />);
     await waitFor(() => expect(pickingAPI.fetchPickingSlips).toHaveBeenCalled());
 
     await user.click(await screen.findByRole('tab', { name: /Spare slips/i }));
-    const select = await screen.findByRole('combobox', { name: /Choose a spare pallet/i });
-    await user.selectOptions(select, String(TODAY_SPARE.id));
+    await screen.findByText(/Rainbow ECD/i);
 
     // A claimed slip stops coming back from the "spare" fetch — the
     // exclusivity the sponsor asked for, proven at the data layer.
@@ -83,7 +79,7 @@ describe('StaffSlipList — spare slips', () => {
       mine ? [MINE_SLIP, { ...TODAY_SPARE, assigned_to: 7 }] : []
     );
 
-    await user.click(screen.getByRole('button', { name: /Claim pallet/i }));
+    await user.click(screen.getByRole('button', { name: /^Claim$/i }));
 
     await waitFor(() => expect(pickingAPI.assignSlip).toHaveBeenCalledWith(TODAY_SPARE.id));
     await waitFor(() =>
@@ -92,16 +88,5 @@ describe('StaffSlipList — spare slips', () => {
 
     await user.click(screen.getByRole('tab', { name: /Spare slips/i }));
     expect(screen.getByText(/No spare pallets for today/i)).toBeInTheDocument();
-  });
-
-  it('disables claiming until a pallet is selected', async () => {
-    const user = userEvent.setup();
-    render(<StaffSlipList onOpenSlip={vi.fn()} />);
-    await waitFor(() => expect(pickingAPI.fetchPickingSlips).toHaveBeenCalled());
-
-    await user.click(await screen.findByRole('tab', { name: /Spare slips/i }));
-    await screen.findByRole('combobox', { name: /Choose a spare pallet/i });
-
-    expect(screen.getByRole('button', { name: /Claim pallet/i })).toBeDisabled();
   });
 });

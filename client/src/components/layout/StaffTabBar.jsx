@@ -50,7 +50,11 @@ const TABS = [
 const isCurrent = (pathname, to) =>
   pathname === to || pathname.startsWith(`${to}/`);
 
-export default function StaffTabBar() {
+// packingBadge is the count of spare (unclaimed) pallets sitting on
+// the floor right now — see useSpareSlipAlert. Only Packing carries
+// one today; nothing else on this bar has a "new work waiting" state
+// to show, so this stays a plain prop rather than a per-tab lookup.
+export default function StaffTabBar({ packingBadge = 0 }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
@@ -58,6 +62,7 @@ export default function StaffTabBar() {
     <nav className="stf-tabbar" aria-label="Warehouse tasks">
       {TABS.map((tab) => {
         const current = isCurrent(pathname, tab.to);
+        const hasBadge = tab.to === STAFF.packing && packingBadge > 0;
         return (
           <button
             key={tab.to}
@@ -66,21 +71,25 @@ export default function StaffTabBar() {
             // aria-current is what a screen reader announces; the
             // border on .is-current is only visible to sighted users.
             aria-current={current ? 'page' : undefined}
+            aria-label={hasBadge ? `${tab.label}, ${packingBadge} new` : undefined}
             onClick={() => navigate(tab.to)}
           >
-            {tab.icon ? (
-              <img
-                className="stf-tab-icon"
-                src={`/icons/${tab.icon}.${ICON_EXT}`}
-                alt=""
-                aria-hidden="true"
-                onError={(e) => { e.currentTarget.style.display = 'none'; }}
-              />
-            ) : (
-              <span className="stf-tab-glyph" aria-hidden="true">
-                <i className={tab.glyph} />
-              </span>
-            )}
+            <span className="stf-tab-icon-wrap">
+              {tab.icon ? (
+                <img
+                  className="stf-tab-icon"
+                  src={`/icons/${tab.icon}.${ICON_EXT}`}
+                  alt=""
+                  aria-hidden="true"
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                />
+              ) : (
+                <span className="stf-tab-glyph" aria-hidden="true">
+                  <i className={tab.glyph} />
+                </span>
+              )}
+              {hasBadge ? <span className="stf-tab-badge" aria-hidden="true" /> : null}
+            </span>
             <span>{tab.label}</span>
           </button>
         );
