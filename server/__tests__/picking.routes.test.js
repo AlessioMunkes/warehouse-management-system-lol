@@ -21,6 +21,7 @@ const serviceMock = {
   generateSlips:        vi.fn(),
   createSlip:           vi.fn(),
   assignSlip:           vi.fn(),
+  releaseSlip:          vi.fn(),
   confirmItem:          vi.fn(),
   flagItem:             vi.fn(),
   completeSlip:         vi.fn(),
@@ -63,6 +64,7 @@ beforeEach(() => {
   serviceMock.generateSlips.mockResolvedValue({ created: 12 });
   serviceMock.createSlip.mockResolvedValue({ slipId: 99, itemCount: 7 });
   serviceMock.assignSlip.mockResolvedValue(SLIP);
+  serviceMock.releaseSlip.mockResolvedValue(SLIP);
   serviceMock.confirmItem.mockResolvedValue(ITEM);
   serviceMock.flagItem.mockResolvedValue(ITEM);
   serviceMock.completeSlip.mockResolvedValue(SLIP);
@@ -75,6 +77,7 @@ const endpoints = [
   ['post', `${BASE}/generate`],
   ['get',  `${BASE}/1`],
   ['post', `${BASE}/1/assign`],
+  ['post', `${BASE}/1/release`],
   ['post', `${BASE}/1/complete`],
   ['post', `${BASE}/1/items/5/confirm`],
   ['post', `${BASE}/1/items/5/flag`],
@@ -394,6 +397,38 @@ describe('regressions — previously known defects', () => {
       .set('Cookie', cookieFor(ROLES.WORKER)).send({ packedQuantity: 3 });
 
     expect(serviceMock.confirmItem).toHaveBeenCalledWith(1, 5, expect.anything(), expect.anything());
+  });
+});
+
+// ── POST /:id/release — manager-only, returns a slip to the floor ──
+describe('picking routes — /:id/release', () => {
+  it.each(MANAGERS_UP)('%s can release a slip', async (role) => {
+    const res = await request(app).post(`${BASE}/1/release`)
+      .set('Cookie', cookieFor(role)).send({});
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, data: SLIP });
+  });
+
+  it.each([ROLES.WORKER, 'finance'])('%s cannot release a slip', async (role) => {
+    const res = await request(app).post(`${BASE}/1/release`)
+      .set('Cookie', cookieFor(role)).send({});
+    expect(res.status).toBe(403);
+    expect(serviceMock.releaseSlip).not.toHaveBeenCalled();
+  });
+
+  it.each(['abc', '0', '-1'])('rejects id "%s" with a 400', async (id) => {
+    const res = await request(app).post(`${BASE}/${id}/release`)
+      .set('Cookie', cookieFor(ROLES.MANAGER)).send({});
+    expect(res.status).toBe(400);
+    expect(serviceMock.releaseSlip).not.toHaveBeenCalled();
+  });
+
+  it('masks a raw failure with a generic message', async () => {
+    serviceMock.releaseSlip.mockRejectedValueOnce(new Error('relation "picking_slips" does not exist'));
+    const res = await request(app).post(`${BASE}/1/release`)
+      .set('Cookie', cookieFor(ROLES.MANAGER)).send({});
+    expect(res.status).toBe(500);
+    expect(res.body.message).toBe('Failed to release picking slip.');
   });
 });
 

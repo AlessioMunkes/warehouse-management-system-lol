@@ -9,26 +9,32 @@
 //
 // Quick actions are ordered by how often a manager actually reaches
 // for them: generating the week's slips is the recurring weekly job;
-// an ad-hoc slip is the exception (a late registration, a correction,
-// a make-up delivery). Assigning a slip to a worker is not a third
-// quick action or a separate page — it happens inline, on the slip
-// itself, once you've opened it: that is where "who is this for"
-// actually gets decided, not a form competing for space up top.
+// creating a new slip is the exception (a late registration, a
+// correction, a make-up delivery).
+//
+// THERE IS NO "PICK A WORKER" CONTROL. A manager doesn't decide who
+// packs a pallet — a slip is either on the floor (unclaimed, status
+// 'pending') or claimed by whoever tapped it first. The only lever a
+// manager has, on the slip itself once it's open, is releasing a
+// claimed pallet back to the floor (releaseSlip) — a shift ends,
+// someone goes home sick, the wrong pallet got tapped. That is the
+// one assignment-related action this page offers.
 //
 // "Edit an existing slip" is NOT a button here on purpose: nothing in
 // picking.service.js supports rewriting a slip's lines or metadata
-// after creation — confirmItem/flagItem/completeSlip during packing
-// and assignSlip for who holds it are the only mutations that exist.
-// Listing + opening a slip to see its current state is what this
-// page offers instead; a real "edit" would need new backend support
-// first, not a client-side button pointed at nothing.
+// after creation — confirmItem/flagItem/completeSlip during packing,
+// and releaseSlip for returning a claim to the floor, are the only
+// mutations that exist. Listing + opening a slip to see its current
+// state is what this page offers instead; a real "edit" would need
+// new backend support first, not a client-side button pointed at
+// nothing.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
 import ManagerLayout   from '../features/taskdashboard/components/ManagerLayout';
 import beneficiaryAPI from '../services/beneficiaryAPI';
 import {
   fetchPickingSlips, fetchPickingSlip, fetchAssignableWorkers,
-  generateSlips, createSlip, assignSlip, addSecondPacker,
+  generateSlips, createSlip, releaseSlip, addSecondPacker,
 } from '../services/pickingAPI';
 
 import {
@@ -58,6 +64,19 @@ const COHORT_OPTIONS = [
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
+// Human wording for the two things a manager actually needs to know
+// at a glance: is this on the floor, or does someone already have it.
+// Anything past that (complete/dispatched/cancelled) reads as itself —
+// there's no "who holds it" question left to answer by then.
+const statusLabel = (slip) => {
+  if (slip.status === 'pending') return 'Assigned to floor';
+  if (slip.status === 'in_progress') return `Claimed by ${slip.packer_name || 'a worker'}`;
+  if (slip.status === 'complete') return 'Complete';
+  if (slip.status === 'collected' || slip.status === 'dispatched') return 'Dispatched';
+  if (slip.status === 'cancelled') return 'Cancelled';
+  return slip.status;
+};
+
 const ErrorBanner = ({ message }) => (
   <div className="p-4 rounded-[4px] bg-[#fff4f2] border-2 border-[#ef3a40] text-[#2b3336] text-sm">
     {message}
@@ -71,18 +90,16 @@ const SuccessBanner = ({ message }) => (
 );
 
 // ── Detail panel ──────────────────────────────────────────────
-// Assignment happens right here, not on a separate page — a manager
-// opens a slip because they're already thinking about it, and "who
-// is this for" is the same decision as "what is this slip." Only
-// shown while the slip is still pending (unclaimed); once someone
-// holds it, reassigning is a manager-override case picking.service.js
-// doesn't distinguish from a first assignment, so the same control
-// would still work, but a slip in progress or beyond is read-only
-// here on purpose — this page is for organising the queue, not
-// pulling work out from under whoever already started it.
+// Status IS the assignment state now — see statusLabel above — so
+// there's no separate "Assigned to" field to keep in sync with it.
+// The only assignment-related action here is releasing an in-progress
+// slip back to the floor: pending/unclaimed already means "on the
+// floor," nothing to do; complete/dispatched/cancelled is read-only,
+// this page is for organising the queue, not pulling work out from
+// under whoever already finished it.
 const SlipDetail = ({
-  slip, workers, assignChoice, onAssignChoice, onAssign, assigning,
-  secondChoice, onSecondChoice, onAddSecond, addingSecond, onClose,
+  slip, releasing, onRelease,
+  workers, secondChoice, onSecondChoice, onAddSecond, addingSecond, onClose,
 }) => (
   <Card>
     <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
@@ -98,25 +115,15 @@ const SlipDetail = ({
     </CardHeader>
     <CardContent className="space-y-4">
       <dl className="grid gap-3 text-sm sm:grid-cols-2">
-        <div><dt className="text-muted-foreground">Status</dt><dd><Badge variant="outline">{slip.status}</Badge></dd></div>
         <div>
-          <dt className="text-muted-foreground">Assigned to</dt>
-          <dd>
-            {slip.status === 'pending' ? (
-              <div className="mt-1 flex items-center gap-2">
-                <Select value={assignChoice || undefined} onValueChange={onAssignChoice}>
-                  <SelectTrigger className="w-40"><SelectValue placeholder="Select a worker" /></SelectTrigger>
-                  <SelectContent>
-                    {workers.map((w) => (
-                      <SelectItem key={w.id} value={String(w.id)}>{w.first_name} {w.last_name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button type="button" size="sm" disabled={!assignChoice || assigning} onClick={onAssign}>
-                  {assigning ? 'Assigning' : 'Assign'}
-                </Button>
-              </div>
-            ) : (slip.packer_name || 'Unassigned')}
+          <dt className="text-muted-foreground">Status</dt>
+          <dd className="flex items-center gap-2">
+            <Badge variant="outline">{statusLabel(slip)}</Badge>
+            {slip.status === 'in_progress' ? (
+              <Button type="button" size="sm" variant="outline" disabled={releasing} onClick={onRelease}>
+                {releasing ? 'Assigning…' : 'Assign to floor'}
+              </Button>
+            ) : null}
           </dd>
         </div>
         {/* Only meaningful once a primary holds the slip — a second
@@ -188,8 +195,7 @@ export default function PickingSlipManagementPage() {
   const [search, setSearch] = useState('');
   const [slips, setSlips] = useState([]);
   const [selected, setSelected] = useState(null);
-  const [assignChoice, setAssignChoice] = useState('');
-  const [assigning, setAssigning] = useState(false);
+  const [releasing, setReleasing] = useState(false);
   const [secondChoice, setSecondChoice] = useState('');
   const [addingSecond, setAddingSecond] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -233,21 +239,20 @@ export default function PickingSlipManagementPage() {
 
   const openSlip = async (slipId) => {
     setError(null);
-    setAssignChoice('');
     setSecondChoice('');
     try {
       setSelected(await fetchPickingSlip(slipId));
     } catch (err) { setError(err.message); }
   };
 
-  const assign = async () => {
-    if (!assignChoice || !selected) return;
-    setAssigning(true); setError(null);
+  const release = async () => {
+    if (!selected) return;
+    setReleasing(true); setError(null);
     try {
-      await assignSlip(selected.id, Number(assignChoice));
+      await releaseSlip(selected.id);
       await loadSlips();
       await openSlip(selected.id);
-    } catch (err) { setError(err.message); } finally { setAssigning(false); }
+    } catch (err) { setError(err.message); } finally { setReleasing(false); }
   };
 
   const addSecond = async () => {
@@ -298,7 +303,7 @@ export default function PickingSlipManagementPage() {
             </Button>
             <Button type="button" variant="outline" onClick={() => { setMode('create'); setAdHocError(null); }}>
               <PackagePlus />
-              Create an ad-hoc slip
+              Create a new slip
             </Button>
           </div>
         ) : null}
@@ -368,7 +373,7 @@ export default function PickingSlipManagementPage() {
 
         {mode === 'create' ? (
           <Card className="mt-4">
-            <CardHeader><CardTitle>Create an ad-hoc slip</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Create a new slip</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
                 For a late registration, a correction, or a make-up delivery outside a
@@ -466,11 +471,9 @@ export default function PickingSlipManagementPage() {
                 {selected ? (
                   <SlipDetail
                     slip={selected}
+                    releasing={releasing}
+                    onRelease={release}
                     workers={workers}
-                    assignChoice={assignChoice}
-                    onAssignChoice={setAssignChoice}
-                    onAssign={assign}
-                    assigning={assigning}
                     secondChoice={secondChoice}
                     onSecondChoice={setSecondChoice}
                     onAddSecond={addSecond}
@@ -489,7 +492,6 @@ export default function PickingSlipManagementPage() {
                           <TableRow>
                             <TableHead>Beneficiary</TableHead>
                             <TableHead>Cohort</TableHead>
-                            <TableHead>Assigned to</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Items</TableHead>
                           </TableRow>
@@ -501,8 +503,7 @@ export default function PickingSlipManagementPage() {
                               <TableCell className="text-muted-foreground">
                                 {slip.cohort === 'week1' ? 'Week 1' : 'Week 2'}
                               </TableCell>
-                              <TableCell className="text-muted-foreground">{slip.packer_name || 'Unassigned'}</TableCell>
-                              <TableCell><Badge variant="outline">{slip.status}</Badge></TableCell>
+                              <TableCell><Badge variant="outline">{statusLabel(slip)}</Badge></TableCell>
                               <TableCell className="text-muted-foreground">
                                 {slip.confirmed_items}/{slip.total_items}
                               </TableCell>

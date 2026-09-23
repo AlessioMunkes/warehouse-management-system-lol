@@ -378,3 +378,81 @@ describe('addSecondPacker', () => {
     expect(sql(client)[1]).toMatch(/FOR UPDATE/i);
   });
 });
+
+// ── releaseSlip ───────────────────────────────────────────────
+// The other half of assignSlip: clears both packer slots and returns
+// the slip to 'pending'. Same fake-client technique, proving the
+// UPDATE only fires from 'in_progress' and never touches a pallet
+// that isn't actually claimed.
+const releaseClient = (slip) => {
+  const calls = [];
+  return {
+    calls,
+    release: vi.fn(),
+    query: vi.fn(async (sql) => {
+      calls.push(sql.replace(/\s+/g, ' ').trim());
+      if (/SELECT id, status, assigned_to.*FROM picking_slips/i.test(sql)) {
+        return { rows: slip ? [slip] : [] };
+      }
+      if (/UPDATE picking_slips SET assigned_to = NULL/i.test(sql)) {
+        return { rows: [{ id: 1, status: 'pending', assigned_to: null, assigned_to_2: null }] };
+      }
+      return { rows: [], rowCount: 1 };
+    }),
+  };
+};
+
+const release = (client, over = {}) => {
+  poolMock.connect.mockResolvedValueOnce(client);
+  return pickingRepository.releaseSlip({ slipId: 1, actorId: OWNER, ...over });
+};
+
+const released = (c) => c.calls.some((s) => /^UPDATE picking_slips SET assigned_to = NULL/i.test(s));
+
+describe('releaseSlip', () => {
+  it('clears both packer slots and returns the slip to pending', async () => {
+    const client = releaseClient({ id: 1, status: 'in_progress', assigned_to: OWNER });
+    const result = await release(client);
+    expect(result.slip).toMatchObject({ status: 'pending', assigned_to: null, assigned_to_2: null });
+    expect(released(client)).toBe(true);
+    expect(client.calls).toContain('COMMIT');
+  });
+
+  it('refuses a pallet that is not currently claimed', async () => {
+    const client = releaseClient({ id: 1, status: 'pending', assigned_to: null });
+    const result = await release(client);
+    expect(result).toMatchObject({ notClaimed: true, status: 'pending' });
+    expect(released(client)).toBe(false);
+    expect(client.calls).toContain('ROLLBACK');
+  });
+
+  it.each(['complete', 'dispatched', 'cancelled'])(
+    'refuses a %s pallet, same as an unclaimed one',
+    async (status) => {
+      const client = releaseClient({ id: 1, status, assigned_to: OWNER });
+      const result = await release(client);
+      expect(result).toMatchObject({ notClaimed: true, status });
+      expect(released(client)).toBe(false);
+    }
+  );
+
+  it('returns notFound for a slip that does not exist', async () => {
+    const client = releaseClient(null);
+    expect(await release(client)).toMatchObject({ notFound: true });
+    expect(released(client)).toBe(false);
+  });
+
+  it('locks the row before deciding anything', async () => {
+    const client = releaseClient({ id: 1, status: 'in_progress', assigned_to: OWNER });
+    await release(client);
+    expect(sql(client)[1]).toMatch(/FOR UPDATE/i);
+  });
+
+  it('logs the release as an "assigned" event with a null packer_id, not a new event type', async () => {
+    const client = releaseClient({ id: 1, status: 'in_progress', assigned_to: OWNER });
+    await release(client);
+    const event = client.query.mock.calls.find(([s]) => /INSERT INTO picking_events/i.test(s));
+    expect(event[1][1]).toBe('assigned');
+    expect(event[1][3]).toMatchObject({ packer_id: null, released_from: OWNER });
+  });
+});

@@ -22,7 +22,7 @@ router.get('/workers',   auth, requireRole(...MANAGERS_UP), pickingController.ge
 
 // ── Collection ────────────────────────────────────────────────
 router.get('/',  auth, requireRole(...ALL_ROLES),    pickingController.getSlips);
-router.post('/', auth, requireRole(...MANAGERS_UP),  pickingController.createSlip); // ad-hoc slip, manager only — same reasoning as /generate above
+router.post('/', auth, requireRole(...MANAGERS_UP),  pickingController.createSlip); // "Create a new slip", manager only — same reasoning as /generate above
 
 // ── Single slip ───────────────────────────────────────────────
 router.get('/:id',           auth, requireRole(...ALL_ROLES),  validateIntId, pickingController.getSlipById);
@@ -32,6 +32,10 @@ router.post('/:id/assign',   auth, requireRole(...PACKERS_UP), validateIntId, pi
 // itself stays PACKERS_UP so a non-manager gets the service's own
 // 403 message rather than a generic route-level one.
 router.post('/:id/assign-second', auth, requireRole(...PACKERS_UP), validateIntId, pickingController.addSecondPacker);
+// Manager-only, gated at the route since there's no packer-effective
+// fallback here the way /assign has — releasing is a floor-management
+// call, not something a packer ever does to their own claim.
+router.post('/:id/release',  auth, requireRole(...MANAGERS_UP), validateIntId, pickingController.releaseSlip);
 router.post('/:id/complete', auth, requireRole(...PACKERS_UP), validateIntId, pickingController.completeSlip);
 
 // ── Slip items ────────────────────────────────────────────────

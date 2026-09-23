@@ -73,10 +73,11 @@ export async function fetchPickingSlip(slipId) {
 
 // POST /api/picking/:id/assign — claim a slip. A packer calling this
 // with no packerId claims for themselves (packerId is ignored for
-// them server-side either way). A manager may pass packerId to
-// assign a slip to a specific worker — see AssignPickingSlipsPage.jsx,
-// the first caller that actually uses this for someone other than
-// the current user.
+// them server-side either way). The service still honours a manager
+// passing packerId to assign someone specific, but no UI calls it
+// that way any more — PickingSlipManagementPage.jsx now only ever
+// releases a slip back to the floor (see releaseSlip below), not
+// hand-picks who claims it.
 export async function assignSlip(slipId, packerId) {
   return request(`/${slipId}/assign`, {
     method: 'POST',
@@ -94,6 +95,14 @@ export async function addSecondPacker(slipId, packerId) {
   });
 }
 
+// POST /api/picking/:id/release — manager only. Returns a claimed
+// slip to the floor: clears both packer slots and sets status back to
+// 'pending'. The only way to undo assignSlip's claim — see
+// PickingSlipManagementPage.jsx, the only caller.
+export async function releaseSlip(slipId) {
+  return request(`/${slipId}/release`, { method: 'POST' });
+}
+
 // POST /api/picking/generate — bulk-generate the week's slips
 // (manager only). Idempotent on the repository side.
 export async function generateSlips({ dispatchDate, cohort }) {
@@ -103,7 +112,7 @@ export async function generateSlips({ dispatchDate, cohort }) {
   });
 }
 
-// POST /api/picking — create one ad-hoc slip for a single beneficiary
+// POST /api/picking — create one new slip for a single beneficiary
 // (manager only): a late-registered centre, a correction, or a
 // make-up delivery outside its normal rotation. `force` overrides
 // the cohort-schedule check for a deliberate make-up run.

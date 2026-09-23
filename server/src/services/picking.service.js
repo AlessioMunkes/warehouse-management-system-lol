@@ -92,7 +92,7 @@ const validateDispatchDate = async (dispatchDate, cohort, { allowOverride = fals
     if (active !== cohort && !allowOverride) {
       fail(400,
         `${cohortLabel(cohort)} is not the scheduled rotation for ${dispatchDate} ` +
-        `(${cohortLabel(active)} is). If this is a deliberate make-up delivery, use the ad-hoc slip creator with the override option.`
+        `(${cohortLabel(active)} is). If this is a deliberate make-up delivery, use "Create a new slip" with the override option.`
       );
     }
   }
@@ -206,6 +206,22 @@ const addSecondPacker = async (slipId, body, user) => {
   return result.slip;
 };
 
+// ── Release a slip back to the floor (manager only) ────────────
+// The other half of assignSlip: there was no way to get assigned_to
+// back to NULL once a claim had been made. This replaces the old
+// "pick a specific worker" control — the manager's real lever is
+// releasing a pallet back to the floor for whoever picks it up next,
+// not naming who that has to be.
+const releaseSlip = async (slipId, user) => {
+  if (!isManager(user)) fail(403, 'Only a manager can release a pallet back to the floor.');
+
+  const result = await pickingRepository.releaseSlip({ slipId, actorId: user.id });
+
+  if (result.notFound) fail(404, 'Picking slip not found.');
+  if (result.notClaimed) fail(409, 'This pallet is not currently claimed by anyone.');
+  return result.slip;
+};
+
 // ── Confirm a line ────────────────────────────────────────────
 // Returns { ...item, variance } — variance is non-null when the
 // packer confirmed a quantity other than the one the slip asked for.
@@ -291,6 +307,7 @@ export default {
   createSlip,
   assignSlip,
   addSecondPacker,
+  releaseSlip,
   confirmItem,
   flagItem,
   completeSlip,
