@@ -40,6 +40,32 @@ export const markAllNotificationsRead = async () => {
   await apiPost("/api/notifications/read-all", {});
 };
 
+// ── Floor (worker-facing) ─────────────────────────────────────
+// Same shapes as above, against the /floor routes — open to any
+// authenticated staff member, narrowed server-side to picking-slip
+// events instead of everything a manager sees.
+export const getFloorNotifications = async ({ unreadOnly = false } = {}) => {
+  const params = new URLSearchParams();
+  if (unreadOnly) params.set("unreadOnly", "true");
+  const qs = params.toString();
+  const body = await apiGet(`/api/notifications/floor${qs ? `?${qs}` : ""}`);
+  return (body.data ?? []).map(toNotification);
+};
+
+export const getFloorUnreadCount = async () => {
+  const body = await apiGet("/api/notifications/floor/unread-count");
+  return Number(body.data?.count ?? 0);
+};
+
+export const markFloorNotificationRead = async (id) => {
+  await apiPatch(`/api/notifications/floor/${id}/read`, {});
+};
+
+export const markAllFloorNotificationsRead = async () => {
+  await apiPost("/api/notifications/floor/read-all", {});
+};
+
 export default {
   getNotifications, getUnreadCount, markNotificationRead, markAllNotificationsRead,
+  getFloorNotifications, getFloorUnreadCount, markFloorNotificationRead, markAllFloorNotificationsRead,
 };

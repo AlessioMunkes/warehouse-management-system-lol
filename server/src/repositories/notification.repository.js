@@ -9,12 +9,15 @@
 // return that never actually happened.
 //
 // NOT PER-USER AT WRITE TIME.
-// One notifications row per event, visible to every manager/admin —
-// see notification_reads for how per-user read state works without
-// duplicating the row itself. Nothing here targets a specific
-// person; every trigger site so far (picking slip generation, BR-14's
-// non-collection sweep, a PO marked returned/follow-up-required) is
-// something every manager should be able to see, not a DM.
+// One notifications row per event, visible to whichever readers ask
+// for its type — see notification_reads for how per-user read state
+// works without duplicating the row itself. Nothing here targets a
+// specific person; every trigger site so far (picking slip generation,
+// BR-14's non-collection sweep, a PO marked returned/follow-up-
+// required) is something a whole audience should be able to see, not
+// a DM. The `types` filter on the read functions below is what lets
+// two different audiences (managers, the floor) share this one feed
+// without either seeing the other's noise — see notification.routes.js.
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
 
@@ -34,29 +37,50 @@ export const createNotification = async (client, {
 // ── Read ──────────────────────────────────────────────────────
 // LEFT JOINed against this user's own reads only — another manager's
 // read state never affects what this user sees as unread.
-const listForUser = async (userId, { limit = 50, unreadOnly = false } = {}) => {
+//
+// `types` is how the floor-facing bell (StaffNotificationBell) and the
+// manager one (NotificationBell) share this one feed without either
+// seeing the other's noise: the floor only ever asks for the types a
+// worker's own task view cares about (picking slips generated/created
+// so far), the manager route passes nothing and gets everything, same
+// as before this existed.
+const listForUser = async (userId, { limit = 50, unreadOnly = false, types = null } = {}) => {
+  const conditions = [];
+  const params = [userId];
+  if (unreadOnly) conditions.push('nr.read_at IS NULL');
+  if (types && types.length > 0) {
+    params.push(types);
+    conditions.push(`n.type = ANY($${params.length})`);
+  }
+  params.push(limit);
   const { rows } = await pool.query(
     `SELECT n.id, n.type, n.title, n.body, n.entity_type, n.entity_id,
             n.created_at, nr.read_at
        FROM notifications n
        LEFT JOIN notification_reads nr
               ON nr.notification_id = n.id AND nr.user_id = $1
-      ${unreadOnly ? 'WHERE nr.read_at IS NULL' : ''}
+      ${conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''}
       ORDER BY n.created_at DESC
-      LIMIT $2`,
-    [userId, limit]
+      LIMIT $${params.length}`,
+    params
   );
   return rows;
 };
 
-const getUnreadCount = async (userId) => {
+const getUnreadCount = async (userId, { types = null } = {}) => {
+  const conditions = ['nr.read_at IS NULL'];
+  const params = [userId];
+  if (types && types.length > 0) {
+    params.push(types);
+    conditions.push(`n.type = ANY($${params.length})`);
+  }
   const { rows } = await pool.query(
     `SELECT COUNT(*)::int AS count
        FROM notifications n
        LEFT JOIN notification_reads nr
               ON nr.notification_id = n.id AND nr.user_id = $1
-      WHERE nr.read_at IS NULL`,
-    [userId]
+      WHERE ${conditions.join(' AND ')}`,
+    params
   );
   return rows[0]?.count ?? 0;
 };
@@ -74,16 +98,22 @@ const markRead = async (notificationId, userId) => {
   );
 };
 
-const markAllRead = async (userId) => {
+const markAllRead = async (userId, { types = null } = {}) => {
+  const conditions = ['nr.read_at IS NULL'];
+  const params = [userId];
+  if (types && types.length > 0) {
+    params.push(types);
+    conditions.push(`n.type = ANY($${params.length})`);
+  }
   await pool.query(
     `INSERT INTO notification_reads (notification_id, user_id)
      SELECT n.id, $1
        FROM notifications n
        LEFT JOIN notification_reads nr
               ON nr.notification_id = n.id AND nr.user_id = $1
-      WHERE nr.read_at IS NULL
+      WHERE ${conditions.join(' AND ')}
      ON CONFLICT (notification_id, user_id) DO NOTHING`,
-    [userId]
+    params
   );
 };
 
