@@ -164,6 +164,28 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
 
   const reload = () => setReloadToken((t) => t + 1);
 
+  // Lifted above the loading/error/no-slip returns below, and reading
+  // slip?.items rather than the slip.items used once it's guaranteed
+  // non-null — this hook used to sit after those early returns, so it
+  // was skipped on every render before the slip finished loading and
+  // then called for the first time the moment it did: one more hook
+  // than the previous render saw, which is a Rules-of-Hooks violation
+  // React treats as fatal ("Rendered more hooks than during the
+  // previous render"), crashing this component on every pallet that
+  // wasn't already cached. Guided renders exactly one pending item,
+  // same as WorkList — so it always needs a focused one. The caller
+  // sets it on entering Guided (handleModeChange) or after a decision
+  // (advanceGuidedFocus); this is the safety net for a list that
+  // arrives after that, the same reason WorkList has its own.
+  const pendingItems = (slip?.items ?? []).filter((i) => i.status === 'pending');
+  const guidedIndex = pendingItems.findIndex((i) => i.id === focusId);
+  useEffect(() => {
+    if (mode === 'guided' && pendingItems.length > 0 && guidedIndex < 0) {
+      setFocusId(pendingItems[0].id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, pendingItems.length, guidedIndex]);
+
   if (loading) return <div className="stf-skeleton" aria-label="Loading" />;
 
   if (error && !slip) {
@@ -189,21 +211,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
   const items = slip.items || [];
   const confirmed = items.filter((i) => i.status === 'confirmed').length;
   const flagged = items.filter((i) => i.status === 'flagged').length;
-  const pendingItems = items.filter((i) => i.status === 'pending');
   const pending = pendingItems.length;
-
-  // Guided renders exactly one pending item, same as WorkList — so it
-  // always needs a focused one. The caller sets it on entering Guided
-  // (handleModeChange) or after a decision (advanceGuidedFocus); this
-  // is the safety net for a list that arrives after that, the same
-  // reason WorkList has its own.
-  const guidedIndex = pendingItems.findIndex((i) => i.id === focusId);
-  useEffect(() => {
-    if (mode === 'guided' && pendingItems.length > 0 && guidedIndex < 0) {
-      setFocusId(pendingItems[0].id);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, pendingItems.length, guidedIndex]);
 
   const handleModeChange = (next) => {
     setMode(next);
