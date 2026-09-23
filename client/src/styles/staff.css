@@ -304,6 +304,56 @@
    flow. It keeps the same chrome and takes the room it needs. */
 .stf-main.is-wide { max-width: 1200px; }
 
+/* ── New-activity toast ──────────────────────────────────────────── */
+/* Sits between the app bar and the page content on every staff screen
+   (StaffShell), so a worker on Receiving or Decanting still hears
+   about new pallets on the floor without leaving what they're doing.
+   Same width as .stf-main so it lines up with the column beneath it
+   rather than running edge to edge. Gold border, same reasoning as
+   .stf-wl-undo: red is this app's click colour, and "something just
+   happened" is an editorial note, not a call to action in itself. */
+.stf-activity-toast {
+  width: 100%;
+  max-width: 520px;
+  margin: 12px auto 0;
+  padding: 10px 12px 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--stf-gold);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+}
+.stf-activity-toast-text {
+  flex: 1;
+  font: 500 13px/1.4 var(--stf-font-sans);
+  color: var(--stf-text-sub);
+}
+.stf-activity-toast-btn {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--stf-accent);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  font: 700 13px/1 var(--stf-font-sans);
+  color: var(--stf-accent);
+  cursor: pointer;
+}
+.stf-activity-toast-btn:hover { background: var(--stf-accent); color: var(--stf-white); }
+.stf-activity-toast-dismiss {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  background: none;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--stf-text-sub);
+  cursor: pointer;
+}
+.stf-activity-toast-dismiss:hover { color: var(--stf-ink); }
+
 /* Dashboard only (.stf-tasks is TaskDashboardPage's own direct child,
    nothing else renders one) — reported as "weird spacing", which is
    .stf-main's own flex:1 doing exactly what it should for every task
@@ -355,9 +405,31 @@
   font: 600 10px/1.2 var(--stf-font-sans);
   cursor: pointer;
 }
+.stf-tab-icon-wrap { position: relative; display: inline-flex; }
 .stf-tab-icon  { width: 24px; height: 24px; object-fit: contain; opacity: 0.55; transition: opacity 150ms ease, transform 150ms ease; }
 .stf-tab-glyph { font-size: 18px; line-height: 24px; opacity: 0.55; transition: opacity 150ms ease, transform 150ms ease; }
 .stf-tab.is-current { border-top-color: var(--stf-accent); color: var(--stf-ink); }
+/* New spare work on the floor — spareCount from useSpareSlipAlert,
+   only ever shown on Packing (see StaffTabBar). Pulses so it reads as
+   "something changed" rather than a static count a worker has to
+   notice on their own; ACC-08 turns the pulse off along with every
+   other animation on the shared tablet. */
+.stf-tab-badge {
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--stf-accent);
+  box-shadow: 0 0 0 2px var(--stf-white);
+  animation: stf-tab-badge-pulse 1.8s ease-in-out infinite;
+}
+[data-stf-motion="reduced"] .stf-tab-badge { animation: none; }
+@keyframes stf-tab-badge-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--stf-white), 0 0 0 2px rgba(239, 58, 64, 0.5); }
+  50%      { box-shadow: 0 0 0 2px var(--stf-white), 0 0 0 7px rgba(239, 58, 64, 0); }
+}
 .stf-tab.is-current .stf-tab-icon,
 .stf-tab.is-current .stf-tab-glyph { opacity: 1; }
 /* Every tab, current or not, on a mouse — the bar had no hover

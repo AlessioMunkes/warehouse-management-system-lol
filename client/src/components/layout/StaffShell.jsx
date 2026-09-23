@@ -13,7 +13,7 @@
 //
 // PageHeader is untouched, so the manager screens keep it.
 // ─────────────────────────────────────────────────────────────
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,9 +24,11 @@ import {
 } from '@/components/ui/tooltip';
 import { useAuth } from '../../context/AuthContext';
 import useReducedMotion from '../../features/staff/hooks/useReducedMotion';
+import useSpareSlipAlert from '../../features/staff/hooks/useSpareSlipAlert';
 import StaffTabBar from './StaffTabBar';
 import OfflineBar from './OfflineBar';
 import { AppNavDrawer } from '../../features/taskdashboard/components/AppNav';
+import { STAFF } from '../../routes/paths';
 
 // Both live in client/public/, the same convention the landing page
 // uses for /images/BatchesLogo.png and /icons/*.svg — plain URLs, no
@@ -54,8 +56,19 @@ export default function StaffShell({
   children,
 }) {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const { user, logout } = useAuth();
   const { reduced, toggle } = useReducedMotion();
+
+  // Managers already get told about picking-slip activity through
+  // NotificationBell on their own layout — this is the floor-facing
+  // half, so it only polls for roles that actually work a pallet.
+  const isManager = user?.role === 'manager' || user?.role === 'admin';
+  const { spareCount, justArrived, dismiss } = useSpareSlipAlert(!isManager);
+  // Already on Packing, so the Spare tab there is telling this worker
+  // the same thing directly — a toast on top of that would just be
+  // announcing what's already on screen.
+  const onPackingPage = pathname.startsWith(STAFF.packing);
 
   const handleLogout = async () => {
     await logout();
@@ -153,9 +166,32 @@ export default function StaffShell({
 
       <OfflineBar />
 
+      {justArrived.length > 0 && !onPackingPage ? (
+        <div className="stf-activity-toast" role="status">
+          <span className="stf-activity-toast-text">
+            {justArrived.length} new pallet{justArrived.length > 1 ? 's' : ''} assigned to the floor.
+          </span>
+          <button
+            type="button"
+            className="stf-activity-toast-btn"
+            onClick={() => { dismiss(); navigate(STAFF.packing); }}
+          >
+            View
+          </button>
+          <button
+            type="button"
+            className="stf-activity-toast-dismiss"
+            aria-label="Dismiss"
+            onClick={dismiss}
+          >
+            &times;
+          </button>
+        </div>
+      ) : null}
+
       <main className={wide ? 'stf-main is-wide' : 'stf-main'}>{children}</main>
 
-      <StaffTabBar />
+      <StaffTabBar packingBadge={spareCount} />
       <div
         className="stf-footer"
         aria-hidden="true"
