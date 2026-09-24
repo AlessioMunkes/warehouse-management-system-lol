@@ -91,6 +91,50 @@ const SuccessBanner = ({ message }) => (
   </div>
 );
 
+// ── Product line editor ─────────────────────────────────────────
+// Shared by the Create and Edit forms: a product picker, a quantity,
+// the product's own unit shown read-only (not a free-text field —
+// see quantityPerMeal below, the unit follows the product, not the
+// line), and a remove button, plus an "Add product line" button.
+const ItemLinesEditor = ({ items, products, onUpdateLine, onRemoveLine, onAddLine }) => (
+  <div className="space-y-2">
+    <FieldLabel>Product lines</FieldLabel>
+    {items.map((line, index) => (
+      <div key={index} className="flex items-center gap-2">
+        <Select
+          value={line.productId || undefined}
+          onValueChange={(v) => onUpdateLine(index, { productId: v })}
+        >
+          <SelectTrigger className="flex-1"><SelectValue placeholder="Select a product" /></SelectTrigger>
+          <SelectContent>
+            {products.map((p) => (
+              <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Input
+          type="number" min="0" step="any" className="w-24"
+          value={line.quantity}
+          onChange={(e) => onUpdateLine(index, { quantity: e.target.value })}
+          placeholder="Qty"
+        />
+        <span className="w-12 shrink-0 text-sm text-muted-foreground">
+          {products.find((p) => String(p.id) === line.productId)?.defaultUnit || ''}
+        </span>
+        <Button
+          type="button" variant="ghost" size="icon-sm"
+          onClick={() => onRemoveLine(index)} aria-label="Remove line"
+        >
+          <Trash2 />
+        </Button>
+      </div>
+    ))}
+    <Button type="button" variant="outline" size="sm" onClick={onAddLine}>
+      <Plus /> Add product line
+    </Button>
+  </div>
+);
+
 // ── Detail panel ──────────────────────────────────────────────
 // Status IS the assignment state now — see statusLabel above — so
 // there's no separate "Assigned to" field to keep in sync with it.
@@ -180,6 +224,7 @@ const SlipDetail = ({
               <TableHead>Item</TableHead>
               <TableHead>Required</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Comment</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -188,6 +233,9 @@ const SlipDetail = ({
                 <TableCell>{item.product_name}</TableCell>
                 <TableCell className="text-muted-foreground">{item.required_quantity} {item.unit}</TableCell>
                 <TableCell><Badge variant="outline">{item.status}</Badge></TableCell>
+                <TableCell className="text-muted-foreground">
+                  {[item.flag_reason, item.packer_note].filter(Boolean).join(' · ') || '—'}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -219,7 +267,14 @@ export default function PickingSlipManagementPage() {
   const [genResult, setGenResult] = useState(null);
   const [genError, setGenError] = useState(null);
 
-  const [adHocForm, setAdHocForm] = useState({ ecdId: '', dispatchDate: todayISO(), cohort: '', force: false });
+  const [adHocForm, setAdHocForm] = useState({
+    ecdId: '', dispatchDate: todayISO(), cohort: '', force: false,
+    // manualItems off by default keeps the original behaviour
+    // unchanged: leave it off and the server pulls this ECD's
+    // standing order exactly as it always has. Switching it on is
+    // what lets a manager type or calculate the lines themselves.
+    manualItems: false, mealsToServe: '', items: [],
+  });
   const [adHocBusy, setAdHocBusy] = useState(false);
   const [adHocError, setAdHocError] = useState(null);
 
@@ -352,10 +407,61 @@ export default function PickingSlipManagementPage() {
     } catch (err) { setGenError(err.message); } finally { setGenBusy(false); }
   };
 
+  // Off by default (see adHocForm's own note). Turning it on seeds the
+  // line list with every product that has a meals-to-serve ratio set,
+  // and defaults meals-to-serve to this beneficiary's own registered
+  // count — a starting point to adjust, not a final answer.
+  const toggleManualItems = () => {
+    setAdHocForm((f) => {
+      if (f.manualItems) return { ...f, manualItems: false, items: [] };
+      const beneficiary = beneficiaries.find((b) => String(b.id) === f.ecdId);
+      return {
+        ...f,
+        manualItems: true,
+        mealsToServe: f.mealsToServe || (beneficiary?.childCount != null ? String(beneficiary.childCount) : ''),
+        items: products
+          .filter((p) => p.quantityPerMeal != null)
+          .map((p) => ({ productId: String(p.id), quantity: '' })),
+      };
+    });
+  };
+
+  // Recomputes every line that has a ratio; a line without one (added
+  // by hand via "Add product line") is left for the manager to fill
+  // in themselves — there's nothing to calculate it from.
+  const applyMealsToServe = (value) => {
+    setAdHocForm((f) => {
+      const meals = Number(value);
+      const items = Number.isFinite(meals) && meals > 0
+        ? f.items.map((line) => {
+            const product = products.find((p) => String(p.id) === line.productId);
+            if (!product?.quantityPerMeal) return line;
+            return { ...line, quantity: String(Math.round(meals * product.quantityPerMeal * 100) / 100) };
+          })
+        : f.items;
+      return { ...f, mealsToServe: value, items };
+    });
+  };
+
+  const addAdHocLine    = () => setAdHocForm((f) => ({ ...f, items: [...f.items, { productId: '', quantity: '' }] }));
+  const removeAdHocLine = (index) => setAdHocForm((f) => ({ ...f, items: f.items.filter((_, i) => i !== index) }));
+  const updateAdHocLine = (index, patch) => setAdHocForm((f) => ({
+    ...f, items: f.items.map((line, i) => (i === index ? { ...line, ...patch } : line)),
+  }));
+
   const runCreateAdHoc = async () => {
     setAdHocBusy(true); setAdHocError(null);
     try {
-      await createSlip({ ...adHocForm, ecdId: Number(adHocForm.ecdId) });
+      const items = adHocForm.manualItems
+        ? adHocForm.items
+            .filter((line) => line.productId && line.quantity && Number(line.quantity) > 0)
+            .map((line) => ({
+              productId: Number(line.productId),
+              quantity: Number(line.quantity),
+              unit: products.find((p) => String(p.id) === line.productId)?.defaultUnit || '',
+            }))
+        : undefined;
+      await createSlip({ ...adHocForm, ecdId: Number(adHocForm.ecdId), items });
       setViewDate(adHocForm.dispatchDate);
       await loadSlips();
       setMode('list');
@@ -506,10 +612,57 @@ export default function PickingSlipManagementPage() {
                   This is a deliberate make-up delivery outside the normal rotation
                 </FieldLabel>
               </Field>
+
+              <Field orientation="horizontal">
+                <Checkbox
+                  id="adhoc-manual-items"
+                  checked={adHocForm.manualItems}
+                  onCheckedChange={toggleManualItems}
+                />
+                <FieldLabel htmlFor="adhoc-manual-items" className="font-normal">
+                  Set the product lines and quantities for this slip myself
+                </FieldLabel>
+              </Field>
+              <FieldDescription>
+                Leave this unchecked to pull the standard product list from the beneficiary's
+                standing order, same as before.
+              </FieldDescription>
+
+              {adHocForm.manualItems ? (
+                <>
+                  <Field>
+                    <FieldLabel htmlFor="adhoc-meals">Meals to serve</FieldLabel>
+                    <Input
+                      id="adhoc-meals" type="number" min="0" step="1" className="w-32"
+                      value={adHocForm.mealsToServe}
+                      onChange={(e) => applyMealsToServe(e.target.value)}
+                    />
+                    <FieldDescription>
+                      Calculates each product's quantity from this centre's per-meal ratio. Every line
+                      stays editable below, so adjust anything by hand before creating the slip.
+                    </FieldDescription>
+                  </Field>
+
+                  <ItemLinesEditor
+                    items={adHocForm.items}
+                    products={products}
+                    onUpdateLine={updateAdHocLine}
+                    onRemoveLine={removeAdHocLine}
+                    onAddLine={addAdHocLine}
+                  />
+                </>
+              ) : null}
+
               <Field orientation="horizontal">
                 <Button
                   type="button" onClick={runCreateAdHoc}
-                  disabled={adHocBusy || !adHocForm.ecdId || !adHocForm.dispatchDate || !adHocForm.cohort}
+                  disabled={
+                    adHocBusy || !adHocForm.ecdId || !adHocForm.dispatchDate || !adHocForm.cohort ||
+                    (adHocForm.manualItems && (
+                      adHocForm.items.length === 0 ||
+                      adHocForm.items.some((l) => !l.productId || !l.quantity || Number(l.quantity) <= 0)
+                    ))
+                  }
                 >
                   {adHocBusy ? 'Creating' : 'Create slip'}
                 </Button>
@@ -560,42 +713,13 @@ export default function PickingSlipManagementPage() {
                 </FieldLabel>
               </Field>
 
-              <div className="space-y-2">
-                <FieldLabel>Product lines</FieldLabel>
-                {editForm.items.map((line, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <Select
-                      value={line.productId || undefined}
-                      onValueChange={(v) => updateEditLine(index, { productId: v })}
-                    >
-                      <SelectTrigger className="flex-1"><SelectValue placeholder="Select a product" /></SelectTrigger>
-                      <SelectContent>
-                        {products.map((p) => (
-                          <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      type="number" min="0" step="any" className="w-24"
-                      value={line.quantity}
-                      onChange={(e) => updateEditLine(index, { quantity: e.target.value })}
-                      placeholder="Qty"
-                    />
-                    <span className="w-12 shrink-0 text-sm text-muted-foreground">
-                      {products.find((p) => String(p.id) === line.productId)?.defaultUnit || ''}
-                    </span>
-                    <Button
-                      type="button" variant="ghost" size="icon-sm"
-                      onClick={() => removeEditLine(index)} aria-label="Remove line"
-                    >
-                      <Trash2 />
-                    </Button>
-                  </div>
-                ))}
-                <Button type="button" variant="outline" size="sm" onClick={addEditLine}>
-                  <Plus /> Add product line
-                </Button>
-              </div>
+              <ItemLinesEditor
+                items={editForm.items}
+                products={products}
+                onUpdateLine={updateEditLine}
+                onRemoveLine={removeEditLine}
+                onAddLine={addEditLine}
+              />
 
               <Field orientation="horizontal">
                 <Button

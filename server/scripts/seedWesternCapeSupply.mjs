@@ -72,28 +72,33 @@ const DATA_PATH = join(__dirname, 'data', 'westernCapeSupply.json');
 const GROUP_TO_COHORT = { 'Group A': 'tuesday', 'Group B': 'thursday' };
 
 // field key in the sheet data -> product to seed it as.
+// sku: stock_keeping_unit is NOT NULL UNIQUE in the live schema (see
+// product.service.js's own comment on this) — these are script-generated
+// placeholders ("WC-" + a short code), not real supplier SKUs. Rename
+// them once real SKUs are known; findByNameOrSku still matches existing
+// rows by NAME first, so re-running this script after a rename is safe.
 const PRODUCTS = [
-  { field: 'baked_beans',  name: 'Baked Beans',    unit: 'each', category: 'Canned Goods', perishable: false },
-  { field: 'pilchards',    name: 'Pilchards',      unit: 'each', category: 'Canned Goods', perishable: false },
-  { field: 'butternut',    name: 'Butternut',      unit: 'kg',   category: 'Vegetables',    perishable: true  },
-  { field: 'cabbage',      name: 'Cabbage',        unit: 'kg',   category: 'Vegetables',    perishable: true  },
-  { field: 'carrots',      name: 'Carrots',        unit: 'kg',   category: 'Vegetables',    perishable: true  },
-  { field: 'leeks',        name: 'Leeks',          unit: 'kg',   category: 'Vegetables',    perishable: true  },
-  { field: 'lentils',      name: 'Lentils',        unit: 'kg',   category: 'Dry Goods',     perishable: false },
-  { field: 'maize_meal',   name: 'Maize Meal',     unit: 'kg',   category: 'Dry Goods',     perishable: false },
-  { field: 'oats',         name: 'Oats',           unit: 'kg',   category: 'Dry Goods',     perishable: false },
-  { field: 'onions',       name: 'Onions',         unit: 'kg',   category: 'Vegetables',    perishable: true  },
-  { field: 'rice',         name: 'Rice',           unit: 'kg',   category: 'Dry Goods',     perishable: false },
-  { field: 'samp',         name: 'Samp',           unit: 'kg',   category: 'Dry Goods',     perishable: false },
-  { field: 'soya',         name: 'Soya Mince',     unit: 'kg',   category: 'Dry Goods',     perishable: false },
-  { field: 'spinach',      name: 'Spinach',        unit: 'kg',   category: 'Vegetables',    perishable: true  },
-  { field: 'spring_onion', name: 'Spring Onion',   unit: 'kg',   category: 'Vegetables',    perishable: true  },
-  { field: 'tomatoes',     name: 'Tomatoes',       unit: 'kg',   category: 'Vegetables',    perishable: true  },
-  { field: 'potatoes',     name: 'Potatoes',       unit: 'kg',   category: 'Vegetables',    perishable: true  },
-  { field: 'salt',         name: 'Salt',           unit: 'kg',   category: 'Dry Goods',     perishable: false },
-  { field: 'sugar',        name: 'Sugar',          unit: 'kg',   category: 'Dry Goods',     perishable: false },
-  { field: 'spices_misc',  name: 'Spices (Misc)',  unit: 'kg',   category: 'Dry Goods',     perishable: false },
-  { field: 'cooking_oil',  name: 'Cooking Oil',    unit: 'l',    category: 'Dry Goods',     perishable: false },
+  { field: 'baked_beans',  name: 'Baked Beans',    sku: 'WC-BAKED-BEANS',   unit: 'each', category: 'Canned Goods', perishable: false },
+  { field: 'pilchards',    name: 'Pilchards',      sku: 'WC-PILCHARDS',     unit: 'each', category: 'Canned Goods', perishable: false },
+  { field: 'butternut',    name: 'Butternut',      sku: 'WC-BUTTERNUT',     unit: 'kg',   category: 'Vegetables',    perishable: true  },
+  { field: 'cabbage',      name: 'Cabbage',        sku: 'WC-CABBAGE',       unit: 'kg',   category: 'Vegetables',    perishable: true  },
+  { field: 'carrots',      name: 'Carrots',        sku: 'WC-CARROTS',       unit: 'kg',   category: 'Vegetables',    perishable: true  },
+  { field: 'leeks',        name: 'Leeks',          sku: 'WC-LEEKS',         unit: 'kg',   category: 'Vegetables',    perishable: true  },
+  { field: 'lentils',      name: 'Lentils',        sku: 'WC-LENTILS',       unit: 'kg',   category: 'Dry Goods',     perishable: false },
+  { field: 'maize_meal',   name: 'Maize Meal',     sku: 'WC-MAIZE-MEAL',    unit: 'kg',   category: 'Dry Goods',     perishable: false },
+  { field: 'oats',         name: 'Oats',           sku: 'WC-OATS',          unit: 'kg',   category: 'Dry Goods',     perishable: false },
+  { field: 'onions',       name: 'Onions',         sku: 'WC-ONIONS',        unit: 'kg',   category: 'Vegetables',    perishable: true  },
+  { field: 'rice',         name: 'Rice',           sku: 'WC-RICE',          unit: 'kg',   category: 'Dry Goods',     perishable: false },
+  { field: 'samp',         name: 'Samp',           sku: 'WC-SAMP',          unit: 'kg',   category: 'Dry Goods',     perishable: false },
+  { field: 'soya',         name: 'Soya Mince',     sku: 'WC-SOYA-MINCE',    unit: 'kg',   category: 'Dry Goods',     perishable: false },
+  { field: 'spinach',      name: 'Spinach',        sku: 'WC-SPINACH',       unit: 'kg',   category: 'Vegetables',    perishable: true  },
+  { field: 'spring_onion', name: 'Spring Onion',   sku: 'WC-SPRING-ONION',  unit: 'kg',   category: 'Vegetables',    perishable: true  },
+  { field: 'tomatoes',     name: 'Tomatoes',       sku: 'WC-TOMATOES',      unit: 'kg',   category: 'Vegetables',    perishable: true  },
+  { field: 'potatoes',     name: 'Potatoes',       sku: 'WC-POTATOES',      unit: 'kg',   category: 'Vegetables',    perishable: true  },
+  { field: 'salt',         name: 'Salt',           sku: 'WC-SALT',          unit: 'kg',   category: 'Dry Goods',     perishable: false },
+  { field: 'sugar',        name: 'Sugar',          sku: 'WC-SUGAR',         unit: 'kg',   category: 'Dry Goods',     perishable: false },
+  { field: 'spices_misc',  name: 'Spices (Misc)',  sku: 'WC-SPICES-MISC',   unit: 'kg',   category: 'Dry Goods',     perishable: false },
+  { field: 'cooking_oil',  name: 'Cooking Oil',    sku: 'WC-COOKING-OIL',   unit: 'l',    category: 'Dry Goods',     perishable: false },
 ];
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -103,7 +108,7 @@ const seedProducts = async () => {
   let created = 0, found = 0;
 
   for (const p of PRODUCTS) {
-    const existing = await productRepository.findByNameOrSku(p.name, null);
+    const existing = await productRepository.findByNameOrSku(p.name, p.sku);
     if (existing) {
       productIdByField[p.field] = existing.id;
       found++;
@@ -111,7 +116,7 @@ const seedProducts = async () => {
     }
     const row = await productRepository.createProduct({
       name: p.name,
-      stockKeepingUnit: null,
+      stockKeepingUnit: p.sku,
       defaultUnit: p.unit,
       category: p.category,
       isPerishable: p.perishable,

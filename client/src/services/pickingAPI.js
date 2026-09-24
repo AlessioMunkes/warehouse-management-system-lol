@@ -129,34 +129,39 @@ export async function generateSlips({ dispatchDate, cohort }) {
 // POST /api/picking — create one new slip for a single beneficiary
 // (manager only): a late-registered centre, a correction, or a
 // make-up delivery outside its normal rotation. `force` overrides
-// the cohort-schedule check for a deliberate make-up run.
-export async function createSlip({ ecdId, dispatchDate, cohort, force }) {
-  return request('', {
-    method: 'POST',
-    body: JSON.stringify({ ecdId, dispatchDate, cohort, force }),
-  });
+// the cohort-schedule check for a deliberate make-up run. `items`,
+// when given, replaces the usual pull from the centre's standing
+// order (ecd_order_lines) — a manager typed or adjusted the lines by
+// hand instead of taking the standing order as-is.
+export async function createSlip({ ecdId, dispatchDate, cohort, force, items }) {
+  const body = { ecdId, dispatchDate, cohort, force };
+  if (items !== undefined) body.items = items;
+  return request('', { method: 'POST', body: JSON.stringify(body) });
 }
 
 // POST /api/picking/:id/items/:itemId/confirm — mark one item as
 // packed as required.
-export async function confirmItem(slipId, itemId, packedQuantity) {
+export async function confirmItem(slipId, itemId, packedQuantity, note) {
+  const body = { packedQuantity };
+  if (note !== undefined && note !== '') body.note = note;
   return request(`/${slipId}/items/${itemId}/confirm`, {
     method: 'POST',
-    body: JSON.stringify({ packedQuantity }),
+    body: JSON.stringify(body),
   });
 }
 
 // POST /api/picking/:id/items/:itemId/flag — mark one item as
 // short, damaged, or substituted. packedQuantity is optional
-// (the packer may not know how much actually went out).
-export async function flagItem(slipId, itemId, flagReason, packedQuantity) {
+// (the packer may not know how much actually went out). note is the
+// paper slip's "Comment" column — for anything worth recording that
+// isn't the flag reason itself.
+export async function flagItem(slipId, itemId, flagReason, packedQuantity, note) {
+  const body = { flagReason };
+  if (packedQuantity !== undefined && packedQuantity !== '') body.packedQuantity = packedQuantity;
+  if (note !== undefined && note !== '') body.note = note;
   return request(`/${slipId}/items/${itemId}/flag`, {
     method: 'POST',
-    body: JSON.stringify(
-      packedQuantity !== undefined && packedQuantity !== ''
-        ? { flagReason, packedQuantity }
-        : { flagReason }
-    ),
+    body: JSON.stringify(body),
   });
 }
 
