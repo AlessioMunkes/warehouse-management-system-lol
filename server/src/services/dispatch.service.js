@@ -30,21 +30,18 @@ import { ROLES }          from '../middleware/auth.middleware.js';
 import { isValidDateString, isPositiveInt } from '../utils/validation.js';
 import { DISPATCH_SORTS, SORT_DIRECTIONS } from '../constants/receiptSort.js';
 
-const COHORTS  = ['week1', 'week2'];
+const COHORTS  = ['tuesday', 'thursday'];
 const STATUSES = ['awaiting', 'collected', 'late_collected', 'not_collected', 'cancelled'];
 
 // BR-14. Kept as a constant rather than a settings row for now — if
-// the sponsor ever wants it configurable, move it to picking_settings
-// alongside cohort_anchor_monday rather than adding a second
-// settings mechanism.
+// the sponsor ever wants it configurable, move it to picking_settings.
 //
 // Sponsor feedback (Milestone 2 change request log): "collections
 // generally happen on Thursdays at approximately 15:00" — the URS's
 // 16:00 cutoff was an hour later than the warehouse actually closes
-// the gate. Moved to 15:00 to match. This is the literal timing fix
-// only; it does NOT touch the deeper, separately-flagged discrepancy
-// below (fortnightly week1/week2 vs weekly tuesday/thursday cohorts),
-// which needs its own sponsor conversation.
+// the gate. Moved to 15:00 to match. (This same feedback is also the
+// confirming evidence for the Tuesday/Thursday weekly cohort model —
+// see picking.service.js's scheduledCohortFor.)
 export const NON_COLLECTION_CUTOFF_HOUR = 15;
 
 // Signatures arrive as base64 PNG data URLs from a canvas, the same
@@ -170,7 +167,7 @@ export const evaluateEligibility = (gateView) => {
 const getBoard = async (query, user) => {
   const { dispatchDate, cohort, status, scope } = query;
 
-  if (cohort && !COHORTS.includes(cohort))   fail(400, 'Cohort must be week1 or week2.');
+  if (cohort && !COHORTS.includes(cohort))   fail(400, 'Cohort must be tuesday or thursday.');
   if (status && !STATUSES.includes(status))  fail(400, 'Invalid dispatch status filter.');
   if (scope !== undefined && scope !== 'gate') {
     fail(400, "Scope must be 'gate' if supplied.");
@@ -451,7 +448,7 @@ const listDispatchNotes = async (query = {}) => {
     fail(400, 'Invalid beneficiary.');
   }
   if (cohort && !COHORTS.includes(cohort)) {
-    fail(400, 'Cohort must be week1 or week2.');
+    fail(400, 'Cohort must be tuesday or thursday.');
   }
   // 'awaiting' is excluded deliberately: an awaiting event is a pallet still
   // standing in the yard, which is the board's business, not the archive's.

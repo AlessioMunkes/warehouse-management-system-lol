@@ -7,9 +7,9 @@
 import pickingRepository from '../repositories/picking.repository.js';
 import { ROLES }         from '../middleware/auth.middleware.js';
 
-const COHORTS = ['week1', 'week2'];
+const COHORTS = ['tuesday', 'thursday'];
 const STATUSES = ['pending', 'in_progress', 'complete', 'cancelled'];
-const cohortLabel = (c) => (c === 'week1' ? 'Week 1' : 'Week 2');
+const cohortLabel = (c) => (c === 'tuesday' ? 'Tuesday' : 'Thursday');
 
 // Small helper so controllers can map errors to status codes without
 // string-matching on messages the way delivery.controller does.
@@ -19,31 +19,20 @@ const fail = (status, message) => {
   throw err;
 };
 
-// ── Fortnightly rotation math ───────────────────────────────────
-// Half the ECDs are 'week1', half 'week2'; each group collects every
-// other week. cohort_anchor_monday (picking_settings) is the Monday
-// of a known week1 week — every other week's cohort is computed from
-// how many whole weeks have passed since that anchor.
-//
-// NOTE: this fortnightly model is what the code implements, but the
-// business case (BR-12), the warehouse visit notes (§4.2) and
-// database.md all describe weekday cohorts ('tuesday' / 'thursday')
-// collecting weekly. One of the two is wrong. Resolve it with the
-// sponsor before Milestone 3 — if fortnightly is correct, the design
-// documents need updating, because they are what gets handed over.
-const mondayOf = (date) => {
-  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  const day = d.getUTCDay();               // 0 = Sunday .. 6 = Saturday
-  d.setUTCDate(d.getUTCDate() + ((day === 0 ? -6 : 1) - day));
-  return d;
-};
+// ── Weekly weekday pickup ────────────────────────────────────
+// Every centre has a fixed pickup day — Tuesday or Thursday, every
+// week, not a fortnightly rotation. Confirmed against a real picking
+// slip ("Pickup Day: Tuesday", "Week Number: Week 25") — this also
+// matches the very first design (database.md's original target
+// schema already had `cohort IN ('tuesday','thursday')`) before the
+// app briefly diverged onto a week1/week2 fortnightly model that this
+// replaces. See server/database/cohort_weekday_migration.sql for the
+// one-time data migration this depends on.
+const WEEKDAY_FOR_COHORT = { tuesday: 2, thursday: 4 };   // Date#getUTCDay(): 0 = Sunday .. 6 = Saturday
 
-const resolveActiveCohort = (dispatchDate, anchorMondayStr) => {
-  const monday = mondayOf(dispatchDate);
-  const anchor = mondayOf(new Date(anchorMondayStr));
-  const weeksBetween = Math.round((monday - anchor) / (7 * 24 * 60 * 60 * 1000));
-  const parity = ((weeksBetween % 2) + 2) % 2;   // handles dates before the anchor too
-  return parity === 0 ? 'week1' : 'week2';
+const scheduledCohortFor = (date) => {
+  const day = date.getUTCDay();
+  return Object.entries(WEEKDAY_FOR_COHORT).find(([, d]) => d === day)?.[0] ?? null;
 };
 
 const isManager = (user) => user.role === ROLES.MANAGER || user.role === ROLES.ADMIN;
@@ -56,7 +45,7 @@ const isManager = (user) => user.role === ROLES.MANAGER || user.role === ROLES.A
 const getSlips = async (query, user) => {
   const { dispatchDate, cohort, status, mine } = query;
 
-  if (cohort && !COHORTS.includes(cohort))   fail(400, 'Cohort must be week1 or week2.');
+  if (cohort && !COHORTS.includes(cohort))   fail(400, 'Cohort must be tuesday or thursday.');
   if (status && !STATUSES.includes(status))  fail(400, 'Invalid status filter.');
 
   const assignedTo = (!isManager(user) && mine === 'true') ? user.id : undefined;
@@ -78,7 +67,7 @@ const getSlipById = async (id) => {
 // normal rotation (e.g. a make-up delivery) without lying about it.
 const validateDispatchDate = async (dispatchDate, cohort, { allowOverride = false } = {}) => {
   if (!dispatchDate)             fail(400, 'Dispatch date is required.');
-  if (!COHORTS.includes(cohort)) fail(400, 'Cohort must be week1 or week2.');
+  if (!COHORTS.includes(cohort)) fail(400, 'Cohort must be tuesday or thursday.');
 
   const date = new Date(dispatchDate);
   if (Number.isNaN(date.getTime())) fail(400, 'Dispatch date is not a valid date.');
@@ -86,15 +75,14 @@ const validateDispatchDate = async (dispatchDate, cohort, { allowOverride = fals
   const today = new Date(); today.setHours(0, 0, 0, 0);
   if (date < today) fail(400, 'Cannot create slips for a past date.');
 
-  const anchor = await pickingRepository.getCohortAnchor();
-  if (anchor) {
-    const active = resolveActiveCohort(date, anchor);
-    if (active !== cohort && !allowOverride) {
-      fail(400,
-        `${cohortLabel(cohort)} is not the scheduled rotation for ${dispatchDate} ` +
-        `(${cohortLabel(active)} is). If this is a deliberate make-up delivery, use "Create a new slip" with the override option.`
-      );
-    }
+  const scheduled = scheduledCohortFor(date);
+  if (scheduled !== cohort && !allowOverride) {
+    fail(400,
+      (scheduled
+        ? `${dispatchDate} is a ${cohortLabel(scheduled)} pickup day, not ${cohortLabel(cohort)}.`
+        : `${dispatchDate} is not a Tuesday or Thursday pickup day.`) +
+      ` If this is a deliberate make-up delivery, use "Create a new slip" with the override option.`
+    );
   }
   return date;
 };
@@ -114,9 +102,9 @@ const generateSlips = async ({ dispatchDate, cohort }, user) => {
   });
 };
 
-// ── Create a single ad-hoc slip (manager only) ────────────────
+// ── Create a single new slip (manager only) ────────────────────
 // For a late-registered ECD, a correction, or a make-up delivery
-// outside that ECD's normal fortnightly rotation.
+// outside that ECD's normal weekly pickup day.
 const createSlip = async ({ ecdId, dispatchDate, cohort, force }, user) => {
   if (!isManager(user)) fail(403, 'Only managers can create picking slips.');
   if (!ecdId)           fail(400, 'ECD is required.');

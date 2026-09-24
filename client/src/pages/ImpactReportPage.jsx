@@ -85,8 +85,8 @@ const DIMENSION_LABELS = {
 // header note), so the two values are restated here rather than
 // pulling in the whole catalog client for one filter.
 const COHORT_OPTIONS = [
-  { value: 'week1', label: 'Week 1' },
-  { value: 'week2', label: 'Week 2' },
+  { value: 'tuesday', label: 'Tuesday' },
+  { value: 'thursday', label: 'Thursday' },
 ];
 
 const MISSING_FACTOR_STATUS = 503;

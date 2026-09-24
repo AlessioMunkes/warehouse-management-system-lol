@@ -23,12 +23,12 @@ const pickingAPI = await import('../services/pickingAPI');
 const { default: StaffSlipList } = await import('../features/packing/components/StaffSlipList');
 
 const MINE_SLIP = {
-  id: 1, ecd_name: 'Sunshine ECD', cohort: 'week1', child_count: 12,
+  id: 1, ecd_name: 'Sunshine ECD', cohort: 'tuesday', child_count: 12,
   confirmed_items: 2, total_items: 5, status: 'in_progress', assigned_to: 7,
 };
 
 const TODAY_SPARE = {
-  id: 2, ecd_name: 'Rainbow ECD', cohort: 'week2', child_count: 8,
+  id: 2, ecd_name: 'Rainbow ECD', cohort: 'thursday', child_count: 8,
   confirmed_items: 0, total_items: 4, status: 'pending', assigned_to: null,
 };
 

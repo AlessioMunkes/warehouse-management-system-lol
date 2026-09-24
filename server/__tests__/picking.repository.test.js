@@ -491,11 +491,11 @@ const wroteSlip  = (c) => c.calls.some((s) => /^UPDATE picking_slips SET dispatc
 const wroteItems = (c) => c.calls.some((s) => /^DELETE FROM picking_slip_items/i.test(s));
 
 describe('editSlip', () => {
-  const PENDING = { id: 1, ecd_id: 7, status: 'pending', dispatch_date: '2026-08-03', cohort: 'week1' };
+  const PENDING = { id: 1, ecd_id: 7, status: 'pending', dispatch_date: '2026-08-03', cohort: 'tuesday' };
 
   it('updates dispatch date and cohort on a pending slip', async () => {
     const client = editClient(PENDING);
-    const result = await edit(client, { dispatchDate: '2026-08-10', cohort: 'week2' });
+    const result = await edit(client, { dispatchDate: '2026-08-10', cohort: 'thursday' });
     expect(result.slip).toBeDefined();
     expect(wroteSlip(client)).toBe(true);
     expect(client.calls).toContain('COMMIT');
@@ -513,7 +513,7 @@ describe('editSlip', () => {
 
   it('refuses a slip that is already claimed', async () => {
     const client = editClient({ ...PENDING, status: 'in_progress' });
-    const result = await edit(client, { dispatchDate: '2026-08-10', cohort: 'week2' });
+    const result = await edit(client, { dispatchDate: '2026-08-10', cohort: 'thursday' });
     expect(result).toMatchObject({ locked: true, status: 'in_progress' });
     expect(wroteSlip(client)).toBe(false);
     expect(client.calls).toContain('ROLLBACK');
@@ -521,7 +521,7 @@ describe('editSlip', () => {
 
   it('refuses a date that collides with another slip for the same ECD', async () => {
     const client = editClient(PENDING, { conflict: true });
-    const result = await edit(client, { dispatchDate: '2026-08-10', cohort: 'week1' });
+    const result = await edit(client, { dispatchDate: '2026-08-10', cohort: 'tuesday' });
     expect(result).toMatchObject({ dateConflict: true });
     expect(wroteSlip(client)).toBe(false);
   });

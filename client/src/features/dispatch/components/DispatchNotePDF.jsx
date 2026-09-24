@@ -122,7 +122,7 @@ const DispatchNotePDF = ({ note, onClose }) => {
               </p>
               <p className="pdfnote-doc-meta-line">
                 <span>Cohort</span>
-                <strong>{note.cohort || '—'}</strong>
+                <strong>{note.cohort === 'thursday' ? 'Thursday' : note.cohort === 'tuesday' ? 'Tuesday' : '—'}</strong>
               </p>
               <p className="pdfnote-doc-meta-line">
                 <span>Status</span>

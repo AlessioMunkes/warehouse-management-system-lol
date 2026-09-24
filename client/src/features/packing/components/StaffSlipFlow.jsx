@@ -44,7 +44,7 @@ const readStoredMode = () => {
   }
 };
 
-const COHORT_LABELS = { week1: 'Week 1', week2: 'Week 2' };
+const COHORT_LABELS = { tuesday: 'Tuesday', thursday: 'Thursday' };
 const REASON_OPTIONS = [
   { value: 'Short quantity', label: 'Short quantity' },
   { value: 'Damaged stock', label: 'Damaged stock' },

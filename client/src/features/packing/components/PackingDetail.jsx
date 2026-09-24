@@ -79,7 +79,7 @@ import {
   completeSlip,
 } from "../../../services/pickingAPI";
 
-const COHORT_LABELS = { week1: "Week 1", week2: "Week 2" };
+const COHORT_LABELS = { tuesday: "Tuesday", thursday: "Thursday" };
 
 const STATUS_BADGE = {
   pending: { className: "badge badge-pending", label: "Pending" },

@@ -153,7 +153,7 @@ const DispatchNotePDF = ({ note, onClose }) => {
         </div>
         <div>
           <p className="pdf-meta-label">Cohort</p>
-          <p className="pdf-meta-value">{note.cohort === 'week2' ? 'Week 2' : 'Week 1'}</p>
+          <p className="pdf-meta-value">{note.cohort === 'thursday' ? 'Thursday' : 'Tuesday'}</p>
         </div>
         <div>
           <p className="pdf-meta-label">Pallet</p>

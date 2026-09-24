@@ -32,7 +32,7 @@ import Paged from '../../staff/components/Paged';
 import usePaged from '../../staff/hooks/usePaged';
 import { todayISO, isSpareSlip } from '../spareSlips';
 
-const COHORT_LABELS = { week1: 'Week 1', week2: 'Week 2' };
+const COHORT_LABELS = { tuesday: 'Tuesday', thursday: 'Thursday' };
 
 // Centre and packer. Module level so its identity is stable.
 const slipText = (slip) => [slip.ecd_name, slip.packer_name].filter(Boolean).join(' ');

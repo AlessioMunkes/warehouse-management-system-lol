@@ -60,8 +60,8 @@ import { Badge } from '@/components/ui/badge';
 import { Search, CalendarPlus, PackagePlus, X, ArrowLeft, Pencil, Plus, Trash2 } from 'lucide-react';
 
 const COHORT_OPTIONS = [
-  { value: 'week1', label: 'Week 1' },
-  { value: 'week2', label: 'Week 2' },
+  { value: 'tuesday', label: 'Tuesday' },
+  { value: 'thursday', label: 'Thursday' },
 ];
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -108,7 +108,7 @@ const SlipDetail = ({
       <div>
         <CardTitle>{slip.ecd_name}</CardTitle>
         <p className="text-sm text-muted-foreground">
-          {slip.cohort === 'week1' ? 'Week 1' : 'Week 2'} · {slip.dispatch_date}
+          {slip.cohort === 'thursday' ? 'Thursday' : 'Tuesday'} · {slip.dispatch_date}
         </p>
       </div>
       <div className="flex items-center gap-1">
@@ -674,7 +674,7 @@ export default function PickingSlipManagementPage() {
                             <TableRow key={slip.id} className="cursor-pointer" onClick={() => openSlip(slip.id)}>
                               <TableCell className="font-medium">{slip.ecd_name}</TableCell>
                               <TableCell className="text-muted-foreground">
-                                {slip.cohort === 'week1' ? 'Week 1' : 'Week 2'}
+                                {slip.cohort === 'thursday' ? 'Thursday' : 'Tuesday'}
                               </TableCell>
                               <TableCell><Badge variant="outline">{statusLabel(slip)}</Badge></TableCell>
                               <TableCell className="text-muted-foreground">

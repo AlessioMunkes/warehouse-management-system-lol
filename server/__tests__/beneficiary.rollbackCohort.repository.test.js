@@ -32,10 +32,10 @@ const { default: repo } = await import('../src/repositories/beneficiary.reposito
 beforeEach(() => vi.clearAllMocks());
 
 describe('rollbackCohort', () => {
-  it('flips week1 to week2', async () => {
+  it('flips tuesday to thursday', async () => {
     client = makeClient({
       onQuery: (sql, params) => {
-        if (/^SELECT id, cohort/i.test(sql)) return { rows: [{ id: 6, cohort: 'week1' }] };
+        if (/^SELECT id, cohort/i.test(sql)) return { rows: [{ id: 6, cohort: 'tuesday' }] };
         if (/^UPDATE ecd_centres/i.test(sql)) return { rows: [{ id: 6, cohort: params[1] }] };
         return { rows: [] };
       },
@@ -43,28 +43,28 @@ describe('rollbackCohort', () => {
 
     const result = await repo.rollbackCohort(6, 3);
 
-    expect(result).toEqual({ id: 6, cohort: 'week2' });
+    expect(result).toEqual({ id: 6, cohort: 'thursday' });
     const update = client.calls.find((c) => /^UPDATE ecd_centres/i.test(c.sql));
-    expect(update.params).toEqual([6, 'week2']);
+    expect(update.params).toEqual([6, 'thursday']);
   });
 
-  it('flips week2 to week1', async () => {
+  it('flips thursday to tuesday', async () => {
     client = makeClient({
       onQuery: (sql, params) => {
-        if (/^SELECT id, cohort/i.test(sql)) return { rows: [{ id: 6, cohort: 'week2' }] };
+        if (/^SELECT id, cohort/i.test(sql)) return { rows: [{ id: 6, cohort: 'thursday' }] };
         if (/^UPDATE ecd_centres/i.test(sql)) return { rows: [{ id: 6, cohort: params[1] }] };
         return { rows: [] };
       },
     });
 
     const result = await repo.rollbackCohort(6, 3);
-    expect(result.cohort).toBe('week1');
+    expect(result.cohort).toBe('tuesday');
   });
 
   it('locks the row with FOR UPDATE before flipping it', async () => {
     client = makeClient({
       onQuery: (sql, params) => {
-        if (/^SELECT id, cohort/i.test(sql)) return { rows: [{ id: 6, cohort: 'week1' }] };
+        if (/^SELECT id, cohort/i.test(sql)) return { rows: [{ id: 6, cohort: 'tuesday' }] };
         if (/^UPDATE ecd_centres/i.test(sql)) return { rows: [{ id: 6, cohort: params[1] }] };
         return { rows: [] };
       },
@@ -78,7 +78,7 @@ describe('rollbackCohort', () => {
   it('writes an audit row recording the flip, unlike the generic update path', async () => {
     client = makeClient({
       onQuery: (sql, params) => {
-        if (/^SELECT id, cohort/i.test(sql)) return { rows: [{ id: 6, cohort: 'week1' }] };
+        if (/^SELECT id, cohort/i.test(sql)) return { rows: [{ id: 6, cohort: 'tuesday' }] };
         if (/^UPDATE ecd_centres/i.test(sql)) return { rows: [{ id: 6, cohort: params[1] }] };
         return { rows: [] };
       },

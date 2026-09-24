@@ -88,7 +88,7 @@ BEGIN
     v_date := CURRENT_DATE - (v_month || ' months')::interval;
 
     INSERT INTO picking_slips (ecd_id, dispatch_date, cohort, generated_by, beneficiary_kind, beneficiary_name)
-    VALUES (NULL, v_date, 'week1', v_user_id, 'soup_kitchen', 'Demo Soup Kitchen')
+    VALUES (NULL, v_date, 'tuesday', v_user_id, 'soup_kitchen', 'Demo Soup Kitchen')
     RETURNING id INTO v_slip_id;
 
     INSERT INTO picking_slip_items (picking_slip_id, product_id, required_quantity, unit, status, packed_quantity, confirmed_by, confirmed_at)
@@ -106,7 +106,7 @@ BEGIN
     -- households, not a whole kitchen.
     IF v_month % 2 = 0 THEN
       INSERT INTO picking_slips (ecd_id, dispatch_date, cohort, generated_by, beneficiary_kind, beneficiary_name)
-      VALUES (NULL, v_date, 'week2', v_user_id, 'community', 'Demo Community Request')
+      VALUES (NULL, v_date, 'thursday', v_user_id, 'community', 'Demo Community Request')
       RETURNING id INTO v_slip_id;
 
       INSERT INTO picking_slip_items (picking_slip_id, product_id, required_quantity, unit, status, packed_quantity, confirmed_by, confirmed_at)
@@ -128,7 +128,7 @@ BEGIN
     v_date := CURRENT_DATE - (v_month || ' months')::interval;
 
     INSERT INTO picking_slips (ecd_id, dispatch_date, cohort, generated_by, beneficiary_kind, beneficiary_name)
-    VALUES (NULL, v_date, 'week1', v_user_id, 'dignity_kitchen', 'Demo Dignity Kitchen')
+    VALUES (NULL, v_date, 'tuesday', v_user_id, 'dignity_kitchen', 'Demo Dignity Kitchen')
     RETURNING id INTO v_slip_id;
 
     INSERT INTO picking_slip_items (picking_slip_id, product_id, required_quantity, unit, status, packed_quantity, confirmed_by, confirmed_at)

@@ -50,7 +50,7 @@ describe('validateSpec — rejects what the AI layer might invent', () => {
   });
 
   it('rejects a filter the metric does not declare', () => {
-    expect(() => validateSpec({ metric: 'decanting_wastage', dateRange: range, filters: { cohort: 'week1' } }))
+    expect(() => validateSpec({ metric: 'decanting_wastage', dateRange: range, filters: { cohort: 'tuesday' } }))
       .toThrow(/cannot be filtered/);
   });
 
@@ -95,11 +95,11 @@ describe('describeSpec', () => {
     const spec = validateSpec({
       metric: 'repeat_non_collections',
       dateRange: range,
-      filters: { cohort: 'week1' },
+      filters: { cohort: 'tuesday' },
     });
     const text = describeSpec(spec);
     expect(text).toContain('Repeat non-collections');
-    expect(text).toContain('week1');
+    expect(text).toContain('tuesday');
     expect(text).toContain('2026-06-01');
   });
 });
