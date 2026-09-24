@@ -30,13 +30,15 @@
 // remove, that's a separate, deliberate step — see the printed summary
 // at the end for what to check by hand.
 //
+// REQUIRES server/database/cohort_weekday_migration.sql's Step 1 (the
+// ALTER TYPE lines) to have already run — this script inserts
+// 'tuesday'/'thursday' cohort values directly, which only exist on
+// the enum once that migration adds them.
+//
 // KNOWN ASSUMPTIONS TO VERIFY, flagged rather than silently decided:
-//   - Sheet's "Group A"/"Group B" mapped to cohort 'week1'/'week2'
-//     respectively — the sheet gives no other cohort label, and the
-//     live app runs a week1/week2 fortnightly model (see
-//     picking.service.js's own note on the week1/week2 vs
-//     tuesday/thursday ambiguity — this script does not resolve that,
-//     only picks a mapping onto whichever model is live).
+//   - Sheet's "Group A"/"Group B" mapped to cohort 'tuesday'/'thursday'
+//     respectively — the sheet gives no other cohort label, so this is
+//     a guess at which group collects which day.
 //   - "Number of beneficiaries" mapped straight to child_count, even
 //     though the sheet's own header says it mixes registered children,
 //     aftercare, staff, and community kids.
@@ -67,7 +69,7 @@ import beneficiaryRepository from '../src/repositories/beneficiary.repository.js
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_PATH = join(__dirname, 'data', 'westernCapeSupply.json');
 
-const GROUP_TO_COHORT = { 'Group A': 'week1', 'Group B': 'week2' };
+const GROUP_TO_COHORT = { 'Group A': 'tuesday', 'Group B': 'thursday' };
 
 // field key in the sheet data -> product to seed it as.
 const PRODUCTS = [

@@ -212,12 +212,12 @@ describe('GET /api/dispatch/notes — the goods-out archive', () => {
   it('forwards the filters', async () => {
     dispatchServiceMock.listDispatchNotes.mockResolvedValue(PAGE);
     await request(dispatchApp)
-      .get('/api/dispatch/notes?from=2026-08-01&ecdId=7&cohort=week2&status=not_collected')
+      .get('/api/dispatch/notes?from=2026-08-01&ecdId=7&cohort=thursday&status=not_collected')
       .set('Cookie', cookieFor(ROLES.MANAGER));
 
     expect(dispatchServiceMock.listDispatchNotes).toHaveBeenCalledWith(
       expect.objectContaining({
-        from: '2026-08-01', ecdId: '7', cohort: 'week2', status: 'not_collected',
+        from: '2026-08-01', ecdId: '7', cohort: 'thursday', status: 'not_collected',
       })
     );
   });

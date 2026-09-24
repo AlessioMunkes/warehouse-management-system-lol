@@ -22,8 +22,8 @@ const ALL = '__all__';
 // would recognise rather than the raw values.
 const FILTER_OPTIONS = {
   cohort: [
-    { value: 'week1', label: 'Week 1' },
-    { value: 'week2', label: 'Week 2' },
+    { value: 'tuesday', label: 'Tuesday' },
+    { value: 'thursday', label: 'Thursday' },
   ],
   // dignity_kitchen and community are selectable for operational
   // reports but excluded server-side from impact metrics under

@@ -131,7 +131,7 @@ describe('picking routes — role enforcement', () => {
 
   it.each(MANAGERS_UP)('%s can generate the week\'s slips', async (role) => {
     const res = await request(app).post(`${BASE}/generate`)
-      .set('Cookie', cookieFor(role)).send({ dispatchDate: '2026-08-03', cohort: 'week1' });
+      .set('Cookie', cookieFor(role)).send({ dispatchDate: '2026-08-03', cohort: 'tuesday' });
     expect(res.status).toBe(201);
   });
 
@@ -182,7 +182,7 @@ describe('picking routes — role enforcement', () => {
 describe('picking routes — /generate is not shadowed by /:id', () => {
   it('POST /generate reaches the generator', async () => {
     await request(app).post(`${BASE}/generate`)
-      .set('Cookie', cookieFor(ROLES.MANAGER)).send({ dispatchDate: '2026-08-03', cohort: 'week1' });
+      .set('Cookie', cookieFor(ROLES.MANAGER)).send({ dispatchDate: '2026-08-03', cohort: 'tuesday' });
 
     expect(serviceMock.generateSlips).toHaveBeenCalledTimes(1);
     expect(serviceMock.createSlip).not.toHaveBeenCalled();
@@ -211,11 +211,11 @@ describe('picking routes — controller passes the right arguments', () => {
   });
 
   it('forwards the query string verbatim', async () => {
-    await request(app).get(`${BASE}?dispatchDate=2026-08-03&cohort=week1&status=pending`)
+    await request(app).get(`${BASE}?dispatchDate=2026-08-03&cohort=tuesday&status=pending`)
       .set('Cookie', cookieFor(ROLES.MANAGER));
 
     expect(serviceMock.getSlips).toHaveBeenCalledWith(
-      { dispatchDate: '2026-08-03', cohort: 'week1', status: 'pending' },
+      { dispatchDate: '2026-08-03', cohort: 'tuesday', status: 'pending' },
       expect.anything()
     );
   });
@@ -223,10 +223,10 @@ describe('picking routes — controller passes the right arguments', () => {
   it('passes the acting user to the generator', async () => {
     await request(app).post(`${BASE}/generate`)
       .set('Cookie', cookieFor(ROLES.MANAGER, { id: 20 }))
-      .send({ dispatchDate: '2026-08-03', cohort: 'week1' });
+      .send({ dispatchDate: '2026-08-03', cohort: 'tuesday' });
 
     expect(serviceMock.generateSlips).toHaveBeenCalledWith(
-      { dispatchDate: '2026-08-03', cohort: 'week1' },
+      { dispatchDate: '2026-08-03', cohort: 'tuesday' },
       expect.objectContaining({ id: 20 })
     );
   });
@@ -310,7 +310,7 @@ describe('picking routes — validateIntId on :id', () => {
 // ── Status mapping ────────────────────────────────────────────
 describe('picking routes — service status is honoured', () => {
   const cases = [
-    [400, 'Cohort must be week1 or week2.'],
+    [400, 'Cohort must be tuesday or thursday.'],
     [403, 'Only managers can generate picking slips.'],
     [404, 'Picking slip not found.'],
     [409, 'This pallet is already being packed by someone else.'],
@@ -407,7 +407,7 @@ describe('regressions — previously known defects', () => {
 describe('picking routes — PATCH /:id', () => {
   it.each(MANAGERS_UP)('%s can edit a slip', async (role) => {
     const res = await request(app).patch(`${BASE}/1`)
-      .set('Cookie', cookieFor(role)).send({ dispatchDate: '2026-08-10', cohort: 'week2' });
+      .set('Cookie', cookieFor(role)).send({ dispatchDate: '2026-08-10', cohort: 'thursday' });
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ success: true, data: SLIP });
   });

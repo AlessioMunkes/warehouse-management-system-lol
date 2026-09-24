@@ -26,8 +26,8 @@ import {
 import { Loader2 } from 'lucide-react';
 
 const COHORT_OPTIONS = [
-  { value: 'week1', label: 'Week 1' },
-  { value: 'week2', label: 'Week 2' },
+  { value: 'tuesday', label: 'Tuesday' },
+  { value: 'thursday', label: 'Thursday' },
 ];
 
 const BLANK = { name: '', cohort: '', contactName: '', childCount: '' };

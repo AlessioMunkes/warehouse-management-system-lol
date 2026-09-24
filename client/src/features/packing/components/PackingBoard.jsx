@@ -11,7 +11,7 @@ import { fetchPickingSlips, assignSlip } from "../../../services/pickingAPI";
 import Paged from "../../staff/components/Paged";
 import usePaged from "../../staff/hooks/usePaged";
 
-const COHORT_LABELS = { week1: "Week 1", week2: "Week 2" };
+const COHORT_LABELS = { tuesday: "Tuesday", thursday: "Thursday" };
 
 const slipText = (slip) => [slip.ecd_name, slip.packer_name].filter(Boolean).join(" ");
 
@@ -187,8 +187,8 @@ export default function PackingBoard({ currentUser, onOpenSlip }) {
             onChange={(e) => setFilters((f) => ({ ...f, cohort: e.target.value }))}
           >
             <option value="">All cohorts</option>
-            <option value="week1">Week 1</option>
-            <option value="week2">Week 2</option>
+            <option value="tuesday">Tuesday</option>
+            <option value="thursday">Thursday</option>
           </select>
         </div>
 

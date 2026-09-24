@@ -31,7 +31,7 @@ import {
 import { Search, Plus, Pencil, Power, ShieldCheck, RotateCcw, X } from 'lucide-react';
 
 const CAN_MANAGE = ['manager', 'admin'];
-const OTHER_COHORT = { week1: 'week2', week2: 'week1' };
+const OTHER_COHORT = { tuesday: 'thursday', thursday: 'tuesday' };
 import useTableView    from '../features/masterdata/hooks/useTableView';
 import MasterDataTable from '../features/masterdata/components/MasterDataTable';
 import ColumnToggle    from '../features/masterdata/components/ColumnToggle';

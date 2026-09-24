@@ -30,7 +30,7 @@
 import pool from '../config/db.js';
 import { logAudit } from './auditLog.repository.js';
 
-const COHORT_FLIP = { week1: 'week2', week2: 'week1' };
+const COHORT_FLIP = { tuesday: 'thursday', thursday: 'tuesday' };
 
 const UPDATABLE = {
   name:        'name',
@@ -150,20 +150,18 @@ const approveBeneficiary = async (id) => {
 
 // ── Cohort rollback ───────────────────────────────────────────
 // Sponsor feedback (Milestone 2 change request log): when an ECD
-// misses its collection, support moving it back to the previous
-// cohort/week rather than leaving the non-collection to sit until its
-// own cohort comes around again a fortnight later.
+// misses its collection, support moving it to the OTHER pickup day
+// this same week rather than making it wait for its own day to come
+// back around.
 //
-// ASSUMED BEHAVIOUR, FLAGGED FOR SPONSOR CONFIRMATION: with only two
-// cohorts (week1/week2), "the previous cohort" is read here as a flip
-// to the other one — that is the only "previous" a two-value rotation
-// has, and it is also the interpretation that actually helps: it
-// moves the centre into NEXT week's run instead of making it wait out
-// the rest of this fortnight. See dispatch.service.js's own note
-// (search "cohort_anchor_monday") — this whole fortnightly week1/week2
-// model may itself be wrong per the URS/database.md's weekly
-// tuesday/thursday design; that is a separate, larger question this
-// rollback does not attempt to resolve.
+// Now that pickup is weekly (Tuesday/Thursday), not fortnightly, the
+// original motivation for this — a missed centre otherwise waiting a
+// full fortnight — mostly doesn't apply (its own day is at most a few
+// days away). Kept anyway as a manual "move it to the other day this
+// week" escape hatch, which is still a real thing a manager might
+// need to do (Tuesday's run overran, get this centre in Thursday's
+// instead) — a flip is still the only "the other one" a two-value
+// cohort has.
 //
 // Audited as its own action (not routed through the generic
 // updateBeneficiary PATCH, which writes no audit row at all) because

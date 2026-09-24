@@ -12,13 +12,13 @@
 // ─────────────────────────────────────────────────────────────
 import { Badge } from '@/components/ui/badge';
 
-export const COHORT_LABELS = { week1: 'Week 1', week2: 'Week 2' };
+export const COHORT_LABELS = { tuesday: 'Tuesday', thursday: 'Thursday' };
 
 // The two values beneficiaries.cohort actually holds. A pill per value,
 // so the filter cannot offer something the column will never match.
 export const COHORT_FILTERS = [
-  { value: 'week1', label: 'Week 1' },
-  { value: 'week2', label: 'Week 2' },
+  { value: 'tuesday', label: 'Tuesday' },
+  { value: 'thursday', label: 'Thursday' },
 ];
 
 const fmtDate = (value) =>

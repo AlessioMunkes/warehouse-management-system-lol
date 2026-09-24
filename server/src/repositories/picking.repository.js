@@ -35,16 +35,6 @@ const logEvent = async (client, slipId, eventType, actorId, detail = null) => {
   );
 };
 
-// ── Rotation anchor ────────────────────────────────────────────
-// The Monday of a known 'week1' week — the service layer uses this
-// to compute which cohort is active for any given dispatch date.
-const getCohortAnchor = async () => {
-  const result = await pool.query(
-    `SELECT value FROM picking_settings WHERE key = 'cohort_anchor_monday'`
-  );
-  return result.rows[0]?.value ?? null;
-};
-
 // ── List slips for a dispatch day ─────────────────────────────
 // Progress is computed in SQL so the board doesn't need N+1 queries.
 //
@@ -888,7 +878,6 @@ const getAssignableWorkers = async () => {
 
 export default {
   CLAIMABLE_STATUSES,
-  getCohortAnchor,
   getSlips,
   getSlipById,
   generateSlips,
