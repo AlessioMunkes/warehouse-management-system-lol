@@ -27,7 +27,7 @@ import {
   fetchPickingSlip, assignSlip, confirmItem, flagItem, completeSlip,
 } from '../../../services/pickingAPI';
 import {
-  Actions, Button, ChoiceList, Counter, Notice, ViewToggle, Coachmark,
+  Actions, Button, ChoiceList, Counter, Notice, TextField, ViewToggle, Coachmark,
 } from '../../staff/components/StepPrimitives';
 import useCoachmark from '../../staff/hooks/useCoachmark';
 
@@ -66,6 +66,9 @@ function ItemDecisionPanel({ item, slipId, onDone }) {
   const [qty, setQty] = useState(Number(item.required_quantity) || 0);
   const [flagQty, setFlagQty] = useState('');
   const [reason, setReason] = useState('');
+  // The paper slip's "Comment" column — on every line, not only a
+  // flagged one, so it lives here rather than folded into reason.
+  const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -82,6 +85,13 @@ function ItemDecisionPanel({ item, slipId, onDone }) {
     return (
       <div className="stf-field-body">
         <Counter label={item.product_name} value={qty} onChange={setQty} />
+        <TextField
+          id={`stf-note-confirm-${item.id}`}
+          label="Comment (optional)"
+          hint="E.g. a substitution — anything worth the floor knowing that isn't a shortage."
+          value={note}
+          onChange={setNote}
+        />
         {error ? <Notice tone="warn">{error}</Notice> : null}
         <Actions row>
           <Button
@@ -90,7 +100,7 @@ function ItemDecisionPanel({ item, slipId, onDone }) {
               setSubmitting(true);
               setError(null);
               try {
-                await confirmItem(slipId, item.id, qty);
+                await confirmItem(slipId, item.id, qty, note);
                 onDone();
               } catch (err) {
                 setError(err.message || 'Could not confirm this item.');
@@ -112,6 +122,13 @@ function ItemDecisionPanel({ item, slipId, onDone }) {
       <ChoiceList legend="Why is this flagged?" options={REASON_OPTIONS} value={reason} onChange={setReason} />
       <Counter label="Qty actually packed" value={flagQty === '' ? 0 : Number(flagQty)} onChange={(v) => setFlagQty(String(v))} />
       <p className="stf-field-hint">Whatever you set here comes off stock when the pallet is closed.</p>
+      <TextField
+        id={`stf-note-flag-${item.id}`}
+        label="Comment (optional)"
+        hint="Extra detail beyond the reason above, if there is any."
+        value={note}
+        onChange={setNote}
+      />
       {error ? <Notice tone="warn">{error}</Notice> : null}
       <Actions row>
         <Button
@@ -120,7 +137,7 @@ function ItemDecisionPanel({ item, slipId, onDone }) {
             setSubmitting(true);
             setError(null);
             try {
-              await flagItem(slipId, item.id, reason, flagQty === '' ? undefined : Number(flagQty));
+              await flagItem(slipId, item.id, reason, flagQty === '' ? undefined : Number(flagQty), note);
               onDone();
             } catch (err) {
               setError(err.message || 'Could not flag this item.');
@@ -366,6 +383,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
                         Required {item.required_quantity} {item.unit}
                         {item.packed_quantity != null ? ` · Packed ${item.packed_quantity} ${item.unit}` : ''}
                         {item.flag_reason ? ` · ${item.flag_reason}` : ''}
+                        {item.packer_note ? ` · ${item.packer_note}` : ''}
                       </span>
                     </span>
                     <span className={badge.className}>{badge.label}</span>

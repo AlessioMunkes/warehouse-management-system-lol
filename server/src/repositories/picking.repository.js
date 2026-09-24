@@ -119,6 +119,7 @@ const getSlipById = async (id) => {
        psi.packed_quantity,
        psi.status,
        psi.flag_reason,
+       psi.packer_note,
        psi.confirmed_at,
        p.name               AS product_name,
        p.stock_keeping_unit AS sku
@@ -209,11 +210,18 @@ const generateSlips = async ({ dispatchDate, cohort, generatedBy }) => {
   }
 };
 
-// ── Create a single ad-hoc slip ───────────────────────────────
+// ── Create a single new slip ───────────────────────────────────
 // Same idempotent shape as generateSlips, scoped to one ECD — for a
 // late-registered ECD, a correction, or any slip needed outside the
 // normal cohort-wide generation run.
-const createSlip = async ({ ecdId, dispatchDate, cohort, generatedBy }) => {
+//
+// `items`, when the caller supplies it, REPLACES the usual pull from
+// ecd_order_lines — the manager typed or adjusted the lines by hand
+// (including via meals-to-serve auto-calculation, done client-side)
+// instead of taking the centre's standing order as-is. Omit it
+// entirely to keep the original "pull from the standing order"
+// behaviour generateSlips also relies on.
+const createSlip = async ({ ecdId, dispatchDate, cohort, generatedBy, items }) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -236,38 +244,51 @@ const createSlip = async ({ ecdId, dispatchDate, cohort, generatedBy }) => {
 
     const slipId = slipResult.rows[0].id;
 
-    const itemsResult = await client.query(
-      `INSERT INTO picking_slip_items (picking_slip_id, product_id, required_quantity, unit)
-       SELECT $1, ol.product_id, ol.quantity, ol.unit
-       FROM ecd_order_lines ol
-       JOIN products p ON p.id = ol.product_id
-       WHERE ol.ecd_id = $2
-         AND ol.effective_from <= $3::date
-         AND (ol.effective_to IS NULL OR ol.effective_to >= $3::date)
-         AND p.archived_at IS NULL
-       RETURNING id`,
-      [slipId, ecdId, dispatchDate]
-    );
+    let itemCount;
+    if (items) {
+      for (const item of items) {
+        await client.query(
+          `INSERT INTO picking_slip_items (picking_slip_id, product_id, required_quantity, unit)
+           VALUES ($1, $2, $3, $4)`,
+          [slipId, item.productId, item.quantity, item.unit]
+        );
+      }
+      itemCount = items.length;
+    } else {
+      const itemsResult = await client.query(
+        `INSERT INTO picking_slip_items (picking_slip_id, product_id, required_quantity, unit)
+         SELECT $1, ol.product_id, ol.quantity, ol.unit
+         FROM ecd_order_lines ol
+         JOIN products p ON p.id = ol.product_id
+         WHERE ol.ecd_id = $2
+           AND ol.effective_from <= $3::date
+           AND (ol.effective_to IS NULL OR ol.effective_to >= $3::date)
+           AND p.archived_at IS NULL
+         RETURNING id`,
+        [slipId, ecdId, dispatchDate]
+      );
+      itemCount = itemsResult.rowCount;
+    }
 
     await logEvent(client, slipId, 'generated', generatedBy, {
       dispatch_date: dispatchDate,
       mode:          'manual',
-      item_count:    itemsResult.rowCount,
+      item_count:    itemCount,
     });
-    if (itemsResult.rowCount === 0) {
+    if (itemCount === 0) {
       await logEvent(client, slipId, 'no_order_lines', generatedBy, { dispatch_date: dispatchDate });
     }
 
     await createNotification(client, {
       type:       'picking_slip_created',
-      title:      `Ad-hoc picking slip created for ${ecdCheck.rows[0].name}`,
-      body:       `${dispatchDate}${itemsResult.rowCount === 0 ? '. No lines to check.' : '.'}`,
+      title:      `New picking slip created for ${ecdCheck.rows[0].name}`,
+      body:       `${dispatchDate}${itemCount === 0 ? '. No lines to check.' : '.'}`,
       entityType: 'picking_slip',
       entityId:   slipId,
     });
 
     await client.query('COMMIT');
-    return { slipId, itemCount: itemsResult.rowCount };
+    return { slipId, itemCount };
 
   } catch (err) {
     await client.query('ROLLBACK');
@@ -598,7 +619,7 @@ const editSlip = async ({ slipId, dispatchDate, cohort, items, actorId }) => {
 // so the board and the slip can show it. Silently accepting a
 // mismatched confirm is how a short pallet reaches the gate looking
 // complete.
-const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReason, actorId, canOverride = false }) => {
+const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReason, note, actorId, canOverride = false }) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -635,11 +656,12 @@ const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReaso
        SET status          = $1::picking_item_status,
            packed_quantity = $2,
            flag_reason     = $3,
-           confirmed_by    = $4,
+           packer_note     = $4,
+           confirmed_by    = $5,
            confirmed_at    = NOW()
-       WHERE id = $5 AND picking_slip_id = $6
+       WHERE id = $6 AND picking_slip_id = $7
        RETURNING *, (packed_quantity - required_quantity) AS quantity_variance`,
-      [status, packedQuantity ?? null, flagReason ?? null, actorId, itemId, slipId]
+      [status, packedQuantity ?? null, flagReason ?? null, note ?? null, actorId, itemId, slipId]
     );
 
     if (!result.rows[0]) { await client.query('ROLLBACK'); return { notFound: true }; }
@@ -662,7 +684,7 @@ const setItemStatus = async ({ slipId, itemId, status, packedQuantity, flagReaso
       client, slipId,
       status === 'flagged' ? 'item_flagged' : 'item_confirmed',
       actorId,
-      { item_id: itemId, required_quantity: required, packed_quantity: packedQuantity, flag_reason: flagReason }
+      { item_id: itemId, required_quantity: required, packed_quantity: packedQuantity, flag_reason: flagReason, note }
     );
 
     if (variance) {

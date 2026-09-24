@@ -37,6 +37,31 @@ const scheduledCohortFor = (date) => {
 
 const isManager = (user) => user.role === ROLES.MANAGER || user.role === ROLES.ADMIN;
 
+// ── Product-line validation ──────────────────────────────────
+// Shared by createSlip (a manager typing/adjusting lines instead of
+// taking the centre's standing order as-is) and editSlip (replacing a
+// pending slip's lines wholesale) — one place so the two paths can't
+// drift on what counts as a valid line.
+const cleanItemLines = (items) => {
+  if (!Array.isArray(items) || items.length === 0) fail(400, 'A slip needs at least one product line.');
+
+  const cleaned = items.map((line) => {
+    const productId = Number(line.productId);
+    const quantity  = Number(line.quantity);
+    if (!Number.isInteger(productId) || productId <= 0) fail(400, 'Invalid product on the slip.');
+    if (!Number.isFinite(quantity) || quantity <= 0)    fail(400, 'Every line needs a quantity greater than zero.');
+    if (!line.unit)                                     fail(400, 'Every line needs a unit.');
+    return { productId, quantity, unit: line.unit };
+  });
+
+  const seen = new Set();
+  for (const line of cleaned) {
+    if (seen.has(line.productId)) fail(400, 'The same product appears twice on this slip.');
+    seen.add(line.productId);
+  }
+  return cleaned;
+};
+
 // ── List slips ────────────────────────────────────────────────
 // Everyone sees the whole board by default — a packer has to be able
 // to see unclaimed pallets in order to claim one. `mine=true` narrows
@@ -105,16 +130,23 @@ const generateSlips = async ({ dispatchDate, cohort }, user) => {
 // ── Create a single new slip (manager only) ────────────────────
 // For a late-registered ECD, a correction, or a make-up delivery
 // outside that ECD's normal weekly pickup day.
-const createSlip = async ({ ecdId, dispatchDate, cohort, force }, user) => {
+// `items`, when supplied, replaces the usual pull from the centre's
+// standing order (ecd_order_lines) — a manager typed or adjusted the
+// lines by hand, including via the client's meals-to-serve
+// calculation. Omit it to keep pulling from the standing order.
+const createSlip = async ({ ecdId, dispatchDate, cohort, force, items }, user) => {
   if (!isManager(user)) fail(403, 'Only managers can create picking slips.');
   if (!ecdId)           fail(400, 'ECD is required.');
   await validateDispatchDate(dispatchDate, cohort, { allowOverride: force === true });
+
+  const cleanItems = items !== undefined ? cleanItemLines(items) : undefined;
 
   const result = await pickingRepository.createSlip({
     ecdId,
     dispatchDate,
     cohort,
     generatedBy: user.id,
+    items: cleanItems,
   });
 
   if (result.ecdNotFound)   fail(404, 'ECD not found, inactive, or not yet approved for dispatch.');
@@ -225,25 +257,7 @@ const editSlip = async (slipId, body, user) => {
     await validateDispatchDate(dispatchDate, cohort, { allowOverride: force === true });
   }
 
-  let cleanItems;
-  if (items !== undefined) {
-    if (!Array.isArray(items) || items.length === 0) fail(400, 'A slip needs at least one product line.');
-
-    cleanItems = items.map((line) => {
-      const productId = Number(line.productId);
-      const quantity  = Number(line.quantity);
-      if (!Number.isInteger(productId) || productId <= 0) fail(400, 'Invalid product on the slip.');
-      if (!Number.isFinite(quantity) || quantity <= 0)    fail(400, 'Every line needs a quantity greater than zero.');
-      if (!line.unit)                                     fail(400, 'Every line needs a unit.');
-      return { productId, quantity, unit: line.unit };
-    });
-
-    const seen = new Set();
-    for (const line of cleanItems) {
-      if (seen.has(line.productId)) fail(400, 'The same product appears twice on this slip.');
-      seen.add(line.productId);
-    }
-  }
+  const cleanItems = items !== undefined ? cleanItemLines(items) : undefined;
 
   const result = await pickingRepository.editSlip({
     slipId,
@@ -261,6 +275,19 @@ const editSlip = async (slipId, body, user) => {
   return result.slip;
 };
 
+// ── Item note ─────────────────────────────────────────────────
+// The paper slip's "Comment" column, on every line — not only a
+// flagged one, which is what flagReason already covers. A substituted
+// product, or anything else the floor needs on record that isn't a
+// shortage. Optional; capped the same length as flagReason.
+const cleanNote = (rawNote) => {
+  if (rawNote === undefined || rawNote === null) return undefined;
+  const note = String(rawNote).trim();
+  if (!note) return undefined;
+  if (note.length > 500) fail(400, 'Note is too long.');
+  return note;
+};
+
 // ── Confirm a line ────────────────────────────────────────────
 // Returns { ...item, variance } — variance is non-null when the
 // packer confirmed a quantity other than the one the slip asked for.
@@ -274,7 +301,8 @@ const confirmItem = async (slipId, itemId, body, user) => {
   if (packedQuantity <= 0)              fail(400, 'Packed quantity must be greater than zero. Flag the item instead if you packed none.');
 
   const result = await pickingRepository.setItemStatus({
-    slipId, itemId, status: 'confirmed', packedQuantity, actorId: user.id, canOverride: isManager(user),
+    slipId, itemId, status: 'confirmed', packedQuantity, note: cleanNote(body.note),
+    actorId: user.id, canOverride: isManager(user),
   });
 
   if (result.notFound) fail(404, 'Picking slip item not found.');
@@ -297,8 +325,8 @@ const flagItem = async (slipId, itemId, body, user) => {
   }
 
   const result = await pickingRepository.setItemStatus({
-    slipId, itemId, status: 'flagged', packedQuantity, flagReason: reason, actorId: user.id,
-    canOverride: isManager(user),
+    slipId, itemId, status: 'flagged', packedQuantity, flagReason: reason, note: cleanNote(body.note),
+    actorId: user.id, canOverride: isManager(user),
   });
 
   if (result.notFound) fail(404, 'Picking slip item not found.');

@@ -30,7 +30,7 @@ const PRODUCT_COLUMNS = `
   p.id, p.name, p.stock_keeping_unit AS sku, p.weight_kg,
   p.is_active, p.created_at, p.category, p.is_perishable,
   p.default_unit, p.storage_type, p.default_location_id,
-  p.archived_at, p.unit_cost,
+  p.archived_at, p.unit_cost, p.quantity_per_meal,
   COALESCE(sl.reorder_threshold, 0) AS reorder_threshold,
   sl.unit AS ledger_unit`;
 
@@ -185,6 +185,10 @@ const PRODUCT_PATCH_COLUMNS = {
   storageType:       'storage_type',
   defaultLocationId: 'default_location_id',
   unitCost:          'unit_cost',
+  // How much of this product one meal/beneficiary needs — drives the
+  // "meals to serve" quantity calculator on Create Slip. Null means
+  // "no ratio set for this product yet," not zero.
+  quantityPerMeal:   'quantity_per_meal',
 };
 
 // Wrapped in a transaction because a patch touching defaultUnit or
