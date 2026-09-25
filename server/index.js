@@ -52,29 +52,32 @@ if (!process.env.JWT_SECRET) {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app  = express();
-app.use((req, res, next) => {
-  console.log(`[REQ] ${req.method} ${req.originalUrl}`);
-  next();
-});
-const port = process.env.PORT || 5000;
-const defaultClientOrigins = new Set([
-  'http://localhost:5173',
-  'http://localhost:5174',
-]);
 
-const isAllowedClientOrigin = (origin) => {
-  console.log(`[CORS] Incoming origin: ${origin}`);
-  console.log(`[CORS] CLIENT_ORIGIN: ${process.env.CLIENT_ORIGIN}`);
-  if (!origin) return true;
-  if (process.env.CLIENT_ORIGIN) {
-    const allowed = origin === process.env.CLIENT_ORIGIN;
-    console.log(`[CORS] Match CLIENT_ORIGIN: ${allowed}`);
-    return allowed;
-  }
-  const allowed = defaultClientOrigins.has(origin);
-  console.log(`[CORS] Match default origins: ${allowed}`);
-  return allowed;
-};
+// Render (and any host like it) sits behind one reverse proxy. Without
+// this, req.ip is the proxy's address for every request, so the login
+// rate limiter counted the whole warehouse as a single client.
+app.set('trust proxy', 1);
+const port = process.env.PORT || 5000;
+// Origins allowed to call the API with the auth cookie.
+//   - dev:                 the Vite server on 5173/5174
+//   - CLIENT_ORIGIN:       an explicit override (e.g. a custom domain)
+//   - RENDER_EXTERNAL_URL: set by Render itself to this service's own
+//                          https URL. The client is served from that
+//                          same origin, and Chrome still sends an Origin
+//                          header on same-origin POSTs and font requests.
+//                          Before this was listed, every login and every
+//                          webfont on Render was rejected here and came
+//                          back as a 500.
+const allowedClientOrigins = new Set([
+  ...(process.env.NODE_ENV === 'production'
+    ? []
+    : ['http://localhost:5173', 'http://localhost:5174']),
+  process.env.CLIENT_ORIGIN,
+  process.env.RENDER_EXTERNAL_URL,
+].filter(Boolean));
+
+const isAllowedClientOrigin = (origin) =>
+  !origin || allowedClientOrigins.has(origin);
 
 // helmet sets 11 HTTP headers that protect against common attacks.
 // Must be first — before cors, routes, everything.
@@ -108,7 +111,10 @@ app.use(cookieParser());
 app.use(cors({
   origin:      (origin, callback) => {
     if (isAllowedClientOrigin(origin)) return callback(null, true);
-    return callback(new Error(`CORS blocked for origin: ${origin}`));
+    console.warn(`[CORS] blocked origin: ${origin}`);
+    const err = new Error(`CORS blocked for origin: ${origin}`);
+    err.status = 403;
+    return callback(err);
   },
   credentials: true,
 }));

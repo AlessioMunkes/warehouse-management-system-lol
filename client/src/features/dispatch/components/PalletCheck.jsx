@@ -104,6 +104,8 @@ export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChan
   const [phase, setPhase] = useState('which');
   const [lines, setLines] = useState([]);
   const [focusId, setFocusId] = useState(null);
+  // Which pallet `lines` belongs to — see the draft effect below.
+  const [linesKey, setLinesKey] = useState(null);
 
   const [overrideReason, setOverrideReason] = useState('');
   const [driverName, setDriverName] = useState('');
@@ -184,6 +186,7 @@ export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChan
         } else {
           setLines(built);
         }
+        setLinesKey(`dispatch-${palletId}`);
       })
       .catch((err) => { if (!cancelled) setLoadError(err.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -228,12 +231,15 @@ export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChan
 
   // Save the draft whenever the numbers or the driver change. Guarded
   // on phase so an untouched pallet does not leave a draft behind.
+  // Keyed by linesKey rather than palletId: when DispatchPage swaps
+  // pallets, palletId changes a render before the new pallet's lines
+  // arrive, and the old lines must not be saved under the new key.
   useEffect(() => {
-    if (phase !== 'work' || !draftKey) return;
+    if (phase !== 'work' || !linesKey) return;
     const loaded = {};
     for (const line of packedLines) loaded[line.itemId] = line.loaded;
-    writeDraft(draftKey, { loaded, driverName, vehicleReg });
-  }, [phase, draftKey, packedLines, driverName, vehicleReg]);
+    writeDraft(linesKey, { loaded, driverName, vehicleReg });
+  }, [phase, linesKey, packedLines, driverName, vehicleReg]);
 
   const handleModeChange = (next) => {
     setMode(next);
@@ -324,8 +330,9 @@ export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChan
         overrideReason: needsOverride ? overrideReason : null,
       });
 
+      // Sent, or safely in the outbox — either way the draft's job is done.
+      clearDraft(linesKey ?? draftKey);
       setPhase('done');
-      clearDraft(draftKey);
 
       // Queued, not recorded — there is no note to show, because the
       // server has not seen this collection yet.

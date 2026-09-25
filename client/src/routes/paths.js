@@ -29,6 +29,12 @@
 // DONATIONS.new must never drift apart.
 const DONATIONS_NEW = '/donations/new';
 
+// ── Landing ──────────────────────────────────────────────────
+// The public entry point — App.jsx's "/" route. Declared here so
+// nothing that links back to it (LoginPage's back link, etc.) has to
+// hardcode "/".
+export const LANDING = '/';
+
 export const PACKING = {
   // One URL for everyone. PackingSelectPage decides whether that
   // renders the manager's board (PackingPage) or the packer's own

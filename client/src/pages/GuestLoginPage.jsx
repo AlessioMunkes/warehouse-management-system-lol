@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import logo from '../assets/Batches_Logo.jpeg';
 import Log_In_Background from '../assets/Log_In_Background.jpg';
+import { LANDING } from '../routes/paths';
 
 // shadcn/ui components
 import { Button } from '@/components/ui/button';
@@ -98,6 +99,15 @@ const GuestLoginPage = () => {
         {/* ── Guest sign-in card ── */}
         <Card className="login-card">
           <CardHeader className="login-card-header">
+            <div className="login-field-row">
+              <button
+                type="button"
+                onClick={() => navigate(LANDING)}
+                className="login-forgot-link"
+              >
+                ← BACK TO HOME
+              </button>
+            </div>
             <CardTitle className="login-title">GUEST LOG IN</CardTitle>
             <CardDescription className="login-subtitle">
               Please fill in your details to continue

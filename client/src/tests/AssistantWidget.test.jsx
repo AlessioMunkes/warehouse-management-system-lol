@@ -270,6 +270,59 @@ describe('not spending a model call when the catalog already knows', () => {
   });
 });
 
+describe('when the server has no API key', () => {
+  // What happened on the hosted site: render.yaml never declared
+  // GEMINI_API_KEY, so provider.isEnabled() was false and every typed
+  // question came back "the help assistant is not switched on" — after
+  // the person had typed it.
+  //
+  // The catalogue needs no key, so most of the panel still works. It
+  // now says so up front instead of letting someone hit a wall.
+  const offline = () => api.fetchAssistantCatalog.mockResolvedValue({
+    enabled: false,
+    suggestions: { receiving: [{ id: 'receiving-record', title: 'Recording a delivery' }] },
+  });
+
+  it('says so up front rather than after you have typed', async () => {
+    offline();
+    renderAt('/noc/procurement');
+    const panel = await openPanel();
+    expect(await within(panel).findByText(/switched off on this server/i)).toBeInTheDocument();
+  });
+
+  it('will not let you type a question it cannot answer', async () => {
+    offline();
+    renderAt('/noc/procurement');
+    const panel = await openPanel();
+    await waitFor(() =>
+      expect(within(panel).getByRole('textbox', { name: /ask/i })).toBeDisabled());
+    expect(within(panel).getByRole('button', { name: /send/i })).toBeDisabled();
+  });
+
+  // The important half: the help itself is a catalogue read, so it
+  // keeps working with no key at all.
+  it('still answers from the suggestions, which need no key', async () => {
+    offline();
+    renderAt('/noc/procurement');
+    const panel = await openPanel();
+    await userEvent.click(await within(panel).findByRole('button', { name: 'Recording a delivery' }));
+
+    await waitFor(() => expect(api.fetchTopic).toHaveBeenCalledWith('receiving-record'));
+    // The BODY, not the title: tapping a chip echoes its label as the
+    // question too, so the title is legitimately on screen twice.
+    expect(await within(panel).findByText(/The system shows what was expected/))
+      .toBeInTheDocument();
+    expect(api.askAssistant).not.toHaveBeenCalled();
+  });
+
+  it('takes questions normally when the key is there', async () => {
+    renderAt('/noc/procurement');
+    const panel = await openPanel();
+    await waitFor(() =>
+      expect(within(panel).getByRole('textbox', { name: /ask/i })).toBeEnabled());
+  });
+});
+
 describe('when it cannot answer', () => {
   it('shows the server’s own wording, which says whether waiting helps', async () => {
     const err = new Error('The assistant is busy right now — try again in a minute.');

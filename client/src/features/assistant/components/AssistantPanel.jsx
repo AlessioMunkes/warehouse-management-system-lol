@@ -177,7 +177,7 @@ export default function AssistantPanel({ open, onOpenChange, screen }) {
     if (!window.matchMedia?.('(min-width: 640px)')?.matches) onOpenChange(false);
   }, [navigate, onOpenChange]);
 
-  const { entries, busy, suggestions, ask, openTopic } =
+  const { entries, busy, suggestions, enabled, ask, openTopic } =
     useAssistant({ open, screen, onNavigate: handleNavigate });
 
   // Keep the newest answer in view. 'auto' rather than 'smooth' —
@@ -246,8 +246,17 @@ export default function AssistantPanel({ open, onOpenChange, screen }) {
           <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-3">
             {entries.length === 0 && (
               <div className="space-y-2">
+                {/* The topics, the suggestions and the related links
+                    are all catalogue reads — they need no API key and
+                    work whether or not the model is configured. Only
+                    free typing does. So when the key is missing the
+                    panel says so ONCE, here, and still does most of
+                    its job, rather than letting someone type a
+                    question and meet a 503. */}
                 <p className="text-muted-foreground">
-                  Type a question in your own words, or start with one of these.
+                  {enabled
+                    ? 'Type a question in your own words, or start with one of these.'
+                    : 'Answering questions is switched off on this server, but these still work.'}
                 </p>
                 <div className="flex flex-col items-start gap-1.5">
                   {suggestions.map((s) => (
@@ -304,12 +313,17 @@ export default function AssistantPanel({ open, onOpenChange, screen }) {
               ref={inputRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="How do I…"
+              placeholder={enabled ? 'How do I…' : 'Questions are switched off here'}
               aria-label="Ask a question"
               maxLength={300}
-              disabled={busy}
+              disabled={busy || !enabled}
             />
-            <Button type="submit" size="icon" aria-label="Send" disabled={busy || !draft.trim()}>
+            <Button
+              type="submit"
+              size="icon"
+              aria-label="Send"
+              disabled={busy || !enabled || !draft.trim()}
+            >
               <Send />
             </Button>
           </form>

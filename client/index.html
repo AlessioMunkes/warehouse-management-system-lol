@@ -9,14 +9,15 @@
          path, so the tab icon 404'd silently from then on. -->
     <link rel="icon" type="image/svg+xml" href="/icons/favicon.svg" />
 
-    <!-- Tabler icon webfont. StaffTabBar.jsx renders `ti ti-home`,
-         `ti ti-truck-delivery` and friends, so this is load-bearing.
-         There were two of these, and the other one omitted /dist/ —
-         a second CDN round trip for a path the package does not
-         publish. Worth pinning a version instead of @latest at some
-         point: a CDN tag that moves under you is a dependency you
-         did not agree to. -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/dist/tabler-icons.min.css" />
+    <!-- Installed-app chrome. iOS ignores manifest icons and reads
+         apple-touch-icon instead; the capable tags make "Add to Home
+         Screen" open full-screen rather than in a Safari tab. -->
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <meta name="theme-color" content="#7A1A1A" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="LoL WMS" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 
     <title>Ladles of Love — Warehouse Management</title>
   </head>

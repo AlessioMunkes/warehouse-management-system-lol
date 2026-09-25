@@ -225,6 +225,11 @@ export default function ReceivingFlow({ onCrumbChange }) {
 
   const step = STEP_META[phase];
   const draftKey = orderId ? `receiving-${orderId}` : null;
+  // Which order `lines` belongs to, set in the same update as the
+  // lines themselves, never from orderId: in Form mode orderId changes
+  // a tick before the new order's lines arrive, and keying the draft
+  // off it would save the previous order's counts under the new name.
+  const [linesKey, setLinesKey] = useState(null);
 
   // ── Suppliers, once ─────────────────────────────────────────
   // Both lists up front rather than lazily on first switch to Form:
@@ -277,15 +282,15 @@ export default function ReceivingFlow({ onCrumbChange }) {
   // Keep the count on the device. This refills the form after a sleep
   // or a reload; it never submits anything.
   useEffect(() => {
-    if (phase !== 'work' || !draftKey || !hasLines) return;
+    if (phase !== 'work' || !linesKey || !hasLines) return;
     const counted = {};
     for (const line of lines) {
       counted[line.purchaseOrderItemId] = {
         counted: line.counted, location: line.location, useBy: line.useBy,
       };
     }
-    writeDraft(draftKey, { counted, deliveryDate });
-  }, [phase, draftKey, lines, deliveryDate, hasLines]);
+    writeDraft(linesKey, { counted, deliveryDate });
+  }, [phase, linesKey, lines, deliveryDate, hasLines]);
 
   const handleModeChange = (next) => {
     setMode(next);
@@ -313,6 +318,8 @@ export default function ReceivingFlow({ onCrumbChange }) {
     resetConfirmed();
     try {
       const items = await receivingAPI.getPurchaseOrderItems(poId);
+      // Numbers only. The order's own lines always come from the
+      // server; a draft just fills in what was already counted.
       const draft = readDraft(`receiving-${poId}`);
 
       const built = items.map((item) => {
@@ -338,6 +345,7 @@ export default function ReceivingFlow({ onCrumbChange }) {
       });
 
       setLines(built);
+      setLinesKey(`receiving-${poId}`);
       if (draft?.deliveryDate) setDeliveryDate(draft.deliveryDate);
       setPhase('work');
       setFocusId(mode === 'guided' ? (built[0]?.purchaseOrderItemId ?? null) : null);
@@ -426,8 +434,9 @@ export default function ReceivingFlow({ onCrumbChange }) {
           };
         }),
       });
+      // Sent, or safely in the outbox — either way the draft's job is done.
+      clearDraft(linesKey ?? draftKey);
       setPhase('done');
-      clearDraft(draftKey);
 
       // Queued, not recorded. There is no delivery note to show
       // because the server has not seen it yet — offering a PDF of a
