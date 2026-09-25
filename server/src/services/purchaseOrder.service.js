@@ -17,9 +17,10 @@ import repo from '../repositories/purchaseOrder.repository.js';
 import { isPositiveInt, isValidDateString } from '../utils/validation.js';
 import { PO_STATUSES as PO_STATUS_LIST } from '../constants/purchaseOrderStatus.js';
 import emailProvider from '../providers/email.provider.js';
-// TODO: swap to '../services/finance.service.js' once feature/notification-fix
-// merges — same call signature, see financeEmailFallback.service.js's header.
-import financeEmailFallback from './financeEmailFallback.service.js';
+// The Finance recipient managers save in the app (finance_report_email_settings).
+// Replaced financeEmailFallback.service.js, which read FINANCE_EMAIL until
+// feature/notification-fix brought this service onto staging.
+import financeService from './finance.service.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -244,7 +245,7 @@ Please capture this purchase order in QuickBooks, then enter the QuickBooks refe
 // recipient configured: nothing actually left the building, so no
 // status is recorded rather than falsely claiming 'sent'.
 const notifyFinance = async (purchaseOrder) => {
-  const { recipientEmail } = await financeEmailFallback.getEmailSettings();
+  const { recipientEmail } = await financeService.getEmailSettings();
   if (!recipientEmail) return; // nothing configured — leave status null, no attempt logged
 
   const { subject, text, html } = buildFinanceEmail(purchaseOrder);

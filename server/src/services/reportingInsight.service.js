@@ -28,6 +28,7 @@ import { writeNarrative } from '../features/reporting/insights/narrative.js';
 import { COMPARISONS, getComparison } from '../features/reporting/reportComparisons.js';
 import { MAX_RANGE_DAYS } from '../features/reporting/reportCatalog.js';
 import targetRepo from '../repositories/reportingTarget.repository.js';
+import comparisonRepo from '../repositories/reportingComparison.repository.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -325,7 +326,7 @@ export const runComparison = async ({ id, dateRange } = {}) => {
   if (Number.isNaN(days) || days < 0) throw fail(400, 'The start date must be on or before the end date.');
   if (days > MAX_RANGE_DAYS) throw fail(400, `Date range too wide. The maximum is ${MAX_RANGE_DAYS} days.`);
 
-  const points = await def.run({ dateRange: { from: range.from, to: range.to } });
+  const points = await comparisonRepo[def.repoFn]({ dateRange: { from: range.from, to: range.to } });
   return {
     type: 'comparison',
     id: def.id,

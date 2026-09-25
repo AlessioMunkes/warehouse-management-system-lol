@@ -17,7 +17,7 @@ const financeEmailFallbackMock = { getEmailSettings: vi.fn() };
 
 vi.mock('../src/repositories/purchaseOrder.repository.js', () => ({ default: repoMock }));
 vi.mock('../src/providers/email.provider.js', () => ({ default: emailProviderMock }));
-vi.mock('../src/services/financeEmailFallback.service.js', () => ({ default: financeEmailFallbackMock }));
+vi.mock('../src/services/finance.service.js', () => ({ default: financeEmailFallbackMock }));
 
 const { default: purchaseOrderService } = await import('../src/services/purchaseOrder.service.js');
 

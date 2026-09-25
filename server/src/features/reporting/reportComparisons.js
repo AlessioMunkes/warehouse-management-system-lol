@@ -6,11 +6,14 @@
 // this can answer is declared here once, and the AI can only name
 // one of these ids — it cannot choose its own axes.
 //
+// `repoFn` names the query in reportingComparison.repository.js rather
+// than importing it, so this file (and the AI tool schema built from
+// it) loads without a database. reportingInsight.service.js runs it.
+//
 // OPERATIONS ONLY. Nothing here is an impact figure; the centre
 // comparison uses the registered child count as context for
 // collections, not as a "children reached" number.
 // ─────────────────────────────────────────────────────────────
-import repo from '../../repositories/reportingComparison.repository.js';
 
 export const COMPARISONS = {
   centre_collections_vs_children: {
@@ -22,7 +25,7 @@ export const COMPARISONS = {
       'are the ones to call first.',
     x: { label: 'Registered children', unit: 'children' },
     y: { label: 'Pallets collected', unit: 'collections' },
-    run: repo.centreCollectionsVsChildren,
+    repoFn: 'centreCollectionsVsChildren',
     detail: (p) => `${p.meta.missed} missed${p.meta.cohort ? ` · ${p.meta.cohort}` : ''}`,
     caveat: 'Centres with no registered child count are left out.',
   },
@@ -34,7 +37,7 @@ export const COMPARISONS = {
       'quantity was wrong. A big supplier with a high rate is the biggest reconciliation risk.',
     x: { label: 'Delivery lines', unit: 'lines' },
     y: { label: 'Discrepancy rate', unit: '%' },
-    run: repo.supplierVolumeVsDiscrepancy,
+    repoFn: 'supplierVolumeVsDiscrepancy',
     detail: (p) => `${p.meta.deliveries} deliveries`,
     caveat: 'A line is discrepant if received differs from expected in either direction.',
   },
@@ -46,7 +49,7 @@ export const COMPARISONS = {
       'Expensive products bought in bulk are where a better price saves the most.',
     x: { label: 'Quantity received', unit: 'units' },
     y: { label: 'Average unit price', unit: 'ZAR/unit' },
-    run: repo.productPriceVsQuantity,
+    repoFn: 'productPriceVsQuantity',
     detail: (p) => (p.meta.unit ? `measured in ${p.meta.unit}` : ''),
     caveat: 'Units differ between products. Excludes lines with no purchase order price.',
   },
@@ -58,7 +61,7 @@ export const COMPARISONS = {
       'flagged one. Shows who carries the load and where packers keep hitting problems.',
     x: { label: 'Lines worked', unit: 'lines' },
     y: { label: 'Flag rate', unit: '%' },
-    run: repo.packerWorkloadVsFlags,
+    repoFn: 'packerWorkloadVsFlags',
     detail: (p) => `${p.meta.slips} slips`,
     caveat: 'Staff packers only; guest packers have no account and are not shown. A flag usually means stock was short, not that the packer erred.',
   },
