@@ -1,0 +1,55 @@
+/* Categorical chart colours for the Operations page, in fixed order.
+   Validated with the dataviz palette checker against --surface in
+   each theme (light #ffffff, dark #1c2325): lightness band, chroma,
+   colour-blind separation and normal-vision separation all pass.
+   Slots 3–5 sit under 3:1 on white, so every chart that uses them
+   also has direct labels or its table view. Scatter plots use one
+   colour only. */
+:root {
+  --viz-1: #2a78d6; --viz-2: #eb6834; --viz-3: #1baf7a; --viz-4: #eda100;
+  --viz-5: #e87ba4; --viz-6: #008300; --viz-7: #4a3aa7; --viz-8: #e34948;
+}
+.dark {
+  --viz-1: #3987e5; --viz-2: #d95926; --viz-3: #199e70; --viz-4: #c98500;
+  --viz-5: #d55181; --viz-6: #008300; --viz-7: #9085e9; --viz-8: #e66767;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   client/src/features/reporting/operationalReport.css
+
+   Print view for the written operations report
+   (OperationalInsight.jsx). While printing, the component renders a
+   clean copy as a direct child of <body> (.op-print-root) and adds
+   .op-printing to <html>; everything else is switched off.
+
+   display: none, not visibility: hidden, for the same reason
+   receipts.css gives: a hidden element still takes up its box and
+   prints as blank pages.
+   ───────────────────────────────────────────────────────────── */
+@media screen {
+  .op-print-root { display: none; }
+}
+
+@media print {
+  html.op-printing body > *:not(.op-print-root) { display: none !important; }
+
+  html.op-printing .op-print-root {
+    display: block;
+    padding: 0;
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  html.op-printing .op-no-print { display: none !important; }
+
+  html.op-printing .op-avoid-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 14mm;
+  }
+}

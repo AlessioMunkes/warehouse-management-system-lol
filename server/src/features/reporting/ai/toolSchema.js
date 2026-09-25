@@ -18,6 +18,7 @@ import {
   METRICS, DIMENSIONS, COHORTS, BENEFICIARY_KINDS,
   MOVEMENT_TYPES, DONATION_CATEGORIES, MAX_RANK_LIMIT,
 } from '../reportCatalog.js';
+import { COMPARISONS, COMPARISON_IDS } from '../reportComparisons.js';
 
 const STRING = 'STRING', INTEGER = 'INTEGER', ARRAY = 'ARRAY', OBJECT = 'OBJECT';
 
@@ -38,6 +39,12 @@ const IMPACT_METRICS = Object.values(METRICS).filter((m) => m.impactOnly);
 // Per-metric legality is enforced by validateSpec — encoding it here
 // would need one function per metric and a far larger prompt.
 const ALL_DIMENSIONS = [...new Set(OPERATIONAL_METRICS.flatMap((m) => m.dimensions))];
+
+// How the Operations page can DRAW a report. A display hint only:
+// it never changes the query, and the page falls back to the
+// default view when the data cannot take the shape asked for (a
+// donut of a trend, say).
+export const CHART_VIEWS = ['bar', 'hbar', 'line', 'area', 'donut', 'pareto', 'stacked', 'heatmap', 'table'];
 
 export const buildTools = () => ([
   {
@@ -63,8 +70,31 @@ export const buildTools = () => ([
         movement_type:     { type: STRING, enum: MOVEMENT_TYPES,     description: 'Optional. One kind of stock movement.' },
         donation_category: { type: STRING, enum: DONATION_CATEGORIES,description: 'Optional. One donation category.' },
         limit: { type: INTEGER, description: `Optional. Rows for ranked reports. Max ${MAX_RANK_LIMIT}.` },
+        chart_type: {
+          type: STRING, enum: CHART_VIEWS,
+          description:
+            'Optional. Only when the user asks for a kind of chart: donut or pie for shares, ' +
+            'pareto for "which few cause most", stacked or heatmap for a two-way month breakdown, ' +
+            'area or line for trends, table for the raw figures.',
+        },
       },
       required: ['metric'],
+    },
+  },
+  {
+    name: 'run_comparison',
+    description:
+      'Show a scatter plot comparing two measures, one dot per item. Use this when the user ' +
+      'asks for a scatter plot, or to compare two things against each other per centre, ' +
+      'supplier, product or packer, and one of the comparisons matches.',
+    parameters: {
+      type: OBJECT,
+      properties: {
+        comparison: { type: STRING, enum: COMPARISON_IDS, description: 'Which comparison to show.' },
+        date_from: { type: STRING, description: 'Start date, YYYY-MM-DD.' },
+        date_to:   { type: STRING, description: 'End date, YYYY-MM-DD.' },
+      },
+      required: ['comparison'],
     },
   },
   {
@@ -85,6 +115,29 @@ export const buildTools = () => ([
       required: ['question', 'options'],
     },
   },
+  {
+    name: 'no_matching_report',
+    description:
+      'Use this when no available report answers the question: it asks for something the ' +
+      'warehouse does not record, for an impact figure, or for donor, caller or volunteer ' +
+      'details. Do not force the question onto a report that answers something else.',
+    parameters: {
+      type: OBJECT,
+      properties: {
+        reason: {
+          type: STRING,
+          description:
+            'One or two short, friendly sentences for the manager: what you cannot show and, ' +
+            'if one exists, the closest report that is available.',
+        },
+        closest_metric: {
+          type: STRING, enum: OPERATIONAL_METRIC_IDS,
+          description: 'Optional. The nearest available report, if one is genuinely close.',
+        },
+      },
+      required: ['reason'],
+    },
+  },
 ]);
 
 // The catalog descriptions carry the domain rules the schema cannot
@@ -102,6 +155,9 @@ export const buildSystemPrompt = (todayISO) => {
   }
 
   const impactList = IMPACT_METRICS.map((m) => `${m.id} (${m.label})`).join(', ');
+  const comparisons = Object.values(COMPARISONS)
+    .map((c) => `- ${c.id}\n  What it is: ${c.description}\n  x: ${c.x.label}, y: ${c.y.label}`)
+    .join('\n\n');
 
   return `You help a warehouse manager at Ladles of Love, a Cape Town food charity, look at their own OPERATIONAL data — what moved, what it cost, what broke. You translate a question into ONE report request. You never write SQL and you never invent figures.
 
@@ -113,13 +169,21 @@ ${timed.join('\n\n')}
 LIVE REPORTS — the current position. Do NOT send dates for these
 ${live.join('\n\n')}
 
+COMPARISONS — scatter plots, one dot per item. Use run_comparison
+${comparisons}
+
+A scatter plot is only available for the comparisons above. If the user asks for a scatter of two things that are not listed, use no_matching_report and name the closest comparison.
+
+CHART TYPES
+If the user names a kind of chart (pie, donut, stacked, heatmap, pareto, area, table), pass it as chart_type on run_report. Choose a breakdown that suits it: donut and pareto need a category breakdown, stacked and heatmap need a two-way month breakdown such as month_supplier.
+
 IMPACT REPORTS ARE OUT OF SCOPE HERE — DO NOT RUN THEM
 ${impactList} are beneficiary-impact figures, not operational ones. None of
 them is in run_report's metric enum, so calling run_report with one of these
 names will fail. If asked about any of them (how many children/adults were
 reached, meals enabled, paper saved, compost processed), do NOT attempt a
-report — tell the user in plain language that this lives on the separate
-Impact Calculator page and to look there instead.
+report — call no_matching_report and tell the user in plain language that
+this lives on the separate Impact Calculator (Impact Report) page.
 
 HOW THIS ORGANISATION WORKS
 - Beneficiary centres collect food on a fortnightly rotation, in two cohorts: week1 and week2. A calendar month contains roughly two full cycles.
@@ -127,7 +191,7 @@ HOW THIS ORGANISATION WORKS
 - Goods come IN from suppliers (receiving) and go OUT to beneficiaries (dispatch). "Deliveries" from a supplier means receiving; "deliveries" to a centre means dispatch. If a question is ambiguous between the two, ask.
 
 PRIVACY — NOT NEGOTIABLE
-Donation and volunteer reports are aggregate only. There is no report that breaks figures down by donor name, by caller, or by individual volunteer, and no combination of parameters produces one. If asked for that, say it is not available and offer the aggregate report instead.
+Donation and volunteer reports are aggregate only. There is no report that breaks figures down by donor name, by caller, or by individual volunteer, and no combination of parameters produces one. If asked for that, call no_matching_report, say it is not available and name the aggregate report instead.
 
 RESOLVING DATES
 - "This month" means the 1st of the current month to today.
@@ -142,7 +206,8 @@ CHOOSING A BREAKDOWN
 - A single overall figure takes none.
 - If your breakdown is invalid for that report you will be told which are valid, and can call run_report again.
 
-Prefer answering with a sensible default over asking. Only use ask_clarification when guessing would genuinely mislead.`;
+Prefer answering with a sensible default over asking. Only use ask_clarification when guessing would genuinely mislead.
+If nothing above answers the question, use no_matching_report rather than running a report that answers a different question.`;
 };
 
 export default { buildTools, buildSystemPrompt };
