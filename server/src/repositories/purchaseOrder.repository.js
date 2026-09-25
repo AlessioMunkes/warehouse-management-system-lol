@@ -279,9 +279,25 @@ const updatePurchaseOrderStatus = async (id, status, reason) => {
   }
 };
 
+// ── Finance email outcome ────────────────────────────────────
+// Written only after the send attempt (success or failure) has
+// resolved — never speculatively before — so this column can never
+// claim 'sent' for an email that actually failed.
+const recordFinanceEmailAttempt = async (id, { status, error, attemptedAt }) => {
+  await pool.query(
+    `UPDATE purchase_orders
+        SET finance_email_status = $2,
+            finance_email_error = $3,
+            finance_email_attempted_at = $4
+      WHERE id = $1`,
+    [id, status, error, attemptedAt]
+  );
+};
+
 export default {
   createPurchaseOrder,
   listPurchaseOrders,
   getPurchaseOrderById,
   updatePurchaseOrderStatus,
+  recordFinanceEmailAttempt,
 };
