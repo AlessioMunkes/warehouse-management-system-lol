@@ -1,44 +1,70 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/components/layout/StaffTabBar.jsx
+// @sentinel script-49-staff-tabbar-in-app
+// @sentinel script-51-staff-tabbar-shared-tasks
+// @sentinel script-52-illustrated-icons
 //
-// How warehouse staff move between their four tasks.
+// Script 51: the tab list moved to staffTasks.js, shared with the
+// dashboard, and the bar shows at every width again (staff.css).
 //
-// This app is installed as a PWA and used on a phone, so the
-// navigation lives at the bottom where the thumb already is. A
-// sidebar was the other candidate and was rejected: on a phone it
-// has to collapse behind a hamburger, which hides all four
-// destinations behind a tap and gives no sense of where you are.
+// How warehouse staff move between their most-used tasks on a PHONE.
 //
-// The tab bar is present on EVERY staff page including mid-task, so
+// This app is installed as a PWA and used on a phone, so on a narrow
+// screen the navigation lives at the bottom where the thumb already
+// is. From sm up the app shell's sidebar is on screen and lists the
+// same destinations, so staff.css hides this bar there (script 49) —
+// one set of task links on screen at a time, not two.
+//
+// The tab bar is present on every staff page including mid-task, so
 // a packer interrupted by a driver at the gate can switch to
 // dispatch and come back. Task pages keep their own progress in
 // component state, and the step flows re-enter at step 1 — a
 // deliberate simplification for Milestone 3, noted in HANDOFF.md.
+//
+// Script 49: the icons are the sidebar's own lucide icons (see
+// navSections.js) rather than the Canva PNG/SVG set, so a task has
+// one picture everywhere in the app.
+//
+// NOT EVERY STAFF DESTINATION IS HERE. Feed the Soil and Benevolent
+// Requests are reached from the drawer (AppNavDrawer, in StaffShell's
+// app bar on every page) rather than this bar — they're worked far
+// less often than the five below, and this bar is the "every shift"
+// set, not the full list. Donation Intake IS one of the five: it's a
+// task worked as routinely as receiving or packing, not an occasional
+// one, so it belongs at the thumb rather than a tap away in the
+// drawer.
 // ─────────────────────────────────────────────────────────────
+import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { STAFF } from '../../routes/paths';
+import { STAFF_TABS } from './staffTasks';
 
-// Order matches the shift: goods come in, get packed, get decanted,
-// go out.
-//
-// Icons follow the landing page's convention — /icons/*.svg served from
-// client/public, the same as noc-icon.svg and the rest. The Canva task
-// icons were exported as PNG, so ICON_EXT is one place to change if you
-// keep them that way rather than converting.
-//
-// Each tab falls back to a Tabler glyph if its image 404s, so a wrong
-// path can never leave a tab unlabelled.
-const ICON_EXT = 'svg';
-const TABS = [
-  { label: 'Home',      to: STAFF.home,      icon: null,               glyph: 'ti ti-home' },
-  { label: 'Receiving', to: STAFF.receiving, icon: 'receiving-icon',   glyph: 'ti ti-truck-delivery' },
-  { label: 'Packing',   to: STAFF.packing,   icon: 'packing-icon',     glyph: 'ti ti-package' },
-  { label: 'Decanting', to: STAFF.decanting, icon: 'decanting-icon',   glyph: 'ti ti-flask' },
-  { label: 'Dispatch',  to: STAFF.dispatch,  icon: 'dispatch-icon',    glyph: 'ti ti-clipboard-check' },
-];
 
-const isCurrent = (pathname, to) =>
-  pathname === to || pathname.startsWith(`${to}/`);
+const isCurrent = (pathname, to, exact) =>
+  pathname === to || (!exact && pathname.startsWith(`${to}/`));
+
+// The drawing, with the lucide glyph behind it: if the file 404s the
+// <img> reports it once and the tab falls back rather than going
+// blank.
+function TabIcon({ tab }) {
+  const [broken, setBroken] = useState(false);
+  const Icon = tab.icon;
+  if (tab.image && !broken) {
+    return (
+      <img
+        className="stf-tab-icon"
+        src={tab.image}
+        alt=""
+        aria-hidden="true"
+        onError={() => setBroken(true)}
+      />
+    );
+  }
+  return (
+    <span className="stf-tab-glyph" aria-hidden="true">
+      <Icon className="size-5" />
+    </span>
+  );
+}
 
 export default function StaffTabBar() {
   const navigate = useNavigate();
@@ -46,31 +72,19 @@ export default function StaffTabBar() {
 
   return (
     <nav className="stf-tabbar" aria-label="Warehouse tasks">
-      {TABS.map((tab) => {
-        const current = isCurrent(pathname, tab.to);
+      {STAFF_TABS.map((tab) => {
+        const current = isCurrent(pathname, tab.to, tab.exact);
         return (
           <button
             key={tab.to}
             type="button"
             className={`stf-tab${current ? ' is-current' : ''}`}
             // aria-current is what a screen reader announces; the
-            // border on .is-current is only visible to sighted users.
+            // fill on .is-current is only visible to sighted users.
             aria-current={current ? 'page' : undefined}
             onClick={() => navigate(tab.to)}
           >
-            {tab.icon ? (
-              <img
-                className="stf-tab-icon"
-                src={`/icons/${tab.icon}.${ICON_EXT}`}
-                alt=""
-                aria-hidden="true"
-                onError={(e) => { e.currentTarget.style.display = 'none'; }}
-              />
-            ) : (
-              <span className="stf-tab-glyph" aria-hidden="true">
-                <i className={tab.glyph} />
-              </span>
-            )}
+            <TabIcon tab={tab} />
             <span>{tab.label}</span>
           </button>
         );

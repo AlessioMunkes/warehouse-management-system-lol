@@ -52,6 +52,16 @@ const validChildCount = (value) => {
   return n;
 };
 
+const validMobileNumber = (value) => {
+  const v = clean(value);
+  if (v === null) return null;
+  const digits = v.replace(/\D/g, '');
+  if (digits.length < 7 || digits.length > 15 || !/^\+?[0-9][0-9\s().-]*$/.test(v)) {
+    throw fail(400, 'Mobile number must be a valid phone number, or left blank.');
+  }
+  return v;
+};
+
 const validCohort = (value) => {
   const v = clean(value);
   if (!COHORTS.includes(v)) throw fail(400, `Cohort must be one of: ${COHORTS.join(', ')}.`);
@@ -68,6 +78,7 @@ const buildBeneficiaryPayload = (body = {}) => {
     name,
     cohort:      validCohort(body.cohort),
     contactName: capped(body.contactName, 100, 'Contact name'),
+    mobileNumber: validMobileNumber(body.mobileNumber),
     childCount:  validChildCount(body.childCount),
   };
 };
@@ -118,6 +129,7 @@ const updateBeneficiary = async (rawId, body) => {
   }
   if (has('cohort'))      patch.cohort      = validCohort(body.cohort);
   if (has('contactName')) patch.contactName = capped(body.contactName, 100, 'Contact name');
+  if (has('mobileNumber')) patch.mobileNumber = validMobileNumber(body.mobileNumber);
   if (has('childCount'))  patch.childCount  = validChildCount(body.childCount);
 
   if (has('name') && patch.name) {
@@ -155,6 +167,22 @@ const approveBeneficiary = async (rawId) => {
   return repo.approveBeneficiary(id);
 };
 
+// ── Rollback to previous cohort ─────────────────────────────────
+// Sponsor feedback: when an ECD misses its collection, support moving
+// it to the other cohort so it picks up next week instead of waiting
+// out this fortnight. See beneficiary.repository.js's rollbackCohort
+// for the assumed "previous cohort = flip" behaviour and the flag
+// that the underlying fortnightly cohort model itself may need
+// sponsor confirmation.
+const rollbackCohort = async (rawId, actorId) => {
+  const id = requireId(rawId);
+
+  const existing = await repo.getBeneficiaryById(id);
+  if (!existing) throw fail(404, 'Beneficiary not found.');
+
+  return repo.rollbackCohort(id, actorId);
+};
+
 export default {
   listBeneficiaries,
   getBeneficiary,
@@ -162,4 +190,5 @@ export default {
   updateBeneficiary,
   setBeneficiaryStatus,
   approveBeneficiary,
+  rollbackCohort,
 };

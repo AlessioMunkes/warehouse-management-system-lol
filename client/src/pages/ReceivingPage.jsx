@@ -21,14 +21,15 @@ import ReceivingFlow from '../features/procurement/components/ReceivingFlow';
 import { STAFF } from '../routes/paths';
 
 export default function ReceivingPage() {
-  const [stepLabel, setStepLabel] = useState('Which delivery');
+  const [step, setStep] = useState({ label: 'Which delivery', step: 1, total: 2 });
 
   // Memoised so the flow's effect does not refire on every render.
-  const handleCrumb = useCallback((label) => setStepLabel(label), []);
+  const handleCrumb = useCallback((next) => setStep(next), []);
 
   return (
     <StaffShell
-      crumb={`Receiving / ${stepLabel}`}
+      crumb={`Receiving / ${step.label}`}
+      progress={step.step ? { step: step.step, total: step.total } : null}
       actions={
         <Link to={STAFF.deliveries} className="stf-crumb-link">
           <i className="ti ti-history" aria-hidden="true" />

@@ -19,7 +19,7 @@ export default function ProgrammeButton({
       style={spread ? { justifyContent: "space-between" } : undefined}
       onClick={disabled ? undefined : onSelect}
       disabled={disabled}
-      aria-label={disabled ? `${label} — coming soon` : `Select ${label} programme`}
+      aria-label={disabled ? `${label}, coming soon` : `Select ${label} programme`}
       title={disabled ? "Coming soon" : undefined}
     >
       {icon && (

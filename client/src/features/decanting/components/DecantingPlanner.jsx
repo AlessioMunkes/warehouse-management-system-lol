@@ -318,7 +318,7 @@ export default function DecantingPlanner({ products }) {
                     .filter(([, count]) => count > 0)
                     .map(([size, count]) => `${count} × ${size}`)
                     .join(', ')}
-                  {' — '}
+                  {' · '}
                   {line.totalBags} bag{line.totalBags !== 1 ? 's' : ''}, packed {line.packedKg}kg
                 </p>
                 {line.withinMargin ? (
@@ -376,7 +376,7 @@ export default function DecantingPlanner({ products }) {
 
         <div className="decanting-save-row">
           <p className="form-helper-text">
-            Once saved, this record is final — it cannot be edited or deleted.
+            Once saved, this record is final. It cannot be edited or deleted.
           </p>
           <Button
             variant="primary"

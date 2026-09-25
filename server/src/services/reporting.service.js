@@ -9,6 +9,7 @@
 // answered.
 // ─────────────────────────────────────────────────────────────
 import repo             from '../repositories/reporting.repository.js';
+import factorRepo       from '../repositories/reportingFactor.repository.js';
 import cache            from '../features/reporting/reportCache.js';
 import { validateSpec } from '../features/reporting/specValidator.js';
 import aiProvider       from '../features/reporting/ai/provider.js';
@@ -47,6 +48,12 @@ const getCatalog = () => ({
     caveat: m.caveat,
     dimensions: m.dimensions.map((d) => ({ id: d, label: DIMENSIONS[d].label })),
     filters: m.filters,
+    // The Operations Analytics page filters this out of its own
+    // builder/dropdown; the Impact Calculator page never reads the
+    // catalog at all, it hard-codes its five metric ids. Exposed here
+    // so the operations page does not have to hard-code the opposite
+    // list to know what to hide.
+    impactOnly: Boolean(m.impactOnly),
   })),
 });
 
@@ -63,7 +70,22 @@ const runReport = async (input) => {
     throw fail(500, `Report "${metric.label}" is not implemented (${metric.repoFn}).`);
   }
 
-  let series = await fn(spec);
+  // A metric can depend on a table that only exists once its own
+  // migration has run — collection_kits for compost_processed is the
+  // current example. Postgres' 42P01 (undefined_table) is the one
+  // failure mode worth distinguishing from a genuine server bug: it
+  // means "not set up yet," not "something is broken," and deserves
+  // the same kind of actionable 503 the missing-factor case gets
+  // below rather than a raw 500 that reads as the feature crashing.
+  let series;
+  try {
+    series = await fn(spec);
+  } catch (err) {
+    if (err.code === '42P01') {
+      throw fail(503, `"${metric.label}" hasn't been set up yet. Its database table doesn't exist yet: run the pending migration for this feature.`);
+    }
+    throw err;
+  }
 
   const meta = {
     unit: metric.unit,
@@ -117,4 +139,25 @@ const runReport = async (input) => {
   return payload;
 };
 
-export default { getCatalog, runReport, todayISO };
+// A positive-or-zero number, not an empty payload — a factor of 0
+// would silently zero out every meals/adults figure it feeds, and
+// that is worth rejecting at the door rather than debugging later.
+const setFactor = async ({ factorKey, value, unit, sourceNote, actorId }) => {
+  if (!factorRepo.FACTOR_KEYS.includes(factorKey)) {
+    throw fail(400, `Unknown factor "${factorKey}". Known factors: ${factorRepo.FACTOR_KEYS.join(', ')}.`);
+  }
+  const num = Number(value);
+  if (!Number.isFinite(num) || num <= 0) {
+    throw fail(400, 'value must be a positive number.');
+  }
+  const factor = await factorRepo.setFactor({ factorKey, value: num, unit, sourceNote, actorId });
+  // Every cached report using this factor is now stale — the whole
+  // cache is cleared rather than trying to guess which keys touched
+  // it, since a factor edit is rare and the cache is cheap to rebuild.
+  cache.clear();
+  return factor;
+};
+
+const getFactorHistory = (factorKey) => factorRepo.listFactorHistory(factorKey);
+
+export default { getCatalog, runReport, todayISO, setFactor, getFactorHistory };

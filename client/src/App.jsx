@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate }  from 'react-router-dom';
 import { AuthProvider }                            from './context/AuthContext';
 import ThemeProvider                               from './components/layout/ThemeProvider';
 import ProtectedRoute                              from './components/layout/ProtectedRoute';
-import { PACKING, STAFF, DONATIONS, DONATION_INTAKE_ROLES, ADMIN, VOLUNTEERS, VOLUNTEER_MANAGEMENT_ROLES, COMMUNITY_REQUEST_ROLES, STAFF_ROLES } from './routes/paths';
+import { PACKING, STAFF, DONATIONS, DONATION_INTAKE_ROLES, ADMIN, VOLUNTEERS, VOLUNTEER_MANAGEMENT_ROLES, COMMUNITY_REQUEST_ROLES, STAFF_ROLES, FEED_THE_SOIL_ROLES } from './routes/paths';
 import LandingPage                                 from './pages/LandingPage';
 import LoginPage                                   from './pages/LoginPage';
 import GuestLoginPage                              from './pages/GuestLoginPage';
@@ -33,6 +33,7 @@ import ReportingPage                               from './pages/ReportingPage';
 import DonationManagementPage                      from './pages/DonationManagementPage';
 import Section18AManagementPage                    from './pages/Section18AManagementPage';
 import BeneficiaryDirectoryPage                     from './pages/BeneficiaryDirectoryPage';
+import EcdCollectionRemindersPage                  from './pages/EcdCollectionRemindersPage';
 import ImpactReportPage                             from './pages/ImpactReportPage';
 import PickingSlipManagementPage                    from './pages/PickingSlipManagementPage';
 import UserDirectoryPage                            from './pages/UserDirectoryPage';
@@ -42,7 +43,11 @@ import VolunteerEventsPage                        from './pages/VolunteerEventsP
 import VolunteerEventWorkspacePage                from './pages/VolunteerEventWorkspacePage';
 import CommunityRequestsPage                       from './pages/CommunityRequestsPage';
 import GmailSettingsPage                           from './pages/GmailSettingsPage';
+import FinanceWarehouseReportPage                  from './pages/FinanceWarehouseReportPage';
+import PublicFinanceReportPage                     from './pages/PublicFinanceReportPage';
 import Section18AFormPage                         from './pages/Section18AFormPage';
+import InviteAcceptPage                            from './pages/InviteAcceptPage';
+import FeedTheSoilPage                              from './pages/FeedTheSoilPage';
 
 // Donations — new feature, own draft context scoped to just these
 // two routes (see features/donation/context/DonationDraftProvider.jsx)
@@ -62,7 +67,11 @@ const App = () => (
         <Route path="/"      element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/guest" element={<GuestLoginPage />} />
+        <Route path="/finance/report/:token" element={<PublicFinanceReportPage />} />
         <Route path="/section-18a/:token" element={<Section18AFormPage />} />
+        {/* An invitee has no account and no session yet — the whole
+            point of this route. See InviteAcceptPage.jsx. */}
+        <Route path="/invite/:token" element={<InviteAcceptPage />} />
         {/* BR-22: the stable public URL behind every pallet's QR code.
             Deliberately OUTSIDE ProtectedRoute — the whole point is that
             a volunteer holding a printed poster reaches it with no
@@ -94,6 +103,7 @@ const App = () => (
               server routes are requireRole(ADMIN), so it sits in this
               admin-only block rather than the manager/admin one. */}
           <Route path={ADMIN.emailIntegration} element={<GmailSettingsPage />} />
+          <Route path={ADMIN.financeReport} element={<FinanceWarehouseReportPage />} />
           {/* The guest log. Admin-only on purpose: GET /api/volunteers
               is requireRole(MANAGER, ADMIN), so a manager is not
               refused by the server — but the manager's volunteer
@@ -129,14 +139,8 @@ const App = () => (
               cannot drift into a UI that hides a route anyone can still call. */}
           <Route path={STAFF.receipts} element={<ReceiptsPage />} />
           <Route path={STAFF.beneficiaries} element={<BeneficiaryDirectoryPage />} />
+          <Route path={STAFF.collectionReminders} element={<EcdCollectionRemindersPage />} />
           <Route path={STAFF.pickingSlips} element={<PickingSlipManagementPage />} />
-        </Route>
-
-        {/* The warehouse worker's dashboard. Split out of the block
-            below so it can take the shell: the four flows underneath it
-            are StaffShell screens and must not. */}
-        <Route element={<ProtectedRoute roles={STAFF_ROLES} shell />}>
-          <Route path="/noc" element={<TaskDashboard />} />
         </Route>
 
         {/* Protected — warehouse floor staff.
@@ -147,6 +151,12 @@ const App = () => (
             so the client agrees with the server, which already refuses a
             guest on every one of these endpoints. */}
         <Route element={<ProtectedRoute roles={STAFF_ROLES} />}>
+          {/* The warehouse worker's dashboard. No longer split into its
+              own shell='true' group — it wraps itself in StaffShell now,
+              same as the flows below it, rather than the ManagerLayout
+              sidebar it used to get here. See TaskDashboardPage.jsx's
+              own note on why. */}
+          <Route path="/noc" element={<TaskDashboard />} />
           <Route path="/noc/decanting" element={<DecantingPage />} />
           <Route path={STAFF.decantingRecords} element={<StaffDecantingRecordsPage />} />
 
@@ -171,10 +181,17 @@ const App = () => (
             here exactly as it is there — the client gate is a UX courtesy,
             the server route is the actual control.
 
+            No shell prop — DonationDetailsPage/ReviewPage wrap themselves in
+            the real StaffShell component now (see their own comments). They
+            used to render a hand-rolled .stf-shell div here AND get wrapped
+            in ManagerLayout by this route's old shell prop, which is the
+            "no bottom nav, sidebar behaves oddly" bug report: neither shell
+            was the one actually meant for this screen.
+
             The draft context is mounted per-route rather than around the
             block so the sessionStorage draft is scoped to the two intake
             pages and cleared by navigating away from them. */}
-        <Route element={<ProtectedRoute roles={DONATION_INTAKE_ROLES} shell />}>
+        <Route element={<ProtectedRoute roles={DONATION_INTAKE_ROLES} />}>
           <Route
             path={STAFF.donation}
             element={
@@ -202,9 +219,24 @@ const App = () => (
 
         {/* Benevolent package request log (ADM-5.0 / BR-28). Warehouse
             staff and up, mirroring STAFF_UP on every
-            /api/community-requests route. Log only — no stock movement. */}
-        <Route element={<ProtectedRoute roles={COMMUNITY_REQUEST_ROLES} shell />}>
+            /api/community-requests route. Log only — no stock movement.
+
+            No shell prop — CommunityRequestsPage picks ManagerLayout or
+            StaffShell itself by role now, the same way FeedTheSoilPage
+            does. It used to always render ManagerLayout (no worker-facing
+            view existed at all) while this route's own shell prop wrapped
+            it in a SECOND ManagerLayout — the doubled sidebar whose drawer
+            state fought itself. */}
+        <Route element={<ProtectedRoute roles={COMMUNITY_REQUEST_ROLES} />}>
           <Route path={STAFF.communityRequests} element={<CommunityRequestsPage />} />
+        </Route>
+
+        {/* Feed the Soil kit logging. Warehouse staff and up, mirroring
+            STAFF_UP on every /api/collection-kits route. No shell here —
+            FeedTheSoilPage picks ManagerLayout or StaffShell itself by
+            role, the same way DecantingPage does for /noc/decanting. */}
+        <Route element={<ProtectedRoute roles={FEED_THE_SOIL_ROLES} />}>
+          <Route path={STAFF.feedTheSoil} element={<FeedTheSoilPage />} />
         </Route>
 
         {/* Guest-only — the Love Activist screens. */}

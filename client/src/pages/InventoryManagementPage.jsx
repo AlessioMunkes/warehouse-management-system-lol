@@ -4,6 +4,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useReducedMotion } from '../features/taskdashboard/components/shellContext';
 import { useAuth } from "../context/AuthContext";
 import StockHealthBar from "../features/InventoryManagement/components/StockHealthBar";
@@ -18,6 +19,8 @@ const CAN_ADJUST = ["manager", "admin"];
 
 export default function InventoryManagementPage() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const initialStatusFilter = searchParams.get("status") === "lowstock" ? "lowstock" : "all";
 
   // Accessibility toggle state for TopNavbar
   const { reducedMotion: reducedMovement } = useReducedMotion();
@@ -129,7 +132,7 @@ export default function InventoryManagementPage() {
       toast({
         variant: "success",
         title: `Reversed the adjustment to ${productName}`,
-        description: "The reversal is recorded as its own movement — the original entry stays in the ledger.",
+        description: "The reversal is recorded as its own movement. The original entry stays in the ledger.",
       });
     } catch (err) {
       toast({
@@ -155,7 +158,7 @@ export default function InventoryManagementPage() {
 
       toast({
         variant: "success",
-        title: `${delta < 0 ? "Removed" : "Added"} ${Math.abs(delta)} ${unit} — ${name}`.trim(),
+        title: `${delta < 0 ? "Removed" : "Added"} ${Math.abs(delta)} ${unit} of ${name}`.trim(),
         description: payload.reason,
         action: { label: "Undo", onClick: () => undoAdjustment(payload, name) },
       });
@@ -249,6 +252,7 @@ export default function InventoryManagementPage() {
             products={products}
             isLoading={isLoading}
             canAdjust={canAdjust}
+            initialStatusFilter={initialStatusFilter}
             trends={trends}
             onAdjust={(prod) => setAdjustingProduct(prod)}
             onViewHistory={handleViewHistory}

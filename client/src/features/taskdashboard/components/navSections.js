@@ -25,6 +25,8 @@ import {
   PhoneCall,
   ScrollText,
   Mail,
+  Sprout,
+  MessageCircle,
 } from 'lucide-react';
 import { STAFF, ADMIN, VOLUNTEERS, PACKING } from '../../../routes/paths';
 
@@ -48,6 +50,7 @@ const WORKER_SECTIONS = [
       { to: STAFF.dispatch, label: 'Dispatch', icon: ClipboardCheck },
       { to: STAFF.donation, label: 'Donation Intake', icon: HandCoins },
       { to: STAFF.communityRequests, label: 'Benevolent Requests', icon: PhoneCall },
+      { to: STAFF.feedTheSoil, label: 'Feed the Soil', icon: Sprout },
     ],
   },
 ];
@@ -108,6 +111,7 @@ const MANAGER_SECTIONS = [
     label: 'Operations',
     items: [
       { to: STAFF.beneficiaries, label: 'Beneficiaries', icon: Users2 },
+      { to: STAFF.collectionReminders, label: 'Collection Reminders', icon: MessageCircle },
       { to: STAFF.pickingSlips, label: 'Picking Slips', icon: ClipboardList },
       { to: STAFF.purchaseOrders, label: 'Purchase Orders', icon: ShoppingCart },
       { to: '/noc/inventory', label: 'Inventory', icon: Boxes },
@@ -121,6 +125,7 @@ const MANAGER_SECTIONS = [
     label: 'Warehouse',
     items: [
       { to: STAFF.donation, label: 'Donation Intake', icon: HandCoins },
+      { to: STAFF.feedTheSoil, label: 'Feed the Soil', icon: Sprout },
     ],
   },
   {
@@ -133,8 +138,8 @@ const MANAGER_SECTIONS = [
     label: 'Insights',
     items: [
       { to: STAFF.stockLedger, label: 'Stock Ledger', icon: ScrollText },
-      { to: STAFF.reporting, label: 'Reporting', icon: BarChart3 },
-      { to: STAFF.impactReport, label: 'Impact Report', icon: HeartHandshake },
+      { to: STAFF.reporting, label: 'Operations Reports', icon: BarChart3 },
+      { to: STAFF.impactReport, label: 'Impact Reports', icon: HeartHandshake },
     ],
   },
 ];

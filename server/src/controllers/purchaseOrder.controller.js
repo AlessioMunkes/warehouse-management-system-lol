@@ -62,4 +62,34 @@ const setStatus = async (req, res) => {
   }
 };
 
-export default { create, list, getOne, setStatus };
+// ── PATCH /api/purchase-orders/:id/quickbooks-ref ──────────────
+const setQuickbooksReference = async (req, res) => {
+  try {
+    const data = await purchaseOrderService.setQuickbooksReference(req.params.id, req.body, req.user.id);
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    respondError(res, err, 'setQuickbooksReference', 'Failed to update the QuickBooks reference.');
+  }
+};
+
+// ── PUT /api/purchase-orders/:id ────────────────────────────────
+const update = async (req, res) => {
+  try {
+    const data = await purchaseOrderService.updatePurchaseOrder(req.params.id, req.body, req.user.id);
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    respondError(res, err, 'updatePurchaseOrder', 'Failed to update the purchase order.');
+  }
+};
+
+// ── DELETE /api/purchase-orders/:id ─────────────────────────────
+const remove = async (req, res) => {
+  try {
+    await purchaseOrderService.deletePurchaseOrder(req.params.id, req.user.id);
+    res.status(200).json({ success: true });
+  } catch (err) {
+    respondError(res, err, 'deletePurchaseOrder', 'Failed to delete the purchase order.');
+  }
+};
+
+export default { create, list, getOne, setStatus, setQuickbooksReference, update, remove };

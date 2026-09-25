@@ -26,6 +26,8 @@
 // ─────────────────────────────────────────────────────────────
 import pool         from '../config/db.js';
 import { logAudit } from './auditLog.repository.js';
+import { runInWarehouse, currentWarehouse } from '../config/warehouseContext.js';
+import { warehouseCodes } from '../config/warehouses.js';
 
 const USER_COLUMNS = `
   u.id, u.username, u.first_name, u.last_name, u.role, u.is_active,
@@ -89,6 +91,34 @@ const findUserByUsername = async (username, { excludeId = null } = {}) => {
     sql += ` AND u.id <> $${params.length}`;
   }
   const { rows } = await pool.query(sql, params);
+  if (rows[0]) return rows[0];
+
+  // Multi-warehouse: login matches a username in EVERY warehouse, so a
+  // username must belong to one person across all sites. Check the
+  // other warehouses too. excludeId only applies here: ids are per site.
+  // Fails closed: if another site's database cannot be checked, the
+  // error stops the account being created rather than risking a clash.
+  const here = currentWarehouse();
+  if (!here) return null;
+  for (const code of warehouseCodes().filter((c) => c !== here)) {
+    const { rows: elsewhere } = await runInWarehouse(code, () => pool.query(
+      `SELECT ${USER_COLUMNS} FROM users u WHERE lower(u.username) = lower($1)`,
+      [username],
+    ));
+    if (elsewhere[0]) return { ...elsewhere[0], warehouse: code };
+  }
+  return null;
+};
+
+// Same case-insensitive reasoning as findUserByUsername. Used only by
+// userInvite.service.js to stop an admin inviting an address that
+// already belongs to an active account — narrower SELECT than
+// USER_COLUMNS because nothing else needs a user's email yet.
+const findUserByEmail = async (email) => {
+  const { rows } = await pool.query(
+    `SELECT id, username, email FROM users WHERE lower(email) = lower($1)`,
+    [email]
+  );
   return rows[0] ?? null;
 };
 
@@ -260,6 +290,7 @@ export default {
   listUsers,
   getUserById,
   findUserByUsername,
+  findUserByEmail,
   insertUser,
   updateUser,
   setUserActive,

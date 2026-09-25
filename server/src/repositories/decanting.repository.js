@@ -119,7 +119,7 @@ const createDecanting = async ({ weekOf, notes, recordedBy, lines }) => {
       if (res.isShortfall) {
         stockWarnings.push({
           productId: line.productId,
-          message: 'Recording this wastage took the product below zero on hand — the shelf and the ledger disagree.',
+          message: 'Recording this wastage took the product below zero on hand. The shelf and the ledger disagree.',
         });
       }
     }

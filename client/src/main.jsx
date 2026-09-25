@@ -13,12 +13,18 @@ import './styles/staff.css'
 import './styles/landingpage.css'
 import App from './App.jsx'
 import { installReadCache } from './services/readCache'
+import { installWarehouseFetch } from './services/warehouse'
 
 // Before the first frame, not in an effect — see lib/theme.js.
 applyTheme(readStoredTheme())
 
-// Before the first render, so the very first /api call is covered.
-// See services/readCache.js.
+// Both before the first render, so the very first /api call is
+// covered. Order matters: the warehouse header is added first, and
+// the read cache wraps that, so a live read always goes to the
+// chosen warehouse. The cache keeps entries per warehouse through
+// its scope (AuthContext's scopeOf). See services/warehouse.js and
+// services/readCache.js.
+installWarehouseFetch()
 installReadCache(window)
 
 createRoot(document.getElementById('root')).render(

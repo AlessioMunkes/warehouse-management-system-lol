@@ -30,7 +30,7 @@ const COHORT_OPTIONS = [
   { value: 'week2', label: 'Week 2' },
 ];
 
-const BLANK = { name: '', cohort: '', contactName: '', childCount: '' };
+const BLANK = { name: '', cohort: '', contactName: '', mobileNumber: '', childCount: '' };
 
 export default function BeneficiaryForm({
   initial = null,
@@ -103,6 +103,17 @@ export default function BeneficiaryForm({
       </div>
 
       <Field>
+        <FieldLabel htmlFor="beneficiary-mobile">Mobile number</FieldLabel>
+        <Input
+          id="beneficiary-mobile"
+          type="tel"
+          value={form.mobileNumber ?? ''}
+          onChange={set('mobileNumber')}
+          placeholder="+27 82 123 4567"
+        />
+      </Field>
+
+      <Field>
         <FieldLabel htmlFor="beneficiary-children">Children served</FieldLabel>
         <Input
           id="beneficiary-children"
@@ -111,7 +122,7 @@ export default function BeneficiaryForm({
           value={form.childCount ?? ''}
           onChange={set('childCount')}
         />
-        <FieldDescription>Leave blank if not yet known — used for impact reporting.</FieldDescription>
+        <FieldDescription>Leave blank if not yet known. Used for impact reporting.</FieldDescription>
       </Field>
 
       <Field orientation="horizontal">

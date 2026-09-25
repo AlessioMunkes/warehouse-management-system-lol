@@ -15,15 +15,15 @@ const fail = (status, message) => {
 };
 
 const listNotifications = async (user, { unreadOnly } = {}) =>
-  repo.listForUser(user.id, { unreadOnly: unreadOnly === true || unreadOnly === 'true' });
+  repo.listForUser(user.id, user.role, { unreadOnly: unreadOnly === true || unreadOnly === 'true' });
 
-const getUnreadCount = async (user) => repo.getUnreadCount(user.id);
+const getUnreadCount = async (user) => repo.getUnreadCount(user.id, user.role);
 
 const markRead = async (user, rawId) => {
   if (!isPositiveInt(rawId)) throw fail(400, 'A valid notification ID is required.');
-  await repo.markRead(Number(rawId), user.id);
+  await repo.markRead(Number(rawId), user.id, user.role);
 };
 
-const markAllRead = async (user) => repo.markAllRead(user.id);
+const markAllRead = async (user) => repo.markAllRead(user.id, user.role);
 
 export default { listNotifications, getUnreadCount, markRead, markAllRead };

@@ -179,6 +179,7 @@ export default function StockManifestTable({
   products = [],
   isLoading = false,
   canAdjust = false,
+  initialStatusFilter = "all",
   trends = {},
   onAdjust,
   onViewHistory,
@@ -186,12 +187,16 @@ export default function StockManifestTable({
 }) {
   // Filter States
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all"); // 'all' | 'shortfall' | 'lowstock' | 'instock'
+  const [statusFilter, setStatusFilter] = useState(initialStatusFilter); // 'all' | 'shortfall' | 'lowstock' | 'instock'
   const [datePreset, setDatePreset] = useState("all"); // 'all' | '7d' | '30d' | 'stale' | 'custom'
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [hasCommitted, setHasCommitted] = useState(false);
   const [needsReorder, setNeedsReorder] = useState(false);
+
+  useEffect(() => {
+    setStatusFilter(initialStatusFilter);
+  }, [initialStatusFilter]);
 
   // Which columns are on. Remembered per device: someone who works from
   // the shortfall list every morning should not re-hide four columns

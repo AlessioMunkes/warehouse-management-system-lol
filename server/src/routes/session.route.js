@@ -22,11 +22,42 @@
 // of the shift.
 // ─────────────────────────────────────────────────────────────
 import express from 'express';
-import auth    from '../middleware/auth.middleware.js';
+import auth, { authIdentity } from '../middleware/auth.middleware.js';
 import pool    from '../config/db.js';
 import { AUTH_COOKIE, authCookieOptions } from '../config/cookie.js';
+import { warehouseName, isMultiWarehouse } from '../config/warehouses.js';
 
 const router = express.Router();
+
+// In multi-warehouse mode, which site this response is about and which
+// others the person can switch to. Absent in single-warehouse mode, so
+// the response shape there is unchanged.
+const warehouseFields = (req) => {
+  if (!req.user?.warehouse) return {};
+  const codes = req.user.warehouses || [req.user.warehouse];
+  return {
+    warehouse:  req.user.warehouse,
+    warehouses: codes.map((code) => ({ code, name: warehouseName(code) })),
+  };
+};
+
+// ── GET /api/me/warehouses ────────────────────────────────────
+// The warehouses this session may enter, for the switcher. Works
+// before a warehouse is chosen, so it reads only the session token and
+// never touches a warehouse database. multiWarehouse:false means the
+// deployment has one database and the client should show no switcher.
+router.get('/warehouses', authIdentity, (req, res) => {
+  const multiWarehouse = isMultiWarehouse();
+  return res.json({
+    success: true,
+    multiWarehouse,
+    warehouses: req.allowedWarehouses.map((code) => ({
+      code,
+      name: warehouseName(code),
+      role: req.session.role === 'guest' ? 'guest' : req.session.warehouses?.[code]?.role,
+    })),
+  });
+});
 
 // Kill a session whose token is technically valid but whose account
 // is gone or disabled. Clearing the cookie stops the browser
@@ -55,7 +86,7 @@ router.get('/', auth, async (req, res) => {
 
       return res.json({
         success: true,
-        user: { id: volunteer.id, firstName: volunteer.full_name, role: 'guest' },
+        user: { id: volunteer.id, firstName: volunteer.full_name, role: 'guest', ...warehouseFields(req) },
       });
     }
 
@@ -81,6 +112,7 @@ router.get('/', auth, async (req, res) => {
         firstName: user.first_name,
         lastName:  user.last_name,
         role:      user.role,
+        ...warehouseFields(req),
       },
     });
 

@@ -112,6 +112,24 @@ const assignSlip = async (req, res) => {
   }
 };
 
+// ── Add a second packer ──────────────────────────────────────────
+// POST /api/picking/:id/assign-second
+// Body: { packerId } — manager only.
+// Returns: the updated slip.
+const addSecondPacker = async (req, res) => {
+  try {
+    const slip = await pickingService.addSecondPacker(req.params.id, req.body, req.user);
+    res.status(200).json({ success: true, data: slip });
+  } catch (err) {
+    console.error('[addSecondPacker]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to add a second packer.',
+    });
+  }
+};
+
 // ── Confirm a line ───────────────────────────────────────────────
 // POST /api/picking/:id/items/:itemId/confirm
 // Body: { packedQuantity }
@@ -191,6 +209,7 @@ export default {
   generateSlips,
   createSlip,
   assignSlip,
+  addSecondPacker,
   confirmItem,
   flagItem,
   completeSlip,

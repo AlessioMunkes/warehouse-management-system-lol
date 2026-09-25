@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import logo from '../assets/Batches_Logo.jpeg';
 import { HugeiconsIcon } from '@hugeicons/react';
 import Log_In_Background from '../assets/Log_In_Background.jpg';
-import { STAFF, ADMIN } from '../routes/paths';
+import { STAFF, ADMIN, LANDING } from '../routes/paths';
 
 // shadcn/ui components
 import { Button } from '@/components/ui/button';
@@ -145,6 +145,15 @@ const LoginPage = () => {
         {/* ── Login card ── */}
         <Card className="login-card">
           <CardHeader className="login-card-header">
+            <div className="login-field-row">
+              <button
+                type="button"
+                onClick={() => navigate(LANDING)}
+                className="login-forgot-link"
+              >
+                ← BACK TO HOME
+              </button>
+            </div>
             <CardTitle className="login-title">EMPLOYEE LOG IN</CardTitle>
             <CardDescription className="login-subtitle">
               Please fill in your details to continue

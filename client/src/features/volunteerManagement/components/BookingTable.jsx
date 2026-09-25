@@ -23,7 +23,7 @@ const formatTimeslot = (slot, spaces) => {
   const start = new Date(slot.startTime).toLocaleString('en-ZA');
   const end = new Date(slot.endTime).toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
   const space = spaces.find((item) => item.id === slot.spaceId);
-  const venue = space ? `${space.name}${space.location ? ` — ${space.location}` : ''}` : 'Unknown space';
+  const venue = space ? `${space.name}${space.location ? ` (${space.location})` : ''}` : 'Unknown space';
   return `${start} – ${end} · ${venue}`;
 };
 

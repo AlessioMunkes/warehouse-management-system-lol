@@ -71,6 +71,7 @@
  *      mount at all.
  */
 import { useState, useEffect } from "react";
+import { fmtQty } from "../../../lib/quantity";
 import {
   fetchPickingSlip,
   assignSlip,
@@ -160,7 +161,7 @@ function ItemDecisionPanel({ item, slipId, onUpdated }) {
     setError(null);
     try {
       const reason = detailText.trim()
-        ? `${selectedReason} — ${detailText.trim()}`
+        ? `${selectedReason}: ${detailText.trim()}`
         : selectedReason;
       await flagItem(
         slipId,
@@ -234,7 +235,7 @@ function ItemDecisionPanel({ item, slipId, onUpdated }) {
           {differsFromRequired && (
             <div className="info-notice mt-3">
               <p>
-                The slip asks for {item.required_quantity} {item.unit}. Confirming a
+                The slip asks for {fmtQty(item.required_quantity, item.unit)}. Confirming a
                 different quantity marks this line for dispatch to check. Use Flag
                 instead if the item is short or damaged.
               </p>
@@ -342,10 +343,10 @@ function ItemRow({ item, slipId, canEdit, locked, onUpdated }) {
           <div className="text-xs text-text-meta">{item.sku}</div>
         </div>
         <div className="note-line-qty">
-          {item.required_quantity} {item.unit}
+          {fmtQty(item.required_quantity, item.unit)}
         </div>
         <div className={`note-line-qty-actual ${discrepancy ? "is-discrepancy" : ""}`}>
-          {item.packed_quantity != null ? `${item.packed_quantity} ${item.unit}` : "—"}
+          {fmtQty(item.packed_quantity, item.unit)}
         </div>
         <div className="text-sm text-text-sub">{item.flag_reason || "—"}</div>
         <div>

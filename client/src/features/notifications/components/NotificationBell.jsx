@@ -13,8 +13,10 @@
 // background while nobody is looking at it.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import notificationAPI from '../../../services/notificationAPI';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from '@/components/ui/popover';
@@ -32,7 +34,76 @@ const timeAgo = (iso) => {
 
 const POLL_MS = 60_000;
 
+const NOTIFICATION_MATRIX = {
+  low_stock: {
+    severity: 'action',
+    destination: () => '/noc/inventory?status=lowstock',
+  },
+  picking_slips_generated: {
+    severity: 'readOnly',
+    destination: () => null,
+  },
+  non_collections_flagged: {
+    severity: 'action',
+    destination: () => '/noc/beneficiaries',
+  },
+  purchase_order_needs_attention: {
+    severity: 'action',
+    destination: (notification) => (
+      notification.entityId
+        ? `/noc/purchase-orders?id=${encodeURIComponent(notification.entityId)}`
+        : '/noc/purchase-orders'
+    ),
+  },
+  vms_sync_failed: {
+    severity: 'action',
+    destination: () => '/volunteers',
+  },
+  stock_expiry_2_weeks: {
+    severity: 'warning',
+    destination: () => null,
+  },
+  stock_expiry_1_week: {
+    severity: 'warning',
+    destination: () => null,
+  },
+  donation_review: {
+    severity: 'action',
+    destination: () => '/admin/donation-management',
+  },
+  section18a_handoff_failed: {
+    severity: 'action',
+    destination: () => '/admin/section-18a',
+  },
+};
+
+const SEVERITY_BADGE = {
+  readOnly: {
+    label: 'READ ONLY',
+    className: 'bg-good-soft text-good hover:bg-good-soft',
+  },
+  warning: {
+    label: 'WARNING',
+    className: 'bg-warn-soft text-warn hover:bg-warn-soft',
+  },
+  action: {
+    label: 'ACTION REQUIRED',
+    className: 'bg-danger-soft text-danger hover:bg-danger-soft',
+  },
+};
+
+export const notificationSeverity = (notification) => (
+  NOTIFICATION_MATRIX[notification?.type]?.severity ?? 'readOnly'
+);
+
+export const notificationDestination = (notification) => {
+  const matrixEntry = NOTIFICATION_MATRIX[notification?.type];
+  if (!matrixEntry || matrixEntry.severity !== 'action') return null;
+  return matrixEntry.destination(notification);
+};
+
 export default function NotificationBell() {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [items, setItems] = useState([]);
@@ -75,6 +146,15 @@ export default function NotificationBell() {
     }
   };
 
+  const openNotification = async (notification) => {
+    if (!notification.isRead) await markOneRead(notification.id);
+    const destination = notificationDestination(notification);
+    if (destination) {
+      setOpen(false);
+      navigate(destination);
+    }
+  };
+
   const markAll = async () => {
     setItems((all) => all.map((n) => ({ ...n, isRead: true })));
     setUnreadCount(0);
@@ -90,8 +170,21 @@ export default function NotificationBell() {
       <PopoverTrigger asChild>
         <Button type="button" variant="ghost" size="icon" className="relative" aria-label="Notifications">
           <Bell />
+          {/* key={unreadCount} remounts this span every time the count
+              changes, which is what re-triggers the animation on a new
+              arrival rather than only on the badge's very first
+              appearance. Same animate-in/zoom-in-95 utilities (tw-
+              animate-css, already a dependency) the dialog/alert-dialog
+              primitives use for their own open transition. motion-safe:
+              rather than the data-open/data-closed pattern those
+              components use: there's no open/closed state here, just
+              "did the count just change", so the animation runs once on
+              mount and Tailwind's reduced-motion variant is the gate. */}
           {unreadCount > 0 ? (
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[10px] font-semibold text-on-brand">
+            <span
+              key={unreadCount}
+              className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[10px] font-semibold text-on-brand motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-200"
+            >
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           ) : null}
@@ -118,13 +211,18 @@ export default function NotificationBell() {
               <button
                 key={n.id}
                 type="button"
-                onClick={() => !n.isRead && markOneRead(n.id)}
-                className={`block w-full border-b px-3 py-2 text-left last:border-b-0 hover:bg-muted/50 ${n.isRead ? '' : 'bg-muted/30'}`}
+                onClick={() => openNotification(n)}
+                className={`block w-full border-b px-3 py-2 text-left last:border-b-0 ${notificationDestination(n) ? 'hover:bg-muted/50' : 'cursor-default'} ${n.isRead ? '' : 'bg-muted/30'}`}
               >
                 <div className="flex items-start gap-2">
                   {!n.isRead ? <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" /> : <span className="mt-1.5 h-1.5 w-1.5 shrink-0" />}
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{n.title}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-medium">{n.title}</p>
+                      <Badge className={SEVERITY_BADGE[notificationSeverity(n)].className}>
+                        {SEVERITY_BADGE[notificationSeverity(n)].label}
+                      </Badge>
+                    </div>
                     {n.body ? <p className="text-xs text-muted-foreground">{n.body}</p> : null}
                     <p className="mt-0.5 text-xs text-muted-foreground">{timeAgo(n.createdAt)}</p>
                   </div>

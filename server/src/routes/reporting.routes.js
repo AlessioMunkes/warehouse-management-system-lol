@@ -49,8 +49,35 @@ const askLimiter = rateLimit({
   },
 });
 
+// The written report is the other call that reaches the model. Only
+// requests asking for it count; the figures, charts and lists are
+// plain SQL and stay unlimited like /report.
+const writeUpLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 30,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  keyGenerator: (req, res) =>
+    req.user?.id ? `u:${req.user.id}` : ipKeyGenerator(req, res),
+  skip: (req) => req.body?.narrate !== true,
+  message: {
+    success: false,
+    message: 'You have written a lot of reports in the last hour. The figures and lists still work; try the write-up again shortly.',
+  },
+});
+
 router.get ('/catalog', auth, requireRole(...MANAGERS_UP), reportingController.getCatalog);
 router.post('/report',  auth, requireRole(...MANAGERS_UP), reportingController.runReport);
 router.post('/ask',     auth, requireRole(...MANAGERS_UP), askLimiter, reportingController.ask);
+router.post('/insight', auth, requireRole(...MANAGERS_UP), writeUpLimiter, reportingController.insight);
+router.get ('/comparisons', auth, requireRole(...MANAGERS_UP), reportingController.getComparisons);
+router.post('/comparison',  auth, requireRole(...MANAGERS_UP), reportingController.runComparison);
+// Personal chart targets: each manager's own, keyed by req.user.id,
+// so one manager moving a line never moves it for another.
+router.get ('/targets',           auth, requireRole(...MANAGERS_UP), reportingController.getTargets);
+router.put ('/targets/:metricId', auth, requireRole(...MANAGERS_UP), reportingController.setTarget);
+
+router.put('/factors/:factorKey',         auth, requireRole(...MANAGERS_UP), reportingController.setFactor);
+router.get('/factors/:factorKey/history', auth, requireRole(...MANAGERS_UP), reportingController.getFactorHistory);
 
 export default router;

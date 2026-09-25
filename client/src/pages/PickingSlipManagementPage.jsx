@@ -28,7 +28,7 @@ import ManagerLayout   from '../features/taskdashboard/components/ManagerLayout'
 import beneficiaryAPI from '../services/beneficiaryAPI';
 import {
   fetchPickingSlips, fetchPickingSlip, fetchAssignableWorkers,
-  generateSlips, createSlip, assignSlip,
+  generateSlips, createSlip, assignSlip, addSecondPacker,
 } from '../services/pickingAPI';
 
 import {
@@ -51,6 +51,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Search, CalendarPlus, PackagePlus, X, ArrowLeft, QrCode, Printer, AlertTriangle } from 'lucide-react';
 import { openLabelPdf, publicAppOrigin, isReachableByPhone } from '../features/packing/palletLabelPdf';
+import { fmtQty } from '../lib/quantity';
 
 const COHORT_OPTIONS = [
   { value: 'week1', label: 'Week 1' },
@@ -81,7 +82,10 @@ const SuccessBanner = ({ message }) => (
 // would still work, but a slip in progress or beyond is read-only
 // here on purpose — this page is for organising the queue, not
 // pulling work out from under whoever already started it.
-const SlipDetail = ({ slip, workers, assignChoice, onAssignChoice, onAssign, assigning, onClose }) => (
+const SlipDetail = ({
+  slip, workers, assignChoice, onAssignChoice, onAssign, assigning,
+  secondChoice, onSecondChoice, onAddSecond, addingSecond, onClose,
+}) => (
   <Card>
     <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
       <div>
@@ -117,6 +121,38 @@ const SlipDetail = ({ slip, workers, assignChoice, onAssignChoice, onAssign, ass
             ) : (slip.packer_name || 'Unassigned')}
           </dd>
         </div>
+        {/* Only meaningful once a primary holds the slip — a second
+            packer with nobody to help does not mean anything (see
+            picking.repository.js's addSecondPacker). Read-only once
+            both slots are filled, same "don't pull work out from
+            under whoever already started it" rule as the primary
+            field above. */}
+        {slip.status !== 'pending' ? (
+          <div>
+            <dt className="text-muted-foreground">Second packer</dt>
+            <dd>
+              {slip.assigned_to_2 ? (
+                slip.packer_name_2 || 'Assigned'
+              ) : (
+                <div className="mt-1 flex items-center gap-2">
+                  <Select value={secondChoice || undefined} onValueChange={onSecondChoice}>
+                    <SelectTrigger className="w-40"><SelectValue placeholder="Add a helper" /></SelectTrigger>
+                    <SelectContent>
+                      {workers
+                        .filter((w) => w.id !== slip.assigned_to)
+                        .map((w) => (
+                          <SelectItem key={w.id} value={String(w.id)}>{w.first_name} {w.last_name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <Button type="button" size="sm" variant="outline" disabled={!secondChoice || addingSecond} onClick={onAddSecond}>
+                    {addingSecond ? 'Adding' : 'Add'}
+                  </Button>
+                </div>
+              )}
+            </dd>
+          </div>
+        ) : null}
         <div><dt className="text-muted-foreground">Pallet ref</dt><dd>{slip.pallet_ref || '—'}</dd></div>
         <div><dt className="text-muted-foreground">Progress</dt><dd>{slip.confirmed_items}/{slip.total_items} confirmed</dd></div>
       </dl>
@@ -133,7 +169,7 @@ const SlipDetail = ({ slip, workers, assignChoice, onAssignChoice, onAssign, ass
             {slip.items.map((item) => (
               <TableRow key={item.id}>
                 <TableCell>{item.product_name}</TableCell>
-                <TableCell className="text-muted-foreground">{item.required_quantity} {item.unit}</TableCell>
+                <TableCell className="text-muted-foreground">{fmtQty(item.required_quantity, item.unit)}</TableCell>
                 <TableCell><Badge variant="outline">{item.status}</Badge></TableCell>
               </TableRow>
             ))}
@@ -157,6 +193,8 @@ export default function PickingSlipManagementPage() {
   const [selected, setSelected] = useState(null);
   const [assignChoice, setAssignChoice] = useState('');
   const [assigning, setAssigning] = useState(false);
+  const [secondChoice, setSecondChoice] = useState('');
+  const [addingSecond, setAddingSecond] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -210,6 +248,7 @@ export default function PickingSlipManagementPage() {
   const openSlip = async (slipId) => {
     setError(null);
     setAssignChoice('');
+    setSecondChoice('');
     try {
       setSelected(await fetchPickingSlip(slipId));
     } catch (err) { setError(err.message); }
@@ -223,6 +262,16 @@ export default function PickingSlipManagementPage() {
       await loadSlips();
       await openSlip(selected.id);
     } catch (err) { setError(err.message); } finally { setAssigning(false); }
+  };
+
+  const addSecond = async () => {
+    if (!secondChoice || !selected) return;
+    setAddingSecond(true); setError(null);
+    try {
+      await addSecondPacker(selected.id, Number(secondChoice));
+      await loadSlips();
+      await openSlip(selected.id);
+    } catch (err) { setError(err.message); } finally { setAddingSecond(false); }
   };
 
   const runGenerate = async () => {
@@ -342,7 +391,7 @@ export default function PickingSlipManagementPage() {
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
                 Creates one slip per approved, active beneficiary in the chosen cohort. Safe to
-                run twice — it skips any centre that already has a slip for that date.
+                run twice: it skips any centre that already has a slip for that date.
               </p>
               {genError ? <ErrorBanner message={genError} /> : null}
               {genResult ? (
@@ -350,7 +399,7 @@ export default function PickingSlipManagementPage() {
                   message={
                     `${genResult.created} slip(s) created.` +
                     (genResult.emptySlips?.length
-                      ? ` ${genResult.emptySlips.length} had no lines — check that centre's order first.`
+                      ? ` ${genResult.emptySlips.length} had no lines. Check that centre's order first.`
                       : '')
                   }
                 />
@@ -545,6 +594,10 @@ export default function PickingSlipManagementPage() {
                     onAssignChoice={setAssignChoice}
                     onAssign={assign}
                     assigning={assigning}
+                    secondChoice={secondChoice}
+                    onSecondChoice={setSecondChoice}
+                    onAddSecond={addSecond}
+                    addingSecond={addingSecond}
                     onClose={() => setSelected(null)}
                   />
                 ) : null}

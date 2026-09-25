@@ -14,7 +14,7 @@ import { AlertTriangle, ClipboardList, RotateCcw } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import FlaggedItemsTab from '../features/donationManagement/components/FlaggedItemsTab';
+import FlaggedItemsTab, { isUnresolvedFlag } from '../features/donationManagement/components/FlaggedItemsTab';
 import ReconciliationTab from '../features/donationManagement/components/ReconciliationTab';
 import donationManagementAPI, { RECONCILIATION_STATUSES } from '@/services/donationManagementAPI';
 
@@ -63,7 +63,7 @@ export default function DonationManagementPage() {
         if (cancelled) return;
 
         setCounts({
-          'awaiting-classification': flags.length,
+          'awaiting-classification': flags.filter(isUnresolvedFlag).length,
           reconciliation: reconciliationRows.filter((row) => row.status === 'commit_incomplete').length,
           'processing-failed': reconciliationRows.filter((row) => row.status === 'commit_failed').length,
         });

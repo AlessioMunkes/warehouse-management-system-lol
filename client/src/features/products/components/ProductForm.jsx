@@ -187,8 +187,8 @@ export default function ProductForm({
             onChange={set('unitCost')}
           />
           <FieldDescription>
-            What one costs, before VAT. Used to fill in purchase-order lines —
-            leave blank if it is donated or the price moves every time.
+            What one costs, before VAT. Used to fill in purchase order lines.
+            Leave blank if it is donated or the price moves every time.
           </FieldDescription>
         </Field>
       </div>
@@ -209,7 +209,7 @@ export default function ProductForm({
               ))}
             </SelectContent>
           </Select>
-          <FieldDescription>Where this is kept — dry storage or cold chain.</FieldDescription>
+          <FieldDescription>Dry storage or cold chain.</FieldDescription>
         </Field>
         <Field>
           <FieldLabel htmlFor="product-reorder">Reorder threshold</FieldLabel>

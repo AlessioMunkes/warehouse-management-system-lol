@@ -137,6 +137,15 @@ const handleResponse = async (res) => {
     );
     error.status = res.status;
     error.errors = data.errors || {};
+    // Set only when the server sends one (currently just the invite
+    // accept/resolve 410s: 'expired' | 'revoked' | 'accepted') — lets a
+    // caller show distinct copy per cause instead of one generic message.
+    if (data.reason) error.reason = data.reason;
+    // Multi-warehouse: 'WAREHOUSE_REQUIRED' | 'WAREHOUSE_FORBIDDEN' |
+    // 'WAREHOUSE_INVALID', with the allowed codes when the server
+    // sends them. AuthContext uses these to pick or reset the site.
+    if (data.code) error.code = data.code;
+    if (Array.isArray(data.warehouses)) error.warehouses = data.warehouses;
     throw error;
   }
   return data;
@@ -157,22 +166,25 @@ const networkError = () => {
 };
 
 // ── GET ───────────────────────────────────────────────────────
-export const apiGet = async (endpoint) => {
+export const apiGet = async (endpoint, options = {}) => {
   let res;
   try {
     res = await fetchWaking(`${API_BASE}${endpoint}`, {
       method:      'GET',
       credentials: 'include', // sends the httpOnly cookie automatically
       headers:     { 'Content-Type': 'application/json' },
+      signal:      options.signal,
     });
-  } catch {
+  } catch (err) {
+    if (err.name === 'AbortError') throw err;
     throw networkError();
   }
   return handleResponse(res);
 };
 
 // ── POST ──────────────────────────────────────────────────────
-export const apiPost = async (endpoint, body) => {
+// options.signal lets a caller abort (section18aSettingsAPI's timeout).
+export const apiPost = async (endpoint, body, options = {}) => {
   // Never log `body` here: on /api/login it holds the password.
   const send = WAKE_RETRY_POSTS.has(endpoint) ? fetchWaking : fetch;
   let res;
@@ -182,8 +194,11 @@ export const apiPost = async (endpoint, body) => {
       credentials: 'include',
       headers:     { 'Content-Type': 'application/json' },
       body:        JSON.stringify(body),
+      signal:      options.signal,
     });
-  } catch {
+  } catch (err) {
+    // A caller's own abort is theirs to handle, not a network failure.
+    if (err.name === 'AbortError') throw err;
     throw networkError();
   }
   return handleResponse(res);
@@ -250,10 +265,14 @@ export const cachedGet = async (key, ttlMs, fetcher) => {
 // 'completed', which changes who has an open order to receive against.
 export const invalidateCache = (key) => cache.delete(key);
 
+// Everything cached belongs to one warehouse. Switching warehouse
+// empties it, or the next screen would show the last site's suppliers.
+export const clearApiCache = () => cache.clear();
+
 // PUT is used by the attendance contract. It lives in the shared helper so
 // that future attendance components keep the same cookie, network-error and
 // session-expiry behaviour as every other API call.
-export const apiPut = async (endpoint, body = {}) => {
+export const apiPut = async (endpoint, body = {}, options = {}) => {
   let res;
   try {
     res = await fetch(`${API_BASE}${endpoint}`, {
@@ -261,8 +280,10 @@ export const apiPut = async (endpoint, body = {}) => {
       credentials: 'include',
       headers:     { 'Content-Type': 'application/json' },
       body:        JSON.stringify(body),
+      signal:      options.signal,
     });
-  } catch {
+  } catch (err) {
+    if (err.name === 'AbortError') throw err;
     throw networkError();
   }
   return handleResponse(res);

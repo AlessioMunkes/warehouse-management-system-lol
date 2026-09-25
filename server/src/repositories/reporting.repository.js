@@ -26,6 +26,7 @@
 // only ever touched DATE columns.
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
+import opsRepo from './reportingOps.repository.js';
 import {
   COLLECTED_STATUSES, NOT_COLLECTED_STATUSES, IMPACT_BENEFICIARY_KINDS, SAST,
 } from '../features/reporting/reportCatalog.js';
@@ -54,6 +55,10 @@ const slipDimension = (dimension) => {
     case 'beneficiary': return { expr: `ps.beneficiary_kind::text`,             group: `ps.beneficiary_kind` };
     case 'product':     return { expr: `p.name`,                                group: `p.name` };
     case 'programme':   return { expr: `COALESCE(pr.name, 'Unassigned')`,       group: `pr.name` };
+    case 'month_beneficiary': {
+      const e = `${bucketMonth('ps.dispatch_date')} || '|' || ps.beneficiary_kind::text`;
+      return { expr: e, group: e };
+    }
     default: throw new Error(`Unsupported dimension: ${dimension}`);
   }
 };
@@ -75,8 +80,9 @@ const impactClause = (params) => {
   return `ps.beneficiary_kind = ANY($${params.length}::beneficiary_type[])`;
 };
 
-const orderFor = (dimension) =>
-  dimension === 'none' || dimension === 'month' || dimension === 'week' ? '1' : '2 DESC, 1';
+// Two-axis "month|category" buckets sort by label, so months stay in order.
+const TIME_ORDERED = new Set(['none', 'month', 'week', 'month_beneficiary', 'month_supplier', 'month_movement']);
+const orderFor = (dimension) => (TIME_ORDERED.has(dimension) ? '1' : '2 DESC, 1');
 
 // ══ Impact ═════════════════════════════════════════════════════
 // SUM(DISTINCT child_count) would be a bug: two 40-child centres
@@ -140,6 +146,169 @@ const dispatchVolume = (spec) => dispatchedKgQuery({ ...spec, impactOnly: false 
 // Kilograms here; the service applies the meals factor so the raw
 // measurement stays inspectable and a factor change needs no re-query.
 const mealsEnabled   = (spec) => dispatchedKgQuery({ ...spec, impactOnly: true });
+
+// Soup kitchens only, forced rather than left to the caller — this is
+// not a general "pick a beneficiary kind" report, it IS the adults
+// number. NFR-20 keeps dignity kitchens out of impact reporting
+// entirely, so there is no other beneficiary kind this could mean.
+const adultsReached = (spec) => dispatchedKgQuery({
+  ...spec,
+  impactOnly: false,
+  filters: { ...spec.filters, beneficiary_kind: 'soup_kitchen' },
+});
+
+// Same shape as adultsReached, forced to dignity_kitchen instead —
+// see reportCatalog.js's dignity_kitchen_served entry for why this
+// exists as its own metric rather than widening IMPACT_BENEFICIARY_KINDS.
+const dignityKitchenServed = (spec) => dispatchedKgQuery({
+  ...spec,
+  impactOnly: false,
+  filters: { ...spec.filters, beneficiary_kind: 'dignity_kitchen' },
+});
+
+// Same shape again, forced to community — real dispatched kilograms
+// for walk-in/phone-in beneficiaries, not a count of logged requests.
+const communityServed = (spec) => dispatchedKgQuery({
+  ...spec,
+  impactOnly: false,
+  filters: { ...spec.filters, beneficiary_kind: 'community' },
+});
+
+// Not built on dispatchedKgQuery/impactClause — that clause is fixed
+// to exactly ECD+soup-kitchen, and this metric widens that by one
+// (community) while still excluding dignity kitchens, which neither
+// impactOnly value expresses. 'group' folds beneficiary_kind to three
+// human categories (see reportCatalog.js's meals_served_by_group
+// entry for why); every other dimension reuses slipDimension()
+// unchanged, same as dispatchedKgQuery does.
+const MEALS_GROUP_KINDS = ['ecd', 'soup_kitchen', 'community'];
+
+const MEALS_GROUP_CASE = `CASE ps.beneficiary_kind::text
+                             WHEN 'ecd' THEN 'Children'
+                             WHEN 'soup_kitchen' THEN 'Adults'
+                             WHEN 'community' THEN 'Households'
+                           END`;
+
+const mealsServedByGroup = async ({ dimension, filters, dateRange }) => {
+  let dim;
+  if (dimension === 'group') {
+    dim = { expr: MEALS_GROUP_CASE, group: `ps.beneficiary_kind` };
+  } else if (dimension === 'group_month') {
+    // Packs both axes into one label ("2026-07|Children") rather than
+    // returning a second shape this feature's one chart component
+    // would have to special-case — see reportCatalog.js's CHART_TYPES
+    // note on grouped_bar. Ordered chronologically-then-by-group below
+    // rather than orderFor()'s usual value-DESC, since the client
+    // pivots this into month clusters and needs the months in
+    // calendar order, not ranked by size.
+    dim = {
+      expr: `${bucketMonth('ps.dispatch_date')} || '|' || ${MEALS_GROUP_CASE}`,
+      group: `${bucketMonth('ps.dispatch_date')}, ps.beneficiary_kind`,
+    };
+  } else {
+    dim = slipDimension(dimension);
+  }
+
+  const params = [dateRange.from, dateRange.to];
+  const where = [
+    `ps.dispatch_date BETWEEN $1::date AND $2::date`,
+    `de.status = ANY($${params.push(COLLECTED_STATUSES)}::text[])`,
+    `del.unit = 'kg'`,
+    `ps.beneficiary_kind = ANY($${params.push(MEALS_GROUP_KINDS)}::beneficiary_type[])`,
+    ...slipFilters(filters, params),
+  ];
+
+  const { rows } = await pool.query(
+    `SELECT ${dim.expr} AS label, SUM(del.loaded_quantity)::numeric AS value
+       FROM picking_slips ps
+       JOIN dispatch_events de ON de.picking_slip_id = ps.id
+       JOIN dispatch_event_lines del ON del.dispatch_event_id = de.id
+  LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
+      WHERE ${where.join(' AND ')}
+      ${dim.group ? `GROUP BY ${dim.group}` : ''}
+      ORDER BY ${dimension === 'group_month' ? '1' : orderFor(dimension)}`,
+    params
+  );
+  return rows2series(rows);
+};
+
+// ══ Paper saved ════════════════════════════════════════════════
+// Three tables, one UNION, because a "digital document" here is
+// whichever of three different features produced one — a delivery
+// note, a dispatch note (collected_at IS NOT NULL, since a flagged
+// non-collection never produces a note to view or print), or a
+// decanting sheet. All three write timestamptz columns via NOW(), so
+// every branch goes through sastDate() — the file header's TIMEZONE
+// warning applies here as much as anywhere else.
+const paperDimension = (dimension) => {
+  switch (dimension) {
+    case 'none':  return { expr: `'Total'`,               group: null };
+    case 'month': return { expr: bucketMonth('bucket_date'), group: bucketMonth('bucket_date') };
+    case 'week':  return { expr: bucketWeek('bucket_date'),  group: bucketWeek('bucket_date') };
+    default: throw new Error(`Unsupported dimension: ${dimension}`);
+  }
+};
+
+const paperSaved = async ({ dimension, dateRange }) => {
+  const dim = paperDimension(dimension);
+  const params = [dateRange.from, dateRange.to, COLLECTED_STATUSES];
+  const { rows } = await pool.query(
+    `WITH docs AS (
+       SELECT ${sastDate('created_at')} AS bucket_date FROM delivery_notes
+        WHERE ${sastDate('created_at')} BETWEEN $1::date AND $2::date
+       UNION ALL
+       SELECT ${sastDate('collected_at')} AS bucket_date FROM dispatch_events
+        WHERE status = ANY($3::text[]) AND collected_at IS NOT NULL
+          AND ${sastDate('collected_at')} BETWEEN $1::date AND $2::date
+       UNION ALL
+       SELECT ${sastDate('created_at')} AS bucket_date FROM decanting_records
+        WHERE ${sastDate('created_at')} BETWEEN $1::date AND $2::date
+     )
+     SELECT ${dim.expr} AS label, COUNT(*)::numeric AS value
+       FROM docs
+       ${dim.group ? `GROUP BY ${dim.group}` : ''}
+       ORDER BY 1`,
+    params
+  );
+  return rows2series(rows);
+};
+
+// ══ Feed the Soil / compost ══════════════════════════════════════
+// Every logged weigh-in counts, dispatched or not — logging IS the
+// processing event (the kit was collected and weighed); dispatch to a
+// farmer is what happens to it afterward, a fulfilment detail with no
+// bearing on how much compost the programme actually produced. See
+// collectionKit.repository.js for the full lifecycle this reads from.
+// 'region' needs collection_kits joined in (the owner's suburb, not
+// anything on collection_kit_records itself), so its expr references
+// the ck alias the query below only joins when a dimension asks for
+// it to matter — joining it unconditionally is harmless (LEFT JOIN,
+// one row per kit, no fan-out) and keeps this switch the only place
+// that knows which dimension needs which table.
+const compostDimension = (dimension) => {
+  switch (dimension) {
+    case 'none':   return { expr: `'Total'`,                        group: null };
+    case 'month':  return { expr: bucketMonth('bucket_date'),        group: bucketMonth('bucket_date') };
+    case 'region': return { expr: `COALESCE(ck.suburb, 'Unspecified')`, group: `COALESCE(ck.suburb, 'Unspecified')` };
+    default: throw new Error(`Unsupported dimension: ${dimension}`);
+  }
+};
+
+const compostProcessed = async ({ dimension, dateRange }) => {
+  const dim = compostDimension(dimension);
+  const params = [dateRange.from, dateRange.to];
+  const { rows } = await pool.query(
+    `SELECT ${dim.expr} AS label, COALESCE(SUM(kg_compost), 0)::numeric AS value
+       FROM (SELECT ${sastDate('logged_at')} AS bucket_date, kg_compost, kit_id
+               FROM collection_kit_records
+              WHERE ${sastDate('logged_at')} BETWEEN $1::date AND $2::date) t
+       LEFT JOIN collection_kits ck ON ck.id = t.kit_id
+       ${dim.group ? `GROUP BY ${dim.group}` : ''}
+       ORDER BY ${dimension === 'region' ? '2 DESC, 1' : '1'}`,
+    params
+  );
+  return rows2series(rows);
+};
 
 // Denominator is every slip that reached the gate. Cancelled slips
 // are excluded — a cancelled pallet was never a collection anyone
@@ -219,7 +388,8 @@ const decantingWastage = async ({ dimension, filters, dateRange }) => {
        JOIN decanting_records dr ON dr.id = dl.decanting_id
   LEFT JOIN products p ON p.id = dl.product_id
       WHERE ${where.join(' AND ')}
-      GROUP BY ${expr} ORDER BY ${dimension === 'product' ? '2 DESC NULLS LAST, 1' : '1'}`,
+      ${dimension === 'none' ? '' : `GROUP BY ${expr}`}
+      ORDER BY ${dimension === 'product' ? '2 DESC NULLS LAST, 1' : '1'}`,
     params
   );
   return rows.map((r) => ({
@@ -250,6 +420,10 @@ const receivingDimension = (dimension) => {
     case 'week':     return { expr: bucketWeek('dn.delivery_date'),  group: bucketWeek('dn.delivery_date') };
     case 'supplier': return { expr: `s.name`,                        group: `s.name` };
     case 'product':  return { expr: `p.name`,                        group: `p.name` };
+    case 'month_supplier': {
+      const e = `${bucketMonth('dn.delivery_date')} || '|' || s.name`;
+      return { expr: e, group: e };
+    }
     default: throw new Error(`Unsupported dimension: ${dimension}`);
   }
 };
@@ -366,6 +540,38 @@ const procurementSpend = async ({ dimension, filters, dateRange }) => {
   return rows2series(rows);
 };
 
+// Average price paid per unit, not total spend — spend rising because
+// more was bought is a different story from price rising per unit,
+// and procurement_spend alone cannot tell them apart. SUM(spend) /
+// SUM(quantity) per bucket, not AVG(unit_price) per line: a weighted
+// average, so one large cheap delivery cannot be out-voted by ten
+// small expensive ones.
+const unitPriceTrend = async ({ dimension, filters, dateRange }) => {
+  const dim = receivingDimension(dimension);
+  const params = [dateRange.from, dateRange.to];
+  const where = [
+    `dn.delivery_date BETWEEN $1::date AND $2::date`,
+    `poi.unit_price IS NOT NULL`,
+    `dni.received_quantity > 0`,
+    ...receivingFilters(filters, params),
+  ];
+  const { rows } = await pool.query(
+    `SELECT ${dim.expr} AS label,
+            ROUND((SUM(dni.received_quantity * poi.unit_price)
+                   / NULLIF(SUM(dni.received_quantity), 0))::numeric, 2) AS value
+       FROM delivery_note_items dni
+       JOIN delivery_notes dn ON dn.id = dni.delivery_note_id
+       JOIN purchase_order_items poi ON poi.id = dni.purchase_order_item_id
+       JOIN suppliers s ON s.id = dn.supplier_id
+       JOIN products p ON p.id = dni.product_id
+      WHERE ${where.join(' AND ')}
+      ${dim.group ? `GROUP BY ${dim.group}` : ''}
+      ORDER BY ${orderFor(dimension)}`,
+    params
+  );
+  return rows2series(rows);
+};
+
 // ══ Donations ══════════════════════════════════════════════════
 // received_at is timestamptz — sastDate() is mandatory here.
 // NO DONOR DIMENSION. donor_name, donor_contact and
@@ -376,14 +582,14 @@ const donationValue = async ({ dimension, filters, dateRange }) => {
   const expr = {
     none:      `'Total'`,
     month:     bucketMonth(d),
-    category:  `dn.category::text`,
+    category:  `dn.donation_category::text`,
     programme: `COALESCE(pr.name, 'Unassigned')`,
   }[dimension];
   if (!expr) throw new Error(`Unsupported dimension: ${dimension}`);
 
   const params = [dateRange.from, dateRange.to];
   const where = [`${d} BETWEEN $1::date AND $2::date`];
-  if (filters.donation_category) { params.push(filters.donation_category); where.push(`dn.category = $${params.length}::donation_category`); }
+  if (filters.donation_category) { params.push(filters.donation_category); where.push(`dn.donation_category = $${params.length}`); }
   if (filters.programme_id)      { params.push(filters.programme_id);      where.push(`dn.programme_id = $${params.length}`); }
 
   const { rows } = await pool.query(
@@ -391,7 +597,8 @@ const donationValue = async ({ dimension, filters, dateRange }) => {
        FROM donations dn
   LEFT JOIN programmes pr ON pr.id = dn.programme_id
       WHERE ${where.join(' AND ')}
-      GROUP BY ${expr} ORDER BY ${dimension === 'none' || dimension === 'month' ? '1' : '2 DESC, 1'}`,
+      ${dimension === 'none' ? '' : `GROUP BY ${expr}`}
+      ORDER BY ${dimension === 'none' || dimension === 'month' ? '1' : '2 DESC, 1'}`,
     params
   );
   return rows2series(rows);
@@ -483,6 +690,7 @@ const stockMovementVolume = async ({ dimension, filters, dateRange }) => {
     week:          bucketWeek(d),
     product:       `p.name`,
     programme:     `COALESCE(pr.name, 'Unassigned')`,
+    month_movement: `${bucketMonth(d)} || '|' || sm.movement_type`,
   }[dimension];
   if (!expr) throw new Error(`Unsupported dimension: ${dimension}`);
 
@@ -501,7 +709,7 @@ const stockMovementVolume = async ({ dimension, filters, dateRange }) => {
        JOIN products p ON p.id = sm.product_id
   LEFT JOIN programmes pr ON pr.id = p.programme_id
       WHERE ${where.join(' AND ')}
-      GROUP BY ${expr} ORDER BY ${dimension === 'month' || dimension === 'week' ? '1' : '2 DESC, 1'}`,
+      GROUP BY ${expr} ORDER BY ${TIME_ORDERED.has(dimension) ? '1' : '2 DESC, 1'}`,
     params
   );
   return rows2series(rows);
@@ -563,7 +771,8 @@ const pickingFlagRate = async ({ dimension, filters, dateRange }) => {
        JOIN picking_slips ps ON ps.id = psi.picking_slip_id
        JOIN products p ON p.id = psi.product_id
       WHERE ${where.join(' AND ')}
-      GROUP BY ${expr} ORDER BY ${dimension === 'none' || dimension === 'month' ? '1' : '2 DESC, 1'}`,
+      ${dimension === 'none' ? '' : `GROUP BY ${expr}`}
+      ORDER BY ${dimension === 'none' || dimension === 'month' ? '1' : '2 DESC, 1'}`,
     params
   );
   return rows.map((r) => ({ label: r.label, value: num(r.value), meta: { lines: r.worked } }));
@@ -608,7 +817,7 @@ const volunteerHours = async ({ dimension, dateRange }) => {
       WHERE ${d} BETWEEN $1::date AND $2::date
         AND v.signed_out_at IS NOT NULL
         AND v.signed_out_at > v.signed_in_at
-      GROUP BY ${expr} ORDER BY 1`,
+      ${dimension === 'none' ? '' : `GROUP BY ${expr}`} ORDER BY 1`,
     [dateRange.from, dateRange.to]
   );
   return rows.map((r) => ({ label: r.label, value: num(r.value), meta: { sessions: r.sessions } }));
@@ -629,11 +838,15 @@ const getFactor = async (key) => {
 };
 
 export default {
-  childrenReached, mealsEnabled, dispatchVolume, collectionCompliance,
+  childrenReached, mealsEnabled, mealsServedByGroup, adultsReached, dignityKitchenServed, communityServed,
+  paperSaved, compostProcessed,
+  dispatchVolume, collectionCompliance,
   repeatNonCollections, decantingWastage,
-  goodsReceived, receivingDiscrepancyRate, unresolvedDiscrepancies, procurementSpend,
+  goodsReceived, receivingDiscrepancyRate, unresolvedDiscrepancies, procurementSpend, unitPriceTrend,
   donationValue, section18aPipeline,
   stockOnHand, lowStockItems, stockMovementVolume, stockCountVariance,
   pickingFlagRate, communityRequestOutcomes, volunteerHours,
   countNonKgLines, getFactor,
+  // Second-wave operational metrics, kept in their own file.
+  ...opsRepo,
 };

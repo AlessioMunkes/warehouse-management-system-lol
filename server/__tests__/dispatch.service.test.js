@@ -98,11 +98,11 @@ describe('currentHour — the hour on the warehouse clock', () => {
   // The whole bug: getHours() on a UTC container returned 14 here, so
   // the cutoff did not fire until 18:00 SAST — two hours after the
   // gate closed, every single day.
-  it('is at the cutoff at 14:00 UTC, not at 16:00 UTC', () => {
-    atUtc('2026-08-19T14:00:00Z');
+  it('is at the cutoff at 13:00 UTC (15:00 SAST), not at 16:00 UTC', () => {
+    atUtc('2026-08-19T13:00:00Z');
     expect(currentHour() >= NON_COLLECTION_CUTOFF_HOUR).toBe(true);
 
-    atUtc('2026-08-19T13:59:00Z');
+    atUtc('2026-08-19T12:59:00Z');
     expect(currentHour() >= NON_COLLECTION_CUTOFF_HOUR).toBe(false);
   });
 
@@ -161,14 +161,14 @@ describe('getBoard — the sweep trigger', () => {
   });
 
   it('does not sweep today before the cutoff', async () => {
-    atUtc('2026-08-19T13:00:00Z');   // 15:00 SAST
+    atUtc('2026-08-19T12:00:00Z');   // 14:00 SAST
     await dispatchService.getBoard({ dispatchDate: '2026-08-19' }, MANAGER);
     expect(repoMock.sweepNonCollections).not.toHaveBeenCalled();
   });
 
   // The two hours the old code got wrong.
-  it('sweeps today from 16:00 SAST, which is 14:00 UTC', async () => {
-    atUtc('2026-08-19T14:00:00Z');
+  it('sweeps today from 15:00 SAST, which is 13:00 UTC', async () => {
+    atUtc('2026-08-19T13:00:00Z');
     await dispatchService.getBoard({ dispatchDate: '2026-08-19' }, MANAGER);
     expect(repoMock.sweepNonCollections).toHaveBeenCalled();
   });
@@ -222,7 +222,7 @@ describe('getBoard — the sweep trigger', () => {
     });
 
     it('does not sweep before the cutoff', async () => {
-      atUtc('2026-08-19T13:00:00Z');   // 15:00 SAST
+      atUtc('2026-08-19T12:00:00Z');   // 14:00 SAST
       await dispatchService.getBoard({ scope: 'gate' }, MANAGER);
       expect(repoMock.sweepNonCollections).not.toHaveBeenCalled();
     });
@@ -291,9 +291,9 @@ describe('evaluateEligibility — wrongDay against the warehouse date', () => {
   });
 
   it('flags afterCutoff on the warehouse clock', () => {
-    atUtc('2026-08-19T14:00:00Z');
-    expect(evaluateEligibility(gateView()).afterCutoff).toBe(true);
     atUtc('2026-08-19T13:00:00Z');
+    expect(evaluateEligibility(gateView()).afterCutoff).toBe(true);
+    atUtc('2026-08-19T12:00:00Z');
     expect(evaluateEligibility(gateView()).afterCutoff).toBe(false);
   });
 
@@ -381,23 +381,23 @@ describe('getNonCollectionHistory', () => {
     );
   });
 });
-// ── The 16:00 write-off is a flag, not a lock (BR-14) ─────────
-// The sweep runs opportunistically from getBoard, so from 16:00
+// ── The 15:00 write-off is a flag, not a lock (BR-14) ─────────
+// The sweep runs opportunistically from getBoard, so from 15:00
 // onwards essentially every uncollected pallet carries
 // dispatch_status = 'not_collected'. When that fed needsOverride, the
-// effect was that the gate closed itself at 16:00 for the warehouse
-// worker actually standing at it — a driver arriving at 16:40 had to
+// effect was that the gate closed itself at 15:00 for the warehouse
+// worker actually standing at it — a driver arriving at 15:40 had to
 // find a manager before food could leave, which is the opposite of
 // the rule this service is built on.
 //
 // These pin the corrected behaviour: written off still SHOWS (the
 // flag survives, and the repository files the event as
 // 'late_collected'), but it does not gate anything.
-describe('a pallet written off at 16:00 can still be collected', () => {
+describe('a pallet written off at 15:00 can still be collected', () => {
   const writtenOff = () => gateView({ dispatch_status: 'not_collected' });
 
   beforeEach(() => {
-    atUtc('2026-08-19T14:40:00Z');          // 16:40 SAST, after the sweep
+    atUtc('2026-08-19T13:40:00Z');          // 15:40 SAST, after the sweep
     repoMock.collect.mockResolvedValue({ event: { id: 9, status: 'late_collected' } });
   });
 

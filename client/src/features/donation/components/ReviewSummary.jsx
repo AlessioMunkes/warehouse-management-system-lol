@@ -42,6 +42,7 @@ export function ReviewSummary({ draft }) {
       </div>
 
       <div className="stf-list">
+        {draft.donorConsentGiven === true && (
         <div className="stf-row is-static">
           <div className="stf-row-main">
             <span className="stf-row-title">Value & Programme</span>
@@ -50,6 +51,7 @@ export function ReviewSummary({ draft }) {
             </span>
           </div>
         </div>
+        )}
 
         <div className="stf-row is-static">
           <div className="stf-row-main">

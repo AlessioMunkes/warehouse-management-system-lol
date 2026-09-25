@@ -13,6 +13,7 @@ import crypto from 'node:crypto';
 import { google } from 'googleapis';
 import { getGmailConfig, OAUTH_STATE_TTL_MS, parseEncryptionKey } from '../config/gmail.js';
 import gmailRepo from '../repositories/gmail.repository.js';
+import { currentWarehouse } from '../config/warehouseContext.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -66,6 +67,9 @@ const startConnectFlow = ({ initiatedByUserId } = {}) => {
   stateStore.set(state, {
     expiresAt: Date.now() + OAUTH_STATE_TTL_MS,
     initiatedByUserId: initiatedByUserId ? String(initiatedByUserId) : null,
+    // Multi-warehouse: Google calls back with no session, so remember
+    // which warehouse started the flow (null with one database).
+    warehouse: currentWarehouse(),
   });
 
   const oauth2Client = getOAuth2Client(config);
@@ -454,7 +458,17 @@ const saveDisplayName = async (userId, displayName) => {
   };
 };
 
+// The warehouse that started this OAuth flow, or null. Read-only: the
+// state is still consumed (and validated) by handleOAuthCallback.
+const warehouseForState = (state) => {
+  if (!state) return null;
+  const tracked = stateStore.get(String(state));
+  if (!tracked || tracked.expiresAt <= Date.now()) return null;
+  return tracked.warehouse ?? null;
+};
+
 export default {
+  warehouseForState,
   startConnectFlow,
   handleOAuthCallback,
   getValidAccessToken,

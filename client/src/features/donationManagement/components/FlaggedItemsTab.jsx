@@ -32,6 +32,7 @@ import {
 import { PRODUCT_CLASSIFICATION_CATEGORIES } from '@/services/donationManagementAPI';
 import { ProductMatchCombobox } from '@/features/donation/components/ProductMatchComboBox';
 import useFlaggedItems from '../hooks/useFlaggedItems';
+import { fmtQty } from '@/lib/quantity';
 
 const formatCategoryLabel = (category = '') =>
   category.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -44,13 +45,16 @@ const isIntakeResponse = (result) =>
 
 const resolveMessage = (result = {}) => {
   if (!isIntakeResponse(result)) return 'Resolved.';
-  if (result.committed === true) return 'Donation now committing — all items resolved.';
+  if (result.committed === true) return 'Donation now committing. All items resolved.';
   if (result.status === 'committing') return 'Donation now committing.';
   return 'Awaiting further resolutions.';
 };
 
 const isPlaceholder = (row = {}) =>
   String(row.name || '').startsWith('[Unclassified]') || row.is_active === false;
+
+export const isUnresolvedFlag = (row = {}) =>
+  !row.status || row.status === 'pending' || row.status === 'pending_classification';
 
 const REVIEW_ROUTES = [
   { value: 'recipe_food', label: 'Recipe Food' },
@@ -63,6 +67,17 @@ const formatDate = (value) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleDateString();
+};
+
+const rowDateValue = (flag) => flag.donation_date || flag.flagged_at || flag.created_at;
+
+const inDateRange = (value, fromValue, toValue) => {
+  const time = value ? new Date(value).getTime() : NaN;
+  const from = fromValue ? new Date(`${fromValue}T00:00:00`).getTime() : null;
+  const to = toValue ? new Date(`${toValue}T23:59:59`).getTime() : null;
+  if (from !== null && (!Number.isFinite(time) || time < from)) return false;
+  if (to !== null && (!Number.isFinite(time) || time > to)) return false;
+  return true;
 };
 
 const parseSnapshot = (snapshot) => {
@@ -93,6 +108,7 @@ const IntakeFlagRow = ({ flag, busy, onResolve }) => {
   const [newProductBrand, setNewProductBrand] = useState('');
   const [newProductCategory, setNewProductCategory] = useState(flag.donation_category || '');
   const [message, setMessage] = useState('');
+  const [activeAction, setActiveAction] = useState(null);
 
   const snapshotItem = getSnapshotItem(flag);
   const qty = flag.item_quantity ?? snapshotItem?.quantity ?? '-';
@@ -100,10 +116,16 @@ const IntakeFlagRow = ({ flag, busy, onResolve }) => {
   const expiry = snapshotItem?.expiryDate ?? snapshotItem?.expiry_date ?? null;
   const donationLabel = flag.pending_donation_id ? `Donation #${flag.pending_donation_id}` : 'Donation';
 
-  const resolve = async (payload) => {
-    const result = await onResolve(flag.flag_id, payload);
-    if (result) setMessage(resolveMessage(result));
+  const resolve = async (payload, action) => {
+    setActiveAction(action);
+    try {
+      const result = await onResolve(flag.flag_id, payload);
+      if (result) setMessage(resolveMessage(result));
+    } finally {
+      setActiveAction(null);
+    }
   };
+  const isBusy = Boolean(activeAction) || busy;
 
   return (
     <Card className="rounded-[12px] border border-line shadow-sm">
@@ -151,7 +173,7 @@ const IntakeFlagRow = ({ flag, busy, onResolve }) => {
                   <span className="text-xs text-muted-foreground">{item.line_no}.</span>
                   <span>{item.description}</span>
                   <span className="text-xs text-muted-foreground">
-                    {item.quantity} {item.unit}
+                    {fmtQty(item.quantity, item.unit)}
                   </span>
                   {item.status && item.status !== 'awaiting_resolution' ? (
                     <Badge variant="outline" className="text-[10px]">
@@ -203,10 +225,10 @@ const IntakeFlagRow = ({ flag, busy, onResolve }) => {
                   decision: 'match_existing_product',
                   productId: selectedProductId,
                   category: selectedProductCategory,
-                })}
-                disabled={!selectedProductId || !selectedProductCategory || busy}
+                }, 'match')}
+                disabled={!selectedProductId || !selectedProductCategory || isBusy}
               >
-                {busy ? <Loader2 className="animate-spin" /> : null} Link Product
+                {activeAction === 'match' ? <Loader2 className="animate-spin" /> : null} Link Product
               </Button>
             </div>
 
@@ -236,10 +258,10 @@ const IntakeFlagRow = ({ flag, busy, onResolve }) => {
                     brand: newProductBrand.trim() || null,
                     category: newProductCategory,
                   },
-                })}
-                disabled={!newProductName.trim() || !newProductCategory || busy}
+                }, 'create')}
+                disabled={!newProductName.trim() || !newProductCategory || isBusy}
               >
-                {busy ? <Loader2 className="animate-spin" /> : null} Save Product
+                {activeAction === 'create' ? <Loader2 className="animate-spin" /> : null} Save Product
               </Button>
             </div>
 
@@ -249,10 +271,10 @@ const IntakeFlagRow = ({ flag, busy, onResolve }) => {
                 type="button"
                 variant="outline"
                 className="mt-3"
-                onClick={() => resolve({ decision: 'move_to_non_food' })}
-                disabled={busy}
+                onClick={() => resolve({ decision: 'move_to_non_food' }, 'non-food')}
+                disabled={isBusy}
               >
-                {busy ? <Loader2 className="animate-spin" /> : null} Move to Non-Food
+                {activeAction === 'non-food' ? <Loader2 className="animate-spin" /> : null} Move to Non-Food
               </Button>
             </div>
           </div>
@@ -295,7 +317,7 @@ const LegacyFlagRow = ({ flag, busy, onResolve }) => {
             </span>
           </div>
           <span className="text-xs text-muted-foreground">
-            {flag.quantity_kg != null ? `${flag.quantity_kg} kg` : ''}
+            {flag.quantity_kg != null ? fmtQty(flag.quantity_kg, 'kg') : ''}
           </span>
         </div>
       </CardHeader>
@@ -373,6 +395,9 @@ const ErrorBanner = ({ message, onRetry }) => (
 );
 
 export default function FlaggedItemsTab() {
+  const [donorSearch, setDonorSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const {
     items,
     isLoading,
@@ -388,18 +413,29 @@ export default function FlaggedItemsTab() {
   };
 
   const busyFor = (flagId) => pendingFlagIds.includes(Number(flagId));
+  const unresolvedItems = items.filter(isUnresolvedFlag);
+  const filteredItems = unresolvedItems.filter((flag) => {
+    const donor = String(flag.donor_name || '').toLowerCase();
+    if (donorSearch.trim() && !donor.includes(donorSearch.trim().toLowerCase())) return false;
+    return inDateRange(rowDateValue(flag), dateFrom, dateTo);
+  });
 
   return (
     <div className="mt-6 space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          {items.length} product review item{items.length === 1 ? '' : 's'} awaiting review.
+          {filteredItems.length} of {unresolvedItems.length} product review item{unresolvedItems.length === 1 ? '' : 's'} awaiting review.
         </p>
         <div className="flex items-center gap-2">
           <Button type="button" variant="outline" size="sm" onClick={refresh} disabled={isLoading}>
             <RefreshCw className={`mr-1 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
           </Button>
         </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Input type="search" aria-label="Search product review by donor name" placeholder="Search donor name" value={donorSearch} onChange={(e) => setDonorSearch(e.target.value)} />
+        <Input type="date" aria-label="Product review date from" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+        <Input type="date" aria-label="Product review date to" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
       </div>
 
       {error ? <ErrorBanner message={error} onRetry={refresh} /> : null}
@@ -412,15 +448,21 @@ export default function FlaggedItemsTab() {
         </div>
       ) : null}
 
-      {!isLoading && items.length === 0 && !error ? (
+      {!isLoading && unresolvedItems.length === 0 && !error ? (
         <div className="rounded-[12px] border border-dashed border-line-strong bg-surface p-8 text-center text-sm text-muted-foreground">
           No pending product reviews.
         </div>
       ) : null}
 
-      {!isLoading && items.length > 0 && !error ? (
+      {!isLoading && unresolvedItems.length > 0 && filteredItems.length === 0 && !error ? (
+        <div className="rounded-[12px] border border-dashed border-line-strong bg-surface p-8 text-center text-sm text-muted-foreground">
+          No pending product reviews match the current filters.
+        </div>
+      ) : null}
+
+      {!isLoading && filteredItems.length > 0 && !error ? (
         <div className="space-y-4">
-          {items.map((flag) =>
+          {filteredItems.map((flag) =>
             flag.pending_donation_id != null ? (
               <IntakeFlagRow key={flag.flag_id} flag={flag} busy={busyFor(flag.flag_id)} onResolve={handleResolve} />
             ) : (

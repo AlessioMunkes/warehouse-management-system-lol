@@ -29,19 +29,19 @@ beforeEach(() => {
 describe('listNotifications', () => {
   it('scopes the read to the calling user\'s id', async () => {
     await notificationService.listNotifications(USER, {});
-    expect(repoMock.listForUser).toHaveBeenCalledWith(USER.id, { unreadOnly: false });
+    expect(repoMock.listForUser).toHaveBeenCalledWith(USER.id, USER.role, { unreadOnly: false });
   });
 
   it('treats the string "true" from a query param as true', async () => {
     await notificationService.listNotifications(USER, { unreadOnly: 'true' });
-    expect(repoMock.listForUser).toHaveBeenCalledWith(USER.id, { unreadOnly: true });
+    expect(repoMock.listForUser).toHaveBeenCalledWith(USER.id, USER.role, { unreadOnly: true });
   });
 });
 
 describe('getUnreadCount', () => {
   it('scopes the read to the calling user\'s id', async () => {
     await notificationService.getUnreadCount(USER);
-    expect(repoMock.getUnreadCount).toHaveBeenCalledWith(USER.id);
+    expect(repoMock.getUnreadCount).toHaveBeenCalledWith(USER.id, USER.role);
   });
 });
 
@@ -53,13 +53,13 @@ describe('markRead', () => {
 
   it('marks read for the calling user only', async () => {
     await notificationService.markRead(USER, 12);
-    expect(repoMock.markRead).toHaveBeenCalledWith(12, USER.id);
+    expect(repoMock.markRead).toHaveBeenCalledWith(12, USER.id, USER.role);
   });
 });
 
 describe('markAllRead', () => {
   it('scopes the write to the calling user\'s id', async () => {
     await notificationService.markAllRead(USER);
-    expect(repoMock.markAllRead).toHaveBeenCalledWith(USER.id);
+    expect(repoMock.markAllRead).toHaveBeenCalledWith(USER.id, USER.role);
   });
 });

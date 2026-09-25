@@ -28,9 +28,10 @@ import { Skeleton }  from '@/components/ui/skeleton';
 import {
   Card, CardContent, CardHeader, CardTitle,
 } from '@/components/ui/card';
-import { Search, Plus, Pencil, Power, ShieldCheck, X } from 'lucide-react';
+import { Search, Plus, Pencil, Power, ShieldCheck, RotateCcw, X } from 'lucide-react';
 
 const CAN_MANAGE = ['manager', 'admin'];
+const OTHER_COHORT = { week1: 'week2', week2: 'week1' };
 import useTableView    from '../features/masterdata/hooks/useTableView';
 import MasterDataTable from '../features/masterdata/components/MasterDataTable';
 import ColumnToggle    from '../features/masterdata/components/ColumnToggle';
@@ -59,7 +60,7 @@ const ErrorBanner = ({ message, onRetry }) => (
 );
 
 // ── Detail panel ──────────────────────────────────────────────
-const BeneficiaryDetail = ({ beneficiary, canManage, onEdit, onToggleActive, onApprove, onClose }) => (
+const BeneficiaryDetail = ({ beneficiary, canManage, onEdit, onToggleActive, onApprove, onRollbackCohort, onClose }) => (
   <Card>
     <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
       <div>
@@ -76,6 +77,7 @@ const BeneficiaryDetail = ({ beneficiary, canManage, onEdit, onToggleActive, onA
     <CardContent className="space-y-5">
       <dl className="grid gap-3 text-sm sm:grid-cols-2">
         <div><dt className="text-muted-foreground">Contact</dt><dd>{beneficiary.contactName || '—'}</dd></div>
+        <div><dt className="text-muted-foreground">Mobile</dt><dd>{beneficiary.mobileNumber || '—'}</dd></div>
         <div><dt className="text-muted-foreground">Children served</dt><dd>{beneficiary.childCount ?? 'Not recorded'}</dd></div>
         <div><dt className="text-muted-foreground">Approved</dt><dd>{beneficiary.approvedAt ? fmtDate(beneficiary.approvedAt) : 'Not yet approved'}</dd></div>
         <div><dt className="text-muted-foreground">Last collection</dt><dd>{fmtDate(beneficiary.lastCollectedDate)}</dd></div>
@@ -102,6 +104,10 @@ const BeneficiaryDetail = ({ beneficiary, canManage, onEdit, onToggleActive, onA
           <Button type="button" variant="outline" onClick={onToggleActive}>
             <Power />
             {beneficiary.isActive ? 'Deactivate' : 'Reactivate'}
+          </Button>
+          <Button type="button" variant="outline" onClick={onRollbackCohort}>
+            <RotateCcw />
+            Move to {COHORT_LABELS[OTHER_COHORT[beneficiary.cohort]] ?? 'other cohort'}
           </Button>
         </div>
       ) : null}
@@ -210,6 +216,15 @@ export default function BeneficiaryDirectoryPage() {
     } catch (err) { setError(err.message); }
   };
 
+  const rollbackCohort = async () => {
+    setError(null);
+    try {
+      await beneficiaryAPI.rollbackCohort(selected.id);
+      await loadBeneficiaries();
+      await open(selected.id);
+    } catch (err) { setError(err.message); }
+  };
+
   return (
     <ManagerLayout>
       <main className="mx-auto w-full max-w-5xl px-4 py-6">
@@ -307,6 +322,7 @@ export default function BeneficiaryDirectoryPage() {
                     onEdit={() => setMode('edit')}
                     onToggleActive={toggleActive}
                     onApprove={approve}
+                    onRollbackCohort={rollbackCohort}
                     onClose={() => setSelected(null)}
                   />
                 ) : null}

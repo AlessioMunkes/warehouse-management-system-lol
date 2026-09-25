@@ -54,19 +54,47 @@ export default function PurchaseOrderForm({
   busy = false,
   error = null,
   invalidProductIds = [],
+  // The PO being edited (toPurchaseOrder's shape), or null/omitted to
+  // raise a new one. Pre-fills every field including the line table;
+  // the caller remounts this component (key={po?.id ?? 'new'}) when
+  // switching between orders or between create/edit, so this only
+  // needs to read initialValue once, on mount.
+  initialValue = null,
+  submitLabel = 'Raise purchase order',
 }) {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState(() => (initialValue ? {
+    supplierId: String(initialValue.supplierId ?? ''),
+    expectedDeliveryDate: initialValue.expectedDeliveryDate ?? '',
+    quickbooksPoId: initialValue.quickbooksPoId ?? '',
+    notes: initialValue.notes ?? '',
+  } : {
     supplierId: '', expectedDeliveryDate: '', quickbooksPoId: '', notes: '',
-  });
-  const [lines, setLines]     = useState([blankLine()]);
+  }));
+  const [lines, setLines] = useState(() => (
+    initialValue?.items?.length
+      ? initialValue.items.map((item) => ({
+          key: `line-${item.id}`,
+          productId: String(item.productId),
+          expectedQuantity: String(item.expectedQuantity),
+          expectedWeightKg: item.expectedWeightKg === null ? '' : String(item.expectedWeightKg),
+          // unitPrice is PER UNIT; lineCost (what the row's own input
+          // shows and edits) is the total — the inverse of what
+          // unitPriceFor() does back at submit time.
+          lineCost: item.unitPrice === null ? '' : (item.unitPrice * item.expectedQuantity).toFixed(2),
+        }))
+      : [blankLine()]
+  ));
   const [touched, setTouched] = useState(false);
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
-  // Only suppliers we can actually order from. An inactive one is a
-  // 409 from the service, and offering a choice that always fails is
-  // worse than not offering it.
-  const orderable = suppliers.filter((s) => s.isActive);
+  // Only suppliers we can actually order from — plus, editing, whichever
+  // one this order already has, even if it has since been deactivated.
+  // Without that an edit silently blanks a valid field the moment the
+  // page loads, for a fact the form never asked the manager to change.
+  const orderable = suppliers.filter(
+    (s) => s.isActive || String(s.id) === form.supplierId
+  );
 
   const filled = lines.filter((l) => l.productId && Number(l.expectedQuantity) > 0);
 
@@ -156,22 +184,30 @@ export default function PurchaseOrderForm({
         />
       </Field>
 
-      <Field>
-        <FieldLabel htmlFor="po-qbo">QuickBooks reference</FieldLabel>
-        <Input
-          id="po-qbo"
-          value={form.quickbooksPoId}
-          onChange={set('quickbooksPoId')}
-          placeholder="Leave blank unless you have already raised it there"
-          disabled={busy}
-        />
-        {/* Warehouse Visit 2.4: the WMS owns the PO number. This is
-            only where QuickBooks' own reference gets recorded, so the
-            two can be reconciled until the OAuth spike lands. */}
-        <FieldDescription>
-          The WMS generates the PO number. This is only QuickBooks' reference for the same order.
-        </FieldDescription>
-      </Field>
+      {/* Not shown when editing an existing order: PurchaseOrderDetail
+          already has its own inline editor for this one field (it's
+          usually set after the PO exists, once it's been entered into
+          QuickBooks separately), and updatePurchaseOrder doesn't touch
+          it — showing it here would look editable and silently do
+          nothing on save. */}
+      {!initialValue ? (
+        <Field>
+          <FieldLabel htmlFor="po-qbo">QuickBooks reference</FieldLabel>
+          <Input
+            id="po-qbo"
+            value={form.quickbooksPoId}
+            onChange={set('quickbooksPoId')}
+            placeholder="Leave blank unless you have already raised it there"
+            disabled={busy}
+          />
+          {/* Warehouse Visit 2.4: the WMS owns the PO number. This is
+              only where QuickBooks' own reference gets recorded, so the
+              two can be reconciled until the OAuth spike lands. */}
+          <FieldDescription>
+            The WMS generates the PO number. This is only QuickBooks' reference for the same order.
+          </FieldDescription>
+        </Field>
+      ) : null}
 
       <Field>
         <FieldLabel htmlFor="po-notes">Notes</FieldLabel>
@@ -191,7 +227,7 @@ export default function PurchaseOrderForm({
       <Field orientation="horizontal">
         <Button type="button" onClick={submit} disabled={busy}>
           {busy ? <Loader2 className="animate-spin" /> : null}
-          {busy ? 'Saving' : 'Raise purchase order'}
+          {busy ? 'Saving' : submitLabel}
         </Button>
         {onCancel ? (
           <Button type="button" variant="outline" onClick={onCancel} disabled={busy}>

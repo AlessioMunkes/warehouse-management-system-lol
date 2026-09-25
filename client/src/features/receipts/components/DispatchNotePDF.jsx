@@ -20,12 +20,20 @@
 // beneficiary on that date and cohort in one document. This is the
 // per-collection receipt. The run-level document is a separate
 // endpoint (/api/dispatch/runs/:date) and is not built yet.
+//
+// The letterhead (logo + warehouse address) DeliveryNotePDF used to
+// carry over from deliveryNotePDF.css's older template was never
+// added here when this note moved to PdfShell — restored below, same
+// asset and address DeliveryNotePDF.jsx uses.
 // ─────────────────────────────────────────────────────────────
 import PdfShell from './PdfShell';
 import {
   formatDate, formatDateTime, fmtQty, variance, qty,
   DISPATCH_STATUS_LABEL, BENEFICIARY_LABEL,
 } from './noteFormat';
+
+const PDF_LOGO_URL = '/images/pdf_logo.png';
+const WAREHOUSE_ADDRESS = ['Unit 4, Hewett Park', '17 Hewett Ave, Epping', 'Cape Town, 7460'];
 
 const COLLECTED = ['collected', 'late_collected'];
 
@@ -46,7 +54,7 @@ const DispatchNotePDF = ({ note, onClose }) => {
 
   return (
     <PdfShell
-      title={`DISPATCH NOTE #${note.id} — ${note.ecd_name || 'Unknown beneficiary'}`}
+      title={`DISPATCH NOTE #${note.id} - ${note.ecd_name || 'Unknown beneficiary'}`}
       filename={`dispatch-note-${note.id}`}
       onClose={onClose}
     >
@@ -55,16 +63,11 @@ const DispatchNotePDF = ({ note, onClose }) => {
           <h1 className="pdf-doc-title">DISPATCH NOTE</h1>
           <p className="pdf-doc-subtitle">Ladles of Love · Nourish Our Children</p>
           <p className="pdf-doc-subtitle">Proof of collection</p>
+          {WAREHOUSE_ADDRESS.map((line) => (
+            <p key={line} className="pdf-doc-address">{line}</p>
+          ))}
         </div>
-        <div>
-          <p className="pdf-doc-id-label">Record number</p>
-          <p className="pdf-doc-id">#{String(note.id).padStart(4, '0')}</p>
-          <p className="pdf-doc-id-label pdf-doc-id-label--spaced">
-            {wasCollected
-              ? `Collected: ${formatDateTime(note.collected_at)}`
-              : `Flagged: ${formatDateTime(note.flagged_at)}`}
-          </p>
-        </div>
+        <img src={PDF_LOGO_URL} alt="" className="pdf-doc-logo" aria-hidden="true" />
       </div>
 
       {/* ── Outcome ────────────────────────────────────────── */}
@@ -75,14 +78,14 @@ const DispatchNotePDF = ({ note, onClose }) => {
         <p className="pdf-status-body">
           {notCollected && (
             <>
-              Nobody collected this pallet. It was written off by the 16:00 sweep (BR-14).
-              No stock was deducted — the goods stopped counting as committed and read as
+              Nobody collected this pallet. It was written off by the 15:00 sweep (BR-14).
+              No stock was deducted: the goods stopped counting as committed and read as
               available again. It remains collectable as a late collection.
             </>
           )}
           {wasLate && (
             <>
-              This pallet was written off at 16:00 and collected afterwards. The collection
+              This pallet was written off at 15:00 and collected afterwards. The collection
               proceeded normally; nothing had been deducted, so nothing needed unwinding.
             </>
           )}
@@ -101,7 +104,7 @@ const DispatchNotePDF = ({ note, onClose }) => {
           </p>
           <p className="pdf-status-body">
             {note.override_reason}
-            {note.override_by_name ? ` — authorised by ${note.override_by_name}` : ''}
+            {note.override_by_name ? ` (authorised by ${note.override_by_name})` : ''}
           </p>
         </div>
       )}
@@ -120,6 +123,16 @@ const DispatchNotePDF = ({ note, onClose }) => {
       )}
 
       <div className="pdf-meta-grid">
+        <div>
+          <p className="pdf-meta-label">Record number</p>
+          <p className="pdf-meta-value">#{String(note.id).padStart(4, '0')}</p>
+        </div>
+        <div>
+          <p className="pdf-meta-label">{wasCollected ? 'Collected' : 'Flagged'}</p>
+          <p className="pdf-meta-value">
+            {formatDateTime(wasCollected ? note.collected_at : note.flagged_at)}
+          </p>
+        </div>
         <div>
           <p className="pdf-meta-label">Beneficiary</p>
           <p className="pdf-meta-value">{note.ecd_name || '—'}</p>
@@ -184,7 +197,7 @@ const DispatchNotePDF = ({ note, onClose }) => {
                   <td className="pdf-table-center">{fmtQty(line.loaded_quantity)}</td>
                   <td className="pdf-table-center">{line.unit || '—'}</td>
                   <td className={`pdf-table-center ${v ? v.className : 'pdf-variance-none'}`}>
-                    {v ? v.label : 'Matched'}
+                    {v ? v.label : '0'}
                   </td>
                 </tr>,
                 v && line.variance_reason ? (
@@ -201,26 +214,26 @@ const DispatchNotePDF = ({ note, onClose }) => {
             <tr>
               <td colSpan={6} className="pdf-table-empty">
                 {notCollected
-                  ? 'Nothing was loaded — this pallet was not collected.'
+                  ? 'Nothing was loaded. This pallet was not collected.'
                   : 'No lines on record'}
               </td>
             </tr>
           )}
         </tbody>
+        {/* Totals in the table's own columns — see the same fix and
+            reasoning in DeliveryNotePDF.jsx. */}
+        {lines.length > 0 && (
+          <tfoot>
+            <tr className="pdf-table-foot">
+              <td colSpan={2} className="pdf-table-foot-label">Total</td>
+              <td className="pdf-table-center pdf-table-foot-value">{fmtQty(totalPacked)}</td>
+              <td className="pdf-table-center pdf-table-foot-value">{fmtQty(totalLoaded)}</td>
+              <td colSpan={2} />
+            </tr>
+          </tfoot>
+        )}
       </table>
 
-      {lines.length > 0 && (
-        <div className="pdf-totals-row">
-          <div className="pdf-total-block">
-            <p className="pdf-meta-label">Total packed</p>
-            <p className="pdf-meta-value">{fmtQty(totalPacked)}</p>
-          </div>
-          <div className="pdf-total-block">
-            <p className="pdf-meta-label">Total loaded</p>
-            <p className="pdf-meta-value">{fmtQty(totalLoaded)}</p>
-          </div>
-        </div>
-      )}
 
       <div className="pdf-signature-section">
         <div className="pdf-signature-block">
@@ -231,12 +244,14 @@ const DispatchNotePDF = ({ note, onClose }) => {
             <div className="pdf-signature-line" />
           )}
           <p className="pdf-signature-name">
-            {note.driver_name || 'Driver'} · {formatDate(note.dispatch_date)}
+            {note.driver_name || '—'} · {formatDate(note.dispatch_date)}
           </p>
         </div>
         <div className="pdf-signature-block">
+          {/* No line here on purpose — same reasoning as
+              DeliveryNotePDF's "Received by": the warehouse side has
+              no signature to collect, only who released the pallet. */}
           <p className="pdf-signature-label">Released by (warehouse)</p>
-          <div className="pdf-signature-line" />
           <p className="pdf-signature-name">
             {note.dispatched_by_name || 'Dispatch staff'} · {formatDate(note.dispatch_date)}
           </p>

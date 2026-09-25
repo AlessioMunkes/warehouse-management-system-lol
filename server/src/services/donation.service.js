@@ -39,6 +39,8 @@ import {
   donationFingerprint,
 } from '../lib/validation/donationIntake.js';
 import donationModel from '../repositories/donation.repository.js';
+import { createNotification } from '../repositories/notification.repository.js';
+import gmailRepository from '../repositories/gmail.repository.js';
 import certificateSettingsService from './certificateSettings.service.js';
 import emailProvider from '../providers/email.provider.js';
 import pdfProvider from '../providers/pdf.provider.js';
@@ -908,6 +910,62 @@ const generateSection18ACertificateEmailContent = (donation, certificate, settin
 const donationReferenceFor = (donation) =>
   donation.section_18a_certificate_ref || `DON-${donation.id}`;
 
+const formatSection18AValue = (value) => {
+  if (value === null || value === undefined || value === '') return 'Not recorded';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (Array.isArray(value)) return value.length ? value.join(', ') : 'Not recorded';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+};
+
+const section18AFormDetailLines = (formData = {}) =>
+  Object.entries(formData)
+    .map(([key, value]) => `- ${key}: ${formatSection18AValue(value)}`)
+    .join('\n');
+
+const donationItemLines = (donation = {}) => {
+  const items = Array.isArray(donation.items) ? donation.items : [];
+  if (!items.length) return '- No donated items recorded on the donation.';
+  return items.map((item) => {
+    const name = item.product_name || item.product || item.description || item.product_description || 'Item';
+    const quantity = item.quantity ?? item.qty ?? 'quantity not recorded';
+    const unit = item.unit ? ` ${item.unit}` : '';
+    return `- ${name}: ${quantity}${unit}`;
+  }).join('\n');
+};
+
+const generateSection18AHandoffEmailContent = (donation, formData) => {
+  const donorName = formData.fullNameOrCompanyName || donation.donor_name || 'Donor';
+  const donorEmail = formData.email || donorEmailFor(donation) || 'Not recorded';
+  const donorPhone = formData.phone || donation.donor_phone || donation.phone || null;
+  const donorContact = donorPhone ? `${donorEmail} / ${donorPhone}` : donorEmail;
+  const reference = donationReferenceFor(donation);
+  const estimatedValue = formatSection18AValue(donation.estimated_value_zar);
+  const taxReference = formData.incomeTaxNumber || donation.donor_tax_reference || 'Not recorded';
+
+  const text = `Finance/Tax handoff: Section 18A donor details received.
+
+${donorName} donated these items. Here are the submitted details Finance/Tax needs to generate the Section 18A certificate.
+
+Donor name: ${donorName}
+Donor email/contact: ${donorContact}
+Donation reference/id: ${reference}
+Estimated donation value: ${estimatedValue}
+Tax reference: ${taxReference}
+
+Donated items:
+${donationItemLines(donation)}
+
+Submitted Section18A form details:
+${section18AFormDetailLines(formData)}
+`;
+
+  return {
+    subject: `Finance/Tax handoff: Section 18A details for ${reference}`,
+    text,
+  };
+};
+
 const sendThankYouEmail = async (donation, sentByUserId = null) => {
   const recipient = donorEmailFor(donation);
   if (!recipient) return null;
@@ -930,6 +988,19 @@ const sendThankYouEmail = async (donation, sentByUserId = null) => {
     sentByUserId,
   });
 };
+
+const notifySection18AEmailFailed = async (donation) => {
+  await createNotification(pool, {
+    type: 'section18a_email_failed',
+    title: 'Section 18A email failed',
+    body: `Certificate email for donation #${donation.id} failed.`,
+    entityType: 'donation',
+    entityId: donation.id,
+    targetRoles: ['admin'],
+    avoidDuplicate: true,
+  });
+};
+
 // Returns the existing certificate for the donation, or creates a new
 // one if none exists yet. Never regenerates one that is already there.
 const getOrCreateSection18ACertificate = async (donation, actorId) => {
@@ -1024,9 +1095,9 @@ const getSection18AFormByToken = async (token) => {
   if (donation.section_18a_form_token_expires_at && new Date(donation.section_18a_form_token_expires_at) < new Date()) {
     fail(410, 'Section 18A form link has expired.');
   }
-  if (donation.section_18a_status === 'issued') {
-  return { donationId: donation.id, status: 'issued', completed: true };
-}
+  if (donation.section_18a_status === 'issued' || donation.section_18a_form_submitted_at) {
+    return { donationId: donation.id, status: donation.section_18a_status || 'submitted', completed: true };
+  }
   return {
     donationId: donation.id,
     status: donation.section_18a_status,
@@ -1040,7 +1111,7 @@ const getSection18AFormByToken = async (token) => {
 const submitSection18AForm = async (token, payload = {}) => {
   const formData = validateSection18AForm(payload);
   const current = await getSection18AFormByToken(token);
-  if (current.completed) fail(409, 'Section 18A certificate has already been generated.');
+  if (current.completed) fail(409, 'Section 18A form has already been submitted.');
 
   const donation = await donationModel.saveSection18AFormSubmission({
     donationId: current.donationId,
@@ -1048,35 +1119,49 @@ const submitSection18AForm = async (token, payload = {}) => {
   });
   if (!donation) fail(404, 'Donation not found.');
 
-  const certificate = await getOrCreateSection18ACertificate(
-    {
-      ...donation,
-      donor_name: formData.fullNameOrCompanyName,
-      donor_contact: formData.email,
-      donor_tax_reference: formData.incomeTaxNumber,
-      section_18a_status: 'queued',
-      section_18a_form: formData,
-    },
-    null
-  );
-
-  const sent = await sendSection18ACertificateEmail({
+  const handoffDonation = {
     ...donation,
     donor_name: formData.fullNameOrCompanyName,
     donor_contact: formData.email,
     donor_tax_reference: formData.incomeTaxNumber,
-    section_18a_status: 'queued',
-  }, null);
+    section_18a_form: formData,
+  };
+  const connectedGmail = await gmailRepository.findLatestConnection();
+  const recipient = connectedGmail?.gmail_email;
+  if (!recipient) {
+    await donationModel.logDonationEmail({
+      donation: handoffDonation,
+      donationId: donation.id,
+      emailType: 'SECTION_18A',
+      recipient: 'connected Gmail account',
+      recipientEmail: null,
+      recipientName: 'Finance/Tax',
+      subject: 'Finance/Tax handoff: Section 18A donor details',
+      status: 'FAILED',
+      errorMessage: 'No connected Gmail account is available for the Section 18A handoff.',
+      sentByUserId: null,
+    });
+    fail(503, 'No connected Gmail account is available for the Section 18A handoff.');
+  }
+
+  const emailContent = generateSection18AHandoffEmailContent(handoffDonation, formData);
+  const sent = await logEmailAttempt({
+    donation: handoffDonation,
+    donationId: donation.id,
+    emailType: 'SECTION_18A',
+    recipient,
+    recipientName: 'Finance/Tax',
+    subject: emailContent.subject,
+    email: {
+      text: emailContent.text,
+    },
+    sentByUserId: null,
+  });
 
   return {
     donationId: donation.id,
-    status: 'issued',
-    certificate: {
-      id: certificate.id,
-      certificate_number: certificate.certificate_number,
-      pdf_filename: certificate.pdf_filename,
-    },
-    email: sent,
+    status: 'submitted',
+    handoffEmail: sent,
   };
 };
 
@@ -1101,7 +1186,7 @@ const sendSection18ACertificateEmail = async (donation, actorId) => {
     emailContent = generateSection18ACertificateEmailContent(donation, certificate, emailSettings);
   } catch (err) {
     console.error('[sendSection18ACertificateEmail:prepare]', err);
-    return await donationModel.logDonationEmail({
+    const failedLog = await donationModel.logDonationEmail({
       donation,
       donationId: donation.id,
       certificateId: certificate?.id ?? null,
@@ -1114,9 +1199,11 @@ const sendSection18ACertificateEmail = async (donation, actorId) => {
       errorMessage: err.message,
       sentByUserId: actorId ?? null,
     });
+    await notifySection18AEmailFailed(donation);
+    return failedLog;
   }
 
-  return await logEmailAttempt({
+  const sent = await logEmailAttempt({
     donation,
     donationId:    donation.id,
     certificateId: certificate.id,
@@ -1126,6 +1213,10 @@ const sendSection18ACertificateEmail = async (donation, actorId) => {
     email: emailContent,
     sentByUserId: actorId ?? null,
   });
+  if (sent?.status === 'FAILED') {
+    await notifySection18AEmailFailed(donation);
+  }
+  return sent;
 };
 
 const generateSection18ACertificate = async (donationId, userId) => {

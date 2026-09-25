@@ -308,3 +308,73 @@ describe('assignSlip — ownership', () => {
     expect(event[1][3]).toMatchObject({ packer_id: OWNER, reassigned_from: OTHER });
   });
 });
+
+// ── addSecondPacker ───────────────────────────────────────────
+// Dual assignment: a slip already held by one packer gains a second.
+// Reuses assignClient's fake, since it already answers both the
+// SELECT ... FOR UPDATE and any UPDATE picking_slips the same way.
+const SECOND = 12;
+
+const secondClient = (slip) => {
+  const calls = [];
+  return {
+    calls,
+    release: vi.fn(),
+    query: vi.fn(async (sql) => {
+      calls.push(sql.replace(/\s+/g, ' ').trim());
+      if (/SELECT id, status, assigned_to.*FROM picking_slips/i.test(sql)) {
+        return { rows: slip ? [slip] : [] };
+      }
+      if (/UPDATE picking_slips SET assigned_to_2/i.test(sql)) {
+        return { rows: [{ ...slip, assigned_to_2: SECOND }] };
+      }
+      return { rows: [], rowCount: 1 };
+    }),
+  };
+};
+
+const addSecond = (client, over = {}) => {
+  poolMock.connect.mockResolvedValueOnce(client);
+  return pickingRepository.addSecondPacker({ slipId: 1, packerId: SECOND, actorId: OWNER, ...over });
+};
+
+describe('addSecondPacker', () => {
+  it('adds a second packer once a primary already holds the slip', async () => {
+    const client = secondClient({ id: 1, status: 'in_progress', assigned_to: OWNER, assigned_to_2: null });
+    const result = await addSecond(client);
+    expect(result.slip.assigned_to_2).toBe(SECOND);
+    expect(client.calls).toContain('COMMIT');
+  });
+
+  it('refuses when nobody holds the slip yet', async () => {
+    const client = secondClient({ id: 1, status: 'pending', assigned_to: null, assigned_to_2: null });
+    const result = await addSecond(client);
+    expect(result).toEqual({ noPrimary: true });
+    expect(client.calls).toContain('ROLLBACK');
+  });
+
+  it('refuses when both slots are already taken', async () => {
+    const client = secondClient({ id: 1, status: 'in_progress', assigned_to: OWNER, assigned_to_2: OTHER });
+    const result = await addSecond(client);
+    expect(result).toEqual({ full: true, assignedTo2: OTHER });
+  });
+
+  it('succeeds quietly when the "second" packer already holds either slot', async () => {
+    const alreadyPrimary = secondClient({ id: 1, status: 'in_progress', assigned_to: SECOND, assigned_to_2: null });
+    const result = await addSecond(alreadyPrimary);
+    expect(result.slip).toBeDefined();
+    expect(result.slip.assigned_to_2).toBeNull();
+  });
+
+  it('refuses a closed pallet, same status guard as the primary claim', async () => {
+    const client = secondClient({ id: 1, status: 'complete', assigned_to: OWNER, assigned_to_2: null });
+    const result = await addSecond(client);
+    expect(result).toEqual({ locked: true, status: 'complete' });
+  });
+
+  it('locks the row before deciding anything', async () => {
+    const client = secondClient({ id: 1, status: 'in_progress', assigned_to: OWNER, assigned_to_2: null });
+    await addSecond(client);
+    expect(sql(client)[1]).toMatch(/FOR UPDATE/i);
+  });
+});

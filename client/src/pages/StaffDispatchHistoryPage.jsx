@@ -102,8 +102,8 @@ export default function StaffDispatchHistoryPage() {
         <div className="stf-step-head">
           <h1 className="stf-step-title" tabIndex={-1}>Dispatch history</h1>
           <p className="stf-step-sub">
-            Every dispatch that's been closed off — collected, late, not collected
-            or cancelled — most recent first. Pallets still waiting are on the gate queue.
+            Every dispatch that's been closed off (collected, late, not collected
+            or cancelled), most recent first. Pallets still waiting are on the gate queue.
           </p>
         </div>
 

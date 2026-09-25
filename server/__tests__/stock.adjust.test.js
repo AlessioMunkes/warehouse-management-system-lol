@@ -43,8 +43,11 @@ const makeClient = ({ existing = null } = {}) => {
     release: vi.fn(),
     query: vi.fn(async (sql, params) => {
       calls.push({ sql: sql.replace(/\s+/g, ' ').trim(), params });
-      if (/SELECT quantity_on_hand, unit FROM stock_levels/i.test(sql)) {
+      if (/SELECT[\s\S]*quantity_on_hand[\s\S]*reorder_threshold[\s\S]*FROM stock_levels/i.test(sql)) {
         return { rows: existing && existing !== 'no-product' ? [existing] : [] };
+      }
+      if (/SELECT name FROM products/i.test(sql)) {
+        return { rows: [{ name: 'Rice' }] };
       }
       if (/SELECT id FROM products/i.test(sql)) {
         return { rows: existing === 'no-product' ? [] : [{ id: 1 }] };
@@ -175,7 +178,7 @@ describe('adjustStock — locking and write order', () => {
     const client = makeClient({ existing: { quantity_on_hand: '100', unit: 'kg' } });
     await adjustStock(client, { ...BASE, quantityDelta: 5, unit: 'kg' });
 
-    expect(client.calls[0].sql).toMatch(/SELECT quantity_on_hand, unit FROM stock_levels .* FOR UPDATE/i);
+    expect(client.calls[0].sql).toMatch(/SELECT .*quantity_on_hand.*unit.*FROM stock_levels .* FOR UPDATE/i);
   });
 
   it('reads, then updates the level, then appends the movement', async () => {
@@ -183,7 +186,7 @@ describe('adjustStock — locking and write order', () => {
     await adjustStock(client, { ...BASE, quantityDelta: 5, unit: 'kg' });
 
     const order = sqlOf(client);
-    expect(order[0]).toMatch(/SELECT quantity_on_hand/i);
+    expect(order[0]).toMatch(/SELECT .*quantity_on_hand/i);
     expect(order[1]).toMatch(/UPDATE stock_levels/i);
     expect(order[2]).toMatch(/INSERT INTO stock_movements/i);
   });
@@ -329,6 +332,61 @@ describe('adjustStock — the movement row', () => {
     await adjustStock(client, { ...BASE, quantityDelta: 5, unit: 'kg' });
 
     expect(sqlOf(client).filter((s) => /INSERT INTO stock_movements/i.test(s))).toHaveLength(1);
+  });
+});
+
+// ── Low-stock notification ───────────────────────────────────────
+describe('adjustStock — low-stock notification', () => {
+  it('creates a notification when stock crosses down to the reorder threshold', async () => {
+    const client = makeClient({
+      existing: {
+        quantity_on_hand: '12',
+        unit: 'kg',
+        reorder_threshold: '10',
+        product_name: 'Rice',
+      },
+    });
+
+    await adjustStock(client, { ...BASE, quantityDelta: -2, unit: 'kg' });
+
+    const insert = findSql(client, /INSERT INTO notifications/i);
+    expect(insert.params).toEqual([
+      'low_stock',
+      'Low stock',
+      'Rice is at or below its reorder threshold.',
+      'product',
+      1,
+    ]);
+  });
+
+  it('does not duplicate low-stock notifications while stock is already low', async () => {
+    const client = makeClient({
+      existing: {
+        quantity_on_hand: '10',
+        unit: 'kg',
+        reorder_threshold: '10',
+        product_name: 'Rice',
+      },
+    });
+
+    await adjustStock(client, { ...BASE, quantityDelta: -1, unit: 'kg' });
+
+    expect(findSql(client, /INSERT INTO notifications/i)).toBeUndefined();
+  });
+
+  it('does not create a notification when no reorder threshold is set', async () => {
+    const client = makeClient({
+      existing: {
+        quantity_on_hand: '12',
+        unit: 'kg',
+        reorder_threshold: '0',
+        product_name: 'Rice',
+      },
+    });
+
+    await adjustStock(client, { ...BASE, quantityDelta: -12, unit: 'kg' });
+
+    expect(findSql(client, /INSERT INTO notifications/i)).toBeUndefined();
   });
 });
 

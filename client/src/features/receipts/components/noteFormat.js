@@ -50,24 +50,25 @@ export const formatDateShort = (value) => {
 
 // Quantities arrive from pg as strings, because numeric does not fit in a JS
 // number safely and node-postgres refuses to guess. Number() them at the edge.
-export const qty = (value) => {
-  if (value === null || value === undefined || value === '') return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-};
+//
+// Script 54: both of these moved to lib/quantity.js — packing, the
+// gate, receiving and the ledger print quantities too, and two copies
+// of a formatter is how "1.000" ended up in a number box. Re-exported
+// here so every existing import of noteFormat keeps working.
+import { qty, fmtQty } from '../../../lib/quantity';
 
-export const fmtQty = (value, unit) => {
-  const n = qty(value);
-  if (n === null) return '—';
-  // Trim a trailing .00 without mangling 1.5
-  const text = Number.isInteger(n) ? String(n) : String(Number(n.toFixed(3)));
-  return unit ? `${text} ${unit}` : text;
-};
+export { qty, fmtQty };
 
 // ── Variance ─────────────────────────────────────────────────
 // Returns { diff, label, className } or null when the two match.
 // Used by both notes: goods-in compares received against expected,
 // goods-out compares loaded against packed.
+//
+// label is a signed number ("-1", "+1"), not prose ("1 short",
+// "1 over") — a receiver reconciling a stack of these wants a column
+// they can sum, not a sentence they have to re-parse into a sign
+// first. The className still carries short-vs-over as a colour, so
+// the distinction isn't lost, only moved out of the text.
 export const variance = (actual, expected) => {
   const a = qty(actual);
   const e = qty(expected);
@@ -76,7 +77,7 @@ export const variance = (actual, expected) => {
   if (diff === 0) return null;
   return {
     diff,
-    label:     diff > 0 ? `${diff} over` : `${Math.abs(diff)} short`,
+    label:     diff > 0 ? `+${diff}` : String(diff),
     className: diff > 0 ? 'pdf-variance-over' : 'pdf-variance-short',
   };
 };

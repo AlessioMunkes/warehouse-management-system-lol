@@ -76,7 +76,7 @@ const getValidationErrors = ({
 
   if (!decision) errors.push('Accept the delivery or flag it for return.');
   if (varied.length > 0 && decision === 'accept')
-    errors.push('Some lines differ from the order — flag this delivery instead of accepting it.');
+    errors.push('Some lines differ from the order. Flag this delivery instead of accepting it.');
   if (decision === 'return' && !reason) errors.push('Pick a reason for flagging.');
 
   if (!signatureData) errors.push('Sign to confirm.');
@@ -201,7 +201,7 @@ const ProcurementDashboard = () => {
           // The picker gives the category, the line note gives the
           // specifics — both end up in discrepancy_reason.
           discrepancyReason: hasVariance(l)
-            ? [reason, l.note.trim(), details.trim()].filter(Boolean).join(' — ')
+            ? [reason, l.note.trim(), details.trim()].filter(Boolean).join(': ')
             : '',
         })),
       });
@@ -314,14 +314,14 @@ const ProcurementDashboard = () => {
             disabled={!supplierId}
             options={purchaseOrders.map((po) => ({
               value: po.id,
-              label: `Expected ${po.expected_delivery_date} — created by ${po.created_by_name || 'unknown'}`,
+              label: `Expected ${po.expected_delivery_date}, created by ${po.created_by_name || 'unknown'}`,
             }))}
           />
 
           {selectedPO && (
             <p className="form-helper-text pdf-doc-id-label--spaced">
               You selected: expected {selectedPO.expected_delivery_date}
-              {selectedSupplier ? ` — ${selectedSupplier.name}` : ''}
+              {selectedSupplier ? ` (${selectedSupplier.name})` : ''}
             </p>
           )}
         </StepCard>
@@ -336,7 +336,7 @@ const ProcurementDashboard = () => {
             <>
               <p className="form-helper-text">
                 Quantities default to the order. Change any line that came up short
-                or over — what you enter here is what gets added to stock.
+                or over. What you enter here is what gets added to stock.
               </p>
 
               <div className="data-table-wrapper">
@@ -397,7 +397,7 @@ const ProcurementDashboard = () => {
                   }}
                 >
                   <p style={{ margin: '0 0 8px', fontWeight: 700 }}>
-                    {l.productName} — {varianceLabel(l)}
+                    {l.productName}: {varianceLabel(l)}
                   </p>
 
                   {isOver(l) && (
@@ -411,10 +411,10 @@ const ProcurementDashboard = () => {
                         }
                       >
                         <option value="accept">
-                          Accept the extra — add all {l.receivedQuantity} {l.unit} to stock
+                          Accept the extra, add all {l.receivedQuantity} {l.unit} to stock
                         </option>
                         <option value="reject">
-                          Turn the extra away — add {l.expectedQuantity} {l.unit} only
+                          Turn the extra away, add {l.expectedQuantity} {l.unit} only
                         </option>
                       </select>
                     </div>
@@ -448,7 +448,7 @@ const ProcurementDashboard = () => {
         <StepCard number={4} title="The delivery decision">
           <p className="form-helper-text">
             {variedLines.length > 0
-              ? `${variedLines.length} line${variedLines.length > 1 ? 's differ' : ' differs'} from the order — this delivery needs to be flagged.`
+              ? `${variedLines.length} line${variedLines.length > 1 ? 's differ' : ' differs'} from the order. This delivery needs to be flagged.`
               : "If something's wrong with this delivery, flag it here."}
           </p>
 

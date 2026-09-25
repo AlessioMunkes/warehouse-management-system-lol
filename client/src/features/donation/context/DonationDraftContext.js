@@ -95,6 +95,7 @@ export function validateDraftField(draft, field) {
     && draft?.isAnonymousDonation !== true && draft?.anonymous !== true;
   switch (field) {
     case "estimatedValueZar":
+      if (draft?.donorConsentGiven !== true) return null;
       return validateMoney(draft?.estimatedValueZar, { required: true, field: "Estimated value" }).error;
     case "donorConsentGiven":
       return (draft?.donorConsentGiven === null || draft?.donorConsentGiven === undefined)
@@ -121,8 +122,10 @@ export function validateDonationDraft(draft) {
   const errors = {};
   const itemErrors = {};
 
-  const money = validateMoney(d.estimatedValueZar, { required: true, field: "Estimated value" });
-  if (money.error) errors.value = money.error;
+  if (d.donorConsentGiven === true) {
+    const money = validateMoney(d.estimatedValueZar, { required: true, field: "Estimated value" });
+    if (money.error) errors.value = money.error;
+  }
 
   if (d.isFood !== true && d.isFood !== false) {
     errors.isFood = "Select whether this donation contains food.";

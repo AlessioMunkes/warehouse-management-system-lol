@@ -62,8 +62,9 @@ export function DonorConsentSection({
       {error && <span className="stf-error">{error}</span>}
 
       <span className="stf-field-hint">
-        Section 18A information will be collected from the donor
-        separately if they request a certificate.
+        Required to save donor details for a Section 18A tax certificate.
+        Without consent, the donation is still recorded, just without
+        the donor's personal details.
       </span>
     </div>
   );

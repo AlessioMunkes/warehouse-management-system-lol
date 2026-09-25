@@ -29,6 +29,12 @@
 // DONATIONS.new must never drift apart.
 const DONATIONS_NEW = '/donations/new';
 
+// ── Landing ──────────────────────────────────────────────────
+// The public entry point — App.jsx's "/" route. Declared here so
+// nothing that links back to it (LoginPage's back link, etc.) has to
+// hardcode "/".
+export const LANDING = '/';
+
 export const PACKING = {
   // One URL for everyone. PackingSelectPage decides whether that
   // renders the manager's board (PackingPage) or the packer's own
@@ -90,6 +96,7 @@ export const STAFF = {
   // screen in its own right, so it lives here rather than under
   // ADMIN — a manager reaches both from the same task set.
   beneficiaries: '/noc/beneficiaries',
+  collectionReminders: '/noc/collection-reminders',
   // POST /api/picking (createSlip), POST /api/picking/generate, and
   // assigning a slip to a specific worker (POST /api/picking/:id/assign
   // with a packerId, only honoured for a manager) are all
@@ -106,6 +113,13 @@ export const STAFF = {
   // Warehouse staff and up: every /api/community-requests route is
   // requireRole(WORKER, MANAGER, ADMIN), and this mirrors that.
   communityRequests: '/noc/community-requests',
+  // Feed the Soil kit tracking (food waste swapped for compost).
+  // Warehouse staff and up, mirroring STAFF_UP on every
+  // /api/collection-kits route — a worker assigns a kit to a community
+  // member and logs the compost each time it's weighed in; the Impact
+  // Calculator's compost_processed metric only reads from what gets
+  // logged here.
+  feedTheSoil: '/noc/feed-the-soil',
 };
 
 // ── Donations ────────────────────────────────────────────────
@@ -139,6 +153,10 @@ export const STAFF_ROLES = ['warehouse_worker', 'manager', 'admin'];
 // Staff or higher"). Two halves of the same rule — change them together.
 export const COMMUNITY_REQUEST_ROLES = ['warehouse_worker', 'manager', 'admin'];
 
+// Client-side mirror of STAFF_UP in server/src/routes/collectionKit.routes.js.
+// Two halves of the same rule — change them together.
+export const FEED_THE_SOIL_ROLES = ['warehouse_worker', 'manager', 'admin'];
+
 // Volunteer Management is currently available to the two live roles that
 // perform the coordinator workflow. Keep this list shared by route guards and
 // dashboard entry points until a coordinator role exists in the live system.
@@ -160,6 +178,7 @@ export const ADMIN = {
   section18aManagement: '/admin/section-18a',
   users:     '/admin/users',
   products:  '/admin/products',
+  financeReport: '/admin/finance-report',
   emailIntegration: '/admin/email-integration',
   // The guest log — who signed in at the door, when they left, and
   // how long they were on site. Its own admin path rather than a

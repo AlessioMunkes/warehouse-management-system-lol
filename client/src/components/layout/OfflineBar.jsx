@@ -64,7 +64,7 @@ export default function OfflineBar() {
         <span className="stf-netbar-text">
           {waiting > 0
             ? `No signal. ${countOf(waiting, 'thing is', 'things are')} saved on this phone and will send when you are back in range.`
-            : 'No signal. Your work is saved on this phone — carry on.'}
+            : 'No signal. Your work is saved on this phone, carry on.'}
           {savedNote}
         </span>
       </div>
