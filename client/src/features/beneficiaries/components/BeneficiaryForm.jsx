@@ -30,7 +30,7 @@ const COHORT_OPTIONS = [
   { value: 'week2', label: 'Week 2' },
 ];
 
-const BLANK = { name: '', cohort: '', contactName: '', childCount: '' };
+const BLANK = { name: '', cohort: '', contactName: '', mobileNumber: '', childCount: '' };
 
 export default function BeneficiaryForm({
   initial = null,
@@ -101,6 +101,17 @@ export default function BeneficiaryForm({
           <Input id="beneficiary-contact" value={form.contactName} onChange={set('contactName')} />
         </Field>
       </div>
+
+      <Field>
+        <FieldLabel htmlFor="beneficiary-mobile">Mobile number</FieldLabel>
+        <Input
+          id="beneficiary-mobile"
+          type="tel"
+          value={form.mobileNumber ?? ''}
+          onChange={set('mobileNumber')}
+          placeholder="+27 82 123 4567"
+        />
+      </Field>
 
       <Field>
         <FieldLabel htmlFor="beneficiary-children">Children served</FieldLabel>

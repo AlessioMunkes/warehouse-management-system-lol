@@ -40,7 +40,7 @@ const READ_ROLES  = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 const WRITE_ROLES = [ROLES.MANAGER, ROLES.ADMIN];
 const NON_WRITE_ROLES = [ROLES.WORKER, 'finance'];
 
-const BENEFICIARY_BODY = { name: 'Sunnyside ECD', cohort: 'week1', contactName: 'Jane Doe', childCount: 40 };
+const BENEFICIARY_BODY = { name: 'Sunnyside ECD', cohort: 'week1', contactName: 'Jane Doe', mobileNumber: '+27 82 123 4567', childCount: 40 };
 const SOME_BENEFICIARY = { id: 6, ...BENEFICIARY_BODY, isActive: true, approvedAt: null };
 
 const withStatus = (status, message) => Object.assign(new Error(message), { status });
@@ -121,6 +121,7 @@ describe('beneficiary controller — responses', () => {
   it('returns 201 for a newly created beneficiary', async () => {
     const res = await request(app).post(BASE).set('Cookie', cookieFor(ROLES.MANAGER)).send(BENEFICIARY_BODY);
     expect(res.status).toBe(201);
+    expect(serviceMock.createBeneficiary).toHaveBeenCalledWith(BENEFICIARY_BODY);
   });
 
   it('preserves a 4xx message from the service', async () => {

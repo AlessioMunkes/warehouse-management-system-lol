@@ -19,18 +19,21 @@
 import pool from '../config/db.js';
 import { ROLES } from '../middleware/auth.middleware.js';
 
-const MANAGERS_UP = [ROLES.MANAGER, ROLES.ADMIN];
+const MANAGER_ONLY = [ROLES.MANAGER];
 const STAFF_ROLES = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 const VOLUNTEER_MANAGEMENT_ROLES = [ROLES.MANAGER, ROLES.ADMIN];
 const ADMIN_ONLY = [ROLES.ADMIN];
 
 const TARGET_ROLES_BY_TYPE = {
-  low_stock: MANAGERS_UP,
-  picking_slips_generated: MANAGERS_UP,
-  non_collections_flagged: MANAGERS_UP,
-  purchase_order_needs_attention: MANAGERS_UP,
+  low_stock: MANAGER_ONLY,
+  picking_slips_generated: MANAGER_ONLY,
+  non_collections_flagged: MANAGER_ONLY,
+  purchase_order_needs_attention: MANAGER_ONLY,
+  vms_sync_failed: MANAGER_ONLY,
+  stock_expiry_2_weeks: MANAGER_ONLY,
+  stock_expiry_1_week: MANAGER_ONLY,
   donation_review: ADMIN_ONLY,
-  section18a: ADMIN_ONLY,
+  section18a_handoff_failed: ADMIN_ONLY,
   picking_slip_created: STAFF_ROLES,
   volunteer: VOLUNTEER_MANAGEMENT_ROLES,
   vms: VOLUNTEER_MANAGEMENT_ROLES,
@@ -55,13 +58,13 @@ export const createNotification = async (client, {
   if (avoidDuplicate) {
     await client.query(
       `INSERT INTO notifications (type, title, body, entity_type, entity_id, target_roles)
-       SELECT $1, $2, $3, $4, $5, $6
+       SELECT $1::varchar, $2::varchar, $3::text, $4::varchar, $5::integer, $6::text[]
        WHERE NOT EXISTS (
          SELECT 1
            FROM notifications
-          WHERE type = $1
-            AND entity_type IS NOT DISTINCT FROM $4
-            AND entity_id IS NOT DISTINCT FROM $5
+          WHERE type = $1::varchar
+            AND entity_type IS NOT DISTINCT FROM $4::varchar
+            AND entity_id IS NOT DISTINCT FROM $5::integer
        )`,
       [type, title, body, entityType, entityId, roles]
     );

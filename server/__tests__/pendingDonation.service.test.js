@@ -790,6 +790,7 @@ describe('pending donation commit finalization', () => {
       donorName: 'Ladles Donor',
       donorTaxReference: '123',
       donorConsentGiven: true,
+      estimatedValueZar: 1500,
       createdBy: 7,
       items: [{ description: 'Rice', quantity: 5, unit: 'kg', estimatedValueZar: 1500 }],
     })).rejects.toThrow('link write failed');
@@ -814,6 +815,59 @@ describe('pending donation commit finalization', () => {
 // a retried submit (network blip, double tap, lost response) must answer
 // with the original pending donation instead of 500ing on the unique index.
 describe('createPendingDonationFromIntake — idempotent replay', () => {
+  it('allows Section 18A no without an estimated value and stores null', async () => {
+    const client = makeClient();
+    poolMock.connect.mockResolvedValueOnce(client);
+    pendingRepoMock.createPendingDonation.mockResolvedValue({ id: 56 });
+    pendingRepoMock.createWarehouseManagerFlag.mockResolvedValue({ id: 502 });
+    pendingRepoMock.createPendingDonationItems.mockResolvedValue([
+      { id: 702, line_no: 1, status: 'awaiting_resolution', flag_id: 502 },
+    ]);
+    pendingRepoMock.getPendingDonationById.mockResolvedValue({
+      id: 56,
+      status: 'awaiting_resolution',
+      items: [{ id: 702, status: 'awaiting_resolution', flag_id: 502 }],
+    });
+
+    await pendingDonationService.createPendingDonationFromIntake({
+      donorName: '',
+      donorConsentGiven: false,
+      isFood: true,
+      items: [{
+        description: 'Mystery tins',
+        productId: 900,
+        quantity: 3,
+        unit: 'kg',
+        status: 'PENDING_PRODUCT_REVIEW',
+      }],
+    });
+
+    expect(pendingRepoMock.createPendingDonation).toHaveBeenCalledWith(
+      expect.objectContaining({ estimatedValueZar: null, donorConsentGiven: false }),
+      client
+    );
+  });
+
+  it('requires estimated value when Section 18A is yes', async () => {
+    const client = makeClient();
+    poolMock.connect.mockResolvedValueOnce(client);
+
+    await expect(pendingDonationService.createPendingDonationFromIntake({
+      donorName: 'Value Donor',
+      donorContact: 'value@example.org',
+      donorConsentGiven: true,
+      isFood: true,
+      items: [{ description: 'Rice', quantity: 1, unit: 'kg', productId: 7 }],
+    })).rejects.toMatchObject({
+      status: 400,
+      errors: expect.objectContaining({
+        estimatedValueZar: 'Estimated value must be 0 or greater.',
+      }),
+    });
+
+    expect(pendingRepoMock.createPendingDonation).not.toHaveBeenCalled();
+  });
+
   it('creates one donation review notification when intake leaves items awaiting review', async () => {
     const client = makeClient();
     poolMock.connect.mockResolvedValueOnce(client);
@@ -853,7 +907,7 @@ describe('createPendingDonationFromIntake — idempotent replay', () => {
         entityId: 55,
       })
     );
-    expect(notificationRepoMock.createNotification.mock.calls[0][1]).not.toHaveProperty('targetRoles');
+    expect(notificationRepoMock.createNotification.mock.calls[0][1]).toHaveProperty('targetRoles', ['admin']);
     expect(client.query.mock.calls.map((call) => call[0])).toContain('COMMIT');
   });
 

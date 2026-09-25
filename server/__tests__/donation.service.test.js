@@ -42,7 +42,15 @@ const emailMock = {
   sendEmail: vi.fn(),
 };
 
+const gmailRepoMock = {
+  findLatestConnection: vi.fn(),
+};
+
 vi.mock('../src/repositories/donation.repository.js', () => ({ default: repoMock }));
+vi.mock('../src/repositories/gmail.repository.js', () => ({ default: gmailRepoMock }));
+vi.mock('../src/repositories/notification.repository.js', () => ({
+  createNotification: vi.fn(),
+}));
 vi.mock('../src/lib/donationRouting.js', () => ({ determineRouting: routeMock.determineRouting }));
 vi.mock('../src/providers/email.provider.js', () => ({ default: emailMock }));
 vi.mock('../src/services/certificateSettings.service.js', () => ({
@@ -110,6 +118,7 @@ beforeEach(() => {
   repoMock.saveSection18AFormToken.mockResolvedValue({ id: 1 });
   repoMock.getDonationBySection18AFormTokenHash.mockResolvedValue(null);
   repoMock.saveSection18AFormSubmission.mockResolvedValue(null);
+  gmailRepoMock.findLatestConnection.mockResolvedValue({ gmail_email: 'tax-team@example.org' });
 
   // Mock email provider to return success by default
   emailMock.sendEmail.mockResolvedValue({ sent: true, messageId: 'msg-123', threadId: 'thread-1' });
@@ -707,7 +716,7 @@ describe('Section 18A certificate engine', () => {
     expect(repoMock.createSection18ACertificate).not.toHaveBeenCalled();
   });
 
-  it('submits the secure donor form, generates the PDF, emails it and returns GENERATED', async () => {
+  it('submits the secure donor form and sends a Finance/Tax handoff to the connected Gmail account', async () => {
     repoMock.getDonationBySection18AFormTokenHash.mockResolvedValue({
       ...queuedDonation,
       section_18a_form_token_expires_at: '2099-01-01T00:00:00.000Z',
@@ -729,17 +738,7 @@ describe('Section 18A certificate engine', () => {
         declarationAccepted: true,
       },
     });
-    repoMock.getSection18ACertificateByDonationId
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({
-        id: 10,
-        donation_id: 42,
-        certificate_number: 'LOL-S18A-000001',
-        issue_date: '2026-09-11',
-        pdf_content: Buffer.from('%PDF-1.4'),
-        pdf_filename: 'section-18a-LOL-S18A-000001.pdf',
-        pdf_content_type: 'application/pdf',
-      });
+    gmailRepoMock.findLatestConnection.mockResolvedValue({ gmail_email: 'tax-gmail@example.org' });
 
     const result = await donationService.submitSection18AForm('secure-token', {
       donorType: 'company',
@@ -753,21 +752,32 @@ describe('Section 18A certificate engine', () => {
       declarationAccepted: true,
     });
 
-    expect(result.status).toBe('issued');
+    expect(result.status).toBe('submitted');
     expect(repoMock.saveSection18AFormSubmission).toHaveBeenCalled();
-    expect(repoMock.createSection18ACertificate).toHaveBeenCalledTimes(1);
-    expect(certificateSettingsServiceMock.getSettings).toHaveBeenCalled();
+    expect(repoMock.createSection18ACertificate).not.toHaveBeenCalled();
+    expect(certificateSettingsServiceMock.getSettings).not.toHaveBeenCalled();
     expect(repoMock.getSection18ASettings).not.toHaveBeenCalled();
     expect(emailMock.sendEmail).toHaveBeenCalledWith(
       expect.objectContaining({
-        to: 'tax@example.test',
-        attachments: [expect.objectContaining({ contentType: 'application/pdf' })],
+        to: 'tax-gmail@example.org',
+        subject: expect.stringContaining('Finance/Tax handoff'),
+        text: expect.stringContaining('Finance/Tax handoff: Section 18A donor details received.'),
       }),
       null
     );
+    const sentEmail = emailMock.sendEmail.mock.calls[0][0];
+    expect(sentEmail.to).not.toBe('tax@example.test');
+    expect(sentEmail.attachments).toBeUndefined();
+    expect(sentEmail.text).toContain('Donor name: Pick n Pay Pty Ltd');
+    expect(sentEmail.text).toContain('Donor email/contact: tax@example.test / 0210000000');
+    expect(sentEmail.text).toContain('Donation reference/id: DON-42');
+    expect(sentEmail.text).toContain('Estimated donation value: 5000');
+    expect(sentEmail.text).toContain('Tax reference: 9012345678');
+    expect(sentEmail.text).toContain('- Rice: 25 kg');
+    expect(sentEmail.text).toContain('- registrationNumber: REG-1');
   });
 
-  it('logs one failed Section 18A email if email preparation fails after certificate creation', async () => {
+  it('logs one failed Section 18A handoff if the connected Gmail send fails', async () => {
     repoMock.getDonationBySection18AFormTokenHash.mockResolvedValue({
       ...queuedDonation,
       section_18a_form_token_expires_at: '2099-01-01T00:00:00.000Z',
@@ -778,19 +788,8 @@ describe('Section 18A certificate engine', () => {
       donor_contact: 'tax@example.test',
       donor_tax_reference: '9012345678',
     });
-    repoMock.getSection18ACertificateByDonationId
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({
-        id: 10,
-        donation_id: 42,
-        certificate_number: 'LOL-S18A-000001',
-        pdf_content: Buffer.from('%PDF-1.4'),
-        pdf_filename: 'section-18a-LOL-S18A-000001.pdf',
-        pdf_content_type: 'application/pdf',
-      });
-    certificateSettingsServiceMock.getSettings
-      .mockResolvedValueOnce({ organisation_name: 'Ladles of Love' })
-      .mockRejectedValueOnce(new Error('settings unavailable'));
+    gmailRepoMock.findLatestConnection.mockResolvedValue({ gmail_email: 'tax-gmail@example.org' });
+    emailMock.sendEmail.mockRejectedValueOnce(new Error('gmail unavailable'));
 
     const result = await donationService.submitSection18AForm('secure-token', {
       donorType: 'company',
@@ -804,15 +803,25 @@ describe('Section 18A certificate engine', () => {
       declarationAccepted: true,
     });
 
-    expect(result.status).toBe('issued');
-    expect(emailMock.sendEmail).not.toHaveBeenCalled();
+    expect(result.status).toBe('submitted');
+    expect(repoMock.createSection18ACertificate).not.toHaveBeenCalled();
+    expect(certificateSettingsServiceMock.getSettings).not.toHaveBeenCalled();
+    expect(emailMock.sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'tax-gmail@example.org',
+        attachments: undefined,
+      }),
+      null
+    );
     expect(repoMock.logDonationEmail).toHaveBeenCalledTimes(1);
     expect(repoMock.logDonationEmail).toHaveBeenCalledWith(expect.objectContaining({
       donationId: 42,
-      certificateId: 10,
+      certificateId: null,
       emailType: 'SECTION_18A',
       status: 'FAILED',
-      errorMessage: 'settings unavailable',
+      recipient: 'tax-gmail@example.org',
+      subject: expect.stringContaining('Finance/Tax handoff'),
+      errorMessage: 'gmail unavailable',
     }));
   });
 

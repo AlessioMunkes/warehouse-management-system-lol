@@ -1,11 +1,17 @@
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { DonationDraftContext, emptyDraft } from '../features/donation/context/DonationDraftContext';
 import { DonationDetailsPage } from '../pages/DonationDetailsPage';
 import { ReviewPage } from '../pages/ReviewPage';
+
+// The donation pages sit in the worker shell, which reads the
+// signed-in user. Same stand-in DispatchWiring.test.jsx uses.
+vi.mock('../context/AuthContext', () => ({
+  useAuth: () => ({ user: { id: 1, firstName: 'M', role: 'warehouse_worker' }, logout: vi.fn() }),
+}));
 
 vi.mock('../services/donationAPI', () => ({
   createPendingDonation: vi.fn(),
@@ -13,7 +19,7 @@ vi.mock('../services/donationAPI', () => ({
 
 const { createPendingDonation } = await import('../services/donationAPI');
 
-const validDraft = () => ({
+const validDraft = (overrides = {}) => ({
   ...emptyDraft(),
   items: [{
     id: 'line-1',
@@ -30,6 +36,8 @@ const validDraft = () => ({
   donorContact: 'donor@example.com',
   contactMethod: 'email',
   contactDetails: 'donor@example.com',
+  donorConsentGiven: true,
+  ...overrides,
 });
 
 function LocationProbe({ onChange }) {
@@ -63,6 +71,48 @@ function renderDonationFlow({ draft = validDraft(), updateDraft = vi.fn(), reset
 }
 
 describe('Donation backend validation UX', () => {
+  it('hides estimated value when Section 18A is no and clears it when switched from yes', async () => {
+    const user = userEvent.setup();
+    const updateDraft = vi.fn();
+
+    render(
+      <MemoryRouter initialEntries={['/donations/new']}>
+        <DonationDraftContext.Provider value={{
+          draft: validDraft({ donorConsentGiven: false, estimatedValueZar: '' }),
+          updateDraft,
+          resetDraft: vi.fn(),
+          emptyItem: vi.fn(),
+        }}>
+          <Routes>
+            <Route path="/donations/new" element={<DonationDetailsPage />} />
+          </Routes>
+        </DonationDraftContext.Provider>
+      </MemoryRouter>
+    );
+
+    expect(screen.queryByLabelText(/Estimated Donation Value/i)).not.toBeInTheDocument();
+    cleanup();
+
+    render(
+      <MemoryRouter initialEntries={['/donations/new']}>
+        <DonationDraftContext.Provider value={{
+          draft: validDraft({ donorConsentGiven: true, estimatedValueZar: '250' }),
+          updateDraft,
+          resetDraft: vi.fn(),
+          emptyItem: vi.fn(),
+        }}>
+          <Routes>
+            <Route path="/donations/new" element={<DonationDetailsPage />} />
+          </Routes>
+        </DonationDraftContext.Provider>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByLabelText(/Estimated Donation Value/i)).toHaveValue(250);
+    await user.click(within(screen.getByRole('group', { name: /Section 18A/i })).getByRole('radio', { name: /^No$/i }));
+    expect(updateDraft).toHaveBeenCalledWith({ donorConsentGiven: false, estimatedValueZar: '' });
+  });
+
   it('moves from donation intake to the donation summary page when valid', async () => {
     const user = userEvent.setup();
     const onLocation = vi.fn();

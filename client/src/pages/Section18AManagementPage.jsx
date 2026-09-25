@@ -3,15 +3,14 @@
 // Route: /admin/section-18a-management
 //
 // Admin page for managing Section 18A tax certificates and email
-// integration. Includes certificate queue, email history, and
-// certificate settings.
+// integration. Includes certificate queue and email history.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState, useCallback } from 'react';
 import {
-  FileText, Mail, Settings, Send,
+  FileText, Mail, Send,
   CheckCircle2, XCircle, Clock, AlertTriangle, Loader2,
 } from 'lucide-react';
-import { TopNavbar } from '../features/taskdashboard/components/TopNavBar';
+//import { TopNavbar } from '../features/taskdashboard/components/TopNavBar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -21,12 +20,10 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import donationManagementAPI from '../services/donationManagementAPI';
-import CertificateSettings from '../features/donationManagement/components/CertificateSettings';
 
 const TABS = [
   { id: 'certificates', label: 'Certificate Queue', icon: FileText, description: 'View and manage Section 18A tax certificates for donations.' },
   { id: 'emails', label: 'Email Integration', icon: Mail, description: 'Track and resend Section 18A certificate emails.' },
-  { id: 'settings', label: 'Settings', icon: Settings, description: 'Configure certificate templates and email defaults.' },
 ];
 
 const EMAIL_STATUS_CONFIG = {
@@ -180,10 +177,10 @@ export default function Section18AManagementPage() {
 
   return (
     <div className="min-h-screen bg-canvas text-ink font-['Montserrat',sans-serif]">
-      <TopNavbar />
+    
       <main className="mx-auto w-full max-w-6xl px-4 py-6">
         <h1 className="text-2xl font-medium">Section 18A Management</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Manage tax certificates, email delivery, and certificate settings.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Manage tax certificates and email delivery.</p>
         <div className="mt-5 flex flex-wrap gap-1 border-b" role="tablist" aria-label="Section 18A management sections">
           {TABS.map((t) => (
             <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)}
@@ -358,11 +355,6 @@ export default function Section18AManagementPage() {
                     )}
                   </CardContent>
                 </Card>
-              </div>
-            )}
-            {tab === 'settings' && (
-              <div className="mt-6">
-                <CertificateSettings />
               </div>
             )}
           </>

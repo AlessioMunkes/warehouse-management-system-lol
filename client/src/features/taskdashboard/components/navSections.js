@@ -26,6 +26,7 @@ import {
   ScrollText,
   Mail,
   Sprout,
+  MessageCircle,
 } from 'lucide-react';
 import { STAFF, ADMIN, VOLUNTEERS, PACKING } from '../../../routes/paths';
 
@@ -110,6 +111,7 @@ const MANAGER_SECTIONS = [
     label: 'Operations',
     items: [
       { to: STAFF.beneficiaries, label: 'Beneficiaries', icon: Users2 },
+      { to: STAFF.collectionReminders, label: 'Collection Reminders', icon: MessageCircle },
       { to: STAFF.pickingSlips, label: 'Picking Slips', icon: ClipboardList },
       { to: STAFF.purchaseOrders, label: 'Purchase Orders', icon: ShoppingCart },
       { to: '/noc/inventory', label: 'Inventory', icon: Boxes },

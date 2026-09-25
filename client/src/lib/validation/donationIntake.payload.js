@@ -8,8 +8,10 @@ export function validateDonationPayload(body={}) {
   const anonymous = body.isAnonymousDonation===true||body.anonymous===true;
   if (!body.category||typeof body.category!=='string'||!trimOrEmpty(body.category)) errors.category='A donation category is required.';
   else sanitized.category=trimOrEmpty(body.category);
-  const money=validateMoney(body.estimatedValueZar,{required:true,field:'Estimated value'});
-  if(money.error) errors.estimatedValueZar=money.error; else sanitized.estimatedValueZar=money.value;
+  if (consent === true) {
+    const money=validateMoney(body.estimatedValueZar,{required:true,field:'Estimated value'});
+    if(money.error) errors.estimatedValueZar=money.error; else sanitized.estimatedValueZar=money.value;
+  }
   if(body.programmeCode!==undefined&&body.programmeCode!==null&&trimOrEmpty(body.programmeCode)!=='') sanitized.programmeCode=trimOrEmpty(body.programmeCode);
   if(!anonymous){
     const n=validateDonorName(body.donorName,{});

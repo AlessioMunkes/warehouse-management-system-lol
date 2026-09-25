@@ -65,19 +65,19 @@ beforeEach(() => {
 });
 
 describe('Section18AManagementPage', () => {
-  it('renders queue with donor, reference, date, amount, and Section 18A status', async () => {
+  it('renders queue with donor, reference, date, amount, and no certificate settings navigation', async () => {
     render(<Section18AManagementPage />);
 
     expect(await screen.findByText('Section 18A Management')).toBeInTheDocument();
     expect(await screen.findByText('DON-1001')).toBeInTheDocument();
     expect(screen.getByText('Jane Doe')).toBeInTheDocument();
     expect(screen.getByText('R500.00')).toBeInTheDocument();
-    expect(screen.getByText('queued')).toBeInTheDocument();
 
     expect(screen.getByText('DON-1002')).toBeInTheDocument();
     expect(screen.getByText('Acme Corp')).toBeInTheDocument();
     expect(screen.getByText('R2500.00')).toBeInTheDocument();
-    expect(screen.getByText('issued')).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /Settings/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/certificate settings/i)).not.toBeInTheDocument();
     expect(screen.queryByText('Donation Status')).not.toBeInTheDocument();
   });
 

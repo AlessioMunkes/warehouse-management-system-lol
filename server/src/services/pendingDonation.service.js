@@ -143,9 +143,6 @@ const sortDonationItemsByLine = (items = []) =>
 const validateIntakePayload = (data = {}) => {
   const errors = {};
   const itemErrors = {};
-  const valueRaw = data.estimatedValueZar ?? data.estimated_value_zar ?? 0;
-  const value = Number(valueRaw);
-  if (!Number.isFinite(value) || value < 0) errors.estimatedValueZar = 'Estimated value must be 0 or greater.';
 
   const snapshot = typeof data.draftSnapshot === 'string'
     ? (() => { try { return JSON.parse(data.draftSnapshot)?.draft ?? {}; } catch { return {}; } })()
@@ -160,6 +157,13 @@ const validateIntakePayload = (data = {}) => {
   const donorName = String(data.donorName ?? data.donor_name ?? '').trim();
   const donorContact = String(data.donorContact ?? data.donor_contact ?? '').trim();
   const donorConsentGiven = data.donorConsentGiven ?? data.donor_consent_given;
+  if (donorConsentGiven === true) {
+    const valueRaw = data.estimatedValueZar ?? data.estimated_value_zar;
+    const value = Number(valueRaw);
+    if (valueRaw === undefined || valueRaw === null || valueRaw === '' || !Number.isFinite(value) || value < 0) {
+      errors.estimatedValueZar = 'Estimated value must be 0 or greater.';
+    }
+  }
   if (phasePayload && donorName && !donorContact) errors.donorContact = 'Donor email is required unless the donor is anonymous.';
   if (phasePayload && donorConsentGiven === true) {
     const email = validateEmail(donorContact, { required: true });

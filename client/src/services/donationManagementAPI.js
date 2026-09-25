@@ -170,28 +170,6 @@ const donationManagementAPI = {
     return body.data;
   },
 
-  async getCertificateSettings() {
-    const response = await fetch(`${API_BASE}/api/donations/admin/section-18a/settings`, {
-      method: 'GET',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-    });
-
-    const body = await parseResponse(response);
-    return body.data ?? null;
-  },
-
-  async updateCertificateSettings(payload) {
-    const response = await fetch(`${API_BASE}/api/donations/admin/section-18a/settings`, {
-      method: 'PUT',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    const body = await parseResponse(response);
-    return body.data;
-  },
 };
 
 export default donationManagementAPI;
