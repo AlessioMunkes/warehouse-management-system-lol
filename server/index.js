@@ -39,6 +39,8 @@ import gmailRouter from './src/routes/gmail.routes.js';
 import certificateSettingsRouter from './src/routes/certificateSettings.routes.js';
 import collectionKitRouter from './src/routes/collectionKit.routes.js';
 import publicImpactRouter from './src/routes/publicImpact.routes.js';
+import publicWarehousesRouter from './src/routes/publicWarehouses.route.js';
+import publicWarehouse   from './src/middleware/publicWarehouse.middleware.js';
 import expiryWarningJob  from './src/jobs/expiryWarning.job.js';
 
 console.log('[server] gmailRouter loaded:', typeof gmailRouter, gmailRouter ? 'OK' : 'UNDEFINED');
@@ -133,6 +135,12 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// ── Multi-warehouse: pages reached without a staff login ──────
+// A pallet QR code, an emailed invite or 18A form, volunteer sign-in
+// and the Gmail callback run in the warehouse their link belongs to.
+// Must come before the routers. Does nothing with one database.
+app.use(publicWarehouse);
+
 // ── Routes ────────────────────────────────────────────────────
 app.use('/api/login',      loginRateLimiter, loginRouter);
 // Deliberately NOT behind loginRateLimiter: the client calls this on
@@ -169,6 +177,7 @@ app.use('/api/community-requests', communityRequestRouter);
 app.use('/api/gmail', gmailRouter);
 app.use('/api/certificate-settings', certificateSettingsRouter);
 app.use('/api/collection-kits', collectionKitRouter);
+app.use('/api/public/warehouses', publicWarehousesRouter);
 app.use('/api/public',      publicImpactRouter);
 
 // ── SPA fallback (production only) ────────────────────────────

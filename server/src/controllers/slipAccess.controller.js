@@ -11,6 +11,7 @@
 import jwt from 'jsonwebtoken';
 import slipAccessService from '../services/slipAccess.service.js';
 import { AUTH_COOKIE, authCookieOptions, sessionMaxAge } from '../config/cookie.js';
+import { guestWarehouseClaim } from '../config/warehouses.js';
 
 // Matches the gate sign-in in volunteer.routes.js. A volunteer's day is
 // longer than a staff shift's 8 hours and they cannot reset a password
@@ -63,7 +64,7 @@ const claim = async (req, res) => {
     });
 
     const token = jwt.sign(
-      { id: volunteer.id, role: 'guest' },
+      { id: volunteer.id, role: 'guest', ...guestWarehouseClaim() },
       process.env.JWT_SECRET,
       { expiresIn: `${SESSION_HOURS}h` },
     );

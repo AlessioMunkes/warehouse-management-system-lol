@@ -33,6 +33,8 @@
 // zero, so "did that save?" always has an answer a worker can see.
 // ─────────────────────────────────────────────────────────────
 
+import { getActiveWarehouse, runWithWarehouse } from './warehouse';
+
 const DB_NAME  = 'batches-outbox';
 const STORE    = 'pending';
 const VERSION  = 1;
@@ -125,7 +127,16 @@ export const list = async () => {
  * @param {string} item.kind      'delivery' | 'collection'
  */
 export const enqueue = async (item) => {
-  const row = { ...item, savedAt: Date.now(), attempts: 0, error: null };
+  // Multi-warehouse: remember where this was recorded. It is sent there
+  // even if the worker has switched to another warehouse by the time
+  // the signal comes back. Null with one database.
+  const row = {
+    warehouse: getActiveWarehouse(),
+    ...item,
+    savedAt: Date.now(),
+    attempts: 0,
+    error: null,
+  };
   try {
     await withStore('readwrite', (store) => store.add(row));
   } catch {
@@ -219,7 +230,7 @@ export const flush = async (post) => {
     }
 
     try {
-      await post(item.endpoint, item.body);
+      await runWithWarehouse(item.warehouse, () => post(item.endpoint, item.body));
       await remove(item.id);
       sent.push(item);
     } catch (err) {

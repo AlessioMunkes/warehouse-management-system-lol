@@ -46,6 +46,7 @@ import {
   readStoredSidebar, writeStoredSidebar,
 } from './shellContext';
 import ThemeToggle from '@/components/layout/ThemeToggle';
+import WarehouseSwitcher from './WarehouseSwitcher';
 import { NAV_SECTIONS, homeForRole } from './navSections';
 import { SidebarNav, AppNavDrawer } from './AppNav';
 
@@ -245,6 +246,9 @@ function ManagerLayoutShell({ children }) {
             <ThemeToggle />
 
             <NotificationBell />
+
+            {/* Multi-warehouse only; renders nothing with one database. */}
+            <WarehouseSwitcher />
 
             {user ? (
               <span className="ml-2 hidden text-sm sm:inline">

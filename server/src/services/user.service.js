@@ -65,7 +65,7 @@ const createUser = async (body, actorId) => {
 
   const clash = await repo.findUserByUsername(payload.username);
   if (clash) {
-    throw fail(409, `A user with the username "${clash.username}" already exists${clash.is_active ? '' : ' (currently inactive)'}.`);
+    throw fail(409, `A user with the username "${clash.username}" already exists${clash.warehouse ? ' at another warehouse' : ''}${clash.is_active ? '' : ' (currently inactive)'}.`);
   }
 
   const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
@@ -87,7 +87,7 @@ const updateUser = async (rawId, body, actorId) => {
   if (has('username')) {
     const username = validUsername(body.username);
     const clash = await repo.findUserByUsername(username, { excludeId: id });
-    if (clash) throw fail(409, `A user with the username "${clash.username}" already exists.`);
+    if (clash) throw fail(409, `A user with the username "${clash.username}" already exists${clash.warehouse ? ' at another warehouse' : ''}.`);
     patch.username = username;
   }
   if (has('firstName')) {

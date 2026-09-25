@@ -12,6 +12,7 @@ import express from 'express';
 import jwt     from 'jsonwebtoken';
 import pool    from '../config/db.js';
 import { AUTH_COOKIE, authCookieOptions, sessionMaxAge } from '../config/cookie.js';
+import { guestWarehouseClaim } from '../config/warehouses.js';
 import auth, { requireRole, ROLES } from '../middleware/auth.middleware.js';
 import { validateIntId }            from '../middleware/validate.middleware.js';
 import volunteerRepo                from '../repositories/volunteer.repository.js';
@@ -55,7 +56,7 @@ router.post('/sign-in', async (req, res) => {
     const volunteer = result.rows[0];
 
     const token = jwt.sign(
-      { id: volunteer.id, role: 'guest' },
+      { id: volunteer.id, role: 'guest', ...guestWarehouseClaim() },
       process.env.JWT_SECRET,
       { expiresIn: `${SESSION_HOURS}h` }
     );
