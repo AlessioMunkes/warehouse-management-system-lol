@@ -7,6 +7,10 @@ import { DonationDraftContext, emptyDraft } from '../features/donation/context/D
 import { DonationDetailsPage } from '../pages/DonationDetailsPage';
 import { EditSectionDialog, ReviewSummary } from '../features/donation/components/ReviewSummary';
 
+vi.mock('../context/AuthContext', () => ({
+  useAuth: () => ({ user: { id: 1, firstName: 'M', role: 'warehouse_worker' }, logout: vi.fn() }),
+}));
+
 const baseDraft = () => ({
   ...emptyDraft(),
   category: 'recipe_food',

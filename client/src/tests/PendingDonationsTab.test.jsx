@@ -105,7 +105,7 @@ describe('PendingDonationsTab', () => {
     mockUsePendingDonations.mockReturnValue(baseHook({ items: [FAILED_DONATION] }));
     render(<PendingDonationsTab onReconcileTab={onReconcileTab} />);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Commit failed — reconcile' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Commit failed, reconcile' }));
     expect(onReconcileTab).toHaveBeenCalledTimes(1);
   });
 

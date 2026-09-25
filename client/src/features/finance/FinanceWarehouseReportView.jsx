@@ -50,10 +50,12 @@ const TYPE_KEYS = {
   dispatched: 'dispatches',
 };
 
+// Theme tokens, not hex, so the chart follows light and dark mode
+// (NoHardcodedColours.test.js). Same blue / red / green meaning.
 const CHART_COLORS = {
-  donations: '#2563eb',
-  po: '#dc2626',
-  dispatches: '#16a34a',
+  donations: 'var(--info-ink)',
+  po: 'var(--brand)',
+  dispatches: 'var(--good-ink)',
 };
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -71,7 +73,7 @@ const startOfThisYear = () => {
 const daysAgo = (days) =>
   new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
 
-export const rangeForFinancePeriod = (period) => {
+const rangeForFinancePeriod = (period) => {
   if (period === 'all') return {};
   if (period === 'this_year') return { from: startOfThisYear(), to: todayISO() };
   if (period === 'last_30_days') return { from: daysAgo(30), to: todayISO() };

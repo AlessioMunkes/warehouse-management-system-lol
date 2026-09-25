@@ -55,7 +55,8 @@ describe('VolunteerEventPage workspace', () => {
     expect(await screen.findByRole('heading', { name: 'Mandela Day' })).toBeInTheDocument();
     expect(screen.getByText('9 remaining')).toBeInTheDocument();
     expect(screen.getByText('Ayesha Khan')).toBeInTheDocument();
-    expect(screen.getByText(/Community Hall — Cape Town/)).toBeInTheDocument();
+    // Space and its location, as TimeslotPanel shows them.
+    expect(screen.getAllByText(/Community Hall - Cape Town/).length).toBeGreaterThan(0);
     expect(screen.queryByText('t1')).not.toBeInTheDocument();
     expect(screen.getByText('No-show')).toBeInTheDocument();
     expect(screen.getByText('SYNCED')).toBeInTheDocument();

@@ -26,7 +26,7 @@ const timeGreeting = () => {
 export default function DashboardGreeting({ name }) {
   return (
     <div>
-      <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight text-[#2b3336]">
+      <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight text-ink">
         {timeGreeting()}{name ? `, ${name}` : ''}!
       </h1>
       <p className="mt-2 text-base text-muted-foreground">

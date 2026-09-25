@@ -235,7 +235,7 @@ export default function PurchaseOrderDetail({
               type="button"
               variant="outline"
               onClick={() => setConfirmDelete(true)}
-              className="border-[#ef3a40] text-[#ef3a40] hover:bg-[#ef3a40] hover:text-white"
+              className="border-brand text-brand hover:bg-brand hover:text-white"
             >
               <Trash2 />
               Delete
@@ -270,7 +270,7 @@ export default function PurchaseOrderDetail({
               variant="outline"
               disabled={deleting}
               onClick={runDelete}
-              className="border-[#ef3a40] text-[#ef3a40] hover:bg-[#ef3a40] hover:text-white"
+              className="border-brand text-brand hover:bg-brand hover:text-white"
             >
               <Trash2 />
               {deleting ? 'Deleting…' : 'Delete permanently'}

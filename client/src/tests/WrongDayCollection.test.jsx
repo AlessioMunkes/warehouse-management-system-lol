@@ -71,7 +71,7 @@ describe('a pallet booked for another day', () => {
 
     // Advisory, not a refusal: it says what is off about the pallet
     // without telling the worker to go and find someone.
-    expect(screen.getByText(/was booked for/)).toBeInTheDocument();
+    expect(screen.getByText(/is booked for another day/)).toBeInTheDocument();
     expect(screen.queryByText(/Ask a manager to authorise/)).not.toBeInTheDocument();
   });
 

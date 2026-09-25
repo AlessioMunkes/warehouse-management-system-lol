@@ -129,7 +129,7 @@ describe('InventoryManagementPage', () => {
     await user.click(modal.getByRole('button', { name: /Save Adjustment/ }));
 
     await waitFor(() => expect(adjustStock).toHaveBeenCalledWith(
-      expect.objectContaining({ reason: 'Spillage — Pallet dropped at bay 3' })
+      expect.objectContaining({ reason: 'Spillage: Pallet dropped at bay 3' })
     ));
   });
 

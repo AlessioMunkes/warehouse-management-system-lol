@@ -81,7 +81,7 @@ describe('VolunteerEventsPage', () => {
     expect(await screen.findByText('Mandela Day')).toBeInTheDocument();
     expect(api.getEvents).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('link', { name: 'Open' })).toHaveAttribute('href', '/volunteers/events/event-1');
-    expect(screen.getByText('Warehouse — Cape Town')).toBeInTheDocument();
+    expect(screen.getByText('Warehouse (Cape Town)')).toBeInTheDocument();
   });
 
   it('shows an empty state', async () => {

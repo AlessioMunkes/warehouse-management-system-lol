@@ -29,9 +29,9 @@ const STATUS_ICON = {
 };
 
 const STATUS_TONE = {
-  completed:          'text-[#1a7d42] border-[#1a7d42]',
-  returned:           'text-[#ef3a40] border-[#ef3a40]',
-  follow_up_required: 'text-[#ef3a40] border-[#ef3a40]',
+  completed:          'text-good-ink border-good-ink',
+  returned:           'text-brand border-brand',
+  follow_up_required: 'text-brand border-brand',
 };
 
 function TimelineRow({ icon: Icon, tone, title, meta, isLast }) {
@@ -55,13 +55,13 @@ export default function PurchaseOrderTimeline({ purchaseOrder: po }) {
   const events = [
     {
       icon: PackagePlus,
-      tone: 'text-[#2b3336] border-[#2b3336]',
+      tone: 'text-ink border-ink',
       title: 'Order raised',
       meta: `${po.createdByName || 'Unknown'} · ${fmtDateTime(po.createdAt)}`,
     },
     ...po.deliveries.map((d) => ({
       icon: Truck,
-      tone: d.hasDiscrepancies ? 'text-[#ef3a40] border-[#ef3a40]' : 'text-[#2b3336] border-[#2b3336]',
+      tone: d.hasDiscrepancies ? 'text-brand border-brand' : 'text-ink border-ink',
       title: d.hasDiscrepancies ? 'Delivery received — with a discrepancy' : 'Delivery received',
       meta: `${d.receivedByName || 'Unknown'} · ${fmtDateTime(d.deliveryDate)}`,
     })),
@@ -74,7 +74,7 @@ export default function PurchaseOrderTimeline({ purchaseOrder: po }) {
   if (po.status !== 'pending') {
     events.push({
       icon: STATUS_ICON[po.status] ?? CheckCircle2,
-      tone: STATUS_TONE[po.status] ?? 'text-[#2b3336] border-[#2b3336]',
+      tone: STATUS_TONE[po.status] ?? 'text-ink border-ink',
       title: po.statusLabel,
       meta: `${fmtDateTime(po.statusChangedAt)}${po.statusReason ? ` · ${po.statusReason}` : ''}`,
     });

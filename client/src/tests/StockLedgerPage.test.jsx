@@ -45,6 +45,12 @@ const renderPage = () =>
   render(<MemoryRouter><StockLedgerPage /></MemoryRouter>);
 
 beforeEach(() => {
+  // StatTile counts up from 0 unless reduced motion is on.
+  window.matchMedia = (query) => ({
+    matches: query.includes('reduce'), media: query,
+    addEventListener: () => {}, removeEventListener: () => {},
+    addListener: () => {}, removeListener: () => {},
+  });
   vi.clearAllMocks();
   api.getLedger.mockResolvedValue({ movements: [MOVEMENT], summary: SUMMARY, nextCursor: null });
   api.getReconciliation.mockResolvedValue({ products: [], variances: [] });

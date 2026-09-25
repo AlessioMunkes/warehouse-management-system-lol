@@ -25,7 +25,11 @@ vi.mock('../context/AuthContext', () => ({
   useAuth: () => ({ user: { id: 1, firstName: 'Alessio', lastName: 'M', role: 'manager' }, logout: vi.fn() }),
 }));
 
-vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn() }));
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => vi.fn(),
+  // The page keeps its filters in the URL (useSearchParams).
+  useSearchParams: () => [new URLSearchParams(), vi.fn()],
+}));
 
 const { getManifest, getMovements, adjustStock, getStockTrends } = await import('../services/stockAPI');
 const { ToastProvider } = await import('../components/ui/toast');

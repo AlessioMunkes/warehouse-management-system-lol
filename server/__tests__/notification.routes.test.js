@@ -32,8 +32,10 @@ const cookieFor = (role) => {
   return [`wms_token=${token}`];
 };
 
-const READ_ROLES     = [ROLES.MANAGER, ROLES.ADMIN];
-const NON_READ_ROLES = [ROLES.WORKER, 'finance', ROLES.GUEST];
+// Role-based notifications (e89e0d8): every staff role reads its own
+// feed; which notifications each role sees is decided by target_roles.
+const READ_ROLES     = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
+const NON_READ_ROLES = ['finance', ROLES.GUEST];
 
 beforeEach(() => {
   vi.clearAllMocks();

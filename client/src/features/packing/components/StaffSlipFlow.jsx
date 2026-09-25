@@ -165,6 +165,23 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
 
   const reload = () => setReloadToken((t) => t + 1);
 
+  // Guided renders exactly one pending item, same as WorkList — so it
+  // always needs a focused one. The caller sets it on entering Guided
+  // (handleModeChange) or after a decision (advanceGuidedFocus); this
+  // is the safety net for a list that arrives after that, the same
+  // reason WorkList has its own. Above the early returns below: a hook
+  // after `if (loading) return` runs on some renders and not others,
+  // which React rejects ("Rendered more hooks than during the
+  // previous render") the moment the slip finishes loading.
+  const pendingIdsForFocus = (slip?.items || []).filter((i) => i.status === 'pending').map((i) => i.id);
+  const firstPendingId = pendingIdsForFocus[0] ?? null;
+  const focusIsPending = pendingIdsForFocus.includes(focusId);
+  useEffect(() => {
+    if (mode === 'guided' && firstPendingId !== null && !focusIsPending) {
+      setFocusId(firstPendingId);
+    }
+  }, [mode, firstPendingId, focusIsPending]);
+
   if (loading) return <div className="stf-skeleton" aria-label="Loading" />;
 
   if (error && !slip) {
@@ -193,18 +210,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
   const pendingItems = items.filter((i) => i.status === 'pending');
   const pending = pendingItems.length;
 
-  // Guided renders exactly one pending item, same as WorkList — so it
-  // always needs a focused one. The caller sets it on entering Guided
-  // (handleModeChange) or after a decision (advanceGuidedFocus); this
-  // is the safety net for a list that arrives after that, the same
-  // reason WorkList has its own.
   const guidedIndex = pendingItems.findIndex((i) => i.id === focusId);
-  useEffect(() => {
-    if (mode === 'guided' && pendingItems.length > 0 && guidedIndex < 0) {
-      setFocusId(pendingItems[0].id);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, pendingItems.length, guidedIndex]);
 
   const handleModeChange = (next) => {
     setMode(next);

@@ -165,7 +165,9 @@ function Heatmap({ rows, keys, unit, highlight, onPick }) {
                     className="h-8 min-w-12 cursor-pointer rounded-[3px] px-1 text-center tabular-nums"
                     style={{
                       background: `color-mix(in srgb, var(--viz-1) ${pct}%, var(--surface))`,
-                      color: dark ? '#fff' : INK,
+                      // --surface is white in light mode (on dark blue)
+                      // and near-black in dark mode (on the lighter blue).
+                      color: dark ? SURF : INK,
                       opacity: highlight && highlight !== k ? DIM + 0.2 : 1,
                     }}
                   >

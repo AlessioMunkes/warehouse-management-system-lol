@@ -356,6 +356,8 @@ describe('adjustStock — low-stock notification', () => {
       'Rice is at or below its reorder threshold.',
       'product',
       1,
+      // Low stock is for managers only (default target_roles).
+      ['manager'],
     ]);
   });
 

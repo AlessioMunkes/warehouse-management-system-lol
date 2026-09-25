@@ -33,6 +33,7 @@ import { PRODUCT_CLASSIFICATION_CATEGORIES } from '@/services/donationManagement
 import { ProductMatchCombobox } from '@/features/donation/components/ProductMatchComboBox';
 import useFlaggedItems from '../hooks/useFlaggedItems';
 import { fmtQty } from '@/lib/quantity';
+import { isUnresolvedFlag } from '../flagStatus';
 
 const formatCategoryLabel = (category = '') =>
   category.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -52,9 +53,6 @@ const resolveMessage = (result = {}) => {
 
 const isPlaceholder = (row = {}) =>
   String(row.name || '').startsWith('[Unclassified]') || row.is_active === false;
-
-export const isUnresolvedFlag = (row = {}) =>
-  !row.status || row.status === 'pending' || row.status === 'pending_classification';
 
 const REVIEW_ROUTES = [
   { value: 'recipe_food', label: 'Recipe Food' },

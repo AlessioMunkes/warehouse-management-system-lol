@@ -2,10 +2,11 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
-import NotificationBell, {
+import NotificationBell from '../features/notifications/components/NotificationBell';
+import {
   notificationDestination,
   notificationSeverity,
-} from '../features/notifications/components/NotificationBell';
+} from '../features/notifications/notificationMatrix';
 import notificationAPI from '../services/notificationAPI';
 
 const navigate = vi.fn();

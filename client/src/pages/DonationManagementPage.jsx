@@ -14,7 +14,8 @@ import { AlertTriangle, ClipboardList, RotateCcw } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import FlaggedItemsTab, { isUnresolvedFlag } from '../features/donationManagement/components/FlaggedItemsTab';
+import FlaggedItemsTab from '../features/donationManagement/components/FlaggedItemsTab';
+import { isUnresolvedFlag } from '../features/donationManagement/flagStatus';
 import ReconciliationTab from '../features/donationManagement/components/ReconciliationTab';
 import donationManagementAPI, { RECONCILIATION_STATUSES } from '@/services/donationManagementAPI';
 
