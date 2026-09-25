@@ -14,6 +14,9 @@
 import provider          from '../features/reporting/ai/provider.js';
 import { buildTools, buildSystemPrompt } from '../features/reporting/ai/toolSchema.js';
 import reportingService  from './reporting.service.js';
+import insightService    from './reportingInsight.service.js';
+import { CHART_VIEWS }   from '../features/reporting/ai/toolSchema.js';
+import { matchQuestion } from '../features/reporting/ai/keywordFallback.js';
 import logRepo           from '../repositories/reportingLog.repository.js';
 
 const fail = (status, message) => {
@@ -75,6 +78,60 @@ const applyDefaultRange = (spec, catalog, todayISO) => {
   };
 };
 
+// Not an error. A question the catalog cannot answer is a normal
+// outcome, so it comes back as a 200 the page shows as a gentle note
+// with a way forward, rather than a red failure. `closest` is only
+// passed on when it names a real operational report.
+const noMatch = (catalog, reason, closestId) => {
+  const operational = catalog.metrics.filter((m) => !m.impactOnly);
+  const closest = operational.find((m) => m.id === closestId);
+  const message = typeof reason === 'string' && reason.trim()
+    ? reason.trim().slice(0, 300)
+    : "I couldn't match that to one of the operational reports.";
+  return {
+    type: 'no_match',
+    message,
+    closest: closest ? { id: closest.id, label: closest.label } : null,
+  };
+};
+
+// Upstream conditions — every model in the chain out of quota,
+// overloaded, unreachable or timing out. Not our bug, and not the
+// manager's question being wrong, so the keyword matcher steps in.
+const PROVIDER_DOWN = new Set([429, 502, 503, 504]);
+
+// Every model failed: answer with the closest keyword match instead
+// of an error. Labelled so the page says "closest match".
+const keywordAnswer = async ({ question, todayISO, reason, log }) => {
+  const match = matchQuestion(question, todayISO);
+  if (!match) {
+    await log('error', { errorMessage: `provider down, no keyword match: ${reason}` });
+    return {
+      type: 'no_match',
+      message: "The AI assistant is busy right now and I couldn't match that question by its keywords. " +
+        'Try one of the suggested questions, or pick a report from Browse all reports.',
+      closest: null,
+    };
+  }
+  try {
+    if (match.kind === 'comparison') {
+      const result = await insightService.runComparison({ id: match.id, dateRange: match.dateRange });
+      await log('ok', { metric: `comparison:${match.id}`, spec: { comparison: match.id }, errorMessage: `keyword fallback: ${reason}` });
+      return { ...result, matchedBy: 'keyword', aiUnavailable: true };
+    }
+    const report = await reportingService.runReport(match.spec);
+    await log('ok', { metric: report.spec.metric, spec: report.spec, errorMessage: `keyword fallback: ${reason}` });
+    return {
+      type: 'report',
+      ...report,
+      meta: { ...report.meta, matchedBy: 'keyword', aiUnavailable: true, chartHint: match.chartHint },
+    };
+  } catch (err) {
+    await log('error', { errorMessage: `keyword fallback failed: ${err.message}` });
+    throw err;
+  }
+};
+
 export const ask = async ({ question, userId }) => {
   if (!provider.isEnabled()) {
     throw fail(503, 'The AI assistant is not available. Use the report builder below.');
@@ -110,7 +167,18 @@ export const ask = async ({ question, userId }) => {
       ? question
       : `${question}\n\nYour previous attempt was rejected: ${lastError}\nTry again, choosing a valid combination.`;
 
-    const call = await provider.callWithTools({ systemPrompt: system, userMessage, tools });
+    let call;
+    try {
+      call = await provider.callWithTools({ systemPrompt: system, userMessage, tools });
+    } catch (err) {
+      // Logged either way, so outages show up in reporting_queries
+      // instead of vanishing (they used to be thrown before logging).
+      if (PROVIDER_DOWN.has(err.status)) {
+        return keywordAnswer({ question, todayISO, reason: err.message, log });
+      }
+      await log('error', { errorMessage: err.message });
+      throw err;
+    }
 
     if (call.name === 'ask_clarification') {
       const options = Array.isArray(call.args.options)
@@ -126,6 +194,29 @@ export const ask = async ({ question, userId }) => {
       }
       lastError = 'ask_clarification needs at least two options. Run a report with a sensible default instead.';
       continue;
+    }
+
+    if (call.name === 'no_matching_report') {
+      // Logged under the existing 'unresolved' outcome, so the log
+      // table needs no new value; the prefix tells the two apart.
+      await log('unresolved', { errorMessage: `no_matching_report: ${call.args?.reason ?? ''}` });
+      return noMatch(catalog, call.args?.reason, call.args?.closest_metric);
+    }
+
+    if (call.name === 'run_comparison') {
+      try {
+        const a = call.args ?? {};
+        const result = await insightService.runComparison({
+          id: a.comparison,
+          dateRange: a.date_from && a.date_to ? { from: a.date_from, to: a.date_to } : undefined,
+        });
+        await log('ok', { metric: `comparison:${result.id}`, spec: { comparison: result.id, dateRange: result.dateRange } });
+        return { ...result, answeredByAI: true };
+      } catch (err) {
+        if (!err.status || err.status >= 500) { await log('error', { errorMessage: err.message }); throw err; }
+        lastError = err.message;
+        continue;
+      }
     }
 
     if (call.name !== 'run_report') { lastError = `Unknown function: ${call.name}`; continue; }
@@ -148,6 +239,8 @@ export const ask = async ({ question, userId }) => {
           // broader than the question, and the manager should know.
           droppedFilters: dropped.length ? dropped : undefined,
           defaultedRange: withRange.defaultedRange || undefined,
+          // Display only: how the manager asked to see it.
+          chartHint: CHART_VIEWS.includes(call.args.chart_type) ? call.args.chart_type : undefined,
         },
       };
     } catch (err) {
@@ -162,10 +255,7 @@ export const ask = async ({ question, userId }) => {
   }
 
   await log('unresolved', { errorMessage: lastError });
-  const names = catalog.metrics.map((m) => m.label).join(', ');
-  throw fail(422,
-    `I could not turn that into one of the available reports. I can show: ${names}. ` +
-    `Try rephrasing, or use the report builder below.`);
+  return noMatch(catalog);
 };
 
 export default { ask };

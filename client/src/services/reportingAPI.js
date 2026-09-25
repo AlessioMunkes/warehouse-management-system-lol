@@ -31,4 +31,26 @@ export const setFactor = (factorKey, { value, unit, sourceNote }) =>
 export const getFactorHistory = (factorKey) =>
   apiGet(`/api/reporting/factors/${encodeURIComponent(factorKey)}/history`);
 
-export default { getCatalog, runReport, askQuestion, setFactor, getFactorHistory };
+// POST /api/reporting/insight
+// Operational reports only. Returns the report with key figures, a
+// previous-period comparison, related charts and "who to act on"
+// lists; narrate: true adds the written reading (AI, or a template
+// from the figures when the AI is unavailable).
+export const getInsight = (spec, { narrate = false } = {}) =>
+  apiPost('/api/reporting/insight', { spec, narrate });
+
+// GET /api/reporting/comparisons — the declared scatter comparisons.
+export const getComparisons = () => apiGet('/api/reporting/comparisons');
+
+// POST /api/reporting/comparison — one scatter plot's points.
+export const runComparison = (id, dateRange) =>
+  apiPost('/api/reporting/comparison', { id, dateRange });
+
+// GET /api/reporting/targets — this manager's target per metric.
+export const getTargets = () => apiGet('/api/reporting/targets');
+
+// PUT /api/reporting/targets/:metricId — value null resets to default.
+export const saveTarget = (metricId, value) =>
+  apiPut(`/api/reporting/targets/${encodeURIComponent(metricId)}`, { value });
+
+export default { getTargets, saveTarget, getComparisons, runComparison, getCatalog, runReport, askQuestion, getInsight, setFactor, getFactorHistory };

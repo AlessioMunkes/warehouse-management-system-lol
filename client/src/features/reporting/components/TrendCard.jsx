@@ -15,7 +15,9 @@
 import { useEffect, useState } from 'react';
 import { runReport } from '../../../services/reportingAPI';
 import { resolvePreset } from '../dateRanges';
-import ReportChart from './ReportChart';
+// OperationalChart, not ReportChart: these cards only appear on the
+// Operations page, and its chart colours follow light and dark mode.
+import OperationalChart from './OperationalChart';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -58,9 +60,9 @@ export default function TrendCard({ metricId, label, icon: Icon, dimension = 'mo
         {loading ? (
           <Skeleton className="h-28 w-full" />
         ) : error ? (
-          <p className="text-xs text-[#ef3a40]">{error}</p>
+          <p className="text-xs text-brand">{error}</p>
         ) : report && report.series?.length ? (
-          <ReportChart report={report} dimensionLabel={label} compact />
+          <OperationalChart report={report} dimensionLabel={label} compact />
         ) : (
           <p className="text-xs text-muted-foreground">No data for this range yet.</p>
         )}

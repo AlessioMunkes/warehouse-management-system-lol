@@ -18,26 +18,46 @@
 // matters.
 // ─────────────────────────────────────────────────────────────
 
-const DEFAULT_MODEL = 'gemini-3.6-flash';
+// Lite models by default. Measured on this project's key (Sep 2026):
+// gemini-3.6-flash answered 1 of 6 questions (the rest 429/503),
+// gemini-3.5-flash-lite 6 of 6, all routed to the right report, with a
+// median of ~1.5s. On the free tier the full flash models are the ones
+// that run out of capacity.
+const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
 
-// Per attempt, not per request. The system prompt now describes 19
-// reports — roughly 2,500 tokens — and a loaded free-tier model can
-// take well over ten seconds to work through it. Overridable because
-// this is exactly the kind of number that needs tuning in the field
-// without a deploy.
-const TIMEOUT_MS = Number(process.env.GEMINI_TIMEOUT_MS) || 25_000;
+// FALLBACK CHAIN
+// Free-tier limits are counted PER MODEL, so when one model is out of
+// quota (429) or overloaded (503), the next one usually is not. On
+// those, or a timeout, the request moves straight on to the next
+// model instead of waiting and retrying the busy one. Comma-separated;
+// set GEMINI_FALLBACK_MODELS= (empty) to turn the chain off.
+const DEFAULT_FALLBACKS = 'gemini-3.1-flash-lite,gemini-flash-lite-latest';
 
-// One retry only. A 503 means the model is busy, and a brief pause
-// usually clears it — but the manager is watching a spinner, so the
-// worst case has to stay bounded at roughly one minute rather than
-// climbing through an exponential ladder.
-const MAX_ATTEMPTS = 2;
-const BACKOFF_MS   = 1_500;
+const modelChain = () => {
+  const primary = process.env.GEMINI_MODEL || DEFAULT_MODEL;
+  const raw = process.env.GEMINI_FALLBACK_MODELS ?? DEFAULT_FALLBACKS;
+  const rest = raw.split(',').map((s) => s.trim()).filter(Boolean);
+  return [...new Set([primary, ...rest])];
+};
+
+// Per model attempt. Lite models answer in a few seconds; 12s is
+// generous for them and keeps the worst case (three models timing
+// out) near the half-minute mark rather than over a minute.
+// Overridable, because this is exactly the kind of number that needs
+// tuning in the field without a deploy.
+const TIMEOUT_MS = Number(process.env.GEMINI_TIMEOUT_MS) || 12_000;
+
+// A short pause before trying the next model, only after a 5xx blip —
+// a 429 on one model says nothing about the next, so that moves on
+// at once.
+const BACKOFF_MS = 400;
 
 export const isEnabled = () => Boolean(process.env.GEMINI_API_KEY);
 
 export const providerName = () =>
   `google:${process.env.GEMINI_MODEL || DEFAULT_MODEL}`;
+
+export const fallbackModels = () => modelChain().slice(1);
 
 // `code` is additive and optional: the message and status are
 // unchanged, so reporting reads exactly as before. It exists because
@@ -55,11 +75,11 @@ const fail = (status, message, code) => {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-// Statuses worth trying again. 503 is an overloaded model, 500 is an
-// occasional internal blip, 504 is a gateway timeout. A 400 or 404 is
-// our request being wrong and will fail identically every time, so
-// retrying those just makes the user wait longer for the same error.
-const RETRYABLE = new Set([500, 503, 504]);
+// Statuses worth trying the NEXT MODEL on. 429 is that model's quota,
+// 503 an overloaded model, 500 an internal blip, 504 a timeout, 404 a
+// model retired or not offered to this key. A 400 is our request being
+// wrong and would fail identically on every model.
+const TRY_NEXT = new Set([404, 429, 500, 503, 504]);
 
 const oneAttempt = async ({ url, apiKey, body }) => {
   const controller = new AbortController();
@@ -78,15 +98,9 @@ const oneAttempt = async ({ url, apiKey, body }) => {
     const text = await res.text().catch(() => '');
     console.error('[ai.provider]', res.status, text.slice(0, 300));
 
-    // Google sends Retry-After on some throttles. Honouring it beats
-    // guessing, and ignoring it is how a client gets rate-limited
-    // harder.
-    const retryAfter = Number(res.headers.get('retry-after'));
-    return {
-      ok: false,
-      status: res.status,
-      retryAfterMs: Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : null,
-    };
+    // No Retry-After wait: a throttled model is skipped for the next
+    // one in the chain rather than waited on.
+    return { ok: false, status: res.status };
   } catch (err) {
     clearTimeout(timer);
     // AbortError is our own timeout firing, which is worth one more
@@ -107,9 +121,6 @@ export const callWithTools = async ({ systemPrompt, userMessage, tools }) => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw fail(503, 'The AI assistant is not configured.', 'model_missing');
 
-  const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-
   const body = JSON.stringify({
     systemInstruction: { parts: [{ text: systemPrompt }] },
     contents: [{ role: 'user', parts: [{ text: userMessage }] }],
@@ -122,8 +133,11 @@ export const callWithTools = async ({ systemPrompt, userMessage, tools }) => {
   });
 
   let last = null;
+  const chain = modelChain();
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+  for (let i = 0; i < chain.length; i += 1) {
+    const model = chain[i];
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
     const result = await oneAttempt({ url, apiKey, body });
 
     if (result.ok) {
@@ -131,19 +145,25 @@ export const callWithTools = async ({ systemPrompt, userMessage, tools }) => {
       // position — ordering is not guaranteed.
       const parts = result.data?.candidates?.[0]?.content?.parts ?? [];
       const call = parts.find((p) => p.functionCall)?.functionCall;
-      if (!call?.name) throw fail(502, 'The AI assistant did not return a usable answer.');
-      return { name: call.name, args: call.args ?? {} };
+      if (call?.name) {
+        if (i > 0) console.warn(`[ai.provider] answered by fallback model ${model}`);
+        return { name: call.name, args: call.args ?? {}, model };
+      }
+      // A reply with no function call is this model misbehaving, not
+      // the request being wrong: the next model may do better.
+      last = { ok: false, status: 502, unusable: true };
+      continue;
     }
 
     last = result;
+    if (!(TRY_NEXT.has(result.status) || result.networkError || result.timedOut)) break;
+    if (i === chain.length - 1) break;
 
-    const worthRetrying = RETRYABLE.has(result.status) || result.networkError;
-    if (!worthRetrying || attempt === MAX_ATTEMPTS) break;
-
-    const wait = result.retryAfterMs ?? BACKOFF_MS;
-    console.warn(`[ai.provider] attempt ${attempt} failed (${result.status}); retrying in ${wait}ms`);
-    await sleep(wait);
+    console.warn(`[ai.provider] ${model} failed (${result.status || 'network'}); trying ${chain[i + 1]}`);
+    if (result.status >= 500) await sleep(BACKOFF_MS);
   }
+
+  if (last?.unusable) throw fail(502, 'The AI assistant did not return a usable answer.', 'error');
 
   // Every message below is written for the manager, not the log, and
   // the controller passes 502/503/504 text through to the screen.
@@ -162,10 +182,11 @@ export const callWithTools = async ({ systemPrompt, userMessage, tools }) => {
   }
   if (last.status === 404) {
     // Distinct because the fix is a config change, not a retry — and
-    // this is how the last model retirement surfaced.
-    throw fail(502, 'The configured AI model is not available. Check GEMINI_MODEL on the server.', 'model_missing');
+    // this is how the last model retirement surfaced. Reaching here
+    // means every model in the chain was unavailable.
+    throw fail(502, 'The configured AI models are not available. Check GEMINI_MODEL and GEMINI_FALLBACK_MODELS on the server.', 'model_missing');
   }
   throw fail(502, 'The AI assistant returned an error.', 'error');
 };
 
-export default { isEnabled, providerName, callWithTools };
+export default { isEnabled, providerName, fallbackModels, callWithTools };

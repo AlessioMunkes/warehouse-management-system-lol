@@ -26,6 +26,7 @@
 // only ever touched DATE columns.
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
+import opsRepo from './reportingOps.repository.js';
 import {
   COLLECTED_STATUSES, NOT_COLLECTED_STATUSES, IMPACT_BENEFICIARY_KINDS, SAST,
 } from '../features/reporting/reportCatalog.js';
@@ -54,6 +55,10 @@ const slipDimension = (dimension) => {
     case 'beneficiary': return { expr: `ps.beneficiary_kind::text`,             group: `ps.beneficiary_kind` };
     case 'product':     return { expr: `p.name`,                                group: `p.name` };
     case 'programme':   return { expr: `COALESCE(pr.name, 'Unassigned')`,       group: `pr.name` };
+    case 'month_beneficiary': {
+      const e = `${bucketMonth('ps.dispatch_date')} || '|' || ps.beneficiary_kind::text`;
+      return { expr: e, group: e };
+    }
     default: throw new Error(`Unsupported dimension: ${dimension}`);
   }
 };
@@ -75,8 +80,9 @@ const impactClause = (params) => {
   return `ps.beneficiary_kind = ANY($${params.length}::beneficiary_type[])`;
 };
 
-const orderFor = (dimension) =>
-  dimension === 'none' || dimension === 'month' || dimension === 'week' ? '1' : '2 DESC, 1';
+// Two-axis "month|category" buckets sort by label, so months stay in order.
+const TIME_ORDERED = new Set(['none', 'month', 'week', 'month_beneficiary', 'month_supplier', 'month_movement']);
+const orderFor = (dimension) => (TIME_ORDERED.has(dimension) ? '1' : '2 DESC, 1');
 
 // ══ Impact ═════════════════════════════════════════════════════
 // SUM(DISTINCT child_count) would be a bug: two 40-child centres
@@ -382,7 +388,8 @@ const decantingWastage = async ({ dimension, filters, dateRange }) => {
        JOIN decanting_records dr ON dr.id = dl.decanting_id
   LEFT JOIN products p ON p.id = dl.product_id
       WHERE ${where.join(' AND ')}
-      GROUP BY ${expr} ORDER BY ${dimension === 'product' ? '2 DESC NULLS LAST, 1' : '1'}`,
+      ${dimension === 'none' ? '' : `GROUP BY ${expr}`}
+      ORDER BY ${dimension === 'product' ? '2 DESC NULLS LAST, 1' : '1'}`,
     params
   );
   return rows.map((r) => ({
@@ -413,6 +420,10 @@ const receivingDimension = (dimension) => {
     case 'week':     return { expr: bucketWeek('dn.delivery_date'),  group: bucketWeek('dn.delivery_date') };
     case 'supplier': return { expr: `s.name`,                        group: `s.name` };
     case 'product':  return { expr: `p.name`,                        group: `p.name` };
+    case 'month_supplier': {
+      const e = `${bucketMonth('dn.delivery_date')} || '|' || s.name`;
+      return { expr: e, group: e };
+    }
     default: throw new Error(`Unsupported dimension: ${dimension}`);
   }
 };
@@ -571,14 +582,14 @@ const donationValue = async ({ dimension, filters, dateRange }) => {
   const expr = {
     none:      `'Total'`,
     month:     bucketMonth(d),
-    category:  `dn.category::text`,
+    category:  `dn.donation_category::text`,
     programme: `COALESCE(pr.name, 'Unassigned')`,
   }[dimension];
   if (!expr) throw new Error(`Unsupported dimension: ${dimension}`);
 
   const params = [dateRange.from, dateRange.to];
   const where = [`${d} BETWEEN $1::date AND $2::date`];
-  if (filters.donation_category) { params.push(filters.donation_category); where.push(`dn.category = $${params.length}::donation_category`); }
+  if (filters.donation_category) { params.push(filters.donation_category); where.push(`dn.donation_category = $${params.length}`); }
   if (filters.programme_id)      { params.push(filters.programme_id);      where.push(`dn.programme_id = $${params.length}`); }
 
   const { rows } = await pool.query(
@@ -586,7 +597,8 @@ const donationValue = async ({ dimension, filters, dateRange }) => {
        FROM donations dn
   LEFT JOIN programmes pr ON pr.id = dn.programme_id
       WHERE ${where.join(' AND ')}
-      GROUP BY ${expr} ORDER BY ${dimension === 'none' || dimension === 'month' ? '1' : '2 DESC, 1'}`,
+      ${dimension === 'none' ? '' : `GROUP BY ${expr}`}
+      ORDER BY ${dimension === 'none' || dimension === 'month' ? '1' : '2 DESC, 1'}`,
     params
   );
   return rows2series(rows);
@@ -678,6 +690,7 @@ const stockMovementVolume = async ({ dimension, filters, dateRange }) => {
     week:          bucketWeek(d),
     product:       `p.name`,
     programme:     `COALESCE(pr.name, 'Unassigned')`,
+    month_movement: `${bucketMonth(d)} || '|' || sm.movement_type`,
   }[dimension];
   if (!expr) throw new Error(`Unsupported dimension: ${dimension}`);
 
@@ -696,7 +709,7 @@ const stockMovementVolume = async ({ dimension, filters, dateRange }) => {
        JOIN products p ON p.id = sm.product_id
   LEFT JOIN programmes pr ON pr.id = p.programme_id
       WHERE ${where.join(' AND ')}
-      GROUP BY ${expr} ORDER BY ${dimension === 'month' || dimension === 'week' ? '1' : '2 DESC, 1'}`,
+      GROUP BY ${expr} ORDER BY ${TIME_ORDERED.has(dimension) ? '1' : '2 DESC, 1'}`,
     params
   );
   return rows2series(rows);
@@ -758,7 +771,8 @@ const pickingFlagRate = async ({ dimension, filters, dateRange }) => {
        JOIN picking_slips ps ON ps.id = psi.picking_slip_id
        JOIN products p ON p.id = psi.product_id
       WHERE ${where.join(' AND ')}
-      GROUP BY ${expr} ORDER BY ${dimension === 'none' || dimension === 'month' ? '1' : '2 DESC, 1'}`,
+      ${dimension === 'none' ? '' : `GROUP BY ${expr}`}
+      ORDER BY ${dimension === 'none' || dimension === 'month' ? '1' : '2 DESC, 1'}`,
     params
   );
   return rows.map((r) => ({ label: r.label, value: num(r.value), meta: { lines: r.worked } }));
@@ -803,7 +817,7 @@ const volunteerHours = async ({ dimension, dateRange }) => {
       WHERE ${d} BETWEEN $1::date AND $2::date
         AND v.signed_out_at IS NOT NULL
         AND v.signed_out_at > v.signed_in_at
-      GROUP BY ${expr} ORDER BY 1`,
+      ${dimension === 'none' ? '' : `GROUP BY ${expr}`} ORDER BY 1`,
     [dateRange.from, dateRange.to]
   );
   return rows.map((r) => ({ label: r.label, value: num(r.value), meta: { sessions: r.sessions } }));
@@ -833,4 +847,6 @@ export default {
   stockOnHand, lowStockItems, stockMovementVolume, stockCountVariance,
   pickingFlagRate, communityRequestOutcomes, volunteerHours,
   countNonKgLines, getFactor,
+  // Second-wave operational metrics, kept in their own file.
+  ...opsRepo,
 };

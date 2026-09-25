@@ -74,6 +74,19 @@ export const DIMENSIONS = {
   group:          { id: 'group',          label: 'Beneficiary group', chart: 'bar'    },
   region:         { id: 'region',         label: 'Region',            chart: 'bar'    },
   group_month:    { id: 'group_month',    label: 'By month',          chart: 'grouped_bar' },
+  // Two-axis operational breakdowns, "YYYY-MM|<category>" labels, same
+  // packing as group_month. The Operations page draws them as stacked
+  // bars or a heatmap; no impact metric declares them.
+  month_beneficiary: { id: 'month_beneficiary', label: 'Month and beneficiary type', chart: 'stacked_bar' },
+  month_supplier:    { id: 'month_supplier',    label: 'Month and supplier',         chart: 'stacked_bar' },
+  month_movement:    { id: 'month_movement',    label: 'Month and movement type',    chart: 'stacked_bar' },
+  po_status:         { id: 'po_status',         label: 'Order status',        chart: 'bar'  },
+  slip_status:       { id: 'slip_status',       label: 'Slip status',         chart: 'bar'  },
+  reason:            { id: 'reason',            label: 'Reason',              chart: 'hbar' },
+  routing_status:    { id: 'routing_status',    label: 'Routing status',      chart: 'bar'  },
+  event:             { id: 'event',             label: 'Event',               chart: 'hbar' },
+  product_category:  { id: 'product_category',  label: 'Product category',    chart: 'bar'  },
+  storage_type:      { id: 'storage_type',      label: 'Storage type',        chart: 'bar'  },
 };
 
 // ── Filters ───────────────────────────────────────────────────
@@ -99,7 +112,7 @@ export const FILTERS = {
 // other chart type already returns; ReportChart.jsx splits it apart
 // client-side rather than this feature inventing a second response
 // shape for one chart type.
-export const CHART_TYPES = ['number', 'line', 'bar', 'hbar', 'grouped_bar'];
+export const CHART_TYPES = ['number', 'line', 'bar', 'hbar', 'grouped_bar', 'stacked_bar'];
 
 // ── Cache tiers ───────────────────────────────────────────────
 // Render's free tier sleeps, so an in-process cache is cold on each
@@ -276,7 +289,7 @@ export const METRICS = {
       'staff loaded onto the vehicle, not what was packed onto the pallet earlier ' +
       'in the week.',
     repoFn: 'dispatchVolume', unit: 'kg',
-    dimensions: ['none', 'month', 'week', 'cohort', 'product', 'programme', 'ecd_centre', 'beneficiary'],
+    dimensions: ['none', 'month', 'week', 'cohort', 'product', 'programme', 'ecd_centre', 'beneficiary', 'month_beneficiary'],
     filters: ['cohort', 'beneficiary_kind', 'programme_id', 'product_id', 'ecd_id'],
     defaultChart: 'line',
     caveat: 'Gate-loaded quantities, kilogram lines only.',
@@ -328,7 +341,7 @@ export const METRICS = {
       'actually received and signed for at the door, not what the purchase order ' +
       'said was coming.',
     repoFn: 'goodsReceived', unit: 'kg',
-    dimensions: ['none', 'month', 'week', 'supplier', 'product'],
+    dimensions: ['none', 'month', 'week', 'supplier', 'product', 'month_supplier'],
     filters: ['supplier_id', 'product_id'],
     defaultChart: 'line',
     caveat: 'Received weights where recorded in kilograms.',
@@ -366,7 +379,7 @@ export const METRICS = {
       'What was spent on bought-in stock, in rands. Calculated from the quantity ' +
       'actually received multiplied by the price on the purchase order line.',
     repoFn: 'procurementSpend', unit: 'ZAR',
-    dimensions: ['none', 'month', 'supplier', 'product'],
+    dimensions: ['none', 'month', 'supplier', 'product', 'month_supplier'],
     filters: ['supplier_id', 'product_id'],
     defaultChart: 'line',
     // Lines received without a linked PO item have no price, so they
@@ -452,7 +465,7 @@ export const METRICS = {
       'donated, written off as wastage, or manually adjusted. Use this to see ' +
       'warehouse throughput or to check how much was adjusted by hand.',
     repoFn: 'stockMovementVolume', unit: 'units',
-    dimensions: ['movement_type', 'month', 'week', 'product', 'programme'],
+    dimensions: ['movement_type', 'month', 'week', 'product', 'programme', 'month_movement'],
     filters: ['movement_type', 'product_id', 'programme_id'],
     defaultChart: 'bar',
     caveat: 'Mixed units across products; compare within a product rather than across.',
@@ -497,6 +510,190 @@ export const METRICS = {
     dimensions: ['outcome', 'month'], filters: [],
     defaultChart: 'bar',
     caveat: 'Counts requests logged in the period.',
+  },
+
+  // ══ Purchase orders (second wave, reportingOps.repository.js) ═
+  po_on_time_rate: {
+    id: 'po_on_time_rate', label: 'On-time deliveries', temporal: 'range',
+    description:
+      'The percentage of purchase orders whose first delivery arrived on or before the date ' +
+      'the supplier promised. Run this when asked which suppliers deliver late or how reliable ' +
+      'delivery dates are.',
+    repoFn: 'poOnTimeRate', unit: '%',
+    dimensions: ['supplier', 'none', 'month'], filters: ['supplier_id'],
+    defaultChart: 'hbar',
+    caveat: 'Judged on the first delivery against each order. Orders past their date with nothing delivered count as late; returned orders are left out.',
+  },
+
+  supplier_lead_time: {
+    id: 'supplier_lead_time', label: 'Supplier lead time', temporal: 'range',
+    description:
+      'Average days from raising a purchase order to the first delivery arriving. Use this to ' +
+      'plan how far ahead to order from each supplier.',
+    repoFn: 'supplierLeadTime', unit: 'days',
+    dimensions: ['supplier', 'none', 'month'], filters: ['supplier_id'],
+    defaultChart: 'hbar',
+    caveat: 'Orders with no delivery yet are left out.',
+  },
+
+  overdue_purchase_orders: {
+    id: 'overdue_purchase_orders', label: 'Overdue purchase orders', temporal: 'snapshot',
+    description:
+      'Open purchase orders whose promised delivery date has passed, by supplier. A live figure ' +
+      'with no date range. Run this when asked what deliveries are late or what to chase.',
+    repoFn: 'overduePurchaseOrders', unit: 'orders',
+    dimensions: ['supplier', 'none'], filters: ['supplier_id'],
+    defaultChart: 'hbar', ranked: true,
+    caveat: 'Open means pending, approved, in transit or partially received.',
+  },
+
+  purchase_order_pipeline: {
+    id: 'purchase_order_pipeline', label: 'Purchase orders raised', temporal: 'range',
+    description:
+      'Purchase orders raised in the period and where they are now: pending, approved, in ' +
+      'transit, partially received, completed, returned or needing follow-up.',
+    repoFn: 'purchaseOrderPipeline', unit: 'orders',
+    dimensions: ['po_status', 'supplier', 'month'], filters: ['supplier_id'],
+    defaultChart: 'bar',
+    caveat: 'Counted by the date the order was raised.',
+  },
+
+  // ══ Picking and dispatch (second wave) ═════════════════════
+  picking_turnaround: {
+    id: 'picking_turnaround', label: 'Picking turnaround', temporal: 'range',
+    description:
+      'Average hours from a packer starting a picking slip to completing it. Rising turnaround ' +
+      'means pallets are taking longer to pack.',
+    repoFn: 'pickingTurnaround', unit: 'hours',
+    dimensions: ['month', 'week', 'cohort', 'none'], filters: ['cohort'],
+    defaultChart: 'line',
+    caveat: 'Slips completed without being started first have no duration and are left out.',
+  },
+
+  slip_pipeline: {
+    id: 'slip_pipeline', label: 'Picking slips in the pipeline', temporal: 'snapshot',
+    description:
+      'Picking slips due from a week ago to two weeks ahead, by status: pending, in progress, ' +
+      'complete, dispatched or cancelled. A live figure. Run this when asked how packing is ' +
+      'going this week or what is still to be packed.',
+    repoFn: 'slipPipeline', unit: 'slips',
+    dimensions: ['slip_status', 'cohort'], filters: ['cohort'],
+    defaultChart: 'bar',
+    caveat: 'Covers dispatch dates from seven days ago to fourteen days ahead.',
+  },
+
+  gate_load_variance: {
+    id: 'gate_load_variance', label: 'Gate loading variance', temporal: 'range',
+    description:
+      'How often the quantity loaded onto the vehicle at the gate differed from what was packed ' +
+      'on the pallet, as a percentage of dispatch lines. A high rate on one product means pallets ' +
+      'are being packed wrong or changed at the gate.',
+    repoFn: 'gateLoadVariance', unit: '%',
+    dimensions: ['product', 'none', 'month'], filters: ['product_id'],
+    defaultChart: 'hbar',
+    caveat: 'A line counts if loaded differs from packed in either direction.',
+  },
+
+  late_collection_rate: {
+    id: 'late_collection_rate', label: 'Late collections', temporal: 'range',
+    description:
+      'Of the pallets that were collected, the percentage collected late (after three in the ' +
+      'afternoon). Run this when asked which centres collect late.',
+    repoFn: 'lateCollectionRate', unit: '%',
+    dimensions: ['ecd_centre', 'month', 'cohort', 'none'], filters: ['cohort', 'ecd_id'],
+    defaultChart: 'hbar',
+    caveat: 'Only collected pallets count; missed collections are in collection compliance.',
+  },
+
+  // ══ Stock (second wave) ════════════════════════════════════
+  standing_order_demand: {
+    id: 'standing_order_demand', label: 'Standing order demand', temporal: 'snapshot',
+    description:
+      'Kilograms the active ECD centres are set up to receive on their standing orders, by product ' +
+      'or centre. A live figure. Compare it with stock on hand to see what the next cycle needs.',
+    repoFn: 'standingOrderDemand', unit: 'kg',
+    dimensions: ['product', 'ecd_centre', 'none'], filters: ['product_id', 'cohort'],
+    defaultChart: 'hbar', ranked: true,
+    caveat: 'Active centres and current order lines only, kilogram lines only. Per collection, not per month.',
+  },
+
+  stock_value: {
+    id: 'stock_value', label: 'Stock value', temporal: 'snapshot',
+    description:
+      'The rand value of what is in the warehouse right now: quantity on hand times each product\u2019s ' +
+      'unit cost, by product category, storage type (dry or cold) or product. A live figure.',
+    repoFn: 'stockValue', unit: 'ZAR',
+    dimensions: ['product_category', 'storage_type', 'product', 'none'], filters: ['programme_id'],
+    defaultChart: 'bar',
+    caveat: 'Products with no unit cost on record are left out.',
+  },
+
+  expiring_stock: {
+    id: 'expiring_stock', label: 'Stock expiring soon', temporal: 'snapshot',
+    description:
+      'Received stock with an expiry date in the next 30 days, counted by delivery line, by week of ' +
+      'expiry or by product. A live figure. Run this when asked what is about to expire.',
+    repoFn: 'expiringStock', unit: 'delivery lines',
+    dimensions: ['week', 'product'], filters: [],
+    defaultChart: 'bar',
+    caveat: 'Based on the expiry date recorded at receiving, not on how much of that delivery is still on the shelf.',
+  },
+
+  adjustment_reasons: {
+    id: 'adjustment_reasons', label: 'Stock adjustment reasons', temporal: 'range',
+    description:
+      'Why stock was adjusted by hand, by the reason staff recorded. Frequent reasons point at a ' +
+      'step in receiving or picking that is not being captured.',
+    repoFn: 'adjustmentReasons', unit: 'adjustments',
+    dimensions: ['reason', 'month'], filters: ['product_id'],
+    defaultChart: 'hbar',
+    caveat: 'Reasons are grouped as typed, ignoring case. The top fifteen are shown.',
+  },
+
+  // ══ Decanting (second wave) ════════════════════════════════
+  decanting_margin_rate: {
+    id: 'decanting_margin_rate', label: 'Decanting accuracy', temporal: 'range',
+    description:
+      'The percentage of decanting lines where the bags packed came out within the allowed margin ' +
+      'of the required weight. Falling accuracy means bags are being over- or under-filled.',
+    repoFn: 'decantingMarginRate', unit: '%',
+    dimensions: ['none', 'week', 'month', 'product'], filters: ['product_id'],
+    defaultChart: 'line',
+    caveat: 'Uses the within-margin check recorded on each decanting line.',
+  },
+
+  // ══ Community, donations, volunteers (second wave) ═════════
+  community_response_time: {
+    id: 'community_response_time', label: 'Community request response time', temporal: 'range',
+    description:
+      'Average hours from a walk-in or phone-in request being logged to it being resolved. ' +
+      'Aggregate only, no caller details.',
+    repoFn: 'communityResponseTime', unit: 'hours',
+    dimensions: ['month', 'outcome', 'none'], filters: [],
+    defaultChart: 'line',
+    caveat: 'Requests not yet resolved are left out.',
+  },
+
+  donation_routing: {
+    id: 'donation_routing', label: 'Donated items by routing status', temporal: 'range',
+    description:
+      'Donated items and where they sit in intake: allocated to stock, still pending, unmatched to a ' +
+      'product, not stock-bearing, or waiting on programme stock. Aggregate only, no donor details.',
+    repoFn: 'donationRouting', unit: 'items',
+    dimensions: ['routing_status', 'month'], filters: [],
+    defaultChart: 'bar',
+    caveat: 'Counts donation lines, not their value or weight.',
+  },
+
+  volunteer_event_attendance: {
+    id: 'volunteer_event_attendance', label: 'Volunteer event attendance', temporal: 'range',
+    description:
+      'Of confirmed bookings for past Love Activism event timeslots, the percentage where the ' +
+      'volunteer checked in, by event or month. Aggregate only, never by individual volunteer.',
+    repoFn: 'volunteerEventAttendance', unit: '%',
+    dimensions: ['event', 'month', 'none'], filters: [],
+    defaultChart: 'hbar',
+    caveat: 'Confirmed bookings for timeslots that have already started.',
   },
 
   // ══ Volunteers ═════════════════════════════════════════════
