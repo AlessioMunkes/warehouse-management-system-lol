@@ -29,7 +29,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   ArrowDownRight, ArrowUpRight, ChevronDown, FileText, Mail, Phone, Printer, User,
 } from 'lucide-react';
-import ReportChart from './ReportChart';
 import OperationalChart from './OperationalChart';
 import ComboChart from './ComboChart';
 import OperationsReportPDF from './OperationsReportPDF';
@@ -259,7 +258,7 @@ export function BusinessView({ n }) {
 // The body of the report, shared by the screen view and the printed
 // copy so the two cannot differ.
 function ReportBody({ data, narrative, printMode, highlight, onHighlight }) {
-  const { report, figures, related, actions, listRange, combo } = data;
+  const { report, figures, related, actions, listRange, combo, target } = data;
   return (
     <div className="space-y-5">
       {narrative && (
@@ -283,14 +282,17 @@ function ReportBody({ data, narrative, printMode, highlight, onHighlight }) {
       {printMode && (
         <section className="op-avoid-break">
           <h3 className="mb-2 text-sm font-bold">{report.description}</h3>
-          <ReportChart report={report} compact />
+          {/* The same Recharts chart as on screen, drawn for paper. The
+              PDF sheet is a fixed 794px and visible while it is
+              captured, so the chart can measure itself. */}
+          <OperationalChart report={report} target={target} hint={report.meta?.chartHint} print />
         </section>
       )}
 
-      {combo && !printMode && (
-        <Collapsible id="combo" title={combo.title}>
-          <section className="rounded-[4px] border-2 bg-surface p-4" style={{ borderColor: BORDER }}>
-            <ComboChart combo={combo} />
+      {combo && (
+        <Collapsible id="combo" title={combo.title} printMode={printMode}>
+          <section className="op-avoid-break rounded-[4px] border-2 bg-surface p-4" style={{ borderColor: BORDER }}>
+            <ComboChart combo={combo} syncId={printMode ? 'combo-print' : 'combo'} print={printMode} />
           </section>
         </Collapsible>
       )}
@@ -314,10 +316,7 @@ function ReportBody({ data, narrative, printMode, highlight, onHighlight }) {
                     {narrative?.relatedConnections?.[i] || r.why}
                   </p>
                 )}
-                {/* Print keeps the static SVG chart: Recharts measures
-                    its container, which is hidden until the print
-                    dialog opens. */}
-                {printMode ? <ReportChart report={r} compact /> : <OperationalChart report={r} compact />}
+                <OperationalChart report={r} compact print={printMode} />
               </section>
             ))}
           </div>

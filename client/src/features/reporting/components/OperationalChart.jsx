@@ -186,6 +186,11 @@ function Heatmap({ rows, keys, unit, highlight, onPick }) {
 
 export default function OperationalChart({
   report, dimensionLabel = 'Category', target = null, hint, compact = false,
+  // For the PDF report: the full-size chart with its value labels, but
+  // no toolbar or clickable extras, and no animation — the page is
+  // captured as an image straight away, and a half-grown bar would be
+  // printed as it stood.
+  print = false,
   highlight: controlledHl, onHighlight, onTargetChange,
   // Optional (name, value) => colour | null. For charts where colour
   // carries a status (red/amber/green); null falls back to the palette.
@@ -304,7 +309,7 @@ export default function OperationalChart({
     return <p className="py-8 text-center text-sm" style={{ color: MUTED }}>Nothing recorded for this selection.</p>;
   }
 
-  const tip = <Tooltip content={<ChartTooltip unit={unit} />} cursor={{ fill: 'var(--line)', fillOpacity: 0.4 }} />;
+  const tip = <Tooltip active={print ? false : undefined} content={<ChartTooltip unit={unit} />} cursor={print ? false : { fill: 'var(--line)', fillOpacity: 0.4 }} />;
 
   let body;
   if (activeView === 'number') {
@@ -360,7 +365,7 @@ export default function OperationalChart({
           <CartesianGrid vertical={false} stroke={LINE} strokeOpacity={0.6} />
           <XAxis dataKey="name" tickFormatter={formatLabel} {...axisProps} />
           <YAxis tickFormatter={(v) => fmtTick(v, unit)} {...axisProps} width={52} />
-          <Tooltip content={<ChartTooltip unit={unit} />} cursor={{ fill: 'var(--line)', fillOpacity: 0.4 }} />
+          <Tooltip active={print ? false : undefined} content={<ChartTooltip unit={unit} />} cursor={print ? false : { fill: 'var(--line)', fillOpacity: 0.4 }} />
           <Legend
             iconType="rect"
             onClick={(e) => setHidden((h) => { const n = new Set(h); if (n.has(e.dataKey)) n.delete(e.dataKey); else n.add(e.dataKey); return n; })}
@@ -371,7 +376,7 @@ export default function OperationalChart({
               key={k} dataKey={k} name={k} stackId={stacked ? 'a' : undefined}
               fill={SERIES[i]} hide={hidden.has(k)} fillOpacity={opacityFor(k)}
               stroke={SURF} strokeWidth={stacked ? 2 : 0}
-              radius={stacked ? 0 : [4, 4, 0, 0]} maxBarSize={48}
+              radius={stacked ? 0 : [4, 4, 0, 0]} maxBarSize={48} isAnimationActive={!print}
               onClick={() => setHighlight(k)} cursor="pointer"
             />
           ))}
@@ -388,15 +393,15 @@ export default function OperationalChart({
           <CartesianGrid vertical={false} stroke={LINE} strokeOpacity={0.6} />
           <XAxis dataKey="name" tickFormatter={formatLabel} {...axisProps} />
           <YAxis tickFormatter={(v) => fmtTick(v, unit)} {...axisProps} width={52} />
-          <Tooltip content={<ChartTooltip unit={unit} />} cursor={{ stroke: MUTED, strokeWidth: 1 }} />
+          <Tooltip active={print ? false : undefined} content={<ChartTooltip unit={unit} />} cursor={print ? false : { stroke: MUTED, strokeWidth: 1 }} />
           {refLines('y')}
           {prevSeries && (
             <Line type="monotone" dataKey="previous" name="Same period last year" stroke={MUTED} strokeWidth={2}
               strokeDasharray="5 4" dot={false} connectNulls isAnimationActive={false} />
           )}
           {activeView === 'line'
-            ? <Line type="monotone" dataKey="value" name="This period" stroke={SINGLE} strokeWidth={2} dot={{ r: 4, fill: SINGLE, stroke: SURF, strokeWidth: 2 }} activeDot={{ r: 6 }} />
-            : <Area type="monotone" dataKey="value" name="This period" stroke={SINGLE} strokeWidth={2} fill={SINGLE} fillOpacity={0.15} />}
+            ? <Line type="monotone" dataKey="value" name="This period" stroke={SINGLE} strokeWidth={2} dot={{ r: 4, fill: SINGLE, stroke: SURF, strokeWidth: 2 }} activeDot={{ r: 6 }} isAnimationActive={!print} />
+            : <Area type="monotone" dataKey="value" name="This period" stroke={SINGLE} strokeWidth={2} fill={SINGLE} fillOpacity={0.15} isAnimationActive={!print} />}
           {!compact && anomalies.map((a) => (
             <ReferenceDot key={`anomaly-${a.name}`} x={a.name} y={a.value} r={8} fill="none" stroke="var(--rag-bad)" strokeWidth={2.5} />
           ))}
@@ -465,7 +470,7 @@ export default function OperationalChart({
             <Bar dataKey="previous" name="Same period last year" fill={MUTED} fillOpacity={0.35}
               radius={[4, 4, 0, 0]} maxBarSize={48} isAnimationActive={false} />
           )}
-          <Bar dataKey="value" name="This period" radius={horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]} maxBarSize={horizontal ? 22 : 48}
+          <Bar dataKey="value" name="This period" radius={horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]} maxBarSize={horizontal ? 22 : 48} isAnimationActive={!print}
             label={!compact && rows.length <= 15 ? {
               position: horizontal ? 'right' : 'top', fill: MUTED, fontSize: 11,
               formatter: (v) => fmtTick(v, unit),
@@ -491,7 +496,7 @@ export default function OperationalChart({
 
   return (
     <figure className="m-0" aria-label={`${VIEW_LABELS[activeView]} chart by ${dimensionLabel.toLowerCase()}`}>
-      {!compact && (
+      {!compact && !print && (
         <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
           <Segmented views={views} view={activeView} onChange={setView} />
 
@@ -559,7 +564,7 @@ export default function OperationalChart({
         </div>
       )}
 
-      {highlight && !compact && (
+      {highlight && !compact && !print && (
         <p className="mb-2 inline-flex items-center gap-1 rounded-full border-2 px-2 py-0.5 text-xs font-medium" style={{ borderColor: INK }}>
           Highlighting: {formatLabel(highlight)}
           <button type="button" aria-label="Clear highlight" onClick={() => setHighlight(highlight)}>
@@ -570,7 +575,7 @@ export default function OperationalChart({
 
       {body}
 
-      {!compact && hiddenCount > 0 && (
+      {!compact && !print && hiddenCount > 0 && (
         <p className="mt-1 text-xs" style={{ color: MUTED }}>
           Showing {rows.length} of {series.length}. Choose “All” to see the rest.
         </p>

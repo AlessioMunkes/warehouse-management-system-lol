@@ -27,7 +27,8 @@ function Tip({ active, payload, label, unit, name }) {
   );
 }
 
-export default function ComboChart({ combo, syncId = 'combo' }) {
+// `print`: no animation, for the PDF report (captured as an image at once).
+export default function ComboChart({ combo, syncId = 'combo', print = false }) {
   const months = [...new Set([...combo.bars.series, ...combo.line.series].map((r) => r.label))].sort();
   const data = months.map((m) => ({
     name: m,
@@ -46,8 +47,8 @@ export default function ComboChart({ combo, syncId = 'combo' }) {
           <CartesianGrid vertical={false} stroke={LINE} strokeOpacity={0.6} />
           <XAxis dataKey="name" hide />
           <YAxis tickFormatter={(v) => fmtTick(v, combo.bars.unit)} {...axis} width={52} />
-          <Tooltip content={<Tip unit={combo.bars.unit} name={combo.bars.label} />} cursor={{ fill: LINE, fillOpacity: 0.4 }} />
-          <Bar dataKey="bars" fill="var(--viz-1)" radius={[4, 4, 0, 0]} maxBarSize={40} />
+          <Tooltip active={print ? false : undefined} content={<Tip unit={combo.bars.unit} name={combo.bars.label} />} cursor={print ? false : { fill: LINE, fillOpacity: 0.4 }} />
+          <Bar dataKey="bars" fill="var(--viz-1)" radius={[4, 4, 0, 0]} maxBarSize={40} isAnimationActive={!print} />
         </BarChart>
       </ResponsiveContainer>
       <p className="text-xs font-medium" style={{ color: MUTED }}>{combo.line.label}</p>
@@ -56,8 +57,8 @@ export default function ComboChart({ combo, syncId = 'combo' }) {
           <CartesianGrid vertical={false} stroke={LINE} strokeOpacity={0.6} />
           <XAxis dataKey="name" tickFormatter={formatLabel} {...axis} />
           <YAxis tickFormatter={(v) => fmtTick(v, combo.line.unit)} {...axis} width={52} />
-          <Tooltip content={<Tip unit={combo.line.unit} name={combo.line.label} />} cursor={{ stroke: MUTED }} />
-          <Line type="monotone" dataKey="line" stroke="var(--viz-2)" strokeWidth={2} connectNulls
+          <Tooltip active={print ? false : undefined} content={<Tip unit={combo.line.unit} name={combo.line.label} />} cursor={print ? false : { stroke: MUTED }} />
+          <Line type="monotone" dataKey="line" stroke="var(--viz-2)" strokeWidth={2} connectNulls isAnimationActive={!print}
             dot={{ r: 4, fill: 'var(--viz-2)', stroke: 'var(--surface)', strokeWidth: 2 }} />
         </LineChart>
       </ResponsiveContainer>
