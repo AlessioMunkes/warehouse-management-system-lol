@@ -87,6 +87,12 @@ export const DIMENSIONS = {
   event:             { id: 'event',             label: 'Event',               chart: 'hbar' },
   product_category:  { id: 'product_category',  label: 'Product category',    chart: 'bar'  },
   storage_type:      { id: 'storage_type',      label: 'Storage type',        chart: 'bar'  },
+  // Busy days: seven bars Monday to Sunday, or a week × day heatmap.
+  weekday:           { id: 'weekday',           label: 'Day of the week',     chart: 'bar'  },
+  week_weekday:      { id: 'week_weekday',      label: 'Week and day',        chart: 'stacked_bar' },
+  // Diagram-only breakdowns, one metric each.
+  flow:              { id: 'flow',              label: 'Opening to closing',  chart: 'bar'  },
+  category_flow:     { id: 'category_flow',     label: 'Category to routing', chart: 'bar'  },
 };
 
 // ── Filters ───────────────────────────────────────────────────
@@ -132,6 +138,11 @@ export const CACHE_TTL = {
 //
 // `temporal`: 'range' needs two dates; 'snapshot' is right now and
 // ignores them entirely.
+//
+// `funnel` (pipelines only): the status breakdown read as stages in
+// order, with the ways out of the pipeline listed as `exits`. The
+// page draws it as a funnel: everything at a stage or past it has
+// "reached" that stage.
 export const METRICS = {
 
   // ══ Impact ═════════════════════════════════════════════════
@@ -289,7 +300,7 @@ export const METRICS = {
       'staff loaded onto the vehicle, not what was packed onto the pallet earlier ' +
       'in the week.',
     repoFn: 'dispatchVolume', unit: 'kg',
-    dimensions: ['none', 'month', 'week', 'cohort', 'product', 'programme', 'ecd_centre', 'beneficiary', 'month_beneficiary'],
+    dimensions: ['none', 'month', 'week', 'cohort', 'product', 'programme', 'ecd_centre', 'beneficiary', 'month_beneficiary', 'weekday', 'week_weekday'],
     filters: ['cohort', 'beneficiary_kind', 'programme_id', 'product_id', 'ecd_id'],
     defaultChart: 'line',
     caveat: 'Gate-loaded quantities, kilogram lines only.',
@@ -341,7 +352,7 @@ export const METRICS = {
       'actually received and signed for at the door, not what the purchase order ' +
       'said was coming.',
     repoFn: 'goodsReceived', unit: 'kg',
-    dimensions: ['none', 'month', 'week', 'supplier', 'product', 'month_supplier'],
+    dimensions: ['none', 'month', 'week', 'supplier', 'product', 'month_supplier', 'weekday', 'week_weekday'],
     filters: ['supplier_id', 'product_id'],
     defaultChart: 'line',
     caveat: 'Received weights where recorded in kilograms.',
@@ -428,6 +439,7 @@ export const METRICS = {
     repoFn: 'section18aPipeline', unit: 'donations',
     dimensions: ['s18a_status', 'month'], filters: [],
     defaultChart: 'bar',
+    funnel: { dimension: 's18a_status', stages: ['not_evaluated', 'qualifying_pending_donor', 'queued', 'issued'], exits: ['not_qualifying', 'failed'] },
     caveat: 'Counts donations by certificate status, not certificate value.',
   },
 
@@ -465,7 +477,7 @@ export const METRICS = {
       'donated, written off as wastage, or manually adjusted. Use this to see ' +
       'warehouse throughput or to check how much was adjusted by hand.',
     repoFn: 'stockMovementVolume', unit: 'units',
-    dimensions: ['movement_type', 'month', 'week', 'product', 'programme', 'month_movement'],
+    dimensions: ['movement_type', 'month', 'week', 'product', 'programme', 'month_movement', 'weekday', 'week_weekday'],
     filters: ['movement_type', 'product_id', 'programme_id'],
     defaultChart: 'bar',
     caveat: 'Mixed units across products; compare within a product rather than across.',
@@ -550,11 +562,13 @@ export const METRICS = {
   purchase_order_pipeline: {
     id: 'purchase_order_pipeline', label: 'Purchase orders raised', temporal: 'range',
     description:
-      'Purchase orders raised in the period and where they are now: pending, approved, in ' +
-      'transit, partially received, completed, returned or needing follow-up.',
+      'How many purchase orders were raised in the period, and where they are now: pending, ' +
+      'approved, in transit, partially received, completed, returned or needing follow-up. Run ' +
+      'this for "how many orders did we raise / place this month".',
     repoFn: 'purchaseOrderPipeline', unit: 'orders',
     dimensions: ['po_status', 'supplier', 'month'], filters: ['supplier_id'],
     defaultChart: 'bar',
+    funnel: { dimension: 'po_status', stages: ['pending', 'approved', 'in_transit', 'partially_received', 'completed'], exits: ['returned', 'follow_up_required', 'cancelled'] },
     caveat: 'Counted by the date the order was raised.',
   },
 
@@ -579,6 +593,7 @@ export const METRICS = {
     repoFn: 'slipPipeline', unit: 'slips',
     dimensions: ['slip_status', 'cohort'], filters: ['cohort'],
     defaultChart: 'bar',
+    funnel: { dimension: 'slip_status', stages: ['pending', 'in_progress', 'complete', 'dispatched'], exits: ['cancelled'] },
     caveat: 'Covers dispatch dates from seven days ago to fourteen days ahead.',
   },
 
@@ -680,9 +695,37 @@ export const METRICS = {
       'Donated items and where they sit in intake: allocated to stock, still pending, unmatched to a ' +
       'product, not stock-bearing, or waiting on programme stock. Aggregate only, no donor details.',
     repoFn: 'donationRouting', unit: 'items',
-    dimensions: ['routing_status', 'month'], filters: [],
+    dimensions: ['routing_status', 'month', 'category_flow'], filters: [],
+    flows: 'category_flow',
     defaultChart: 'bar',
     caveat: 'Counts donation lines, not their value or weight.',
+  },
+
+  // A waterfall: opening stock, what came in and went out, closing.
+  stock_flow: {
+    id: 'stock_flow', label: 'Stock in and out (opening to closing)', temporal: 'range',
+    description:
+      'How stock moved over the period as a waterfall: opening stock, plus received and donated, ' +
+      'minus dispatched, plus or minus adjustments, to closing stock. Run this when asked how stock ' +
+      'changed, where it went, or to reconcile opening and closing stock. Kilogram products only.',
+    repoFn: 'stockFlow', unit: 'kg',
+    dimensions: ['flow'], filters: ['product_id', 'programme_id'],
+    defaultChart: 'bar', waterfall: true,
+    caveat: 'Kilogram products only: crates, bags and litres cannot be added to kilograms.',
+  },
+
+  // How long stock lasts at the current rate of dispatch.
+  days_of_cover: {
+    id: 'days_of_cover', label: 'Days of stock left', temporal: 'snapshot',
+    description:
+      'For each product, how many days the stock on hand will last at the rate it was dispatched ' +
+      'over the last 90 days, and the date it runs out. Most urgent first. Run this when asked what ' +
+      'will run out, when stock runs out, or how long stock will last. A live figure.',
+    repoFn: 'daysOfCover', unit: 'days',
+    dimensions: ['product'], filters: ['programme_id'],
+    defaultChart: 'hbar', ranked: true,
+    rag: { red: 14, amber: 30 },
+    caveat: 'Products not dispatched in the last 90 days are left out: at that rate they never run out.',
   },
 
   volunteer_event_attendance: {

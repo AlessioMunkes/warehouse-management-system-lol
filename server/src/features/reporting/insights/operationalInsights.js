@@ -433,6 +433,16 @@ export const OPERATIONAL_INSIGHTS = {
     related: [{ metric: 'donation_value', dimension: 'category' }],
     actions: [],
   },
+  stock_flow: {
+    area: 'stock', better: null,
+    related: [{ metric: 'stock_movement_volume', dimension: 'movement_type' }, { metric: 'adjustment_reasons', dimension: 'reason' }],
+    actions: ['manual_adjustments'],
+  },
+  days_of_cover: {
+    area: 'stock', better: 'up', target: 30,
+    related: [{ metric: 'low_stock_items', dimension: 'product' }, { metric: 'dispatch_volume', dimension: 'product' }],
+    actions: ['low_stock'],
+  },
   volunteer_event_attendance: {
     area: 'volunteers', better: 'up', target: 80,
     related: [{ metric: 'volunteer_hours', dimension: 'month' }],

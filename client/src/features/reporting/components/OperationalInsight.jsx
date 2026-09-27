@@ -149,7 +149,7 @@ function Contact({ c }) {
   );
 }
 
-function ActionList({ list, printMode, highlight, onHighlight }) {
+export function ActionList({ list, printMode, highlight, onHighlight }) {
   const [expanded, setExpanded] = useState(false);
   const shown = printMode || expanded ? list.entries : list.entries.slice(0, LIST_PREVIEW);
   const link = LINKS[list.link];
@@ -210,34 +210,48 @@ function ActionList({ list, printMode, highlight, onHighlight }) {
   );
 }
 
-function Narrative({ n }) {
+const SOURCE_NOTE = (n) => (n.source === 'ai'
+  ? 'Written by the AI assistant from the figures on this page. Check the numbers before quoting them.'
+  : n.fallbackReason
+    ? 'The AI assistant was unavailable, so this was written from the figures directly.'
+    : 'Written from the figures directly.');
+
+const SectionTitle = ({ children }) => (
+  <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: MUTED }}>{children}</h3>
+);
+
+// 1. What the chart shows, in words anyone can follow — first, so a
+//    reader who has never seen this report knows what they are
+//    looking at before being told what to think about it.
+export function ChartExplanation({ n }) {
   return (
-    <div className="space-y-3 text-sm leading-relaxed">
+    <div className="space-y-2 text-sm leading-relaxed">
+      <SectionTitle>About this chart</SectionTitle>
       <p className="text-base font-bold">{n.headline}</p>
-      <div>
-        <h4 className="text-xs font-bold uppercase tracking-wider" style={{ color: MUTED }}>What happened</h4>
-        <p className="mt-1">{n.whatHappened}</p>
-        {n.context && <p className="mt-2">{n.context}</p>}
-      </div>
-      <div>
-        <h4 className="text-xs font-bold uppercase tracking-wider" style={{ color: MUTED }}>What this means for the operation</h4>
-        <p className="mt-1">{n.meaning}</p>
-      </div>
+      {n.explanation ? <p>{n.explanation}</p> : null}
+      {n.whatHappened ? <p>{n.whatHappened}</p> : null}
+      {n.context ? <p>{n.context}</p> : null}
+    </div>
+  );
+}
+
+// 2. The same figures read against what Ladles of Love's operation
+//    needs to hold true — is it being met, and what is at risk.
+export function BusinessView({ n }) {
+  const text = n.businessView ?? n.meaning;
+  return (
+    <div className="space-y-2 text-sm leading-relaxed">
+      <SectionTitle>Business view</SectionTitle>
+      {text ? <p>{text}</p> : null}
       {n.nextSteps?.length > 0 && (
         <div>
-          <h4 className="text-xs font-bold uppercase tracking-wider" style={{ color: MUTED }}>Next steps</h4>
+          <h4 className="mt-3 text-sm font-bold">Next steps</h4>
           <ol className="mt-1 list-decimal space-y-1 pl-5">
-            {n.nextSteps.map((s) => <li key={s}>{s}</li>)}
+            {n.nextSteps.map((st) => <li key={st}>{st}</li>)}
           </ol>
         </div>
       )}
-      <p className="text-xs" style={{ color: MUTED }}>
-        {n.source === 'ai'
-          ? 'Written by the AI assistant from the figures on this page. Check the numbers before quoting them.'
-          : n.fallbackReason
-            ? 'The AI assistant was unavailable, so this reading was written from the figures directly.'
-            : 'Written from the figures directly.'}
-      </p>
+      <p className="pt-1 text-xs" style={{ color: MUTED }}>{SOURCE_NOTE(n)}</p>
     </div>
   );
 }
@@ -248,16 +262,22 @@ function ReportBody({ data, narrative, printMode, highlight, onHighlight }) {
   const { report, figures, related, actions, listRange, combo } = data;
   return (
     <div className="space-y-5">
-      {figures?.length > 0 && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {figures.map((f) => <Figure key={f.label} f={f} />)}
-        </div>
+      {narrative && (
+        <section className="op-avoid-break rounded-[4px] border-2 bg-surface p-4 sm:p-5" style={{ borderColor: BORDER }}>
+          <ChartExplanation n={narrative} />
+        </section>
       )}
 
       {narrative && (
         <section className="op-avoid-break rounded-[4px] border-2 bg-surface p-4 sm:p-5" style={{ borderColor: BORDER }}>
-          <Narrative n={narrative} />
+          <BusinessView n={narrative} />
         </section>
+      )}
+
+      {figures?.length > 0 && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {figures.map((f) => <Figure key={f.label} f={f} />)}
+        </div>
       )}
 
       {printMode && (
@@ -265,23 +285,6 @@ function ReportBody({ data, narrative, printMode, highlight, onHighlight }) {
           <h3 className="mb-2 text-sm font-bold">{report.description}</h3>
           <ReportChart report={report} compact />
         </section>
-      )}
-
-      {actions?.length > 0 && (
-        <Collapsible
-          id="actions" title="Who to act on" printMode={printMode}
-          note={listRange && (
-            <p className="text-xs" style={{ color: MUTED }}>
-              Lists cover {listRange.from} to {listRange.to}, since this report has no period of its own.
-            </p>
-          )}
-        >
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            {actions.map((a) => (
-              <ActionList key={a.id} list={a} printMode={printMode} highlight={highlight} onHighlight={onHighlight} />
-            ))}
-          </div>
-        </Collapsible>
       )}
 
       {combo && !printMode && (
@@ -292,17 +295,48 @@ function ReportBody({ data, narrative, printMode, highlight, onHighlight }) {
         </Collapsible>
       )}
 
+      {/* Two related diagrams, always shown with the report, each with
+          a short note on how it connects to the main chart (written
+          from the figures when the AI is available). */}
       {related?.length > 0 && (
-        <Collapsible id="related" title="Related views" printMode={printMode}>
+        <section aria-labelledby="op-related-title">
+          <h3 id="op-related-title" className="text-sm font-bold">Related diagrams</h3>
+          <p className="mb-2 mt-0.5 text-xs" style={{ color: MUTED }}>
+            {related.length === 1 ? 'A chart' : 'Two charts'} that help explain the one above, and how they connect.
+          </p>
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            {related.map((r) => (
+            {related.map((r, i) => (
               <section key={r.description} className="op-avoid-break rounded-[4px] border-2 bg-surface p-4" style={{ borderColor: BORDER }}>
-                <p className="mb-2 text-xs font-medium">{r.description}</p>
+                <p className="text-xs font-medium">{r.description}</p>
+                {(narrative?.relatedConnections?.[i] || r.why) && (
+                  <p className="mb-2 mt-1 text-xs leading-relaxed" style={{ color: MUTED }}>
+                    <span className="font-semibold" style={{ color: 'var(--ink)' }}>How it connects: </span>
+                    {narrative?.relatedConnections?.[i] || r.why}
+                  </p>
+                )}
                 {/* Print keeps the static SVG chart: Recharts measures
                     its container, which is hidden until the print
                     dialog opens. */}
                 {printMode ? <ReportChart report={r} compact /> : <OperationalChart report={r} compact />}
               </section>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Last: who to follow up with, once the reader knows why. */}
+      {actions?.length > 0 && (
+        <Collapsible
+          id="actions" title="Actions" printMode={printMode}
+          note={listRange && (
+            <p className="text-xs" style={{ color: MUTED }}>
+              Lists cover {listRange.from} to {listRange.to}, since this report has no period of its own.
+            </p>
+          )}
+        >
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            {actions.map((a) => (
+              <ActionList key={a.id} list={a} printMode={printMode} highlight={highlight} onHighlight={onHighlight} />
             ))}
           </div>
         </Collapsible>
@@ -360,11 +394,9 @@ export default function OperationalInsight({ report, highlight, onHighlight, onL
 
   return (
     <div className="mt-5">
-      {loading && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-[4px]" />)}
-        </div>
-      )}
+      {/* Nothing to show while the breakdown loads: the page is the
+          chart above until a report is generated. */}
+      {loading && <Skeleton className="h-9 w-44 rounded-[4px]" />}
 
       {error && (
         <p className="text-xs" style={{ color: MUTED }}>
@@ -382,19 +414,20 @@ export default function OperationalInsight({ report, highlight, onHighlight, onL
               className="bg-ink hover:bg-ink/90 text-on-ink font-bold text-xs tracking-wider rounded-[4px] px-4"
             >
               <FileText aria-hidden="true" className="mr-2 h-4 w-4" />
-              {writing ? 'WRITING…' : narrative ? 'REWRITE REPORT' : 'WRITE UP THIS REPORT'}
+              {writing ? 'GENERATING…' : narrative ? 'REGENERATE REPORT' : 'GENERATE REPORT'}
             </Button>
-            {/* Always offered: without a write-up the PDF is still the
-                figures, chart and who to act on. */}
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setPrinting(true)}
-              className="rounded-[4px] border-2 text-xs font-bold tracking-wider"
-            >
-              <Printer aria-hidden="true" className="mr-2 h-4 w-4" />
-              PDF REPORT
-            </Button>
+            {/* The PDF is the generated report, so it waits for one. */}
+            {narrative && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setPrinting(true)}
+                className="rounded-[4px] border-2 text-xs font-bold tracking-wider"
+              >
+                <Printer aria-hidden="true" className="mr-2 h-4 w-4" />
+                PDF REPORT
+              </Button>
+            )}
             {writeError && (
               <p role="alert" className="text-xs">
                 <span aria-hidden="true" className="mr-1 font-bold text-brand">!</span>{writeError}
@@ -402,7 +435,16 @@ export default function OperationalInsight({ report, highlight, onHighlight, onL
             )}
           </div>
 
-          <ReportBody data={data} narrative={narrative} highlight={highlight} onHighlight={onHighlight} />
+          {/* Until a report is generated the page is just the chart and
+              its table above — the write-up, figures, related views and
+              actions all arrive together, in reading order. */}
+          {narrative ? (
+            <ReportBody data={data} narrative={narrative} highlight={highlight} onHighlight={onHighlight} />
+          ) : (
+            <p className="text-xs" style={{ color: MUTED }}>
+              Generate the report for a plain-English explanation of this chart, what it means for the operation, and who to follow up with.
+            </p>
+          )}
         </>
       )}
 

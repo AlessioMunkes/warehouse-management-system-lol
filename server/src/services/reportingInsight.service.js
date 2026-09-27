@@ -24,10 +24,29 @@ import { getMetric, isSnapshot, DIMENSIONS } from '../features/reporting/reportC
 import {
   ACTION_LISTS, LENSES, getInsightConfig, OPERATIONAL_INSIGHTS,
 } from '../features/reporting/insights/operationalInsights.js';
-import { writeNarrative } from '../features/reporting/insights/narrative.js';
+import { writeNarrative, writeComparisonNarrative } from '../features/reporting/insights/narrative.js';
 import { COMPARISONS, getComparison } from '../features/reporting/reportComparisons.js';
 import { MAX_RANGE_DAYS } from '../features/reporting/reportCatalog.js';
+import { DATASETS } from '../features/reporting/customQuery.js';
 import targetRepo from '../repositories/reportingTarget.repository.js';
+import { RELATED_COUNT, candidatesFor, customCandidatesFor } from '../features/reporting/insights/relatedCharts.js';
+
+// Two related diagrams: the candidates are tried in order, a few at a
+// time, and the first two with data are kept. If fewer than two have
+// data, empty ones fill in, so the reader sees "nothing recorded"
+// rather than a missing chart.
+const pickRelated = async (candidates, runOne) => {
+  const withData = [];
+  const empty = [];
+  for (let i = 0; i < candidates.length && withData.length < RELATED_COUNT; i += 3) {
+    const batch = await Promise.all(candidates.slice(i, i + 3).map((c) => settle(`related ${c.metric ?? c.custom?.dataset}`, async () => {
+      const out = await runOne(c);
+      return { ...out, why: c.why };
+    })));
+    for (const r of batch.filter(Boolean)) (r.series?.length ? withData : empty).push(r);
+  }
+  return [...withData, ...empty].slice(0, RELATED_COUNT);
+};
 import comparisonRepo from '../repositories/reportingComparison.repository.js';
 
 const fail = (status, message) => {
@@ -219,7 +238,67 @@ export const setTarget = async ({ userId, metricId, value }) => {
   return makeTarget(metric, cfg, num, true);
 };
 
+// ── Custom reports ────────────────────────────────────────────
+// The same page sections for a custom "how many X by Y": the previous
+// period for comparison, a total and the largest group as key figures,
+// and the written report read through the area's lens. No targets or
+// action lists: those belong to prepared reports.
+const CUSTOM_AREA = {
+  purchase_orders: 'procurement', picking_slips: 'picking', picking_lines: 'picking',
+  collections: 'dispatch', deliveries: 'receiving', delivery_lines: 'receiving',
+  donations: 'donations', community_requests: 'community', volunteer_events: 'volunteers',
+  stock_movements: 'stock', products: 'stock', beneficiaries: 'dispatch', compost: null,
+};
+
+const buildCustomInsight = async ({ spec, narrate }) => {
+  const report = await reportingService.runReport(spec);
+  const ds = DATASETS[report.spec.custom.dataset];
+  const unit = report.meta.unit;
+
+  const previous = report.spec.dateRange
+    ? await settle('previous period', async () => {
+        const dateRange = previousRange(report.spec.dateRange);
+        const prev = await reportingService.runReport({ custom: report.spec.custom, dateRange });
+        if (prev.series.length === 0) return { dateRange, total: null, changePct: null, empty: true };
+        return { dateRange, total: prev.total, changePct: pctChange(report.total, prev.total) };
+      })
+    : null;
+
+  const items = [{
+    label: report.meta.measureLabel,
+    value: report.total, unit,
+    delta: previous?.changePct ?? null,
+    deltaLabel: previous?.changePct != null ? 'vs previous period' : null,
+    tone: 'neutral',
+  }];
+  const top = [...report.series].sort((a, b) => b.value - a.value)[0];
+  if (top && report.series.length > 1 && report.spec.custom.groupBy.length === 1) {
+    items.push({
+      label: `Largest: ${String(top.label).replace(/_/g, ' ')}`,
+      value: top.value, unit,
+      note: report.total ? `${Math.round((top.value / report.total) * 100)}% of the total` : null,
+    });
+  }
+  const figures = { items, better: null };
+  const area = CUSTOM_AREA[report.spec.custom.dataset];
+  const related = await pickRelated(customCandidatesFor(report.spec.custom),
+    (c) => reportingService.runReport({ custom: c.custom, dateRange: report.spec.dateRange }));
+
+  const result = {
+    report, previous, figures: items, related, actions: [], combo: null, target: null,
+    listRange: null, area, generatedAt: new Date().toISOString(),
+  };
+  if (narrate) {
+    const metric = { label: ds.label, unit, description: ds.description, caveat: report.meta.caveat };
+    result.narrative = await writeNarrative({
+      metric, lens: area ? LENSES[area] : null, report, previous, figures, related, actions: [], target: null,
+    });
+  }
+  return result;
+};
+
 export const buildInsight = async ({ spec, narrate = false, userId } = {}) => {
+  if (spec?.custom) return buildCustomInsight({ spec, narrate });
   const metric = getMetric(spec?.metric);
   if (!metric) throw fail(400, 'Unknown report.');
   if (metric.impactOnly) {
@@ -250,18 +329,16 @@ export const buildInsight = async ({ spec, narrate = false, userId } = {}) => {
         return { dateRange, total: Math.round(before * 100) / 100, changePct: pctChange(measure(report), before) };
       });
 
-  const relatedP = Promise.all(cfg.related
-    .filter((r) => !(r.metric === report.spec.metric && r.dimension === report.spec.dimension))
-    .map((r) => settle(`related ${r.metric}`, async () => {
-      const m = getMetric(r.metric);
-      const out = await reportingService.runReport({
-        metric: r.metric,
-        dimension: r.dimension,
-        filters: pickFilters(report.spec.filters, m),
-        dateRange: isSnapshot(m) ? undefined : range,
-      });
-      return { ...out, meta: { ...out.meta, unit: m.unit } };
-    })));
+  const relatedP = pickRelated(candidatesFor(metric, report.spec), async (r) => {
+    const m = getMetric(r.metric);
+    const out = await reportingService.runReport({
+      metric: r.metric,
+      dimension: r.dimension,
+      filters: pickFilters(report.spec.filters, m),
+      dateRange: isSnapshot(m) ? undefined : range,
+    });
+    return { ...out, meta: { ...out.meta, unit: m.unit } };
+  });
 
   const actionsP = Promise.all(cfg.actions.map((id) => settle(`list ${id}`, async () => {
     const def = ACTION_LISTS[id];
@@ -287,7 +364,7 @@ export const buildInsight = async ({ spec, narrate = false, userId } = {}) => {
     : Promise.resolve(null);
 
   const [previous, relatedRaw, actionsRaw, combo] = await Promise.all([previousP, relatedP, actionsP, comboP]);
-  const related = relatedRaw.filter(Boolean).slice(0, 2);
+  const related = relatedRaw;
   const actions = actionsRaw.filter(Boolean);
   const figures = buildFigures({ metric, cfg, report, previous, actions });
 
@@ -320,7 +397,28 @@ const ISO = /^\d{4}-\d{2}-\d{2}$/;
 export const listComparisons = () =>
   Object.values(COMPARISONS).map(({ id, label, description, x, y, caveat }) => ({ id, label, description, x, y, caveat }));
 
-export const runComparison = async ({ id, dateRange } = {}) => {
+// "7.1%", "42 lines", "R12.50 per unit" — the value with its unit.
+const axisValue = (v, axis) => {
+  const n = Number(v ?? 0).toLocaleString('en-GB', { maximumFractionDigits: axis.unit === 'ZAR/unit' ? 2 : 1 });
+  if (axis.unit === '%') return `${n}%`;
+  if (axis.unit === 'ZAR/unit') return `R${n} per unit`;
+  return `${n} ${axis.unit}`;
+};
+
+const mean = (xs) => (xs.length ? xs.reduce((s, v) => s + v, 0) / xs.length : 0);
+
+// The dots in the corner the comparison says needs attention, relative
+// to the averages drawn on the chart. Worst first.
+export const attentionPoints = (def, points, averages) => {
+  if (def.pick) return points.filter((p) => def.pick(p, averages)).sort(def.rank ?? (() => 0));
+  const rule = def.attention ?? {};
+  const inCorner = (p) => (!rule.x || (rule.x === 'high' ? p.x >= averages.x : p.x < averages.x))
+    && (!rule.y || (rule.y === 'high' ? p.y > averages.y : p.y < averages.y));
+  const worst = rule.y === 'low' ? (a, b) => b.x - a.x || a.y - b.y : (a, b) => b.y - a.y || b.x - a.x;
+  return points.filter(inCorner).sort(worst);
+};
+
+export const runComparison = async ({ id, dateRange, narrate = false } = {}) => {
   const def = getComparison(id);
   if (!def) throw fail(400, 'Unknown comparison.');
   const range = dateRange ?? defaultRange(reportingService.todayISO());
@@ -330,7 +428,9 @@ export const runComparison = async ({ id, dateRange } = {}) => {
   if (days > MAX_RANGE_DAYS) throw fail(400, `Date range too wide. The maximum is ${MAX_RANGE_DAYS} days.`);
 
   const points = await comparisonRepo[def.repoFn]({ dateRange: { from: range.from, to: range.to } });
-  return {
+  const averages = { x: mean(points.map((p) => p.x)), y: mean(points.map((p) => p.y)) };
+  const flagged = attentionPoints(def, points, averages);
+  const result = {
     type: 'comparison',
     id: def.id,
     label: def.label,
@@ -340,7 +440,22 @@ export const runComparison = async ({ id, dateRange } = {}) => {
     caveat: def.caveat,
     dateRange: { from: range.from, to: range.to },
     points: points.map((p) => ({ ...p, detail: def.detail(p) })),
+    averages,
+    // Same shape as a report's action lists, so the page draws it the same way.
+    actions: def.actionTitle ? [{
+      id: `${def.id}_attention`,
+      title: def.actionTitle,
+      intro: def.actionIntro,
+      total: flagged.length,
+      entries: flagged.slice(0, 10).map((p) => ({
+        name: p.label,
+        detail: `${def.x.label}: ${axisValue(p.x, def.x)} · ${def.y.label}: ${axisValue(p.y, def.y)}${def.detail(p) ? ` · ${def.detail(p)}` : ''}`,
+      })),
+    }] : [],
+    generatedAt: new Date().toISOString(),
   };
+  if (narrate) result.narrative = await writeComparisonNarrative({ def, comparison: result, flagged });
+  return result;
 };
 
 export default {

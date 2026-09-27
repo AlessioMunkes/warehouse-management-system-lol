@@ -32,14 +32,15 @@
 // ─────────────────────────────────────────────────────────────
 import { useMemo, useState } from 'react';
 import {
-  Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart,
+  Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line, LineChart,
   Pie, PieChart, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import { X } from 'lucide-react';
 import {
-  SERIES, VIEW_LABELS, defaultView, downloadCsv, fmtTick, fmtValue, formatLabel,
-  isAdditive, pivot, shapeOf, toCsv, unitWord, viewsFor,
+  SERIES, VIEW_LABELS, anomaliesOf, defaultView, downloadCsv, fmtTick, fmtValue, formatLabel,
+  isAdditive, pivot, ragColour, shapeOf, toCsv, unitWord, viewsFor,
 } from '../chartFormat';
+import { Flow, Funnel, Waterfall } from './OperationalDiagrams';
 
 const INK    = 'var(--ink)';
 const MUTED  = 'var(--ink-soft)';
@@ -191,7 +192,10 @@ export default function OperationalChart({
   colorFor,
   // Keep the series in the order given instead of largest first — for
   // stages (a pipeline) where the order is the meaning.
-  keepOrder = false,
+  keepOrder: keepOrderProp = false,
+  // The same report for the same period a year earlier, drawn as a
+  // dashed line (or pale columns) behind this one. Time charts only.
+  compare = null,
 }) {
   const [targetSaving, setTargetSaving] = useState(false);
   const [targetError, setTargetError]   = useState(null);
@@ -211,9 +215,12 @@ export default function OperationalChart({
   const unit = report?.meta?.unit;
   const series = useMemo(() => report?.series ?? [], [report]);
   const shape = shapeOf(report);
-  const views = viewsFor(shape, unit, series);
+  const meta = report?.meta;
+  const views = viewsFor(shape, unit, series, meta);
+  // Days of the week keep Monday to Sunday.
+  const keepOrder = keepOrderProp || Boolean(meta?.ordered);
 
-  const [view, setView]       = useState(() => defaultView(views, report?.chartType, hint));
+  const [view, setView]       = useState(() => defaultView(views, report?.chartType, hint, meta));
   const [topN, setTopN]       = useState(compact ? 8 : 10);
   const [sortBy, setSortBy]   = useState('value');
   const [showAvg, setShowAvg] = useState(false);
@@ -254,7 +261,16 @@ export default function OperationalChart({
   const additive = isAdditive(unit, series);
 
   const opacityFor = (name) => (highlight && highlight !== name ? DIM : 1);
-  const colourOf = (r, fallback) => colorFor?.(r.name, r.value) ?? fallback;
+  const colourOf = (r, fallback) => colorFor?.(r.name, r.value) ?? ragColour(meta?.rag, r.value) ?? fallback;
+
+  // Time charts: points far off the usual level, and last year's
+  // figures lined up by position (month 1 against month 1).
+  const isTimeView = shape === 'time' && ['line', 'area', 'bar'].includes(activeView);
+  const anomalies = useMemo(() => (shape === 'time' ? anomaliesOf(rows) : []), [shape, rows]);
+  const prevSeries = compare?.series ?? null;
+  const timeRows = useMemo(() => (prevSeries
+    ? rows.map((r, i) => ({ ...r, previous: prevSeries[i]?.value ?? null, previousLabel: prevSeries[i]?.label ?? null }))
+    : rows), [rows, prevSeries]);
   const hbarHeight = Math.max(compact ? 150 : 180, rows.length * (compact ? 24 : 30) + 40);
   const height = compact ? 200 : 300;
 
@@ -328,6 +344,12 @@ export default function OperationalChart({
         </table>
       </div>
     );
+  } else if (activeView === 'funnel') {
+    body = <Funnel series={series} funnel={meta.funnel} unit={unit} highlight={highlight} onPick={setHighlight} />;
+  } else if (activeView === 'waterfall') {
+    body = <Waterfall series={series} unit={unit} height={height} compact={compact} />;
+  } else if (activeView === 'sankey') {
+    body = <Flow series={series} unit={unit} height={compact ? 220 : 340} />;
   } else if (activeView === 'heatmap') {
     body = <Heatmap rows={twoAxis.rows} keys={twoAxis.keys} unit={unit} highlight={highlight} onPick={setHighlight} />;
   } else if (activeView === 'stacked' || activeView === 'grouped') {
@@ -357,20 +379,27 @@ export default function OperationalChart({
       </ResponsiveContainer>
     );
   } else if (activeView === 'line' || activeView === 'area') {
-    const Chart = activeView === 'line' ? LineChart : AreaChart;
+    const Chart = prevSeries ? ComposedChart : activeView === 'line' ? LineChart : AreaChart;
     const hlRow = rows.find((r) => r.name === highlight);
     body = (
       <ResponsiveContainer width="100%" height={height}>
-        <Chart data={rows} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}
+        <Chart data={timeRows} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}
           onClick={(e) => e?.activeLabel && setHighlight(e.activeLabel)}>
           <CartesianGrid vertical={false} stroke={LINE} strokeOpacity={0.6} />
           <XAxis dataKey="name" tickFormatter={formatLabel} {...axisProps} />
           <YAxis tickFormatter={(v) => fmtTick(v, unit)} {...axisProps} width={52} />
           <Tooltip content={<ChartTooltip unit={unit} />} cursor={{ stroke: MUTED, strokeWidth: 1 }} />
           {refLines('y')}
+          {prevSeries && (
+            <Line type="monotone" dataKey="previous" name="Same period last year" stroke={MUTED} strokeWidth={2}
+              strokeDasharray="5 4" dot={false} connectNulls isAnimationActive={false} />
+          )}
           {activeView === 'line'
-            ? <Line type="monotone" dataKey="value" stroke={SINGLE} strokeWidth={2} dot={{ r: 4, fill: SINGLE, stroke: SURF, strokeWidth: 2 }} activeDot={{ r: 6 }} />
-            : <Area type="monotone" dataKey="value" stroke={SINGLE} strokeWidth={2} fill={SINGLE} fillOpacity={0.15} />}
+            ? <Line type="monotone" dataKey="value" name="This period" stroke={SINGLE} strokeWidth={2} dot={{ r: 4, fill: SINGLE, stroke: SURF, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+            : <Area type="monotone" dataKey="value" name="This period" stroke={SINGLE} strokeWidth={2} fill={SINGLE} fillOpacity={0.15} />}
+          {!compact && anomalies.map((a) => (
+            <ReferenceDot key={`anomaly-${a.name}`} x={a.name} y={a.value} r={8} fill="none" stroke="var(--rag-bad)" strokeWidth={2.5} />
+          ))}
           {hlRow && <ReferenceDot x={hlRow.name} y={hlRow.value} r={7} fill={SINGLE} stroke={INK} strokeWidth={2}
             label={{ value: fmtValue(hlRow.value, unit), position: 'top', fill: INK, fontSize: 12, fontWeight: 700 }} />}
         </Chart>
@@ -406,9 +435,11 @@ export default function OperationalChart({
   } else {
     // bar, hbar, pareto
     const horizontal = activeView === 'hbar';
+    const odd = new Set(anomalies.map((a) => a.name));
+    const withPrev = isTimeView && prevSeries && !horizontal;
     body = (
       <ResponsiveContainer width="100%" height={horizontal ? hbarHeight : height}>
-        <BarChart data={rows} layout={horizontal ? 'vertical' : 'horizontal'}
+        <BarChart data={withPrev ? timeRows : rows} layout={horizontal ? 'vertical' : 'horizontal'}
           margin={{ top: 12, right: horizontal ? 48 : 8, left: 0, bottom: 0 }} barCategoryGap="20%">
           <CartesianGrid horizontal={!horizontal} vertical={horizontal} stroke={LINE} strokeOpacity={0.6} />
           {horizontal ? (
@@ -430,7 +461,11 @@ export default function OperationalChart({
             <ReferenceLine x={paretoCut} stroke={INK} strokeDasharray="6 3"
               label={{ value: '80% of the total by here', fill: INK, fontSize: 11, position: 'insideTopRight' }} />
           )}
-          <Bar dataKey="value" radius={horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]} maxBarSize={horizontal ? 22 : 48}
+          {withPrev && (
+            <Bar dataKey="previous" name="Same period last year" fill={MUTED} fillOpacity={0.35}
+              radius={[4, 4, 0, 0]} maxBarSize={48} isAnimationActive={false} />
+          )}
+          <Bar dataKey="value" name="This period" radius={horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]} maxBarSize={horizontal ? 22 : 48}
             label={!compact && rows.length <= 15 ? {
               position: horizontal ? 'right' : 'top', fill: MUTED, fontSize: 11,
               formatter: (v) => fmtTick(v, unit),
@@ -440,8 +475,8 @@ export default function OperationalChart({
                 key={r.name}
                 fill={colourOf(r, SINGLE)}
                 fillOpacity={opacityFor(r.name)}
-                stroke={highlight === r.name ? INK : 'none'}
-                strokeWidth={highlight === r.name ? 2 : 0}
+                stroke={highlight === r.name ? INK : odd.has(r.name) && !compact ? 'var(--rag-bad)' : 'none'}
+                strokeWidth={highlight === r.name || (odd.has(r.name) && !compact) ? 2 : 0}
                 cursor="pointer"
                 onClick={() => setHighlight(r.name)}
               />
@@ -460,7 +495,7 @@ export default function OperationalChart({
         <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
           <Segmented views={views} view={activeView} onChange={setView} />
 
-          {shape === 'category' && activeView !== 'table' && series.length > 5 && (
+          {shape === 'category' && !['table', 'funnel', 'waterfall', 'sankey'].includes(activeView) && series.length > 5 && (
             <label className="inline-flex items-center gap-1">
               <span style={{ color: MUTED }}>Show</span>
               <select value={topN} onChange={(e) => setTopN(Number(e.target.value))}
@@ -538,6 +573,22 @@ export default function OperationalChart({
       {!compact && hiddenCount > 0 && (
         <p className="mt-1 text-xs" style={{ color: MUTED }}>
           Showing {rows.length} of {series.length}. Choose “All” to see the rest.
+        </p>
+      )}
+      {!compact && isTimeView && prevSeries && (
+        <p className="mt-1 flex items-center gap-2 text-xs" style={{ color: MUTED }}>
+          <span aria-hidden="true" className="inline-block h-0 w-5 border-t-2 border-dashed" style={{ borderColor: MUTED }} />
+          Same period last year
+          {compact ? null : ` (${compare.spec?.dateRange?.from} to ${compare.spec?.dateRange?.to})`}
+          {!prevSeries.length && ': nothing was recorded then.'}
+        </p>
+      )}
+      {!compact && isTimeView && anomalies.length > 0 && (
+        <p className="mt-1 text-xs" style={{ color: MUTED }}>
+          <span aria-hidden="true" className="mr-1 inline-block h-2.5 w-2.5 rounded-full border-2 align-middle" style={{ borderColor: 'var(--rag-bad)' }} />
+          Stands out from the usual level (about {fmtValue(anomalies[0].usual, unit)} {unitWord(unit)}):{' '}
+          {anomalies.map((a) => `${formatLabel(a.name)} is unusually ${a.direction} at ${fmtValue(a.value, unit)}`).join('; ')}.
+          Worth checking what happened.
         </p>
       )}
       {!compact && activeView === 'pareto' && additive && (

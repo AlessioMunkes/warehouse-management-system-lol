@@ -44,6 +44,7 @@ import publicImpactRouter from './src/routes/publicImpact.routes.js';
 import publicWarehousesRouter from './src/routes/publicWarehouses.route.js';
 import publicWarehouse   from './src/middleware/publicWarehouse.middleware.js';
 import expiryWarningJob  from './src/jobs/expiryWarning.job.js';
+import savedReportsJob   from './src/jobs/savedReports.job.js';
 import { startEmailReminderScheduler } from './src/jobs/ecdCollectionReminder.job.js';
 
 console.log('[server] gmailRouter loaded:', typeof gmailRouter, gmailRouter ? 'OK' : 'UNDEFINED');
@@ -215,6 +216,9 @@ app.listen(port, () => {
   console.log(`[env] PORT: ${process.env.PORT || 5000}`);
   console.log(`[env] JWT_SECRET exists: ${!!process.env.JWT_SECRET}`);
   expiryWarningJob.startExpiryWarningJob();
+  if (process.env.NODE_ENV !== 'test' && process.env.SAVED_REPORTS_SCHEDULER !== 'false') {
+    savedReportsJob.startSavedReportsJob();
+  }
 });
 
 if (process.env.NODE_ENV !== 'test' && process.env.ECD_REMINDER_SCHEDULER !== 'false') {

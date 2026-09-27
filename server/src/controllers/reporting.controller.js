@@ -20,6 +20,7 @@
 import reportingService from '../services/reporting.service.js';
 import aiService        from '../services/reportingAi.service.js';
 import insightService   from '../services/reportingInsight.service.js';
+import savedReportService from '../services/savedReport.service.js';
 
 // Upstream conditions whose text is safe and useful to show.
 const PASS_THROUGH = new Set([502, 503, 504]);
@@ -51,6 +52,33 @@ const runReport = async (req, res) => {
   } catch (err) {
     console.error('[runReport]', err.message);
     send(res, err, 'Failed to run the report.');
+  }
+};
+
+// Saved reports — always the signed-in manager's own.
+// GET /api/reporting/saved · POST /saved · PATCH /saved/:id · DELETE /saved/:id · POST /saved/:id/send
+const wrap = (fn, fallback) => async (req, res) => {
+  try {
+    res.status(200).json({ success: true, data: await fn(req) });
+  } catch (err) {
+    console.error('[savedReports]', err.message);
+    send(res, err, fallback);
+  }
+};
+const listSaved   = wrap((req) => savedReportService.list(req.user.id), 'Failed to load saved reports.');
+const createSaved = wrap((req) => savedReportService.create(req.user.id, req.body ?? {}), 'Failed to save the report.');
+const updateSaved = wrap((req) => savedReportService.update(req.user.id, req.params.id, req.body ?? {}), 'Failed to update the saved report.');
+const removeSaved = wrap((req) => savedReportService.remove(req.user.id, req.params.id), 'Failed to remove the saved report.');
+const sendSaved   = wrap((req) => savedReportService.sendNow(req.user.id, req.params.id), 'Failed to send the report.');
+
+// POST /api/reporting/drill  { spec, label } — the report behind one bar.
+const drill = async (req, res) => {
+  try {
+    const report = await reportingService.drillDown(req.body ?? {});
+    res.status(200).json({ success: true, data: report });
+  } catch (err) {
+    console.error('[drill]', err.message);
+    send(res, err, 'Failed to drill into the report.');
   }
 };
 
@@ -96,10 +124,12 @@ const getComparisons = (req, res) => {
   res.status(200).json({ success: true, data: insightService.listComparisons() });
 };
 
-// POST /api/reporting/comparison  { id, dateRange }
+// POST /api/reporting/comparison  { id, dateRange, narrate }
 const runComparison = async (req, res) => {
   try {
-    const result = await insightService.runComparison({ id: req.body?.id, dateRange: req.body?.dateRange });
+    const result = await insightService.runComparison({
+      id: req.body?.id, dateRange: req.body?.dateRange, narrate: req.body?.narrate === true,
+    });
     res.status(200).json({ success: true, data: result });
   } catch (err) {
     console.error('[runComparison]', err.status ?? '', err.message);
@@ -161,6 +191,7 @@ const getFactorHistory = async (req, res) => {
 };
 
 export default {
+  drill, listSaved, createSaved, updateSaved, removeSaved, sendSaved,
   getCatalog, runReport, ask, insight, getComparisons, runComparison, getTargets, setTarget,
   setFactor, getFactorHistory,
 };

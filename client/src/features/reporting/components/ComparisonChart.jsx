@@ -37,7 +37,9 @@ function Tip({ active, payload, data }) {
   );
 }
 
-export default function ComparisonChart({ data }) {
+// `compact`: no table / CSV controls — for the printed report, where
+// buttons mean nothing.
+export default function ComparisonChart({ data, compact = false }) {
   const [highlight, setHighlight] = useState(null);
   const [showTable, setShowTable] = useState(false);
   const pts = data.points ?? [];
@@ -52,7 +54,7 @@ export default function ComparisonChart({ data }) {
 
   return (
     <figure className="m-0" aria-label={`Scatter plot: ${data.y.label} against ${data.x.label}`}>
-      <div className="mb-2 flex flex-wrap items-center gap-3 text-xs">
+      <div className={`mb-2 flex-wrap items-center gap-3 text-xs ${compact ? 'hidden' : 'flex'}`}>
         <button type="button" onClick={() => setShowTable((v) => !v)} className="underline underline-offset-2">
           {showTable ? 'Show chart' : 'Show table'}
         </button>

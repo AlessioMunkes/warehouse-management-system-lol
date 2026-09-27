@@ -133,7 +133,7 @@ export const SCREENS = [
     about: 'The archive of delivery notes and dispatch notes.',
     aka: ['paperwork', 'notes archive', 'documents'] },
   { id: 'reporting', label: 'Operations reports', roles: MANAGERS_UP,
-    about: 'Ask a question about the figures, or browse reports by area, with charts and who to act on.',
+    about: 'Ask a question about the figures, or browse reports by area; Generate report explains the chart, gives the business view and lists the actions.',
     aka: ['reporting', 'reports', 'analytics', 'operations analytics', 'statistics'] },
   { id: 'impactReport', label: 'Impact reports', roles: MANAGERS_UP,
     about: 'The Impact Calculator: meals, children and adults served, compost processed, poster PDF.',
@@ -1650,7 +1650,7 @@ export const TOPICS = [
       'You can also tap one of the suggested questions, or build a report with the ' +
       'dropdowns underneath.',
     followUp: {
-      question: 'Would you like to know how to read the chart and the ’who to act on’ list?',
+      question: 'Would you like to know what Generate report adds under the chart?',
       topic: 'reporting-insights',
     },
     related: ['reporting-impact', 'reporting-export'],
@@ -1726,9 +1726,9 @@ export const TOPICS = [
       'give it to the board', 'spreadsheet',
     ],
     body:
-      'Open the report and choose PDF REPORT. You get a document with our letterhead,' +
-      ' the figures, chart and who-to-act-on lists; from there choose View PDF to ' +
-      'download it or Print.\n\n' +
+      'Open the report, choose GENERATE REPORT, then PDF REPORT. You get a document ' +
+      'with our letterhead: the explanation of the chart, the business view, the ' +
+      'figures and the actions. From there choose View PDF to download it, or Print.\n\n' +
       'Check the period on the report before sending it — it’s the part people most ' +
       'often misread.',
     followUp: {
@@ -1759,19 +1759,21 @@ export const TOPICS = [
   },
   {
     id: 'reporting-insights',
-    title: 'Reading a report’s chart and insight',
+    title: 'Generating a report and reading it',
     roles: MANAGERS_UP,
     screens: ['reporting'],
     asks: [
       'what does the chart mean', 'what is the dotted line', 'target line', 'who to act on',
+      'generate report', 'business view', 'explain this chart', 'actions',
       'what should I do about this report', 'highlight a bar', 'compare to last month',
       'is this good or bad',
     ],
     body:
-      'Under each report you’ll see the key figures, how they compare with the period' +
-      ' before, and a "who to act on" list — the centres, suppliers or products ' +
-      'behind the number, with contact details.\n\n' +
-      'The line across the chart is the working target. Tap a bar or point to ' +
+      'Under the chart, choose GENERATE REPORT. It adds, in order: About this chart ' +
+      '(what the chart shows, in plain words), the Business view (what it means for ' +
+      'the operation and whether it is on target), the key figures, related views, ' +
+      'and Actions — the centres, suppliers or products to follow up, with contacts.\n\n' +
+      'The dashed line across the chart is the working target. Tap a bar or point to ' +
       'highlight it.',
     followUp: {
       question: 'Would you like to know how to get the report as a PDF?',

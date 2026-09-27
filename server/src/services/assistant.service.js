@@ -31,6 +31,8 @@ import {
   suggestionsFor, publicTopic, publicScreen,
 } from '../features/assistant/helpCatalog.js';
 import logRepo from '../repositories/assistantLog.repository.js';
+import { redactText } from '../features/privacy/redact.js';
+import knownPeople from '../repositories/knownPeople.repository.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -124,7 +126,11 @@ export const ask = async ({ question, screen, userId, role }) => {
   // this work" toward what they are looking at, and it is the only
   // thing about their session the model is told.
   const where = screenById.get(screen)?.label;
-  const base  = where ? `They are on: ${where}\n\nThey asked: ${question}` : question;
+  // People, phone numbers, emails and ID numbers never reach the
+  // model: a help answer does not need them.
+  const { names, keep } = await knownPeople.listNames();
+  const safe  = redactText(question, names, keep).text;
+  const base  = where ? `They are on: ${where}\n\nThey asked: ${safe}` : safe;
 
   let lastError = null;
 

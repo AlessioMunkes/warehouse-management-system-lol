@@ -58,12 +58,17 @@ import AskBox        from '../features/reporting/components/AskBox';
 import ReportBuilder from '../features/reporting/components/ReportBuilder';
 import OperationalChart from '../features/reporting/components/OperationalChart';
 import ComparisonChart  from '../features/reporting/components/ComparisonChart';
+import ComparisonInsight from '../features/reporting/components/ComparisonInsight';
 import TrendCard     from '../features/reporting/components/TrendCard';
 import DataUpload   from '../features/reporting/components/DataUpload';
 import ReportBrowser from '../features/reporting/components/ReportBrowser';
 import OperationalInsight from '../features/reporting/components/OperationalInsight';
+import CustomReportBuilder from '../features/reporting/components/CustomReportBuilder';
+import { defaultCustom } from '../features/reporting/customSpec';
+import { formatLabel, shapeOf, yearEarlier } from '../features/reporting/chartFormat';
 import { resolvePreset, DEFAULT_PRESET } from '../features/reporting/dateRanges';
-import { getCatalog, runReport, getComparisons, runComparison, saveTarget } from '../services/reportingAPI';
+import { getCatalog, runReport, getComparisons, runComparison, saveTarget, drillDown, getSaved } from '../services/reportingAPI';
+import { SavedReportsBar, SaveReport } from '../features/reporting/components/SavedReports';
 import { Truck, TrendingUp, CheckCircle2, AlertTriangle, ChevronDown } from 'lucide-react';
 
 const CHARCOAL = 'var(--ink)';
@@ -83,12 +88,37 @@ const TRENDS = [
   { metricId: 'low_stock_items',   label: 'Items below reorder level', icon: AlertTriangle, dimension: 'product' },
 ];
 
+// "Not what you meant? Try:" — the next closest answers the server
+// offered with an AI answer. One tap runs that one instead.
+function Alternatives({ items, onPick, closest }) {
+  if (!items?.length) return null;
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs" style={{ color: MUTED }}>
+      <span>{closest ? 'Closest match. Or try:' : 'Not what you meant? Try:'}</span>
+      {items.map((a) => (
+        <button
+          key={`${a.kind}:${a.id}`}
+          type="button"
+          onClick={() => onPick(a)}
+          className="rounded-full border-2 px-3 py-1 font-medium text-ink hover:bg-muted/60"
+          style={{ borderColor: BORDER }}
+        >
+          {a.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function ReportingPage() {
   const [catalog, setCatalog]     = useState(null);
   const [metricId, setMetricId]   = useState(null);
   const [dimension, setDimension] = useState('none');
   const [preset, setPreset]       = useState(DEFAULT_PRESET);
   const [filters, setFilters]     = useState({});
+  // Prepared report or custom "how many X by Y" — see CustomReportBuilder.
+  const [mode, setMode]           = useState('prepared');
+  const [custom, setCustom]       = useState(null);
 
   const [report, setReport] = useState(null);
   const [busy, setBusy]     = useState(false);
@@ -97,14 +127,65 @@ export default function ReportingPage() {
   const [comparison, setComparison]   = useState(null);
   const [highlight, setHighlight]     = useState(null);
   const [target, setTarget]           = useState(null);
+  // The same report a year earlier, drawn behind a time chart.
+  const [lastYear, setLastYear]       = useState(null);
+  const [lastYearBusy, setLastYearBusy] = useState(false);
+  // Drill-down: the reports above this one, newest last, for "Back".
+  const [drillStack, setDrillStack]   = useState([]);
+  const [drillBusy, setDrillBusy]     = useState(false);
+  const [saved, setSaved]             = useState([]);
+  const loadSaved = useCallback(() => getSaved()
+    .then((res) => setSaved(res.data ?? res ?? []))
+    .catch(() => { /* saved reports are optional; the page works without them */ }), []);
+  useEffect(() => { loadSaved(); }, [loadSaved]);
 
   // One way in for a new result: a fresh report clears the scatter
   // view, the old highlight and the old report's target line.
-  const showReport = (next) => {
+  const showReport = (next, { keepDrill = false } = {}) => {
     setReport(next);
     setComparison(null);
     setHighlight(null);
     setTarget(null);
+    setLastYear(null);
+    if (!keepDrill) setDrillStack([]);
+  };
+
+  const drillInto = async (label) => {
+    if (!report || !label) return;
+    setDrillBusy(true);
+    setError(null);
+    try {
+      const res = await drillDown(report.spec, label);
+      setDrillStack((s) => [...s, report]);
+      showReport(res.data ?? res, { keepDrill: true });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDrillBusy(false);
+    }
+  };
+  const drillBack = () => {
+    const parent = drillStack[drillStack.length - 1];
+    if (!parent) return;
+    setDrillStack((s) => s.slice(0, -1));
+    showReport(parent, { keepDrill: true });
+  };
+
+  const toggleLastYear = async () => {
+    if (lastYear) { setLastYear(null); return; }
+    const range = yearEarlier(report?.spec?.dateRange);
+    if (!range) return;
+    setLastYearBusy(true);
+    try {
+      const res = await runReport(report.spec.custom
+        ? { custom: report.spec.custom, dateRange: range }
+        : { metric: report.spec.metric, dimension: report.spec.dimension, filters: report.spec.filters ?? {}, dateRange: range });
+      setLastYear(res.data ?? res);
+    } catch (err) {
+      setError(`Could not load last year: ${err.message}`);
+    } finally {
+      setLastYearBusy(false);
+    }
   };
   const showComparison = (next) => {
     setComparison(next);
@@ -136,6 +217,54 @@ export default function ReportingPage() {
     }
   };
   const builderRef = useRef(null);
+
+  // A saved report opens over its own period.
+  const openSaved = async (s) => {
+    const range = resolvePreset(s.preset);
+    setPreset(s.preset);
+    setBusy(true);
+    setError(null);
+    focusResult();
+    try {
+      if (s.kind === 'comparison') {
+        const res = await runComparison(s.spec.comparison, range);
+        showComparison(res.data ?? res);
+        return;
+      }
+      const res = await runReport(s.kind === 'custom' ? { custom: s.spec.custom, dateRange: range } : { ...s.spec, dateRange: range });
+      const next = res.data ?? res;
+      showReport(next);
+      if (s.kind === 'custom') { setMode('custom'); setCustom(s.spec.custom); }
+      else { setMode('prepared'); setMetricId(s.spec.metric); setDimension(s.spec.dimension); setFilters(s.spec.filters ?? {}); }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runCustomSpec = async (spec) => {
+    setMode('custom');
+    setCustom(spec);
+    setBusy(true);
+    setError(null);
+    focusResult();
+    try {
+      const res = await runReport({ custom: spec, dateRange: resolvePreset(preset) });
+      showReport(res.data ?? res);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const pickAlternative = (a) => {
+    if (a.kind === 'comparison') return runComparisonById(a.id);
+    if (a.kind === 'custom') return runCustomSpec(a.custom);
+    setMode('prepared');
+    return runMetric(a.id);
+  };
 
   // FOCUS ON THE ANSWER
   // Explore, an ask-box answer, Browse all reports and a comparison
@@ -237,16 +366,18 @@ export default function ReportingPage() {
     });
 
   const run = useCallback(async () => {
-    if (!metricId) return;
+    if (mode === 'prepared' && !metricId) return;
     setBusy(true);
     setError(null);
     try {
-      const res = await runReport({
-        metric: metricId,
-        dimension,
-        filters,
-        dateRange: resolvePreset(preset),
-      });
+      const res = await runReport(mode === 'custom'
+        ? { custom: custom ?? defaultCustom(catalog.datasets[0]), dateRange: resolvePreset(preset) }
+        : {
+            metric: metricId,
+            dimension,
+            filters,
+            dateRange: resolvePreset(preset),
+          });
       showReport(res.data ?? res);
     } catch (err) {
       setError(err.message);
@@ -254,7 +385,7 @@ export default function ReportingPage() {
     } finally {
       setBusy(false);
     }
-  }, [metricId, dimension, filters, preset]);
+  }, [mode, custom, catalog, metricId, dimension, filters, preset]);
 
   // Browse all reports, and the ask box's "closest report" button:
   // pick a metric and run it straight away with its first breakdown
@@ -290,7 +421,12 @@ export default function ReportingPage() {
     if (aiReport.type === 'comparison') { showComparison(aiReport); return; }
     showReport(aiReport);
     setError(null);
-    if (aiReport.spec) {
+    if (aiReport.spec?.custom) {
+      // A custom answer: show it in the custom builder, ready to adjust.
+      setMode('custom');
+      setCustom(aiReport.spec.custom);
+    } else if (aiReport.spec) {
+      setMode('prepared');
       setMetricId(aiReport.spec.metric);
       setDimension(aiReport.spec.dimension);
       setFilters(aiReport.spec.filters ?? {});
@@ -298,8 +434,9 @@ export default function ReportingPage() {
   };
 
   const metric = catalog?.metrics.find((m) => m.id === metricId);
-  const dimensionLabel =
-    metric?.dimensions.find((d) => d.id === dimension)?.label ?? 'Category';
+  const dimensionLabel = report?.meta?.custom
+    ? (report.meta.groupLabels?.[0] ?? 'Category')
+    : metric?.dimensions.find((d) => d.id === dimension)?.label ?? 'Category';
 
   return (
     <ManagerLayout>
@@ -342,6 +479,8 @@ export default function ReportingPage() {
           </section>
         )}
 
+        <SavedReportsBar items={saved} onOpen={openSaved} onChanged={loadSaved} />
+
         {catalog?.aiEnabled && (
           <div className="mt-6">
             <AskBox onReport={handleAIReport} onPickMetric={runMetric} />
@@ -359,7 +498,33 @@ export default function ReportingPage() {
         )}
 
         <div ref={builderRef} className="mt-6 scroll-mt-4">
-          {catalog && (
+          {catalog?.datasets?.length > 0 && (
+            <div className="mb-3 inline-flex rounded-[4px] border-2 border-line bg-surface p-0.5 text-xs font-semibold" role="tablist" aria-label="Kind of report">
+              {[['prepared', 'Prepared report'], ['custom', 'Custom report']].map(([id, label]) => (
+                <button
+                  key={id} type="button" role="tab" aria-selected={mode === id}
+                  onClick={() => { setMode(id); if (id === 'custom' && !custom) setCustom(defaultCustom(catalog.datasets[0])); }}
+                  className={`rounded-[3px] px-3 py-1.5 ${mode === id ? 'bg-ink text-on-ink' : 'text-ink-soft hover:text-ink'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+          {catalog && mode === 'custom' && catalog.datasets?.length > 0 && (
+            <div className="rounded-[4px] border-2 border-line bg-surface p-4 sm:p-5">
+              <CustomReportBuilder
+                datasets={catalog.datasets}
+                value={custom ?? defaultCustom(catalog.datasets[0])}
+                preset={preset}
+                onChange={setCustom}
+                onPresetChange={setPreset}
+                onRun={run}
+                busy={busy}
+              />
+            </div>
+          )}
+          {catalog && mode === 'prepared' && (
             <ReportBuilder
               catalog={catalog}
               metricId={metricId}
@@ -397,9 +562,34 @@ export default function ReportingPage() {
           <section className="mt-5 rounded-[4px] border-2 bg-surface p-4 sm:p-5"
                    style={{ borderColor: BORDER }}>
 
+            {drillStack.length > 0 && (
+              <button type="button" onClick={drillBack}
+                className="mb-2 text-xs font-medium underline underline-offset-2" style={{ color: CHARCOAL }}>
+                ← Back to {drillStack[drillStack.length - 1].description}
+              </button>
+            )}
             <p className="text-sm font-medium" style={{ color: CHARCOAL }}>
               {report.description}
             </p>
+            {report.meta?.drillable && (
+              <p className="mt-1 text-xs" style={{ color: MUTED }}>
+                {highlight
+                  ? (
+                    <button type="button" disabled={drillBusy} onClick={() => drillInto(highlight)}
+                      className="rounded-[4px] bg-ink px-2 py-1 font-bold text-on-ink disabled:opacity-50">
+                      {drillBusy ? 'Opening…' : `Drill into ${formatLabel(highlight)} →`}
+                    </button>
+                  )
+                  : 'Click a bar or point to pick it, then drill into the report behind it.'}
+              </p>
+            )}
+
+            {shapeOf(report) === 'time' && report.spec?.dateRange && (
+              <label className="mt-3 inline-flex cursor-pointer items-center gap-2 text-xs" style={{ color: CHARCOAL }}>
+                <input type="checkbox" checked={Boolean(lastYear)} disabled={lastYearBusy} onChange={toggleLastYear} />
+                {lastYearBusy ? 'Loading last year…' : 'Compare with the same period last year'}
+              </label>
+            )}
 
             <div className="mt-4">
               {/* Keyed by spec so a new report starts from its own
@@ -407,16 +597,26 @@ export default function ReportingPage() {
               <OperationalChart
                 key={JSON.stringify(report.spec)}
                 report={report}
+                compare={lastYear}
                 dimensionLabel={dimensionLabel}
                 target={target}
                 hint={report.meta?.chartHint}
                 highlight={highlight}
                 onHighlight={setHighlight}
-                onTargetChange={async (value) => {
+                // Targets belong to prepared reports; a custom one has none.
+                onTargetChange={report.meta?.custom ? undefined : async (value) => {
                   const res = await saveTarget(report.spec.metric, value);
                   setTarget(res.data ?? res);
                 }}
               />
+            </div>
+
+            <div className="mt-4">
+              <SaveReport key={JSON.stringify(report.spec)}
+                kind={report.spec?.custom ? 'custom' : 'report'}
+                spec={report.spec?.custom ? { custom: report.spec.custom } : { metric: report.spec?.metric, dimension: report.spec?.dimension, filters: report.spec?.filters ?? {} }}
+                defaultTitle={report.description?.replace(/,? \d{4}-\d{2}-\d{2} to \d{4}-\d{2}-\d{2}$/, '')}
+                preset={preset === 'custom' ? 'last_3m' : preset} onSaved={loadSaved} />
             </div>
 
             <footer className="mt-5 space-y-1 border-t pt-3 text-xs"
@@ -460,6 +660,10 @@ export default function ReportingPage() {
           </section>
         )}
 
+        {report && (
+          <Alternatives items={report.alternatives} onPick={pickAlternative} closest={report.meta?.matchedBy === 'keyword'} />
+        )}
+
         {/* Keyed by spec: a different question is a fresh breakdown,
             with nothing carried over from the last one. */}
         {report && (
@@ -487,8 +691,18 @@ export default function ReportingPage() {
             {comparison.caveat && (
               <p className="mt-3 border-t pt-3 text-xs" style={{ borderColor: BORDER, color: MUTED }}>{comparison.caveat}</p>
             )}
+            <div className="mt-3">
+              <SaveReport key={comparison.id} kind="comparison" spec={{ comparison: comparison.id }}
+                defaultTitle={comparison.label ?? comparison.description} preset={preset} onSaved={loadSaved} />
+            </div>
           </section>
         )}
+        {/* Keyed like the chart, so a new comparison starts without the
+            last one's report. */}
+        {comparison && (
+          <Alternatives items={comparison.alternatives} onPick={pickAlternative} closest={comparison.matchedBy === 'keyword'} />
+        )}
+        {comparison && <ComparisonInsight key={comparison.description} comparison={comparison} />}
         <div className="mt-6">
           <DataUpload />
         </div>

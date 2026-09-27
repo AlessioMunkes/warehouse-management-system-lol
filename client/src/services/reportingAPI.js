@@ -7,7 +7,7 @@
 // All three routes are manager/admin only on the server. The client
 // gate in App.jsx is a UX courtesy; the route guard is the control.
 // ─────────────────────────────────────────────────────────────
-import { apiGet, apiPost, apiPut } from './api';
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from './api';
 
 // GET /api/reporting/catalog
 // Returns { aiEnabled, metrics }. aiEnabled is false when no API key
@@ -16,6 +16,16 @@ export const getCatalog = () => apiGet('/api/reporting/catalog');
 
 // POST /api/reporting/report
 export const runReport = (spec) => apiPost('/api/reporting/report', spec);
+
+// Saved and scheduled reports — the signed-in manager's own.
+export const getSaved = () => apiGet('/api/reporting/saved');
+export const saveReport = (body) => apiPost('/api/reporting/saved', body);
+export const updateSaved = (id, patch) => apiPatch(`/api/reporting/saved/${id}`, patch);
+export const deleteSaved = (id) => apiDelete(`/api/reporting/saved/${id}`);
+export const sendSavedNow = (id) => apiPost(`/api/reporting/saved/${id}/send`, {});
+
+// POST /api/reporting/drill — the report behind one clicked bar.
+export const drillDown = (spec, label) => apiPost('/api/reporting/drill', { spec, label });
 
 // POST /api/reporting/ask
 // Returns either a report payload or { type: 'clarify', question, options }.
@@ -43,8 +53,10 @@ export const getInsight = (spec, { narrate = false } = {}) =>
 export const getComparisons = () => apiGet('/api/reporting/comparisons');
 
 // POST /api/reporting/comparison — one scatter plot's points.
-export const runComparison = (id, dateRange) =>
-  apiPost('/api/reporting/comparison', { id, dateRange });
+// narrate: true adds the written report (explanation, business view,
+// next steps) — the Generate report button under a scatter chart.
+export const runComparison = (id, dateRange, { narrate = false } = {}) =>
+  apiPost('/api/reporting/comparison', { id, dateRange, narrate });
 
 // GET /api/reporting/targets — this manager's target per metric.
 export const getTargets = () => apiGet('/api/reporting/targets');
@@ -53,4 +65,4 @@ export const getTargets = () => apiGet('/api/reporting/targets');
 export const saveTarget = (metricId, value) =>
   apiPut(`/api/reporting/targets/${encodeURIComponent(metricId)}`, { value });
 
-export default { getTargets, saveTarget, getComparisons, runComparison, getCatalog, runReport, askQuestion, getInsight, setFactor, getFactorHistory };
+export default { getSaved, saveReport, updateSaved, deleteSaved, sendSavedNow, drillDown, getTargets, saveTarget, getComparisons, runComparison, getCatalog, runReport, askQuestion, getInsight, setFactor, getFactorHistory };
