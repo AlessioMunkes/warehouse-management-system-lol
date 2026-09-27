@@ -39,7 +39,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ReceiptFilters from '../features/receipts/components/ReceiptFilters';
 import ReceiptsTable from '../features/receipts/components/ReceiptsTable';
-import StatusPill from '../features/receipts/components/StatusPill';
+import StatusBadge from '@/components/ui/status-badge';
+import { VARIANCE_STYLE } from '@/lib/statusStyles';
 import DeliveryNotePDF from '../features/procurement/components/DeliveryNotePDF';
 import DispatchNotePDF from '../features/receipts/components/DispatchNotePDF';
 import {
@@ -48,7 +49,8 @@ import {
 import receivingAPI from '../services/receivingAPI';
 import dispatchAPI from '../services/dispatchAPI';
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 15;
+
 
 const TABS = [
   { id: 'in',  label: 'Goods in',  sub: 'Delivery notes' },
@@ -268,13 +270,16 @@ export default function ReceiptsPage() {
       key: 'status', header: 'Status', sortKey: 'status',
       render: (r) => (
         <div className="flex items-center gap-2">
-          <StatusPill tone={r.status === 'flagged' ? 'warn' : 'neutral'}>
+          {/* Flagged is a problem (red); recorded and closed are done
+              (green, told apart by icon and fill); a count difference
+              on its own is amber. Styles: lib/statusStyles.js. */}
+          <StatusBadge kind="delivery" status={r.status}>
             {DELIVERY_STATUS_LABEL[r.status] || r.status}
-          </StatusPill>
+          </StatusBadge>
           {r.has_discrepancies && (
-            <StatusPill tone="warn">
+            <StatusBadge {...VARIANCE_STYLE}>
               {r.discrepancy_count} variance{Number(r.discrepancy_count) === 1 ? '' : 's'}
-            </StatusPill>
+            </StatusBadge>
           )}
         </div>
       ),
@@ -302,19 +307,13 @@ export default function ReceiptsPage() {
       key: 'status', header: 'Outcome', sortKey: 'status',
       render: (r) => (
         <div className="flex items-center gap-2">
-          <StatusPill
-            tone={
-              r.status === 'collected' ? 'good'
-                : r.status === 'not_collected' ? 'warn'
-                  : r.status === 'late_collected' ? 'warn' : 'muted'
-            }
-          >
+          <StatusBadge kind="dispatch" status={r.status}>
             {DISPATCH_STATUS_LABEL[r.status] || r.status}
-          </StatusPill>
+          </StatusBadge>
           {Number(r.variance_count) > 0 && (
-            <StatusPill tone="warn">
+            <StatusBadge {...VARIANCE_STYLE}>
               {r.variance_count} variance{Number(r.variance_count) === 1 ? '' : 's'}
-            </StatusPill>
+            </StatusBadge>
           )}
         </div>
       ),

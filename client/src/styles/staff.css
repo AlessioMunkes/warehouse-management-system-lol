@@ -2909,3 +2909,16 @@ button.stf-panel-head:disabled { cursor: default; }
   padding: 4px;
   cursor: pointer;
 }
+
+/* Red / amber / green status badges, on the theme's status tokens so
+   they hold contrast in light and dark. Used where a status says what
+   a record is waiting on (Feed the Soil kits). */
+.stf-badge.is-rag-good { background: var(--good-soft); color: var(--good-ink); }
+.stf-badge.is-rag-warn { background: var(--warn-soft); color: var(--warn-ink); }
+.stf-badge.is-rag-bad  { background: var(--danger-soft); color: var(--danger-ink); }
+.stf-badge.is-rag-info { background: var(--info-soft); color: var(--info-ink); }
+
+/* No tab bar for managers and admins (StaffShell adds .no-tabbar):
+   hide it and give back the space reserved for it. */
+.stf-shell.no-tabbar { --stf-tabbar-h: 0px; }
+.stf-shell.is-in-app.no-tabbar .stf-tabbar { display: none; }

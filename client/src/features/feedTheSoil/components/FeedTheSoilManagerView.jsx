@@ -21,7 +21,7 @@ import collectionKitAPI from '../../../services/collectionKitAPI';
 import formatKitCode from '../kitCode';
 
 import { Button }   from '@/components/ui/button';
-import { Badge }    from '@/components/ui/badge';
+import StatusBadge from '@/components/ui/status-badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input }    from '@/components/ui/input';
 import {
@@ -34,9 +34,12 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { Plus, Loader2, Search } from 'lucide-react';
+import TablePager from '@/components/ui/table-pager';
+import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
 
 const STATUS_LABELS = { assigned: 'Assigned', logged: 'Logged', dispatched: 'Dispatched' };
-const STATUS_BADGE  = { assigned: 'outline', logged: 'secondary', dispatched: 'default' };
+// Amber with the household, blue once compost is in and waiting to go
+// to a farm, green when it has gone — lib/statusStyles.js.
 
 const fmtDate = (value) =>
   value ? new Date(value).toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
@@ -50,8 +53,8 @@ const fmtDateTime = (value) =>
 
 const fmtKg = (value) => (value === null || value === undefined ? '—' : `${Number(value).toLocaleString('en-ZA')} kg`);
 
-const StatusBadge = ({ status }) => (
-  <Badge variant={STATUS_BADGE[status] ?? 'outline'}>{STATUS_LABELS[status] ?? status}</Badge>
+const KitStatus = ({ status }) => (
+  <StatusBadge kind="kit" status={status}>{STATUS_LABELS[status] ?? status}</StatusBadge>
 );
 
 const ErrorBanner = ({ message, onRetry }) => (
@@ -258,7 +261,7 @@ const LogPickKitPanel = ({ kits, isLoading, search, onSearch, onPick, onCancel }
                 <TableCell className="font-medium">{formatKitCode(k.id)}</TableCell>
                 <TableCell>{k.owner_name}</TableCell>
                 <TableCell className="text-muted-foreground">{k.suburb || '—'}</TableCell>
-                <TableCell><StatusBadge status={k.status} /></TableCell>
+                <TableCell><KitStatus status={k.status} /></TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -280,7 +283,7 @@ const KitDetail = ({ kit, onLogCompost, onOpenRecord, onClose }) => (
           {formatKitCode(kit.id)} · {kit.owner_name} · {kit.suburb || 'No suburb on record'} · assigned {fmtDate(kit.assigned_at)}
         </p>
       </div>
-      <StatusBadge status={kit.status} />
+      <KitStatus status={kit.status} />
     </CardHeader>
     <CardContent className="space-y-4">
       <Button type="button" size="sm" onClick={() => onLogCompost(kit)}>Log compost</Button>
@@ -299,7 +302,7 @@ const KitDetail = ({ kit, onLogCompost, onOpenRecord, onClose }) => (
             {kit.records.map((r) => (
               <TableRow key={r.id} className="cursor-pointer" onClick={() => onOpenRecord(r.id)}>
                 <TableCell>{fmtDate(r.logged_at)}</TableCell>
-                <TableCell><StatusBadge status={r.status} /></TableCell>
+                <TableCell><KitStatus status={r.status} /></TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -324,7 +327,7 @@ const RecordDetail = ({ record, onDispatch, onOpenKit, onClose, backLabel }) => 
           {formatKitCode(record.kit_id)} · {record.owner_name}{record.suburb ? ` · ${record.suburb}` : ''}
         </p>
       </div>
-      <StatusBadge status={record.status} />
+      <KitStatus status={record.status} />
     </CardHeader>
     <CardContent className="space-y-4">
       <Table>
@@ -495,6 +498,10 @@ export default function FeedTheSoilManagerView() {
     }
   };
 
+  // Kits, fifteen to a page.
+  const kitPage = usePaged(kits, TABLE_PAGE_SIZE, `${kitSearch}|${kits.length}`);
+  // Records, fifteen to a page.
+  const recordPage = usePaged(records, TABLE_PAGE_SIZE, `${recordSearch}|${records.length}`);
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-6">
       <h1 className="text-2xl font-medium">Feed the Soil</h1>
@@ -588,18 +595,19 @@ export default function FeedTheSoilManagerView() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {kits.map((k) => (
+                      {kitPage.slice.map((k) => (
                         <TableRow key={k.id} className="cursor-pointer" onClick={() => openKit(k.id)}>
                           <TableCell className="font-medium">{formatKitCode(k.id)}</TableCell>
                           <TableCell>{k.owner_name}</TableCell>
                           <TableCell className="text-muted-foreground">{k.suburb || '—'}</TableCell>
-                          <TableCell><StatusBadge status={k.status} /></TableCell>
+                          <TableCell><KitStatus status={k.status} /></TableCell>
                           <TableCell className="text-muted-foreground">{fmtDate(k.last_logged_at)}</TableCell>
                           <TableCell className="text-muted-foreground">{fmtDate(k.assigned_at)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
+                  <TablePager {...kitPage} noun="kits" />
                 </CardContent>
               </Card>
             )}
@@ -638,15 +646,16 @@ export default function FeedTheSoilManagerView() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {records.map((r) => (
+                      {recordPage.slice.map((r) => (
                         <TableRow key={r.id} className="cursor-pointer" onClick={() => openRecord(r.id)}>
                           <TableCell className="font-medium">{formatKitCode(r.kit_id)}</TableCell>
                           <TableCell className="text-muted-foreground">{r.owner_name}{r.suburb ? ` · ${r.suburb}` : ''}</TableCell>
-                          <TableCell><StatusBadge status={r.status} /></TableCell>
+                          <TableCell><KitStatus status={r.status} /></TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
+                  <TablePager {...recordPage} noun="records" />
                 </CardContent>
               </Card>
             )}

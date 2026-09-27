@@ -40,6 +40,7 @@ import {
 } from '@/components/ui/tooltip';
 import ManagerLayout from '../../features/taskdashboard/components/ManagerLayout';
 import StaffTabBar from './StaffTabBar';
+import { useAuth } from '../../context/AuthContext';
 import OfflineBar from './OfflineBar';
 
 // 'Packing / Little Stars ECD' → title 'Packing', sub 'Little Stars ECD'.
@@ -70,9 +71,16 @@ export default function StaffShell({
   const navigate = useNavigate();
   const { title, sub } = splitCrumb(crumb);
 
+  // The bottom tab bar is warehouse staff's own navigation. A manager
+  // or admin opening a floor screen (recording a donation, say) has the
+  // sidebar, or the menu drawer on a phone, and their own set of
+  // screens — the worker's five tabs would be the wrong menu for them.
+  const { user } = useAuth() ?? {};
+  const showTabBar = !user || user.role === 'warehouse_worker';
+
   return (
     <ManagerLayout>
-      <div className="stf-shell is-in-app">
+      <div className={`stf-shell is-in-app${showTabBar ? '' : ' no-tabbar'}`}>
         <OfflineBar />
 
         <main className={wide ? 'stf-main is-wide' : 'stf-main'}>
@@ -151,7 +159,7 @@ export default function StaffShell({
           {children}
         </main>
 
-        <StaffTabBar />
+        {showTabBar ? <StaffTabBar /> : null}
       </div>
     </ManagerLayout>
   );

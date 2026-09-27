@@ -20,6 +20,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import donationManagementAPI from '../services/donationManagementAPI';
+import TablePager from '@/components/ui/table-pager';
+import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
 
 const TABS = [
   { id: 'certificates', label: 'Certificate Queue', icon: FileText, description: 'View and manage Section 18A tax certificates for donations.' },
@@ -175,6 +177,10 @@ export default function Section18AManagementPage() {
       return queueDateTimeOf(a) - queueDateTimeOf(b);
     });
 
+  // Certificates, fifteen to a page.
+  const certPage = usePaged(filteredCertificateQueue, TABLE_PAGE_SIZE, `${donorSearch}|${filteredCertificateQueue.length}`);
+  // Emails, fifteen to a page.
+  const emailPage = usePaged(emailHistory, TABLE_PAGE_SIZE, emailHistory.length);
   return (
     <div className="min-h-screen bg-canvas text-ink font-['Montserrat',sans-serif]">
     
@@ -248,7 +254,7 @@ export default function Section18AManagementPage() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {filteredCertificateQueue.map((item) => {
+                            {certPage.slice.map((item) => {
                               const formattedDate = item.received_at
                                 ? new Date(item.received_at).toLocaleDateString()
                                 : item.createdAt
@@ -271,6 +277,7 @@ export default function Section18AManagementPage() {
                             })}
                           </TableBody>
                         </Table>
+                        <TablePager {...certPage} noun="certificates" />
                       </div>
                     )}
                   </CardContent>
@@ -334,7 +341,7 @@ export default function Section18AManagementPage() {
                       <div className="flex flex-col items-center justify-center py-8 text-center"><Mail className="h-12 w-12 text-muted-foreground/40" /><p className="mt-3 text-sm text-muted-foreground">No emails match. Try clearing search or filters.</p></div>
                     ) : (
                       <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Recipient</TableHead><TableHead>Donor</TableHead><TableHead>Donation</TableHead><TableHead>Type</TableHead><TableHead>Subject</TableHead><TableHead>Status</TableHead><TableHead>Sent At</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader><TableBody>
-                        {emailHistory.map((email) => {
+                        {emailPage.slice.map((email) => {
                           const statusConfig = getEmailStatusConfig(email.status);
                           const StatusIcon = statusConfig.icon;
                           const sentAt = emailSentAtOf(email);
@@ -351,7 +358,8 @@ export default function Section18AManagementPage() {
                             </TableRow>
                           );
                         })}
-                      </TableBody></Table></div>
+                      </TableBody></Table>
+                      <TablePager {...emailPage} noun="emails" /></div>
                     )}
                   </CardContent>
                 </Card>

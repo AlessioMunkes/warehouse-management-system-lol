@@ -44,7 +44,7 @@ import {
   InputGroup, InputGroupAddon, InputGroupInput,
 } from '@/components/ui/input-group';
 import { Button }   from '@/components/ui/button';
-import { Badge }    from '@/components/ui/badge';
+import StatusBadge from '@/components/ui/status-badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -60,14 +60,12 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Search, Plus, Loader2 } from 'lucide-react';
+import TablePager from '@/components/ui/table-pager';
+import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
 
-const OUTCOME_BADGE = {
-  pending:             'secondary',
-  fulfilled:           'default',
-  partially_fulfilled: 'outline',
-  declined:            'outline',
-  referred:            'outline',
-};
+// Pending amber, fulfilled solid green, part-fulfilled soft green,
+// referred blue, declined red — each with its own icon
+// (lib/statusStyles.js).
 
 const fmtDateTime = (value) =>
   value
@@ -249,6 +247,9 @@ function CommunityRequestsManagerView() {
     }
   };
 
+  // Requests, fifteen to a page; back to page one when the list changes.
+  const requestPage = usePaged(requests, TABLE_PAGE_SIZE, `${search}|${outcomeFilter}|${requests.length}`);
+
   return (
     <ManagerLayout>
       <main className="mx-auto w-full max-w-5xl px-4 py-6">
@@ -337,7 +338,7 @@ function CommunityRequestsManagerView() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {requests.map((r) => {
+                        {requestPage.slice.map((r) => {
                           const resolved = r.outcome !== 'pending';
                           return (
                             <TableRow key={r.id}>
@@ -357,9 +358,9 @@ function CommunityRequestsManagerView() {
                                 ) : null}
                               </TableCell>
                               <TableCell>
-                                <Badge variant={OUTCOME_BADGE[r.outcome] ?? 'outline'}>
+                                <StatusBadge kind="communityRequest" status={r.outcome}>
                                   {OUTCOME_LABELS[r.outcome] ?? r.outcome}
-                                </Badge>
+                                </StatusBadge>
                                 {resolved && r.outcomeNote ? (
                                   <span className="mt-1 block max-w-xs text-xs text-muted-foreground whitespace-pre-line">
                                     {r.outcomeNote}
@@ -400,6 +401,7 @@ function CommunityRequestsManagerView() {
                         })}
                       </TableBody>
                     </Table>
+                    <TablePager {...requestPage} noun="requests" />
                   </CardContent>
                 </Card>
               )}

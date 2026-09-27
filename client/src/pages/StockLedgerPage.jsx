@@ -17,6 +17,8 @@ import { ArrowDownLeft, ArrowUpRight, Layers, Scale } from "lucide-react";
 
 import StatTile from "../features/taskdashboard/components/StatTile";
 import LedgerTable from "../features/InventoryManagement/components/LedgerTable";
+import TablePager from "@/components/ui/table-pager";
+import usePaged, { TABLE_PAGE_SIZE } from "@/features/staff/hooks/usePaged";
 import ReconciliationPanel from "../features/InventoryManagement/components/ReconciliationPanel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -175,6 +177,23 @@ export default function StockLedgerPage() {
     }
   };
 
+  // Movements, fifteen to a page; back to page one when a filter
+  // changes (a new first page from the server).
+  const ledgerPage = usePaged(rows, TABLE_PAGE_SIZE, `${range}|${productId}|${performedBy}|${types.join(',')}`);
+  // Next on the last loaded page: fetch the next fifty, then step on
+  // once they have arrived (the page count only grows on the next render).
+  const [advanceWhenLoaded, setAdvanceWhenLoaded] = useState(false);
+  if (advanceWhenLoaded && ledgerPage.page < ledgerPage.pages) {
+    setAdvanceWhenLoaded(false);
+    ledgerPage.next();
+  }
+  const ledgerNext = async () => {
+    if (ledgerPage.page < ledgerPage.pages) { ledgerPage.next(); return; }
+    if (!nextCursor) return;
+    setAdvanceWhenLoaded(true);
+    await loadMore();
+  };
+
   const toggleType = (value) => {
     setIsLoading(true);
     setTypes((prev) =>
@@ -306,13 +325,16 @@ export default function StockLedgerPage() {
 
           {/* ── Summary ─────────────────────────────────────── */}
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <StatTile icon={ArrowUpRight} label="Stock in"
+            {/* Green in, red out, net change green or red by its sign,
+                movements amber — the inventory screen's card colours. */}
+            <StatTile icon={ArrowUpRight} label="Stock in" tone="good"
                       value={summary ? fmtQty(summary.totalIn) : "—"} />
-            <StatTile icon={ArrowDownLeft} label="Stock out"
+            <StatTile icon={ArrowDownLeft} label="Stock out" tone="bad"
                       value={summary ? fmtQty(Math.abs(summary.totalOut)) : "—"} />
             <StatTile icon={Scale} label="Net change"
+                      tone={!summary || Number(summary.netChange) === 0 ? undefined : Number(summary.netChange) > 0 ? "good" : "bad"}
                       value={summary ? fmtQty(summary.netChange) : "—"} />
-            <StatTile icon={Layers} label="Movements"
+            <StatTile icon={Layers} label="Movements" tone="warn"
                       value={summary ? summary.movementCount : "—"} />
           </div>
 
@@ -324,17 +346,20 @@ export default function StockLedgerPage() {
 
           <Card>
             <CardContent className="p-0">
-              <LedgerTable rows={rows} isLoading={isLoading} />
+              <LedgerTable rows={ledgerPage.slice} isLoading={isLoading} />
+              {/* Fifteen to a page. The server sends fifty at a time, so
+                  Next on the last loaded page fetches the next fifty
+                  and moves on to them. */}
+              <TablePager
+                {...ledgerPage}
+                noun="movements"
+                hasMore={Boolean(nextCursor)}
+                loading={isPaging}
+                next={ledgerNext}
+                className="border-t px-3"
+              />
             </CardContent>
           </Card>
-
-          {nextCursor && (
-            <div className="flex justify-center">
-              <Button variant="outline" onClick={loadMore} disabled={isPaging}>
-                {isPaging ? "Loading…" : "Load more"}
-              </Button>
-            </div>
-          )}
         </>
       )}
 

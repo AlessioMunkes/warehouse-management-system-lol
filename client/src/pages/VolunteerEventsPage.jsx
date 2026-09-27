@@ -18,7 +18,7 @@ import { CalendarDays, CheckCircle2, Pencil, Plus, XCircle } from 'lucide-react'
 import EventFormDialog from '../features/volunteerManagement/components/EventFormDialog';
 import volunteerManagementAPI from '../services/volunteerManagementAPI';
 import { VOLUNTEERS } from '../routes/paths';
-import { Badge } from '@/components/ui/badge';
+import StatusBadge from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -29,6 +29,8 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import TablePager from '@/components/ui/table-pager';
+import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
 
 // Terminal events remain visible for history, but no longer expose edit or
 // lifecycle actions that would be invalid after completion/cancellation.
@@ -101,6 +103,8 @@ export default function VolunteerEventsPage() {
       });
   }, [events, fromDate, search, sortDirection, statusFilter, toDate]);
 
+  // Events, fifteen to a page.
+  const eventPage = usePaged(visibleEvents, TABLE_PAGE_SIZE, visibleEvents.length + (visibleEvents[0]?.id ?? ""));
   const filtersActive = Boolean(search || fromDate || toDate || statusFilter !== 'all' || sortDirection !== 'asc');
 
   const clearFilters = () => {
@@ -280,7 +284,7 @@ export default function VolunteerEventsPage() {
                     <TableHead>Event</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead>
                   </TableRow></TableHeader>
                   <TableBody>
-                    {visibleEvents.map((event) => {
+                    {eventPage.slice.map((event) => {
                       const terminal = terminalStatuses.has(event.status);
                       return (
                         <TableRow key={event.id}>
@@ -292,7 +296,7 @@ export default function VolunteerEventsPage() {
                             {event.venueName && <p className="text-xs text-muted-foreground mt-1">{event.venueName}{event.address ? ` (${event.address})` : ''}</p>}
                           </TableCell>
                           <TableCell>{displayDate(event.eventDate)}</TableCell>
-                          <TableCell><Badge variant="outline">{event.statusLabel}</Badge></TableCell>
+                          <TableCell><StatusBadge kind="volunteerEvent" status={event.status}>{event.statusLabel}</StatusBadge></TableCell>
                           <TableCell>
                             <div className="flex justify-end gap-2">
                               <Button asChild size="sm" variant="outline"><Link to={VOLUNTEERS.event(event.id)}>Open</Link></Button>
@@ -306,6 +310,7 @@ export default function VolunteerEventsPage() {
                     })}
                   </TableBody>
                 </Table>
+                <TablePager {...eventPage} noun="events" />
               </div>
                 )}
               </div>

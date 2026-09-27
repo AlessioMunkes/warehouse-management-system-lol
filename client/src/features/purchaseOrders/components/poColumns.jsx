@@ -13,7 +13,7 @@
 // Numeric columns say so. "10" sorts before "9" as text, and a
 // purchase order for R 9 000 is not larger than one for R 10 000.
 // ─────────────────────────────────────────────────────────────
-import { Badge } from '@/components/ui/badge';
+import StatusBadge from '@/components/ui/status-badge';
 import { OPEN_PO_STATUSES } from '@/services/purchaseOrderAPI';
 
 const fmtDate = (value) =>
@@ -26,14 +26,9 @@ const money = (value) =>
     minimumFractionDigits: 2, maximumFractionDigits: 2,
   })}`;
 
+// Colour, fill and icon per status come from lib/statusStyles.js.
 // BR-07C: returned and follow-up-required are the two the manager is
-// meant to notice, so they get the destructive badge rather than
-// sitting quietly in a list of six greys.
-const badgeVariant = (status) => {
-  if (status === 'returned' || status === 'follow_up_required') return 'destructive';
-  if (status === 'completed') return 'secondary';
-  return 'outline';
-};
+// meant to notice, so both are red — told apart by icon and fill.
 
 export const PO_COLUMNS = [
   { key: 'poNumber', label: 'PO number', alwaysOn: true, weight: 2.2,
@@ -53,7 +48,7 @@ export const PO_COLUMNS = [
     cellClass: '',
     cell: (po) => (
       <>
-        <Badge variant={badgeVariant(po.status)}>{po.statusLabel}</Badge>
+        <StatusBadge kind="purchaseOrder" status={po.status}>{po.statusLabel}</StatusBadge>
         {/* An instalment count only means something while the order is
             still open — BR-07A partial receipts. */}
         {po.receiptCount > 0 && OPEN_PO_STATUSES.includes(po.status) ? (

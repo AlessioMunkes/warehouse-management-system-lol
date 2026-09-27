@@ -52,6 +52,8 @@ import { Badge } from '@/components/ui/badge';
 import { Search, CalendarPlus, PackagePlus, X, ArrowLeft, QrCode, Printer, AlertTriangle } from 'lucide-react';
 import { openLabelPdf, publicAppOrigin, isReachableByPhone } from '../features/packing/palletLabelPdf';
 import { fmtQty } from '../lib/quantity';
+import TablePager from '@/components/ui/table-pager';
+import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
 
 const COHORT_OPTIONS = [
   { value: 'week1', label: 'Week 1' },
@@ -356,6 +358,8 @@ export default function PickingSlipManagementPage() {
     ? slips.filter((s) => s.ecd_name.toLowerCase().includes(search.trim().toLowerCase()))
     : slips;
 
+  // Slips, fifteen to a page.
+  const slipPage = usePaged(filteredSlips, TABLE_PAGE_SIZE, `${search}|${filteredSlips.length}`);
   return (
     <ManagerLayout>
       <main className="mx-auto w-full max-w-4xl px-4 py-6">
@@ -619,7 +623,7 @@ export default function PickingSlipManagementPage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {filteredSlips.map((slip) => (
+                          {slipPage.slice.map((slip) => (
                             <TableRow key={slip.id} className="cursor-pointer" onClick={() => openSlip(slip.id)}>
                               <TableCell className="font-medium">{slip.ecd_name}</TableCell>
                               <TableCell className="text-muted-foreground">
@@ -646,6 +650,7 @@ export default function PickingSlipManagementPage() {
                           ))}
                         </TableBody>
                       </Table>
+                      <TablePager {...slipPage} noun="slips" />
                     </CardContent>
                   </Card>
                 )}

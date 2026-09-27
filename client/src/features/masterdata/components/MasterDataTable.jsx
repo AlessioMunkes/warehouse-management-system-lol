@@ -45,6 +45,8 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react';
+import TablePager from '@/components/ui/table-pager';
+import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
 
 export default function MasterDataTable({
   columns,        // the VISIBLE columns, from useTableView
@@ -58,10 +60,19 @@ export default function MasterDataTable({
   // attribute, so a caller that needs something else does not have to
   // come back here for it.
   rowAttrs,
+  // Fifteen rows a page, with Previous / Next underneath once there
+  // are more. Every list that renders through here gets it — users,
+  // products, suppliers, beneficiaries, purchase orders, the door log.
+  pageSize = TABLE_PAGE_SIZE,
+  noun = 'records',
 }) {
+  // Back to page one when the sort or the filtered set changes.
+  const resetKey = `${sort?.key}|${sort?.direction}|${rows.length}|${rows.length ? rowKey(rows[0]) : ''}`;
+  const paged = usePaged(rows, pageSize, resetKey);
   const totalWeight = columns.reduce((sum, c) => sum + (c.weight ?? 1), 0) || 1;
 
   return (
+    <>
     <Table className="w-full table-fixed">
       <colgroup>
         {columns.map((col) => (
@@ -109,7 +120,7 @@ export default function MasterDataTable({
       </TableHeader>
 
       <TableBody>
-        {rows.map((row) => (
+        {paged.slice.map((row) => (
           <TableRow
             key={rowKey(row)}
             className="cursor-pointer"
@@ -128,5 +139,7 @@ export default function MasterDataTable({
         ))}
       </TableBody>
     </Table>
+    <TablePager {...paged} noun={noun} className="border-t px-3" />
+    </>
   );
 }

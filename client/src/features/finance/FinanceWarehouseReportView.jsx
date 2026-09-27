@@ -23,6 +23,8 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import TablePager from '@/components/ui/table-pager';
+import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
 
 const PERIODS = {
   this_month: 'This Month',
@@ -654,6 +656,8 @@ function LegendItem({ color, label }) {
 }
 
 function FinanceList({ rows, type, search, onSearchChange, onExportCsv, onExportExcel }) {
+  // Movements, fifteen to a page.
+  const rowPage = usePaged(rows, TABLE_PAGE_SIZE, `${type}|${search}|${rows.length}`);
   return (
     <Card className="mt-4">
       <CardHeader className="gap-3 sm:flex sm:flex-row sm:items-center sm:justify-between">
@@ -687,11 +691,12 @@ function FinanceList({ rows, type, search, onSearchChange, onExportCsv, onExport
                   No matching movements.
                 </TableCell>
               </TableRow>
-            ) : rows.map((row) => (
+            ) : rowPage.slice.map((row) => (
               <ListRow key={`${type}-${referenceId(row)}-${productName(row)}-${movementDate(row)}`} row={row} type={type} />
             ))}
           </TableBody>
         </Table>
+        <TablePager {...rowPage} noun="movements" />
       </CardContent>
     </Card>
   );

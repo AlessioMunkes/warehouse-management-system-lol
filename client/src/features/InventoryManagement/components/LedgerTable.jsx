@@ -6,7 +6,7 @@
 // ledger is chronological by definition and re-sorting it by quantity
 // would make the running balance column meaningless.
 // ─────────────────────────────────────────────────────────────
-import { Badge } from "@/components/ui/badge";
+import StatusBadge from "@/components/ui/status-badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -23,12 +23,7 @@ const TYPE_LABEL = {
   wastage:    "Wastage",
 };
 
-// Tone follows what the movement means, not its sign: wastage is a
-// loss even though a manual correction downward is not.
-const TYPE_TONE = {
-  wastage:    "border-brand text-brand",
-  adjustment: "border-warn text-warn",
-};
+// Colour, fill and icon per movement type: lib/statusStyles.js (ledger).
 
 const fmtWhen = (iso) => {
   if (!iso) return "—";
@@ -97,9 +92,9 @@ export default function LedgerTable({ rows, isLoading }) {
               </TableCell>
               <TableCell className="text-xs text-muted-foreground">{m.sku}</TableCell>
               <TableCell>
-                <Badge variant="outline" className={TYPE_TONE[m.movementType] || ""}>
+                <StatusBadge kind="ledger" status={m.movementType}>
                   {TYPE_LABEL[m.movementType] ?? m.movementType}
-                </Badge>
+                </StatusBadge>
               </TableCell>
               <TableCell
                 className={`text-right font-mono text-sm ${m.quantity < 0 ? "text-brand" : ""}`}

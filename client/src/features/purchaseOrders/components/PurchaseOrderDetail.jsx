@@ -21,6 +21,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
+import StatusBadge from '@/components/ui/status-badge';
 import {
   AlertDialog, AlertDialogContent, AlertDialogDescription,
   AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogCancel,
@@ -69,7 +70,7 @@ export default function PurchaseOrderDetail({
   // the same card.
   const facts = [
     ['Supplier',   po.supplierName],
-    ['Status',     po.statusLabel],
+    ['Status',     <StatusBadge key="status" kind="purchaseOrder" status={po.status}>{po.statusLabel}</StatusBadge>],
     ['Expected',   fmtDate(po.expectedDeliveryDate)],
   ];
 

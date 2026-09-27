@@ -60,6 +60,8 @@ import {
 } from "lucide-react";
 
 import "../../../styles/landingpage.css";
+import TablePager from '@/components/ui/table-pager';
+import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
 
 // ── Columns ──────────────────────────────────────────────────
 // One definition drives the header, the body and the Columns menu, so
@@ -354,6 +356,8 @@ export default function StockManifestTable({
     });
   }, [filteredProducts, sort]);
 
+  // Products, fifteen to a page.
+  const productPage = usePaged(sortedProducts, TABLE_PAGE_SIZE, sortedProducts.length + (sortedProducts[0]?.id ?? ""));
   return (
     <Card className="stock-manifest-card">
       <CardHeader className="stock-manifest-header">
@@ -679,7 +683,7 @@ export default function StockManifestTable({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedProducts.map((product) => (
+                {productPage.slice.map((product) => (
                   <TableRow
                     key={product.id}
                     className={`stock-table-row${onOpenSummary ? ' cursor-pointer' : ''}`}
@@ -768,6 +772,7 @@ export default function StockManifestTable({
                 ))}
               </TableBody>
             </Table>
+            <TablePager {...productPage} noun="products" />
           </div>
         )}
       </CardContent>

@@ -9,6 +9,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
+import TablePager from '@/components/ui/table-pager';
+import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
 
 const STATUS_LABELS = {
   pending: 'Pending',
@@ -125,6 +127,8 @@ export default function EcdCollectionRemindersPage() {
     }
   };
 
+  // Reminders, fifteen to a page.
+  const reminderPage = usePaged(reminders, TABLE_PAGE_SIZE, reminders.length);
   return (
     <ManagerLayout>
       <main className="mx-auto w-full max-w-6xl px-4 py-6">
@@ -200,7 +204,7 @@ export default function EcdCollectionRemindersPage() {
                           No reminders are queued for tomorrow.
                         </TableCell>
                       </TableRow>
-                    ) : reminders.map((reminder) => (
+                    ) : reminderPage.slice.map((reminder) => (
                       <TableRow key={reminder.id}>
                         <TableCell className="font-medium">{reminder.ecdName}</TableCell>
                         <TableCell>{reminder.contactName || 'Not recorded'}</TableCell>
@@ -266,6 +270,7 @@ export default function EcdCollectionRemindersPage() {
                     ))}
                   </TableBody>
                 </Table>
+                <TablePager {...reminderPage} noun="reminders" />
               </CardContent>
             </Card>
           </div>

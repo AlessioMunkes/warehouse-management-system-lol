@@ -82,14 +82,25 @@ function useCountUp(value) {
 // `alarm` forces the red state for a value that is not a count — the
 // admin board's "Email sending: Off". Otherwise `warn` goes red only
 // above zero, as described above.
-export default function StatTile({ icon: Icon, label, value, to, warn, alarm }) {
-  const alarming = alarm ?? (warn && Number(value) > 0);
+// `tone` tints the card and its icon red / amber / green, the same
+// idea as the inventory screen's stock cards — for a figure whose
+// colour is its meaning (stock in green, stock out red). It takes
+// precedence over `warn`.
+const TONE = {
+  good: { card: 'border-good/40', icon: 'bg-good-soft text-good' },
+  warn: { card: 'border-warn/40', icon: 'bg-warn-soft text-warn' },
+  bad:  { card: 'border-danger/40', icon: 'bg-danger-soft text-danger' },
+};
+
+export default function StatTile({ icon: Icon, label, value, to, warn, alarm, tone }) {
+  const alarming = !tone && (alarm ?? (warn && Number(value) > 0));
+  const toned = TONE[tone];
   const display = useCountUp(value);
 
   const content = (
-    <Card className={`h-full transition-colors ${alarming ? 'border-brand' : 'hover:border-line-strong'}`}>
+    <Card className={`h-full transition-colors ${toned ? toned.card : alarming ? 'border-brand' : 'hover:border-line-strong'}`}>
       <CardContent className="flex items-center gap-3 p-4">
-        <div className={`rounded-full p-2 ${alarming ? 'bg-danger-soft text-brand' : 'bg-muted text-muted-foreground'}`}>
+        <div className={`rounded-full p-2 ${toned ? toned.icon : alarming ? 'bg-danger-soft text-brand' : 'bg-muted text-muted-foreground'}`}>
           <Icon className="size-5" />
         </div>
         <div>
