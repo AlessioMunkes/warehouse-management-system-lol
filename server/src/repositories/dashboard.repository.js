@@ -20,7 +20,8 @@
 //                            pallets belong, not a dashboard count.
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
-import { OPEN_PO_STATUSES } from '../constants/purchaseOrderStatus.js';
+import { OPEN_PO_STATUSES, CLOSED_PO_STATUSES } from '../constants/purchaseOrderStatus.js';
+import stockRepo from './stock.repository.js';
 
 const num = (v) => (v === null || v === undefined ? 0 : Number(v));
 
@@ -81,23 +82,41 @@ const getMyWork = async () => {
   };
 };
 
+// STOCK HEALTH, FROM THE INVENTORY SCREEN'S OWN ROWS
+// The tiles used to count `quantity_on_hand <= reorder_threshold`
+// where a threshold was set. That missed every product with no stock
+// row or no threshold — 33 of 60 in the demo data had nothing
+// available and the dashboard called them healthy — and it used on
+// hand where the inventory screen uses AVAILABLE (on hand minus what
+// is promised to slips). So the tile said 1 and the inventory filter
+// it links to said 34. Counting getManifest's rows cannot disagree
+// with that screen, because it is that screen's query.
+//   out of stock — nothing available
+//   low          — some available, at or below the reorder level
+//   healthy      — everything else
+const stockHealth = (rows) => {
+  let out = 0;
+  let low = 0;
+  for (const r of rows) {
+    const available = Number(r.available);
+    if (available <= 0) out += 1;
+    else if (available <= Number(r.reorder_threshold)) low += 1;
+  }
+  return { active: rows.length, out, low, healthy: rows.length - out - low };
+};
+
 const getSummary = async () => {
-  const [lowStock, activeProducts, openPOs, deliveriesToday, dispatchesToday, pendingCommunityRequests] = await Promise.all([
-    pool.query(
-      `SELECT COUNT(*)::int AS count
-         FROM stock_levels sl
-         JOIN products p ON p.id = sl.product_id
-        WHERE p.is_active = true
-          AND sl.reorder_threshold > 0
-          AND sl.quantity_on_hand <= sl.reorder_threshold`
-    ),
-    pool.query(
-      `SELECT COUNT(*)::int AS count FROM products WHERE is_active = true`
-    ),
+  const [manifest, openPOs, deliveriesToday, dispatchesToday, pendingCommunityRequests] = await Promise.all([
+    stockRepo.getManifest(),
+    // Open = not finished. follow_up_required is not in
+    // OPEN_PO_STATUSES (that list is "still expecting goods", which
+    // receiving needs), but an order waiting on a supplier problem is
+    // exactly one a manager has to look at — leaving it out made the
+    // tile 4 short of the orders actually outstanding.
     pool.query(
       `SELECT COUNT(*)::int AS count
          FROM purchase_orders
-        WHERE status = ANY($1)`, openPoParams
+        WHERE NOT (status = ANY($1))`, [CLOSED_PO_STATUSES]
     ),
     pool.query(
       `SELECT COUNT(*)::int AS count
@@ -124,9 +143,14 @@ const getSummary = async () => {
     ),
   ]);
 
+  const health = stockHealth(manifest);
   return {
-    lowStockCount:            num(lowStock.rows[0]?.count),
-    activeProductCount:       num(activeProducts.rows[0]?.count),
+    // Low OR out: what the inventory screen's low-stock filter shows.
+    lowStockCount:            health.low + health.out,
+    belowReorderCount:        health.low,
+    outOfStockCount:          health.out,
+    healthyStockCount:        health.healthy,
+    activeProductCount:       health.active,
     openPurchaseOrders:       num(openPOs.rows[0]?.count),
     deliveriesExpectedToday:  num(deliveriesToday.rows[0]?.count),
     pendingDispatchesToday:   num(dispatchesToday.rows[0]?.count),
@@ -134,4 +158,4 @@ const getSummary = async () => {
   };
 };
 
-export default { getSummary, getMyWork };
+export default { getSummary, getMyWork, stockHealth };

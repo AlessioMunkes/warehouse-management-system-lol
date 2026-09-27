@@ -9,6 +9,9 @@ import { apiGet } from "./api";
 
 export const toSummary = (row = {}) => ({
   lowStockCount:            Number(row.lowStockCount ?? 0),
+  belowReorderCount:        Number(row.belowReorderCount ?? 0),
+  outOfStockCount:          Number(row.outOfStockCount ?? 0),
+  healthyStockCount:        Number(row.healthyStockCount ?? 0),
   activeProductCount:       Number(row.activeProductCount ?? 0),
   openPurchaseOrders:       Number(row.openPurchaseOrders ?? 0),
   deliveriesExpectedToday:  Number(row.deliveriesExpectedToday ?? 0),

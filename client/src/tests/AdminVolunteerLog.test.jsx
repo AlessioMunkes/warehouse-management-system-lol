@@ -22,7 +22,8 @@ const read = (rel) =>
 
 const app   = read('../App.jsx');
 const nav   = read('../features/taskdashboard/components/navSections.js');
-const admin = read('../pages/AdminActivityScreen.jsx');
+// The admin dashboard's links now live in its widget catalogue.
+const admin = read('../features/dashboard/widgetCatalog.jsx');
 
 describe('the admin volunteer log is its own screen', () => {
   it('has a path of its own, under /admin', () => {

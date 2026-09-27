@@ -186,6 +186,12 @@ function Heatmap({ rows, keys, unit, highlight, onPick }) {
 export default function OperationalChart({
   report, dimensionLabel = 'Category', target = null, hint, compact = false,
   highlight: controlledHl, onHighlight, onTargetChange,
+  // Optional (name, value) => colour | null. For charts where colour
+  // carries a status (red/amber/green); null falls back to the palette.
+  colorFor,
+  // Keep the series in the order given instead of largest first — for
+  // stages (a pipeline) where the order is the meaning.
+  keepOrder = false,
 }) {
   const [targetSaving, setTargetSaving] = useState(false);
   const [targetError, setTargetError]   = useState(null);
@@ -227,7 +233,7 @@ export default function OperationalChart({
   // Category rows after sort and top-N. Time rows keep their order.
   const rows = useMemo(() => {
     const base = series.map((r) => ({ name: r.label, value: r.value, unit: r.meta?.unit }));
-    if (shape !== 'category') return base;
+    if (shape !== 'category' || keepOrder) return base;
     const sorted = [...base].sort((a, b) =>
       sortBy === 'name' ? String(a.name).localeCompare(String(b.name)) : Math.abs(b.value) - Math.abs(a.value));
     if (activeView === 'pareto') {
@@ -238,7 +244,7 @@ export default function OperationalChart({
         .slice(0, topN === 0 ? undefined : topN);
     }
     return topN === 0 ? sorted : sorted.slice(0, topN);
-  }, [series, shape, sortBy, topN, activeView]);
+  }, [series, shape, sortBy, topN, activeView, keepOrder]);
 
   const twoAxis = useMemo(() => (shape === 'twoAxis' ? pivot(series) : null), [shape, series]);
 
@@ -248,6 +254,7 @@ export default function OperationalChart({
   const additive = isAdditive(unit, series);
 
   const opacityFor = (name) => (highlight && highlight !== name ? DIM : 1);
+  const colourOf = (r, fallback) => colorFor?.(r.name, r.value) ?? fallback;
   const hbarHeight = Math.max(compact ? 150 : 180, rows.length * (compact ? 24 : 30) + 40);
   const height = compact ? 200 : 300;
 
@@ -258,7 +265,10 @@ export default function OperationalChart({
           label={{ value: `Average ${fmtValue(avg, unit)}`, fill: MUTED, fontSize: 11, position: 'insideTopRight' }} />
       )}
       {target && showTarget && (
-        <ReferenceLine {...{ [axis]: target.value }} stroke={INK} strokeDasharray="6 3" strokeWidth={1.5}
+        // extendDomain: a target above every bar (compliance at 37% against
+        // 90%) is exactly when the line matters, and Recharts would
+        // otherwise drop it for falling outside the axis.
+        <ReferenceLine {...{ [axis]: target.value }} ifOverflow="extendDomain" stroke={INK} strokeDasharray="6 3" strokeWidth={1.5}
           label={{ value: target.label, fill: INK, fontSize: 11, position: 'insideTopLeft' }} />
       )}
     </>
@@ -375,7 +385,7 @@ export default function OperationalChart({
             {tip}
             <Pie data={rows} dataKey="value" nameKey="name" innerRadius="55%" outerRadius="85%" stroke={SURF} strokeWidth={2}
               onClick={(d) => setHighlight(d.name)} cursor="pointer" isAnimationActive={false}>
-              {rows.map((r, i) => <Cell key={r.name} fill={SERIES[i % SERIES.length]} fillOpacity={opacityFor(r.name)} />)}
+              {rows.map((r, i) => <Cell key={r.name} fill={colourOf(r, SERIES[i % SERIES.length])} fillOpacity={opacityFor(r.name)} />)}
             </Pie>
           </PieChart>
         </ResponsiveContainer>
@@ -384,7 +394,7 @@ export default function OperationalChart({
             <li key={r.name}>
               <button type="button" onClick={() => setHighlight(r.name)} className="flex w-full items-center gap-2 text-left"
                 style={{ opacity: opacityFor(r.name) === 1 ? 1 : 0.5, fontWeight: highlight === r.name ? 700 : 400 }}>
-                <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: SERIES[i % SERIES.length] }} />
+                <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: colourOf(r, SERIES[i % SERIES.length]) }} />
                 <span className="min-w-0 flex-1 truncate">{formatLabel(r.name)}</span>
                 <span className="tabular-nums" style={{ color: MUTED }}>{Math.round((r.value / total) * 100)}%</span>
               </button>
@@ -428,7 +438,7 @@ export default function OperationalChart({
             {rows.map((r) => (
               <Cell
                 key={r.name}
-                fill={SINGLE}
+                fill={colourOf(r, SINGLE)}
                 fillOpacity={opacityFor(r.name)}
                 stroke={highlight === r.name ? INK : 'none'}
                 strokeWidth={highlight === r.name ? 2 : 0}

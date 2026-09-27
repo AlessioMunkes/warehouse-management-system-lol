@@ -23,6 +23,7 @@ vi.mock('../services/donationManagementAPI', async (importOriginal) => {
       ...actual,
       getFlaggedItems: (...args) => getFlaggedItemsMock(...args),
       getPendingDonations: (...args) => getPendingDonationsMock(...args),
+      getSection18AQueue: async () => [],
       // getAttentionCounts runs for real on top of the mocked sources, so
       // the deduplication logic itself is what's under test.
       async getAttentionCounts() {
@@ -45,9 +46,30 @@ vi.mock('../services/donationManagementAPI', async (importOriginal) => {
   };
 });
 
+// The screen imports useAuth from '@/context/AuthContext'; both
+// spellings resolve to the same module, so one mock covers it. The
+// role matters now: the board shows the widgets for this role.
 vi.mock('../context/AuthContext', () => ({
-  useAuth: () => ({ user: { firstName: 'Test' } }),
+  useAuth: () => ({ user: { id: 1, role: 'admin', firstName: 'Test' } }),
 }));
+
+// The other tiles' sources — not under test here, so kept off the network.
+vi.mock('../services/dashboardAPI', () => ({
+  default: {
+    getDashboardSummary: vi.fn().mockResolvedValue({
+      lowStockCount: 0, belowReorderCount: 0, outOfStockCount: 0, healthyStockCount: 1,
+      activeProductCount: 1, openPurchaseOrders: 0, deliveriesExpectedToday: 0,
+      pendingDispatchesToday: 0, pendingCommunityRequests: 0,
+    }),
+    getMyWork: vi.fn().mockResolvedValue({ slipsToPack: 0, deliveriesExpected: 0, palletsAtGate: 0 }),
+  },
+}));
+vi.mock('../services/userAPI', () => ({ getUsers: vi.fn().mockResolvedValue([]) }));
+vi.mock('../services/gmailAPI', () => ({ default: { getStatus: vi.fn().mockResolvedValue({ connected: true }) } }));
+vi.mock('../services/productAPI', () => ({ getProducts: vi.fn().mockResolvedValue([]) }));
+vi.mock('../services/supplierAPI', () => ({ getSuppliers: vi.fn().mockResolvedValue([]) }));
+vi.mock('../services/volunteerAPI', () => ({ getGuestLog: vi.fn().mockResolvedValue([]) }));
+vi.mock('../services/reportingAPI', () => ({ runReport: vi.fn().mockResolvedValue({ series: [] }) }));
 
 import AdminActivityScreen from '../pages/AdminActivityScreen';
 
@@ -76,6 +98,8 @@ const renderScreen = () =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // A saved layout from another test must not hide the shortcuts.
+  try { window.localStorage.clear(); } catch { /* none */ }
 });
 
 describe('AdminActivityScreen — Donation Management badge (D6/Q2)', () => {

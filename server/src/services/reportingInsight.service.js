@@ -175,6 +175,9 @@ export const makeTarget = (metric, cfg, value, custom) => (
     label: `${cfg.better === 'down' ? 'Limit' : 'Target'} ${targetValueText(value, metric.unit)}`,
     custom: Boolean(custom),
     defaultValue: cfg.target ?? null,
+    // Which side of the line is good — the dashboard colours a bar
+    // green, amber or red against it.
+    better: cfg.better ?? null,
   }
 );
 

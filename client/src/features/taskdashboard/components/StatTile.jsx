@@ -79,8 +79,11 @@ function useCountUp(value) {
   return display;
 }
 
-export default function StatTile({ icon: Icon, label, value, to, warn }) {
-  const alarming = warn && Number(value) > 0;
+// `alarm` forces the red state for a value that is not a count — the
+// admin board's "Email sending: Off". Otherwise `warn` goes red only
+// above zero, as described above.
+export default function StatTile({ icon: Icon, label, value, to, warn, alarm }) {
+  const alarming = alarm ?? (warn && Number(value) > 0);
   const display = useCountUp(value);
 
   const content = (

@@ -16,126 +16,36 @@
 // three flagged items counts once. See
 // donationManagementAPI.getAttentionCounts().
 // ─────────────────────────────────────────────────────────────
-import { useEffect, useState } from 'react';
-import {
-  Users2, HandHeart, Package, Truck, Gift, AlertTriangle, ScrollText,
-} from 'lucide-react';
+import { useState } from 'react';
 import DashboardGreeting from '../features/taskdashboard/components/DashboardGreeting';
-import StatTile from '../features/taskdashboard/components/StatTile';
-import ActionCard from '../features/taskdashboard/components/ActionCard';
-import { Skeleton } from '@/components/ui/skeleton';
+import CustomisableDashboard from '../features/dashboard/components/CustomisableDashboard';
 import { useAuth } from '@/context/AuthContext';
-import donationManagementAPI from '../services/donationManagementAPI';
-import dashboardAPI from '../services/dashboardAPI';
-import { getUsers } from '../services/userAPI';
-import { ADMIN } from '../routes/paths';
+
+// The admin home screen: the same customisable board as the manager's,
+// with the admin widgets (users, donation queue, shortcuts) on by
+// default. See features/dashboard/widgetCatalog.jsx.
+// What the greeting line reads, whatever widgets are showing.
+const ALWAYS = ['donations', 's18a'];
 
 export default function AdminActivityScreen() {
   const { user } = useAuth();
+  const [data, setData] = useState({});
 
-  const [donationMgmtCount, setDonationMgmtCount] = useState(null);
-  const [summary, setSummary] = useState(null);
-  const [userCount, setUserCount] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let isActive = true;
-
-    const loadDonationMgmtCount = async () => {
-      try {
-        const { total } = await donationManagementAPI.getAttentionCounts();
-        if (isActive) setDonationMgmtCount(total);
-      } catch {
-        // Advisory — a failed load leaves the card without a badge
-        // rather than blocking the screen.
-        if (isActive) setDonationMgmtCount(null);
-      }
-    };
-
-    void loadDonationMgmtCount();
-
-    // Catalog health, which is master data an admin owns.
-    dashboardAPI.getDashboardSummary()
-      .then((data) => { if (isActive) setSummary(data); })
-      .catch(() => { if (isActive) setSummary(null); })
-      .finally(() => { if (isActive) setLoading(false); });
-
-    // No count endpoint for users, and one route is not worth adding for
-    // a number this small — the directory the admin is about to open
-    // returns the rows anyway.
-    getUsers()
-      .then((rows) => { if (isActive) setUserCount(Array.isArray(rows) ? rows.length : null); })
-      .catch(() => { if (isActive) setUserCount(null); });
-
-    return () => { isActive = false; };
-  }, []);
-
-  const summaryLine = summary
+  // The admin's own to-do: the classification queue and certificates
+  // ready to issue — not the manager's stock figures.
+  const loaded = data.donations !== undefined || data.s18a !== undefined;
+  const queued = data.s18a?.queued ?? 0;
+  const summaryLine = loaded
     ? [
-        summary.lowStockCount > 0 ? `${summary.lowStockCount} low on stock` : null,
-        donationMgmtCount > 0 ? `${donationMgmtCount} in the donation queue` : null,
+        data.donations > 0 ? `${data.donations} in the donation queue` : null,
+        queued > 0 ? `${queued} certificate${queued === 1 ? '' : 's'} to issue` : null,
       ].filter(Boolean).join(' · ') || 'nothing needs your attention'
     : null;
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6">
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
       <DashboardGreeting name={user?.firstName} summaryLine={summaryLine} />
-
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {loading ? (
-          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)
-        ) : (
-          <>
-            <StatTile icon={Users2} label="User accounts" value={userCount ?? '—'} to={ADMIN.users} />
-            <StatTile icon={Package} label="Active products" value={summary?.activeProductCount ?? '—'} to={ADMIN.products} />
-            <StatTile icon={AlertTriangle} label="Low stock items" value={summary?.lowStockCount ?? 0} to="/noc/inventory" warn />
-            <StatTile icon={Gift} label="Donation queue" value={donationMgmtCount ?? 0} to={ADMIN.donationManagement} warn />
-          </>
-        )}
-      </div>
-
-      <h2 className="mt-8 mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        People
-      </h2>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <ActionCard
-          to={ADMIN.users} icon={Users2} title="Users"
-          description="Create accounts, set roles, deactivate someone who has left."
-        />
-        <ActionCard
-          to={ADMIN.volunteerLog} icon={HandHeart} title="Volunteer Log"
-          description="Everyone who signed in at the door — arrival, departure, time on site."
-        />
-      </div>
-
-      <h2 className="mt-8 mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        Master data
-      </h2>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <ActionCard
-          to={ADMIN.products} icon={Package} title="Products"
-          description="The item catalog every delivery, slip and donation references."
-        />
-        <ActionCard
-          to={ADMIN.suppliers} icon={Truck} title="Manage Suppliers"
-          description="Who the warehouse buys from, and the terms on each agreement."
-        />
-      </div>
-
-      <h2 className="mt-8 mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        Donations
-      </h2>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <ActionCard
-          to={ADMIN.donationManagement} icon={Gift} title="Classification Queue"
-          description="Pending donations and flagged items waiting on a decision."
-          badge={donationMgmtCount > 0 ? `Needs attention (${donationMgmtCount})` : null}
-        />
-        <ActionCard
-          to={ADMIN.section18aManagement} icon={ScrollText} title="Section 18A Management"
-          description="Review donations that qualify for tax certificates."
-        />
-      </div>
+      <CustomisableDashboard user={user} always={ALWAYS} onData={setData} />
     </div>
   );
 }

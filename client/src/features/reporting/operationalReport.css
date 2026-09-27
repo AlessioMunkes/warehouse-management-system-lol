@@ -14,6 +14,22 @@
   --viz-5: #d55181; --viz-6: #008300; --viz-7: #9085e9; --viz-8: #e66767;
 }
 
+/* Status colours — red / amber / green — for charts where the colour
+   MEANS something (stock health, a figure against its target). Taken
+   from the validated palette above rather than new hexes, so they
+   keep its contrast and colour-blind separation in both themes; the
+   label or legend always says the status in words too. */
+:root, .dark {
+  --rag-bad:  var(--viz-8);
+  --rag-warn: var(--viz-4);
+  --rag-good: var(--viz-3);
+  --rag-none: var(--chart-grey, #8a8a8a);
+}
+/* A slice that is there for context, not action — it should recede
+   next to the statuses someone has to do something about. */
+:root { --rag-muted: #d3d8da; }
+.dark { --rag-muted: #46535a; }
+
 /* ─────────────────────────────────────────────────────────────
    client/src/features/reporting/operationalReport.css
 

@@ -346,6 +346,9 @@ const SORT_OPTIONS = [
 ];
 
 const sortSeries = (series, sort) => {
+  // 'none' keeps the server's order — a month-by-month trend has to
+  // read left to right in time, not tallest first.
+  if (sort === 'none') return series;
   if (sort === 'desc') return [...series].sort((a, b) => b.value - a.value);
   if (sort === 'asc')  return [...series].sort((a, b) => a.value - b.value);
   return [...series].sort((a, b) => formatLabel(a.label).localeCompare(formatLabel(b.label)));
@@ -355,9 +358,9 @@ const sortSeries = (series, sort) => {
 // small preview card (TrendCard.jsx) — the aria-label summary below
 // still carries every value to assistive tech regardless, so this is
 // a visual simplification, not an accessibility trade-off.
-export default function ReportChart({ report, dimensionLabel = 'Category', compact = false }) {
+export default function ReportChart({ report, dimensionLabel = 'Category', compact = false, initialSort = 'desc' }) {
   const [asTable, setAsTable] = useState(false);
-  const [sort, setSort] = useState('desc');
+  const [sort, setSort] = useState(initialSort);
   const { series: rawSeries, chartType, meta } = report;
   const unit = meta?.unit ?? '';
 

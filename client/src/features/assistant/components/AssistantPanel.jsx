@@ -27,6 +27,7 @@ import { Input } from '@/components/ui/input';
 import { X, Send, ArrowRight, Loader2 } from 'lucide-react';
 import { pathForScreen } from '../screenPaths';
 import useAssistant from '../useAssistant';
+import { BATCHES_LOGO } from '../brand';
 
 // ── One answer ───────────────────────────────────────────────
 
@@ -268,11 +269,17 @@ export default function AssistantPanel({ open, onOpenChange, screen }) {
           ].join(' ')}
         >
           <header className="flex shrink-0 items-center justify-between border-b px-3 py-2">
-            <div className="min-w-0">
-              <p className="font-semibold">Help</p>
-              <p className="truncate text-xs text-muted-foreground">
-                Ask me how to do something
-              </p>
+            <div className="flex min-w-0 items-center gap-2">
+              <img
+                src={BATCHES_LOGO} alt="" aria-hidden="true" draggable={false}
+                className="size-9 shrink-0 rounded-full bg-white object-contain ring-1 ring-black/10"
+              />
+              <div className="min-w-0">
+                <p className="font-semibold">Help</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  Ask me how to do something
+                </p>
+              </div>
             </div>
             {/* Required inside the popup when focus is trapped: it is
                 how a touch screen-reader user gets out. */}

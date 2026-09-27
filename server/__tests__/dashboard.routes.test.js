@@ -79,3 +79,23 @@ describe('dashboard controller — responses', () => {
     expect(res.body.message).not.toMatch(/relation/);
   });
 });
+
+// Stock health is counted from the inventory screen's own rows, so the
+// tile and the inventory filter it links to cannot disagree. The case
+// that was wrong: a product with no stock and no reorder level used to
+// count as healthy.
+describe('stock health', async () => {
+  const { default: repo } = await import('../src/repositories/dashboard.repository.js');
+  const row = (available, reorder_threshold) => ({ available: String(available), reorder_threshold: String(reorder_threshold) });
+
+  it('splits products into out of stock, low and healthy by what is available', () => {
+    expect(repo.stockHealth([
+      row(0, 0),     // nothing, no reorder level: OUT, not healthy
+      row(-2, 5),    // shortfall: out
+      row(3, 5),     // low
+      row(5, 5),     // at the level: low
+      row(9, 5),     // healthy
+      row(4, 0),     // no level set, some stock: healthy
+    ])).toEqual({ active: 6, out: 2, low: 2, healthy: 2 });
+  });
+});
