@@ -125,8 +125,8 @@ const PendingItemRow = ({ item }) => {
         </div>
       </TableCell>
       <TableCell className="text-xs text-muted-foreground">{item.routing_status || '—'}</TableCell>
-      <TableCell className="text-right">
-        <div className="flex flex-col items-end">
+      <TableCell className="text-center">
+        <div className="flex flex-col items-center">
           <span>{Number(item.quantity || 0).toLocaleString('en-ZA')} {item.unit || item.default_unit || ''}</span>
           <ItemStatusChip status={item.status} />
         </div>
@@ -179,7 +179,7 @@ const PendingDonationCard = ({ donation, onStatusClick }) => {
               <TableHead className="w-[40px]">#</TableHead>
               <TableHead>Description</TableHead>
               <TableHead>Routing</TableHead>
-              <TableHead className="text-right">Qty</TableHead>
+              <TableHead className="text-center">Qty</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

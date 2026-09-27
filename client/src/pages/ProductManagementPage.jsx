@@ -73,7 +73,7 @@ const COLUMNS = [
     // which sorts last in both directions rather than reading as the
     // cheapest thing in the catalogue.
     sort: (p) => (p.unitCost ?? null),
-    cellClass: 'text-right',
+    cellClass: 'text-center',
     cell: (p) => (p.unitCost === null || p.unitCost === undefined
       ? '—'
       : `R ${p.unitCost.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`) },

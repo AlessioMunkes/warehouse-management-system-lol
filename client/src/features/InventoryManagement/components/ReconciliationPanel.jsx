@@ -66,10 +66,10 @@ export default function ReconciliationPanel({ data, isLoading }) {
             <TableRow>
               <TableHead>Product</TableHead>
               <TableHead className="w-[110px]">SKU</TableHead>
-              <TableHead className="w-[120px] text-right">On hand</TableHead>
-              <TableHead className="w-[120px] text-right">Ledger sum</TableHead>
-              <TableHead className="w-[120px] text-right">Variance</TableHead>
-              <TableHead className="w-[110px] text-right">Movements</TableHead>
+              <TableHead className="w-[120px] text-center">On hand</TableHead>
+              <TableHead className="w-[120px] text-center">Ledger sum</TableHead>
+              <TableHead className="w-[120px] text-center">Variance</TableHead>
+              <TableHead className="w-[110px] text-center">Movements</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -79,14 +79,14 @@ export default function ReconciliationPanel({ data, isLoading }) {
                   {r.name}
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">{r.sku}</TableCell>
-                <TableCell className="text-right font-mono text-sm">{fmt(r.balance)} {r.unit}</TableCell>
-                <TableCell className="text-right font-mono text-sm">{fmt(r.ledgerSum)}</TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-center font-mono text-sm">{fmt(r.balance)} {r.unit}</TableCell>
+                <TableCell className="text-center font-mono text-sm">{fmt(r.ledgerSum)}</TableCell>
+                <TableCell className="text-center">
                   <Badge variant="outline" className="border-brand font-mono text-brand">
                     {r.variance > 0 ? "+" : ""}{fmt(r.variance)}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right text-xs text-muted-foreground">
+                <TableCell className="text-center text-xs text-muted-foreground">
                   {r.movementCount}
                 </TableCell>
               </TableRow>

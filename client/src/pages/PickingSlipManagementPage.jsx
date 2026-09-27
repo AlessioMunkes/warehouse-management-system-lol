@@ -618,7 +618,7 @@ export default function PickingSlipManagementPage() {
                             <TableHead>Cohort</TableHead>
                             <TableHead>Assigned to</TableHead>
                             <TableHead>Status</TableHead>
-                            <TableHead>Items</TableHead>
+                            <TableHead className="text-center">Items</TableHead>
                             <TableHead className="text-right">Label</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -631,7 +631,7 @@ export default function PickingSlipManagementPage() {
                               </TableCell>
                               <TableCell className="text-muted-foreground">{slip.packer_name || 'Unassigned'}</TableCell>
                               <TableCell><Badge variant="outline">{slip.status}</Badge></TableCell>
-                              <TableCell className="text-muted-foreground">
+                              <TableCell className="text-center text-muted-foreground">
                                 {slip.confirmed_items}/{slip.total_items}
                               </TableCell>
                               {/* For a slip added late, or a label torn

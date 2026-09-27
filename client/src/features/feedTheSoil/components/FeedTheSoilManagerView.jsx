@@ -35,6 +35,8 @@ import {
 } from '@/components/ui/table';
 import { Plus, Loader2, Search } from 'lucide-react';
 import TablePager from '@/components/ui/table-pager';
+import SortableHead from '@/components/ui/sortable-head';
+import useSortable from '@/lib/useSortable';
 import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
 
 const STATUS_LABELS = { assigned: 'Assigned', logged: 'Logged', dispatched: 'Dispatched' };
@@ -52,6 +54,24 @@ const fmtDateTime = (value) =>
     : '—';
 
 const fmtKg = (value) => (value === null || value === undefined ? '—' : `${Number(value).toLocaleString('en-ZA')} kg`);
+
+// Click a column name to sort by it. Status sorts in the order a kit
+// moves through (assigned → logged → dispatched), not alphabetically.
+const STATUS_ORDER = { assigned: 0, logged: 1, dispatched: 2 };
+const time = (v) => (v ? new Date(v).getTime() : null);
+const KIT_SORT = {
+  kit: (k) => Number(k.id),
+  owner: (k) => k.owner_name,
+  suburb: (k) => k.suburb,
+  status: (k) => STATUS_ORDER[k.status] ?? 9,
+  lastLogged: (k) => time(k.last_logged_at),
+  assigned: (k) => time(k.assigned_at),
+};
+const RECORD_SORT = {
+  kit: (r) => Number(r.kit_id),
+  owner: (r) => r.owner_name,
+  status: (r) => STATUS_ORDER[r.status] ?? 9,
+};
 
 const KitStatus = ({ status }) => (
   <StatusBadge kind="kit" status={status}>{STATUS_LABELS[status] ?? status}</StatusBadge>
@@ -499,9 +519,11 @@ export default function FeedTheSoilManagerView() {
   };
 
   // Kits, fifteen to a page.
-  const kitPage = usePaged(kits, TABLE_PAGE_SIZE, `${kitSearch}|${kits.length}`);
+  const kitSort = useSortable(kits, KIT_SORT);
+  const kitPage = usePaged(kitSort.rows, TABLE_PAGE_SIZE, `${kitSearch}|${kits.length}|${kitSort.sort?.key}|${kitSort.sort?.dir}`);
   // Records, fifteen to a page.
-  const recordPage = usePaged(records, TABLE_PAGE_SIZE, `${recordSearch}|${records.length}`);
+  const recordSort = useSortable(records, RECORD_SORT);
+  const recordPage = usePaged(recordSort.rows, TABLE_PAGE_SIZE, `${recordSearch}|${records.length}|${recordSort.sort?.key}|${recordSort.sort?.dir}`);
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-6">
       <h1 className="text-2xl font-medium">Feed the Soil</h1>
@@ -586,12 +608,12 @@ export default function FeedTheSoilManagerView() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Kit</TableHead>
-                        <TableHead>Owner</TableHead>
-                        <TableHead>Suburb</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Last logged</TableHead>
-                        <TableHead>Assigned</TableHead>
+                        <SortableHead label="Kit" sortKey="kit" sort={kitSort.sort} onSort={kitSort.toggle} />
+                        <SortableHead label="Owner" sortKey="owner" sort={kitSort.sort} onSort={kitSort.toggle} />
+                        <SortableHead label="Suburb" sortKey="suburb" sort={kitSort.sort} onSort={kitSort.toggle} />
+                        <SortableHead label="Status" sortKey="status" sort={kitSort.sort} onSort={kitSort.toggle} />
+                        <SortableHead label="Last logged" sortKey="lastLogged" sort={kitSort.sort} onSort={kitSort.toggle} />
+                        <SortableHead label="Assigned" sortKey="assigned" sort={kitSort.sort} onSort={kitSort.toggle} />
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -640,9 +662,9 @@ export default function FeedTheSoilManagerView() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Kit</TableHead>
-                        <TableHead>Owner</TableHead>
-                        <TableHead>Status</TableHead>
+                        <SortableHead label="Kit" sortKey="kit" sort={recordSort.sort} onSort={recordSort.toggle} />
+                        <SortableHead label="Owner" sortKey="owner" sort={recordSort.sort} onSort={recordSort.toggle} />
+                        <SortableHead label="Status" sortKey="status" sort={recordSort.sort} onSort={recordSort.toggle} />
                       </TableRow>
                     </TableHeader>
                     <TableBody>

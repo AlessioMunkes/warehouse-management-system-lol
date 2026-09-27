@@ -30,6 +30,8 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import TablePager from '@/components/ui/table-pager';
+import SortableHead from '@/components/ui/sortable-head';
+import { compareValues } from '@/lib/useSortable';
 import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
 
 // Terminal events remain visible for history, but no longer expose edit or
@@ -51,6 +53,14 @@ const ErrorBanner = ({ message, onRetry }) => (
 );
 
 const eventDateValue = (event) => String(event.eventDate ?? '').slice(0, 10);
+
+// Status sorts by where an event is in its life, not alphabetically.
+const STATUS_ORDER = { DRAFT: 0, SCHEDULED: 1, PUBLISHED: 2, COMPLETED: 3, CANCELLED: 4 };
+const EVENT_SORT = {
+  name: (e) => String(e.name ?? '').toLowerCase(),
+  date: (e) => eventDateValue(e) || '9999-12-31',
+  status: (e) => STATUS_ORDER[e.status] ?? 9,
+};
 
 const eventSearchText = (event) => [
   event.name,
@@ -84,6 +94,10 @@ export default function VolunteerEventsPage() {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [sortDirection, setSortDirection] = useState('asc');
+  // Which column the table is sorted by. Date is the default and is the
+  // same setting as the Sort dropdown; Event and Status come from
+  // clicking their column names.
+  const [sortKey, setSortKey] = useState('date');
   const [statusFilter, setStatusFilter] = useState('all');
 
   const visibleEvents = useMemo(() => {
@@ -97,21 +111,32 @@ export default function VolunteerEventsPage() {
         return matchesStatus(event, statusFilter);
       })
       .sort((a, b) => {
-        const left = eventDateValue(a) || '9999-12-31';
-        const right = eventDateValue(b) || '9999-12-31';
-        return sortDirection === 'asc' ? left.localeCompare(right) : right.localeCompare(left);
+        const by = EVENT_SORT[sortKey] ?? EVENT_SORT.date;
+        const c = compareValues(by(a), by(b));
+        return sortDirection === 'asc' ? c : -c;
       });
-  }, [events, fromDate, search, sortDirection, statusFilter, toDate]);
+  }, [events, fromDate, search, sortDirection, sortKey, statusFilter, toDate]);
+
+  // Click a column name: sort by it, again to flip the order, a third
+  // time to go back to how the page opened (earliest date first).
+  const toggleSort = (key) => {
+    if (key !== sortKey) { setSortKey(key); setSortDirection('asc'); return; }
+    if (sortDirection === 'asc') { setSortDirection('desc'); return; }
+    setSortKey('date');
+    setSortDirection('asc');
+  };
+  const tableSort = { key: sortKey, dir: sortDirection };
 
   // Events, fifteen to a page.
-  const eventPage = usePaged(visibleEvents, TABLE_PAGE_SIZE, visibleEvents.length + (visibleEvents[0]?.id ?? ""));
-  const filtersActive = Boolean(search || fromDate || toDate || statusFilter !== 'all' || sortDirection !== 'asc');
+  const eventPage = usePaged(visibleEvents, TABLE_PAGE_SIZE, `${visibleEvents.length}|${sortKey}|${sortDirection}|${search}|${statusFilter}`);
+  const filtersActive = Boolean(search || fromDate || toDate || statusFilter !== 'all' || sortDirection !== 'asc' || sortKey !== 'date');
 
   const clearFilters = () => {
     setSearch('');
     setFromDate('');
     setToDate('');
     setSortDirection('asc');
+    setSortKey('date');
     setStatusFilter('all');
   };
 
@@ -261,7 +286,8 @@ export default function VolunteerEventsPage() {
                   </div>
                   <div className="grid gap-2">
                     <label htmlFor="event-sort" className="text-sm font-medium">Sort</label>
-                    <select id="event-sort" className="h-9 rounded-md border bg-background px-3 text-sm" value={sortDirection} onChange={(e) => setSortDirection(e.target.value)}>
+                    <select id="event-sort" className="h-9 rounded-md border bg-background px-3 text-sm" value={sortKey === 'date' ? sortDirection : 'column'} onChange={(e) => { setSortKey('date'); setSortDirection(e.target.value); }}>
+                      {sortKey !== 'date' && <option value="column" disabled>By {sortKey === 'name' ? 'event' : 'status'} ({sortDirection === 'asc' ? 'A to Z' : 'Z to A'})</option>}
                       <option value="asc">Earliest to Latest</option>
                       <option value="desc">Latest to Earliest</option>
                     </select>
@@ -281,7 +307,7 @@ export default function VolunteerEventsPage() {
               <div className="overflow-x-auto rounded-md border">
                 <Table>
                   <TableHeader><TableRow>
-                    <TableHead>Event</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead>
+                    <SortableHead label="Event" sortKey="name" sort={tableSort} onSort={toggleSort} /><SortableHead label="Date" sortKey="date" sort={tableSort} onSort={toggleSort} /><SortableHead label="Status" sortKey="status" sort={tableSort} onSort={toggleSort} /><TableHead className="text-right">Actions</TableHead>
                   </TableRow></TableHeader>
                   <TableBody>
                     {eventPage.slice.map((event) => {

@@ -181,9 +181,9 @@ export default function PurchaseOrderDetail({
             <TableHeader>
               <TableRow>
                 <TableHead>Item</TableHead>
-                <TableHead className="text-right">Expected</TableHead>
-                <TableHead className="text-right">Received</TableHead>
-                <TableHead className="text-right">Unit price</TableHead>
+                <TableHead className="text-center">Expected</TableHead>
+                <TableHead className="text-center">Received</TableHead>
+                <TableHead className="text-center">Unit price</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -197,16 +197,16 @@ export default function PurchaseOrderDetail({
                         <span className="block text-xs text-muted-foreground">{line.sku}</span>
                       ) : null}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-center">
                       {line.expectedQuantity}{line.defaultUnit ? ` ${line.defaultUnit}` : ''}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-center">
                       {line.receivedToDate}
                       {outstanding > 0 && line.receivedToDate > 0 ? (
                         <Badge variant="outline" className="ml-2">{outstanding} short</Badge>
                       ) : null}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-center">
                       {line.unitPrice === null ? '—' : money(line.unitPrice)}
                     </TableCell>
                   </TableRow>

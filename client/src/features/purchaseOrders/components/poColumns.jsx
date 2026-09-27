@@ -68,11 +68,11 @@ export const PO_COLUMNS = [
 
   { key: 'lines', label: 'Lines', weight: 1.3, minWidth: 'lg', numeric: true,
     sort: (po) => Number(po.lineCount ?? 0),
-    cellClass: 'text-right',
+    cellClass: 'text-center',
     cell: (po) => po.lineCount },
 
   { key: 'estimated', label: 'Estimated', weight: 2.4, minWidth: 'lg', numeric: true,
     sort: (po) => Number(po.estimatedValue ?? 0),
-    cellClass: 'text-right',
+    cellClass: 'text-center',
     cell: (po) => money(po.estimatedValue) },
 ];

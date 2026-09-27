@@ -78,17 +78,17 @@ import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
 // Widths re-proportioned to make room for the trend column without
 // reintroducing horizontal scroll — they still total 100%.
 const COLUMNS = [
-  { key: 'name',      label: 'Product',   width: '22%', align: 'left',
+  { key: 'name',      label: 'Product',   width: '19%', align: 'left',
     sort: (p) => (p.name ?? '').toLowerCase() },
-  { key: 'sku',       label: 'SKU',       width: '12%', align: 'left',
+  { key: 'sku',       label: 'SKU',       width: '11%', align: 'left',
     sort: (p) => (p.sku ?? '').toLowerCase() },
-  { key: 'onHand',    label: 'On Hand',   width: '9%',  align: 'right',
+  { key: 'onHand',    label: 'On Hand',   width: '9%',  align: 'center',
     sort: (p) => Number(p.onHand ?? 0) },
-  { key: 'committed', label: 'Committed', width: '9%',  align: 'right',
+  { key: 'committed', label: 'Committed', width: '9%',  align: 'center',
     sort: (p) => Number(p.committed ?? 0) },
-  { key: 'available', label: 'Available', width: '9%',  align: 'right',
+  { key: 'available', label: 'Available', width: '9%',  align: 'center',
     sort: (p) => Number(p.available ?? 0) },
-  { key: 'reorderAt', label: 'Reorder At',width: '9%',  align: 'right',
+  { key: 'reorderAt', label: 'Reorder At',width: '8%',  align: 'center',
     sort: (p) => Number(p.reorderAt ?? 0) },
   // Not sortable, deliberately. Every other accessor here reads a
   // field off the product row, but the series lives in the `trends`
@@ -97,13 +97,15 @@ const COLUMNS = [
   // casing this one column inside the component; worth doing if
   // someone asks for it, not worth a fake accessor that silently
   // sorts by nothing.
-  { key: 'trend',     label: '30 days',   width: '12%', align: 'left',
+  { key: 'trend',     label: '30 days',   width: '11%', align: 'left',
     sort: null },
-  { key: 'status',    label: 'Status',    width: '9%',  align: 'left',
+  // Wide enough for "Low stock" / "Shortfall" on one line, with a
+  // gap before the action buttons — at 9% the badge ran into them.
+  { key: 'status',    label: 'Status',    width: '12%',  align: 'left',
     // Shortfall first, then low stock, then healthy — the order someone
     // scanning for problems wants, not alphabetical.
     sort: (p) => (p.isShortfall ? 2 : p.isLowStock ? 1 : 0) },
-  { key: 'actions',   label: 'Actions',   width: '9%',  align: 'right',
+  { key: 'actions',   label: 'Actions',   width: '12%',  align: 'right',
     sort: null },
 ];
 
@@ -651,7 +653,7 @@ export default function StockManifestTable({
                       // one, a bigger font, a narrower window — the full
                       // text is still one hover away rather than lost.
                       title={c.label || undefined}
-                      className={`px-2 font-semibold ${c.align === 'right' ? 'text-right' : ''}`}
+                      className={`px-2 font-semibold ${c.align === 'right' ? 'text-right' : c.align === 'center' ? 'text-center' : ''}`}
                     >
                       {c.sort ? (
                         <button
@@ -659,7 +661,7 @@ export default function StockManifestTable({
                           onClick={() => toggleSort(c.key)}
                           aria-label={`Sort by ${c.label}`}
                           className={`flex w-full min-w-0 items-center gap-1 hover:text-ink ${
-                            c.align === 'right' ? 'flex-row-reverse' : ''
+                            c.align === 'right' ? 'flex-row-reverse' : c.align === 'center' ? 'justify-center' : ''
                           }`}
                         >
                           {/* min-w-0 + truncate. An inline-flex whose
@@ -704,7 +706,7 @@ export default function StockManifestTable({
                         </TableCell>
                       );
                       if (c.key === 'onHand') return (
-                        <TableCell key={c.key} className="text-right font-medium">
+                        <TableCell key={c.key} className="text-center font-medium">
                           {product.onHand} {product.unit}
                         </TableCell>
                       );
@@ -712,19 +714,19 @@ export default function StockManifestTable({
                       // muted rather than dashed out — a dash would
                       // read as "unknown".
                       if (c.key === 'committed') return (
-                        <TableCell key={c.key} className="text-right text-muted-foreground">
+                        <TableCell key={c.key} className="text-center text-muted-foreground">
                           {product.committed > 0 ? `${product.committed} ${product.unit}` : "—"}
                         </TableCell>
                       );
                       // The number the allocation decision is made on,
                       // so it carries the emphasis.
                       if (c.key === 'available') return (
-                        <TableCell key={c.key} className="text-right font-semibold">
+                        <TableCell key={c.key} className="text-center font-semibold">
                           {product.available} {product.unit}
                         </TableCell>
                       );
                       if (c.key === 'reorderAt') return (
-                        <TableCell key={c.key} className="text-right text-muted-foreground">
+                        <TableCell key={c.key} className="text-center text-muted-foreground">
                           {product.reorderAt} {product.unit}
                         </TableCell>
                       );
@@ -734,7 +736,7 @@ export default function StockManifestTable({
                         </TableCell>
                       );
                       if (c.key === 'status') return (
-                        <TableCell key={c.key}>{renderStatusBadge(product)}</TableCell>
+                        <TableCell key={c.key} className="whitespace-nowrap pr-4">{renderStatusBadge(product)}</TableCell>
                       );
                       return (
                         <TableCell key={c.key} className="stock-action-cell">

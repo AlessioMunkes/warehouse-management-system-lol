@@ -711,10 +711,10 @@ function ListHeader({ type }) {
         <TableHead>ref</TableHead>
         <TableHead>{sourceLabel}</TableHead>
         <TableHead>product</TableHead>
-        <TableHead>qty</TableHead>
+        <TableHead className="text-center">qty</TableHead>
         <TableHead>unit</TableHead>
         {type !== 'dispatched' && (
-          <TableHead>{type === 'received' ? 'value' : 'estimated value'}</TableHead>
+          <TableHead className="text-center">{type === 'received' ? 'value' : 'estimated value'}</TableHead>
         )}
       </TableRow>
     </TableHeader>
@@ -728,10 +728,10 @@ function ListRow({ row, type }) {
       <TableCell>{referenceId(row)}</TableCell>
       <TableCell>{sourceDestination(row)}</TableCell>
       <TableCell>{productName(row)}</TableCell>
-      <TableCell>{quantity(row)}</TableCell>
+      <TableCell className="text-center">{quantity(row)}</TableCell>
       <TableCell>{unit(row)}</TableCell>
       {type !== 'dispatched' && (
-        <TableCell>{formatMoney(monetaryValue(row))}</TableCell>
+        <TableCell className="text-center">{formatMoney(monetaryValue(row))}</TableCell>
       )}
     </TableRow>
   );

@@ -18,6 +18,8 @@ import { ArrowDownLeft, ArrowUpRight, Layers, Scale } from "lucide-react";
 import StatTile from "../features/taskdashboard/components/StatTile";
 import LedgerTable from "../features/InventoryManagement/components/LedgerTable";
 import TablePager from "@/components/ui/table-pager";
+import useSortable from "@/lib/useSortable";
+import { LEDGER_SORT } from "../features/InventoryManagement/ledgerSort";
 import usePaged, { TABLE_PAGE_SIZE } from "@/features/staff/hooks/usePaged";
 import ReconciliationPanel from "../features/InventoryManagement/components/ReconciliationPanel";
 import { Button } from "@/components/ui/button";
@@ -179,7 +181,37 @@ export default function StockLedgerPage() {
 
   // Movements, fifteen to a page; back to page one when a filter
   // changes (a new first page from the server).
-  const ledgerPage = usePaged(rows, TABLE_PAGE_SIZE, `${range}|${productId}|${performedBy}|${types.join(',')}`);
+  // Click a column to sort. The server sends fifty at a time, newest
+  // first; sorting only those would put "the smallest change" on page
+  // one while a smaller one sat unloaded. So choosing a sort first
+  // fetches the rest of the movements for the current filters (a
+  // period's worth, not the whole history), then sorts all of them.
+  const ledgerSort = useSortable(rows, LEDGER_SORT);
+  const [loadingAll, setLoadingAll] = useState(false);
+  const sortLedger = async (key) => {
+    ledgerSort.toggle(key);
+    if (!nextCursor || loadingAll) return;
+    setLoadingAll(true);
+    try {
+      let cursor = nextCursor;
+      const more = [];
+      // A cap, so an unfiltered "all time" can never page forever.
+      for (let i = 0; cursor && i < 40; i += 1) {
+        const res = await getLedger({ ...filters(), limit: 50, cursor });
+        more.push(...res.movements);
+        cursor = res.nextCursor;
+      }
+      setRows((prev) => [...prev, ...more]);
+      setNextCursor(cursor);
+    } catch (err) {
+      setError(err.message || "Could not load the rest of the movements to sort.");
+    } finally {
+      setLoadingAll(false);
+    }
+  };
+
+  const ledgerPage = usePaged(ledgerSort.rows, TABLE_PAGE_SIZE,
+    `${range}|${productId}|${performedBy}|${types.join(',')}|${ledgerSort.sort?.key}|${ledgerSort.sort?.dir}`);
   // Next on the last loaded page: fetch the next fifty, then step on
   // once they have arrived (the page count only grows on the next render).
   const [advanceWhenLoaded, setAdvanceWhenLoaded] = useState(false);
@@ -346,7 +378,7 @@ export default function StockLedgerPage() {
 
           <Card>
             <CardContent className="p-0">
-              <LedgerTable rows={ledgerPage.slice} isLoading={isLoading} />
+              <LedgerTable rows={ledgerPage.slice} isLoading={isLoading || loadingAll} sort={ledgerSort.sort} onSort={sortLedger} />
               {/* Fifteen to a page. The server sends fifty at a time, so
                   Next on the last loaded page fetches the next fifty
                   and moves on to them. */}

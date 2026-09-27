@@ -7,23 +7,15 @@
 // would make the running balance column meaningless.
 // ─────────────────────────────────────────────────────────────
 import StatusBadge from "@/components/ui/status-badge";
+import SortableHead from "@/components/ui/sortable-head";
+import { TYPE_LABEL } from "../ledgerSort";
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table, TableBody, TableCell, TableHeader, TableRow,
 } from "@/components/ui/table";
 
-// Same keys the database stores. Kept in step with
-// server/src/constants/movementTypes.js.
-const TYPE_LABEL = {
-  adjustment: "Manual adjustment",
-  decanted:   "Decanting",
-  dispatched: "Dispatched",
-  donated:    "Donation",
-  picked:     "Picked",
-  received:   "Received",
-  wastage:    "Wastage",
-};
 
 // Colour, fill and icon per movement type: lib/statusStyles.js (ledger).
+
 
 const fmtWhen = (iso) => {
   if (!iso) return "—";
@@ -44,7 +36,7 @@ const fmtQty = (n) => {
   return `${rounded > 0 ? "+" : ""}${rounded.toLocaleString("en-ZA")}`;
 };
 
-export default function LedgerTable({ rows, isLoading }) {
+export default function LedgerTable({ rows, isLoading, sort = null, onSort = () => {} }) {
   if (isLoading && rows.length === 0) {
     return (
       <div className="space-y-2 p-4" aria-busy="true">
@@ -71,14 +63,14 @@ export default function LedgerTable({ rows, isLoading }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[150px]">When</TableHead>
-            <TableHead>Product</TableHead>
-            <TableHead className="w-[110px]">SKU</TableHead>
-            <TableHead className="w-[140px]">Type</TableHead>
-            <TableHead className="w-[110px] text-right">Change</TableHead>
-            <TableHead className="w-[120px] text-right">Balance after</TableHead>
-            <TableHead>Reason</TableHead>
-            <TableHead className="w-[110px]">By</TableHead>
+            <SortableHead label="When" sortKey="when" sort={sort} onSort={onSort} className="w-[150px]" />
+            <SortableHead label="Product" sortKey="product" sort={sort} onSort={onSort} />
+            <SortableHead label="SKU" sortKey="sku" sort={sort} onSort={onSort} className="w-[110px]" />
+            <SortableHead label="Type" sortKey="type" sort={sort} onSort={onSort} className="w-[140px]" />
+            <SortableHead label="Change" sortKey="change" sort={sort} onSort={onSort} align="center" className="w-[110px]" />
+            <SortableHead label="Balance after" sortKey="balance" sort={sort} onSort={onSort} align="center" className="w-[120px]" />
+            <SortableHead label="Reason" sortKey="reason" sort={sort} onSort={onSort} />
+            <SortableHead label="By" sortKey="by" sort={sort} onSort={onSort} className="w-[110px]" />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -97,11 +89,11 @@ export default function LedgerTable({ rows, isLoading }) {
                 </StatusBadge>
               </TableCell>
               <TableCell
-                className={`text-right font-mono text-sm ${m.quantity < 0 ? "text-brand" : ""}`}
+                className={`text-center font-mono text-sm ${m.quantity < 0 ? "text-brand" : ""}`}
               >
                 {fmtQty(m.quantity)} {m.unit}
               </TableCell>
-              <TableCell className="text-right font-mono text-sm text-muted-foreground">
+              <TableCell className="text-center font-mono text-sm text-muted-foreground">
                 {(Math.round(m.balanceAfter * 1000) / 1000).toLocaleString("en-ZA")}
               </TableCell>
               <TableCell className="max-w-[260px] truncate text-xs" title={m.reason || ""}>

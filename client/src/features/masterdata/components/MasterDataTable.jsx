@@ -48,6 +48,10 @@ import { ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react';
 import TablePager from '@/components/ui/table-pager';
 import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
 
+// A number column is centred, header and all, so the label sits over
+// its values.
+const isCentre = (col) => /(^|\s)text-center(\s|$)/.test(col.cellClass ?? '');
+
 export default function MasterDataTable({
   columns,        // the VISIBLE columns, from useTableView
   rows,
@@ -86,7 +90,10 @@ export default function MasterDataTable({
       <TableHeader>
         <TableRow>
           {columns.map((col) => (
-            <TableHead key={col.key} className="align-bottom">
+            // A right-aligned column (a number) gets a right-aligned
+            // header, so the label sits over its values rather than
+            // off to their left.
+            <TableHead key={col.key} className={`align-bottom ${isCentre(col) ? 'text-center' : ''}`}>
               {col.sort ? (
                 // stopPropagation: without it, sorting by SKU also
                 // opened whichever row happened to be underneath the
@@ -95,7 +102,7 @@ export default function MasterDataTable({
                   type="button"
                   onClick={(e) => { e.stopPropagation(); onToggleSort(col.key); }}
                   aria-label={`Sort by ${col.label}`}
-                  className="flex w-full min-w-0 items-center gap-1 text-left hover:text-foreground"
+                  className={`flex w-full min-w-0 items-center gap-1 hover:text-foreground ${isCentre(col) ? 'justify-center text-center' : 'text-left'}`}
                 >
                   {/* Headers truncate; they never wrap and never break
                       mid-word. Letting break-words loose on them turned

@@ -45,7 +45,7 @@ export const BENEFICIARY_COLUMNS = [
   // rather than letting them read as the smallest centre.
   { key: 'children', label: 'Children', weight: 1.6, minWidth: 'lg', numeric: true,
     sort: (b) => (b.childCount ?? null),
-    cellClass: 'text-right',
+    cellClass: 'text-center',
     cell: (b) => (b.childCount === null || b.childCount === undefined ? '—' : b.childCount) },
 
   { key: 'lastCollected', label: 'Last collected', weight: 2.2, minWidth: 'lg', numeric: true,
