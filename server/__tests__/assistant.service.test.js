@@ -49,7 +49,7 @@ describe('answering normally', () => {
     expect(res.topic.id).toBe('receiving-record');
     expect(res.topic.title).toBe('Recording a delivery');
     // The body is the file's, not the model's.
-    expect(res.topic.body).toMatch(/checking a list, not writing one/);
+    expect(res.topic.body).toMatch(/ticking off a list rather than writing one/);
     expect(res.topic.steps.length).toBeGreaterThan(0);
   });
 

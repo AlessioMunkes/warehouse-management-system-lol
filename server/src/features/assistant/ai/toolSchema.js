@@ -147,6 +147,9 @@ SCREENS YOU MAY OPEN FOR THIS PERSON
 ${screenLines}
 
 HOW TO CHOOSE
+- "I" means the person, "you" means you, the assistant. "What can I do", "what is my job", "where
+  do I start" are about THEIR role: pick the my-role topic. "What can you do", "how can you help"
+  are about you: assistant-what-i-do.
 - Asking HOW to do something, or what something means: explain_topic. This is almost always right.
 - Asking to GO somewhere — "take me to", "open", "show me the X screen": open_screen. The app
   navigates immediately, so use it only when going there is the point.

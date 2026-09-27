@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   TOPICS, TOPIC_IDS, SCREENS, SCREEN_IDS,
-  getTopic, topicsForRole, screensForRole, suggestionsFor, publicTopic,
+  getTopic, topicsForRole, screensForRole, suggestionsFor, publicTopic, followUpFor,
 } from '../src/features/assistant/helpCatalog.js';
 import { buildTools, buildSystemPrompt } from '../src/features/assistant/ai/toolSchema.js';
 
@@ -96,8 +96,11 @@ describe('what each role may be told', () => {
     expect(ids).toContain('master-data-admin-only');
   });
 
-  it('gives an admin everything', () => {
-    expect(topicsForRole('admin')).toHaveLength(TOPICS.length);
+  // Everything except the other roles' own "what you can do" answers.
+  it('gives an admin everything but the other roles’ own job summaries', () => {
+    const others = ['my-role-worker', 'my-role-manager'];
+    expect(topicsForRole('admin').map((t) => t.id))
+      .toEqual(TOPICS.map((t) => t.id).filter((id) => !others.includes(id)));
   });
 
   it('never offers a role a topic it is not allowed', () => {
@@ -303,5 +306,58 @@ describe('the newer parts of the system', () => {
 
   it('suggests Feed the Soil help on Feed the Soil', () => {
     expect(suggestionsFor('feedTheSoil', 'warehouse_worker')[0].id).toBe('feed-the-soil');
+  });
+});
+
+describe('"what can I do" is about the person’s own job', () => {
+  it.each([
+    ['warehouse_worker', 'my-role-worker'],
+    ['manager',          'my-role-manager'],
+    ['admin',            'my-role-admin'],
+  ])('a %s gets exactly their own role answer', (role, id) => {
+    const mine = topicsForRole(role).map((t) => t.id).filter((t) => t.startsWith('my-role-'));
+    expect(mine).toEqual([id]);
+  });
+
+  it('leads the home screen suggestions with it', () => {
+    expect(suggestionsFor('home', 'manager')[0].id).toBe('my-role-manager');
+  });
+
+  it('tells the model "I" is the person and "you" is the assistant', () => {
+    expect(buildSystemPrompt('manager')).toMatch(/"I" means the person/);
+  });
+});
+
+describe('every answer ends by offering what to do next', () => {
+  const ROLES = ['warehouse_worker', 'manager', 'admin'];
+
+  it.each(TOPICS.map((t) => [t.id, t]))('%s has a follow-up question', (id, t) => {
+    expect(t.followUp?.question, id).toMatch(/\?$/);
+  });
+
+  // A follow-up to a topic the reader cannot open is silently dropped;
+  // this makes sure that never happens to anyone who can see the topic.
+  it('resolves the follow-up for every role that can read the topic', () => {
+    for (const role of ROLES) {
+      for (const t of topicsForRole(role)) {
+        const f = followUpFor(t, role);
+        expect(f, `${role} / ${t.id}`).not.toBeNull();
+        expect(f.topic.id, `${t.id} points at itself`).not.toBe(t.id);
+      }
+    }
+  });
+
+  it('points "what can I do" follow-ups at the asker’s own role', () => {
+    const t = getTopic('assistant-what-i-do');
+    expect(followUpFor(t, 'warehouse_worker').topic.id).toBe('my-role-worker');
+    expect(followUpFor(t, 'admin').topic.id).toBe('my-role-admin');
+  });
+
+  it('sends it to the client', () => {
+    const sent = publicTopic(getTopic('picking-slip-create'), 'manager');
+    expect(sent.followUp).toEqual({
+      question: expect.stringMatching(/\?$/),
+      topic: { id: 'picking-slip-generate', title: expect.any(String) },
+    });
   });
 });

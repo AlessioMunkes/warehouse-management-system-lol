@@ -45,6 +45,8 @@ const role  = process.argv[2] || 'warehouse_worker';
 const DEFAULT_QUESTIONS = {
   warehouse_worker: [
     ['what are you able to do',                      'assistant-what-i-do'],
+    ['what can I do',                                'my-role-worker'],
+    ['where do I start I am new',                    'my-role-worker'],
     ['the truck is here what do I do',               'receiving-record'],
     ['we got less than the order said',              'receiving-discrepancy'],
     ['which box do I take first',                    'fifo-fefo'],
@@ -73,6 +75,7 @@ const DEFAULT_QUESTIONS = {
   ],
   manager: [
     ['what can you do',                              'assistant-what-i-do'],
+    ['what can I do',                                'my-role-manager'],
     ['we are running low on maize',                  'po-create or inventory-low-stock'],
     ['why did the weight change when I typed a price', 'po-line-numbers'],
     ['what does returned mean on an order',          'po-status'],
@@ -95,6 +98,7 @@ const DEFAULT_QUESTIONS = {
     ['open user management',                         'who-can-do-what or master-data-admin-only or not_covered'],
   ],
   admin: [
+    ['what can I do',                                'my-role-admin'],
     ['someone left the organisation',                'users-and-accounts'],
     ['I want to get rid of an old product',          'archive-not-delete'],
     ['where do I set what something costs',          'product-fields'],

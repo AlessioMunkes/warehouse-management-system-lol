@@ -38,6 +38,11 @@ function TopicAnswer({ topic, onOpenTopic, onClose, here }) {
     .map((s) => ({ ...s, to: pathForScreen(s.id) }))
     .filter((s) => s.to);
 
+  // The follow-up is offered as a question, so it is not repeated
+  // among the chips as well.
+  const followUp = topic.followUp ?? null;
+  const related = (topic.related ?? []).filter((r) => r.id !== followUp?.topic.id);
+
   return (
     <div className="space-y-2">
       <p className="font-semibold">{topic.title}</p>
@@ -71,9 +76,9 @@ function TopicAnswer({ topic, onOpenTopic, onClose, here }) {
         </div>
       )}
 
-      {topic.related?.length > 0 && (
+      {related.length > 0 && (
         <div className="flex flex-wrap gap-1.5 pt-1">
-          {topic.related.map((r) => (
+          {related.map((r) => (
             <button
               key={r.id}
               type="button"
@@ -83,6 +88,20 @@ function TopicAnswer({ topic, onOpenTopic, onClose, here }) {
               {r.title}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Last, so the answer ends by offering the natural next step. */}
+      {followUp && (
+        <div className="mt-1 border-t pt-2">
+          <p className="text-sm">{followUp.question}</p>
+          <button
+            type="button"
+            onClick={() => onOpenTopic(followUp.topic.id, followUp.topic.title)}
+            className="mt-1.5 rounded-[4px] border px-2.5 py-1.5 text-xs font-medium hover:bg-muted/60"
+          >
+            Yes, show me
+          </button>
         </div>
       )}
     </div>
