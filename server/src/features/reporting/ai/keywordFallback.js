@@ -77,7 +77,7 @@ const DIMENSION_WORDS = [
   [/\b(centres?|centers?|ecds?|schools?)\b/, ['ecd_centre']],
   [/\bproducts?|items?\b/, ['product']],
   [/\b(day of (the )?week|week ?days?|busiest days?|busy days?|which days?|quiet days?)\b/, ['weekday']],
-  [/\bcohorts?|week ?1|week ?2\b/, ['cohort']],
+  [/\bcohorts?|tuesdays?|thursdays?|pickup days?\b/, ['cohort']],
   [/\bstatus\b/, ['po_status', 'slip_status', 's18a_status', 'routing_status', 'outcome']],
   [/\breasons?\b/, ['reason']],
   [/\b(flow|sankey|ended up|end up)\b/, ['category_flow']],

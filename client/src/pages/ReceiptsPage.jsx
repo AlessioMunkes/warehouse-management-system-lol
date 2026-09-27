@@ -300,7 +300,7 @@ export default function ReceiptsPage() {
     { key: 'ecd',    header: 'Beneficiary',   sortKey: 'ecd_name',
       render: (r) => r.ecd_name || 'Unknown' },
     { key: 'cohort', header: 'Cohort',        sortKey: 'cohort',
-      render: (r) => (r.cohort === 'week2' ? 'Week 2' : 'Week 1') },
+      render: (r) => (r.cohort === 'thursday' ? 'Thursday' : 'Tuesday') },
     { key: 'driver', header: 'Driver',        sortKey: 'driver_name',
       render: (r) => r.driver_name || '—' },
     {
@@ -415,8 +415,8 @@ export default function ReceiptsPage() {
                   onChange={(e) => { setCohort(e.target.value); setOffset(0); }}
                 >
                   <option value="">All</option>
-                  <option value="week1">Week 1</option>
-                  <option value="week2">Week 2</option>
+                  <option value="tuesday">Tuesday</option>
+                  <option value="thursday">Thursday</option>
                 </select>
               </div>
             ) : null}

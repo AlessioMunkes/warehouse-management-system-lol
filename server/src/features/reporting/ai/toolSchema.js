@@ -235,7 +235,7 @@ report — call no_matching_report and tell the user in plain language that
 this lives on the separate Impact Calculator (Impact Report) page.
 
 HOW THIS ORGANISATION WORKS
-- Beneficiary centres collect food on a fortnightly rotation, in two cohorts: week1 and week2. A calendar month contains roughly two full cycles.
+- Beneficiary centres collect food every week on a fixed pickup day, in two cohorts: tuesday and thursday. A calendar month contains about four collections per centre.
 - A collection after 16:00 is late but still counts as collected.
 - Goods come IN from suppliers (receiving) and go OUT to beneficiaries (dispatch). "Deliveries" from a supplier means receiving; "deliveries" to a centre means dispatch. If a question is ambiguous between the two, ask.
 

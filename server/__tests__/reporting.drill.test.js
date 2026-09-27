@@ -52,9 +52,9 @@ describe('the plan', () => {
 
   it('a fixed value (cohort) is used as it is, and existing filters are kept', () => {
     const plan = planDrill(getMetric('dispatch_volume'),
-      { metric: 'dispatch_volume', dimension: 'cohort', filters: { beneficiary_kind: 'ecd' }, dateRange: RANGE }, 'week1');
+      { metric: 'dispatch_volume', dimension: 'cohort', filters: { beneficiary_kind: 'ecd' }, dateRange: RANGE }, 'tuesday');
     expect(plan.lookup).toBeUndefined();
-    expect(plan.spec.filters).toEqual({ beneficiary_kind: 'ecd', cohort: 'week1' });
+    expect(plan.spec.filters).toEqual({ beneficiary_kind: 'ecd', cohort: 'tuesday' });
   });
 
   it('refuses a label that is not a month on a month chart', () => {

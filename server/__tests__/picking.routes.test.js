@@ -21,6 +21,8 @@ const serviceMock = {
   generateSlips:        vi.fn(),
   createSlip:           vi.fn(),
   assignSlip:           vi.fn(),
+  releaseSlip:          vi.fn(),
+  editSlip:             vi.fn(),
   confirmItem:          vi.fn(),
   flagItem:             vi.fn(),
   completeSlip:         vi.fn(),
@@ -63,6 +65,8 @@ beforeEach(() => {
   serviceMock.generateSlips.mockResolvedValue({ created: 12 });
   serviceMock.createSlip.mockResolvedValue({ slipId: 99, itemCount: 7 });
   serviceMock.assignSlip.mockResolvedValue(SLIP);
+  serviceMock.releaseSlip.mockResolvedValue(SLIP);
+  serviceMock.editSlip.mockResolvedValue(SLIP);
   serviceMock.confirmItem.mockResolvedValue(ITEM);
   serviceMock.flagItem.mockResolvedValue(ITEM);
   serviceMock.completeSlip.mockResolvedValue(SLIP);
@@ -73,8 +77,10 @@ const endpoints = [
   ['get',  BASE],
   ['post', BASE],
   ['post', `${BASE}/generate`],
-  ['get',  `${BASE}/1`],
+  ['get',   `${BASE}/1`],
+  ['patch', `${BASE}/1`],
   ['post', `${BASE}/1/assign`],
+  ['post', `${BASE}/1/release`],
   ['post', `${BASE}/1/complete`],
   ['post', `${BASE}/1/items/5/confirm`],
   ['post', `${BASE}/1/items/5/flag`],
@@ -125,7 +131,7 @@ describe('picking routes — role enforcement', () => {
 
   it.each(MANAGERS_UP)('%s can generate the week\'s slips', async (role) => {
     const res = await request(app).post(`${BASE}/generate`)
-      .set('Cookie', cookieFor(role)).send({ dispatchDate: '2026-08-03', cohort: 'week1' });
+      .set('Cookie', cookieFor(role)).send({ dispatchDate: '2026-08-03', cohort: 'tuesday' });
     expect(res.status).toBe(201);
   });
 
@@ -176,7 +182,7 @@ describe('picking routes — role enforcement', () => {
 describe('picking routes — /generate is not shadowed by /:id', () => {
   it('POST /generate reaches the generator', async () => {
     await request(app).post(`${BASE}/generate`)
-      .set('Cookie', cookieFor(ROLES.MANAGER)).send({ dispatchDate: '2026-08-03', cohort: 'week1' });
+      .set('Cookie', cookieFor(ROLES.MANAGER)).send({ dispatchDate: '2026-08-03', cohort: 'tuesday' });
 
     expect(serviceMock.generateSlips).toHaveBeenCalledTimes(1);
     expect(serviceMock.createSlip).not.toHaveBeenCalled();
@@ -205,11 +211,11 @@ describe('picking routes — controller passes the right arguments', () => {
   });
 
   it('forwards the query string verbatim', async () => {
-    await request(app).get(`${BASE}?dispatchDate=2026-08-03&cohort=week1&status=pending`)
+    await request(app).get(`${BASE}?dispatchDate=2026-08-03&cohort=tuesday&status=pending`)
       .set('Cookie', cookieFor(ROLES.MANAGER));
 
     expect(serviceMock.getSlips).toHaveBeenCalledWith(
-      { dispatchDate: '2026-08-03', cohort: 'week1', status: 'pending' },
+      { dispatchDate: '2026-08-03', cohort: 'tuesday', status: 'pending' },
       expect.anything()
     );
   });
@@ -217,10 +223,10 @@ describe('picking routes — controller passes the right arguments', () => {
   it('passes the acting user to the generator', async () => {
     await request(app).post(`${BASE}/generate`)
       .set('Cookie', cookieFor(ROLES.MANAGER, { id: 20 }))
-      .send({ dispatchDate: '2026-08-03', cohort: 'week1' });
+      .send({ dispatchDate: '2026-08-03', cohort: 'tuesday' });
 
     expect(serviceMock.generateSlips).toHaveBeenCalledWith(
-      { dispatchDate: '2026-08-03', cohort: 'week1' },
+      { dispatchDate: '2026-08-03', cohort: 'tuesday' },
       expect.objectContaining({ id: 20 })
     );
   });
@@ -304,7 +310,7 @@ describe('picking routes — validateIntId on :id', () => {
 // ── Status mapping ────────────────────────────────────────────
 describe('picking routes — service status is honoured', () => {
   const cases = [
-    [400, 'Cohort must be week1 or week2.'],
+    [400, 'Cohort must be tuesday or thursday.'],
     [403, 'Only managers can generate picking slips.'],
     [404, 'Picking slip not found.'],
     [409, 'This pallet is already being packed by someone else.'],
@@ -394,6 +400,77 @@ describe('regressions — previously known defects', () => {
       .set('Cookie', cookieFor(ROLES.WORKER)).send({ packedQuantity: 3 });
 
     expect(serviceMock.confirmItem).toHaveBeenCalledWith(1, 5, expect.anything(), expect.anything());
+  });
+});
+
+// ── PATCH /:id — manager-only edit of a pending slip ────────────
+describe('picking routes — PATCH /:id', () => {
+  it.each(MANAGERS_UP)('%s can edit a slip', async (role) => {
+    const res = await request(app).patch(`${BASE}/1`)
+      .set('Cookie', cookieFor(role)).send({ dispatchDate: '2026-08-10', cohort: 'thursday' });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, data: SLIP });
+  });
+
+  it.each([ROLES.WORKER, 'finance'])('%s cannot edit a slip', async (role) => {
+    const res = await request(app).patch(`${BASE}/1`)
+      .set('Cookie', cookieFor(role)).send({});
+    expect(res.status).toBe(403);
+    expect(serviceMock.editSlip).not.toHaveBeenCalled();
+  });
+
+  it.each(['abc', '0', '-1'])('rejects id "%s" with a 400', async (id) => {
+    const res = await request(app).patch(`${BASE}/${id}`)
+      .set('Cookie', cookieFor(ROLES.MANAGER)).send({});
+    expect(res.status).toBe(400);
+    expect(serviceMock.editSlip).not.toHaveBeenCalled();
+  });
+
+  it('passes the body through to the service', async () => {
+    const items = [{ productId: 3, quantity: 5, unit: 'kg' }];
+    await request(app).patch(`${BASE}/1`)
+      .set('Cookie', cookieFor(ROLES.MANAGER)).send({ items });
+    expect(serviceMock.editSlip).toHaveBeenCalledWith(1, { items }, expect.anything());
+  });
+
+  it('masks a raw failure with a generic message', async () => {
+    serviceMock.editSlip.mockRejectedValueOnce(new Error('relation "picking_slips" does not exist'));
+    const res = await request(app).patch(`${BASE}/1`)
+      .set('Cookie', cookieFor(ROLES.MANAGER)).send({});
+    expect(res.status).toBe(500);
+    expect(res.body.message).toBe('Failed to update picking slip.');
+  });
+});
+
+// ── POST /:id/release — manager-only, returns a slip to the floor ──
+describe('picking routes — /:id/release', () => {
+  it.each(MANAGERS_UP)('%s can release a slip', async (role) => {
+    const res = await request(app).post(`${BASE}/1/release`)
+      .set('Cookie', cookieFor(role)).send({});
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, data: SLIP });
+  });
+
+  it.each([ROLES.WORKER, 'finance'])('%s cannot release a slip', async (role) => {
+    const res = await request(app).post(`${BASE}/1/release`)
+      .set('Cookie', cookieFor(role)).send({});
+    expect(res.status).toBe(403);
+    expect(serviceMock.releaseSlip).not.toHaveBeenCalled();
+  });
+
+  it.each(['abc', '0', '-1'])('rejects id "%s" with a 400', async (id) => {
+    const res = await request(app).post(`${BASE}/${id}/release`)
+      .set('Cookie', cookieFor(ROLES.MANAGER)).send({});
+    expect(res.status).toBe(400);
+    expect(serviceMock.releaseSlip).not.toHaveBeenCalled();
+  });
+
+  it('masks a raw failure with a generic message', async () => {
+    serviceMock.releaseSlip.mockRejectedValueOnce(new Error('relation "picking_slips" does not exist'));
+    const res = await request(app).post(`${BASE}/1/release`)
+      .set('Cookie', cookieFor(ROLES.MANAGER)).send({});
+    expect(res.status).toBe(500);
+    expect(res.body.message).toBe('Failed to release picking slip.');
   });
 });
 

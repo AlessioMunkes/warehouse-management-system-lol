@@ -73,10 +73,11 @@ export async function fetchPickingSlip(slipId) {
 
 // POST /api/picking/:id/assign — claim a slip. A packer calling this
 // with no packerId claims for themselves (packerId is ignored for
-// them server-side either way). A manager may pass packerId to
-// assign a slip to a specific worker — see AssignPickingSlipsPage.jsx,
-// the first caller that actually uses this for someone other than
-// the current user.
+// them server-side either way). The service still honours a manager
+// passing packerId to assign someone specific, but no UI calls it
+// that way any more — PickingSlipManagementPage.jsx now only ever
+// releases a slip back to the floor (see releaseSlip below), not
+// hand-picks who claims it.
 export async function assignSlip(slipId, packerId) {
   return request(`/${slipId}/assign`, {
     method: 'POST',
@@ -94,6 +95,28 @@ export async function addSecondPacker(slipId, packerId) {
   });
 }
 
+// POST /api/picking/:id/release — manager only. Returns a claimed
+// slip to the floor: clears both packer slots and sets status back to
+// 'pending'. The only way to undo assignSlip's claim — see
+// PickingSlipManagementPage.jsx, the only caller.
+export async function releaseSlip(slipId) {
+  return request(`/${slipId}/release`, { method: 'POST' });
+}
+
+// PATCH /api/picking/:id — manager only, and only while the slip is
+// still pending: dispatch date, cohort, and/or the whole product-line
+// list. `items`, when sent, REPLACES the slip's current lines — send
+// the full edited set, not a delta. See PickingSlipManagementPage.jsx,
+// the only caller.
+export async function editSlip(slipId, { dispatchDate, cohort, force, items } = {}) {
+  const body = {};
+  if (dispatchDate !== undefined) body.dispatchDate = dispatchDate;
+  if (cohort !== undefined)       body.cohort = cohort;
+  if (force !== undefined)        body.force = force;
+  if (items !== undefined)        body.items = items;
+  return request(`/${slipId}`, { method: 'PATCH', body: JSON.stringify(body) });
+}
+
 // POST /api/picking/generate — bulk-generate the week's slips
 // (manager only). Idempotent on the repository side.
 export async function generateSlips({ dispatchDate, cohort }) {
@@ -103,37 +126,42 @@ export async function generateSlips({ dispatchDate, cohort }) {
   });
 }
 
-// POST /api/picking — create one ad-hoc slip for a single beneficiary
+// POST /api/picking — create one new slip for a single beneficiary
 // (manager only): a late-registered centre, a correction, or a
 // make-up delivery outside its normal rotation. `force` overrides
-// the cohort-schedule check for a deliberate make-up run.
-export async function createSlip({ ecdId, dispatchDate, cohort, force }) {
-  return request('', {
-    method: 'POST',
-    body: JSON.stringify({ ecdId, dispatchDate, cohort, force }),
-  });
+// the cohort-schedule check for a deliberate make-up run. `items`,
+// when given, replaces the usual pull from the centre's standing
+// order (ecd_order_lines) — a manager typed or adjusted the lines by
+// hand instead of taking the standing order as-is.
+export async function createSlip({ ecdId, dispatchDate, cohort, force, items }) {
+  const body = { ecdId, dispatchDate, cohort, force };
+  if (items !== undefined) body.items = items;
+  return request('', { method: 'POST', body: JSON.stringify(body) });
 }
 
 // POST /api/picking/:id/items/:itemId/confirm — mark one item as
 // packed as required.
-export async function confirmItem(slipId, itemId, packedQuantity) {
+export async function confirmItem(slipId, itemId, packedQuantity, note) {
+  const body = { packedQuantity };
+  if (note !== undefined && note !== '') body.note = note;
   return request(`/${slipId}/items/${itemId}/confirm`, {
     method: 'POST',
-    body: JSON.stringify({ packedQuantity }),
+    body: JSON.stringify(body),
   });
 }
 
 // POST /api/picking/:id/items/:itemId/flag — mark one item as
 // short, damaged, or substituted. packedQuantity is optional
-// (the packer may not know how much actually went out).
-export async function flagItem(slipId, itemId, flagReason, packedQuantity) {
+// (the packer may not know how much actually went out). note is the
+// paper slip's "Comment" column — for anything worth recording that
+// isn't the flag reason itself.
+export async function flagItem(slipId, itemId, flagReason, packedQuantity, note) {
+  const body = { flagReason };
+  if (packedQuantity !== undefined && packedQuantity !== '') body.packedQuantity = packedQuantity;
+  if (note !== undefined && note !== '') body.note = note;
   return request(`/${slipId}/items/${itemId}/flag`, {
     method: 'POST',
-    body: JSON.stringify(
-      packedQuantity !== undefined && packedQuantity !== ''
-        ? { flagReason, packedQuantity }
-        : { flagReason }
-    ),
+    body: JSON.stringify(body),
   });
 }
 

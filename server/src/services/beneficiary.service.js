@@ -13,7 +13,7 @@
 import repo from '../repositories/beneficiary.repository.js';
 import { isPositiveInt } from '../utils/validation.js';
 
-const COHORTS = ['week1', 'week2'];
+const COHORTS = ['tuesday', 'thursday'];
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -167,13 +167,11 @@ const approveBeneficiary = async (rawId) => {
   return repo.approveBeneficiary(id);
 };
 
-// ── Rollback to previous cohort ─────────────────────────────────
+// ── Rollback to the other cohort ─────────────────────────────────
 // Sponsor feedback: when an ECD misses its collection, support moving
-// it to the other cohort so it picks up next week instead of waiting
-// out this fortnight. See beneficiary.repository.js's rollbackCohort
-// for the assumed "previous cohort = flip" behaviour and the flag
-// that the underlying fortnightly cohort model itself may need
-// sponsor confirmation.
+// it to the other pickup day this same week. See
+// beneficiary.repository.js's rollbackCohort for why this still
+// exists now that pickup is weekly rather than fortnightly.
 const rollbackCohort = async (rawId, actorId) => {
   const id = requireId(rawId);
 

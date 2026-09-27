@@ -1321,7 +1321,7 @@ export const TOPICS = [
       'items in — each slip is filled from that centre’s standard order.\n\n' +
       'Open Picking Slips and choose one of two options:',
     steps: [
-      'Generate this week’s slips — one slip for every approved, active centre in a cohort (Week 1 or Week 2), for a dispatch date.',
+      'Generate this week’s slips — one slip for every approved, active centre in a cohort (Tuesday or Thursday), for a dispatch date.',
       'Create an ad-hoc slip — one slip for a single centre, for a late registration, a correction or a make-up delivery.',
       'Then check the slips, and assign them to packers or leave them on the board.',
     ],
@@ -1343,7 +1343,7 @@ export const TOPICS = [
     ],
     body:
       'Slips are made for three kinds of centre. ECD centres are crèches: they ' +
-      'collect every other week (Week 1 or Week 2), and their quantities depend on ' +
+      'collect every week on their pickup day (Tuesday or Thursday), and their quantities depend on ' +
       'how many children they have. Soup kitchens serve cooked meals. Dignity ' +
       'kitchens work differently again, which is why a slip always says which kind of' +
       ' centre it is for.',
@@ -1388,7 +1388,7 @@ export const TOPICS = [
       ' the cohort you choose, filled from each centre’s standard order.',
     steps: [
       'Open Picking Slips and choose Generate this week’s slips.',
-      'Pick the dispatch date and the cohort (Week 1 or Week 2).',
+      'Pick the dispatch date and the cohort (Tuesday or Thursday).',
       'Choose Generate slips.',
       'If it says some slips had no lines, check those centres before packing starts.',
     ],
@@ -1412,7 +1412,7 @@ export const TOPICS = [
     ],
     body:
       'Beneficiaries are the centres that collect food from us. Each record holds the' +
-      ' centre’s name, its cohort (Week 1 or Week 2), a contact person, a mobile ' +
+      ' centre’s name, its pickup day (Tuesday or Thursday), a contact person, a mobile ' +
       'number for reminders and, for ECD centres, the number of children.\n\n' +
       'Centres usually join and leave around once a quarter.',
     followUp: {

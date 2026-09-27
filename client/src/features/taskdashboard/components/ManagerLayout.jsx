@@ -33,6 +33,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { STAFF, ADMIN } from '../../../routes/paths';
 import NotificationBell from '../../notifications/components/NotificationBell';
+import StaffNotificationBell from '../../../components/layout/StaffNotificationBell';
 import LogoutConfirmDialog from '@/components/ui/log-out-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -245,7 +246,10 @@ function ManagerLayoutShell({ children }) {
 
             <ThemeToggle />
 
-            <NotificationBell />
+            {/* Warehouse workers get the floor's notifications (new
+                pallets, slips released back); everyone else the
+                manager feed. */}
+            {user?.role === 'warehouse_worker' ? <StaffNotificationBell /> : <NotificationBell />}
 
             {/* Multi-warehouse only; renders nothing with one database. */}
             <WarehouseSwitcher />

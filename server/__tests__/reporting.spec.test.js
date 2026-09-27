@@ -55,7 +55,7 @@ describe('validateSpec — rejects what the AI layer might invent', () => {
   });
 
   it('rejects a cohort value outside the enum', () => {
-    expect(() => validateSpec({ metric: 'dispatch_volume', dateRange: range, filters: { cohort: 'tuesday' } }))
+    expect(() => validateSpec({ metric: 'dispatch_volume', dateRange: range, filters: { cohort: 'week1' } }))
       .toThrow(/must be one of/);
   });
 
@@ -95,11 +95,11 @@ describe('describeSpec', () => {
     const spec = validateSpec({
       metric: 'repeat_non_collections',
       dateRange: range,
-      filters: { cohort: 'week1' },
+      filters: { cohort: 'tuesday' },
     });
     const text = describeSpec(spec);
     expect(text).toContain('Repeat non-collections');
-    expect(text).toContain('week1');
+    expect(text).toContain('tuesday');
     expect(text).toContain('2026-06-01');
   });
 });

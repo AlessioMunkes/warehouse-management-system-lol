@@ -1,6 +1,28 @@
 // ─────────────────────────────────────────────────────────────
 // server/index.js
 // ─────────────────────────────────────────────────────────────
+// .env.local is loaded by the "dev"/"start" npm scripts themselves
+// (node --env-file-if-exists=.env.local), NOT from inside this file.
+// An earlier attempt tried dotenv.config({ path: '.env.local' })
+// called here, textually above the imports below — that does not
+// work in an ES module: a plain statement like a function call always
+// runs after ALL of this file's own static imports have finished
+// loading, no matter where it is written relative to them, because
+// import declarations are resolved during module instantiation,
+// which completes before any of the module's own top-level code
+// (including that call) runs at all. express, cors and — critically —
+// every local route file below (which transitively imports
+// config/db.js, which reads process.env.DATABASE_URL at ITS OWN top
+// level) had therefore already loaded before that dotenv.config()
+// call ever executed, so it was always too late.
+//
+// The plain `import 'dotenv/config'` below doesn't have that problem
+// — it's a real import, evaluated in encounter order like any other,
+// so it runs before express/cors/the route files as long as it's the
+// first one in the file. It only loads a file literally named `.env`
+// though, which is why it's a fallback here and not the primary
+// mechanism: for anyone who runs `node index.js` directly, bypassing
+// the npm scripts and their .env.local support, entirely.
 import 'dotenv/config';
 import express          from 'express';
 import cors             from 'cors';

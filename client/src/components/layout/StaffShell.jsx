@@ -29,7 +29,7 @@
 // this needed editing. ManagerLayout is idempotent, so a page that is
 // already inside a shell gets a passthrough rather than a second one.
 // ─────────────────────────────────────────────────────────────
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -42,6 +42,8 @@ import ManagerLayout from '../../features/taskdashboard/components/ManagerLayout
 import StaffTabBar from './StaffTabBar';
 import { useAuth } from '../../context/AuthContext';
 import OfflineBar from './OfflineBar';
+import useSpareSlipAlert from '../../features/staff/hooks/useSpareSlipAlert';
+import { STAFF } from '../../routes/paths';
 
 // 'Packing / Little Stars ECD' → title 'Packing', sub 'Little Stars ECD'.
 // The first segment is the task, which is what the new-style pages put
@@ -69,14 +71,27 @@ export default function StaffShell({
   children,
 }) {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const { title, sub } = splitCrumb(crumb);
 
   // The bottom tab bar is warehouse staff's own navigation. A manager
   // or admin opening a floor screen (recording a donation, say) has the
   // sidebar, or the menu drawer on a phone, and their own set of
   // screens — the worker's five tabs would be the wrong menu for them.
+  // Log out, "reduce movement" and the notification bell live in the
+  // app header (ManagerLayout) for every role.
   const { user } = useAuth() ?? {};
   const showTabBar = !user || user.role === 'warehouse_worker';
+
+  // Managers already get told about picking-slip activity through
+  // NotificationBell — this is the floor-facing half, so it only polls
+  // for roles that actually work a pallet.
+  const isManager = user?.role === 'manager' || user?.role === 'admin';
+  const { spareCount, justArrived, dismiss } = useSpareSlipAlert(!isManager);
+  // Already on Packing, so the Spare tab there is telling this worker
+  // the same thing directly — a toast on top of that would just be
+  // announcing what's already on screen.
+  const onPackingPage = pathname.startsWith(STAFF.packing);
 
   return (
     <ManagerLayout>
@@ -156,10 +171,33 @@ export default function StaffShell({
             ) : null}
           </header>
 
+          {justArrived.length > 0 && !onPackingPage ? (
+            <div className="stf-activity-toast" role="status">
+              <span className="stf-activity-toast-text">
+                {justArrived.length} new pallet{justArrived.length > 1 ? 's' : ''} assigned to the floor.
+              </span>
+              <button
+                type="button"
+                className="stf-activity-toast-btn"
+                onClick={() => { dismiss(); navigate(STAFF.packing); }}
+              >
+                View
+              </button>
+              <button
+                type="button"
+                className="stf-activity-toast-dismiss"
+                aria-label="Dismiss"
+                onClick={dismiss}
+              >
+                &times;
+              </button>
+            </div>
+          ) : null}
+
           {children}
         </main>
 
-        {showTabBar ? <StaffTabBar /> : null}
+        {showTabBar ? <StaffTabBar packingBadge={spareCount} /> : null}
       </div>
     </ManagerLayout>
   );
