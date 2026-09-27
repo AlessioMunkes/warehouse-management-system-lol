@@ -55,8 +55,14 @@ const DEFAULT_QUESTIONS = {
     ['theres no wifi in the cold room',              'working-offline'],
     ['someone phoned asking for a food parcel',      'benevolent-requests'],
     ['this number looks wrong who do I tell',        'something-looks-wrong'],
+    ['a lady brought her compost bucket back',       'feed-the-soil-log'],
+    ['what is feed the soil',                        'feed-the-soil'],
+    ['someone wants one of the compost kits',        'feed-the-soil-assign'],
+    ['how do I change to the other warehouse',       'which-warehouse'],
+    ['take me to where I log compost',               'open_screen'],
     // Navigation, to screens a worker is allowed.
     ['take me to receiving',                         'open_screen'],
+    ['open the whatsapp reminders',                  'not_covered or who-can-do-what'],
     ['open the dispatch gate',                       'open_screen'],
     // Navigation to screens a worker is NOT allowed. The screen is
     // not in their enum at all, so the honest answers are a topic
@@ -67,15 +73,25 @@ const DEFAULT_QUESTIONS = {
   ],
   manager: [
     ['what can you do',                              'assistant-what-i-do'],
-    ['we are running low on maize',                  'po-create'],
+    ['we are running low on maize',                  'po-create or inventory-low-stock'],
     ['why did the weight change when I typed a price', 'po-line-numbers'],
     ['what does returned mean on an order',          'po-status'],
     ['how many children did we feed last month',     'reporting-impact or reporting-ask'],
     ['a creche stopped collecting',                  'beneficiary-inactive or beneficiary-manage'],
     ['where did the stock go',                       'stock-ledger'],
     ['some of the rice has gone off',                'expired-stock'],
+    ['do the creches get reminded to collect',       'collection-reminders'],
+    ['how do I send the whatsapp to the ecd',        'collection-reminder-whatsapp'],
+    ['the whatsapp button is greyed out',            'collection-reminder-failed'],
+    ['does finance know about my new order',         'po-finance-email'],
+    ['what is the dotted line on the chart',         'reporting-insights'],
+    ['how many meals does a kilo make',              'impact-conversions'],
+    ['I need a poster of our impact for donors',     'impact-poster or reporting-impact'],
     ['take me to inventory',                         'open_screen'],
     ['show me the purchase orders',                  'open_screen'],
+    ['open the collection reminders',                'open_screen'],
+    ['operations reports',                           'open_screen'],
+    ['open the finance report',                      'not_covered or who-can-do-what'],
     ['open user management',                         'who-can-do-what or master-data-admin-only or not_covered'],
   ],
   admin: [
@@ -85,6 +101,11 @@ const DEFAULT_QUESTIONS = {
     ['a donor wants their tax certificate',          'section18a-certificates or donation-18a'],
     ['emails have stopped going out',                'email-settings'],
     ['take me to product management',                'open_screen'],
+    ['where do finance emails go',                   'finance-recipient'],
+    ['I need the movement report for the accountant', 'finance-report or open_screen'],
+    ['a volunteer forgot to sign out',               'volunteer-guest-log'],
+    ['open the classification queue',                'open_screen'],
+    ['take me to the guest log',                     'open_screen'],
   ],
 };
 

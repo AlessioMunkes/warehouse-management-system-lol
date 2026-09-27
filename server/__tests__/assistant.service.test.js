@@ -56,7 +56,7 @@ describe('answering normally', () => {
   it('opens a screen when that is what was asked', async () => {
     call('open_screen', { screen_id: 'inventory' });
     const res = await askAs('manager', 'where is the stock list');
-    expect(res).toEqual({ type: 'navigate', screen: { id: 'inventory', label: 'Inventory' } });
+    expect(res).toEqual({ type: 'navigate', screen: { id: 'inventory', label: 'Inventory', about: expect.any(String) } });
   });
 
   it('passes a clarifying question back with its options', async () => {

@@ -40,12 +40,14 @@ export const SCREEN_PATHS = {
   dispatchHistory:    STAFF.dispatchHistory,
   donation:           DONATIONS.new,
   communityRequests:  STAFF.communityRequests,
+  feedTheSoil:        STAFF.feedTheSoil,
 
   inventory:          INVENTORY,
   stockLedger:        STAFF.stockLedger,
   purchaseOrders:     STAFF.purchaseOrders,
   pickingSlips:       STAFF.pickingSlips,
   beneficiaries:      STAFF.beneficiaries,
+  collectionReminders: STAFF.collectionReminders,
   receipts:           STAFF.receipts,
   reporting:          STAFF.reporting,
   impactReport:       STAFF.impactReport,
@@ -57,6 +59,8 @@ export const SCREEN_PATHS = {
   donationManagement: ADMIN.donationManagement,
   section18a:         ADMIN.section18aManagement,
   emailIntegration:   ADMIN.emailIntegration,
+  financeReport:      ADMIN.financeReport,
+  volunteerLog:       ADMIN.volunteerLog,
 };
 
 /** Where a screen id points, or null if this build has no such route. */

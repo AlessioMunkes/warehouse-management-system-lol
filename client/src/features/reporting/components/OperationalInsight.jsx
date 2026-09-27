@@ -23,7 +23,6 @@
 // the model, which is rate-limited and sometimes slow.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -33,6 +32,7 @@ import {
 import ReportChart from './ReportChart';
 import OperationalChart from './OperationalChart';
 import ComboChart from './ComboChart';
+import OperationsReportPDF from './OperationsReportPDF';
 import { getInsight } from '../../../services/reportingAPI';
 import { STAFF } from '../../../routes/paths';
 import '../operationalReport.css';
@@ -356,23 +356,6 @@ export default function OperationalInsight({ report, highlight, onHighlight, onL
     }
   };
 
-  // Printing renders a clean copy straight into <body> and hides
-  // everything else (operationalReport.css), so the sidebar, builder
-  // and buttons never reach the paper. "Save as PDF" in the print
-  // dialog is the download.
-  useEffect(() => {
-    if (!printing) return undefined;
-    document.documentElement.classList.add('op-printing');
-    const done = () => setPrinting(false);
-    window.addEventListener('afterprint', done);
-    const t = setTimeout(() => window.print(), 50);
-    return () => {
-      clearTimeout(t);
-      window.removeEventListener('afterprint', done);
-      document.documentElement.classList.remove('op-printing');
-    };
-  }, [printing]);
-
   if (!spec) return null;
 
   return (
@@ -401,17 +384,17 @@ export default function OperationalInsight({ report, highlight, onHighlight, onL
               <FileText aria-hidden="true" className="mr-2 h-4 w-4" />
               {writing ? 'WRITING…' : narrative ? 'REWRITE REPORT' : 'WRITE UP THIS REPORT'}
             </Button>
-            {narrative && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setPrinting(true)}
-                className="rounded-[4px] border-2 text-xs font-bold tracking-wider"
-              >
-                <Printer aria-hidden="true" className="mr-2 h-4 w-4" />
-                PRINT / SAVE AS PDF
-              </Button>
-            )}
+            {/* Always offered: without a write-up the PDF is still the
+                figures, chart and who to act on. */}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setPrinting(true)}
+              className="rounded-[4px] border-2 text-xs font-bold tracking-wider"
+            >
+              <Printer aria-hidden="true" className="mr-2 h-4 w-4" />
+              PDF REPORT
+            </Button>
             {writeError && (
               <p role="alert" className="text-xs">
                 <span aria-hidden="true" className="mr-1 font-bold text-brand">!</span>{writeError}
@@ -423,21 +406,13 @@ export default function OperationalInsight({ report, highlight, onHighlight, onL
         </>
       )}
 
-      {printing && data && createPortal(
-        <div className="op-print-root text-ink font-['Montserrat',sans-serif]">
-          <header className="mb-4 border-b-2 pb-3" style={{ borderColor: BORDER }}>
-            <p className="text-xs font-bold uppercase tracking-wider" style={{ color: MUTED }}>Ladles of Love · Operations report</p>
-            <h1 className="mt-1 text-xl font-bold">{data.report.description}</h1>
-            <p className="text-xs" style={{ color: MUTED }}>
-              Generated {new Date(data.generatedAt).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' })}
-            </p>
-          </header>
-          <ReportBody data={data} narrative={narrative} printMode />
-          {data.report.meta?.caveat && (
-            <p className="mt-4 text-xs" style={{ color: MUTED }}>{data.report.meta.caveat}</p>
-          )}
-        </div>,
-        document.body,
+      {printing && data && (
+        <OperationsReportPDF
+          data={data}
+          narrative={narrative}
+          onClose={() => setPrinting(false)}
+          renderBody={(p) => <ReportBody {...p} printMode />}
+        />
       )}
     </div>
   );

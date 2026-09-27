@@ -30,7 +30,14 @@ import useAssistant from '../useAssistant';
 
 // ── One answer ───────────────────────────────────────────────
 
-function TopicAnswer({ topic, onOpenTopic }) {
+function TopicAnswer({ topic, onOpenTopic, onClose, here }) {
+  // Where the answer's screens are, as links — minus the one they are
+  // already on, and minus any id this build has no route for.
+  const links = (topic.open ?? [])
+    .filter((s) => s.id !== here)
+    .map((s) => ({ ...s, to: pathForScreen(s.id) }))
+    .filter((s) => s.to);
+
   return (
     <div className="space-y-2">
       <p className="font-semibold">{topic.title}</p>
@@ -47,6 +54,21 @@ function TopicAnswer({ topic, onOpenTopic }) {
         <ol className="ml-4 list-decimal space-y-1">
           {topic.steps.map((s, i) => <li key={i}>{s}</li>)}
         </ol>
+      )}
+
+      {links.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {links.map((s) => (
+            <Link
+              key={s.id}
+              to={s.to}
+              onClick={onClose}
+              className={buttonVariants({ size: 'sm', variant: 'secondary' })}
+            >
+              Open {s.label} <ArrowRight className="size-3.5" />
+            </Link>
+          ))}
+        </div>
       )}
 
       {topic.related?.length > 0 && (
@@ -80,6 +102,7 @@ function NavigateAnswer({ screen, onClose }) {
       {to
         ? <p>Opened <span className="font-semibold">{screen.label}</span>.</p>
         : <p>That is on <span className="font-semibold">{screen.label}</span>.</p>}
+      {screen.about && <p className="text-muted-foreground">{screen.about}</p>}
       {to && (
         // buttonVariants on the Link, NOT <Button asChild><Link/></Button>.
         // This project's Button is a plain styled <button> — Base UI,
@@ -141,9 +164,9 @@ function NotCoveredAnswer({ closest, onOpenTopic }) {
   );
 }
 
-function Answer({ entry, onOpenTopic, onPick, onClose }) {
+function Answer({ entry, onOpenTopic, onPick, onClose, here }) {
   switch (entry.kind) {
-    case 'topic':       return <TopicAnswer topic={entry.topic} onOpenTopic={onOpenTopic} />;
+    case 'topic':       return <TopicAnswer topic={entry.topic} onOpenTopic={onOpenTopic} onClose={onClose} here={here} />;
     case 'navigate':    return <NavigateAnswer screen={entry.screen} onClose={onClose} />;
     case 'clarify':     return <ClarifyAnswer question={entry.question} options={entry.options} onPick={onPick} />;
     case 'not_covered': return <NotCoveredAnswer closest={entry.closest} onOpenTopic={onOpenTopic} />;
@@ -292,6 +315,7 @@ export default function AssistantPanel({ open, onOpenChange, screen }) {
                       onOpenTopic={openTopic}
                       onPick={(o) => ask(o)}
                       onClose={() => onOpenChange(false)}
+                      here={screen}
                     />
                   </div>
                 )

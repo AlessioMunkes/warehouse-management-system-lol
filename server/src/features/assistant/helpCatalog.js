@@ -54,38 +54,109 @@ const ADMIN_ONLY  = [ADMIN];
 // again; and ProtectedRoute plus the server's requireRole still
 // stand behind both. Nothing here can grant access — it can only
 // decline to offer it.
+//
+// `about` is one line on what the screen is FOR. It goes in the
+// model's prompt, so "where do I log compost" can find Feed the Soil
+// without a topic having to say so, and it comes back with a
+// navigate answer so the person knows what they have landed on.
+//
+// `aka` is what else people call it — above all the sidebar's own
+// wording, which is not always the label here ("Classification
+// Queue" is Donation management). Prompt only; never shown.
 export const SCREENS = [
-  { id: 'home',              label: 'Your home screen',   roles: EVERYONE },
+  { id: 'home', label: 'Your home screen', roles: EVERYONE,
+    about: 'Your dashboard: the jobs you do, and what needs attention today.',
+    aka: ['dashboard', 'home', 'start page', 'main menu', 'task dashboard'] },
 
   // The warehouse floor. <ProtectedRoute /> with no role list.
-  { id: 'receiving',         label: 'Receiving',          roles: EVERYONE },
-  { id: 'deliveries',        label: 'Past deliveries',    roles: EVERYONE },
-  { id: 'decanting',         label: 'Decanting',          roles: EVERYONE },
-  { id: 'decantingRecords',  label: 'Past decanting runs', roles: EVERYONE },
-  { id: 'packing',           label: 'Packing',            roles: EVERYONE },
-  { id: 'dispatch',          label: 'The dispatch gate',  roles: EVERYONE },
-  { id: 'dispatchHistory',   label: 'Collection history', roles: EVERYONE },
-  { id: 'donation',          label: 'Donation intake',    roles: EVERYONE },
-  { id: 'communityRequests', label: 'Benevolent requests', roles: EVERYONE },
+  { id: 'receiving', label: 'Receiving', roles: EVERYONE,
+    about: 'Book in a delivery against its purchase order: count, weigh, place, date.',
+    aka: ['procurement', 'goods in', 'book in stock', 'unloading'] },
+  { id: 'deliveries', label: 'Past deliveries', roles: EVERYONE,
+    about: 'Every delivery already received, with its delivery note.',
+    aka: ['delivery history', 'old deliveries', 'delivery notes'] },
+  { id: 'decanting', label: 'Decanting', roles: EVERYONE,
+    about: 'Split bulk sacks into bags and record what you actually got, plus wastage.',
+    aka: ['bagging', 'repacking', 'splitting sacks', 'decanting sheet'] },
+  { id: 'decantingRecords', label: 'Past decanting runs', roles: EVERYONE,
+    about: 'Every past decanting run with expected and actual bags.',
+    aka: ['decanting sheets', 'decanting history'] },
+  { id: 'packing', label: 'Packing', roles: EVERYONE,
+    about: 'The packing board: claim a picking slip and pack its pallet.',
+    aka: ['packing board', 'pallets', 'pack an order'] },
+  { id: 'dispatch', label: 'The dispatch gate', roles: EVERYONE,
+    about: 'Hand pallets over to collecting centres, with the driver signing on screen.',
+    aka: ['dispatch', 'gate', 'collections', 'hand over'] },
+  { id: 'dispatchHistory', label: 'Collection history', roles: EVERYONE,
+    about: 'Every past collection with its signature, and every missed one.',
+    aka: ['dispatch history', 'past collections', 'dispatch notes'] },
+  { id: 'donation', label: 'Donation intake', roles: EVERYONE,
+    about: 'Log food someone has donated: what, rough value, who brought it.',
+    aka: ['donations', 'log a donation', 'new donation'] },
+  { id: 'communityRequests', label: 'Benevolent requests', roles: EVERYONE,
+    about: 'Log phoned-in or walk-in requests for a food parcel, and what happened.',
+    aka: ['community requests', 'call-in requests', 'benevolent packages', 'food parcel requests'] },
+  { id: 'feedTheSoil', label: 'Feed the Soil', roles: EVERYONE,
+    about: 'Compost collection kits: assign a kit to a household, log compost weighed in, mark it sent to a farm.',
+    aka: ['compost', 'collection kits', 'food waste', 'compost kits', 'soil'] },
 
   // Manager and admin. roles={['manager','admin']} in App.jsx.
-  { id: 'inventory',         label: 'Inventory',          roles: MANAGERS_UP },
-  { id: 'stockLedger',       label: 'Stock ledger',       roles: MANAGERS_UP },
-  { id: 'purchaseOrders',    label: 'Purchase orders',    roles: MANAGERS_UP },
-  { id: 'pickingSlips',      label: 'Picking slips',      roles: MANAGERS_UP },
-  { id: 'beneficiaries',     label: 'Beneficiaries',      roles: MANAGERS_UP },
-  { id: 'receipts',          label: 'Receipts',           roles: MANAGERS_UP },
-  { id: 'reporting',         label: 'Reporting',          roles: MANAGERS_UP },
-  { id: 'impactReport',      label: 'Impact report',      roles: MANAGERS_UP },
-  { id: 'volunteers',        label: 'Volunteer events',   roles: MANAGERS_UP },
+  { id: 'inventory', label: 'Inventory', roles: MANAGERS_UP,
+    about: 'Stock levels per item: on hand, committed, available, and what is low.',
+    aka: ['stock', 'stock levels', 'what we have'] },
+  { id: 'stockLedger', label: 'Stock ledger', roles: MANAGERS_UP,
+    about: 'Every stock movement in and out, warehouse-wide, with who did it.',
+    aka: ['stock movements', 'audit trail', 'ledger'] },
+  { id: 'purchaseOrders', label: 'Purchase orders', roles: MANAGERS_UP,
+    about: 'Raise and track orders to suppliers. New orders are emailed to Finance.',
+    aka: ['POs', 'orders', 'buying', 'procurement orders'] },
+  { id: 'pickingSlips', label: 'Picking slips', roles: MANAGERS_UP,
+    about: 'Create, generate and assign the slips that say what each centre gets.',
+    aka: ['slips', 'picking list', 'centre orders'] },
+  { id: 'beneficiaries', label: 'Beneficiaries', roles: MANAGERS_UP,
+    about: 'The centres that collect from us, their contacts and child numbers.',
+    aka: ['centres', 'ECDs', 'soup kitchens', 'beneficiary directory'] },
+  { id: 'collectionReminders', label: 'Collection reminders', roles: MANAGERS_UP,
+    about: 'Tomorrow’s ECD collection reminders: email status, and WhatsApp messages to send.',
+    aka: ['reminders', 'whatsapp reminders', 'ecd reminders', 'collection messages'] },
+  { id: 'receipts', label: 'Receipts', roles: MANAGERS_UP,
+    about: 'The archive of delivery notes and dispatch notes.',
+    aka: ['paperwork', 'notes archive', 'documents'] },
+  { id: 'reporting', label: 'Operations reports', roles: MANAGERS_UP,
+    about: 'Ask a question about the figures, or browse reports by area, with charts and who to act on.',
+    aka: ['reporting', 'reports', 'analytics', 'operations analytics', 'statistics'] },
+  { id: 'impactReport', label: 'Impact reports', roles: MANAGERS_UP,
+    about: 'The Impact Calculator: meals, children and adults served, compost processed, poster PDF.',
+    aka: ['impact calculator', 'impact report', 'donor report', 'meals served'] },
+  { id: 'volunteers', label: 'Volunteer events', roles: MANAGERS_UP,
+    about: 'Set up volunteer events and time slots, and see who signed in to each.',
+    aka: ['volunteer events', 'volunteer sessions', 'corporate groups'] },
 
   // Admin. roles={['admin']} in App.jsx.
-  { id: 'products',          label: 'Product management',  roles: ADMIN_ONLY },
-  { id: 'suppliers',         label: 'Supplier management', roles: ADMIN_ONLY },
-  { id: 'users',             label: 'User management',     roles: ADMIN_ONLY },
-  { id: 'donationManagement', label: 'Donation management', roles: ADMIN_ONLY },
-  { id: 'section18a',        label: 'Section 18A certificates', roles: ADMIN_ONLY },
-  { id: 'emailIntegration',  label: 'Email settings',      roles: ADMIN_ONLY },
+  { id: 'products', label: 'Product management', roles: ADMIN_ONLY,
+    about: 'The product catalogue: names, codes, weights, costs, reorder levels.',
+    aka: ['products', 'catalogue', 'items'] },
+  { id: 'suppliers', label: 'Supplier management', roles: ADMIN_ONLY,
+    about: 'Who we buy from, and their contact details.',
+    aka: ['suppliers', 'vendors'] },
+  { id: 'users', label: 'User management', roles: ADMIN_ONLY,
+    about: 'Staff accounts, roles and passwords.',
+    aka: ['users', 'accounts', 'staff accounts', 'logins'] },
+  { id: 'donationManagement', label: 'Donation management', roles: ADMIN_ONLY,
+    about: 'Check, value and classify donations taken in at the gate.',
+    aka: ['classification queue', 'review donations', 'flagged donations'] },
+  { id: 'section18a', label: 'Section 18A certificates', roles: ADMIN_ONLY,
+    about: 'Issue and track tax certificates for donors.',
+    aka: ['18a', 'tax certificates', 'certificate queue'] },
+  { id: 'emailIntegration', label: 'Email settings', roles: ADMIN_ONLY,
+    about: 'The Gmail account the system sends from, and the Finance recipient for orders and reports.',
+    aka: ['email integration', 'gmail', 'finance email', 'finance recipient'] },
+  { id: 'financeReport', label: 'Finance report', roles: ADMIN_ONLY,
+    about: 'Warehouse Movement Report: purchase orders, donations and dispatches for a period, with exports.',
+    aka: ['warehouse movement report', 'finance', 'movement report', 'quickbooks report'] },
+  { id: 'volunteerLog', label: 'Volunteer log', roles: ADMIN_ONLY,
+    about: 'Every guest sign-in at the door; sign out a visit so its hours count.',
+    aka: ['guest log', 'sign-in log', 'visitor log', 'who was on site'] },
 ];
 
 export const SCREEN_IDS = SCREENS.map((s) => s.id);
@@ -142,7 +213,8 @@ export const TOPICS = [
     body:
       'It tracks food coming in, being sorted and packed, and going out to the centres ' +
       'that collect it — so the same information stops living on paper, in a spreadsheet ' +
-      'and in somebody’s head at once.',
+      'and in somebody’s head at once. It also logs donations, food parcel requests and ' +
+      'Feed the Soil compost.',
     rules: ['BR-01'],
     related: ['who-can-do-what', 'find-my-way'],
   },
@@ -174,6 +246,23 @@ export const TOPICS = [
       'A screen that will not open is not broken — it belongs to another job.',
     rules: ['BR-01', 'NFR-08'],
     related: ['what-is-this', 'signing-in'],
+  },
+  {
+    id: 'which-warehouse',
+    title: 'Which warehouse you are in',
+    roles: EVERYONE,
+    screens: ['home'],
+    general: true,
+    asks: [
+      'switch warehouse', 'change warehouse', 'wrong warehouse', 'other site',
+      'which warehouse am I in', 'the other branch', 'I cannot see the other warehouse',
+    ],
+    body:
+      'The warehouse name is in the top bar next to the bell. If you work at more than ' +
+      'one, tap it to switch — you go to that site’s home screen, and your role there ' +
+      'may differ. Not there? Your account has one warehouse.\n\n' +
+      'Check it before recording a delivery. Stock booked to the wrong site is hard to spot.',
+    related: ['who-can-do-what', 'find-my-way'],
   },
   {
     id: 'signing-in',
@@ -813,6 +902,21 @@ export const TOPICS = [
     related: ['receiving-partial', 'po-create'],
   },
   {
+    id: 'po-finance-email',
+    title: 'Orders and Finance',
+    roles: MANAGERS_UP,
+    screens: ['purchaseOrders', 'emailIntegration'],
+    asks: [
+      'does finance know about the order', 'quickbooks', 'send the po to finance',
+      'finance email', 'did finance get it', 'accounts need the order', 'capture in quickbooks',
+    ],
+    body:
+      'Every new purchase order is emailed to Finance automatically, with its lines and ' +
+      'total, so they can capture it in QuickBooks. Nothing to do — but if Finance says it ' +
+      'never arrived, ask an admin to check the Finance recipient in Email settings.',
+    related: ['po-create', 'finance-recipient'],
+  },
+  {
     id: 'receipts-screen',
     title: 'The receipts archive',
     roles: MANAGERS_UP,
@@ -899,9 +1003,10 @@ export const TOPICS = [
     ],
     body:
       'The centres that collect from us: what kind each is, who to contact, and for ECDs ' +
-      'the number of children. Onboarding and offboarding happen roughly quarterly.',
+      'the number of children and a mobile number for reminders. Onboarding and ' +
+      'offboarding happen roughly quarterly.',
     rules: ['BR-11', 'BR-27'],
-    related: ['beneficiary-ecd-numbers', 'beneficiary-inactive', 'picking-slip-types'],
+    related: ['beneficiary-ecd-numbers', 'beneficiary-inactive', 'collection-reminders'],
   },
   {
     id: 'beneficiary-ecd-numbers',
@@ -934,6 +1039,53 @@ export const TOPICS = [
     related: ['beneficiary-manage', 'archive-not-delete'],
   },
   {
+    id: 'collection-reminders',
+    title: 'Collection reminders',
+    roles: MANAGERS_UP,
+    screens: ['collectionReminders', 'beneficiaries'],
+    asks: [
+      'remind a centre', 'collection reminder', 'do centres get reminded', 'ecd reminder',
+      'remind them to collect tomorrow', 'reminder messages', 'did the reminder go',
+    ],
+    body:
+      'ECD centres collecting tomorrow are emailed a reminder automatically at 8:00. ' +
+      'Collection reminders shows each one’s email status, and a WhatsApp message ready ' +
+      'to send by hand.',
+    related: ['collection-reminder-whatsapp', 'collection-reminder-failed'],
+  },
+  {
+    id: 'collection-reminder-whatsapp',
+    title: 'Sending a WhatsApp reminder',
+    roles: MANAGERS_UP,
+    screens: ['collectionReminders'],
+    asks: [
+      'whatsapp', 'send a whatsapp', 'message the centre', 'whatsapp reminder',
+      'text the ecd', 'open whatsapp',
+    ],
+    body: 'The system writes the message; you send it from the WhatsApp signed in on this device.',
+    steps: [
+      'Open Collection reminders.',
+      'Choose Open WhatsApp on the centre’s row.',
+      'Send the prefilled message in WhatsApp.',
+      'Come back and choose Mark sent.',
+    ],
+    related: ['collection-reminders', 'collection-reminder-failed'],
+  },
+  {
+    id: 'collection-reminder-failed',
+    title: 'A reminder did not go',
+    roles: MANAGERS_UP,
+    screens: ['collectionReminders', 'beneficiaries'],
+    asks: [
+      'reminder failed', 'email failed', 'whatsapp button is greyed out', 'no reminder sent',
+      'centre did not get the reminder', 'retry the email', 'missing phone number',
+    ],
+    body:
+      'A failed email has Retry email on its row. A greyed-out Open WhatsApp means the ' +
+      'centre has no mobile number — add it on Beneficiaries so next time works.',
+    related: ['collection-reminders', 'beneficiary-manage', 'email-settings'],
+  },
+  {
     id: 'benevolent-requests',
     title: 'Benevolent package requests',
     roles: EVERYONE,
@@ -947,6 +1099,69 @@ export const TOPICS = [
       'happened about it. These used to go untracked entirely.',
     rules: ['BR-28'],
     related: ['something-looks-wrong'],
+  },
+
+  // ═══ Feed the Soil ════════════════════════════════════════
+  {
+    id: 'feed-the-soil',
+    title: 'What Feed the Soil is',
+    roles: EVERYONE,
+    screens: ['feedTheSoil'],
+    asks: [
+      'what is feed the soil', 'compost programme', 'collection kit', 'food waste for compost',
+      'what are the kits', 'compost',
+    ],
+    body:
+      'Households get a collection kit for food waste. What they bring back is weighed in ' +
+      'as compost and sent on to a farm. The compost figure on the Impact Calculator comes ' +
+      'only from what is logged here.',
+    related: ['feed-the-soil-assign', 'feed-the-soil-log', 'feed-the-soil-dispatch'],
+  },
+  {
+    id: 'feed-the-soil-assign',
+    title: 'Giving someone a kit',
+    roles: EVERYONE,
+    screens: ['feedTheSoil'],
+    asks: [
+      'assign a kit', 'new kit', 'someone wants a kit', 'give out a kit',
+      'sign up for compost', 'register a household',
+    ],
+    body:
+      'Feed the Soil, Kits, then Assign a kit. Owner’s name is required; suburb is ' +
+      'optional but it is what the compost-by-region figure is built from.',
+    related: ['feed-the-soil', 'feed-the-soil-log'],
+  },
+  {
+    id: 'feed-the-soil-log',
+    title: 'Logging compost that came in',
+    roles: EVERYONE,
+    screens: ['feedTheSoil'],
+    asks: [
+      'log compost', 'weigh the compost', 'someone brought their bucket', 'compost came in',
+      'record kilograms', 'kit came back',
+    ],
+    body: 'Weigh it before you record it — the kilograms are the whole point.',
+    steps: [
+      'Feed the Soil, then Log a collection.',
+      'Find the kit by owner or suburb.',
+      'Enter the kilograms and the date.',
+      'Log compost.',
+    ],
+    related: ['feed-the-soil', 'feed-the-soil-dispatch'],
+  },
+  {
+    id: 'feed-the-soil-dispatch',
+    title: 'Sending compost to a farm',
+    roles: EVERYONE,
+    screens: ['feedTheSoil'],
+    asks: [
+      'compost to the farm', 'mark dispatched', 'compost collected by farmer',
+      'where did the compost go', 'send compost',
+    ],
+    body:
+      'Open the compost record and choose Mark dispatched, then name the farmer or drop-off ' +
+      'point. Dispatched records sink to the bottom of the list.',
+    related: ['feed-the-soil-log'],
   },
 
   // ═══ Reporting (manager+) ═════════════════════════════════
@@ -975,10 +1190,40 @@ export const TOPICS = [
       'meals served', 'report for the board',
     ],
     body:
-      'ECD centres and soup kitchens only — Dignity Kitchen is deliberately left out. ' +
-      'Children are counted once a period however many times a centre collects.',
+      'The Impact Calculator turns food sent out into people served — children at ECDs, ' +
+      'adults at soup kitchens, dignity kitchen guests and households — plus compost ' +
+      'processed. Children are counted once a period however many times a centre collects.',
     rules: ['NFR-20'],
-    related: ['reporting-ask', 'beneficiary-ecd-numbers'],
+    related: ['impact-conversions', 'reporting-export', 'beneficiary-ecd-numbers'],
+  },
+  {
+    id: 'impact-conversions',
+    title: 'How kilograms become meals',
+    roles: MANAGERS_UP,
+    screens: ['impactReport'],
+    asks: [
+      'how many meals does a kg make', 'where does the meals number come from',
+      'conversion rate', 'kg to meals', 'is the meals figure real', 'change the meal rate',
+    ],
+    body:
+      'Meals and people served are worked out from kilograms dispatched, using the rates ' +
+      'shown on the calculator ("how many meals does 1 kg feed?"). Change a rate and every ' +
+      'figure follows — so agree it before a report goes out, and say which rate you used.',
+    related: ['reporting-impact'],
+  },
+  {
+    id: 'impact-poster',
+    title: 'The impact poster',
+    roles: MANAGERS_UP,
+    screens: ['impactReport'],
+    asks: [
+      'impact poster', 'pdf for donors', 'print the impact', 'one page summary',
+      'something to show the board', 'export impact',
+    ],
+    body:
+      'Export the calculator as a PDF poster — the headline figures in a grid, ready to ' +
+      'print or send. Set the period first; the poster shows whatever the screen shows.',
+    related: ['reporting-impact', 'reporting-export'],
   },
   {
     id: 'reporting-export',
@@ -992,6 +1237,37 @@ export const TOPICS = [
     body: 'Use the download on the report itself. Check the date range on the report before sending it anywhere — it is the thing people misread.',
     related: ['reporting-ask'],
   },
+  {
+    id: 'reporting-browse',
+    title: 'Browsing the reports',
+    roles: MANAGERS_UP,
+    screens: ['reporting'],
+    asks: [
+      'what reports are there', 'list of reports', 'which reports can I run',
+      'report on suppliers', 'report on wastage', 'report on collections', 'all reports',
+    ],
+    body:
+      'Under the question box, the reports are grouped by area — dispatch, picking and ' +
+      'decanting, receiving and suppliers, procurement, stock, and donations and ' +
+      'volunteers. The suggested questions are a quick way in.',
+    related: ['reporting-ask', 'reporting-insights'],
+  },
+  {
+    id: 'reporting-insights',
+    title: 'Reading a report’s chart and insight',
+    roles: MANAGERS_UP,
+    screens: ['reporting'],
+    asks: [
+      'what does the chart mean', 'what is the dotted line', 'target line', 'who to act on',
+      'what should I do about this report', 'highlight a bar', 'compare to last month',
+      'is this good or bad',
+    ],
+    body:
+      'Under each report are the key figures, how they compare with the period before, and ' +
+      'a list of who to act on — the centre, supplier or product behind the number. The ' +
+      'line across the chart is the working target. Tap a bar or point to highlight it.',
+    related: ['reporting-ask', 'reporting-browse'],
+  },
 
   // ═══ Volunteers (manager+) ════════════════════════════════
   {
@@ -1003,8 +1279,8 @@ export const TOPICS = [
       'volunteers', 'who signed in today', 'volunteer log', 'who is in the building',
       'volunteer hours', 'who is here',
     ],
-    body: 'Volunteers sign in with a first name on arrival. The log shows who is in now, who has been before, and when they signed out.',
-    related: ['volunteer-events', 'guest-sign-in'],
+    body: 'Volunteers sign in with a first name on arrival, against an event. Open the event to see who is in now and who has been. Admins also have the full door log.',
+    related: ['volunteer-events', 'guest-sign-in', 'volunteer-guest-log'],
   },
   {
     id: 'volunteer-events',
@@ -1150,7 +1426,51 @@ export const TOPICS = [
       'who do emails come from', 'certificate emails',
     ],
     body: 'Where the account that sends certificates and notifications is connected. If emails have stopped, check the connection here first.',
-    related: ['section18a-certificates'],
+    related: ['finance-recipient', 'section18a-certificates'],
+  },
+  {
+    id: 'finance-recipient',
+    title: 'Where Finance emails go',
+    roles: ADMIN_ONLY,
+    screens: ['emailIntegration', 'financeReport'],
+    asks: [
+      'finance email address', 'change the finance recipient', 'who gets the purchase orders',
+      'finance did not get the po', 'send finance the report', 'report link for finance',
+    ],
+    body:
+      'Save the Finance recipient in Email settings. New purchase orders go there, and so ' +
+      'does the report link — Send Finance Report Link gives them the movement report without ' +
+      'an account.',
+    related: ['po-finance-email', 'finance-report', 'email-settings'],
+  },
+  {
+    id: 'finance-report',
+    title: 'The warehouse movement report',
+    roles: ADMIN_ONLY,
+    screens: ['financeReport'],
+    asks: [
+      'finance report', 'movement report', 'what did we spend', 'report for the accountant',
+      'export to excel', 'csv', 'purchase orders donations and dispatches',
+    ],
+    body:
+      'Purchase orders, donations and dispatches for a period, with totals and a trend ' +
+      'chart. Pick the period at the top; Export PDF for the summary, and a list’s CSV or ' +
+      'Excel for the lines.',
+    related: ['finance-recipient'],
+  },
+  {
+    id: 'volunteer-guest-log',
+    title: 'The volunteer log',
+    roles: ADMIN_ONLY,
+    screens: ['volunteerLog'],
+    asks: [
+      'guest log', 'sign a volunteer out', 'they forgot to sign out', 'volunteer hours are zero',
+      'who was on site', 'delete a sign in',
+    ],
+    body:
+      'Every sign-in at the door. Sign out a visit that was left open — hours only count ' +
+      'once a visit is closed. There is no delete: it is a record of who was on site.',
+    related: ['volunteer-log', 'guest-sign-in'],
   },
 ];
 
@@ -1158,6 +1478,7 @@ export const TOPIC_IDS = TOPICS.map((t) => t.id);
 
 // ── Lookups used by the tool schema and the service ──────────
 const byId = new Map(TOPICS.map((t) => [t.id, t]));
+const screenById = new Map(SCREENS.map((s) => [s.id, s]));
 
 export const getTopic = (id) => byId.get(id) ?? null;
 
@@ -1202,21 +1523,45 @@ export const suggestionsFor = (screenId, role, limit = 4) => {
     .map(({ t }) => ({ id: t.id, title: t.title }));
 };
 
-/** What crosses the wire. `asks` and `rules` stay on the server. */
-export const publicTopic = (topic) => ({
-  id:      topic.id,
-  title:   topic.title,
-  body:    topic.body,
-  steps:   topic.steps ?? null,
-  screens: topic.screens ?? [],
-  related: (topic.related ?? [])
-    .map((id) => byId.get(id))
-    .filter(Boolean)
-    .map((t) => ({ id: t.id, title: t.title })),
+const MAX_OPEN_LINKS = 2;
+
+/**
+ * What crosses the wire. `asks` and `rules` stay on the server.
+ *
+ * With a role, the links are narrowed to what that role may follow:
+ * a related topic they could not open is a chip that answers 404,
+ * and a screen they could not open is a locked door. `open` is the
+ * topic's own screens as "go there" links — home is left out, since
+ * a link to where you started is not somewhere to go.
+ */
+export const publicTopic = (topic, role) => {
+  const allowed = (t) => !role || t.roles.includes(role);
+  return {
+    id:      topic.id,
+    title:   topic.title,
+    body:    topic.body,
+    steps:   topic.steps ?? null,
+    screens: topic.screens ?? [],
+    open: (topic.screens ?? [])
+      .filter((id) => id !== 'home')
+      .map((id) => screenById.get(id))
+      .filter((s) => s && allowed(s))
+      .slice(0, MAX_OPEN_LINKS)
+      .map((s) => ({ id: s.id, label: s.label })),
+    related: (topic.related ?? [])
+      .map((id) => byId.get(id))
+      .filter((t) => t && allowed(t))
+      .map((t) => ({ id: t.id, title: t.title })),
+  };
+};
+
+/** What a navigate answer carries: the screen and what it is for. */
+export const publicScreen = (screen) => ({
+  id: screen.id, label: screen.label, about: screen.about ?? null,
 });
 
 export default {
   SCREENS, SCREEN_IDS, TOPICS, TOPIC_IDS,
   getTopic, topicsForRole, screensForRole, screenForRole,
-  suggestionsFor, publicTopic,
+  suggestionsFor, publicTopic, publicScreen,
 };

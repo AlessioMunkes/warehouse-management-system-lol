@@ -118,7 +118,7 @@ describe('the second gate, in the service', () => {
     const res = await service.ask({
       question: 'take me to inventory', userId: 1, role: 'manager',
     });
-    expect(res).toEqual({ type: 'navigate', screen: { id: 'inventory', label: 'Inventory' } });
+    expect(res).toEqual({ type: 'navigate', screen: { id: 'inventory', label: 'Inventory', about: expect.any(String) } });
   });
 
   // The one that matters. Even if the enum were wrong, or the model

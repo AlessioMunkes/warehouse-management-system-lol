@@ -28,7 +28,7 @@ import provider from '../features/reporting/ai/provider.js';
 import { buildTools, buildSystemPrompt } from '../features/assistant/ai/toolSchema.js';
 import {
   SCREENS, getTopic, topicsForRole, screensForRole, screenForRole,
-  suggestionsFor, publicTopic,
+  suggestionsFor, publicTopic, publicScreen,
 } from '../features/assistant/helpCatalog.js';
 import logRepo from '../repositories/assistantLog.repository.js';
 
@@ -91,7 +91,7 @@ export const getTopicForRole = (id, role) => {
   if (!topic || !topic.roles.includes(role)) {
     throw fail(404, 'That help topic does not exist.');
   }
-  return { type: 'topic', topic: publicTopic(topic) };
+  return { type: 'topic', topic: publicTopic(topic, role) };
 };
 
 export const ask = async ({ question, screen, userId, role }) => {
@@ -146,7 +146,7 @@ export const ask = async ({ question, screen, userId, role }) => {
           continue;
         }
         log('topic', { topicId: topic.id });
-        return { type: 'topic', topic: publicTopic(topic) };
+        return { type: 'topic', topic: publicTopic(topic, role) };
       }
 
       if (call.name === 'open_screen') {
@@ -160,7 +160,7 @@ export const ask = async ({ question, screen, userId, role }) => {
           continue;
         }
         log('navigate', { screenId: target.id });
-        return { type: 'navigate', screen: { id: target.id, label: target.label } };
+        return { type: 'navigate', screen: publicScreen(target) };
       }
 
       if (call.name === 'ask_clarification') {
