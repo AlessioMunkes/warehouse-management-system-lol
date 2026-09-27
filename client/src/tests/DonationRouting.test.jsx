@@ -34,6 +34,7 @@ function renderAt(path, user) {
           <Route path={DONATIONS.review} element={<p>REVIEW PAGE</p>} />
         </Route>
         <Route path={STAFF.home}   element={<p>TASK DASHBOARD</p>} />
+        <Route path="/manager"     element={<p>MANAGER HOME</p>} />
         <Route path="/login"       element={<p>LOGIN</p>} />
         <Route path="/guest-home"  element={<p>GUEST HOME</p>} />
         <Route path="*"            element={<Navigate to="/login" replace />} />
@@ -67,9 +68,17 @@ describe('donation intake route guarding', () => {
   // is no signed-in staff role left to bounce — intake is open to all
   // three — so the list itself is what is worth pinning. Narrow it and
   // the .each blocks above start exercising the gate.
-  it('is open to every staff role and nothing else', () => {
+  it('is open to warehouse staff and admin, not managers', () => {
     expect([...DONATION_INTAKE_ROLES].sort())
-      .toEqual(['admin', 'manager', 'warehouse_worker']);
+      .toEqual(['admin', 'warehouse_worker']);
+  });
+
+  // Taken out of the manager's view on request: an old link or bookmark
+  // lands them on their own dashboard instead of the intake form.
+  it('sends a manager to their own dashboard', () => {
+    renderAt(DONATIONS.new, user('manager'));
+    expect(screen.getByText('MANAGER HOME')).toBeInTheDocument();
+    expect(screen.queryByText('INTAKE FORM')).not.toBeInTheDocument();
   });
 
   it('bounces a guest to the guest home', () => {
@@ -96,9 +105,11 @@ describe('donation intake route guarding', () => {
     expect(screen.getByRole('status')).toBeInTheDocument();
   });
 
-  it('mirrors RECEIVERS_UP on the server', () => {
-    // server/src/routes/donation.routes.js:12
-    expect([...DONATION_INTAKE_ROLES].sort())
-      .toEqual(['admin', 'manager', 'warehouse_worker']);
+  it('stays within RECEIVERS_UP on the server', () => {
+    // server/src/routes/donation.routes.js:12 allows worker, manager and
+    // admin. The screen is narrower on purpose (managers do not log
+    // donations from here); it must never be wider than the server.
+    const serverRoles = ['admin', 'manager', 'warehouse_worker'];
+    for (const role of DONATION_INTAKE_ROLES) expect(serverRoles).toContain(role);
   });
 });

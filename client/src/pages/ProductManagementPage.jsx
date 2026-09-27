@@ -16,6 +16,7 @@ import ProductForm  from '../features/products/components/ProductForm';
 import productAPI   from '../services/productAPI';
 import ConfirmRemoveDialog from '../features/masterdata/components/ConfirmRemoveDialog';
 import useDetailFocus      from '../features/masterdata/hooks/useDetailFocus';
+import useOpenFromQuery    from '../features/masterdata/hooks/useOpenFromQuery';
 import useTableView        from '../features/masterdata/hooks/useTableView';
 import MasterDataTable     from '../features/masterdata/components/MasterDataTable';
 import ColumnToggle        from '../features/masterdata/components/ColumnToggle';
@@ -232,6 +233,8 @@ export default function ProductManagementPage() {
       focusDetail();
     } catch (err) { setError(err.message); }
   };
+  // ?open=<id> from the admin Activity / Archive screens.
+  useOpenFromQuery(open);
 
   const create = async (payload) => {
     setBusy(true); setError(null);

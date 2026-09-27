@@ -33,6 +33,8 @@ import { Search, Plus, Pencil, Power, ShieldCheck, RotateCcw, X } from 'lucide-r
 const CAN_MANAGE = ['manager', 'admin'];
 const OTHER_COHORT = { tuesday: 'thursday', thursday: 'tuesday' };
 import useTableView    from '../features/masterdata/hooks/useTableView';
+import useDetailFocus  from '../features/masterdata/hooks/useDetailFocus';
+import useOpenFromQuery from '../features/masterdata/hooks/useOpenFromQuery';
 import MasterDataTable from '../features/masterdata/components/MasterDataTable';
 import ColumnToggle    from '../features/masterdata/components/ColumnToggle';
 import FilterPills     from '../features/masterdata/components/FilterPills';
@@ -170,13 +172,21 @@ export default function BeneficiaryDirectoryPage() {
     return () => { cancelled = true; };
   }, [includeInactive, search]);
 
+  // Opening a centre, or its add/edit form, moves the page to it —
+  // the card sits above a long list, out of sight of the row clicked.
+  const [detailRef, focusDetail] = useDetailFocus();
   const open = async (id) => {
     setError(null);
     try {
       setSelected(await beneficiaryAPI.getBeneficiary(id));
       setMode('list');
+      focusDetail();
     } catch (err) { setError(err.message); }
   };
+  const startCreate = () => { setSelected(null); setMode('create'); focusDetail(); };
+  const startEdit = () => { setMode('edit'); focusDetail(); };
+  // ?open=<id> from the admin Activity / Archive screens.
+  useOpenFromQuery(open);
 
   const create = async (payload) => {
     setBusy(true); setError(null);
@@ -248,14 +258,14 @@ export default function BeneficiaryDirectoryPage() {
         ) : (
           <div className="mt-6 space-y-6">
             {mode === 'create' ? (
-              <Card>
+              <Card ref={detailRef} tabIndex={-1} className="scroll-mt-6 outline-none">
                 <CardHeader><CardTitle>Add a beneficiary</CardTitle></CardHeader>
                 <CardContent>
                   <BeneficiaryForm onSubmit={create} onCancel={() => setMode('list')} busy={busy} />
                 </CardContent>
               </Card>
             ) : mode === 'edit' && selected ? (
-              <Card>
+              <Card ref={detailRef} tabIndex={-1} className="scroll-mt-6 outline-none">
                 <CardHeader><CardTitle>Edit {selected.name}</CardTitle></CardHeader>
                 <CardContent>
                   <BeneficiaryForm
@@ -308,24 +318,26 @@ export default function BeneficiaryDirectoryPage() {
                   />
 
                   {canManage ? (
-                    <Button type="button" onClick={() => { setSelected(null); setMode('create'); }}>
+                    <Button type="button" onClick={startCreate}>
                       <Plus />
                       Add beneficiary
                     </Button>
                   ) : null}
                 </div>
 
+                <div ref={detailRef} tabIndex={-1} className="scroll-mt-6 outline-none">
                 {selected ? (
                   <BeneficiaryDetail
                     beneficiary={selected}
                     canManage={canManage}
-                    onEdit={() => setMode('edit')}
+                    onEdit={startEdit}
                     onToggleActive={toggleActive}
                     onApprove={approve}
                     onRollbackCohort={rollbackCohort}
                     onClose={() => setSelected(null)}
                   />
                 ) : null}
+                </div>
 
                 {visibleBeneficiaries.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No beneficiaries match.</p>

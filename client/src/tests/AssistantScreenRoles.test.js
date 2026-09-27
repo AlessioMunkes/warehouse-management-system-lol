@@ -48,7 +48,7 @@ const CONSTANTS = { STAFF, ADMIN, PACKING, DONATIONS, VOLUNTEERS };
 // imported wholesale so that a change to one of them shows up as a
 // failing test with a name, not a silently different expectation.
 const ROLE_LISTS = {
-  DONATION_INTAKE_ROLES:      ['warehouse_worker', 'manager', 'admin'],
+  DONATION_INTAKE_ROLES:      ['warehouse_worker', 'admin'],
   STAFF_ROLES:                ['warehouse_worker', 'manager', 'admin'],
   COMMUNITY_REQUEST_ROLES:    ['warehouse_worker', 'manager', 'admin'],
   FEED_THE_SOIL_ROLES:        ['warehouse_worker', 'manager', 'admin'],

@@ -62,6 +62,7 @@ import {
 import { Search, Plus, Loader2 } from 'lucide-react';
 import TablePager from '@/components/ui/table-pager';
 import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
+import useDetailFocus from '../features/masterdata/hooks/useDetailFocus';
 
 // Pending amber, fulfilled solid green, part-fulfilled soft green,
 // referred blue, declined red — each with its own icon
@@ -168,6 +169,7 @@ function CommunityRequestsManagerView() {
   const [outcomeFilter, setOutcomeFilter] = useState('all');
   const [mode, setMode] = useState('list');       // list | create
   const [resolving, setResolving] = useState(null); // request being resolved
+  const [detailRef, focusDetail] = useDetailFocus();
 
   const [isLoading, setIsLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -264,7 +266,9 @@ function CommunityRequestsManagerView() {
           </div>
         ) : null}
 
-        <div className="mt-6 space-y-6">
+        {/* The form and the resolve panel replace the list in place:
+            opening one moves the page up to it (useDetailFocus). */}
+        <div ref={detailRef} tabIndex={-1} className="mt-6 space-y-6 scroll-mt-6 outline-none">
           {mode === 'create' ? (
             <Card>
               <CardHeader><CardTitle>Log a request</CardTitle></CardHeader>
@@ -309,7 +313,7 @@ function CommunityRequestsManagerView() {
                   </SelectContent>
                 </Select>
 
-                <Button type="button" onClick={() => { setMode('create'); setFormError(null); }}>
+                <Button type="button" onClick={() => { setMode('create'); setFormError(null); focusDetail(); }}>
                   <Plus />
                   Log a request
                 </Button>
@@ -389,7 +393,7 @@ function CommunityRequestsManagerView() {
                                     ) : null}
                                     <Button
                                       type="button" size="sm"
-                                      onClick={() => { setResolving(r); setFormError(null); }}
+                                      onClick={() => { setResolving(r); setFormError(null); focusDetail(); }}
                                     >
                                       Resolve
                                     </Button>

@@ -133,7 +133,9 @@ export const DONATIONS = {
 // Client-side mirror of RECEIVERS_UP in
 // server/src/routes/donation.routes.js. If the server list changes,
 // change this one with it — they are two halves of the same rule.
-export const DONATION_INTAKE_ROLES = ['warehouse_worker', 'manager', 'admin'];
+// Not managers: donation intake is done on the floor, and was taken out
+// of the manager's view on request. Admin keeps it for corrections.
+export const DONATION_INTAKE_ROLES = ['warehouse_worker', 'admin'];
 
 // Every role that works the warehouse floor — the task dashboard and the
 // four staff flows (receiving, packing, decanting, dispatch).
@@ -186,4 +188,9 @@ export const ADMIN = {
   // event workflow and belongs to the manager. Two screens, two
   // audiences, two URLs.
   volunteerLog: '/admin/volunteer-log',
+  // Who did what, across the system; and everything deactivated or
+  // deleted. Admin-only, read-mostly (restore goes through each item's
+  // own status route).
+  activity: '/admin/activity',
+  archive:  '/admin/archive',
 };

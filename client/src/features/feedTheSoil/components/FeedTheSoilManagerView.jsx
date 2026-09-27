@@ -38,6 +38,7 @@ import TablePager from '@/components/ui/table-pager';
 import SortableHead from '@/components/ui/sortable-head';
 import useSortable from '@/lib/useSortable';
 import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
+import useDetailFocus from '../../masterdata/hooks/useDetailFocus';
 
 const STATUS_LABELS = { assigned: 'Assigned', logged: 'Logged', dispatched: 'Dispatched' };
 // Amber with the household, blue once compost is in and waiting to go
@@ -400,6 +401,9 @@ export default function FeedTheSoilManagerView() {
   const [selectedRecord, setSelectedRecord] = useState(null);
   // Where a record's "back" action returns to.
   const [recordOrigin, setRecordOrigin] = useState('records');
+  // A kit, a record or a form opens above the list: move the page to it.
+  const [detailRef, focusDetail] = useDetailFocus();
+  const go = (next) => { setView(next); focusDetail(); };
 
   const [kits, setKits] = useState([]);
   const [kitSearch, setKitSearch] = useState('');
@@ -446,6 +450,7 @@ export default function FeedTheSoilManagerView() {
       setSelectedKit(res?.data ?? res);
       setSelectedRecord(null);
       setView('list');
+      focusDetail();
     } catch (err) {
       setError(err.message || 'Could not load this kit.');
     }
@@ -459,6 +464,7 @@ export default function FeedTheSoilManagerView() {
       setSelectedKit(null);
       setRecordOrigin(fromKit ? 'kit' : 'records');
       setView('list');
+      focusDetail();
     } catch (err) {
       setError(err.message || 'Could not load this record.');
     }
@@ -548,7 +554,7 @@ export default function FeedTheSoilManagerView() {
         ))}
       </div>
 
-      <div className="mt-6 space-y-6">
+      <div ref={detailRef} tabIndex={-1} className="mt-6 space-y-6 scroll-mt-6 outline-none">
         {view === 'assign' ? (
           <AssignKitPanel busy={busy} error={formError} onSubmit={assignKit} onCancel={() => { setView('list'); setFormError(null); }} />
         ) : view === 'log' && selectedKit ? (
@@ -556,7 +562,7 @@ export default function FeedTheSoilManagerView() {
         ) : view === 'logPickKit' ? (
           <LogPickKitPanel
             kits={kits} isLoading={isLoading} search={kitSearch} onSearch={setKitSearch}
-            onPick={(kit) => { setSelectedKit(kit); setFormError(null); setView('log'); }}
+            onPick={(kit) => { setSelectedKit(kit); setFormError(null); go('log'); }}
             onCancel={() => { setView('list'); setFormError(null); }}
           />
         ) : view === 'dispatch' && selectedRecord ? (
@@ -568,7 +574,7 @@ export default function FeedTheSoilManagerView() {
         ) : selectedRecord ? (
           <RecordDetail
             record={selectedRecord}
-            onDispatch={() => { setFormError(null); setView('dispatch'); }}
+            onDispatch={() => { setFormError(null); go('dispatch'); }}
             onOpenKit={openKit}
             onClose={closeRecord}
             backLabel={recordOrigin === 'kit' ? 'Back to kit' : 'Back to records'}
@@ -576,7 +582,7 @@ export default function FeedTheSoilManagerView() {
         ) : selectedKit ? (
           <KitDetail
             kit={selectedKit}
-            onLogCompost={() => setView('log')}
+            onLogCompost={() => go('log')}
             onOpenRecord={(id) => openRecord(id, { fromKit: true })}
             onClose={() => { setSelectedKit(null); loadKits(); }}
           />
@@ -590,7 +596,7 @@ export default function FeedTheSoilManagerView() {
                   value={kitSearch} onChange={(e) => setKitSearch(e.target.value)}
                 />
               </div>
-              <Button type="button" onClick={() => setView('assign')}>
+              <Button type="button" onClick={() => go('assign')}>
                 <Plus /> Assign a kit
               </Button>
             </div>
@@ -644,7 +650,7 @@ export default function FeedTheSoilManagerView() {
                   value={recordSearch} onChange={(e) => setRecordSearch(e.target.value)}
                 />
               </div>
-              <Button type="button" onClick={() => { setFormError(null); setView('logPickKit'); }}>
+              <Button type="button" onClick={() => { setFormError(null); go('logPickKit'); }}>
                 <Plus /> Log a collection
               </Button>
             </div>

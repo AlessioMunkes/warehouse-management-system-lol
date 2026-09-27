@@ -38,6 +38,8 @@ import ImpactReportPage                             from './pages/ImpactReportPa
 import PickingSlipManagementPage                    from './pages/PickingSlipManagementPage';
 import UserDirectoryPage                            from './pages/UserDirectoryPage';
 import VolunteerManagementPage                      from './pages/VolunteerManagementPage';
+import AdminUserActivityPage                        from './pages/AdminUserActivityPage';
+import AdminArchivePage                             from './pages/AdminArchivePage';
 import ProductManagementPage                        from './pages/ProductManagementPage';
 import VolunteerEventsPage                        from './pages/VolunteerEventsPage';
 import VolunteerEventWorkspacePage                from './pages/VolunteerEventWorkspacePage';
@@ -111,6 +113,9 @@ const App = () => (
               one role two volunteer screens is how these two got
               confused in the first place. */}
           <Route path={ADMIN.volunteerLog} element={<VolunteerManagementPage />} />
+          {/* Admin oversight: who did what, and what was switched off. */}
+          <Route path={ADMIN.activity} element={<AdminUserActivityPage />} />
+          <Route path={ADMIN.archive} element={<AdminArchivePage />} />
         </Route>
 
         {/* Protected — manager and admin.

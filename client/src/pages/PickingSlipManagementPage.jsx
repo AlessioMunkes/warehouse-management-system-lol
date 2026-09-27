@@ -64,6 +64,8 @@ import { openLabelPdf, publicAppOrigin, isReachableByPhone } from '../features/p
 import { fmtQty } from '../lib/quantity';
 import TablePager from '@/components/ui/table-pager';
 import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
+import useDetailFocus from '../features/masterdata/hooks/useDetailFocus';
+import useOpenFromQuery from '../features/masterdata/hooks/useOpenFromQuery';
 
 const COHORT_OPTIONS = [
   { value: 'tuesday', label: 'Tuesday' },
@@ -71,6 +73,17 @@ const COHORT_OPTIONS = [
 ];
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
+
+// A single slip comes back with dispatch_date as a timestamp (midnight
+// in Cape Town, i.e. 22:00 the day before in UTC). Shown as the
+// warehouse's calendar day, not the raw string.
+const fmtSlipDate = (value) => {
+  if (!value) return '—';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? String(value)
+    : d.toLocaleDateString('en-CA', { timeZone: 'Africa/Johannesburg' });
+};
 
 // Human wording for the two things a manager actually needs to know
 // at a glance: is this on the floor, or does someone already have it.
@@ -158,7 +171,7 @@ const SlipDetail = ({
       <div>
         <CardTitle>{slip.ecd_name}</CardTitle>
         <p className="text-sm text-muted-foreground">
-          {slip.cohort === 'thursday' ? 'Thursday' : 'Tuesday'} · {slip.dispatch_date}
+          {slip.cohort === 'thursday' ? 'Thursday' : 'Tuesday'} · {fmtSlipDate(slip.dispatch_date)}
         </p>
       </div>
       <div className="flex items-center gap-1">
@@ -221,7 +234,7 @@ const SlipDetail = ({
           </div>
         ) : null}
         <div><dt className="text-muted-foreground">Pallet ref</dt><dd>{slip.pallet_ref || '—'}</dd></div>
-        <div><dt className="text-muted-foreground">Progress</dt><dd>{slip.confirmed_items}/{slip.total_items} confirmed</dd></div>
+        <div><dt className="text-muted-foreground">Progress</dt><dd>{slip.confirmed_items ?? (slip.items ?? []).filter((i) => i.status === 'confirmed').length}/{slip.total_items ?? (slip.items ?? []).length} confirmed</dd></div>
       </dl>
       {slip.items?.length ? (
         <Table>
@@ -330,13 +343,19 @@ export default function PickingSlipManagementPage() {
     return () => { cancelled = true; };
   }, []);
 
+  // The slip card (and its edit form) sits above a long list: opening
+  // one moves the page to it rather than leaving it out of sight.
+  const [detailRef, focusDetail] = useDetailFocus();
   const openSlip = async (slipId) => {
     setError(null);
     setSecondChoice('');
     try {
       setSelected(await fetchPickingSlip(slipId));
+      focusDetail();
     } catch (err) { setError(err.message); }
   };
+  // ?open=<id> from the admin Activity screen.
+  useOpenFromQuery(openSlip);
 
   const release = async () => {
     if (!selected) return;
@@ -374,6 +393,7 @@ export default function PickingSlipManagementPage() {
       })),
     });
     setMode('edit');
+    focusDetail();
   };
 
   const addEditLine = () => {
@@ -751,7 +771,7 @@ export default function PickingSlipManagementPage() {
         ) : null}
 
         {mode === 'edit' && selected ? (
-          <Card className="mt-4">
+          <Card ref={detailRef} tabIndex={-1} className="mt-4 scroll-mt-6 outline-none">
             <CardHeader><CardTitle>Edit slip — {selected.ecd_name}</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
@@ -893,6 +913,7 @@ export default function PickingSlipManagementPage() {
               </div>
             ) : (
               <>
+                <div ref={detailRef} tabIndex={-1} className="scroll-mt-6 outline-none">
                 {selected ? (
                   <SlipDetail
                     slip={selected}
@@ -907,6 +928,7 @@ export default function PickingSlipManagementPage() {
                     onClose={() => setSelected(null)}
                   />
                 ) : null}
+                </div>
 
                 {filteredSlips.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No slips match.</p>

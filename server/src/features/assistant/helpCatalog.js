@@ -100,7 +100,7 @@ export const SCREENS = [
   { id: 'dispatchHistory', label: 'Collection history', roles: EVERYONE,
     about: 'Every past collection with its signature, and every missed one.',
     aka: ['dispatch history', 'past collections', 'dispatch notes'] },
-  { id: 'donation', label: 'Donation intake', roles: EVERYONE,
+  { id: 'donation', label: 'Donation intake', roles: [WORKER, ADMIN],
     about: 'Log food someone has donated: what, rough value, who brought it.',
     aka: ['donations', 'log a donation', 'new donation'] },
   { id: 'communityRequests', label: 'Benevolent requests', roles: EVERYONE,
@@ -655,6 +655,8 @@ export const TOPICS = [
     followUp: {
       question: 'Would you like to know how to record a donation?',
       topic: 'donation-intake',
+      // Managers no longer log donations themselves.
+      otherwise: { question: 'Would you like to know how a delivery is recorded against its order?', topic: 'receiving-record' },
     },
     related: ['donation-intake', 'receiving-record'],
   },
@@ -703,7 +705,7 @@ export const TOPICS = [
   {
     id: 'donation-intake',
     title: 'Taking in a donation',
-    roles: EVERYONE,
+    roles: [WORKER, ADMIN],
     screens: ['donation'],
     asks: [
       'someone donated food', 'how do I log a donation', 'record a donation',
@@ -744,6 +746,7 @@ export const TOPICS = [
     followUp: {
       question: 'Would you like to know what donor details you need to take?',
       topic: 'donation-donor-details',
+      otherwise: { question: 'Would you like to see how donations and Section 18A progress show in the reports?', topic: 'reporting-insights' },
     },
     rules: ['BR-09', 'NFR-16'],
     related: ['donation-intake', 'section18a-certificates'],
@@ -751,7 +754,7 @@ export const TOPICS = [
   {
     id: 'donation-what-we-take',
     title: 'What we can accept',
-    roles: EVERYONE,
+    roles: [WORKER, ADMIN],
     screens: ['donation'],
     asks: [
       'can we accept this', 'is this ok to take', 'expired donation', 'opened packet',
@@ -772,7 +775,7 @@ export const TOPICS = [
   {
     id: 'donation-donor-details',
     title: 'Donor details',
-    roles: EVERYONE,
+    roles: [WORKER, ADMIN],
     screens: ['donation'],
     asks: [
       'do I need their name', 'donor details', 'anonymous donation', 'personal information',
@@ -2155,13 +2158,17 @@ export const publicTopic = (topic, role) => {
  * rather than offered when its topic is one the role cannot open —
  * a "Yes, show me" that answers 404 is worse than no question.
  */
+// `otherwise` is a second offer for a reader who cannot open the first
+// topic (e.g. a manager, for a how-to only warehouse staff use).
 export const followUpFor = (topic, role) => {
-  const f = topic.followUp;
-  if (!f?.question || !f.topic) return null;
-  const id = f.topic === MY_ROLE ? MY_ROLE_TOPIC[role] : f.topic;
-  const target = id ? byId.get(id) : null;
-  if (!target || (role && !target.roles.includes(role))) return null;
-  return { question: f.question, topic: { id: target.id, title: target.title } };
+  const resolve = (f) => {
+    if (!f?.question || !f.topic) return null;
+    const id = f.topic === MY_ROLE ? MY_ROLE_TOPIC[role] : f.topic;
+    const target = id ? byId.get(id) : null;
+    if (!target || (role && !target.roles.includes(role))) return null;
+    return { question: f.question, topic: { id: target.id, title: target.title } };
+  };
+  return resolve(topic.followUp) ?? resolve(topic.followUp?.otherwise);
 };
 
 /** What a navigate answer carries: the screen and what it is for. */

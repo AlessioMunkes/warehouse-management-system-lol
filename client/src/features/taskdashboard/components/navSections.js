@@ -20,7 +20,7 @@
 import {
   LayoutDashboard, Users2, ClipboardList, ShoppingCart,
   BarChart3, HeartHandshake, Package, Truck, /* FileText, */
-  Gift, HandHeart, Boxes, ReceiptText,
+  Gift, HandHeart, Boxes, ReceiptText, Activity, Archive,
   PackageOpen, PackageCheck, FlaskConical, ClipboardCheck, HandCoins,
   PhoneCall,
   ScrollText,
@@ -87,7 +87,9 @@ const ADMIN_SECTIONS = [
   {
     label: 'Logs',
     items: [
+      { to: ADMIN.activity, label: 'User Activity', icon: Activity },
       { to: ADMIN.volunteerLog, label: 'Volunteer Log', icon: HandHeart },
+      { to: ADMIN.archive, label: 'Archive', icon: Archive },
     ],
   },
   {
@@ -121,10 +123,11 @@ const MANAGER_SECTIONS = [
   },
   // Receiving, Packing, Decanting and Dispatch are reached through the
   // staff shell rather than from here, so they are deliberately absent.
+  // So is Donation Intake: logging a donation at the door is floor work,
+  // and a manager sees donations through the reports instead.
   {
     label: 'Warehouse',
     items: [
-      { to: STAFF.donation, label: 'Donation Intake', icon: HandCoins },
       { to: STAFF.feedTheSoil, label: 'Feed the Soil', icon: Sprout },
     ],
   },

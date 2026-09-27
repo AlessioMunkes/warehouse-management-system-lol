@@ -41,6 +41,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Plus }     from 'lucide-react';
 
 import useTableView from '../features/masterdata/hooks/useTableView';
+import useDetailFocus from '../features/masterdata/hooks/useDetailFocus';
 import ColumnToggle  from '../features/masterdata/components/ColumnToggle';
 import { PO_COLUMNS } from '../features/purchaseOrders/components/poColumns';
 
@@ -118,14 +119,17 @@ export default function PurchaseOrdersPage() {
     }
   }, [loadPurchaseOrders]);
 
+  // The order (or its form) opens above a long list: move the page to it.
+  const [detailRef, focusDetail] = useDetailFocus();
   const open = useCallback(async (id) => {
     setError(null);
     try {
       const po = await purchaseOrderAPI.getPurchaseOrder(id);
       setSelected(po);
       setMode('detail');
+      focusDetail();
     } catch (err) { setError(err.message); }
-  }, []);
+  }, [focusDetail]);
 
   useEffect(() => {
     let cancelled = false;
@@ -247,7 +251,7 @@ export default function PurchaseOrdersPage() {
           {canManage && mode !== 'create' && mode !== 'edit' ? (
             <Button
               type="button"
-              onClick={() => { setMode('create'); setSelected(null); setFormError(null); }}
+              onClick={() => { setMode('create'); setSelected(null); setFormError(null); focusDetail(); }}
             >
               <Plus /> New purchase order
             </Button>
@@ -255,7 +259,7 @@ export default function PurchaseOrdersPage() {
         </div>
 
         {mode === 'create' || mode === 'edit' ? (
-          <div className="mt-6">
+          <div ref={detailRef} tabIndex={-1} className="mt-6 scroll-mt-6 outline-none">
             <PurchaseOrderForm
               // Forces a remount (and so a fresh read of initialValue)
               // whenever the target changes — create vs. edit, or one
@@ -333,17 +337,19 @@ export default function PurchaseOrdersPage() {
               </div>
             ) : (
               <div className="mt-6 space-y-6">
+                <div ref={detailRef} tabIndex={-1} className="scroll-mt-6 outline-none">
                 {mode === 'detail' && selected ? (
                   <PurchaseOrderDetail
                     purchaseOrder={selected}
                     canManage={canManage}
                     onApprove={approve}
                     onSetQuickbooksRef={setQuickbooksRef}
-                    onEdit={() => { setMode('edit'); setFormError(null); setInvalidProductIds([]); }}
+                    onEdit={() => { setMode('edit'); setFormError(null); setInvalidProductIds([]); focusDetail(); }}
                     onDelete={remove}
                     onClose={() => { setSelected(null); setMode('list'); }}
                   />
                 ) : null}
+                </div>
 
                 <PurchaseOrderList
                   purchaseOrders={sortedVisible}

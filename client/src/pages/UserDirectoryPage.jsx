@@ -31,6 +31,7 @@ import { copyToClipboard } from '../lib/clipboard';
 import { useToast } from '@/components/ui/toastContext';
 import ConfirmRemoveDialog from '../features/masterdata/components/ConfirmRemoveDialog';
 import useDetailFocus      from '../features/masterdata/hooks/useDetailFocus';
+import useOpenFromQuery    from '../features/masterdata/hooks/useOpenFromQuery';
 import useTableView        from '../features/masterdata/hooks/useTableView';
 import MasterDataTable     from '../features/masterdata/components/MasterDataTable';
 import ColumnToggle        from '../features/masterdata/components/ColumnToggle';
@@ -249,6 +250,8 @@ export default function UserDirectoryPage() {
       focusDetail();
     } catch (err) { setError(err.message); }
   };
+  // ?open=<id> from the admin Activity / Archive screens.
+  useOpenFromQuery(open);
 
   const deactivateFromDialog = async () => {
     setBusy(true);
