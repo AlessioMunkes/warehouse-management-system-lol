@@ -1865,9 +1865,28 @@ color:white;
   transition: border-color 0.2s ease;
 }
 
-.stock-card-emerald { border-left: 4px solid #10b981; }
-.stock-card-amber   { border-left: 4px solid #f59e0b; }
-.stock-card-rose    { border-left: 4px solid #f43f5e; }
+/* The three status cards: a bright 3px outline all the way round in
+   the card's colour (the card itself stays plain). Drawn as a
+   border-box gradient behind the padding-box card, shading only
+   slightly between the corners. Brighter shades in dark mode. */
+.stock-card-emerald { --stock-tone: #10b981; }
+.stock-card-amber   { --stock-tone: #f59e0b; }
+.stock-card-rose    { --stock-tone: #f43f5e; }
+.dark .stock-card-emerald { --stock-tone: #34d399; }
+.dark .stock-card-amber   { --stock-tone: #fbbf24; }
+.dark .stock-card-rose    { --stock-tone: #fb7185; }
+
+.stock-card-emerald,
+.stock-card-amber,
+.stock-card-rose {
+  border: 3px solid transparent;
+  background:
+    linear-gradient(var(--card), var(--card)) padding-box,
+    linear-gradient(135deg,
+      var(--stock-tone) 0%,
+      color-mix(in srgb, var(--stock-tone) 75%, transparent) 50%,
+      var(--stock-tone) 100%) border-box;
+}
 
 .stock-card-header {
   display: flex;
