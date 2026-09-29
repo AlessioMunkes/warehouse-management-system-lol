@@ -66,6 +66,7 @@ import TablePager from '@/components/ui/table-pager';
 import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
 import useDetailFocus from '../features/masterdata/hooks/useDetailFocus';
 import useOpenFromQuery from '../features/masterdata/hooks/useOpenFromQuery';
+import { takeUrlParam } from '../features/staff/resumeParam';
 
 const COHORT_OPTIONS = [
   { value: 'tuesday', label: 'Tuesday' },
@@ -271,7 +272,11 @@ export default function PickingSlipManagementPage() {
   const [workers, setWorkers] = useState([]);
   const [products, setProducts] = useState([]);
 
-  const [viewDate, setViewDate] = useState(todayISO());
+  // ?date=YYYY-MM-DD (from a "slips generated" notification) shows that day.
+  const [viewDate, setViewDate] = useState(() => {
+    const asked = takeUrlParam('date');
+    return asked && /^\d{4}-\d{2}-\d{2}$/.test(asked) ? asked : todayISO();
+  });
   const [search, setSearch] = useState('');
   const [labelError, setLabelError] = useState(null);
   const [slips, setSlips] = useState([]);

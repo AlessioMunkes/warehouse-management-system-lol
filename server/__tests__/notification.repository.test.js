@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
+const query = vi.fn();
 vi.mock('../src/config/db.js', () => ({
-  default: {},
+  default: { query: (...args) => query(...args) },
 }));
 
-const { createNotification } = await import('../src/repositories/notification.repository.js');
+const { createNotification, default: repo } = await import('../src/repositories/notification.repository.js');
 
 describe('createNotification duplicate insert SQL', () => {
   it('casts reused placeholders consistently in the insert and duplicate check', async () => {
@@ -44,6 +45,8 @@ describe('createNotification duplicate insert SQL', () => {
     ['stock_expiry_1_week', ['manager']],
     ['donation_review', ['admin']],
     ['section18a_handoff_failed', ['admin']],
+    ['stock_expiry_warning_1w', ['manager']],
+    ['picking_slip_created', ['warehouse_worker', 'manager']],
   ])('targets %s notifications to %j', async (type, targetRoles) => {
     const client = { query: vi.fn().mockResolvedValue({ rows: [] }) };
 
@@ -53,5 +56,31 @@ describe('createNotification duplicate insert SQL', () => {
     });
 
     expect(client.query.mock.calls[0][1][5]).toEqual(targetRoles);
+  });
+});
+
+describe('what each role reads', () => {
+  // Older rows keep the recipients they were written with, so the read
+  // also hides the types a role is no longer meant to get.
+  const hiddenFor = async (role) => {
+    query.mockReset();
+    query.mockResolvedValue({ rows: [] });
+    await repo.listForUser(1, role);
+    const [sql, params] = query.mock.calls[0];
+    expect(sql).toMatch(/NOT \(n\.type = ANY\(\$3\)\)/);
+    return params[2];
+  };
+
+  it('keeps floor and stock notifications off the admin feed', async () => {
+    const hidden = await hiddenFor('admin');
+    expect(hidden).toEqual(expect.arrayContaining(['picking_slip_created', 'low_stock', 'purchase_order_needs_attention']));
+    expect(hidden).not.toContain('donation_review');
+  });
+
+  it('keeps admin work off the manager feed', async () => {
+    const hidden = await hiddenFor('manager');
+    expect(hidden).toEqual(expect.arrayContaining(['donation_review', 'section18a_handoff_failed']));
+    expect(hidden).not.toContain('picking_slip_created');
+    expect(hidden).not.toContain('low_stock');
   });
 });

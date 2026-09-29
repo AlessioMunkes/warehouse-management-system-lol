@@ -34,7 +34,7 @@ const markAllRead = async (user) => repo.markAllRead(user.id, user.role);
 // markRead above is reused as-is for a floor notification too — it
 // only ever touches this user's own read state on a known id, so it
 // doesn't matter which bell called it.
-const FLOOR_TYPES = ['picking_slips_generated', 'picking_slip_created'];
+const FLOOR_TYPES = ['picking_slips_generated', 'picking_slip_created', 'picking_slip_released'];
 
 const listFloorNotifications = async (user, { unreadOnly } = {}) =>
   repo.listForUser(user.id, null, {

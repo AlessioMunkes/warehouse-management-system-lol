@@ -37,12 +37,14 @@ import StatTile from '../taskdashboard/components/StatTile';
 import ActionCard from '../taskdashboard/components/ActionCard';
 import ReportPanel from './components/ReportPanel';
 import StaticChart from './components/StaticChart';
+import NotificationsPanel from './components/NotificationsPanel';
 import { STAFF, ADMIN } from '../../routes/paths';
 import { RAG, byLabel } from './chartTheme';
 
 const MANAGER = 'manager';
 const ADMIN_ROLE = 'admin';
 const MANAGER_ONLY = [MANAGER];
+const MANAGERS_AND_ADMINS = [MANAGER, 'admin'];
 const ADMIN_ONLY = [ADMIN_ROLE];
 
 const INVENTORY = '/noc/inventory';
@@ -56,6 +58,13 @@ const report = (def) => ({
 });
 
 export const WIDGETS = [
+  // ═══ Both: notifications ═════════════════════════════════════
+  {
+    id: 'notifications', kind: 'panel', title: 'Notifications', roles: MANAGERS_AND_ADMINS,
+    description: 'Your latest notifications. Click one to open where it needs dealing with.',
+    render: () => <NotificationsPanel />,
+  },
+
   // ═══ Manager: number tiles ═══════════════════════════════════
   tile({
     id: 'low-stock', title: 'Low or out of stock', roles: MANAGER_ONLY, needs: ['summary'],

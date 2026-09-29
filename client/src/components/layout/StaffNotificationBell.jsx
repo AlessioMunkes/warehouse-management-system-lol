@@ -1,36 +1,30 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/components/layout/StaffNotificationBell.jsx
 //
-// The worker-facing twin of NotificationBell (manager side). Same
-// polling shape, same /api/notifications envelope, but reads the
-// /floor routes — server-narrowed to picking-slip events, never a
-// manager's PO/BR-14 chatter (see notification.routes.js's header
-// comment) — and opens as a slide-in Sheet rather than a Popover.
-// StaffShell already reaches for Sheet for AppNavDrawer's own overlay,
-// so this follows the same proven pattern for a staff-phone screen
-// instead of introducing a new one.
+// The warehouse worker's bell. Same look and behaviour as the manager
+// bell (NotificationBell), but it reads the floor feed (new picking
+// slips only) and slides in from the side, which suits a phone.
+// Clicking a notification marks it read and opens the pallet, or the
+// packing board for a whole new batch. The top of the panel is where a
+// worker turns on alerts for their phone (PhoneAlerts).
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
 import notificationAPI from '../../services/notificationAPI';
-
-const timeAgo = (iso) => {
-  const diffMs = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
-};
+import NotificationList from '../../features/notifications/components/NotificationList';
+import { notificationDestination, NOTIFICATIONS_CHANGED } from '../../features/notifications/notificationMatrix';
+import PhoneAlerts from '../../features/notifications/components/PhoneAlerts';
 
 const POLL_MS = 60_000;
+const ROLE = 'warehouse_worker';
 
 export default function StaffNotificationBell() {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [items, setItems] = useState([]);
@@ -38,13 +32,19 @@ export default function StaffNotificationBell() {
   const [error, setError] = useState(null);
 
   const refreshCount = useCallback(() => {
-    notificationAPI.getFloorUnreadCount().then(setUnreadCount).catch(() => { /* silent — a stale badge is not worth an error banner */ });
+    notificationAPI.getFloorUnreadCount().then(setUnreadCount).catch(() => { /* a stale badge is not worth an error banner */ });
   }, []);
 
+  // Polls, and refreshes at once when a phone alert arrives
+  // (usePushMessages announces it).
   useEffect(() => {
     refreshCount();
     const timer = setInterval(refreshCount, POLL_MS);
-    return () => clearInterval(timer);
+    window.addEventListener(NOTIFICATIONS_CHANGED, refreshCount);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener(NOTIFICATIONS_CHANGED, refreshCount);
+    };
   }, [refreshCount]);
 
   const loadList = useCallback(async () => {
@@ -69,7 +69,16 @@ export default function StaffNotificationBell() {
       await notificationAPI.markFloorNotificationRead(id);
       refreshCount();
     } catch {
-      /* the badge will self-correct on the next poll tick */
+      /* the badge will self-correct on the next check */
+    }
+  };
+
+  const openNotification = async (notification) => {
+    if (!notification.isRead) await markOneRead(notification.id);
+    const destination = notificationDestination(notification, ROLE);
+    if (destination) {
+      setOpen(false);
+      navigate(destination);
     }
   };
 
@@ -86,7 +95,8 @@ export default function StaffNotificationBell() {
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetTrigger asChild>
-        <Button type="button" variant="ghost" size="icon" className="relative" aria-label="Notifications">
+        <Button type="button" variant="ghost" size="icon" className="relative"
+          aria-label={unreadCount ? `Notifications, ${unreadCount} unread` : 'Notifications'}>
           <Bell />
           {unreadCount > 0 ? (
             <span
@@ -98,43 +108,25 @@ export default function StaffNotificationBell() {
           ) : null}
         </Button>
       </SheetTrigger>
-      <SheetContent side="right" className="w-80 max-w-[85vw] p-0">
+      <SheetContent side="right" className="w-[22rem] max-w-[90vw] gap-0 p-0">
         <SheetHeader className="border-b px-4 py-3">
-          <div className="flex items-center justify-between gap-2">
-            <SheetTitle>Notifications</SheetTitle>
+          <div className="flex items-center justify-between gap-2 pr-8">
+            <div className="flex items-center gap-2">
+              <SheetTitle>Notifications</SheetTitle>
+              {unreadCount > 0 ? (
+                <span className="whitespace-nowrap rounded-full bg-brand px-1.5 py-px text-[11px] font-semibold text-on-brand">{unreadCount} new</span>
+              ) : null}
+            </div>
             {items.some((n) => !n.isRead) ? (
-              <button type="button" onClick={markAll} className="text-xs text-muted-foreground underline">
+              <button type="button" onClick={markAll} className="whitespace-nowrap text-xs font-medium text-muted-foreground hover:text-foreground">
                 Mark all read
               </button>
             ) : null}
           </div>
         </SheetHeader>
-        <div className="max-h-[70vh] overflow-y-auto">
-          {loading ? (
-            <p className="p-4 text-sm text-muted-foreground">Loading…</p>
-          ) : error ? (
-            <p className="p-4 text-sm text-muted-foreground">{error}</p>
-          ) : items.length === 0 ? (
-            <p className="p-4 text-sm text-muted-foreground">Nothing yet.</p>
-          ) : (
-            items.map((n) => (
-              <button
-                key={n.id}
-                type="button"
-                onClick={() => !n.isRead && markOneRead(n.id)}
-                className={`block w-full border-b px-4 py-3 text-left last:border-b-0 hover:bg-muted/50 ${n.isRead ? '' : 'bg-muted/30'}`}
-              >
-                <div className="flex items-start gap-2">
-                  {!n.isRead ? <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-brand" /> : <span className="mt-1.5 h-1.5 w-1.5 shrink-0" />}
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">{n.title}</p>
-                    {n.body ? <p className="text-xs text-muted-foreground">{n.body}</p> : null}
-                    <p className="mt-0.5 text-xs text-muted-foreground">{timeAgo(n.createdAt)}</p>
-                  </div>
-                </div>
-              </button>
-            ))
-          )}
+        <PhoneAlerts />
+        <div className="flex-1 overflow-y-auto">
+          <NotificationList items={items} role={ROLE} onOpen={openNotification} loading={loading} error={error} />
         </div>
       </SheetContent>
     </Sheet>

@@ -23,7 +23,9 @@ import pool from '../config/db.js';
 import { ROLES } from '../middleware/auth.middleware.js';
 
 const MANAGER_ONLY = [ROLES.MANAGER];
-const STAFF_ROLES = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
+// A new slip is floor work: the worker packs it, the manager runs the
+// floor. Admins look after accounts, donations and 18A, not packing.
+const FLOOR_AND_MANAGER = [ROLES.WORKER, ROLES.MANAGER];
 const VOLUNTEER_MANAGEMENT_ROLES = [ROLES.MANAGER, ROLES.ADMIN];
 const ADMIN_ONLY = [ROLES.ADMIN];
 
@@ -33,11 +35,17 @@ const TARGET_ROLES_BY_TYPE = {
   non_collections_flagged: MANAGER_ONLY,
   purchase_order_needs_attention: MANAGER_ONLY,
   vms_sync_failed: MANAGER_ONLY,
+  // The names expiryWarning.service.js sends, and the older ones. Without
+  // these the warnings were stored with no recipients, so nobody saw them.
+  stock_expiry_warning_2w: MANAGER_ONLY,
+  stock_expiry_warning_1w: MANAGER_ONLY,
   stock_expiry_2_weeks: MANAGER_ONLY,
   stock_expiry_1_week: MANAGER_ONLY,
   donation_review: ADMIN_ONLY,
   section18a_handoff_failed: ADMIN_ONLY,
-  picking_slip_created: STAFF_ROLES,
+  picking_slip_created: FLOOR_AND_MANAGER,
+  // A manager released a claimed pallet: news for the floor only.
+  picking_slip_released: [ROLES.WORKER],
   volunteer: VOLUNTEER_MANAGEMENT_ROLES,
   vms: VOLUNTEER_MANAGEMENT_ROLES,
 };
@@ -91,11 +99,21 @@ export const createNotification = async (client, {
 // ever asks for the picking-slip types a worker's task view cares about,
 // and passes role = null because those are the floor's by definition.
 // The manager route passes no types and gets everything for its role.
+// Types this role must not see, whatever an older row's target_roles
+// says: rows keep the recipients they were written with, so when a
+// type's audience narrows (picking_slip_created used to reach admins
+// too) the rows already stored would otherwise keep reaching them.
+const typesHiddenFrom = (role) => Object.entries(TARGET_ROLES_BY_TYPE)
+  .filter(([, roles]) => !roles.includes(role))
+  .map(([type]) => type);
+
 const filtersFor = (role, types, params, base = []) => {
   const conditions = [...base];
   if (role) {
     params.push(role);
     conditions.push('n.target_roles IS NOT NULL', `$${params.length} = ANY(n.target_roles)`);
+    params.push(typesHiddenFrom(role));
+    conditions.push(`NOT (n.type = ANY($${params.length}))`);
   }
   if (types && types.length > 0) {
     params.push(types);

@@ -72,10 +72,11 @@ describe('the widget catalogue', () => {
 
   // Two jobs, two boards: a manager runs the floor, an admin looks
   // after what it is built on. No widget is offered to both.
-  it('gives the manager and the admin different widgets', () => {
+  it('gives the manager and the admin different widgets, apart from notifications', () => {
     const manager = new Set(widgetsForRole('manager').map((w) => w.id));
     const shared = widgetsForRole('admin').filter((w) => manager.has(w.id)).map((w) => w.id);
-    expect(shared).toEqual([]);
+    // Everyone has notifications; everything else is role-specific.
+    expect(shared).toEqual(['notifications']);
   });
 
   it('offers the admin their own work: accounts, donations, 18A, email, catalogue', () => {

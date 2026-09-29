@@ -5,7 +5,7 @@
 // Packing tab can carry a badge and a worker on another screen gets a
 // heads-up instead of having to keep checking. There's no websocket
 // in this app, so polling is the honest option here, not a stand-in
-// for one.
+// for one. A phone alert (push) also triggers a check straight away.
 //
 // The FIRST fetch is a baseline, never an announcement — a worker
 // opening the app to five already-spare slips did not just get five
@@ -15,6 +15,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { fetchPickingSlips } from '../../../services/pickingAPI';
 import { todayISO, isSpareSlip } from '../../packing/spareSlips';
+import { NOTIFICATIONS_CHANGED } from '../../notifications/notificationMatrix';
 
 const POLL_MS = 45000;
 const ANNOUNCE_MS = 10000;
@@ -55,9 +56,13 @@ export default function useSpareSlipAlert(active = true) {
 
     poll();
     const id = setInterval(poll, POLL_MS);
+    // A phone alert about new slips: check now, so the Packing dot is
+    // already there when the worker looks.
+    window.addEventListener(NOTIFICATIONS_CHANGED, poll);
     return () => {
       cancelled = true;
       clearInterval(id);
+      window.removeEventListener(NOTIFICATIONS_CHANGED, poll);
       clearTimeout(dismissTimer.current);
     };
   }, [active]);

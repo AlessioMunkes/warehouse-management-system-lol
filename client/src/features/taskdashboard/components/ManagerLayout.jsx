@@ -18,15 +18,9 @@
 // versa (nothing, today — every manager-only screen is also
 // admin-reachable).
 //
-// Script 52: the disabled search box is gone from the top bar. It sat
-// there through every screen advertising something that does not
-// exist, and a control nobody can use is worse than no control.
-// The note below is kept for whoever builds the real one.
-//
-// (was) Search is a placeholder, not wired to anything yet — cross-entity
-// search (suppliers/products/beneficiaries/POs from one box) is a
-// real, larger feature flagged separately, not a fake input that
-// silently does nothing forever. It says so.
+// There is no search box in the top bar: searching across suppliers,
+// products, centres and orders isn't built yet, and a box that does
+// nothing is worse than none.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -34,13 +28,13 @@ import { useAuth } from '../../../context/AuthContext';
 import { STAFF, ADMIN } from '../../../routes/paths';
 import NotificationBell from '../../notifications/components/NotificationBell';
 import StaffNotificationBell from '../../../components/layout/StaffNotificationBell';
+import usePushMessages from '../../notifications/usePushMessages';
 import LogoutConfirmDialog from '@/components/ui/log-out-dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from '@/components/ui/popover';
-import { Plus, LogOut, EyeOff, Eye, PanelLeftClose, PanelLeftOpen, Search } from 'lucide-react';
+import { Plus, LogOut, EyeOff, Eye, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import {
   ShellContext, useInsideShell,
   ReducedMotionContext, MOTION_KEY, readStoredMotion, applyMotionAttribute,
@@ -95,6 +89,8 @@ function ManagerLayoutShell({ children }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  // Phone alerts: refresh on arrival, open where a tapped one points.
+  usePushMessages();
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const [reducedMotion, setReducedMotionState] = useState(readStoredMotion);
@@ -199,16 +195,6 @@ function ManagerLayoutShell({ children }) {
           >
             {sidebarCollapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
           </Button>
-
-          <div className="relative hidden max-w-xs flex-1 sm:block">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              className="pl-8"
-              placeholder="Search coming soon"
-              disabled
-              title="Coming soon"
-            />
-          </div>
 
           <div className="ml-auto flex items-center gap-1">
             <Popover open={quickCreateOpen} onOpenChange={setQuickCreateOpen}>

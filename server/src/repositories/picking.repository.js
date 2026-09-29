@@ -354,7 +354,7 @@ const createSlip = async ({ ecdId, dispatchDate, cohort, generatedBy, items }) =
     });
 
     await client.query('COMMIT');
-    return { slipId, itemCount };
+    return { slipId, itemCount, ecdName: ecdCheck.rows[0].name };
 
   } catch (err) {
     await client.query('ROLLBACK');
@@ -575,8 +575,21 @@ const releaseSlip = async ({ slipId, actorId }) => {
       released_from: slip.assigned_to,
     });
 
+    // The pallet is spare again: tell the floor, the same way a new
+    // slip is announced (it shows in the workers' bell and, for today's
+    // slips, on their phones).
+    const ecd = await client.query('SELECT name FROM ecd_centres WHERE id = $1', [result.rows[0].ecd_id]);
+    const ecdName = ecd.rows[0]?.name ?? 'a centre';
+    await createNotification(client, {
+      type:       'picking_slip_released',
+      title:      `Pallet for ${ecdName} is back on the floor`,
+      body:       'Anyone can claim it.',
+      entityType: 'picking_slip',
+      entityId:   slipId,
+    });
+
     await client.query('COMMIT');
-    return { slip: result.rows[0] };
+    return { slip: result.rows[0], ecdName };
 
   } catch (err) {
     await client.query('ROLLBACK');

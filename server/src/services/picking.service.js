@@ -6,6 +6,7 @@
 // ─────────────────────────────────────────────────────────────
 import pickingRepository from '../repositories/picking.repository.js';
 import { ROLES }         from '../middleware/auth.middleware.js';
+import pushService       from './push.service.js';
 
 const COHORTS = ['tuesday', 'thursday'];
 const STATUSES = ['pending', 'in_progress', 'complete', 'cancelled'];
@@ -115,11 +116,21 @@ const generateSlips = async ({ dispatchDate, cohort }, user) => {
   if (!isManager(user)) fail(403, 'Only managers can generate picking slips.');
   await validateDispatchDate(dispatchDate, cohort);   // strict — no override for the bulk weekly run
 
-  return await pickingRepository.generateSlips({
+  const result = await pickingRepository.generateSlips({
     dispatchDate,
     cohort,
     generatedBy: user.id,   // from JWT — never trusted from frontend
   });
+
+  // Buzz the floor's phones, but only for today's slips: that's all the
+  // Packing tab lists, so a tap would find nothing for a later date.
+  if (result.created > 0 && pushService.isForToday(dispatchDate)) {
+    pushService.notifyFloor({
+      title: `${result.created} new picking slip${result.created === 1 ? '' : 's'} on the floor`,
+      body:  'Open Packing to claim a pallet.',
+    });
+  }
+  return result;
 };
 
 // ── Create a single new slip (manager only) ────────────────────
@@ -146,6 +157,13 @@ const createSlip = async ({ ecdId, dispatchDate, cohort, force, items }, user) =
 
   if (result.ecdNotFound)   fail(404, 'ECD not found, inactive, or not yet approved for dispatch.');
   if (result.alreadyExists) fail(409, 'A picking slip already exists for this ECD on this date.');
+
+  if (pushService.isForToday(dispatchDate)) {
+    pushService.notifyFloor({
+      title: 'New picking slip on the floor',
+      body:  `${result.ecdName}. Open Packing to claim it.`,
+    });
+  }
   return result;
 };
 
@@ -234,6 +252,13 @@ const releaseSlip = async (slipId, user) => {
 
   if (result.notFound) fail(404, 'Picking slip not found.');
   if (result.notClaimed) fail(409, 'This pallet is not currently claimed by anyone.');
+
+  if (pushService.isForToday(result.slip.dispatch_date)) {
+    pushService.notifyFloor({
+      title: 'A pallet is back on the floor',
+      body:  `${result.ecdName}. Open Packing to claim it.`,
+    });
+  }
   return result.slip;
 };
 

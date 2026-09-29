@@ -69,3 +69,13 @@ services:
       # dashboard; it matches provider.js's default.
       - key: GEMINI_FALLBACK_MODELS
         value: gemini-3.1-flash-lite,gemini-flash-lite-latest
+      # Phone notifications for the floor (Web Push). Generate the pair
+      # once with `npx web-push generate-vapid-keys` and never rotate it
+      # casually: every phone that turned alerts on is tied to it.
+      # Unset = no phone notifications; the in-app bell still works.
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false            # e.g. mailto:ops@ladlesoflove.org.za
