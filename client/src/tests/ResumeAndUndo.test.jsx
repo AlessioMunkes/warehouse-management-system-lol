@@ -83,12 +83,20 @@ describe('UnfinishedWork', () => {
     expect(screen.getByText(/S. Ndlovu/)).toBeInTheDocument();
   });
 
-  it('links to the task it belongs to', () => {
+  it('links straight to the unfinished order, not just the task', () => {
     writeDraft('receiving-86', { counted: {} });
     render(<UnfinishedWork />);
 
     expect(screen.getByRole('link', { name: 'Carry on' }))
-      .toHaveAttribute('href', '/noc/procurement');
+      .toHaveAttribute('href', '/noc/procurement?resume=86');
+  });
+
+  it('links straight to the unfinished pallet at the gate', () => {
+    writeDraft('dispatch-115', { loaded: {} });
+    render(<UnfinishedWork />);
+
+    expect(screen.getByRole('link', { name: 'Carry on' }))
+      .toHaveAttribute('href', '/staff/dispatch?pallet=115');
   });
 
   it('throwing one away really removes it', async () => {
