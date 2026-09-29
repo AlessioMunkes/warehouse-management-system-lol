@@ -1,26 +1,19 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/features/reporting/components/OperationalInsight.jsx
 //
-// Everything under an operational chart that turns it into work:
-//   key figures     — the headline, change on the previous period,
-//                     and the biggest contributor or latest bucket
-//   who to act on   — the named centres, suppliers, products and
-//                     packers behind the number, with contact
-//                     details and a link to the screen to fix it on
-//   written report  — on request: what happened, what the related
-//                     charts add, what it means, next steps. Printable.
+// The report under an Operations chart. Until "Generate report" is
+// clicked, only the button shows. Generating asks the server (and the
+// AI, if available) for the write-up, then shows in this order:
+//   1. About this chart: what the chart shows, in plain words
+//   2. Business view: what it means for Ladles of Love
+//   3. Key figures, including the change on the previous period
+//   4. Related diagrams: two charts that help explain this one
+//   5. Actions: the centres, suppliers, products or packers to follow
+//      up with, with contact details and a link to fix it
+// "PDF report" prints the same body with a letterhead.
 //
-// OPERATIONS ONLY. Used on ReportingPage alone; the server refuses
-// impact metrics on /insight, so this cannot drift onto the Impact
-// Report page by accident.
-//
-// Each section can be collapsed; the choice is remembered per
-// browser. Clicking a name in a list highlights it on the main chart
-// and the reverse, through the page's shared `highlight`.
-//
-// The figures and lists load with every report because they are
-// plain SQL. The written report waits for a click because it calls
-// the model, which is rate-limited and sometimes slow.
+// Operations reports only; the server refuses impact metrics here.
+// Clicking a name in Actions highlights it on the chart, and back.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';

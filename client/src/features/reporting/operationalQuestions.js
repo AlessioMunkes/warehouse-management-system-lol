@@ -31,7 +31,7 @@ export const groupByArea = (metrics) => {
   return groups;
 };
 
-// Questions that each lead to a report with a "who to act on" list
+// Questions that each lead to a report with an Actions list
 // under it, so a first tap shows what the page is for.
 export const FEATURED_QUESTIONS = [
   'Which centres keep missing collections?',

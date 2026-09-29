@@ -1,17 +1,11 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/features/reporting/components/OperationalDiagrams.jsx
 //
-// The Operations page's diagrams that are not bars or lines, drawn
-// by OperationalChart when the report asks for one (report.meta):
-//   Funnel    — a pipeline by status, read as stages (meta.funnel)
-//   Waterfall — opening stock, what came in and went out, closing
-//               (meta.waterfall)
-//   Flow      — a Sankey from one grouping to another, e.g. donation
-//               category → where the items ended up (meta.flows)
-//
-// Each one names its numbers in text as well as in shape (ACC-01):
-// the funnel prints its counts and percentages, the waterfall labels
-// every bar with its signed change, the flow lists its links.
+// The diagrams OperationalChart draws when a report asks for them:
+//   Funnel    - a pipeline by status, read as stages (meta.funnel)
+//   Waterfall - opening stock, what came in and out, closing (meta.waterfall)
+//   Flow      - a Sankey from one grouping to another (meta.flows)
+// Each one also shows its numbers as text, not just shapes.
 // ─────────────────────────────────────────────────────────────
 import { useMemo } from 'react';
 import {

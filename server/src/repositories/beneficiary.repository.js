@@ -150,19 +150,9 @@ const approveBeneficiary = async (id) => {
 };
 
 // ── Cohort rollback ───────────────────────────────────────────
-// Sponsor feedback (Milestone 2 change request log): when an ECD
-// misses its collection, support moving it to the OTHER pickup day
-// this same week rather than making it wait for its own day to come
-// back around.
-//
-// Now that pickup is weekly (Tuesday/Thursday), not fortnightly, the
-// original motivation for this — a missed centre otherwise waiting a
-// full fortnight — mostly doesn't apply (its own day is at most a few
-// days away). Kept anyway as a manual "move it to the other day this
-// week" escape hatch, which is still a real thing a manager might
-// need to do (Tuesday's run overran, get this centre in Thursday's
-// instead) — a flip is still the only "the other one" a two-value
-// cohort has.
+// Moves a centre to the other pickup day (Tuesday <-> Thursday), e.g.
+// when Tuesday's run overran and a centre needs to come on Thursday
+// instead. Requested by the sponsor for centres that miss a collection.
 //
 // Audited as its own action (not routed through the generic
 // updateBeneficiary PATCH, which writes no audit row at all) because

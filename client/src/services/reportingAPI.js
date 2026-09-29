@@ -43,7 +43,7 @@ export const getFactorHistory = (factorKey) =>
 
 // POST /api/reporting/insight
 // Operational reports only. Returns the report with key figures, a
-// previous-period comparison, related charts and "who to act on"
+// previous-period comparison, related charts and Actions
 // lists; narrate: true adds the written reading (AI, or a template
 // from the figures when the AI is unavailable).
 export const getInsight = (spec, { narrate = false } = {}) =>

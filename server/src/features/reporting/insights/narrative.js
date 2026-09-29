@@ -14,7 +14,7 @@
 // THE MODEL WRITES WORDS, NEVER NUMBERS IT WAS NOT GIVEN
 // It receives the figures already computed from pg — the main
 // series, the previous period, the related charts, and how long
-// each "who to act on" list is. It never receives the lists
+// each Actions list is. It never receives the lists
 // themselves (contact names, phone numbers), only their titles and
 // counts, and is told to say "listed below".
 //

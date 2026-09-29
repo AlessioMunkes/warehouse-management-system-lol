@@ -20,14 +20,9 @@ const fail = (status, message) => {
 };
 
 // ── Weekly weekday pickup ────────────────────────────────────
-// Every centre has a fixed pickup day — Tuesday or Thursday, every
-// week, not a fortnightly rotation. Confirmed against a real picking
-// slip ("Pickup Day: Tuesday", "Week Number: Week 25") — this also
-// matches the very first design (database.md's original target
-// schema already had `cohort IN ('tuesday','thursday')`) before the
-// app briefly diverged onto a week1/week2 fortnightly model that this
-// replaces. See server/database/cohort_weekday_migration.sql for the
-// one-time data migration this depends on.
+// Every centre collects once a week on a fixed day, Tuesday or
+// Thursday, matching the real picking slips ("Pickup Day: Tuesday").
+// Older data used week1/week2; cohort_weekday_migration.sql converts it.
 const WEEKDAY_FOR_COHORT = { tuesday: 2, thursday: 4 };   // Date#getUTCDay(): 0 = Sunday .. 6 = Saturday
 
 const scheduledCohortFor = (date) => {

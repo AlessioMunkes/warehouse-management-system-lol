@@ -1,34 +1,23 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/features/reporting/components/OperationalChart.jsx
 //
-// The Operations page's chart, on Recharts. One report payload in,
-// drawn whichever way suits its shape:
-//   single figure → a big number
-//   over time     → line, area or columns
-//   by category   → bars, columns, donut (shares) or Pareto
-//   two-way       → stacked or grouped columns, or a heatmap
-//   any           → a table with the same numbers (and CSV)
+// The Operations chart (Recharts). It picks a view that suits the data:
+//   one number       -> a big figure
+//   over time        -> line, area or columns (with last year's line and
+//                       unusual points circled, when available)
+//   by category      -> bars, columns, donut or Pareto
+//   two-way          -> stacked or grouped columns, or a heatmap
+//   pipelines        -> a funnel; stock flow -> a waterfall;
+//   category → where -> a flow (Sankey) diagram
+//   any              -> a table with the same numbers (and CSV)
 //
-// OPERATIONS ONLY. ReportChart.jsx is still what the Impact Report
-// page draws with, and it is not touched by anything in here.
+// Click a bar, point or cell to highlight it. The toolbar has top N,
+// sorting, an average line and the manager's own target line (saved to
+// their profile). `compact` is the small version for cards and related
+// charts; `print` is the PDF version (no controls or animation).
 //
-// INTERACTION
-//   - Click or tap a bar, slice, point or cell to highlight it; the
-//     rest dim. Clicking it again clears. `highlight`/`onHighlight`
-//     let the page share the choice with the "who to act on" lists.
-//   - Top 5 / 10 / all, sort by value or name, an average line, the
-//     report's working target line, and a find box to highlight by
-//     name.
-//   - Stacked charts: click a legend entry to hide that series.
-//   - Targets: with `onTargetChange`, the manager can set, move or
-//     reset their own target line. It is saved to their profile
-//     (PUT /api/reporting/targets/:metric), so it is the same on
-//     every device and no one else's line moves.
-//
-// ACCESSIBILITY (ACC-01, ACC-03): colour is never the only signal —
-// highlighted items are also named in a chip and bolded in the table,
-// two-way charts carry a legend, and every view has the table beside
-// it one click away.
+// Colour is never the only signal: highlights are named, two-way charts
+// have a legend, and the table view is always one click away.
 // ─────────────────────────────────────────────────────────────
 import { useMemo, useState } from 'react';
 import {

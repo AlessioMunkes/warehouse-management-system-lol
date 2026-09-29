@@ -1,17 +1,10 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/pages/AdminArchivePage.jsx
 //
-// Archive: everything switched off or deleted, in one place — users,
-// products, suppliers, ECD centres, programmes, storage locations and
-// event spaces. Each screen hides these by default; this is where an
-// admin finds them again.
-//
-// Two states, spelled out rather than one "inactive":
-//   Deactivated — switched off, can be switched back on. Restore uses
-//                 that item's own status route, with its own rules.
-//   Deleted     — removed from the system on purpose; users, products
-//                 and suppliers cannot come back (the server refuses),
-//                 so there is no Restore button to tempt anyone.
+// Archive (admin): everything switched off or deleted across the system.
+// Deactivated items can be restored (through the item's own status
+// route and its rules). Deleted users, products and suppliers can't come
+// back, so they have no Restore button.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';

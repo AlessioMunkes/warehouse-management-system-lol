@@ -168,10 +168,8 @@ const approveBeneficiary = async (rawId) => {
 };
 
 // ── Rollback to the other cohort ─────────────────────────────────
-// Sponsor feedback: when an ECD misses its collection, support moving
-// it to the other pickup day this same week. See
-// beneficiary.repository.js's rollbackCohort for why this still
-// exists now that pickup is weekly rather than fortnightly.
+// Moves a centre to the other pickup day this week (see rollbackCohort
+// in beneficiary.repository.js).
 const rollbackCohort = async (rawId, actorId) => {
   const id = requireId(rawId);
 

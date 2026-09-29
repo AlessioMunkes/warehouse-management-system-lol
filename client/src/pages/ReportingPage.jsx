@@ -1,55 +1,18 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/pages/ReportingPage.jsx
 //
-// Operations Analytics. Manager view only — App.jsx gates the
-// route, and every /api/reporting endpoint is
-// requireRole(MANAGER, ADMIN).
+// Operations Reports (managers and admins). The day-to-day running of the
+// warehouse; beneficiary impact figures are on the Impact Report page.
 //
-// OPERATIONS, NOT IMPACT.
-// Beneficiary-facing numbers (children/adults served, meals enabled,
-// paper saved, compost processed) live on their own Impact Calculator
-// page — this one is the day-to-day running of the warehouse: what
-// moved, what it cost, what broke. Keeping them apart means neither
-// screen has to caveat itself around the other's audience.
+// From top to bottom: saved reports, "At a glance" trend cards, the ask
+// box (hidden if no AI key is set), Browse all reports, and the builder
+// (prepared or custom report). Every answer shows the question it
+// actually answered in plain words, plus "Not what you meant? Try:"
+// alternatives.
 //
-// THE ASK BOX SITS ABOVE THE BUILDER, NOT INSTEAD OF IT
-// A manager opening the page to check a standing figure should not
-// have to type anything. The ask box is a faster way to REACH the
-// builder, and every AI answer stays one click from being adjusted
-// by hand. It renders only when catalog.aiEnabled is true, so when
-// the API key lapses after handover the input disappears and the
-// dropdowns carry on.
-//
-// TRENDS ARE A SHORTCUT INTO THE BUILDER, NOT A SEPARATE FEATURE.
-// Four pre-picked metrics render small on open so the page never
-// looks like an empty form waiting to be told what to look at —
-// "Explore" runs that report in full (with the card's breakdown),
-// syncs the builder to it and brings the result into focus. The
-// "At a glance" heading folds the cards away.
-//
-// THE RESOLVED-SPEC LINE IS THE TRUST MECHANISM
-// Every result restates, in plain English, the question that was
-// actually answered — generated server-side, so the AI path and the
-// dropdown path describe a spec identically. A question the model
-// misreads is visible before anyone acts on the number.
-//
-// EVERY REPORT ENDS IN WHO TO ACT ON
-// Under each result, OperationalInsight shows the key figures (with
-// the change on the previous period), the named centres, suppliers,
-// products and packers behind the number with their contact details,
-// and related views. A written report — model-written, or built from
-// the figures when the model is unavailable — is one click away and
-// prints to PDF. Impact metrics never reach it: they are filtered out
-// of this page's catalog and refused by /insight on the server.
-//
-// CHARTS
-// The result chart is OperationalChart (Recharts): the manager can
-// switch how it is drawn, trim to the top few, sort, show averages and
-// the working target, and click any bar or point to highlight it —
-// the same item lights up in the "who to act on" lists. Scatter plots
-// come from declared comparisons (Browse all reports, or a question
-// like "scatter plot of centres' collections against children").
-// ReportChart stays for the Impact Report page and for printing.
+// Under a result: compare with last year, drill into a bar, save the
+// report, and Generate report (see OperationalInsight). Scatter
+// comparisons have their own chart and report.
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback, useRef } from 'react';
 import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';

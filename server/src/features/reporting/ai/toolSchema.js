@@ -172,10 +172,9 @@ export const buildTools = () => ([
   },
 ]);
 
-// The catalog descriptions carry the domain rules the schema cannot
-// express — that children are counted once per period, that late
-// collections still count, that a fortnightly cycle makes "this
-// month" two cycles rather than one.
+// The catalog descriptions carry the rules the schema can't express:
+// children are counted once per period, late collections still count,
+// and centres collect weekly on a fixed day (Tuesday or Thursday).
 export const buildSystemPrompt = (todayISO) => {
   const live  = [];
   const timed = [];

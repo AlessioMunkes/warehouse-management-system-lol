@@ -1,14 +1,9 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/features/masterdata/hooks/useOpenFromQuery.js
 //
-// A link can open a record: /noc/beneficiaries?open=12 lands on the
-// beneficiary list with centre 12 already open and scrolled into view
-// (the screen's own open(), which calls useDetailFocus). Used by the
-// admin Activity and Archive screens so "Open" goes straight to the
-// record rather than to a list the admin then has to search.
-//
-// The parameter is removed once used, so a refresh or the back button
-// does not re-open a record the admin has since closed.
+// Opens a record from the URL: /noc/beneficiaries?open=12 opens centre 12
+// and scrolls to it. Used by the admin Activity and Archive links. The
+// parameter is then removed, so refreshing doesn't reopen it.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';

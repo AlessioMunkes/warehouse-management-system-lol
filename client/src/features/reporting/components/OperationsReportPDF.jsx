@@ -1,24 +1,11 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/features/reporting/components/OperationsReportPDF.jsx
 //
-// The operations report as a document: letterhead, what the report
-// is and when it covers, then the same body the screen shows.
-//
-// WHY THIS IS IN PdfShell AND NOT ITS OWN PRINT PORTAL
-// The old version rendered a bare copy into <body> and called
-// window.print(). receipts.css — loaded on this page through the
-// Impact Calculator's PDF — hides every child of <body> except
-// .pdf-modal while printing, so the report was hidden along with the
-// app and the page came out blank. PdfShell IS the .pdf-modal: it
-// prints, it has the same View PDF download the delivery and dispatch
-// notes use, and it cannot be hidden by that rule.
-//
-// WHY THE COLOURS ARE PINNED (operationalReport.css, .op-pdf)
-// The body reads var(--ink), var(--line) and friends. In dark mode
-// those are light-on-dark, which on a white sheet is white text on
-// white — a second way to print a blank page. .op-pdf pins them to
-// the light values, so the paper looks the same whatever theme the
-// person was using.
+// The Operations report as a printable document: letterhead, title and
+// period, then the same report body as the screen, charts included. It
+// uses PdfShell (Print / View PDF), like the delivery and dispatch notes.
+// The colours are fixed to the light theme (.op-pdf) so a report made in
+// dark mode still prints dark text on white paper.
 // ─────────────────────────────────────────────────────────────
 import { useState } from 'react';
 import PdfShell from '../../receipts/components/PdfShell';

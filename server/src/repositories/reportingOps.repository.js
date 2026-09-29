@@ -147,8 +147,8 @@ const pickingTurnaround = async ({ dimension, filters, dateRange }) => {
   return rows.map((r) => ({ label: r.label, value: num(r.value), meta: { slips: r.slips } }));
 };
 
-// Live: the fortnight around today — last week's stragglers and the
-// next two weeks' pallets.
+// Live: slips due from a week ago to two weeks ahead, so late pallets
+// from last week show alongside the next two weeks.
 const slipPipeline = async ({ dimension, filters }) => {
   const expr = pick({ slip_status: 'ps.status', cohort: 'ps.cohort::text' }, dimension);
   const params = [];

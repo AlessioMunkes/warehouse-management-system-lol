@@ -3,7 +3,7 @@
 //
 // What turns an operational chart into something a manager can act
 // on. Per metric: which way is good, which related charts explain
-// it, which "who to act on" lists sit under it, and the business
+// it, which Actions lists sit under it, and the business
 // lens its written reading is framed through.
 //
 // OPERATIONS ONLY. Impact metrics have no entry here and

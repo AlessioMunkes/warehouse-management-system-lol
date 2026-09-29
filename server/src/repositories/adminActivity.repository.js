@@ -1,28 +1,18 @@
 // ─────────────────────────────────────────────────────────────
 // server/src/repositories/adminActivity.repository.js
 //
-// Two read-only admin views, built from what the system already records.
+// Read-only queries for the admin Activity and Archive screens.
 //
-// ACTIVITY — who did what, one timeline. There is an audit_log, but
-// only a few features write to it; most actions are recorded on their
-// own rows (picking_events.actor_id, stock_movements.performed_by,
-// purchase_orders.created_by, …). Each source below is one SELECT with
-// the same columns, UNION ALL'd, then filtered by date and person:
-//   source   — which table it came from (the service words it)
-//   at       — when
-//   actor_id — who (NULL: the system, e.g. a scheduled sweep)
-//   verb     — what happened, in that table's own terms
-//   subject  — what it happened to (a centre, product, supplier…)
-//   screen / record_id — where to open it
-//   detail   — the few extra fields worth showing
-// Stock movements are limited to adjustments: receiving, dispatch and
-// donations each already appear from their own table. audit_log rows
-// that another source already covers are left out, so nothing is
-// counted twice.
+// Activity: one timeline of who did what. Most actions are recorded on
+// their own tables (picking_events, stock_movements, purchase_orders...),
+// so each table has a SELECT with the same columns, joined with UNION ALL:
+// source, at, actor_id, verb, subject, screen/record_id, detail. Only
+// stock adjustments are taken from stock_movements (receiving, dispatch
+// and donations have their own rows), and audit_log rows already covered
+// elsewhere are skipped so nothing shows twice.
 //
-// ARCHIVE — everything switched off or deleted: deactivated
-// (is_active = false) or deleted (archived_at set, which by design
-// cannot be undone for users, products and suppliers).
+// Archive: everything deactivated (is_active = false) or deleted
+// (archived_at set).
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
 

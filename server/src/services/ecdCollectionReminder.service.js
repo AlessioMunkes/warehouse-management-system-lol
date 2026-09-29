@@ -44,6 +44,8 @@ const normaliseChannels = (channels = DEFAULT_CHANNELS) => {
   return [...new Set(cleaned)];
 };
 
+const QUEUE_CONCURRENCY = 8;
+
 const queueTomorrowCollectionReminders = async ({
   channels = DEFAULT_CHANNELS,
   now = new Date(),
@@ -56,19 +58,22 @@ const queueTomorrowCollectionReminders = async ({
   const reminders = [];
   let skipped = 0;
 
-  for (const collection of collections) {
-    for (const channel of reminderChannels) {
-      const reminder = await reminderRepository.createReminderOnce({
-        ecdId: collection.ecd_id,
-        collectionDate,
-        channel,
-      });
-
-      if (reminder) {
-        reminders.push(reminder);
-      } else {
-        skipped += 1;
-      }
+  // One insert per centre and channel, sent a few at a time. One after
+  // another, 98 centres meant 98 round trips to the database and a
+  // 20-second wait every time the reminders screen opened. Batches of
+  // QUEUE_CONCURRENCY keep the order, and stay well inside the pool.
+  const jobs = collections.flatMap((collection) => reminderChannels.map((channel) => ({
+    ecdId: collection.ecd_id,
+    collectionDate,
+    channel,
+  })));
+  for (let i = 0; i < jobs.length; i += QUEUE_CONCURRENCY) {
+    const created = await Promise.all(
+      jobs.slice(i, i + QUEUE_CONCURRENCY).map((job) => reminderRepository.createReminderOnce(job)),
+    );
+    for (const reminder of created) {
+      if (reminder) reminders.push(reminder);
+      else skipped += 1;
     }
   }
 

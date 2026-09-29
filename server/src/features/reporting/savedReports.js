@@ -1,16 +1,12 @@
 // ─────────────────────────────────────────────────────────────
 // server/src/features/reporting/savedReports.js
 //
-// The rules for saved and scheduled reports, with no database:
-//   periodFor   — the period a scheduled email covers: last full
-//                 week (Monday to Sunday) or last full calendar month
-//   isDue       — has this schedule's period ended since it last went?
-//   presetRange — a page preset ("last_3m") as dates, for "send now"
-//   emailFor    — the email: title, period, headline figure, a table of
-//                 the top rows, the caveat and a link back to the page
-//
-// Emails carry aggregate figures only, like the reports themselves:
-// no names, no contact details.
+// Rules for saved and scheduled reports (no database access):
+//   periodFor   - the last full week (Mon-Sun) or calendar month
+//   isDue       - whether that period has ended since the last email
+//   presetRange - a page period ("last_3m") as dates, for "send now"
+//   emailFor    - the email's subject, text and HTML
+// Emails only contain totals, never names or contact details.
 // ─────────────────────────────────────────────────────────────
 export const SCHEDULES = ['none', 'weekly', 'monthly'];
 export const PRESETS = ['this_month', 'last_month', 'last_3m', 'last_6m', 'this_year'];

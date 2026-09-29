@@ -11,10 +11,24 @@ function Sheet({
   return <SheetPrimitive.Root data-slot="sheet" {...props} />;
 }
 
+// `asChild` translated to Base UI's `render`, the same as TooltipTrigger
+// and PopoverTrigger. Without it, `<SheetTrigger asChild><Button/>`
+// (the mobile menu, the floor notification bell) leaked `asChild` to the
+// DOM and nested the Button inside Base UI's own <button>: invalid HTML,
+// and a control a screen reader announces twice.
 function SheetTrigger({
+  asChild,
+  children,
   ...props
 }) {
-  return <SheetPrimitive.Trigger data-slot="sheet-trigger" {...props} />;
+  if (asChild) {
+    return <SheetPrimitive.Trigger data-slot="sheet-trigger" render={children} {...props} />;
+  }
+  return (
+    <SheetPrimitive.Trigger data-slot="sheet-trigger" {...props}>
+      {children}
+    </SheetPrimitive.Trigger>
+  );
 }
 
 function SheetClose({

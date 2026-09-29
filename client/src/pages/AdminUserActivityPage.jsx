@@ -1,18 +1,9 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/pages/AdminUserActivityPage.jsx
 //
-// User Activity: who did what, across the whole warehouse, in one
-// timeline — packing, dispatch, receiving, stock adjustments, purchase
-// orders, donations, volunteers and admin changes. Same table, filters
-// and detail card as the Volunteer Log, so the two Logs screens read
-// alike.
-//
-// Read-only. "Open" takes the admin to the record itself (a slip, a
-// purchase order, a supplier…), opened and scrolled into view.
-//
-// Built from what each part of the system already records (see
-// server/src/repositories/adminActivity.repository.js); nothing new is
-// captured to feed it.
+// User Activity (admin): a timeline of what everyone did, with filters by
+// person, area and date. Click an entry for details; "Open the record"
+// goes to the slip, order or supplier itself. Read-only.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';

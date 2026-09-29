@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // server/src/repositories/reportingInsight.repository.js
 //
-// The "who to act on" lists behind an operational report: the
+// The Actions lists behind an operational report: the
 // named centres, suppliers, products and packers that make up a
 // chart's headline number, with whatever the manager needs to
 // pick up the phone. Read-only, parameterised, same rules as

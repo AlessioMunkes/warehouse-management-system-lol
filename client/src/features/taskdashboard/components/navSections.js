@@ -1,21 +1,13 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/features/taskdashboard/components/navSections.js
 //
-// What each role can navigate to. Data only — no components — so that
-// AppNav.jsx and ManagerLayout.jsx can both import it without tripping
-// react-refresh/only-export-components.
+// The sidebar menu for each role (used by ManagerLayout and AppNav).
 //
-// THREE SETS, NOT ONE WITH BITS ADDED
-// The admin list used to be the manager list plus an Admin section,
-// which said admin is a manager with extra powers. users.role does not
-// work that way here: an admin looks after accounts, suppliers, the
-// product catalog and donation management, while beneficiaries,
-// picking slips, purchase orders and reporting are the manager's daily
-// work. The admin list keeps those responsibilities visible.
-//
-// The manager routes stay reachable by URL for an admin — App.jsx gates
-// them to ['manager','admin'] because the server does the same — this
-// is about what the app steers each role toward, not a second gate.
+// Each role gets its own list. Admins look after accounts, products,
+// suppliers, donations and the logs; managers run the day-to-day
+// (beneficiaries, picking slips, orders, reports); workers get the floor
+// tasks. Admins can still open manager screens by URL; this only
+// decides what the menu shows, not what's allowed.
 // ─────────────────────────────────────────────────────────────
 import {
   LayoutDashboard, Users2, ClipboardList, ShoppingCart,
@@ -30,10 +22,7 @@ import {
 } from 'lucide-react';
 import { STAFF, ADMIN, VOLUNTEERS, PACKING } from '../../../routes/paths';
 
-// A warehouse worker's routes are a different set, not a subset: they
-// cannot open Beneficiaries, Purchase Orders, Reporting or any of the
-// admin screens, and they are the only role that lives in the four
-// floor flows.
+// Warehouse workers: the floor tasks only.
 const WORKER_SECTIONS = [
   {
     label: 'Overview',
@@ -55,8 +44,7 @@ const WORKER_SECTIONS = [
   },
 ];
 
-// Accounts, master data, and where donations end up. Every one of these
-// is either admin-only in App.jsx or master data an admin owns.
+// Admins: accounts, master data, logs and donations.
 const ADMIN_SECTIONS = [
   {
     label: 'Overview',
@@ -64,14 +52,6 @@ const ADMIN_SECTIONS = [
       { to: ADMIN.dashboard, label: 'Dashboard', icon: LayoutDashboard },
     ],
   },
-  // One section, because it is one job. Users sat under "People"
-  // alongside Volunteer Events, which put account provisioning next to
-  // event scheduling and split the admin's actual work — the master
-  // data every other module reads — across three headings.
-  //
-  // Named "X Management" rather than the bare plural: these screens
-  // create, edit, deactivate and delete, and "Products" reads like a
-  // list you look at.
   {
     label: 'Master data',
     items: [
@@ -80,10 +60,7 @@ const ADMIN_SECTIONS = [
       { to: ADMIN.suppliers, label: 'Supplier Management', icon: Truck },
     ],
   },
-  // Records of what happened, as opposed to the master data above that
-  // every other module reads. One item today; the stock ledger and the
-  // audit trail are the obvious next two, and they will want to live
-  // beside it rather than under "Master data".
+  // Records of what happened: user activity, the door log and the archive.
   {
     label: 'Logs',
     items: [
@@ -121,10 +98,8 @@ const MANAGER_SECTIONS = [
       { to: STAFF.communityRequests, label: 'Benevolent Requests', icon: PhoneCall },
     ],
   },
-  // Receiving, Packing, Decanting and Dispatch are reached through the
-  // staff shell rather than from here, so they are deliberately absent.
-  // So is Donation Intake: logging a donation at the door is floor work,
-  // and a manager sees donations through the reports instead.
+  // The floor flows (receiving, packing, decanting, dispatch) and
+  // donation intake aren't in the manager's menu.
   {
     label: 'Warehouse',
     items: [
@@ -152,8 +127,7 @@ export const NAV_SECTIONS = (role) =>
   : role === 'admin'         ? ADMIN_SECTIONS
   : MANAGER_SECTIONS;
 
-// Where the brand link goes, per role. Hard-coding /manager sent a
-// warehouse worker to a route ProtectedRoute bounces.
+// Each role's home screen (where the logo links to).
 export const homeForRole = (role) =>
   role === 'warehouse_worker' ? STAFF.home
   : role === 'admin' ? ADMIN.dashboard

@@ -70,10 +70,9 @@ const customArgsToSpec = (a, todayISO) => {
   };
 };
 
-// Metrics declare which filters they accept and validateSpec rejects
-// the rest. Rather than burn a retry, drop unsupported filters and
-// tell the caller — "decanting wastage for week1" is a reasonable
-// thing to say even though wastage is not cohort-scoped.
+// Each metric only accepts certain filters. Rather than fail, drop the
+// ones it doesn't support and say so: "decanting wastage for Tuesday
+// centres" is a fair question even though wastage isn't split by day.
 const stripUnsupportedFilters = (spec, catalog) => {
   const metric = catalog.metrics.find((m) => m.id === spec.metric);
   if (!metric) return { spec, dropped: [] };

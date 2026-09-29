@@ -1,10 +1,9 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/features/reporting/components/ComparisonInsight.jsx
 //
-// Generate report, for a scatter comparison. The same shape as a
-// single report's (OperationalInsight): nothing but the button until
-// asked, then About this chart, Business view, and Actions — here the
-// dots in the corner that needs attention — with a PDF of the lot.
+// "Generate report" for a scatter comparison: About this chart, Business
+// view and Actions (the dots in the corner that needs attention), with a
+// PDF version.
 // ─────────────────────────────────────────────────────────────
 import { useState } from 'react';
 import { FileText, Printer } from 'lucide-react';

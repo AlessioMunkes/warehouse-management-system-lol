@@ -1,13 +1,10 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/features/reporting/components/SavedReports.jsx
 //
-// Saved and scheduled Operations reports, each manager's own.
-//   SavedReportsBar — pinned reports first, one tap to open; "Manage"
-//     sets a weekly or monthly email, pins, sends one now or removes.
-//   SaveReport      — "Save this report" under a result: a name, an
-//     optional schedule, pin to the top.
-// A scheduled email goes to the manager's own address only, and
-// covers the last full week (Mondays) or month (the 1st).
+// Saved reports on the Operations page. SavedReportsBar lists them (pinned
+// first) with a Manage view for email schedules, pinning, "send now" and
+// removing. SaveReport is the "Save this report" form under a result.
+// Scheduled emails go only to the report's owner.
 // ─────────────────────────────────────────────────────────────
 import { useState } from 'react';
 import { Bookmark, Pin, PinOff, Send, Trash2, Mail } from 'lucide-react';

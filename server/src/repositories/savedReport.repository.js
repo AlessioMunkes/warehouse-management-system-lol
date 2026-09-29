@@ -1,13 +1,9 @@
 // ─────────────────────────────────────────────────────────────
 // server/src/repositories/savedReport.repository.js
 //
-// A manager's saved Operations reports (migration 029). Every query
-// is scoped to the owner, so one manager can never read, change or
-// delete another's.
-//
-// The table may not exist yet on a database that has not run 029.
-// Reads then return nothing (the page works, with no saved reports);
-// writes throw a 503 saying which migration to run.
+// Saved Operations reports (migration 029). Every query is limited to the
+// owner. If the table doesn't exist yet, reads return nothing and writes
+// return a 503 naming the migration.
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
 

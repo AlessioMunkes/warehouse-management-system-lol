@@ -1,14 +1,11 @@
 // ─────────────────────────────────────────────────────────────
 // server/src/features/reporting/insights/relatedCharts.js
 //
-// Every generated report comes with two related diagrams and a short
-// note on how each connects to the main one. Candidates, best first:
-//   1. the report's own related charts (operationalInsights.js),
-//      which carry a hand-written `why` where one is given;
-//   2. the same figure month by month, or split another way;
-//   3. another report from the same area of the operation.
-// The service runs them in this order and keeps the first two that
-// have data, so a report never arrives with one chart or none.
+// Picks the two related diagrams shown with every generated report, and a
+// short note on how each connects. Candidates, best first: the report's
+// own related charts, then the same figure over time or split another
+// way, then another report from the same area. The service keeps the
+// first two that have data.
 // ─────────────────────────────────────────────────────────────
 import { METRICS, DIMENSIONS, isSnapshot } from '../reportCatalog.js';
 import { OPERATIONAL_INSIGHTS } from './operationalInsights.js';

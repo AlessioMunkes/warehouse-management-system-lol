@@ -22,10 +22,9 @@ const STATUS_BADGE = {
   cancelled: { className: "badge badge-inactive", label: "Cancelled" },
 };
 
-// A centre is on a fortnightly rotation, so ~14 days between
-// collections is normal. Past three weeks it has missed at least one
-// turn, which warehouse visit §4.1 says has to be visible and
-// followed up rather than discovered after the fact.
+// Centres collect every week, so three weeks without a collection
+// means they've missed at least two in a row. Flag it so someone
+// follows up (warehouse visit §4.1).
 const MISSED_COLLECTION_DAYS = 21;
 
 function isManager(user) {

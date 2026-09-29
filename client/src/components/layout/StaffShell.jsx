@@ -2,32 +2,15 @@
 // client/src/components/layout/StaffShell.jsx
 // @sentinel script-49-staff-shell-in-app
 //
-// The frame every warehouse-staff task page sits in.
+// The frame every warehouse-staff page sits in. It uses the same app
+// layout as the rest of the system (ManagerLayout: sidebar on a desk,
+// menu drawer on a phone, top bar with the bell, "reduce movement" and
+// log out), then adds the staff page header and the bottom tab bar.
 //
-// Script 49: the floor flows now sit INSIDE the same app shell as the
-// dashboard, manager and admin screens (ManagerLayout — sidebar on a
-// desk, hamburger drawer on a phone, one top bar). Before this they
-// had their own dark app bar, a breadcrumb strip and a doodle footer,
-// so opening Receiving from the worker's dashboard felt like leaving
-// the app.
-//
-// What moved where — nothing was dropped:
-//   dark app bar drawer        → ManagerLayout's drawer / sidebar
-//   "Less movement"            → the eye button in the top bar. Same
-//                                storage key (stf_reduced_motion) and
-//                                the same <html data-stf-motion>
-//                                attribute, so every staff.css rule
-//                                that honours it still does.
-//   "Log out"                  → the top bar's log-out button
-//   signed-in name             → the top bar
-//   back arrow (history -1)    → the arrow beside the page title
-//   crumb / onBack / actions / meta → the page header below
-//   bottom tab bar             → kept, phones only (below sm). At sm+
-//                                the sidebar lists the same four tasks.
-//
-// The props are unchanged, so none of the seven pages that render
-// this needed editing. ManagerLayout is idempotent, so a page that is
-// already inside a shell gets a passthrough rather than a second one.
+// The tab bar only shows for warehouse workers; managers and admins
+// opening a floor screen already have the sidebar. Workers also get a
+// small pop-up when new pallets are put on the floor, except when they
+// are already on the Packing screen.
 // ─────────────────────────────────────────────────────────────
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ChevronLeft } from 'lucide-react';
@@ -56,11 +39,8 @@ const splitCrumb = (crumb) => {
 export default function StaffShell({
   crumb,          // 'Receiving' or 'Packing / Little Stars ECD'
   meta,           // right-hand line: a date, a reference, a count
-  // { step, total } — a numbered step flow's progress, shown in the
-  // crumb row (see .stf-crumb-progress). Was its own StepRail block
-  // rendered inside the card by each flow; moved up here so the
-  // breadcrumb, progress and History share one row instead of three
-  // stacked ones. Omit entirely for a page with no steps.
+  // { step, total } for a numbered flow, shown as progress bars in the
+  // page header. Leave out for pages without steps.
   progress,
   onBack,         // omit for a task's first screen
   backLabel = 'Back',
@@ -74,23 +54,16 @@ export default function StaffShell({
   const { pathname } = useLocation();
   const { title, sub } = splitCrumb(crumb);
 
-  // The bottom tab bar is warehouse staff's own navigation. A manager
-  // or admin opening a floor screen (recording a donation, say) has the
-  // sidebar, or the menu drawer on a phone, and their own set of
-  // screens — the worker's five tabs would be the wrong menu for them.
-  // Log out, "reduce movement" and the notification bell live in the
-  // app header (ManagerLayout) for every role.
+  // Only workers get the bottom tab bar; managers and admins use the
+  // sidebar. Log out, "reduce movement" and the bell are in the top bar.
   const { user } = useAuth() ?? {};
   const showTabBar = !user || user.role === 'warehouse_worker';
 
-  // Managers already get told about picking-slip activity through
-  // NotificationBell — this is the floor-facing half, so it only polls
-  // for roles that actually work a pallet.
+  // Only workers are told about new pallets here; managers already get
+  // picking-slip notifications through their bell.
   const isManager = user?.role === 'manager' || user?.role === 'admin';
   const { spareCount, justArrived, dismiss } = useSpareSlipAlert(!isManager);
-  // Already on Packing, so the Spare tab there is telling this worker
-  // the same thing directly — a toast on top of that would just be
-  // announcing what's already on screen.
+  // No pop-up on the Packing screen itself; its tabs already show it.
   const onPackingPage = pathname.startsWith(STAFF.packing);
 
   return (
@@ -121,9 +94,7 @@ export default function StaffShell({
 
               <div className="stf-page-head-text">
                 {onBack ? (
-                  // Same accessible name as the old crumb button, so the
-                  // in-flow "back" still announces where it goes and
-                  // what it leaves.
+                  // The label names where "back" goes and what it leaves.
                   <button
                     type="button"
                     className="stf-page-back"
@@ -139,9 +110,7 @@ export default function StaffShell({
               </div>
             </div>
 
-            {/* A numbered flow's progress. Lived in the old .stf-crumb
-                strip; the strip is gone, but the bars and their
-                classes are not, so staff.css needed no change. */}
+            {/* Step progress for numbered flows. */}
             {progress ? (
               <div
                 className="stf-crumb-progress"

@@ -1,14 +1,9 @@
 // ─────────────────────────────────────────────────────────────
 // server/src/jobs/savedReports.job.js
 //
-// Emails scheduled Operations reports. Same shape as
-// expiryWarning.job.js: an hourly look, no cron dependency. Whether a
-// report is due is decided from its last_sent_at (savedReports.js
-// isDue), not from an in-memory date, so a restart never sends twice
-// and a server that slept through Monday catches up when it wakes.
-//
-// Multi-warehouse: each warehouse's saved reports are swept inside
-// that warehouse (runInWarehouse).
+// Emails scheduled reports. Checks once an hour; whether a report is due
+// comes from its last_sent_at, so a restart never sends twice and a
+// missed day is caught up. Runs once per warehouse in multi-warehouse mode.
 // ─────────────────────────────────────────────────────────────
 import savedReportService from '../services/savedReport.service.js';
 import { runInWarehouse } from '../config/warehouseContext.js';

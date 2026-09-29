@@ -32,9 +32,8 @@ export const RANGE_PRESETS = [
   { id: 'custom',       label: 'Custom range' },
 ];
 
-// Three months is the default: ~6 fortnightly cycles, enough for the
-// compliance and non-collection charts to show a pattern rather than
-// a single data point.
+// Three months is the default: about 13 weekly collections per centre,
+// enough for the compliance charts to show a pattern.
 export const DEFAULT_PRESET = 'last_3m';
 
 export const resolvePreset = (id) => {

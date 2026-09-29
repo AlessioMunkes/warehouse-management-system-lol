@@ -1,23 +1,16 @@
 // ─────────────────────────────────────────────────────────────
 // server/src/features/privacy/redact.js
 //
-// What leaves this server for the AI model is never a person.
+// Keeps people's details away from the AI model.
 //
-//   redactText(text, names) — before a typed question goes to the
-//     model: South African ID numbers, phone numbers and email
-//     addresses become [id number] / [phone] / [email], and the name
-//     of any person the system knows (staff, centre contacts, donors,
-//     callers, volunteers) becomes [person]. Centre, supplier and
-//     product names are organisations and are left alone — the
-//     reports need them.
+// redactText: before a typed question is sent, replaces ID numbers,
+// phone numbers, emails and the names of people in the system with
+// [id number], [phone], [email] and [person]. Centre, supplier and
+// product names stay, since reports need them.
 //
-//   pseudonymise(labels, noun) / restore(text, map) — when the rows
-//     of a chart ARE people (packers), the model sees "Packer A",
-//     "Packer B", and the real names are put back into its words
-//     afterwards, on this server. The model never sees who they are.
-//
-// The saved query log keeps the original question: it never leaves
-// our own database.
+// pseudonymise / restore: when a chart's rows are people (packers), the
+// model sees "Packer A", "Packer B", and the real names are put back
+// into its text on our server afterwards.
 // ─────────────────────────────────────────────────────────────
 
 const SA_ID = /\b\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{7}\b/g;       // 13-digit SA ID

@@ -2,13 +2,8 @@
 // src/pages/ReviewPage.jsx
 // Route: /donations/new/review
 //
-// Page 2 of 2. Shows everything captured on DonationDetailsPage,
-// lets the worker correct specific sections via SectionPicker ->
-// EditSectionDialog, then submits. On success, shows CompletionDialog.
-//
-// Wrapped in the real StaffShell component now — same fix and same
-// reasoning as DonationDetailsPage.jsx's own note: a hand-rolled
-// .stf-shell div has no app bar, no drawer and no bottom tab bar.
+// Donation intake, page 2 of 2: shows what was captured, lets the worker
+// fix any section, then submits and shows a confirmation.
 // ─────────────────────────────────────────────────────────────
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";

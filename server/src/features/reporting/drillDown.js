@@ -1,17 +1,12 @@
 // ─────────────────────────────────────────────────────────────
 // server/src/features/reporting/drillDown.js
 //
-// Click a bar, get the report behind it. Two kinds of drill:
-//
-//   a thing  (a supplier, product, centre, cohort…) → the same report
-//            over time, filtered to that thing: "Bokomo's discrepancy
-//            rate month by month".
-//   a month  → the same report week by week inside that month.
-//
-// The plan is worked out here from the catalog, so the page only
-// offers a drill that will run. A name is turned into an id by the
-// service (lookupTable), since chart rows carry names, not ids; a
-// fixed value (cohort, movement type) is used as it is.
+// Drill-down: click a bar to open the report behind it.
+//   a thing (supplier, product, centre, cohort...) -> the same report
+//     over time, filtered to it
+//   a month -> the same report week by week within that month
+// Names are turned into ids by the service; fixed values (like a cohort)
+// are used as they are.
 // ─────────────────────────────────────────────────────────────
 
 // Breakdown → the filter that narrows to one of its bars.

@@ -30,10 +30,8 @@ import { MOVEMENT_TYPES } from '../../constants/movementTypes.js';
 import { STORAGE_AREAS } from '../../constants/storageAreas.js';
 
 // ── Enum values ─────────────────────────────────────────────
-// Was ['week1', 'week2'] (confirmed from pg_enum, 22 Aug 2026) — moved
-// to the weekly Tuesday/Thursday pickup-day model; see
-// server/database/cohort_weekday_migration.sql and
-// picking.service.js's scheduledCohortFor.
+// Each centre's weekly pickup day. (These were week1/week2 before
+// server/database/cohort_weekday_migration.sql.)
 export const COHORTS = ['tuesday', 'thursday'];
 export const BENEFICIARY_KINDS = ['ecd', 'dignity_kitchen', 'soup_kitchen', 'community'];
 // NFR-20: impact reporting covers ECDs and soup kitchens only.

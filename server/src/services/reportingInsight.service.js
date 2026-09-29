@@ -6,13 +6,13 @@
 //   key figures      — headline, change on the previous period,
 //                      latest bucket or biggest contributor
 //   related charts   — one or two views that explain the main one
-//   who to act on    — named centres, suppliers, products, packers
+//   Actions      — named centres, suppliers, products, packers
 //   written reading  — optional; model-written, template fallback
 //
 // NO NEW PATH TO THE NUMBERS
 // The main chart, the previous period and every related chart go
 // through reporting.service.runReport — same validator, cache and
-// queries as the builder. Only the "who to act on" lists have their
+// queries as the builder. Only the Actions lists have their
 // own SQL (reportingInsight.repository.js).
 //
 // OPERATIONS ONLY

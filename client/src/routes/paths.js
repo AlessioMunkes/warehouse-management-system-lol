@@ -1,167 +1,81 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/routes/paths.js
 //
-// Route paths that more than one file needs to agree on.
+// Every route path the app links to, in one place. App.jsx builds its
+// routes from these, and the menus, tab bar and links use the same
+// values, so a renamed route can't leave a link pointing nowhere.
 //
-// The packing board and the packing page each used to hard-code their
-// own string. They drifted: the page navigated to
-// "/programmes/noc/packing/:id" while App.jsx only declared
-// "/noc/packing/:slipId", so opening a pallet from the board fell
-// through to the catch-all and bounced the packer to the landing
-// page. Declaring the path once, and building both the <Route> and
-// the navigate() target from it, means that cannot happen again.
-//
-// The staff task pages are added here for the same reason: the tab
-// bar, the four pages and the route table all read from STAFF, so a
-// renamed route cannot leave a tab pointing at nothing.
-//
-// Receiving and packing each used to have two URLs — a manager one
-// and a "/staff/..." one — and every chooser screen only ever linked
-// to the manager one, so a worker could never reach the new flow
-// except by typing the staff URL directly. They now share a single
-// URL with the manager view, the same way decanting already did:
-// ProcurementPage/PackingSelectPage pick the shape by role at the one
-// path everything links to. See DecantingPage.jsx for the pattern
-// this follows.
+// Several screens have one URL for every role and choose what to show
+// by role (receiving, packing, decanting). The role lists below are the
+// client's copy of the server's rules; change both together.
 // ─────────────────────────────────────────────────────────────
 
-// Single source for the donation intake base path — STAFF.donation and
-// DONATIONS.new must never drift apart.
 const DONATIONS_NEW = '/donations/new';
 
-// ── Landing ──────────────────────────────────────────────────
-// The public entry point — App.jsx's "/" route. Declared here so
-// nothing that links back to it (LoginPage's back link, etc.) has to
-// hardcode "/".
 export const LANDING = '/';
 
 export const PACKING = {
-  // One URL for everyone. PackingSelectPage decides whether that
-  // renders the manager's board (PackingPage) or the packer's own
-  // flow (PackingStaffPage).
+  // Managers see the packing board; warehouse staff see their own flow.
   board: '/noc/packing',
   detailPattern: '/noc/packing/:slipId',
   detail: (slipId) => `/noc/packing/${slipId}`,
 };
 
 export const STAFF = {
-  // The task chooser. Still SelectNOCjob for now; the wireframed
-  // dashboard (icon grid or journey) replaces it in the next pass.
+  // The home screen for warehouse staff (TaskDashboardPage).
   home:      '/noc',
-  // One URL for everyone — ProcurementPage picks the manager
-  // dashboard or the receiving wizard by role.
+  // Managers get the procurement dashboard here; staff get the receiving flow.
   receiving: '/noc/procurement',
-  // A sub-screen of receiving, not a sixth tab: the tab bar is a
-  // fixed five-item strip with no spare icon slot, and this only
-  // needs to be reachable from the receiving flow, not from
-  // everywhere. Reached via a link on ReceivingFlow's first screen.
+  // Past deliveries, reached from the receiving flow rather than the tab bar.
   deliveries: '/noc/procurement/deliveries',
   packing:   PACKING.board,
-  // One route, two shapes: DecantingPage picks the sack flow or the
-  // week planner by role. There is no /staff/decanting.
+  // Staff get the decanting flow; managers get the week planner.
   decanting: '/noc/decanting',
-  // A sub-screen of decanting, not a sixth tab, same reasoning as
-  // deliveries above — reached via a link on Decanting's crumb bar.
+  // Decanting sheets, reached from the decanting screen.
   decantingRecords: '/noc/decanting/sheets',
   dispatch:  '/staff/dispatch',
-  // A sub-screen of dispatch, not a sixth tab, same reasoning as
-  // deliveries/decantingRecords above — reached via a link on the
-  // gate queue's crumb bar.
+  // Collection history, reached from the gate queue.
   dispatchHistory: '/staff/dispatch/history',
-  // Manager-only. Both /api/reporting routes are
-  // requireRole(MANAGER, ADMIN); the App.jsx gate mirrors that.
+  // Reporting, purchase orders, receipts, beneficiaries, reminders,
+  // picking slips and the stock ledger are for managers and admins only.
   reporting: '/noc/reporting',
-  // Donation intake. Entry point of the draft flow; see DONATIONS
-  // below for the later steps.
+  // Donation intake (workers and admins; see DONATION_INTAKE_ROLES).
   donation:  DONATIONS_NEW,
-  // Manager-only, same reasoning as reporting above — a dedicated
-  // view for the two impactOnly metrics in reportCatalog.js, rather
-  // than one more entry in ReportingPage.jsx's full metric picker.
   impactReport: '/noc/impact-report',
-  // Manager-only, like reporting above: POST /api/purchase-orders
-  // is requireRole(MANAGER, ADMIN) and the App.jsx gate mirrors
-  // that. Reads are open to warehouse staff, but they reach a PO
-  // through the receiving flow rather than this screen.
   purchaseOrders: '/noc/purchase-orders',
-  // The receipts archive: past delivery notes and past dispatch notes.
-  // NOT manager-gated. Both server GETs are requireRole(...ALL_ROLES) and the
-  // URS puts each document in front of warehouse staff — the procurement
-  // sequence diagram's [view delivery note selected] frame is Warehouse
-  // Staff, and the dispatch one says the note is viewable by staff, admin and
-  // management. Declared here for the same reason everything else is: the
-  // route table and the entry tiles read one string, so they cannot drift.
+  // Past delivery notes and dispatch notes.
   receipts: '/noc/receipts',
-  // Manager-only, same reasoning as purchaseOrders above. Needed by
-  // picking slip creation (the ECD dropdown) as much as it is a
-  // screen in its own right, so it lives here rather than under
-  // ADMIN — a manager reaches both from the same task set.
   beneficiaries: '/noc/beneficiaries',
   collectionReminders: '/noc/collection-reminders',
-  // POST /api/picking (createSlip), POST /api/picking/generate, and
-  // assigning a slip to a specific worker (POST /api/picking/:id/assign
-  // with a packerId, only honoured for a manager) are all
-  // requireRole(MANAGER, ADMIN) in picking.routes.js — one screen for
-  // all three, since assignment happens inline on a slip rather than
-  // as a separate page.
+  // Weekly slip generation, one-off slips, editing a slip still on the
+  // floor, and releasing a claimed pallet back to the floor.
   pickingSlips: '/noc/picking-slips',
-  // Manager-only. All three /api/stock/ledger routes are
-  // requireRole(MANAGER, ADMIN); the App.jsx gate mirrors that. The
-  // per-product history drawer on the inventory screen stays open to
-  // every role — this is the warehouse-wide, supervisory view.
   stockLedger: '/noc/stock-ledger',
-  // ADM-5.0 / BR-28 — the benevolent package (call-in) request log.
-  // Warehouse staff and up: every /api/community-requests route is
-  // requireRole(WORKER, MANAGER, ADMIN), and this mirrors that.
+  // Open to warehouse staff as well as managers and admins.
   communityRequests: '/noc/community-requests',
-  // Feed the Soil kit tracking (food waste swapped for compost).
-  // Warehouse staff and up, mirroring STAFF_UP on every
-  // /api/collection-kits route — a worker assigns a kit to a community
-  // member and logs the compost each time it's weighed in; the Impact
-  // Calculator's compost_processed metric only reads from what gets
-  // logged here.
   feedTheSoil: '/noc/feed-the-soil',
 };
 
-// ── Donations ────────────────────────────────────────────────
-// Split from STAFF because the intake flow is role-gated more
-// tightly than the rest of the task dashboard (see App.jsx).
 export const DONATIONS = {
   new:    DONATIONS_NEW,
   review: `${DONATIONS_NEW}/review`,
 };
 
-// Client-side mirror of RECEIVERS_UP in
-// server/src/routes/donation.routes.js. If the server list changes,
-// change this one with it — they are two halves of the same rule.
-// Not managers: donation intake is done on the floor, and was taken out
-// of the manager's view on request. Admin keeps it for corrections.
+// Matches RECEIVERS_UP in server/src/routes/donation.routes.js, minus
+// managers: logging a donation is floor work, so managers don't see the
+// intake screens. Admins keep them for corrections.
 export const DONATION_INTAKE_ROLES = ['warehouse_worker', 'admin'];
 
-// Every role that works the warehouse floor — the task dashboard and the
-// four staff flows (receiving, packing, decanting, dispatch).
-//
-// Client-side mirror of ALL_ROLES in server/src/routes/picking.routes.js
-// and its equivalents on the decanting/dispatch/delivery routes.
-//
-// 'guest' is deliberately absent and must stay absent. These route groups
-// previously carried no roles at all, and ProtectedRoute skips its check
-// entirely when `roles` is undefined — so a signed-in guest rendered the
-// worker surface. The API refused the data, but the screens still drew.
-// Guests get /guest-home and the slip flow, never the floor.
+// Everyone who works the floor: the home screen and the receiving,
+// packing, decanting and dispatch flows. Guests are left out on
+// purpose; they only get /guest-home and the pallet QR flow.
 export const STAFF_ROLES = ['warehouse_worker', 'manager', 'admin'];
 
-// Client-side mirror of STAFF_UP in
-// server/src/routes/communityRequest.routes.js (BR-01: "Warehouse
-// Staff or higher"). Two halves of the same rule — change them together.
+// Match STAFF_UP on the server's community-request and collection-kit routes.
 export const COMMUNITY_REQUEST_ROLES = ['warehouse_worker', 'manager', 'admin'];
-
-// Client-side mirror of STAFF_UP in server/src/routes/collectionKit.routes.js.
-// Two halves of the same rule — change them together.
 export const FEED_THE_SOIL_ROLES = ['warehouse_worker', 'manager', 'admin'];
 
-// Volunteer Management is currently available to the two live roles that
-// perform the coordinator workflow. Keep this list shared by route guards and
-// dashboard entry points until a coordinator role exists in the live system.
+// Volunteer events are run by managers and admins.
 export const VOLUNTEER_MANAGEMENT_ROLES = ['manager', 'admin'];
 
 export const VOLUNTEERS = {
@@ -170,9 +84,7 @@ export const VOLUNTEERS = {
   event: (eventId) => `/volunteers/events/${eventId}`,
 };
 
-// ── Admin ────────────────────────────────────────────────────
-// Admin-only screens. Gated in App.jsx with roles={['admin']} and
-// mirrored on the server by requireRole(MANAGER, ADMIN) for writes.
+// Admin-only screens.
 export const ADMIN = {
   dashboard: '/admin',
   suppliers: '/admin/suppliers',
@@ -182,15 +94,9 @@ export const ADMIN = {
   products:  '/admin/products',
   financeReport: '/admin/finance-report',
   emailIntegration: '/admin/email-integration',
-  // The guest log — who signed in at the door, when they left, and
-  // how long they were on site. Its own admin path rather than a
-  // second view of /volunteers: that route is the coordinator's
-  // event workflow and belongs to the manager. Two screens, two
-  // audiences, two URLs.
+  // Who signed in at the door, and for how long.
   volunteerLog: '/admin/volunteer-log',
-  // Who did what, across the system; and everything deactivated or
-  // deleted. Admin-only, read-mostly (restore goes through each item's
-  // own status route).
+  // What everyone did in the system, and everything deactivated or deleted.
   activity: '/admin/activity',
   archive:  '/admin/archive',
 };
