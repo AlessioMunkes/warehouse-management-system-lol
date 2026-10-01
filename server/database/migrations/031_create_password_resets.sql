@@ -1,5 +1,5 @@
 -- =============================================================
--- server/database/migrations/029_create_password_resets.sql
+-- server/database/migrations/031_create_password_resets.sql
 --
 -- Self-service password reset by email, replacing LoginPage.jsx's
 -- "contact your admin" modal. Modelled directly on migration 023's

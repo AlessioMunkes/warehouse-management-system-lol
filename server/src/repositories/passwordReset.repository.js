@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // server/src/repositories/passwordReset.repository.js
 //
-// Data access for the password-reset flow (migration 029). Raw pg,
+// Data access for the password-reset flow (migration 031). Raw pg,
 // bound parameters everywhere, same shape as userInvite.repository.js.
 //
 // token_hash IS NEVER SELECTED for anything the API returns — every
@@ -10,7 +10,7 @@
 //
 // CREATERESET OWNS ITS OWN TRANSACTION so a reader can never observe
 // the new row without the user's prior live row(s) already marked
-// superseded — see the header on migration 029.
+// superseded — see the header on migration 031.
 //
 // CONFIRMRESET'S UPDATE IS THE CONCURRENCY GUARD. `UPDATE
 // password_resets SET used_at = now() WHERE id = $1 AND used_at IS
@@ -57,7 +57,7 @@ const getByTokenHash = async (tokenHash) => {
 
 // ── Write ─────────────────────────────────────────────────────
 // Marks any prior live request for this user superseded, then inserts
-// the new one, in one transaction — see migration 029's header for
+// the new one, in one transaction — see migration 031's header for
 // why superseding (not overwriting expires_at) keeps request history
 // honest.
 const createReset = async ({ userId, tokenHash, expiresAt, requestedIp }) => {
