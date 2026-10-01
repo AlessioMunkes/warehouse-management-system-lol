@@ -635,6 +635,28 @@
   padding-top: 8px;
 }
 
+/* The post-request confirmation ("check your email") is not an error
+   or a warning — #ef3a40 above is for the old "contact your manager"
+   instruction, which read as attention-grabbing on purpose. This is
+   plain, successful feedback. */
+.forgot-modal-desc-sent {
+  color: #4a4a4a;
+}
+
+.forgot-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.forgot-modal-footnote {
+  text-align: center;
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin-top: 16px;
+}
+
 .forgot-modal-footer {
   margin-top: 16px;
 }
@@ -2578,6 +2600,8 @@ color:white;
 .dark .forgot-modal-content  { background: var(--surface); color: var(--ink); }
 .dark .forgot-modal-title    { color: var(--ink); }
 .dark .forgot-modal-btn      { color: var(--on-brand); }
+.dark .forgot-modal-desc-sent { color: var(--ink); }
+.dark .forgot-modal-footnote  { color: var(--ink-faint); }
 
 /* ── The staff/manager top navbar (TopNavBar.jsx) ──────────────── */
 .dark .top-navbar            { background-color: var(--surface); border-bottom-color: var(--line); }

@@ -48,6 +48,7 @@ import FinanceWarehouseReportPage                  from './pages/FinanceWarehous
 import PublicFinanceReportPage                     from './pages/PublicFinanceReportPage';
 import Section18AFormPage                         from './pages/Section18AFormPage';
 import InviteAcceptPage                            from './pages/InviteAcceptPage';
+import ResetPasswordPage                            from './pages/ResetPasswordPage';
 import FeedTheSoilPage                              from './pages/FeedTheSoilPage';
 
 import { DonationDraftProvider }                   from './features/donation/context/DonationDraftProvider';
@@ -69,6 +70,9 @@ const App = () => (
         <Route path="/section-18a/:token" element={<Section18AFormPage />} />
         {/* Accepting an invite: the person has no account yet. */}
         <Route path="/invite/:token" element={<InviteAcceptPage />} />
+        {/* Resetting a password: the person has an account, but no
+            session — same public footing as the invite route above. */}
+        <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
         {/* The page behind each pallet's QR code (BR-22). Public, so a
             volunteer can open it without an account; it only shows what
             is already printed on the pallet label. */}
