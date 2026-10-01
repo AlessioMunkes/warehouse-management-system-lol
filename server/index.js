@@ -42,6 +42,7 @@ import decantingRouter   from './src/routes/decanting.routes.js';
 import stockRouter       from './src/routes/stock.routes.js';
 import pickingRouter     from './src/routes/picking.routes.js';
 import slipRouter        from './src/routes/slip.routes.js';
+import passwordResetRouter from './src/routes/passwordReset.routes.js';
 import donationRouter    from './src/routes/donation.routes.js';
 import pendingDonationRouter from './src/routes/pendingDonation.routes.js';
 import dispatchRouter    from './src/routes/dispatch.routes.js';
@@ -185,6 +186,10 @@ app.use('/api/picking',    pickingRouter);
 // authenticated guest routes do not, and the limiter it uses counts
 // only failures so a warehouse behind one NAT address is not locked out.
 app.use('/api/slip',       slipRouter);
+// Public by necessity — nobody has a session at any point in this
+// flow. Rate limiting is applied per-route inside this router, same
+// reasoning as slip.routes.js above.
+app.use('/api/password-reset', passwordResetRouter);
 app.use('/api/dispatch',   dispatchRouter);
 app.use('/api/donations',  pendingDonationRouter);
 app.use('/api/donations',  donationRouter);
@@ -223,9 +228,20 @@ if (process.env.NODE_ENV === 'production') {
 
 // ── Central error handler ─────────────────────────────────────
 // Must be after all routes. Four arguments = Express error handler.
+//
+// req.path is logged raw for every other route, but /api/password-reset/*
+// carries the raw reset token as a path segment (GET /:token and POST
+// /:token/confirm) — an unhandled error on either would otherwise
+// print a live, single-use credential to server logs. Redacted only
+// for this one prefix; every other route's logging is unchanged.
+const loggableRequestPath = (req) =>
+  req.path.startsWith('/api/password-reset/')
+    ? req.path.replace(/^(\/api\/password-reset\/)[^/]+/, '$1[REDACTED]')
+    : req.path;
+
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  console.error(`[error] ${req.method} ${req.path} —`, err.message);
+  console.error(`[error] ${req.method} ${loggableRequestPath(req)} —`, err.message);
   const status = err.status || err.statusCode || 500;
   res.status(status).json({
     success: false,
