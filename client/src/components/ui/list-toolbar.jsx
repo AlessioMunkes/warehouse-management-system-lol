@@ -21,6 +21,7 @@
 //   onExport     — Export button handler; omit to hide the button
 //   children     — screen-specific controls, placed before Columns
 // ─────────────────────────────────────────────────────────────
+import { useId } from 'react';
 import { Download, Plus, Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,6 +32,9 @@ import ColumnToggle from '@/components/ui/column-toggle';
 export default function ListToolbar({
   search, filters = [], chips = [], onClearAll, note, columns, onExport, exportLabel = 'Export', children,
 }) {
+  // Ids from useId, not the filter key: a key can be free text ("Cold
+  // chain"), and an id with a space never links its label.
+  const idBase = useId();
   const active = filters.filter((f) => f.active);
   const shown = [
     ...active.map((f) => ({ key: f.key, label: f.label, onRemove: f.onToggle })),
@@ -65,8 +69,8 @@ export default function ListToolbar({
           <PopoverContent className="w-64" align="start">
             <div className="space-y-2">
               <p className="text-sm font-medium">Show only</p>
-              {filters.map((f) => {
-                const id = `filter-${f.key}`;
+              {filters.map((f, i) => {
+                const id = `${idBase}-filter-${i}`;
                 return (
                   <div key={f.key} className="flex items-center gap-2">
                     <Checkbox id={id} checked={f.active} onCheckedChange={() => f.onToggle()} />

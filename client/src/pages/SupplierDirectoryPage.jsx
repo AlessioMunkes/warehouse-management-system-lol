@@ -22,34 +22,30 @@
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth }   from '../context/AuthContext';
-import ManagerLayout from '../components/layout/ManagerLayout';
 import SupplierForm  from '../features/suppliers/components/SupplierForm';
 import ProspectPad   from '../features/suppliers/components/ProspectPad';
 import supplierAPI   from '../services/supplierAPI';
 import ConfirmRemoveDialog from '../features/masterdata/components/ConfirmRemoveDialog';
-import useDetailFocus      from '../features/masterdata/hooks/useDetailFocus';
 import useOpenFromQuery    from '../features/masterdata/hooks/useOpenFromQuery';
 import useTableView        from '../features/masterdata/hooks/useTableView';
 import MasterDataTable     from '../features/masterdata/components/MasterDataTable';
-import ColumnToggle        from '@/components/ui/column-toggle';
-import FilterPills         from '../features/masterdata/components/FilterPills';
+import { PO_STATUS_LABELS } from '../services/purchaseOrderAPI';
 
-import {
-  InputGroup, InputGroupAddon, InputGroupInput,
-} from '@/components/ui/input-group';
-import { Field, FieldLabel } from '@/components/ui/field';
 import { Button }    from '@/components/ui/button';
-import { Badge }     from '@/components/ui/badge';
-import { Checkbox }  from '@/components/ui/checkbox';
 import { Skeleton }  from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import {
-  Card, CardContent, CardHeader, CardTitle,
-} from '@/components/ui/card';
-import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Search, Plus, Pencil, Power, X, AlertTriangle, Trash2 } from 'lucide-react';
+import StatusBadge   from '@/components/ui/status-badge';
+import PageHeader, { PageShell } from '@/components/ui/page-header';
+import ViewTabs      from '@/components/ui/view-tabs';
+import ListCard      from '@/components/ui/list-card';
+import ListToolbar   from '@/components/ui/list-toolbar';
+import DetailPanel   from '@/components/ui/detail-panel';
+import EmptyState    from '@/components/ui/empty-state';
+import ErrorBanner   from '@/components/ui/error-banner';
+import { Plus, Pencil, Power, AlertTriangle, Trash2, Truck } from 'lucide-react';
 
 // Admin only, matching supplier.routes.js. The prospect pad is the
 // exception and stays open to managers — see the note on PROSPECTS
@@ -68,20 +64,6 @@ const fmtDate = (value) =>
 
 // Same markup as the global fetch error banner in
 // InventoryManagementPage. One error style per app.
-const ErrorBanner = ({ message, onRetry }) => (
-  <div className="p-4 rounded-[4px] bg-danger-soft border-2 border-brand text-ink text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-    <span>{message}</span>
-    {onRetry ? (
-      <button
-        onClick={onRetry}
-        className="text-xs sm:text-sm font-semibold underline hover:text-brand focus:outline-none"
-      >
-        Try again
-      </button>
-    ) : null}
-  </div>
-);
-
 // ── Detail panel ──────────────────────────────────────────────
 const SupplierDetail = ({ supplier, canManage, onEdit, onToggleActive, onRemove, onClose }) => {
   const s = supplier.stats ?? {};
@@ -93,121 +75,109 @@ const SupplierDetail = ({ supplier, canManage, onEdit, onToggleActive, onRemove,
   ];
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+    <DetailPanel
+      open
+      onClose={onClose}
+      eyebrow={supplier.category || 'No category recorded'}
+      title={supplier.name}
+      badges={!supplier.isActive ? <StatusBadge kind="record" status="inactive">Inactive</StatusBadge> : null}
+      actions={canManage ? (
+        <>
+          <Button type="button" variant="outline" onClick={onEdit}>
+            <Pencil />
+            Edit details
+          </Button>
+          <Button type="button" variant="outline" onClick={onToggleActive}>
+            <Power />
+            {supplier.isActive ? 'Deactivate' : 'Reactivate'}
+          </Button>
+          <Button type="button" variant="destructive" onClick={onRemove}>
+            <Trash2 />
+            Delete
+          </Button>
+        </>
+      ) : null}
+    >
+      <dl className="grid gap-4 text-sm sm:grid-cols-2">
+        <div><dt className="text-muted-foreground">Contact</dt><dd>{supplier.contactName || '—'}</dd></div>
+        <div><dt className="text-muted-foreground">Email</dt><dd className="break-words">{supplier.contactEmail || '—'}</dd></div>
+        <div><dt className="text-muted-foreground">Phone</dt><dd>{supplier.contactPhone || '—'}</dd></div>
+        <div><dt className="text-muted-foreground">Agreement</dt><dd>{supplier.agreementRef || 'None on file'}</dd></div>
+        <div><dt className="text-muted-foreground">Payment terms</dt><dd>{supplier.paymentTerms || '—'}</dd></div>
         <div>
-          <CardTitle>{supplier.name}</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            {supplier.category || 'No category recorded'}
-          </p>
+          <dt className="text-muted-foreground">Expected lead time</dt>
+          {/* null and 0 mean different things: "nobody recorded it"
+              versus "same day". Number(null) would collapse both. */}
+          <dd>
+            {supplier.expectedLeadTimeDays === null
+              ? 'Not recorded'
+              : `${supplier.expectedLeadTimeDays} days`}
+          </dd>
         </div>
-        <Button type="button" variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close">
-          <X />
-        </Button>
-      </CardHeader>
+      </dl>
 
-      <CardContent className="space-y-5">
-        <dl className="grid gap-3 text-sm sm:grid-cols-2">
-          <div><dt className="text-muted-foreground">Contact</dt><dd>{supplier.contactName || '—'}</dd></div>
-          <div><dt className="text-muted-foreground">Email</dt><dd>{supplier.contactEmail || '—'}</dd></div>
-          <div><dt className="text-muted-foreground">Phone</dt><dd>{supplier.contactPhone || '—'}</dd></div>
-          <div><dt className="text-muted-foreground">Agreement</dt><dd>{supplier.agreementRef || 'None on file'}</dd></div>
-          <div><dt className="text-muted-foreground">Payment terms</dt><dd>{supplier.paymentTerms || '—'}</dd></div>
-          <div>
-            <dt className="text-muted-foreground">Expected lead time</dt>
-            {/* null and 0 mean different things: "nobody recorded it"
-                versus "same day". Number(null) would collapse both. */}
-            <dd>
-              {supplier.expectedLeadTimeDays === null
-                ? 'Not recorded'
-                : `${supplier.expectedLeadTimeDays} days`}
-            </dd>
-          </div>
-        </dl>
+      {supplier.notes ? (
+        <p className="whitespace-pre-line text-sm text-muted-foreground">{supplier.notes}</p>
+      ) : null}
 
-        {supplier.notes ? (
-          <p className="whitespace-pre-line text-sm text-muted-foreground">{supplier.notes}</p>
-        ) : null}
-
-        <Separator />
-
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {stats.map(([label, value]) => (
-            <div key={label} className="rounded-md bg-muted/50 p-3">
-              <p className="text-xs text-muted-foreground">{label}</p>
-              <p className="text-xl font-medium">{value}</p>
-            </div>
-          ))}
-        </div>
-
-        <p className="text-xs text-muted-foreground">
-          Last delivery: {fmtDate(s.lastDeliveryDate)}
+      {/* Deactivation is never blocked on open orders — the system
+          records what is, it does not prevent it. The warning is the
+          whole guard, same principle as the dispatch gate. */}
+      {supplier.isActive && (s.openPurchaseOrders ?? 0) > 0 ? (
+        <p className="flex items-start gap-2 rounded-md bg-warn-soft px-3 py-2 text-xs text-warn">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+          <span>
+            {s.openPurchaseOrders} purchase order{s.openPurchaseOrders === 1 ? '' : 's'} still open.
+            Deactivating hides this supplier from new orders; it does not cancel existing ones.
+          </span>
         </p>
+      ) : null}
 
-        {supplier.purchaseOrders?.length ? (
-          <div>
-            <h3 className="mb-2 text-sm font-medium">Recent purchase orders</h3>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>PO</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Expected</TableHead>
-                  <TableHead>Delivered</TableHead>
-                  <TableHead>Lines</TableHead>
+      <Separator />
+
+      <dl className="grid grid-cols-2 divide-x rounded-lg border sm:grid-cols-4">
+        {stats.map(([label, value]) => (
+          <div key={label} className="px-3 py-2">
+            <dt className="text-xs text-muted-foreground">{label}</dt>
+            <dd className="text-xl font-medium tabular-nums">{value}</dd>
+          </div>
+        ))}
+      </dl>
+
+      <p className="text-xs text-muted-foreground">
+        Last delivery: {fmtDate(s.lastDeliveryDate)}
+      </p>
+
+      {supplier.purchaseOrders?.length ? (
+        <div>
+          <h3 className="mb-2 text-sm font-medium">Recent purchase orders</h3>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>PO</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Expected</TableHead>
+                <TableHead>Delivered</TableHead>
+                <TableHead className="text-right">Lines</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {supplier.purchaseOrders.map((po) => (
+                <TableRow key={po.id}>
+                  <TableCell>#{po.id}</TableCell>
+                  <TableCell>
+                    <StatusBadge kind="purchaseOrder" status={po.status}>{PO_STATUS_LABELS[po.status] ?? po.status}</StatusBadge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{fmtDate(po.expectedDeliveryDate)}</TableCell>
+                  <TableCell className="text-muted-foreground">{fmtDate(po.deliveredOn)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{po.lineCount}</TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {supplier.purchaseOrders.map((po) => (
-                  <TableRow key={po.id}>
-                    <TableCell>#{po.id}</TableCell>
-                    <TableCell>{po.status}</TableCell>
-                    <TableCell>{fmtDate(po.expectedDeliveryDate)}</TableCell>
-                    <TableCell>{fmtDate(po.deliveredOn)}</TableCell>
-                    <TableCell>{po.lineCount}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        ) : null}
-
-        {canManage ? (
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" onClick={onEdit}>
-              <Pencil />
-              Edit details
-            </Button>
-            <Button type="button" variant="outline" onClick={onToggleActive}>
-              <Power />
-              {supplier.isActive ? 'Deactivate' : 'Reactivate'}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onRemove}
-              className="border-brand text-brand hover:bg-brand hover:text-on-brand"
-            >
-              <Trash2 />
-              Delete
-            </Button>
-          </div>
-        ) : null}
-
-        {/* Deactivation is never blocked on open orders — the system
-            records what is, it does not prevent it. The warning is
-            the whole guard, same principle as the dispatch gate. */}
-        {supplier.isActive && (s.openPurchaseOrders ?? 0) > 0 ? (
-          <p className="flex items-start gap-2 rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-            <span>
-              {s.openPurchaseOrders} purchase order{s.openPurchaseOrders === 1 ? '' : 's'} still open.
-              Deactivating hides this supplier from new orders; it does not cancel existing ones.
-            </span>
-          </p>
-        ) : null}
-      </CardContent>
-    </Card>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      ) : null}
+    </DetailPanel>
   );
 };
 
@@ -257,7 +227,7 @@ const COLUMNS = [
     sort: (s) => (s.expectedLeadTimeDays ?? null),
     cell: (s) => (s.expectedLeadTimeDays === null ? '—' : `${s.expectedLeadTimeDays} days`) },
   { key: 'status',   label: '', sort: null, alwaysOn: true, weight: 1.8,
-    cell: (s) => (!s.isActive ? <Badge variant="outline">Inactive</Badge> : null) },
+    cell: (s) => (!s.isActive ? <StatusBadge kind="record" status="inactive">Inactive</StatusBadge> : null) },
 ];
 
 export default function SupplierDirectoryPage() {
@@ -278,8 +248,6 @@ export default function SupplierDirectoryPage() {
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState(null);
   const view = useTableView('suppliers', COLUMNS);
-
-  const [detailRef, focusDetail] = useDetailFocus();
 
   const categoryPills = useMemo(() => categoryOptions(suppliers), [suppliers]);
 
@@ -346,7 +314,6 @@ export default function SupplierDirectoryPage() {
     try {
       setSelected(await supplierAPI.getSupplier(id));
       setMode('list');
-      focusDetail();
     } catch (err) { setError(err.message); }
   };
   // ?open=<id> from the admin Activity / Archive screens.
@@ -437,45 +404,32 @@ export default function SupplierDirectoryPage() {
     } catch (err) { setError(err.message); } finally { setBusy(false); }
   };
 
+  const switchTab = (id) => { setIsLoading(true); setTab(id); setSelected(null); setMode('list'); };
+
   return (
-    <ManagerLayout>
-      <main className="mx-auto w-full max-w-5xl px-4 py-6">
-        <h1 className="text-2xl font-medium">Supplier Management</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Who we buy from, and who we might buy from.
-        </p>
-
-        <div className="mt-5 flex gap-1 border-b">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => { setIsLoading(true); setTab(t.id); setSelected(null); setMode('list'); }}
-              className={
-                tab === t.id
-                  ? 'border-b-2 border-foreground px-4 py-2 text-sm font-medium'
-                  : 'px-4 py-2 text-sm text-muted-foreground'
-              }
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {error ? (
-          <div className="mt-4">
-            <ErrorBanner message={error} onRetry={reload} />
-          </div>
+    <PageShell>
+      <PageHeader
+        title="Supplier Management"
+        description="Who we buy from, and who we might buy from."
+        actions={canManage && tab === 'suppliers' ? (
+          <Button type="button" onClick={() => { setSelected(null); setMode('create'); }}>
+            <Plus />
+            Register supplier
+          </Button>
         ) : null}
+      />
 
-        {isLoading ? (
-          <div className="mt-6 space-y-3">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-24 w-full" />
-          </div>
-        ) : tab === 'prospects' ? (
-          <div className="mt-6">
+      <ViewTabs className="mt-5" label="Supplier views" value={tab} onChange={switchTab} tabs={TABS} />
+
+      <ErrorBanner className="mt-4" message={error} onRetry={reload} />
+
+      {tab === 'prospects' ? (
+        <div className="mt-6">
+          {isLoading ? (
+            <div className="space-y-2" aria-busy="true">
+              {[0, 1, 2].map((i) => <Skeleton key={i} className="h-12 w-full" />)}
+            </div>
+          ) : (
             <ProspectPad
               prospects={prospects}
               busy={busy}
@@ -484,124 +438,113 @@ export default function SupplierDirectoryPage() {
               onConvert={convert}
               onDelete={removeProspect}
             />
-          </div>
-        ) : (
-          <div className="mt-6 space-y-6">
-            {mode === 'create' ? (
-              <Card>
-                <CardHeader><CardTitle>Register a supplier</CardTitle></CardHeader>
-                <CardContent>
-                  <SupplierForm onSubmit={create} onCancel={() => setMode('list')} busy={busy} />
-                </CardContent>
-              </Card>
-            ) : mode === 'edit' && selected ? (
-              <Card>
-                <CardHeader><CardTitle>Edit {selected.name}</CardTitle></CardHeader>
-                <CardContent>
-                  <SupplierForm
-                    initial={selected}
-                    submitLabel="Save changes"
-                    onSubmit={save}
-                    onCancel={() => setMode('list')}
-                    busy={busy}
-                  />
-                </CardContent>
-              </Card>
+          )}
+        </div>
+      ) : (
+        <div className="mt-6">
+          <ListCard
+            // Mounted through a reload: the search triggers the fetch,
+            // and swapping it for a skeleton would lose focus.
+            header={
+              <ListToolbar
+                search={{
+                  value: search,
+                  onChange: (value) => { setIsLoading(true); setSearch(value); },
+                  placeholder: 'Search name, category or agreement',
+                }}
+                // Categories are free text, so the menu offers the ones
+                // actually present (categoryOptions), one at a time.
+                filters={[
+                  {
+                    key: 'inactive', label: 'Show inactive', active: includeInactive,
+                    onToggle: () => { setIsLoading(true); setIncludeInactive((v) => !v); },
+                  },
+                  ...categoryPills.map((c) => ({
+                    key: `cat-${c.value}`, label: c.label, active: categoryFilter === c.value,
+                    onToggle: () => setCategoryFilter((cur) => (cur === c.value ? null : c.value)),
+                  })),
+                ]}
+                onClearAll={() => { setCategoryFilter(null); if (includeInactive) { setIsLoading(true); setIncludeInactive(false); } }}
+                columns={{
+                  idPrefix: 'suppliers',
+                  columns: view.availableColumns,
+                  hidden: view.hidden,
+                  onToggle: view.toggleColumn,
+                  onReset: view.resetColumns,
+                }}
+              />
+            }
+          >
+            {isLoading ? (
+              <div className="space-y-2 p-4" aria-busy="true">
+                {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+              </div>
+            ) : visibleSuppliers.length === 0 ? (
+              <EmptyState
+                icon={Truck}
+                title="No suppliers match"
+                description={search || categoryFilter ? 'Nothing matches the search or category.' : 'No supplier is registered yet.'}
+                action={search || categoryFilter
+                  ? { label: 'Clear all filters', onClick: () => { setCategoryFilter(null); if (search) { setIsLoading(true); setSearch(''); } } }
+                  : undefined}
+              />
             ) : (
-              <>
-                <div className="flex flex-wrap items-center gap-3">
-                  <InputGroup className="min-w-56 flex-1">
-                    <InputGroupAddon align="inline-start">
-                      <Search />
-                    </InputGroupAddon>
-                    <InputGroupInput
-                      placeholder="Search by name, category or agreement reference"
-                      value={search}
-                      onChange={(e) => { setIsLoading(true); setSearch(e.target.value); }}
-                    />
-                  </InputGroup>
-
-                  <Field orientation="horizontal" className="w-auto">
-                    <Checkbox
-                      id="include-inactive"
-                      checked={includeInactive}
-                      onCheckedChange={(v) => { setIsLoading(true); setIncludeInactive(Boolean(v)); }}
-                    />
-                    <FieldLabel htmlFor="include-inactive" className="font-normal">
-                      Show inactive
-                    </FieldLabel>
-                  </Field>
-
-                  <FilterPills
-                    label="Filter by category"
-                    value={categoryFilter}
-                    onChange={setCategoryFilter}
-                    options={categoryPills}
-                  />
-
-                  <ColumnToggle
-                    idPrefix="suppliers"
-                    columns={view.availableColumns}
-                    hidden={view.hidden}
-                    onToggle={view.toggleColumn}
-                    onReset={view.resetColumns}
-                  />
-
-                  {canManage ? (
-                    <Button type="button" onClick={() => { setSelected(null); setMode('create'); }}>
-                      <Plus />
-                      Register supplier
-                    </Button>
-                  ) : null}
-                </div>
-
-                <div ref={detailRef} tabIndex={-1} className="scroll-mt-6 outline-none">
-                  {selected ? (
-                    <SupplierDetail
-                      supplier={selected}
-                      canManage={canManage}
-                      onEdit={() => setMode('edit')}
-                      onToggleActive={toggleActive}
-                      onRemove={() => setConfirmRemove(true)}
-                      onClose={() => setSelected(null)}
-                    />
-                  ) : null}
-                </div>
-
-                {selected ? (
-                  <ConfirmRemoveDialog
-                    open={confirmRemove}
-                    onOpenChange={setConfirmRemove}
-                    name={selected.name}
-                    noun="supplier"
-                    isActive={selected.isActive}
-                    busy={busy}
-                    historyNote="Past purchase orders, delivery notes and receipts keep their name."
-                    onDeactivate={deactivateFromDialog}
-                    onDelete={remove}
-                  />
-                ) : null}
-
-                {visibleSuppliers.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No suppliers match.</p>
-                ) : (
-                  <Card>
-                    <CardContent className="p-0">
-                      <MasterDataTable
-                        columns={view.visibleColumns}
-                        rows={visibleSuppliers}
-                        sort={view.sort}
-                        onToggleSort={view.toggleSort}
-                        onOpenRow={(s) => open(s.id)}
-                      />
-                    </CardContent>
-                  </Card>
-                )}
-              </>
+              <MasterDataTable
+                columns={view.visibleColumns}
+                rows={visibleSuppliers}
+                sort={view.sort}
+                onToggleSort={view.toggleSort}
+                onOpenRow={(row) => open(row.id)}
+                noun="suppliers"
+              />
             )}
-          </div>
-        )}
-      </main>
-    </ManagerLayout>
+          </ListCard>
+        </div>
+      )}
+
+      {mode === 'list' && selected ? (
+        <SupplierDetail
+          key={selected.id}
+          supplier={selected}
+          canManage={canManage}
+          onEdit={() => setMode('edit')}
+          onToggleActive={toggleActive}
+          onRemove={() => setConfirmRemove(true)}
+          onClose={() => setSelected(null)}
+        />
+      ) : null}
+
+      {selected ? (
+        <ConfirmRemoveDialog
+          open={confirmRemove}
+          onOpenChange={setConfirmRemove}
+          name={selected.name}
+          noun="supplier"
+          isActive={selected.isActive}
+          busy={busy}
+          historyNote="Past purchase orders, delivery notes and receipts keep their name."
+          onDeactivate={deactivateFromDialog}
+          onDelete={remove}
+        />
+      ) : null}
+
+      {mode === 'create' ? (
+        <DetailPanel open onClose={() => setMode('list')} title="Register a supplier">
+          <SupplierForm onSubmit={create} onCancel={() => setMode('list')} busy={busy} />
+        </DetailPanel>
+      ) : null}
+
+      {mode === 'edit' && selected ? (
+        <DetailPanel open onClose={() => setMode('list')} eyebrow="Edit" title={selected.name}>
+          <SupplierForm
+            initial={selected}
+            submitLabel="Save changes"
+            onSubmit={save}
+            onCancel={() => setMode('list')}
+            busy={busy}
+          />
+        </DetailPanel>
+      ) : null}
+    </PageShell>
   );
 }
