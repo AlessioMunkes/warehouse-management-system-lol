@@ -3,7 +3,7 @@
 // Hardened to 10/10 Production Security Standard with Conversational Comments
 // ─────────────────────────────────────────────────────────────
 import donationAdminService from '../services/donationAdmin.service.js';
-import { ROLES } from '../middleware/auth.middleware.js';
+import { MANAGERS_UP } from '../constants/permissions.js';
 
 /**
  * Authorization Helper for Administrative Endpoints
@@ -27,8 +27,7 @@ const authorizeAdminOrManager = (req, res) => {
     };
   }
 
-  const authorizedRoles = [ROLES.ADMIN, ROLES.MANAGER];
-  if (!authorizedRoles.includes(req.user.role)) {
+  if (!MANAGERS_UP.includes(req.user.role)) {
     return {
       authorized: false,
       status: 403,

@@ -2,15 +2,13 @@
 // server/src/routes/donation.routes.js
 // ─────────────────────────────────────────────────────────────
 import express                            from 'express';
-import auth, { requireRole, ROLES }       from '../middleware/auth.middleware.js';
+import auth, { requireRole } from '../middleware/auth.middleware.js';
+import { ALL_STAFF, MANAGERS_UP } from '../constants/permissions.js';
 import { validateIntId, validateIntParam } from '../middleware/validate.middleware.js';
 import donationController                 from '../controllers/donation.controller.js';
 
 const router = express.Router();
 
-const ALL_ROLES    = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
-const RECEIVERS_UP = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN]; // record donations at the gate
-const MANAGERS_UP  = [ROLES.MANAGER, ROLES.ADMIN];               // resolve unmatched lines / reclassify — both can move stock
 
 // ── Static paths before /:id to prevent shadowing ────────────
 router.get('/section-18a/form/:token', donationController.getSection18AForm);
@@ -34,12 +32,12 @@ router.patch('/items/:itemId/resolve',
 );
 
 // ── Collection ────────────────────────────────────────────────
-router.get('/',  auth, requireRole(...ALL_ROLES),    donationController.listDonations);
-router.post('/', auth, requireRole(...RECEIVERS_UP), donationController.createDonation);
+router.get('/',  auth, requireRole(...ALL_STAFF),    donationController.listDonations);
+router.post('/', auth, requireRole(...ALL_STAFF), donationController.createDonation);
 
 // ── Single donation ───────────────────────────────────────────
-router.get('/:id',        auth, requireRole(...ALL_ROLES), validateIntId, donationController.getDonationById);
-router.get('/:id/events', auth, requireRole(...ALL_ROLES), validateIntId, donationController.getDonationEvents);
+router.get('/:id',        auth, requireRole(...ALL_STAFF), validateIntId, donationController.getDonationById);
+router.get('/:id/events', auth, requireRole(...ALL_STAFF), validateIntId, donationController.getDonationEvents);
 router.get('/:id/section-18a/certificate',
   auth, requireRole(...MANAGERS_UP),
   validateIntId,

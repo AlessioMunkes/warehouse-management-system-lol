@@ -26,7 +26,7 @@
 // day, not to close the gate at 16:00.
 // ─────────────────────────────────────────────────────────────
 import dispatchRepository from '../repositories/dispatch.repository.js';
-import { ROLES }          from '../middleware/auth.middleware.js';
+import { isManagerUp } from '../constants/permissions.js';
 import { isValidDateString, isPositiveInt } from '../utils/validation.js';
 import { DISPATCH_SORTS, SORT_DIRECTIONS } from '../constants/receiptSort.js';
 
@@ -57,7 +57,8 @@ const fail = (status, message) => {
   throw err;
 };
 
-const isManager = (user) => user.role === ROLES.MANAGER || user.role === ROLES.ADMIN;
+// Same group as the routes' MANAGERS_UP — constants/permissions.js.
+const isManager = isManagerUp;
 
 // ─────────────────────────────────────────────────────────────
 // TIME

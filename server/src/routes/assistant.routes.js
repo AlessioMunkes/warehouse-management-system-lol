@@ -23,12 +23,12 @@
 // ─────────────────────────────────────────────────────────────
 import express                      from 'express';
 import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
-import auth, { requireRole, ROLES } from '../middleware/auth.middleware.js';
+import auth, { requireRole } from '../middleware/auth.middleware.js';
+import { ALL_STAFF } from '../constants/permissions.js';
 import assistantController          from '../controllers/assistant.controller.js';
 
 const router = express.Router();
 
-const STAFF_UP = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 
 // Only /ask is limited — it is the one route that costs money per
 // call and draws on a shared free-tier quota.
@@ -60,8 +60,8 @@ const askLimiter = rateLimit({
   },
 });
 
-router.get ('/catalog',   auth, requireRole(...STAFF_UP), assistantController.getCatalog);
-router.get ('/topic/:id', auth, requireRole(...STAFF_UP), assistantController.getTopic);
-router.post('/ask',       auth, requireRole(...STAFF_UP), askLimiter, assistantController.ask);
+router.get ('/catalog',   auth, requireRole(...ALL_STAFF), assistantController.getCatalog);
+router.get ('/topic/:id', auth, requireRole(...ALL_STAFF), assistantController.getTopic);
+router.post('/ask',       auth, requireRole(...ALL_STAFF), askLimiter, assistantController.ask);
 
 export default router;

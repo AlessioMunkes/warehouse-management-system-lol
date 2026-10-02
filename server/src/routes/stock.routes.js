@@ -2,17 +2,16 @@
 // server/src/routes/stock.routes.js
 // ─────────────────────────────────────────────────────────────
 import express                      from 'express';
-import auth, { requireRole, ROLES } from '../middleware/auth.middleware.js';
+import auth, { requireRole } from '../middleware/auth.middleware.js';
+import { ALL_STAFF, MANAGERS_UP } from '../constants/permissions.js';
 import { validateIntId }            from '../middleware/validate.middleware.js';
 import stockController              from '../controllers/stock.controller.js';
 
 const router = express.Router();
 
-const ALL_ROLES  = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
-const MANAGERS_UP = [ROLES.MANAGER, ROLES.ADMIN]; // manual adjustments only
 
 // ── Collection ────────────────────────────────────────────────
-router.get('/', auth, requireRole(...ALL_ROLES), stockController.getManifest);
+router.get('/', auth, requireRole(...ALL_STAFF), stockController.getManifest);
 
 // ── Static paths before /:id to prevent shadowing ────────────
 router.post('/adjust', auth, requireRole(...MANAGERS_UP), stockController.adjustManually);
@@ -21,7 +20,7 @@ router.post('/adjust', auth, requireRole(...MANAGERS_UP), stockController.adjust
 // The sparkline data for the inventory screen. Gated like GET /api/stock
 // rather than like the ledger: it is the same manifest with a time
 // axis, not a supervisory view.
-router.get('/trends', auth, requireRole(...ALL_ROLES), stockController.getStockTrends);
+router.get('/trends', auth, requireRole(...ALL_STAFF), stockController.getStockTrends);
 
 // ── Ledger (manager/admin) ────────────────────────────────────
 // The two /ledger/... paths are declared before /ledger itself for
@@ -42,11 +41,11 @@ router.get('/ledger',                auth, requireRole(...MANAGERS_UP), stockCon
 // The sparkline data for the inventory screen. Gated like GET /api/stock
 // rather than like the ledger: it is the same manifest with a time
 // axis, not a supervisory view.
-router.get('/trends', auth, requireRole(...ALL_ROLES), stockController.getStockTrends);
+router.get('/trends', auth, requireRole(...ALL_STAFF), stockController.getStockTrends);
 
 // ── Single product ────────────────────────────────────────────
-router.get('/:id/history', auth, requireRole(...ALL_ROLES), validateIntId, stockController.getMovements);
+router.get('/:id/history', auth, requireRole(...ALL_STAFF), validateIntId, stockController.getMovements);
 // Gated like history: the same product's receiving record, read-only.
-router.get('/:id/batches', auth, requireRole(...ALL_ROLES), validateIntId, stockController.getExpiryBatches);
+router.get('/:id/batches', auth, requireRole(...ALL_STAFF), validateIntId, stockController.getExpiryBatches);
 
 export default router;

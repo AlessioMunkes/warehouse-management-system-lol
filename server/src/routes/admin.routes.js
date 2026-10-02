@@ -6,12 +6,13 @@
 // through that item's own /:id/status route, with its own rules.
 // ─────────────────────────────────────────────────────────────
 import express from 'express';
-import auth, { requireRole, ROLES } from '../middleware/auth.middleware.js';
+import auth, { requireRole } from '../middleware/auth.middleware.js';
+import { ADMIN_ONLY } from '../constants/permissions.js';
 import controller from '../controllers/adminActivity.controller.js';
 
 const router = express.Router();
 
-router.get('/activity', auth, requireRole(ROLES.ADMIN), controller.activity);
-router.get('/archive',  auth, requireRole(ROLES.ADMIN), controller.archive);
+router.get('/activity', auth, requireRole(...ADMIN_ONLY), controller.activity);
+router.get('/archive',  auth, requireRole(...ADMIN_ONLY), controller.archive);
 
 export default router;

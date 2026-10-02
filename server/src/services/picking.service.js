@@ -5,7 +5,7 @@
 // Validates data and enforces rules before touching the DB.
 // ─────────────────────────────────────────────────────────────
 import pickingRepository from '../repositories/picking.repository.js';
-import { ROLES }         from '../middleware/auth.middleware.js';
+import { isManagerUp } from '../constants/permissions.js';
 import pushService       from './push.service.js';
 
 const COHORTS = ['tuesday', 'thursday'];
@@ -31,7 +31,8 @@ const scheduledCohortFor = (date) => {
   return Object.entries(WEEKDAY_FOR_COHORT).find(([, d]) => d === day)?.[0] ?? null;
 };
 
-const isManager = (user) => user.role === ROLES.MANAGER || user.role === ROLES.ADMIN;
+// Same group as the routes' MANAGERS_UP — constants/permissions.js.
+const isManager = isManagerUp;
 
 // ── Product-line validation ──────────────────────────────────
 // Shared by createSlip (a manager typing/adjusting lines instead of
