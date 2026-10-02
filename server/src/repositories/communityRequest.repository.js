@@ -106,18 +106,20 @@ const claimRequest = async (id, handledBy, client = pool) => {
   return getRequestById(id, client);
 };
 
-// ── Resolve — sets outcome, outcome_note and resolved_at ──────
-// Does NOT touch handled_by: a request may have been claimed earlier
-// (handled_by already set) or resolved without ever being claimed
-// (handled_by stays NULL). Returns null when the row does not exist.
-const resolveRequest = async (id, { outcome, outcomeNote = null }, client = pool) => {
+// ── Resolve — sets outcome, outcome_note, resolved_at, handled_by ──
+// handled_by = COALESCE(handled_by, resolver): a request resolved
+// without ever being claimed still records who handled it, while a
+// claimed one keeps its claimer (the resolver may be someone else).
+// Returns null when the row does not exist.
+const resolveRequest = async (id, { outcome, outcomeNote = null, handledBy = null }, client = pool) => {
   const { rowCount } = await client.query(
     `UPDATE public.community_requests
         SET outcome = $1::request_outcome,
             outcome_note = $2,
+            handled_by = COALESCE(handled_by, $3),
             resolved_at = NOW()
-      WHERE id = $3`,
-    [outcome, outcomeNote, id]
+      WHERE id = $4`,
+    [outcome, outcomeNote, handledBy, id]
   );
   if (rowCount === 0) return null;
   return getRequestById(id, client);

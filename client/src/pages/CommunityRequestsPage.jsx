@@ -399,7 +399,7 @@ function CommunityRequestsManagerView() {
                                 ) : null}
                                 {r.handledByName ? (
                                   <span className="mt-1 block text-xs text-muted-foreground">
-                                    {resolved ? 'Resolved' : 'Claimed'} by {r.handledByName}
+                                    {resolved ? 'Handled' : 'Claimed'} by {r.handledByName}
                                   </span>
                                 ) : null}
                               </TableCell>

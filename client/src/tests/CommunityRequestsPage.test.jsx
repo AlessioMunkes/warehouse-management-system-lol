@@ -58,13 +58,13 @@ describe('CommunityRequestsPage (manager)', () => {
     expect(screen.queryByText('Boom')).toBeNull();
   });
 
-  it('labels who claimed a pending row and who resolved a resolved row', async () => {
+  it('labels the claimer on a pending row and the handler on a resolved row', async () => {
     api.getRequests.mockResolvedValue([
       row({ id: 1, handledBy: 5, handledByName: 'Ayesha K' }),
       row({ id: 2, itemsRequested: 'Oil', outcome: 'fulfilled', handledBy: 6, handledByName: 'Sipho M', resolvedAt: '2026-10-01T10:00:00.000Z' }),
     ]);
     render(<CommunityRequestsPage />);
     expect(await screen.findByText('Claimed by Ayesha K')).toBeTruthy();
-    expect(screen.getByText('Resolved by Sipho M')).toBeTruthy();
+    expect(screen.getByText('Handled by Sipho M')).toBeTruthy();
   });
 });

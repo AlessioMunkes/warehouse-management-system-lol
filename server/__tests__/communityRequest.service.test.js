@@ -170,28 +170,29 @@ describe('resolve', () => {
   it.each(['fulfilled', 'partially_fulfilled', 'declined'])('accepts %s with a note', async (outcome) => {
     await service.resolve(1, { outcome, outcomeNote: 'Handled at the gate' }, ACTOR);
     expect(repoMock.resolveRequest).toHaveBeenCalledWith(
-      1, { outcome, outcomeNote: 'Handled at the gate' }, expect.anything(),
+      1, { outcome, outcomeNote: 'Handled at the gate', handledBy: 7 }, expect.anything(),
     );
   });
 
   it('does not require a note — resolves with none, storing null', async () => {
     await service.resolve(1, { outcome: 'fulfilled' }, ACTOR);
     expect(repoMock.resolveRequest).toHaveBeenCalledWith(
-      1, { outcome: 'fulfilled', outcomeNote: null }, expect.anything(),
+      1, { outcome: 'fulfilled', outcomeNote: null, handledBy: 7 }, expect.anything(),
     );
   });
 
   it('treats a whitespace-only note as null', async () => {
     await service.resolve(1, { outcome: 'declined', outcomeNote: '   ' }, ACTOR);
     expect(repoMock.resolveRequest).toHaveBeenCalledWith(
-      1, { outcome: 'declined', outcomeNote: null }, expect.anything(),
+      1, { outcome: 'declined', outcomeNote: null, handledBy: 7 }, expect.anything(),
     );
   });
 
-  it('does not touch handled_by (resolve payload carries only outcome + note)', async () => {
+  it('passes the resolver as the handler candidate — the repository only applies it to an unclaimed row', async () => {
     await service.resolve(1, { outcome: 'declined', outcomeNote: 'No stock available' }, ACTOR);
     const [, patch] = repoMock.resolveRequest.mock.calls[0];
-    expect(Object.keys(patch).sort()).toEqual(['outcome', 'outcomeNote']);
+    expect(Object.keys(patch).sort()).toEqual(['handledBy', 'outcome', 'outcomeNote']);
+    expect(patch.handledBy).toBe(7);
   });
 
   it('404s when the row does not exist', async () => {

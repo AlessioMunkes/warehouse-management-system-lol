@@ -13,7 +13,8 @@
 //   1. log     — create the request (outcome starts 'pending')
 //   2a. claim  — a staff member takes ownership (sets handled_by)
 //   2b. resolve — record the outcome (sets outcome + outcome_note +
-//                 resolved_at); does not touch handled_by
+//                 resolved_at); fills handled_by with the resolver only
+//                 when nobody claimed it, never overwrites a claimer
 // Claiming and resolving are independent: a request can be resolved
 // without ever being claimed, and claimed without being resolved
 // (both live seed rows are claimed but still pending).
@@ -136,7 +137,7 @@ const resolve = async (id, data = {}, actor) => {
   if (outcomeNote && outcomeNote.length > 5000) fail(400, 'The outcome note is too long.');
 
   const updated = await withTransaction((client) =>
-    requestRepo.resolveRequest(id, { outcome, outcomeNote }, client)
+    requestRepo.resolveRequest(id, { outcome, outcomeNote, handledBy: Number(actor.id) }, client)
   );
   if (!updated) fail(404, 'Community request not found.');
   return updated;
