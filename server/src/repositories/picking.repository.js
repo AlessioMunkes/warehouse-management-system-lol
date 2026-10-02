@@ -170,6 +170,11 @@ const getSlipById = async (id) => {
   const slipResult = await pool.query(
     `SELECT
        ps.*,
+       -- The calendar day as text, same reason as getSlips: the DATE
+       -- itself serialises as the previous day in UTC.
+       ps.dispatch_date::text AS dispatch_date_iso,
+       -- The gate's outcome, as getSlips reports it.
+       (SELECT de.status FROM dispatch_events de WHERE de.picking_slip_id = ps.id) AS dispatch_status,
        e.name                AS ecd_name,
        e.child_count,
        e.contact_name,

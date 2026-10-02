@@ -76,6 +76,18 @@ export const STATUS_STYLES = {
     referred:            s('info', Forward),
     declined:            s('bad', CircleX, true),
   },
+  // A slip's place in the week, as the Picking Slips list shows it —
+  // see features/pickingSlips/slipViews.js slipState, which folds the
+  // gate's outcome (dispatch_events) in over the slip's own status.
+  pickingSlip: {
+    pending:       s('neutral', CircleDashed),            // on the floor, nobody has it
+    in_progress:   s('info', PackageOpen),                // being packed
+    complete:      s('warn', PackageCheck),               // packed, waiting at the gate
+    dispatched:    s('good', Truck),
+    collected:     s('good', CheckCheck, true),
+    not_collected: s('bad', CircleX, true),
+    cancelled:     s('neutral', Ban, true),
+  },
   // Derived from AVAILABLE server-side (stock.repository.js getManifest).
   inventory: {
     in_stock:  s('good', CircleCheck),
