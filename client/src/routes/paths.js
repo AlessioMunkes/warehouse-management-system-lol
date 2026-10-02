@@ -82,5 +82,7 @@ export const ADMIN = {
   volunteerLog: '/admin/volunteer-log',
   // What everyone did in the system, and everything deactivated or deleted.
   activity: '/admin/activity',
+  // Every email the system has sent, whatever sent it.
+  messageHistory: '/admin/messages',
   archive:  '/admin/archive',
 };

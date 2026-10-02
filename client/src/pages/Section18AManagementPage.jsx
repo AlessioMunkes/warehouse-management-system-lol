@@ -25,7 +25,7 @@ import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
 
 const TABS = [
   { id: 'certificates', label: 'Certificate Queue', icon: FileText, description: 'View and manage Section 18A tax certificates for donations.' },
-  { id: 'emails', label: 'Email Integration', icon: Mail, description: 'Track and resend Section 18A certificate emails.' },
+  { id: 'emails', label: 'Email history', icon: Mail, description: 'Track and resend Section 18A certificate emails.' },
 ];
 
 const EMAIL_STATUS_CONFIG = {

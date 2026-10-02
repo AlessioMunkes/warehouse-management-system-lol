@@ -97,7 +97,7 @@ describe('Section18AManagementPage', () => {
 
     await screen.findByText('DON-1001');
 
-    const emailTabBtn = screen.getByRole('tab', { name: /Email Integration/i });
+    const emailTabBtn = screen.getByRole('tab', { name: /Email history/i });
     await user.click(emailTabBtn);
 
     expect(await screen.findByText('jane@example.com')).toBeInTheDocument();

@@ -88,6 +88,12 @@ export const STATUS_STYLES = {
     not_collected: s('bad', CircleX, true),
     cancelled:     s('neutral', Ban, true),
   },
+  // An outbound email's outcome (features/communications on the server).
+  message: {
+    sent:    s('good', CheckCheck, true),
+    stubbed: s('neutral', CircleDashed),                  // sending switched off; nothing left
+    failed:  s('bad', CircleX, true),
+  },
   // Derived from AVAILABLE server-side (stock.repository.js getManifest).
   inventory: {
     in_stock:  s('good', CircleCheck),

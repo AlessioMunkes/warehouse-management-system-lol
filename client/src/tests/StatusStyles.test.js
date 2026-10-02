@@ -42,6 +42,7 @@ describe('status styles', () => {
     ['dispatch', Object.keys(DISPATCH_STATUS_LABEL)],
     ['ledger', LEDGER_TYPES],
     ['inventory', ['in_stock', 'low_stock', 'shortfall']],
+    ['message', ['sent', 'stubbed', 'failed']],
     ['pickingSlip', ['pending', 'in_progress', 'complete', 'dispatched', 'collected', 'not_collected', 'cancelled']],
     ['expiry', ['ok', 'soon', 'expired']],
   ])('styles every %s status the app can show', (kind, statuses) => {

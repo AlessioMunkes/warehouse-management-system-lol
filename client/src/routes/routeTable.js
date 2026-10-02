@@ -31,7 +31,7 @@
 // ─────────────────────────────────────────────────────────────
 import {
   LayoutDashboard, Users2, ClipboardList, ShoppingCart, BarChart3, HeartHandshake,
-  Package, Truck, Gift, HandHeart, Boxes, ReceiptText, Activity, Archive,
+  Package, Truck, Gift, HandHeart, Boxes, ReceiptText, Activity, Archive, Inbox,
   PackageOpen, PackageCheck, FlaskConical, ClipboardCheck, HandCoins, PhoneCall,
   ScrollText, Mail, Sprout, MessageCircle,
 } from 'lucide-react';
@@ -153,6 +153,8 @@ export const ROUTES = [
     nav: [nav('admin', 'Logs', 'Volunteer Log', HandHeart)] },
   { id: 'archive', path: ADMIN.archive, roles: ADMIN_ONLY, shell: true,
     nav: [nav('admin', 'Logs', 'Archive', Archive)] },
+  { id: 'messageHistory', path: ADMIN.messageHistory, roles: ADMIN_ONLY, shell: true,
+    nav: [nav('admin', 'Logs', 'Message History', Inbox)] },
   { id: 'donationManagement', path: ADMIN.donationManagement, roles: ADMIN_ONLY, shell: true,
     nav: [nav('admin', 'Donations', 'Classification Queue', Gift)] },
   { id: 'section18a', path: ADMIN.section18aManagement, roles: ADMIN_ONLY, shell: true,

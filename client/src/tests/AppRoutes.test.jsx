@@ -88,7 +88,10 @@ describe('sidebars built from the table', () => {
         'Product Management /admin/products',
         'Supplier Management /admin/suppliers',
       ]],
-      ['Logs', ['User Activity /admin/activity', 'Volunteer Log /admin/volunteer-log', 'Archive /admin/archive']],
+      ['Logs', [
+        'User Activity /admin/activity', 'Volunteer Log /admin/volunteer-log', 'Archive /admin/archive',
+        'Message History /admin/messages',
+      ]],
       ['Donations', [
         'Classification Queue /admin/donation-management',
         'Section 18A Management /admin/section-18a',

@@ -39,6 +39,7 @@ import PickingSlipManagementPage                   from '../pages/PickingSlipMan
 import UserDirectoryPage                           from '../pages/UserDirectoryPage';
 import VolunteerManagementPage                     from '../pages/VolunteerManagementPage';
 import AdminUserActivityPage                       from '../pages/AdminUserActivityPage';
+import MessageHistoryPage                          from '../pages/MessageHistoryPage';
 import AdminArchivePage                            from '../pages/AdminArchivePage';
 import ProductManagementPage                       from '../pages/ProductManagementPage';
 import VolunteerEventsPage                         from '../pages/VolunteerEventsPage';
@@ -109,6 +110,7 @@ export const PAGES = {
   activity:         <AdminUserActivityPage />,
   volunteerLog:     <VolunteerManagementPage />,
   archive:          <AdminArchivePage />,
+  messageHistory:   <MessageHistoryPage />,
   donationManagement: <DonationManagementPage />,
   section18a:       <Section18AManagementPage />,
   emailIntegration: <GmailSettingsPage />,
