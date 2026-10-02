@@ -46,8 +46,6 @@ const ALLOWED = [
   'features/procurement/components/SignaturePad.jsx',
   // The public page: its visitors are not logged in and have no toggle.
   'pages/LandingPage.jsx',
-  // Dead — its import in App.jsx is commented out.
-  'pages/SelectNOCjob.jsx',
 ];
 
 const UTILITY = /(?:bg|text|border|ring|fill|stroke|divide|placeholder)-\[#[0-9a-fA-F]{3,8}\]/g;

@@ -771,19 +771,6 @@ color:white;
   margin-bottom: 1.25rem;
 }
 
-.greeting__title {
-  font-size: 1.35rem;
-  font-weight: 700;
-  color: var(--color-text);
-  font-family: var(--font-base);
-}
-
-.greeting__subtitle {
-  color: var(--color-text-muted);
-  font-family: var(--font-base);
-  font-size: 0.875rem;
-}
-
 /* ── Main Layout Container ──────────────────────────────── */
 
 .home-main {
@@ -1117,13 +1104,10 @@ color:white;
    buttons.
 
    PR #41 (commit 45571de) merged over the pre-redesign stylesheet
-   and dropped these selectors along with it. The manager page
-   (ManagerActivityScreen -> PageHeader / ManagerActivitySelect) has
-   used them since before the colour-scheme change and has no
-   stylesheet of its own, so it rendered unstyled with them gone.
-   Restored from commit 039f0a7, with colours reconciled to the
-   tokens above instead of the old hardcoded red/maroon — see the
-   --color-maroon/--color-accent/etc. block in :root.
+   and dropped these selectors; restored from commit 039f0a7, with
+   colours reconciled to the tokens above. The screen they were
+   restored for (ManagerActivityScreen) has since been removed as
+   unused; what remains here is still used by the floor pages.
    ───────────────────────────────────────────────────────────── */
 
 .page-light {
@@ -1339,15 +1323,6 @@ color:white;
 }
 
 /* ── Programme / activity select ─────────────────────────────── */
-.programme-select-content {
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 40px 24px 60px;
-}
-
-@media (max-width: 640px) {
-  .programme-select-content { padding: 24px 16px 40px; }
-}
 
 .programme-select-heading {
   font-family: var(--font-family-display);
@@ -1365,95 +1340,6 @@ color:white;
   font-size: 15px;
   color: rgba(10, 1, 1, 0.85);
   margin-bottom: 32px;
-}
-
-.programme-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1.125rem;
-  border-radius: 999px;
-  background: #ffffff;
-  border: 1px solid #e6e2da;
-  box-shadow: 0 1px 2px rgba(20, 20, 20, 0.04);
-}
-
-.programme-badge__icon {
-  color: var(--color-accent); /* was #d9534f (old red) — now the current accent red */
-  font-size: 0.85rem;
-  line-height: 1;
-}
-
-.programme-badge__label {
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: #9c968a;
-}
-
-.programme-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  width: 100%;
-  padding: 1.15rem 1.5rem;
-  border-radius: 999px;
-  border: 1px solid #ece8e0;
-  background: #ffffff;
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: #1c1b19;
-  cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease,
-    color 0.15s ease, transform 0.1s ease;
-}
-
-.programme-button:hover {
-  background: var(--color-maroon);
-  border-color: var(--color-maroon);
-  color: var(--color-lol-white);
-}
-
-.programme-button:hover .programme-button__icon {
-  color: var(--color-lol-white);
-}
-
-.programme-button:active {
-  background: var(--color-maroon-deep);
-  border-color: var(--color-maroon-deep);
-  color: var(--color-lol-white);
-  transform: scale(0.98);
-}
-
-.programme-button:focus-visible {
-  outline: 2px solid var(--color-maroon);
-  outline-offset: 2px;
-}
-
-.programme-button__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.25rem;
-  height: 1.25rem;
-  transition: color 0.15s ease;
-}
-
-.programme-button:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-  filter: grayscale(1);
-}
-
-.programme-button:disabled:hover {
-  transform: none;
-  box-shadow: none;
-}
-
-.programme-button__label {
-  line-height: 1;
 }
 
 /* ── Modal ──────────────────────────────────────────────────── */
@@ -1667,70 +1553,14 @@ color:white;
 
 /* ─────────────────────────────────────────────────────────────
    task-nav-card.css
-   Styles for TaskNavCard header navigation bar.
+   The task navigation icon, used by the floor pages' TaskNavGrid.
    ───────────────────────────────────────────────────────────── */
-
-.task-nav-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1rem 1.5rem;
-  border-bottom: 1px solid var(--border, hsl(var(--border)));
-  background-color: var(--card, hsl(var(--card)));
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-}
-
-.task-nav-left {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.task-nav-back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-  line-height: 1.25rem;
-  font-weight: 500;
-  color: var(--muted-foreground, hsl(var(--muted-foreground)));
-  transition: color 0.15s ease-in-out;
-  text-decoration: none;
-}
-
-.task-nav-back-link:hover {
-  color: var(--foreground, hsl(var(--foreground)));
-}
 
 .task-nav-icon {
   height: 1rem;
   width: 1rem;
 }
 
-.task-nav-logout-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-  line-height: 1.25rem;
-  font-weight: 500;
-  color: hsl(346.8 77.2% 49.8%); /* Rose 600 */
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  transition: color 0.15s ease-in-out;
-}
-
-.task-nav-logout-btn:hover {
-  color: hsl(346.8 77.2% 42%); /* Rose 700 */
-}
-
-.task-nav-logout-btn:focus-visible {
-  outline: 2px solid var(--ring, hsl(var(--ring)));
-  outline-offset: 2px;
-  border-radius: 0.25rem;
-}
 /* ─────────────────────────────────────────────────────────────
    top-navbar.css
    Styles for TopNavbar header layout and component elements.
