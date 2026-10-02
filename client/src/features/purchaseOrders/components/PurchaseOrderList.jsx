@@ -17,7 +17,6 @@
 // ─────────────────────────────────────────────────────────────
 import { ShoppingCart } from 'lucide-react';
 import MasterDataTable from '@/features/masterdata/components/MasterDataTable';
-import { Card, CardContent } from '@/components/ui/card';
 import EmptyState from '@/components/ui/empty-state';
 
 export default function PurchaseOrderList({
@@ -34,11 +33,8 @@ export default function PurchaseOrderList({
   }
 
   return (
-    // The same card every manager list sits in (Inventory, Picking
-    // Slips); py-0 so the header row meets the card's top edge.
-    <Card className="py-0">
-      <CardContent className="p-0">
-      <MasterDataTable
+    // Bare: the page's ListCard is the card, with the toolbar above.
+    <MasterDataTable
         columns={columns}
         rows={purchaseOrders}
         sort={sort}
@@ -46,8 +42,7 @@ export default function PurchaseOrderList({
         onOpenRow={(po) => onSelect(po.id)}
         // Keeps the selected-row highlight the detail panel relies on.
         rowAttrs={(po) => (po.id === selectedId ? { 'data-state': 'selected' } : {})}
+        noun="orders"
       />
-      </CardContent>
-    </Card>
   );
 }

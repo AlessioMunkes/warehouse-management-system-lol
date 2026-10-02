@@ -19,6 +19,9 @@
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
+import PageHeader, { PageShell } from "@/components/ui/page-header";
+import ListCard from "@/components/ui/list-card";
+import ErrorBanner from "@/components/ui/error-banner";
 import ViewTabs from "@/components/ui/view-tabs";
 import ListToolbar from "@/components/ui/list-toolbar";
 import {
@@ -271,11 +274,11 @@ export default function StockLedgerPage() {
   const signed = (n) => `${Number(n) > 0 ? "+" : Number(n) < 0 ? "−" : ""}${fmtQty(Math.abs(Number(n)))}`;
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-6">
-      <h1 className="text-2xl font-medium">Stock ledger</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Every movement of stock through the warehouse, and whether the balances still add up.
-      </p>
+    <PageShell>
+      <PageHeader
+        title="Stock ledger"
+        description="Every movement of stock through the warehouse, and whether the balances still add up."
+      />
 
       <ViewTabs
         className="mt-5"
@@ -293,75 +296,70 @@ export default function StockLedgerPage() {
 
       {tab === "movements" && (
         <div className="mt-6 space-y-4">
-          <ListToolbar chips={chips} onClearAll={resetFilters}>
-            <Select value={range} onValueChange={(v) => { setIsLoading(true); setRange(v); }}>
-              <SelectTrigger aria-label="Period" className="w-40"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {RANGES.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={productId || "any"} onValueChange={(v) => { setIsLoading(true); setProductId(v === "any" ? "" : v); }}>
-              <SelectTrigger aria-label="Product" className="w-52"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="any">All products</SelectItem>
-                {products.map((p) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={performedBy || "any"} onValueChange={(v) => { setIsLoading(true); setPerformedBy(v === "any" ? "" : v); }}>
-              <SelectTrigger aria-label="Recorded by" className="w-40"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="any">Anyone</SelectItem>
-                {actors.map((a) => <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </ListToolbar>
+          <ErrorBanner message={error} />
+          <ListCard
+            header={
+              <div className="space-y-2">
+                <ListToolbar chips={chips} onClearAll={resetFilters}>
+                  <Select value={range} onValueChange={(v) => { setIsLoading(true); setRange(v); }}>
+                    <SelectTrigger aria-label="Period" className="w-40"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {RANGES.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={productId || "any"} onValueChange={(v) => { setIsLoading(true); setProductId(v === "any" ? "" : v); }}>
+                    <SelectTrigger aria-label="Product" className="w-52"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">All products</SelectItem>
+                      {products.map((p) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Select value={performedBy || "any"} onValueChange={(v) => { setIsLoading(true); setPerformedBy(v === "any" ? "" : v); }}>
+                    <SelectTrigger aria-label="Recorded by" className="w-40"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">Anyone</SelectItem>
+                      {actors.map((a) => <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </ListToolbar>
 
-          {/* One line in place of four tiles: the totals for exactly
-              what the tab and filters select, from the server. */}
-          <p className="text-sm text-muted-foreground tabular-nums" aria-live="polite">
-            {summary ? (
-              <>
-                In <span className="font-medium text-good">{signed(summary.totalIn)}</span>
-                {" · "}Out <span className="font-medium text-danger">{signed(summary.totalOut)}</span>
-                {" · "}Net <span className="font-medium text-foreground">{signed(summary.netChange)}</span>
-                {" · "}{summary.movementCount} movement{summary.movementCount === 1 ? "" : "s"}
-                {summary.productCount ? ` across ${summary.productCount} product${summary.productCount === 1 ? "" : "s"}` : ""}
-              </>
-            ) : " "}
-          </p>
-
-          {error && (
-            <div className="rounded-md border border-brand bg-danger-soft px-4 py-3 text-sm text-brand">
-              {error}
-            </div>
-          )}
-
-          <Card className="py-0">
-            <CardContent className="p-0">
-              <LedgerTable rows={ledgerPage.slice} isLoading={isLoading || loadingAll} sort={ledgerSort.sort} onSort={sortLedger} />
-              {/* Fifteen to a page. The server sends fifty at a time, so
-                  Next on the last loaded page fetches the next fifty
-                  and moves on to them. */}
+                {/* One line in place of four tiles: the totals for exactly
+                    what the tab and filters select, from the server. */}
+                <p className="text-sm text-muted-foreground tabular-nums" aria-live="polite">
+                  {summary ? (
+                    <>
+                      In <span className="font-medium text-good">{signed(summary.totalIn)}</span>
+                      {" · "}Out <span className="font-medium text-danger">{signed(summary.totalOut)}</span>
+                      {" · "}Net <span className="font-medium text-foreground">{signed(summary.netChange)}</span>
+                      {" · "}{summary.movementCount} movement{summary.movementCount === 1 ? "" : "s"}
+                      {summary.productCount ? ` across ${summary.productCount} product${summary.productCount === 1 ? "" : "s"}` : ""}
+                    </>
+                  ) : " "}
+                </p>
+              </div>
+            }
+            // Fifteen to a page. The server sends fifty at a time, so
+            // Next on the last loaded page fetches the next fifty and
+            // moves on to them.
+            footer={
               <TablePager
                 {...ledgerPage}
                 noun="movements"
                 hasMore={Boolean(nextCursor)}
                 loading={isPaging}
                 next={ledgerNext}
-                className="border-t px-3"
+                alwaysShow
               />
-            </CardContent>
-          </Card>
+            }
+          >
+            <LedgerTable rows={ledgerPage.slice} isLoading={isLoading || loadingAll} sort={ledgerSort.sort} onSort={sortLedger} />
+          </ListCard>
         </div>
       )}
 
       {tab === "reconciliation" && (
         <div className="mt-6 space-y-4">
-          {reconError && (
-            <div className="rounded-md border border-brand bg-danger-soft px-4 py-3 text-sm text-brand">
-              {reconError}
-            </div>
-          )}
+          <ErrorBanner message={reconError} />
           <Card>
             <CardContent className="p-4">
               <ReconciliationPanel data={recon} isLoading={reconLoading} />
@@ -369,6 +367,6 @@ export default function StockLedgerPage() {
           </Card>
         </div>
       )}
-    </main>
+    </PageShell>
   );
 }

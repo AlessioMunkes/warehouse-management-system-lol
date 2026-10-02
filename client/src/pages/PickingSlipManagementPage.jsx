@@ -25,7 +25,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AlertTriangle, CalendarPlus, ChevronLeft, ChevronRight, PackagePlus, ArrowLeft } from 'lucide-react';
-import ManagerLayout from '../components/layout/ManagerLayout';
 import beneficiaryAPI from '../services/beneficiaryAPI';
 import productAPI from '../services/productAPI';
 import {
@@ -34,6 +33,8 @@ import {
 } from '../services/pickingAPI';
 import { Button } from '@/components/ui/button';
 import ViewTabs from '@/components/ui/view-tabs';
+import PageHeader, { PageShell } from '@/components/ui/page-header';
+import ErrorBanner from '@/components/ui/error-banner';
 import { useToast } from '@/components/ui/toastContext';
 import { openLabelPdf, publicAppOrigin, isReachableByPhone } from '../features/packing/palletLabelPdf';
 import useOpenFromQuery from '../features/masterdata/hooks/useOpenFromQuery';
@@ -44,17 +45,6 @@ import { GenerateSlipsForm, CreateSlipForm, EditSlipForm } from '../features/pic
 import {
   VIEWS, countViews, shiftWeek, todaySast, viewById, weekLabel, weekOf,
 } from '../features/pickingSlips/slipViews';
-
-const ErrorBanner = ({ message, onRetry }) => (
-  <div className="p-4 rounded-[4px] bg-danger-soft border-2 border-brand text-ink text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-    <span>{message}</span>
-    {onRetry ? (
-      <button onClick={onRetry} className="text-xs sm:text-sm font-semibold underline hover:text-brand focus:outline-none">
-        Try again
-      </button>
-    ) : null}
-  </div>
-);
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
@@ -219,137 +209,131 @@ export default function PickingSlipManagementPage() {
   const backToList = () => setMode('list');
 
   return (
-    <ManagerLayout>
-      <main className="mx-auto w-full max-w-6xl px-4 py-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-medium">Picking slips</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Every pallet going out this week, who is packing it, and what happened at the gate.
-            </p>
-          </div>
-          {mode === 'list' ? (
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" onClick={() => setMode('generate')}>
-                <CalendarPlus /> Generate this week's slips
-              </Button>
-              <Button type="button" variant="outline" onClick={() => setMode('create')}>
-                <PackagePlus /> Create a new slip
-              </Button>
-            </div>
-          ) : (
-            <Button type="button" variant="ghost" size="sm" onClick={backToList}>
-              <ArrowLeft /> Back to picking slips
-            </Button>
-          )}
-        </div>
-
-        {mode === 'generate' ? (
-          <div className="mt-6">
-            <GenerateSlipsForm onGenerated={showWeekOf} onDone={backToList} />
-          </div>
-        ) : mode === 'create' ? (
-          <div className="mt-6">
-            <CreateSlipForm
-              beneficiaries={beneficiaries} products={products}
-              onCreated={async (day) => { await showWeekOf(day); backToList(); }}
-              onCancel={backToList}
-            />
-          </div>
-        ) : mode === 'edit' && open ? (
-          <div className="mt-6">
-            <EditSlipForm
-              slip={open} products={products}
-              onSaved={async (day) => { await showWeekOf(day); await openSlip(open.id); backToList(); }}
-              onCancel={backToList}
-            />
-          </div>
-        ) : (
+    <PageShell>
+      <PageHeader
+        title="Picking slips"
+        description="Every pallet going out this week, who is packing it, and what happened at the gate."
+        actions={mode === 'list' ? (
           <>
-            {/* The week the list covers. Buttons rather than a week
-                input: <input type="week"> does not exist in Firefox. */}
-            <div className="mt-5 flex flex-wrap items-center gap-2">
-              <Button
-                type="button" variant="outline" size="icon-sm" aria-label="Previous week"
-                onClick={() => changeWeek(shiftWeek(week, -1))}
-              >
-                <ChevronLeft />
-              </Button>
-              <span className="min-w-44 text-center text-sm font-medium tabular-nums" aria-live="polite">
-                {weekLabel(week)}
-              </span>
-              <Button
-                type="button" variant="outline" size="icon-sm" aria-label="Next week"
-                onClick={() => changeWeek(shiftWeek(week, 1))}
-              >
-                <ChevronRight />
-              </Button>
-              {week.from !== weekOf(todaySast()).from ? (
-                <Button type="button" variant="ghost" size="sm" onClick={() => changeWeek(weekOf(todaySast()))}>
-                  This week
-                </Button>
-              ) : null}
-            </div>
-
-            {error ? <div className="mt-4"><ErrorBanner message={error} onRetry={loadSlips} /></div> : null}
-
-            <ViewTabs
-              className="mt-4"
-              label="Slip views"
-              value={view}
-              onChange={changeView}
-              tabs={VIEWS.map((v) => ({ id: v.id, label: v.label, alert: v.alert, count: isLoading ? null : counts[v.id] }))}
-            />
-
-            {/* Whether printed labels will scan, in words a manager can
-                act on (ACC-03: icon and sentence both carry it). Printing
-                is not blocked — someone testing has to be able to. */}
-            {!labelsReachable ? (
-              <p
-                className="mt-4 flex items-start gap-2 rounded-md bg-muted/50 px-3 py-2 text-sm text-destructive"
-                title={`Labels would point at ${labelOrigin || 'an address this app could not determine'}`}
-              >
-                <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                <span>
-                  <strong>These labels will only work on this computer.</strong>{' '}
-                  Please don’t print them for the warehouse — a volunteer scanning one
-                  would not be able to open their pallet.
-                </span>
-              </p>
-            ) : null}
-            {labelError ? <p className="mt-2 text-sm text-destructive">{labelError}</p> : null}
-
-            <div className="mt-6">
-              <SlipList
-                slips={slips}
-                view={view}
-                isLoading={isLoading}
-                workers={workers}
-                weekText={week.from}
-                onOpen={openSlip}
-                onAssign={bulkAssign}
-                onRelease={bulkRelease}
-                onPrintLabels={printLabels}
-              />
-            </div>
+            <Button type="button" variant="outline" onClick={() => setMode('create')}>
+              <PackagePlus /> Create a new slip
+            </Button>
+            <Button type="button" onClick={() => setMode('generate')}>
+              <CalendarPlus /> Generate this week's slips
+            </Button>
           </>
+        ) : (
+          <Button type="button" variant="ghost" size="sm" onClick={backToList}>
+            <ArrowLeft /> Back to picking slips
+          </Button>
         )}
+      />
 
-        {open && mode === 'list' ? (
-          <SlipDetailPanel
-            key={open.id}
-            slip={open}
-            workers={workers}
-            busy={busy}
-            onAssign={(workerId) => act((id) => assignSlip(id, workerId))}
-            onRelease={() => act((id) => releaseSlip(id))}
-            onAddSecond={(workerId) => act((id) => addSecondPacker(id, workerId))}
-            onEdit={() => setMode('edit')}
-            onPrintLabel={() => printLabels([open])}
-            onClose={() => setOpen(null)}
+      {mode === 'generate' ? (
+        <div className="mt-6">
+          <GenerateSlipsForm onGenerated={showWeekOf} onDone={backToList} />
+        </div>
+      ) : mode === 'create' ? (
+        <div className="mt-6">
+          <CreateSlipForm
+            beneficiaries={beneficiaries} products={products}
+            onCreated={async (day) => { await showWeekOf(day); backToList(); }}
+            onCancel={backToList}
           />
-        ) : null}
-      </main>
-    </ManagerLayout>
+        </div>
+      ) : mode === 'edit' && open ? (
+        <div className="mt-6">
+          <EditSlipForm
+            slip={open} products={products}
+            onSaved={async (day) => { await showWeekOf(day); await openSlip(open.id); backToList(); }}
+            onCancel={backToList}
+          />
+        </div>
+      ) : (
+        <>
+          {/* The week the list covers. Buttons rather than a week
+              input: <input type="week"> does not exist in Firefox. */}
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <Button
+              type="button" variant="outline" size="icon-sm" aria-label="Previous week"
+              onClick={() => changeWeek(shiftWeek(week, -1))}
+            >
+              <ChevronLeft />
+            </Button>
+            <span className="min-w-44 text-center text-sm font-medium tabular-nums" aria-live="polite">
+              {weekLabel(week)}
+            </span>
+            <Button
+              type="button" variant="outline" size="icon-sm" aria-label="Next week"
+              onClick={() => changeWeek(shiftWeek(week, 1))}
+            >
+              <ChevronRight />
+            </Button>
+            {week.from !== weekOf(todaySast()).from ? (
+              <Button type="button" variant="ghost" size="sm" onClick={() => changeWeek(weekOf(todaySast()))}>
+                This week
+              </Button>
+            ) : null}
+          </div>
+
+          <ErrorBanner className="mt-4" message={error} onRetry={loadSlips} />
+
+          <ViewTabs
+            className="mt-4"
+            label="Slip views"
+            value={view}
+            onChange={changeView}
+            tabs={VIEWS.map((v) => ({ id: v.id, label: v.label, alert: v.alert, count: isLoading ? null : counts[v.id] }))}
+          />
+
+          {/* Whether printed labels will scan, in words a manager can
+              act on (ACC-03: icon and sentence both carry it). Printing
+              is not blocked — someone testing has to be able to. */}
+          {!labelsReachable ? (
+            <p
+              className="mt-4 flex items-start gap-2 rounded-md bg-muted/50 px-3 py-2 text-sm text-destructive"
+              title={`Labels would point at ${labelOrigin || 'an address this app could not determine'}`}
+            >
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              <span>
+                <strong>These labels will only work on this computer.</strong>{' '}
+                Please don’t print them for the warehouse — a volunteer scanning one
+                would not be able to open their pallet.
+              </span>
+            </p>
+          ) : null}
+          {labelError ? <p className="mt-2 text-sm text-destructive">{labelError}</p> : null}
+
+          <div className="mt-6">
+            <SlipList
+              slips={slips}
+              view={view}
+              isLoading={isLoading}
+              workers={workers}
+              weekText={week.from}
+              onOpen={openSlip}
+              onAssign={bulkAssign}
+              onRelease={bulkRelease}
+              onPrintLabels={printLabels}
+            />
+          </div>
+        </>
+      )}
+
+      {open && mode === 'list' ? (
+        <SlipDetailPanel
+          key={open.id}
+          slip={open}
+          workers={workers}
+          busy={busy}
+          onAssign={(workerId) => act((id) => assignSlip(id, workerId))}
+          onRelease={() => act((id) => releaseSlip(id))}
+          onAddSecond={(workerId) => act((id) => addSecondPacker(id, workerId))}
+          onEdit={() => setMode('edit')}
+          onPrintLabel={() => printLabels([open])}
+          onClose={() => setOpen(null)}
+        />
+      ) : null}
+    </PageShell>
   );
 }

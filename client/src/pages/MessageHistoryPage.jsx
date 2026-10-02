@@ -24,7 +24,9 @@ import StatusBadge from '@/components/ui/status-badge';
 import EmptyState from '@/components/ui/empty-state';
 import TablePager from '@/components/ui/table-pager';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent } from '@/components/ui/card';
+import PageHeader, { PageShell } from '@/components/ui/page-header';
+import ListCard from '@/components/ui/list-card';
+import ErrorBanner from '@/components/ui/error-banner';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -125,34 +127,40 @@ export default function MessageHistoryPage() {
   const changeType = (value) => { setIsLoading(true); setType(value === 'any' ? '' : value); };
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-6">
-      <h1 className="text-2xl font-medium">Message history</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Every email the system has sent, and whether it went out. History starts when message recording was switched on.
-      </p>
+    <PageShell>
+      <PageHeader
+        title="Message history"
+        description="Every email the system has sent, and whether it went out. History starts when message recording was switched on."
+      />
 
       <ViewTabs className="mt-5" label="Message outcomes" value={view.id} onChange={changeView}
         tabs={VIEWS.map((v) => ({ id: v.id, label: v.label, alert: v.alert }))} />
 
-      <div className="mt-6 space-y-4">
-        <ListToolbar
-          chips={type ? [{ key: 'type', label: typeLabel[type] ?? type, onRemove: () => changeType('any') }] : []}
-        >
-          <Select value={type || 'any'} onValueChange={changeType}>
-            <SelectTrigger aria-label="Message type" className="w-60"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="any">Every type</SelectItem>
-              {types.map((t) => <SelectItem key={t.key} value={t.key}>{t.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
-        </ListToolbar>
+      <ErrorBanner className="mt-4" message={error} />
 
-        {error ? (
-          <div className="rounded-md border border-brand bg-danger-soft px-4 py-3 text-sm text-brand">{error}</div>
+      <ListCard
+        className="mt-6"
+        header={
+          <ListToolbar
+            chips={type ? [{ key: 'type', label: typeLabel[type] ?? type, onRemove: () => changeType('any') }] : []}
+          >
+            <Select value={type || 'any'} onValueChange={changeType}>
+              <SelectTrigger aria-label="Message type" className="w-60"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">Every type</SelectItem>
+                {types.map((t) => <SelectItem key={t.key} value={t.key}>{t.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </ListToolbar>
+        }
+        footer={!isLoading && messages.length ? (
+          <TablePager
+            {...page} noun="messages" hasMore={Boolean(nextCursor)} loading={isPaging} next={next} alwaysShow
+          />
         ) : null}
-
+      >
         {isLoading ? (
-          <div className="space-y-2" aria-busy="true">
+          <div className="space-y-2 p-4" aria-busy="true">
             {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
           </div>
         ) : messages.length === 0 ? (
@@ -162,46 +170,38 @@ export default function MessageHistoryPage() {
             description={type || view.status ? 'Nothing matches this outcome and type.' : 'Nothing has been sent since message recording started.'}
           />
         ) : (
-          <Card className="py-0">
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[150px] pl-4">When</TableHead>
-                    <TableHead>Message</TableHead>
-                    <TableHead>To</TableHead>
-                    <TableHead>Outcome</TableHead>
-                    <TableHead>About</TableHead>
-                    <TableHead>Sent by</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {page.slice.map((m) => (
-                    <TableRow key={m.id}>
-                      <TableCell className="whitespace-nowrap pl-4 text-xs text-muted-foreground">{fmtWhen(m.attemptedAt)}</TableCell>
-                      <TableCell className="max-w-[260px] whitespace-normal">
-                        <span className="block font-medium">{typeLabel[m.type] ?? m.type}</span>
-                        <span className="block break-words text-xs text-muted-foreground">{m.subject || '—'}</span>
-                      </TableCell>
-                      <TableCell className="max-w-[200px] break-words whitespace-normal text-sm">{m.recipient || '—'}</TableCell>
-                      <TableCell className="whitespace-normal">
-                        <StatusBadge kind="message" status={m.status}>{STATUS_LABEL[m.status] ?? m.status}</StatusBadge>
-                        {m.error ? <span className="mt-1 block break-words text-xs text-danger">{m.error}</span> : null}
-                      </TableCell>
-                      <TableCell className="text-sm"><About m={m} /></TableCell>
-                      <TableCell className="text-xs">{m.sentByName || 'The system'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              <TablePager
-                {...page} noun="messages" hasMore={Boolean(nextCursor)} loading={isPaging} next={next}
-                className="border-t px-3"
-              />
-            </CardContent>
-          </Card>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[150px] pl-4 sm:pl-5">When</TableHead>
+              <TableHead>Message</TableHead>
+              <TableHead>To</TableHead>
+              <TableHead>Outcome</TableHead>
+              <TableHead>About</TableHead>
+              <TableHead>Sent by</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {page.slice.map((m) => (
+              <TableRow key={m.id}>
+                <TableCell className="whitespace-nowrap pl-4 sm:pl-5 text-xs text-muted-foreground">{fmtWhen(m.attemptedAt)}</TableCell>
+                <TableCell className="max-w-[260px] whitespace-normal">
+                  <span className="block font-medium">{typeLabel[m.type] ?? m.type}</span>
+                  <span className="block break-words text-xs text-muted-foreground">{m.subject || '—'}</span>
+                </TableCell>
+                <TableCell className="max-w-[200px] break-words whitespace-normal text-sm">{m.recipient || '—'}</TableCell>
+                <TableCell className="whitespace-normal">
+                  <StatusBadge kind="message" status={m.status}>{STATUS_LABEL[m.status] ?? m.status}</StatusBadge>
+                  {m.error ? <span className="mt-1 block break-words text-xs text-danger">{m.error}</span> : null}
+                </TableCell>
+                <TableCell className="text-sm"><About m={m} /></TableCell>
+                <TableCell className="text-xs">{m.sentByName || 'The system'}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
         )}
-      </div>
-    </main>
+      </ListCard>
+    </PageShell>
   );
 }

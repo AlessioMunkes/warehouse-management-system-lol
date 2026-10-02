@@ -99,7 +99,7 @@ export default function MasterDataTable({
             // A right-aligned column (a number) gets a right-aligned
             // header, so the label sits over its values rather than
             // off to their left.
-            <TableHead key={col.key} className={`align-bottom ${EDGE} ${isCentre(col) ? 'text-center' : isRight(col) ? 'text-right' : ''}`}>
+            <TableHead key={col.key} className={`${EDGE} ${isCentre(col) ? 'text-center' : isRight(col) ? 'text-right' : ''}`}>
               {col.sort ? (
                 // stopPropagation: without it, sorting by SKU also
                 // opened whichever row happened to be underneath the

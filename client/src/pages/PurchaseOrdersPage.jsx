@@ -32,7 +32,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth }   from '../context/AuthContext';
-import ManagerLayout from '../components/layout/ManagerLayout';
 import PurchaseOrderForm   from '../features/purchaseOrders/components/PurchaseOrderForm';
 import PurchaseOrderList   from '../features/purchaseOrders/components/PurchaseOrderList';
 import PurchaseOrderDetail from '../features/purchaseOrders/components/PurchaseOrderDetail';
@@ -42,6 +41,9 @@ import stockAPI    from '../services/stockAPI';
 import { Button }   from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import ViewTabs from '@/components/ui/view-tabs';
+import PageHeader, { PageShell } from '@/components/ui/page-header';
+import ListCard from '@/components/ui/list-card';
+import ErrorBanner from '@/components/ui/error-banner';
 import ListToolbar from '@/components/ui/list-toolbar';
 import { useToast } from '@/components/ui/toastContext';
 import { Plus }     from 'lucide-react';
@@ -74,20 +76,6 @@ const EXPORT_COLUMNS = [
   { key: 'lineCount', label: 'Lines' },
   { key: 'estimatedValue', label: 'Estimated (R)' },
 ];
-
-const ErrorBanner = ({ message, onRetry }) => (
-  <div className="p-4 rounded-[4px] bg-danger-soft border-2 border-brand text-ink text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-    <span>{message}</span>
-    {onRetry ? (
-      <button
-        onClick={onRetry}
-        className="text-xs sm:text-sm font-semibold underline hover:text-brand focus:outline-none"
-      >
-        Try again
-      </button>
-    ) : null}
-  </div>
-);
 
 export default function PurchaseOrdersPage() {
   const { user } = useAuth();
@@ -282,65 +270,62 @@ export default function PurchaseOrdersPage() {
   );
 
   return (
-    <ManagerLayout>
-      <main className="mx-auto w-full max-w-6xl px-4 py-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-medium">Purchase orders</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              What we have asked suppliers for, and what has arrived.
-            </p>
-          </div>
-          {canManage && mode === 'list' ? (
-            <Button
-              type="button"
-              onClick={() => { setMode('create'); setSeedProducts([]); setSelected(null); setFormError(null); }}
-            >
-              <Plus /> New purchase order
-            </Button>
-          ) : null}
+    <PageShell>
+      <PageHeader
+        title="Purchase orders"
+        description="What we have asked suppliers for, and what has arrived."
+        actions={canManage && mode === 'list' ? (
+          <Button
+            type="button"
+            onClick={() => { setMode('create'); setSeedProducts([]); setSelected(null); setFormError(null); }}
+          >
+            <Plus /> New purchase order
+          </Button>
+        ) : null}
+      />
+
+      {mode === 'create' || mode === 'edit' ? (
+        <div className="mt-6">
+          <PurchaseOrderForm
+            // Forces a remount (and so a fresh read of initialValue)
+            // whenever the target changes — create vs. edit, or one
+            // PO's edit vs. another's.
+            key={mode === 'edit' ? `edit-${selected?.id}` : 'create'}
+            suppliers={suppliers}
+            products={products}
+            busy={busy}
+            error={formError}
+            invalidProductIds={invalidProductIds}
+            initialValue={mode === 'edit' ? selected : null}
+            initialProducts={mode === 'create' ? seedProducts : []}
+            submitLabel={mode === 'edit' ? 'Save changes' : undefined}
+            onSubmit={mode === 'edit' ? update : create}
+            onCancel={() => {
+              if (mode === 'create') setSelected(null);
+              setMode('list');
+              setSeedProducts([]);
+              setFormError(null);
+              setInvalidProductIds([]);
+            }}
+          />
         </div>
+      ) : (
+        <>
+          <ErrorBanner className="mt-4" message={error} onRetry={reload} />
 
-        {mode === 'create' || mode === 'edit' ? (
-          <div className="mt-6">
-            <PurchaseOrderForm
-              // Forces a remount (and so a fresh read of initialValue)
-              // whenever the target changes — create vs. edit, or one
-              // PO's edit vs. another's.
-              key={mode === 'edit' ? `edit-${selected?.id}` : 'create'}
-              suppliers={suppliers}
-              products={products}
-              busy={busy}
-              error={formError}
-              invalidProductIds={invalidProductIds}
-              initialValue={mode === 'edit' ? selected : null}
-              initialProducts={mode === 'create' ? seedProducts : []}
-              submitLabel={mode === 'edit' ? 'Save changes' : undefined}
-              onSubmit={mode === 'edit' ? update : create}
-              onCancel={() => {
-                if (mode === 'create') setSelected(null);
-                setMode('list');
-                setSeedProducts([]);
-                setFormError(null);
-                setInvalidProductIds([]);
-              }}
-            />
-          </div>
-        ) : (
-          <>
-            {error ? <div className="mt-4"><ErrorBanner message={error} onRetry={reload} /></div> : null}
+          <ViewTabs
+            className="mt-5"
+            label="Purchase order views"
+            value={view}
+            onChange={changeView}
+            tabs={PO_VIEWS.map((v) => ({ id: v.id, label: v.label, alert: v.alert, count: isLoading ? null : counts[v.id] }))}
+          />
 
-            <ViewTabs
-              className="mt-5"
-              label="Purchase order views"
-              value={view}
-              onChange={changeView}
-              tabs={PO_VIEWS.map((v) => ({ id: v.id, label: v.label, alert: v.alert, count: isLoading ? null : counts[v.id] }))}
-            />
-
-            <div className="mt-6 space-y-4">
+          <ListCard
+            className="mt-6"
+            header={
               <ListToolbar
-                search={{ value: search, onChange: setSearch, placeholder: 'Search by PO number or supplier' }}
+                search={{ value: search, onChange: setSearch, placeholder: 'Search PO number or supplier' }}
                 columns={{
                   idPrefix: 'po',
                   columns: tableView.availableColumns,
@@ -350,42 +335,40 @@ export default function PurchaseOrdersPage() {
                 }}
                 onExport={rows.length ? exportRows : undefined}
               />
+            }
+          >
+            {isLoading ? (
+              <div className="space-y-2 p-4" aria-busy="true">
+                {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+              </div>
+            ) : (
+              <PurchaseOrderList
+                purchaseOrders={rows}
+                selectedId={selected?.id ?? null}
+                onSelect={open}
+                columns={tableView.visibleColumns}
+                sort={tableView.sort}
+                onToggleSort={tableView.toggleSort}
+              />
+            )}
+          </ListCard>
+        </>
+      )}
 
-              {isLoading ? (
-                <div className="space-y-3">
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-24 w-full" />
-                  <Skeleton className="h-24 w-full" />
-                </div>
-              ) : (
-                <PurchaseOrderList
-                  purchaseOrders={rows}
-                  selectedId={selected?.id ?? null}
-                  onSelect={open}
-                  columns={tableView.visibleColumns}
-                  sort={tableView.sort}
-                  onToggleSort={tableView.toggleSort}
-                />
-              )}
-            </div>
-          </>
-        )}
-
-        {selected && mode === 'list' ? (
-          <PurchaseOrderDetail
-            key={selected.id}
-            purchaseOrder={selected}
-            canManage={canManage}
-            onApprove={() => changeStatus('approved', null, `${selected.poNumber} approved`)}
-            onRecordFollowUp={(reason) => changeStatus('follow_up_required', reason, `Follow-up recorded on ${selected.poNumber}`)}
-            onReopen={() => changeStatus('approved', null, `${selected.poNumber} reopened for receiving`)}
-            onSetQuickbooksRef={setQuickbooksRef}
-            onEdit={() => { setMode('edit'); setFormError(null); setInvalidProductIds([]); }}
-            onDelete={remove}
-            onClose={() => setSelected(null)}
-          />
-        ) : null}
-      </main>
-    </ManagerLayout>
+      {selected && mode === 'list' ? (
+        <PurchaseOrderDetail
+          key={selected.id}
+          purchaseOrder={selected}
+          canManage={canManage}
+          onApprove={() => changeStatus('approved', null, `${selected.poNumber} approved`)}
+          onRecordFollowUp={(reason) => changeStatus('follow_up_required', reason, `Follow-up recorded on ${selected.poNumber}`)}
+          onReopen={() => changeStatus('approved', null, `${selected.poNumber} reopened for receiving`)}
+          onSetQuickbooksRef={setQuickbooksRef}
+          onEdit={() => { setMode('edit'); setFormError(null); setInvalidProductIds([]); }}
+          onDelete={remove}
+          onClose={() => setSelected(null)}
+        />
+      ) : null}
+    </PageShell>
   );
 }
