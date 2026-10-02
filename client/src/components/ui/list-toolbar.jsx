@@ -9,6 +9,9 @@
 //   filters      — [{ key, label, active, onToggle }]. Offered in the
 //                  Filters menu; the active ones become chips. Omit for
 //                  a list with nothing to filter beyond its tabs.
+//   chips        — [{ key, label, onRemove }]: chips for filters set by
+//                  a control of the screen's own (a product picker, a
+//                  period), shown beside the Filters-menu chips
 //   onClearAll   — shown as "Clear all" beside the chips when more than
 //                  one filter (or a search) is on
 //   columns      — props for ColumnToggle (useTableView's output), or
@@ -27,10 +30,14 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import ColumnToggle from '@/components/ui/column-toggle';
 
 export default function ListToolbar({
-  search, filters = [], onClearAll, columns, onExport, exportLabel = 'Export', children,
+  search, filters = [], chips = [], onClearAll, columns, onExport, exportLabel = 'Export', children,
 }) {
   const active = filters.filter((f) => f.active);
-  const showClearAll = onClearAll && (active.length > 1 || (active.length > 0 && search?.value));
+  const shown = [
+    ...active.map((f) => ({ key: f.key, label: f.label, onRemove: f.onToggle })),
+    ...chips,
+  ];
+  const showClearAll = onClearAll && (shown.length > 1 || (shown.length > 0 && search?.value));
 
   return (
     <div className="space-y-2">
@@ -87,9 +94,9 @@ export default function ListToolbar({
         ) : null}
       </div>
 
-      {active.length ? (
+      {shown.length ? (
         <div className="flex flex-wrap items-center gap-2" aria-label="Active filters">
-          {active.map((f) => (
+          {shown.map((f) => (
             <span
               key={f.key}
               className="inline-flex items-center gap-1 rounded-full border bg-muted py-0.5 pl-3 pr-1 text-xs"
@@ -97,7 +104,7 @@ export default function ListToolbar({
               {f.label}
               <button
                 type="button"
-                onClick={() => f.onToggle()}
+                onClick={() => f.onRemove()}
                 aria-label={`Remove filter: ${f.label}`}
                 className="rounded-full p-0.5 text-muted-foreground hover:bg-background hover:text-foreground"
               >

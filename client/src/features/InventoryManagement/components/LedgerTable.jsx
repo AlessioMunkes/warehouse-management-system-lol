@@ -1,21 +1,27 @@
 // ─────────────────────────────────────────────────────────────
 // LedgerTable.jsx
 //
-// The warehouse-wide movement list. Deliberately NOT a copy of
-// StockManifestTable: this one has no client-side sort, because the
-// ledger is chronological by definition and re-sorting it by quantity
-// would make the running balance column meaningless.
+// The warehouse-wide movement list. Chronological by default; any
+// column can be clicked to sort, and the page fetches the rest of the
+// period first so a sort is over all of it (StockLedgerPage sortLedger).
+//
+// REFERENCE
+// What the movement came from, as something to open: a dispatch links
+// to its picking slip, a receipt to its purchase order (resolved
+// server-side — see stock.repository.js getLedger). Anything else
+// (a donation, decanting, a manual adjustment) has no screen of its own
+// and is named in words.
 // ─────────────────────────────────────────────────────────────
+import { Link } from "react-router-dom";
 import StatusBadge from "@/components/ui/status-badge";
 import SortableHead from "@/components/ui/sortable-head";
 import { TYPE_LABEL } from "../ledgerSort";
+import { STAFF } from "../../../routes/paths";
 import {
   Table, TableBody, TableCell, TableHeader, TableRow,
 } from "@/components/ui/table";
 
-
 // Colour, fill and icon per movement type: lib/statusStyles.js (ledger).
-
 
 const fmtWhen = (iso) => {
   if (!iso) return "—";
@@ -36,6 +42,34 @@ const fmtQty = (n) => {
   return `${rounded > 0 ? "+" : ""}${rounded.toLocaleString("en-ZA")}`;
 };
 
+const REFERENCE_WORDS = {
+  donation: "Donation",
+  donation_intake: "Donation intake",
+  decanting: "Decanting",
+  manual_adjustment: "Manual adjustment",
+  delivery_note: "Delivery",
+  dispatch_event: "Dispatch",
+};
+
+const Reference = ({ m }) => {
+  const link = "text-sm underline-offset-2 hover:underline";
+  if (m.purchaseOrderId) {
+    return <Link className={link} to={`${STAFF.purchaseOrders}?id=${m.purchaseOrderId}`}>{m.poNumber || "Purchase order"}</Link>;
+  }
+  if (m.pickingSlipId) {
+    return (
+      <Link className={link} to={`${STAFF.pickingSlips}?open=${m.pickingSlipId}`}>
+        {m.pickingSlipName ? `Slip · ${m.pickingSlipName}` : "Picking slip"}
+      </Link>
+    );
+  }
+  return (
+    <span className="text-xs text-muted-foreground">
+      {REFERENCE_WORDS[m.referenceType] ?? (m.referenceType ? m.referenceType.replace(/_/g, " ") : "—")}
+    </span>
+  );
+};
+
 export default function LedgerTable({ rows, isLoading, sort = null, onSort = () => {} }) {
   if (isLoading && rows.length === 0) {
     return (
@@ -52,58 +86,53 @@ export default function LedgerTable({ rows, isLoading, sort = null, onSort = () 
       <div className="px-4 py-12 text-center">
         <p className="text-sm font-medium">No stock movements match these filters.</p>
         <p className="mt-1 text-xs text-muted-foreground">
-          Widen the date range, or clear the filters to see everything.
+          Widen the period, or clear the filters to see everything.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <SortableHead label="When" sortKey="when" sort={sort} onSort={onSort} className="w-[150px]" />
-            <SortableHead label="Product" sortKey="product" sort={sort} onSort={onSort} />
-            <SortableHead label="SKU" sortKey="sku" sort={sort} onSort={onSort} className="w-[110px]" />
-            <SortableHead label="Type" sortKey="type" sort={sort} onSort={onSort} className="w-[140px]" />
-            <SortableHead label="Change" sortKey="change" sort={sort} onSort={onSort} align="center" className="w-[110px]" />
-            <SortableHead label="Balance after" sortKey="balance" sort={sort} onSort={onSort} align="center" className="w-[120px]" />
-            <SortableHead label="Reason" sortKey="reason" sort={sort} onSort={onSort} />
-            <SortableHead label="By" sortKey="by" sort={sort} onSort={onSort} className="w-[110px]" />
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <SortableHead label="When" sortKey="when" sort={sort} onSort={onSort} className="w-[150px] pl-4" />
+          <SortableHead label="Product" sortKey="product" sort={sort} onSort={onSort} />
+          <SortableHead label="Type" sortKey="type" sort={sort} onSort={onSort} className="w-[150px]" />
+          <SortableHead label="Change" sortKey="change" sort={sort} onSort={onSort} align="right" className="w-[110px]" />
+          <SortableHead label="Balance after" sortKey="balance" sort={sort} onSort={onSort} align="right" className="w-[120px]" />
+          <SortableHead label="Reference" sortKey="reference" sort={sort} onSort={onSort} />
+          <SortableHead label="By" sortKey="by" sort={sort} onSort={onSort} className="w-[110px]" />
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((m) => (
+          <TableRow key={m.id}>
+            <TableCell className="whitespace-nowrap pl-4 text-xs text-muted-foreground">
+              {fmtWhen(m.createdAt)}
+            </TableCell>
+            <TableCell className="max-w-[240px] whitespace-normal">
+              <span className="block break-words font-medium">{m.productName}</span>
+              <span className="block text-xs text-muted-foreground">{m.sku}</span>
+              {/* The reason a person typed, where there was one. */}
+              {m.reason ? <span className="block break-words text-xs text-muted-foreground">{m.reason}</span> : null}
+            </TableCell>
+            <TableCell>
+              <StatusBadge kind="ledger" status={m.movementType}>
+                {TYPE_LABEL[m.movementType] ?? m.movementType}
+              </StatusBadge>
+            </TableCell>
+            <TableCell className={`text-right tabular-nums ${m.quantity < 0 ? "text-danger" : ""}`}>
+              {fmtQty(m.quantity)} {m.unit}
+            </TableCell>
+            <TableCell className="text-right tabular-nums text-muted-foreground">
+              {(Math.round(m.balanceAfter * 1000) / 1000).toLocaleString("en-ZA")}
+            </TableCell>
+            <TableCell className="max-w-[220px] whitespace-normal"><Reference m={m} /></TableCell>
+            <TableCell className="text-xs">{m.performedByName}</TableCell>
           </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((m) => (
-            <TableRow key={m.id}>
-              <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                {fmtWhen(m.createdAt)}
-              </TableCell>
-              <TableCell className="max-w-[220px] truncate font-medium" title={m.productName}>
-                {m.productName}
-              </TableCell>
-              <TableCell className="text-xs text-muted-foreground">{m.sku}</TableCell>
-              <TableCell>
-                <StatusBadge kind="ledger" status={m.movementType}>
-                  {TYPE_LABEL[m.movementType] ?? m.movementType}
-                </StatusBadge>
-              </TableCell>
-              <TableCell
-                className={`text-center font-mono text-sm ${m.quantity < 0 ? "text-brand" : ""}`}
-              >
-                {fmtQty(m.quantity)} {m.unit}
-              </TableCell>
-              <TableCell className="text-center font-mono text-sm text-muted-foreground">
-                {(Math.round(m.balanceAfter * 1000) / 1000).toLocaleString("en-ZA")}
-              </TableCell>
-              <TableCell className="max-w-[260px] truncate text-xs" title={m.reason || ""}>
-                {m.reason || (m.referenceType ? m.referenceType.replace(/_/g, " ") : "—")}
-              </TableCell>
-              <TableCell className="text-xs">{m.performedByName}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+        ))}
+      </TableBody>
+    </Table>
   );
 }

@@ -251,11 +251,16 @@ describe('manager screen copy', () => {
     expect(src).toMatch(/aria-hidden="true"/);
   });
 
-  // Someone testing the flow has to be able to generate one.
+  // Someone testing the flow has to be able to generate one. The print
+  // buttons live in the slip list now (features/pickingSlips); the list
+  // is never told whether labels will scan, so it cannot disable on it.
   it('does not disable the button when labels are unreachable', async () => {
-    const src = await pageSource();
-    const button = src.slice(src.indexOf('onClick={printAllLabels}'), src.indexOf('Print pallet labels'));
-    expect(button).toContain('disabled={filteredSlips.length === 0}');
-    expect(button).not.toContain('labelsReachable');
+    const { readFileSync } = await import('node:fs');
+    const { fileURLToPath } = await import('node:url');
+    const list = readFileSync(
+      fileURLToPath(new URL('../features/pickingSlips/components/SlipList.jsx', import.meta.url)), 'utf8');
+    const button = list.slice(list.indexOf('onPrintLabels(rows)') - 200, list.indexOf('Print labels ('));
+    expect(button).toContain('disabled={rows.length === 0}');
+    expect(list).not.toContain('labelsReachable');
   });
 });

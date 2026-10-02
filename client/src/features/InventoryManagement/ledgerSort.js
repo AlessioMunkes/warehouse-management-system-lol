@@ -27,5 +27,6 @@ export const LEDGER_SORT = {
   change: (m) => Number(m.quantity),
   balance: (m) => Number(m.balanceAfter),
   reason: (m) => m.reason || m.referenceType,
+  reference: (m) => m.poNumber || m.pickingSlipName || m.referenceType || '',
   by: (m) => m.performedByName,
 };

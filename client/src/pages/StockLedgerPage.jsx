@@ -10,34 +10,45 @@
 //
 // Manager and admin only (mirrored by requireRole on all three
 // /api/stock/ledger routes). Warehouse staff keep the per-product
-// history drawer on the inventory screen.
+// history on the inventory screen.
+//
+// Laid out like every manager list: tabs by movement type (the server
+// filters on them), the period, product and person as toolbar controls
+// whose choices show as removable chips, one summary line, the table.
+// Reconciliation is the last tab. The tab is in ?status=.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Layers, Scale } from "lucide-react";
-
-import StatTile from "../features/taskdashboard/components/StatTile";
+import { useSearchParams } from "react-router-dom";
+import ViewTabs from "@/components/ui/view-tabs";
+import ListToolbar from "@/components/ui/list-toolbar";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import LedgerTable from "../features/InventoryManagement/components/LedgerTable";
 import TablePager from "@/components/ui/table-pager";
 import useSortable from "@/lib/useSortable";
 import { LEDGER_SORT } from "../features/InventoryManagement/ledgerSort";
 import usePaged, { TABLE_PAGE_SIZE } from "@/features/staff/hooks/usePaged";
 import ReconciliationPanel from "../features/InventoryManagement/components/ReconciliationPanel";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { getLedger, getReconciliation, getLedgerActors, getManifest } from "../services/stockAPI";
 
+// The tabs, each a set of movement types the server filters on.
 // Kept in step with server/src/constants/movementTypes.js. 'picked' is
-// omitted: it is never written (stock is deducted at the dispatch
-// gate, not at packing), so offering it as a filter would only ever
-// return nothing.
-const TYPES = [
-  { value: "received",   label: "Received" },
-  { value: "donated",    label: "Donation" },
-  { value: "dispatched", label: "Dispatched" },
-  { value: "wastage",    label: "Wastage" },
-  { value: "adjustment", label: "Adjustment" },
-  { value: "decanted",   label: "Decanting" },
+// in no tab: it is never written (stock is deducted at the dispatch
+// gate, not at packing), so it could only ever show nothing.
+// Reconciliation is not a movement type; it is the last tab because it
+// answers the question the movements raise — do the balances add up.
+const VIEWS = [
+  { id: "all",            label: "All movements", types: [] },
+  { id: "in",             label: "Stock in",      types: ["received", "donated"] },
+  { id: "dispatched",     label: "Dispatched",    types: ["dispatched"] },
+  { id: "wastage",        label: "Wastage",       types: ["wastage"] },
+  { id: "adjustment",     label: "Adjustments",   types: ["adjustment"] },
+  { id: "decanted",       label: "Decanting",     types: ["decanted"] },
+  { id: "reconciliation", label: "Reconciliation", alert: true },
 ];
+const viewById = (id) => VIEWS.find((v) => v.id === id) ?? VIEWS[0];
 
 const RANGES = [
   { value: "7",   label: "Last 7 days" },
@@ -68,12 +79,14 @@ const rangeToFrom = (range) => {
 const fmtQty = (n) => (Math.round(Number(n) * 1000) / 1000).toLocaleString("en-ZA");
 
 export default function StockLedgerPage() {
-  const [tab, setTab] = useState("movements");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const view = viewById(searchParams.get("status"));
+  const tab = view.id === "reconciliation" ? "reconciliation" : "movements";
+  const typeKey = (view.types ?? []).join(",");
 
   const [range, setRange] = useState("30");
   const [productId, setProductId] = useState("");
   const [performedBy, setPerformedBy] = useState("");
-  const [types, setTypes] = useState([]);
 
   const [rows, setRows] = useState([]);
   const [summary, setSummary] = useState(null);
@@ -105,15 +118,18 @@ export default function StockLedgerPage() {
     return () => { cancelled = true; };
   }, []);
 
+  // typeKey, a string, rather than the tab's array: the dependency has
+  // to be equal from one render to the next or this refetches forever.
   const filters = useCallback(() => ({
     from: rangeToFrom(range),
     productId: productId || null,
     performedBy: performedBy || null,
-    movementTypes: types,
-  }), [range, productId, performedBy, types]);
+    movementTypes: typeKey ? typeKey.split(",") : [],
+  }), [range, productId, performedBy, typeKey]);
 
   // ── First page, and every refetch when a filter changes ────
   useEffect(() => {
+    if (tab !== "movements") return undefined;
     let cancelled = false;
 
     getLedger({ ...filters(), limit: 50 })
@@ -132,7 +148,7 @@ export default function StockLedgerPage() {
       });
 
     return () => { cancelled = true; };
-  }, [filters]);
+  }, [filters, tab]);
 
   // ── Reconciliation, loaded when its tab is first opened ────
   //
@@ -211,7 +227,7 @@ export default function StockLedgerPage() {
   };
 
   const ledgerPage = usePaged(ledgerSort.rows, TABLE_PAGE_SIZE,
-    `${range}|${productId}|${performedBy}|${types.join(',')}|${ledgerSort.sort?.key}|${ledgerSort.sort?.dir}`);
+    `${range}|${productId}|${performedBy}|${typeKey}|${ledgerSort.sort?.key}|${ledgerSort.sort?.dir}`);
   // Next on the last loaded page: fetch the next fifty, then step on
   // once they have arrived (the page count only grows on the next render).
   const [advanceWhenLoaded, setAdvanceWhenLoaded] = useState(false);
@@ -226,11 +242,9 @@ export default function StockLedgerPage() {
     await loadMore();
   };
 
-  const toggleType = (value) => {
-    setIsLoading(true);
-    setTypes((prev) =>
-      prev.includes(value) ? prev.filter((t) => t !== value) : [...prev, value],
-    );
+  const changeView = (id) => {
+    if (id !== "reconciliation") setIsLoading(true);
+    setSearchParams(id === "all" ? {} : { status: id }, { replace: true });
   };
 
   const resetFilters = () => {
@@ -238,137 +252,83 @@ export default function StockLedgerPage() {
     setRange("30");
     setProductId("");
     setPerformedBy("");
-    setTypes([]);
   };
 
-  const filtersActive = range !== "30" || productId || performedBy || types.length > 0;
+  // The choices away from the defaults, as chips that undo themselves.
+  const chips = [
+    range !== "30"
+      ? { key: "range", label: RANGES.find((r) => r.value === range)?.label, onRemove: () => { setIsLoading(true); setRange("30"); } }
+      : null,
+    productId
+      ? { key: "product", label: products.find((p) => String(p.id) === productId)?.name ?? "Product", onRemove: () => { setIsLoading(true); setProductId(""); } }
+      : null,
+    performedBy
+      ? { key: "by", label: `By ${actors.find((a) => String(a.id) === performedBy)?.name ?? "someone"}`, onRemove: () => { setIsLoading(true); setPerformedBy(""); } }
+      : null,
+  ].filter(Boolean);
+
+  const variances = recon?.variances?.length;
+  const signed = (n) => `${Number(n) > 0 ? "+" : Number(n) < 0 ? "−" : ""}${fmtQty(Math.abs(Number(n)))}`;
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
-      <header>
-        <h1 className="text-2xl font-semibold">Stock ledger</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Every movement of stock through the warehouse, and whether the balances
-          still add up.
-        </p>
-      </header>
+    <main className="mx-auto w-full max-w-6xl px-4 py-6">
+      <h1 className="text-2xl font-medium">Stock ledger</h1>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Every movement of stock through the warehouse, and whether the balances still add up.
+      </p>
 
-      {/* Tabs — two buttons rather than a tab primitive, since there
-          is no Tabs component in components/ui and two states do not
-          justify adding one. */}
-      <div className="flex gap-1 border-b">
-        {[
-          { id: "movements", label: "Movements" },
-          { id: "reconciliation", label: "Reconciliation" },
-        ].map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            aria-current={tab === t.id ? "page" : undefined}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
-              tab === t.id
-                ? "border-brand text-brand"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <ViewTabs
+        className="mt-5"
+        label="Ledger views"
+        value={view.id}
+        onChange={changeView}
+        tabs={VIEWS.map((v) => ({
+          id: v.id, label: v.label, alert: v.alert,
+          // Only Reconciliation has a count worth showing: the movement
+          // tabs are paged from the server, so their size is not known
+          // until all of it has been fetched.
+          count: v.id === "reconciliation" && variances !== undefined ? variances : null,
+        }))}
+      />
 
       {tab === "movements" && (
-        <>
-          {/* ── Filters ─────────────────────────────────────── */}
-          <Card>
-            <CardContent className="flex flex-wrap items-end gap-3 p-4">
-              <label className="flex flex-col gap-1 text-xs font-medium">
-                Period
-                <select
-                  value={range}
-                  onChange={(e) => { setIsLoading(true); setRange(e.target.value); }}
-                  className="h-9 rounded-md border bg-background px-2 text-sm"
-                >
-                  {RANGES.map((r) => (
-                    <option key={r.value} value={r.value}>{r.label}</option>
-                  ))}
-                </select>
-              </label>
+        <div className="mt-6 space-y-4">
+          <ListToolbar chips={chips} onClearAll={resetFilters}>
+            <Select value={range} onValueChange={(v) => { setIsLoading(true); setRange(v); }}>
+              <SelectTrigger aria-label="Period" className="w-40"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {RANGES.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={productId || "any"} onValueChange={(v) => { setIsLoading(true); setProductId(v === "any" ? "" : v); }}>
+              <SelectTrigger aria-label="Product" className="w-52"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">All products</SelectItem>
+                {products.map((p) => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={performedBy || "any"} onValueChange={(v) => { setIsLoading(true); setPerformedBy(v === "any" ? "" : v); }}>
+              <SelectTrigger aria-label="Recorded by" className="w-40"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">Anyone</SelectItem>
+                {actors.map((a) => <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </ListToolbar>
 
-              <label className="flex flex-col gap-1 text-xs font-medium">
-                Product
-                <select
-                  value={productId}
-                  onChange={(e) => { setIsLoading(true); setProductId(e.target.value); }}
-                  className="h-9 max-w-[220px] rounded-md border bg-background px-2 text-sm"
-                >
-                  <option value="">All products</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="flex flex-col gap-1 text-xs font-medium">
-                Recorded by
-                <select
-                  value={performedBy}
-                  onChange={(e) => { setIsLoading(true); setPerformedBy(e.target.value); }}
-                  className="h-9 rounded-md border bg-background px-2 text-sm"
-                >
-                  <option value="">Anyone</option>
-                  {actors.map((a) => (
-                    <option key={a.id} value={a.id}>{a.name}</option>
-                  ))}
-                </select>
-              </label>
-
-              <div className="flex flex-col gap-1 text-xs font-medium">
-                Movement type
-                <div className="flex flex-wrap gap-1">
-                  {TYPES.map((t) => {
-                    const on = types.includes(t.value);
-                    return (
-                      <button
-                        key={t.value}
-                        type="button"
-                        aria-pressed={on}
-                        onClick={() => toggleType(t.value)}
-                        className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                          on
-                            ? "border-brand bg-danger-soft text-brand"
-                            : "border-input text-muted-foreground hover:text-foreground"
-                        }`}
-                      >
-                        {t.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {filtersActive && (
-                <Button variant="ghost" size="sm" onClick={resetFilters}>
-                  Reset
-                </Button>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* ── Summary ─────────────────────────────────────── */}
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {/* Green in, red out, net change green or red by its sign,
-                movements amber — the inventory screen's card colours. */}
-            <StatTile icon={ArrowUpRight} label="Stock in" tone="good"
-                      value={summary ? fmtQty(summary.totalIn) : "—"} />
-            <StatTile icon={ArrowDownLeft} label="Stock out" tone="bad"
-                      value={summary ? fmtQty(Math.abs(summary.totalOut)) : "—"} />
-            <StatTile icon={Scale} label="Net change"
-                      tone={!summary || Number(summary.netChange) === 0 ? undefined : Number(summary.netChange) > 0 ? "good" : "bad"}
-                      value={summary ? fmtQty(summary.netChange) : "—"} />
-            <StatTile icon={Layers} label="Movements" tone="warn"
-                      value={summary ? summary.movementCount : "—"} />
-          </div>
+          {/* One line in place of four tiles: the totals for exactly
+              what the tab and filters select, from the server. */}
+          <p className="text-sm text-muted-foreground tabular-nums" aria-live="polite">
+            {summary ? (
+              <>
+                In <span className="font-medium text-good">{signed(summary.totalIn)}</span>
+                {" · "}Out <span className="font-medium text-danger">{signed(summary.totalOut)}</span>
+                {" · "}Net <span className="font-medium text-foreground">{signed(summary.netChange)}</span>
+                {" · "}{summary.movementCount} movement{summary.movementCount === 1 ? "" : "s"}
+                {summary.productCount ? ` across ${summary.productCount} product${summary.productCount === 1 ? "" : "s"}` : ""}
+              </>
+            ) : " "}
+          </p>
 
           {error && (
             <div className="rounded-md border border-brand bg-danger-soft px-4 py-3 text-sm text-brand">
@@ -376,7 +336,7 @@ export default function StockLedgerPage() {
             </div>
           )}
 
-          <Card>
+          <Card className="py-0">
             <CardContent className="p-0">
               <LedgerTable rows={ledgerPage.slice} isLoading={isLoading || loadingAll} sort={ledgerSort.sort} onSort={sortLedger} />
               {/* Fifteen to a page. The server sends fifty at a time, so
@@ -392,11 +352,11 @@ export default function StockLedgerPage() {
               />
             </CardContent>
           </Card>
-        </>
+        </div>
       )}
 
       {tab === "reconciliation" && (
-        <>
+        <div className="mt-6 space-y-4">
           {reconError && (
             <div className="rounded-md border border-brand bg-danger-soft px-4 py-3 text-sm text-brand">
               {reconError}
@@ -407,8 +367,8 @@ export default function StockLedgerPage() {
               <ReconciliationPanel data={recon} isLoading={reconLoading} />
             </CardContent>
           </Card>
-        </>
+        </div>
       )}
-    </div>
+    </main>
   );
 }

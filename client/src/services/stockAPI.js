@@ -166,6 +166,13 @@ const toLedgerRow = (row) => ({
   reason:          row.reason,
   performedByName: row.performed_by_name || "Unknown",
   createdAt:       row.created_at,
+  // What the movement came from, resolved server-side to something a
+  // manager can open: the picking slip a dispatch belonged to, or the
+  // purchase order a receipt was against. Null otherwise.
+  pickingSlipId:   row.picking_slip_id ?? null,
+  pickingSlipName: row.picking_slip_name ?? null,
+  purchaseOrderId: row.purchase_order_id ?? null,
+  poNumber:        row.po_number ?? null,
 });
 
 const toReconciliationRow = (row) => ({
