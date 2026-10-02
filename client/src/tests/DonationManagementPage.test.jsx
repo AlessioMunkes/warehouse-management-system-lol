@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import DonationManagementPage from '../pages/DonationManagementPage';
 
-vi.mock('../features/taskdashboard/components/TopNavBar', () => ({
+vi.mock('../components/layout/TopNavBar', () => ({
   TopNavbar: () => <div>Top Navbar</div>,
 }));
 

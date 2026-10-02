@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// client/src/features/taskdashboard/components/StatTile.jsx
+// client/src/features/dashboard/components/StatTile.jsx
 //
 // The number-with-an-icon card, lifted out of ManagerDashboardPage so
 // the worker and admin dashboards use it too. There were about to be
@@ -28,7 +28,7 @@ import { Card, CardContent } from '@/components/ui/card';
 //
 // value ISN'T always a plain number — StockLedgerPage passes a
 // pre-formatted string through fmtQty() ("1,234 kg"), and both that
-// page and AdminActivityScreen pass the literal string "—" while a
+// page and AdminDashboardPage pass the literal string "—" while a
 // stat is still loading. Number() on either of those is NaN, so
 // anything that isn't a clean numeric value renders exactly as given,
 // same as this component did before the count-up existed — only a

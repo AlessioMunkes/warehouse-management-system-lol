@@ -12,8 +12,8 @@
 // ─────────────────────────────────────────────────────────────
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { homeForRole } from '../../features/taskdashboard/components/navSections';
-import ManagerLayout from '../../features/taskdashboard/components/ManagerLayout';
+import { homeForRole } from './navSections';
+import ManagerLayout from './ManagerLayout';
 import AssistantLauncher from '../../features/assistant/components/AssistantLauncher';
 
 // `shell` wraps the whole group in the app shell — sidebar on desktop,

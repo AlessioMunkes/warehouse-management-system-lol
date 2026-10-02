@@ -14,7 +14,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth }     from '../context/AuthContext';
-import ManagerLayout    from '../features/taskdashboard/components/ManagerLayout';
+import ManagerLayout    from '../components/layout/ManagerLayout';
 import BeneficiaryForm from '../features/beneficiaries/components/BeneficiaryForm';
 import beneficiaryAPI  from '../services/beneficiaryAPI';
 

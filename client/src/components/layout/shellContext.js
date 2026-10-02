@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// client/src/features/taskdashboard/components/shellContext.js
+// client/src/components/layout/shellContext.js
 //
 // Two small contexts the app shell provides.
 //

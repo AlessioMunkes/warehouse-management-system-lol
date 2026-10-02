@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import EcdCollectionRemindersPage from '../pages/EcdCollectionRemindersPage';
 import collectionReminderAPI from '../services/collectionReminderAPI';
 
-vi.mock('../features/taskdashboard/components/ManagerLayout', () => ({
+vi.mock('../components/layout/ManagerLayout', () => ({
   default: ({ children }) => <div>{children}</div>,
 }));
 

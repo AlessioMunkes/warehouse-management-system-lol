@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
+import ManagerLayout from '../components/layout/ManagerLayout';
 import FinanceWarehouseReportView from '../features/finance/FinanceWarehouseReportView';
 import { getFinanceReport } from '../services/financeAPI';
 

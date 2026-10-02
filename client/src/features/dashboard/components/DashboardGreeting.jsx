@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// client/src/features/taskdashboard/components/DashboardGreeting.jsx
+// client/src/features/dashboard/components/DashboardGreeting.jsx
 //
 // Deliberately not a reuse of Greeting.jsx ("Hi {name}! What are you
 // working on today?") — that one is the staff task-grid's plain

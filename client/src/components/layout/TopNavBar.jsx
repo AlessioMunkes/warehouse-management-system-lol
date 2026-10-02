@@ -21,9 +21,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import LogoutConfirmDialog from "@/components/ui/log-out-dialog";
-import { useAuth } from "../../../context/AuthContext";
-import batchesLogo from "../../../assets/Batches_Logo.jpeg";
-import "../../../styles/index.css";
+import { useAuth } from "../../context/AuthContext";
+import batchesLogo from "../../assets/Batches_Logo.jpeg";
+import "../../styles/index.css";
 
 const ROLE_LABELS = {
   warehouse_worker: "Warehouse staff",

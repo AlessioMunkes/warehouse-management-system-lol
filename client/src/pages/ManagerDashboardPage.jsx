@@ -8,8 +8,8 @@
 // ─────────────────────────────────────────────────────────────
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
-import DashboardGreeting from '../features/taskdashboard/components/DashboardGreeting';
+import ManagerLayout from '../components/layout/ManagerLayout';
+import DashboardGreeting from '../features/dashboard/components/DashboardGreeting';
 import CustomisableDashboard from '../features/dashboard/components/CustomisableDashboard';
 import NeedsAttention from '../features/dashboard/components/NeedsAttention';
 import useAttention from '../features/dashboard/useAttention';

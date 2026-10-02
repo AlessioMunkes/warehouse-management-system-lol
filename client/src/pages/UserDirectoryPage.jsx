@@ -20,7 +20,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth }   from '../context/AuthContext';
-import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
+import ManagerLayout from '../components/layout/ManagerLayout';
 import UserForm      from '../features/users/components/UserForm';
 import InviteForm    from '../features/users/components/InviteForm';
 import InviteResultPanel from '../features/users/components/InviteResultPanel';

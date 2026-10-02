@@ -25,7 +25,7 @@ vi.mock('../services/purchaseOrderAPI', async () => {
 });
 vi.mock('../services/supplierAPI', () => ({ default: { getSuppliers: vi.fn(async () => []) } }));
 vi.mock('../services/stockAPI', () => ({ default: { getManifest: vi.fn(async () => []) } }));
-vi.mock('../features/taskdashboard/components/ManagerLayout', () => ({ default: ({ children }) => children }));
+vi.mock('../components/layout/ManagerLayout', () => ({ default: ({ children }) => children }));
 vi.mock('@/components/ui/toastContext', () => ({ useToast: () => vi.fn() }));
 vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: { id: 1, role: 'manager' } }) }));
 

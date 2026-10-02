@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Section18AManagementPage from '../pages/Section18AManagementPage';
 
-vi.mock('../features/taskdashboard/components/TopNavBar', () => ({
+vi.mock('../components/layout/TopNavBar', () => ({
   TopNavbar: () => <div>TopNavbar</div>,
 }));
 

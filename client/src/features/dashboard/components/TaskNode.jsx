@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// client/src/features/taskdashboard/components/TaskNode.jsx
+// client/src/features/dashboard/components/TaskNode.jsx
 //
 // One task on the worker dashboard — was TaskPathNode.jsx, renamed
 // alongside dropping the connecting line between nodes (see staff.css's

@@ -31,7 +31,7 @@ vi.mock('../features/packing/palletLabelPdf', () => ({
   publicAppOrigin: () => 'https://example.org',
   isReachableByPhone: () => true,
 }));
-vi.mock('../features/taskdashboard/components/ManagerLayout', () => ({ default: ({ children }) => children }));
+vi.mock('../components/layout/ManagerLayout', () => ({ default: ({ children }) => children }));
 vi.mock('@/components/ui/toastContext', () => ({ useToast: () => vi.fn() }));
 
 const router = { params: new URLSearchParams(), setParams: vi.fn() };

@@ -13,7 +13,7 @@
 import { describe, it, expect } from 'vitest';
 import { ROUTES, REDIRECTS } from '../routes/routeTable';
 import { PAGES } from '../routes/pages';
-import { NAV_SECTIONS } from '../features/taskdashboard/components/navSections';
+import { NAV_SECTIONS } from '../components/layout/navSections';
 import { ALL_STAFF, MANAGERS_UP, ADMIN_ONLY, GUEST_ONLY, DONATION_INTAKE } from '../routes/permissions';
 
 const ROLE_OF_MENU = { worker: 'warehouse_worker', manager: 'manager', admin: 'admin' };
@@ -82,7 +82,7 @@ describe('sidebars built from the table', () => {
 
   it('admin', () => {
     expect(menu('admin')).toEqual([
-      ['Overview', ['Dashboard /admin']],
+      ['Overview', ['Dashboard /admin', 'Finance Report /admin/finance-report']],
       ['Master data', [
         'User Management /admin/users',
         'Product Management /admin/products',

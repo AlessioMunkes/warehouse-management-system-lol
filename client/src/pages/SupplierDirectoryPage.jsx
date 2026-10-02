@@ -22,7 +22,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth }   from '../context/AuthContext';
-import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
+import ManagerLayout from '../components/layout/ManagerLayout';
 import SupplierForm  from '../features/suppliers/components/SupplierForm';
 import ProspectPad   from '../features/suppliers/components/ProspectPad';
 import supplierAPI   from '../services/supplierAPI';

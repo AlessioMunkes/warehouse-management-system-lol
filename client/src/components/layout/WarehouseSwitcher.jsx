@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// client/src/features/taskdashboard/components/WarehouseSwitcher.jsx
+// client/src/components/layout/WarehouseSwitcher.jsx
 //
 // Which warehouse you are working in, always on screen, and the way
 // to change it.
@@ -17,7 +17,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, ChevronDown, Warehouse } from 'lucide-react';
-import { useAuth } from '../../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import { useToast } from '@/components/ui/toastContext';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';

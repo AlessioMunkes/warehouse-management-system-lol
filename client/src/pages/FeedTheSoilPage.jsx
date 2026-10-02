@@ -22,7 +22,7 @@
 // screen picks it up — nothing left to do here.
 // ─────────────────────────────────────────────────────────────
 import { useState } from 'react';
-import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
+import ManagerLayout from '../components/layout/ManagerLayout';
 import StaffShell from '../components/layout/StaffShell';
 import FeedTheSoilManagerView from '../features/feedTheSoil/components/FeedTheSoilManagerView';
 import FeedTheSoilFlow from '../features/feedTheSoil/components/FeedTheSoilFlow';

@@ -25,7 +25,7 @@ import ReceiptsPage                                from '../pages/ReceiptsPage';
 import InventoryManagementPage                     from '../pages/InventoryManagementPage';
 import ManagerDashboardPage                        from '../pages/ManagerDashboardPage';
 import StockLedgerPage                             from '../pages/StockLedgerPage';
-import AdminActivityScreen                         from '../pages/AdminActivityScreen';
+import AdminDashboardPage                          from '../pages/AdminDashboardPage';
 import TaskDashboard                               from '../pages/TaskDashboardPage';
 import SupplierDirectoryPage                       from '../pages/SupplierDirectoryPage';
 import PurchaseOrdersPage                          from '../pages/PurchaseOrdersPage';
@@ -73,7 +73,7 @@ export const PAGES = {
   slipPreview:      <SlipPreviewPage />,
 
   managerDashboard: <ManagerDashboardPage />,
-  adminDashboard:   <AdminActivityScreen />,
+  adminDashboard:   <AdminDashboardPage />,
   staffHome:        <TaskDashboard />,
 
   purchaseOrders:   <PurchaseOrdersPage />,

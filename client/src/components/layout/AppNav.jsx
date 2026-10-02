@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// client/src/features/taskdashboard/components/AppNav.jsx
+// client/src/components/layout/AppNav.jsx
 //
 // The navigation itself, rendered three ways from one definition: the
 // desktop sidebar, the drawer behind ManagerLayout's hamburger, and the
@@ -21,10 +21,10 @@ import {
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useAuth } from '../../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import { NAV_SECTIONS, homeForRole } from './navSections';
-import useAttention from '../../dashboard/useAttention';
-import batchesLogo from '../../../assets/Batches_Logo.jpeg';
+import useAttention from '../../features/dashboard/useAttention';
+import batchesLogo from '../../assets/Batches_Logo.jpeg';
 
 // `count` — how many things on this screen need dealing with, or
 // nothing. Expanded it is a number at the end of the row; collapsed, a

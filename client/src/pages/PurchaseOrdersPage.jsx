@@ -32,7 +32,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth }   from '../context/AuthContext';
-import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
+import ManagerLayout from '../components/layout/ManagerLayout';
 import PurchaseOrderForm   from '../features/purchaseOrders/components/PurchaseOrderForm';
 import PurchaseOrderList   from '../features/purchaseOrders/components/PurchaseOrderList';
 import PurchaseOrderDetail from '../features/purchaseOrders/components/PurchaseOrderDetail';

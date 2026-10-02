@@ -31,7 +31,7 @@
 // prop) a doubled-up sidebar whose drawer state fought itself.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
-import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
+import ManagerLayout from '../components/layout/ManagerLayout';
 import StaffShell from '../components/layout/StaffShell';
 import CommunityRequestForm from '../features/communityRequests/components/CommunityRequestForm';
 import CommunityRequestFlow from '../features/communityRequests/components/CommunityRequestFlow';

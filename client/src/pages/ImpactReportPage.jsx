@@ -47,7 +47,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
+import ManagerLayout from '../components/layout/ManagerLayout';
 import ReportChart    from '../features/reporting/components/ReportChart';
 import ImpactStatCard from '../features/reporting/components/ImpactStatCard';
 import BeneficiaryTypeChart from '../features/reporting/components/BeneficiaryTypeChart';

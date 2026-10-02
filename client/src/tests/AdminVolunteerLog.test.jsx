@@ -19,7 +19,7 @@ import { isValidElement } from 'react';
 import { ADMIN, VOLUNTEERS } from '../routes/paths';
 import { ROUTES } from '../routes/routeTable';
 import { PAGES } from '../routes/pages';
-import { NAV_SECTIONS } from '../features/taskdashboard/components/navSections';
+import { NAV_SECTIONS } from '../components/layout/navSections';
 import VolunteerManagementPage from '../pages/VolunteerManagementPage';
 
 const read = (rel) =>

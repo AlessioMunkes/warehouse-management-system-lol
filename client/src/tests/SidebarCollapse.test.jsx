@@ -16,8 +16,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
-import { SIDEBAR_KEY } from '../features/taskdashboard/components/shellContext';
+import ManagerLayout from '../components/layout/ManagerLayout';
+import { SIDEBAR_KEY } from '../components/layout/shellContext';
 import { useAuth } from '../context/AuthContext';
 
 vi.mock('../context/AuthContext', () => ({ useAuth: vi.fn() }));

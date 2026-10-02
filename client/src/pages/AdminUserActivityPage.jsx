@@ -7,7 +7,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
+import ManagerLayout from '../components/layout/ManagerLayout';
 import adminAPI from '../services/adminAPI';
 import { linkFor } from '../features/admin/recordLinks';
 import useDetailFocus  from '../features/masterdata/hooks/useDetailFocus';

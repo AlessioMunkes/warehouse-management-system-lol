@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// client/src/pages/AdminActivityScreen.jsx
+// client/src/pages/AdminDashboardPage.jsx
 //
 // The admin landing screen. LoginPage sends every admin here.
 //
@@ -17,7 +17,7 @@
 // donationManagementAPI.getAttentionCounts().
 // ─────────────────────────────────────────────────────────────
 import { useState } from 'react';
-import DashboardGreeting from '../features/taskdashboard/components/DashboardGreeting';
+import DashboardGreeting from '../features/dashboard/components/DashboardGreeting';
 import CustomisableDashboard from '../features/dashboard/components/CustomisableDashboard';
 import { useAuth } from '@/context/AuthContext';
 
@@ -27,7 +27,7 @@ import { useAuth } from '@/context/AuthContext';
 // What the greeting line reads, whatever widgets are showing.
 const ALWAYS = ['donations', 's18a'];
 
-export default function AdminActivityScreen() {
+export default function AdminDashboardPage() {
   const { user } = useAuth();
   const [data, setData] = useState({});
 

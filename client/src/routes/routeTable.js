@@ -33,7 +33,7 @@ import {
   LayoutDashboard, Users2, ClipboardList, ShoppingCart, BarChart3, HeartHandshake,
   Package, Truck, Gift, HandHeart, Boxes, ReceiptText, Activity, Archive, Inbox,
   PackageOpen, PackageCheck, FlaskConical, ClipboardCheck, HandCoins, PhoneCall,
-  ScrollText, Sprout, MessageCircle, Settings,
+  ScrollText, Sprout, MessageCircle, Settings, Landmark,
 } from 'lucide-react';
 import { STAFF, ADMIN, VOLUNTEERS, PACKING, DONATIONS } from './paths';
 import {
@@ -162,8 +162,10 @@ export const ROUTES = [
   // Settings' Email section, at the address Google's sign-in returns to
   // and older links use. Listed in the menu as Settings.
   { id: 'emailIntegration', path: ADMIN.emailIntegration, roles: ADMIN_ONLY, shell: true },
-  // Routed, not in the menu — reached from the admin dashboard.
-  { id: 'financeReport', path: ADMIN.financeReport, roles: ADMIN_ONLY, shell: true },
+  // The warehouse movement report finance works from. It was routed
+  // but in no menu; listed beside the dashboard.
+  { id: 'financeReport', path: ADMIN.financeReport, roles: ADMIN_ONLY, shell: true,
+    nav: [nav('admin', 'Overview', 'Finance Report', Landmark)] },
 
   { id: 'settings', path: ADMIN.settings, roles: ADMIN_ONLY, shell: true,
     nav: [nav('admin', 'Setup', 'Settings', Settings)] },

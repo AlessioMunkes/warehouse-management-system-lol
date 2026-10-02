@@ -11,7 +11,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth }  from '../context/AuthContext';
-import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
+import ManagerLayout from '../components/layout/ManagerLayout';
 import ProductForm  from '../features/products/components/ProductForm';
 import productAPI   from '../services/productAPI';
 import ConfirmRemoveDialog from '../features/masterdata/components/ConfirmRemoveDialog';

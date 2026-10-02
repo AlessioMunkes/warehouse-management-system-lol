@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// client/src/features/taskdashboard/components/ManagerLayout.jsx
+// client/src/components/layout/ManagerLayout.jsx
 //
 // The Zoho-style shell: a persistent left sidebar plus a top bar,
 // wrapping every manager-area screen (dashboard, beneficiaries,
@@ -24,11 +24,11 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../../context/AuthContext';
-import { STAFF, ADMIN } from '../../../routes/paths';
-import NotificationBell from '../../notifications/components/NotificationBell';
-import StaffNotificationBell from '../../../components/layout/StaffNotificationBell';
-import usePushMessages from '../../notifications/usePushMessages';
+import { useAuth } from '../../context/AuthContext';
+import { STAFF, ADMIN } from '../../routes/paths';
+import NotificationBell from '../../features/notifications/components/NotificationBell';
+import StaffNotificationBell from './StaffNotificationBell';
+import usePushMessages from '../../features/notifications/usePushMessages';
 import LogoutConfirmDialog from '@/components/ui/log-out-dialog';
 import { Button } from '@/components/ui/button';
 import {

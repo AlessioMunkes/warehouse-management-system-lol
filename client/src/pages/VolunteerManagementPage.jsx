@@ -27,7 +27,7 @@
 // there is one of everything rather than four.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
+import ManagerLayout from '../components/layout/ManagerLayout';
 import volunteerAPI  from '../services/volunteerAPI';
 import useDetailFocus  from '../features/masterdata/hooks/useDetailFocus';
 import useTableView    from '../features/masterdata/hooks/useTableView';

@@ -33,8 +33,8 @@ import {
   AlertTriangle, ClipboardList, FileBadge, Gift, HandHeart, Mail, Package, PackageOpen,
   PackageSearch, PhoneCall, ScrollText, ShoppingCart, Truck, Users2, Warehouse,
 } from 'lucide-react';
-import StatTile from '../taskdashboard/components/StatTile';
-import ActionCard from '../taskdashboard/components/ActionCard';
+import StatTile from './components/StatTile';
+import ActionCard from './components/ActionCard';
 import ReportPanel from './components/ReportPanel';
 import StaticChart from './components/StaticChart';
 import NotificationsPanel from './components/NotificationsPanel';

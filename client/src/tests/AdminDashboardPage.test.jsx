@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// client/src/tests/AdminActivityScreen.test.jsx
+// client/src/tests/AdminDashboardPage.test.jsx
 //
 // Covers the D6/Q2 dashboard badge: the Classification Queue tile shows one
 // DEDUPLICATED attention count — legacy/unlinked flags + pending donations
@@ -71,7 +71,7 @@ vi.mock('../services/supplierAPI', () => ({ getSuppliers: vi.fn().mockResolvedVa
 vi.mock('../services/volunteerAPI', () => ({ getGuestLog: vi.fn().mockResolvedValue([]) }));
 vi.mock('../services/reportingAPI', () => ({ runReport: vi.fn().mockResolvedValue({ series: [] }) }));
 
-import AdminActivityScreen from '../pages/AdminActivityScreen';
+import AdminDashboardPage from '../pages/AdminDashboardPage';
 
 const intakeFlag = (id, pendingDonationId) => ({
   flag_id: id,
@@ -92,7 +92,7 @@ const pendingDonation = (id, status) => ({ id, status });
 const renderScreen = () =>
   render(
     <MemoryRouter>
-      <AdminActivityScreen />
+      <AdminDashboardPage />
     </MemoryRouter>
   );
 
@@ -102,7 +102,7 @@ beforeEach(() => {
   try { window.localStorage.clear(); } catch { /* none */ }
 });
 
-describe('AdminActivityScreen — Donation Management badge (D6/Q2)', () => {
+describe('AdminDashboardPage — Donation Management badge (D6/Q2)', () => {
   it('shows the deduplicated total: legacy flags + pending donations, intake-linked flags excluded', async () => {
     // 2 legacy flags (counted) + 3 intake-linked flags belonging to the
     // 2 pending donations below (NOT counted again) + 2 pending donations

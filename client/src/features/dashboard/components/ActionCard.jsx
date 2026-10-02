@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// client/src/features/taskdashboard/components/ActionCard.jsx
+// client/src/features/dashboard/components/ActionCard.jsx
 //
 // A destination with a sentence attached. The dashboards used to list
 // the same words as the sidebar two inches to their left, which tells

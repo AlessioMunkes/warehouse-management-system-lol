@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ExternalLink, Mail, MessageCircle, RefreshCw, Send } from 'lucide-react';
-import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
+import ManagerLayout from '../components/layout/ManagerLayout';
 import collectionReminderAPI from '../services/collectionReminderAPI';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';

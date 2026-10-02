@@ -25,7 +25,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AlertTriangle, CalendarPlus, ChevronLeft, ChevronRight, PackagePlus, ArrowLeft } from 'lucide-react';
-import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
+import ManagerLayout from '../components/layout/ManagerLayout';
 import beneficiaryAPI from '../services/beneficiaryAPI';
 import productAPI from '../services/productAPI';
 import {

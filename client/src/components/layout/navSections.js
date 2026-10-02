@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// client/src/features/taskdashboard/components/navSections.js
+// client/src/components/layout/navSections.js
 //
 // The sidebar menu for each role (used by ManagerLayout and AppNav),
 // built from routes/routeTable.js — each route says which menus list
@@ -15,8 +15,8 @@
 // menu does not list them, so today they reach them by URL. Listing
 // them is one `nav('admin', …)` entry per route in routeTable.js.
 // ─────────────────────────────────────────────────────────────
-import { ROUTES, MENU_GROUPS } from '../../../routes/routeTable';
-import { STAFF, ADMIN } from '../../../routes/paths';
+import { ROUTES, MENU_GROUPS } from '../../routes/routeTable';
+import { STAFF, ADMIN } from '../../routes/paths';
 
 const menuFor = (role) =>
   role === 'warehouse_worker' ? 'worker'

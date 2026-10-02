@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 
-vi.mock('../features/taskdashboard/components/TopNavBar', () => ({
+vi.mock('../components/layout/TopNavBar', () => ({
   TopNavbar: () => <div>Navigation</div>,
 }));
 
