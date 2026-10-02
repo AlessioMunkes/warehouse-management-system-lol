@@ -8,28 +8,25 @@
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import ManagerLayout from '../components/layout/ManagerLayout';
 import adminAPI from '../services/adminAPI';
 import { archiveLinkFor } from '../features/admin/recordLinks';
 import { setUserStatus } from '../services/userAPI';
 import { setProductStatus } from '../services/productAPI';
 import { setSupplierStatus } from '../services/supplierAPI';
 import { setBeneficiaryStatus } from '../services/beneficiaryAPI';
-import useDetailFocus  from '../features/masterdata/hooks/useDetailFocus';
 import useTableView    from '../features/masterdata/hooks/useTableView';
 import MasterDataTable from '../features/masterdata/components/MasterDataTable';
-import ColumnToggle    from '@/components/ui/column-toggle';
-import FilterPills     from '../features/masterdata/components/FilterPills';
-import {
-  InputGroup, InputGroupAddon, InputGroupInput,
-} from '@/components/ui/input-group';
 import { Button, buttonVariants } from '@/components/ui/button';
 import StatusBadge from '@/components/ui/status-badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Card, CardContent, CardHeader, CardTitle,
-} from '@/components/ui/card';
-import { Search, X, RotateCcw, ExternalLink } from 'lucide-react';
+import PageHeader, { PageShell } from '@/components/ui/page-header';
+import ViewTabs from '@/components/ui/view-tabs';
+import ListCard from '@/components/ui/list-card';
+import ListToolbar from '@/components/ui/list-toolbar';
+import DetailPanel from '@/components/ui/detail-panel';
+import EmptyState from '@/components/ui/empty-state';
+import ErrorBanner from '@/components/ui/error-banner';
+import { RotateCcw, ExternalLink, Archive } from 'lucide-react';
 
 const SAST = 'Africa/Johannesburg';
 const fmtDate = (value) => {
@@ -50,9 +47,10 @@ const RESTORE = {
   beneficiary: (id) => setBeneficiaryStatus(id, true),
 };
 
-const STATE_FILTERS = [
-  { value: 'deactivated', label: 'Deactivated' },
-  { value: 'deleted', label: 'Deleted' },
+const VIEWS = [
+  { id: 'all',         label: 'All',         test: () => true },
+  { id: 'deactivated', label: 'Deactivated', test: (x) => x.state === 'deactivated' },
+  { id: 'deleted',     label: 'Deleted',     test: (x) => x.state === 'deleted' },
 ];
 
 const COLUMNS = [
@@ -69,40 +67,17 @@ const COLUMNS = [
     sort: (x) => (x.by ?? '').toLowerCase(), cell: (x) => x.by || '—' },
 ];
 
-const ErrorBanner = ({ message, onRetry }) => (
-  <div className="p-4 rounded-[4px] bg-danger-soft border-2 border-brand text-ink text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-    <span>{message}</span>
-    {onRetry ? (
-      <button onClick={onRetry} className="text-xs sm:text-sm font-semibold underline hover:text-brand focus:outline-none">Try again</button>
-    ) : null}
-  </div>
-);
-
 function ItemDetail({ item, busy, onRestore, onClose }) {
   const href = archiveLinkFor(item);
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
-        <div>
-          <CardTitle>{item.name}</CardTitle>
-          <p className="text-sm text-muted-foreground">{item.kindLabel}{item.detail ? ` · ${item.detail}` : ''}</p>
-        </div>
-        <Button type="button" variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close"><X /></Button>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <dl className="grid gap-3 text-sm sm:grid-cols-3">
-          <div><dt className="text-muted-foreground">Status</dt><dd><StateBadge state={item.state} /></dd></div>
-          <div><dt className="text-muted-foreground">When</dt><dd>{fmtDate(item.at)}</dd></div>
-          <div><dt className="text-muted-foreground">By</dt><dd>{item.by || '—'}</dd></div>
-        </dl>
-        <p className="text-sm text-muted-foreground">
-          {item.restorable
-            ? 'Restoring switches it back on: it appears again on its own screen and can be used as before.'
-            : item.state === 'deleted'
-              ? 'Deleted on purpose, so it cannot be restored. Create a new one if it is needed again.'
-              : 'This kind of item cannot be switched back on from here yet.'}
-        </p>
-        <div className="flex flex-wrap gap-2">
+    <DetailPanel
+      open
+      onClose={onClose}
+      eyebrow={`${item.kindLabel}${item.detail ? ` · ${item.detail}` : ''}`}
+      title={item.name}
+      badges={<StateBadge state={item.state} />}
+      actions={item.restorable || href ? (
+        <>
           {item.restorable ? (
             <Button type="button" disabled={busy} onClick={onRestore}>
               <RotateCcw /> {busy ? 'Restoring…' : 'Restore'}
@@ -111,9 +86,21 @@ function ItemDetail({ item, busy, onRestore, onClose }) {
           {href ? (
             <Link to={href} className={buttonVariants({ variant: 'outline' })}><ExternalLink /> Open on its screen</Link>
           ) : null}
-        </div>
-      </CardContent>
-    </Card>
+        </>
+      ) : null}
+    >
+      <dl className="grid gap-4 text-sm sm:grid-cols-2">
+        <div><dt className="text-muted-foreground">When</dt><dd>{fmtDate(item.at)}</dd></div>
+        <div><dt className="text-muted-foreground">By</dt><dd>{item.by || '—'}</dd></div>
+      </dl>
+      <p className="text-sm text-muted-foreground">
+        {item.restorable
+          ? 'Restoring switches it back on: it appears again on its own screen and can be used as before.'
+          : item.state === 'deleted'
+            ? 'Deleted on purpose, so it cannot be restored. Create a new one if it is needed again.'
+            : 'This kind of item cannot be switched back on from here yet.'}
+      </p>
+    </DetailPanel>
   );
 }
 
@@ -121,14 +108,13 @@ export default function AdminArchivePage() {
   const [items, setItems] = useState([]);
   const [search, setSearch] = useState('');
   const [kind, setKind] = useState(null);
-  const [state, setState] = useState(null);
+  const [tab, setTab] = useState('all');
   const [selected, setSelected] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
 
-  const [detailRef, focusDetail] = useDetailFocus();
   const view = useTableView('admin-archive', COLUMNS);
 
   const load = useCallback(async () => {
@@ -154,16 +140,17 @@ export default function AdminArchivePage() {
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return view.sortRows(items.filter((x) => (!kind || x.kind === kind) && (!state || x.state === state)
+    const current = VIEWS.find((v) => v.id === tab) ?? VIEWS[0];
+    return view.sortRows(items.filter((x) => (!kind || x.kind === kind) && current.test(x)
       && (!q || `${x.name} ${x.detail ?? ''}`.toLowerCase().includes(q))));
-  }, [items, kind, state, search, view]);
+  }, [items, kind, tab, search, view]);
 
-  const counts = useMemo(() => ({
-    deactivated: items.filter((x) => x.state === 'deactivated').length,
-    deleted: items.filter((x) => x.state === 'deleted').length,
-  }), [items]);
+  const counts = useMemo(
+    () => Object.fromEntries(VIEWS.map((v) => [v.id, items.filter(v.test).length])),
+    [items],
+  );
 
-  const open = (item) => { setSelected(item); setNotice(null); focusDetail(); };
+  const open = (item) => { setSelected(item); setNotice(null); };
 
   const restore = async () => {
     const fn = RESTORE[selected?.kind];
@@ -178,55 +165,78 @@ export default function AdminArchivePage() {
   };
 
   return (
-    <ManagerLayout>
-      <main className="mx-auto w-full max-w-5xl px-4 py-6">
-        <h1 className="text-2xl font-medium">Archive</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Everything switched off or deleted across the system.
-          {items.length ? ` ${counts.deactivated} deactivated, ${counts.deleted} deleted.` : ''}
-        </p>
+    <PageShell>
+      <PageHeader
+        title="Archive"
+        description="Everything switched off or deleted across the system, and a way back for what can be restored."
+      />
 
-        {error ? <div className="mt-4"><ErrorBanner message={error} onRetry={load} /></div> : null}
-        {notice ? <p role="status" className="mt-4 text-sm font-medium">{notice}</p> : null}
+      <ErrorBanner className="mt-4" message={error} onRetry={load} />
+      {notice ? <p role="status" className="mt-4 rounded-lg border bg-good-soft px-4 py-3 text-sm text-good">{notice}</p> : null}
 
-        <div className="mt-6 space-y-6">
-          <div className="flex flex-wrap items-center gap-3">
-            <InputGroup className="min-w-56 flex-1">
-              <InputGroupAddon align="inline-start"><Search /></InputGroupAddon>
-              <InputGroupInput placeholder="Search by name" value={search} onChange={(e) => setSearch(e.target.value)} />
-            </InputGroup>
-            <FilterPills label="Filter by status" value={state} onChange={setState} options={STATE_FILTERS} />
-            <ColumnToggle idPrefix="admin-archive" columns={view.availableColumns} hidden={view.hidden}
-              onToggle={view.toggleColumn} onReset={view.resetColumns} />
-          </div>
-          {kindOptions.length > 1 ? (
-            <FilterPills label="Filter by type" value={kind} onChange={setKind} options={kindOptions} />
-          ) : null}
+      <ViewTabs
+        className="mt-5"
+        label="Archive views"
+        value={tab}
+        onChange={setTab}
+        tabs={VIEWS.map((v) => ({ id: v.id, label: v.label, count: isLoading ? null : counts[v.id] }))}
+      />
 
-          <div ref={detailRef} tabIndex={-1} className="scroll-mt-6 outline-none">
-            {selected ? <ItemDetail item={selected} busy={busy} onRestore={restore} onClose={() => setSelected(null)} /> : null}
-          </div>
-
+      <div className="mt-6">
+        <ListCard
+          header={
+            <ListToolbar
+              search={{ value: search, onChange: setSearch, placeholder: 'Search by name' }}
+              // Only the kinds present, one at a time.
+              filters={kindOptions.length > 1 ? kindOptions.map((o) => ({
+                key: o.value, label: o.label, active: kind === o.value,
+                onToggle: () => setKind((cur) => (cur === o.value ? null : o.value)),
+              })) : []}
+              onClearAll={() => { setKind(null); setSearch(''); }}
+              columns={{
+                idPrefix: 'admin-archive',
+                columns: view.availableColumns,
+                hidden: view.hidden,
+                onToggle: view.toggleColumn,
+                onReset: view.resetColumns,
+              }}
+            />
+          }
+        >
           {isLoading ? (
-            <div className="space-y-3"><Skeleton className="h-24 w-full" /><Skeleton className="h-24 w-full" /></div>
+            <div className="space-y-2 p-4" aria-busy="true">
+              {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+            </div>
           ) : visible.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{items.length ? 'Nothing matches.' : 'Nothing has been deactivated or deleted.'}</p>
+            <EmptyState
+              icon={Archive}
+              title={items.length ? 'Nothing matches' : 'Nothing archived'}
+              description={items.length ? 'Nothing in this view matches the search or type.' : 'Nothing has been deactivated or deleted.'}
+              action={search || kind ? { label: 'Clear all filters', onClick: () => { setKind(null); setSearch(''); } } : undefined}
+            />
           ) : (
-            <Card>
-              <CardContent className="p-0">
-                <MasterDataTable
-                  columns={view.visibleColumns}
-                  rows={visible}
-                  rowKey={(x) => `${x.kind}-${x.id}`}
-                  sort={view.sort}
-                  onToggleSort={view.toggleSort}
-                  onOpenRow={open}
-                />
-              </CardContent>
-            </Card>
+            <MasterDataTable
+              columns={view.visibleColumns}
+              rows={visible}
+              rowKey={(x) => `${x.kind}-${x.id}`}
+              sort={view.sort}
+              onToggleSort={view.toggleSort}
+              onOpenRow={open}
+              noun="items"
+            />
           )}
-        </div>
-      </main>
-    </ManagerLayout>
+        </ListCard>
+      </div>
+
+      {selected ? (
+        <ItemDetail
+          key={`${selected.kind}-${selected.id}`}
+          item={selected}
+          busy={busy}
+          onRestore={restore}
+          onClose={() => setSelected(null)}
+        />
+      ) : null}
+    </PageShell>
   );
 }
