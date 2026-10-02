@@ -45,7 +45,7 @@ import ProductManagementPage                       from '../pages/ProductManagem
 import VolunteerEventsPage                         from '../pages/VolunteerEventsPage';
 import VolunteerEventWorkspacePage                 from '../pages/VolunteerEventWorkspacePage';
 import CommunityRequestsPage                       from '../pages/CommunityRequestsPage';
-import GmailSettingsPage                           from '../pages/GmailSettingsPage';
+import SettingsPage                                from '../pages/SettingsPage';
 import FinanceWarehouseReportPage                  from '../pages/FinanceWarehouseReportPage';
 import PublicFinanceReportPage                     from '../pages/PublicFinanceReportPage';
 import Section18AFormPage                          from '../pages/Section18AFormPage';
@@ -113,7 +113,8 @@ export const PAGES = {
   messageHistory:   <MessageHistoryPage />,
   donationManagement: <DonationManagementPage />,
   section18a:       <Section18AManagementPage />,
-  emailIntegration: <GmailSettingsPage />,
+  emailIntegration: <SettingsPage defaultSection="email" />,
+  settings:         <SettingsPage />,
   financeReport:    <FinanceWarehouseReportPage />,
 
   guestHome:        <GuestHomePage />,

@@ -95,8 +95,9 @@ describe('sidebars built from the table', () => {
       ['Donations', [
         'Classification Queue /admin/donation-management',
         'Section 18A Management /admin/section-18a',
-        'Email Integration /admin/email-integration',
       ]],
+      // The Gmail screen is Settings' Email section now.
+      ['Setup', ['Settings /admin/settings']],
     ]);
   });
 

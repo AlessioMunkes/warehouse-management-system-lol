@@ -78,6 +78,8 @@ export const ADMIN = {
   products:  '/admin/products',
   financeReport: '/admin/finance-report',
   emailIntegration: '/admin/email-integration',
+  // Everything an admin can set up, in sections (?section=).
+  settings: '/admin/settings',
   // Who signed in at the door, and for how long.
   volunteerLog: '/admin/volunteer-log',
   // What everyone did in the system, and everything deactivated or deleted.

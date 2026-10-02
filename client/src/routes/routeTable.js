@@ -33,7 +33,7 @@ import {
   LayoutDashboard, Users2, ClipboardList, ShoppingCart, BarChart3, HeartHandshake,
   Package, Truck, Gift, HandHeart, Boxes, ReceiptText, Activity, Archive, Inbox,
   PackageOpen, PackageCheck, FlaskConical, ClipboardCheck, HandCoins, PhoneCall,
-  ScrollText, Mail, Sprout, MessageCircle,
+  ScrollText, Sprout, MessageCircle, Settings,
 } from 'lucide-react';
 import { STAFF, ADMIN, VOLUNTEERS, PACKING, DONATIONS } from './paths';
 import {
@@ -44,7 +44,7 @@ import {
 export const MENU_GROUPS = {
   worker:  ['Overview', 'Warehouse'],
   manager: ['Overview', 'Inbound', 'Stock', 'Outbound', 'Programmes', 'Insights'],
-  admin:   ['Overview', 'Master data', 'Logs', 'Donations'],
+  admin:   ['Overview', 'Master data', 'Logs', 'Donations', 'Setup'],
 };
 
 const nav = (menu, group, label, icon, count) => ({ menu, group, label, icon, ...(count ? { count } : {}) });
@@ -159,11 +159,14 @@ export const ROUTES = [
     nav: [nav('admin', 'Donations', 'Classification Queue', Gift)] },
   { id: 'section18a', path: ADMIN.section18aManagement, roles: ADMIN_ONLY, shell: true,
     nav: [nav('admin', 'Donations', 'Section 18A Management', ScrollText)] },
-  // The Gmail account donation emails are sent from.
-  { id: 'emailIntegration', path: ADMIN.emailIntegration, roles: ADMIN_ONLY, shell: true,
-    nav: [nav('admin', 'Donations', 'Email Integration', Mail)] },
+  // Settings' Email section, at the address Google's sign-in returns to
+  // and older links use. Listed in the menu as Settings.
+  { id: 'emailIntegration', path: ADMIN.emailIntegration, roles: ADMIN_ONLY, shell: true },
   // Routed, not in the menu — reached from the admin dashboard.
   { id: 'financeReport', path: ADMIN.financeReport, roles: ADMIN_ONLY, shell: true },
+
+  { id: 'settings', path: ADMIN.settings, roles: ADMIN_ONLY, shell: true,
+    nav: [nav('admin', 'Setup', 'Settings', Settings)] },
 
   // ── Guests (Love Activist volunteers) ──────────────────────
   { id: 'guestHome', path: '/guest-home', roles: GUEST_ONLY },

@@ -53,7 +53,7 @@ import ImpactStatCard from '../features/reporting/components/ImpactStatCard';
 import BeneficiaryTypeChart from '../features/reporting/components/BeneficiaryTypeChart';
 import ImpactCalculatorPDF from '../features/reporting/components/ImpactCalculatorPDF';
 import { runReport }  from '../services/reportingAPI';
-import reportingAPI   from '../services/reportingAPI';
+import ImpactFactorsForm from '../features/reporting/components/ImpactFactorsForm';
 import { RANGE_PRESETS, DEFAULT_PRESET, resolvePreset } from '../features/reporting/dateRanges';
 import { STAFF } from '../routes/paths';
 
@@ -62,8 +62,6 @@ import {
 } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -146,77 +144,23 @@ const EXTRA_METRIC_DEFS = [
   { metric: 'community_served' },
 ];
 
-// Phrased as direct questions rather than "X per kg dispatched" — the
-// underlying number is identical, but "how many meals does 1kg feed"
-// is what a manager who has never heard the word "factor" can
-// actually answer.
-const FACTOR_DEFS = [
-  { key: 'kg_to_meals',                  label: 'How many meals does 1 kg feed?' },
-  { key: 'kg_to_adults_served',          label: 'How many soup kitchen adults does 1 kg feed?' },
-  { key: 'kg_to_dignity_kitchen_served', label: 'How many dignity kitchen guests does 1 kg feed?' },
-  { key: 'kg_to_community_served',       label: 'How many people via community requests does 1 kg feed?' },
-];
-
-const AdjustFactorsDialog = () => {
-  const [open, setOpen] = useState(false);
-  const [values, setValues] = useState({});
-  const [busy, setBusy] = useState(null);
-  const [error, setError] = useState(null);
-  const [savedKey, setSavedKey] = useState(null);
-
-  const submit = async (key) => {
-    const value = values[key];
-    if (!value) return;
-    setBusy(key); setError(null); setSavedKey(null);
-    try {
-      await reportingAPI.setFactor(key, { value: Number(value) });
-      setSavedKey(key);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm">
-          <Settings2 /> Adjust estimates
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>How kilograms become people fed</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            The warehouse only ever weighs what left in kilograms — it never counts plates or
-            people directly. Every "meals," "adults" or "people served" number on this page is
-            that weight multiplied by your answer below. Change an answer and every report from
-            today onward uses it; nothing already shown on this page changes.
-          </p>
-          {FACTOR_DEFS.map((f) => (
-            <div key={f.key} className="flex items-end gap-2">
-              <div className="flex-1">
-                <Label htmlFor={`factor-${f.key}`}>{f.label}</Label>
-                <Input
-                  id={`factor-${f.key}`} type="number" min="0" step="0.01"
-                  value={values[f.key] ?? ''}
-                  onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
-                />
-              </div>
-              <Button type="button" size="sm" disabled={busy === f.key} onClick={() => submit(f.key)}>
-                {busy === f.key ? 'Saving…' : savedKey === f.key ? 'Saved' : 'Save'}
-              </Button>
-            </div>
-          ))}
-          {error && <p className="text-sm text-[#ef3a40]">{error}</p>}
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-};
+// The factor questions live in ImpactFactorsForm, shared with admin
+// Settings → Reporting.
+const AdjustFactorsDialog = () => (
+  <Dialog>
+    <DialogTrigger asChild>
+      <Button type="button" variant="outline" size="sm">
+        <Settings2 /> Adjust estimates
+      </Button>
+    </DialogTrigger>
+    <DialogContent>
+      <DialogHeader>
+        <DialogTitle>How kilograms become people fed</DialogTitle>
+      </DialogHeader>
+      <ImpactFactorsForm />
+    </DialogContent>
+  </Dialog>
+);
 
 // A dimension picks what a chart is FOR, not just how it's grouped —
 // "no breakdown" is a single figure (NumberView), a time dimension is
