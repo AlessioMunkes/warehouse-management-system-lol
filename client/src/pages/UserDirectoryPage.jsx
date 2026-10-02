@@ -83,6 +83,12 @@ const COLUMNS = [
     cell: (u) => u.username },
   // Sort by the label the user reads ("Worker"), not the raw enum
   // ("warehouse_worker") — otherwise the on-screen order looks wrong.
+  // Optional on an account (only invite-accept or an admin edit sets
+  // it), so a dash stands in rather than an empty cell.
+  { key: 'email',    label: 'Email', weight: 2.6, minWidth: 'md',
+    sort: (u) => (u.email ?? '').toLowerCase(),
+    cellClass: 'truncate',
+    cell: (u) => u.email || <span className="text-muted-foreground">—</span> },
   { key: 'role',     label: 'Role', weight: 1.6, minWidth: 'md',
     sort: (u) => (ROLE_LABELS[u.role] ?? u.role ?? '').toLowerCase(),
     cell: (u) => ROLE_LABELS[u.role] ?? u.role },
@@ -125,6 +131,7 @@ const UserDetail = ({ targetUser, canManage, isSelf, onEdit, onToggleActive, onR
 
     <CardContent className="space-y-5">
       <dl className="grid gap-3 text-sm sm:grid-cols-2">
+        <div><dt className="text-muted-foreground">Email</dt><dd className="break-all">{targetUser.email || 'Not set'}</dd></div>
         <div><dt className="text-muted-foreground">Role</dt><dd>{ROLE_LABELS[targetUser.role] ?? targetUser.role}</dd></div>
         <div><dt className="text-muted-foreground">Status</dt><dd>{targetUser.isActive ? 'Active' : 'Inactive'}</dd></div>
       </dl>

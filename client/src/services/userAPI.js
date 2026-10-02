@@ -25,6 +25,7 @@ export const toUser = (row) => ({
   username:  row.username,
   firstName: row.first_name ?? "",
   lastName:  row.last_name ?? "",
+  email:     row.email ?? "",
   role:      row.role,
   isActive:  Boolean(row.is_active),
 });
