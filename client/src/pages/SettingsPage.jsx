@@ -31,6 +31,8 @@ import AppSettingsSection from '../features/settings/components/AppSettingsSecti
 import CertificateSettingsForm from '../features/settings/components/CertificateSettingsForm';
 import ImpactFactorsForm from '../features/reporting/components/ImpactFactorsForm';
 import { listSettings } from '../services/settingsAPI';
+import PageHeader, { PageShell } from '@/components/ui/page-header';
+import ErrorBanner from '@/components/ui/error-banner';
 
 const SECTIONS = [
   { id: 'email',         label: 'Email' },
@@ -76,11 +78,10 @@ export default function SettingsPage({ defaultSection = 'email' }) {
   const valueSection = VALUE_SECTIONS[section];
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-4 py-6">
-      <h1 className="text-2xl font-medium">Settings</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        How the warehouse system is set up. Changes apply to everyone.
-      </p>
+    // Narrower than the list screens: this page is forms, and a form
+    // line stretched across 6xl is hard to read.
+    <PageShell width="max-w-4xl">
+      <PageHeader title="Settings" description="How the warehouse system is set up. Changes apply to everyone." />
 
       <ViewTabs className="mt-5" label="Settings sections" value={section} onChange={changeSection} tabs={SECTIONS} />
 
@@ -89,7 +90,7 @@ export default function SettingsPage({ defaultSection = 'email' }) {
 
         {valueSection ? (
           error ? (
-            <p className="rounded-md border border-danger bg-danger-soft px-4 py-3 text-sm text-danger">{error}</p>
+            <ErrorBanner message={error} />
           ) : !settings ? (
             <Skeleton className="h-48 w-full" />
           ) : (
@@ -117,6 +118,6 @@ export default function SettingsPage({ defaultSection = 'email' }) {
 
         {section === 'certificates' ? <CertificateSettingsForm /> : null}
       </div>
-    </main>
+    </PageShell>
   );
 }
