@@ -22,3 +22,19 @@ dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 process.env.JWT_SECRET = 'test-jwt-secret-do-not-use-in-production';
 process.env.NODE_ENV = 'test';
+
+// ── Message history writes ────────────────────────────────────
+// Every email now goes through features/communications, which records
+// it in outbound_messages. A unit test that mocks a sender's own
+// repository (and so never loads config/db.js) would otherwise load it
+// through this one — and db.js connects to whatever DATABASE_URL the
+// .env above names. Stubbed here for every file; the repository's own
+// test (communications.test.js) asks for the real module.
+import { vi } from 'vitest';
+
+vi.mock('../src/features/communications/outboundMessage.repository.js', () => ({
+  default: {
+    record: vi.fn(async () => ({ id: 1 })),
+    list: vi.fn(async () => ({ rows: [], nextCursor: null })),
+  },
+}));

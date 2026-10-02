@@ -16,7 +16,8 @@
 import repo from '../repositories/purchaseOrder.repository.js';
 import { isPositiveInt, isValidDateString } from '../utils/validation.js';
 import { PO_STATUSES as PO_STATUS_LIST } from '../constants/purchaseOrderStatus.js';
-import emailProvider from '../providers/email.provider.js';
+import communications from '../features/communications/communications.service.js';
+import notices from '../features/communications/notices.js';
 // The Finance recipient managers save in the app (finance_report_email_settings).
 // Replaced financeEmailFallback.service.js, which read FINANCE_EMAIL until
 // feature/notification-fix brought this service onto staging.
@@ -252,7 +253,12 @@ const notifyFinance = async (purchaseOrder) => {
 
   let result;
   try {
-    result = await emailProvider.sendEmail({ to: recipientEmail, subject, text, html }, null);
+    result = await communications.send({
+      type: 'purchase_order_finance',
+      to: recipientEmail, subject, text, html,
+      related: { type: 'purchase_order', id: purchaseOrder.id },
+      sendAs: null,
+    });
   } catch (err) {
     await repo.recordFinanceEmailAttempt(purchaseOrder.id, {
       status: 'failed',
@@ -366,12 +372,19 @@ const setPurchaseOrderStatus = async (rawId, body = {}) => {
   if (status === 'returned' && !reason) {
     throw fail(400, 'A reason is required when marking a purchase order as returned.');
   }
+  // A follow-up is a note to whoever picks it up next; without one it
+  // says only that something is wrong.
+  if (status === 'follow_up_required' && !reason) {
+    throw fail(400, 'Say what needs following up when marking a purchase order for follow-up.');
+  }
 
   const existing = await repo.getPurchaseOrderById(Number(rawId));
   if (!existing) throw fail(404, 'Purchase order not found.');
   if (existing.status === status) return existing;
 
-  return repo.updatePurchaseOrderStatus(Number(rawId), status, reason);
+  return repo.updatePurchaseOrderStatus(Number(rawId), status, reason, {
+    beforeCommit: notices.purchaseOrderNeedsAttention,
+  });
 };
 
 // ── QuickBooks reference ─────────────────────────────────────

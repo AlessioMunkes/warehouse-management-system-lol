@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import financeRepository from '../repositories/finance.repository.js';
-import emailProvider from '../providers/email.provider.js';
+import communications from '../features/communications/communications.service.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -171,11 +171,15 @@ const sendFinanceReportLink = async ({ sentBy } = {}) => {
     'If a new link is generated later, this link may stop working.',
   ].join('\n');
 
-  const result = await emailProvider.sendEmail({
+  const result = await communications.send({
+    type: 'finance_report_link',
     to: settings.recipientEmail,
     subject,
     text,
-  }, sentBy);
+    related: { type: 'finance_report_link', id: link.link?.id ?? null },
+    sentBy,
+    sendAs: sentBy,
+  });
 
   const sent = result?.sent === true;
   const log = await financeRepository.logFinanceReportEmail({

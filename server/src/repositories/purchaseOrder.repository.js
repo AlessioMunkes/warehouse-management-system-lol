@@ -18,7 +18,6 @@
 // ─────────────────────────────────────────────────────────────
 import pool           from '../config/db.js';
 import { logAudit }   from './auditLog.repository.js';
-import { createNotification } from './notification.repository.js';
 
 // Named columns rather than SELECT *, so a column added later does not
 // silently start crossing the API.
@@ -272,12 +271,14 @@ const getPurchaseOrderById = async (id) => {
 // onto a PO that has since moved past it and read as if it still
 // applies.
 //
-// Runs in its own transaction (rather than a bare pool.query) purely
-// so the notification for 'returned'/'follow_up_required' can use
-// createNotification, which — like logAudit — requires the caller's
-// client so a notification can never survive a change that itself
-// got rolled back.
-const updatePurchaseOrderStatus = async (id, status, reason) => {
+// Runs in its own transaction (rather than a bare pool.query) so the
+// service's notification for 'returned'/'follow_up_required' — passed
+// in as beforeCommit — goes in with the status change or not at all.
+//
+// The reason is kept for both of those statuses: it is what the order
+// shows as needing attention. Every other status clears it, so a
+// reopened order does not keep an old complaint.
+const updatePurchaseOrderStatus = async (id, status, reason, { beforeCommit } = {}) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -289,19 +290,11 @@ const updatePurchaseOrderStatus = async (id, status, reason) => {
               status_changed_at = NOW()
         WHERE id = $1
         RETURNING ${PO_COLUMNS.replace(/po\./g, '')}`,
-      [id, status, status === 'returned' ? reason : null]
+      [id, status, (status === 'returned' || status === 'follow_up_required') ? reason : null]
     );
     const po = rows[0] ?? null;
 
-    if (po && (status === 'returned' || status === 'follow_up_required')) {
-      await createNotification(client, {
-        type:       'purchase_order_needs_attention',
-        title:      `Purchase order ${po.po_number} ${status === 'returned' ? 'returned' : 'needs follow-up'}`,
-        body:       reason ?? null,
-        entityType: 'purchase_order',
-        entityId:   id,
-      });
-    }
+    if (beforeCommit) await beforeCommit(client, { purchaseOrder: po, status, reason });
 
     await client.query('COMMIT');
     return po;

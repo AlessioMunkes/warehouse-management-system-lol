@@ -563,7 +563,7 @@ describe('addSecondPacker — a second packer on a pallet', () => {
 describe('releaseSlip — returning a pallet to the floor', () => {
   it('lets a manager release a claimed pallet', async () => {
     await pickingService.releaseSlip(1, MANAGER);
-    expect(repoMock.releaseSlip).toHaveBeenCalledWith({ slipId: 1, actorId: MANAGER.id });
+    expect(repoMock.releaseSlip).toHaveBeenCalledWith({ slipId: 1, actorId: MANAGER.id, beforeCommit: expect.any(Function) });
   });
 
   it('refuses a worker — releasing is a floor-management call, not a packer\'s own claim', async () => {

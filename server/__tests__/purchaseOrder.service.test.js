@@ -105,7 +105,18 @@ describe('setPurchaseOrderStatus', () => {
     await expect(
       purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status: 'returned', reason: 'Damaged in transit' })
     ).resolves.toBeTruthy();
-    expect(repoMock.updatePurchaseOrderStatus).toHaveBeenCalledWith(PO_ID, 'returned', 'Damaged in transit');
+    expect(repoMock.updatePurchaseOrderStatus).toHaveBeenCalledWith(PO_ID, 'returned', 'Damaged in transit', { beforeCommit: expect.any(Function) });
+  });
+
+  it('requires a reason for follow_up_required', async () => {
+    await expect(purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status: 'follow_up_required' }))
+      .rejects.toMatchObject({ status: 400 });
+    expect(repoMock.updatePurchaseOrderStatus).not.toHaveBeenCalled();
+  });
+
+  it('accepts follow_up_required with a reason, and passes the notice to raise', async () => {
+    await purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status: 'follow_up_required', reason: 'Late' });
+    expect(repoMock.updatePurchaseOrderStatus).toHaveBeenCalledWith(PO_ID, 'follow_up_required', 'Late', { beforeCommit: expect.any(Function) });
   });
 
   it('does not require a reason for approved', async () => {

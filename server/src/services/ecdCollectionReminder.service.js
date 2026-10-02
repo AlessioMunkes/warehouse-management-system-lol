@@ -1,5 +1,5 @@
 import reminderRepository from '../repositories/ecdCollectionReminder.repository.js';
-import emailProvider from '../providers/email.provider.js';
+import communications from '../features/communications/communications.service.js';
 
 const DEFAULT_CHANNELS = ['sms'];
 const EMAIL_CHANNEL = 'email';
@@ -182,10 +182,12 @@ const sendTomorrowCollectionReminderEmails = async ({ now = new Date() } = {}) =
     }
 
     const email = buildReminderEmail(reminder);
-    const providerResult = await emailProvider.sendEmail({
+    const providerResult = await communications.send({
+      type: 'collection_reminder',
       to,
       subject: email.subject,
       text: email.text,
+      related: { type: 'ecd_collection_reminder', id: reminder.id },
     });
 
     if (providerResult?.sent) {

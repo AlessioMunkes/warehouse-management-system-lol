@@ -16,7 +16,7 @@
 // bound to one teammate's local tunnel) — that is a routine, expected
 // outcome here, not a bug to surface as a 500.
 //
-// THREE OUTCOMES, NOT TWO. emailProvider.sendEmail returns
+// THREE OUTCOMES, NOT TWO. communications.send returns the provider's reply:
 // { sent: true, stubbed: true, ... } when EMAIL_ENABLED=false — sent
 // is true but nothing was actually transmitted anywhere. Treating
 // that as "sent" would tell an admin an email went out when it did
@@ -48,7 +48,7 @@ import crypto from 'node:crypto';
 import bcrypt from 'bcrypt';
 import inviteRepo    from '../repositories/userInvite.repository.js';
 import userRepo      from '../repositories/user.repository.js';
-import emailProvider from '../providers/email.provider.js';
+import communications from '../features/communications/communications.service.js';
 import {
   fail, clean, validUsername, validFirstName, validLastName, validRole, validPassword,
 } from '../utils/userAccountFields.js';
@@ -98,13 +98,13 @@ const composeInviteEmail = ({ email, role, inviterName }, url) => {
   };
 };
 
-// Wraps emailProvider.sendEmail and reduces its shape to exactly one
+// Wraps communications.send (email.provider underneath) and reduces its shape to exactly one
 // of 'sent' / 'stubbed' / 'failed' — see the file header for why
 // stubbed cannot be treated as sent. Never throws: any failure here
 // (a Gmail account not connected being the routine one — see file
 // header) is caught and reported as a 'failed' outcome, the same way
 // donation.service.js's sendThankYouEmail catches around its own
-// emailProvider.sendEmail call so a broken send can never fail the
+// communications.send call so a broken send can never fail the
 // request that created the record it describes.
 //
 // ALWAYS SENDS AS THE ORGANISATION ACCOUNT (userId = null to the
@@ -124,10 +124,12 @@ const sendInviteEmail = async (invite, url) => {
     const inviter = invite.invited_by ? await userRepo.getUserById(invite.invited_by) : null;
     const inviterName = inviter ? `${inviter.first_name} ${inviter.last_name}`.trim() : null;
 
-    const result = await emailProvider.sendEmail(
-      composeInviteEmail({ ...invite, inviterName }, url),
-      null
-    );
+    const result = await communications.send({
+      type: 'user_invite',
+      ...composeInviteEmail({ ...invite, inviterName }, url),
+      related: { type: 'user_invite', id: invite.id },
+      sendAs: null,
+    });
     if (result?.stubbed) {
       outcome = { status: 'stubbed', error: null };
     } else if (result?.sent) {

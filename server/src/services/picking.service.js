@@ -5,6 +5,7 @@
 // Validates data and enforces rules before touching the DB.
 // ─────────────────────────────────────────────────────────────
 import pickingRepository from '../repositories/picking.repository.js';
+import notices from '../features/communications/notices.js';
 import { isManagerUp } from '../constants/permissions.js';
 import pushService       from './push.service.js';
 
@@ -128,6 +129,7 @@ const generateSlips = async ({ dispatchDate, cohort }, user) => {
     dispatchDate,
     cohort,
     generatedBy: user.id,   // from JWT — never trusted from frontend
+    beforeCommit: notices.slipsGenerated,
   });
 
   // Buzz the floor's phones, but only for today's slips: that's all the
@@ -161,6 +163,7 @@ const createSlip = async ({ ecdId, dispatchDate, cohort, force, items }, user) =
     cohort,
     generatedBy: user.id,
     items: cleanItems,
+    beforeCommit: notices.slipCreated,
   });
 
   if (result.ecdNotFound)   fail(404, 'ECD not found, inactive, or not yet approved for dispatch.');
@@ -256,7 +259,7 @@ const addSecondPacker = async (slipId, body, user) => {
 const releaseSlip = async (slipId, user) => {
   if (!isManager(user)) fail(403, 'Only a manager can release a pallet back to the floor.');
 
-  const result = await pickingRepository.releaseSlip({ slipId, actorId: user.id });
+  const result = await pickingRepository.releaseSlip({ slipId, actorId: user.id, beforeCommit: notices.slipReleased });
 
   if (result.notFound) fail(404, 'Picking slip not found.');
   if (result.notClaimed) fail(409, 'This pallet is not currently claimed by anyone.');

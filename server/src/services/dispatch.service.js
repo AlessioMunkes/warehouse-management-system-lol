@@ -26,6 +26,7 @@
 // day, not to close the gate at 16:00.
 // ─────────────────────────────────────────────────────────────
 import dispatchRepository from '../repositories/dispatch.repository.js';
+import notices from '../features/communications/notices.js';
 import { isManagerUp } from '../constants/permissions.js';
 import { isValidDateString, isPositiveInt } from '../utils/validation.js';
 import { DISPATCH_SORTS, SORT_DIRECTIONS } from '../constants/receiptSort.js';
@@ -192,14 +193,14 @@ const getBoard = async (query, user) => {
     const isPast     = dispatchDate < today;
     const pastCutoff = currentHour() >= NON_COLLECTION_CUTOFF_HOUR;
     if (isPast || (dispatchDate === today && pastCutoff)) {
-      await dispatchRepository.sweepNonCollections({ dispatchDate, actorId: user.id });
+      await dispatchRepository.sweepNonCollections({ dispatchDate, actorId: user.id, beforeCommit: notices.nonCollectionsFlagged });
     }
   } else if (gateToday && currentHour() >= NON_COLLECTION_CUTOFF_HOUR) {
     // The gate board is the other place the sweep gets triggered from
     // (see the note above this function). Dropping the date filter
     // must not also drop that trigger, or an afternoon where nobody
     // opens the dated board leaves the day unswept.
-    await dispatchRepository.sweepNonCollections({ dispatchDate: gateToday, actorId: user.id });
+    await dispatchRepository.sweepNonCollections({ dispatchDate: gateToday, actorId: user.id, beforeCommit: notices.nonCollectionsFlagged });
   }
 
   return await dispatchRepository.getBoard({ dispatchDate, cohort, status, gateToday });
@@ -405,7 +406,7 @@ const sweep = async (body, user) => {
     fail(400, 'Dispatch date must be a real date in YYYY-MM-DD form.');
   }
 
-  return await dispatchRepository.sweepNonCollections({ dispatchDate, actorId: user.id });
+  return await dispatchRepository.sweepNonCollections({ dispatchDate, actorId: user.id, beforeCommit: notices.nonCollectionsFlagged });
 };
 
 // ── Dispatch note ─────────────────────────────────────────────

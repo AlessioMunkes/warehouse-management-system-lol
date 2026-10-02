@@ -64,6 +64,7 @@ import communityRequestRouter from './src/routes/communityRequest.routes.js';
 import gmailRouter from './src/routes/gmail.routes.js';
 import certificateSettingsRouter from './src/routes/certificateSettings.routes.js';
 import collectionKitRouter from './src/routes/collectionKit.routes.js';
+import communicationsRouter from './src/routes/communications.routes.js';
 import publicImpactRouter from './src/routes/publicImpact.routes.js';
 import publicWarehousesRouter from './src/routes/publicWarehouses.route.js';
 import publicWarehouse   from './src/middleware/publicWarehouse.middleware.js';
@@ -214,6 +215,7 @@ app.use('/api/community-requests', communityRequestRouter);
 app.use('/api/gmail', gmailRouter);
 app.use('/api/certificate-settings', certificateSettingsRouter);
 app.use('/api/collection-kits', collectionKitRouter);
+app.use('/api/communications', communicationsRouter);
 app.use('/api/public/warehouses', publicWarehousesRouter);
 app.use('/api/public',      publicImpactRouter);
 

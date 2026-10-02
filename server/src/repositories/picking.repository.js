@@ -24,7 +24,6 @@
 // ─────────────────────────────────────────────────────────────
 import pool                  from '../config/db.js';
 import { committedStockSql } from './committedStock.sql.js';
-import { createNotification } from './notification.repository.js';
 
 // ── Audit helper (used inside existing transactions) ──────────
 const logEvent = async (client, slipId, eventType, actorId, detail = null) => {
@@ -224,7 +223,10 @@ const getSlipById = async (id) => {
 // instantly with nothing packed. That is not blocked — food is never
 // blocked on a data problem — but every such slip is returned in
 // emptySlips so the manager can fix the master data before Monday.
-const generateSlips = async ({ dispatchDate, cohort, generatedBy }) => {
+// `beforeCommit(client, facts)`, when given, runs inside this
+// transaction just before COMMIT — the service's notification goes in
+// with the change or not at all (features/communications/notices.js).
+const generateSlips = async ({ dispatchDate, cohort, generatedBy, beforeCommit }) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -270,14 +272,8 @@ const generateSlips = async ({ dispatchDate, cohort, generatedBy }) => {
       }
     }
 
-    if (slips.rowCount > 0) {
-      await createNotification(client, {
-        type:  'picking_slips_generated',
-        title: `${slips.rowCount} picking slip${slips.rowCount === 1 ? '' : 's'} generated`,
-        body:  `${cohort}, ${dispatchDate}` +
-          (emptySlips.length ? `. ${emptySlips.length} with no lines to check.` : '.'),
-        entityType: 'picking_slip_run',
-      });
+    if (beforeCommit) {
+      await beforeCommit(client, { created: slips.rowCount, cohort, dispatchDate, emptySlips });
     }
 
     await client.query('COMMIT');
@@ -302,7 +298,10 @@ const generateSlips = async ({ dispatchDate, cohort, generatedBy }) => {
 // instead of taking the centre's standing order as-is. Omit it
 // entirely to keep the original "pull from the standing order"
 // behaviour generateSlips also relies on.
-const createSlip = async ({ ecdId, dispatchDate, cohort, generatedBy, items }) => {
+// `beforeCommit(client, facts)`, when given, runs inside this
+// transaction just before COMMIT — the service's notification goes in
+// with the change or not at all (features/communications/notices.js).
+const createSlip = async ({ ecdId, dispatchDate, cohort, generatedBy, items, beforeCommit }) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -360,13 +359,9 @@ const createSlip = async ({ ecdId, dispatchDate, cohort, generatedBy, items }) =
       await logEvent(client, slipId, 'no_order_lines', generatedBy, { dispatch_date: dispatchDate });
     }
 
-    await createNotification(client, {
-      type:       'picking_slip_created',
-      title:      `New picking slip created for ${ecdCheck.rows[0].name}`,
-      body:       `${dispatchDate}${itemCount === 0 ? '. No lines to check.' : '.'}`,
-      entityType: 'picking_slip',
-      entityId:   slipId,
-    });
+    if (beforeCommit) {
+      await beforeCommit(client, { slipId, ecdName: ecdCheck.rows[0].name, dispatchDate, itemCount });
+    }
 
     await client.query('COMMIT');
     return { slipId, itemCount, ecdName: ecdCheck.rows[0].name };
@@ -555,7 +550,10 @@ const addSecondPacker = async ({ slipId, packerId, actorId }) => {
 // releasing is about who holds the pallet, not what's already been
 // packed on it, so the next claimant picks up where the last one left
 // off rather than starting the checklist over.
-const releaseSlip = async ({ slipId, actorId }) => {
+// `beforeCommit(client, facts)`, when given, runs inside this
+// transaction just before COMMIT — the service's notification goes in
+// with the change or not at all (features/communications/notices.js).
+const releaseSlip = async ({ slipId, actorId, beforeCommit }) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -590,18 +588,11 @@ const releaseSlip = async ({ slipId, actorId }) => {
       released_from: slip.assigned_to,
     });
 
-    // The pallet is spare again: tell the floor, the same way a new
-    // slip is announced (it shows in the workers' bell and, for today's
-    // slips, on their phones).
+    // The centre's name, for the floor's "back on the floor" notice
+    // and the caller's push message.
     const ecd = await client.query('SELECT name FROM ecd_centres WHERE id = $1', [result.rows[0].ecd_id]);
     const ecdName = ecd.rows[0]?.name ?? 'a centre';
-    await createNotification(client, {
-      type:       'picking_slip_released',
-      title:      `Pallet for ${ecdName} is back on the floor`,
-      body:       'Anyone can claim it.',
-      entityType: 'picking_slip',
-      entityId:   slipId,
-    });
+    if (beforeCommit) await beforeCommit(client, { slipId, ecdName });
 
     await client.query('COMMIT');
     return { slip: result.rows[0], ecdName };

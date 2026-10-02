@@ -156,7 +156,7 @@ describe('getBoard — the sweep trigger', () => {
     atUtc('2026-08-19T06:00:00Z');   // 08:00 SAST
     await dispatchService.getBoard({ dispatchDate: '2026-08-18' }, MANAGER);
     expect(repoMock.sweepNonCollections).toHaveBeenCalledWith(
-      { dispatchDate: '2026-08-18', actorId: MANAGER.id }
+      { dispatchDate: '2026-08-18', actorId: MANAGER.id, beforeCommit: expect.any(Function) }
     );
   });
 
@@ -217,7 +217,7 @@ describe('getBoard — the sweep trigger', () => {
       atUtc('2026-08-19T14:00:00Z');   // 16:00 SAST
       await dispatchService.getBoard({ scope: 'gate' }, MANAGER);
       expect(repoMock.sweepNonCollections).toHaveBeenCalledWith(
-        { dispatchDate: '2026-08-19', actorId: MANAGER.id }
+        { dispatchDate: '2026-08-19', actorId: MANAGER.id, beforeCommit: expect.any(Function) }
       );
     });
 
@@ -309,7 +309,7 @@ describe('sweep', () => {
     atUtc('2026-08-19T22:30:00Z');
     await dispatchService.sweep({}, MANAGER);
     expect(repoMock.sweepNonCollections).toHaveBeenCalledWith(
-      { dispatchDate: '2026-08-20', actorId: MANAGER.id }
+      { dispatchDate: '2026-08-20', actorId: MANAGER.id, beforeCommit: expect.any(Function) }
     );
   });
 

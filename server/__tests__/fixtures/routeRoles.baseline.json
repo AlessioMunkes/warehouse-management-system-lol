@@ -22,6 +22,7 @@
   "collectionKit.routes.js POST /": "admin,manager,warehouse_worker",
   "collectionKit.routes.js GET /:id": "admin,manager,warehouse_worker",
   "collectionKit.routes.js POST /:id/records": "admin,manager,warehouse_worker",
+  "communications.routes.js GET /messages": "admin",
   "communityRequest.routes.js GET /": "admin,manager,warehouse_worker",
   "communityRequest.routes.js POST /": "admin,manager,warehouse_worker",
   "communityRequest.routes.js GET /:id": "admin,manager,warehouse_worker",
