@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ExternalLink, Mail, MessageCircle, RefreshCw, Send } from 'lucide-react';
-import ManagerLayout from '../components/layout/ManagerLayout';
+import { BellOff, ExternalLink, Mail, MessageCircle, RefreshCw, Send } from 'lucide-react';
 import collectionReminderAPI from '../services/collectionReminderAPI';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import SharedStatusBadge from '@/components/ui/status-badge';
+import PageHeader, { PageShell } from '@/components/ui/page-header';
+import ViewTabs from '@/components/ui/view-tabs';
+import ListCard from '@/components/ui/list-card';
+import ListToolbar from '@/components/ui/list-toolbar';
+import EmptyState from '@/components/ui/empty-state';
+import ErrorBanner from '@/components/ui/error-banner';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -20,21 +24,22 @@ const STATUS_LABELS = {
   cancelled: 'Cancelled',
 };
 
-const statusVariant = (status) => {
-  if (status === 'sent') return 'default';
-  if (status === 'failed') return 'destructive';
-  if (status === 'pending' || status === 'sending') return 'secondary';
-  return 'outline';
-};
-
 const StatusBadge = ({ status }) => {
   const normalized = status ? String(status).toLowerCase() : null;
   return (
-    <Badge variant={statusVariant(normalized)}>
+    <SharedStatusBadge kind="reminder" status={normalized}>
       {STATUS_LABELS[normalized] ?? 'Not queued'}
-    </Badge>
+    </SharedStatusBadge>
   );
 };
+
+// The tabs: what is left to do first. WhatsApp goes out by hand, so a
+// reminder with a number and no "sent" is still somebody's job.
+const VIEWS = [
+  { id: 'all',      label: 'All',             test: () => true },
+  { id: 'whatsapp', label: 'WhatsApp to send', alert: true, test: (r) => Boolean(r.whatsappLink) && r.whatsappStatus !== 'sent' },
+  { id: 'failed',   label: 'Email failed',    alert: true, test: (r) => r.emailStatus === 'failed' },
+];
 
 const formatDate = (value) => {
   if (!value) return 'Not scheduled';
@@ -59,6 +64,8 @@ export default function EcdCollectionRemindersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState(null);
+  const [tab, setTab] = useState('all');
+  const [search, setSearch] = useState('');
 
   const load = useCallback(async () => {
     setError(null);
@@ -75,7 +82,6 @@ export default function EcdCollectionRemindersPage() {
 
   useEffect(() => {
     let cancelled = false;
-    setIsLoading(true);
     collectionReminderAPI.getTomorrowCollectionReminders()
       .then((data) => {
         if (cancelled) return;
@@ -92,11 +98,16 @@ export default function EcdCollectionRemindersPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const summary = useMemo(() => ({
-    total: reminders.length,
-    whatsappReady: reminders.filter((r) => r.whatsappLink).length,
-    emailFailed: reminders.filter((r) => r.emailStatus === 'failed').length,
-  }), [reminders]);
+  const counts = useMemo(
+    () => Object.fromEntries(VIEWS.map((v) => [v.id, reminders.filter(v.test).length])),
+    [reminders],
+  );
+  const visible = useMemo(() => {
+    const view = VIEWS.find((v) => v.id === tab) ?? VIEWS[0];
+    const q = search.trim().toLowerCase();
+    return reminders.filter((r) => view.test(r)
+      && (!q || `${r.ecdName ?? ''} ${r.contactName ?? ''}`.toLowerCase().includes(q)));
+  }, [reminders, search, tab]);
 
   const markSent = async (reminder) => {
     setBusyId(reminder.id);
@@ -128,154 +139,146 @@ export default function EcdCollectionRemindersPage() {
   };
 
   // Reminders, fifteen to a page.
-  const reminderPage = usePaged(reminders, TABLE_PAGE_SIZE, reminders.length);
+  const reminderPage = usePaged(visible, TABLE_PAGE_SIZE, `${visible.length}|${tab}|${search}`);
   return (
-    <ManagerLayout>
-      <main className="mx-auto w-full max-w-6xl px-4 py-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-medium">ECD collection reminders</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Tomorrow's queued reminders for ECD collections.
-            </p>
-          </div>
+    <PageShell>
+      <PageHeader
+        title="Collection reminders"
+        description={collectionDate
+          ? `Reminders queued for ECDs collecting tomorrow, ${formatDate(collectionDate)}.`
+          : "Tomorrow's queued reminders for ECD collections."}
+        actions={
           <Button type="button" variant="outline" onClick={load}>
             <RefreshCw />
             Refresh
           </Button>
-        </div>
+        }
+      />
 
-        {error ? (
-          <div className="mt-4 rounded-[4px] border-2 border-brand bg-danger-soft p-4 text-sm text-ink">
-            {error}
-          </div>
-        ) : null}
+      <ErrorBanner className="mt-4" message={error} onRetry={load} />
 
-        {isLoading ? (
-          <div className="mt-6 space-y-3">
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-48 w-full" />
-          </div>
-        ) : (
-          <div className="mt-6 space-y-5">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <Card>
-                <CardHeader><CardTitle className="text-sm">Collection date</CardTitle></CardHeader>
-                <CardContent className="text-lg font-medium">{formatDate(collectionDate)}</CardContent>
-              </Card>
-              <Card>
-                <CardHeader><CardTitle className="text-sm">Queued ECDs</CardTitle></CardHeader>
-                <CardContent className="text-lg font-medium">{summary.total}</CardContent>
-              </Card>
-              <Card>
-                <CardHeader><CardTitle className="text-sm">WhatsApp ready</CardTitle></CardHeader>
-                <CardContent className="text-lg font-medium">{summary.whatsappReady}</CardContent>
-              </Card>
+      <ViewTabs
+        className="mt-5"
+        label="Reminder views"
+        value={tab}
+        onChange={setTab}
+        tabs={VIEWS.map((v) => ({ id: v.id, label: v.label, alert: v.alert, count: isLoading ? null : counts[v.id] }))}
+      />
+
+      <div className="mt-6">
+        <ListCard
+          header={
+            <div className="space-y-2">
+              <ListToolbar search={{ value: search, onChange: setSearch, placeholder: 'Search by ECD or contact' }} />
+              <p className="flex items-start gap-2 text-xs text-muted-foreground">
+                <MessageCircle aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+                Open WhatsApp uses the ECD mobile number and prefilled reminder text from WMS.
+                The message is sent manually from the WhatsApp account currently logged in on this device or browser.
+              </p>
             </div>
-
-            <Card>
-              <CardHeader className="border-b">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <MessageCircle className="size-4" />
-                  Manual WhatsApp sending
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Open WhatsApp uses the ECD mobile number and prefilled reminder text from WMS.
-                  The message is sent manually from the WhatsApp account currently logged in on this device or browser.
-                </p>
-              </CardHeader>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>ECD</TableHead>
-                      <TableHead>Contact</TableHead>
-                      <TableHead>Collection</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>WhatsApp</TableHead>
-                      <TableHead>Mobile</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {reminders.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
-                          No reminders are queued for tomorrow.
-                        </TableCell>
-                      </TableRow>
-                    ) : reminderPage.slice.map((reminder) => (
-                      <TableRow key={reminder.id}>
-                        <TableCell className="font-medium">{reminder.ecdName}</TableCell>
-                        <TableCell>{reminder.contactName || 'Not recorded'}</TableCell>
-                        <TableCell>{collectionWhen(reminder, collectionDate)}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Mail className="size-4 text-muted-foreground" />
-                            <StatusBadge status={reminder.emailStatus} />
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <MessageCircle className="size-4 text-muted-foreground" />
-                            <StatusBadge status={reminder.whatsappStatus} />
-                          </div>
-                        </TableCell>
-                        <TableCell>{reminder.mobileNumber || 'Not recorded'}</TableCell>
-                        <TableCell>
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              disabled={!reminder.whatsappLink}
-                              title={
-                                reminder.whatsappLink
-                                  ? 'Opens WhatsApp with the ECD mobile number and prefilled reminder text. Send it manually from the account logged in on this device.'
-                                  : 'No usable ECD mobile number is available.'
-                              }
-                              aria-label={`Open WhatsApp for ${reminder.ecdName}`}
-                              onClick={() => window.open(reminder.whatsappLink, '_blank', 'noopener,noreferrer')}
-                            >
-                              <ExternalLink />
-                              Open WhatsApp
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              disabled={!reminder.whatsappLink || reminder.whatsappStatus === 'sent' || busyId === reminder.id}
-                              title="After sending the WhatsApp message manually, mark it sent in WMS."
-                              aria-label={`Mark WhatsApp sent for ${reminder.ecdName}`}
-                              onClick={() => markSent(reminder)}
-                            >
-                              <Send />
-                              Mark sent
-                            </Button>
-                            {reminder.emailStatus === 'failed' && reminder.canRetryEmail ? (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                disabled={busyId === reminder.id}
-                                onClick={() => retryEmail(reminder)}
-                              >
-                                <RefreshCw />
-                                Retry email
-                              </Button>
-                            ) : null}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                <TablePager {...reminderPage} noun="reminders" />
-              </CardContent>
-            </Card>
-          </div>
-        )}
-      </main>
-    </ManagerLayout>
+          }
+          footer={!isLoading && visible.length ? <TablePager {...reminderPage} noun="reminders" alwaysShow /> : null}
+        >
+          {isLoading ? (
+            <div className="space-y-2 p-4" aria-busy="true">
+              {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+            </div>
+          ) : reminders.length === 0 ? (
+            <EmptyState
+              icon={BellOff}
+              title="No reminders queued"
+              description="No reminders are queued for tomorrow."
+            />
+          ) : visible.length === 0 ? (
+            <EmptyState
+              icon={BellOff}
+              title={search ? 'No reminders match' : 'Nothing in this view'}
+              description={search ? 'Nothing matches the search.' : 'Nothing is waiting here.'}
+              action={search ? { label: 'Clear search', onClick: () => setSearch('') } : undefined}
+            />
+          ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="pl-4 sm:pl-5">ECD</TableHead>
+                <TableHead>Contact</TableHead>
+                <TableHead>Collection</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>WhatsApp</TableHead>
+                <TableHead>Mobile</TableHead>
+                <TableHead className="pr-4 text-right sm:pr-5">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {reminderPage.slice.map((reminder) => (
+                <TableRow key={reminder.id}>
+                  <TableCell className="pl-4 font-medium sm:pl-5">{reminder.ecdName}</TableCell>
+                  <TableCell>{reminder.contactName || 'Not recorded'}</TableCell>
+                  <TableCell>{collectionWhen(reminder, collectionDate)}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Mail className="size-4 text-muted-foreground" />
+                      <StatusBadge status={reminder.emailStatus} />
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <MessageCircle className="size-4 text-muted-foreground" />
+                      <StatusBadge status={reminder.whatsappStatus} />
+                    </div>
+                  </TableCell>
+                  <TableCell>{reminder.mobileNumber || 'Not recorded'}</TableCell>
+                  <TableCell>
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={!reminder.whatsappLink}
+                        title={
+                          reminder.whatsappLink
+                            ? 'Opens WhatsApp with the ECD mobile number and prefilled reminder text. Send it manually from the account logged in on this device.'
+                            : 'No usable ECD mobile number is available.'
+                        }
+                        aria-label={`Open WhatsApp for ${reminder.ecdName}`}
+                        onClick={() => window.open(reminder.whatsappLink, '_blank', 'noopener,noreferrer')}
+                      >
+                        <ExternalLink />
+                        Open WhatsApp
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={!reminder.whatsappLink || reminder.whatsappStatus === 'sent' || busyId === reminder.id}
+                        title="After sending the WhatsApp message manually, mark it sent in WMS."
+                        aria-label={`Mark WhatsApp sent for ${reminder.ecdName}`}
+                        onClick={() => markSent(reminder)}
+                      >
+                        <Send />
+                        Mark sent
+                      </Button>
+                      {reminder.emailStatus === 'failed' && reminder.canRetryEmail ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={busyId === reminder.id}
+                          onClick={() => retryEmail(reminder)}
+                        >
+                          <RefreshCw />
+                          Retry email
+                        </Button>
+                      ) : null}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+          )}
+        </ListCard>
+      </div>
+    </PageShell>
   );
 }

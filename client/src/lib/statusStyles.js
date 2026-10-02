@@ -21,7 +21,7 @@ import {
   AlarmClock, Ban, Check, BadgeCheck, CalendarCheck, CalendarClock, CalendarX, CheckCheck, CircleDashed,
   CircleOff, CircleX, ClipboardList, DoorOpen, Clock, FileCheck, Flag, Forward, Gift, History, House, Lock,
   LogOut, Megaphone, PackageCheck, PackageOpen, PencilLine, Scale, SlidersHorizontal, Split, Trash2,
-  TriangleAlert, Truck, Undo2,
+  Send, TriangleAlert, Truck, Undo2,
 } from 'lucide-react';
 
 const s = (tone, icon, strong = false) => ({ tone, icon, strong });
@@ -108,6 +108,14 @@ export const STATUS_STYLES = {
     soon:    s('warn', Clock),                            // 15 to 30 days
     urgent:  s('bad', AlarmClock),                        // 14 days or less
     expired: s('bad', CalendarX, true),
+  },
+  // A collection reminder's email or WhatsApp leg.
+  reminder: {
+    pending:   s('neutral', Clock),
+    sending:   s('info', Send),
+    sent:      s('good', CheckCheck),
+    failed:    s('bad', CircleX, true),
+    cancelled: s('neutral', Ban),
   },
   // A visit in the door log (Volunteer log).
   visit: {
