@@ -49,7 +49,7 @@ function ChartTooltip({ active, payload, label, unit, labelFor }) {
   if (!active || !payload?.length) return null;
   const title = labelFor ? labelFor(label, payload) : formatLabel(label);
   return (
-    <div className="rounded-[4px] border-2 bg-surface px-3 py-2 text-xs shadow-sm" style={{ borderColor: LINE }}>
+    <div className="rounded-lg border bg-surface px-3 py-2 text-xs shadow-sm" style={{ borderColor: LINE }}>
       <p className="mb-1" style={{ color: MUTED }}>{title}</p>
       {payload.filter((p) => p.value !== undefined && p.value !== null).map((p) => (
         <p key={p.dataKey ?? p.name} className="flex items-center gap-2">
@@ -69,7 +69,7 @@ function ChartTooltip({ active, payload, label, unit, labelFor }) {
 
 function Segmented({ views, view, onChange }) {
   return (
-    <div role="group" aria-label="Chart type" className="inline-flex flex-wrap rounded-[4px] border-2" style={{ borderColor: LINE }}>
+    <div role="group" aria-label="Chart type" className="inline-flex flex-wrap rounded-lg border" style={{ borderColor: LINE }}>
       {views.map((v) => (
         <button
           key={v}
@@ -107,9 +107,9 @@ function TargetEditor({ target, unit, onSave, onReset, saving, error }) {
         <span style={{ color: MUTED }}>My target{unit === '%' ? ' (%)' : unit ? ` (${unitWord(unit) || unit})` : ''}</span>
         <input type="number" min="0" step="any" value={draft} autoFocus
           onChange={(e) => setDraft(e.target.value)}
-          className="w-20 rounded-[4px] border-2 bg-surface px-1.5 py-0.5" style={{ borderColor: LINE }} />
+          className="w-20 rounded-lg border bg-surface px-1.5 py-0.5" style={{ borderColor: LINE }} />
       </label>
-      <button type="submit" disabled={saving || draft === ''} className="rounded-[4px] bg-ink px-2 py-0.5 font-bold text-on-ink disabled:opacity-50">
+      <button type="submit" disabled={saving || draft === ''} className="rounded-lg bg-ink px-2 py-0.5 font-bold text-on-ink disabled:opacity-50">
         {saving ? 'Saving…' : 'Save'}
       </button>
       {target?.custom && (
@@ -152,7 +152,7 @@ function Heatmap({ rows, keys, unit, highlight, onPick }) {
                     key={r.name}
                     onClick={() => onPick(k)}
                     title={`${formatLabel(k)}, ${formatLabel(r.name)}: ${fmtValue(v, unit)}`}
-                    className="h-8 min-w-12 cursor-pointer rounded-[3px] px-1 text-center tabular-nums"
+                    className="h-8 min-w-12 cursor-pointer rounded-md px-1 text-center tabular-nums"
                     style={{
                       background: `color-mix(in srgb, var(--viz-1) ${pct}%, var(--surface))`,
                       // --surface is white in light mode (on dark blue)
@@ -493,7 +493,7 @@ export default function OperationalChart({
             <label className="inline-flex items-center gap-1">
               <span style={{ color: MUTED }}>Show</span>
               <select value={topN} onChange={(e) => setTopN(Number(e.target.value))}
-                className="rounded-[4px] border-2 bg-surface px-1.5 py-0.5" style={{ borderColor: LINE }}>
+                className="rounded-lg border bg-surface px-1.5 py-0.5" style={{ borderColor: LINE }}>
                 <option value={5}>Top 5</option>
                 <option value={10}>Top 10</option>
                 <option value={0}>All {series.length}</option>
@@ -505,7 +505,7 @@ export default function OperationalChart({
             <label className="inline-flex items-center gap-1">
               <span style={{ color: MUTED }}>Sort</span>
               <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}
-                className="rounded-[4px] border-2 bg-surface px-1.5 py-0.5" style={{ borderColor: LINE }}>
+                className="rounded-lg border bg-surface px-1.5 py-0.5" style={{ borderColor: LINE }}>
                 <option value="value">By value</option>
                 <option value="name">By name</option>
               </select>
@@ -541,7 +541,7 @@ export default function OperationalChart({
                 list="op-chart-find"
                 placeholder="Find…"
                 onChange={(e) => { const hit = series.find((r) => r.label === e.target.value); if (hit) setHighlight(hit.label); }}
-                className="w-32 rounded-[4px] border-2 bg-surface px-1.5 py-0.5" style={{ borderColor: LINE }}
+                className="w-32 rounded-lg border bg-surface px-1.5 py-0.5" style={{ borderColor: LINE }}
               />
               <datalist id="op-chart-find">
                 {series.map((r) => <option key={r.label} value={r.label} />)}
@@ -554,7 +554,7 @@ export default function OperationalChart({
       )}
 
       {highlight && !compact && !print && (
-        <p className="mb-2 inline-flex items-center gap-1 rounded-full border-2 px-2 py-0.5 text-xs font-medium" style={{ borderColor: INK }}>
+        <p className="mb-2 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium" style={{ borderColor: INK }}>
           Highlighting: {formatLabel(highlight)}
           <button type="button" aria-label="Clear highlight" onClick={() => setHighlight(highlight)}>
             <X aria-hidden="true" className="h-3 w-3" />
@@ -579,7 +579,7 @@ export default function OperationalChart({
       )}
       {!compact && isTimeView && anomalies.length > 0 && (
         <p className="mt-1 text-xs" style={{ color: MUTED }}>
-          <span aria-hidden="true" className="mr-1 inline-block h-2.5 w-2.5 rounded-full border-2 align-middle" style={{ borderColor: 'var(--rag-bad)' }} />
+          <span aria-hidden="true" className="mr-1 inline-block h-2.5 w-2.5 rounded-full border align-middle" style={{ borderColor: 'var(--rag-bad)' }} />
           Stands out from the usual level (about {fmtValue(anomalies[0].usual, unit)} {unitWord(unit)}):{' '}
           {anomalies.map((a) => `${formatLabel(a.name)} is unusually ${a.direction} at ${fmtValue(a.value, unit)}`).join('; ')}.
           Worth checking what happened.

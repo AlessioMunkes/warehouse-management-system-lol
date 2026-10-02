@@ -28,7 +28,7 @@ function Tip({ active, payload, data }) {
   if (!active || !payload?.length) return null;
   const p = payload[0].payload;
   return (
-    <div className="rounded-[4px] border-2 bg-surface px-3 py-2 text-xs" style={{ borderColor: LINE }}>
+    <div className="rounded-lg border bg-surface px-3 py-2 text-xs" style={{ borderColor: LINE }}>
       <p className="font-bold" style={{ color: INK }}>{p.label}</p>
       <p>{data.x.label}: <strong>{fmtValue(p.x, data.x.unit)}</strong> {unitWord(data.x.unit)}</p>
       <p>{data.y.label}: <strong>{fmtValue(p.y, data.y.unit)}</strong> {unitWord(data.y.unit)}</p>
@@ -62,7 +62,7 @@ export default function ComparisonChart({ data, compact = false }) {
           { key: 'label', label: 'Item' }, { key: 'x', label: data.x.label }, { key: 'y', label: data.y.label }, { key: 'detail', label: 'Detail' },
         ]))} className="underline underline-offset-2">Export CSV</button>
         {highlight && (
-          <button type="button" onClick={() => setHighlight(null)} className="rounded-full border-2 px-2 py-0.5 font-medium" style={{ borderColor: INK }}>
+          <button type="button" onClick={() => setHighlight(null)} className="rounded-full border px-2 py-0.5 font-medium" style={{ borderColor: INK }}>
             Highlighting: {highlight} ✕
           </button>
         )}

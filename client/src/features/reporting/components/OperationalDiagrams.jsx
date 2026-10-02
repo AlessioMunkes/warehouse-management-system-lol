@@ -47,7 +47,7 @@ export function Funnel({ series, funnel, unit, highlight, onPick }) {
                 style={{ opacity: dim ? 0.45 : 1 }}>
                 <span className="font-medium" style={{ color: INK, fontWeight: highlight === s.id ? 700 : 500 }}>{formatLabel(s.id)}</span>
                 <span className="flex justify-center">
-                  <span className="flex h-8 items-center justify-center rounded-[3px] text-xs font-bold tabular-nums"
+                  <span className="flex h-8 items-center justify-center rounded-md text-xs font-bold tabular-nums"
                     style={{ width: `${width}%`, background: SERIES[0], color: SURF, outline: highlight === s.id ? `2px solid ${INK}` : 'none', outlineOffset: 1 }}>
                     {s.reached}
                   </span>
@@ -90,7 +90,7 @@ export function Waterfall({ series, unit, height = 300, compact = false }) {
             const r = active && payload?.[0]?.payload;
             if (!r) return null;
             return (
-              <div className="rounded-[4px] border-2 bg-surface px-3 py-2 text-xs shadow-sm" style={{ borderColor: LINE }}>
+              <div className="rounded-lg border bg-surface px-3 py-2 text-xs shadow-sm" style={{ borderColor: LINE }}>
                 <p className="mb-1" style={{ color: MUTED }}>{r.name}</p>
                 <p className="font-bold" style={{ color: INK }}>
                   {r.kind === 'total' ? '' : r.signed >= 0 ? '+' : '−'}{fmtValue(r.value, unit)} {unitWord(unit)}
@@ -147,7 +147,7 @@ export function Flow({ series, unit, height = 320 }) {
             if (!p) return null;
             const label = p.source && p.target ? `${p.source.name} → ${p.target.name}` : p.name;
             return (
-              <div className="rounded-[4px] border-2 bg-surface px-3 py-2 text-xs shadow-sm" style={{ borderColor: LINE }}>
+              <div className="rounded-lg border bg-surface px-3 py-2 text-xs shadow-sm" style={{ borderColor: LINE }}>
                 <p style={{ color: MUTED }}>{label}</p>
                 <p className="font-bold" style={{ color: INK }}>{fmtValue(p.value, unit)} {unitWord(unit)}</p>
               </div>
