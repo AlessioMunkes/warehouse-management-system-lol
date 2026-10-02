@@ -48,6 +48,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PageHeader, { PageShell } from '@/components/ui/page-header';
+import ErrorBanner from '@/components/ui/error-banner';
 import ReportChart    from '../features/reporting/components/ReportChart';
 import ImpactStatCard from '../features/reporting/components/ImpactStatCard';
 import BeneficiaryTypeChart from '../features/reporting/components/BeneficiaryTypeChart';
@@ -263,7 +264,7 @@ const ImpactPanel = ({
             "Adjust factors" above to set one.
           </p>
         ) : error ? (
-          <p className="rounded-[4px] border-2 border-brand bg-danger-soft p-3 text-sm">{error}</p>
+          <ErrorBanner message={error} />
         ) : report ? (
           <>
             <p className="mb-3 text-sm text-muted-foreground">{report.description}</p>
