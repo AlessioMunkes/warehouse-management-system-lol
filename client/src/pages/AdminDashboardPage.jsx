@@ -17,7 +17,8 @@
 // donationManagementAPI.getAttentionCounts().
 // ─────────────────────────────────────────────────────────────
 import { useState } from 'react';
-import DashboardGreeting from '../features/dashboard/components/DashboardGreeting';
+import PageHeader, { PageShell } from '@/components/ui/page-header';
+import { timeGreeting } from '../features/dashboard/timeGreeting';
 import CustomisableDashboard from '../features/dashboard/components/CustomisableDashboard';
 import { useAuth } from '@/context/AuthContext';
 
@@ -43,9 +44,13 @@ export default function AdminDashboardPage() {
     : null;
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
-      <DashboardGreeting name={user?.firstName} summaryLine={summaryLine} />
+    <PageShell>
+      <PageHeader
+        className="mb-6"
+        title={`${timeGreeting()}${user?.firstName ? `, ${user.firstName}` : ''}`}
+        description={summaryLine ? `Today: ${summaryLine}.` : 'What would you like to work on today?'}
+      />
       <CustomisableDashboard user={user} always={ALWAYS} onData={setData} />
-    </div>
+    </PageShell>
   );
 }

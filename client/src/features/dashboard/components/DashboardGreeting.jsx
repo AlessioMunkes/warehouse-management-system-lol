@@ -16,12 +16,9 @@
 // among others) is — a name and a time of day is the one line this
 // screen exists to say, not a caption under something else.
 // ─────────────────────────────────────────────────────────────
-const timeGreeting = () => {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  return 'Good evening';
-};
+// The staff floor's dashboard. Manager and admin dashboards open with
+// the ordinary PageHeader instead, so they match the screens around them.
+import { timeGreeting } from '../timeGreeting';
 
 export default function DashboardGreeting({ name }) {
   return (
