@@ -51,6 +51,9 @@ import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
 // A number column is centred, header and all, so the label sits over
 // its values.
 const isCentre = (col) => /(^|\s)text-center(\s|$)/.test(col.cellClass ?? '');
+// Numbers read down a column right-aligned; the header follows its
+// cells so the label sits over the figures it names.
+const isRight = (col) => /(^|\s)text-right(\s|$)/.test(col.cellClass ?? '');
 
 export default function MasterDataTable({
   columns,        // the VISIBLE columns, from useTableView
@@ -93,7 +96,7 @@ export default function MasterDataTable({
             // A right-aligned column (a number) gets a right-aligned
             // header, so the label sits over its values rather than
             // off to their left.
-            <TableHead key={col.key} className={`align-bottom ${isCentre(col) ? 'text-center' : ''}`}>
+            <TableHead key={col.key} className={`align-bottom ${isCentre(col) ? 'text-center' : isRight(col) ? 'text-right' : ''}`}>
               {col.sort ? (
                 // stopPropagation: without it, sorting by SKU also
                 // opened whichever row happened to be underneath the
@@ -102,7 +105,7 @@ export default function MasterDataTable({
                   type="button"
                   onClick={(e) => { e.stopPropagation(); onToggleSort(col.key); }}
                   aria-label={`Sort by ${col.label}`}
-                  className={`flex w-full min-w-0 items-center gap-1 hover:text-foreground ${isCentre(col) ? 'justify-center text-center' : 'text-left'}`}
+                  className={`flex w-full min-w-0 items-center gap-1 hover:text-foreground ${isCentre(col) ? 'justify-center text-center' : isRight(col) ? 'flex-row-reverse text-right' : 'text-left'}`}
                 >
                   {/* Headers truncate; they never wrap and never break
                       mid-word. Letting break-words loose on them turned

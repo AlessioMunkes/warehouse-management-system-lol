@@ -66,13 +66,16 @@ export const PO_COLUMNS = [
     sort: (po) => (po.expectedDeliveryDate ? new Date(po.expectedDeliveryDate).getTime() : null),
     cell: (po) => fmtDate(po.expectedDeliveryDate) },
 
-  { key: 'lines', label: 'Lines', weight: 1.3, minWidth: 'lg', numeric: true,
-    sort: (po) => Number(po.lineCount ?? 0),
-    cellClass: 'text-center',
-    cell: (po) => po.lineCount },
+  // How far the order has got: lines whose full quantity has arrived,
+  // out of all its lines. Sorted by the share, so a half-received order
+  // sits between an untouched one and a finished one.
+  { key: 'received', label: 'Received', weight: 1.8, minWidth: 'md', numeric: true,
+    sort: (po) => (po.lineCount ? po.receivedLineCount / po.lineCount : 0),
+    cellClass: 'text-right tabular-nums',
+    cell: (po) => `${po.receivedLineCount} of ${po.lineCount}` },
 
   { key: 'estimated', label: 'Estimated', weight: 2.4, minWidth: 'lg', numeric: true,
     sort: (po) => Number(po.estimatedValue ?? 0),
-    cellClass: 'text-center',
+    cellClass: 'text-right tabular-nums',
     cell: (po) => money(po.estimatedValue) },
 ];
