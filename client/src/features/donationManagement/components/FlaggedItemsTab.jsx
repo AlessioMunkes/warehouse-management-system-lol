@@ -34,6 +34,7 @@ import { ProductMatchCombobox } from '@/features/donation/components/ProductMatc
 import useFlaggedItems from '../hooks/useFlaggedItems';
 import { fmtQty } from '@/lib/quantity';
 import { isUnresolvedFlag } from '../flagStatus';
+import ErrorBanner from '@/components/ui/error-banner';
 
 const formatCategoryLabel = (category = '') =>
   category.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -377,21 +378,6 @@ const LegacyFlagRow = ({ flag, busy, onResolve }) => {
     </Card>
   );
 };
-const ErrorBanner = ({ message, onRetry }) => (
-  <div className="flex flex-col items-start justify-between gap-3 rounded-[4px] border-2 border-brand bg-danger-soft p-4 text-sm text-ink shadow-sm sm:flex-row sm:items-center">
-    <span>{message}</span>
-    {onRetry ? (
-      <button
-        type="button"
-        onClick={onRetry}
-        className="text-xs font-semibold text-brand underline hover:text-ink focus:outline-none sm:text-sm"
-      >
-        Try again
-      </button>
-    ) : null}
-  </div>
-);
-
 export default function FlaggedItemsTab() {
   const [donorSearch, setDonorSearch] = useState('');
   const [dateFrom, setDateFrom] = useState('');

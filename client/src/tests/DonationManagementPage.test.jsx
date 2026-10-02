@@ -34,9 +34,9 @@ describe('DonationManagementPage', () => {
     render(<DonationManagementPage />);
 
     expect(screen.getByText('Classification Queue')).toBeInTheDocument();
-    expect(screen.getByText('Pending Product Review', { selector: 'button' })).toBeInTheDocument();
-    expect(screen.getByText('Reconciliation', { selector: 'button' })).toBeInTheDocument();
-    expect(screen.getByText('Processing Failed', { selector: 'button' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Pending Product Review/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Reconciliation/ })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Processing Failed/ })).toBeInTheDocument();
     expect(screen.getByText('Pending Product Review Tab')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole('tab', { name: /Pending Product Review 2/ })).toBeInTheDocument());
   });

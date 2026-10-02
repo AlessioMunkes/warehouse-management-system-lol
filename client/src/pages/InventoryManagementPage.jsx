@@ -26,20 +26,12 @@ import { VIEWS, countViews, viewById } from "../features/InventoryManagement/inv
 import { getManifest, adjustStock } from "../services/stockAPI";
 import { STAFF } from "../routes/paths";
 import { useToast } from "@/components/ui/toastContext";
+import ErrorBanner from "@/components/ui/error-banner";
 
 // Manual adjustment rewrites the ledger; raising an order commits
 // money. Both are manager and admin, matching the server's routes.
 const CAN_ADJUST = ["manager", "admin"];
 const CAN_ORDER  = ["manager", "admin"];
-
-const ErrorBanner = ({ message, onRetry }) => (
-  <div className="p-4 rounded-[4px] bg-danger-soft border-2 border-brand text-ink text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-    <span>{message}</span>
-    <button onClick={onRetry} className="text-xs sm:text-sm font-semibold underline hover:text-brand focus:outline-none">
-      Try again
-    </button>
-  </div>
-);
 
 export default function InventoryManagementPage() {
   const { user } = useAuth();
