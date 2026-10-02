@@ -95,6 +95,14 @@ export const SidebarNav = ({ sections, pathname, homeTo, collapsed = false, onNa
   // how to read them (navSections.js `count`).
   const { user } = useAuth();
   const attention = useAttention(user?.role === 'manager');
+  // The item the page sits under: its own path, or the longest one the
+  // path starts with, so an event's workspace (/volunteers/events/…)
+  // still marks Volunteer Events, and /admin/users does not also mark
+  // the /admin dashboard.
+  const activeTo = sections
+    .flatMap((section) => section.items.map((item) => item.to))
+    .filter((to) => pathname === to || pathname?.startsWith(`${to}/`))
+    .sort((x, y) => y.length - x.length)[0];
   const body = (
     <>
       <Link
@@ -133,7 +141,7 @@ export const SidebarNav = ({ sections, pathname, homeTo, collapsed = false, onNa
                   key={item.to}
                   {...item}
                   count={attention && item.count ? item.count(attention) : 0}
-                  active={pathname === item.to}
+                  active={item.to === activeTo}
                   collapsed={collapsed}
                   onNavigate={onNavigate}
                 />

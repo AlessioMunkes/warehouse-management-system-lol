@@ -13,15 +13,21 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { CalendarDays, CheckCircle2, Pencil, Plus, XCircle } from 'lucide-react';
 import EventFormDialog from '../features/volunteerManagement/components/EventFormDialog';
 import volunteerManagementAPI from '../services/volunteerManagementAPI';
 import { VOLUNTEERS } from '../routes/paths';
 import StatusBadge from '@/components/ui/status-badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button, buttonVariants } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import PageHeader, { PageShell } from '@/components/ui/page-header';
+import ViewTabs from '@/components/ui/view-tabs';
+import ListCard from '@/components/ui/list-card';
+import ListToolbar from '@/components/ui/list-toolbar';
+import EmptyState from '@/components/ui/empty-state';
+import ErrorBanner from '@/components/ui/error-banner';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -45,13 +51,6 @@ const displayDate = (value) => {
   return new Intl.DateTimeFormat('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }).format(date);
 };
 
-const ErrorBanner = ({ message, onRetry }) => (
-  <div role="alert" className="p-4 rounded-[4px] bg-danger-soft border-2 border-brand text-ink text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-    <span>{message}</span>
-    {onRetry && <Button type="button" variant="outline" onClick={onRetry}>Try again</Button>}
-  </div>
-);
-
 const eventDateValue = (event) => String(event.eventDate ?? '').slice(0, 10);
 
 // Status sorts by where an event is in its life, not alphabetically.
@@ -69,15 +68,23 @@ const eventSearchText = (event) => [
   event.description,
 ].join(' ').toLowerCase();
 
-const matchesStatus = (event, statusFilter) => {
-  if (statusFilter === 'open') return openStatuses.has(event.status);
-  if (statusFilter === 'cancelled') return event.status === 'CANCELLED';
-  if (statusFilter === 'completed') return event.status === 'COMPLETED';
-  return true;
-};
+// The tabs. `id` is what goes in ?status=; All is the default and
+// leaves the URL bare.
+const VIEWS = [
+  { id: 'all',       label: 'All',       test: () => true },
+  { id: 'open',      label: 'Open',      test: (e) => openStatuses.has(e.status) },
+  { id: 'completed', label: 'Completed', test: (e) => e.status === 'COMPLETED' },
+  { id: 'cancelled', label: 'Cancelled', test: (e) => e.status === 'CANCELLED' },
+];
+const viewById = (id) => VIEWS.find((v) => v.id === id) ?? VIEWS[0];
+
+const shortDate = (value) => new Intl.DateTimeFormat('en-ZA', { day: 'numeric', month: 'short' })
+  .format(new Date(`${value}T00:00:00`));
 
 export default function VolunteerEventsPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const view = viewById(searchParams.get('status'));
   const [events, setEvents] = useState([]);
   const [isLoading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -98,24 +105,33 @@ export default function VolunteerEventsPage() {
   // same setting as the Sort dropdown; Event and Status come from
   // clicking their column names.
   const [sortKey, setSortKey] = useState('date');
-  const [statusFilter, setStatusFilter] = useState('all');
+
+  // Search and dates narrow every tab; the tab counts follow them.
+  const narrowedEvents = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return events.filter((event) => {
+      const date = eventDateValue(event);
+      if (query && !eventSearchText(event).includes(query)) return false;
+      if (fromDate && (!date || date < fromDate)) return false;
+      if (toDate && (!date || date > toDate)) return false;
+      return true;
+    });
+  }, [events, fromDate, search, toDate]);
+
+  const counts = useMemo(
+    () => Object.fromEntries(VIEWS.map((v) => [v.id, narrowedEvents.filter(v.test).length])),
+    [narrowedEvents],
+  );
 
   const visibleEvents = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return [...events]
-      .filter((event) => {
-        const date = eventDateValue(event);
-        if (query && !eventSearchText(event).includes(query)) return false;
-        if (fromDate && (!date || date < fromDate)) return false;
-        if (toDate && (!date || date > toDate)) return false;
-        return matchesStatus(event, statusFilter);
-      })
+    return narrowedEvents
+      .filter(view.test)
       .sort((a, b) => {
         const by = EVENT_SORT[sortKey] ?? EVENT_SORT.date;
         const c = compareValues(by(a), by(b));
         return sortDirection === 'asc' ? c : -c;
       });
-  }, [events, fromDate, search, sortDirection, sortKey, statusFilter, toDate]);
+  }, [narrowedEvents, sortDirection, sortKey, view]);
 
   // Click a column name: sort by it, again to flip the order, a third
   // time to go back to how the page opened (earliest date first).
@@ -128,17 +144,26 @@ export default function VolunteerEventsPage() {
   const tableSort = { key: sortKey, dir: sortDirection };
 
   // Events, fifteen to a page.
-  const eventPage = usePaged(visibleEvents, TABLE_PAGE_SIZE, `${visibleEvents.length}|${sortKey}|${sortDirection}|${search}|${statusFilter}`);
-  const filtersActive = Boolean(search || fromDate || toDate || statusFilter !== 'all' || sortDirection !== 'asc' || sortKey !== 'date');
+  const eventPage = usePaged(visibleEvents, TABLE_PAGE_SIZE, `${visibleEvents.length}|${sortKey}|${sortDirection}|${search}|${view.id}`);
+  const narrowed = Boolean(search || fromDate || toDate);
 
   const clearFilters = () => {
     setSearch('');
     setFromDate('');
     setToDate('');
-    setSortDirection('asc');
-    setSortKey('date');
-    setStatusFilter('all');
   };
+
+  const changeView = (id) => setSearchParams(id === 'all' ? {} : { status: id }, { replace: true });
+
+  // The date range as chips beside the search, removable one at a time.
+  const dateChips = [
+    fromDate ? { key: 'from', label: `From ${shortDate(fromDate)}`, onRemove: () => setFromDate('') } : null,
+    toDate ? { key: 'to', label: `To ${shortDate(toDate)}`, onRemove: () => setToDate('') } : null,
+  ].filter(Boolean);
+
+  const sortNote = sortKey === 'date'
+    ? `Sorted by date, ${sortDirection === 'asc' ? 'earliest' : 'latest'} first`
+    : `Sorted by ${sortKey === 'name' ? 'event' : 'status'}${sortDirection === 'desc' ? ', reversed' : ''}`;
 
   // Shared reload path used after mutations and by the visible retry action.
   const loadEvents = useCallback(async () => {
@@ -229,121 +254,105 @@ export default function VolunteerEventsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-surface text-ink font-['Montserrat',sans-serif]">
-      <main className="px-4 sm:px-6 py-6 max-w-6xl mx-auto">
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl font-black tracking-tight">Volunteer Management</h1>
-            <p className="text-sm text-muted-foreground mt-1">Create and manage volunteer events.</p>
-          </div>
-          <Button type="button" onClick={openCreate}><Plus /> Create event</Button>
-        </div>
+    <PageShell>
+      <PageHeader
+        title="Volunteer events"
+        description="Plan events, open one to manage its timeslots and sign-ups, and close it off when it is done."
+        actions={<Button type="button" onClick={openCreate}><Plus /> Create event</Button>}
+      />
 
-        {loadError && <div className="mb-4"><ErrorBanner message={loadError} onRetry={loadEvents} /></div>}
-        {actionError && <div className="mb-4"><ErrorBanner message={actionError} /></div>}
+      <ErrorBanner className="mt-4" message={loadError} onRetry={loadEvents} />
+      <ErrorBanner className="mt-4" message={actionError} />
 
-        {/* Event list states share one card to avoid layout shifts while loading. */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Volunteer events</CardTitle>
-            <CardDescription>Open an event to manage its workspace.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div role="status" aria-label="Loading volunteer events" className="grid gap-3">
-                {[1, 2, 3].map((row) => <Skeleton key={row} className="h-12 w-full" />)}
-              </div>
-            ) : events.length === 0 && !loadError ? (
-              <div className="py-12 text-center">
-                <CalendarDays className="mx-auto mb-3 h-9 w-9 text-muted-foreground" aria-hidden="true" />
-                <p className="font-semibold">No volunteer events yet</p>
-                <p className="text-sm text-muted-foreground mt-1 mb-4">Create the first event to get started.</p>
-                <Button type="button" onClick={openCreate}><Plus /> Create event</Button>
-              </div>
-            ) : !loadError ? (
-              <div className="grid gap-4">
-                <div className="grid gap-3 rounded-md border bg-muted/20 p-4 md:grid-cols-2 lg:grid-cols-6">
-                  <div className="grid gap-2 lg:col-span-2">
-                    <label htmlFor="event-search" className="text-sm font-medium">Search events</label>
-                    <input id="event-search" className="h-9 rounded-md border bg-background px-3 text-sm" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Name, venue, address or description" />
-                  </div>
-                  <div className="grid gap-2">
-                    <label htmlFor="event-from-date" className="text-sm font-medium">From date</label>
-                    <input id="event-from-date" className="h-9 rounded-md border bg-background px-3 text-sm" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-                  </div>
-                  <div className="grid gap-2">
-                    <label htmlFor="event-to-date" className="text-sm font-medium">To date</label>
-                    <input id="event-to-date" className="h-9 rounded-md border bg-background px-3 text-sm" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
-                  </div>
-                  <div className="grid gap-2">
-                    <label htmlFor="event-status-filter" className="text-sm font-medium">Status</label>
-                    <select id="event-status-filter" className="h-9 rounded-md border bg-background px-3 text-sm" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                      <option value="all">All Events</option>
-                      <option value="open">Open Events</option>
-                      <option value="cancelled">Cancelled</option>
-                      <option value="completed">Completed</option>
-                    </select>
-                  </div>
-                  <div className="grid gap-2">
-                    <label htmlFor="event-sort" className="text-sm font-medium">Sort</label>
-                    <select id="event-sort" className="h-9 rounded-md border bg-background px-3 text-sm" value={sortKey === 'date' ? sortDirection : 'column'} onChange={(e) => { setSortKey('date'); setSortDirection(e.target.value); }}>
-                      {sortKey !== 'date' && <option value="column" disabled>By {sortKey === 'name' ? 'event' : 'status'} ({sortDirection === 'asc' ? 'A to Z' : 'Z to A'})</option>}
-                      <option value="asc">Earliest to Latest</option>
-                      <option value="desc">Latest to Earliest</option>
-                    </select>
-                  </div>
-                  <div className="flex items-end lg:col-span-6">
-                    <Button type="button" variant="outline" onClick={clearFilters} disabled={!filtersActive}>Clear Filters</Button>
-                  </div>
-                </div>
-                {visibleEvents.length === 0 ? (
-                  <div className="py-12 text-center">
-                    <CalendarDays className="mx-auto mb-3 h-9 w-9 text-muted-foreground" aria-hidden="true" />
-                    <p className="font-semibold">No events match your filters</p>
-                    <p className="text-sm text-muted-foreground mt-1 mb-4">Adjust your search, dates or status to see more events.</p>
-                    <Button type="button" variant="outline" onClick={clearFilters}>Clear Filters</Button>
-                  </div>
-                ) : (
-              <div className="overflow-x-auto rounded-md border">
-                <Table>
-                  <TableHeader><TableRow>
-                    <SortableHead label="Event" sortKey="name" sort={tableSort} onSort={toggleSort} /><SortableHead label="Date" sortKey="date" sort={tableSort} onSort={toggleSort} /><SortableHead label="Status" sortKey="status" sort={tableSort} onSort={toggleSort} /><TableHead className="text-right">Actions</TableHead>
-                  </TableRow></TableHeader>
-                  <TableBody>
-                    {eventPage.slice.map((event) => {
-                      const terminal = terminalStatuses.has(event.status);
-                      return (
-                        <TableRow key={event.id}>
-                          <TableCell>
-                            <button type="button" className="text-left font-semibold hover:underline" onClick={() => navigate(VOLUNTEERS.event(event.id))}>
-                              {event.name}
-                            </button>
-                            {event.description && <p className="max-w-md truncate text-xs text-muted-foreground mt-1">{event.description}</p>}
-                            {event.venueName && <p className="text-xs text-muted-foreground mt-1">{event.venueName}{event.address ? ` (${event.address})` : ''}</p>}
-                          </TableCell>
-                          <TableCell>{displayDate(event.eventDate)}</TableCell>
-                          <TableCell><StatusBadge kind="volunteerEvent" status={event.status}>{event.statusLabel}</StatusBadge></TableCell>
-                          <TableCell>
-                            <div className="flex justify-end gap-2">
-                              <Button asChild size="sm" variant="outline"><Link to={VOLUNTEERS.event(event.id)}>Open</Link></Button>
-                              {!terminal && <Button type="button" size="sm" variant="ghost" aria-label={`Edit ${event.name}`} onClick={() => openEdit(event)}><Pencil /> Edit</Button>}
-                              {!terminal && <Button type="button" size="icon-sm" variant="ghost" aria-label={`Complete ${event.name}`} onClick={() => setPendingAction({ type: 'complete', event })}><CheckCircle2 /></Button>}
-                              {!terminal && <Button type="button" size="icon-sm" variant="ghost" aria-label={`Cancel ${event.name}`} onClick={() => setPendingAction({ type: 'cancel', event })}><XCircle /></Button>}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-                <TablePager {...eventPage} noun="events" />
-              </div>
-                )}
-              </div>
-            ) : null}
-          </CardContent>
-        </Card>
-      </main>
+      <ViewTabs
+        className="mt-5"
+        label="Event views"
+        value={view.id}
+        onChange={changeView}
+        tabs={VIEWS.map((v) => ({ id: v.id, label: v.label, count: isLoading ? null : counts[v.id] }))}
+      />
+
+      <div className="mt-6">
+        <ListCard
+          header={
+            <ListToolbar
+              search={{ value: search, onChange: setSearch, placeholder: 'Search events' }}
+              chips={dateChips}
+              onClearAll={clearFilters}
+              note={sortNote}
+            >
+              <Input
+                type="date" aria-label="From date" title="From date" className="h-8 w-auto"
+                value={fromDate} onChange={(e) => setFromDate(e.target.value)}
+              />
+              <span className="text-sm text-muted-foreground">to</span>
+              <Input
+                type="date" aria-label="To date" title="To date" className="h-8 w-auto"
+                value={toDate} onChange={(e) => setToDate(e.target.value)}
+              />
+            </ListToolbar>
+          }
+          footer={!isLoading && visibleEvents.length ? <TablePager {...eventPage} noun="events" alwaysShow /> : null}
+        >
+          {isLoading ? (
+            <div role="status" aria-label="Loading volunteer events" className="space-y-2 p-4">
+              {[1, 2, 3, 4].map((row) => <Skeleton key={row} className="h-10 w-full" />)}
+            </div>
+          ) : loadError ? null : events.length === 0 ? (
+            <EmptyState
+              icon={CalendarDays}
+              title="No volunteer events yet"
+              description="Create the first event to get started."
+              action={{ label: 'Create event', onClick: openCreate }}
+            />
+          ) : visibleEvents.length === 0 ? (
+            <EmptyState
+              icon={CalendarDays}
+              title={narrowed ? 'No events match your filters' : 'Nothing in this view'}
+              description={narrowed ? 'Adjust the search or dates to see more events.' : 'No event is in this state right now.'}
+              action={narrowed ? { label: 'Clear all filters', onClick: clearFilters } : undefined}
+            />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <SortableHead label="Event" sortKey="name" sort={tableSort} onSort={toggleSort} />
+                  <SortableHead label="Date" sortKey="date" sort={tableSort} onSort={toggleSort} />
+                  <SortableHead label="Status" sortKey="status" sort={tableSort} onSort={toggleSort} />
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {eventPage.slice.map((event) => {
+                  const terminal = terminalStatuses.has(event.status);
+                  return (
+                    <TableRow key={event.id}>
+                      <TableCell className="max-w-md whitespace-normal">
+                        <button type="button" className="text-left font-medium hover:underline" onClick={() => navigate(VOLUNTEERS.event(event.id))}>
+                          {event.name}
+                        </button>
+                        {event.venueName && (
+                          <p className="text-xs text-muted-foreground">{event.venueName}{event.address ? ` (${event.address})` : ''}</p>
+                        )}
+                      </TableCell>
+                      <TableCell className="tabular-nums">{displayDate(event.eventDate)}</TableCell>
+                      <TableCell><StatusBadge kind="volunteerEvent" status={event.status}>{event.statusLabel}</StatusBadge></TableCell>
+                      <TableCell>
+                        <div className="flex justify-end gap-1">
+                          <Link to={VOLUNTEERS.event(event.id)} className={buttonVariants({ variant: 'outline', size: 'sm' })}>Open</Link>
+                          {!terminal && <Button type="button" size="icon-sm" variant="ghost" aria-label={`Edit ${event.name}`} title="Edit" onClick={() => openEdit(event)}><Pencil /></Button>}
+                          {!terminal && <Button type="button" size="icon-sm" variant="ghost" aria-label={`Complete ${event.name}`} title="Mark completed" onClick={() => setPendingAction({ type: 'complete', event })}><CheckCircle2 /></Button>}
+                          {!terminal && <Button type="button" size="icon-sm" variant="ghost" aria-label={`Cancel ${event.name}`} title="Cancel event" onClick={() => setPendingAction({ type: 'cancel', event })}><XCircle /></Button>}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </ListCard>
+      </div>
 
       {formOpen && (
         <EventFormDialog
@@ -380,6 +389,6 @@ export default function VolunteerEventsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageShell>
   );
 }
