@@ -60,11 +60,11 @@ export const slipReleased = async (client, { slipId, ecdName }) => {
 // dispatch.repository.js sweepNonCollections — BR-14: "the system
 // must ... notify the Warehouse Manager." One summary per sweep, not
 // one per pallet, matching slipsGenerated.
-export const nonCollectionsFlagged = async (client, { flagged, dispatchDate }) => {
+export const nonCollectionsFlagged = async (client, { flagged, dispatchDate, cutoffHour = 15 }) => {
   if (flagged <= 0) return;
   await createNotification(client, {
     type:  'non_collections_flagged',
-    title: `${plural(flagged, 'pallet')} not collected by 15:00`,
+    title: `${plural(flagged, 'pallet')} not collected by ${String(cutoffHour).padStart(2, '0')}:00`,
     body:  `Flagged automatically for ${dispatchDate}.`,
     entityType: 'dispatch_sweep',
   });

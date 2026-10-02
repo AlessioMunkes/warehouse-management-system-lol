@@ -192,6 +192,8 @@
   "reporting.routes.js GET /factors/:factorKey/history": "admin,manager",
   "session.route.js GET /warehouses": "no role check",
   "session.route.js GET /": "no role check",
+  "settings.routes.js GET /": "admin",
+  "settings.routes.js PATCH /": "admin",
   "slip.routes.js GET /available": "guest",
   "slip.routes.js POST /claim/:id": "guest",
   "slip.routes.js GET /mine": "guest",

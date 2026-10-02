@@ -26,6 +26,7 @@
 // day, not to close the gate at 16:00.
 // ─────────────────────────────────────────────────────────────
 import dispatchRepository from '../repositories/dispatch.repository.js';
+import settings from '../features/settings/settings.service.js';
 import notices from '../features/communications/notices.js';
 import { isManagerUp } from '../constants/permissions.js';
 import { isValidDateString, isPositiveInt } from '../utils/validation.js';
@@ -43,7 +44,15 @@ const STATUSES = ['awaiting', 'collected', 'late_collected', 'not_collected', 'c
 // the gate. Moved to 15:00 to match. (This same feedback is also the
 // confirming evidence for the Tuesday/Thursday weekly cohort model —
 // see picking.service.js's scheduledCohortFor.)
+//
+// This is the DEFAULT. Admins can move it in Settings
+// (dispatch.nonCollectionCutoffHour); cutoffHour() reads the current
+// value, falling back to this.
 export const NON_COLLECTION_CUTOFF_HOUR = 15;
+const cutoffHour = () => settings.get('dispatch.nonCollectionCutoffHour');
+// The sweep's notice, naming the hour the pallets missed.
+const flagNonCollections = (cutoff) => (client, facts) =>
+  notices.nonCollectionsFlagged(client, { ...facts, cutoffHour: cutoff });
 
 // Signatures arrive as base64 PNG data URLs from a canvas, the same
 // way delivery notes already store them. A signature from a phone
@@ -140,14 +149,14 @@ export const pgDateToString = (value) => {
 // can never disagree about whether a pallet needs an override. The
 // screen renders these as warnings; collect() below reads the same
 // object to decide what it insists on.
-export const evaluateEligibility = (gateView) => {
+export const evaluateEligibility = (gateView, cutoff = NON_COLLECTION_CUTOFF_HOUR) => {
   const dispatchDay = pgDateToString(gateView.dispatch_date);
 
   return {
     ecdInactive:      gateView.ecd_is_active === false || gateView.ecd_approved_at === null,
     slipNotPacked:    !['complete', 'dispatched'].includes(gateView.slip_status),
     wrongDay:         dispatchDay !== null && dispatchDay !== todayString(),
-    afterCutoff:      currentHour() >= NON_COLLECTION_CUTOFF_HOUR,
+    afterCutoff:      currentHour() >= cutoff,
     writtenOff:       gateView.dispatch_status === 'not_collected',
     alreadyDispatched: ['collected', 'late_collected'].includes(gateView.dispatch_status),
     hasFlaggedLines:  (gateView.items || []).some((i) => i.status === 'flagged'),
@@ -167,6 +176,7 @@ export const evaluateEligibility = (gateView) => {
 // past-or-present date. sweepNonCollections is idempotent, so the two
 // triggers cannot conflict.
 const getBoard = async (query, user) => {
+  const cutoff = await cutoffHour();
   const { dispatchDate, cohort, status, scope } = query;
 
   if (cohort && !COHORTS.includes(cohort))   fail(400, 'Cohort must be tuesday or thursday.');
@@ -191,16 +201,16 @@ const getBoard = async (query, user) => {
   if (dispatchDate) {
     const today      = todayString();
     const isPast     = dispatchDate < today;
-    const pastCutoff = currentHour() >= NON_COLLECTION_CUTOFF_HOUR;
+    const pastCutoff = currentHour() >= cutoff;
     if (isPast || (dispatchDate === today && pastCutoff)) {
-      await dispatchRepository.sweepNonCollections({ dispatchDate, actorId: user.id, beforeCommit: notices.nonCollectionsFlagged });
+      await dispatchRepository.sweepNonCollections({ dispatchDate, actorId: user.id, beforeCommit: flagNonCollections(cutoff) });
     }
-  } else if (gateToday && currentHour() >= NON_COLLECTION_CUTOFF_HOUR) {
+  } else if (gateToday && currentHour() >= cutoff) {
     // The gate board is the other place the sweep gets triggered from
     // (see the note above this function). Dropping the date filter
     // must not also drop that trigger, or an afternoon where nobody
     // opens the dated board leaves the day unswept.
-    await dispatchRepository.sweepNonCollections({ dispatchDate: gateToday, actorId: user.id, beforeCommit: notices.nonCollectionsFlagged });
+    await dispatchRepository.sweepNonCollections({ dispatchDate: gateToday, actorId: user.id, beforeCommit: flagNonCollections(cutoff) });
   }
 
   return await dispatchRepository.getBoard({ dispatchDate, cohort, status, gateToday });
@@ -222,7 +232,7 @@ const getGateView = async (slipId) => {
   const gateView = await dispatchRepository.getGateView(slipId);
   if (!gateView) fail(404, 'Picking slip not found.');
 
-  return { ...gateView, eligibility: evaluateEligibility(gateView) };
+  return { ...gateView, eligibility: evaluateEligibility(gateView, await cutoffHour()) };
 };
 
 // ── Validate the collection payload ───────────────────────────
@@ -287,7 +297,7 @@ const collect = async (slipId, body, user) => {
   const gateView = await dispatchRepository.getGateView(slipId);
   if (!gateView) fail(404, 'Picking slip not found.');
 
-  const eligibility = evaluateEligibility(gateView);
+  const eligibility = evaluateEligibility(gateView, await cutoffHour());
 
   // The one hard block.
   if (eligibility.ecdInactive) {
@@ -406,7 +416,8 @@ const sweep = async (body, user) => {
     fail(400, 'Dispatch date must be a real date in YYYY-MM-DD form.');
   }
 
-  return await dispatchRepository.sweepNonCollections({ dispatchDate, actorId: user.id, beforeCommit: notices.nonCollectionsFlagged });
+  const cutoff = await cutoffHour();
+  return await dispatchRepository.sweepNonCollections({ dispatchDate, actorId: user.id, beforeCommit: flagNonCollections(cutoff) });
 };
 
 // ── Dispatch note ─────────────────────────────────────────────

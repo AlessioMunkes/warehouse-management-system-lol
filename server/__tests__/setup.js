@@ -38,3 +38,16 @@ vi.mock('../src/features/communications/outboundMessage.repository.js', () => ({
     list: vi.fn(async () => ({ rows: [], nextCursor: null })),
   },
 }));
+
+// ── Admin settings ────────────────────────────────────────────
+// The schedulers and services that used to read constants now read
+// features/settings, which opens config/db.js. Stubbed to the
+// defaults — the old constants — for every file, so a test that mocks
+// a service's own repository still never reaches a real database.
+// settings.test.js asks for the real module.
+vi.mock('../src/features/settings/settings.service.js', async () => {
+  const { defaults } = await import('../src/features/settings/settingsDefinitions.js');
+  const get = vi.fn(async (key) => defaults()[key]);
+  const getAll = vi.fn(async () => defaults());
+  return { get, getAll, list: vi.fn(), update: vi.fn(), default: { get, getAll, list: vi.fn(), update: vi.fn() } };
+});
