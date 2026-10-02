@@ -46,5 +46,7 @@ router.get('/trends', auth, requireRole(...ALL_ROLES), stockController.getStockT
 
 // ── Single product ────────────────────────────────────────────
 router.get('/:id/history', auth, requireRole(...ALL_ROLES), validateIntId, stockController.getMovements);
+// Gated like history: the same product's receiving record, read-only.
+router.get('/:id/batches', auth, requireRole(...ALL_ROLES), validateIntId, stockController.getExpiryBatches);
 
 export default router;

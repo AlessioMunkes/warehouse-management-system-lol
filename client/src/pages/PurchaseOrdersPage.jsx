@@ -42,7 +42,7 @@ import { Plus }     from 'lucide-react';
 
 import useTableView from '../features/masterdata/hooks/useTableView';
 import useDetailFocus from '../features/masterdata/hooks/useDetailFocus';
-import ColumnToggle  from '../features/masterdata/components/ColumnToggle';
+import ColumnToggle  from '@/components/ui/column-toggle';
 import { PO_COLUMNS } from '../features/purchaseOrders/components/poColumns';
 
 const CAN_MANAGE = ['manager', 'admin'];
@@ -72,7 +72,7 @@ const ErrorBanner = ({ message, onRetry }) => (
 export default function PurchaseOrdersPage() {
   const { user } = useAuth();
   const canManage = CAN_MANAGE.includes(user?.role);
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [tab, setTab]           = useState('open');
   const [statusFilter, setStatusFilter] = useState('');
@@ -158,6 +158,29 @@ export default function PurchaseOrdersPage() {
     if (!id || String(selected?.id ?? '') === id) return;
     open(id);
   }, [open, searchParams, selected?.id]);
+
+  // ?products=1,2,3 — sent by the inventory screen's bulk "Raise
+  // purchase order". Opens a new order with a line per product, once
+  // the manifest has loaded (the lines need its reorder levels and
+  // costs). The parameter is then dropped, so a refresh or a later
+  // Cancel does not reopen the same draft.
+  const [seedProducts, setSeedProducts] = useState([]);
+  const [seededFrom, setSeededFrom] = useState(null);
+  const productsParam = searchParams.get('products');
+  if (productsParam && productsParam !== seededFrom && canManage && products.length) {
+    const ids = new Set(productsParam.split(',').map(Number).filter(Number.isInteger));
+    setSeededFrom(productsParam);
+    setSeedProducts(products.filter((p) => ids.has(p.id)));
+    setMode('create');
+    setSelected(null);
+    setFormError(null);
+  }
+  useEffect(() => {
+    if (!seededFrom || searchParams.get('products') !== seededFrom) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('products');
+    setSearchParams?.(next, { replace: true });
+  }, [seededFrom, searchParams, setSearchParams]);
 
   const create = async (payload) => {
     setBusy(true); setFormError(null); setInvalidProductIds([]);
@@ -251,7 +274,7 @@ export default function PurchaseOrdersPage() {
           {canManage && mode !== 'create' && mode !== 'edit' ? (
             <Button
               type="button"
-              onClick={() => { setMode('create'); setSelected(null); setFormError(null); focusDetail(); }}
+              onClick={() => { setMode('create'); setSeedProducts([]); setSelected(null); setFormError(null); focusDetail(); }}
             >
               <Plus /> New purchase order
             </Button>
@@ -272,10 +295,12 @@ export default function PurchaseOrdersPage() {
               error={formError}
               invalidProductIds={invalidProductIds}
               initialValue={mode === 'edit' ? selected : null}
+              initialProducts={mode === 'create' ? seedProducts : []}
               submitLabel={mode === 'edit' ? 'Save changes' : undefined}
               onSubmit={mode === 'edit' ? update : create}
               onCancel={() => {
                 setMode(mode === 'edit' ? 'detail' : 'list');
+                setSeedProducts([]);
                 setFormError(null);
                 setInvalidProductIds([]);
               }}

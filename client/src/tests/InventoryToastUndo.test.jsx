@@ -18,7 +18,7 @@ vi.mock('../services/stockAPI', () => ({
   getManifest:    vi.fn(),
   getMovements:   vi.fn(),
   adjustStock:    vi.fn(),
-  getStockTrends: vi.fn(),
+  getBatches:     vi.fn(),
 }));
 
 vi.mock('../context/AuthContext', () => ({
@@ -31,7 +31,7 @@ vi.mock('react-router-dom', () => ({
   useSearchParams: () => [new URLSearchParams(), vi.fn()],
 }));
 
-const { getManifest, getMovements, adjustStock, getStockTrends } = await import('../services/stockAPI');
+const { getManifest, getMovements, adjustStock, getBatches } = await import('../services/stockAPI');
 const { ToastProvider } = await import('../components/ui/toast');
 const { useToast } = await import('../components/ui/toastContext');
 const { default: InventoryManagementPage } = await import('../pages/InventoryManagementPage');
@@ -45,16 +45,19 @@ const MAIZE = {
 const renderPage = () =>
   render(<ToastProvider><InventoryManagementPage /></ToastProvider>);
 
+// Adjust lives in the product's detail panel: name -> panel -> Adjust.
 async function openAdjustModal(user) {
-  await user.click(await screen.findByRole('button', { name: /Adjust/ }));
-  return within(await screen.findByRole('dialog'));
+  await user.click(await screen.findByRole('button', { name: 'Maize Meal' }));
+  const panel = within(await screen.findByRole('dialog'));
+  await user.click(panel.getByRole('button', { name: /Adjust stock/ }));
+  return within(await screen.findByRole('dialog', { name: /Adjust stock · Maize Meal/ }));
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   getManifest.mockResolvedValue([MAIZE]);
   getMovements.mockResolvedValue([]);
-  getStockTrends.mockResolvedValue({ 3: [60, 58, 55] });
+  getBatches.mockResolvedValue([]);
   adjustStock.mockResolvedValue({ before: 60, after: 48, isShortfall: false });
 });
 
@@ -109,17 +112,6 @@ describe('toast primitive', () => {
 
 // ── The page ───────────────────────────────────────────
 describe('inventory adjustments — toast and undo', () => {
-  it('loads the 30 day sparkline series alongside the manifest', async () => {
-    renderPage();
-    await waitFor(() => expect(getStockTrends).toHaveBeenCalledWith(30));
-  });
-
-  it('still renders the manifest when the trend fetch fails', async () => {
-    getStockTrends.mockRejectedValue(new Error('trends unavailable'));
-    renderPage();
-    expect(await screen.findAllByText('Maize Meal')).not.toHaveLength(0);
-  });
-
   it('offers Undo after a successful adjustment', async () => {
     const user = userEvent.setup();
     renderPage();

@@ -218,6 +218,22 @@ const manualAdjust = async ({ productId, quantityDelta, unit, reason, performedB
 //
 // All three come back as NUMERIC, which node-postgres returns as
 // STRINGS — see the Number() casts in client/src/services/stockAPI.js.
+//
+// TWO DATES FOR THE INVENTORY TABS
+//   last_movement_at — the newest stock_movements row. Not
+//                      stock_levels.updated_at, which setStockMeta also
+//                      bumps when someone edits a reorder threshold, so a
+//                      product nobody has touched in months would read as
+//                      "moved today".
+//   earliest_expiry  — the soonest expiry_date still today or later, off
+//                      delivery_note_items. That column is the only place
+//                      an expiry is recorded (PO receiving, migration 018;
+//                      donations record none), and it is per receipt line,
+//                      not per unit left on the shelf — see the note at the
+//                      top of expiryWarning.repository.js. Past dates are
+//                      left out: a delivery used up months ago would
+//                      otherwise read "Expired" for ever.
+// Both are grouped once and joined, not correlated per product row.
 const getManifest = async () => {
   const result = await pool.query(
     `SELECT
@@ -234,12 +250,63 @@ const getManifest = async () => {
        (COALESCE(sl.quantity_on_hand, 0) - COALESCE(c.committed, 0))
          <= COALESCE(sl.reorder_threshold, 0)
          AS is_low_stock,
-       sl.updated_at
+       sl.updated_at,
+       lm.last_movement_at,
+       ex.earliest_expiry
      FROM products p
      LEFT JOIN stock_levels sl ON sl.product_id = p.id
      LEFT JOIN (${committedStockSql()}) c ON c.product_id = p.id
+     LEFT JOIN (
+       SELECT product_id, MAX(created_at) AS last_movement_at
+       FROM stock_movements
+       GROUP BY product_id
+     ) lm ON lm.product_id = p.id
+     LEFT JOIN (
+       SELECT product_id, MIN(expiry_date) AS earliest_expiry
+       FROM delivery_note_items
+       WHERE expiry_date >= (now() AT TIME ZONE 'Africa/Johannesburg')::date
+       GROUP BY product_id
+     ) ex ON ex.product_id = p.id
      WHERE p.is_active = true
      ORDER BY p.name ASC`
+  );
+  return result.rows;
+};
+
+// ── Expiry by receipt line, for one product's detail panel ─────
+// The closest thing to batches the schema has: every receiving line
+// for this product that recorded an expiry date, soonest first.
+//
+// RECEIVED, NOT REMAINING. received_quantity is what came in on that
+// delivery; stock_levels holds one balance per product, so how much of
+// a given line is still on the shelf is not known (database.md, "per-
+// batch stock — still open"). The panel labels it that way.
+//
+// Lines that expired more than EXPIRED_GRACE_DAYS ago are dropped for
+// the same reason getManifest drops past dates: after a month the
+// stock is almost certainly gone, and listing it is noise. Inside the
+// window they stay, because "this expired last week" is exactly what
+// a manager checking the shelf needs to see.
+const EXPIRED_GRACE_DAYS = 30;
+
+const getExpiryBatches = async (productId) => {
+  const result = await pool.query(
+    `SELECT dni.id,
+            dni.expiry_date,
+            dni.received_quantity::numeric AS received_quantity,
+            dni.unit,
+            dn.delivery_date               AS received_on,
+            s.name                         AS supplier_name,
+            (dni.expiry_date - (now() AT TIME ZONE 'Africa/Johannesburg')::date)::int AS days_left
+     FROM delivery_note_items dni
+     JOIN delivery_notes dn ON dn.id = dni.delivery_note_id
+     LEFT JOIN suppliers s  ON s.id  = dn.supplier_id
+     WHERE dni.product_id = $1
+       AND dni.expiry_date IS NOT NULL
+       AND dni.received_quantity > 0
+       AND dni.expiry_date >= (now() AT TIME ZONE 'Africa/Johannesburg')::date - $2::int
+     ORDER BY dni.expiry_date ASC, dni.id ASC`,
+    [productId, EXPIRED_GRACE_DAYS],
   );
   return result.rows;
 };
@@ -570,4 +637,4 @@ const getStockTrends = async ({ days = 30 } = {}) => {
 export default {
   getStockTrends,
   getLedger, getLedgerSummary, getReconciliation, getLedgerActors,
-  adjustStock, manualAdjust, getManifest, getMovements, setStockMeta };
+  adjustStock, manualAdjust, getManifest, getMovements, getExpiryBatches, setStockMeta };

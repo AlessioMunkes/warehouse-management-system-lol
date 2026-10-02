@@ -18,9 +18,10 @@
 // share all three.
 // ─────────────────────────────────────────────────────────────
 import {
-  Ban, BadgeCheck, CalendarClock, CheckCheck, CircleDashed, CircleX, ClipboardList, Clock,
-  FileCheck, Flag, Forward, Gift, History, House, Lock, Megaphone, PackageCheck, PackageOpen,
-  PencilLine, Scale, SlidersHorizontal, Split, Trash2, TriangleAlert, Truck, Undo2,
+  Ban, BadgeCheck, CalendarCheck, CalendarClock, CalendarX, CheckCheck, CircleCheck, CircleDashed,
+  CircleX, ClipboardList, Clock, FileCheck, Flag, Forward, Gift, History, Hourglass, House, Lock,
+  Megaphone, PackageCheck, PackageOpen, PencilLine, Scale, SlidersHorizontal, Split, Trash2,
+  TrendingDown, TriangleAlert, Truck, Undo2,
 } from 'lucide-react';
 
 const s = (tone, icon, strong = false) => ({ tone, icon, strong });
@@ -74,6 +75,18 @@ export const STATUS_STYLES = {
     partially_fulfilled: s('good', CircleDashed),
     referred:            s('info', Forward),
     declined:            s('bad', CircleX, true),
+  },
+  // Derived from AVAILABLE server-side (stock.repository.js getManifest).
+  inventory: {
+    in_stock:  s('good', CircleCheck),
+    low_stock: s('warn', TrendingDown),
+    shortfall: s('bad', CircleX, true),
+  },
+  // A receipt line's expiry date, against today.
+  expiry: {
+    ok:      s('neutral', CalendarCheck),
+    soon:    s('warn', Hourglass),                        // within 30 days
+    expired: s('bad', CalendarX, true),
   },
 };
 

@@ -36,7 +36,7 @@ import useTableView    from '../features/masterdata/hooks/useTableView';
 import useDetailFocus  from '../features/masterdata/hooks/useDetailFocus';
 import useOpenFromQuery from '../features/masterdata/hooks/useOpenFromQuery';
 import MasterDataTable from '../features/masterdata/components/MasterDataTable';
-import ColumnToggle    from '../features/masterdata/components/ColumnToggle';
+import ColumnToggle    from '@/components/ui/column-toggle';
 import FilterPills     from '../features/masterdata/components/FilterPills';
 import {
   BENEFICIARY_COLUMNS, COHORT_FILTERS, COHORT_LABELS,

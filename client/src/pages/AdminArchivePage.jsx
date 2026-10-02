@@ -18,7 +18,7 @@ import { setBeneficiaryStatus } from '../services/beneficiaryAPI';
 import useDetailFocus  from '../features/masterdata/hooks/useDetailFocus';
 import useTableView    from '../features/masterdata/hooks/useTableView';
 import MasterDataTable from '../features/masterdata/components/MasterDataTable';
-import ColumnToggle    from '../features/masterdata/components/ColumnToggle';
+import ColumnToggle    from '@/components/ui/column-toggle';
 import FilterPills     from '../features/masterdata/components/FilterPills';
 import {
   InputGroup, InputGroupAddon, InputGroupInput,

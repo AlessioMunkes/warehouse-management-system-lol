@@ -152,9 +152,29 @@ const getStockTrends = async (req, res) => {
   }
 };
 
+// ── Expiry by receipt line for one product ───────────────────────
+// GET /api/stock/:id/batches
+// Returns: delivery lines for that product that recorded an expiry,
+// soonest first. Received quantity, not what remains — see
+// stock.repository.js getExpiryBatches.
+const getExpiryBatches = async (req, res) => {
+  try {
+    const batches = await stockService.getExpiryBatches(req.params.id);
+    res.status(200).json({ success: true, data: batches });
+  } catch (err) {
+    console.error('[getExpiryBatches]', err.message);
+    const status = err.status || 500;
+    res.status(status).json({
+      success: false,
+      message: status < 500 ? err.message : 'Failed to retrieve expiry dates for this product.',
+    });
+  }
+};
+
 export default {
   getManifest,
   getMovements,
+  getExpiryBatches,
   adjustManually,
   getStockTrends,
   getLedger,

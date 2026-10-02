@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// client/src/features/masterdata/components/ColumnToggle.jsx
+// client/src/components/ui/column-toggle.jsx
 //
 // "Columns" — collapse the ones you never look at.
 //

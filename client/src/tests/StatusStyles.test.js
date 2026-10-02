@@ -41,6 +41,8 @@ describe('status styles', () => {
     ['delivery', Object.keys(DELIVERY_STATUS_LABEL)],
     ['dispatch', Object.keys(DISPATCH_STATUS_LABEL)],
     ['ledger', LEDGER_TYPES],
+    ['inventory', ['in_stock', 'low_stock', 'shortfall']],
+    ['expiry', ['ok', 'soon', 'expired']],
   ])('styles every %s status the app can show', (kind, statuses) => {
     for (const status of statuses) expect(STATUS_STYLES[kind][status], `${kind}.${status}`).toBeTruthy();
   });
