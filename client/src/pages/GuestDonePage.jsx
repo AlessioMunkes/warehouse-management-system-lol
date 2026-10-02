@@ -67,11 +67,11 @@ const GuestDonePage = () => {
           title={`Thank you, ${name}`}
           lede="Your pallet is finished and on its way."
         >
-          <Button onClick={signOut} disabled={busy}>
-            {busy ? 'Signing you out…' : 'Sign out'}
-          </Button>
-          <Button variant="ghost" onClick={() => navigate('/guest-home')}>
+          <Button onClick={() => navigate('/guest-home')} disabled={busy}>
             Pack another pallet
+          </Button>
+          <Button variant="secondary" onClick={signOut} disabled={busy}>
+            {busy ? 'Signing you out…' : 'Sign out'}
           </Button>
           <HelpNote>Anything you want to tell a staff member before you go?</HelpNote>
         </GuestScreen>
@@ -144,11 +144,13 @@ const GuestDonePage = () => {
           </p>
         </div>
 
-        <Button onClick={signOut} disabled={busy}>
-          {busy ? 'Signing you out…' : 'Sign out — I’m finished'}
-        </Button>
-        <Button variant="secondary" onClick={() => navigate('/guest-home')} disabled={busy}>
+        {/* Keep them going: another pallet is the primary action, and
+            sign-out stays clearly visible as the outlined one. */}
+        <Button onClick={() => navigate('/guest-home')} disabled={busy}>
           Pack another pallet
+        </Button>
+        <Button variant="secondary" onClick={signOut} disabled={busy}>
+          {busy ? 'Signing you out…' : 'Sign out — I’m finished'}
         </Button>
 
         <HelpNote>Anything you want to tell a staff member before you go?</HelpNote>
