@@ -112,6 +112,19 @@ describe('createRequest', () => {
       .rejects.toMatchObject({ status: 400 });
   });
 
+  it('rejects a requested-at more than 5 minutes in the future', async () => {
+    const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    await expect(service.createRequest(body({ requestedAt: future }), ACTOR))
+      .rejects.toMatchObject({ status: 400, message: expect.stringContaining('future') });
+    expect(repoMock.createRequest).not.toHaveBeenCalled();
+  });
+
+  it('allows a requested-at within the 5 minute clock-drift tolerance', async () => {
+    const soon = new Date(Date.now() + 2 * 60 * 1000).toISOString();
+    await service.createRequest(body({ requestedAt: soon }), ACTOR);
+    expect(repoMock.createRequest.mock.calls[0][0].requestedAt).toBe(soon);
+  });
+
   it('does not send an outcome — a new request starts pending at the DB default', async () => {
     await service.createRequest(body(), ACTOR);
     const arg = repoMock.createRequest.mock.calls[0][0];

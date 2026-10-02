@@ -175,6 +175,9 @@ function CommunityRequestsManagerView() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [formError, setFormError] = useState(null);
+  // Bumped by "Try again" so the load effect runs again even though the
+  // filter and search are unchanged.
+  const [reloadToken, setReloadToken] = useState(0);
 
   const load = useCallback(async () => {
     setError(null);
@@ -204,13 +207,34 @@ function CommunityRequestsManagerView() {
         }
       })
       .catch((err) => {
-        if (!cancelled) setError(err.message || 'Could not load requests.');
+        // Drop the previous rows: they belong to another filter and
+        // would sit under the error as if they were this one's results.
+        if (!cancelled) {
+          setRequests([]);
+          setError(err.message || 'Could not load requests.');
+        }
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false);
       });
     return () => { cancelled = true; };
-  }, [outcomeFilter, search]);
+  }, [outcomeFilter, search, reloadToken]);
+
+  // Base UI's Select fires onValueChange even when the item picked is
+  // already selected. Raising isLoading for an unchanged filter would
+  // never be cleared (the load effect's deps don't change), leaving the
+  // skeletons up for good.
+  const changeOutcome = (value) => {
+    if (value === outcomeFilter) return;
+    setIsLoading(true);
+    setOutcomeFilter(value);
+  };
+
+  const retry = () => {
+    setError(null);
+    setIsLoading(true);
+    setReloadToken((t) => t + 1);
+  };
 
   const create = async (payload) => {
     setBusy(true); setFormError(null);
@@ -250,7 +274,7 @@ function CommunityRequestsManagerView() {
   };
 
   // Requests, fifteen to a page; back to page one when the list changes.
-  const requestPage = usePaged(requests, TABLE_PAGE_SIZE, `${search}|${outcomeFilter}|${requests.length}`);
+  const requestPage = usePaged(requests, TABLE_PAGE_SIZE, `${search}|${outcomeFilter}|${requests.length}|${reloadToken}`);
 
   return (
     <ManagerLayout>
@@ -262,7 +286,7 @@ function CommunityRequestsManagerView() {
 
         {error ? (
           <div className="mt-4">
-            <ErrorBanner message={error} onRetry={load} />
+            <ErrorBanner message={error} onRetry={retry} />
           </div>
         ) : null}
 
@@ -303,7 +327,7 @@ function CommunityRequestsManagerView() {
                   />
                 </InputGroup>
 
-                <Select value={outcomeFilter} onValueChange={(value) => { setIsLoading(true); setOutcomeFilter(value); }}>
+                <Select value={outcomeFilter} onValueChange={changeOutcome}>
                   <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All outcomes</SelectItem>
@@ -326,7 +350,9 @@ function CommunityRequestsManagerView() {
                   <Skeleton className="h-24 w-full" />
                 </div>
               ) : requests.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No requests match.</p>
+                // A failed load already says so in the banner above;
+                // "No requests match" would contradict it.
+                error ? null : <p className="text-sm text-muted-foreground">No requests match.</p>
               ) : (
                 <Card>
                   <CardContent className="p-0">
@@ -335,10 +361,11 @@ function CommunityRequestsManagerView() {
                         <TableRow>
                           <TableHead>Requested</TableHead>
                           <TableHead>Items</TableHead>
-                          <TableHead>Quantity note</TableHead>
+                          <TableHead>Quantity &amp; collection notes</TableHead>
                           <TableHead>Caller</TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead />
+                          {/* Sticky so Claim / Resolve stay visible however wide the table gets. */}
+                          <TableHead className="sticky right-0 bg-card" />
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -352,7 +379,7 @@ function CommunityRequestsManagerView() {
                               <TableCell className="max-w-xs whitespace-pre-line">
                                 {r.itemsRequested}
                               </TableCell>
-                              <TableCell className="text-muted-foreground">
+                              <TableCell className="max-w-48 whitespace-pre-line text-muted-foreground">
                                 {r.quantityNote || '—'}
                               </TableCell>
                               <TableCell className="text-muted-foreground">
@@ -372,11 +399,11 @@ function CommunityRequestsManagerView() {
                                 ) : null}
                                 {r.handledByName ? (
                                   <span className="mt-1 block text-xs text-muted-foreground">
-                                    Handled by {r.handledByName}
+                                    {resolved ? 'Resolved' : 'Claimed'} by {r.handledByName}
                                   </span>
                                 ) : null}
                               </TableCell>
-                              <TableCell className="whitespace-nowrap text-right">
+                              <TableCell className="sticky right-0 whitespace-nowrap bg-card text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.15)]">
                                 {resolved ? (
                                   <span className="text-xs text-muted-foreground">
                                     {fmtDateTime(r.resolvedAt)}

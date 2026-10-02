@@ -21,6 +21,9 @@ import { Button }   from '@/components/ui/button';
 import { Input }    from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
+import {
+  FUTURE_REQUEST_MESSAGE, isFutureRequestedAt, localDateTimeValue, withRequestedAtForServer,
+} from '../requestedAt';
 
 const BLANK = {
   callerName: '', callerContact: '', itemsRequested: '',
@@ -41,15 +44,14 @@ export default function CommunityRequestForm({
   const itemsMissing = !String(form.itemsRequested ?? '').trim();
   const itemsInvalid = touchedItems && itemsMissing;
 
+  const requestedAtFuture = isFutureRequestedAt(form.requestedAt);
+
   const submit = () => {
     setTouchedItems(true);
-    if (itemsMissing) return;
-    onSubmit({
-      ...form,
-      // The service maps '' to null anyway, but sending null keeps the
-      // payload honest — same reasoning as SupplierForm's lead time.
-      requestedAt: form.requestedAt === '' ? null : form.requestedAt,
-    });
+    if (itemsMissing || requestedAtFuture) return;
+    // An ISO instant, or no requestedAt at all so the DB default now()
+    // applies (see requestedAt.js).
+    onSubmit(withRequestedAtForServer(form));
   };
 
   return (
@@ -95,24 +97,28 @@ export default function CommunityRequestForm({
 
       <div className="grid gap-7 sm:grid-cols-2">
         <Field>
-          <FieldLabel htmlFor="cr-quantity-note">Quantity note</FieldLabel>
+          <FieldLabel htmlFor="cr-quantity-note">Quantity &amp; collection notes</FieldLabel>
           <Input
             id="cr-quantity-note"
             value={form.quantityNote}
             onChange={set('quantityNote')}
-            placeholder="e.g. Enough for roughly 80 plates"
+            placeholder="e.g. Enough for 80 plates, collecting Monday"
           />
           <FieldDescription>Approximate is fine.</FieldDescription>
         </Field>
-        <Field>
+        <Field data-invalid={requestedAtFuture || undefined}>
           <FieldLabel htmlFor="cr-requested-at">Date &amp; time of request</FieldLabel>
           <Input
             id="cr-requested-at"
             type="datetime-local"
             value={form.requestedAt}
+            max={localDateTimeValue()}
             onChange={set('requestedAt')}
+            aria-invalid={requestedAtFuture || undefined}
           />
-          <FieldDescription>Defaults to now.</FieldDescription>
+          {requestedAtFuture
+            ? <FieldError>{FUTURE_REQUEST_MESSAGE}</FieldError>
+            : <FieldDescription>Defaults to now.</FieldDescription>}
         </Field>
       </div>
 

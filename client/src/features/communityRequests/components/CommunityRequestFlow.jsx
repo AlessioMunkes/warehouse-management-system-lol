@@ -21,6 +21,9 @@ import communityRequestAPI, { RESOLVE_OUTCOMES, OUTCOME_LABELS } from '../../../
 import { Notice, ChoiceList, TextField, Actions, Button } from '../../staff/components/StepPrimitives';
 import ListTools, { NoMatches } from '../../staff/components/ListTools';
 import useListSearch from '../../staff/hooks/useListSearch';
+import {
+  FUTURE_REQUEST_MESSAGE, isFutureRequestedAt, localDateTimeValue, withRequestedAtForServer,
+} from '../requestedAt';
 
 // Item and caller — matches the desktop table's own "Search by item or
 // caller name" (CommunityRequestsPage.jsx). Module level so its
@@ -69,10 +72,12 @@ function LogRequestForm({ onSubmit, busy, error }) {
   const itemsMissing = !form.itemsRequested.trim();
   const itemsInvalid = touchedItems && itemsMissing;
 
+  const requestedAtFuture = isFutureRequestedAt(form.requestedAt);
+
   const submit = () => {
     setTouchedItems(true);
-    if (itemsMissing) return;
-    onSubmit({ ...form, requestedAt: form.requestedAt === '' ? null : form.requestedAt });
+    if (itemsMissing || requestedAtFuture) return;
+    onSubmit(withRequestedAtForServer(form));
   };
 
   return (
@@ -107,9 +112,9 @@ function LogRequestForm({ onSubmit, busy, error }) {
         placeholder="Phone, WhatsApp, email…"
       />
       <TextField
-        id="stf-cr-quantity-note" label="Quantity note"
+        id="stf-cr-quantity-note" label="Quantity & collection notes"
         value={form.quantityNote} onChange={set('quantityNote')}
-        placeholder="e.g. Enough for roughly 80 plates"
+        placeholder="e.g. Enough for 80 plates, collecting Monday"
         hint="Approximate is fine."
       />
 
@@ -120,9 +125,13 @@ function LogRequestForm({ onSubmit, busy, error }) {
           className="stf-input is-text"
           type="datetime-local"
           value={form.requestedAt}
+          max={localDateTimeValue()}
           onChange={(e) => set('requestedAt')(e.target.value)}
+          aria-invalid={requestedAtFuture || undefined}
         />
-        <p className="stf-field-hint">Defaults to now.</p>
+        <p className="stf-field-hint">
+          {requestedAtFuture ? FUTURE_REQUEST_MESSAGE : 'Defaults to now.'}
+        </p>
       </div>
 
       <Actions>

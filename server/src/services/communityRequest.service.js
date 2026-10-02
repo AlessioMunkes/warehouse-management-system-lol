@@ -43,13 +43,20 @@ const cleanText = (value) => {
   return trimmed === '' ? null : trimmed;
 };
 
-// Optional. When given it must be a real timestamp; the repository
-// falls back to NOW() when this is null.
+// "When the person asked" cannot be in the future. A few minutes of
+// slack covers clock drift between a phone and the server.
+const FUTURE_TOLERANCE_MS = 5 * 60 * 1000;
+
+// Optional. When given it must be a real timestamp, not in the future;
+// the repository falls back to NOW() when this is null.
 const parseRequestedAt = (raw) => {
   if (raw === undefined || raw === null || raw === '') return null;
   const date = new Date(raw);
   if (Number.isNaN(date.getTime())) {
     fail(400, 'Requested at must be a valid date and time.');
+  }
+  if (date.getTime() > Date.now() + FUTURE_TOLERANCE_MS) {
+    fail(400, "Requested at can't be in the future. Enter when the person asked.");
   }
   return date.toISOString();
 };
