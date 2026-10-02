@@ -31,6 +31,7 @@
 // prop) a doubled-up sidebar whose drawer state fought itself.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
 import StaffShell from '../components/layout/StaffShell';
 import CommunityRequestForm from '../features/communityRequests/components/CommunityRequestForm';
@@ -39,6 +40,7 @@ import communityRequestAPI, {
   OUTCOMES, OUTCOME_LABELS, RESOLVE_OUTCOMES,
 } from '../services/communityRequestAPI';
 import { useAuth } from '../context/AuthContext';
+import { mayHaveStockOut, stockOutReason } from '../features/communityRequests/stockOut';
 
 import {
   InputGroup, InputGroupAddon, InputGroupInput,
@@ -91,6 +93,42 @@ const ErrorBanner = ({ message, onRetry }) => (
     ) : null}
   </div>
 );
+
+// ── Stock-out prompt ─────────────────────────────────────────
+// Resolving never moves stock, so after a fulfilled / partly fulfilled
+// request this points the manager at Inventory and hands them the text
+// for the adjustment note. Same banner construction as ErrorBanner.
+const StockOutPrompt = ({ request, onGoToInventory, onDismiss }) => {
+  const reason = stockOutReason(request);
+  const [copied, setCopied] = useState(false);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(reason);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <div role="status" className="p-4 rounded-[4px] bg-surface border-2 border-line text-ink text-sm space-y-3 shadow-sm">
+      <p className="font-semibold">Did stock leave the warehouse? Record it in Inventory so stock stays accurate.</p>
+      <p className="text-muted-foreground">
+        In Inventory, adjust the product: choose <strong>Remove</strong>, reason
+        {' '}<strong>Other (explain below)</strong>, and paste this as the note:
+      </p>
+      <code className="block rounded-[4px] bg-muted px-3 py-2 text-xs break-words">{reason}</code>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" size="sm" onClick={onGoToInventory}>Go to Inventory</Button>
+        <Button type="button" size="sm" variant="outline" onClick={copy}>
+          {copied ? 'Copied' : 'Copy note text'}
+        </Button>
+        <Button type="button" size="sm" variant="ghost" onClick={onDismiss}>Not from inventory</Button>
+      </div>
+    </div>
+  );
+};
 
 // ── Resolve panel ────────────────────────────────────────────
 const ResolvePanel = ({ request, busy, error, onSubmit, onCancel }) => {
@@ -170,6 +208,8 @@ function CommunityRequestsManagerView() {
   const [mode, setMode] = useState('list');       // list | create
   const [resolving, setResolving] = useState(null); // request being resolved
   const [detailRef, focusDetail] = useDetailFocus();
+  const navigate = useNavigate();
+  const [stockPrompt, setStockPrompt] = useState(null); // { id, callerName }
 
   const [isLoading, setIsLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -264,6 +304,9 @@ function CommunityRequestsManagerView() {
     setBusy(true); setFormError(null);
     try {
       await communityRequestAPI.resolveRequest(resolving.id, { outcome, outcomeNote });
+      setStockPrompt(mayHaveStockOut(outcome)
+        ? { id: resolving.id, callerName: resolving.callerName }
+        : null);
       setResolving(null);
       await load();
     } catch (err) {
@@ -315,6 +358,14 @@ function CommunityRequestsManagerView() {
             />
           ) : (
             <>
+              {stockPrompt ? (
+                <StockOutPrompt
+                  request={stockPrompt}
+                  onGoToInventory={() => navigate('/noc/inventory')}
+                  onDismiss={() => setStockPrompt(null)}
+                />
+              ) : null}
+
               <div className="flex flex-wrap items-center gap-3">
                 <InputGroup className="min-w-56 flex-1">
                   <InputGroupAddon align="inline-start">

@@ -24,6 +24,7 @@ import useListSearch from '../../staff/hooks/useListSearch';
 import {
   FUTURE_REQUEST_MESSAGE, isFutureRequestedAt, localDateTimeValue, withRequestedAtForServer,
 } from '../requestedAt';
+import { mayHaveStockOut, withStockOutTag } from '../stockOut';
 
 // Item and caller — matches the desktop table's own "Search by item or
 // caller name" (CommunityRequestsPage.jsx). Module level so its
@@ -165,12 +166,17 @@ function ResolveForm({ onSubmit, onCancel, busy, error }) {
   const [outcome, setOutcome] = useState('fulfilled');
   const [note, setNote] = useState('');
   const [touched, setTouched] = useState(false);
+  const [stockOut, setStockOut] = useState(false);
   const noteMissing = !note.trim();
+  const canFlagStock = mayHaveStockOut(outcome);
 
   const submit = () => {
     setTouched(true);
     if (noteMissing) return;
-    onSubmit({ outcome, outcomeNote: note });
+    // A worker cannot adjust stock, so the flag travels in the note for
+    // a manager to act on. Ignored if the outcome was switched to one
+    // where nothing leaves.
+    onSubmit({ outcome, outcomeNote: withStockOutTag(note, canFlagStock && stockOut) });
   };
 
   return (
@@ -187,6 +193,17 @@ function ResolveForm({ onSubmit, onCancel, busy, error }) {
         onChange={setNote}
         error={touched && noteMissing ? 'A note is required to resolve a request.' : null}
       />
+      {canFlagStock ? (
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 44 }}>
+          <input
+            type="checkbox"
+            checked={stockOut}
+            onChange={(e) => setStockOut(e.target.checked)}
+            style={{ width: 20, height: 20 }}
+          />
+          <span>Stock went out — a manager needs to record it</span>
+        </label>
+      ) : null}
       <div className="stf-actions is-row">
         <button type="button" className="stf-btn stf-btn-secondary" onClick={onCancel}>Cancel</button>
         <button type="button" className="stf-btn stf-btn-primary" onClick={submit} disabled={busy}>
