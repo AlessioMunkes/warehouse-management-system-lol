@@ -12,7 +12,7 @@
  * The workspace is backed by a single event snapshot, ensuring all panels
  * (timeslot, booking, attendance) stay in sync.
  *
- * Access is restricted to users with VOLUNTEER_MANAGEMENT_ROLES.
+ * Access is restricted to users with MANAGERS_UP.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -22,7 +22,8 @@ import BookingTable from '../features/volunteerManagement/components/BookingTabl
 import WalkInDialog from '../features/volunteerManagement/components/WalkInDialog';
 import SyncStatusCard from '../features/volunteerManagement/components/SyncStatusCard';
 import volunteerManagementAPI from '../services/volunteerManagementAPI';
-import { VOLUNTEERS, VOLUNTEER_MANAGEMENT_ROLES } from '../routes/paths';
+import { VOLUNTEERS } from '../routes/paths';
+import { ALL_STAFF, MANAGERS_UP } from '../routes/permissions';
 import { useAuth } from '../context/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -34,8 +35,8 @@ const formatDate = (value) => value ? new Intl.DateTimeFormat('en-ZA', { dateSty
 export default function VolunteerEventWorkspacePage() {
   const { eventId } = useParams();
   const { user } = useAuth();
-  const canManage = VOLUNTEER_MANAGEMENT_ROLES.includes(user?.role);
-  const canRecordAttendance = ['warehouse_worker', ...VOLUNTEER_MANAGEMENT_ROLES].includes(user?.role);
+  const canManage = MANAGERS_UP.includes(user?.role);
+  const canRecordAttendance = ALL_STAFF.includes(user?.role);
   const [workspace, setWorkspace] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [attendanceByBooking, setAttendanceByBooking] = useState({});

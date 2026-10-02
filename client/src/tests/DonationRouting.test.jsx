@@ -15,7 +15,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from '../components/layout/ProtectedRoute';
-import { DONATIONS, DONATION_INTAKE_ROLES, STAFF } from '../routes/paths';
+import { DONATIONS, STAFF } from '../routes/paths';
+import { routeById } from '../routes/routeTable';
+
+// The guard the real intake route uses (routes/routeTable.js).
+const DONATION_INTAKE_ROLES = routeById('donationIntake').roles;
 
 const mockAuth = { value: { user: null, isLoading: false } };
 vi.mock('../context/AuthContext', () => ({

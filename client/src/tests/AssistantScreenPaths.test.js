@@ -11,7 +11,7 @@
 // here is silent: the id simply resolves to a path nothing serves.
 //
 // So this is the thing that notices. It reads the real route table
-// out of App.jsx rather than a list someone remembered to update,
+// (routes/routeTable.js, which App.jsx is built from) rather than a list someone remembered to update,
 // which means renaming a route breaks this test in the same commit
 // that renames it.
 //
@@ -23,36 +23,12 @@
 // @vitest-environment node
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { SCREEN_PATHS, pathForScreen, matchScreen } from '../features/assistant/screenPaths';
-import { STAFF, ADMIN, PACKING, DONATIONS, VOLUNTEERS } from '../routes/paths';
+import { ROUTES, REDIRECTS } from '../routes/routeTable';
 
-const appSource = readFileSync(
-  fileURLToPath(new URL('../App.jsx', import.meta.url)), 'utf8'
-);
-
-// App.jsx writes most routes as path={ADMIN.products}, not as a
-// string, so a regex for quoted literals alone finds about half the
-// table and passes the other half vacuously. Both forms are read,
-// and the constants are resolved through the same paths.js the app
-// uses — so this compares real routes, not a transcription of them.
-const CONSTANTS = { STAFF, ADMIN, PACKING, DONATIONS, VOLUNTEERS };
-
-const declaredPaths = (() => {
-  const found = new Set();
-
-  // path="/noc/inventory"  and  path={'/noc/inventory'}
-  for (const m of appSource.matchAll(/path=\{?["'`]([^"'`]+)["'`]\}?/g)) {
-    found.add(m[1]);
-  }
-  // path={ADMIN.products}
-  for (const m of appSource.matchAll(/path=\{([A-Z_]+)\.([A-Za-z0-9_]+)\}/g)) {
-    const value = CONSTANTS[m[1]]?.[m[2]];
-    if (typeof value === 'string') found.add(value);
-  }
-  return found;
-})();
+// Every path the app serves, from the route table App.jsx is built
+// from (routes/routeTable.js) — real routes, not a transcription.
+const declaredPaths = new Set([...ROUTES.map((r) => r.path), ...REDIRECTS.map((r) => r.from)]);
 
 describe('every screen the assistant can point at', () => {
   const entries = Object.entries(SCREEN_PATHS).filter(([, p]) => p);
@@ -63,11 +39,9 @@ describe('every screen the assistant can point at', () => {
     expect(entries.length).toBeGreaterThan(10);
   });
 
-  // The same guard for the other side. If the extraction below ever
-  // stops finding routes — App.jsx restructured, a new way of
-  // declaring them — every row would fail loudly rather than
-  // quietly, but this says why in one line.
-  it('found the route table in App.jsx', () => {
+  // The same guard for the other side: an emptied route table would
+  // fail every row below; this says why in one line.
+  it('found the route table', () => {
     expect(declaredPaths.size).toBeGreaterThan(20);
   });
 
@@ -75,7 +49,7 @@ describe('every screen the assistant can point at', () => {
     const served = [...declaredPaths].some(
       (p) => p === path || p.startsWith(`${path}/`) || path.startsWith(`${p}/`)
     );
-    expect(served, `${id} -> ${path} is not in App.jsx`).toBe(true);
+    expect(served, `${id} -> ${path} is not in the route table`).toBe(true);
   });
 
   it('points each id somewhere different', () => {

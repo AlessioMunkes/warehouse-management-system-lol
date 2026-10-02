@@ -9,7 +9,7 @@
  *   - Mark events as completed or cancel them
  *   - Navigate to a single event's workspace for detailed management
  *
- * Access is restricted to users with VOLUNTEER_MANAGEMENT_ROLES.
+ * Access is restricted to users with MANAGERS_UP (routes/permissions.js).
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
