@@ -11,6 +11,13 @@ import { useNavigate } from "react-router-dom";
 export default function NotFoundPage() {
   const navigate = useNavigate();
 
+  // navigate(-1) does nothing when there is no history entry to go back
+  // to, e.g. a link opened from an email in a fresh tab.
+  const goBack = () => {
+    if (window.history.length <= 1) navigate("/");
+    else navigate(-1);
+  };
+
   return (
     <div className="stf-shell">
       <main className="stf-main">
@@ -26,7 +33,7 @@ export default function NotFoundPage() {
             <button className="stf-btn stf-btn-primary" onClick={() => navigate("/")}>
               Go to Home
             </button>
-            <button className="stf-btn stf-btn-secondary" onClick={() => navigate(-1)}>
+            <button className="stf-btn stf-btn-secondary" onClick={goBack}>
               Go Back
             </button>
           </div>
