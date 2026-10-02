@@ -11,6 +11,9 @@
 // ─────────────────────────────────────────────────────────────
 
 export const EXPIRY_WINDOW_DAYS = 30;
+// Inside this, an expiry is urgent (red) rather than soon (amber) —
+// the server's first expiry warning goes out at 14 days by default.
+export const URGENT_EXPIRY_DAYS = 14;
 export const IDLE_DAYS = 60;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -51,9 +54,15 @@ export const expiryState = (day, today = todaySast()) => {
   if (!day) return null;
   const daysLeft = daysBetween(today, day);
   if (daysLeft < 0) return { status: 'expired', daysLeft };
+  if (daysLeft <= URGENT_EXPIRY_DAYS) return { status: 'urgent', daysLeft };
   if (daysLeft <= EXPIRY_WINDOW_DAYS) return { status: 'soon', daysLeft };
   return { status: 'ok', daysLeft };
 };
+
+// Within the window: inside a badge, a countdown reads faster than a
+// date ("In 7 days").
+export const isExpiringSoon = (state) => state?.status === 'soon' || state?.status === 'urgent';
+export const countdownLabel = ({ daysLeft }) => (daysLeft === 0 ? 'Today' : daysLeft === 1 ? 'Tomorrow' : `In ${daysLeft} days`);
 
 export const expiryLabel = (state) => {
   if (!state) return '';
@@ -83,7 +92,7 @@ export const VIEWS = [
   { id: 'lowstock',  label: 'Low stock',  alert: false,              test: (p) => stockStatus(p) === 'low_stock' },
   { id: 'shortfall', label: 'Shortfall',  alert: true,               test: (p) => p.isShortfall },
   { id: 'expiring',  label: `Expiring in ${EXPIRY_WINDOW_DAYS} days`, alert: true,
-    test: (p, ctx) => expiryState(p.earliestExpiry, ctx.today)?.status === 'soon' },
+    test: (p, ctx) => isExpiringSoon(expiryState(p.earliestExpiry, ctx.today)) },
   { id: 'idle',      label: `No movement ${IDLE_DAYS}+ days`,        test: (p, ctx) => isIdle(p, ctx.now) },
 ];
 
@@ -114,6 +123,18 @@ export const filterProducts = (products, { view = 'all', filters = [], search = 
 export const countViews = (products, now = new Date()) => {
   const ctx = { now, today: todaySast(now) };
   return Object.fromEntries(VIEWS.map((v) => [v.id, products.filter((p) => v.test(p, ctx)).length]));
+};
+
+// ── The row's edge ────────────────────────────────────────────
+// The worst thing about a product, as a colour down the row's left
+// edge: red for a shortfall or an expiry inside two weeks, amber for
+// low stock or an expiry inside the month. Scanning a long list, the
+// edge says where to look before any number is read.
+export const rowTone = (p, today = todaySast()) => {
+  const expiry = expiryState(p.earliestExpiry, today)?.status;
+  if (p.isShortfall || expiry === 'urgent') return 'bad';
+  if (stockStatus(p) === 'low_stock' || expiry === 'soon') return 'warn';
+  return null;
 };
 
 // ── Export ────────────────────────────────────────────────────

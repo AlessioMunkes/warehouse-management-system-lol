@@ -26,7 +26,6 @@ import EmptyState from '@/components/ui/empty-state';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import StatusBadge from '@/components/ui/status-badge';
@@ -34,13 +33,14 @@ import SortableHead from '@/components/ui/sortable-head';
 import TablePager from '@/components/ui/table-pager';
 import ListToolbar from '@/components/ui/list-toolbar';
 import BulkActionBar from '@/components/ui/bulk-action-bar';
+import ListCard from '@/components/ui/list-card';
 import useTableView from '@/features/masterdata/hooks/useTableView';
 import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
 import { downloadCsv, toCsv } from '@/features/reporting/chartFormat';
 import { fmtQty } from '@/lib/quantity';
 import {
   FILTERS, EXPORT_COLUMNS, STOCK_STATUS_LABEL, STOCK_STATUS_RANK,
-  expiryState, exportRows, filterProducts, stockStatus, todaySast,
+  countdownLabel, expiryState, exportRows, filterProducts, isExpiringSoon, rowTone, stockStatus, todaySast,
 } from '../inventoryViews';
 
 // ── Columns ──────────────────────────────────────────────────
@@ -140,52 +140,66 @@ export default function StockManifestTable({
 
   const sort = tableView.sort ? { key: tableView.sort.key, dir: tableView.sort.direction } : null;
 
-  return (
-    <div className="space-y-4">
-      {selectedProducts.length ? (
-        <BulkActionBar count={selectedProducts.length} noun="products" onClear={clearSelection}>
-          {canOrder ? (
-            <Button type="button" size="sm" onClick={() => onRaisePurchaseOrder?.(selectedProducts)}>
-              <ShoppingCart />
-              Raise purchase order
-            </Button>
-          ) : null}
-          {canAdjust ? (
-            <Button type="button" variant="outline" size="sm" onClick={() => onBulkAdjust?.(selectedProducts)}>
-              <SlidersHorizontal />
-              Adjust stock
-            </Button>
-          ) : null}
-          <Button
-            type="button" variant="outline" size="sm"
-            onClick={() => downloadCsv(exportFile('selected'), toCsv(exportRows(selectedProducts), EXPORT_COLUMNS))}
-          >
-            <Download />
-            Export selected
-          </Button>
-        </BulkActionBar>
-      ) : (
-        <ListToolbar
-          search={{ value: search, onChange: setSearch, placeholder: 'Search by product, SKU or barcode' }}
-          filters={FILTERS.map((f) => ({
-            key: f.key, label: f.label, active: filters.includes(f.key), onToggle: () => toggleFilter(f.key),
-          }))}
-          onClearAll={clearAll}
-          columns={{
-            idPrefix: 'inventory',
-            columns: tableView.availableColumns,
-            hidden: tableView.hidden,
-            onToggle: tableView.toggleColumn,
-            onReset: tableView.resetColumns,
-          }}
-          onExport={rows.length ? () => downloadCsv(exportFile(view), toCsv(exportRows(rows), EXPORT_COLUMNS)) : undefined}
-        />
-      )}
+  // How the rows are ordered, in words, for the toolbar.
+  const sortColumn = COLUMNS.find((c) => c.key === tableView.sort?.key);
+  const sortNote = !sortColumn ? 'Sorted by product name'
+    : sortColumn.numeric
+      ? `Sorted by ${sortColumn.label.toLowerCase()}, ${tableView.sort.direction === 'desc' ? 'highest' : 'lowest'} first`
+      : `Sorted by ${sortColumn.label.toLowerCase()}, ${tableView.sort.direction === 'desc' ? 'Z to A' : 'A to Z'}`;
 
+  const header = selectedProducts.length ? (
+    <BulkActionBar count={selectedProducts.length} noun="products" onClear={clearSelection}>
+      {canOrder ? (
+        <Button type="button" size="sm" onClick={() => onRaisePurchaseOrder?.(selectedProducts)}>
+          <ShoppingCart />
+          Raise purchase order
+        </Button>
+      ) : null}
+      {canAdjust ? (
+        <Button type="button" variant="outline" size="sm" onClick={() => onBulkAdjust?.(selectedProducts)}>
+          <SlidersHorizontal />
+          Adjust stock
+        </Button>
+      ) : null}
+      <Button
+        type="button" variant="outline" size="sm"
+        onClick={() => downloadCsv(exportFile('selected'), toCsv(exportRows(selectedProducts), EXPORT_COLUMNS))}
+      >
+        <Download />
+        Export selected
+      </Button>
+    </BulkActionBar>
+  ) : (
+    <ListToolbar
+      search={{ value: search, onChange: setSearch, placeholder: 'Search by product or SKU' }}
+      filters={FILTERS.map((f) => ({
+        key: f.key, label: f.label, active: filters.includes(f.key), onToggle: () => toggleFilter(f.key),
+      }))}
+      onClearAll={clearAll}
+      note={sortNote}
+      columns={{
+        idPrefix: 'inventory',
+        columns: tableView.availableColumns,
+        hidden: tableView.hidden,
+        onToggle: tableView.toggleColumn,
+        onReset: tableView.resetColumns,
+      }}
+      onExport={rows.length ? () => downloadCsv(exportFile(view), toCsv(exportRows(rows), EXPORT_COLUMNS)) : undefined}
+    />
+  );
+
+  const today = todaySast();
+  const EDGE = { bad: 'border-l-danger', warn: 'border-l-warn' };
+
+  return (
+    <ListCard
+      header={header}
+      footer={!isLoading && rows.length ? <TablePager {...page} noun="products" alwaysShow /> : null}
+    >
       {isLoading ? (
         // Skeleton rows rather than a line of text: a sentence where a
         // table is about to appear reads as an error message.
-        <div className="space-y-2 py-2" aria-busy="true">
+        <div className="space-y-2 p-4" aria-busy="true">
           {[0, 1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
         </div>
       ) : rows.length === 0 ? (
@@ -204,66 +218,65 @@ export default function StockManifestTable({
           action={narrowed ? { label: 'Clear all filters', onClick: clearAll } : undefined}
         />
       ) : (
-        // py-0: Card's own vertical padding is for a titled card; on a
-        // table it leaves an empty band above the header row.
-        <Card className="py-0">
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10 pl-4">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-12 border-l-[3px] border-l-transparent pl-4">
+                <Checkbox
+                  checked={allTicked}
+                  indeterminate={someTicked}
+                  onCheckedChange={toggleAll}
+                  aria-label={allTicked ? 'Untick all products in this view' : 'Tick all products in this view'}
+                />
+              </TableHead>
+              {columns.map((c) => (
+                <SortableHead
+                  key={c.key}
+                  label={c.label}
+                  sortKey={c.key}
+                  sort={sort}
+                  onSort={tableView.toggleSort}
+                  align={c.align}
+                />
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {page.slice.map((p) => {
+              const ticked = selected.has(p.id);
+              const tone = rowTone(p, today);
+              return (
+                <TableRow
+                  key={p.id}
+                  data-state={ticked ? 'selected' : undefined}
+                  className="cursor-pointer"
+                  onClick={() => onOpen?.(p)}
+                >
+                  {/* The row's edge: red or amber for the worst thing
+                      about the product (rowTone). stopPropagation, or
+                      ticking a row also opens it. */}
+                  <TableCell
+                    className={`w-12 border-l-[3px] pl-4 ${EDGE[tone] ?? 'border-l-transparent'}`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <Checkbox
-                      checked={allTicked}
-                      indeterminate={someTicked}
-                      onCheckedChange={toggleAll}
-                      aria-label={allTicked ? 'Untick all products in this view' : 'Tick all products in this view'}
+                      checked={ticked}
+                      onCheckedChange={() => toggleOne(p.id)}
+                      aria-label={`Select ${p.name}`}
                     />
-                  </TableHead>
-                  {columns.map((c) => (
-                    <SortableHead
-                      key={c.key}
-                      label={c.label}
-                      sortKey={c.key}
-                      sort={sort}
-                      onSort={tableView.toggleSort}
-                      align={c.align}
-                    />
-                  ))}
+                  </TableCell>
+                  {columns.map((c) => <Cell key={c.key} column={c} product={p} onOpen={onOpen} today={today} />)}
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {page.slice.map((p) => {
-                  const ticked = selected.has(p.id);
-                  return (
-                    <TableRow
-                      key={p.id}
-                      data-state={ticked ? 'selected' : undefined}
-                      className="cursor-pointer"
-                      onClick={() => onOpen?.(p)}
-                    >
-                      {/* stopPropagation, or ticking a row also opens it. */}
-                      <TableCell className="w-10 pl-4" onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={ticked}
-                          onCheckedChange={() => toggleOne(p.id)}
-                          aria-label={`Select ${p.name}`}
-                        />
-                      </TableCell>
-                      {columns.map((c) => <Cell key={c.key} column={c} product={p} onOpen={onOpen} />)}
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-            <TablePager {...page} noun="products" className="px-4" />
-          </CardContent>
-        </Card>
+              );
+            })}
+          </TableBody>
+        </Table>
       )}
-    </div>
+    </ListCard>
   );
 }
 
-function Cell({ column, product: p, onOpen }) {
+function Cell({ column, product: p, onOpen, today }) {
   const num = 'text-right tabular-nums';
   switch (column.key) {
     case 'name':
@@ -278,34 +291,36 @@ function Cell({ column, product: p, onOpen }) {
           >
             <span className="block break-words">{p.name}</span>
           </button>
-          <span className="block break-words text-xs text-muted-foreground">{p.sku}</span>
+          <span className="block break-words text-xs text-muted-foreground">
+            {[p.sku, p.category].filter(Boolean).join(' · ')}
+          </span>
         </TableCell>
       );
+    // The unit is said once, on Available — the figure a decision is
+    // made on. Repeated on every number it was noise.
     case 'onHand':
-      return <TableCell className={num}>{fmtQty(p.onHand, p.unit)}</TableCell>;
-    // Zero committed is the ordinary state, so it is a muted dash.
+      return <TableCell className={num}>{fmtQty(p.onHand)}</TableCell>;
     case 'committed':
+      return <TableCell className={`${num} text-muted-foreground`}>{fmtQty(p.committed)}</TableCell>;
+    case 'available':
       return (
-        <TableCell className={`${num} text-muted-foreground`}>
-          {p.committed > 0 ? fmtQty(p.committed, p.unit) : '—'}
+        <TableCell className={`${num} font-semibold ${p.available < 0 ? 'text-danger' : ''}`}>
+          {fmtQty(p.available, p.unit)}
         </TableCell>
       );
-    // The number the allocation decision is made on, so it carries the
-    // emphasis.
-    case 'available':
-      return <TableCell className={`${num} font-medium`}>{fmtQty(p.available, p.unit)}</TableCell>;
     case 'reorderAt':
-      return <TableCell className={`${num} text-muted-foreground`}>{fmtQty(p.reorderAt, p.unit)}</TableCell>;
+      return <TableCell className={`${num} text-muted-foreground`}>{fmtQty(p.reorderAt)}</TableCell>;
     case 'expiry': {
-      const state = expiryState(p.earliestExpiry);
+      // Close: a countdown badge, red inside two weeks, amber inside the
+      // month. Further out: the date.
+      const state = expiryState(p.earliestExpiry, today);
       return (
         <TableCell className="tabular-nums">
-          <span className={state?.status === 'soon' ? '' : 'text-muted-foreground'}>{fmtDay(p.earliestExpiry)}</span>
-          {state?.status === 'soon' ? (
-            <StatusBadge kind="expiry" status="soon" className="ml-2">
-              {state.daysLeft === 0 ? 'today' : state.daysLeft === 1 ? '1 day' : `${state.daysLeft} days`}
-            </StatusBadge>
-          ) : null}
+          {isExpiringSoon(state) ? (
+            <StatusBadge kind="expiry" status={state.status}>{countdownLabel(state)}</StatusBadge>
+          ) : (
+            <span className="text-muted-foreground">{fmtDay(p.earliestExpiry)}</span>
+          )}
         </TableCell>
       );
     }

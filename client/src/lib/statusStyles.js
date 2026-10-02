@@ -18,10 +18,10 @@
 // share all three.
 // ─────────────────────────────────────────────────────────────
 import {
-  Ban, BadgeCheck, CalendarCheck, CalendarClock, CalendarX, CheckCheck, CircleCheck, CircleDashed,
-  CircleX, ClipboardList, Clock, FileCheck, Flag, Forward, Gift, History, Hourglass, House, Lock,
+  AlarmClock, Ban, Check, BadgeCheck, CalendarCheck, CalendarClock, CalendarX, CheckCheck, CircleDashed,
+  CircleX, ClipboardList, Clock, FileCheck, Flag, Forward, Gift, History, House, Lock,
   Megaphone, PackageCheck, PackageOpen, PencilLine, Scale, SlidersHorizontal, Split, Trash2,
-  TrendingDown, TriangleAlert, Truck, Undo2,
+  TriangleAlert, Truck, Undo2,
 } from 'lucide-react';
 
 const s = (tone, icon, strong = false) => ({ tone, icon, strong });
@@ -95,15 +95,18 @@ export const STATUS_STYLES = {
     failed:  s('bad', CircleX, true),
   },
   // Derived from AVAILABLE server-side (stock.repository.js getManifest).
+  // All soft: on a list of sixty products a solid red pill per row
+  // shouts over the numbers. The row's coloured edge carries urgency.
   inventory: {
-    in_stock:  s('good', CircleCheck),
-    low_stock: s('warn', TrendingDown),
-    shortfall: s('bad', CircleX, true),
+    in_stock:  s('good', Check),
+    low_stock: s('warn', TriangleAlert),
+    shortfall: s('bad', CircleX),
   },
   // A receipt line's expiry date, against today.
   expiry: {
     ok:      s('neutral', CalendarCheck),
-    soon:    s('warn', Hourglass),                        // within 30 days
+    soon:    s('warn', Clock),                            // 15 to 30 days
+    urgent:  s('bad', AlarmClock),                        // 14 days or less
     expired: s('bad', CalendarX, true),
   },
 };

@@ -7,7 +7,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   countViews, daysBetween, expiryLabel, expiryState, filterProducts, isIdle,
-  stockStatus, todaySast, viewById,
+  rowTone, stockStatus, todaySast, viewById,
 } from '../features/InventoryManagement/inventoryViews';
 
 const NOW = new Date('2026-10-02T10:00:00+02:00');
@@ -44,7 +44,9 @@ describe('dates', () => {
 describe('expiryState', () => {
   const today = '2026-10-02';
 
-  it('is soon up to and including thirty days out', () => {
+  it('is urgent up to fourteen days out, soon up to thirty', () => {
+    expect(expiryState('2026-10-16', today)).toEqual({ status: 'urgent', daysLeft: 14 });
+    expect(expiryState('2026-10-17', today)).toEqual({ status: 'soon', daysLeft: 15 });
     expect(expiryState('2026-11-01', today)).toEqual({ status: 'soon', daysLeft: 30 });
     expect(expiryState('2026-11-02', today).status).toBe('ok');
   });
@@ -62,6 +64,21 @@ describe('expiryState', () => {
   it('reads today and tomorrow as words', () => {
     expect(expiryLabel(expiryState(today, today))).toBe('Expires today');
     expect(expiryLabel(expiryState('2026-10-03', today))).toBe('Expires tomorrow');
+  });
+});
+
+describe('rowTone', () => {
+  const today = '2026-10-02';
+  it('is red for a shortfall or an expiry inside two weeks', () => {
+    expect(rowTone(p({ isShortfall: true, isLowStock: true }), today)).toBe('bad');
+    expect(rowTone(p({ earliestExpiry: '2026-10-12' }), today)).toBe('bad');
+  });
+  it('is amber for low stock or an expiry inside the month', () => {
+    expect(rowTone(p({ isLowStock: true }), today)).toBe('warn');
+    expect(rowTone(p({ earliestExpiry: '2026-10-28' }), today)).toBe('warn');
+  });
+  it('is nothing for healthy stock', () => {
+    expect(rowTone(p({ earliestExpiry: '2027-01-01' }), today)).toBeNull();
   });
 });
 

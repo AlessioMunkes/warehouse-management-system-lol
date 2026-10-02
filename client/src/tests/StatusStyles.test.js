@@ -44,7 +44,7 @@ describe('status styles', () => {
     ['inventory', ['in_stock', 'low_stock', 'shortfall']],
     ['message', ['sent', 'stubbed', 'failed']],
     ['pickingSlip', ['pending', 'in_progress', 'complete', 'dispatched', 'collected', 'not_collected', 'cancelled']],
-    ['expiry', ['ok', 'soon', 'expired']],
+    ['expiry', ['ok', 'soon', 'urgent', 'expired']],
   ])('styles every %s status the app can show', (kind, statuses) => {
     for (const status of statuses) expect(STATUS_STYLES[kind][status], `${kind}.${status}`).toBeTruthy();
   });

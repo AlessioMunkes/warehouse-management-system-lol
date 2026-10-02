@@ -36,7 +36,7 @@ import BalanceChart from './BalanceChart';
 import { getBatches, getMovements } from '../../../services/stockAPI';
 import { ADMIN } from '../../../routes/paths';
 import {
-  STOCK_STATUS_LABEL, expiryLabel, expiryState, stockStatus,
+  STOCK_STATUS_LABEL, expiryLabel, expiryState, isExpiringSoon, stockStatus,
 } from '../inventoryViews';
 
 // Keys are the values the database stores — the movement_type CHECK
@@ -148,8 +148,8 @@ export default function StockDetailPanel({
       badges={(
         <>
           <StatusBadge kind="inventory" status={status}>{STOCK_STATUS_LABEL[status]}</StatusBadge>
-          {earliest?.status === 'soon' ? (
-            <StatusBadge kind="expiry" status="soon">
+          {isExpiringSoon(earliest) ? (
+            <StatusBadge kind="expiry" status={earliest.status}>
               Earliest delivery {expiryLabel(earliest).toLowerCase()}
             </StatusBadge>
           ) : null}

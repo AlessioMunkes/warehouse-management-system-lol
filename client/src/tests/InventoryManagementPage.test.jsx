@@ -269,7 +269,8 @@ describe('InventoryManagementPage — bulk actions', () => {
 
     await user.click(await screen.findByRole('checkbox', { name: 'Select Rice' }));
     await user.click(screen.getByRole('checkbox', { name: 'Select Sugar beans' }));
-    await user.click(screen.getByRole('button', { name: /^Adjust stock/ }));
+    const bulkBar = within(screen.getByRole('toolbar', { name: /Actions for selected products/ }));
+    await user.click(bulkBar.getByRole('button', { name: /Adjust stock/ }));
 
     const first = within(await screen.findByRole('dialog', { name: /Adjust stock · Rice/ }));
     expect(first.getByText(/Product 1 of 2/)).toBeInTheDocument();
@@ -281,5 +282,28 @@ describe('InventoryManagementPage — bulk actions', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(adjustStock).not.toHaveBeenCalled();
+  });
+});
+
+describe('InventoryManagementPage — adjusting from the header', () => {
+  it('asks which product, then opens its adjustment', async () => {
+    const user = userEvent.setup();
+    getManifest.mockResolvedValue([RICE, BEANS]);
+    render(<InventoryManagementPage />);
+
+    await screen.findByRole('button', { name: 'Rice' });
+    await user.click(screen.getAllByRole('button', { name: /Adjust stock/ })[0]);
+    const picker = within(await screen.findByRole('dialog', { name: 'Adjust stock' }));
+    await user.type(picker.getByRole('searchbox', { name: 'Search by product or SKU' }), 'bea');
+    await user.click(picker.getByRole('button', { name: /Sugar beans/ }));
+
+    expect(await screen.findByRole('dialog', { name: /Adjust stock · Sugar beans/ })).toBeInTheDocument();
+  });
+
+  it('is not offered to a role that cannot adjust', async () => {
+    mockUser.value = { id: 2, firstName: 'Mcebisi', lastName: 'N', role: 'warehouse_worker' };
+    render(<InventoryManagementPage />);
+    await screen.findByRole('button', { name: 'Rice' });
+    expect(screen.queryByRole('button', { name: /Adjust stock/ })).not.toBeInTheDocument();
   });
 });

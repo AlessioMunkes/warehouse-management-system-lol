@@ -15,6 +15,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import ViewTabs from "@/components/ui/view-tabs";
+import PageHeader, { PageShell } from "@/components/ui/page-header";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
+import ProductPickerDialog from "../features/InventoryManagement/components/ProductPickerDialog";
 import StockManifestTable from "../features/InventoryManagement/components/StockManifestTable";
 import StockDetailPanel from "../features/InventoryManagement/components/StockDetailPanel";
 import AdjustStockModal from "../features/InventoryManagement/components/AdjustStockModal";
@@ -57,6 +61,8 @@ export default function InventoryManagementPage() {
   const [adjustQueue, setAdjustQueue] = useState([]);
   const [queueTotal, setQueueTotal] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
+  // "+ Adjust stock" in the header: which product, first.
+  const [picking, setPicking] = useState(false);
 
   const toast = useToast();
   const canAdjust = CAN_ADJUST.includes(user?.role);
@@ -174,12 +180,16 @@ export default function InventoryManagementPage() {
   const adjusting = adjustQueue[0] ?? null;
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-6">
-      <h1 className="text-2xl font-medium">Inventory</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        What is in the warehouse, what is already promised, and what is left to allocate.
-        Open a product for its history, expiry dates and adjustments.
-      </p>
+    <PageShell>
+      <PageHeader
+        title="Inventory"
+        description="What is in the building, what is promised to a pallet, and what is still free to allocate."
+        actions={canAdjust ? (
+          <Button type="button" onClick={() => setPicking(true)} disabled={isLoading || products.length === 0}>
+            <Plus /> Adjust stock
+          </Button>
+        ) : null}
+      />
 
       {loadError ? <div className="mt-4"><ErrorBanner message={loadError} onRetry={reloadManifest} /></div> : null}
 
@@ -215,6 +225,16 @@ export default function InventoryManagementPage() {
         />
       ) : null}
 
+      {picking ? (
+        <ProductPickerDialog
+          products={products}
+          title="Adjust stock"
+          description="Which product?"
+          onPick={(p) => { setPicking(false); startAdjusting([p]); }}
+          onClose={() => setPicking(false)}
+        />
+      ) : null}
+
       {adjusting ? (
         <AdjustStockModal
           // A fresh form for each product in a run, not the last one's
@@ -231,6 +251,6 @@ export default function InventoryManagementPage() {
           } : null}
         />
       ) : null}
-    </main>
+    </PageShell>
   );
 }
