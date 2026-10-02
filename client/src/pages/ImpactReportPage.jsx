@@ -47,7 +47,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import ManagerLayout from '../components/layout/ManagerLayout';
+import PageHeader, { PageShell } from '@/components/ui/page-header';
 import ReportChart    from '../features/reporting/components/ReportChart';
 import ImpactStatCard from '../features/reporting/components/ImpactStatCard';
 import BeneficiaryTypeChart from '../features/reporting/components/BeneficiaryTypeChart';
@@ -103,21 +103,21 @@ const MISSING_FACTOR_STATUS = 503;
 const STAT_DEFS = [
   {
     metric: 'children_reached', label: 'Children served',
-    unit: 'children', color: '#ef3a40', image: '/images/child-bowl.svg',
+    unit: 'children', color: 'var(--brand)', image: '/images/child-bowl.svg',
   },
   {
     metric: 'adults_reached', label: 'Adults served',
-    unit: 'adults', color: '#c9a86a', image: '/images/person-waving.svg',
+    unit: 'adults', color: 'var(--chart-tan)', image: '/images/person-waving.svg',
     staticCaption: 'Soup kitchens only · estimated from kg',
   },
   {
     metric: 'compost_processed', label: 'Compost processed',
-    unit: 'kg', color: '#6b8f71', image: '/images/farmer-compost.svg',
+    unit: 'kg', color: 'var(--chart-sage)', image: '/images/farmer-compost.svg',
     staticCaption: 'From Feed the Soil kits returned',
   },
   {
     metric: 'paper_saved', label: 'Paper saved',
-    unit: 'documents', color: '#2b3336', image: '/images/person-phone.svg',
+    unit: 'documents', color: 'var(--ink)', image: '/images/person-phone.svg',
     staticCaption: 'Delivery notes · dispatch · decanting',
   },
 ];
@@ -130,10 +130,10 @@ const STAT_DEFS = [
 // them, so this list only needs to say how to LABEL and colour each
 // one, not how to fetch it.
 const BENEFICIARY_TYPE_DEFS = [
-  { metric: 'children_reached', label: 'Children (ECD)', unit: 'children', color: '#ef3a40' },
-  { metric: 'adults_reached', label: 'Adults (soup kitchens)', unit: 'adults', color: '#c9a86a' },
-  { metric: 'dignity_kitchen_served', label: 'Dignity kitchens', unit: 'people', color: '#6b8f71' },
-  { metric: 'community_served', label: 'Households (community requests)', unit: 'people', color: '#2b3336' },
+  { metric: 'children_reached', label: 'Children (ECD)', unit: 'children', color: 'var(--brand)' },
+  { metric: 'adults_reached', label: 'Adults (soup kitchens)', unit: 'adults', color: 'var(--chart-tan)' },
+  { metric: 'dignity_kitchen_served', label: 'Dignity kitchens', unit: 'people', color: 'var(--chart-sage)' },
+  { metric: 'community_served', label: 'Households (community requests)', unit: 'people', color: 'var(--ink)' },
 ];
 
 // Fetched the same way as STAT_DEFS but not rendered as a poster
@@ -148,10 +148,10 @@ const EXTRA_METRIC_DEFS = [
 // Settings → Reporting.
 const AdjustFactorsDialog = () => (
   <Dialog>
-    <DialogTrigger asChild>
-      <Button type="button" variant="outline" size="sm">
-        <Settings2 /> Adjust estimates
-      </Button>
+    {/* Styled as a button rather than wrapping one: Base UI's Trigger
+        is itself a <button>, so a Button inside it nested two. */}
+    <DialogTrigger className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+      <Settings2 /> Adjust estimates
     </DialogTrigger>
     <DialogContent>
       <DialogHeader>
@@ -218,7 +218,7 @@ const ImpactPanel = ({
         <div className="flex items-center gap-3">
           <div
             className="flex size-9 shrink-0 items-center justify-center rounded-full"
-            style={{ backgroundColor: `${color}1a`, color }}
+            style={{ backgroundColor: `color-mix(in srgb, ${color} 10%, transparent)`, color }}
           >
             <Icon className="size-4" />
           </div>
@@ -267,7 +267,7 @@ const ImpactPanel = ({
         ) : report ? (
           <>
             <p className="mb-3 text-sm text-muted-foreground">{report.description}</p>
-            <div className="rounded-xl bg-[#f7f4ef] p-4">
+            <div className="rounded-xl bg-surface-2 p-4">
               <ReportChart report={report} dimensionLabel={DIMENSION_LABELS[dimension] ?? dimension} />
             </div>
             {report.meta?.caveat ? (
@@ -365,95 +365,88 @@ export default function ImpactReportPage() {
   const beneficiaryTypeItems = BENEFICIARY_TYPE_DEFS.map((def) => ({ ...def, stat: stats[def.metric] }));
 
   return (
-    <ManagerLayout>
-      <main className="mx-auto w-full max-w-5xl px-4 py-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-medium">Impact Calculator</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              What the warehouse achieved, at a glance. ECDs and soup kitchens only;
-              dignity kitchens don't require an impact report.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Select value={preset} onValueChange={setPreset}>
-              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {RANGE_PRESETS.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button type="button" variant="outline" size="sm" onClick={() => setPdfOpen(true)}>
-              <Download /> Export PDF
-            </Button>
-            {/* A config action, not a primary one — it belongs in the
-                same row as the other page-level controls, not as a
-                standalone button competing with the actual content
-                for attention. See AdjustFactorsDialog for the plainer
-                explanation now inside it. */}
-            <AdjustFactorsDialog />
-          </div>
-        </div>
+    <PageShell>
+      <PageHeader
+        title="Impact report"
+        description="What the warehouse achieved, at a glance. ECDs and soup kitchens only; dignity kitchens don't require an impact report."
+        actions={<>
+          <Select value={preset} onValueChange={setPreset}>
+            <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {RANGE_PRESETS.map((p) => (
+                <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button type="button" variant="outline" size="sm" onClick={() => setPdfOpen(true)}>
+            <Download /> Export PDF
+          </Button>
+          {/* A config action, not a primary one — it belongs in the
+              same row as the other page-level controls, not as a
+              standalone button competing with the actual content
+              for attention. See AdjustFactorsDialog for the plainer
+              explanation now inside it. */}
+          <AdjustFactorsDialog />
+        </>}
+      />
 
-        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {STAT_DEFS.map((def) => (
-            <ImpactStatCard key={def.metric} def={def} stat={stats[def.metric]} />
-          ))}
-        </div>
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {STAT_DEFS.map((def) => (
+          <ImpactStatCard key={def.metric} def={def} stat={stats[def.metric]} />
+        ))}
+      </div>
 
-        <div className="mt-6">
-          <BeneficiaryTypeChart items={beneficiaryTypeItems} />
-        </div>
+      <div className="mt-6">
+        <BeneficiaryTypeChart items={beneficiaryTypeItems} />
+      </div>
 
-        <h2 className="mt-8 text-lg font-medium">Detailed breakdown</h2>
-        <div className="mt-3 space-y-6">
-          <ImpactPanel
-            title="Meals served"
-            metric="meals_served_by_group"
-            dimensions={['group_month', 'group', 'cohort', 'month', 'week', 'none']}
-            defaultDimension="group_month"
-            filters={['cohort']}
-            icon={Utensils}
-            color="#2b3336"
-          />
-          <div>
-            {/* Logging a kit is a warehouse-floor action, not a
-                reporting one — it lives on its own staff module page
-                (see FeedTheSoilPage.jsx) alongside Donation Intake and
-                Benevolent Requests. It sits here, not up by Export PDF,
-                because "go log a kit" is only ever something someone
-                does in reaction to looking at this specific number.
-                buttonVariants applied directly to the Link rather than
-                Button's own `asChild` — Button wraps Base UI's
-                ButtonPrimitive, which does not merge onto a child the
-                way Radix's Slot does, so `asChild` here would render a
-                real nested <button> around the <a>. */}
-            <div className="mb-2 flex justify-end">
-              <Link to={STAFF.feedTheSoil} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-                <Sprout /> Log a Feed the Soil kit
-              </Link>
-            </div>
-            <ImpactPanel
-              title="Compost processed"
-              metric="compost_processed"
-              dimensions={['region', 'month', 'none']}
-              defaultDimension="region"
-              icon={Sprout}
-              color="#6b8f71"
-            />
-          </div>
-        </div>
-      </main>
-
-      {pdfOpen ? (
-        <ImpactCalculatorPDF
-          pdfStats={pdfStats}
-          beneficiaryTypeStats={beneficiaryTypeItems}
-          dateRange={dateRange}
-          onClose={() => setPdfOpen(false)}
+      <h2 className="mt-8 text-lg font-medium">Detailed breakdown</h2>
+      <div className="mt-3 space-y-6">
+        <ImpactPanel
+          title="Meals served"
+          metric="meals_served_by_group"
+          dimensions={['group_month', 'group', 'cohort', 'month', 'week', 'none']}
+          defaultDimension="group_month"
+          filters={['cohort']}
+          icon={Utensils}
+          color="var(--ink)"
         />
-      ) : null}
-    </ManagerLayout>
+        <div>
+          {/* Logging a kit is a warehouse-floor action, not a
+              reporting one — it lives on its own staff module page
+              (see FeedTheSoilPage.jsx) alongside Donation Intake and
+              Benevolent Requests. It sits here, not up by Export PDF,
+              because "go log a kit" is only ever something someone
+              does in reaction to looking at this specific number.
+              buttonVariants applied directly to the Link rather than
+              Button's own `asChild` — Button wraps Base UI's
+              ButtonPrimitive, which does not merge onto a child the
+              way Radix's Slot does, so `asChild` here would render a
+              real nested <button> around the <a>. */}
+          <div className="mb-2 flex justify-end">
+            <Link to={STAFF.feedTheSoil} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+              <Sprout /> Log a Feed the Soil kit
+            </Link>
+          </div>
+          <ImpactPanel
+            title="Compost processed"
+            metric="compost_processed"
+            dimensions={['region', 'month', 'none']}
+            defaultDimension="region"
+            icon={Sprout}
+            color="var(--chart-sage)"
+          />
+        </div>
+      </div>
+
+    {pdfOpen ? (
+      <ImpactCalculatorPDF
+        pdfStats={pdfStats}
+        beneficiaryTypeStats={beneficiaryTypeItems}
+        dateRange={dateRange}
+        onClose={() => setPdfOpen(false)}
+      />
+    ) : null}
+    </PageShell>
   );
 }

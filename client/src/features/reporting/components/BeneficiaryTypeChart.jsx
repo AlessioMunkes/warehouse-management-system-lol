@@ -46,14 +46,14 @@ export default function BeneficiaryTypeChart({ items }) {
               ) : stat.notReady ? (
                 <span className="text-xs text-muted-foreground">{stat.message || 'Not set up yet'}</span>
               ) : stat.error ? (
-                <span className="text-xs text-[#ef3a40]">Couldn't load</span>
+                <span className="text-xs text-brand">Couldn't load</span>
               ) : (
                 <span className="text-muted-foreground">
                   {Math.round(stat.value).toLocaleString('en-ZA')} {unit}
                 </span>
               )}
             </div>
-            <div className="h-2.5 w-full overflow-hidden rounded-full bg-[#f7f4ef]">
+            <div className="h-2.5 w-full overflow-hidden rounded-full bg-surface-2">
               {stat && !stat.notReady && !stat.error ? (
                 <div
                   className="h-full rounded-full motion-safe:transition-[width] motion-safe:duration-700 motion-safe:ease-out"

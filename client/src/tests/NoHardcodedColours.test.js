@@ -39,6 +39,7 @@ const ALLOWED = [
   'features/procurement/components/DeliveryNotePDF.jsx',
   'features/dispatch/components/DispatchNotePDF.jsx',
   'features/decanting/components/DecantingSheetPDF.jsx',
+  'features/reporting/components/ImpactCalculatorPDF.jsx',
   'features/packing/palletLabelPdf.js',
   'features/staff/hooks/usePdfDocument.js',
   // A signature drawn in near-white is an invisible signature.
