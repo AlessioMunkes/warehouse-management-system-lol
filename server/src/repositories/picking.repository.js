@@ -99,11 +99,14 @@ const canWorkSlip = (actor, slip) =>
 // 'confirmed', so without this count the board shows the pallet as
 // clean and dispatch has no reason to look twice — which is exactly
 // the Monday packing error the gate re-check exists to catch.
-const getSlips = async ({ dispatchDate, cohort, status, assignedTo }) => {
+const getSlips = async ({ dispatchDate, from, to, cohort, status, assignedTo }) => {
   const params = [];
   const where  = [];
 
   if (dispatchDate) { params.push(dispatchDate); where.push(`ps.dispatch_date = $${params.length}`); }
+  // A range, for the manager's week view. Inclusive both ends.
+  if (from)         { params.push(from);         where.push(`ps.dispatch_date >= $${params.length}::date`); }
+  if (to)           { params.push(to);           where.push(`ps.dispatch_date <= $${params.length}::date`); }
   if (cohort)       { params.push(cohort);       where.push(`ps.cohort = $${params.length}`); }
   if (status)       { params.push(status);       where.push(`ps.status = $${params.length}`); }
   // Matches either slot — a worker requesting "mine" wants every slip
@@ -140,15 +143,22 @@ const getSlips = async ({ dispatchDate, cohort, status, assignedTo }) => {
        COUNT(psi.id) FILTER (
          WHERE psi.status = 'confirmed'
            AND psi.packed_quantity IS DISTINCT FROM psi.required_quantity
-       )                                                      AS variance_items
+       )                                                      AS variance_items,
+       -- What happened at the gate: awaiting / collected /
+       -- late_collected / not_collected / cancelled, or null before a
+       -- dispatch event exists. dispatch_events is where the
+       -- not-collected cut-off writes; picking_slips.collection_status
+       -- is never written and must not be read.
+       de.status                                              AS dispatch_status
      FROM picking_slips ps
      JOIN ecd_centres e ON e.id = ps.ecd_id
      LEFT JOIN users u  ON u.id = ps.assigned_to
      LEFT JOIN users u2 ON u2.id = ps.assigned_to_2
+     LEFT JOIN dispatch_events de ON de.picking_slip_id = ps.id
      LEFT JOIN picking_slip_items psi ON psi.picking_slip_id = ps.id
      ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-     GROUP BY ps.id, e.name, e.child_count, e.last_collected_date, u.first_name, u2.first_name
-     ORDER BY e.name ASC`,
+     GROUP BY ps.id, e.name, e.child_count, e.last_collected_date, u.first_name, u2.first_name, de.status
+     ORDER BY ps.dispatch_date ASC, e.name ASC`,
     params
   );
 

@@ -20,5 +20,6 @@ const ALL_STAFF = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 
 router.get('/summary', auth, requireRole(...MANAGERS_UP), dashboardController.getSummary);
 router.get('/my-work', auth, requireRole(...ALL_STAFF),   dashboardController.getMyWork);
+router.get('/attention', auth, requireRole(...MANAGERS_UP), dashboardController.getAttention);
 
 export default router;

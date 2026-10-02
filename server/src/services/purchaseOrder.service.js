@@ -311,7 +311,12 @@ const createPurchaseOrder = async (body, userId) => {
 };
 
 // ── Read ──────────────────────────────────────────────────────
-const listPurchaseOrders = async ({ status, supplierId } = {}) => {
+// The list page counts its tabs from what it fetched, so it asks for
+// more than the repository's default of 50. Capped: an unbounded limit
+// from a query string is a full-table read on request.
+const MAX_LIST_LIMIT = 500;
+
+const listPurchaseOrders = async ({ status, supplierId, limit } = {}) => {
   const cleanStatus = clean(status);
   if (cleanStatus && !PO_STATUS_LIST.includes(cleanStatus)) {
     throw fail(400, `Unknown status filter "${cleanStatus}".`);
@@ -321,9 +326,14 @@ const listPurchaseOrders = async ({ status, supplierId } = {}) => {
     throw fail(400, 'A valid supplier ID is required.');
   }
 
+  if (limit !== undefined && limit !== null && limit !== ''
+      && (!isPositiveInt(limit) || Number(limit) > MAX_LIST_LIMIT)) {
+    throw fail(400, `Limit must be a whole number from 1 to ${MAX_LIST_LIMIT}.`);
+  }
   return repo.listPurchaseOrders({
     status:     cleanStatus,
     supplierId: isPositiveInt(supplierId) ? Number(supplierId) : null,
+    ...(isPositiveInt(limit) ? { limit: Number(limit) } : {}),
   });
 };
 

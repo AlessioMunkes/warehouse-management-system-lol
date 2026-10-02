@@ -14,7 +14,7 @@ import request from 'supertest';
 import jwt     from 'jsonwebtoken';
 import { ROLES } from '../src/middleware/auth.middleware.js';
 
-const serviceMock = { getSummary: vi.fn() };
+const serviceMock = { getSummary: vi.fn(), getAttention: vi.fn() };
 
 vi.mock('../src/services/dashboard.service.js', () => ({ default: serviceMock }));
 
@@ -39,6 +39,7 @@ const SUMMARY = {
 beforeEach(() => {
   vi.clearAllMocks();
   serviceMock.getSummary.mockResolvedValue(SUMMARY);
+  serviceMock.getAttention.mockResolvedValue({ inventory: { shortfall: 1 } });
 });
 
 describe('dashboard routes — authentication', () => {
@@ -63,6 +64,20 @@ describe('dashboard routes — authorisation', () => {
   it.each([ROLES.WORKER, 'finance', ROLES.GUEST])('%s cannot read the summary', async (role) => {
     const res = await request(app).get(`${BASE}/summary`).set('Cookie', cookieFor(role));
     expect(res.status).toBe(403);
+  });
+});
+
+describe('dashboard routes — attention', () => {
+  it.each([ROLES.MANAGER, ROLES.ADMIN])('%s can read what needs attention', async (role) => {
+    const res = await request(app).get(`${BASE}/attention`).set('Cookie', cookieFor(role));
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, data: { inventory: { shortfall: 1 } } });
+  });
+
+  it.each([ROLES.WORKER, ROLES.GUEST])('%s cannot', async (role) => {
+    const res = await request(app).get(`${BASE}/attention`).set('Cookie', cookieFor(role));
+    expect(res.status).toBe(403);
+    expect(serviceMock.getAttention).not.toHaveBeenCalled();
   });
 });
 

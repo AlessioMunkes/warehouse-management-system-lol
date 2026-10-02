@@ -35,6 +35,7 @@ const list = async (req, res) => {
     const data = await purchaseOrderService.listPurchaseOrders({
       status:     req.query.status,
       supplierId: req.query.supplierId,
+      limit:      req.query.limit,
     });
     res.status(200).json({ success: true, data });
   } catch (err) {

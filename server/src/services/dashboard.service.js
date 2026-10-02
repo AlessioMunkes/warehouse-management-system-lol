@@ -10,5 +10,6 @@ import repo from '../repositories/dashboard.repository.js';
 
 const getSummary = async () => repo.getSummary();
 const getMyWork  = async () => repo.getMyWork();
+const getAttention = async () => repo.getAttention();
 
-export default { getSummary, getMyWork };
+export default { getSummary, getMyWork, getAttention };

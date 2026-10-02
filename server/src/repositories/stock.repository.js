@@ -252,7 +252,11 @@ const getManifest = async () => {
          AS is_low_stock,
        sl.updated_at,
        lm.last_movement_at,
-       ex.earliest_expiry
+       -- ::text, not the DATE: node-postgres turns a DATE into a JS
+       -- Date at local midnight, which serialises as the day before
+       -- anywhere east of UTC. Same reason getSlips selects
+       -- dispatch_date::text.
+       ex.earliest_expiry::text AS earliest_expiry
      FROM products p
      LEFT JOIN stock_levels sl ON sl.product_id = p.id
      LEFT JOIN (${committedStockSql()}) c ON c.product_id = p.id
@@ -292,10 +296,10 @@ const EXPIRED_GRACE_DAYS = 30;
 const getExpiryBatches = async (productId) => {
   const result = await pool.query(
     `SELECT dni.id,
-            dni.expiry_date,
+            dni.expiry_date::text          AS expiry_date,
             dni.received_quantity::numeric AS received_quantity,
             dni.unit,
-            dn.delivery_date               AS received_on,
+            dn.delivery_date::text         AS received_on,
             s.name                         AS supplier_name,
             (dni.expiry_date - (now() AT TIME ZONE 'Africa/Johannesburg')::date)::int AS days_left
      FROM delivery_note_items dni
@@ -447,6 +451,14 @@ const ledgerWhere = (filters, params, alias) => {
   return where;
 };
 
+// REFERENCES, RESOLVED TO WHAT A MANAGER CAN OPEN
+// A movement's reference_id points at the row that caused it, which is
+// not always a screen: a dispatch movement points at a dispatch_events
+// row, a receipt at a delivery_notes row. The two joins below follow
+// those one step to the picking slip and the purchase order, so the
+// ledger can link to them. Both are keyed on reference_type as well as
+// the id — ids are only unique within their own table.
+//
 // One extra row is requested beyond the caller's limit. If it comes
 // back there is another page; it is dropped before returning, so the
 // caller never sees it. Cheaper and more honest than a COUNT(*) over
@@ -470,10 +482,21 @@ const getLedger = async ({ limit = 50, cursor = null, ...filters } = {}) => {
             w.balance_after,
             p.name               AS product_name,
             p.stock_keeping_unit AS sku,
-            u.first_name         AS performed_by_name
+            u.first_name         AS performed_by_name,
+            de.picking_slip_id   AS picking_slip_id,
+            ecd.name             AS picking_slip_name,
+            dn.purchase_order_id AS purchase_order_id,
+            po.po_number         AS po_number
      FROM walked w
      JOIN products p       ON p.id = w.product_id
      LEFT JOIN users u     ON u.id = w.performed_by
+     LEFT JOIN dispatch_events de
+            ON w.reference_type = 'dispatch_event' AND de.id = w.reference_id
+     LEFT JOIN picking_slips ps   ON ps.id  = de.picking_slip_id
+     LEFT JOIN ecd_centres ecd    ON ecd.id = ps.ecd_id
+     LEFT JOIN delivery_notes dn
+            ON w.reference_type = 'delivery_note' AND dn.id = w.reference_id
+     LEFT JOIN purchase_orders po ON po.id = dn.purchase_order_id
      ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
      ORDER BY w.created_at DESC, w.id DESC
      LIMIT $${params.length}`,

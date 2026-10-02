@@ -80,3 +80,15 @@ describe('getExpiryBatches', () => {
     expect(sql).toMatch(/dni\.received_quantity > 0/);
   });
 });
+
+describe('getLedger — references a manager can open', () => {
+  it('follows a dispatch movement to its picking slip and a receipt to its purchase order', async () => {
+    await repo.getLedger({ limit: 10 });
+    const sql = flat(poolMock.query.mock.calls[0][0]);
+
+    expect(sql).toMatch(/LEFT JOIN dispatch_events de ON w\.reference_type = 'dispatch_event' AND de\.id = w\.reference_id/);
+    expect(sql).toMatch(/LEFT JOIN delivery_notes dn ON w\.reference_type = 'delivery_note' AND dn\.id = w\.reference_id/);
+    expect(sql).toMatch(/de\.picking_slip_id AS picking_slip_id/);
+    expect(sql).toMatch(/po\.po_number AS po_number/);
+  });
+});

@@ -14,6 +14,7 @@ const repoMock = {
   getPurchaseOrderById:      vi.fn(),
   updatePurchaseOrderStatus: vi.fn(),
   setQuickbooksReference:    vi.fn(),
+  listPurchaseOrders:        vi.fn(),
 };
 
 vi.mock('../src/repositories/purchaseOrder.repository.js', () => ({ default: repoMock }));
@@ -40,6 +41,24 @@ beforeEach(() => {
   repoMock.getPurchaseOrderById.mockResolvedValue(existingPO());
   repoMock.updatePurchaseOrderStatus.mockResolvedValue(existingPO({ status: 'approved' }));
   repoMock.setQuickbooksReference.mockResolvedValue(true);
+  repoMock.listPurchaseOrders.mockResolvedValue([]);
+});
+
+describe('listPurchaseOrders — limit', () => {
+  it('leaves the repository default alone when no limit is asked for', async () => {
+    await purchaseOrderService.listPurchaseOrders({});
+    expect(repoMock.listPurchaseOrders.mock.calls[0][0]).not.toHaveProperty('limit');
+  });
+
+  it('passes a limit the list page asks for', async () => {
+    await purchaseOrderService.listPurchaseOrders({ limit: '500' });
+    expect(repoMock.listPurchaseOrders).toHaveBeenCalledWith(expect.objectContaining({ limit: 500 }));
+  });
+
+  it.each(['0', '501', 'all', '2.5'])('rejects the limit %s with 400', async (limit) => {
+    await expect(purchaseOrderService.listPurchaseOrders({ limit })).rejects.toMatchObject({ status: 400 });
+    expect(repoMock.listPurchaseOrders).not.toHaveBeenCalled();
+  });
 });
 
 describe('setPurchaseOrderStatus', () => {

@@ -158,4 +158,62 @@ const getSummary = async () => {
   };
 };
 
-export default { getSummary, getMyWork, stockHealth };
+// ── What needs a manager, and where ────────────────────────────
+// One read behind the dashboard's "Needs attention" list and the
+// counts on the manager sidebar, so the two can never disagree.
+//
+// Each count is the size of a tab a manager can open:
+//   inventory      — the Inventory tabs (same rules as inventoryViews.js:
+//                    low stock excludes shortfalls; expiring is a
+//                    delivery line due within 30 days, today included)
+//   pickingSlips   — this week (Monday to Sunday, SAST), the Picking
+//                    Slips page's default range
+//   purchaseOrders — awaiting approval, and those flagged for follow-up
+//   communityRequests — still pending
+const EXPIRY_WINDOW_DAYS = 30;
+
+const sastDay = (date) =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Johannesburg' }).format(date);
+
+const getAttention = async ({ now = new Date() } = {}) => {
+  const [manifest, slips, pos, requests] = await Promise.all([
+    stockRepo.getManifest(),
+    pool.query(
+      `SELECT
+         COUNT(*) FILTER (WHERE ps.status = 'pending')::int          AS unassigned,
+         COUNT(*) FILTER (WHERE de.status = 'not_collected')::int     AS not_collected
+       FROM picking_slips ps
+       LEFT JOIN dispatch_events de ON de.picking_slip_id = ps.id
+       WHERE ps.dispatch_date >= date_trunc('week', ${SAST_TODAY})::date
+         AND ps.dispatch_date <  date_trunc('week', ${SAST_TODAY})::date + 7`
+    ),
+    pool.query(
+      `SELECT
+         COUNT(*) FILTER (WHERE status = 'pending')::int            AS awaiting_approval,
+         COUNT(*) FILTER (WHERE status = 'follow_up_required')::int AS follow_up
+       FROM purchase_orders`
+    ),
+    pool.query(
+      `SELECT COUNT(*)::int AS count FROM community_requests WHERE outcome = 'pending'`
+    ),
+  ]);
+
+  const today = sastDay(now);
+  const horizon = sastDay(new Date(now.getTime() + EXPIRY_WINDOW_DAYS * 86400000));
+  let shortfall = 0; let lowStock = 0; let expiring = 0;
+  for (const p of manifest) {
+    if (p.is_shortfall) shortfall += 1;
+    else if (p.is_low_stock) lowStock += 1;
+    // 'YYYY-MM-DD' strings compare correctly as text.
+    if (p.earliest_expiry && p.earliest_expiry >= today && p.earliest_expiry <= horizon) expiring += 1;
+  }
+
+  return {
+    inventory:         { shortfall, lowStock, expiring },
+    pickingSlips:      { unassigned: num(slips.rows[0]?.unassigned), notCollected: num(slips.rows[0]?.not_collected) },
+    purchaseOrders:    { awaitingApproval: num(pos.rows[0]?.awaiting_approval), followUp: num(pos.rows[0]?.follow_up) },
+    communityRequests: { pending: num(requests.rows[0]?.count) },
+  };
+};
+
+export default { getSummary, getMyWork, getAttention, stockHealth };

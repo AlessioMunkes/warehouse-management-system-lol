@@ -170,6 +170,17 @@ const listPurchaseOrders = async ({ status = null, supplierId = null, limit = 50
             u.first_name AS created_by_name,
             (SELECT COUNT(*) FROM purchase_order_items poi
               WHERE poi.purchase_order_id = po.id)::int AS line_count,
+            -- Lines whose full expected quantity has arrived, summed
+            -- over every delivery against them. The "n of m received"
+            -- the list shows; partially_received is not written
+            -- automatically (see delivery.repository.js), so the status
+            -- alone cannot say how far an order has got.
+            (SELECT COUNT(*) FROM purchase_order_items poi
+              WHERE poi.purchase_order_id = po.id
+                AND COALESCE((SELECT SUM(dni.received_quantity)
+                                FROM delivery_note_items dni
+                               WHERE dni.purchase_order_item_id = poi.id), 0)
+                    >= poi.expected_quantity)::int AS received_line_count,
             (SELECT COALESCE(SUM(poi.expected_quantity * COALESCE(poi.unit_price, 0)), 0)
                FROM purchase_order_items poi
               WHERE poi.purchase_order_id = po.id) AS estimated_value,

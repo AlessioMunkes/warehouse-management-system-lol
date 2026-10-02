@@ -63,15 +63,22 @@ const cleanItemLines = (items) => {
 // to see unclaimed pallets in order to claim one. `mine=true` narrows
 // a packer to the pallets already assigned to them; for a manager it
 // is ignored, because a manager's board is the whole floor.
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
 const getSlips = async (query, user) => {
-  const { dispatchDate, cohort, status, mine } = query;
+  const { dispatchDate, from, to, cohort, status, mine } = query;
 
   if (cohort && !COHORTS.includes(cohort))   fail(400, 'Cohort must be tuesday or thursday.');
   if (status && !STATUSES.includes(status))  fail(400, 'Invalid status filter.');
+  // Checked here so a malformed day is a 400 with a message rather
+  // than a Postgres cast error coming back as a 500.
+  if (from && !ISO_DAY.test(from)) fail(400, 'From must be a date (YYYY-MM-DD).');
+  if (to && !ISO_DAY.test(to))     fail(400, 'To must be a date (YYYY-MM-DD).');
+  if (from && to && from > to)     fail(400, 'From must be on or before To.');
 
   const assignedTo = (!isManager(user) && mine === 'true') ? user.id : undefined;
 
-  return await pickingRepository.getSlips({ dispatchDate, cohort, status, assignedTo });
+  return await pickingRepository.getSlips({ dispatchDate, from, to, cohort, status, assignedTo });
 };
 
 // ── One slip ──────────────────────────────────────────────────
