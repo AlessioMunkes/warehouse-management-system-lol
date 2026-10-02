@@ -11,6 +11,8 @@ import { useAuth } from '../context/AuthContext';
 import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
 import DashboardGreeting from '../features/taskdashboard/components/DashboardGreeting';
 import CustomisableDashboard from '../features/dashboard/components/CustomisableDashboard';
+import NeedsAttention from '../features/dashboard/components/NeedsAttention';
+import useAttention from '../features/dashboard/useAttention';
 
 // The greeting reads the summary even if no widget does.
 const ALWAYS = ['summary'];
@@ -26,11 +28,16 @@ export default function ManagerDashboardPage() {
   const { user } = useAuth();
   const [data, setData] = useState({});
   const summary = data.summary ?? null;
+  const attention = useAttention(true);
 
   return (
     <ManagerLayout>
       <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
         <DashboardGreeting name={user?.firstName} summaryLine={managerSummaryLine(summary)} />
+        {/* Above the widgets: what to act on before what to read. */}
+        <div className="mb-6 mt-4">
+          <NeedsAttention attention={attention} />
+        </div>
         <CustomisableDashboard user={user} always={ALWAYS} onData={setData} />
       </div>
     </ManagerLayout>

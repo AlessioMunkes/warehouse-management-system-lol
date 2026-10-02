@@ -23,17 +23,24 @@ import {
 } from '@/components/ui/tooltip';
 import { useAuth } from '../../../context/AuthContext';
 import { NAV_SECTIONS, homeForRole } from './navSections';
+import useAttention from '../../dashboard/useAttention';
 import batchesLogo from '../../../assets/Batches_Logo.jpeg';
 
-const NavLink = ({ to, label, icon: Icon, active, collapsed, onNavigate }) => {
+// `count` — how many things on this screen need dealing with, or
+// nothing. Expanded it is a number at the end of the row; collapsed, a
+// dot on the icon. Either way the accessible name says it in words, so
+// it never rests on the pill alone.
+const NavLink = ({ to, label, icon: Icon, active, collapsed, onNavigate, count }) => {
+  const flagged = count > 0;
+  const name = flagged ? `${label}, ${count} need${count === 1 ? 's' : ''} attention` : label;
   const link = (
     <Link
       to={to}
       onClick={onNavigate}
       // Collapsed, the text that named this link is gone, so the name
-      // has to come from somewhere. Expanded, an aria-label would just
-      // duplicate the visible text.
-      aria-label={collapsed ? label : undefined}
+      // has to come from somewhere. Expanded, an aria-label is only
+      // needed when there is a count to say.
+      aria-label={collapsed || flagged ? name : undefined}
       className={`flex items-center rounded-[4px] text-sm transition-colors ${
         collapsed ? 'justify-center px-0 py-2.5' : 'gap-2.5 px-3 py-2'
       } ${
@@ -42,8 +49,23 @@ const NavLink = ({ to, label, icon: Icon, active, collapsed, onNavigate }) => {
           : 'text-ink hover:bg-surface-2'
       }`}
     >
-      <Icon className="size-4 shrink-0" />
-      {collapsed ? null : label}
+      <span className="relative shrink-0">
+        <Icon className="size-4" />
+        {collapsed && flagged ? (
+          <span aria-hidden="true" className="absolute -right-1 -top-1 size-2 rounded-full bg-danger" />
+        ) : null}
+      </span>
+      {collapsed ? null : <span className="min-w-0 flex-1">{label}</span>}
+      {!collapsed && flagged ? (
+        <span
+          aria-hidden="true"
+          className={`ml-auto rounded-full px-1.5 text-[11px] font-medium tabular-nums ${
+            active ? 'bg-on-ink/20 text-on-ink' : 'bg-danger-soft text-danger'
+          }`}
+        >
+          {count > 99 ? '99+' : count}
+        </span>
+      ) : null}
     </Link>
   );
 
@@ -55,7 +77,7 @@ const NavLink = ({ to, label, icon: Icon, active, collapsed, onNavigate }) => {
   return (
     <Tooltip>
       <TooltipTrigger asChild>{link}</TooltipTrigger>
-      <TooltipContent side="right">{label}</TooltipContent>
+      <TooltipContent side="right">{name}</TooltipContent>
     </Tooltip>
   );
 };
@@ -69,6 +91,10 @@ const NavLink = ({ to, label, icon: Icon, active, collapsed, onNavigate }) => {
 // full-width panel someone deliberately opened — an icon rail inside
 // one would be a smaller target for no gain.
 export const SidebarNav = ({ sections, pathname, homeTo, collapsed = false, onNavigate }) => {
+  // Counts only for the manager's menu — the only one whose items say
+  // how to read them (navSections.js `count`).
+  const { user } = useAuth();
+  const attention = useAttention(user?.role === 'manager');
   const body = (
     <>
       <Link
@@ -106,6 +132,7 @@ export const SidebarNav = ({ sections, pathname, homeTo, collapsed = false, onNa
                 <NavLink
                   key={item.to}
                   {...item}
+                  count={attention && item.count ? item.count(attention) : 0}
                   active={pathname === item.to}
                   collapsed={collapsed}
                   onNavigate={onNavigate}

@@ -79,6 +79,15 @@ const ADMIN_SECTIONS = [
   },
 ];
 
+// Grouped by the way stock moves through the building: what comes in,
+// what is held, what goes out, the programmes beside the main flow,
+// and the reports on all of it.
+//
+// `count` reads the manager's attention counts (useAttention) and puts
+// a number beside the item when something there needs dealing with.
+// Only problems are counted — a slip nobody has claimed yet this week
+// is the normal state of the queue, so it is on the dashboard's list
+// but not here.
 const MANAGER_SECTIONS = [
   {
     label: 'Overview',
@@ -87,35 +96,44 @@ const MANAGER_SECTIONS = [
     ],
   },
   {
-    label: 'Operations',
+    label: 'Inbound',
     items: [
+      { to: STAFF.purchaseOrders, label: 'Purchase Orders', icon: ShoppingCart,
+        count: (a) => a.purchaseOrders.awaitingApproval + a.purchaseOrders.followUp },
+      { to: STAFF.receipts, label: 'Receipts', icon: ReceiptText },
+    ],
+  },
+  {
+    label: 'Stock',
+    items: [
+      { to: '/noc/inventory', label: 'Inventory', icon: Boxes,
+        count: (a) => a.inventory.shortfall + a.inventory.expiring },
+      { to: STAFF.stockLedger, label: 'Stock Ledger', icon: ScrollText },
+    ],
+  },
+  {
+    label: 'Outbound',
+    items: [
+      { to: STAFF.pickingSlips, label: 'Picking Slips', icon: ClipboardList,
+        count: (a) => a.pickingSlips.notCollected },
       { to: STAFF.beneficiaries, label: 'Beneficiaries', icon: Users2 },
       { to: STAFF.collectionReminders, label: 'Collection Reminders', icon: MessageCircle },
-      { to: STAFF.pickingSlips, label: 'Picking Slips', icon: ClipboardList },
-      { to: STAFF.purchaseOrders, label: 'Purchase Orders', icon: ShoppingCart },
-      { to: '/noc/inventory', label: 'Inventory', icon: Boxes },
-      { to: STAFF.receipts, label: 'Receipts', icon: ReceiptText },
-      { to: STAFF.communityRequests, label: 'Benevolent Requests', icon: PhoneCall },
+      { to: STAFF.communityRequests, label: 'Benevolent Requests', icon: PhoneCall,
+        count: (a) => a.communityRequests.pending },
     ],
   },
   // The floor flows (receiving, packing, decanting, dispatch) and
   // donation intake aren't in the manager's menu.
   {
-    label: 'Warehouse',
+    label: 'Programmes',
     items: [
       { to: STAFF.feedTheSoil, label: 'Feed the Soil', icon: Sprout },
-    ],
-  },
-  {
-    label: 'Volunteers',
-    items: [
       { to: VOLUNTEERS.events, label: 'Volunteer Events', icon: HandHeart },
     ],
   },
   {
     label: 'Insights',
     items: [
-      { to: STAFF.stockLedger, label: 'Stock Ledger', icon: ScrollText },
       { to: STAFF.reporting, label: 'Operations Reports', icon: BarChart3 },
       { to: STAFF.impactReport, label: 'Impact Reports', icon: HeartHandshake },
     ],
