@@ -83,10 +83,15 @@ const Section = ({ title, note, children }) => (
   </section>
 );
 
-const Figure = ({ label, value, emphasis }) => (
+// The number large and the unit small beside it, on one line — "30"
+// over "crate" read as two figures.
+const Figure = ({ label, value, unit, emphasis }) => (
   <div className="min-w-0">
     <dt className="text-xs text-muted-foreground">{label}</dt>
-    <dd className={`text-lg tabular-nums ${emphasis ? 'font-semibold' : 'font-medium'}`}>{value}</dd>
+    <dd className="whitespace-nowrap">
+      <span className={`text-lg tabular-nums ${emphasis ? 'font-semibold' : 'font-medium'}`}>{fmtQty(value)}</span>
+      {unit ? <span className="ml-1 text-xs text-muted-foreground">{unit}</span> : null}
+    </dd>
   </div>
 );
 
@@ -174,10 +179,10 @@ export default function StockDetailPanel({
       )}
     >
       <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Figure label="On hand"    value={fmtQty(product.onHand, unit)} />
-        <Figure label="Committed"  value={fmtQty(product.committed, unit)} />
-        <Figure label="Available"  value={fmtQty(product.available, unit)} emphasis />
-        <Figure label="Reorder at" value={fmtQty(product.reorderAt, unit)} />
+        <Figure label="On hand"    value={product.onHand}    unit={unit} />
+        <Figure label="Committed"  value={product.committed} unit={unit} />
+        <Figure label="Available"  value={product.available} unit={unit} emphasis />
+        <Figure label="Reorder at" value={product.reorderAt} unit={unit} />
       </dl>
 
       <Section title="Balance over time" note={product.reorderAt > 0 ? 'Dashed line: reorder level' : undefined}>

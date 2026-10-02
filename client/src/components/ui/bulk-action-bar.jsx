@@ -9,8 +9,8 @@
 //   onClear  — untick everything
 //   children — the action Buttons
 //
-// Same height as ListToolbar so the table does not jump when the first
-// box is ticked. The count is a polite live region: a screen reader
+// Same height as ListToolbar's row (min-h-10) so the table does not
+// jump when the first box is ticked. The count is a polite live region: a screen reader
 // hears "3 products selected" without losing its place in the table.
 // ─────────────────────────────────────────────────────────────
 import { X } from 'lucide-react';
@@ -23,7 +23,7 @@ export default function BulkActionBar({ count, noun = 'rows', onClear, children 
     <div
       role="toolbar"
       aria-label={`Actions for selected ${noun}`}
-      className="flex min-h-9 flex-wrap items-center gap-2 rounded-full border bg-muted/60 py-1 pl-4 pr-1"
+      className="flex min-h-10 flex-wrap items-center gap-2 rounded-full border bg-muted/60 py-0.5 pl-4 pr-1"
     >
       <span className="text-sm font-medium tabular-nums" aria-live="polite">
         {count} {count === 1 ? noun.replace(/s$/, '') : noun} selected

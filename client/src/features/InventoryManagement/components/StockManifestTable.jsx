@@ -204,7 +204,9 @@ export default function StockManifestTable({
           action={narrowed ? { label: 'Clear all filters', onClick: clearAll } : undefined}
         />
       ) : (
-        <Card>
+        // py-0: Card's own vertical padding is for a titled card; on a
+        // table it leaves an empty band above the header row.
+        <Card className="py-0">
           <CardContent className="p-0">
             <Table>
               <TableHeader>

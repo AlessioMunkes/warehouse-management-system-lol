@@ -15,7 +15,9 @@
 //
 // Built on Sheet, so focus is trapped while it is open and returns to
 // the row that opened it when it closes. Wider than Sheet's default:
-// a figure grid and a chart need more than 384px.
+// a figure grid and a chart need more than 384px. The width class has
+// to carry Sheet's own data-[side=right] variant, or tailwind-merge
+// keeps both and Sheet's narrower one wins.
 // ─────────────────────────────────────────────────────────────
 import {
   Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle,
@@ -24,7 +26,7 @@ import {
 export default function DetailPanel({ open, onClose, eyebrow, title, badges, actions, children }) {
   return (
     <Sheet open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
-      <SheetContent className="w-full gap-0 sm:max-w-xl">
+      <SheetContent className="w-full gap-0 data-[side=right]:w-full data-[side=right]:sm:max-w-xl">
         <SheetHeader className="border-b pr-14">
           {eyebrow ? (
             <SheetDescription className="min-w-0 break-words text-xs">{eyebrow}</SheetDescription>

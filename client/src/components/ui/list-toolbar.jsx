@@ -34,7 +34,7 @@ export default function ListToolbar({
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex min-h-10 flex-wrap items-center gap-2">
         {search ? (
           <div className="relative min-w-56 flex-1">
             <Search aria-hidden="true" className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
