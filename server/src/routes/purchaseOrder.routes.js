@@ -42,6 +42,11 @@ router.patch('/:id/status',
 router.patch('/:id/quickbooks-ref',
   auth, requireRole(...MANAGES_UP), validateIntId, purchaseOrderController.setQuickbooksReference);
 
+// Resend the "new PO" email to Finance. Only meaningful when the first
+// send failed or never happened; the service refuses overlapping sends.
+router.post('/:id/finance-email/resend',
+  auth, requireRole(...MANAGES_UP), validateIntId, purchaseOrderController.resendFinanceEmail);
+
 // Header + line edit, and outright removal — both restricted to a
 // 'pending' order by purchaseOrder.service.js, not by the role check
 // here. Same MANAGES_UP as create: editing/deleting a PO is the same

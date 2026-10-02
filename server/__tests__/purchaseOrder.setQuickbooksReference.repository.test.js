@@ -87,3 +87,74 @@ describe('setQuickbooksReference', () => {
     expect(select.sql).toMatch(/FOR UPDATE/);
   });
 });
+
+describe('setQuickbooksReference — duplicate QuickBooks PO number', () => {
+  // The live table has UNIQUE (qbo_object_type, qbo_id) as
+  // qbo_map_unique_remote; the second link to one number violates it.
+  const duplicateClient = () => {
+    const calls = [];
+    return {
+      calls,
+      release: vi.fn(),
+      query: vi.fn(async (sql, params) => {
+        const clean = sql.replace(/\s+/g, ' ').trim();
+        calls.push({ sql: clean, params });
+        if (/^SELECT id FROM purchase_orders/i.test(clean)) return { rows: [{ id: params[0] }] };
+        if (/^INSERT INTO quickbooks_object_map/i.test(clean)) {
+          throw Object.assign(new Error('duplicate key value'), {
+            code: '23505', constraint: 'qbo_map_unique_remote',
+          });
+        }
+        if (/^SELECT po\.po_number/i.test(clean)) return { rows: [{ po_number: 'PO-2026-0101' }] };
+        return { rows: [] };
+      }),
+    };
+  };
+
+  it('rolls back and throws a 409 naming the PO that already holds the number', async () => {
+    client = duplicateClient();
+
+    await expect(repo.setQuickbooksReference(12, 'QB-500', 3)).rejects.toMatchObject({
+      status: 409,
+      message: 'QuickBooks PO QB-500 is already linked to PO-2026-0101.',
+    });
+
+    const sqls = client.calls.map((c) => c.sql);
+    expect(sqls).toContain('ROLLBACK');
+    // The lookup for the other PO's number runs after the rollback.
+    expect(sqls.indexOf('ROLLBACK')).toBeLessThan(sqls.findIndex((s) => /^SELECT po\.po_number/i.test(s)));
+    expect(sqls).not.toContain('COMMIT');
+  });
+
+  it('does not treat other unique violations as a duplicate link', async () => {
+    client = duplicateClient();
+    client.query.mockImplementationOnce(async () => ({ rows: [] })); // BEGIN
+    client.query.mockImplementationOnce(async () => { throw Object.assign(new Error('other'), { code: '23505', constraint: 'something_else' }); });
+
+    await expect(repo.setQuickbooksReference(12, 'QB-500', 3)).rejects.toMatchObject({ message: 'other' });
+  });
+});
+
+describe('getPurchaseOrderById — finance email fields', () => {
+  it('selects the status columns and never returns a raw error message', async () => {
+    const queries = [];
+    poolMock.query = vi.fn(async (sql) => {
+      queries.push(sql.replace(/\s+/g, ' '));
+      if (/FROM purchase_orders po/i.test(sql)) {
+        return { rows: [{
+          id: 12, po_number: 'PO-2026-0012',
+          finance_email_status: 'failed',
+          finance_email_error: 'getaddrinfo ENOTFOUND gmail.googleapis.com',
+          finance_email_attempted_at: '2026-10-02T08:00:00.000Z',
+        }] };
+      }
+      return { rows: [] };
+    });
+
+    const po = await repo.getPurchaseOrderById(12);
+
+    expect(queries[0]).toMatch(/po\.finance_email_status/);
+    expect(queries[0]).toMatch(/po\.finance_email_attempted_at/);
+    expect(po.finance_email_error).toBe("Couldn't reach the email service");
+  });
+});

@@ -232,6 +232,18 @@ export default function PurchaseOrdersPage() {
     } catch (err) { setError(err.message); return false; }
   };
 
+  // Resend the Finance email. Returns success like setQuickbooksRef, so
+  // the button can stop spinning either way; the banner shows the
+  // server's message (e.g. no Finance recipient saved).
+  const resendFinanceEmail = async () => {
+    setError(null);
+    try {
+      await purchaseOrderAPI.resendFinanceEmail(selected.id);
+      await open(selected.id);
+      return true;
+    } catch (err) { setError(err.message); await open(selected.id); return false; }
+  };
+
   const visible = tab === 'open'
     ? purchaseOrders.filter((po) => po.status !== 'completed' && po.status !== 'returned')
     : purchaseOrders;
@@ -344,6 +356,7 @@ export default function PurchaseOrdersPage() {
                     canManage={canManage}
                     onApprove={approve}
                     onSetQuickbooksRef={setQuickbooksRef}
+                    onResendFinanceEmail={resendFinanceEmail}
                     onEdit={() => { setMode('edit'); setFormError(null); setInvalidProductIds([]); focusDetail(); }}
                     onDelete={remove}
                     onClose={() => { setSelected(null); setMode('list'); }}

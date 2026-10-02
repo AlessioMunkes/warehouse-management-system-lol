@@ -19,6 +19,35 @@
 import pool           from '../config/db.js';
 import { logAudit }   from './auditLog.repository.js';
 import { createNotification } from './notification.repository.js';
+import { safeFinanceEmailError } from '../utils/financeEmailError.js';
+
+const QBO_UNIQUE_CONSTRAINT = 'qbo_map_unique_remote';
+
+// UNIQUE (qbo_object_type, qbo_id): one QuickBooks PO number can be
+// linked to only one WMS PO. Turns that violation into a 409 naming the
+// PO that already holds it. Must run after ROLLBACK, on a client that
+// is out of the failed transaction.
+const duplicateLinkError = async (client, quickbooksPoId) => {
+  const { rows } = await client.query(
+    `SELECT po.po_number
+       FROM quickbooks_object_map qom
+       JOIN purchase_orders po ON po.id = qom.entity_id
+      WHERE qom.entity_type = 'purchase_order'
+        AND qom.qbo_object_type = 'PurchaseOrder'
+        AND qom.qbo_id = $1
+      LIMIT 1`,
+    [quickbooksPoId]
+  );
+  const other = rows[0]?.po_number;
+  const err = new Error(other
+    ? `QuickBooks PO ${quickbooksPoId} is already linked to ${other}.`
+    : `QuickBooks PO ${quickbooksPoId} is already linked to another purchase order.`);
+  err.status = 409;
+  return err;
+};
+
+const isDuplicateLink = (err) =>
+  err?.code === '23505' && err.constraint === QBO_UNIQUE_CONSTRAINT;
 
 // Named columns rather than SELECT *, so a column added later does not
 // silently start crossing the API.
@@ -153,6 +182,7 @@ const createPurchaseOrder = async (payload, userId) => {
     };
   } catch (err) {
     await client.query('ROLLBACK');
+    if (quickbooksPoId && isDuplicateLink(err)) throw await duplicateLinkError(client, quickbooksPoId);
     throw err;
   } finally {
     client.release();
@@ -195,7 +225,10 @@ const getPurchaseOrderById = async (id) => {
             s.name AS supplier_name,
             s.is_active AS supplier_is_active,
             u.first_name AS created_by_name,
-            qom.qbo_id AS quickbooks_po_id
+            qom.qbo_id AS quickbooks_po_id,
+            po.finance_email_status,
+            po.finance_email_error,
+            po.finance_email_attempted_at
        FROM purchase_orders po
        JOIN suppliers s ON s.id = po.supplier_id
        LEFT JOIN users u ON u.id = po.created_by
@@ -207,6 +240,8 @@ const getPurchaseOrderById = async (id) => {
   );
   const purchaseOrder = rows[0];
   if (!purchaseOrder) return null;
+  // Whatever is stored, only a short safe message leaves the repository.
+  purchaseOrder.finance_email_error = safeFinanceEmailError(purchaseOrder.finance_email_error);
 
   // received_to_date comes from delivery_note_items joined back to the
   // PO line, which is what makes BR-07A work without a new table:
@@ -356,6 +391,7 @@ const setQuickbooksReference = async (id, quickbooksPoId, actorId) => {
     return true;
   } catch (err) {
     await client.query('ROLLBACK');
+    if (quickbooksPoId && isDuplicateLink(err)) throw await duplicateLinkError(client, quickbooksPoId);
     throw err;
   } finally {
     client.release();

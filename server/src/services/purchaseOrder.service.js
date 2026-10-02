@@ -21,6 +21,7 @@ import emailProvider from '../providers/email.provider.js';
 // Replaced financeEmailFallback.service.js, which read FINANCE_EMAIL until
 // feature/notification-fix brought this service onto staging.
 import financeService from './finance.service.js';
+import { FINANCE_EMAIL_ERRORS, safeFinanceEmailError } from '../utils/financeEmailError.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -244,31 +245,56 @@ Please capture this purchase order in QuickBooks, then enter the QuickBooks refe
 // A stubbed result (EMAIL_ENABLED=false) is treated the same as no
 // recipient configured: nothing actually left the building, so no
 // status is recorded rather than falsely claiming 'sent'.
+//
+// Returns what happened: 'no_recipient' | 'stubbed' | 'sent' | 'failed'
+// | 'in_progress' (another send for this PO is already running). Only
+// 'sent' and 'failed' touch the status columns.
+//
+// What is stored is a short safe message (utils/financeEmailError.js),
+// never the raw provider text; the raw text goes to the server log.
+//
+// One send per PO at a time: the create-time send and a Resend click
+// cannot overlap and race each other's status write. The flag is
+// always cleared in finally.
+const sendsInFlight = new Set();
+
 const notifyFinance = async (purchaseOrder) => {
-  const { recipientEmail } = await financeService.getEmailSettings();
-  if (!recipientEmail) return; // nothing configured — leave status null, no attempt logged
-
-  const { subject, text, html } = buildFinanceEmail(purchaseOrder);
-
-  let result;
+  if (sendsInFlight.has(purchaseOrder.id)) return 'in_progress';
+  sendsInFlight.add(purchaseOrder.id);
   try {
-    result = await emailProvider.sendEmail({ to: recipientEmail, subject, text, html }, null);
-  } catch (err) {
+    const { recipientEmail } = await financeService.getEmailSettings();
+    if (!recipientEmail) return 'no_recipient'; // nothing configured — status left as is, no attempt logged
+
+    const { subject, text, html } = buildFinanceEmail(purchaseOrder);
+
+    let result;
+    try {
+      result = await emailProvider.sendEmail({ to: recipientEmail, subject, text, html }, null);
+    } catch (err) {
+      console.error('[purchaseOrder:financeEmail]', err.message);
+      await repo.recordFinanceEmailAttempt(purchaseOrder.id, {
+        status: 'failed',
+        error: safeFinanceEmailError(err.message) ?? FINANCE_EMAIL_ERRORS.generic,
+        attemptedAt: new Date(),
+      });
+      return 'failed';
+    }
+
+    if (result?.stubbed) return 'stubbed'; // EMAIL_ENABLED=false — no real attempt was made
+
+    const sent = result?.sent === true;
+    if (!sent) {
+      console.error('[purchaseOrder:financeEmail]', result?.error || result?.reason || 'Provider reported a failure.');
+    }
     await repo.recordFinanceEmailAttempt(purchaseOrder.id, {
-      status: 'failed',
-      error: err.message || 'Finance email send failed.',
+      status: sent ? 'sent' : 'failed',
+      error: sent ? null : (safeFinanceEmailError(result?.error || result?.reason) ?? FINANCE_EMAIL_ERRORS.generic),
       attemptedAt: new Date(),
     });
-    return;
+    return sent ? 'sent' : 'failed';
+  } finally {
+    sendsInFlight.delete(purchaseOrder.id);
   }
-
-  if (result?.stubbed) return; // EMAIL_ENABLED=false — no real attempt was made
-
-  await repo.recordFinanceEmailAttempt(purchaseOrder.id, {
-    status: result?.sent === true ? 'sent' : 'failed',
-    error: result?.sent === true ? null : (result?.error || result?.reason || 'Provider reported a failure.'),
-    attemptedAt: new Date(),
-  });
 };
 
 // ── Create ────────────────────────────────────────────────────
@@ -298,16 +324,19 @@ const createPurchaseOrder = async (body, userId) => {
     throw fail(500, 'Failed to create the purchase order.');
   }
 
-  // Sent after commit, never before. Wrapped so a Gmail outage can
-  // never turn a created PO into a failed API response — notifyFinance
-  // already never throws, this is belt-and-braces.
-  try {
-    await notifyFinance(result.purchaseOrder);
-  } catch {
-    /* notifyFinance records its own failure; nothing more to do here */
-  }
+  // Fire-and-forget, after commit. setImmediate runs it after the
+  // controller has sent the response, so Gmail's latency (or an outage)
+  // never delays or fails the create. The send writes its own status
+  // once the attempt resolves; the catch keeps any error from becoming
+  // an unhandled rejection.
+  const created = result.purchaseOrder;
+  setImmediate(() => {
+    notifyFinance(created).catch((err) => {
+      console.error('[purchaseOrder:financeEmail]', err.message);
+    });
+  });
 
-  return result.purchaseOrder;
+  return created;
 };
 
 // ── Read ──────────────────────────────────────────────────────
@@ -385,6 +414,30 @@ const setQuickbooksReference = async (rawId, body = {}, actorId) => {
   return repo.getPurchaseOrderById(id);
 };
 
+// ── Resend the Finance email ─────────────────────────────────
+// Same send + status-write path as creation. Returns the PO as it now
+// stands, so the caller sees the status the attempt left behind.
+const resendFinanceEmail = async (rawId) => {
+  if (!isPositiveInt(rawId)) throw fail(400, 'A valid purchase order ID is required.');
+  const id = Number(rawId);
+
+  const purchaseOrder = await repo.getPurchaseOrderById(id);
+  if (!purchaseOrder) throw fail(404, 'Purchase order not found.');
+
+  const outcome = await notifyFinance(purchaseOrder);
+  if (outcome === 'in_progress') {
+    throw fail(409, 'An email for this purchase order is already being sent.');
+  }
+  if (outcome === 'no_recipient') {
+    throw fail(400, FINANCE_EMAIL_ERRORS.noRecipient);
+  }
+  if (outcome === 'stubbed') {
+    throw fail(503, 'Email sending is turned off on this server.');
+  }
+
+  return repo.getPurchaseOrderById(id);
+};
+
 // ── Update (pending only) ──────────────────────────────────────
 // Reuses buildPayload/buildItems wholesale — an edit is validated
 // exactly as hard as a fresh order, because it produces the same
@@ -450,4 +503,5 @@ export default {
   updatePurchaseOrder,
   deletePurchaseOrder,
   setQuickbooksReference,
+  resendFinanceEmail,
 };

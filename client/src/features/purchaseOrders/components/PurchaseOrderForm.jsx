@@ -192,7 +192,7 @@ export default function PurchaseOrderForm({
           nothing on save. */}
       {!initialValue ? (
         <Field>
-          <FieldLabel htmlFor="po-qbo">QuickBooks reference</FieldLabel>
+          <FieldLabel htmlFor="po-qbo">QuickBooks PO number (optional)</FieldLabel>
           <Input
             id="po-qbo"
             value={form.quickbooksPoId}
