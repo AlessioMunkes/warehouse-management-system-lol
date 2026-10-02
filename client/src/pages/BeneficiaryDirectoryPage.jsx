@@ -14,107 +14,91 @@
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth }     from '../context/AuthContext';
-import ManagerLayout    from '../components/layout/ManagerLayout';
 import BeneficiaryForm from '../features/beneficiaries/components/BeneficiaryForm';
 import beneficiaryAPI  from '../services/beneficiaryAPI';
+import useTableView    from '../features/masterdata/hooks/useTableView';
+import useOpenFromQuery from '../features/masterdata/hooks/useOpenFromQuery';
+import MasterDataTable from '../features/masterdata/components/MasterDataTable';
+import {
+  BENEFICIARY_COLUMNS, COHORT_LABELS,
+} from '../features/beneficiaries/components/beneficiaryColumns';
 
-import {
-  InputGroup, InputGroupAddon, InputGroupInput,
-} from '@/components/ui/input-group';
-import { Field, FieldLabel } from '@/components/ui/field';
 import { Button }    from '@/components/ui/button';
-import { Checkbox }  from '@/components/ui/checkbox';
 import { Skeleton }  from '@/components/ui/skeleton';
-import {
-  Card, CardContent, CardHeader, CardTitle,
-} from '@/components/ui/card';
-import { Search, Plus, Pencil, Power, ShieldCheck, RotateCcw, X } from 'lucide-react';
+import StatusBadge   from '@/components/ui/status-badge';
+import PageHeader, { PageShell } from '@/components/ui/page-header';
+import ViewTabs      from '@/components/ui/view-tabs';
+import ListCard      from '@/components/ui/list-card';
+import ListToolbar   from '@/components/ui/list-toolbar';
+import DetailPanel   from '@/components/ui/detail-panel';
+import EmptyState    from '@/components/ui/empty-state';
+import ErrorBanner   from '@/components/ui/error-banner';
+import { Plus, Pencil, Power, ShieldCheck, RotateCcw, Building2 } from 'lucide-react';
 
 const CAN_MANAGE = ['manager', 'admin'];
 const OTHER_COHORT = { tuesday: 'thursday', thursday: 'tuesday' };
-import useTableView    from '../features/masterdata/hooks/useTableView';
-import useDetailFocus  from '../features/masterdata/hooks/useDetailFocus';
-import useOpenFromQuery from '../features/masterdata/hooks/useOpenFromQuery';
-import MasterDataTable from '../features/masterdata/components/MasterDataTable';
-import ColumnToggle    from '@/components/ui/column-toggle';
-import FilterPills     from '../features/masterdata/components/FilterPills';
-import {
-  BENEFICIARY_COLUMNS, COHORT_FILTERS, COHORT_LABELS,
-} from '../features/beneficiaries/components/beneficiaryColumns';
+
+// Cohort and approval as tabs, client-side over the fetched rows, so
+// neither races the server-side search or "Show inactive".
+const VIEWS = [
+  { id: 'all',      label: 'All',               test: () => true },
+  { id: 'tuesday',  label: 'Tuesday',           test: (b) => b.cohort === 'tuesday' },
+  { id: 'thursday', label: 'Thursday',          test: (b) => b.cohort === 'thursday' },
+  { id: 'pending',  label: 'Awaiting approval', alert: true, test: (b) => !b.approvedAt },
+];
 
 const fmtDate = (value) =>
   value
     ? new Date(value).toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' })
     : '—';
 
-const ErrorBanner = ({ message, onRetry }) => (
-  <div className="p-4 rounded-[4px] bg-danger-soft border-2 border-brand text-ink text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-    <span>{message}</span>
-    {onRetry ? (
-      <button
-        onClick={onRetry}
-        className="text-xs sm:text-sm font-semibold underline hover:text-brand focus:outline-none"
-      >
-        Try again
-      </button>
-    ) : null}
-  </div>
-);
-
-// ── Detail panel ──────────────────────────────────────────────
 const BeneficiaryDetail = ({ beneficiary, canManage, onEdit, onToggleActive, onApprove, onRollbackCohort, onClose }) => (
-  <Card>
-    <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
-      <div>
-        <CardTitle>{beneficiary.name}</CardTitle>
-        <p className="text-sm text-muted-foreground">
-          {COHORT_LABELS[beneficiary.cohort] ?? beneficiary.cohort}
-        </p>
-      </div>
-      <Button type="button" variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close">
-        <X />
-      </Button>
-    </CardHeader>
-
-    <CardContent className="space-y-5">
-      <dl className="grid gap-3 text-sm sm:grid-cols-2">
-        <div><dt className="text-muted-foreground">Contact</dt><dd>{beneficiary.contactName || '—'}</dd></div>
-        <div><dt className="text-muted-foreground">Mobile</dt><dd>{beneficiary.mobileNumber || '—'}</dd></div>
-        <div><dt className="text-muted-foreground">Children served</dt><dd>{beneficiary.childCount ?? 'Not recorded'}</dd></div>
-        <div><dt className="text-muted-foreground">Approved</dt><dd>{beneficiary.approvedAt ? fmtDate(beneficiary.approvedAt) : 'Not yet approved'}</dd></div>
-        <div><dt className="text-muted-foreground">Last collection</dt><dd>{fmtDate(beneficiary.lastCollectedDate)}</dd></div>
-      </dl>
-
-      {!beneficiary.approvedAt ? (
-        <p className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-          This centre cannot receive a picking slip until it is approved.
-        </p>
-      ) : null}
-
-      {canManage ? (
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" onClick={onEdit}>
-            <Pencil />
-            Edit details
+  <DetailPanel
+    open
+    onClose={onClose}
+    eyebrow={`${COHORT_LABELS[beneficiary.cohort] ?? beneficiary.cohort} cohort`}
+    title={beneficiary.name}
+    badges={!beneficiary.approvedAt || beneficiary.isActive === false ? <>
+      {beneficiary.approvedAt ? null : <StatusBadge kind="record" status="inactive">Awaiting approval</StatusBadge>}
+      {beneficiary.isActive === false ? <StatusBadge kind="record" status="inactive">Inactive</StatusBadge> : null}
+    </> : null}
+    actions={canManage ? (
+      <>
+        {!beneficiary.approvedAt ? (
+          <Button type="button" onClick={onApprove}>
+            <ShieldCheck />
+            Approve
           </Button>
-          {!beneficiary.approvedAt ? (
-            <Button type="button" variant="outline" onClick={onApprove}>
-              <ShieldCheck />
-              Approve
-            </Button>
-          ) : null}
-          <Button type="button" variant="outline" onClick={onToggleActive}>
-            <Power />
-            {beneficiary.isActive ? 'Deactivate' : 'Reactivate'}
-          </Button>
-          <Button type="button" variant="outline" onClick={onRollbackCohort}>
-            <RotateCcw />
-            Move to {COHORT_LABELS[OTHER_COHORT[beneficiary.cohort]] ?? 'other cohort'}
-          </Button>
-        </div>
-      ) : null}
-    </CardContent>
-  </Card>
+        ) : null}
+        <Button type="button" variant="outline" onClick={onEdit}>
+          <Pencil />
+          Edit details
+        </Button>
+        <Button type="button" variant="outline" onClick={onRollbackCohort}>
+          <RotateCcw />
+          Move to {COHORT_LABELS[OTHER_COHORT[beneficiary.cohort]] ?? 'other cohort'}
+        </Button>
+        <Button type="button" variant="outline" onClick={onToggleActive}>
+          <Power />
+          {beneficiary.isActive ? 'Deactivate' : 'Reactivate'}
+        </Button>
+      </>
+    ) : null}
+  >
+    <dl className="grid gap-4 text-sm sm:grid-cols-2">
+      <div><dt className="text-muted-foreground">Contact</dt><dd>{beneficiary.contactName || '—'}</dd></div>
+      <div><dt className="text-muted-foreground">Mobile</dt><dd>{beneficiary.mobileNumber || '—'}</dd></div>
+      <div><dt className="text-muted-foreground">Children served</dt><dd>{beneficiary.childCount ?? 'Not recorded'}</dd></div>
+      <div><dt className="text-muted-foreground">Approved</dt><dd>{beneficiary.approvedAt ? fmtDate(beneficiary.approvedAt) : 'Not yet approved'}</dd></div>
+      <div><dt className="text-muted-foreground">Last collection</dt><dd>{fmtDate(beneficiary.lastCollectedDate)}</dd></div>
+    </dl>
+
+    {!beneficiary.approvedAt ? (
+      <p className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+        This centre cannot receive a picking slip until it is approved.
+      </p>
+    ) : null}
+  </DetailPanel>
 );
 
 // ── Page ──────────────────────────────────────────────────────
@@ -132,18 +116,18 @@ export default function BeneficiaryDirectoryPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
-  // Cohort narrows first, then sort orders what is left — both
-  // client-side over the already-fetched rows, so neither races the
-  // server-side search or the "Show inactive" toggle.
-  const [cohortFilter, setCohortFilter] = useState(null);
+  const [tab, setTab] = useState('all');
   const view = useTableView('beneficiaries', BENEFICIARY_COLUMNS);
+  const current = VIEWS.find((v) => v.id === tab) ?? VIEWS[0];
 
-  const visibleBeneficiaries = useMemo(() => {
-    const filtered = cohortFilter
-      ? beneficiaries.filter((b) => b.cohort === cohortFilter)
-      : beneficiaries;
-    return view.sortRows(filtered);
-  }, [beneficiaries, cohortFilter, view]);
+  const visibleBeneficiaries = useMemo(
+    () => view.sortRows(beneficiaries.filter(current.test)),
+    [beneficiaries, current, view],
+  );
+  const counts = useMemo(
+    () => Object.fromEntries(VIEWS.map((v) => [v.id, beneficiaries.filter(v.test).length])),
+    [beneficiaries],
+  );
 
   const loadBeneficiaries = useCallback(async () => {
     setError(null);
@@ -172,19 +156,17 @@ export default function BeneficiaryDirectoryPage() {
     return () => { cancelled = true; };
   }, [includeInactive, search]);
 
-  // Opening a centre, or its add/edit form, moves the page to it —
-  // the card sits above a long list, out of sight of the row clicked.
-  const [detailRef, focusDetail] = useDetailFocus();
+  // A centre, and its add/edit form, open in the panel down the right;
+  // the list stays where it was behind it.
   const open = async (id) => {
     setError(null);
     try {
       setSelected(await beneficiaryAPI.getBeneficiary(id));
       setMode('list');
-      focusDetail();
     } catch (err) { setError(err.message); }
   };
-  const startCreate = () => { setSelected(null); setMode('create'); focusDetail(); };
-  const startEdit = () => { setMode('edit'); focusDetail(); };
+  const startCreate = () => { setSelected(null); setMode('create'); };
+  const startEdit = () => setMode('edit');
   // ?open=<id> from the admin Activity / Archive screens.
   useOpenFromQuery(open);
 
@@ -236,129 +218,107 @@ export default function BeneficiaryDirectoryPage() {
   };
 
   return (
-    <ManagerLayout>
-      <main className="mx-auto w-full max-w-5xl px-4 py-6">
-        <h1 className="text-2xl font-medium">Beneficiaries</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          ECDs, soup kitchens, dignity kitchens and benevolent package beneficiaries on record.
-        </p>
-
-        {error ? (
-          <div className="mt-4">
-            <ErrorBanner message={error} onRetry={loadBeneficiaries} />
-          </div>
+    <PageShell>
+      <PageHeader
+        title="Beneficiaries"
+        description="ECDs, soup kitchens, dignity kitchens and benevolent package beneficiaries on record."
+        actions={canManage ? (
+          <Button type="button" onClick={startCreate}>
+            <Plus />
+            Add beneficiary
+          </Button>
         ) : null}
+      />
 
-        {isLoading ? (
-          <div className="mt-6 space-y-3">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-24 w-full" />
-          </div>
-        ) : (
-          <div className="mt-6 space-y-6">
-            {mode === 'create' ? (
-              <Card ref={detailRef} tabIndex={-1} className="scroll-mt-6 outline-none">
-                <CardHeader><CardTitle>Add a beneficiary</CardTitle></CardHeader>
-                <CardContent>
-                  <BeneficiaryForm onSubmit={create} onCancel={() => setMode('list')} busy={busy} />
-                </CardContent>
-              </Card>
-            ) : mode === 'edit' && selected ? (
-              <Card ref={detailRef} tabIndex={-1} className="scroll-mt-6 outline-none">
-                <CardHeader><CardTitle>Edit {selected.name}</CardTitle></CardHeader>
-                <CardContent>
-                  <BeneficiaryForm
-                    initial={selected}
-                    submitLabel="Save changes"
-                    onSubmit={save}
-                    onCancel={() => setMode('list')}
-                    busy={busy}
-                  />
-                </CardContent>
-              </Card>
-            ) : (
-              <>
-                <div className="flex flex-wrap items-center gap-3">
-                  <InputGroup className="min-w-56 flex-1">
-                    <InputGroupAddon align="inline-start">
-                      <Search />
-                    </InputGroupAddon>
-                    <InputGroupInput
-                      placeholder="Search by name or contact"
-                      value={search}
-                      onChange={(e) => { setIsLoading(true); setSearch(e.target.value); }}
-                    />
-                  </InputGroup>
+      <ErrorBanner className="mt-4" message={error} onRetry={loadBeneficiaries} />
 
-                  <Field orientation="horizontal" className="w-auto">
-                    <Checkbox
-                      id="include-inactive"
-                      checked={includeInactive}
-                      onCheckedChange={(v) => { setIsLoading(true); setIncludeInactive(Boolean(v)); }}
-                    />
-                    <FieldLabel htmlFor="include-inactive" className="font-normal">
-                      Show inactive
-                    </FieldLabel>
-                  </Field>
+      <ViewTabs
+        className="mt-5"
+        label="Beneficiary views"
+        value={tab}
+        onChange={setTab}
+        tabs={VIEWS.map((v) => ({ id: v.id, label: v.label, alert: v.alert, count: isLoading ? null : counts[v.id] }))}
+      />
 
-                  <FilterPills
-                    label="Filter by cohort"
-                    value={cohortFilter}
-                    onChange={setCohortFilter}
-                    options={COHORT_FILTERS}
-                  />
+      <div className="mt-6">
+        <ListCard
+          // Mounted through a reload: the search triggers the fetch, and
+          // swapping it for a skeleton would lose focus after each letter.
+          header={
+            <ListToolbar
+              search={{
+                value: search,
+                onChange: (value) => { setIsLoading(true); setSearch(value); },
+                placeholder: 'Search by name or contact',
+              }}
+              filters={[{
+                key: 'inactive', label: 'Show inactive', active: includeInactive,
+                onToggle: () => { setIsLoading(true); setIncludeInactive((v) => !v); },
+              }]}
+              columns={{
+                idPrefix: 'beneficiaries',
+                columns: view.availableColumns,
+                hidden: view.hidden,
+                onToggle: view.toggleColumn,
+                onReset: view.resetColumns,
+              }}
+            />
+          }
+        >
+          {isLoading ? (
+            <div className="space-y-2 p-4" aria-busy="true">
+              {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+            </div>
+          ) : visibleBeneficiaries.length === 0 ? (
+            <EmptyState
+              icon={Building2}
+              title="No beneficiaries match"
+              description={search ? 'Nothing matches the search.' : 'Nobody is in this view.'}
+              action={search ? { label: 'Clear search', onClick: () => { setIsLoading(true); setSearch(''); } } : undefined}
+            />
+          ) : (
+            <MasterDataTable
+              columns={view.visibleColumns}
+              rows={visibleBeneficiaries}
+              sort={view.sort}
+              onToggleSort={view.toggleSort}
+              onOpenRow={(b) => open(b.id)}
+              noun="beneficiaries"
+            />
+          )}
+        </ListCard>
+      </div>
 
-                  <ColumnToggle
-                    idPrefix="beneficiaries"
-                    columns={view.availableColumns}
-                    hidden={view.hidden}
-                    onToggle={view.toggleColumn}
-                    onReset={view.resetColumns}
-                  />
+      {mode === 'list' && selected ? (
+        <BeneficiaryDetail
+          key={selected.id}
+          beneficiary={selected}
+          canManage={canManage}
+          onEdit={startEdit}
+          onToggleActive={toggleActive}
+          onApprove={approve}
+          onRollbackCohort={rollbackCohort}
+          onClose={() => setSelected(null)}
+        />
+      ) : null}
 
-                  {canManage ? (
-                    <Button type="button" onClick={startCreate}>
-                      <Plus />
-                      Add beneficiary
-                    </Button>
-                  ) : null}
-                </div>
+      {mode === 'create' ? (
+        <DetailPanel open onClose={() => setMode('list')} title="Add a beneficiary">
+          <BeneficiaryForm onSubmit={create} onCancel={() => setMode('list')} busy={busy} />
+        </DetailPanel>
+      ) : null}
 
-                <div ref={detailRef} tabIndex={-1} className="scroll-mt-6 outline-none">
-                {selected ? (
-                  <BeneficiaryDetail
-                    beneficiary={selected}
-                    canManage={canManage}
-                    onEdit={startEdit}
-                    onToggleActive={toggleActive}
-                    onApprove={approve}
-                    onRollbackCohort={rollbackCohort}
-                    onClose={() => setSelected(null)}
-                  />
-                ) : null}
-                </div>
-
-                {visibleBeneficiaries.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No beneficiaries match.</p>
-                ) : (
-                  <Card>
-                    <CardContent className="p-0">
-                      <MasterDataTable
-                        columns={view.visibleColumns}
-                        rows={visibleBeneficiaries}
-                        sort={view.sort}
-                        onToggleSort={view.toggleSort}
-                        onOpenRow={(b) => open(b.id)}
-                      />
-                    </CardContent>
-                  </Card>
-                )}
-              </>
-            )}
-          </div>
-        )}
-      </main>
-    </ManagerLayout>
+      {mode === 'edit' && selected ? (
+        <DetailPanel open onClose={() => setMode('list')} eyebrow="Edit" title={selected.name}>
+          <BeneficiaryForm
+            initial={selected}
+            submitLabel="Save changes"
+            onSubmit={save}
+            onCancel={() => setMode('list')}
+            busy={busy}
+          />
+        </DetailPanel>
+      ) : null}
+    </PageShell>
   );
 }
