@@ -93,7 +93,8 @@ const GuestDonePage = () => {
         lede="That pallet is packed and ready to go out. Here is what you did."
       >
         {/* The headline figure — what they physically packed. */}
-        <div className="gst-card gst-animate-pop" style={{ textAlign: 'center' }}>
+        <div className="gst-celebrate gst-animate-pop">
+          <span className="gst-seal" aria-hidden="true">✓</span>
           <span className="gst-figure">{unitsPacked || itemsPacked}</span>
           <span className="gst-figure-label">
             {unitsPacked
@@ -103,14 +104,12 @@ const GuestDonePage = () => {
         </div>
 
         <div className="gst-figure-row">
-          <div className="gst-card">
-            <span className="gst-figure" style={{ fontSize: '2.5rem' }}>{itemsPacked}</span>
+          <div className="gst-card gst-stat">
+            <span className="gst-figure gst-figure-sm is-packed">{itemsPacked}</span>
             <span className="gst-figure-label">things packed</span>
           </div>
-          <div className="gst-card">
-            <span className="gst-figure" style={{ fontSize: '2.5rem', color: 'var(--gst-ink)' }}>
-              {itemsFlagged}
-            </span>
+          <div className="gst-card gst-stat">
+            <span className="gst-figure gst-figure-sm">{itemsFlagged}</span>
             <span className="gst-figure-label">
               {itemsFlagged === 1 ? 'problem reported' : 'problems reported'}
             </span>
@@ -122,7 +121,7 @@ const GuestDonePage = () => {
             a made-up number here would be the worst kind. */}
         <div className="gst-card gst-card-quiet">
           <h2 className="gst-card-title">Where it’s going</h2>
-          <p className="gst-card-meta" style={{ color: 'var(--gst-ink)' }}>
+          <p className="gst-card-meta gst-text-ink">
             This pallet goes to <strong>{beneficiary}</strong>
             {`, ${kind.article} ${kind.noun}`}
             {childCount ? <> that feeds <strong>{childCount} children</strong></> : ''}
@@ -138,8 +137,8 @@ const GuestDonePage = () => {
           </Notice>
         ) : null}
 
-        <div className="gst-card gst-card-quiet">
-          <p className="gst-card-meta" style={{ color: 'var(--gst-ink)', textAlign: 'center' }}>
+        <div className="gst-card gst-card-quiet gst-thanks">
+          <p className="gst-card-meta gst-text-ink">
             Ladles of Love could not do this without people giving up their time.
             Thank you for giving yours today.
           </p>
