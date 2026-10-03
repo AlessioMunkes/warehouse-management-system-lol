@@ -25,6 +25,7 @@ import ManagerLayout from './ManagerLayout';
 import StaffTabBar from './StaffTabBar';
 import { useAuth } from '../../context/AuthContext';
 import OfflineBar from './OfflineBar';
+import useGoBack from './useGoBack';
 import useSpareSlipAlert from '../../features/staff/hooks/useSpareSlipAlert';
 import { STAFF } from '../../routes/paths';
 
@@ -51,6 +52,7 @@ export default function StaffShell({
   children,
 }) {
   const navigate = useNavigate();
+  const goBack = useGoBack();
   const { pathname } = useLocation();
   const { title, sub } = splitCrumb(crumb);
 
@@ -80,7 +82,7 @@ export default function StaffShell({
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => navigate(-1)}
+                      onClick={goBack}
                       aria-label="Go back"
                     >
                       <ArrowLeft className="h-5 w-5" />
