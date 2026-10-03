@@ -33,7 +33,7 @@ const BCRYPT_COST = 10;
 // idx_users_email_unique is the last line of defence against two
 // accounts sharing an address; the pre-checks below give the friendly
 // message, this catches the race between check and write.
-const emailTaken = (email) => fail(409, `Another account already uses the email "${email}".`);
+const emailTaken = (email) => fail(409, `Another user already has this email address. Use a different one.`);
 
 const isEmailUniqueViolation = (err) =>
   err?.code === '23505' && /email/i.test(`${err.constraint ?? ''} ${err.detail ?? ''}`);

@@ -20,7 +20,7 @@ vi.mock('../src/providers/email.provider.js', () => ({ default: emailProviderMoc
 vi.mock('../src/services/finance.service.js', () => ({ default: financeEmailFallbackMock }));
 
 const { default: purchaseOrderService } = await import('../src/services/purchaseOrder.service.js');
-const { safeFinanceEmailError } = await import('../src/utils/financeEmailError.js');
+const { safeFinanceEmailError, FINANCE_EMAIL_ERRORS } = await import('../src/utils/financeEmailError.js');
 const { default: outboundMessages } = await import('../src/features/communications/outboundMessage.repository.js');
 
 const VALID_BODY = {
@@ -87,7 +87,7 @@ describe('createPurchaseOrder — finance email', () => {
     await sendFinished();
     expect(repoMock.recordFinanceEmailAttempt).toHaveBeenCalledWith(42, {
       status: 'failed',
-      error: "Couldn't reach the email service",
+      error: "The email service didn't respond. Try again.",
       attemptedAt: expect.any(Date),
     });
     expect(console.error).toHaveBeenCalledWith('[purchaseOrder:financeEmail]', expect.stringContaining('ECONNREFUSED'));
@@ -130,7 +130,7 @@ describe('createPurchaseOrder — finance email', () => {
     await purchaseOrderService.createPurchaseOrder(VALID_BODY, 7);
     await sendFinished();
     expect(repoMock.recordFinanceEmailAttempt).toHaveBeenCalledWith(42, expect.objectContaining({
-      status: 'failed', error: 'Gmail not connected',
+      status: 'failed', error: 'Ask an admin to connect Gmail in Settings, then resend.',
     }));
   });
 
@@ -160,13 +160,13 @@ describe('createPurchaseOrder — finance email', () => {
 
 describe('safeFinanceEmailError', () => {
   it.each([
-    ['No Gmail connection found. Please connect Gmail first.', 'Gmail not connected'],
-    ['Failed to refresh Gmail access token. Please reconnect Gmail.', 'Gmail not connected'],
-    ['invalid_grant', 'Gmail not connected'],
-    ['getaddrinfo ENOTFOUND gmail.googleapis.com', "Couldn't reach the email service"],
-    ['fetch failed', "Couldn't reach the email service"],
-    ['Gmail API send failed.', 'Send failed'],
-    ['550 5.1.1 someone@secret-host.internal rejected', 'Send failed'],
+    ['No Gmail connection found. Please connect Gmail first.', 'Ask an admin to connect Gmail in Settings, then resend.'],
+    ['Failed to refresh Gmail access token. Please reconnect Gmail.', 'Ask an admin to connect Gmail in Settings, then resend.'],
+    ['invalid_grant', 'Ask an admin to connect Gmail in Settings, then resend.'],
+    ['getaddrinfo ENOTFOUND gmail.googleapis.com', "The email service didn't respond. Try again."],
+    ['fetch failed', "The email service didn't respond. Try again."],
+    ['Gmail API send failed.', "The email didn't send. Try again."],
+    ['550 5.1.1 someone@secret-host.internal rejected', "The email didn't send. Try again."],
   ])('maps %j to %j', (raw, safe) => {
     expect(safeFinanceEmailError(raw)).toBe(safe);
   });
@@ -178,10 +178,11 @@ describe('safeFinanceEmailError', () => {
   });
 
   it('is idempotent on already-safe messages', () => {
-    for (const m of ['No Finance recipient saved', 'Gmail not connected', "Couldn't reach the email service", 'Send failed']) {
+    for (const m of [FINANCE_EMAIL_ERRORS.noRecipient, FINANCE_EMAIL_ERRORS.notConnected, FINANCE_EMAIL_ERRORS.unreachable, FINANCE_EMAIL_ERRORS.generic]) {
       expect(safeFinanceEmailError(m)).toBe(m);
     }
   });
+it('maps the texts earlier versions stored to the current ones', () => {    expect(safeFinanceEmailError('No Finance recipient saved')).toBe(FINANCE_EMAIL_ERRORS.noRecipient);    expect(safeFinanceEmailError('Gmail not connected')).toBe(FINANCE_EMAIL_ERRORS.notConnected);    expect(safeFinanceEmailError("Couldn't reach the email service")).toBe(FINANCE_EMAIL_ERRORS.unreachable);    expect(safeFinanceEmailError('Send failed')).toBe(FINANCE_EMAIL_ERRORS.generic);  });
 });
 
 describe('resendFinanceEmail', () => {
@@ -208,15 +209,15 @@ describe('resendFinanceEmail', () => {
     const po = await purchaseOrderService.resendFinanceEmail(42);
 
     expect(repoMock.recordFinanceEmailAttempt).toHaveBeenCalledWith(42, expect.objectContaining({
-      status: 'failed', error: 'Gmail not connected',
+      status: 'failed', error: 'Ask an admin to connect Gmail in Settings, then resend.',
     }));
     expect(po.finance_email_error).toBe('Gmail not connected');
   });
 
-  it('400s with "No Finance recipient saved" when none is set', async () => {
+  it('400s with the Finance recipient message when none is set', async () => {
     financeEmailFallbackMock.getEmailSettings.mockResolvedValue({ recipientEmail: null });
     await expect(purchaseOrderService.resendFinanceEmail(42))
-      .rejects.toMatchObject({ status: 400, message: 'No Finance recipient saved' });
+      .rejects.toMatchObject({ status: 400, message: 'Ask an admin to add a Finance email address in Settings, then resend.' });
     expect(emailProviderMock.sendEmail).not.toHaveBeenCalled();
     expect(repoMock.recordFinanceEmailAttempt).not.toHaveBeenCalled();
   });

@@ -51,17 +51,17 @@ describe('toPurchaseOrder — finance email fields', () => {
 });
 
 describe('PurchaseOrderDetail — finance email', () => {
-  it('shows "Sent to finance · <time>" in a neutral badge with no Resend', () => {
+  it('shows "Sent to Finance · <time>" in a neutral badge with no Resend', () => {
     renderDetail({ finance_email_status: 'sent', finance_email_attempted_at: '2026-10-02T08:30:00.000Z' });
-    const badge = screen.getByText(/Sent to finance ·/);
+    const badge = screen.getByText(/Sent to Finance ·/);
     expect(badge.closest('[data-tone]').dataset.tone).toBe('neutral');
-    expect(screen.queryByRole('button', { name: 'Resend' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Resend to Finance' })).toBeNull();
   });
 
   it('shows "Not sent" with Resend when nothing was ever attempted', () => {
     renderDetail();
     expect(screen.getByText('Not sent').closest('[data-tone]').dataset.tone).toBe('neutral');
-    expect(screen.getByRole('button', { name: 'Resend' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Resend to Finance' })).toBeTruthy();
   });
 
   it('shows "Send failed" in the warning tone, the safe reason, and Resend', async () => {
@@ -72,27 +72,27 @@ describe('PurchaseOrderDetail — finance email', () => {
     expect(screen.getByText('Send failed').closest('[data-tone]').dataset.tone).toBe('warn');
     expect(screen.getByText('Gmail not connected')).toBeTruthy();
 
-    await user.click(screen.getByRole('button', { name: 'Resend' }));
+    await user.click(screen.getByRole('button', { name: 'Resend to Finance' }));
     expect(onResendFinanceEmail).toHaveBeenCalledTimes(1);
   });
 
   it('hides Resend from someone who cannot manage orders', () => {
     renderDetail({ finance_email_status: 'failed' }, { canManage: false });
     expect(screen.getByText('Send failed')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Resend' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Resend to Finance' })).toBeNull();
   });
 });
 
 describe('PurchaseOrderDetail — QuickBooks PO number', () => {
-  it('shows "Not linked yet" in a neutral badge when unlinked', () => {
+  it('shows "Not linked to QuickBooks yet" in a neutral badge when unlinked', () => {
     renderDetail();
     expect(screen.getByText('QuickBooks PO number')).toBeTruthy();
-    expect(screen.getByText('Not linked yet').closest('[data-tone]').dataset.tone).toBe('neutral');
+    expect(screen.getByText('Not linked to QuickBooks yet').closest('[data-tone]').dataset.tone).toBe('neutral');
   });
 
-  it('shows "Linked to QuickBooks PO <number>" when linked', () => {
+  it('shows "Linked to QuickBooks PO number <number>" when linked', () => {
     renderDetail({ quickbooks_po_id: 'QB-1042' });
-    expect(screen.getByText('Linked to QuickBooks PO QB-1042')).toBeTruthy();
+    expect(screen.getByText('Linked to QuickBooks PO number QB-1042')).toBeTruthy();
   });
 
   it('uses the renamed edit label and placeholder', async () => {
@@ -109,10 +109,10 @@ describe('PurchaseOrderDetail — QuickBooks PO number', () => {
 });
 
 describe('PurchaseOrderForm — QuickBooks field', () => {
-  it('is labelled "QuickBooks PO number (optional)", keeping its existing placeholder and hint', () => {
+  it('is labelled "QuickBooks PO number (optional)", with the new placeholder and hint', () => {
     render(<PurchaseOrderForm suppliers={[]} products={[]} onSubmit={vi.fn()} />);
     const input = screen.getByLabelText('QuickBooks PO number (optional)');
-    expect(input.getAttribute('placeholder')).toBe('Leave blank unless you have already raised it there');
-    expect(screen.getByText(/The WMS generates the PO number/)).toBeTruthy();
+    expect(input.getAttribute('placeholder')).toBe('Leave blank');
+    expect(screen.getByText('Only fill in if this order was already raised in QuickBooks.')).toBeTruthy();
   });
 });

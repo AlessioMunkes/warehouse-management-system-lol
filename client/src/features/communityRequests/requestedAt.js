@@ -10,7 +10,7 @@
 // applies.
 // ─────────────────────────────────────────────────────────────
 
-export const FUTURE_REQUEST_MESSAGE = "Date & time of request can't be in the future.";
+export const FUTURE_REQUEST_MESSAGE = 'Choose a date and time that is not in the future.';
 
 const pad = (n) => String(n).padStart(2, '0');
 

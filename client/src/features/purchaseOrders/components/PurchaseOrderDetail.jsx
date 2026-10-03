@@ -231,12 +231,12 @@ export default function PurchaseOrderDetail({
                 placeholder="QuickBooks PO number" maxLength={50} className="h-8" disabled={qboBusy}
                 aria-label="QuickBooks PO number"
               />
-              <Button type="button" size="sm" onClick={saveQbo} disabled={qboBusy}>Save</Button>
+              <Button type="button" size="sm" onClick={saveQbo} disabled={qboBusy}>Save number</Button>
               <Button
                 type="button" variant="ghost" size="sm" disabled={qboBusy}
                 onClick={() => { setQboDraft(po.quickbooksPoId || ''); setEditingQbo(false); }}
               >
-                Cancel
+                Discard
               </Button>
             </dd>
           ) : (
@@ -244,7 +244,7 @@ export default function PurchaseOrderDetail({
               {/* Unlinked is the normal state until Finance has entered
                   the order, so it reads as neutral, not as a problem. */}
               <StatusBadge tone="neutral" className="max-w-full whitespace-normal break-all">
-                {po.quickbooksPoId ? `Linked to QuickBooks PO ${po.quickbooksPoId}` : 'Not linked yet'}
+                {po.quickbooksPoId ? `Linked to QuickBooks PO number ${po.quickbooksPoId}` : 'Not linked to QuickBooks yet'}
               </StatusBadge>
               {canManage ? (
                 <Button
@@ -262,7 +262,7 @@ export default function PurchaseOrderDetail({
           <dd className="flex flex-wrap items-center gap-2">
             {emailSent ? (
               <StatusBadge tone="neutral" icon={MailCheck}>
-                Sent to finance{po.financeEmailAttemptedAt ? ` · ${fmtDateTime(po.financeEmailAttemptedAt)}` : ''}
+                Sent to Finance{po.financeEmailAttemptedAt ? ` · ${fmtDateTime(po.financeEmailAttemptedAt)}` : ''}
               </StatusBadge>
             ) : emailFailed ? (
               <StatusBadge tone="warn" icon={MailX}>Send failed</StatusBadge>
@@ -274,7 +274,7 @@ export default function PurchaseOrderDetail({
             ) : null}
             {canResend ? (
               <Button type="button" variant="outline" size="sm" onClick={resend} disabled={resending}>
-                {resending ? 'Sending' : 'Resend'}
+                {resending ? 'Sending…' : 'Resend to Finance'}
               </Button>
             ) : null}
           </dd>

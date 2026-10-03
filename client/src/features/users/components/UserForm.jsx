@@ -156,8 +156,8 @@ export default function UserForm({
             aria-invalid={(touched.email && emailInvalid) || undefined}
           />
           {touched.email && emailInvalid
-            ? <FieldError>That does not look like a valid email address.</FieldError>
-            : <FieldDescription>Used for password reset emails. Leave blank to remove it.</FieldDescription>}
+            ? <FieldError>Enter a valid email address, like name@example.org.</FieldError>
+            : <FieldDescription>Add an email address so this person can reset their own password. Leave blank to remove it.</FieldDescription>}
         </Field>
       </div>
 

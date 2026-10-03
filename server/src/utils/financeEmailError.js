@@ -5,7 +5,7 @@
 // the browser (Google API messages, hostnames, token errors). Anything
 // stored in purchase_orders.finance_email_error, or sent to the client,
 // goes through here first: known failures become one short fixed
-// sentence, everything else "Send failed". The raw message is logged
+// sentence, everything else the generic one. The raw message is logged
 // server-side by the caller, never kept.
 //
 // Idempotent: a message that is already one of the safe ones maps to
@@ -13,10 +13,20 @@
 // ─────────────────────────────────────────────────────────────
 
 export const FINANCE_EMAIL_ERRORS = {
-  noRecipient:  'No Finance recipient saved',
-  notConnected: 'Gmail not connected',
-  unreachable:  "Couldn't reach the email service",
-  generic:      'Send failed',
+  noRecipient:  'Ask an admin to add a Finance email address in Settings, then resend.',
+  notConnected: 'Ask an admin to connect Gmail in Settings, then resend.',
+  unreachable:  "The email service didn't respond. Try again.",
+  generic:      "The email didn't send. Try again.",
+};
+
+// What earlier versions stored. Rows already in the database still
+// hold these, so they map to the current text instead of falling
+// through to the generic one.
+const LEGACY = {
+  'No Finance recipient saved':        FINANCE_EMAIL_ERRORS.noRecipient,
+  'Gmail not connected':               FINANCE_EMAIL_ERRORS.notConnected,
+  "Couldn't reach the email service":  FINANCE_EMAIL_ERRORS.unreachable,
+  'Send failed':                       FINANCE_EMAIL_ERRORS.generic,
 };
 
 const SAFE = new Set(Object.values(FINANCE_EMAIL_ERRORS));
@@ -25,6 +35,7 @@ export const safeFinanceEmailError = (raw) => {
   if (raw === null || raw === undefined || raw === '') return null;
   const text = String(raw);
   if (SAFE.has(text)) return text;
+  if (LEGACY[text]) return LEGACY[text];
 
   if (/gmail connection|connect gmail|reconnect|not connected|invalid_grant|unauthori[sz]ed|credential|access token|oauth/i.test(text)) {
     return FINANCE_EMAIL_ERRORS.notConnected;

@@ -23,7 +23,7 @@ import { safeFinanceEmailError } from '../utils/financeEmailError.js';
 const QBO_UNIQUE_CONSTRAINT = 'qbo_map_unique_remote';
 
 // UNIQUE (qbo_object_type, qbo_id): one QuickBooks PO number can be
-// linked to only one WMS PO. Turns that violation into a 409 naming the
+// linked to only one PO here. Turns that violation into a 409 naming the
 // PO that already holds it. Must run after ROLLBACK, on a client that
 // is out of the failed transaction.
 const duplicateLinkError = async (client, quickbooksPoId) => {
@@ -39,8 +39,8 @@ const duplicateLinkError = async (client, quickbooksPoId) => {
   );
   const other = rows[0]?.po_number;
   const err = new Error(other
-    ? `QuickBooks PO ${quickbooksPoId} is already linked to ${other}.`
-    : `QuickBooks PO ${quickbooksPoId} is already linked to another purchase order.`);
+    ? `QuickBooks PO number ${quickbooksPoId} is already linked to ${other}. Enter a different number.`
+    : `QuickBooks PO number ${quickbooksPoId} is already linked to another purchase order. Enter a different number.`);
   err.status = 409;
   return err;
 };

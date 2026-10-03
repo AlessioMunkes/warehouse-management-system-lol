@@ -57,7 +57,7 @@ const parseRequestedAt = (raw) => {
     fail(400, 'Requested at must be a valid date and time.');
   }
   if (date.getTime() > Date.now() + FUTURE_TOLERANCE_MS) {
-    fail(400, "Requested at can't be in the future. Enter when the person asked.");
+    fail(400, 'Choose a date and time that is not in the future.');
   }
   return date.toISOString();
 };

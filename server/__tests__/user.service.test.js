@@ -249,7 +249,7 @@ describe('email on accounts', () => {
     it('409s when another account already has the email, whatever its case', async () => {
       repoMock.findUserByEmail.mockResolvedValue({ id: 99, username: 'other', email: 'taken@example.com' });
       await expect(userService.updateUser(OTHER_ID, { email: 'TAKEN@Example.com' }, ADMIN_ID))
-        .rejects.toMatchObject({ status: 409, message: expect.stringContaining('taken@example.com') });
+        .rejects.toMatchObject({ status: 409, message: 'Another user already has this email address. Use a different one.' });
       expect(repoMock.findUserByEmail).toHaveBeenCalledWith('taken@example.com');
       expect(repoMock.updateUser).not.toHaveBeenCalled();
     });

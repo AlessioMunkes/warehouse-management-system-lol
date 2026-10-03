@@ -79,7 +79,7 @@ const resendFinanceEmail = async (req, res) => {
     const data = await purchaseOrderService.resendFinanceEmail(req.params.id, req.user.id);
     res.status(200).json({ success: true, data });
   } catch (err) {
-    respondError(res, err, 'resendFinanceEmail', 'Failed to resend the Finance email.');
+    respondError(res, err, 'resendFinanceEmail', 'Could not resend to Finance. Try again.');
   }
 };
 

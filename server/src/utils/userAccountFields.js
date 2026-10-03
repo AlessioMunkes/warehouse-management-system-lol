@@ -70,9 +70,9 @@ export const validRole = (value) => {
 export const validOptionalEmail = (value) => {
   const email = clean(value)?.toLowerCase() ?? null;
   if (email === null) return null;
-  if (email.length > 255) throw fail(400, 'Email must be 255 characters or fewer.');
+  if (email.length > 255) throw fail(400, 'Use an email address of 255 characters or fewer.');
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    throw fail(400, 'That does not look like a valid email address.');
+    throw fail(400, 'Enter a valid email address, like name@example.org.');
   }
   return email;
 };

@@ -57,7 +57,7 @@ describe('UserForm email', () => {
     await user.type(input, 'not-an-email');
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(onSubmit).not.toHaveBeenCalled();
-    expect(screen.getByText('That does not look like a valid email address.')).toBeTruthy();
+    expect(screen.getByText('Enter a valid email address, like name@example.org.')).toBeTruthy();
   });
 
   it('shows a server error such as a duplicate', () => {

@@ -116,7 +116,7 @@ describe('setQuickbooksReference — duplicate QuickBooks PO number', () => {
 
     await expect(repo.setQuickbooksReference(12, 'QB-500', 3)).rejects.toMatchObject({
       status: 409,
-      message: 'QuickBooks PO QB-500 is already linked to PO-2026-0101.',
+      message: 'QuickBooks PO number QB-500 is already linked to PO-2026-0101. Enter a different number.',
     });
 
     const sqls = client.calls.map((c) => c.sql);
@@ -155,6 +155,6 @@ describe('getPurchaseOrderById — finance email fields', () => {
 
     expect(queries[0]).toMatch(/po\.finance_email_status/);
     expect(queries[0]).toMatch(/po\.finance_email_attempted_at/);
-    expect(po.finance_email_error).toBe("Couldn't reach the email service");
+    expect(po.finance_email_error).toBe("The email service didn't respond. Try again.");
   });
 });

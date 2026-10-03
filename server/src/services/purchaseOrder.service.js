@@ -205,7 +205,7 @@ ${textLines}
 
 Total: ${money(total)}
 
-Please capture this purchase order in QuickBooks, then enter the QuickBooks reference back into the WMS against ${purchaseOrder.po_number}.`;
+Please capture this purchase order in QuickBooks, then add the QuickBooks PO number to ${purchaseOrder.po_number} in Batches.`;
 
   const rows = purchaseOrder.items.map((item) => `
     <tr>
@@ -232,7 +232,7 @@ Please capture this purchase order in QuickBooks, then enter the QuickBooks refe
         <td style="padding:6px 12px;text-align:right;font-weight:600;">${money(total)}</td>
       </tr></tfoot>
     </table>
-    <p>Please capture this purchase order in QuickBooks, then enter the QuickBooks reference back into the WMS against <strong>${purchaseOrder.po_number}</strong>.</p>
+    <p>Please capture this purchase order in QuickBooks, then add the QuickBooks PO number to <strong>${purchaseOrder.po_number}</strong> in Batches.</p>
   `;
 
   return { subject, text, html };
@@ -453,13 +453,13 @@ const resendFinanceEmail = async (rawId, userId = null) => {
 
   const outcome = await notifyFinance(purchaseOrder, userId);
   if (outcome === 'in_progress') {
-    throw fail(409, 'An email for this purchase order is already being sent.');
+    throw fail(409, 'Already sending. Wait a moment, then check the status.');
   }
   if (outcome === 'no_recipient') {
     throw fail(400, FINANCE_EMAIL_ERRORS.noRecipient);
   }
   if (outcome === 'stubbed') {
-    throw fail(503, 'Email sending is turned off on this server.');
+    throw fail(503, 'Email is turned off. Ask an admin to turn it on.');
   }
 
   return repo.getPurchaseOrderById(id);

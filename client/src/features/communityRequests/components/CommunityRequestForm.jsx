@@ -97,12 +97,12 @@ export default function CommunityRequestForm({
 
       <div className="grid gap-7 sm:grid-cols-2">
         <Field>
-          <FieldLabel htmlFor="cr-quantity-note">Quantity &amp; collection notes</FieldLabel>
+          <FieldLabel htmlFor="cr-quantity-note">Quantity and collection notes</FieldLabel>
           <Input
             id="cr-quantity-note"
             value={form.quantityNote}
             onChange={set('quantityNote')}
-            placeholder="e.g. Enough for 80 plates, collecting Monday"
+            placeholder="Say how much and when they collect, e.g. 80 plates, Monday"
           />
           <FieldDescription>Approximate is fine.</FieldDescription>
         </Field>
@@ -118,7 +118,7 @@ export default function CommunityRequestForm({
           />
           {requestedAtFuture
             ? <FieldError>{FUTURE_REQUEST_MESSAGE}</FieldError>
-            : <FieldDescription>Defaults to now.</FieldDescription>}
+            : <FieldDescription>Leave as is to use the current time.</FieldDescription>}
         </Field>
       </div>
 

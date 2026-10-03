@@ -112,9 +112,9 @@ function LogRequestForm({ onSubmit, busy, error }) {
         placeholder="Phone, WhatsApp, email…"
       />
       <TextField
-        id="stf-cr-quantity-note" label="Quantity & collection notes"
+        id="stf-cr-quantity-note" label="Quantity and collection notes"
         value={form.quantityNote} onChange={set('quantityNote')}
-        placeholder="e.g. Enough for 80 plates, collecting Monday"
+        placeholder="Say how much and when they collect, e.g. 80 plates, Monday"
         hint="Approximate is fine."
       />
 
@@ -130,7 +130,7 @@ function LogRequestForm({ onSubmit, busy, error }) {
           aria-invalid={requestedAtFuture || undefined}
         />
         <p className="stf-field-hint">
-          {requestedAtFuture ? FUTURE_REQUEST_MESSAGE : 'Defaults to now.'}
+          {requestedAtFuture ? FUTURE_REQUEST_MESSAGE : 'Leave as is to use the current time.'}
         </p>
       </div>
 
