@@ -11,7 +11,7 @@
 import repo from '../repositories/savedReport.repository.js';
 import reportingService from './reporting.service.js';
 import insightService from './reportingInsight.service.js';
-import emailProvider from '../providers/email.provider.js';
+import communications from '../features/communications/communications.service.js';
 import { validateSpec } from '../features/reporting/specValidator.js';
 import { validateCustom } from '../features/reporting/customQuery.js';
 import { getComparison } from '../features/reporting/reportComparisons.js';
@@ -114,7 +114,13 @@ const send = async (saved, period) => {
   if (!saved.email) throw fail(400, 'Your account has no email address, so the report cannot be sent.');
   const result = await runSaved(saved, { from: period.from, to: period.to });
   const mail = emailFor({ saved, result, period, appUrl: appUrl() });
-  const res = await emailProvider.sendEmail({ to: saved.email, ...mail });
+  const res = await communications.send({
+    type: 'scheduled_report',
+    to: saved.email,
+    ...mail,
+    related: { type: 'saved_report', id: saved.id },
+    sentBy: saved.user_id ?? null,
+  });
   if (res?.sent === false) throw fail(502, `The email could not be sent: ${res.error ?? res.reason ?? 'unknown error'}.`);
   return res;
 };

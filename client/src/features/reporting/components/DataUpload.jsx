@@ -119,7 +119,7 @@ export default function DataUpload() {
 
   return (
     <section
-      className="rounded-[4px] border-2 border-dashed bg-surface p-4 sm:p-5"
+      className="rounded-4xl border border-dashed bg-card p-4 sm:p-5"
       style={{ borderColor: BORDER }}
     >
       <header className="mb-3">
@@ -141,7 +141,7 @@ export default function DataUpload() {
             role="button"
             tabIndex={0}
             aria-label="Drop a spreadsheet here, or press Enter to choose a file"
-            className="cursor-pointer rounded-[4px] border-2 border-dashed px-4 py-8 text-center text-sm transition-colors"
+            className="cursor-pointer rounded-lg border border-dashed px-4 py-8 text-center text-sm transition-colors"
             style={{
               borderColor: dragging ? CHARCOAL : BORDER,
               color: MUTED,

@@ -81,7 +81,9 @@ describe('runEmailReminderJob', () => {
 });
 
 describe('startEmailReminderScheduler', () => {
-  it('schedules the first run for 08:00 SAST and can be stopped', () => {
+  // Scheduling now waits for the send hour from Settings, so each test
+  // waits for the timer to be set rather than expecting it at once.
+  it('schedules the first run for 08:00 SAST and can be stopped', async () => {
     const log = logger();
     const setTimer = vi.fn(() => 123);
     const clearTimer = vi.fn();
@@ -94,6 +96,7 @@ describe('startEmailReminderScheduler', () => {
       nowFn: () => new Date('2026-09-23T05:30:00.000Z'),
     });
 
+    await vi.waitFor(() => expect(setTimer).toHaveBeenCalled());
     expect(setTimer).toHaveBeenCalledWith(expect.any(Function), 30 * 60 * 1000);
     expect(log.info).toHaveBeenCalledWith(
       '[ecd_collection_email_reminders] scheduled',
@@ -121,7 +124,9 @@ describe('startEmailReminderScheduler', () => {
       nowFn: () => new Date('2026-09-23T06:00:00.000Z'),
     });
 
+    await vi.waitFor(() => expect(callbacks).toHaveLength(1));
     await callbacks[0]();
+    await vi.waitFor(() => expect(setTimer).toHaveBeenCalledTimes(2));
 
     expect(serviceMock.sendTomorrowCollectionReminderEmails).toHaveBeenCalledTimes(1);
     expect(log.error).toHaveBeenCalledWith(
@@ -129,6 +134,23 @@ describe('startEmailReminderScheduler', () => {
       expect.objectContaining({ message: 'Gmail down' })
     );
     expect(setTimer).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('the send hour from Settings', () => {
+  it('waits for the hour an admin chose', async () => {
+    const setTimer = vi.fn(() => 1);
+    startEmailReminderScheduler({
+      logger: logger(), service: serviceMock, setTimer, clearTimer: vi.fn(),
+      nowFn: () => new Date('2026-09-23T05:30:00.000Z'),   // 07:30 SAST
+      runHourFn: async () => 10,                            // 10:00 SAST
+    });
+    await vi.waitFor(() => expect(setTimer).toHaveBeenCalled());
+    expect(setTimer.mock.calls[0][1]).toBe(150 * 60 * 1000);
+  });
+
+  it('takes the hour as an argument when working out the next run', () => {
+    expect(nextRunAt(new Date('2026-09-23T05:59:00.000Z'), 6).toISOString()).toBe('2026-09-24T04:00:00.000Z');
   });
 });
 

@@ -4,7 +4,7 @@
 // Thin HTTP layer for Gmail OAuth connection.
 // -------------------------------------------------------------
 import gmailService from '../services/gmail.service.js';
-import emailProvider from '../providers/email.provider.js';
+import communications from '../features/communications/communications.service.js';
 
 const EMAIL_INTEGRATION_PATH = '/admin/email-integration';
 
@@ -93,7 +93,11 @@ const testEmail = async (req, res) => {
       });
     }
 
-    const result = await emailProvider.sendEmail({ to, subject, text }, req.user.id);
+    // Through the same service every other email uses, so a test send
+    // shows in the message history beside the real ones.
+    const result = await communications.send({
+      type: 'test_email', to, subject, text, sentBy: req.user.id, sendAs: req.user.id,
+    });
 
     if (!result.sent) {
       return res.status(502).json({

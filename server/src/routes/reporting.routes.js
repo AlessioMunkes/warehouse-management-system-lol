@@ -12,12 +12,12 @@
 // ─────────────────────────────────────────────────────────────
 import express                      from 'express';
 import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
-import auth, { requireRole, ROLES } from '../middleware/auth.middleware.js';
+import auth, { requireRole } from '../middleware/auth.middleware.js';
+import { MANAGERS_UP } from '../constants/permissions.js';
 import reportingController          from '../controllers/reporting.controller.js';
 
 const router = express.Router();
 
-const MANAGERS_UP = [ROLES.MANAGER, ROLES.ADMIN];
 
 // Only /ask is limited. It is the one route that costs money per
 // call and draws on a shared free-tier quota, so one person holding

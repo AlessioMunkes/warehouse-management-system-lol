@@ -21,6 +21,7 @@ vi.mock('../src/services/finance.service.js', () => ({ default: financeEmailFall
 
 const { default: purchaseOrderService } = await import('../src/services/purchaseOrder.service.js');
 const { safeFinanceEmailError } = await import('../src/utils/financeEmailError.js');
+const { default: outboundMessages } = await import('../src/features/communications/outboundMessage.repository.js');
 
 const VALID_BODY = {
   supplierId: 1,
@@ -255,5 +256,36 @@ describe('resendFinanceEmail', () => {
     emailProviderMock.sendEmail.mockResolvedValue({ sent: true, stubbed: true });
     await expect(purchaseOrderService.resendFinanceEmail(42)).rejects.toMatchObject({ status: 503 });
     expect(repoMock.recordFinanceEmailAttempt).not.toHaveBeenCalled();
+  });
+});
+
+// The send goes through the communications module, so it lands in the
+// message history; the provider's reply still drives the status write.
+describe('finance email — message history', () => {
+  it('records a purchase_order_finance message tied to the PO and the user who caused it', async () => {
+    const record = vi.spyOn(outboundMessages, 'record').mockResolvedValue(undefined);
+
+    await purchaseOrderService.resendFinanceEmail(42, 9);
+
+    expect(record).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'purchase_order_finance',
+      status: 'sent',
+      recipient: 'finance@example.org',
+      relatedType: 'purchase_order',
+      relatedId: 42,
+      sentBy: 9,
+    }));
+    expect(repoMock.recordFinanceEmailAttempt).toHaveBeenCalledWith(
+      42, expect.objectContaining({ status: 'sent' }),
+    );
+  });
+
+  it('a history write that fails does not change the outcome', async () => {
+    vi.spyOn(outboundMessages, 'record').mockRejectedValue(new Error('relation does not exist'));
+
+    await expect(purchaseOrderService.resendFinanceEmail(42, 9)).resolves.toBeTruthy();
+    expect(repoMock.recordFinanceEmailAttempt).toHaveBeenCalledWith(
+      42, expect.objectContaining({ status: 'sent' }),
+    );
   });
 });

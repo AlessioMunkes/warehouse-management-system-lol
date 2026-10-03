@@ -47,7 +47,6 @@ const cookieFor = (role, overrides = {}) => {
 
 // ── Role groups, mirroring decanting.routes.js ────────────────
 const ALL_ROLES    = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
-const RECEIVERS_UP = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 
 const PLAN   = { product: 'Rice', bags: [{ sizeKg: 2, count: 12 }], wastageKg: 0.3 };
 const RECORD = { id: 1, product_id: 1, wastage_kg: 0.3 };
@@ -115,22 +114,32 @@ describe('decanting routes — role enforcement', () => {
     expect(res.status).toBe(200);
   });
 
-  it.each(ALL_ROLES)('%s can run a calculation preview', async (role) => {
-    // /calculate is deliberately open to every warehouse role — it
-    // writes nothing.
+  // Decanting is floor work: each role works only its own screens, so
+  // the calculator and the record are the warehouse worker's alone.
+  it('a warehouse worker can run a calculation preview', async () => {
     const res = await request(app)
       .post(`${BASE}/calculate`)
-      .set('Cookie', cookieFor(role))
+      .set('Cookie', cookieFor(ROLES.WORKER))
       .send({ productId: 1, actualWeightKg: 25 });
     expect(res.status).toBe(200);
   });
 
-  it.each(RECEIVERS_UP)('%s can record a completed decanting run', async (role) => {
+  it('a warehouse worker can record a completed decanting run', async () => {
     const res = await request(app)
       .post(BASE)
-      .set('Cookie', cookieFor(role))
+      .set('Cookie', cookieFor(ROLES.WORKER))
       .send({ productId: 1, actualWeightKg: 25 });
     expect(res.status).toBe(201);
+  });
+
+  it.each([ROLES.MANAGER, ROLES.ADMIN])('%s is refused the calculator and the record', async (role) => {
+    const calc = await request(app).post(`${BASE}/calculate`).set('Cookie', cookieFor(role))
+      .send({ productId: 1, actualWeightKg: 25 });
+    const write = await request(app).post(BASE).set('Cookie', cookieFor(role))
+      .send({ productId: 1, actualWeightKg: 25 });
+    expect(calc.status).toBe(403);
+    expect(write.status).toBe(403);
+    expect(decantingServiceMock.recordDecanting).not.toHaveBeenCalled();
   });
 
   it('an unassignable role is refused the write path with 403, not 401', async () => {

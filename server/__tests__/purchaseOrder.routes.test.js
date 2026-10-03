@@ -155,7 +155,7 @@ describe('purchase order routes — POST /:id/finance-email/resend', () => {
     const res = await request(app).post(url).set('Cookie', cookieFor(role));
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ success: true, data: SOME_PO });
-    expect(serviceMock.resendFinanceEmail).toHaveBeenCalledWith(12);
+    expect(serviceMock.resendFinanceEmail).toHaveBeenCalledWith(12, 1);
   });
 
   it.each(NON_WRITE_ROLES)('%s cannot resend the Finance email', async (role) => {

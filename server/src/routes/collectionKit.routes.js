@@ -16,33 +16,33 @@
 // "records" before the real handler ever ran if it came first.
 // ─────────────────────────────────────────────────────────────
 import express from 'express';
-import auth, { requireRole, ROLES } from '../middleware/auth.middleware.js';
+import auth, { requireRole } from '../middleware/auth.middleware.js';
+import { ALL_STAFF } from '../constants/permissions.js';
 import { validateIntId, validateIntParam } from '../middleware/validate.middleware.js';
 import kitController from '../controllers/collectionKit.controller.js';
 
 const router = express.Router();
 
-const STAFF_UP = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 
 router.get('/records',
-  auth, requireRole(...STAFF_UP), kitController.listRecords);
+  auth, requireRole(...ALL_STAFF), kitController.listRecords);
 
 router.get('/records/:recordId',
-  auth, requireRole(...STAFF_UP), validateIntParam('recordId'), kitController.getRecord);
+  auth, requireRole(...ALL_STAFF), validateIntParam('recordId'), kitController.getRecord);
 
 router.patch('/records/:recordId/dispatch',
-  auth, requireRole(...STAFF_UP), validateIntParam('recordId'), kitController.markDispatched);
+  auth, requireRole(...ALL_STAFF), validateIntParam('recordId'), kitController.markDispatched);
 
 router.get('/',
-  auth, requireRole(...STAFF_UP), kitController.listKits);
+  auth, requireRole(...ALL_STAFF), kitController.listKits);
 
 router.post('/',
-  auth, requireRole(...STAFF_UP), kitController.createKit);
+  auth, requireRole(...ALL_STAFF), kitController.createKit);
 
 router.get('/:id',
-  auth, requireRole(...STAFF_UP), validateIntId, kitController.getKit);
+  auth, requireRole(...ALL_STAFF), validateIntId, kitController.getKit);
 
 router.post('/:id/records',
-  auth, requireRole(...STAFF_UP), validateIntId, kitController.logCompost);
+  auth, requireRole(...ALL_STAFF), validateIntId, kitController.logCompost);
 
 export default router;

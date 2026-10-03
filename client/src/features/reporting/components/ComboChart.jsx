@@ -20,7 +20,7 @@ const axis = { tick: { fill: MUTED, fontSize: 11 }, axisLine: { stroke: LINE }, 
 function Tip({ active, payload, label, unit, name }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-[4px] border-2 bg-surface px-3 py-2 text-xs" style={{ borderColor: LINE }}>
+    <div className="rounded-lg border bg-surface px-3 py-2 text-xs" style={{ borderColor: LINE }}>
       <p style={{ color: MUTED }}>{formatLabel(label)} · {name}</p>
       <p className="font-bold" style={{ color: INK }}>{fmtValue(payload[0].value, unit)} {unitWord(unit)}</p>
     </div>

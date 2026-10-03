@@ -25,7 +25,6 @@
 // ─────────────────────────────────────────────────────────────
 import pool       from '../config/db.js';
 import stockModel from './stock.repository.js';
-import { createNotification } from './notification.repository.js';
 import { DISPATCH_SORTS, buildOrderBy } from '../constants/receiptSort.js';
 
 // ── Audit helper ──────────────────────────────────────────────
@@ -541,7 +540,10 @@ const collect = async ({
 // Idempotent by construction: the UNIQUE constraint on
 // picking_slip_id means a second run inserts nothing, so it is safe
 // to call from a scheduler AND opportunistically from the board.
-const sweepNonCollections = async ({ dispatchDate, actorId }) => {
+// `beforeCommit(client, facts)`, when given, runs inside this
+// transaction just before COMMIT — the service's notification goes in
+// with the change or not at all (features/communications/notices.js).
+const sweepNonCollections = async ({ dispatchDate, actorId, beforeCommit }) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -567,18 +569,8 @@ const sweepNonCollections = async ({ dispatchDate, actorId }) => {
       });
     }
 
-    // BR-14: "the system must ... notify the Warehouse Manager." This
-    // is that notification — one summary per sweep run, not one per
-    // pallet, matching picking.repository.js's own generateSlips
-    // notification.
-    if (swept.rowCount > 0) {
-      await createNotification(client, {
-        type:  'non_collections_flagged',
-        title: `${swept.rowCount} pallet${swept.rowCount === 1 ? '' : 's'} not collected by 15:00`,
-        body:  `Flagged automatically for ${dispatchDate}.`,
-        entityType: 'dispatch_sweep',
-      });
-    }
+    // BR-14's "notify the Warehouse Manager" — the service's notice.
+    if (beforeCommit) await beforeCommit(client, { flagged: swept.rowCount, dispatchDate });
 
     await client.query('COMMIT');
     return { flagged: swept.rowCount, slipIds: swept.rows.map((r) => r.picking_slip_id) };

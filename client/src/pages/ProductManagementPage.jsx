@@ -11,29 +11,25 @@
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth }  from '../context/AuthContext';
-import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
 import ProductForm  from '../features/products/components/ProductForm';
 import productAPI   from '../services/productAPI';
 import ConfirmRemoveDialog from '../features/masterdata/components/ConfirmRemoveDialog';
-import useDetailFocus      from '../features/masterdata/hooks/useDetailFocus';
 import useOpenFromQuery    from '../features/masterdata/hooks/useOpenFromQuery';
 import useTableView        from '../features/masterdata/hooks/useTableView';
 import MasterDataTable     from '../features/masterdata/components/MasterDataTable';
-import ColumnToggle        from '../features/masterdata/components/ColumnToggle';
-import FilterPills         from '../features/masterdata/components/FilterPills';
 
-import {
-  InputGroup, InputGroupAddon, InputGroupInput,
-} from '@/components/ui/input-group';
-import { Field, FieldLabel } from '@/components/ui/field';
 import { Button }    from '@/components/ui/button';
 import { Badge }     from '@/components/ui/badge';
-import { Checkbox }  from '@/components/ui/checkbox';
 import { Skeleton }  from '@/components/ui/skeleton';
-import {
-  Card, CardContent, CardHeader, CardTitle,
-} from '@/components/ui/card';
-import { Search, Plus, Pencil, Power, X, Trash2 } from 'lucide-react';
+import StatusBadge   from '@/components/ui/status-badge';
+import PageHeader, { PageShell } from '@/components/ui/page-header';
+import ViewTabs      from '@/components/ui/view-tabs';
+import ListCard      from '@/components/ui/list-card';
+import ListToolbar   from '@/components/ui/list-toolbar';
+import DetailPanel   from '@/components/ui/detail-panel';
+import EmptyState    from '@/components/ui/empty-state';
+import ErrorBanner   from '@/components/ui/error-banner';
+import { Plus, Pencil, Power, Trash2, Package } from 'lucide-react';
 
 // Admin only, matching requireRole on every write in
 // product.routes.js. The server is the control; this is what stops the
@@ -43,9 +39,12 @@ const CAN_MANAGE = ['admin'];
 // products.storage_type carries its own CHECK — 'dry' or 'cold' and
 // nothing else (STORAGE_TYPES in product.service.js). A pill per value,
 // so the filter can never offer something the column cannot hold.
-const STORAGE_FILTERS = [
-  { value: 'dry',  label: 'Dry' },
-  { value: 'cold', label: 'Cold' },
+// Storage type as tabs, client-side over the fetched rows, so they
+// compose with the server-side search and "Show inactive".
+const VIEWS = [
+  { id: 'all',  label: 'All',  test: () => true },
+  { id: 'dry',  label: 'Dry',  test: (p) => p.storageType === 'dry' },
+  { id: 'cold', label: 'Cold', test: (p) => p.storageType === 'cold' },
 ];
 
 // Three columns more than the table used to show, all of them things
@@ -87,80 +86,50 @@ const COLUMNS = [
 
 // Same markup as the global fetch error banner in
 // SupplierDirectoryPage/InventoryManagementPage. One error style per app.
-const ErrorBanner = ({ message, onRetry }) => (
-  <div className="p-4 rounded-[4px] bg-danger-soft border-2 border-brand text-ink text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-    <span>{message}</span>
-    {onRetry ? (
-      <button
-        onClick={onRetry}
-        className="text-xs sm:text-sm font-semibold underline hover:text-brand focus:outline-none"
-      >
-        Try again
-      </button>
-    ) : null}
-  </div>
-);
-
-// ── Detail panel ──────────────────────────────────────────────
 const ProductDetail = ({ product, canManage, onEdit, onToggleActive, onRemove, onClose }) => (
-  <Card>
-    <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+  <DetailPanel
+    open
+    onClose={onClose}
+    eyebrow={product.category || 'No category recorded'}
+    title={product.name}
+    badges={!product.isActive ? <StatusBadge kind="record" status="inactive">Inactive</StatusBadge> : null}
+    // Delete is the soft destructive variant, not a solid red block: a
+    // filled button beside two outlined ones pulls the eye to the one
+    // action nobody should reach for by reflex. The dialog does the
+    // actual guarding.
+    actions={canManage ? (
+      <>
+        <Button type="button" variant="outline" onClick={onEdit}>
+          <Pencil />
+          Edit details
+        </Button>
+        <Button type="button" variant="outline" onClick={onToggleActive}>
+          <Power />
+          {product.isActive ? 'Deactivate' : 'Reactivate'}
+        </Button>
+        <Button type="button" variant="destructive" onClick={onRemove}>
+          <Trash2 />
+          Delete
+        </Button>
+      </>
+    ) : null}
+  >
+    <dl className="grid gap-4 text-sm sm:grid-cols-2">
+      <div><dt className="text-muted-foreground">SKU</dt><dd>{product.sku || '—'}</dd></div>
+      <div><dt className="text-muted-foreground">Default unit</dt><dd>{product.defaultUnit || '—'}</dd></div>
       <div>
-        <CardTitle>{product.name}</CardTitle>
-        <p className="text-sm text-muted-foreground">
-          {product.category || 'No category recorded'}
-        </p>
+        <dt className="text-muted-foreground">Weight</dt>
+        <dd>{product.weightKg === null ? 'Not recorded' : `${product.weightKg} kg`}</dd>
       </div>
-      <Button type="button" variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close">
-        <X />
-      </Button>
-    </CardHeader>
-
-    <CardContent className="space-y-5">
-      <dl className="grid gap-3 text-sm sm:grid-cols-2">
-        <div><dt className="text-muted-foreground">SKU</dt><dd>{product.sku || '—'}</dd></div>
-        <div><dt className="text-muted-foreground">Default unit</dt><dd>{product.defaultUnit || '—'}</dd></div>
-        <div>
-          <dt className="text-muted-foreground">Weight</dt>
-          <dd>{product.weightKg === null ? 'Not recorded' : `${product.weightKg} kg`}</dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Cost per item</dt>
-          <dd>{product.unitCost === null || product.unitCost === undefined
-            ? 'Not priced'
-            : `R ${product.unitCost.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</dd>
-        </div>
-        <div><dt className="text-muted-foreground">Perishable</dt><dd>{product.isPerishable ? 'Yes' : 'No'}</dd></div>
-      </dl>
-
-      {canManage ? (
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" onClick={onEdit}>
-            <Pencil />
-            Edit details
-          </Button>
-          <Button type="button" variant="outline" onClick={onToggleActive}>
-            <Power />
-            {product.isActive ? 'Deactivate' : 'Reactivate'}
-          </Button>
-          {/* Outline, not a solid red block. A filled destructive
-              button beside two outlined ones pulls the eye to the one
-              action nobody should reach for by reflex. The red border
-              and label are enough to say what it is; the dialog does
-              the actual guarding. */}
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onRemove}
-            className="border-brand text-brand hover:bg-brand hover:text-on-brand"
-          >
-            <Trash2 />
-            Delete
-          </Button>
-        </div>
-      ) : null}
-    </CardContent>
-  </Card>
+      <div>
+        <dt className="text-muted-foreground">Cost per item</dt>
+        <dd>{product.unitCost === null || product.unitCost === undefined
+          ? 'Not priced'
+          : `R ${product.unitCost.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</dd>
+      </div>
+      <div><dt className="text-muted-foreground">Perishable</dt><dd>{product.isPerishable ? 'Yes' : 'No'}</dd></div>
+    </dl>
+  </DetailPanel>
 );
 
 // ── Page ──────────────────────────────────────────────────────
@@ -178,22 +147,19 @@ export default function ProductManagementPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [confirmRemove, setConfirmRemove] = useState(false);
-  const [storageFilter, setStorageFilter] = useState(null);
+  const [tab, setTab] = useState('all');
   const view = useTableView('products', COLUMNS);
+  const current = VIEWS.find((v) => v.id === tab) ?? VIEWS[0];
 
-  // Brings the detail card to the click instead of making the admin
-  // scroll back up to find it.
-  const [detailRef, focusDetail] = useDetailFocus();
-
-  // Narrow first, then order — same composition as the user
-  // directory. Both are client-side over the already-fetched rows, so
-  // neither races the server-side search.
-  const visibleProducts = useMemo(() => {
-    const filtered = storageFilter
-      ? products.filter((p) => p.storageType === storageFilter)
-      : products;
-    return view.sortRows(filtered);
-  }, [products, storageFilter, view]);
+  // Narrow first, then order — same composition as the user directory.
+  const visibleProducts = useMemo(
+    () => view.sortRows(products.filter(current.test)),
+    [products, current, view],
+  );
+  const counts = useMemo(
+    () => Object.fromEntries(VIEWS.map((v) => [v.id, products.filter(v.test).length])),
+    [products],
+  );
 
   const loadProducts = useCallback(async () => {
     setError(null);
@@ -230,7 +196,6 @@ export default function ProductManagementPage() {
     try {
       setSelected(await productAPI.getProduct(id));
       setMode('list');
-      focusDetail();
     } catch (err) { setError(err.message); }
   };
   // ?open=<id> from the admin Activity / Archive screens.
@@ -293,144 +258,120 @@ export default function ProductManagementPage() {
   };
 
   return (
-    <ManagerLayout>
-      <main className="mx-auto w-full max-w-5xl px-4 py-6">
-        <h1 className="text-2xl font-medium">Product Management</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          What we stock, and what every other module counts against.
-        </p>
-
-        {error ? (
-          <div className="mt-4">
-            <ErrorBanner message={error} onRetry={loadProducts} />
-          </div>
+    <PageShell>
+      <PageHeader
+        title="Product Management"
+        description="What we stock, and what every other module counts against."
+        actions={canManage ? (
+          <Button type="button" onClick={() => { setSelected(null); setMode('create'); }}>
+            <Plus />
+            Add product
+          </Button>
         ) : null}
+      />
 
-        {isLoading ? (
-          <div className="mt-6 space-y-3">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-24 w-full" />
-          </div>
-        ) : (
-          <div className="mt-6 space-y-6">
-            {mode === 'create' ? (
-              <Card>
-                <CardHeader><CardTitle>Add a product</CardTitle></CardHeader>
-                <CardContent>
-                  <ProductForm onSubmit={create} onCancel={() => setMode('list')} busy={busy} />
-                </CardContent>
-              </Card>
-            ) : mode === 'edit' && selected ? (
-              <Card>
-                <CardHeader><CardTitle>Edit {selected.name}</CardTitle></CardHeader>
-                <CardContent>
-                  <ProductForm
-                    initial={selected}
-                    submitLabel="Save changes"
-                    onSubmit={save}
-                    onCancel={() => setMode('list')}
-                    busy={busy}
-                  />
-                </CardContent>
-              </Card>
-            ) : (
-              <>
-                <div className="flex flex-wrap items-center gap-3">
-                  <InputGroup className="min-w-56 flex-1">
-                    <InputGroupAddon align="inline-start">
-                      <Search />
-                    </InputGroupAddon>
-                    <InputGroupInput
-                      placeholder="Search by name, SKU or category"
-                      value={search}
-                      onChange={(e) => { setIsLoading(true); setSearch(e.target.value); }}
-                    />
-                  </InputGroup>
+      <ErrorBanner className="mt-4" message={error} onRetry={loadProducts} />
 
-                  <Field orientation="horizontal" className="w-auto">
-                    <Checkbox
-                      id="include-inactive"
-                      checked={includeInactive}
-                      onCheckedChange={(v) => { setIsLoading(true); setIncludeInactive(Boolean(v)); }}
-                    />
-                    <FieldLabel htmlFor="include-inactive" className="font-normal">
-                      Show inactive
-                    </FieldLabel>
-                  </Field>
+      <ViewTabs
+        className="mt-5"
+        label="Product views"
+        value={tab}
+        onChange={setTab}
+        tabs={VIEWS.map((v) => ({ id: v.id, label: v.label, count: isLoading ? null : counts[v.id] }))}
+      />
 
-                  <FilterPills
-                    label="Filter by storage type"
-                    value={storageFilter}
-                    onChange={setStorageFilter}
-                    options={STORAGE_FILTERS}
-                  />
+      <div className="mt-6">
+        <ListCard
+          // Mounted through a reload: the search triggers the fetch, and
+          // swapping it for a skeleton would lose focus after each letter.
+          header={
+            <ListToolbar
+              search={{
+                value: search,
+                onChange: (value) => { setIsLoading(true); setSearch(value); },
+                placeholder: 'Search by name, SKU or category',
+              }}
+              filters={[{
+                key: 'inactive', label: 'Show inactive', active: includeInactive,
+                onToggle: () => { setIsLoading(true); setIncludeInactive((v) => !v); },
+              }]}
+              columns={{
+                idPrefix: 'products',
+                columns: view.availableColumns,
+                hidden: view.hidden,
+                onToggle: view.toggleColumn,
+                onReset: view.resetColumns,
+              }}
+            />
+          }
+        >
+          {isLoading ? (
+            <div className="space-y-2 p-4" aria-busy="true">
+              {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+            </div>
+          ) : visibleProducts.length === 0 ? (
+            <EmptyState
+              icon={Package}
+              title="No products match"
+              description={search ? 'Nothing matches the search.' : 'No product is in this view.'}
+              action={search ? { label: 'Clear search', onClick: () => { setIsLoading(true); setSearch(''); } } : undefined}
+            />
+          ) : (
+            <MasterDataTable
+              columns={view.visibleColumns}
+              rows={visibleProducts}
+              sort={view.sort}
+              onToggleSort={view.toggleSort}
+              onOpenRow={(p) => open(p.id)}
+              noun="products"
+            />
+          )}
+        </ListCard>
+      </div>
 
-                  <ColumnToggle
-                    idPrefix="products"
-                    columns={view.availableColumns}
-                    hidden={view.hidden}
-                    onToggle={view.toggleColumn}
-                    onReset={view.resetColumns}
-                  />
+      {mode === 'list' && selected ? (
+        <ProductDetail
+          key={selected.id}
+          product={selected}
+          canManage={canManage}
+          onEdit={() => setMode('edit')}
+          onToggleActive={toggleActive}
+          onRemove={() => setConfirmRemove(true)}
+          onClose={() => setSelected(null)}
+        />
+      ) : null}
 
-                  {canManage ? (
-                    <Button type="button" onClick={() => { setSelected(null); setMode('create'); }}>
-                      <Plus />
-                      Add product
-                    </Button>
-                  ) : null}
-                </div>
+      {selected ? (
+        <ConfirmRemoveDialog
+          open={confirmRemove}
+          onOpenChange={setConfirmRemove}
+          name={selected.name}
+          noun="product"
+          isActive={selected.isActive}
+          busy={busy}
+          historyNote="Past picking slips, delivery notes and stock history keep showing it."
+          onDeactivate={deactivateFromDialog}
+          onDelete={remove}
+        />
+      ) : null}
 
-                {/* tabIndex so focus can be moved here; scroll-mt so the
-                    card does not land flush against the top edge. */}
-                <div ref={detailRef} tabIndex={-1} className="scroll-mt-6 outline-none">
-                  {selected ? (
-                    <ProductDetail
-                      product={selected}
-                      canManage={canManage}
-                      onEdit={() => setMode('edit')}
-                      onToggleActive={toggleActive}
-                      onRemove={() => setConfirmRemove(true)}
-                      onClose={() => setSelected(null)}
-                    />
-                  ) : null}
-                </div>
+      {mode === 'create' ? (
+        <DetailPanel open onClose={() => setMode('list')} title="Add a product">
+          <ProductForm onSubmit={create} onCancel={() => setMode('list')} busy={busy} />
+        </DetailPanel>
+      ) : null}
 
-                {selected ? (
-                  <ConfirmRemoveDialog
-                    open={confirmRemove}
-                    onOpenChange={setConfirmRemove}
-                    name={selected.name}
-                    noun="product"
-                    isActive={selected.isActive}
-                    busy={busy}
-                    historyNote="Past picking slips, delivery notes and stock history keep showing it."
-                    onDeactivate={deactivateFromDialog}
-                    onDelete={remove}
-                  />
-                ) : null}
-
-                {visibleProducts.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No products match.</p>
-                ) : (
-                  <Card>
-                    <CardContent className="p-0">
-                      <MasterDataTable
-                        columns={view.visibleColumns}
-                        rows={visibleProducts}
-                        sort={view.sort}
-                        onToggleSort={view.toggleSort}
-                        onOpenRow={(p) => open(p.id)}
-                      />
-                    </CardContent>
-                  </Card>
-                )}
-              </>
-            )}
-          </div>
-        )}
-      </main>
-    </ManagerLayout>
+      {mode === 'edit' && selected ? (
+        <DetailPanel open onClose={() => setMode('list')} eyebrow="Edit" title={selected.name}>
+          <ProductForm
+            initial={selected}
+            submitLabel="Save changes"
+            onSubmit={save}
+            onCancel={() => setMode('list')}
+            busy={busy}
+          />
+        </DetailPanel>
+      ) : null}
+    </PageShell>
   );
 }

@@ -34,7 +34,7 @@ import crypto from 'node:crypto';
 import bcrypt from 'bcrypt';
 import resetRepo     from '../repositories/passwordReset.repository.js';
 import userRepo       from '../repositories/user.repository.js';
-import emailProvider  from '../providers/email.provider.js';
+import communications from '../features/communications/communications.service.js';
 import { fail, clean, validPassword } from '../utils/userAccountFields.js';
 
 const BCRYPT_COST      = 10;
@@ -74,7 +74,7 @@ const composeResetEmail = (email, url) => {
   };
 };
 
-// Wraps emailProvider.sendEmail and reduces its shape to exactly one
+// Wraps communications.send (email.provider underneath) and reduces its shape to exactly one
 // of 'sent' / 'stubbed' / 'failed' — same collapse as
 // userInvite.service.js's sendInviteEmail, and for the same reason:
 // EMAIL_ENABLED=false returns { sent: true, stubbed: true }, and
@@ -83,7 +83,12 @@ const composeResetEmail = (email, url) => {
 const sendResetEmail = async (reset, email, url) => {
   let outcome;
   try {
-    const result = await emailProvider.sendEmail(composeResetEmail(email, url), null);
+    const result = await communications.send({
+      type: 'password_reset',
+      ...composeResetEmail(email, url),
+      related: { type: 'password_reset', id: reset.id },
+      sendAs: null,
+    });
     if (result?.stubbed) {
       outcome = { status: 'stubbed', error: null };
     } else if (result?.sent) {

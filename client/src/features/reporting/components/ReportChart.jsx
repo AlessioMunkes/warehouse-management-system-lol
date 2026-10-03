@@ -36,7 +36,7 @@ const RED = 'var(--brand)', CHARCOAL = 'var(--ink)', BORDER = 'var(--line)', MUT
 // means "third category." A single-series trend (LineView) stays on
 // plain RED: rotating hue along a time axis would read as categories
 // changing, not one thing moving.
-const PALETTE = [CHARCOAL, RED, '#c9a86a', '#6b8f71', '#8a8a8a'];
+const PALETTE = [CHARCOAL, RED, 'var(--chart-tan)', 'var(--chart-sage)', 'var(--chart-grey)'];
 
 // Percentages keep a decimal; counts and weights read better whole.
 // "94.7 children" would be nonsense on screen.
@@ -82,7 +82,7 @@ const formatLabel = (label) => {
 // Children/Adults/Households colours exactly, so the two charts never
 // disagree about what a colour means. Any other group name (a future
 // grouped_bar metric) falls back to rotating the shared PALETTE.
-const GROUP_COLORS = { Children: RED, Adults: '#c9a86a', Households: CHARCOAL };
+const GROUP_COLORS = { Children: RED, Adults: 'var(--chart-tan)', Households: CHARCOAL };
 const colorForGroup = (name, i) => GROUP_COLORS[name] ?? PALETTE[i % PALETTE.length];
 
 const NumberView = ({ series, unit }) => (

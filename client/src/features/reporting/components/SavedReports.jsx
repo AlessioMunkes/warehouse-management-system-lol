@@ -41,14 +41,14 @@ export function SavedReportsBar({ items, onOpen, onChanged }) {
   };
 
   return (
-    <section className="mt-6 rounded-[4px] border-2 bg-surface p-4" style={{ borderColor: LINE }} aria-label="Saved reports">
+    <section className="mt-6 rounded-4xl bg-card shadow-md ring-1 ring-foreground/5 p-4" style={{ borderColor: LINE }} aria-label="Saved reports">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="mr-1 inline-flex items-center gap-1.5 text-sm font-semibold">
           <Bookmark aria-hidden="true" className="h-4 w-4" /> Saved reports
         </h2>
         {items.map((s) => (
           <button key={s.id} type="button" onClick={() => onOpen(s)}
-            className="inline-flex items-center gap-1 rounded-full border-2 px-3 py-1 text-xs font-medium hover:bg-ink/5"
+            className="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium hover:bg-ink/5"
             style={{ borderColor: s.pinned ? 'var(--ink)' : LINE }}>
             {s.pinned && <Pin aria-label="Pinned" className="h-3 w-3" />}
             {s.title}
@@ -72,25 +72,25 @@ export function SavedReportsBar({ items, onOpen, onChanged }) {
                 <span className="sr-only">Email schedule for {s.title}</span>
                 <select value={s.schedule} disabled={busyId === s.id}
                   onChange={(e) => act(s.id, () => updateSaved(s.id, { schedule: e.target.value }))}
-                  className="rounded-[4px] border-2 bg-surface px-1.5 py-0.5" style={{ borderColor: LINE }}>
+                  className="rounded-lg border bg-surface px-1.5 py-0.5" style={{ borderColor: LINE }}>
                   {SCHEDULES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
                 </select>
               </label>
               <button type="button" disabled={busyId === s.id} title={s.pinned ? 'Unpin' : 'Pin to the top'}
                 aria-label={s.pinned ? `Unpin ${s.title}` : `Pin ${s.title}`}
                 onClick={() => act(s.id, () => updateSaved(s.id, { pinned: !s.pinned }))}
-                className="rounded-[4px] border-2 p-1" style={{ borderColor: LINE }}>
+                className="rounded-lg border p-1" style={{ borderColor: LINE }}>
                 {s.pinned ? <PinOff aria-hidden="true" className="h-3.5 w-3.5" /> : <Pin aria-hidden="true" className="h-3.5 w-3.5" />}
               </button>
               <button type="button" disabled={busyId === s.id} aria-label={`Email ${s.title} to me now`} title="Email it to me now"
                 onClick={() => act(s.id, () => sendSavedNow(s.id),
                   (r) => (r?.stubbed ? `Email is switched off on this server, so "${s.title}" was not really sent.` : `"${s.title}" sent to ${r?.to}.`))}
-                className="rounded-[4px] border-2 p-1" style={{ borderColor: LINE }}>
+                className="rounded-lg border p-1" style={{ borderColor: LINE }}>
                 <Send aria-hidden="true" className="h-3.5 w-3.5" />
               </button>
               <button type="button" disabled={busyId === s.id} aria-label={`Remove ${s.title}`} title="Remove"
                 onClick={() => { if (window.confirm(`Remove "${s.title}"?`)) act(s.id, () => deleteSaved(s.id)); }}
-                className="rounded-[4px] border-2 p-1" style={{ borderColor: LINE, color: 'var(--rag-bad)' }}>
+                className="rounded-lg border p-1" style={{ borderColor: LINE, color: 'var(--rag-bad)' }}>
                 <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
               </button>
               {s.last_error && <span className="w-full text-xs" style={{ color: 'var(--rag-bad)' }}>Last email failed: {s.last_error}</span>}
@@ -143,19 +143,19 @@ export function SaveReport({ kind, spec, defaultTitle, preset, onSaved }) {
       <label className="inline-flex items-center gap-1">
         <span style={{ color: MUTED }}>Name</span>
         <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={120} required autoFocus
-          className="w-64 rounded-[4px] border-2 bg-surface px-1.5 py-0.5" style={{ borderColor: LINE }} />
+          className="w-64 rounded-lg border bg-surface px-1.5 py-0.5" style={{ borderColor: LINE }} />
       </label>
       <label className="inline-flex items-center gap-1">
         <span className="sr-only">Email schedule</span>
         <select value={schedule} onChange={(e) => setSchedule(e.target.value)}
-          className="rounded-[4px] border-2 bg-surface px-1.5 py-0.5" style={{ borderColor: LINE }}>
+          className="rounded-lg border bg-surface px-1.5 py-0.5" style={{ borderColor: LINE }}>
           {SCHEDULES.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
         </select>
       </label>
       <label className="inline-flex cursor-pointer items-center gap-1">
         <input type="checkbox" checked={pinned} onChange={(e) => setPinned(e.target.checked)} /> Pin to the top
       </label>
-      <button type="submit" disabled={busy || !title.trim()} className="rounded-[4px] bg-ink px-2 py-0.5 font-bold text-on-ink disabled:opacity-50">
+      <button type="submit" disabled={busy || !title.trim()} className="rounded-lg bg-ink px-2 py-0.5 font-bold text-on-ink disabled:opacity-50">
         {busy ? 'Saving…' : 'Save'}
       </button>
       <button type="button" onClick={() => setOpen(false)} className="underline underline-offset-2">Cancel</button>

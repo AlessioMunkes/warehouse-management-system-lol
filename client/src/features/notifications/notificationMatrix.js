@@ -15,7 +15,9 @@
 import {
   AlertTriangle, ClipboardList, Clock, Gift, Mail, Package, ShoppingCart, Truck, Users, Bell,
 } from 'lucide-react';
+import { matchPath } from 'react-router-dom';
 import { STAFF, ADMIN, PACKING, VOLUNTEERS } from '../../routes/paths';
+import { ROUTES } from '../../routes/routeTable';
 
 const isWorker = (role) => role === 'warehouse_worker';
 const withOpen = (path, id, param = 'open') => (id ? `${path}?${param}=${encodeURIComponent(id)}` : path);
@@ -53,7 +55,9 @@ const NOTIFICATION_MATRIX = {
   },
   non_collections_flagged: {
     severity: 'action', icon: Truck,
-    destination: () => STAFF.dispatchHistory,
+    destination: (n, role) => (isWorker(role)
+      ? STAFF.dispatchHistory
+      : `${STAFF.pickingSlips}?status=notcollected`),
   },
   purchase_order_needs_attention: {
     severity: 'action', icon: ShoppingCart,
@@ -93,10 +97,21 @@ export const notificationIcon = (notification) => (
   NOTIFICATION_MATRIX[notification?.type]?.icon ?? Bell
 );
 
+// Whether this role may open a destination. A notification never sends
+// someone to a screen of another role's (a worker to Inventory, a
+// manager to the dispatch gate) — that would only bounce them home.
+const canOpen = (destination, role) => {
+  if (!role) return true;
+  const pathname = destination.split('?')[0];
+  const route = ROUTES.find((r) => matchPath({ path: r.path, end: true }, pathname));
+  return !route || !route.roles || route.roles.includes(role);
+};
+
 /** Where clicking it goes for this role, or null if nowhere. */
 export const notificationDestination = (notification, role = null) => {
   const entry = NOTIFICATION_MATRIX[notification?.type];
-  return entry ? entry.destination(notification, role) : null;
+  const to = entry ? entry.destination(notification, role) : null;
+  return to && canOpen(to, role) ? to : null;
 };
 
 // "5m ago" beats a timestamp in a list someone glances at.

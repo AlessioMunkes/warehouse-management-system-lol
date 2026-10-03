@@ -1,110 +1,112 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/pages/PurchaseOrdersPage.jsx
 //
-// Manager view. App.jsx gates the route and POST /api/purchase-orders
-// is requireRole(MANAGER, ADMIN); the useAuth check below is
-// belt-and-braces for the same reason SupplierDirectoryPage and
-// InventoryManagementPage do it — the route decides who reaches the
-// page, the role check decides what the page offers them.
+// Manager view, on the shared list pattern (Inventory's): title, view
+// tabs with counts, toolbar, table, and the order in a panel down the
+// right. Raising or editing an order replaces the list with the form —
+// it is too long for a panel.
 //
-// The page shell, the tab strip, the ErrorBanner and the Skeleton
-// block are all the SupplierDirectoryPage treatment. That is
-// deliberate: it is the closest sibling screen, and a second layout
-// for the same kind of work would be a second thing to maintain.
+// App.jsx gates the route and POST /api/purchase-orders is
+// requireRole(MANAGER, ADMIN); the role check below decides what the
+// page offers, the route decides who reaches it.
 //
-// The tab strip is still hand-rolled because there is no tabs.jsx in
-// components/ui — SupplierDirectoryPage says the same, and flags that
-// the first page to need one should share it. That is now two pages.
-// The next one should extract it.
+// TABS COUNT WHAT WAS FETCHED
+// The list asks for up to 500 orders (the server's default is 50) and
+// the tabs filter and count that, so a tab's number is the rows it
+// shows. A warehouse that ever has more than 500 orders on the books
+// will want server-side paging here.
+//
+// URL
+//   ?status=<tab>     the tab (the dashboard's Needs attention links)
+//   ?id=<id>          open that order (notifications)
+//   ?products=1,2,3   start a new order with these lines (Inventory's
+//                     bulk "Raise purchase order")
 //
 // PRODUCTS COME FROM stockAPI.getManifest().
 // There is no products endpoint, and the manifest already carries
 // name, sku, unit, reorderAt and isLowStock — everything the picker
-// and the low-stock seed need. Caveat worth knowing: the manifest is
-// built from stock_levels, so a product with no stock_levels row will
-// not appear and cannot be ordered. If that bites, the fix belongs in
-// the stock repository, not here.
+// and the low-stock seed need. A product with no stock_levels row will
+// not appear and cannot be ordered; the fix for that belongs in the
+// stock repository, not here.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth }   from '../context/AuthContext';
-import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
 import PurchaseOrderForm   from '../features/purchaseOrders/components/PurchaseOrderForm';
 import PurchaseOrderList   from '../features/purchaseOrders/components/PurchaseOrderList';
 import PurchaseOrderDetail from '../features/purchaseOrders/components/PurchaseOrderDetail';
 import purchaseOrderAPI, { PO_STATUS_LABELS } from '../services/purchaseOrderAPI';
 import supplierAPI from '../services/supplierAPI';
 import stockAPI    from '../services/stockAPI';
-
 import { Button }   from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import ViewTabs from '@/components/ui/view-tabs';
+import PageHeader, { PageShell } from '@/components/ui/page-header';
+import ListCard from '@/components/ui/list-card';
+import ErrorBanner from '@/components/ui/error-banner';
+import ListToolbar from '@/components/ui/list-toolbar';
+import { useToast } from '@/components/ui/toastContext';
 import { Plus }     from 'lucide-react';
-
 import useTableView from '../features/masterdata/hooks/useTableView';
-import useDetailFocus from '../features/masterdata/hooks/useDetailFocus';
-import ColumnToggle  from '../features/masterdata/components/ColumnToggle';
+import useOpenFromQuery from '../features/masterdata/hooks/useOpenFromQuery';
 import { PO_COLUMNS } from '../features/purchaseOrders/components/poColumns';
+import { downloadCsv, toCsv } from '../features/reporting/chartFormat';
 
 const CAN_MANAGE = ['manager', 'admin'];
+const LIST_LIMIT = 500;
 
-const TABS = [
-  { id: 'open', label: 'Open' },
-  { id: 'all',  label: 'All' },
+// `id` is what goes in ?status=. The ids that are statuses are the
+// status itself, so the dashboard links read plainly.
+const PO_VIEWS = [
+  { id: 'open',               label: 'Open',
+    test: (po) => po.status !== 'completed' && po.status !== 'returned' },
+  { id: 'pending',            label: 'Awaiting approval', alert: true, test: (po) => po.status === 'pending' },
+  { id: 'in_transit',         label: 'In transit',         test: (po) => po.status === 'in_transit' },
+  { id: 'follow_up_required', label: 'Follow-up required', alert: true, test: (po) => po.status === 'follow_up_required' },
+  { id: 'all',                label: 'All',                test: () => true },
 ];
+const viewById = (id) => PO_VIEWS.find((v) => v.id === id) ?? PO_VIEWS[0];
 
-// Same markup as the global fetch error banner in
-// InventoryManagementPage and SupplierDirectoryPage. One error style
-// per app.
-const ErrorBanner = ({ message, onRetry }) => (
-  <div className="p-4 rounded-[4px] bg-danger-soft border-2 border-brand text-ink text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-    <span>{message}</span>
-    {onRetry ? (
-      <button
-        onClick={onRetry}
-        className="text-xs sm:text-sm font-semibold underline hover:text-brand focus:outline-none"
-      >
-        Try again
-      </button>
-    ) : null}
-  </div>
-);
+const EXPORT_COLUMNS = [
+  { key: 'poNumber', label: 'PO number' },
+  { key: 'supplierName', label: 'Supplier' },
+  { key: 'statusLabel', label: 'Status' },
+  { key: 'expectedDeliveryDate', label: 'Expected' },
+  { key: 'receivedLineCount', label: 'Lines received' },
+  { key: 'lineCount', label: 'Lines' },
+  { key: 'estimatedValue', label: 'Estimated (R)' },
+];
 
 export default function PurchaseOrdersPage() {
   const { user } = useAuth();
+  const toast = useToast();
   const canManage = CAN_MANAGE.includes(user?.role);
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const view = viewById(searchParams.get('status')).id;
 
-  const [tab, setTab]           = useState('open');
-  const [statusFilter, setStatusFilter] = useState('');
   const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [products, setProducts]   = useState([]);
   const [selected, setSelected]   = useState(null);
-  const [mode, setMode]           = useState('list');
+  const [mode, setMode]           = useState('list');   // list | create | edit
   const [isLoading, setLoading]   = useState(true);
   const [busy, setBusy]           = useState(false);
   const [error, setError]         = useState(null);
   const [formError, setFormError] = useState(null);
   const [invalidProductIds, setInvalidProductIds] = useState([]);
+  const [search, setSearch]       = useState('');
 
-  // Sorting and column visibility, from the same hook every other table
-  // in the app reads. The status filter below stays a <select> and
-  // stays server-side: there are seven statuses, and seven pills across
-  // a toolbar that already carries two tabs is not a filter any more —
-  // it is a second row of tabs.
-  const view = useTableView('purchaseOrders', PO_COLUMNS);
+  // Sorting and column visibility, from the hook every other table in
+  // the app reads.
+  const tableView = useTableView('purchaseOrders', PO_COLUMNS);
 
   const loadPurchaseOrders = useCallback(async () => {
-    const rows = await purchaseOrderAPI.getPurchaseOrders({ status: statusFilter });
-    setPurchaseOrders(rows);
-  }, [statusFilter]);
+    setPurchaseOrders(await purchaseOrderAPI.getPurchaseOrders({ limit: LIST_LIMIT }));
+  }, []);
 
   const reload = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      // In parallel: three independent reads, and doing them in
-      // sequence would show a skeleton for three round trips to
-      // Supabase instead of one.
       const [, sups, prods] = await Promise.all([
         loadPurchaseOrders(),
         supplierAPI.getSuppliers(),
@@ -119,22 +121,12 @@ export default function PurchaseOrdersPage() {
     }
   }, [loadPurchaseOrders]);
 
-  // The order (or its form) opens above a long list: move the page to it.
-  const [detailRef, focusDetail] = useDetailFocus();
-  const open = useCallback(async (id) => {
-    setError(null);
-    try {
-      const po = await purchaseOrderAPI.getPurchaseOrder(id);
-      setSelected(po);
-      setMode('detail');
-      focusDetail();
-    } catch (err) { setError(err.message); }
-  }, [focusDetail]);
-
   useEffect(() => {
     let cancelled = false;
+    // In parallel: three independent reads, so one skeleton for one
+    // round trip rather than three.
     Promise.all([
-      purchaseOrderAPI.getPurchaseOrders({ status: statusFilter }),
+      purchaseOrderAPI.getPurchaseOrders({ limit: LIST_LIMIT }),
       supplierAPI.getSuppliers(),
       stockAPI.getManifest(),
     ])
@@ -144,28 +136,55 @@ export default function PurchaseOrdersPage() {
         setSuppliers(sups);
         setProducts(prods);
       })
-      .catch((err) => {
-        if (!cancelled) setError(err.message);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+      .catch((err) => { if (!cancelled) setError(err.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [statusFilter]);
+  }, []);
 
+  const open = useCallback(async (id) => {
+    setError(null);
+    try {
+      setSelected(await purchaseOrderAPI.getPurchaseOrder(id));
+      setMode('list');
+    } catch (err) { setError(err.message); }
+  }, []);
+  useOpenFromQuery(open, { param: 'id' });
+
+  // ?products=1,2,3 — the inventory screen's bulk "Raise purchase
+  // order". Opens a new order with a line per product once the
+  // manifest has loaded (the lines need its reorder levels and costs).
+  // The parameter is then dropped, so a refresh or a later Cancel does
+  // not reopen the same draft.
+  const [seedProducts, setSeedProducts] = useState([]);
+  const [seededFrom, setSeededFrom] = useState(null);
+  const productsParam = searchParams.get('products');
+  if (productsParam && productsParam !== seededFrom && canManage && products.length) {
+    const ids = new Set(productsParam.split(',').map(Number).filter(Number.isInteger));
+    setSeededFrom(productsParam);
+    setSeedProducts(products.filter((p) => ids.has(p.id)));
+    setMode('create');
+    setSelected(null);
+    setFormError(null);
+  }
   useEffect(() => {
-    const id = searchParams.get('id');
-    if (!id || String(selected?.id ?? '') === id) return;
-    open(id);
-  }, [open, searchParams, selected?.id]);
+    if (!seededFrom || searchParams.get('products') !== seededFrom) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('products');
+    setSearchParams?.(next, { replace: true });
+  }, [seededFrom, searchParams, setSearchParams]);
 
+  const changeView = (id) => {
+    setSearchParams(id === 'open' ? {} : { status: id }, { replace: true });
+  };
+
+  // ── Actions ────────────────────────────────────────────────
   const create = async (payload) => {
     setBusy(true); setFormError(null); setInvalidProductIds([]);
     try {
       const created = await purchaseOrderAPI.createPurchaseOrder(payload);
       await loadPurchaseOrders();
       // Straight into the new PO rather than back to a list where the
-      // manager has to find what she just made.
+      // manager has to find what they just made.
       await open(created.id);
     } catch (err) {
       setFormError(err.message);
@@ -177,22 +196,13 @@ export default function PurchaseOrdersPage() {
     }
   };
 
-  const approve = async () => {
-    setError(null);
-    try {
-      await purchaseOrderAPI.approvePurchaseOrder(selected.id);
-      await loadPurchaseOrders();
-      await open(selected.id);
-    } catch (err) { setError(err.message); }
-  };
-
   const update = async (payload) => {
     setBusy(true); setFormError(null); setInvalidProductIds([]);
     try {
       const updated = await purchaseOrderAPI.updatePurchaseOrder(selected.id, payload);
       await loadPurchaseOrders();
       setSelected(updated);
-      setMode('detail');
+      setMode('list');
     } catch (err) {
       setFormError(err.message);
       if (err.missingProductIds) setInvalidProductIds(err.missingProductIds);
@@ -201,182 +211,180 @@ export default function PurchaseOrdersPage() {
     }
   };
 
-  // Boolean return, not a throw — PurchaseOrderDetail's confirm dialog
-  // reads it the same way setQuickbooksRef's caller does, to decide
-  // whether to close itself (true) or stay open over the error (false).
-  const remove = async () => {
-    setError(null);
+  // Status changes report through a toast and return whether they
+  // worked, so the panel knows whether to close its own editor.
+  const changeStatus = async (status, reason, done) => {
     try {
-      await purchaseOrderAPI.deletePurchaseOrder(selected.id);
+      await purchaseOrderAPI.setPurchaseOrderStatus(selected.id, status, reason);
       await loadPurchaseOrders();
-      setSelected(null);
-      setMode('list');
+      await open(selected.id);
+      toast({ variant: 'success', title: done });
       return true;
     } catch (err) {
-      setError(err.message);
+      toast({ variant: 'error', title: 'Could not change this order', description: err.message });
       return false;
     }
   };
 
-  // Returns whether it succeeded rather than throwing, so the inline
-  // editor in PurchaseOrderDetail knows whether to close (success) or
-  // stay open with the draft intact (failure) — the ErrorBanner above
-  // already surfaces the message either way.
+  const remove = async () => {
+    try {
+      await purchaseOrderAPI.deletePurchaseOrder(selected.id);
+      await loadPurchaseOrders();
+      setSelected(null);
+      return true;
+    } catch (err) {
+      toast({ variant: 'error', title: 'Could not delete this order', description: err.message });
+      return false;
+    }
+  };
+
   const setQuickbooksRef = async (quickbooksPoId) => {
-    setError(null);
     try {
       await purchaseOrderAPI.setQuickbooksReference(selected.id, quickbooksPoId);
       await loadPurchaseOrders();
       await open(selected.id);
       return true;
-    } catch (err) { setError(err.message); return false; }
+    } catch (err) {
+      toast({ variant: 'error', title: 'Could not save the QuickBooks reference', description: err.message });
+      return false;
+    }
   };
 
-  // Resend the Finance email. Returns success like setQuickbooksRef, so
-  // the button can stop spinning either way; the banner shows the
-  // server's message (e.g. no Finance recipient saved).
+  // Resend the Finance email. Returns success like setQuickbooksRef so
+  // the button can stop spinning either way. The order is reloaded in
+  // both cases: a failed attempt still leaves a status behind.
   const resendFinanceEmail = async () => {
-    setError(null);
     try {
       await purchaseOrderAPI.resendFinanceEmail(selected.id);
       await open(selected.id);
       return true;
-    } catch (err) { setError(err.message); await open(selected.id); return false; }
+    } catch (err) {
+      toast({ variant: 'error', title: 'Could not resend to Finance', description: err.message });
+      await open(selected.id);
+      return false;
+    }
   };
 
-  const visible = tab === 'open'
-    ? purchaseOrders.filter((po) => po.status !== 'completed' && po.status !== 'returned')
-    : purchaseOrders;
+  // ── The list ───────────────────────────────────────────────
+  const counts = useMemo(
+    () => Object.fromEntries(PO_VIEWS.map((v) => [v.id, purchaseOrders.filter(v.test).length])),
+    [purchaseOrders],
+  );
+  const { sortRows } = tableView;
+  const rows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const inView = purchaseOrders.filter(viewById(view).test).filter((po) => !q
+      || po.poNumber?.toLowerCase().includes(q)
+      || po.supplierName?.toLowerCase().includes(q));
+    return sortRows(inView);
+  }, [purchaseOrders, view, search, sortRows]);
 
-  const sortedVisible = useMemo(() => view.sortRows(visible), [visible, view]);
+  const exportRows = () => downloadCsv(
+    `purchase-orders-${view}.csv`,
+    toCsv(rows.map((po) => ({ ...po, statusLabel: PO_STATUS_LABELS[po.status] ?? po.status })), EXPORT_COLUMNS),
+  );
 
   return (
-    <ManagerLayout>
-      <main className="mx-auto w-full max-w-5xl px-4 py-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-medium">Purchase orders</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              What we have asked suppliers for, and what has arrived.
-            </p>
-          </div>
-          {canManage && mode !== 'create' && mode !== 'edit' ? (
-            <Button
-              type="button"
-              onClick={() => { setMode('create'); setSelected(null); setFormError(null); focusDetail(); }}
-            >
-              <Plus /> New purchase order
-            </Button>
-          ) : null}
+    <PageShell>
+      <PageHeader
+        title="Purchase orders"
+        description="What we have asked suppliers for, and what has arrived."
+        actions={canManage && mode === 'list' ? (
+          <Button
+            type="button"
+            onClick={() => { setMode('create'); setSeedProducts([]); setSelected(null); setFormError(null); }}
+          >
+            <Plus /> New purchase order
+          </Button>
+        ) : null}
+      />
+
+      {mode === 'create' || mode === 'edit' ? (
+        <div className="mt-6">
+          <PurchaseOrderForm
+            // Forces a remount (and so a fresh read of initialValue)
+            // whenever the target changes — create vs. edit, or one
+            // PO's edit vs. another's.
+            key={mode === 'edit' ? `edit-${selected?.id}` : 'create'}
+            suppliers={suppliers}
+            products={products}
+            busy={busy}
+            error={formError}
+            invalidProductIds={invalidProductIds}
+            initialValue={mode === 'edit' ? selected : null}
+            initialProducts={mode === 'create' ? seedProducts : []}
+            submitLabel={mode === 'edit' ? 'Save changes' : undefined}
+            onSubmit={mode === 'edit' ? update : create}
+            onCancel={() => {
+              if (mode === 'create') setSelected(null);
+              setMode('list');
+              setSeedProducts([]);
+              setFormError(null);
+              setInvalidProductIds([]);
+            }}
+          />
         </div>
+      ) : (
+        <>
+          <ErrorBanner className="mt-4" message={error} onRetry={reload} />
 
-        {mode === 'create' || mode === 'edit' ? (
-          <div ref={detailRef} tabIndex={-1} className="mt-6 scroll-mt-6 outline-none">
-            <PurchaseOrderForm
-              // Forces a remount (and so a fresh read of initialValue)
-              // whenever the target changes — create vs. edit, or one
-              // PO's edit vs. another's — rather than trying to react
-              // to a prop change inside the form's own state.
-              key={mode === 'edit' ? `edit-${selected?.id}` : 'create'}
-              suppliers={suppliers}
-              products={products}
-              busy={busy}
-              error={formError}
-              invalidProductIds={invalidProductIds}
-              initialValue={mode === 'edit' ? selected : null}
-              submitLabel={mode === 'edit' ? 'Save changes' : undefined}
-              onSubmit={mode === 'edit' ? update : create}
-              onCancel={() => {
-                setMode(mode === 'edit' ? 'detail' : 'list');
-                setFormError(null);
-                setInvalidProductIds([]);
-              }}
-            />
-          </div>
-        ) : (
-          <>
-            <div className="mt-5 flex gap-1 border-b">
-              {TABS.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => { setTab(t.id); setSelected(null); setMode('list'); }}
-                  className={
-                    tab === t.id
-                      ? 'border-b-2 border-foreground px-4 py-2 text-sm font-medium'
-                      : 'px-4 py-2 text-sm text-muted-foreground'
-                  }
-                >
-                  {t.label}
-                </button>
-              ))}
+          <ViewTabs
+            className="mt-5"
+            label="Purchase order views"
+            value={view}
+            onChange={changeView}
+            tabs={PO_VIEWS.map((v) => ({ id: v.id, label: v.label, alert: v.alert, count: isLoading ? null : counts[v.id] }))}
+          />
 
-              {/* Server-side status filter, separate from the tabs.
-                  The tabs are the two views a manager wants by default;
-                  this is for chasing one specific state. */}
-              <select
-                value={statusFilter}
-                onChange={(e) => { setLoading(true); setStatusFilter(e.target.value); setSelected(null); }}
-                className="ml-auto mb-1 rounded-[4px] border-2 px-2 py-1 text-sm"
-                aria-label="Filter by status"
-              >
-                <option value="">All statuses</option>
-                {Object.entries(PO_STATUS_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
-
-              <ColumnToggle
-                idPrefix="po"
-                columns={view.availableColumns}
-                hidden={view.hidden}
-                onToggle={view.toggleColumn}
-                onReset={view.resetColumns}
+          <ListCard
+            className="mt-6"
+            header={
+              <ListToolbar
+                search={{ value: search, onChange: setSearch, placeholder: 'Search PO number or supplier' }}
+                columns={{
+                  idPrefix: 'po',
+                  columns: tableView.availableColumns,
+                  hidden: tableView.hidden,
+                  onToggle: tableView.toggleColumn,
+                  onReset: tableView.resetColumns,
+                }}
+                onExport={rows.length ? exportRows : undefined}
               />
-            </div>
-
-            {error ? (
-              <div className="mt-4">
-                <ErrorBanner message={error} onRetry={reload} />
-              </div>
-            ) : null}
-
+            }
+          >
             {isLoading ? (
-              <div className="mt-6 space-y-3">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-24 w-full" />
+              <div className="space-y-2 p-4" aria-busy="true">
+                {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
               </div>
             ) : (
-              <div className="mt-6 space-y-6">
-                <div ref={detailRef} tabIndex={-1} className="scroll-mt-6 outline-none">
-                {mode === 'detail' && selected ? (
-                  <PurchaseOrderDetail
-                    purchaseOrder={selected}
-                    canManage={canManage}
-                    onApprove={approve}
-                    onSetQuickbooksRef={setQuickbooksRef}
-                    onResendFinanceEmail={resendFinanceEmail}
-                    onEdit={() => { setMode('edit'); setFormError(null); setInvalidProductIds([]); focusDetail(); }}
-                    onDelete={remove}
-                    onClose={() => { setSelected(null); setMode('list'); }}
-                  />
-                ) : null}
-                </div>
-
-                <PurchaseOrderList
-                  purchaseOrders={sortedVisible}
-                  selectedId={selected?.id ?? null}
-                  onSelect={open}
-                  columns={view.visibleColumns}
-                  sort={view.sort}
-                  onToggleSort={view.toggleSort}
-                />
-              </div>
+              <PurchaseOrderList
+                purchaseOrders={rows}
+                selectedId={selected?.id ?? null}
+                onSelect={open}
+                columns={tableView.visibleColumns}
+                sort={tableView.sort}
+                onToggleSort={tableView.toggleSort}
+              />
             )}
-          </>
-        )}
-      </main>
-    </ManagerLayout>
+          </ListCard>
+        </>
+      )}
+
+      {selected && mode === 'list' ? (
+        <PurchaseOrderDetail
+          key={selected.id}
+          purchaseOrder={selected}
+          canManage={canManage}
+          onApprove={() => changeStatus('approved', null, `${selected.poNumber} approved`)}
+          onRecordFollowUp={(reason) => changeStatus('follow_up_required', reason, `Follow-up recorded on ${selected.poNumber}`)}
+          onReopen={() => changeStatus('approved', null, `${selected.poNumber} reopened for receiving`)}
+          onSetQuickbooksRef={setQuickbooksRef}
+          onResendFinanceEmail={resendFinanceEmail}
+          onEdit={() => { setMode('edit'); setFormError(null); setInvalidProductIds([]); }}
+          onDelete={remove}
+          onClose={() => setSelected(null)}
+        />
+      ) : null}
+    </PageShell>
   );
 }

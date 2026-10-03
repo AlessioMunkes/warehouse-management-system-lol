@@ -45,9 +45,9 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect } from 'react';
 import StaffShell from '../components/layout/StaffShell';
-import DashboardGreeting from '../features/taskdashboard/components/DashboardGreeting';
+import DashboardGreeting from '../features/dashboard/components/DashboardGreeting';
 import UnfinishedWork from '../features/staff/components/UnfinishedWork';
-import TaskNode from '../features/taskdashboard/components/TaskNode';
+import TaskNode from '../features/dashboard/components/TaskNode';
 import { useAuth } from '../context/AuthContext';
 import useCoachmark from '../features/staff/hooks/useCoachmark';
 import { STAFF, PACKING } from '../routes/paths';
@@ -65,9 +65,9 @@ const TASKS = [
     meta: 'Portion bulk stock' },
   { to: STAFF.dispatch, icon: 'dispatch-icon', title: 'Dispatch',
     meta: 'Dispatch pallets' },
-  { to: STAFF.communityRequests, icon: 'benevolent-icon', title: 'Benevolent requests',
+  { to: STAFF.floorRequests, icon: 'benevolent-icon', title: 'Benevolent requests',
     meta: 'Log a request' },
-  { to: STAFF.feedTheSoil, icon: 'fts-icon', title: 'Feed the Soil',
+  { to: STAFF.floorFeedTheSoil, icon: 'fts-icon', title: 'Feed the Soil',
     meta: 'Log compost' },
   // Receipts is manager-only and deliberately absent. The item and
   // the route guard in App.jsx have to agree — a hidden item on an

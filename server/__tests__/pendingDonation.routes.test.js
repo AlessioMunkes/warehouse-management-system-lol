@@ -51,18 +51,24 @@ beforeEach(() => {
 });
 
 describe('pending donation routes', () => {
-  it('creates pending donations for the same roles that can record donations', async () => {
-    for (const role of [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN]) {
-      const res = await request(app)
+  it('creates pending donations for the same role that can record donations', async () => {
+    const res = await request(app)
+      .post(BASE)
+      .set('Cookie', cookieFor(ROLES.WORKER, { id: 55 }))
+      .send({ createdBy: 999, donorName: 'Body Donor', items: [] });
+
+    expect(res.status).toBe(201);
+    expect(res.body).toEqual({
+      success: true,
+      data: { id: 10, status: 'awaiting_resolution', items: [] },
+    });
+
+    for (const role of [ROLES.MANAGER, ROLES.ADMIN]) {
+      const refused = await request(app)
         .post(BASE)
         .set('Cookie', cookieFor(role, { id: 55 }))
         .send({ createdBy: 999, donorName: 'Body Donor', items: [] });
-
-      expect(res.status).toBe(201);
-      expect(res.body).toEqual({
-        success: true,
-        data: { id: 10, status: 'awaiting_resolution', items: [] },
-      });
+      expect(refused.status, role).toBe(403);
     }
 
     expect(serviceMock.createPendingDonationFromIntake.mock.calls.every((call) => call[0].createdBy === 55)).toBe(true);

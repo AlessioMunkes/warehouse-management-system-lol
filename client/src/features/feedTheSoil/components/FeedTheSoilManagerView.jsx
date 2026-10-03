@@ -33,12 +33,18 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Plus, Loader2, Search } from 'lucide-react';
+import { Plus, Loader2, Search, Sprout } from 'lucide-react';
 import TablePager from '@/components/ui/table-pager';
 import SortableHead from '@/components/ui/sortable-head';
 import useSortable from '@/lib/useSortable';
 import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
 import useDetailFocus from '../../masterdata/hooks/useDetailFocus';
+import PageHeader, { PageShell } from '@/components/ui/page-header';
+import ViewTabs from '@/components/ui/view-tabs';
+import ListCard from '@/components/ui/list-card';
+import ListToolbar from '@/components/ui/list-toolbar';
+import EmptyState from '@/components/ui/empty-state';
+import ErrorBanner from '@/components/ui/error-banner';
 
 const STATUS_LABELS = { assigned: 'Assigned', logged: 'Logged', dispatched: 'Dispatched' };
 // Amber with the household, blue once compost is in and waiting to go
@@ -76,17 +82,6 @@ const RECORD_SORT = {
 
 const KitStatus = ({ status }) => (
   <StatusBadge kind="kit" status={status}>{STATUS_LABELS[status] ?? status}</StatusBadge>
-);
-
-const ErrorBanner = ({ message, onRetry }) => (
-  <div className="p-4 rounded-[4px] bg-danger-soft border-2 border-brand text-ink text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-    <span>{message}</span>
-    {onRetry ? (
-      <button onClick={onRetry} className="text-xs sm:text-sm font-semibold underline hover:text-brand focus:outline-none">
-        Try again
-      </button>
-    ) : null}
-  </div>
 );
 
 const TABS = [
@@ -530,29 +525,35 @@ export default function FeedTheSoilManagerView() {
   // Records, fifteen to a page.
   const recordSort = useSortable(records, RECORD_SORT);
   const recordPage = usePaged(recordSort.rows, TABLE_PAGE_SIZE, `${recordSearch}|${records.length}|${recordSort.sort?.key}|${recordSort.sort?.dir}`);
+  // The page's main action follows the tab, and only on the list itself.
+  const onList = view === 'list' && !selectedKit && !selectedRecord;
+  const headerAction = !onList ? null : tab === 'kits' ? (
+    <Button type="button" onClick={() => go('assign')}>
+      <Plus /> Assign a kit
+    </Button>
+  ) : (
+    <Button type="button" onClick={() => { setFormError(null); go('logPickKit'); }}>
+      <Plus /> Log a collection
+    </Button>
+  );
+
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 py-6">
-      <h1 className="text-2xl font-medium">Feed the Soil</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Collection kits assigned to community members and the compost logged against each one.
-        The Impact Calculator's compost figure comes straight from what's logged here.
-      </p>
+    <PageShell>
+      <PageHeader
+        title="Feed the Soil"
+        description="Collection kits assigned to community members and the compost logged against each one. The Impact report's compost figure comes straight from what's logged here."
+        actions={headerAction}
+      />
 
-      {error ? <div className="mt-4"><ErrorBanner message={error} onRetry={tab === 'kits' ? loadKits : loadRecords} /></div> : null}
+      <ErrorBanner className="mt-4" message={error} onRetry={tab === 'kits' ? loadKits : loadRecords} />
 
-      <div className="mt-5 flex gap-1 border-b">
-        {TABS.map((t) => (
-          <button
-            key={t.id} type="button"
-            onClick={() => { setTab(t.id); setView('list'); setSelectedKit(null); setSelectedRecord(null); }}
-            className={t.id === tab
-              ? 'border-b-2 border-foreground px-4 py-2 text-sm font-medium'
-              : 'px-4 py-2 text-sm text-muted-foreground'}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <ViewTabs
+        className="mt-5"
+        label="Feed the Soil views"
+        value={tab}
+        onChange={(id) => { setTab(id); setView('list'); setSelectedKit(null); setSelectedRecord(null); }}
+        tabs={TABS}
+      />
 
       <div ref={detailRef} tabIndex={-1} className="mt-6 space-y-6 scroll-mt-6 outline-none">
         {view === 'assign' ? (
@@ -587,109 +588,85 @@ export default function FeedTheSoilManagerView() {
             onClose={() => { setSelectedKit(null); loadKits(); }}
           />
         ) : tab === 'kits' ? (
-          <>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="relative flex-1 min-w-56">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  className="pl-8" placeholder="Search by owner or suburb"
-                  value={kitSearch} onChange={(e) => setKitSearch(e.target.value)}
-                />
-              </div>
-              <Button type="button" onClick={() => go('assign')}>
-                <Plus /> Assign a kit
-              </Button>
-            </div>
-
+          <ListCard
+            header={<ListToolbar search={{ value: kitSearch, onChange: setKitSearch, placeholder: 'Search by owner or suburb' }} />}
+            footer={!isLoading && kits.length ? <TablePager {...kitPage} noun="kits" alwaysShow /> : null}
+          >
             {isLoading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-24 w-full" />
+              <div className="space-y-2 p-4" aria-busy="true">
+                {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
               </div>
             ) : kits.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No kits match.</p>
+              <EmptyState
+                icon={Sprout}
+                title={kitSearch ? 'No kits match' : 'No kits assigned yet'}
+                description={kitSearch ? 'Nothing matches the search.' : 'Assign a kit to a community member to start.'}
+              />
             ) : (
-              <Card>
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <SortableHead label="Kit" sortKey="kit" sort={kitSort.sort} onSort={kitSort.toggle} />
-                        <SortableHead label="Owner" sortKey="owner" sort={kitSort.sort} onSort={kitSort.toggle} />
-                        <SortableHead label="Suburb" sortKey="suburb" sort={kitSort.sort} onSort={kitSort.toggle} />
-                        <SortableHead label="Status" sortKey="status" sort={kitSort.sort} onSort={kitSort.toggle} />
-                        <SortableHead label="Last logged" sortKey="lastLogged" sort={kitSort.sort} onSort={kitSort.toggle} />
-                        <SortableHead label="Assigned" sortKey="assigned" sort={kitSort.sort} onSort={kitSort.toggle} />
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {kitPage.slice.map((k) => (
-                        <TableRow key={k.id} className="cursor-pointer" onClick={() => openKit(k.id)}>
-                          <TableCell className="font-medium">{formatKitCode(k.id)}</TableCell>
-                          <TableCell>{k.owner_name}</TableCell>
-                          <TableCell className="text-muted-foreground">{k.suburb || '—'}</TableCell>
-                          <TableCell><KitStatus status={k.status} /></TableCell>
-                          <TableCell className="text-muted-foreground">{fmtDate(k.last_logged_at)}</TableCell>
-                          <TableCell className="text-muted-foreground">{fmtDate(k.assigned_at)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  <TablePager {...kitPage} noun="kits" />
-                </CardContent>
-              </Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <SortableHead label="Kit" sortKey="kit" sort={kitSort.sort} onSort={kitSort.toggle} />
+                <SortableHead label="Owner" sortKey="owner" sort={kitSort.sort} onSort={kitSort.toggle} />
+                <SortableHead label="Suburb" sortKey="suburb" sort={kitSort.sort} onSort={kitSort.toggle} />
+                <SortableHead label="Status" sortKey="status" sort={kitSort.sort} onSort={kitSort.toggle} />
+                <SortableHead label="Last logged" sortKey="lastLogged" sort={kitSort.sort} onSort={kitSort.toggle} />
+                <SortableHead label="Assigned" sortKey="assigned" sort={kitSort.sort} onSort={kitSort.toggle} />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {kitPage.slice.map((k) => (
+                <TableRow key={k.id} className="cursor-pointer" onClick={() => openKit(k.id)}>
+                  <TableCell className="font-medium">{formatKitCode(k.id)}</TableCell>
+                  <TableCell>{k.owner_name}</TableCell>
+                  <TableCell className="text-muted-foreground">{k.suburb || '—'}</TableCell>
+                  <TableCell><KitStatus status={k.status} /></TableCell>
+                  <TableCell className="text-muted-foreground">{fmtDate(k.last_logged_at)}</TableCell>
+                  <TableCell className="text-muted-foreground">{fmtDate(k.assigned_at)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
             )}
-          </>
+          </ListCard>
         ) : (
-          <>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="relative flex-1 min-w-56">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  className="pl-8" placeholder="Search by owner or suburb"
-                  value={recordSearch} onChange={(e) => setRecordSearch(e.target.value)}
-                />
-              </div>
-              <Button type="button" onClick={() => { setFormError(null); go('logPickKit'); }}>
-                <Plus /> Log a collection
-              </Button>
-            </div>
-
+          <ListCard
+            header={<ListToolbar search={{ value: recordSearch, onChange: setRecordSearch, placeholder: 'Search by owner or suburb' }} />}
+            footer={!isLoading && records.length ? <TablePager {...recordPage} noun="records" alwaysShow /> : null}
+          >
             {isLoading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-24 w-full" />
+              <div className="space-y-2 p-4" aria-busy="true">
+                {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
               </div>
             ) : records.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No compost has been logged yet.</p>
+              <EmptyState
+                icon={Sprout}
+                title={recordSearch ? 'No records match' : 'No compost logged yet'}
+                description={recordSearch ? 'Nothing matches the search.' : 'Log a collection against a kit when compost comes in.'}
+              />
             ) : (
-              <Card>
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <SortableHead label="Kit" sortKey="kit" sort={recordSort.sort} onSort={recordSort.toggle} />
-                        <SortableHead label="Owner" sortKey="owner" sort={recordSort.sort} onSort={recordSort.toggle} />
-                        <SortableHead label="Status" sortKey="status" sort={recordSort.sort} onSort={recordSort.toggle} />
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {recordPage.slice.map((r) => (
-                        <TableRow key={r.id} className="cursor-pointer" onClick={() => openRecord(r.id)}>
-                          <TableCell className="font-medium">{formatKitCode(r.kit_id)}</TableCell>
-                          <TableCell className="text-muted-foreground">{r.owner_name}{r.suburb ? ` · ${r.suburb}` : ''}</TableCell>
-                          <TableCell><KitStatus status={r.status} /></TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  <TablePager {...recordPage} noun="records" />
-                </CardContent>
-              </Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <SortableHead label="Kit" sortKey="kit" sort={recordSort.sort} onSort={recordSort.toggle} />
+                <SortableHead label="Owner" sortKey="owner" sort={recordSort.sort} onSort={recordSort.toggle} />
+                <SortableHead label="Status" sortKey="status" sort={recordSort.sort} onSort={recordSort.toggle} />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {recordPage.slice.map((r) => (
+                <TableRow key={r.id} className="cursor-pointer" onClick={() => openRecord(r.id)}>
+                  <TableCell className="font-medium">{formatKitCode(r.kit_id)}</TableCell>
+                  <TableCell className="text-muted-foreground">{r.owner_name}{r.suburb ? ` · ${r.suburb}` : ''}</TableCell>
+                  <TableCell><KitStatus status={r.status} /></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
             )}
-          </>
+          </ListCard>
         )}
       </div>
-    </main>
+    </PageShell>
   );
 }

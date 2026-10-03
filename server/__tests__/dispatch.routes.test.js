@@ -36,7 +36,6 @@ const cookieFor = (role, overrides = {}) => {
 };
 
 const ALL_ROLES      = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
-const DISPATCHERS_UP = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 const MANAGERS_UP    = [ROLES.MANAGER, ROLES.ADMIN];
 
 const COLLECT_BODY = {
@@ -124,10 +123,18 @@ describe('dispatch routes — authorisation', () => {
     expect(res.status).toBe(403);
   });
 
-  it.each(DISPATCHERS_UP)('%s can record a collection', async (role) => {
+  // The gate is floor work: each role works only its own screens.
+  it('a warehouse worker can record a collection', async () => {
+    const res = await request(app).post(`${BASE}/1/collect`)
+      .set('Cookie', cookieFor(ROLES.WORKER)).send(COLLECT_BODY);
+    expect(res.status).toBe(201);
+  });
+
+  it.each([ROLES.MANAGER, ROLES.ADMIN])('%s cannot record a collection', async (role) => {
     const res = await request(app).post(`${BASE}/1/collect`)
       .set('Cookie', cookieFor(role)).send(COLLECT_BODY);
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(403);
+    expect(serviceMock.collect).not.toHaveBeenCalled();
   });
 
   // Finance reconciles the money side but does not stand at the gate.
@@ -247,9 +254,9 @@ describe('dispatch controller — responses', () => {
 
   it('passes req.user through to collect (not just its id)', async () => {
     await request(app).post(`${BASE}/1/collect`)
-      .set('Cookie', cookieFor(ROLES.MANAGER, { id: 55 })).send(COLLECT_BODY);
+      .set('Cookie', cookieFor(ROLES.WORKER, { id: 55 })).send(COLLECT_BODY);
     const [, , userArg] = serviceMock.collect.mock.calls[0];
-    expect(userArg).toMatchObject({ id: 55, role: ROLES.MANAGER });
+    expect(userArg).toMatchObject({ id: 55, role: ROLES.WORKER });
   });
 
   it('preserves a 4xx message from the service', async () => {

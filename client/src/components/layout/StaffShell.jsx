@@ -21,7 +21,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import ManagerLayout from '../../features/taskdashboard/components/ManagerLayout';
+import ManagerLayout from './ManagerLayout';
 import StaffTabBar from './StaffTabBar';
 import { useAuth } from '../../context/AuthContext';
 import OfflineBar from './OfflineBar';

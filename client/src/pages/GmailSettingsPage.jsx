@@ -12,7 +12,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-//import { TopNavbar } from '../features/taskdashboard/components/TopNavBar';
+//import { TopNavbar } from '../components/layout/TopNavBar';
 import gmailAPI from '../services/gmailAPI';
 import financeAPI from '../services/financeAPI';
 import {
@@ -38,7 +38,9 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 
-export default function GmailSettingsPage() {
+// `embedded`: shown as the Email section of the admin Settings page,
+// which supplies the page's own header and spacing.
+export default function GmailSettingsPage({ embedded = false } = {}) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -211,9 +213,8 @@ export default function GmailSettingsPage() {
   const connected = Boolean(status?.connected);
 
   return (
-    <div className="min-h-screen bg-canvas">
-   
-      <div className="mx-auto max-w-3xl space-y-6 p-6">
+    <div className={embedded ? '' : 'min-h-screen bg-canvas'}>
+      <div className={embedded ? 'space-y-6' : 'mx-auto max-w-3xl space-y-6 p-6'}>
         {displayFeedback && (
           <div
             role="status"

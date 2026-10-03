@@ -16,7 +16,8 @@
 import repo from '../repositories/purchaseOrder.repository.js';
 import { isPositiveInt, isValidDateString } from '../utils/validation.js';
 import { PO_STATUSES as PO_STATUS_LIST } from '../constants/purchaseOrderStatus.js';
-import emailProvider from '../providers/email.provider.js';
+import communications from '../features/communications/communications.service.js';
+import notices from '../features/communications/notices.js';
 // The Finance recipient managers save in the app (finance_report_email_settings).
 // Replaced financeEmailFallback.service.js, which read FINANCE_EMAIL until
 // feature/notification-fix brought this service onto staging.
@@ -258,7 +259,7 @@ Please capture this purchase order in QuickBooks, then enter the QuickBooks refe
 // always cleared in finally.
 const sendsInFlight = new Set();
 
-const notifyFinance = async (purchaseOrder) => {
+const notifyFinance = async (purchaseOrder, sentBy = null) => {
   if (sendsInFlight.has(purchaseOrder.id)) return 'in_progress';
   sendsInFlight.add(purchaseOrder.id);
   try {
@@ -269,7 +270,16 @@ const notifyFinance = async (purchaseOrder) => {
 
     let result;
     try {
-      result = await emailProvider.sendEmail({ to: recipientEmail, subject, text, html }, null);
+      // Through the communications module so the send lands in message
+      // history. It returns the provider's reply unchanged, so the
+      // result handling below is the same as before.
+      result = await communications.send({
+        type: 'purchase_order_finance',
+        to: recipientEmail, subject, text, html,
+        related: { type: 'purchase_order', id: purchaseOrder.id },
+        sentBy,
+        sendAs: null,
+      });
     } catch (err) {
       console.error('[purchaseOrder:financeEmail]', err.message);
       await repo.recordFinanceEmailAttempt(purchaseOrder.id, {
@@ -331,7 +341,7 @@ const createPurchaseOrder = async (body, userId) => {
   // an unhandled rejection.
   const created = result.purchaseOrder;
   setImmediate(() => {
-    notifyFinance(created).catch((err) => {
+    notifyFinance(created, userId).catch((err) => {
       console.error('[purchaseOrder:financeEmail]', err.message);
     });
   });
@@ -340,7 +350,12 @@ const createPurchaseOrder = async (body, userId) => {
 };
 
 // ── Read ──────────────────────────────────────────────────────
-const listPurchaseOrders = async ({ status, supplierId } = {}) => {
+// The list page counts its tabs from what it fetched, so it asks for
+// more than the repository's default of 50. Capped: an unbounded limit
+// from a query string is a full-table read on request.
+const MAX_LIST_LIMIT = 500;
+
+const listPurchaseOrders = async ({ status, supplierId, limit } = {}) => {
   const cleanStatus = clean(status);
   if (cleanStatus && !PO_STATUS_LIST.includes(cleanStatus)) {
     throw fail(400, `Unknown status filter "${cleanStatus}".`);
@@ -350,9 +365,14 @@ const listPurchaseOrders = async ({ status, supplierId } = {}) => {
     throw fail(400, 'A valid supplier ID is required.');
   }
 
+  if (limit !== undefined && limit !== null && limit !== ''
+      && (!isPositiveInt(limit) || Number(limit) > MAX_LIST_LIMIT)) {
+    throw fail(400, `Limit must be a whole number from 1 to ${MAX_LIST_LIMIT}.`);
+  }
   return repo.listPurchaseOrders({
     status:     cleanStatus,
     supplierId: isPositiveInt(supplierId) ? Number(supplierId) : null,
+    ...(isPositiveInt(limit) ? { limit: Number(limit) } : {}),
   });
 };
 
@@ -385,12 +405,19 @@ const setPurchaseOrderStatus = async (rawId, body = {}) => {
   if (status === 'returned' && !reason) {
     throw fail(400, 'A reason is required when marking a purchase order as returned.');
   }
+  // A follow-up is a note to whoever picks it up next; without one it
+  // says only that something is wrong.
+  if (status === 'follow_up_required' && !reason) {
+    throw fail(400, 'Say what needs following up when marking a purchase order for follow-up.');
+  }
 
   const existing = await repo.getPurchaseOrderById(Number(rawId));
   if (!existing) throw fail(404, 'Purchase order not found.');
   if (existing.status === status) return existing;
 
-  return repo.updatePurchaseOrderStatus(Number(rawId), status, reason);
+  return repo.updatePurchaseOrderStatus(Number(rawId), status, reason, {
+    beforeCommit: notices.purchaseOrderNeedsAttention,
+  });
 };
 
 // ── QuickBooks reference ─────────────────────────────────────
@@ -417,14 +444,14 @@ const setQuickbooksReference = async (rawId, body = {}, actorId) => {
 // ── Resend the Finance email ─────────────────────────────────
 // Same send + status-write path as creation. Returns the PO as it now
 // stands, so the caller sees the status the attempt left behind.
-const resendFinanceEmail = async (rawId) => {
+const resendFinanceEmail = async (rawId, userId = null) => {
   if (!isPositiveInt(rawId)) throw fail(400, 'A valid purchase order ID is required.');
   const id = Number(rawId);
 
   const purchaseOrder = await repo.getPurchaseOrderById(id);
   if (!purchaseOrder) throw fail(404, 'Purchase order not found.');
 
-  const outcome = await notifyFinance(purchaseOrder);
+  const outcome = await notifyFinance(purchaseOrder, userId);
   if (outcome === 'in_progress') {
     throw fail(409, 'An email for this purchase order is already being sent.');
   }

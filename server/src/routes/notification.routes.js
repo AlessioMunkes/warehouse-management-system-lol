@@ -15,18 +15,18 @@
 // "new work on the floor" events — see StaffNotificationBell.jsx.
 // ─────────────────────────────────────────────────────────────
 import express                      from 'express';
-import auth, { requireRole, ROLES } from '../middleware/auth.middleware.js';
+import auth, { requireRole } from '../middleware/auth.middleware.js';
+import { ALL_STAFF } from '../constants/permissions.js';
 import { validateIntId }            from '../middleware/validate.middleware.js';
 import notificationController       from '../controllers/notification.controller.js';
 
 const router = express.Router();
 
-const STAFF_ROLES = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 
-router.get('/',              auth, requireRole(...STAFF_ROLES), notificationController.list);
-router.get('/unread-count',  auth, requireRole(...STAFF_ROLES), notificationController.unreadCount);
-router.post('/read-all',     auth, requireRole(...STAFF_ROLES), notificationController.markAllRead);
-router.patch('/:id/read',    auth, requireRole(...STAFF_ROLES), validateIntId, notificationController.markRead);
+router.get('/',              auth, requireRole(...ALL_STAFF), notificationController.list);
+router.get('/unread-count',  auth, requireRole(...ALL_STAFF), notificationController.unreadCount);
+router.post('/read-all',     auth, requireRole(...ALL_STAFF), notificationController.markAllRead);
+router.patch('/:id/read',    auth, requireRole(...ALL_STAFF), validateIntId, notificationController.markRead);
 
 router.get('/floor',              auth, notificationController.listFloor);
 router.get('/floor/unread-count', auth, notificationController.floorUnreadCount);

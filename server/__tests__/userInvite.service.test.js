@@ -416,3 +416,19 @@ describe('acceptInvite', () => {
     expect(user.username).toBe('janed');
   });
 });
+
+describe('invite link lifetime from Settings', () => {
+  it('expires a new invite after the days an admin chose, and the email says so', async () => {
+    const { default: settings } = await import('../src/features/settings/settings.service.js');
+    settings.get.mockImplementation(async (key) => (key === 'invites.linkDays' ? 3 : undefined));
+    const before = Date.now();
+
+    await userInviteService.createInvite({ email: 'three@example.com', role: 'warehouse_worker' }, ADMIN_ID);
+
+    const { expiresAt } = inviteRepoMock.createInvite.mock.calls.at(-1)[0];
+    const days = (expiresAt.getTime() - before) / 86400000;
+    expect(days).toBeGreaterThan(2.99);
+    expect(days).toBeLessThan(3.01);
+    settings.get.mockReset();
+  });
+});

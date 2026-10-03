@@ -34,7 +34,7 @@ import {
 } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import PurchaseOrderLines from './PurchaseOrderLines';
-import { blankLine, unitPriceFor } from './purchaseOrderLine';
+import { blankLine, suggestedLine, unitPriceFor } from './purchaseOrderLine';
 
 // Render runs UTC and the warehouse does not. Between midnight and
 // 02:00 SAST the container still thinks it is yesterday, so a date
@@ -60,6 +60,11 @@ export default function PurchaseOrderForm({
   // switching between orders or between create/edit, so this only
   // needs to read initialValue once, on mount.
   initialValue = null,
+  // A new order only: products to start with a line each, at the
+  // quantity that tops them up to their reorder level. Sent from the
+  // inventory screen's bulk "Raise purchase order". Read once, on
+  // mount, like initialValue.
+  initialProducts = [],
   submitLabel = 'Raise purchase order',
 }) {
   const [form, setForm] = useState(() => (initialValue ? {
@@ -82,7 +87,9 @@ export default function PurchaseOrderForm({
           // unitPriceFor() does back at submit time.
           lineCost: item.unitPrice === null ? '' : (item.unitPrice * item.expectedQuantity).toFixed(2),
         }))
-      : [blankLine()]
+      : initialProducts.length
+        ? initialProducts.map(suggestedLine)
+        : [blankLine()]
   ));
   const [touched, setTouched] = useState(false);
 

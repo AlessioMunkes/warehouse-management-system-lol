@@ -33,8 +33,8 @@ import {
   AlertTriangle, ClipboardList, FileBadge, Gift, HandHeart, Mail, Package, PackageOpen,
   PackageSearch, PhoneCall, ScrollText, ShoppingCart, Truck, Users2, Warehouse,
 } from 'lucide-react';
-import StatTile from '../taskdashboard/components/StatTile';
-import ActionCard from '../taskdashboard/components/ActionCard';
+import StatTile from './components/StatTile';
+import ActionCard from './components/ActionCard';
 import ReportPanel from './components/ReportPanel';
 import StaticChart from './components/StaticChart';
 import NotificationsPanel from './components/NotificationsPanel';
@@ -85,14 +85,14 @@ export const WIDGETS = [
     id: 'dispatches-today', title: 'Pallets due out today', roles: MANAGER_ONLY, needs: ['summary'],
     description: 'Packed pallets due to be collected today and not yet collected.',
     render: ({ summary }) => (
-      <StatTile icon={Truck} label="Pallets due out today" value={summary.pendingDispatchesToday} to={STAFF.dispatch} />
+      <StatTile icon={Truck} label="Pallets due out today" value={summary.pendingDispatchesToday} to={`${STAFF.pickingSlips}?status=ready`} />
     ),
   }),
   tile({
     id: 'deliveries-today', title: 'Deliveries expected today', roles: MANAGER_ONLY, needs: ['summary'],
     description: 'Open purchase orders with today as the expected delivery date.',
     render: ({ summary }) => (
-      <StatTile icon={PackageOpen} label="Deliveries expected today" value={summary.deliveriesExpectedToday} to={STAFF.receiving} />
+      <StatTile icon={PackageOpen} label="Deliveries expected today" value={summary.deliveriesExpectedToday} to={`${STAFF.purchaseOrders}?status=in_transit`} />
     ),
   }),
   tile({
@@ -106,7 +106,7 @@ export const WIDGETS = [
     id: 'pallets-at-gate', title: 'Pallets waiting at the gate', roles: MANAGER_ONLY, needs: ['myWork'],
     description: 'Packed pallets due today or earlier that have not been collected.',
     render: ({ myWork }) => (
-      <StatTile icon={Warehouse} label="Pallets waiting at the gate" value={myWork.palletsAtGate} to={STAFF.dispatch} />
+      <StatTile icon={Warehouse} label="Pallets waiting at the gate" value={myWork.palletsAtGate} to={`${STAFF.pickingSlips}?status=ready`} />
     ),
   }),
   tile({

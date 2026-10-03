@@ -30,21 +30,13 @@
 // route also wrapped it in ManagerLayout via ProtectedRoute's shell
 // prop) a doubled-up sidebar whose drawer state fought itself.
 // ─────────────────────────────────────────────────────────────
-import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
-import StaffShell from '../components/layout/StaffShell';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import CommunityRequestForm from '../features/communityRequests/components/CommunityRequestForm';
-import CommunityRequestFlow from '../features/communityRequests/components/CommunityRequestFlow';
 import communityRequestAPI, {
   OUTCOMES, OUTCOME_LABELS, RESOLVE_OUTCOMES,
 } from '../services/communityRequestAPI';
-import { useAuth } from '../context/AuthContext';
-import { mayHaveStockOut, stockOutReason } from '../features/communityRequests/stockOut';
 
-import {
-  InputGroup, InputGroupAddon, InputGroupInput,
-} from '@/components/ui/input-group';
 import { Button }   from '@/components/ui/button';
 import StatusBadge from '@/components/ui/status-badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -53,18 +45,21 @@ import {
   Field, FieldGroup, FieldLabel, FieldError,
 } from '@/components/ui/field';
 import {
-  Card, CardContent, CardHeader, CardTitle,
-} from '@/components/ui/card';
-import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Search, Plus, Loader2 } from 'lucide-react';
+import { Plus, Loader2, PhoneIncoming } from 'lucide-react';
 import TablePager from '@/components/ui/table-pager';
 import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
-import useDetailFocus from '../features/masterdata/hooks/useDetailFocus';
+import PageHeader, { PageShell } from '@/components/ui/page-header';
+import ViewTabs from '@/components/ui/view-tabs';
+import ListCard from '@/components/ui/list-card';
+import ListToolbar from '@/components/ui/list-toolbar';
+import DetailPanel from '@/components/ui/detail-panel';
+import EmptyState from '@/components/ui/empty-state';
+import ErrorBanner from '@/components/ui/error-banner';
 
 // Pending amber, fulfilled solid green, part-fulfilled soft green,
 // referred blue, declined red — each with its own icon
@@ -80,57 +75,14 @@ const fmtDateTime = (value) =>
 
 // Same markup as the global fetch error banner in
 // InventoryManagementPage / SupplierDirectoryPage. One error style.
-const ErrorBanner = ({ message, onRetry }) => (
-  <div className="p-4 rounded-[4px] bg-danger-soft border-2 border-brand text-ink text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-    <span>{message}</span>
-    {onRetry ? (
-      <button
-        onClick={onRetry}
-        className="text-xs sm:text-sm font-semibold underline hover:text-brand focus:outline-none"
-      >
-        Try again
-      </button>
-    ) : null}
-  </div>
-);
+// The tabs: one per outcome, Pending first because that is the work.
+// `id` is what goes in ?status=; Pending leaves the URL bare.
+const VIEWS = [
+  ...OUTCOMES.map((o) => ({ id: o, label: OUTCOME_LABELS[o], alert: o === 'pending', test: (r) => r.outcome === o })),
+  { id: 'all', label: 'All', test: () => true },
+];
+const viewById = (id) => VIEWS.find((v) => v.id === id) ?? VIEWS[0];
 
-// ── Stock-out prompt ─────────────────────────────────────────
-// Resolving never moves stock, so after a fulfilled / partly fulfilled
-// request this points the manager at Inventory and hands them the text
-// for the adjustment note. Same banner construction as ErrorBanner.
-const StockOutPrompt = ({ request, onGoToInventory, onDismiss }) => {
-  const reason = stockOutReason(request);
-  const [copied, setCopied] = useState(false);
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(reason);
-      setCopied(true);
-    } catch {
-      setCopied(false);
-    }
-  };
-
-  return (
-    <div role="status" className="p-4 rounded-[4px] bg-surface border-2 border-line text-ink text-sm space-y-3 shadow-sm">
-      <p className="font-semibold">Did stock leave the warehouse? Record it in Inventory so stock stays accurate.</p>
-      <p className="text-muted-foreground">
-        In Inventory, adjust the product: choose <strong>Remove</strong>, reason
-        {' '}<strong>Other (explain below)</strong>, and paste this as the note:
-      </p>
-      <code className="block rounded-[4px] bg-muted px-3 py-2 text-xs break-words">{reason}</code>
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" size="sm" onClick={onGoToInventory}>Go to Inventory</Button>
-        <Button type="button" size="sm" variant="outline" onClick={copy}>
-          {copied ? 'Copied' : 'Copy note text'}
-        </Button>
-        <Button type="button" size="sm" variant="ghost" onClick={onDismiss}>Not from inventory</Button>
-      </div>
-    </div>
-  );
-};
-
-// ── Resolve panel ────────────────────────────────────────────
 const ResolvePanel = ({ request, busy, error, onSubmit, onCancel }) => {
   const [outcome, setOutcome] = useState('fulfilled');
   const [note, setNote] = useState('');
@@ -144,11 +96,12 @@ const ResolvePanel = ({ request, busy, error, onSubmit, onCancel }) => {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Resolve request from {request.callerName || 'an unnamed caller'}</CardTitle>
-      </CardHeader>
-      <CardContent>
+    <DetailPanel
+      open
+      onClose={onCancel}
+      eyebrow="Resolve request"
+      title={request.callerName || 'An unnamed caller'}
+    >
         <FieldGroup>
           {error ? <FieldError>{error}</FieldError> : null}
 
@@ -194,52 +147,44 @@ const ResolvePanel = ({ request, busy, error, onSubmit, onCancel }) => {
             <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
           </Field>
         </FieldGroup>
-      </CardContent>
-    </Card>
+    </DetailPanel>
   );
 };
 
-const isManager = (user) => user?.role === 'manager' || user?.role === 'admin';
 
-function CommunityRequestsManagerView() {
+// The manager's screen. The floor logs requests on its own screen,
+// StaffCommunityRequestsPage.
+export default function CommunityRequestsPage() {
   const [requests, setRequests] = useState([]);
   const [search, setSearch] = useState('');
-  const [outcomeFilter, setOutcomeFilter] = useState('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const view = viewById(searchParams.get('status'));
+  const changeView = (id) => setSearchParams(id === VIEWS[0].id ? {} : { status: id }, { replace: true });
   const [mode, setMode] = useState('list');       // list | create
   const [resolving, setResolving] = useState(null); // request being resolved
-  const [detailRef, focusDetail] = useDetailFocus();
-  const navigate = useNavigate();
-  const [stockPrompt, setStockPrompt] = useState(null); // { id, callerName }
 
   const [isLoading, setIsLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [formError, setFormError] = useState(null);
-  // Bumped by "Try again" so the load effect runs again even though the
-  // filter and search are unchanged.
-  const [reloadToken, setReloadToken] = useState(0);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      setRequests(await communityRequestAPI.getRequests({
-        outcome: outcomeFilter === 'all' ? '' : outcomeFilter,
-        search,
-      }));
+      setRequests(await communityRequestAPI.getRequests({ outcome: '', search }));
     } catch (err) {
       setError(err.message || 'Could not load requests.');
     }
-  }, [outcomeFilter, search]);
+  }, [search]);
 
   // The cancelled flag is the same guard SupplierDirectoryPage uses: a
   // fast filter change must not let a stale response overwrite fresher
   // state.
   useEffect(() => {
     let cancelled = false;
-    communityRequestAPI.getRequests({
-      outcome: outcomeFilter === 'all' ? '' : outcomeFilter,
-      search,
-    })
+    // Every outcome at once: the tabs filter here, so each can say how
+    // many it holds.
+    communityRequestAPI.getRequests({ outcome: '', search })
       .then((rows) => {
         if (!cancelled) {
           setRequests(rows);
@@ -247,34 +192,13 @@ function CommunityRequestsManagerView() {
         }
       })
       .catch((err) => {
-        // Drop the previous rows: they belong to another filter and
-        // would sit under the error as if they were this one's results.
-        if (!cancelled) {
-          setRequests([]);
-          setError(err.message || 'Could not load requests.');
-        }
+        if (!cancelled) setError(err.message || 'Could not load requests.');
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false);
       });
     return () => { cancelled = true; };
-  }, [outcomeFilter, search, reloadToken]);
-
-  // Base UI's Select fires onValueChange even when the item picked is
-  // already selected. Raising isLoading for an unchanged filter would
-  // never be cleared (the load effect's deps don't change), leaving the
-  // skeletons up for good.
-  const changeOutcome = (value) => {
-    if (value === outcomeFilter) return;
-    setIsLoading(true);
-    setOutcomeFilter(value);
-  };
-
-  const retry = () => {
-    setError(null);
-    setIsLoading(true);
-    setReloadToken((t) => t + 1);
-  };
+  }, [search]);
 
   const create = async (payload) => {
     setBusy(true); setFormError(null);
@@ -304,9 +228,6 @@ function CommunityRequestsManagerView() {
     setBusy(true); setFormError(null);
     try {
       await communityRequestAPI.resolveRequest(resolving.id, { outcome, outcomeNote });
-      setStockPrompt(mayHaveStockOut(outcome)
-        ? { id: resolving.id, callerName: resolving.callerName }
-        : null);
       setResolving(null);
       await load();
     } catch (err) {
@@ -317,195 +238,163 @@ function CommunityRequestsManagerView() {
   };
 
   // Requests, fifteen to a page; back to page one when the list changes.
-  const requestPage = usePaged(requests, TABLE_PAGE_SIZE, `${search}|${outcomeFilter}|${requests.length}|${reloadToken}`);
+  const counts = useMemo(
+    () => Object.fromEntries(VIEWS.map((v) => [v.id, requests.filter(v.test).length])),
+    [requests],
+  );
+  const visible = useMemo(() => requests.filter(view.test), [requests, view]);
+  const requestPage = usePaged(visible, TABLE_PAGE_SIZE, `${search}|${view.id}|${visible.length}`);
 
   return (
-    <ManagerLayout>
-      <main className="mx-auto w-full max-w-5xl px-4 py-6">
-        <h1 className="text-2xl font-medium">Benevolent Package Requests</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Phone-in and walk-in requests for goods from the public, and what happened to each one.
-        </p>
+    <PageShell>
+      <PageHeader
+        title="Benevolent requests"
+        description="Phone-in and walk-in requests for goods from the public, and what happened to each one."
+        actions={
+          <Button type="button" onClick={() => { setMode('create'); setFormError(null); }}>
+            <Plus />
+            Log a request
+          </Button>
+        }
+      />
 
-        {error ? (
-          <div className="mt-4">
-            <ErrorBanner message={error} onRetry={retry} />
-          </div>
-        ) : null}
+      <ErrorBanner className="mt-4" message={error} onRetry={load} />
 
-        {/* The form and the resolve panel replace the list in place:
-            opening one moves the page up to it (useDetailFocus). */}
-        <div ref={detailRef} tabIndex={-1} className="mt-6 space-y-6 scroll-mt-6 outline-none">
-          {mode === 'create' ? (
-            <Card>
-              <CardHeader><CardTitle>Log a request</CardTitle></CardHeader>
-              <CardContent>
-                <CommunityRequestForm
-                  onSubmit={create}
-                  onCancel={() => { setMode('list'); setFormError(null); }}
-                  busy={busy}
-                  error={formError}
-                />
-              </CardContent>
-            </Card>
-          ) : resolving ? (
-            <ResolvePanel
-              request={resolving}
-              busy={busy}
-              error={formError}
-              onSubmit={resolve}
-              onCancel={() => { setResolving(null); setFormError(null); }}
+      <ViewTabs
+        className="mt-5"
+        label="Request views"
+        value={view.id}
+        onChange={changeView}
+        tabs={VIEWS.map((v) => ({ id: v.id, label: v.label, alert: v.alert, count: isLoading ? null : counts[v.id] }))}
+      />
+
+      <div className="mt-6">
+        <ListCard
+          // Mounted through a reload, so the search box keeps its focus.
+          header={
+            <ListToolbar
+              search={{
+                value: search,
+                onChange: (value) => { setIsLoading(true); setSearch(value); },
+                placeholder: 'Search by item or caller name',
+              }}
+            />
+          }
+          footer={!isLoading && visible.length ? <TablePager {...requestPage} noun="requests" alwaysShow /> : null}
+        >
+          {isLoading ? (
+            <div className="space-y-2 p-4" aria-busy="true">
+              {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+            </div>
+          ) : visible.length === 0 ? (
+            <EmptyState
+              icon={PhoneIncoming}
+              title={search ? 'No requests match' : 'Nothing in this view'}
+              description={search ? 'Nothing matches the search.' : 'No request has this outcome.'}
+              action={search ? { label: 'Clear search', onClick: () => { setIsLoading(true); setSearch(''); } } : undefined}
             />
           ) : (
-            <>
-              {stockPrompt ? (
-                <StockOutPrompt
-                  request={stockPrompt}
-                  onGoToInventory={() => navigate('/noc/inventory')}
-                  onDismiss={() => setStockPrompt(null)}
-                />
-              ) : null}
-
-              <div className="flex flex-wrap items-center gap-3">
-                <InputGroup className="min-w-56 flex-1">
-                  <InputGroupAddon align="inline-start">
-                    <Search />
-                  </InputGroupAddon>
-                  <InputGroupInput
-                    placeholder="Search by item or caller name"
-                    value={search}
-                    onChange={(e) => { setIsLoading(true); setSearch(e.target.value); }}
-                  />
-                </InputGroup>
-
-                <Select value={outcomeFilter} onValueChange={changeOutcome}>
-                  <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All outcomes</SelectItem>
-                    {OUTCOMES.map((o) => (
-                      <SelectItem key={o} value={o}>{OUTCOME_LABELS[o]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Button type="button" onClick={() => { setMode('create'); setFormError(null); focusDetail(); }}>
-                  <Plus />
-                  Log a request
-                </Button>
-              </div>
-
-              {isLoading ? (
-                <div className="space-y-3">
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-24 w-full" />
-                  <Skeleton className="h-24 w-full" />
-                </div>
-              ) : requests.length === 0 ? (
-                // A failed load already says so in the banner above;
-                // "No requests match" would contradict it.
-                error ? null : <p className="text-sm text-muted-foreground">No requests match.</p>
-              ) : (
-                <Card>
-                  <CardContent className="p-0">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Requested</TableHead>
-                          <TableHead>Items</TableHead>
-                          <TableHead>Quantity &amp; collection notes</TableHead>
-                          <TableHead>Caller</TableHead>
-                          <TableHead>Status</TableHead>
-                          {/* Sticky so Claim / Resolve stay visible however wide the table gets. */}
-                          <TableHead className="sticky right-0 bg-card" />
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {requestPage.slice.map((r) => {
-                          const resolved = r.outcome !== 'pending';
-                          return (
-                            <TableRow key={r.id}>
-                              <TableCell className="whitespace-nowrap text-muted-foreground">
-                                {fmtDateTime(r.requestedAt)}
-                              </TableCell>
-                              <TableCell className="max-w-xs whitespace-pre-line">
-                                {r.itemsRequested}
-                              </TableCell>
-                              <TableCell className="max-w-48 whitespace-pre-line text-muted-foreground">
-                                {r.quantityNote || '—'}
-                              </TableCell>
-                              <TableCell className="text-muted-foreground">
-                                {r.callerName || 'Not given'}
-                                {r.callerContact ? (
-                                  <span className="block text-xs">{r.callerContact}</span>
-                                ) : null}
-                              </TableCell>
-                              <TableCell>
-                                <StatusBadge kind="communityRequest" status={r.outcome}>
-                                  {OUTCOME_LABELS[r.outcome] ?? r.outcome}
-                                </StatusBadge>
-                                {resolved && r.outcomeNote ? (
-                                  <span className="mt-1 block max-w-xs text-xs text-muted-foreground whitespace-pre-line">
-                                    {r.outcomeNote}
-                                  </span>
-                                ) : null}
-                                {r.handledByName ? (
-                                  <span className="mt-1 block text-xs text-muted-foreground">
-                                    {resolved ? 'Handled' : 'Claimed'} by {r.handledByName}
-                                  </span>
-                                ) : null}
-                              </TableCell>
-                              <TableCell className="sticky right-0 whitespace-nowrap bg-card text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.15)]">
-                                {resolved ? (
-                                  <span className="text-xs text-muted-foreground">
-                                    {fmtDateTime(r.resolvedAt)}
-                                  </span>
-                                ) : (
-                                  <div className="flex justify-end gap-2">
-                                    {r.handledBy == null ? (
-                                      <Button
-                                        type="button" variant="outline" size="sm"
-                                        onClick={() => claim(r.id)}
-                                      >
-                                        Claim
-                                      </Button>
-                                    ) : null}
-                                    <Button
-                                      type="button" size="sm"
-                                      onClick={() => { setResolving(r); setFormError(null); focusDetail(); }}
-                                    >
-                                      Resolve
-                                    </Button>
-                                  </div>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                    <TablePager {...requestPage} noun="requests" />
-                  </CardContent>
-                </Card>
-              )}
-            </>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="pl-4 sm:pl-5">Requested</TableHead>
+                <TableHead>Items</TableHead>
+                <TableHead>Quantity and collection notes</TableHead>
+                <TableHead>Caller</TableHead>
+                <TableHead>Status</TableHead>
+                {/* Sticky so Claim and Resolve stay visible at laptop widths. */}
+                <TableHead className="sticky right-0 bg-card" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {requestPage.slice.map((r) => {
+                const resolved = r.outcome !== 'pending';
+                return (
+                  <TableRow key={r.id}>
+                    <TableCell className="whitespace-nowrap pl-4 text-muted-foreground sm:pl-5">
+                      {fmtDateTime(r.requestedAt)}
+                    </TableCell>
+                    <TableCell className="min-w-40 max-w-xs whitespace-pre-line">
+                      {r.itemsRequested}
+                    </TableCell>
+                    <TableCell className="min-w-32 max-w-48 whitespace-pre-line text-muted-foreground">
+                      {r.quantityNote || '—'}
+                    </TableCell>
+                    <TableCell className="min-w-36 whitespace-normal text-muted-foreground">
+                      {r.callerName || 'Not given'}
+                      {r.callerContact ? (
+                        <span className="block text-xs">{r.callerContact}</span>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="whitespace-normal">
+                      <StatusBadge kind="communityRequest" status={r.outcome}>
+                        {OUTCOME_LABELS[r.outcome] ?? r.outcome}
+                      </StatusBadge>
+                      {resolved && r.outcomeNote ? (
+                        <span className="mt-1 block max-w-xs text-xs text-muted-foreground whitespace-pre-line">
+                          {r.outcomeNote}
+                        </span>
+                      ) : null}
+                      {r.handledByName ? (
+                        <span className="mt-1 block text-xs text-muted-foreground">
+                          {resolved ? 'Handled' : 'Claimed'} by {r.handledByName}
+                        </span>
+                      ) : null}
+                    </TableCell>
+                    <TableCell className="sticky right-0 whitespace-nowrap bg-card pr-4 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.15)] sm:pr-5">
+                      {resolved ? (
+                        <span className="text-xs text-muted-foreground">
+                          {fmtDateTime(r.resolvedAt)}
+                        </span>
+                      ) : (
+                        <div className="flex justify-end gap-2">
+                          {r.handledBy == null ? (
+                            <Button
+                              type="button" variant="outline" size="sm"
+                              onClick={() => claim(r.id)}
+                            >
+                              Claim
+                            </Button>
+                          ) : null}
+                          <Button
+                            type="button" size="sm"
+                            onClick={() => { setResolving(r); setFormError(null); }}
+                          >
+                            Resolve
+                          </Button>
+                        </div>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
           )}
-        </div>
-      </main>
-    </ManagerLayout>
-  );
-}
+        </ListCard>
+      </div>
 
-export default function CommunityRequestsPage() {
-  const { user } = useAuth();
-  const [crumb, setCrumb] = useState('Log a request');
+      {mode === 'create' ? (
+        <DetailPanel open onClose={() => { setMode('list'); setFormError(null); }} title="Log a request">
+          <CommunityRequestForm
+            onSubmit={create}
+            onCancel={() => { setMode('list'); setFormError(null); }}
+            busy={busy}
+            error={formError}
+          />
+        </DetailPanel>
+      ) : null}
 
-  if (isManager(user)) {
-    return <CommunityRequestsManagerView />;
-  }
-
-  return (
-    <StaffShell crumb={`Benevolent Requests / ${crumb}`}>
-      <CommunityRequestFlow onCrumbChange={setCrumb} />
-    </StaffShell>
+      {resolving ? (
+        <ResolvePanel
+          key={resolving.id}
+          request={resolving}
+          busy={busy}
+          error={formError}
+          onSubmit={resolve}
+          onCancel={() => { setResolving(null); setFormError(null); }}
+        />
+      ) : null}
+    </PageShell>
   );
 }

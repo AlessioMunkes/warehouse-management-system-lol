@@ -21,6 +21,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import useReconciliationQueue from '../hooks/useReconciliation';
+import ErrorBanner from '@/components/ui/error-banner';
 
 const fmtValue = (value) => {
   if (value === null || value === undefined || value === '') return '—';
@@ -53,21 +54,6 @@ const inDateRange = (value, fromValue, toValue) => {
 
 const resolvedItemCount = (donation) =>
   (donation.items || []).filter((item) => item.status === 'resolved' || item.status === 'committed').length;
-
-const ErrorBanner = ({ message, onRetry }) => (
-  <div className="flex flex-col items-start justify-between gap-3 rounded-[4px] border-2 border-brand bg-danger-soft p-4 text-sm text-ink shadow-sm sm:flex-row sm:items-center">
-    <span>{message}</span>
-    {onRetry ? (
-      <button
-        type="button"
-        onClick={onRetry}
-        className="text-xs font-semibold text-brand underline hover:text-ink focus:outline-none sm:text-sm"
-      >
-        Try again
-      </button>
-    ) : null}
-  </div>
-);
 
 const ReconciliationRow = ({ donation, busy, rowError, onRetry, actionLabel = 'Retry' }) => {
   const meta = statusMeta(donation.status);

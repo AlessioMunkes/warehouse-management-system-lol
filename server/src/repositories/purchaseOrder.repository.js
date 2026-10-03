@@ -18,7 +18,6 @@
 // ─────────────────────────────────────────────────────────────
 import pool           from '../config/db.js';
 import { logAudit }   from './auditLog.repository.js';
-import { createNotification } from './notification.repository.js';
 import { safeFinanceEmailError } from '../utils/financeEmailError.js';
 
 const QBO_UNIQUE_CONSTRAINT = 'qbo_map_unique_remote';
@@ -200,6 +199,17 @@ const listPurchaseOrders = async ({ status = null, supplierId = null, limit = 50
             u.first_name AS created_by_name,
             (SELECT COUNT(*) FROM purchase_order_items poi
               WHERE poi.purchase_order_id = po.id)::int AS line_count,
+            -- Lines whose full expected quantity has arrived, summed
+            -- over every delivery against them. The "n of m received"
+            -- the list shows; partially_received is not written
+            -- automatically (see delivery.repository.js), so the status
+            -- alone cannot say how far an order has got.
+            (SELECT COUNT(*) FROM purchase_order_items poi
+              WHERE poi.purchase_order_id = po.id
+                AND COALESCE((SELECT SUM(dni.received_quantity)
+                                FROM delivery_note_items dni
+                               WHERE dni.purchase_order_item_id = poi.id), 0)
+                    >= poi.expected_quantity)::int AS received_line_count,
             (SELECT COALESCE(SUM(poi.expected_quantity * COALESCE(poi.unit_price, 0)), 0)
                FROM purchase_order_items poi
               WHERE poi.purchase_order_id = po.id) AS estimated_value,
@@ -296,12 +306,14 @@ const getPurchaseOrderById = async (id) => {
 // onto a PO that has since moved past it and read as if it still
 // applies.
 //
-// Runs in its own transaction (rather than a bare pool.query) purely
-// so the notification for 'returned'/'follow_up_required' can use
-// createNotification, which — like logAudit — requires the caller's
-// client so a notification can never survive a change that itself
-// got rolled back.
-const updatePurchaseOrderStatus = async (id, status, reason) => {
+// Runs in its own transaction (rather than a bare pool.query) so the
+// service's notification for 'returned'/'follow_up_required' — passed
+// in as beforeCommit — goes in with the status change or not at all.
+//
+// The reason is kept for both of those statuses: it is what the order
+// shows as needing attention. Every other status clears it, so a
+// reopened order does not keep an old complaint.
+const updatePurchaseOrderStatus = async (id, status, reason, { beforeCommit } = {}) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -313,19 +325,11 @@ const updatePurchaseOrderStatus = async (id, status, reason) => {
               status_changed_at = NOW()
         WHERE id = $1
         RETURNING ${PO_COLUMNS.replace(/po\./g, '')}`,
-      [id, status, status === 'returned' ? reason : null]
+      [id, status, (status === 'returned' || status === 'follow_up_required') ? reason : null]
     );
     const po = rows[0] ?? null;
 
-    if (po && (status === 'returned' || status === 'follow_up_required')) {
-      await createNotification(client, {
-        type:       'purchase_order_needs_attention',
-        title:      `Purchase order ${po.po_number} ${status === 'returned' ? 'returned' : 'needs follow-up'}`,
-        body:       reason ?? null,
-        entityType: 'purchase_order',
-        entityId:   id,
-      });
-    }
+    if (beforeCommit) await beforeCommit(client, { purchaseOrder: po, status, reason });
 
     await client.query('COMMIT');
     return po;

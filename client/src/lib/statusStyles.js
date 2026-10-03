@@ -18,9 +18,10 @@
 // share all three.
 // ─────────────────────────────────────────────────────────────
 import {
-  Ban, BadgeCheck, CalendarClock, CheckCheck, CircleDashed, CircleX, ClipboardList, Clock,
-  FileCheck, Flag, Forward, Gift, History, House, Lock, Megaphone, PackageCheck, PackageOpen,
-  PencilLine, Scale, SlidersHorizontal, Split, Trash2, TriangleAlert, Truck, Undo2,
+  AlarmClock, Ban, Check, BadgeCheck, CalendarCheck, CalendarClock, CalendarX, CheckCheck, CircleDashed,
+  CircleOff, CircleX, ClipboardList, DoorOpen, Clock, FileCheck, Flag, Forward, Gift, History, House, Lock,
+  LogOut, Megaphone, PackageCheck, PackageOpen, PencilLine, Scale, SlidersHorizontal, Split, Trash2,
+  Send, TriangleAlert, Truck, Undo2,
 } from 'lucide-react';
 
 const s = (tone, icon, strong = false) => ({ tone, icon, strong });
@@ -74,6 +75,71 @@ export const STATUS_STYLES = {
     partially_fulfilled: s('good', CircleDashed),
     referred:            s('info', Forward),
     declined:            s('bad', CircleX, true),
+  },
+  // A slip's place in the week, as the Picking Slips list shows it —
+  // see features/pickingSlips/slipViews.js slipState, which folds the
+  // gate's outcome (dispatch_events) in over the slip's own status.
+  pickingSlip: {
+    pending:       s('neutral', CircleDashed),            // on the floor, nobody has it
+    in_progress:   s('info', PackageOpen),                // being packed
+    complete:      s('warn', PackageCheck),               // packed, waiting at the gate
+    dispatched:    s('good', Truck),
+    collected:     s('good', CheckCheck, true),
+    not_collected: s('bad', CircleX, true),
+    cancelled:     s('neutral', Ban, true),
+  },
+  // An outbound email's outcome (features/communications on the server).
+  message: {
+    sent:    s('good', CheckCheck, true),
+    stubbed: s('neutral', CircleDashed),                  // sending switched off; nothing left
+    failed:  s('bad', CircleX, true),
+  },
+  // Derived from AVAILABLE server-side (stock.repository.js getManifest).
+  // All soft: on a list of sixty products a solid red pill per row
+  // shouts over the numbers. The row's coloured edge carries urgency.
+  inventory: {
+    in_stock:  s('good', Check),
+    low_stock: s('warn', TriangleAlert),
+    shortfall: s('bad', CircleX),
+  },
+  // A receipt line's expiry date, against today.
+  expiry: {
+    ok:      s('neutral', CalendarCheck),
+    soon:    s('warn', Clock),                            // 15 to 30 days
+    urgent:  s('bad', AlarmClock),                        // 14 days or less
+    expired: s('bad', CalendarX, true),
+  },
+  // A closed day on the operating calendar.
+  closure: {
+    public_holiday: s('info', Flag),
+    closure:        s('warn', CalendarX),
+  },
+  // Settings → Connections: one outside service's health.
+  connection: {
+    ok:      s('good', Check),
+    warning: s('warn', TriangleAlert),
+    down:    s('bad', CircleX, true),
+    off:     s('neutral', CircleDashed),
+  },
+  // A collection reminder's email or WhatsApp leg.
+  reminder: {
+    pending:   s('neutral', Clock),
+    sending:   s('info', Send),
+    sent:      s('good', CheckCheck),
+    failed:    s('bad', CircleX, true),
+    cancelled: s('neutral', Ban),
+  },
+  // A visit in the door log (Volunteer log).
+  visit: {
+    on_site: s('good', DoorOpen),
+    closed:  s('neutral', LogOut),
+  },
+  // Any record that can be switched off rather than deleted — a user,
+  // a product, a supplier. Active is the normal case, so it is quiet;
+  // inactive is the one worth a glance.
+  record: {
+    active:   s('neutral', Check),
+    inactive: s('warn', CircleOff),
   },
 };
 

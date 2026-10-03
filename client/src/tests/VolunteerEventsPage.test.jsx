@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 
-vi.mock('../features/taskdashboard/components/TopNavBar', () => ({
+vi.mock('../components/layout/TopNavBar', () => ({
   TopNavbar: () => <div>Navigation</div>,
 }));
 
@@ -137,26 +137,29 @@ describe('VolunteerEventsPage', () => {
     await screen.findByText('Spring Packing');
 
     expect(visibleRowText()[0]).toContain('Completed Garden Day');
-    await user.selectOptions(screen.getByLabelText('Sort'), 'desc');
+    expect(screen.getByText('Sorted by date, earliest first')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Sort by Date' }));
     expect(visibleRowText()[0]).toContain('Winter Drive');
+    expect(screen.getByText('Sorted by date, latest first')).toBeInTheDocument();
   });
 
   it.each([
-    ['Open Events', ['Spring Packing', 'Winter Drive'], ['Cancelled Kitchen Prep', 'Completed Garden Day']],
-    ['Cancelled', ['Cancelled Kitchen Prep'], ['Spring Packing', 'Winter Drive', 'Completed Garden Day']],
-    ['Completed', ['Completed Garden Day'], ['Spring Packing', 'Winter Drive', 'Cancelled Kitchen Prep']],
-  ])('filters status: %s', async (status, visible, hidden) => {
+    ['Open 2', ['Spring Packing', 'Winter Drive'], ['Cancelled Kitchen Prep', 'Completed Garden Day']],
+    ['Cancelled 1', ['Cancelled Kitchen Prep'], ['Spring Packing', 'Winter Drive', 'Completed Garden Day']],
+    ['Completed 1', ['Completed Garden Day'], ['Spring Packing', 'Winter Drive', 'Cancelled Kitchen Prep']],
+  ])('shows the %s tab', async (tab, visible, hidden) => {
     const user = userEvent.setup();
     api.getEvents.mockResolvedValueOnce(FILTER_EVENTS);
     renderPage();
     await screen.findByText('Spring Packing');
 
-    await user.selectOptions(screen.getByLabelText('Status'), status);
+    await user.click(screen.getByRole('tab', { name: tab }));
+    expect(screen.getByRole('tab', { name: tab })).toHaveAttribute('aria-selected', 'true');
     visible.forEach((name) => expect(screen.getByText(name)).toBeInTheDocument());
     hidden.forEach((name) => expect(screen.queryByText(name)).not.toBeInTheDocument());
   });
 
-  it('combines search, date range, status and sort filters', async () => {
+  it('combines search, date range, tab and sort', async () => {
     const user = userEvent.setup();
     api.getEvents.mockResolvedValueOnce(FILTER_EVENTS);
     renderPage();
@@ -165,8 +168,10 @@ describe('VolunteerEventsPage', () => {
     await user.type(screen.getByLabelText('Search events'), 'packing');
     fireEvent.change(screen.getByLabelText('From date'), { target: { value: '2026-08-01' } });
     fireEvent.change(screen.getByLabelText('To date'), { target: { value: '2026-09-30' } });
-    await user.selectOptions(screen.getByLabelText('Status'), 'Open Events');
-    await user.selectOptions(screen.getByLabelText('Sort'), 'Latest to Earliest');
+    // The tab counts follow the search and dates.
+    expect(screen.getByRole('tab', { name: 'Open 1' })).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Open 1' }));
+    await user.click(screen.getByRole('button', { name: 'Sort by Date' }));
 
     expect(screen.getByText('Spring Packing')).toBeInTheDocument();
     expect(screen.queryByText('Completed Garden Day')).not.toBeInTheDocument();
@@ -181,7 +186,7 @@ describe('VolunteerEventsPage', () => {
 
     await user.type(screen.getByLabelText('Search events'), 'zzzz');
     expect(screen.getByText('No events match your filters')).toBeInTheDocument();
-    await user.click(screen.getAllByRole('button', { name: 'Clear Filters' }).at(-1));
+    await user.click(screen.getByRole('button', { name: 'Clear all filters' }));
 
     expect(screen.getByText('Spring Packing')).toBeInTheDocument();
     expect(screen.getByText('Winter Drive')).toBeInTheDocument();

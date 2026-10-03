@@ -31,12 +31,12 @@ import { BATCHES_LOGO } from '../brand';
 
 // ── One answer ───────────────────────────────────────────────
 
-function TopicAnswer({ topic, onOpenTopic, onClose, here }) {
+function TopicAnswer({ topic, onOpenTopic, onClose, here, role }) {
   // Where the answer's screens are, as links — minus the one they are
   // already on, and minus any id this build has no route for.
   const links = (topic.open ?? [])
     .filter((s) => s.id !== here)
-    .map((s) => ({ ...s, to: pathForScreen(s.id) }))
+    .map((s) => ({ ...s, to: pathForScreen(s.id, role) }))
     .filter((s) => s.to);
 
   // The follow-up is offered as a question, so it is not repeated
@@ -109,8 +109,8 @@ function TopicAnswer({ topic, onOpenTopic, onClose, here }) {
   );
 }
 
-function NavigateAnswer({ screen, onClose }) {
-  const to = pathForScreen(screen.id);
+function NavigateAnswer({ screen, onClose, role }) {
+  const to = pathForScreen(screen.id, role);
 
   // The app has already moved by the time this renders — see the
   // onNavigate handler below. So this confirms rather than offers,
@@ -184,10 +184,10 @@ function NotCoveredAnswer({ closest, onOpenTopic }) {
   );
 }
 
-function Answer({ entry, onOpenTopic, onPick, onClose, here }) {
+function Answer({ entry, onOpenTopic, onPick, onClose, here, role }) {
   switch (entry.kind) {
-    case 'topic':       return <TopicAnswer topic={entry.topic} onOpenTopic={onOpenTopic} onClose={onClose} here={here} />;
-    case 'navigate':    return <NavigateAnswer screen={entry.screen} onClose={onClose} />;
+    case 'topic':       return <TopicAnswer topic={entry.topic} onOpenTopic={onOpenTopic} onClose={onClose} here={here} role={role} />;
+    case 'navigate':    return <NavigateAnswer screen={entry.screen} onClose={onClose} role={role} />;
     case 'clarify':     return <ClarifyAnswer question={entry.question} options={entry.options} onPick={onPick} />;
     case 'not_covered': return <NotCoveredAnswer closest={entry.closest} onOpenTopic={onOpenTopic} />;
     default:            return <p>{entry.text}</p>;
@@ -196,7 +196,9 @@ function Answer({ entry, onOpenTopic, onPick, onClose, here }) {
 
 // ── The panel ────────────────────────────────────────────────
 
-export default function AssistantPanel({ open, onOpenChange, screen }) {
+// `role` picks the right side's page where a screen has one per side
+// (Benevolent Requests, Feed the Soil); see screenPaths.js.
+export default function AssistantPanel({ open, onOpenChange, screen, role }) {
   const navigate = useNavigate();
   const [draft, setDraft] = useState('');
   const endRef   = useRef(null);
@@ -214,11 +216,11 @@ export default function AssistantPanel({ open, onOpenChange, screen }) {
   // returns a screen their role allows, and pathForScreen returns
   // null for anything this build has no route for.
   const handleNavigate = useCallback((target) => {
-    const to = pathForScreen(target.id);
+    const to = pathForScreen(target.id, role);
     if (!to) return;
     navigate(to);
     if (!window.matchMedia?.('(min-width: 640px)')?.matches) onOpenChange(false);
-  }, [navigate, onOpenChange]);
+  }, [navigate, onOpenChange, role]);
 
   const { entries, busy, suggestions, enabled, ask, openTopic } =
     useAssistant({ open, screen, onNavigate: handleNavigate });
@@ -342,6 +344,7 @@ export default function AssistantPanel({ open, onOpenChange, screen }) {
                       onPick={(o) => ask(o)}
                       onClose={() => onOpenChange(false)}
                       here={screen}
+                      role={role}
                     />
                   </div>
                 )

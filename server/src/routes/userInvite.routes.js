@@ -18,14 +18,14 @@
 // miss.
 // ─────────────────────────────────────────────────────────────
 import express                              from 'express';
-import auth, { requireRole, ROLES }         from '../middleware/auth.middleware.js';
+import auth, { requireRole } from '../middleware/auth.middleware.js';
+import { ADMIN_ONLY } from '../constants/permissions.js';
 import { validateIntId }                    from '../middleware/validate.middleware.js';
 import { publicInviteRateLimiter }          from '../middleware/rateLimiter.middleware.js';
 import userInviteController                 from '../controllers/userInvite.controller.js';
 
 const router = express.Router();
 
-const ADMIN_ONLY = [ROLES.ADMIN];
 
 // ── Admin: manage invites ────────────────────────────────────
 router.post('/',

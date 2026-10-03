@@ -34,17 +34,17 @@ const PaperGraphic = () => (
   <div className="relative flex h-full w-full items-center justify-center">
     <div className="flex w-24 flex-col gap-2 rounded-md bg-white p-4 shadow-sm ring-1 ring-black/5">
       {[100, 82, 92, 60].map((w, i) => (
-        <span key={i} className="block h-1.5 rounded-full bg-[#e9e3dd]" style={{ width: `${w}%` }} />
+        <span key={i} className="block h-1.5 rounded-full bg-line" style={{ width: `${w}%` }} />
       ))}
     </div>
-    <div className="absolute bottom-3 right-3 flex size-9 items-center justify-center rounded-full bg-[#ef3a40] text-[10px] font-bold text-white shadow-sm">
+    <div className="absolute bottom-3 right-3 flex size-9 items-center justify-center rounded-full bg-brand text-[10px] font-bold text-white shadow-sm">
       PDF
     </div>
   </div>
 );
 
 const Illustration = ({ src, alt }) => (
-  <div className="relative hidden h-full min-h-[180px] w-full items-center justify-center overflow-hidden rounded-2xl bg-[#f7f4ef] ring-1 ring-black/5 sm:flex">
+  <div className="relative hidden h-full min-h-[180px] w-full items-center justify-center overflow-hidden rounded-2xl bg-surface-2 ring-1 ring-black/5 sm:flex">
     {src ? (
       <img
         src={src}
@@ -71,7 +71,7 @@ export default function ImpactStatCard({ def, stat }) {
           ) : stat.notReady ? (
             <p className="mt-2 text-sm text-muted-foreground">{stat.message || 'Not set up yet'}</p>
           ) : stat.error ? (
-            <p className="mt-2 text-sm text-[#ef3a40]">Couldn't load</p>
+            <p className="mt-2 text-sm text-brand">Couldn't load</p>
           ) : (
             <>
               <p className="mt-1 flex items-baseline gap-2">

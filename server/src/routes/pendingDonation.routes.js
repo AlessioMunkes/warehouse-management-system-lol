@@ -1,19 +1,16 @@
 import express from 'express';
-import auth, { requireRole, ROLES } from '../middleware/auth.middleware.js';
+import auth, { requireRole } from '../middleware/auth.middleware.js';
+import { ALL_STAFF, MANAGERS_UP, ADMIN_ONLY, WORKERS_ONLY } from '../constants/permissions.js';
 import { validateIntParam } from '../middleware/validate.middleware.js';
 import pendingDonationController from '../controllers/pendingDonation.controller.js';
 
 const router = express.Router();
 
-const ALL_ROLES = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
-const RECEIVERS_UP = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
-const MANAGERS_UP = [ROLES.MANAGER, ROLES.ADMIN];
-const ADMIN_ONLY = [ROLES.ADMIN];
 
 router.post(
   '/pending',
   auth,
-  requireRole(...RECEIVERS_UP),
+  requireRole(...WORKERS_ONLY),
   pendingDonationController.createPendingDonation
 );
 
@@ -50,7 +47,7 @@ router.post(
 router.get(
   '/pending/:id',
   auth,
-  requireRole(...ALL_ROLES),
+  requireRole(...ALL_STAFF),
   validateIntParam('id'),
   pendingDonationController.getPendingDonationById
 );

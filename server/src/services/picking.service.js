@@ -4,8 +4,10 @@
 // Business logic for the picking workflow.
 // Validates data and enforces rules before touching the DB.
 // ─────────────────────────────────────────────────────────────
+import { closureOn, cohortForDate, cohortWeekdays } from '../features/calendar/calendar.service.js';
 import pickingRepository from '../repositories/picking.repository.js';
-import { ROLES }         from '../middleware/auth.middleware.js';
+import notices from '../features/communications/notices.js';
+import { isManagerUp } from '../constants/permissions.js';
 import pushService       from './push.service.js';
 
 const COHORTS = ['tuesday', 'thursday'];
@@ -21,17 +23,16 @@ const fail = (status, message) => {
 };
 
 // ── Weekly weekday pickup ────────────────────────────────────
-// Every centre collects once a week on a fixed day, Tuesday or
-// Thursday, matching the real picking slips ("Pickup Day: Tuesday").
-// Older data used week1/week2; cohort_weekday_migration.sql converts it.
-const WEEKDAY_FOR_COHORT = { tuesday: 2, thursday: 4 };   // Date#getUTCDay(): 0 = Sunday .. 6 = Saturday
+// Every centre collects once a week with its cohort, Tuesday or
+// Thursday by default, matching the real picking slips ("Pickup Day:
+// Tuesday"). Which weekday each cohort collects on, and the days the
+// warehouse is shut, come from the operating calendar
+// (features/calendar). Older data used week1/week2;
+// cohort_weekday_migration.sql converts it.
+const WEEKDAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-const scheduledCohortFor = (date) => {
-  const day = date.getUTCDay();
-  return Object.entries(WEEKDAY_FOR_COHORT).find(([, d]) => d === day)?.[0] ?? null;
-};
-
-const isManager = (user) => user.role === ROLES.MANAGER || user.role === ROLES.ADMIN;
+// Same group as the routes' MANAGERS_UP — constants/permissions.js.
+const isManager = isManagerUp;
 
 // ── Product-line validation ──────────────────────────────────
 // Shared by createSlip (a manager typing/adjusting lines instead of
@@ -63,15 +64,22 @@ const cleanItemLines = (items) => {
 // to see unclaimed pallets in order to claim one. `mine=true` narrows
 // a packer to the pallets already assigned to them; for a manager it
 // is ignored, because a manager's board is the whole floor.
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
 const getSlips = async (query, user) => {
-  const { dispatchDate, cohort, status, mine } = query;
+  const { dispatchDate, from, to, cohort, status, mine } = query;
 
   if (cohort && !COHORTS.includes(cohort))   fail(400, 'Cohort must be tuesday or thursday.');
   if (status && !STATUSES.includes(status))  fail(400, 'Invalid status filter.');
+  // Checked here so a malformed day is a 400 with a message rather
+  // than a Postgres cast error coming back as a 500.
+  if (from && !ISO_DAY.test(from)) fail(400, 'From must be a date (YYYY-MM-DD).');
+  if (to && !ISO_DAY.test(to))     fail(400, 'To must be a date (YYYY-MM-DD).');
+  if (from && to && from > to)     fail(400, 'From must be on or before To.');
 
   const assignedTo = (!isManager(user) && mine === 'true') ? user.id : undefined;
 
-  return await pickingRepository.getSlips({ dispatchDate, cohort, status, assignedTo });
+  return await pickingRepository.getSlips({ dispatchDate, from, to, cohort, status, assignedTo });
 };
 
 // ── One slip ──────────────────────────────────────────────────
@@ -96,12 +104,20 @@ const validateDispatchDate = async (dispatchDate, cohort, { allowOverride = fals
   const today = new Date(); today.setHours(0, 0, 0, 0);
   if (date < today) fail(400, 'Cannot create slips for a past date.');
 
-  const scheduled = scheduledCohortFor(date);
+  const isoDate = String(dispatchDate).slice(0, 10);
+  const closed = await closureOn(isoDate);
+  if (closed && !allowOverride) {
+    fail(400,
+      `The warehouse is closed on ${isoDate} (${closed.label}). Choose another date, or check the operating calendar.`);
+  }
+
+  const scheduled = await cohortForDate(isoDate);
   if (scheduled !== cohort && !allowOverride) {
+    const days = await cohortWeekdays();
     fail(400,
       (scheduled
-        ? `${dispatchDate} is a ${cohortLabel(scheduled)} pickup day, not ${cohortLabel(cohort)}.`
-        : `${dispatchDate} is not a Tuesday or Thursday pickup day.`) +
+        ? `${isoDate} is a ${cohortLabel(scheduled)} cohort pickup day, not ${cohortLabel(cohort)}.`
+        : `${isoDate} is not a pickup day: the ${cohortLabel(cohort)} cohort collects on ${WEEKDAY_NAMES[days[cohort] - 1]}.`) +
       ` If this is a deliberate make-up delivery, use "Create a new slip" with the override option.`
     );
   }
@@ -120,6 +136,7 @@ const generateSlips = async ({ dispatchDate, cohort }, user) => {
     dispatchDate,
     cohort,
     generatedBy: user.id,   // from JWT — never trusted from frontend
+    beforeCommit: notices.slipsGenerated,
   });
 
   // Buzz the floor's phones, but only for today's slips: that's all the
@@ -153,6 +170,7 @@ const createSlip = async ({ ecdId, dispatchDate, cohort, force, items }, user) =
     cohort,
     generatedBy: user.id,
     items: cleanItems,
+    beforeCommit: notices.slipCreated,
   });
 
   if (result.ecdNotFound)   fail(404, 'ECD not found, inactive, or not yet approved for dispatch.');
@@ -248,7 +266,7 @@ const addSecondPacker = async (slipId, body, user) => {
 const releaseSlip = async (slipId, user) => {
   if (!isManager(user)) fail(403, 'Only a manager can release a pallet back to the floor.');
 
-  const result = await pickingRepository.releaseSlip({ slipId, actorId: user.id });
+  const result = await pickingRepository.releaseSlip({ slipId, actorId: user.id, beforeCommit: notices.slipReleased });
 
   if (result.notFound) fail(404, 'Picking slip not found.');
   if (result.notClaimed) fail(409, 'This pallet is not currently claimed by anyone.');

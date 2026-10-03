@@ -20,10 +20,10 @@ function Body({ data, narrative, printMode = false }) {
   const actions = data.actions ?? [];
   return (
     <div className="space-y-5">
-      <section className="op-avoid-break rounded-[4px] border-2 bg-surface p-4 sm:p-5" style={{ borderColor: BORDER }}>
+      <section className="op-avoid-break rounded-4xl bg-card shadow-md ring-1 ring-foreground/5 p-4 sm:p-5" style={{ borderColor: BORDER }}>
         <ChartExplanation n={narrative} />
       </section>
-      <section className="op-avoid-break rounded-[4px] border-2 bg-surface p-4 sm:p-5" style={{ borderColor: BORDER }}>
+      <section className="op-avoid-break rounded-4xl bg-card shadow-md ring-1 ring-foreground/5 p-4 sm:p-5" style={{ borderColor: BORDER }}>
         <BusinessView n={narrative} />
       </section>
       {printMode && (
@@ -76,7 +76,7 @@ export default function ComparisonInsight({ comparison }) {
           type="button"
           onClick={generate}
           disabled={writing}
-          className="bg-ink hover:bg-ink/90 text-on-ink font-bold text-xs tracking-wider rounded-[4px] px-4"
+          className="bg-ink hover:bg-ink/90 text-on-ink font-bold text-xs tracking-wider rounded-lg px-4"
         >
           <FileText aria-hidden="true" className="mr-2 h-4 w-4" />
           {writing ? 'GENERATING…' : data ? 'REGENERATE REPORT' : 'GENERATE REPORT'}
@@ -86,7 +86,7 @@ export default function ComparisonInsight({ comparison }) {
             type="button"
             variant="outline"
             onClick={() => setPrinting(true)}
-            className="rounded-[4px] border-2 text-xs font-bold tracking-wider"
+            className="rounded-lg border text-xs font-bold tracking-wider"
           >
             <Printer aria-hidden="true" className="mr-2 h-4 w-4" />
             PDF REPORT

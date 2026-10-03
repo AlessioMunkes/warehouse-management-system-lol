@@ -85,6 +85,16 @@ export const lineForProduct = (line, product) => {
 
 // One of the three changed. Recompute the other two where the
 // catalogue gives us enough to do it.
+// A line for a product that needs topping up: the shortfall to its
+// reorder level, rounded up, at least one. A suggestion, not a
+// decision — the manager overwrites it constantly and should.
+// Shared by "Add low-stock items" and the inventory screen's bulk
+// "Raise purchase order", so both suggest the same quantity.
+export const suggestedLine = (product) => lineForProduct({
+  ...blankLine(),
+  expectedQuantity: String(Math.max(1, Math.ceil(Number(product.reorderAt) - Number(product.available)))),
+}, product);
+
 export const relinkLine = (line, product, field, raw) => {
   const next = { ...line, [field]: raw };
   if (!product) return next;

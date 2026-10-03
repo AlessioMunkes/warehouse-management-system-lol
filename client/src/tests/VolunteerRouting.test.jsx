@@ -2,7 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ProtectedRoute from '../components/layout/ProtectedRoute';
-import { VOLUNTEERS, VOLUNTEER_MANAGEMENT_ROLES } from '../routes/paths';
+import { VOLUNTEERS } from '../routes/paths';
+import { routeById } from '../routes/routeTable';
+
+// The guard the real events route uses (routes/routeTable.js).
+const VOLUNTEER_MANAGEMENT_ROLES = routeById('volunteerEvents').roles;
 import { useAuth } from '../context/AuthContext';
 
 vi.mock('../context/AuthContext', () => ({ useAuth: vi.fn() }));

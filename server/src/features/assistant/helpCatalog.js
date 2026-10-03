@@ -45,6 +45,7 @@ const EVERYONE    = [WORKER, MANAGER, ADMIN];
 const MY_ROLE = 'my-role';
 const MY_ROLE_TOPIC = { [WORKER]: 'my-role-worker', [MANAGER]: 'my-role-manager', [ADMIN]: 'my-role-admin' };
 const MANAGERS_UP = [MANAGER, ADMIN];
+const WORKERS_ONLY = [WORKER];
 const ADMIN_ONLY  = [ADMIN];
 
 // ── Screens ──────────────────────────────────────────────────
@@ -78,29 +79,31 @@ export const SCREENS = [
     about: 'Your dashboard: the jobs you do, and what needs attention today.',
     aka: ['dashboard', 'home', 'start page', 'main menu', 'task dashboard'] },
 
-  // The warehouse floor. <ProtectedRoute /> with no role list.
-  { id: 'receiving', label: 'Receiving', roles: EVERYONE,
+  // The warehouse floor: warehouse staff only (WORKERS_ONLY in
+  // client/src/routes/routeTable.js). Managers and admins never open
+  // a floor screen.
+  { id: 'receiving', label: 'Receiving', roles: WORKERS_ONLY,
     about: 'Book in a delivery against its purchase order: count, weigh, place, date.',
     aka: ['procurement', 'goods in', 'book in stock', 'unloading'] },
-  { id: 'deliveries', label: 'Past deliveries', roles: EVERYONE,
+  { id: 'deliveries', label: 'Past deliveries', roles: WORKERS_ONLY,
     about: 'Every delivery already received, with its delivery note.',
     aka: ['delivery history', 'old deliveries', 'delivery notes'] },
-  { id: 'decanting', label: 'Decanting', roles: EVERYONE,
+  { id: 'decanting', label: 'Decanting', roles: WORKERS_ONLY,
     about: 'Split bulk sacks into bags and record what you actually got, plus wastage.',
     aka: ['bagging', 'repacking', 'splitting sacks', 'decanting sheet'] },
-  { id: 'decantingRecords', label: 'Past decanting runs', roles: EVERYONE,
+  { id: 'decantingRecords', label: 'Past decanting runs', roles: WORKERS_ONLY,
     about: 'Every past decanting run with expected and actual bags.',
     aka: ['decanting sheets', 'decanting history'] },
-  { id: 'packing', label: 'Packing', roles: EVERYONE,
+  { id: 'packing', label: 'Packing', roles: WORKERS_ONLY,
     about: 'The packing board: claim a picking slip and pack its pallet.',
     aka: ['packing board', 'pallets', 'pack an order'] },
-  { id: 'dispatch', label: 'The dispatch gate', roles: EVERYONE,
+  { id: 'dispatch', label: 'The dispatch gate', roles: WORKERS_ONLY,
     about: 'Hand pallets over to collecting centres, with the driver signing on screen.',
     aka: ['dispatch', 'gate', 'collections', 'hand over'] },
-  { id: 'dispatchHistory', label: 'Collection history', roles: EVERYONE,
+  { id: 'dispatchHistory', label: 'Collection history', roles: WORKERS_ONLY,
     about: 'Every past collection with its signature, and every missed one.',
     aka: ['dispatch history', 'past collections', 'dispatch notes'] },
-  { id: 'donation', label: 'Donation intake', roles: [WORKER, ADMIN],
+  { id: 'donation', label: 'Donation intake', roles: WORKERS_ONLY,
     about: 'Log food someone has donated: what, rough value, who brought it.',
     aka: ['donations', 'log a donation', 'new donation'] },
   { id: 'communityRequests', label: 'Benevolent requests', roles: EVERYONE,
@@ -110,7 +113,7 @@ export const SCREENS = [
     about: 'Compost collection kits: assign a kit to a household, log compost weighed in, mark it sent to a farm.',
     aka: ['compost', 'collection kits', 'food waste', 'compost kits', 'soil'] },
 
-  // Manager and admin. roles={['manager','admin']} in App.jsx.
+  // Manager and admin.
   { id: 'inventory', label: 'Inventory', roles: MANAGERS_UP,
     about: 'Stock levels per item: on hand, committed, available, and what is low.',
     aka: ['stock', 'stock levels', 'what we have'] },
@@ -129,6 +132,9 @@ export const SCREENS = [
   { id: 'collectionReminders', label: 'Collection reminders', roles: MANAGERS_UP,
     about: 'Tomorrow’s ECD collection reminders: email status, and WhatsApp messages to send.',
     aka: ['reminders', 'whatsapp reminders', 'ecd reminders', 'collection messages'] },
+  { id: 'operatingCalendar', label: 'Operating calendar', roles: MANAGERS_UP,
+    about: 'Which weekday each cohort collects, and the public holidays and closures when the warehouse is shut.',
+    aka: ['calendar', 'public holidays', 'closures', 'closed days', 'collection days', 'holidays'] },
   { id: 'receipts', label: 'Receipts', roles: MANAGERS_UP,
     about: 'The archive of delivery notes and dispatch notes.',
     aka: ['paperwork', 'notes archive', 'documents'] },
@@ -142,7 +148,7 @@ export const SCREENS = [
     about: 'Set up volunteer events and time slots, and see who signed in to each.',
     aka: ['volunteer events', 'volunteer sessions', 'corporate groups'] },
 
-  // Admin. roles={['admin']} in App.jsx.
+  // Admin only.
   { id: 'products', label: 'Product management', roles: ADMIN_ONLY,
     about: 'The product catalogue: names, codes, weights, costs, reorder levels.',
     aka: ['products', 'catalogue', 'items'] },
@@ -167,6 +173,18 @@ export const SCREENS = [
   { id: 'volunteerLog', label: 'Volunteer log', roles: ADMIN_ONLY,
     about: 'Every guest sign-in at the door; sign out a visit so its hours count.',
     aka: ['guest log', 'sign-in log', 'visitor log', 'who was on site'] },
+  { id: 'activity', label: 'User activity', roles: ADMIN_ONLY,
+    about: 'Everything people did in the system, newest first, by person, area and date.',
+    aka: ['activity log', 'audit log', 'who did what', 'user activity'] },
+  { id: 'archive', label: 'Archive', roles: ADMIN_ONLY,
+    about: 'Everything deactivated or deleted, with Restore for what can come back.',
+    aka: ['archive', 'deleted items', 'deactivated', 'restore'] },
+  { id: 'messageHistory', label: 'Message history', roles: ADMIN_ONLY,
+    about: 'Every email the system has sent, and whether it went out.',
+    aka: ['message history', 'sent emails', 'email log', 'outbox'] },
+  { id: 'settings', label: 'Settings', roles: ADMIN_ONLY,
+    about: 'How the system is set up: email, reminders, stock rules, reporting, certificates, accounts.',
+    aka: ['settings', 'configuration', 'set up', 'preferences'] },
 ];
 
 export const SCREEN_IDS = SCREENS.map((s) => s.id);
@@ -215,7 +233,8 @@ export const TOPICS = [
       'what are my tasks', 'what can I do in the system', 'where do I start', 'I am new',
     ],
     body:
-      'You can do everything warehouse staff do, plus run the operation. The bell at ' +
+      'You run the operation; the floor screens — receiving, packing, decanting, the ' +
+      'gate — are the warehouse staff’s, and you follow that work from here. The bell at ' +
       'the top tells you what needs you — low stock, missed collections and flagged ' +
       'deliveries.',
     steps: [
@@ -241,15 +260,15 @@ export const TOPICS = [
       'what are my tasks', 'what can I do in the system', 'where do I start', 'I am new',
     ],
     body:
-      'You can do everything a manager can, plus look after the information the rest ' +
-      'of the system is built on. Changes here reach every screen, so it is worth ' +
-      'going carefully.',
+      'You look after the information the rest of the system is built on, and you ' +
+      'can open every manager screen too. The floor screens are the warehouse ' +
+      'staff’s. Changes here reach every screen, so it is worth going carefully.',
     steps: [
-      'Accounts — create users, set roles, reset passwords.',
+      'Accounts — invite staff and set their roles.',
       'Catalogue — products and suppliers.',
       'Donations — the classification queue and Section 18A certificates.',
-      'Email settings — the sending account and the Finance recipient.',
-      'Finance report and the volunteer log.',
+      'Logs — user activity, the archive, message history and the volunteer log.',
+      'Settings — email, reminders, stock rules, reporting and certificates; and the finance report.',
     ],
     followUp: {
       question: 'Would you like to know how to set up a new user?',
@@ -353,11 +372,12 @@ export const TOPICS = [
     ],
     body:
       'Each account has a role, and the role decides which screens you see. A screen ' +
-      'that won’t open isn’t broken — it belongs to another role.',
+      'that won’t open isn’t broken — it belongs to another role, and it sends you ' +
+      'back to your own home screen.',
     steps: [
-      'Warehouse staff — receiving, decanting, packing, dispatch, donations, requests.',
-      'Managers — all of that, plus stock, orders, centres, slips and reports.',
-      'Admins — all of that, plus users, products, suppliers and settings.',
+      'Warehouse staff — the floor: receiving, decanting, packing, dispatch, donations, requests, Feed the Soil.',
+      'Managers — the office: stock, orders, centres, picking slips, reminders, volunteers and reports. They follow the floor’s work from their own screens rather than opening the floor’s.',
+      'Admins — every manager screen, plus users, products, suppliers, logs and settings.',
       'Guests — volunteers signed in for one event.',
     ],
     followUp: {
@@ -387,6 +407,7 @@ export const TOPICS = [
     followUp: {
       question: 'Would you like to know how to record a delivery?',
       topic: 'receiving-record',
+      otherwise: { question: 'Would you like to know how to read the inventory screen?', topic: 'inventory-columns' },
     },
     related: ['who-can-do-what', 'find-my-way'],
   },
@@ -395,15 +416,20 @@ export const TOPICS = [
     title: 'Signing in',
     roles: EVERYONE,
     screens: ['home'],
-    asks: ['how do I log in', 'I forgot my password', 'it logged me out', 'sign in problem', 'cannot log in'],
+    asks: [
+      'how do I log in', 'I forgot my password', 'it logged me out', 'sign in problem', 'cannot log in',
+      'reset my password', 'change my password', 'password reset email',
+    ],
     body:
-      'Sign in with the username and password your admin gave you. Nobody can look up' +
-      ' your password — if you forget it, ask an admin to set a new one.\n\n' +
+      'Sign in with your username and the password you chose when you accepted your ' +
+      'invite. Nobody can look your password up — if you forget it, choose Forgot ' +
+      'password? on the sign-in page and enter your email for a reset link.\n\n' +
       'If you are signed out in the middle of a task, just sign back in. Work that ' +
       'was saved is still there.',
     followUp: {
       question: 'Would you like to know how to carry on with work you had started?',
       topic: 'unfinished-work',
+      otherwise: { question: 'Would you like to know how to sign out safely on a shared device?', topic: 'signing-out' },
     },
     rules: ['NFR-09'],
     related: ['unfinished-work', 'signing-out'],
@@ -439,7 +465,9 @@ export const TOPICS = [
       'The bell in the top bar collects things that need someone’s attention — a ' +
       'delivery that didn’t match its order, a centre that didn’t collect, stock ' +
       'running low. The red number is how many you haven’t read yet.\n\n' +
-      'Tap a notification to go straight to the thing it is about.',
+      'Tap a notification to go straight to the thing it is about. It only ever ' +
+      'opens one of your own screens; if the thing belongs to another role, it is ' +
+      'there to let you know rather than to open.',
     followUp: {
       question: 'Would you like to know what to do when something looks wrong?',
       topic: 'something-looks-wrong',
@@ -469,7 +497,7 @@ export const TOPICS = [
   {
     id: 'working-offline',
     title: 'When the signal drops',
-    roles: EVERYONE,
+    roles: WORKERS_ONLY,
     screens: ['dispatch', 'receiving', 'decanting', 'packing'],
     general: true,
     asks: [
@@ -492,7 +520,7 @@ export const TOPICS = [
   {
     id: 'unfinished-work',
     title: 'Picking up where you stopped',
-    roles: EVERYONE,
+    roles: WORKERS_ONLY,
     screens: ['receiving', 'decanting', 'dispatch', 'packing'],
     general: true,
     asks: [
@@ -554,7 +582,7 @@ export const TOPICS = [
   {
     id: 'receiving-record',
     title: 'Recording a delivery',
-    roles: EVERYONE,
+    roles: WORKERS_ONLY,
     screens: ['receiving'],
     asks: [
       'a truck arrived', 'how do I receive stock', 'goods came in', 'delivery arrived',
@@ -580,7 +608,7 @@ export const TOPICS = [
   {
     id: 'receiving-discrepancy',
     title: 'The count does not match',
-    roles: EVERYONE,
+    roles: WORKERS_ONLY,
     screens: ['receiving'],
     asks: [
       'short delivery', 'wrong quantity', 'less than ordered', 'more than expected',
@@ -602,8 +630,8 @@ export const TOPICS = [
   {
     id: 'receiving-partial',
     title: 'Only part of the order came',
-    roles: EVERYONE,
-    screens: ['receiving', 'purchaseOrders'],
+    roles: WORKERS_ONLY,
+    screens: ['receiving'],
     asks: [
       'only part of the order came', 'rest is coming later', 'second delivery',
       'split delivery', 'partial delivery', 'half the order',
@@ -621,7 +649,7 @@ export const TOPICS = [
   {
     id: 'receiving-expiry',
     title: 'Dates and storage',
-    roles: EVERYONE,
+    roles: WORKERS_ONLY,
     screens: ['receiving'],
     asks: [
       'expiry date', 'sell by date', 'cold room or dry store', 'where do I put it',
@@ -642,7 +670,7 @@ export const TOPICS = [
   {
     id: 'receiving-no-order',
     title: 'Goods with no order',
-    roles: EVERYONE,
+    roles: WORKERS_ONLY,
     screens: ['receiving', 'donation'],
     asks: [
       'there is no order for this', 'nothing to receive against', 'no purchase order',
@@ -655,15 +683,13 @@ export const TOPICS = [
     followUp: {
       question: 'Would you like to know how to record a donation?',
       topic: 'donation-intake',
-      // Managers no longer log donations themselves.
-      otherwise: { question: 'Would you like to know how a delivery is recorded against its order?', topic: 'receiving-record' },
     },
     related: ['donation-intake', 'receiving-record'],
   },
   {
     id: 'deliveries-past',
     title: 'Looking up an old delivery',
-    roles: EVERYONE,
+    roles: WORKERS_ONLY,
     screens: ['deliveries', 'receipts'],
     asks: [
       'past deliveries', 'what came in last week', 'old delivery note', 'find a delivery',
@@ -689,13 +715,14 @@ export const TOPICS = [
       'paperwork for a delivery',
     ],
     body:
-      'Open a past delivery and choose View note. It shows what was ordered, what ' +
-      'actually arrived and the difference, with the driver’s signature — so a short ' +
-      'delivery shows on the paperwork, not only in the system. From there you can ' +
-      'view it as a PDF or print it.',
+      'Open the delivery — from Past deliveries on Receiving, or the Goods in tab of ' +
+      'Receipts. The note shows what was ordered, what actually arrived and the ' +
+      'difference, with the driver’s signature — so a short delivery shows on the ' +
+      'paperwork, not only in the system. You can view it as a PDF or print it.',
     followUp: {
       question: 'Would you like to know how to find an older delivery?',
       topic: 'deliveries-past',
+      otherwise: { question: 'Would you like to know how to find notes on Receipts?', topic: 'receipts-screen' },
     },
     rules: ['BR-08', 'BR-17'],
     related: ['deliveries-past', 'receiving-discrepancy'],
@@ -705,7 +732,7 @@ export const TOPICS = [
   {
     id: 'donation-intake',
     title: 'Taking in a donation',
-    roles: [WORKER, ADMIN],
+    roles: WORKERS_ONLY,
     screens: ['donation'],
     asks: [
       'someone donated food', 'how do I log a donation', 'record a donation',
@@ -754,7 +781,7 @@ export const TOPICS = [
   {
     id: 'donation-what-we-take',
     title: 'What we can accept',
-    roles: [WORKER, ADMIN],
+    roles: WORKERS_ONLY,
     screens: ['donation'],
     asks: [
       'can we accept this', 'is this ok to take', 'expired donation', 'opened packet',
@@ -775,7 +802,7 @@ export const TOPICS = [
   {
     id: 'donation-donor-details',
     title: 'Donor details',
-    roles: [WORKER, ADMIN],
+    roles: WORKERS_ONLY,
     screens: ['donation'],
     asks: [
       'do I need their name', 'donor details', 'anonymous donation', 'personal information',
@@ -797,7 +824,7 @@ export const TOPICS = [
   {
     id: 'decanting-record',
     title: 'Recording a decanting run',
-    roles: EVERYONE,
+    roles: WORKERS_ONLY,
     screens: ['decanting'],
     asks: [
       'how do I record decanting', 'splitting bags', 'decanting sheet', 'we split a sack',
@@ -823,7 +850,7 @@ export const TOPICS = [
   {
     id: 'decanting-wastage',
     title: 'Recording wastage',
-    roles: EVERYONE,
+    roles: WORKERS_ONLY,
     screens: ['decanting'],
     asks: [
       'we lost some', 'spoiled', 'spilled', 'wastage', 'fewer bags than expected',
@@ -844,7 +871,7 @@ export const TOPICS = [
   {
     id: 'decanting-records',
     title: 'Past decanting runs',
-    roles: EVERYONE,
+    roles: WORKERS_ONLY,
     screens: ['decantingRecords'],
     asks: [
       'past decanting', 'old decanting sheet', 'what did we decant', 'decanting history',
@@ -864,7 +891,7 @@ export const TOPICS = [
   {
     id: 'packing-pallet',
     title: 'Packing a pallet',
-    roles: EVERYONE,
+    roles: WORKERS_ONLY,
     screens: ['packing'],
     asks: ['how do I pack', 'what goes on this pallet', 'packing a slip', 'pack an order', 'make up a pallet'],
     body:
@@ -901,6 +928,7 @@ export const TOPICS = [
     followUp: {
       question: 'Would you like to know what to do if there isn’t enough stock to finish a pallet?',
       topic: 'packing-shortage',
+      otherwise: { question: 'Would you like to know what to do with stock that has gone off?', topic: 'expired-stock' },
     },
     rules: ['BR-06'],
     related: ['packing-pallet', 'receiving-expiry'],
@@ -908,7 +936,7 @@ export const TOPICS = [
   {
     id: 'packing-shortage',
     title: 'You cannot finish a pallet',
-    roles: EVERYONE,
+    roles: WORKERS_ONLY,
     screens: ['packing'],
     asks: [
       'not enough stock', 'item is expired', 'damaged item', 'short on the pallet',
@@ -929,7 +957,7 @@ export const TOPICS = [
   {
     id: 'packing-claim',
     title: 'Taking a slip off the board',
-    roles: EVERYONE,
+    roles: WORKERS_ONLY,
     screens: ['packing'],
     asks: [
       'how do I claim a slip', 'whose pallet is this', 'someone else is on it',
@@ -952,7 +980,7 @@ export const TOPICS = [
   {
     id: 'dispatch-collection',
     title: 'A collection at the gate',
-    roles: EVERYONE,
+    roles: WORKERS_ONLY,
     screens: ['dispatch'],
     asks: [
       'a driver is here', 'someone came to collect', 'how do I dispatch',
@@ -979,7 +1007,7 @@ export const TOPICS = [
   {
     id: 'dispatch-signature',
     title: 'The driver has to sign',
-    roles: EVERYONE,
+    roles: WORKERS_ONLY,
     screens: ['dispatch'],
     asks: [
       'do they have to sign', 'can I skip the signature', 'driver will not sign',
@@ -1000,16 +1028,17 @@ export const TOPICS = [
   {
     id: 'dispatch-non-collection',
     title: 'A centre did not collect',
-    roles: EVERYONE,
+    roles: WORKERS_ONLY,
     screens: ['dispatch', 'dispatchHistory'],
     asks: [
       'they did not come', 'nobody collected', 'no show', 'missed collection', '16:00',
       'four o clock', 'non collection', 'still not here',
     ],
     body:
-      'You don’t need to do anything. A pallet that hasn’t been collected by 15:00 is' +
-      ' marked as not collected automatically, and it goes on that centre’s record so' +
-      ' a pattern shows up over time.\n\n' +
+      'You don’t need to do anything. A pallet that hasn’t been collected by the ' +
+      'cut-off (15:00 unless an admin has changed it) is marked as not collected ' +
+      'automatically, and it goes on that centre’s record so a pattern shows up over ' +
+      'time.\n\n' +
       'If the centre turns up later, the collection can still go ahead as a late ' +
       'collection.',
     followUp: {
@@ -1022,7 +1051,7 @@ export const TOPICS = [
   {
     id: 'dispatch-history',
     title: 'Who collected, and when',
-    roles: EVERYONE,
+    roles: WORKERS_ONLY,
     screens: ['dispatchHistory'],
     asks: [
       'collection history', 'did they collect', 'past collections', 'who came',
@@ -1046,12 +1075,14 @@ export const TOPICS = [
     screens: ['dispatchHistory', 'receipts'],
     asks: ['dispatch note', 'print the collection', 'proof they took it', 'collection paperwork'],
     body:
-      'Open a past collection and choose View note. It shows what went out, to which ' +
-      'centre, what was loaded against what was packed, and the driver’s signature. ' +
-      'You can view it as a PDF or print it.',
+      'Open the collection — from the gate’s history, or the Goods out tab of ' +
+      'Receipts. The note shows what went out, to which centre, what was loaded ' +
+      'against what was packed, and the driver’s signature. You can view it as a PDF ' +
+      'or print it.',
     followUp: {
       question: 'Would you like to know how to find other past collections?',
       topic: 'dispatch-history',
+      otherwise: { question: 'Would you like to know how to see which centres didn’t collect?', topic: 'missed-collections-manager' },
     },
     rules: ['BR-13'],
     related: ['dispatch-history'],
@@ -1060,7 +1091,7 @@ export const TOPICS = [
     id: 'picking-slip-qr',
     title: 'The QR code on a slip',
     roles: EVERYONE,
-    screens: ['pickingSlips', 'dispatch'],
+    screens: ['dispatch', 'pickingSlips'],
     asks: ['qr code', 'scan the slip', 'what is the square code', 'barcode on the slip'],
     body:
       'The QR code on a pallet label opens that one slip on a phone, without signing ' +
@@ -1083,20 +1114,24 @@ export const TOPICS = [
     asks: [
       'what does on hand mean', 'committed', 'available', 'reorder level',
       'what do the columns mean', 'how much do we have', 'stock levels',
+      'what is the red line on the row', 'why is a row orange', 'earliest expiry',
     ],
     body:
-      'Each row is one product.',
+      'Each row is one product, with its stock code and category under the name. A ' +
+      'red edge on a row means a shortfall or stock about to expire; amber means low ' +
+      'or expiring within the month.',
     steps: [
       'On hand — what is physically in the building.',
       'Committed — already promised to picking slips that haven’t gone out.',
-      'Available — on hand minus committed. This is the number to trust.',
-      'Low — shown when available drops below the product’s reorder level.',
+      'Available — on hand minus committed, in bold. This is the number to trust; red means more is promised than we have.',
+      'Reorder at — the level below which the product counts as low.',
+      'Earliest expiry — a countdown when it is within the month, otherwise the date.',
     ],
     followUp: {
-      question: 'Would you like to know how to see one product’s history in detail?',
+      question: 'Would you like to know how to see one product in detail?',
       topic: 'inventory-item-summary',
     },
-    related: ['inventory-item-summary', 'inventory-low-stock'],
+    related: ['inventory-item-summary', 'inventory-low-stock', 'list-screens'],
   },
   {
     id: 'inventory-item-summary',
@@ -1108,9 +1143,10 @@ export const TOPICS = [
       'click on a row', 'details of an item',
     ],
     body:
-      'Click any row in Inventory. You get everything about that product in one ' +
-      'place, with a chart of how its stock has gone up and down — built from the ' +
-      'real movements in and out, so it matches the ledger.',
+      'Click a product in Inventory and a panel opens on the right, without losing ' +
+      'your place in the list. It shows the four figures, the balance over time with ' +
+      'the reorder line on it, expiry by delivery (soonest first), recent movements, ' +
+      'and the catalogue details. Adjust stock is at the foot of the panel.',
     followUp: {
       question: 'Would you like to know how to see every stock movement across the warehouse?',
       topic: 'stock-ledger',
@@ -1125,21 +1161,24 @@ export const TOPICS = [
     asks: [
       'the number is wrong', 'stock does not match', 'how do I correct stock',
       'stock adjustment', 'count is off', 'shelf does not match the screen', 'fix stock',
+      'adjust several products', 'adjust stock button',
     ],
     body:
       'If the shelf doesn’t match the screen, count again first. If it’s still ' +
-      'different, make a stock adjustment on the product in Inventory.',
+      'different, adjust it. Choose + Adjust stock at the top of Inventory and pick ' +
+      'the product, or use Adjust stock in a product’s panel. Tick several rows and ' +
+      'choose Adjust stock to go through them one after another.',
     steps: [
-      'Choose Add to stock (+) or Remove from stock (−).',
+      'Choose Add to stock (+) or Remove from stock (-).',
       'Enter the amount.',
-      'Pick a reason from the list (with a note if you choose Other).',
-      'Save. The system records who made it and when.',
+      'Pick a reason — Stock count correction, Damaged / spoiled, Expired, Spillage, Donation not captured at receiving, or Other with a note.',
+      'Save. The system records who made it and when, and it shows on the stock ledger.',
     ],
     followUp: {
       question: 'Would you like to know how to find out why a figure changed in the first place?',
       topic: 'stock-ledger',
     },
-    related: ['inventory-columns', 'undo-a-mistake'],
+    related: ['inventory-columns', 'undo-a-mistake', 'expired-stock'],
   },
   {
     id: 'inventory-low-stock',
@@ -1148,18 +1187,20 @@ export const TOPICS = [
     screens: ['inventory'],
     asks: [
       'low stock', 'running out', 'what is low', 'reorder', 'shortfall', 'we need more',
-      'what should I order',
+      'what should I order', 'what is a shortfall',
     ],
     body:
-      'A product is low when its available stock falls below its reorder level. Low ' +
-      'items are marked in Inventory and flagged on your dashboard and the bell.\n\n' +
-      'When you start a new purchase order, it offers to add everything that is ' +
-      'currently low.',
+      'A product is low when its available stock falls below its reorder level, and ' +
+      'a shortfall when more is promised to picking slips than we have. Each has its ' +
+      'own tab in Inventory, with the count beside it, and they are flagged on your ' +
+      'dashboard and the bell.\n\n' +
+      'Tick the products on the Low stock tab and choose Raise purchase order to ' +
+      'start an order with them already on it.',
     followUp: {
       question: 'Would you like to know how to raise a purchase order?',
       topic: 'po-create',
     },
-    related: ['po-create', 'product-fields'],
+    related: ['po-create', 'po-from-inventory', 'product-fields'],
   },
   {
     id: 'stock-ledger',
@@ -1168,17 +1209,19 @@ export const TOPICS = [
     screens: ['stockLedger'],
     asks: [
       'stock ledger', 'every movement', 'where did the stock go', 'audit stock',
-      'why did the number change', 'stock movements',
+      'why did the number change', 'stock movements', 'reconciliation',
     ],
     body:
-      'The stock ledger lists every movement in and out of the warehouse — receipts, ' +
-      'decanting, dispatches and adjustments — with who did it and when.\n\n' +
-      'It’s the place to look when a figure changed and nobody knows why.',
+      'The stock ledger lists every movement in and out — receipts, donations, ' +
+      'decanting, dispatches, wastage and adjustments — with who did it and when. ' +
+      'Tabs split it by kind, and the line above the table totals what is in view.\n\n' +
+      'Narrow it by period, product or who recorded it. The Reconciliation tab shows ' +
+      'any product whose balance no longer adds up from its movements.',
     followUp: {
       question: 'Would you like to know how to correct a figure that is wrong?',
       topic: 'stock-adjustment',
     },
-    related: ['inventory-item-summary', 'stock-adjustment'],
+    related: ['inventory-item-summary', 'stock-adjustment', 'decanting-manager'],
   },
   {
     id: 'expired-stock',
@@ -1190,9 +1233,11 @@ export const TOPICS = [
       'spoiled stock', 'past its date',
     ],
     body:
-      'Remove it with a stock adjustment: choose Remove from stock and pick the ' +
-      'reason that fits. It has to come off the figures — otherwise the next picking ' +
-      'slip promises food that can’t be sent.',
+      'Remove it with a stock adjustment: choose Remove from stock (-) and the reason ' +
+      'Expired. It has to come off the figures — otherwise the next picking slip ' +
+      'promises food that can’t be sent.\n\n' +
+      'The Expiring in 30 days tab in Inventory shows what is close, so it can go out ' +
+      'first instead.',
     followUp: {
       question: 'Would you like to know how to make a stock adjustment?',
       topic: 'stock-adjustment',
@@ -1215,16 +1260,16 @@ export const TOPICS = [
       'A purchase order tells a supplier what to deliver, and gives Receiving the ' +
       'list to check against.',
     steps: [
-      'Open Purchase Orders and choose New.',
-      'Pick the supplier.',
-      'Add a line per product and set the quantity. If items are low, it offers to start with those.',
-      'Check the estimated total and send it.',
+      'Open Purchase Orders and choose + New purchase order.',
+      'Pick the supplier and the expected delivery date.',
+      'Add a line per product and set the quantity — or choose Add low-stock items to start with everything that is low.',
+      'Check the estimated total and save. It waits under Awaiting approval until a manager approves it.',
     ],
     followUp: {
-      question: 'Would you like to know what happens with Finance once it’s sent?',
-      topic: 'po-finance-email',
+      question: 'Would you like to know how approving an order works?',
+      topic: 'po-approve',
     },
-    related: ['po-line-numbers', 'po-status', 'inventory-low-stock'],
+    related: ['po-line-numbers', 'po-status', 'po-from-inventory'],
   },
   {
     id: 'po-line-numbers',
@@ -1253,20 +1298,22 @@ export const TOPICS = [
     screens: ['purchaseOrders'],
     asks: [
       'what does returned mean', 'follow up required', 'order status', 'open order',
-      'who can change the status', 'close an order', 'is the order done',
+      'who can change the status', 'close an order', 'is the order done', 'in transit',
+      'partially received', 'pending approval',
     ],
     body:
-      'An order starts as raised, then becomes received in full or in part as ' +
-      'deliveries come in. Returned and follow-up are for when the supplier got it ' +
-      'wrong.\n\n' +
-      'Only the warehouse manager changes the status — Receiving just records what ' +
-      'arrived, and the order follows.',
+      'Pending approval — raised, not signed off. Approved — ready to send to the ' +
+      'supplier. In transit — on its way. Partially received — some of it has come. ' +
+      'Completed — everything arrived. Returned and Follow-up required are for when ' +
+      'the supplier got it wrong.\n\n' +
+      'Deliveries move an order along by themselves; the tabs Open, Awaiting approval,' +
+      ' In transit and Follow-up required show where each one is.',
     followUp: {
-      question: 'Would you like to know what happens when only part of an order arrives?',
-      topic: 'receiving-partial',
+      question: 'Would you like to know how to record a follow-up with the supplier?',
+      topic: 'po-follow-up',
     },
     rules: ['BR-07B'],
-    related: ['receiving-partial', 'po-create'],
+    related: ['po-follow-up', 'po-create', 'deliveries-manager'],
   },
   {
     id: 'po-finance-email',
@@ -1299,9 +1346,10 @@ export const TOPICS = [
       'delivery and dispatch notes',
     ],
     body:
-      'Receipts holds every delivery note and dispatch note in one place, and you can' +
-      ' search it. It’s where to look when someone asks what came in or went out on a' +
-      ' particular day.',
+      'Receipts holds every delivery note (Goods in) and dispatch note (Goods out). ' +
+      'Search, narrow by status, supplier or centre and dates, and click a row to ' +
+      'open its note. It’s where to look when someone asks what came in or went out ' +
+      'on a particular day.',
     followUp: {
       question: 'Would you like to know what a delivery note shows?',
       topic: 'delivery-note',
@@ -1353,6 +1401,7 @@ export const TOPICS = [
     followUp: {
       question: 'Would you like to know how a pallet is packed from its slip?',
       topic: 'packing-pallet',
+      otherwise: { question: 'Would you like to know how to generate the week’s slips?', topic: 'picking-slip-generate' },
     },
     rules: ['BR-18', 'BR-19', 'BR-20', 'BR-21', 'NFR-20'],
     related: ['picking-slip-create', 'beneficiary-manage'],
@@ -1367,13 +1416,15 @@ export const TOPICS = [
       'hand it to a packer',
     ],
     body:
-      'Open a slip on the Picking Slips screen and choose a worker under Assigned to.' +
-      ' You can also add a helper if two people are packing it.\n\n' +
-      'Or leave it unassigned and anyone free can claim it from the packing board — ' +
+      'Open a slip on Picking Slips, choose a worker under Assign to a worker, then ' +
+      'Assign. You can add a second packer when two people are on it. To give many ' +
+      'at once, tick them and choose Assign to….\n\n' +
+      'Or leave slips unassigned and anyone free can claim one on the floor — ' +
       'assigning is only needed when it has to be someone in particular.',
     followUp: {
       question: 'Would you like to know how packers claim a slip themselves?',
       topic: 'packing-claim',
+      otherwise: { question: 'Would you like to know how to take a slip back off someone?', topic: 'picking-slip-release' },
     },
     related: ['picking-slip-create', 'packing-claim'],
   },
@@ -1417,7 +1468,8 @@ export const TOPICS = [
       'Beneficiaries are the centres that collect food from us. Each record holds the' +
       ' centre’s name, its pickup day (Tuesday or Thursday), a contact person, a mobile ' +
       'number for reminders and, for ECD centres, the number of children.\n\n' +
-      'Centres usually join and leave around once a quarter.',
+      'Choose + Add beneficiary to add one, or click a centre to open it in the panel ' +
+      'on the right, where you can edit, approve or move it.',
     followUp: {
       question: 'Would you like to know why the number of children matters?',
       topic: 'beneficiary-ecd-numbers',
@@ -1455,8 +1507,9 @@ export const TOPICS = [
       'delete a centre', 'they are not coming anymore',
     ],
     body:
-      'Mark the centre inactive rather than deleting it. It stops getting new picking' +
-      ' slips, but its history stays, so past reports still add up.',
+      'Open the centre and choose Deactivate rather than deleting it. It stops ' +
+      'getting new picking slips, but its history stays, so past reports still add ' +
+      'up. To see inactive centres again, tick Show inactive under + Filter.',
     followUp: {
       question: 'Would you like to know what a centre’s record holds?',
       topic: 'beneficiary-manage',
@@ -1475,9 +1528,11 @@ export const TOPICS = [
     ],
     body:
       'The day before a collection, every ECD centre due to collect is emailed a ' +
-      'reminder automatically at 8:00.\n\n' +
+      'reminder automatically at 8:00 — unless that day is closed on the operating ' +
+      'calendar, when none go out.\n\n' +
       'The Collection reminders screen shows tomorrow’s list: whether each email ' +
-      'went, and a WhatsApp message ready for you to send by hand.',
+      'went, and a WhatsApp message ready for you to send by hand. The WhatsApp to ' +
+      'send and Email failed tabs show what still needs you.',
     followUp: {
       question: 'Would you like to know how to send the WhatsApp reminder?',
       topic: 'collection-reminder-whatsapp',
@@ -1518,7 +1573,7 @@ export const TOPICS = [
       'centre did not get the reminder', 'retry the email', 'missing phone number',
     ],
     body:
-      'If an email failed, choose Retry email on that centre’s row.\n\n' +
+      'Open the Email failed tab and choose Retry email on that centre’s row.\n\n' +
       'If Open WhatsApp is greyed out, the centre has no mobile number. Add it on the' +
       ' Beneficiaries screen so the next reminder works.',
     followUp: {
@@ -1530,7 +1585,7 @@ export const TOPICS = [
   {
     id: 'benevolent-requests',
     title: 'Benevolent package requests',
-    roles: EVERYONE,
+    roles: WORKERS_ONLY,
     screens: ['communityRequests'],
     asks: [
       'someone phoned asking for food', 'call in request', 'benevolent package',
@@ -1540,7 +1595,7 @@ export const TOPICS = [
       'When someone phones or walks in asking for a food parcel, log it here instead ' +
       'of on a note.',
     steps: [
-      'Open Benevolent requests and choose Log a request.',
+      'Open Benevolent Requests and choose Log a request.',
       'Enter what was requested, the caller’s name and how to contact them.',
       'Add a quantity note and when they asked.',
       'Save. It then shows under Open requests until it’s dealt with.',
@@ -1668,7 +1723,7 @@ export const TOPICS = [
       'meals served', 'report for the board',
     ],
     body:
-      'The Impact Calculator turns food sent out into people served — children at ECD' +
+      'The Impact report turns food sent out into people served — children at ECD' +
       ' centres, adults at soup kitchens, dignity kitchen guests and households — ' +
       'plus compost processed.\n\n' +
       'Children are counted once per period, however many times their centre ' +
@@ -1691,8 +1746,8 @@ export const TOPICS = [
     ],
     body:
       'Meals and people served are worked out from the kilograms dispatched, using ' +
-      'the rates shown on the calculator (for example "how many meals does 1 kg ' +
-      'feed?"). Change a rate and every figure updates.\n\n' +
+      'set rates (for example "how many meals does 1 kg feed?"). Choose Adjust ' +
+      'estimates on the Impact report to see or change them; every figure updates.\n\n' +
       'Agree the rate before a report goes out, and mention which one you used.',
     followUp: {
       question: 'Would you like to know how to export the impact poster?',
@@ -1710,7 +1765,7 @@ export const TOPICS = [
       'something to show the board', 'export impact',
     ],
     body:
-      'On the Impact Calculator, set the period first, then export the PDF poster. It' +
+      'On the Impact report, set the period at the top, then choose Export PDF. It' +
       ' puts the headline figures in a grid, ready to print or send to donors or the ' +
       'board — and it shows exactly what’s on screen.',
     followUp: {
@@ -1797,7 +1852,8 @@ export const TOPICS = [
     ],
     body:
       'Volunteers sign in with their first name when they arrive, against an event. ' +
-      'Open the event under Volunteer events to see who is in now and who has been.\n\n' +
+      'Open the event under Volunteer Events: Bookings and attendance shows who is ' +
+      'booked and who has been checked in.\n\n' +
       'Admins also have the full door log, with sign-out times.',
     followUp: {
       question: 'Would you like to know how to set up a volunteer event?',
@@ -1812,17 +1868,19 @@ export const TOPICS = [
     screens: ['volunteers'],
     asks: [
       'volunteer event', 'set up a session', 'group coming in', 'corporate volunteers',
-      'book volunteers', 'schedule volunteers',
+      'book volunteers', 'schedule volunteers', 'create an event',
     ],
     body:
-      'Open Volunteer events and create the event, then add its time slots with Add ' +
-      'Timeslot. On the day, volunteers sign in against it — that’s what turns a ' +
-      'sign-in into hours we can count.',
+      'Choose + Create event on Volunteer Events. Fill in the name, date, venue and ' +
+      'description, then the first time slot: its space, start and end time, and ' +
+      'capacity. Add more with Add Timeslot.\n\n' +
+      'On the day, volunteers sign in against it — that’s what turns a sign-in into ' +
+      'hours we can count. The tabs show Open, Completed and Cancelled events.',
     followUp: {
-      question: 'Would you like to know how volunteers sign in as guests?',
-      topic: 'guest-sign-in',
+      question: 'Would you like to know how to run the event on the day?',
+      topic: 'volunteer-event-day',
     },
-    related: ['volunteer-log'],
+    related: ['volunteer-log', 'volunteer-event-day', 'volunteer-event-close'],
   },
   {
     id: 'guest-sign-in',
@@ -1855,8 +1913,8 @@ export const TOPICS = [
       'cost per item', 'weight per item', 'reorder level', 'change a product',
     ],
     body:
-      'Open Product management to add or edit a product. Name and stock code are ' +
-      'required. Weight, cost and reorder level are optional, but they matter: they ' +
+      'Choose + Add product on Product Management, or click a product and choose ' +
+      'Edit details in its panel. Name and stock code are required. Weight, cost and reorder level are optional, but they matter: they ' +
       'fill in purchase order lines and decide when a product shows as low.\n\n' +
       'A wrong number here becomes a wrong number on every order, so double-check it.',
     followUp: {
@@ -1898,9 +1956,10 @@ export const TOPICS = [
       'supplier contact', 'we stopped using them',
     ],
     body:
-      'Open Supplier management to add a supplier or change their contact details. If' +
-      ' you stop using a supplier, deactivate them rather than deleting — past orders' +
-      ' still need to show who they were from.',
+      'Choose Register supplier on Supplier Management, or click a supplier to see ' +
+      'their details, open orders and recent deliveries, and choose Edit details. If ' +
+      'you stop using a supplier, deactivate them rather than deleting — past orders ' +
+      'still need to show who they were from.',
     followUp: {
       question: 'Would you like to know how removing things safely works?',
       topic: 'archive-not-delete',
@@ -1911,22 +1970,22 @@ export const TOPICS = [
     id: 'archive-not-delete',
     title: 'Removing something safely',
     roles: ADMIN_ONLY,
-    screens: ['products', 'suppliers', 'users'],
+    screens: ['products', 'suppliers'],
     asks: [
-      'delete a product', 'remove a supplier', 'how do I delete', 'archive',
-      'it is still showing', 'get rid of an old item', 'deactivate',
+      'delete a product', 'remove a supplier', 'how do I delete', 'deactivate',
+      'it is still showing', 'get rid of an old item',
     ],
     body:
-      'Deactivate takes a product, supplier or user out of the lists people pick ' +
-      'from. Remove goes further, but past orders and reports still read correctly ' +
-      'either way.\n\n' +
-      'Nothing is ever truly erased, because that would change last year’s figures.',
+      'Deactivate takes a product, supplier, centre or user out of the lists people ' +
+      'pick from, and can be undone. Delete goes further and cannot. Past orders and ' +
+      'reports still read correctly either way.\n\n' +
+      'Everything deactivated or deleted is listed in the Archive.',
     followUp: {
-      question: 'Would you like to know how to handle a staff member who has left?',
-      topic: 'users-and-accounts',
+      question: 'Would you like to know how to bring something back from the Archive?',
+      topic: 'archive-restore',
     },
     rules: ['BR-27', 'NFR-16'],
-    related: ['product-fields', 'beneficiary-inactive'],
+    related: ['archive-restore', 'product-fields', 'beneficiary-inactive'],
   },
   {
     id: 'users-and-accounts',
@@ -1934,21 +1993,23 @@ export const TOPICS = [
     roles: ADMIN_ONLY,
     screens: ['users'],
     asks: [
-      'add a user', 'new staff member', 'reset a password', 'change someone role',
-      'someone left', 'create an account', 'give someone access',
+      'add a user', 'new staff member', 'change someone role', 'someone left',
+      'create an account', 'give someone access', 'invite someone',
     ],
     body:
-      'Open User management to create an account: choose the role and set the first ' +
-      'password. Give the narrowest role that lets the person do their job — you can ' +
-      'widen it later.\n\n' +
-      'When someone leaves, deactivate their account rather than removing it, so ' +
-      'their past work stays under their name.',
+      'You invite people rather than make their accounts. Choose Invite user on User ' +
+      'Management, enter their email and role, and choose Send invite. They set their' +
+      ' own username, name and password when they accept — you never see or choose a ' +
+      'password.\n\n' +
+      'Give the narrowest role that lets them do their job. When someone leaves, ' +
+      'deactivate their account rather than deleting it, so their past work stays ' +
+      'under their name.',
     followUp: {
-      question: 'Would you like to know which screens each role can use?',
-      topic: 'who-can-do-what',
+      question: 'Would you like to know what to do if an invite hasn’t arrived?',
+      topic: 'user-invites',
     },
     rules: ['BR-01', 'NFR-08'],
-    related: ['who-can-do-what', 'archive-not-delete'],
+    related: ['user-invites', 'who-can-do-what', 'archive-not-delete'],
   },
   {
     id: 'donation-management-screen',
@@ -1960,9 +2021,11 @@ export const TOPICS = [
       'donation value is wrong', 'approve donations',
     ],
     body:
-      'The Classification queue is where donations recorded at the gate are checked, ' +
-      'valued properly and classified. It’s the place to correct a rough value ' +
-      'entered in a hurry before a certificate goes out.',
+      'The Classification Queue is where donations recorded at the gate are checked, ' +
+      'valued properly and classified. Its tabs: Pending Product Review (items that ' +
+      'need a decision), Reconciliation (something doesn’t match) and Processing ' +
+      'Failed (a system problem — try them again).\n\n' +
+      'It’s the place to correct a rough value before a certificate goes out.',
     followUp: {
       question: 'Would you like to know how Section 18A certificates are issued?',
       topic: 'section18a-certificates',
@@ -1980,9 +2043,11 @@ export const TOPICS = [
       'certificate queue', '18a management', 'send a certificate',
     ],
     body:
-      'Donations where the donor asked for a certificate queue up on the Section 18A ' +
-      'screen, ready to be issued. Every action is recorded, because SARS needs the ' +
-      'trail as much as the certificate itself.',
+      'Donations where the donor asked for a certificate queue up on the Certificate ' +
+      'Queue tab, which you can search by donor, amount and date. The Email history ' +
+      'tab shows every certificate and thank-you email, and Resend sends one again.\n\n' +
+      'Every action is recorded, because SARS needs the trail as much as the ' +
+      'certificate itself.',
     followUp: {
       question: 'Would you like to know how to check and correct a donation’s value first?',
       topic: 'donation-management-screen',
@@ -1994,15 +2059,16 @@ export const TOPICS = [
     id: 'email-settings',
     title: 'Email settings',
     roles: ADMIN_ONLY,
-    screens: ['emailIntegration'],
+    screens: ['emailIntegration', 'settings'],
     asks: [
       'email settings', 'gmail', 'emails are not sending', 'connect email',
       'who do emails come from', 'certificate emails',
     ],
     body:
-      'Email settings is where the Gmail account that sends certificates, reminders ' +
-      'and notifications is connected. If emails have stopped going out, check the ' +
-      'connection here first — and send yourself a test email.',
+      'Open Settings and the Email section. That is where the Gmail account that ' +
+      'sends certificates, reminders and notifications is connected. If emails have ' +
+      'stopped going out, check the connection here first, then Message history for ' +
+      'what failed.',
     followUp: {
       question: 'Would you like to know how to set where Finance emails go?',
       topic: 'finance-recipient',
@@ -2013,13 +2079,13 @@ export const TOPICS = [
     id: 'finance-recipient',
     title: 'Where Finance emails go',
     roles: ADMIN_ONLY,
-    screens: ['emailIntegration', 'financeReport'],
+    screens: ['emailIntegration', 'financeReport', 'settings'],
     asks: [
       'finance email address', 'change the finance recipient', 'who gets the purchase orders',
       'finance did not get the po', 'send finance the report', 'report link for finance',
     ],
     body:
-      'In Email settings, save the Finance recipient’s email address. New purchase ' +
+      'In Settings, Email section, save the Finance recipient’s email address. New purchase ' +
       'orders are sent there automatically.\n\n' +
       'The Send Finance Report Link button emails Finance a link to the warehouse ' +
       'movement report, which they can open without an account.',
@@ -2059,15 +2125,704 @@ export const TOPICS = [
       'who was on site', 'delete a sign in',
     ],
     body:
-      'The Volunteer log lists every guest sign-in at the door. If someone left ' +
-      'without signing out, choose Sign out on their visit — their hours only count ' +
-      'once the visit is closed.\n\n' +
+      'The Volunteer log lists every guest sign-in at the door; the On site tab is ' +
+      'who is here now. If someone left without signing out, open their visit and ' +
+      'choose Sign out — their hours only count once the visit is closed.\n\n' +
       'There’s no delete button on purpose: it’s a record of who was on site.',
     followUp: {
       question: 'Would you like to know how volunteer events work?',
       topic: 'volunteer-events',
     },
     related: ['volunteer-log', 'guest-sign-in'],
+  },
+
+  // ═══ The floor and the office ═════════════════════════════
+  {
+    id: 'office-and-floor',
+    title: 'Why the floor screens are not on your menu',
+    roles: EVERYONE,
+    screens: ['home'],
+    general: true,
+    asks: [
+      'why can I not open receiving', 'where is packing', 'where is the decanting screen',
+      'I cannot see the gate', 'why can I not see inventory', 'where did the packing board go',
+      'can a manager receive a delivery', 'can I log a donation', 'it sent me back to my dashboard',
+    ],
+    body:
+      'Each role works only its own screens. The floor — receiving, decanting, ' +
+      'packing, the gate, donation intake — belongs to warehouse staff. The office — ' +
+      'stock, orders, picking slips, centres and reports — belongs to managers, and ' +
+      'admins look after users, products and settings.\n\n' +
+      'Opening another role’s screen takes you back to your own home. Managers ' +
+      'follow the floor’s work from their own screens instead.',
+    followUp: {
+      question: 'Would you like to know what you can do in your role?',
+      topic: MY_ROLE,
+    },
+    rules: ['BR-01'],
+    related: ['who-can-do-what', 'deliveries-manager', 'packing-progress-manager'],
+  },
+
+  // ═══ Working with the lists (manager and admin screens) ════
+  {
+    id: 'list-screens',
+    title: 'Tabs, search, filters and columns',
+    roles: MANAGERS_UP,
+    screens: ['inventory', 'purchaseOrders', 'pickingSlips', 'beneficiaries', 'stockLedger', 'receipts', 'products', 'suppliers', 'users'],
+    general: true,
+    asks: [
+      'how do I filter', 'how do I search', 'hide a column', 'what are the tabs',
+      'export to csv', 'the number next to the tab', 'show only', 'clear the filters',
+      'sort by a column', 'how do I find something in the list',
+    ],
+    body:
+      'Every list works the same way. The tabs along the top are ready-made views, ' +
+      'with how many rows each holds — a red number means something needs you. Inside ' +
+      'the card: search, then + Filter for more ways to narrow it (each one shows as a ' +
+      'chip you can remove), Columns to hide or show columns, and Export for a CSV of ' +
+      'what is in view.\n\n' +
+      'Click a column name to sort by it, and a row to open it in the panel on the ' +
+      'right.',
+    followUp: {
+      question: 'Would you like to know what you can do with several rows at once?',
+      topic: 'list-bulk-actions',
+    },
+    related: ['list-bulk-actions', 'inventory-columns'],
+  },
+  {
+    id: 'list-bulk-actions',
+    title: 'Doing something to several rows at once',
+    roles: MANAGERS_UP,
+    screens: ['inventory', 'pickingSlips'],
+    general: true,
+    asks: [
+      'select several', 'tick boxes', 'bulk', 'do them all at once', 'select all',
+      'many products at once', 'several slips at once',
+    ],
+    body:
+      'Tick the box at the start of each row you want — or the box in the header for ' +
+      'every row in the view. The search and filters are replaced by a bar saying how ' +
+      'many you have ticked, with what you can do to them.',
+    steps: [
+      'Inventory — Raise purchase order, Adjust stock (one after another), or Export selected.',
+      'Picking Slips — Assign to…, Assign to floor, or Print pallet labels.',
+      'Choose Clear selection on the bar to untick them all.',
+    ],
+    followUp: {
+      question: 'Would you like to know how to order everything that is low?',
+      topic: 'po-from-inventory',
+    },
+    related: ['list-screens', 'po-from-inventory', 'picking-slip-assign'],
+  },
+  {
+    id: 'dashboard-manager',
+    title: 'Your dashboard',
+    roles: MANAGERS_UP,
+    screens: ['home'],
+    asks: [
+      'what is on my dashboard', 'needs attention', 'customise the dashboard',
+      'add a widget', 'remove a tile', 'what should I do first today',
+      'move a widget', 'drag the tiles', 'rearrange the dashboard', 'hide needs attention',
+      'collapse needs attention',
+    ],
+    body:
+      'Needs attention, at the top, lists what is waiting on you, worst first — tap a ' +
+      'line to go straight to it. Tap its heading to fold it away; it still says how ' +
+      'many things are waiting.\n\n' +
+      'Under it are figures and charts. Choose Customise dashboard to add, remove or ' +
+      'replace them, and drag one by its handle to move it — numbers among numbers, ' +
+      'charts among charts. Done keeps it; Reset to default starts again.',
+    followUp: {
+      question: 'Would you like to know how the bell works?',
+      topic: 'notifications',
+    },
+    related: ['notifications', 'inventory-low-stock', 'po-approve'],
+  },
+
+  // ═══ Following the floor's work (manager) ═════════════════
+  {
+    id: 'deliveries-manager',
+    title: 'Following deliveries as a manager',
+    roles: MANAGERS_UP,
+    screens: ['purchaseOrders', 'receipts'],
+    asks: [
+      'did the delivery come', 'has the order arrived', 'what came in today',
+      'short delivery', 'which deliveries were flagged', 'is the supplier late',
+      'how do I receive a delivery', 'expected deliveries today',
+    ],
+    body:
+      'Warehouse staff record deliveries on the floor; you follow them from your own ' +
+      'screens. The In transit tab on Purchase Orders is what is still expected. Once ' +
+      'a delivery is recorded, its order moves to Partially received or Completed, and' +
+      ' the delivery note appears on Receipts under Goods in.\n\n' +
+      'A delivery whose count didn’t match shows Flagged and a variance on Receipts, ' +
+      'and the bell tells you.',
+    followUp: {
+      question: 'Would you like to know what to do when a supplier got an order wrong?',
+      topic: 'po-follow-up',
+    },
+    rules: ['BR-07B', 'BR-08'],
+    related: ['po-status', 'receipts-screen', 'po-follow-up'],
+  },
+  {
+    id: 'packing-progress-manager',
+    title: 'Following packing as a manager',
+    roles: MANAGERS_UP,
+    screens: ['pickingSlips'],
+    asks: [
+      'how is packing going', 'which pallets are packed', 'who is packing',
+      'is the pallet ready', 'packing board', 'packing progress', 'what is still to pack',
+    ],
+    body:
+      'Picking Slips is your view of the floor’s packing. Its tabs split the week: ' +
+      'Unassigned (nobody on it yet), Packing, Ready at gate and Not collected. Each ' +
+      'row shows who is packing it and how many lines are packed.\n\n' +
+      'Open a slip to see its lines, what was flagged short, and who has it.',
+    followUp: {
+      question: 'Would you like to know how to give a slip to a particular packer?',
+      topic: 'picking-slip-assign',
+    },
+    related: ['picking-slip-assign', 'picking-slip-week', 'missed-collections-manager'],
+  },
+  {
+    id: 'missed-collections-manager',
+    title: 'Centres that didn’t collect',
+    roles: MANAGERS_UP,
+    screens: ['pickingSlips', 'beneficiaries'],
+    asks: [
+      'who did not collect', 'missed collection', 'no show', 'non collection',
+      'which centres missed', 'uncollected pallets', 'they never came',
+    ],
+    body:
+      'A pallet nobody collected by the cut-off (15:00 unless an admin changed it in ' +
+      'Settings) is marked Not collected automatically. You see them on the Not ' +
+      'collected tab of Picking Slips, which counts red, and the bell tells you.\n\n' +
+      'If a centre keeps missing, check its contact details and reminders on ' +
+      'Beneficiaries and Collection reminders.',
+    followUp: {
+      question: 'Would you like to know how collection reminders work?',
+      topic: 'collection-reminders',
+    },
+    rules: ['BR-14', 'BR-26', 'BR-27'],
+    related: ['collection-reminders', 'beneficiary-manage', 'packing-progress-manager'],
+  },
+  {
+    id: 'decanting-manager',
+    title: 'Decanting runs and wastage, for a manager',
+    roles: MANAGERS_UP,
+    screens: ['stockLedger', 'reporting'],
+    asks: [
+      'how much was decanted', 'decanting wastage', 'decanting sheets', 'decanting report',
+      'where is the decanting planner', 'which sacks came in light',
+    ],
+    body:
+      'Warehouse staff record decanting on the floor. You see every run on the ' +
+      'Decanting tab of the stock ledger, and the Wastage tab shows what was lost.\n\n' +
+      'For the pattern over time — which products and suppliers keep coming in ' +
+      'light — open Operations reports and browse the picking and decanting reports.',
+    followUp: {
+      question: 'Would you like to know how to browse the reports?',
+      topic: 'reporting-browse',
+    },
+    rules: ['BR-06'],
+    related: ['stock-ledger', 'reporting-browse'],
+  },
+
+  // ═══ Purchase orders (manager) ════════════════════════════
+  {
+    id: 'po-approve',
+    title: 'Approving a purchase order',
+    roles: MANAGERS_UP,
+    screens: ['purchaseOrders'],
+    asks: [
+      'approve an order', 'awaiting approval', 'sign off an order', 'pending order',
+      'edit an order', 'delete an order', 'change an order before it goes',
+    ],
+    body:
+      'New orders wait on the Awaiting approval tab. Open one, check the lines and ' +
+      'total, and choose Approve — it is then ready to send to the supplier.\n\n' +
+      'Only an order still awaiting approval can be edited or deleted; once approved, ' +
+      'it is a commitment to the supplier.',
+    followUp: {
+      question: 'Would you like to know what each status means?',
+      topic: 'po-status',
+    },
+    related: ['po-status', 'po-create', 'po-finance-email'],
+  },
+  {
+    id: 'po-follow-up',
+    title: 'When a supplier got it wrong',
+    roles: MANAGERS_UP,
+    screens: ['purchaseOrders'],
+    asks: [
+      'record a follow up', 'supplier sent the wrong thing', 'chase the supplier',
+      'reopen an order', 'follow-up required', 'the rest never came',
+    ],
+    body:
+      'Open the order and choose Record follow-up, with a short reason. It moves to ' +
+      'the Follow-up required tab, so it isn’t forgotten, and no more can be received ' +
+      'against it until you decide.\n\n' +
+      'If the supplier sorts it out, choose Reopen for receiving to put it back to ' +
+      'Approved.',
+    followUp: {
+      question: 'Would you like to know what each status means?',
+      topic: 'po-status',
+    },
+    rules: ['BR-07B'],
+    related: ['po-status', 'deliveries-manager'],
+  },
+  {
+    id: 'po-from-inventory',
+    title: 'Ordering what is low, straight from Inventory',
+    roles: MANAGERS_UP,
+    screens: ['inventory', 'purchaseOrders'],
+    asks: [
+      'order everything that is low', 'reorder from inventory', 'order the low items',
+      'raise purchase order from stock', 'quick reorder',
+    ],
+    body:
+      'On Inventory, open the Low stock (or Shortfall) tab, tick the products you ' +
+      'want and choose Raise purchase order. A new order opens with those products ' +
+      'already on it, each with enough to bring it back up to its reorder level — pick ' +
+      'the supplier, check the quantities and save.',
+    followUp: {
+      question: 'Would you like to know how approving the order works?',
+      topic: 'po-approve',
+    },
+    related: ['inventory-low-stock', 'po-create'],
+  },
+  {
+    id: 'po-quickbooks',
+    title: 'The QuickBooks reference',
+    roles: MANAGERS_UP,
+    screens: ['purchaseOrders'],
+    asks: [
+      'quickbooks reference', 'quickbooks number', 'link to quickbooks', 'finance captured it',
+      'where do I put the quickbooks number',
+    ],
+    body:
+      'Once Finance has captured an order in QuickBooks, open the order and add ' +
+      'their reference in the QuickBooks field, then Save. It ties the two records ' +
+      'together, so anyone can find the order from Finance’s side.',
+    followUp: {
+      question: 'Would you like to know how orders reach Finance?',
+      topic: 'po-finance-email',
+    },
+    related: ['po-finance-email'],
+  },
+
+  // ═══ Picking slips (manager) ══════════════════════════════
+  {
+    id: 'picking-slip-week',
+    title: 'Choosing the week',
+    roles: MANAGERS_UP,
+    screens: ['pickingSlips'],
+    asks: [
+      'next week slips', 'last week', 'change the week', 'see another week',
+      'slips for a different week', 'go back to this week',
+    ],
+    body:
+      'Picking Slips shows one week at a time — the dates are above the tabs. Use the ' +
+      'arrows either side to move a week back or forward, and This week to come ' +
+      'back. The tabs and their counts are for the week on screen.',
+    followUp: {
+      question: 'Would you like to know how to generate the week’s slips?',
+      topic: 'picking-slip-generate',
+    },
+    related: ['picking-slip-generate', 'packing-progress-manager'],
+  },
+  {
+    id: 'picking-slip-labels',
+    title: 'Printing pallet labels',
+    roles: MANAGERS_UP,
+    screens: ['pickingSlips'],
+    asks: [
+      'print labels', 'pallet label', 'print the qr', 'label for the pallet',
+      'print all labels', 'labels will only work on this computer',
+    ],
+    body:
+      'Print labels at the top of the list prints one for every slip in view. For ' +
+      'some, tick them and choose Print pallet labels; for one, open it and choose ' +
+      'Print pallet label.\n\n' +
+      'If the screen warns the labels will only work on this computer, don’t print ' +
+      'them for the warehouse — the QR codes would not open on a phone.',
+    followUp: {
+      question: 'Would you like to know what the QR code on a label does?',
+      topic: 'picking-slip-qr',
+    },
+    rules: ['BR-22'],
+    related: ['picking-slip-qr', 'list-bulk-actions'],
+  },
+  {
+    id: 'picking-slip-release',
+    title: 'Taking a slip back off someone',
+    roles: MANAGERS_UP,
+    screens: ['pickingSlips'],
+    asks: [
+      'unassign a slip', 'release a slip', 'they went home', 'give it back to the floor',
+      'assign to floor', 'someone else should pack it', 'reassign',
+    ],
+    body:
+      'Open the slip and choose Assign to floor: it goes back for anyone to claim, ' +
+      'and the packer is told. To hand it straight to someone else instead, choose ' +
+      'them under Assign to a worker and Reassign.\n\n' +
+      'For several at once, tick them and choose Assign to floor on the bar.',
+    followUp: {
+      question: 'Would you like to know how assigning a slip works?',
+      topic: 'picking-slip-assign',
+    },
+    related: ['picking-slip-assign', 'list-bulk-actions'],
+  },
+  {
+    id: 'picking-slip-edit',
+    title: 'Changing a slip',
+    roles: MANAGERS_UP,
+    screens: ['pickingSlips'],
+    asks: [
+      'edit a slip', 'change the quantities', 'add a line to a slip', 'wrong amount on the slip',
+      'change what a centre gets',
+    ],
+    body:
+      'Open the slip and choose Edit slip to change its lines and quantities. That ' +
+      'is only offered until someone claims it — once a packer has started, release ' +
+      'it with Assign to floor first.\n\n' +
+      'To change what a centre gets every week, update its record on Beneficiaries ' +
+      'instead, so next week’s slip is right too.',
+    followUp: {
+      question: 'Would you like to know how to create a one-off slip?',
+      topic: 'picking-slip-create',
+    },
+    related: ['picking-slip-create', 'beneficiary-manage'],
+  },
+
+  // ═══ Beneficiaries (manager) ══════════════════════════════
+  {
+    id: 'beneficiary-approve',
+    title: 'Approving a new centre',
+    roles: MANAGERS_UP,
+    screens: ['beneficiaries'],
+    asks: [
+      'approve a centre', 'awaiting approval', 'new centre cannot get a slip',
+      'why is there no slip for this centre', 'approve a beneficiary',
+    ],
+    body:
+      'A new centre can’t receive a picking slip until it is approved. The Awaiting ' +
+      'approval tab on Beneficiaries lists them, counting red. Open the centre, check ' +
+      'its details and choose Approve.',
+    followUp: {
+      question: 'Would you like to know what a centre’s record holds?',
+      topic: 'beneficiary-manage',
+    },
+    rules: ['BR-11'],
+    related: ['beneficiary-manage', 'picking-slip-generate'],
+  },
+  {
+    id: 'beneficiary-cohort',
+    title: 'Moving a centre to the other day',
+    roles: MANAGERS_UP,
+    screens: ['beneficiaries'],
+    asks: [
+      'change pickup day', 'move to thursday', 'move to tuesday', 'change cohort',
+      'they want to collect on a different day', 'tuesday or thursday',
+    ],
+    body:
+      'Open the centre and choose Move to Thursday (or Move to Tuesday). It is ' +
+      'generated with the other cohort from the next run of slips. The Tuesday and ' +
+      'Thursday tabs show who is in each.',
+    followUp: {
+      question: 'Would you like to know how generating slips for a cohort works?',
+      topic: 'picking-slip-generate',
+    },
+    related: ['beneficiary-manage', 'picking-slip-generate'],
+  },
+
+  // ═══ Benevolent requests ══════════════════════════════════
+  {
+    id: 'benevolent-requests-manage',
+    title: 'Benevolent requests, for a manager',
+    roles: MANAGERS_UP,
+    screens: ['communityRequests'],
+    asks: [
+      'someone phoned asking for food', 'benevolent package', 'community request',
+      'open requests', 'what requests are waiting', 'log a request', 'food parcel request',
+    ],
+    body:
+      'Benevolent Requests lists every phoned-in or walk-in request for a food ' +
+      'parcel, with a tab for each outcome. Pending, first and counting red, is what ' +
+      'still needs dealing with.\n\n' +
+      'Choose + Log a request to add one yourself. Claim a request to show you are ' +
+      'handling it, then Resolve it.',
+    followUp: {
+      question: 'Would you like to know how to resolve a request?',
+      topic: 'benevolent-resolve',
+    },
+    rules: ['BR-28'],
+    related: ['benevolent-resolve'],
+  },
+  {
+    id: 'benevolent-resolve',
+    title: 'Closing off a request',
+    roles: EVERYONE,
+    screens: ['communityRequests'],
+    asks: [
+      'resolve a request', 'we gave them food', 'we cannot help', 'decline a request',
+      'what happened to the request', 'claim a request', 'save outcome',
+    ],
+    body:
+      'Claim the request first if nobody has, so two people don’t chase it. Then ' +
+      'resolve it: choose the outcome — Fulfilled, Partially fulfilled or Declined — ' +
+      'and write a short note of what was given or why not, then Save outcome.\n\n' +
+      'The note is required: it is the only record of what happened.',
+    followUp: {
+      question: 'Would you like to know what to do if something about a request looks wrong?',
+      topic: 'something-looks-wrong',
+    },
+    rules: ['BR-28'],
+    related: ['benevolent-requests', 'benevolent-requests-manage'],
+  },
+
+  // ═══ Volunteers (manager) ═════════════════════════════════
+  {
+    id: 'volunteer-event-day',
+    title: 'Running an event on the day',
+    roles: MANAGERS_UP,
+    screens: ['volunteers'],
+    asks: [
+      'check in a volunteer', 'walk in volunteer', 'someone turned up without booking',
+      'register a walk-in', 'who has arrived', 'mark attendance', 'undo check in',
+    ],
+    body:
+      'Open the event from Volunteer Events. Schedule and capacity shows each time ' +
+      'slot and how full it is. Under Bookings and attendance, choose Check in as ' +
+      'each person arrives (Undo check-in if it was the wrong one).\n\n' +
+      'Someone who turns up without a booking: choose Register walk-in, pick the time ' +
+      'slot and enter their name.',
+    followUp: {
+      question: 'Would you like to know how to close the event afterwards?',
+      topic: 'volunteer-event-close',
+    },
+    related: ['volunteer-events', 'volunteer-event-close', 'volunteer-log'],
+  },
+  {
+    id: 'volunteer-event-close',
+    title: 'Completing or cancelling an event',
+    roles: MANAGERS_UP,
+    screens: ['volunteers'],
+    asks: [
+      'finish an event', 'complete an event', 'cancel an event', 'the event is off',
+      'edit an event', 'change the event date',
+    ],
+    body:
+      'On Volunteer Events, each open event has three small buttons at the end of ' +
+      'its row: the pencil edits it, the tick marks it completed, and the cross ' +
+      'cancels it. Both ask you to confirm.\n\n' +
+      'A completed or cancelled event stays on its tab for the record, but can no ' +
+      'longer be changed.',
+    followUp: {
+      question: 'Would you like to know how to set up a new event?',
+      topic: 'volunteer-events',
+    },
+    related: ['volunteer-events', 'volunteer-event-day'],
+  },
+
+  // ═══ Admin ════════════════════════════════════════════════
+  {
+    id: 'user-invites',
+    title: 'Invites that haven’t been accepted',
+    roles: ADMIN_ONLY,
+    screens: ['users'],
+    asks: [
+      'invite did not arrive', 'resend an invite', 'copy the invite link', 'cancel an invite',
+      'pending invites', 'invite expired', 'revoke an invite',
+    ],
+    body:
+      'Invites not yet accepted are listed above the users on User Management. For ' +
+      'each one: Resend emails a fresh link, Copy link puts a fresh link on your ' +
+      'clipboard to send another way, and Revoke cancels it.\n\n' +
+      'A link only works for a limited time (set under Settings, Accounts); after ' +
+      'that, Resend.',
+    followUp: {
+      question: 'Would you like to know how to set up a user?',
+      topic: 'users-and-accounts',
+    },
+    related: ['users-and-accounts', 'settings-admin'],
+  },
+  {
+    id: 'archive-restore',
+    title: 'Bringing something back',
+    roles: ADMIN_ONLY,
+    screens: ['archive'],
+    asks: [
+      'restore', 'undelete', 'bring back a product', 'reactivate a supplier',
+      'I deactivated the wrong one', 'where do deleted things go', 'archive',
+    ],
+    body:
+      'The Archive lists everything switched off or deleted across the system, with ' +
+      'tabs for Deactivated and Deleted. Open an item and choose Restore to switch it ' +
+      'back on — it reappears on its own screen as before.\n\n' +
+      'A deleted item can’t be restored; create it again if it is needed.',
+    followUp: {
+      question: 'Would you like to know the difference between deactivating and deleting?',
+      topic: 'archive-not-delete',
+    },
+    rules: ['BR-27', 'NFR-16'],
+    related: ['archive-not-delete'],
+  },
+  {
+    id: 'user-activity',
+    title: 'Who did what',
+    roles: ADMIN_ONLY,
+    screens: ['activity'],
+    asks: [
+      'who changed this', 'who did that', 'activity log', 'audit trail', 'what did they do',
+      'who deleted it', 'what happened yesterday',
+    ],
+    body:
+      'User Activity lists everything people did, newest first, for the dates you ' +
+      'choose. Narrow it to one person with the picker (or tap a name under Most ' +
+      'active), or to one area under + Filter.\n\n' +
+      'Open an entry to see what changed, from what to what, and choose Open the ' +
+      'record to go to it.',
+    followUp: {
+      question: 'Would you like to know how to bring back something that was removed?',
+      topic: 'archive-restore',
+    },
+    rules: ['NFR-16'],
+    related: ['archive-restore', 'message-history'],
+  },
+  {
+    id: 'message-history',
+    title: 'Emails the system has sent',
+    roles: ADMIN_ONLY,
+    screens: ['messageHistory'],
+    asks: [
+      'did the email go', 'email history', 'sent emails', 'failed emails',
+      'why did they not get the email', 'message history',
+    ],
+    body:
+      'Message history lists every email the system has sent, with tabs for Failed, ' +
+      'Sent and Not sent (sending switched off). Narrow it by message type. A failed ' +
+      'one shows why underneath.\n\n' +
+      'If many have failed, check the connection under Settings, Email.',
+    followUp: {
+      question: 'Would you like to know how email settings work?',
+      topic: 'email-settings',
+    },
+    related: ['email-settings', 'user-activity'],
+  },
+  {
+    id: 'settings-admin',
+    title: 'Settings',
+    roles: ADMIN_ONLY,
+    screens: ['settings'],
+    asks: [
+      'settings', 'change the cut off time', 'reminder time', 'expiry warning',
+      'how long do invites last', 'certificate settings', 'impact rates',
+    ],
+    body:
+      'Settings holds how the system is set up, in sections. Changes apply to ' +
+      'everyone.',
+    steps: [
+      'Email — the sending account, the Finance recipient and the Finance report link.',
+      'Connections — whether the database, Gmail, email links, scheduled jobs, the AI, phone notifications and the volunteer system are working.',
+      'Notifications & reminders — the not-collected cut-off and when reminders go out.',
+      'Stock rules — when managers are warned about stock nearing its expiry date.',
+      'Reporting — the rates that turn kilograms into people fed.',
+      'Certificates and Accounts — certificate details, and how long invite links last.',
+    ],
+    followUp: {
+      question: 'Would you like to know how email settings work?',
+      topic: 'email-settings',
+    },
+    related: ['email-settings', 'impact-conversions', 'user-invites'],
+  },
+  {
+    id: 'supplier-prospects',
+    title: 'Possible new suppliers',
+    roles: ADMIN_ONLY,
+    screens: ['suppliers'],
+    asks: [
+      'prospects', 'a possible supplier', 'someone offered to supply', 'supplier lead',
+      'not a supplier yet', 'register as supplier',
+    ],
+    body:
+      'The Prospects tab on Supplier Management is a notepad for suppliers we might ' +
+      'use — a name is enough to start. Mark contacted once you’ve spoken to them, or ' +
+      'Not for us. When one comes on board, choose Register as supplier to turn it ' +
+      'into a supplier without retyping it.',
+    followUp: {
+      question: 'Would you like to know how to manage suppliers?',
+      topic: 'supplier-manage',
+    },
+    related: ['supplier-manage'],
+  },
+  // ═══ Operating calendar (manager) ═════════════════════════
+  {
+    id: 'operating-calendar',
+    title: 'The operating calendar',
+    roles: MANAGERS_UP,
+    screens: ['operatingCalendar'],
+    asks: [
+      'operating calendar', 'public holiday', 'the warehouse is closed', 'close the warehouse',
+      'shutdown', 'stocktake day', 'we are closed on', 'add a holiday', 'closed days',
+    ],
+    body:
+      'The operating calendar holds the days the warehouse is shut. On a closed day no ' +
+      'collection reminders go out, pallets due that day are not written off as not ' +
+      'collected, and the week’s slips can’t be generated for it.',
+    steps: [
+      'Open Operating Calendar and choose Add public holidays to add South Africa’s for the year — Good Friday, Family Day and Sunday-to-Monday days included.',
+      'For anything else — a stocktake, a shutdown week — choose Add closed day, pick the first (and last) day and give the reason.',
+      'Each closed day shows which cohort misses its collection, so you can plan a make-up day.',
+    ],
+    followUp: {
+      question: 'Would you like to know how to change a cohort’s collection day?',
+      topic: 'operating-calendar-cohorts',
+    },
+    related: ['operating-calendar-cohorts', 'collection-reminders', 'missed-collections-manager'],
+  },
+  {
+    id: 'operating-calendar-cohorts',
+    title: 'Changing a cohort’s collection day',
+    roles: MANAGERS_UP,
+    screens: ['operatingCalendar', 'pickingSlips'],
+    asks: [
+      'change collection day', 'collect on wednesday', 'move the cohort', 'collection days per cohort',
+      'tuesday cohort on a different day', 'swap the days',
+    ],
+    body:
+      'Under Collection days on the Operating Calendar, choose the weekday each cohort ' +
+      'collects on, then Save collection days. The cohorts keep their names — the ' +
+      'Tuesday cohort is still the Tuesday cohort — but slips are generated for, and ' +
+      'reminders sent before, the new day. The two cohorts need different days.',
+    followUp: {
+      question: 'Would you like to know how generating the week’s slips works?',
+      topic: 'picking-slip-generate',
+    },
+    related: ['operating-calendar', 'picking-slip-generate'],
+  },
+
+  // ═══ Connections (admin) ══════════════════════════════════
+  {
+    id: 'connections',
+    title: 'Checking the connections',
+    roles: ADMIN_ONLY,
+    screens: ['settings'],
+    asks: [
+      'is everything working', 'connections', 'health check', 'is email working', 'system status',
+      'is the database up', 'why are emails not sending', 'check the integrations',
+    ],
+    body:
+      'Settings → Connections checks everything outside this system that it depends on: ' +
+      'the database, Gmail, the links in emails, the scheduled jobs, the AI assistant, ' +
+      'phone notifications and the volunteer system. Problems come first.\n\n' +
+      'Not working means someone needs to act, and most cards offer the fix. Not set up ' +
+      'is a choice, not a fault. Choose Check again after fixing something.',
+    followUp: {
+      question: 'Would you like to know how email settings work?',
+      topic: 'email-settings',
+    },
+    related: ['email-settings', 'message-history', 'settings-admin'],
   },
 ];
 

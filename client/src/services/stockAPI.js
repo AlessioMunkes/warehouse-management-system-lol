@@ -53,6 +53,12 @@ const toProduct = (row) => ({
   isShortfall: Boolean(row.is_shortfall),
   isLowStock:  Boolean(row.is_low_stock),
   updatedAt:   row.updated_at ?? null,
+  // The newest ledger row, for "No movement 60+ days". Not updatedAt,
+  // which a reorder-threshold edit also bumps.
+  lastMovementAt: row.last_movement_at ?? null,
+  // Soonest expiry still today or later, as 'YYYY-MM-DD'. Per receipt
+  // line, not per unit on the shelf — see getManifest.
+  earliestExpiry: toDay(row.earliest_expiry),
 
   // Catalogue fields, for the summary panel. Not rendered as columns —
   // the table is already full — but they are why the panel can stand
@@ -79,6 +85,25 @@ const toProduct = (row) => ({
                   : Number(row.unit_cost),
 });
 
+// A Postgres DATE arrives as 'YYYY-MM-DD' or, through a JSON
+// serialiser that saw a Date, as a full ISO string. The day is all
+// that matters, and comparing it as a string keeps a timezone from
+// moving an expiry onto the day before.
+function toDay(value) {
+  if (!value) return null;
+  return String(value).slice(0, 10);
+}
+
+const toBatch = (row) => ({
+  id:               row.id,
+  expiryDate:       toDay(row.expiry_date),
+  receivedQuantity: Number(row.received_quantity ?? 0),
+  unit:             row.unit || "",
+  receivedOn:       toDay(row.received_on),
+  supplierName:     row.supplier_name || null,
+  daysLeft:         row.days_left === null || row.days_left === undefined ? null : Number(row.days_left),
+});
+
 const toMovement = (row) => ({
   id:              row.id,
   quantity:        Number(row.quantity ?? 0),
@@ -101,6 +126,14 @@ export const getManifest = async () => {
 export const getMovements = async (productId) => {
   const body = await apiGet(`/api/stock/${productId}/history`);
   return (body.data ?? []).map(toMovement);
+};
+
+// ── GET /api/stock/:id/batches ────────────────────────────────
+// Receipt lines that recorded an expiry, soonest first. Quantity is
+// what was RECEIVED on that line, not what is left of it.
+export const getBatches = async (productId) => {
+  const body = await apiGet(`/api/stock/${productId}/batches`);
+  return (body.data ?? []).map(toBatch);
 };
 
 // ── POST /api/stock/adjust ────────────────────────────────────
@@ -133,6 +166,13 @@ const toLedgerRow = (row) => ({
   reason:          row.reason,
   performedByName: row.performed_by_name || "Unknown",
   createdAt:       row.created_at,
+  // What the movement came from, resolved server-side to something a
+  // manager can open: the picking slip a dispatch belonged to, or the
+  // purchase order a receipt was against. Null otherwise.
+  pickingSlipId:   row.picking_slip_id ?? null,
+  pickingSlipName: row.picking_slip_name ?? null,
+  purchaseOrderId: row.purchase_order_id ?? null,
+  poNumber:        row.po_number ?? null,
 });
 
 const toReconciliationRow = (row) => ({
@@ -198,27 +238,7 @@ export const getLedgerActors = async () => {
   return (body.data ?? []).map((r) => ({ id: r.id, name: r.name || "Unknown" }));
 };
 
-// ── GET /api/stock/trends ─────────────────────────────────────
-// { [productId]: number[] } — the balance at the end of each day,
-// oldest first. Products that have never moved are absent, and the
-// table renders those as a dash rather than a flat line.
-export const getStockTrends = async (days) => {
-  const qs   = days ? `?days=${encodeURIComponent(days)}` : "";
-  const body = await apiGet(`/api/stock/trends${qs}`);
-  const series = body.data?.series ?? {};
-
-  // Keys arrive as strings (JSON object keys always are) but products
-  // are keyed by integer id everywhere else, so the lookup in the
-  // table would silently miss. Normalise once, here.
-  const out = {};
-  for (const [productId, points] of Object.entries(series)) {
-    out[Number(productId)] = (points ?? []).map(Number);
-  }
-  return out;
-};
-
 export default {
-  getManifest, getMovements, adjustStock,
+  getManifest, getMovements, getBatches, adjustStock,
   getLedger, getReconciliation, getLedgerActors,
-  getStockTrends,
 };

@@ -12,7 +12,7 @@
  * The workspace is backed by a single event snapshot, ensuring all panels
  * (timeslot, booking, attendance) stay in sync.
  *
- * Access is restricted to users with VOLUNTEER_MANAGEMENT_ROLES.
+ * Access is restricted to users with MANAGERS_UP.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -22,20 +22,23 @@ import BookingTable from '../features/volunteerManagement/components/BookingTabl
 import WalkInDialog from '../features/volunteerManagement/components/WalkInDialog';
 import SyncStatusCard from '../features/volunteerManagement/components/SyncStatusCard';
 import volunteerManagementAPI from '../services/volunteerManagementAPI';
-import { VOLUNTEERS, VOLUNTEER_MANAGEMENT_ROLES } from '../routes/paths';
+import { VOLUNTEERS } from '../routes/paths';
+import { ALL_STAFF, MANAGERS_UP } from '../routes/permissions';
 import { useAuth } from '../context/AuthContext';
-import { Badge } from '@/components/ui/badge';
-import { Button, buttonVariants } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { ChevronLeft } from 'lucide-react';
+import { buttonVariants } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import PageHeader, { PageShell } from '@/components/ui/page-header';
+import StatusBadge from '@/components/ui/status-badge';
+import ErrorBanner from '@/components/ui/error-banner';
 
 const formatDate = (value) => value ? new Intl.DateTimeFormat('en-ZA', { dateStyle: 'long' }).format(new Date(`${String(value).slice(0, 10)}T00:00:00`)) : '';
 
 export default function VolunteerEventWorkspacePage() {
   const { eventId } = useParams();
   const { user } = useAuth();
-  const canManage = VOLUNTEER_MANAGEMENT_ROLES.includes(user?.role);
-  const canRecordAttendance = ['warehouse_worker', ...VOLUNTEER_MANAGEMENT_ROLES].includes(user?.role);
+  const canManage = MANAGERS_UP.includes(user?.role);
+  const canRecordAttendance = ALL_STAFF.includes(user?.role);
   const [workspace, setWorkspace] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [attendanceByBooking, setAttendanceByBooking] = useState({});
@@ -121,19 +124,34 @@ export default function VolunteerEventWorkspacePage() {
   const event = workspace?.event;
   const eventIsActive = event && !['COMPLETED', 'CANCELLED'].includes(event.status);
 
-  return <div className="min-h-screen bg-surface text-ink font-['Montserrat',sans-serif]">
-    <main className="px-4 sm:px-6 py-6 max-w-6xl mx-auto grid gap-6">
-      <div><Link className={buttonVariants({ variant: 'outline' })} to={VOLUNTEERS.events}>Back to events</Link></div>
-      {error && <div role="alert" className="p-4 rounded-[4px] bg-danger-soft border-2 border-brand text-sm flex justify-between gap-3"><span>{error}</span><Button variant="outline" onClick={refresh}>Try again</Button></div>}
-      {success && <div role="status" className="rounded-md border bg-muted p-3 text-sm">{success}</div>}
+  return (
+    <PageShell>
+      <Link className={buttonVariants({ variant: 'ghost', size: 'sm', className: '-ml-2 mb-2 text-muted-foreground' })} to={VOLUNTEERS.events}>
+        <ChevronLeft /> Back to events
+      </Link>
+      <ErrorBanner className="mb-4" message={error} onRetry={refresh} />
+      {success && <div role="status" className="mb-4 rounded-lg border bg-muted px-4 py-3 text-sm">{success}</div>}
       {/* Keep all workspace panels backed by the same event snapshot. */}
-      {isLoading ? <div role="status" aria-label="Loading event workspace" className="grid gap-4"><Skeleton className="h-28 w-full" /><Skeleton className="h-64 w-full" /><Skeleton className="h-64 w-full" /></div> : event ? <>
-        <Card><CardContent className="p-5 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3"><div><h1 className="text-2xl font-black">{event.name}</h1><p className="text-sm text-muted-foreground mt-1">{formatDate(event.eventDate)}</p>{event.venueName && <p className="mt-2 text-sm font-semibold">{event.venueName}</p>}{event.address && <p className="text-sm text-muted-foreground">{event.address}</p>}{event.description && <p className="mt-3 text-sm">{event.description}</p>}</div><Badge variant="outline">{event.statusLabel}</Badge></CardContent></Card>
-        <TimeslotPanel timeslots={workspace.timeslots} capacityBySlot={capacityBySlot} spaces={spaces} />
-        <BookingTable bookings={bookings} timeslots={workspace.timeslots} spaces={spaces} attendanceByBooking={attendanceByBooking} summaries={summaries} busyBookingId={busyBookingId} canAddWalkIn={canManage && eventIsActive} canRecordAttendance={canRecordAttendance && event.status !== 'CANCELLED'} onCheckIn={(id) => setAttendance(id, true)} onCheckOut={(id) => setAttendance(id, false)} onAddWalkIn={() => { setWalkInError(''); setWalkInOpen(true); }} />
-        {canManage && <SyncStatusCard sync={sync} busy={busy} onRetry={retrySync} />}
-      </> : !error ? <p className="py-12 text-center text-sm text-muted-foreground">Event not found.</p> : null}
-    </main>
-    {walkInOpen && <WalkInDialog open={walkInOpen} timeslots={workspace?.timeslots ?? []} busy={busy} error={walkInError} onOpenChange={setWalkInOpen} onSubmit={createWalkIn} />}
-  </div>;
+      {isLoading ? (
+        <div role="status" aria-label="Loading event workspace" className="grid gap-4">
+          <Skeleton className="h-16 w-full" /><Skeleton className="h-64 w-full" /><Skeleton className="h-64 w-full" />
+        </div>
+      ) : event ? (
+        <div className="grid gap-6">
+          <div>
+            <PageHeader
+              title={event.name}
+              description={[formatDate(event.eventDate), event.venueName, event.address].filter(Boolean).join(' · ')}
+              actions={<StatusBadge kind="volunteerEvent" status={event.status}>{event.statusLabel}</StatusBadge>}
+            />
+            {event.description && <p className="mt-3 max-w-3xl text-sm">{event.description}</p>}
+          </div>
+          <TimeslotPanel timeslots={workspace.timeslots} capacityBySlot={capacityBySlot} spaces={spaces} />
+          <BookingTable bookings={bookings} timeslots={workspace.timeslots} spaces={spaces} attendanceByBooking={attendanceByBooking} summaries={summaries} busyBookingId={busyBookingId} canAddWalkIn={canManage && eventIsActive} canRecordAttendance={canRecordAttendance && event.status !== 'CANCELLED'} onCheckIn={(id) => setAttendance(id, true)} onCheckOut={(id) => setAttendance(id, false)} onAddWalkIn={() => { setWalkInError(''); setWalkInOpen(true); }} />
+          {canManage && <SyncStatusCard sync={sync} busy={busy} onRetry={retrySync} />}
+        </div>
+      ) : !error ? <p className="py-12 text-center text-sm text-muted-foreground">Event not found.</p> : null}
+      {walkInOpen && <WalkInDialog open={walkInOpen} timeslots={workspace?.timeslots ?? []} busy={busy} error={walkInError} onOpenChange={setWalkInOpen} onSubmit={createWalkIn} />}
+    </PageShell>
+  );
 }

@@ -15,7 +15,9 @@
 // comparisons have their own chart and report.
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect, useCallback, useRef } from 'react';
-import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
+import PageHeader, { PageShell } from '@/components/ui/page-header';
+import ViewTabs from '@/components/ui/view-tabs';
+import ErrorBanner from '@/components/ui/error-banner';
 import { Skeleton } from '@/components/ui/skeleton';
 import AskBox        from '../features/reporting/components/AskBox';
 import ReportBuilder from '../features/reporting/components/ReportBuilder';
@@ -63,7 +65,7 @@ function Alternatives({ items, onPick, closest }) {
           key={`${a.kind}:${a.id}`}
           type="button"
           onClick={() => onPick(a)}
-          className="rounded-full border-2 px-3 py-1 font-medium text-ink hover:bg-muted/60"
+          className="rounded-full border px-3 py-1 font-medium text-ink hover:bg-muted/60"
           style={{ borderColor: BORDER }}
         >
           {a.label}
@@ -402,275 +404,258 @@ export default function ReportingPage() {
     : metric?.dimensions.find((d) => d.id === dimension)?.label ?? 'Category';
 
   return (
-    <ManagerLayout>
-      <main className="px-4 sm:px-6 py-6 max-w-5xl mx-auto text-ink font-['Montserrat',sans-serif]">
-        <header className="mb-5">
-          <h1 className="text-2xl font-bold tracking-tight">Operations analytics</h1>
-          <p className="mt-1 text-sm" style={{ color: MUTED }}>
-            Figures come from what was recorded at the gate, not what was planned. Looking
-            for beneficiary impact instead? See Impact Report in the sidebar.
-          </p>
-        </header>
+    <PageShell>
+      <PageHeader
+        className="mb-5"
+        title="Operations reports"
+        description="Figures come from what was recorded at the gate, not what was planned. Looking for beneficiary impact instead? See Impact Reports in the sidebar."
+      />
 
-        {!catalog && !error && (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-40 w-full rounded-[4px]" />)}
-          </div>
-        )}
+      {!catalog && !error && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-40 w-full rounded-lg" />)}
+        </div>
+      )}
 
-        {catalog && (
-          <section aria-labelledby="op-trends-heading">
-            <h2 id="op-trends-heading" className="mb-2">
-              <button
-                type="button"
-                onClick={toggleTrends}
-                aria-expanded={trendsOpen}
-                aria-controls="op-trends"
-                className="flex items-center gap-2 text-sm font-bold"
-              >
-                <ChevronDown aria-hidden="true" className={`h-4 w-4 transition-transform ${trendsOpen ? '' : '-rotate-90'}`} />
-                At a glance
-              </button>
-            </h2>
-            {trendsOpen && (
-              <div id="op-trends" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {TRENDS.map((t) => (
-                  <TrendCard key={t.metricId} {...t} onExplore={handleExplore} />
-                ))}
-              </div>
-            )}
-          </section>
-        )}
-
-        <SavedReportsBar items={saved} onOpen={openSaved} onChanged={loadSaved} />
-
-        {catalog?.aiEnabled && (
-          <div className="mt-6">
-            <AskBox onReport={handleAIReport} onPickMetric={runMetric} />
-          </div>
-        )}
-
-        {catalog && (
-          <div className="mt-4">
-            <ReportBrowser
-              metrics={catalog.metrics} onPick={runMetric}
-              comparisons={comparisons} onPickComparison={runComparisonById}
-              disabled={busy}
-            />
-          </div>
-        )}
-
-        <div ref={builderRef} className="mt-6 scroll-mt-4">
-          {catalog?.datasets?.length > 0 && (
-            <div className="mb-3 inline-flex rounded-[4px] border-2 border-line bg-surface p-0.5 text-xs font-semibold" role="tablist" aria-label="Kind of report">
-              {[['prepared', 'Prepared report'], ['custom', 'Custom report']].map(([id, label]) => (
-                <button
-                  key={id} type="button" role="tab" aria-selected={mode === id}
-                  onClick={() => { setMode(id); if (id === 'custom' && !custom) setCustom(defaultCustom(catalog.datasets[0])); }}
-                  className={`rounded-[3px] px-3 py-1.5 ${mode === id ? 'bg-ink text-on-ink' : 'text-ink-soft hover:text-ink'}`}
-                >
-                  {label}
-                </button>
+      {catalog && (
+        <section aria-labelledby="op-trends-heading">
+          <h2 id="op-trends-heading" className="mb-2">
+            <button
+              type="button"
+              onClick={toggleTrends}
+              aria-expanded={trendsOpen}
+              aria-controls="op-trends"
+              className="flex items-center gap-2 text-sm font-bold"
+            >
+              <ChevronDown aria-hidden="true" className={`h-4 w-4 transition-transform ${trendsOpen ? '' : '-rotate-90'}`} />
+              At a glance
+            </button>
+          </h2>
+          {trendsOpen && (
+            <div id="op-trends" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {TRENDS.map((t) => (
+                <TrendCard key={t.metricId} {...t} onExplore={handleExplore} />
               ))}
             </div>
           )}
-          {catalog && mode === 'custom' && catalog.datasets?.length > 0 && (
-            <div className="rounded-[4px] border-2 border-line bg-surface p-4 sm:p-5">
-              <CustomReportBuilder
-                datasets={catalog.datasets}
-                value={custom ?? defaultCustom(catalog.datasets[0])}
-                preset={preset}
-                onChange={setCustom}
-                onPresetChange={setPreset}
-                onRun={run}
-                busy={busy}
-              />
-            </div>
-          )}
-          {catalog && mode === 'prepared' && (
-            <ReportBuilder
-              catalog={catalog}
-              metricId={metricId}
-              dimension={dimension}
+        </section>
+      )}
+
+      <SavedReportsBar items={saved} onOpen={openSaved} onChanged={loadSaved} />
+
+      {catalog?.aiEnabled && (
+        <div className="mt-6">
+          <AskBox onReport={handleAIReport} onPickMetric={runMetric} />
+        </div>
+      )}
+
+      {catalog && (
+        <div className="mt-4">
+          <ReportBrowser
+            metrics={catalog.metrics} onPick={runMetric}
+            comparisons={comparisons} onPickComparison={runComparisonById}
+            disabled={busy}
+          />
+        </div>
+      )}
+
+      <div ref={builderRef} className="mt-6 scroll-mt-4">
+        {catalog?.datasets?.length > 0 && (
+          <ViewTabs
+            className="mb-4"
+            label="Kind of report"
+            value={mode}
+            onChange={(id) => { setMode(id); if (id === 'custom' && !custom) setCustom(defaultCustom(catalog.datasets[0])); }}
+            tabs={[{ id: 'prepared', label: 'Prepared report' }, { id: 'custom', label: 'Custom report' }]}
+          />
+        )}
+        {catalog && mode === 'custom' && catalog.datasets?.length > 0 && (
+          <div className="rounded-4xl bg-card shadow-md ring-1 ring-foreground/5 p-4 sm:p-5">
+            <CustomReportBuilder
+              datasets={catalog.datasets}
+              value={custom ?? defaultCustom(catalog.datasets[0])}
               preset={preset}
-              filters={filters}
-              onMetricChange={handleMetricChange}
-              onDimensionChange={setDimension}
+              onChange={setCustom}
               onPresetChange={setPreset}
-              onFilterChange={handleFilterChange}
               onRun={run}
               busy={busy}
             />
-          )}
-        </div>
-
-        {error && (
-          <div
-            role="alert"
-            className="mt-5 rounded-[4px] border-2 p-4 text-sm"
-            style={{ borderColor: 'var(--brand)', color: CHARCOAL }}
-          >
-            <span aria-hidden="true" className="mr-2 font-bold text-brand">!</span>
-            {error}
           </div>
         )}
-
-        {/* Where Explore, the ask box and Browse all reports land.
-            tabIndex -1 lets focus move here without adding a tab stop. */}
-        <div ref={resultRef} tabIndex={-1} aria-label="Report result" className="scroll-mt-4 outline-none" />
-
-        {busy && !report && !comparison && <Skeleton className="mt-5 h-64 w-full rounded-[4px]" />}
-
-        {report && (
-          <section className="mt-5 rounded-[4px] border-2 bg-surface p-4 sm:p-5"
-                   style={{ borderColor: BORDER }}>
-
-            {drillStack.length > 0 && (
-              <button type="button" onClick={drillBack}
-                className="mb-2 text-xs font-medium underline underline-offset-2" style={{ color: CHARCOAL }}>
-                ← Back to {drillStack[drillStack.length - 1].description}
-              </button>
-            )}
-            <p className="text-sm font-medium" style={{ color: CHARCOAL }}>
-              {report.description}
-            </p>
-            {report.meta?.drillable && (
-              <p className="mt-1 text-xs" style={{ color: MUTED }}>
-                {highlight
-                  ? (
-                    <button type="button" disabled={drillBusy} onClick={() => drillInto(highlight)}
-                      className="rounded-[4px] bg-ink px-2 py-1 font-bold text-on-ink disabled:opacity-50">
-                      {drillBusy ? 'Opening…' : `Drill into ${formatLabel(highlight)} →`}
-                    </button>
-                  )
-                  : 'Click a bar or point to pick it, then drill into the report behind it.'}
-              </p>
-            )}
-
-            {shapeOf(report) === 'time' && report.spec?.dateRange && (
-              <label className="mt-3 inline-flex cursor-pointer items-center gap-2 text-xs" style={{ color: CHARCOAL }}>
-                <input type="checkbox" checked={Boolean(lastYear)} disabled={lastYearBusy} onChange={toggleLastYear} />
-                {lastYearBusy ? 'Loading last year…' : 'Compare with the same period last year'}
-              </label>
-            )}
-
-            <div className="mt-4">
-              {/* Keyed by spec so a new report starts from its own
-                  default view, or the one the AI was asked for. */}
-              <OperationalChart
-                key={JSON.stringify(report.spec)}
-                report={report}
-                compare={lastYear}
-                dimensionLabel={dimensionLabel}
-                target={target}
-                hint={report.meta?.chartHint}
-                highlight={highlight}
-                onHighlight={setHighlight}
-                // Targets belong to prepared reports; a custom one has none.
-                onTargetChange={report.meta?.custom ? undefined : async (value) => {
-                  const res = await saveTarget(report.spec.metric, value);
-                  setTarget(res.data ?? res);
-                }}
-              />
-            </div>
-
-            <div className="mt-4">
-              <SaveReport key={JSON.stringify(report.spec)}
-                kind={report.spec?.custom ? 'custom' : 'report'}
-                spec={report.spec?.custom ? { custom: report.spec.custom } : { metric: report.spec?.metric, dimension: report.spec?.dimension, filters: report.spec?.filters ?? {} }}
-                defaultTitle={report.description?.replace(/,? \d{4}-\d{2}-\d{2} to \d{4}-\d{2}-\d{2}$/, '')}
-                preset={preset === 'custom' ? 'last_3m' : preset} onSaved={loadSaved} />
-            </div>
-
-            <footer className="mt-5 space-y-1 border-t pt-3 text-xs"
-                    style={{ borderColor: BORDER, color: MUTED }}>
-              {report.meta?.caveat && <p>{report.meta.caveat}</p>}
-
-              {/* A filter the chosen report cannot apply means the
-                  answer is broader than the question. Say so. */}
-              {report.meta?.droppedFilters && (
-                <p>
-                  This report cannot be filtered by {report.meta.droppedFilters.join(', ')},
-                  so those were ignored.
-                </p>
-              )}
-
-              {report.meta?.excludedLines > 0 && (
-                <p>
-                  {report.meta.excludedLines} dispatch line
-                  {report.meta.excludedLines === 1 ? '' : 's'} excluded, not measured in kilograms.
-                </p>
-              )}
-
-              {report.meta?.factor && (
-                <p>
-                  Converted at {report.meta.factor.value} per kg.
-                  {report.meta.factor.note ? ` ${report.meta.factor.note}` : ''}
-                </p>
-              )}
-
-              {report.meta?.cached && <p>Showing a recently cached result.</p>}
-
-              {/* Every AI model was busy or out of quota, so the
-                  server matched the question by its keywords. */}
-              {report.meta?.matchedBy === 'keyword' && (
-                <p>
-                  Closest match: the AI assistant was busy, so this report was picked from the
-                  words in your question. Check it answers what you asked, or adjust it above.
-                </p>
-              )}
-            </footer>
-          </section>
-        )}
-
-        {report && (
-          <Alternatives items={report.alternatives} onPick={pickAlternative} closest={report.meta?.matchedBy === 'keyword'} />
-        )}
-
-        {/* Keyed by spec: a different question is a fresh breakdown,
-            with nothing carried over from the last one. */}
-        {report && (
-          <OperationalInsight
-            key={JSON.stringify(report.spec)}
-            report={report}
-            highlight={highlight}
-            onHighlight={setHighlight}
-            onLoaded={(d) => setTarget(d.target ?? null)}
+        {catalog && mode === 'prepared' && (
+          <ReportBuilder
+            catalog={catalog}
+            metricId={metricId}
+            dimension={dimension}
+            preset={preset}
+            filters={filters}
+            onMetricChange={handleMetricChange}
+            onDimensionChange={setDimension}
+            onPresetChange={setPreset}
+            onFilterChange={handleFilterChange}
+            onRun={run}
+            busy={busy}
           />
         )}
+      </div>
 
-        {comparison && (
-          <section className="mt-5 rounded-[4px] border-2 bg-surface p-4 sm:p-5" style={{ borderColor: BORDER }}>
-            <p className="text-sm font-medium">{comparison.description}</p>
-            <p className="mt-1 text-xs" style={{ color: MUTED }}>{comparison.about}</p>
-            {comparison.matchedBy === 'keyword' && (
-              <p className="mt-1 text-xs" style={{ color: MUTED }}>
-                Closest match: the AI assistant was busy, so this was picked from the words in your question.
+      <ErrorBanner className="mt-5" message={error} />
+
+      {/* Where Explore, the ask box and Browse all reports land.
+          tabIndex -1 lets focus move here without adding a tab stop. */}
+      <div ref={resultRef} tabIndex={-1} aria-label="Report result" className="scroll-mt-4 outline-none" />
+
+      {busy && !report && !comparison && <Skeleton className="mt-5 h-64 w-full rounded-lg" />}
+
+      {report && (
+        <section className="mt-5 rounded-4xl bg-card shadow-md ring-1 ring-foreground/5 p-4 sm:p-5"
+                 style={{ borderColor: BORDER }}>
+
+          {drillStack.length > 0 && (
+            <button type="button" onClick={drillBack}
+              className="mb-2 text-xs font-medium underline underline-offset-2" style={{ color: CHARCOAL }}>
+              ← Back to {drillStack[drillStack.length - 1].description}
+            </button>
+          )}
+          <p className="text-sm font-medium" style={{ color: CHARCOAL }}>
+            {report.description}
+          </p>
+          {report.meta?.drillable && (
+            <p className="mt-1 text-xs" style={{ color: MUTED }}>
+              {highlight
+                ? (
+                  <button type="button" disabled={drillBusy} onClick={() => drillInto(highlight)}
+                    className="rounded-lg bg-ink px-2 py-1 font-bold text-on-ink disabled:opacity-50">
+                    {drillBusy ? 'Opening…' : `Drill into ${formatLabel(highlight)} →`}
+                  </button>
+                )
+                : 'Click a bar or point to pick it, then drill into the report behind it.'}
+            </p>
+          )}
+
+          {shapeOf(report) === 'time' && report.spec?.dateRange && (
+            <label className="mt-3 inline-flex cursor-pointer items-center gap-2 text-xs" style={{ color: CHARCOAL }}>
+              <input type="checkbox" checked={Boolean(lastYear)} disabled={lastYearBusy} onChange={toggleLastYear} />
+              {lastYearBusy ? 'Loading last year…' : 'Compare with the same period last year'}
+            </label>
+          )}
+
+          <div className="mt-4">
+            {/* Keyed by spec so a new report starts from its own
+                default view, or the one the AI was asked for. */}
+            <OperationalChart
+              key={JSON.stringify(report.spec)}
+              report={report}
+              compare={lastYear}
+              dimensionLabel={dimensionLabel}
+              target={target}
+              hint={report.meta?.chartHint}
+              highlight={highlight}
+              onHighlight={setHighlight}
+              // Targets belong to prepared reports; a custom one has none.
+              onTargetChange={report.meta?.custom ? undefined : async (value) => {
+                const res = await saveTarget(report.spec.metric, value);
+                setTarget(res.data ?? res);
+              }}
+            />
+          </div>
+
+          <div className="mt-4">
+            <SaveReport key={JSON.stringify(report.spec)}
+              kind={report.spec?.custom ? 'custom' : 'report'}
+              spec={report.spec?.custom ? { custom: report.spec.custom } : { metric: report.spec?.metric, dimension: report.spec?.dimension, filters: report.spec?.filters ?? {} }}
+              defaultTitle={report.description?.replace(/,? \d{4}-\d{2}-\d{2} to \d{4}-\d{2}-\d{2}$/, '')}
+              preset={preset === 'custom' ? 'last_3m' : preset} onSaved={loadSaved} />
+          </div>
+
+          <footer className="mt-5 space-y-1 border-t pt-3 text-xs"
+                  style={{ borderColor: BORDER, color: MUTED }}>
+            {report.meta?.caveat && <p>{report.meta.caveat}</p>}
+
+            {/* A filter the chosen report cannot apply means the
+                answer is broader than the question. Say so. */}
+            {report.meta?.droppedFilters && (
+              <p>
+                This report cannot be filtered by {report.meta.droppedFilters.join(', ')},
+                so those were ignored.
               </p>
             )}
-            <div className="mt-4">
-              <ComparisonChart key={comparison.description} data={comparison} />
-            </div>
-            {comparison.caveat && (
-              <p className="mt-3 border-t pt-3 text-xs" style={{ borderColor: BORDER, color: MUTED }}>{comparison.caveat}</p>
-            )}
-            <div className="mt-3">
-              <SaveReport key={comparison.id} kind="comparison" spec={{ comparison: comparison.id }}
-                defaultTitle={comparison.label ?? comparison.description} preset={preset} onSaved={loadSaved} />
-            </div>
-          </section>
-        )}
-        {/* Keyed like the chart, so a new comparison starts without the
-            last one's report. */}
-        {comparison && (
-          <Alternatives items={comparison.alternatives} onPick={pickAlternative} closest={comparison.matchedBy === 'keyword'} />
-        )}
-        {comparison && <ComparisonInsight key={comparison.description} comparison={comparison} />}
-        <div className="mt-6">
-          <DataUpload />
-        </div>
 
-      </main>
-    </ManagerLayout>
+            {report.meta?.excludedLines > 0 && (
+              <p>
+                {report.meta.excludedLines} dispatch line
+                {report.meta.excludedLines === 1 ? '' : 's'} excluded, not measured in kilograms.
+              </p>
+            )}
+
+            {report.meta?.factor && (
+              <p>
+                Converted at {report.meta.factor.value} per kg.
+                {report.meta.factor.note ? ` ${report.meta.factor.note}` : ''}
+              </p>
+            )}
+
+            {report.meta?.cached && <p>Showing a recently cached result.</p>}
+
+            {/* Every AI model was busy or out of quota, so the
+                server matched the question by its keywords. */}
+            {report.meta?.matchedBy === 'keyword' && (
+              <p>
+                Closest match: the AI assistant was busy, so this report was picked from the
+                words in your question. Check it answers what you asked, or adjust it above.
+              </p>
+            )}
+          </footer>
+        </section>
+      )}
+
+      {report && (
+        <Alternatives items={report.alternatives} onPick={pickAlternative} closest={report.meta?.matchedBy === 'keyword'} />
+      )}
+
+      {/* Keyed by spec: a different question is a fresh breakdown,
+          with nothing carried over from the last one. */}
+      {report && (
+        <OperationalInsight
+          key={JSON.stringify(report.spec)}
+          report={report}
+          highlight={highlight}
+          onHighlight={setHighlight}
+          onLoaded={(d) => setTarget(d.target ?? null)}
+        />
+      )}
+
+      {comparison && (
+        <section className="mt-5 rounded-4xl bg-card shadow-md ring-1 ring-foreground/5 p-4 sm:p-5" style={{ borderColor: BORDER }}>
+          <p className="text-sm font-medium">{comparison.description}</p>
+          <p className="mt-1 text-xs" style={{ color: MUTED }}>{comparison.about}</p>
+          {comparison.matchedBy === 'keyword' && (
+            <p className="mt-1 text-xs" style={{ color: MUTED }}>
+              Closest match: the AI assistant was busy, so this was picked from the words in your question.
+            </p>
+          )}
+          <div className="mt-4">
+            <ComparisonChart key={comparison.description} data={comparison} />
+          </div>
+          {comparison.caveat && (
+            <p className="mt-3 border-t pt-3 text-xs" style={{ borderColor: BORDER, color: MUTED }}>{comparison.caveat}</p>
+          )}
+          <div className="mt-3">
+            <SaveReport key={comparison.id} kind="comparison" spec={{ comparison: comparison.id }}
+              defaultTitle={comparison.label ?? comparison.description} preset={preset} onSaved={loadSaved} />
+          </div>
+        </section>
+      )}
+      {/* Keyed like the chart, so a new comparison starts without the
+          last one's report. */}
+      {comparison && (
+        <Alternatives items={comparison.alternatives} onPick={pickAlternative} closest={comparison.matchedBy === 'keyword'} />
+      )}
+      {comparison && <ComparisonInsight key={comparison.description} comparison={comparison} />}
+      <div className="mt-6">
+        <DataUpload />
+      </div>
+
+    </PageShell>
   );
 }

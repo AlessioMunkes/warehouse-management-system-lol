@@ -107,6 +107,8 @@ export const toPurchaseOrder = (row) => ({
   createdByName:        row.created_by_name ?? "",
   createdAt:            row.created_at ?? null,
   lineCount:            Number(row.line_count ?? 0),
+  // Lines whose full expected quantity has arrived (list only).
+  receivedLineCount:    Number(row.received_line_count ?? 0),
   estimatedValue:       Number(row.estimated_value ?? 0),
   receiptCount:         Number(row.receipt_count ?? 0),
   items:                (row.items ?? []).map(toLine),
@@ -114,10 +116,13 @@ export const toPurchaseOrder = (row) => ({
 });
 
 // ── GET /api/purchase-orders ──────────────────────────────────
-export const getPurchaseOrders = async ({ status = "", supplierId = null } = {}) => {
+// `limit` (1-500): the list page asks for 500 and counts its tabs from
+// what comes back; the server's default is 50.
+export const getPurchaseOrders = async ({ status = "", supplierId = null, limit = null } = {}) => {
   const params = new URLSearchParams();
   if (status) params.set("status", status);
   if (supplierId) params.set("supplierId", String(supplierId));
+  if (limit) params.set("limit", String(limit));
   const qs = params.toString();
   const body = await apiGet(`/api/purchase-orders${qs ? `?${qs}` : ""}`);
   return (body.data ?? []).map(toPurchaseOrder);

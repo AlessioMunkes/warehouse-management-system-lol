@@ -35,6 +35,7 @@ const list = async (req, res) => {
     const data = await purchaseOrderService.listPurchaseOrders({
       status:     req.query.status,
       supplierId: req.query.supplierId,
+      limit:      req.query.limit,
     });
     res.status(200).json({ success: true, data });
   } catch (err) {
@@ -75,7 +76,7 @@ const setQuickbooksReference = async (req, res) => {
 // ── POST /api/purchase-orders/:id/finance-email/resend ─────────
 const resendFinanceEmail = async (req, res) => {
   try {
-    const data = await purchaseOrderService.resendFinanceEmail(req.params.id);
+    const data = await purchaseOrderService.resendFinanceEmail(req.params.id, req.user.id);
     res.status(200).json({ success: true, data });
   } catch (err) {
     respondError(res, err, 'resendFinanceEmail', 'Failed to resend the Finance email.');

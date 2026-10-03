@@ -42,7 +42,7 @@ import donationModel from '../repositories/donation.repository.js';
 import { createNotification } from '../repositories/notification.repository.js';
 import gmailRepository from '../repositories/gmail.repository.js';
 import certificateSettingsService from './certificateSettings.service.js';
-import emailProvider from '../providers/email.provider.js';
+import communications from '../features/communications/communications.service.js';
 import pdfProvider from '../providers/pdf.provider.js';
 import crypto from 'crypto';
 
@@ -677,13 +677,19 @@ const logEmailAttempt = async ({ donation, donationId, donorId = null, certifica
   const resolvedRecipientName = recipientName || donation?.donor_name || null;
   const resolvedDonorId = donorId ?? donation?.donor_id ?? null;
   try {
-    const result = await emailProvider.sendEmail({
+    const result = await communications.send({
+      type: emailType === 'THANK_YOU' ? 'donation_thank_you'
+        : certificateId ? 'section_18a'
+        : 'section_18a_handoff',
       to: recipient,
       subject,
       text: email.text,
       html: email.html,
       attachments: email.attachments,
-    }, null);
+      related: { type: 'donation', id: resolvedDonationId },
+      sentBy: sentByUserId,
+      sendAs: null,
+    });
     const success = Boolean(result && result.sent === true);
     return await donationModel.logDonationEmail({
       donationId: resolvedDonationId,
