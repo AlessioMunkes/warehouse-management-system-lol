@@ -629,4 +629,30 @@ describe('the packing screen (guided look)', () => {
     expect(api.confirmItem).toHaveBeenCalledWith(135, 210, 20);
     expect(screen.getByText('1 / 3')).toBeInTheDocument();
   });
+
+  it('confirming the last item after skipping ahead wraps to the ones still pending, not the all-done screen', async () => {
+    api.fetchMySlip.mockResolvedValue(three);
+    api.confirmItem.mockImplementation(async () => {
+      api.fetchMySlip.mockResolvedValue({
+        ...three,
+        items: three.items.map((i) => (i.id === 211 ? { ...i, status: 'confirmed', packed_quantity: '5.000' } : i)),
+      });
+      return {};
+    });
+    renderAt('/guest/pack', <GuestPackPage />, '/guest/pack');
+
+    await screen.findByRole('heading', { level: 2, name: 'Butternut' });
+    screen.getByRole('button', { name: 'Next item' }).click();
+    await screen.findByRole('heading', { level: 2, name: 'Rice' });
+    screen.getByRole('button', { name: 'Next item' }).click();
+    await screen.findByRole('heading', { level: 2, name: 'Beans' });
+    screen.getByRole('button', { name: 'Packed it' }).click();
+
+    // Beans was last in the list; Butternut and Rice are still to do.
+    expect(await screen.findByRole('heading', { level: 2, name: 'Butternut' })).toBeInTheDocument();
+    expect(screen.getByText('1 / 2')).toBeInTheDocument();
+    expect(screen.getByText('1 / 3')).toBeInTheDocument();   // progress: one of three done
+    expect(screen.queryByText(/that.s everything/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Finish this pallet' })).not.toBeInTheDocument();
+  });
 });
