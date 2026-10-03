@@ -168,6 +168,19 @@ export const setQuickbooksReference = async (id, quickbooksPoId) => {
   return toPurchaseOrder(body.data ?? {});
 };
 
+// ── POST /api/purchase-orders/quickbooks-import/{preview,apply} ─
+// pairs: [{ poNumber, quickbooksNumber, overwrite? }], up to 500.
+// Both answer { rows, counts } with one row per pair, in order.
+export const previewQuickbooksImport = async (pairs) => {
+  const body = await apiPost("/api/purchase-orders/quickbooks-import/preview", { pairs });
+  return body.data ?? { rows: [], counts: {} };
+};
+
+export const applyQuickbooksImport = async (pairs) => {
+  const body = await apiPost("/api/purchase-orders/quickbooks-import/apply", { pairs });
+  return body.data ?? { rows: [], counts: {} };
+};
+
 // ── POST /api/purchase-orders/:id/finance-email/resend ──────────
 // Re-sends the new-PO email to Finance; resolves to the PO with the
 // status the attempt left behind.
@@ -200,4 +213,5 @@ export default {
   getPurchaseOrders, getPurchaseOrder, createPurchaseOrder,
   setPurchaseOrderStatus, approvePurchaseOrder, setQuickbooksReference,
   updatePurchaseOrder, deletePurchaseOrder, resendFinanceEmail,
+  previewQuickbooksImport, applyQuickbooksImport,
 };

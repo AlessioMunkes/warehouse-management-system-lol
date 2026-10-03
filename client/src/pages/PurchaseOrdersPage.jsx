@@ -46,7 +46,8 @@ import ListCard from '@/components/ui/list-card';
 import ErrorBanner from '@/components/ui/error-banner';
 import ListToolbar from '@/components/ui/list-toolbar';
 import { useToast } from '@/components/ui/toastContext';
-import { Plus }     from 'lucide-react';
+import { Plus, Link2 } from 'lucide-react';
+import QuickbooksImportDialog from '../features/purchaseOrders/components/QuickbooksImportDialog';
 import useTableView from '../features/masterdata/hooks/useTableView';
 import useOpenFromQuery from '../features/masterdata/hooks/useOpenFromQuery';
 import { PO_COLUMNS } from '../features/purchaseOrders/components/poColumns';
@@ -95,6 +96,7 @@ export default function PurchaseOrdersPage() {
   const [formError, setFormError] = useState(null);
   const [invalidProductIds, setInvalidProductIds] = useState([]);
   const [search, setSearch]       = useState('');
+  const [importOpen, setImportOpen] = useState(false);
 
   // Sorting and column visibility, from the hook every other table in
   // the app reads.
@@ -290,12 +292,17 @@ export default function PurchaseOrdersPage() {
         title="Purchase orders"
         description="Raise, approve and track orders to suppliers."
         actions={canManage && mode === 'list' ? (
-          <Button
-            type="button"
-            onClick={() => { setMode('create'); setSeedProducts([]); setSelected(null); setFormError(null); }}
-          >
-            <Plus /> New purchase order
-          </Button>
+          <>
+            <Button type="button" variant="outline" onClick={() => setImportOpen(true)}>
+              <Link2 /> Import QuickBooks links
+            </Button>
+            <Button
+              type="button"
+              onClick={() => { setMode('create'); setSeedProducts([]); setSelected(null); setFormError(null); }}
+            >
+              <Plus /> New purchase order
+            </Button>
+          </>
         ) : null}
       />
 
@@ -383,6 +390,16 @@ export default function PurchaseOrdersPage() {
           onEdit={() => { setMode('edit'); setFormError(null); setInvalidProductIds([]); }}
           onDelete={remove}
           onClose={() => setSelected(null)}
+        />
+      ) : null}
+      {canManage ? (
+        <QuickbooksImportDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          onDone={async () => {
+            await loadPurchaseOrders();
+            if (selected) await open(selected.id);
+          }}
         />
       ) : null}
     </PageShell>

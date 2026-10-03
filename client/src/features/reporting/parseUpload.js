@@ -82,14 +82,16 @@ const toTable = (grid, sourceName) => {
   };
 };
 
-// ── Entry point: a File from the drop zone ────────────────────
-export const parseFile = async (file) => {
+// ── The raw grid of a File ────────────────────────────────────
+// Rows of cells exactly as the file has them: no header assumed. Some
+// exports (QuickBooks) put a title and a blank row above the headers,
+// so callers that cannot trust row 1 shape the grid themselves.
+export const readGrid = async (file) => {
   const name = file.name;
   const ext  = name.split('.').pop().toLowerCase();
 
   if (ext === 'csv' || ext === 'txt' || ext === 'tsv') {
-    const text = await file.text();
-    return toTable(parseCSV(text), name);
+    return { grid: parseCSV(await file.text()), sourceName: name };
   }
 
   if (ext === 'xlsx' || ext === 'xls' || ext === 'xlsm') {
@@ -108,13 +110,18 @@ export const parseFile = async (file) => {
     const grid = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {
       header: 1, blankrows: false, raw: false, defval: '',
     });
-
-    const table = toTable(grid, `${name} — ${sheetName}`);
-    table.sheetNames = wb.SheetNames;
-    return table;
+    return { grid, sourceName: `${name} — ${sheetName}`, sheetNames: wb.SheetNames };
   }
 
   throw new Error(`Cannot read .${ext} files. Use CSV or Excel.`);
+};
+
+// ── Entry point: a File from the drop zone ────────────────────
+export const parseFile = async (file) => {
+  const { grid, sourceName, sheetNames } = await readGrid(file);
+  const table = toTable(grid, sourceName);
+  if (sheetNames) table.sheetNames = sheetNames;
+  return table;
 };
 
 // ── Google Sheets ─────────────────────────────────────────────
@@ -244,6 +251,6 @@ export const buildSeries = (table, { labelColumn, valueColumn, aggregation }) =>
 };
 
 export default {
-  parseFile, parseSheetUrl, parseCSV, toCsvUrl,
+  parseFile, readGrid, parseSheetUrl, parseCSV, toCsvUrl,
   detectColumns, buildSeries, numericFraction, MAX_ROWS, MAX_SERIES,
 };
