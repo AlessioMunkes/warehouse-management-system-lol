@@ -69,7 +69,7 @@ describe('what the model is sent', () => {
   it('the help assistant', async () => {
     const { default: assistant } = await import('../src/services/assistant.service.js');
     providerMock.callWithTools.mockResolvedValueOnce({ name: 'explain_topic', args: { topic_id: 'receiving-record' } });
-    await assistant.ask({ question: 'Nomsa Dlamini on 082 555 1234 asked how to receive', userId: 1, role: 'manager' });
+    await assistant.ask({ question: 'Nomsa Dlamini on 082 555 1234 asked how to receive', userId: 1, role: 'warehouse_worker' });
     const sent = providerMock.callWithTools.mock.calls[0][0].userMessage;
     expect(sent).not.toMatch(/Nomsa|Dlamini|082/);
     expect(sent).toMatch(/\[person\] on \[phone\] asked how to receive/);

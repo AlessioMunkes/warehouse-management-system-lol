@@ -61,6 +61,10 @@ export const SCREEN_PATHS = {
   emailIntegration:   ADMIN.emailIntegration,
   financeReport:      ADMIN.financeReport,
   volunteerLog:       ADMIN.volunteerLog,
+  activity:           ADMIN.activity,
+  archive:            ADMIN.archive,
+  messageHistory:     ADMIN.messageHistory,
+  settings:           ADMIN.settings,
 };
 
 // The two screens each side has its own page for. A worker is sent to

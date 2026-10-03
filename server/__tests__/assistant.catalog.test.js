@@ -96,11 +96,25 @@ describe('what each role may be told', () => {
     expect(ids).toContain('master-data-admin-only');
   });
 
-  // Everything except the other roles' own "what you can do" answers.
-  it('gives an admin everything but the other roles’ own job summaries', () => {
-    const others = ['my-role-worker', 'my-role-manager'];
+  // Everything except the other roles' own "what you can do" answers
+  // and the floor's how-tos: each role works only its own screens.
+  it('gives an admin everything but the other roles’ job summaries and the floor’s how-tos', () => {
+    // The manager's dashboard topic too: the admin dashboard is different.
+    const others = ['my-role-worker', 'my-role-manager', 'dashboard-manager'];
+    const floorOnly = (t) => t.roles.length === 1 && t.roles[0] === 'warehouse_worker';
     expect(topicsForRole('admin').map((t) => t.id))
-      .toEqual(TOPICS.map((t) => t.id).filter((id) => !others.includes(id)));
+      .toEqual(TOPICS.filter((t) => !floorOnly(t)).map((t) => t.id).filter((id) => !others.includes(id)));
+  });
+
+  it('keeps the floor’s how-tos from managers and admins', () => {
+    for (const role of ['manager', 'admin']) {
+      const ids = topicsForRole(role).map((t) => t.id);
+      for (const floor of ['receiving-record', 'packing-pallet', 'dispatch-collection', 'decanting-record', 'donation-intake']) {
+        expect(ids, `${role} / ${floor}`).not.toContain(floor);
+      }
+      // …and gives them their own side of the same work instead.
+      expect(ids).toEqual(expect.arrayContaining(['deliveries-manager', 'packing-progress-manager', 'office-and-floor']));
+    }
   });
 
   it('never offers a role a topic it is not allowed', () => {
