@@ -29,10 +29,14 @@ export const ALL_STAFF   = Object.freeze([ROLES.WORKER, ROLES.MANAGER, ROLES.ADM
 export const MANAGERS_UP = Object.freeze([ROLES.MANAGER, ROLES.ADMIN]);
 export const ADMIN_ONLY  = Object.freeze([ROLES.ADMIN]);
 export const GUEST_ONLY  = Object.freeze([ROLES.GUEST]);
+// The floor's own actions. Each role works only its own screens, so
+// recording a delivery, a decanting run, a packed pallet, a collection
+// or a donation is the warehouse worker's alone.
+export const WORKERS_ONLY = Object.freeze([ROLES.WORKER]);
 
 // For a service that needs the same answer outside a route guard —
 // "is this a manager's request?" — rather than a third spelling of it.
 export const hasRole = (user, group) => Boolean(user && group.includes(user.role));
 export const isManagerUp = (user) => hasRole(user, MANAGERS_UP);
 
-export default { ALL_STAFF, MANAGERS_UP, ADMIN_ONLY, GUEST_ONLY, hasRole, isManagerUp };
+export default { ALL_STAFF, MANAGERS_UP, ADMIN_ONLY, GUEST_ONLY, WORKERS_ONLY, hasRole, isManagerUp };

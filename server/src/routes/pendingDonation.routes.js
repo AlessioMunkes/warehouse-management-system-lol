@@ -1,6 +1,6 @@
 import express from 'express';
 import auth, { requireRole } from '../middleware/auth.middleware.js';
-import { ALL_STAFF, MANAGERS_UP, ADMIN_ONLY } from '../constants/permissions.js';
+import { ALL_STAFF, MANAGERS_UP, ADMIN_ONLY, WORKERS_ONLY } from '../constants/permissions.js';
 import { validateIntParam } from '../middleware/validate.middleware.js';
 import pendingDonationController from '../controllers/pendingDonation.controller.js';
 
@@ -10,7 +10,7 @@ const router = express.Router();
 router.post(
   '/pending',
   auth,
-  requireRole(...ALL_STAFF),
+  requireRole(...WORKERS_ONLY),
   pendingDonationController.createPendingDonation
 );
 

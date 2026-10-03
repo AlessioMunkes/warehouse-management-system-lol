@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────
 import express                            from 'express';
 import auth, { requireRole } from '../middleware/auth.middleware.js';
-import { ALL_STAFF, MANAGERS_UP } from '../constants/permissions.js';
+import { ALL_STAFF, MANAGERS_UP, WORKERS_ONLY } from '../constants/permissions.js';
 import { validateIntId, validateIntParam } from '../middleware/validate.middleware.js';
 import donationController                 from '../controllers/donation.controller.js';
 
@@ -33,7 +33,7 @@ router.patch('/items/:itemId/resolve',
 
 // ── Collection ────────────────────────────────────────────────
 router.get('/',  auth, requireRole(...ALL_STAFF),    donationController.listDonations);
-router.post('/', auth, requireRole(...ALL_STAFF), donationController.createDonation);
+router.post('/', auth, requireRole(...WORKERS_ONLY), donationController.createDonation);
 
 // ── Single donation ───────────────────────────────────────────
 router.get('/:id',        auth, requireRole(...ALL_STAFF), validateIntId, donationController.getDonationById);

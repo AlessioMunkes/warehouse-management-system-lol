@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────
 import express                            from 'express';
 import auth, { requireRole } from '../middleware/auth.middleware.js';
-import { ALL_STAFF, MANAGERS_UP } from '../constants/permissions.js';
+import { ALL_STAFF, MANAGERS_UP, WORKERS_ONLY } from '../constants/permissions.js';
 import { validateIntId, validateIntParam } from '../middleware/validate.middleware.js';
 import pickingController                  from '../controllers/picking.controller.js';
 
@@ -38,19 +38,19 @@ router.post('/:id/assign-second', auth, requireRole(...ALL_STAFF), validateIntId
 // fallback here the way /assign has — releasing is a floor-management
 // call, not something a packer ever does to their own claim.
 router.post('/:id/release',  auth, requireRole(...MANAGERS_UP), validateIntId, pickingController.releaseSlip);
-router.post('/:id/complete', auth, requireRole(...ALL_STAFF), validateIntId, pickingController.completeSlip);
+router.post('/:id/complete', auth, requireRole(...WORKERS_ONLY), validateIntId, pickingController.completeSlip);
 
 // ── Slip items ────────────────────────────────────────────────
 // Both params are validated. :itemId used to be left unchecked, so a
 // non-numeric item id travelled all the way to Postgres and came back
 // as a 500; validateIntParam('itemId') stops it at the door with a 400.
 router.post('/:id/items/:itemId/confirm',
-  auth, requireRole(...ALL_STAFF),
+  auth, requireRole(...WORKERS_ONLY),
   validateIntId, validateIntParam('itemId'),
   pickingController.confirmItem
 );
 router.post('/:id/items/:itemId/flag',
-  auth, requireRole(...ALL_STAFF),
+  auth, requireRole(...WORKERS_ONLY),
   validateIntId, validateIntParam('itemId'),
   pickingController.flagItem
 );

@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────
 import express                            from 'express';
 import auth, { requireRole } from '../middleware/auth.middleware.js';
-import { ALL_STAFF, MANAGERS_UP } from '../constants/permissions.js';
+import { ALL_STAFF, MANAGERS_UP, WORKERS_ONLY } from '../constants/permissions.js';
 import { validateIntId, validateIntParam } from '../middleware/validate.middleware.js';
 import dispatchController                 from '../controllers/dispatch.controller.js';
 
@@ -53,7 +53,7 @@ router.get('/', auth, requireRole(...ALL_STAFF), dispatchController.getBoard);
 router.get('/:id', auth, requireRole(...ALL_STAFF), validateIntId, dispatchController.getGateView);
 
 router.post('/:id/collect',
-  auth, requireRole(...ALL_STAFF),
+  auth, requireRole(...WORKERS_ONLY),
   validateIntId,
   dispatchController.collect
 );

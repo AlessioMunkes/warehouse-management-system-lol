@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────────────────────
 import express                      from 'express';
 import auth, { requireRole } from '../middleware/auth.middleware.js';
-import { ALL_STAFF, MANAGERS_UP } from '../constants/permissions.js';
+import { ALL_STAFF, MANAGERS_UP, WORKERS_ONLY } from '../constants/permissions.js';
 import { validateIntId }            from '../middleware/validate.middleware.js';
 import deliveryController           from '../controllers/delivery.controller.js';
 
@@ -50,7 +50,7 @@ router.get('/:id',
   deliveryController.getDeliveryById
 );
 router.post('/',
-  auth, requireRole(...ALL_STAFF),
+  auth, requireRole(...WORKERS_ONLY),
   deliveryController.createDelivery
 );
 

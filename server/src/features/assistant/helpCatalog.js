@@ -45,6 +45,7 @@ const EVERYONE    = [WORKER, MANAGER, ADMIN];
 const MY_ROLE = 'my-role';
 const MY_ROLE_TOPIC = { [WORKER]: 'my-role-worker', [MANAGER]: 'my-role-manager', [ADMIN]: 'my-role-admin' };
 const MANAGERS_UP = [MANAGER, ADMIN];
+const WORKERS_ONLY = [WORKER];
 const ADMIN_ONLY  = [ADMIN];
 
 // ── Screens ──────────────────────────────────────────────────
@@ -78,29 +79,31 @@ export const SCREENS = [
     about: 'Your dashboard: the jobs you do, and what needs attention today.',
     aka: ['dashboard', 'home', 'start page', 'main menu', 'task dashboard'] },
 
-  // The warehouse floor. <ProtectedRoute /> with no role list.
-  { id: 'receiving', label: 'Receiving', roles: EVERYONE,
+  // The warehouse floor: warehouse staff only (WORKERS_ONLY in
+  // client/src/routes/routeTable.js). Managers and admins never open
+  // a floor screen.
+  { id: 'receiving', label: 'Receiving', roles: WORKERS_ONLY,
     about: 'Book in a delivery against its purchase order: count, weigh, place, date.',
     aka: ['procurement', 'goods in', 'book in stock', 'unloading'] },
-  { id: 'deliveries', label: 'Past deliveries', roles: EVERYONE,
+  { id: 'deliveries', label: 'Past deliveries', roles: WORKERS_ONLY,
     about: 'Every delivery already received, with its delivery note.',
     aka: ['delivery history', 'old deliveries', 'delivery notes'] },
-  { id: 'decanting', label: 'Decanting', roles: EVERYONE,
+  { id: 'decanting', label: 'Decanting', roles: WORKERS_ONLY,
     about: 'Split bulk sacks into bags and record what you actually got, plus wastage.',
     aka: ['bagging', 'repacking', 'splitting sacks', 'decanting sheet'] },
-  { id: 'decantingRecords', label: 'Past decanting runs', roles: EVERYONE,
+  { id: 'decantingRecords', label: 'Past decanting runs', roles: WORKERS_ONLY,
     about: 'Every past decanting run with expected and actual bags.',
     aka: ['decanting sheets', 'decanting history'] },
-  { id: 'packing', label: 'Packing', roles: EVERYONE,
+  { id: 'packing', label: 'Packing', roles: WORKERS_ONLY,
     about: 'The packing board: claim a picking slip and pack its pallet.',
     aka: ['packing board', 'pallets', 'pack an order'] },
-  { id: 'dispatch', label: 'The dispatch gate', roles: EVERYONE,
+  { id: 'dispatch', label: 'The dispatch gate', roles: WORKERS_ONLY,
     about: 'Hand pallets over to collecting centres, with the driver signing on screen.',
     aka: ['dispatch', 'gate', 'collections', 'hand over'] },
-  { id: 'dispatchHistory', label: 'Collection history', roles: EVERYONE,
+  { id: 'dispatchHistory', label: 'Collection history', roles: WORKERS_ONLY,
     about: 'Every past collection with its signature, and every missed one.',
     aka: ['dispatch history', 'past collections', 'dispatch notes'] },
-  { id: 'donation', label: 'Donation intake', roles: [WORKER, ADMIN],
+  { id: 'donation', label: 'Donation intake', roles: WORKERS_ONLY,
     about: 'Log food someone has donated: what, rough value, who brought it.',
     aka: ['donations', 'log a donation', 'new donation'] },
   { id: 'communityRequests', label: 'Benevolent requests', roles: EVERYONE,
@@ -110,7 +113,7 @@ export const SCREENS = [
     about: 'Compost collection kits: assign a kit to a household, log compost weighed in, mark it sent to a farm.',
     aka: ['compost', 'collection kits', 'food waste', 'compost kits', 'soil'] },
 
-  // Manager and admin. roles={['manager','admin']} in App.jsx.
+  // Manager and admin.
   { id: 'inventory', label: 'Inventory', roles: MANAGERS_UP,
     about: 'Stock levels per item: on hand, committed, available, and what is low.',
     aka: ['stock', 'stock levels', 'what we have'] },
@@ -215,7 +218,8 @@ export const TOPICS = [
       'what are my tasks', 'what can I do in the system', 'where do I start', 'I am new',
     ],
     body:
-      'You can do everything warehouse staff do, plus run the operation. The bell at ' +
+      'You run the operation; the floor screens — receiving, packing, decanting, the ' +
+      'gate — are the warehouse staff’s, and you follow that work from here. The bell at ' +
       'the top tells you what needs you — low stock, missed collections and flagged ' +
       'deliveries.',
     steps: [
