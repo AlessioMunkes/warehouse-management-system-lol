@@ -149,6 +149,38 @@
 }
 .gst-masthead-brand span { color: var(--gst-accent); }
 
+/* ── Session bar: Home and Sign out ───────────────────────────── */
+.gst-nav {
+  background: var(--gst-white);
+  border-bottom: 1px solid var(--gst-border);
+}
+.gst-nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 0 0.75rem;
+}
+.gst-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--gst-tap);
+  padding: 0 0.75rem;
+  border: 0;
+  background: transparent;
+  color: var(--gst-ink);
+  font: 700 1rem/1.2 var(--gst-font-display);
+  cursor: pointer;
+}
+.gst-nav-btn:hover:not(:disabled) { color: var(--gst-accent); }
+.gst-nav-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.gst-confirm { border-color: var(--gst-ink); }
+
 /* ── Sense of place: where am I, who is it for ────────────────── */
 .gst-place {
   display: flex;

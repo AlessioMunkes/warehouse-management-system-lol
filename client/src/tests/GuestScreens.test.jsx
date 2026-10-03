@@ -16,7 +16,7 @@
 // screen told the volunteer the pallet went out yesterday.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 vi.mock('../services/guestSlipAPI', () => ({
@@ -30,6 +30,7 @@ vi.mock('../services/guestSlipAPI', () => ({
   confirmItem: vi.fn(),
   flagItem: vi.fn(),
   completeSlip: vi.fn(),
+  releaseMySlip: vi.fn(),
 }));
 
 vi.mock('../context/AuthContext', () => ({ useAuth: vi.fn() }));
@@ -77,6 +78,10 @@ const renderAt = (path, element, routePattern) => render(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Default: the guest holds nothing. A test that needs a held pallet says so.
+  api.fetchMySlip.mockReset();
+  api.fetchMySlip.mockRejectedValue(Object.assign(new Error('none'), { status: 404 }));
+  api.releaseMySlip.mockReset();
   useAuth.mockReturnValue({ user: guest, logout: vi.fn(), refreshFromClaim: vi.fn() });
 });
 
@@ -210,7 +215,35 @@ describe('(c) guest home', () => {
     api.fetchAvailableSlips.mockResolvedValue([]);
     renderAt('/guest-home', <GuestHomePage />, '/guest-home');
 
-    expect(await screen.findByRole('button', { name: /carry on packing/i })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Continue packing' })).toBeInTheDocument();
+    // The in-progress card names the beneficiary and how far they got.
+    expect(screen.getByText('Your pallet in progress: Masibambane Day Care, 0 of 2 packed')).toBeInTheDocument();
+    // …and does not offer a second pallet on top of it.
+    expect(screen.queryByText(/today.s pallets/i)).not.toBeInTheDocument();
+  });
+
+  it('counts confirmed and flagged items as done on the in-progress card', async () => {
+    api.fetchMySlip.mockResolvedValue({
+      ...mySlip,
+      items: [
+        { ...mySlip.items[0], status: 'confirmed' },
+        { ...mySlip.items[1], status: 'flagged' },
+        { ...mySlip.items[1], id: 211, status: 'pending' },
+      ],
+    });
+    api.fetchAvailableSlips.mockResolvedValue([]);
+    renderAt('/guest-home', <GuestHomePage />, '/guest-home');
+
+    expect(await screen.findByText('Your pallet in progress: Masibambane Day Care, 2 of 3 packed')).toBeInTheDocument();
+  });
+
+  it('Continue packing goes to the packing screen', async () => {
+    api.fetchMySlip.mockResolvedValue(mySlip);
+    api.fetchAvailableSlips.mockResolvedValue([]);
+    renderAt('/guest-home', <GuestHomePage />, '/guest-home');
+
+    (await screen.findByRole('button', { name: 'Continue packing' })).click();
+    expect(await screen.findByText('Packing')).toBeInTheDocument();
   });
 
   it('says so plainly when every pallet is taken', async () => {
@@ -257,7 +290,7 @@ describe('(d) the packing screen', () => {
 
     expect(await screen.findByText(/this pallet is empty/i)).toBeInTheDocument();
     expect(screen.getByText(/not something you have done wrong/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /pick a different pallet/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /back to home/i })).toBeInTheDocument();
   });
 
   it('offers to finish once every item is dealt with', async () => {
@@ -339,5 +372,102 @@ describe('(e) the thank-you and contribution summary', () => {
     renderDone(undefined);
     expect(await screen.findByText(/thank you/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument();
+  });
+});
+
+// ── Session bar and sign-out with a pallet in hand ────────────
+describe('the guest session bar', () => {
+  const landing = () => screen.findByText('Landing');
+  const signedIn = (logout) => useAuth.mockReturnValue({ user: guest, logout, refreshFromClaim: vi.fn() });
+
+  it('shows Home and Sign out on the packing screen, and Home keeps the claim', async () => {
+    api.fetchMySlip.mockResolvedValue(mySlip);
+    renderAt('/guest/pack', <GuestPackPage />, '/guest/pack');
+
+    await screen.findByRole('navigation', { name: 'Your session' });
+    screen.getByRole('button', { name: 'Sign out' });
+    screen.getByRole('button', { name: 'Home' }).click();
+    expect(await screen.findByText('Guest home')).toBeInTheDocument();
+    expect(api.releaseMySlip).not.toHaveBeenCalled();
+  });
+
+  it('shows Sign out but no Home on the home screen itself', async () => {
+    api.fetchAvailableSlips.mockResolvedValue([]);
+    renderAt('/guest-home', <GuestHomePage />, '/guest-home');
+
+    expect(await screen.findByRole('button', { name: 'Sign out' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Home' })).not.toBeInTheDocument();
+  });
+
+  it('signs out straight away when no pallet is held', async () => {
+    const logout = vi.fn().mockResolvedValue();
+    signedIn(logout);
+    api.fetchAvailableSlips.mockResolvedValue([]);
+    renderAt('/guest-home', <GuestHomePage />, '/guest-home');
+
+    (await screen.findByRole('button', { name: 'Sign out' })).click();
+    expect(await landing()).toBeInTheDocument();
+    expect(logout).toHaveBeenCalledTimes(1);
+    expect(api.releaseMySlip).not.toHaveBeenCalled();
+  });
+
+  it('asks first when a pallet is held, and Keep packing changes nothing', async () => {
+    const logout = vi.fn().mockResolvedValue();
+    signedIn(logout);
+    api.fetchMySlip.mockResolvedValue(mySlip);
+    renderAt('/guest/pack', <GuestPackPage />, '/guest/pack');
+
+    (await screen.findByRole('button', { name: 'Sign out' })).click();
+    expect(await screen.findByText(/You haven’t finished this pallet\. If you sign out, it goes back to the floor for someone else to finish\. Your packing so far is saved\./)).toBeInTheDocument();
+    expect(logout).not.toHaveBeenCalled();
+
+    screen.getByRole('button', { name: 'Keep packing' }).click();
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    expect(logout).not.toHaveBeenCalled();
+    expect(api.releaseMySlip).not.toHaveBeenCalled();
+  });
+
+  it('Sign out and return pallet releases first, then signs out', async () => {
+    const order = [];
+    signedIn(vi.fn(async () => { order.push('logout'); }));
+    api.fetchMySlip.mockResolvedValue(mySlip);
+    api.releaseMySlip.mockImplementation(async () => { order.push('release'); return { released: true }; });
+    renderAt('/guest/pack', <GuestPackPage />, '/guest/pack');
+
+    (await screen.findByRole('button', { name: 'Sign out' })).click();
+    (await screen.findByRole('button', { name: 'Sign out and return pallet' })).click();
+
+    expect(await landing()).toBeInTheDocument();
+    expect(order).toEqual(['release', 'logout']);
+  });
+
+  it('does not sign out silently when the return fails', async () => {
+    const logout = vi.fn().mockResolvedValue();
+    signedIn(logout);
+    api.fetchMySlip.mockResolvedValue(mySlip);
+    api.releaseMySlip.mockRejectedValue(new Error('Could not return your pallet.'));
+    renderAt('/guest/pack', <GuestPackPage />, '/guest/pack');
+
+    (await screen.findByRole('button', { name: 'Sign out' })).click();
+    (await screen.findByRole('button', { name: 'Sign out and return pallet' })).click();
+
+    expect(await screen.findByText('Could not return your pallet.')).toBeInTheDocument();
+    expect(logout).not.toHaveBeenCalled();
+    expect(screen.queryByText('Landing')).not.toBeInTheDocument();
+    // still there to try again, or to keep packing
+    expect(screen.getByRole('button', { name: 'Sign out and return pallet' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Keep packing' })).toBeInTheDocument();
+  });
+
+  it('does not sign out blind when it cannot tell whether a pallet is held', async () => {
+    const logout = vi.fn().mockResolvedValue();
+    signedIn(logout);
+    api.fetchMySlip.mockRejectedValue(Object.assign(new Error('boom'), { status: 500 }));
+    api.fetchAvailableSlips.mockResolvedValue([]);
+    renderAt('/guest-home', <GuestHomePage />, '/guest-home');
+
+    (await screen.findByRole('button', { name: 'Sign out' })).click();
+    expect(await screen.findByText(/could not check your pallet/i)).toBeInTheDocument();
+    expect(logout).not.toHaveBeenCalled();
   });
 });

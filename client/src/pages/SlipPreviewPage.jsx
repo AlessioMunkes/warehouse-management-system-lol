@@ -23,7 +23,7 @@ import { useGuestSignOut } from '../features/guest/useGuestSignOut';
 import { fetchSlipPreview, claimSlipByToken } from '../services/guestSlipAPI';
 import {
   GuestShell, GuestScreen, PlaceBar, Button, Notice,
-  PalletCard, HelpNote, Loading,
+  PalletCard, HelpNote, Loading, SignOutConfirm,
 } from '../features/guest/components/GuestPrimitives';
 
 const SlipPreviewPage = () => {
@@ -40,7 +40,7 @@ const SlipPreviewPage = () => {
   const [busy, setBusy]   = useState(false);
 
   const alreadySignedIn = user?.role === 'guest';
-  const { signOut, signingOut } = useGuestSignOut();
+  const flow = useGuestSignOut();
 
   // Explicit routes, never navigate(-1): a scan can be the first page in
   // the tab, so "back" might leave the app. A signed-in guest's start is
@@ -48,11 +48,12 @@ const SlipPreviewPage = () => {
   const startPath = alreadySignedIn ? '/guest-home' : '/';
   const exitButtons = (
     <>
-      <Button variant="ghost" onClick={() => navigate(startPath)} disabled={busy || signingOut}>
+      <SignOutConfirm flow={flow} />
+      <Button variant="ghost" onClick={() => navigate(startPath)} disabled={busy || flow.busy || flow.confirming}>
         Back to start
       </Button>
       {alreadySignedIn ? (
-        <Button variant="ghost" onClick={signOut} disabled={busy} loading={signingOut}>
+        <Button variant="ghost" onClick={flow.request} disabled={busy || flow.confirming} loading={flow.busy}>
           Sign out
         </Button>
       ) : null}
@@ -74,7 +75,11 @@ const SlipPreviewPage = () => {
     try {
       const data = await claimSlipByToken(token, volunteerName);
       refreshFromClaim(data.user);
-      navigate('/guest/pack', { replace: true });
+      // The preview is replaced by the pallet list, then packing is
+      // pushed on top: back from packing (or the thank-you page, which
+      // replaces packing) lands on the list, not on a poster link.
+      navigate('/guest-home', { replace: true });
+      navigate('/guest/pack');
     } catch (err) {
       setError(err.message);
       setBusy(false);

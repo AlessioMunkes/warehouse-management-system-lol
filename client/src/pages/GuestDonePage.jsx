@@ -20,43 +20,28 @@
 // volunteers.signed_out_at, which is what the volunteer-hours report is
 // built on. Before Phase 0.3 nothing set it and the metric was empty.
 // ─────────────────────────────────────────────────────────────
-import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-  GuestShell, GuestScreen, Button, Notice, HelpNote,
+  GuestShell, GuestScreen, Button, Notice, HelpNote, SignOutConfirm,
 } from '../features/guest/components/GuestPrimitives';
+import { useGuestSignOut } from '../features/guest/useGuestSignOut';
 import { formatDay, displayName, beneficiaryKind as beneficiaryKindOf } from '../features/guest/guestFormat';
 
 const GuestDonePage = () => {
   const { state } = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
-  const [busy, setBusy] = useState(false);
+  const { user } = useAuth();
 
   const summary = state?.summary ?? null;
   const name = displayName(user?.firstName);
 
-  // Navigate BEFORE clearing the session, not after.
-  //
-  // This screen sits inside ProtectedRoute, which renders
-  // <Navigate to="/login"> the moment the user becomes null. Awaiting
-  // logout() first therefore handed the volunteer to the staff login —
-  // "EMPLOYEE LOG IN · AUTHORISED PERSONNEL ONLY" — as the last thing
-  // they saw after giving up their morning. Leaving the protected route
-  // first means that redirect never has a chance to fire.
-  //
-  // The landing page, not /guest: it carries "I'm volunteering today",
-  // so a volunteer coming back tomorrow has a way in, and it reads as
-  // the front door rather than a form.
-  //
-  // logout() is still awaited so the visit is properly signed out; it
-  // just is not what decides where they end up.
-  const signOut = async () => {
-    setBusy(true);
-    navigate('/', { replace: true });
-    await logout();               // closes the visit AND clears the cookie
-  };
+  // Sign-out lives in useGuestSignOut: it lands on the front door
+  // (navigating BEFORE the session is cleared, so ProtectedRoute never
+  // bounces the volunteer to the staff login) and asks first if they
+  // somehow still hold a pallet.
+  const flow = useGuestSignOut();
+  const busy = flow.busy || flow.confirming;
 
   // Reached without state — a refresh, or a direct link. Say thank you
   // properly rather than inventing numbers to fill the space.
@@ -67,11 +52,12 @@ const GuestDonePage = () => {
           title={`Thank you, ${name}`}
           lede="Your pallet is finished and on its way."
         >
+          <SignOutConfirm flow={flow} />
           <Button onClick={() => navigate('/guest-home')} disabled={busy}>
             Pack another pallet
           </Button>
-          <Button variant="secondary" onClick={signOut} disabled={busy} loading={busy}>
-            {busy ? 'Signing you out…' : 'Sign out'}
+          <Button variant="secondary" onClick={flow.request} disabled={busy} loading={flow.busy}>
+            {flow.busy ? 'Signing you out…' : 'Sign out'}
           </Button>
           <HelpNote>Need to tell us something? Let a staff member know before you go.</HelpNote>
         </GuestScreen>
@@ -145,11 +131,12 @@ const GuestDonePage = () => {
 
         {/* Keep them going: another pallet is the primary action, and
             sign-out stays clearly visible as the outlined one. */}
+        <SignOutConfirm flow={flow} />
         <Button onClick={() => navigate('/guest-home')} disabled={busy}>
           Pack another pallet
         </Button>
-        <Button variant="secondary" onClick={signOut} disabled={busy} loading={busy}>
-          {busy ? 'Signing you out…' : 'Sign out'}
+        <Button variant="secondary" onClick={flow.request} disabled={busy} loading={flow.busy}>
+          {flow.busy ? 'Signing you out…' : 'Sign out'}
         </Button>
 
         <HelpNote>Need to tell us something? Let a staff member know before you go.</HelpNote>

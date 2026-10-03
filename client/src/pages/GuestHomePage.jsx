@@ -30,8 +30,18 @@ import {
 } from '../features/guest/components/GuestPrimitives';
 import { displayName } from '../features/guest/guestFormat';
 
+// "<beneficiary>, <n> of <total> packed", from the /mine payload the page
+// already has. "n" counts every item dealt with (packed or flagged), the
+// same count the packing screen's progress uses.
+const mySlipLabel = (slip) => {
+  const items = slip.items ?? [];
+  const done = items.filter((i) => i.status !== 'pending').length;
+  const who = slip.beneficiary_name || slip.ecd_name || 'a community partner';
+  return `${who}, ${done} of ${items.length} packed`;
+};
+
 const GuestHomePage = () => {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const [slips, setSlips]     = useState([]);
@@ -104,18 +114,22 @@ const GuestHomePage = () => {
   const name = displayName(user?.firstName);
 
   return (
-    <GuestShell>
+    <GuestShell nav>
       <GuestScreen
         title={<>Welcome, <span className="gst-underline">{name}</span></>}
-        lede="Thank you for being here today. Pick a pallet below and we’ll take it one step at a time."
+        lede={mySlip
+          ? 'Pick up where you left off.'
+          : 'Thank you for being here today. Pick a pallet below and we’ll take it one step at a time.'}
       >
         {loading ? <Loading label="Loading today’s pallets" /> : (
           <>
             {/* Already holding one — offer that before anything else. */}
             {mySlip ? (
-              <div className="gst-stack-tight">
-                <Notice tone="good">You already have a pallet on the go.</Notice>
-                <Button onClick={() => navigate('/guest/pack')}>Carry on packing</Button>
+              <div className="gst-card gst-stack-tight">
+                <p className="gst-card-title">
+                  Your pallet in progress: {mySlipLabel(mySlip)}
+                </p>
+                <Button onClick={() => navigate('/guest/pack')}>Continue packing</Button>
               </div>
             ) : null}
 
@@ -175,13 +189,6 @@ const GuestHomePage = () => {
             ) : null}
           </>
         )}
-
-        {/* Navigate first, then log out — see the note in
-            GuestDonePage.signOut. Clearing the session while still on a
-            protected route hands the volunteer to the staff login. */}
-        <Button variant="ghost" onClick={async () => { navigate('/', { replace: true }); await logout(); }}>
-          I’m finished for today
-        </Button>
 
         <HelpNote>New here, or not sure which pallet is yours?</HelpNote>
       </GuestScreen>

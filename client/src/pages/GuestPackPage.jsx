@@ -92,12 +92,12 @@ const GuestPackPage = () => {
     : (Number(current?.required_quantity) || 0);
   const setQty = (value) => setQtyFor({ itemId: current?.id, value });
 
-  if (loading) return <GuestShell><Loading label="Loading your pallet" /></GuestShell>;
+  if (loading) return <GuestShell nav><Loading label="Loading your pallet" /></GuestShell>;
 
   // No pallet — a dead end, so it gets a way out.
   if (!slip) {
     return (
-      <GuestShell>
+      <GuestShell nav>
         <GuestScreen
           title="You don’t have a pallet yet"
           lede="Pick one and we’ll get started."
@@ -169,7 +169,7 @@ const GuestPackPage = () => {
   // nothing, wondering what they did wrong. Say it in words instead.
   if (total === 0) {
     return (
-      <GuestShell>
+      <GuestShell nav>
         <GuestScreen
           title="This pallet is empty"
           lede={`There is nothing listed for ${beneficiary} yet, so there is nothing to pack right now.`}
@@ -182,7 +182,7 @@ const GuestPackPage = () => {
             This is not something you have done wrong — the list for this pallet
             has not been set up yet. A staff member needs to sort it out.
           </Notice>
-          <Button onClick={() => navigate('/guest-home')}>Pick a different pallet</Button>
+          <Button onClick={() => navigate('/guest-home')}>Back to home</Button>
           <HelpNote>Please let a staff member know about this one.</HelpNote>
         </GuestScreen>
       </GuestShell>
@@ -192,7 +192,7 @@ const GuestPackPage = () => {
   // ── Everything done — offer to close it ─────────────────────
   if (allDone) {
     return (
-      <GuestShell>
+      <GuestShell nav>
         <GuestScreen
           title="That’s everything"
           lede={`You have been through all ${total} item${total === 1 ? '' : 's'}. One last step.`}
@@ -214,7 +214,7 @@ const GuestPackPage = () => {
   // ── Reporting a problem ─────────────────────────────────────
   if (mode === 'problem') {
     return (
-      <GuestShell>
+      <GuestShell nav>
         <GuestScreen
           title="What’s wrong with it?"
           lede="Whatever you pick, it gets passed to a staff member. Nothing here is a mistake on your part."
@@ -266,7 +266,7 @@ const GuestPackPage = () => {
 
   // ── The one item in front of them ───────────────────────────
   return (
-    <GuestShell>
+    <GuestShell nav>
       <GuestScreen
         title={current.product_name}
         lede={`Put ${fmtQty(current.required_quantity, current.unit || '')} into the box.`.replace(/\s+/g, ' ')}

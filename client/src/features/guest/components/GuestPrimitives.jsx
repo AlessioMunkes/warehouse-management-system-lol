@@ -17,20 +17,93 @@
 //   "no dead ends" — HelpNote belongs on every screen
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { formatDay, foodForPhrase } from '../guestFormat';
+import { useGuestSignOut } from '../useGuestSignOut';
 import '../../../styles/guest.css';
 
 // ── Shell ─────────────────────────────────────────────────────
 // Owns the token scope. Every guest screen renders inside one.
-export const GuestShell = ({ children }) => (
-  <div className="gst-shell">
-    <header className="gst-masthead">
-      <span className="gst-masthead-brand">Ladles<span>·</span>of<span>·</span>Love</span>
-      <span className="gst-masthead-brand" style={{ fontWeight: 500 }}>Love Activist</span>
-    </header>
-    <main className="gst-page">{children}</main>
-  </div>
+const Masthead = () => (
+  <header className="gst-masthead">
+    <span className="gst-masthead-brand">Ladles<span>·</span>of<span>·</span>Love</span>
+    <span className="gst-masthead-brand" style={{ fontWeight: 500 }}>Love Activist</span>
+  </header>
 );
+
+// `nav` adds the volunteer's own bar — Home and Sign out — for the pages
+// a signed-in guest works from. Pages with their own exits (the QR
+// preview, the thank-you page) leave it off rather than show two
+// sign-outs.
+export const GuestShell = ({ children, nav = false }) => (
+  nav ? <NavShell>{children}</NavShell> : (
+    <div className="gst-shell">
+      <Masthead />
+      <main className="gst-page">{children}</main>
+    </div>
+  )
+);
+
+// Explicit routes, never navigate(-1): "back" can mean the poster's
+// camera app. Home keeps any claimed pallet and its progress; the home
+// page offers it back.
+const NavShell = ({ children }) => {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const flow = useGuestSignOut();
+
+  return (
+    <div className="gst-shell">
+      <Masthead />
+      <nav className="gst-nav" aria-label="Your session">
+        <div className="gst-nav-inner">
+          {pathname !== '/guest-home' ? (
+            <button type="button" className="gst-nav-btn" onClick={() => navigate('/guest-home')} disabled={flow.busy}>
+              Home
+            </button>
+          ) : <span />}
+          <button
+            type="button" className="gst-nav-btn"
+            onClick={flow.request}
+            disabled={flow.busy || flow.confirming}
+            aria-busy={flow.busy || undefined}
+          >
+            {flow.busy ? <span className="gst-spinner" aria-hidden="true" /> : null}
+            Sign out
+          </button>
+        </div>
+      </nav>
+      <main className="gst-page">
+        <SignOutConfirm flow={flow} />
+        {children}
+      </main>
+    </div>
+  );
+};
+
+// ── Sign-out confirmation ─────────────────────────────────────
+// Shown only when the guest still holds a pallet. Also carries a failed
+// check or a failed return, so a refusal is never silent.
+export const SignOutConfirm = ({ flow }) => {
+  const headingRef = useRef(null);
+  useEffect(() => { if (flow.confirming) headingRef.current?.focus(); }, [flow.confirming]);
+
+  if (!flow.confirming) {
+    return flow.error ? <Notice tone="warn">{flow.error}</Notice> : null;
+  }
+  return (
+    <div className="gst-card gst-confirm gst-stack-tight" role="alertdialog" aria-labelledby="gst-confirm-title" aria-describedby="gst-confirm-text">
+      <h2 className="gst-card-title" id="gst-confirm-title" ref={headingRef} tabIndex={-1}>Sign out?</h2>
+      <p className="gst-card-meta gst-text-ink" id="gst-confirm-text">
+        You haven’t finished this pallet. If you sign out, it goes back to the floor
+        for someone else to finish. Your packing so far is saved.
+      </p>
+      {flow.error ? <Notice tone="warn">{flow.error}</Notice> : null}
+      <Button onClick={flow.confirm} loading={flow.releasing}>Sign out and return pallet</Button>
+      <Button variant="secondary" onClick={flow.cancel} disabled={flow.releasing}>Keep packing</Button>
+    </div>
+  );
+};
 
 // ── Screen ────────────────────────────────────────────────────
 // Moving between screens replaces the content, so focus has to move
