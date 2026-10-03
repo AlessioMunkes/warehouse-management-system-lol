@@ -190,7 +190,7 @@ export default function CommunityRequestsPage() {
     <PageShell>
       <PageHeader
         title="Benevolent requests"
-        description="Log phone-in and walk-in requests for food parcels, and record each outcome."
+        description="Log requests for food parcels, approve what to give, and record what went out."
         actions={
           <Button type="button" onClick={() => { setPanel({ type: 'create' }); setFormError(null); }}>
             <Plus />
