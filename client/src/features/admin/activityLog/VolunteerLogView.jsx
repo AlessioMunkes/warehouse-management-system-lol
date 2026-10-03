@@ -1,7 +1,8 @@
 // ─────────────────────────────────────────────────────────────
-// client/src/pages/VolunteerManagementPage.jsx
+// client/src/features/admin/activityLog/VolunteerLogView.jsx
 //
-// The guest log: every time somebody signed in at the door.
+// The Volunteers view of the admin Activity log, the guest log: every
+// time somebody signed in at the door.
 //
 // The data was already there. POST /api/volunteers/sign-in has been
 // writing a row per arrival since guest login went in — name, source,
@@ -28,37 +29,22 @@
 // tabs; a visit opens in the panel down the right.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import volunteerAPI  from '../services/volunteerAPI';
-import useTableView    from '../features/masterdata/hooks/useTableView';
-import MasterDataTable from '../features/masterdata/components/MasterDataTable';
+import volunteerAPI  from '../../../services/volunteerAPI';
+import { fmtDateTime } from './fmtDateTime';
+import useTableView    from '../../masterdata/hooks/useTableView';
+import MasterDataTable from '../../masterdata/components/MasterDataTable';
 
 import { Button }   from '@/components/ui/button';
 import { Input }    from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import StatusBadge  from '@/components/ui/status-badge';
-import PageHeader, { PageShell } from '@/components/ui/page-header';
-import ViewTabs     from '@/components/ui/view-tabs';
+import ViewTabs    from '@/components/ui/view-tabs';
 import ListCard     from '@/components/ui/list-card';
 import ListToolbar  from '@/components/ui/list-toolbar';
 import DetailPanel  from '@/components/ui/detail-panel';
 import EmptyState   from '@/components/ui/empty-state';
 import ErrorBanner  from '@/components/ui/error-banner';
 import { LogOut, Users } from 'lucide-react';
-
-const SAST = 'Africa/Johannesburg';
-
-// Warehouse time, always. A timestamptz rendered in the reader's own
-// zone would put a 09:00 arrival at 07:00 for anyone looking from the
-// UK, and this is a record of what happened at a building in Cape Town.
-const fmtDateTime = (value) => {
-  if (!value) return '—';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString('en-ZA', {
-    year: 'numeric', month: 'short', day: 'numeric',
-    hour: '2-digit', minute: '2-digit', timeZone: SAST,
-  });
-};
 
 // Minutes into something a person reads without doing arithmetic.
 const fmtDuration = (minutes) => {
@@ -127,7 +113,7 @@ const VisitDetail = ({ visit, busy, onSignOut, onClose }) => (
   </DetailPanel>
 );
 
-export default function VolunteerManagementPage() {
+export default function VolunteerLogView() {
   const [visits, setVisits] = useState([]);
   const [search, setSearch] = useState('');
   const [from, setFrom] = useState('');
@@ -192,13 +178,12 @@ export default function VolunteerManagementPage() {
   };
 
   return (
-    <PageShell>
-      <PageHeader
-        title="Volunteer log"
-        description={`See who signed in at the door, and sign out open visits.${onSiteCount > 0
+    <>
+      <p className="mt-4 text-sm text-muted-foreground">
+        {`See who signed in at the door, and sign out open visits.${onSiteCount > 0
           ? ` ${onSiteCount} ${onSiteCount === 1 ? 'person is' : 'people are'} on site now.`
           : ''}`}
-      />
+      </p>
 
       <ErrorBanner className="mt-4" message={error} onRetry={loadVisits} />
 
@@ -273,6 +258,6 @@ export default function VolunteerManagementPage() {
           onClose={() => setSelected(null)}
         />
       ) : null}
-    </PageShell>
+    </>
   );
 }

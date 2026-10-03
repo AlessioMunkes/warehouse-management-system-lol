@@ -38,8 +38,7 @@ import OperatingCalendarPage                       from '../pages/OperatingCalen
 import ImpactReportPage                            from '../pages/ImpactReportPage';
 import PickingSlipManagementPage                   from '../pages/PickingSlipManagementPage';
 import UserDirectoryPage                           from '../pages/UserDirectoryPage';
-import VolunteerManagementPage                     from '../pages/VolunteerManagementPage';
-import AdminUserActivityPage                       from '../pages/AdminUserActivityPage';
+import AdminActivityLogPage                        from '../pages/AdminActivityLogPage';
 import MessageHistoryPage                          from '../pages/MessageHistoryPage';
 import AdminArchivePage                            from '../pages/AdminArchivePage';
 import ProductManagementPage                       from '../pages/ProductManagementPage';
@@ -113,8 +112,7 @@ export const PAGES = {
   users:            <UserDirectoryPage />,
   products:         <ProductManagementPage />,
   suppliers:        <SupplierDirectoryPage />,
-  activity:         <AdminUserActivityPage />,
-  volunteerLog:     <VolunteerManagementPage />,
+  activityLog:      <AdminActivityLogPage />,
   archive:          <AdminArchivePage />,
   messageHistory:   <MessageHistoryPage />,
   donationManagement: <DonationManagementPage />,

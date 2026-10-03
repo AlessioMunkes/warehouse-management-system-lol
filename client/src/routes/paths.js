@@ -84,10 +84,13 @@ export const ADMIN = {
   emailIntegration: '/admin/email-integration',
   // Everything an admin can set up, in sections (?section=).
   settings: '/admin/settings',
-  // Who signed in at the door, and for how long.
-  volunteerLog: '/admin/volunteer-log',
-  // What everyone did in the system, and everything deactivated or deleted.
-  activity: '/admin/activity',
+  // What staff did in the system, and who signed in at the door, as two
+  // views of one page (?view=staff | volunteers).
+  activityLog: '/admin/activity-log',
+  activityLogVolunteers: '/admin/activity-log?view=volunteers',
+  // The two pages it replaced; they redirect to the matching view.
+  legacyActivity: '/admin/activity',
+  legacyVolunteerLog: '/admin/volunteer-log',
   // Every email the system has sent, whatever sent it.
   messageHistory: '/admin/messages',
   archive:  '/admin/archive',

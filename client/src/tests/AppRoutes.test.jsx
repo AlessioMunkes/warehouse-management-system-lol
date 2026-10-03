@@ -100,7 +100,7 @@ describe('sidebars built from the table', () => {
         'Suppliers /admin/suppliers',
       ]],
       ['Logs', [
-        'User activity /admin/activity', 'Volunteer log /admin/volunteer-log', 'Archive /admin/archive',
+        'Activity log /admin/activity-log', 'Archive /admin/archive',
         'Message history /admin/messages',
       ]],
       ['Donations', [

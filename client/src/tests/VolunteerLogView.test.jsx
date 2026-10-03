@@ -8,7 +8,7 @@ vi.mock('../services/volunteerAPI', () => ({
 }));
 
 const { default: api } = await import('../services/volunteerAPI');
-const { default: VolunteerManagementPage } = await import('../pages/VolunteerManagementPage');
+const { default: VolunteerLogView } = await import('../features/admin/activityLog/VolunteerLogView');
 
 const ON_SITE = {
   id: 'v1', fullName: 'Thandi Mokoena', source: 'guest', signedInAt: '2026-10-01T07:00:00Z',
@@ -19,7 +19,7 @@ const LEFT = {
   signedOutAt: '2026-10-01T09:30:00Z', minutesOnSite: 210,
 };
 
-const renderPage = () => render(<MemoryRouter><VolunteerManagementPage /></MemoryRouter>);
+const renderPage = () => render(<MemoryRouter><VolunteerLogView /></MemoryRouter>);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -27,11 +27,10 @@ beforeEach(() => {
   api.signOutVisit.mockResolvedValue({ ...ON_SITE, signedOutAt: '2026-10-01T10:00:00Z', minutesOnSite: 180 });
 });
 
-describe('Volunteer log', () => {
+describe('Activity log: Volunteers view', () => {
   it('lists visits with tabs counting who is on site', async () => {
     renderPage();
     expect(await screen.findByText('Thandi Mokoena')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Volunteer log' })).toBeInTheDocument();
     expect(screen.getByText(/1 person is on site now/)).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'On site 1' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Signed out 1' })).toBeInTheDocument();

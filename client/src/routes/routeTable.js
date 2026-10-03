@@ -147,11 +147,10 @@ export const ROUTES = [
     nav: [nav('admin', 'Master data', 'Products', Package)] },
   { id: 'suppliers', path: ADMIN.suppliers, roles: ADMIN_ONLY, shell: true,
     nav: [nav('admin', 'Master data', 'Suppliers', Truck)] },
-  { id: 'activity', path: ADMIN.activity, roles: ADMIN_ONLY, shell: true,
-    nav: [nav('admin', 'Logs', 'User activity', Activity)] },
-  // The door sign-in log. Managers use Volunteer Events instead.
-  { id: 'volunteerLog', path: ADMIN.volunteerLog, roles: ADMIN_ONLY, shell: true,
-    nav: [nav('admin', 'Logs', 'Volunteer log', HandHeart)] },
+  // Staff activity and the door sign-in log. Managers use Volunteer
+  // Events instead.
+  { id: 'activityLog', path: ADMIN.activityLog, roles: ADMIN_ONLY, shell: true,
+    nav: [nav('admin', 'Logs', 'Activity log', Activity)] },
   { id: 'archive', path: ADMIN.archive, roles: ADMIN_ONLY, shell: true,
     nav: [nav('admin', 'Logs', 'Archive', Archive)] },
   { id: 'messageHistory', path: ADMIN.messageHistory, roles: ADMIN_ONLY, shell: true,
@@ -183,6 +182,8 @@ export const REDIRECTS = [
   { from: '/decanting', to: STAFF.decanting },
   { from: '/programmes/noc/packing', to: PACKING.board },
   { from: '/programmes/noc/packing/:slipId', to: PACKING.board },
+  { from: ADMIN.legacyActivity, to: `${ADMIN.activityLog}?view=staff` },
+  { from: ADMIN.legacyVolunteerLog, to: ADMIN.activityLogVolunteers },
 ];
 
 export const routeById = (id) => ROUTES.find((r) => r.id === id);

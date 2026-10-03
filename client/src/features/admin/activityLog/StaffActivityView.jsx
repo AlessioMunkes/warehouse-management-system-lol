@@ -1,22 +1,23 @@
 // ─────────────────────────────────────────────────────────────
-// client/src/pages/AdminUserActivityPage.jsx
+// client/src/features/admin/activityLog/StaffActivityView.jsx
 //
-// User Activity (admin): a timeline of what everyone did, with filters by
-// person, area and date. Click an entry for details; "Open the record"
-// goes to the slip, order or supplier itself. Read-only.
+// The Staff view of the admin Activity log: a timeline of what everyone
+// did, with filters by person, area and date. Click an entry for
+// details; "Open the record" goes to the slip, order or supplier itself.
+// Read-only.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import adminAPI from '../services/adminAPI';
-import { linkFor } from '../features/admin/recordLinks';
-import useTableView    from '../features/masterdata/hooks/useTableView';
-import MasterDataTable from '../features/masterdata/components/MasterDataTable';
+import adminAPI from '../../../services/adminAPI';
+import { linkFor } from '../recordLinks';
+import { fmtDateTime } from './fmtDateTime';
+import useTableView    from '../../masterdata/hooks/useTableView';
+import MasterDataTable from '../../masterdata/components/MasterDataTable';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Badge }    from '@/components/ui/badge';
 import { Input }    from '@/components/ui/input';
 import NativeSelect from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
-import PageHeader, { PageShell } from '@/components/ui/page-header';
 import ListCard from '@/components/ui/list-card';
 import ListToolbar from '@/components/ui/list-toolbar';
 import DetailPanel from '@/components/ui/detail-panel';
@@ -24,17 +25,7 @@ import EmptyState from '@/components/ui/empty-state';
 import ErrorBanner from '@/components/ui/error-banner';
 import { ExternalLink, Activity } from 'lucide-react';
 
-const SAST = 'Africa/Johannesburg';
 const ROLE_LABELS = { admin: 'Admin', manager: 'Manager', warehouse_worker: 'Warehouse staff' };
-
-const fmtDateTime = (value) => {
-  if (!value) return '—';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString('en-ZA', {
-    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: SAST,
-  });
-};
 
 const isoDaysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
 
@@ -114,7 +105,7 @@ function EntryDetail({ entry, onClose, onFilterPerson }) {
   );
 }
 
-export default function AdminUserActivityPage() {
+export default function StaffActivityView() {
   const [data, setData] = useState(null);
   const [from, setFrom] = useState(() => isoDaysAgo(29));
   const [to, setTo] = useState(() => isoDaysAgo(0));
@@ -173,11 +164,10 @@ export default function AdminUserActivityPage() {
   const chips = person ? [{ key: 'person', label: personName, onRemove: () => filterPerson('') }] : [];
 
   return (
-    <PageShell>
-      <PageHeader
-        title="User activity"
-        description={`Review what people did in the system, newest first.${data ? ` ${entries.length} ${entries.length === 1 ? 'action' : 'actions'} by ${people.length} ${people.length === 1 ? 'person' : 'people'}, ${data.from} to ${data.to}.` : ''}${data?.truncated ? ' Showing the latest 2 000 — narrow the dates to see earlier ones.' : ''}`}
-      />
+    <>
+      <p className="mt-4 text-sm text-muted-foreground">
+        {`Review what people did in the system, newest first.${data ? ` ${entries.length} ${entries.length === 1 ? 'action' : 'actions'} by ${people.length} ${people.length === 1 ? 'person' : 'people'}, ${data.from} to ${data.to}.` : ''}${data?.truncated ? ' Showing the latest 2 000 — narrow the dates to see earlier ones.' : ''}`}
+      </p>
 
       <ErrorBanner className="mt-4" message={error} onRetry={load} />
 
@@ -262,6 +252,6 @@ export default function AdminUserActivityPage() {
       {selected ? (
         <EntryDetail key={selected.id ?? selected.at} entry={selected} onClose={() => setSelected(null)} onFilterPerson={filterPerson} />
       ) : null}
-    </PageShell>
+    </>
   );
 }

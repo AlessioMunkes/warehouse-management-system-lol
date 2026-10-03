@@ -6,7 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
 vi.mock('../services/adminAPI', () => ({ default: { getArchive: vi.fn(), getActivity: vi.fn() } }));
 
 const { default: adminAPI } = await import('../services/adminAPI');
-const { default: AdminUserActivityPage } = await import('../pages/AdminUserActivityPage');
+const { default: StaffActivityView } = await import('../features/admin/activityLog/StaffActivityView');
 
 const ADA = { id: 1, name: 'Ada Admin', username: 'ada', role: 'admin', count: 2 };
 const MO = { id: 2, name: 'Mo Manager', username: 'mo', role: 'manager', count: 1 };
@@ -16,7 +16,7 @@ const ENTRIES = [
   { id: 'a3', at: '2026-09-30T07:00:00Z', actor: MO, text: 'generated slips', area: 'Picking', source: 'event', detail: {} },
 ];
 
-const renderPage = () => render(<MemoryRouter><AdminUserActivityPage /></MemoryRouter>);
+const renderPage = () => render(<MemoryRouter><StaffActivityView /></MemoryRouter>);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -25,7 +25,7 @@ beforeEach(() => {
   });
 });
 
-describe('User Activity', () => {
+describe('Activity log: Staff view', () => {
   it('lists activity with a summary in the header', async () => {
     renderPage();
     expect(await screen.findByText('approved PO-2026-0007')).toBeInTheDocument();

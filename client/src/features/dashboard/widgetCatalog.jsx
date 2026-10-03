@@ -30,7 +30,7 @@
 // the Month / 3 months / Year menu.
 // ─────────────────────────────────────────────────────────────
 import {
-  AlertTriangle, ClipboardList, FileBadge, Gift, HandHeart, Mail, Package, PackageOpen,
+  Activity, AlertTriangle, ClipboardList, FileBadge, Gift, HandHeart, Mail, Package, PackageOpen,
   PackageSearch, PhoneCall, ScrollText, ShoppingCart, Truck, Users2, Warehouse,
 } from 'lucide-react';
 import StatTile from './components/StatTile';
@@ -243,7 +243,7 @@ export const WIDGETS = [
     id: 'on-site-now', title: 'Visitors signed in now', roles: ADMIN_ONLY, needs: ['visits'],
     description: 'Guests signed in at the door who have not signed out.',
     render: ({ visits }) => (
-      <StatTile icon={HandHeart} label="Visitors signed in now" value={visits.filter((v) => !v.signedOutAt).length} to={ADMIN.volunteerLog} />
+      <StatTile icon={HandHeart} label="Visitors signed in now" value={visits.filter((v) => !v.signedOutAt).length} to={ADMIN.activityLogVolunteers} />
     ),
   }),
 
@@ -317,8 +317,8 @@ export const WIDGETS = [
       <div className="grid gap-3 sm:grid-cols-2">
         <ActionCard to={ADMIN.users} icon={Users2} title="Users"
           description="Create accounts, set roles, deactivate someone who has left." />
-        <ActionCard to={ADMIN.volunteerLog} icon={HandHeart} title="Volunteer log"
-          description="See who signed in at the door and sign out open visits." />
+        <ActionCard to={ADMIN.activityLog} icon={Activity} title="Activity log"
+          description="See what staff did, and who signed in at the door." />
         <ActionCard to={ADMIN.products} icon={Package} title="Products"
           description="Add and edit the products the warehouse stocks." />
         <ActionCard to={ADMIN.suppliers} icon={Truck} title="Suppliers"
