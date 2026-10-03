@@ -33,10 +33,6 @@ export const OUTCOME_LABELS = {
 
 export const OUTCOMES = ['pending', 'approved', 'fulfilled', 'partially_fulfilled', 'declined', 'referred'];
 
-// Kept for the worker flow until it moves to the new screens: nobody
-// can resolve a request directly any more, so nothing new should use it.
-export const RESOLVE_OUTCOMES = ['fulfilled', 'partially_fulfilled', 'declined'];
-
 const fullName = (first, last) => `${first ?? ''} ${last ?? ''}`.trim() || null;
 
 const toItem = (line = {}) => ({
@@ -139,18 +135,8 @@ export const confirmRequest = async (id, items) => {
   return toRequest(body.data ?? {});
 };
 
-// ── PATCH /:id/resolve (the old call) ────────────────────────
-// The server now only lets a manager or admin decline with it. Kept
-// until the worker screens move to confirm / claim; use decline and
-// confirm instead.
-export const resolveRequest = async (id, { outcome, outcomeNote }) => {
-  const body = await apiPatch(`/api/community-requests/${id}/resolve`, { outcome, outcomeNote });
-  return toRequest(body.data ?? {});
-};
-
 export default {
-  resolveRequest,
   getRequests, getRequest, logRequest,
   approveRequest, declineRequest, assignRequest, rechooseItems, claimRequest, confirmRequest,
-  OUTCOMES, OUTCOME_LABELS, RESOLVE_OUTCOMES,
+  OUTCOMES, OUTCOME_LABELS,
 };

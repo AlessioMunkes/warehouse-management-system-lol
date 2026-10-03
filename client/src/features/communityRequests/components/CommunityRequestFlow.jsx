@@ -6,34 +6,43 @@
 // shapes picked by role. A manager gets the ManagerLayout table; a
 // warehouse worker gets this, inside StaffShell.
 //
-// Two tabs, not a wizard: logging a request and working the open
-// queue are two different tasks a worker moves between all day, not
-// steps in one flow. Reuses CommunityRequestForm as-is — its shadcn
-// fields already read consistently inside StaffShell now that the
-// worker and manager colour/type tokens are unified (see staff.css).
+// Two tabs, not a wizard: logging a request and packing approved ones
+// are two different tasks a worker moves between all day.
 //
-// Claim and resolve stay separate actions here exactly as they are on
-// the desktop table (see communityRequestAPI.js's own note): a
-// request can be resolved whether or not anyone claimed it first.
+//   Log a request   a caller phoned in or walked in; a manager approves
+//                   it (choosing the products) before anyone packs.
+//   To pack         approved requests that are not waiting for new
+//                   items. Claim one (or open the one assigned to you),
+//                   fetch what the list says, then confirm what
+//                   actually went out. Fewer than approved is fine;
+//                   stock only leaves when you confirm.
+//
+// Workers no longer resolve a request themselves: it has to be
+// approved first, and nothing leaves the building without a
+// confirmation.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
-import communityRequestAPI, { RESOLVE_OUTCOMES, OUTCOME_LABELS } from '../../../services/communityRequestAPI';
-import { Notice, ChoiceList, TextField, Actions, Button } from '../../staff/components/StepPrimitives';
+import communityRequestAPI from '../../../services/communityRequestAPI';
+import { useAuth } from '../../../context/AuthContext';
+import { Notice, TextField, Actions, Button } from '../../staff/components/StepPrimitives';
 import ListTools, { NoMatches } from '../../staff/components/ListTools';
 import useListSearch from '../../staff/hooks/useListSearch';
+import { fmtQty } from '@/lib/quantity';
 import {
   FUTURE_REQUEST_MESSAGE, isFutureRequestedAt, localDateTimeValue, withRequestedAtForServer,
 } from '../requestedAt';
 
 // Item and caller — matches the desktop table's own "Search by item or
-// caller name" (CommunityRequestsPage.jsx). Module level so its
-// identity is stable, same reasoning as every other *Text helper in
-// this codebase.
-const requestText = (r) => [r.itemsRequested, r.callerName].filter(Boolean).join(' ');
+// caller name" (CommunityRequestsPage.jsx), plus the chosen products.
+// Module level so its identity is stable, same reasoning as every other
+// *Text helper in this codebase.
+const requestText = (r) => [
+  r.itemsRequested, r.callerName, ...r.items.map((i) => i.productName),
+].filter(Boolean).join(' ');
 
 const TABS = [
   { key: 'log',  label: 'Log a request' },
-  { key: 'open', label: 'Open requests' },
+  { key: 'pack', label: 'To pack' },
 ];
 
 const fmtDateTime = (value) =>
@@ -141,63 +150,102 @@ function LogRequestForm({ onSubmit, busy, error }) {
   );
 }
 
-// Same construction as NotesField.jsx in the donation flow — a
-// .stf-input textarea, not the single-line TextField from
-// StepPrimitives, because an outcome note is a sentence, not a value.
-function NoteField({ value, onChange, error }) {
-  return (
-    <div className="stf-field">
-      <label className="stf-field-label" htmlFor="stf-cr-note">Note</label>
-      <textarea
-        id="stf-cr-note"
-        className="stf-input is-text"
-        style={{ minHeight: '72px', paddingTop: '12px', paddingBottom: '12px' }}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="What was given, referred, or why it was declined."
-      />
-      {error ? <p className="stf-field-hint">{error}</p> : null}
-    </div>
-  );
-}
+// Is this request mine to pack: claimed by me, or assigned to me?
+const isMine = (r, userId) => userId != null
+  && (Number(r.handledBy) === Number(userId) || Number(r.assignedTo) === Number(userId));
 
-function ResolveForm({ onSubmit, onCancel, busy, error }) {
-  const [outcome, setOutcome] = useState('fulfilled');
-  const [note, setNote] = useState('');
-  const [touched, setTouched] = useState(false);
-  const noteMissing = !note.trim();
+// Who has it, as the worker should read it.
+const holderText = (r, userId) => {
+  if (r.handledBy != null) {
+    return Number(r.handledBy) === Number(userId) ? 'Claimed by you' : `Claimed by ${r.handledByName ?? 'someone else'}`;
+  }
+  if (r.assignedTo != null) {
+    return Number(r.assignedTo) === Number(userId) ? 'Assigned to you' : `Assigned to ${r.assignedToName ?? 'someone else'}`;
+  }
+  return null;
+};
+
+const asNumber = (text) => {
+  const n = Number(text);
+  return text !== '' && Number.isFinite(n) ? n : null;
+};
+
+// The pack screen: what to fetch, then what actually went out. Starts
+// with everything that was approved; lower a quantity if less went out.
+function PackScreen({ request, onConfirm, onBack, busy, error }) {
+  const [released, setReleased] = useState(() =>
+    Object.fromEntries(request.items.map((i) => [i.productId, String(i.quantityApproved)])));
+
+  const problem = (i) => {
+    const n = asNumber(released[i.productId]);
+    if (n === null || n < 0) return 'Enter how many went out, zero or more.';
+    if (n > i.quantityApproved) return `No more than ${fmtQty(i.quantityApproved, i.unit)}.`;
+    return null;
+  };
+  const anyProblem = request.items.some((i) => problem(i));
+  const nothingOut = !anyProblem && request.items.every((i) => Number(released[i.productId]) === 0);
 
   const submit = () => {
-    setTouched(true);
-    if (noteMissing) return;
-    onSubmit({ outcome, outcomeNote: note });
+    if (anyProblem || nothingOut) return;
+    onConfirm(request.items.map((i) => ({
+      productId: i.productId, quantityReleased: Number(released[i.productId]),
+    })));
   };
 
   return (
-    <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {error ? <Notice tone="warn">{error}</Notice> : null}
-      <ChoiceList
-        legend="Outcome"
-        options={RESOLVE_OUTCOMES.map((o) => ({ value: o, label: OUTCOME_LABELS[o] }))}
-        value={outcome}
-        onChange={setOutcome}
-      />
-      <NoteField
-        value={note}
-        onChange={setNote}
-        error={touched && noteMissing ? 'A note is required to resolve a request.' : null}
-      />
-      <div className="stf-actions is-row">
-        <button type="button" className="stf-btn stf-btn-secondary" onClick={onCancel}>Cancel</button>
-        <button type="button" className="stf-btn stf-btn-primary" onClick={submit} disabled={busy}>
-          {busy ? 'Saving…' : 'Save outcome'}
-        </button>
+    <>
+      <div className="stf-step-head">
+        <h1 className="stf-step-title" tabIndex={-1}>{request.callerName || 'Unnamed caller'}</h1>
+        <p className="stf-step-sub">Fetch these items. Then confirm what went out.</p>
       </div>
-    </div>
+
+      {error ? <Notice tone="warn">{error}</Notice> : null}
+
+      <p className="stf-row-meta">
+        {request.itemsRequested}
+        {request.quantityNote ? ` · ${request.quantityNote}` : ''}
+      </p>
+
+      {request.items.map((i) => (
+        <div key={i.productId} className="stf-field">
+          <label className="stf-field-label" htmlFor={`stf-cr-out-${i.productId}`}>
+            {i.productName} · fetch {fmtQty(i.quantityApproved, i.unit)}
+          </label>
+          <input
+            id={`stf-cr-out-${i.productId}`}
+            className="stf-input is-text"
+            type="number" inputMode="decimal" min="0" step="any"
+            value={released[i.productId]}
+            onChange={(e) => setReleased((r) => ({ ...r, [i.productId]: e.target.value }))}
+            aria-label={`Went out: ${i.productName}`}
+            aria-invalid={problem(i) ? true : undefined}
+          />
+          <p className="stf-field-hint">
+            {problem(i) ?? `Went out, in ${i.unit || 'units'}. Lower it if less went out.`}
+          </p>
+        </div>
+      ))}
+
+      {nothingOut ? (
+        <Notice tone="warn">Nothing went out. Ask a manager to decline the request instead.</Notice>
+      ) : null}
+
+      <Actions>
+        <Button disabled={busy || anyProblem || nothingOut} onClick={submit}>
+          {busy ? 'Saving' : 'Confirm what went out'}
+        </Button>
+        <button type="button" className="stf-btn stf-btn-secondary" onClick={onBack} disabled={busy}>
+          Back to the list
+        </button>
+      </Actions>
+    </>
   );
 }
 
 export default function CommunityRequestFlow({ onCrumbChange }) {
+  const { user } = useAuth() ?? {};
+  const userId = user?.id ?? null;
+
   const [tab, setTab] = useState('log');
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -205,23 +253,29 @@ export default function CommunityRequestFlow({ onCrumbChange }) {
   const [notice, setNotice] = useState(null);
   const [logBusy, setLogBusy] = useState(false);
   const [logError, setLogError] = useState(null);
+  const [logKey, setLogKey] = useState(0);
   const [claimingId, setClaimingId] = useState(null);
-  const [resolvingId, setResolvingId] = useState(null);
-  const [resolveBusy, setResolveBusy] = useState(false);
-  const [resolveError, setResolveError] = useState(null);
+  const [packing, setPacking] = useState(null);       // the request being packed
+  const [packBusy, setPackBusy] = useState(false);
+  const [packError, setPackError] = useState(null);
   const [reloadToken, setReloadToken] = useState(0);
   const search = useListSearch(requests, requestText);
 
   useEffect(() => {
-    onCrumbChange?.(tab === 'log' ? 'Log a request' : 'Open requests');
+    onCrumbChange?.(tab === 'log' ? 'Log a request' : 'To pack');
   }, [tab, onCrumbChange]);
 
+  // Approved requests that are not waiting for new items.
   useEffect(() => {
-    if (tab !== 'open') return;
+    if (tab !== 'pack') return;
     let cancelled = false;
     setLoading(true);
-    communityRequestAPI.getRequests({ outcome: 'pending' })
-      .then((rows) => { if (!cancelled) { setRequests(rows); setError(null); } })
+    communityRequestAPI.getRequests({ outcome: 'approved' })
+      .then((rows) => {
+        // The error is not cleared here: a refused claim reloads the list,
+        // and the reason must stay on screen while it does.
+        if (!cancelled) setRequests(rows.filter((r) => !r.itemsShortAt));
+      })
       .catch((err) => { if (!cancelled) setError(err.message || 'Could not load requests.'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
@@ -229,8 +283,9 @@ export default function CommunityRequestFlow({ onCrumbChange }) {
 
   const changeTab = (nextTab) => {
     setTab(nextTab);
-    setResolvingId(null);
+    setPacking(null);
     setNotice(null);
+    setError(null);
   };
 
   const handleLog = async (payload) => {
@@ -238,9 +293,8 @@ export default function CommunityRequestFlow({ onCrumbChange }) {
     setLogError(null);
     try {
       await communityRequestAPI.logRequest(payload);
-      setNotice('Request logged.');
-      setTab('open');
-      setReloadToken((t) => t + 1);
+      setNotice('Request logged. A manager approves it before anyone packs.');
+      setLogKey((k) => k + 1);   // a clean form for the next call
     } catch (err) {
       setLogError(err.message || 'Could not log the request.');
     } finally {
@@ -253,27 +307,32 @@ export default function CommunityRequestFlow({ onCrumbChange }) {
     setError(null);
     try {
       await communityRequestAPI.claimRequest(id);
-      setNotice('Request claimed.');
+      setNotice('Request claimed. Open it when you are ready to pack.');
       setReloadToken((t) => t + 1);
     } catch (err) {
+      // Someone else got there first, or a manager changed it: the
+      // server's message says which, and the list is refreshed.
       setError(err.message || 'Could not claim this request.');
+      setReloadToken((t) => t + 1);
     } finally {
       setClaimingId(null);
     }
   };
 
-  const handleResolve = async ({ outcome, outcomeNote }) => {
-    setResolveBusy(true);
-    setResolveError(null);
+  const handleConfirm = async (items) => {
+    setPackBusy(true);
+    setPackError(null);
     try {
-      await communityRequestAPI.resolveRequest(resolvingId, { outcome, outcomeNote });
-      setResolvingId(null);
-      setNotice(`Marked ${OUTCOME_LABELS[outcome].toLowerCase()}.`);
+      const done = await communityRequestAPI.confirmRequest(packing.id, items);
+      setPacking(null);
+      setNotice(done.outcome === 'partially_fulfilled'
+        ? 'Done. Marked partly fulfilled, with what went out.'
+        : 'Done. Marked fulfilled.');
       setReloadToken((t) => t + 1);
     } catch (err) {
-      setResolveError(err.message || 'Could not resolve this request.');
+      setPackError(err.message || 'Could not confirm this request.');
     } finally {
-      setResolveBusy(false);
+      setPackBusy(false);
     }
   };
 
@@ -301,18 +360,25 @@ export default function CommunityRequestFlow({ onCrumbChange }) {
           <div className="stf-step-head">
             <h1 className="stf-step-title" tabIndex={-1}>Log a request</h1>
             <p className="stf-step-sub">
-              A member of the public phoned in or walked in asking for goods.
-              Log those requests here.
+              Log what the caller asks for. A manager approves it before anyone packs.
             </p>
           </div>
-          <LogRequestForm onSubmit={handleLog} busy={logBusy} error={logError} />
+          <LogRequestForm key={logKey} onSubmit={handleLog} busy={logBusy} error={logError} />
         </>
+      ) : packing ? (
+        <PackScreen
+          request={packing}
+          onConfirm={handleConfirm}
+          onBack={() => { setPacking(null); setPackError(null); }}
+          busy={packBusy}
+          error={packError}
+        />
       ) : (
         <>
           <div className="stf-step-head">
-            <h1 className="stf-step-title" tabIndex={-1}>Open requests</h1>
+            <h1 className="stf-step-title" tabIndex={-1}>To pack</h1>
             <p className="stf-step-sub">
-              Not yet resolved. Claim one to take ownership, or resolve it straight away.
+              Claim a request to pack it. Then confirm what went out.
             </p>
           </div>
 
@@ -330,9 +396,7 @@ export default function CommunityRequestFlow({ onCrumbChange }) {
           {loading ? (
             <div className="stf-skeleton" aria-label="Loading" />
           ) : requests.length === 0 ? (
-            <div className="stf-empty">
-              Nothing open right now. Every request that's come in has been resolved.
-            </div>
+            <div className="stf-empty">Nothing to pack right now.</div>
           ) : search.filtered.length === 0 ? (
             <NoMatches
               query={search.query}
@@ -341,24 +405,34 @@ export default function CommunityRequestFlow({ onCrumbChange }) {
             />
           ) : (
             <div className="stf-list">
-              {search.filtered.map((r) => (
-                <div key={r.id} className="stf-row is-static" style={{ flexWrap: 'wrap' }}>
-                  <span className="stf-row-main">
-                    <span className="stf-row-title">{r.callerName || 'Unnamed caller'}</span>
-                    <span className="stf-row-meta">
-                      {r.itemsRequested}
-                      {r.quantityNote ? ` · ${r.quantityNote}` : ''}
+              {search.filtered.map((r) => {
+                const mine = isMine(r, userId);
+                const holder = holderText(r, userId);
+                return (
+                  <div key={r.id} className="stf-row is-static" style={{ flexWrap: 'wrap' }}>
+                    <span className="stf-row-main">
+                      <span className="stf-row-title">{r.callerName || 'Unnamed caller'}</span>
+                      <span className="stf-row-meta">
+                        {r.items.map((i) => `${i.productName} · ${fmtQty(i.quantityApproved, i.unit)}`).join(', ')}
+                      </span>
+                      {r.quantityNote ? <span className="stf-row-meta">{r.quantityNote}</span> : null}
+                      <span className="stf-row-meta">
+                        {fmtDateTime(r.requestedAt)}
+                        {r.callerContact ? ` · ${r.callerContact}` : ''}
+                        {holder ? ` · ${holder}` : ''}
+                      </span>
                     </span>
-                    <span className="stf-row-meta">
-                      {fmtDateTime(r.requestedAt)}
-                      {r.callerContact ? ` · ${r.callerContact}` : ''}
-                      {r.handledByName ? ` · Claimed by ${r.handledByName}` : ''}
-                    </span>
-                  </span>
 
-                  {resolvingId === r.id ? null : (
                     <span style={{ display: 'flex', gap: 8 }}>
-                      {!r.handledByName ? (
+                      {mine ? (
+                        <button
+                          type="button"
+                          className="stf-btn stf-btn-primary"
+                          onClick={() => { setPacking(r); setPackError(null); setNotice(null); }}
+                        >
+                          Start packing
+                        </button>
+                      ) : r.handledBy == null ? (
                         <button
                           type="button"
                           className="stf-btn stf-btn-secondary"
@@ -368,28 +442,10 @@ export default function CommunityRequestFlow({ onCrumbChange }) {
                           {claimingId === r.id ? 'Claiming…' : 'Claim'}
                         </button>
                       ) : null}
-                      <button
-                        type="button"
-                        className="stf-btn stf-btn-primary"
-                        onClick={() => { setResolvingId(r.id); setResolveError(null); }}
-                      >
-                        Resolve
-                      </button>
                     </span>
-                  )}
-
-                  {resolvingId === r.id ? (
-                    <div style={{ width: '100%' }}>
-                      <ResolveForm
-                        onSubmit={handleResolve}
-                        onCancel={() => setResolvingId(null)}
-                        busy={resolveBusy}
-                        error={resolveError}
-                      />
-                    </div>
-                  ) : null}
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
           )}
         </>
