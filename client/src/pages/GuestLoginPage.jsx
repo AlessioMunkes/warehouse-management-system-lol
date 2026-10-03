@@ -194,7 +194,7 @@ const GuestLoginPage = () => {
               )}
 
               {/* Primary sign-in button */}
-              <Button type="submit" className="login-btn-primary" disabled={isSubmitting}>
+              <Button type="submit" className="login-btn-primary" disabled={isSubmitting} loading={isSubmitting}>
                 {isSubmitting ? 'SIGNING IN…' : 'LOGIN'}
               </Button>
 

@@ -67,7 +67,7 @@ const GuestDonePage = () => {
           title={`Thank you, ${name}`}
           lede="Your pallet is finished and on its way."
         >
-          <Button onClick={signOut} disabled={busy}>
+          <Button onClick={signOut} disabled={busy} loading={busy}>
             {busy ? 'Signing you out…' : 'Sign out'}
           </Button>
           <Button variant="ghost" onClick={() => navigate('/guest-home')}>
@@ -145,7 +145,7 @@ const GuestDonePage = () => {
           </p>
         </div>
 
-        <Button onClick={signOut} disabled={busy}>
+        <Button onClick={signOut} disabled={busy} loading={busy}>
           {busy ? 'Signing you out…' : 'Sign out — I’m finished'}
         </Button>
         <Button variant="secondary" onClick={() => navigate('/guest-home')} disabled={busy}>

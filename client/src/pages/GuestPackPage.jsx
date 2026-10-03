@@ -202,7 +202,7 @@ const GuestPackPage = () => {
           ]} />
           <Progress done={done} total={total} />
           {error ? <Notice tone="warn">{error}</Notice> : null}
-          <Button onClick={finish} disabled={busy}>
+          <Button onClick={finish} disabled={busy} loading={busy}>
             {busy ? 'Finishing…' : 'Finish this pallet'}
           </Button>
           <HelpNote>Spotted something you want to change first?</HelpNote>
@@ -250,8 +250,7 @@ const GuestPackPage = () => {
               onClick={() => act(
                 () => flagItem(slip.id, current.id, reason, qty),
                 `Thanks — a staff member will look at the ${current.product_name}.`,
-              )}
-            >
+              )} loading={busy}>
               {busy ? 'Saving…' : 'Report it'}
             </Button>
             <Button variant="ghost" onClick={() => { setMode('item'); setReason(''); }} disabled={busy}>
@@ -302,8 +301,7 @@ const GuestPackPage = () => {
             onClick={() => act(
               () => confirmItem(slip.id, current.id, qty),
               `${current.product_name} — packed. Nice one, ${displayName(user?.firstName)}.`,
-            )}
-          >
+            )} loading={busy}>
             {busy ? 'Saving…' : 'Packed it'}
           </Button>
           <Button variant="secondary" onClick={() => setMode('problem')} disabled={busy}>

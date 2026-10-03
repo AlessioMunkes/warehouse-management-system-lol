@@ -26,6 +26,7 @@ import ListToolbar from '@/components/ui/list-toolbar';
 import DetailPanel from '@/components/ui/detail-panel';
 import EmptyState from '@/components/ui/empty-state';
 import ErrorBanner from '@/components/ui/error-banner';
+import Notice from '@/components/ui/notice';
 import { RotateCcw, ExternalLink, Archive } from 'lucide-react';
 
 const SAST = 'Africa/Johannesburg';
@@ -79,7 +80,7 @@ function ItemDetail({ item, busy, onRestore, onClose }) {
       actions={item.restorable || href ? (
         <>
           {item.restorable ? (
-            <Button type="button" disabled={busy} onClick={onRestore}>
+            <Button type="button" disabled={busy} onClick={onRestore} loading={busy}>
               <RotateCcw /> {busy ? 'Restoring…' : 'Restore'}
             </Button>
           ) : null}
@@ -172,7 +173,7 @@ export default function AdminArchivePage() {
       />
 
       <ErrorBanner className="mt-4" message={error} onRetry={load} />
-      {notice ? <p role="status" className="mt-4 rounded-lg border bg-good-soft px-4 py-3 text-sm text-good">{notice}</p> : null}
+      <Notice className="mt-4" message={notice} onClear={() => setNotice(null)} />
 
       <ViewTabs
         className="mt-5"

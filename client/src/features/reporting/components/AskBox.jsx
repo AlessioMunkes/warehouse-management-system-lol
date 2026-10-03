@@ -91,8 +91,7 @@ export default function AskBox({ onReport, onPickMetric, disabled }) {
           type="button"
           onClick={() => submit()}
           disabled={disabled || busy || !question.trim()}
-          className="shrink-0"
-        >
+          className="shrink-0" loading={busy}>
           {busy ? 'Asking…' : 'Ask'}
         </Button>
       </div>

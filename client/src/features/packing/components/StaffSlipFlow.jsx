@@ -316,7 +316,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
 
       {unassigned && !locked ? (
         <Actions>
-          <Button disabled={claiming} onClick={handleClaim}>
+          <Button disabled={claiming} onClick={handleClaim} loading={claiming}>
             {claiming ? 'Claiming…' : 'Claim this pallet'}
           </Button>
         </Actions>

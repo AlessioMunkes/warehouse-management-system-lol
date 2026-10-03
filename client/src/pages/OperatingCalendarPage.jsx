@@ -13,6 +13,7 @@ import { CalendarOff, Flag, Plus, Trash2 } from 'lucide-react';
 import calendarAPI from '../services/calendarAPI';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import NativeSelect from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -29,6 +30,7 @@ import ListCard from '@/components/ui/list-card';
 import DetailPanel from '@/components/ui/detail-panel';
 import EmptyState from '@/components/ui/empty-state';
 import ErrorBanner from '@/components/ui/error-banner';
+import Notice from '@/components/ui/notice';
 
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const COHORTS = [
@@ -36,7 +38,6 @@ const COHORTS = [
   { id: 'thursday', label: 'Thursday cohort' },
 ];
 const KIND_LABEL = { public_holiday: 'Public holiday', closure: 'Closure' };
-const SELECT = 'h-9 rounded-md border border-input bg-transparent px-2 text-sm';
 
 const todaySast = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Johannesburg' }).format(new Date());
 // 1 = Monday … 7 = Sunday, as the server counts.
@@ -68,16 +69,16 @@ function CollectionDays({ saved, onSave, busy }) {
         {COHORTS.map((c) => (
           <label key={c.id} className="grid gap-1.5 text-sm">
             <span className="font-medium">{c.label}</span>
-            <select
-              className={`${SELECT} w-44`}
+            <NativeSelect
+              className="w-44"
               value={days[c.id] ?? ''}
               onChange={(e) => setDays((d) => ({ ...d, [c.id]: Number(e.target.value) }))}
             >
               {WEEKDAYS.map((name, i) => <option key={name} value={i + 1}>{name}</option>)}
-            </select>
+            </NativeSelect>
           </label>
         ))}
-        <Button type="button" disabled={!changed || clash || busy} onClick={() => onSave(days)}>
+        <Button type="button" disabled={!changed || clash || busy} onClick={() => onSave(days)} loading={busy}>
           {busy ? 'Saving…' : 'Save collection days'}
         </Button>
         {clash ? <p className="w-full text-sm text-danger">The two cohorts need different days.</p> : null}
@@ -101,7 +102,7 @@ function AddClosurePanel({ busy, error, onSubmit, onClose }) {
       actions={(
         <>
           <Button type="button" disabled={!ready || busy}
-            onClick={() => onSubmit({ date, endDate: endDate || undefined, kind, label: label.trim() })}>
+            onClick={() => onSubmit({ date, endDate: endDate || undefined, kind, label: label.trim() })} loading={busy}>
             {busy ? 'Saving…' : 'Close the warehouse'}
           </Button>
           <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
@@ -124,10 +125,10 @@ function AddClosurePanel({ busy, error, onSubmit, onClose }) {
       </div>
       <label className="grid gap-1.5 text-sm">
         <span className="font-medium">Type</span>
-        <select className={SELECT} value={kind} onChange={(e) => setKind(e.target.value)}>
+        <NativeSelect value={kind} onChange={(e) => setKind(e.target.value)}>
           <option value="closure">Closure (stocktake, shutdown, other)</option>
           <option value="public_holiday">Public holiday</option>
-        </select>
+        </NativeSelect>
       </label>
       <label className="grid gap-1.5 text-sm">
         <span className="font-medium">Reason</span>
@@ -147,7 +148,7 @@ function PublicHolidaysPanel({ busy, error, onSubmit, onClose }) {
       title="Add public holidays"
       actions={(
         <>
-          <Button type="button" disabled={busy} onClick={() => onSubmit(year)}>
+          <Button type="button" disabled={busy} onClick={() => onSubmit(year)} loading={busy}>
             {busy ? 'Adding…' : `Add ${year}’s public holidays`}
           </Button>
           <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
@@ -161,9 +162,9 @@ function PublicHolidaysPanel({ busy, error, onSubmit, onClose }) {
       <ErrorBanner message={error} />
       <label className="grid gap-1.5 text-sm">
         <span className="font-medium">Year</span>
-        <select className={`${SELECT} w-32`} value={year} onChange={(e) => setYear(Number(e.target.value))}>
+        <NativeSelect className="w-32" value={year} onChange={(e) => setYear(Number(e.target.value))}>
           {[thisYear, thisYear + 1].map((y) => <option key={y} value={y}>{y}</option>)}
-        </select>
+        </NativeSelect>
       </label>
     </DetailPanel>
   );
@@ -235,7 +236,7 @@ export default function OperatingCalendarPage() {
       />
 
       <ErrorBanner className="mt-4" message={error} onRetry={load} />
-      {notice ? <p role="status" className="mt-4 rounded-lg border border-good/40 bg-good-soft px-4 py-3 text-sm text-good">{notice}</p> : null}
+      <Notice className="mt-4" message={notice} onClear={() => setNotice(null)} />
 
       <div className="mt-6">
         {calendar ? (

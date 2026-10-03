@@ -220,8 +220,8 @@ export default function GmailSettingsPage({ embedded = false } = {}) {
             role="status"
             className={
               displayFeedback.type === 'success'
-                ? 'rounded-md border border-good bg-good-soft px-4 py-3 text-sm text-good'
-                : 'rounded-md border border-danger bg-danger-soft px-4 py-3 text-sm text-danger'
+                ? 'fx-fade-in rounded-lg border border-good/40 bg-good-soft px-4 py-3 text-sm text-good'
+                : 'fx-fade-in rounded-lg border border-danger/40 bg-danger-soft px-4 py-3 text-sm text-danger'
             }
           >
             {displayFeedback.message}
@@ -272,7 +272,7 @@ export default function GmailSettingsPage({ embedded = false } = {}) {
                               maxLength={255}
                             />
                           </div>
-                          <Button type="submit" variant="secondary" disabled={savingDisplayName || !displayName.trim()}>
+                          <Button type="submit" variant="secondary" disabled={savingDisplayName || !displayName.trim()} loading={savingDisplayName}>
                             {savingDisplayName ? 'Saving…' : 'Save name'}
                           </Button>
                         </form>
@@ -325,7 +325,7 @@ export default function GmailSettingsPage({ embedded = false } = {}) {
                   required
                 />
               </div>
-              <Button type="submit" disabled={sendingTest || !connected}>
+              <Button type="submit" disabled={sendingTest || !connected} loading={sendingTest}>
                 {sendingTest ? 'Sending…' : 'Send test email'}
               </Button>
             </form>
@@ -352,15 +352,14 @@ export default function GmailSettingsPage({ embedded = false } = {}) {
                   required
                 />
               </div>
-              <Button type="submit" variant="secondary" disabled={savingFinanceRecipient || !financeRecipientEmail.trim()}>
+              <Button type="submit" variant="secondary" disabled={savingFinanceRecipient || !financeRecipientEmail.trim()} loading={savingFinanceRecipient}>
                 {savingFinanceRecipient ? 'Saving…' : 'Save email address'}
               </Button>
             </form>
             <Button
               type="button"
               onClick={handleSendFinanceReportLink}
-              disabled={sendingFinanceLink || !connected}
-            >
+              disabled={sendingFinanceLink || !connected} loading={sendingFinanceLink}>
               {sendingFinanceLink ? 'Sending…' : 'Send report link'}
             </Button>
           </CardContent>

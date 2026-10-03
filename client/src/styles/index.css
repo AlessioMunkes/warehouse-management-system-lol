@@ -1862,3 +1862,27 @@ color:white;
 
 /* ── Inventory stock health, which names its own colours ───────── */
 
+
+/* ── Small motion on the office screens ──────────────────────────
+   Short and quiet: content settling in, not decoration. Nothing here
+   needs its own reduced-motion rule — staff.css zeroes every animation
+   and transition when <html data-stf-motion="reduced"> (the eye button
+   in the top bar, seeded from the device's own setting). */
+@keyframes fx-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes fx-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes fx-slide-in {
+  from { opacity: 0; transform: translateX(16px); }
+  to   { opacity: 1; transform: none; }
+}
+/* A table replacing its loading rows: no movement, so a re-search does not jiggle. */
+.fx-fade     { animation: fx-fade 180ms ease-out both; }
+/* A notice or empty state arriving. */
+.fx-fade-in  { animation: fx-fade-in 200ms ease-out both; }
+/* A toast arriving from the edge it sits on. */
+.fx-slide-in { animation: fx-slide-in 220ms ease-out both; }

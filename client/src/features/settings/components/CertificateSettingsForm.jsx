@@ -114,7 +114,7 @@ export default function CertificateSettingsForm() {
         </Card>
       ))}
       {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
-      <Button type="button" onClick={save} disabled={busy || !changed}>
+      <Button type="button" onClick={save} disabled={busy || !changed} loading={busy}>
         {busy ? 'Saving…' : 'Save certificate details'}
       </Button>
     </div>

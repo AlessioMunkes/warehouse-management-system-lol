@@ -143,7 +143,7 @@ export function GenerateSlipsForm({ onGenerated, onDone }) {
           </Field>
         </div>
         <Field orientation="horizontal">
-          <Button type="button" onClick={run} disabled={busy || !form.dispatchDate || !form.cohort}>
+          <Button type="button" onClick={run} disabled={busy || !form.dispatchDate || !form.cohort} loading={busy}>
             {busy ? 'Generating' : 'Generate slips'}
           </Button>
           <Button type="button" variant="outline" onClick={onDone}>Done</Button>
@@ -285,8 +285,7 @@ export function CreateSlipForm({ beneficiaries, products, onCreated, onCancel })
         <Field orientation="horizontal">
           <Button
             type="button" onClick={run}
-            disabled={busy || !form.ecdId || !form.dispatchDate || !form.cohort || (form.manualItems && linesInvalid(form.items))}
-          >
+            disabled={busy || !form.ecdId || !form.dispatchDate || !form.cohort || (form.manualItems && linesInvalid(form.items))} loading={busy}>
             {busy ? 'Creating' : 'Create slip'}
           </Button>
           <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
@@ -363,8 +362,7 @@ export function EditSlipForm({ slip, products, onSaved, onCancel }) {
         <Field orientation="horizontal">
           <Button
             type="button" onClick={run}
-            disabled={busy || !form.dispatchDate || !form.cohort || linesInvalid(form.items)}
-          >
+            disabled={busy || !form.dispatchDate || !form.cohort || linesInvalid(form.items)} loading={busy}>
             {busy ? 'Saving' : 'Save changes'}
           </Button>
           <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>

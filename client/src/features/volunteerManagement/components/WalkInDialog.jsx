@@ -49,7 +49,7 @@ export default function WalkInDialog({ open, timeslots, busy, error, onOpenChang
           {validationMessages.length > 0 && <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"><p className="font-medium">Please fix the following:</p><ul className="mt-2 list-disc space-y-1 pl-5">{validationMessages.map((message) => <li key={message}>{message}</li>)}</ul></div>}
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         </div>
-        <DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button><Button type="submit" disabled={busy}>{busy ? 'Registering…' : 'Register walk-in'}</Button></DialogFooter>
+        <DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button><Button type="submit" disabled={busy} loading={busy}>{busy ? 'Registering…' : 'Register walk-in'}</Button></DialogFooter>
       </form></DialogContent>
     </Dialog>
   );

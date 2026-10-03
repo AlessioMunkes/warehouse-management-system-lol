@@ -13,6 +13,7 @@ import {
 //import { TopNavbar } from '../components/layout/TopNavBar';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
+import NativeSelect from '@/components/ui/native-select';
 import { Skeleton } from '../components/ui/skeleton';
 import StatusBadge from '@/components/ui/status-badge';
 import PageHeader, { PageShell } from '@/components/ui/page-header';
@@ -21,6 +22,7 @@ import ListCard from '@/components/ui/list-card';
 import ListToolbar from '@/components/ui/list-toolbar';
 import EmptyState from '@/components/ui/empty-state';
 import ErrorBanner from '@/components/ui/error-banner';
+import Notice from '@/components/ui/notice';
 import { Button } from '../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import {
@@ -212,7 +214,7 @@ export default function Section18AManagementPage() {
 
       {feedback && (
         feedback.type === 'success'
-          ? <div className="mt-4 rounded-lg border border-good/40 bg-good-soft px-4 py-3 text-sm text-good" role="status">{feedback.message}</div>
+          ? <Notice className="mt-4" message={feedback.message} onClear={() => setFeedback(null)} />
           : <ErrorBanner className="mt-4" message={feedback.message} />
       )}
       <ErrorBanner className="mt-4" message={error} />
@@ -229,12 +231,12 @@ export default function Section18AManagementPage() {
               <Input type="number" aria-label="Maximum amount" placeholder="Max R" value={amountMax} onChange={(e) => setAmountMax(e.target.value)} className="h-8 w-24" />
               <Input type="date" aria-label="Date from" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 w-auto" />
               <Input type="date" aria-label="Date to" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 w-auto" />
-              <select aria-label="Sort certificate queue" value={queueSort} onChange={(e) => setQueueSort(e.target.value)} className="h-8 rounded-md border border-input bg-transparent px-2 text-sm">
+              <NativeSelect aria-label="Sort certificate queue" value={queueSort} onChange={(e) => setQueueSort(e.target.value)} size="sm">
                 <option value="date-asc">Date: oldest first</option>
                 <option value="date-desc">Date: newest first</option>
                 <option value="amount-asc">Amount: low to high</option>
                 <option value="amount-desc">Amount: high to low</option>
-              </select>
+              </NativeSelect>
             </ListToolbar>
           }
           footer={!loading && filteredCertificateQueue.length ? <TablePager {...certPage} noun="certificates" alwaysShow /> : null}
@@ -293,17 +295,17 @@ export default function Section18AManagementPage() {
               <ListToolbar
                 search={{ value: emailSearch, onChange: setEmailSearch, placeholder: 'Recipient, donor, donation, subject', label: 'Search email history' }}
               >
-                <select aria-label="Filter by email type" value={emailTypeFilter} onChange={(e) => setEmailTypeFilter(e.target.value)} className="h-8 rounded-md border border-input bg-transparent px-2 text-sm">
+                <NativeSelect aria-label="Filter by email type" value={emailTypeFilter} onChange={(e) => setEmailTypeFilter(e.target.value)} size="sm">
                   <option value="">All types</option>
                   <option value="THANK_YOU">Thank you</option>
                   <option value="SECTION_18A">Section 18A</option>
-                </select>
-                <select aria-label="Filter by email status" value={emailStatusFilter} onChange={(e) => setEmailStatusFilter(e.target.value)} className="h-8 rounded-md border border-input bg-transparent px-2 text-sm">
+                </NativeSelect>
+                <NativeSelect aria-label="Filter by email status" value={emailStatusFilter} onChange={(e) => setEmailStatusFilter(e.target.value)} size="sm">
                   <option value="">All statuses</option>
                   <option value="SENT">Sent</option>
                   <option value="FAILED">Failed</option>
                   <option value="PENDING">Pending</option>
-                </select>
+                </NativeSelect>
                 {(emailSearch || emailTypeFilter || emailStatusFilter) && (
                   <Button variant="ghost" size="sm" onClick={() => { setEmailSearch(''); setEmailTypeFilter(''); setEmailStatusFilter(''); }}>
                     Clear

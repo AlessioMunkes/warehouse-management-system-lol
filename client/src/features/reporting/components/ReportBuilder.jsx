@@ -155,8 +155,7 @@ export default function ReportBuilder({
       <div className="mt-4">
         <Button
           type="button" onClick={onRun} disabled={busy || !metricId}
-          className="bg-ink hover:bg-ink/90 text-on-ink font-bold text-xs tracking-wider rounded-lg px-6"
-        >
+          className="bg-ink hover:bg-ink/90 text-on-ink font-bold text-xs tracking-wider rounded-lg px-6" loading={busy}>
           {busy ? 'RUNNING…' : 'RUN REPORT'}
         </Button>
       </div>
