@@ -202,14 +202,12 @@ export const StatusPill = ({ status }) => {
 };
 
 // ── Progress ──────────────────────────────────────────────────
+// The worker's bar: a track and an "n / n" count beside it. The count is
+// the words; the bar is the picture (ACC-03).
 export const Progress = ({ done, total }) => {
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   return (
-    <div>
-      <p className="gst-progress-meta">
-        <span>{done} of {total} done</span>
-        <span>{pct}%</span>
-      </p>
+    <div className="gst-progress">
       <div
         className="gst-progress-track"
         role="progressbar"
@@ -220,9 +218,43 @@ export const Progress = ({ done, total }) => {
       >
         <div className="gst-progress-fill" style={{ width: `${pct}%` }} />
       </div>
+      <span className="gst-progress-count" aria-hidden="true">{done} / {total}</span>
     </div>
   );
 };
+
+// ── Item row (the worker's .stf-list / .stf-row, in guest classes) ──
+// One rounded list holding the item in front of them. `children` is the
+// panel under the head: the counter and the buttons.
+export const ItemList = ({ children }) => <div className="gst-list">{children}</div>;
+
+export const ItemRow = ({ position, title, meta, badge, children }) => (
+  <div className="gst-row">
+    <div className="gst-row-head">
+      <div className="gst-row-main">
+        {position ? <span className="gst-row-pos">{position}</span> : null}
+        <h2 className="gst-row-title">{title}</h2>
+        {meta ? <span className="gst-row-meta">{meta}</span> : null}
+      </div>
+      {badge}
+    </div>
+    {children}
+  </div>
+);
+
+// Previous and next among the items still to do, like the worker's
+// "Move between items" bar. Only drawn when there is somewhere to go.
+export const ItemSteps = ({ index, count, onPrevious, onNext, disabled }) => (
+  <nav className="gst-steps" aria-label="Move between items">
+    <button type="button" className="gst-step-btn" onClick={onPrevious} disabled={disabled || index <= 0}>
+      Previous item
+    </button>
+    <span className="gst-steps-count">{index + 1} / {count}</span>
+    <button type="button" className="gst-step-btn" onClick={onNext} disabled={disabled || index >= count - 1}>
+      Next item
+    </button>
+  </nav>
+);
 
 // ── Counter ───────────────────────────────────────────────────
 // Plus and minus rather than a keyboard. A volunteer standing at a

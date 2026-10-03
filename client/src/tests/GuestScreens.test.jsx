@@ -556,3 +556,77 @@ describe('Return this pallet (guest home)', () => {
     expect(screen.getByRole('button', { name: 'Return pallet' })).toBeInTheDocument();
   });
 });
+
+// ── The packing screen, in the worker's guided look ───────────
+describe('the packing screen (guided look)', () => {
+  const three = {
+    ...mySlip,
+    items: [
+      { id: 207, product_name: 'Butternut', required_quantity: '1.000', unit: 'crate', packed_quantity: null, status: 'pending', flag_reason: null },
+      { id: 210, product_name: 'Rice', required_quantity: '20.000', unit: 'kg', packed_quantity: null, status: 'pending', flag_reason: null },
+      { id: 211, product_name: 'Beans', required_quantity: '5.000', unit: 'kg', packed_quantity: null, status: 'pending', flag_reason: null },
+    ],
+  };
+
+  it('shows the pallet as the heading, an n / n progress bar and the item in a row', async () => {
+    api.fetchMySlip.mockResolvedValue(mySlip);
+    const { container } = renderAt('/guest/pack', <GuestPackPage />, '/guest/pack');
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Masibambane Day Care' })).toBeInTheDocument();
+    expect(screen.getByText('0 / 2')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: '0 of 2 items done' })).toBeInTheDocument();
+    expect(container.querySelector('.gst-list .gst-row')).not.toBeNull();
+    expect(screen.getByRole('heading', { level: 2, name: 'Butternut' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Packed it' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'There’s a problem' })).toBeInTheDocument();
+    // two items is "next" territory only if there is somewhere to go
+    expect(screen.getByRole('navigation', { name: 'Move between items' })).toBeInTheDocument();
+  });
+
+  it('has no previous / next when only one item is left', async () => {
+    api.fetchMySlip.mockResolvedValue({ ...mySlip, items: [mySlip.items[0]] });
+    renderAt('/guest/pack', <GuestPackPage />, '/guest/pack');
+
+    await screen.findByRole('heading', { level: 2, name: 'Butternut' });
+    expect(screen.queryByRole('navigation', { name: 'Move between items' })).not.toBeInTheDocument();
+  });
+
+  it('steps to the next and previous item still to do, without saving anything', async () => {
+    api.fetchMySlip.mockResolvedValue(three);
+    renderAt('/guest/pack', <GuestPackPage />, '/guest/pack');
+
+    await screen.findByRole('heading', { level: 2, name: 'Butternut' });
+    expect(screen.getByRole('button', { name: 'Previous item' })).toBeDisabled();
+    expect(screen.getByText('1 / 3')).toBeInTheDocument();
+
+    screen.getByRole('button', { name: 'Next item' }).click();
+    expect(await screen.findByRole('heading', { level: 2, name: 'Rice' })).toBeInTheDocument();
+    expect(screen.getByText('2 / 3')).toBeInTheDocument();
+
+    screen.getByRole('button', { name: 'Previous item' }).click();
+    expect(await screen.findByRole('heading', { level: 2, name: 'Butternut' })).toBeInTheDocument();
+    expect(api.confirmItem).not.toHaveBeenCalled();
+  });
+
+  it('packing a stepped-to item saves that item, then moves on to the one after it', async () => {
+    api.fetchMySlip.mockResolvedValue(three);
+    api.confirmItem.mockImplementation(async () => {
+      // the server now has Rice done
+      api.fetchMySlip.mockResolvedValue({
+        ...three,
+        items: three.items.map((i) => (i.id === 210 ? { ...i, status: 'confirmed', packed_quantity: '20.000' } : i)),
+      });
+      return {};
+    });
+    renderAt('/guest/pack', <GuestPackPage />, '/guest/pack');
+
+    await screen.findByRole('heading', { level: 2, name: 'Butternut' });
+    screen.getByRole('button', { name: 'Next item' }).click();
+    await screen.findByRole('heading', { level: 2, name: 'Rice' });
+    screen.getByRole('button', { name: 'Packed it' }).click();
+
+    expect(await screen.findByRole('heading', { level: 2, name: 'Beans' })).toBeInTheDocument();
+    expect(api.confirmItem).toHaveBeenCalledWith(135, 210, 20);
+    expect(screen.getByText('1 / 3')).toBeInTheDocument();
+  });
+});
