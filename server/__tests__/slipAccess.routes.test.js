@@ -29,6 +29,7 @@ const slipAccessRepo = {
   findPreviewsByShortCode: vi.fn(),
   listUnclaimedForDate:   vi.fn(),
   claimForVolunteer:      vi.fn(),
+  releaseForVolunteer:    vi.fn(),
   findSlipIdForVolunteer: vi.fn(),
   volunteerHoldsSlip:     vi.fn(),
   getVolunteerById:       vi.fn(),
@@ -526,5 +527,48 @@ describe('role separation', () => {
   it('refuses staff on the available list', async () => {
     const res = await request(app).get('/api/slip/available').set('Cookie', authCookie(MANAGER));
     expect(res.status).toBe(403);
+  });
+});
+
+// ── Release on sign-out ───────────────────────────────────────
+describe('POST /api/slip/release', () => {
+  it('releases the pallet the caller holds, naming only the caller', async () => {
+    slipAccessRepo.releaseForVolunteer.mockResolvedValue({ slip: { id: 132 } });
+    const res = await request(app).post('/api/slip/release').set('Cookie', authCookie(GUEST));
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual({ released: true, slipId: 132 });
+    expect(slipAccessRepo.releaseForVolunteer).toHaveBeenCalledWith({ volunteerId: '7' });
+  });
+
+  it('cannot be pointed at a pallet: a body or id is ignored', async () => {
+    slipAccessRepo.releaseForVolunteer.mockResolvedValue({ slip: { id: 132 } });
+    await request(app).post('/api/slip/release').set('Cookie', authCookie(OTHER)).send({ slipId: 999, volunteerId: '7' });
+    expect(slipAccessRepo.releaseForVolunteer).toHaveBeenCalledWith({ volunteerId: '9' });
+  });
+
+  it('holding nothing is a success with released: false', async () => {
+    slipAccessRepo.releaseForVolunteer.mockResolvedValue({ nothingHeld: true });
+    const res = await request(app).post('/api/slip/release').set('Cookie', authCookie(GUEST));
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual({ released: false });
+  });
+
+  it('requires a session', async () => {
+    const res = await request(app).post('/api/slip/release');
+    expect(res.status).toBe(401);
+  });
+
+  it.each([['warehouse_worker', WORKER], ['manager', MANAGER]])('refuses %s', async (_l, user) => {
+    const res = await request(app).post('/api/slip/release').set('Cookie', authCookie(user));
+    expect(res.status).toBe(403);
+    expect(slipAccessRepo.releaseForVolunteer).not.toHaveBeenCalled();
+  });
+
+  it('a database failure is a generic 500, not a raw message', async () => {
+    slipAccessRepo.releaseForVolunteer.mockRejectedValue(new Error('connection terminated'));
+    const res = await request(app).post('/api/slip/release').set('Cookie', authCookie(GUEST));
+    expect(res.status).toBe(500);
+    expect(res.body.message).toBe('Could not return your pallet.');
   });
 });

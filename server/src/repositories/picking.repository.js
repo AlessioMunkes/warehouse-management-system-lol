@@ -572,7 +572,8 @@ const releaseSlip = async ({ slipId, actorId, beforeCommit }) => {
 
     const result = await client.query(
       `UPDATE picking_slips
-       SET assigned_to = NULL, assigned_to_2 = NULL, status = 'pending'
+       SET assigned_to = NULL, assigned_to_2 = NULL, assigned_volunteer_id = NULL,
+           status = 'pending'
        WHERE id = $1
        RETURNING *`,
       [slipId]

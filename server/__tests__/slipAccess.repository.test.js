@@ -209,3 +209,46 @@ describe('volunteerHoldsSlip', () => {
     expect(await repo.volunteerHoldsSlip({ slipId: 999, volunteerId: '7' })).toBe(false);
   });
 });
+
+describe('releaseForVolunteer', () => {
+  const run = async (heldRow) => {
+    const calls = [];
+    client.query.mockImplementation(async (sql, params) => {
+      const text = String(sql).replace(/\s+/g, ' ').trim();
+      calls.push({ text, params });
+      if (/^SELECT id FROM picking_slips/i.test(text)) return { rows: heldRow ? [heldRow] : [] };
+      if (/^UPDATE picking_slips/i.test(text)) return { rows: heldRow ? [{ id: heldRow.id, status: 'pending', assigned_volunteer_id: null }] : [] };
+      return { rows: [] };
+    });
+    const result = await repo.releaseForVolunteer({ volunteerId: '7' });
+    return { result, calls };
+  };
+
+  it('guards the write itself: caller, unfinished status, never item rows', async () => {
+    const { result, calls } = await run({ id: 132 });
+    const update = calls.find((c) => /^UPDATE picking_slips/i.test(c.text));
+    expect(update.text).toMatch(/assigned_volunteer_id = NULL/);
+    expect(update.text).toMatch(/status = 'pending'/);
+    expect(update.text).toMatch(/AND assigned_volunteer_id = \$2/);
+    expect(update.text).toMatch(/AND status = ANY\(\$3\)/);
+    expect(update.params).toEqual([132, '7', ['pending', 'in_progress']]);
+    expect(calls.some((c) => /picking_slip_items/i.test(c.text))).toBe(false);
+    expect(calls.map((c) => c.text)).toContain('COMMIT');
+    expect(result.slip.id).toBe(132);
+  });
+
+  it('only ever looks for unfinished slips held by the caller, under a row lock', async () => {
+    const { calls } = await run({ id: 132 });
+    const sel = calls.find((c) => /^SELECT id FROM picking_slips/i.test(c.text));
+    expect(sel.text).toMatch(/assigned_volunteer_id = \$1/);
+    expect(sel.text).toMatch(/status = ANY\(\$2\)/);
+    expect(sel.text).toMatch(/FOR UPDATE/);
+  });
+
+  it('holding nothing is a quiet no-op, not a write', async () => {
+    const { result, calls } = await run(null);
+    expect(result).toEqual({ nothingHeld: true });
+    expect(calls.some((c) => /^UPDATE/i.test(c.text))).toBe(false);
+    expect(calls.map((c) => c.text)).toContain('ROLLBACK');
+  });
+});
