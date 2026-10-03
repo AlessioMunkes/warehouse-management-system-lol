@@ -67,6 +67,7 @@ const renderAt = (path, element, routePattern) => render(
   <MemoryRouter initialEntries={[path]}>
     <Routes>
       <Route path={routePattern} element={element} />
+      <Route path="/" element={<div>Landing</div>} />
       <Route path="/guest" element={<div>Guest sign in</div>} />
       <Route path="/guest-home" element={<div>Guest home</div>} />
       <Route path="/guest/pack" element={<div>Packing</div>} />
@@ -119,6 +120,48 @@ describe('(a) /slip/:token — the public preview', () => {
 
     expect(await screen.findByText(/could not find that pallet/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /sign in without a code/i })).toBeInTheDocument();
+  });
+});
+
+// ── (a2) Exits on the preview ─────────────────────────────────
+describe('(a2) /slip/:token — ways out', () => {
+  it('offers Back to start to the landing page, and no Sign out, with no session', async () => {
+    useAuth.mockReturnValue({ user: null, logout: vi.fn(), refreshFromClaim: vi.fn() });
+    api.fetchSlipPreview.mockResolvedValue(preview135);
+    renderAt('/slip/abc', <SlipPreviewPage />, '/slip/:token');
+
+    const back = await screen.findByRole('button', { name: 'Back to start' });
+    expect(screen.queryByRole('button', { name: 'Sign out' })).not.toBeInTheDocument();
+    back.click();
+    expect(await screen.findByText('Landing')).toBeInTheDocument();
+  });
+
+  it('shows Sign out when the guest has a session, and Back to start goes to their pallets', async () => {
+    api.fetchSlipPreview.mockResolvedValue(preview135);
+    renderAt('/slip/abc', <SlipPreviewPage />, '/slip/:token');
+
+    expect(await screen.findByRole('button', { name: 'Sign out' })).toBeInTheDocument();
+    screen.getByRole('button', { name: 'Back to start' }).click();
+    expect(await screen.findByText('Guest home')).toBeInTheDocument();
+  });
+
+  it('Sign out clears the session and lands on the landing page', async () => {
+    const logout = vi.fn().mockResolvedValue();
+    useAuth.mockReturnValue({ user: guest, logout, refreshFromClaim: vi.fn() });
+    api.fetchSlipPreview.mockResolvedValue(preview135);
+    renderAt('/slip/abc', <SlipPreviewPage />, '/slip/:token');
+
+    (await screen.findByRole('button', { name: 'Sign out' })).click();
+    expect(await screen.findByText('Landing')).toBeInTheDocument();
+    expect(logout).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the exits on the not-found screen too', async () => {
+    api.fetchSlipPreview.mockRejectedValue(new Error('That code did not match a pallet.'));
+    renderAt('/slip/bad', <SlipPreviewPage />, '/slip/:token');
+
+    expect(await screen.findByRole('button', { name: 'Back to start' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
   });
 });
 

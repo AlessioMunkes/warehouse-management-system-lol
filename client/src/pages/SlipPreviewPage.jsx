@@ -19,6 +19,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useGuestSignOut } from '../features/guest/useGuestSignOut';
 import { fetchSlipPreview, claimSlipByToken } from '../services/guestSlipAPI';
 import {
   GuestShell, GuestScreen, PlaceBar, Button, Notice,
@@ -39,6 +40,24 @@ const SlipPreviewPage = () => {
   const [busy, setBusy]   = useState(false);
 
   const alreadySignedIn = user?.role === 'guest';
+  const { signOut, signingOut } = useGuestSignOut();
+
+  // Explicit routes, never navigate(-1): a scan can be the first page in
+  // the tab, so "back" might leave the app. A signed-in guest's start is
+  // their pallet list; everyone else's is the landing page.
+  const startPath = alreadySignedIn ? '/guest-home' : '/';
+  const exitButtons = (
+    <>
+      <Button variant="ghost" onClick={() => navigate(startPath)} disabled={busy || signingOut}>
+        Back to start
+      </Button>
+      {alreadySignedIn ? (
+        <Button variant="ghost" onClick={signOut} disabled={busy} loading={signingOut}>
+          Sign out
+        </Button>
+      ) : null}
+    </>
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -72,10 +91,11 @@ const SlipPreviewPage = () => {
       <GuestShell>
         <GuestScreen
           title="We could not find that pallet"
-          lede="The code may have been typed wrong, or this pallet may already be finished."
+          lede="The code may be mistyped, or the pallet may be finished."
         >
           <Notice tone="warn">{error || 'That code did not match a pallet.'}</Notice>
           <Button onClick={() => navigate('/guest')}>Sign in without a code</Button>
+          {exitButtons}
           <HelpNote>Still stuck?</HelpNote>
         </GuestScreen>
       </GuestShell>
@@ -93,7 +113,7 @@ const SlipPreviewPage = () => {
       <GuestShell>
         <GuestScreen
           title="First — what should we call you?"
-          lede="So we can thank you properly at the end. That is the only reason we ask."
+          lede="So we can thank you at the end. That is the only reason we ask."
         >
           <PlaceBar items={[
             { text: 'Packing for' },
@@ -129,7 +149,7 @@ const SlipPreviewPage = () => {
               {busy ? 'Just a moment…' : 'Start packing'}
             </button>
             <Button variant="ghost" onClick={() => setStep('preview')} disabled={busy}>
-              Back
+              Back to pallet
             </Button>
           </form>
 
@@ -144,15 +164,15 @@ const SlipPreviewPage = () => {
     <GuestShell>
       <GuestScreen
         title="You’ve found a pallet"
-        lede="Here is what this one is, and who it feeds."
+        lede="Check this is the pallet you are standing at."
       >
         <PalletCard slip={slip} />
 
         <div className="gst-card gst-card-quiet">
-          <p className="gst-card-meta" style={{ color: 'var(--gst-ink)' }}>
+          <p className="gst-card-meta gst-text-ink">
             {slip.itemCount === 0
               ? 'There is nothing listed on this pallet yet. A staff member will need to sort that out before it can be packed.'
-              : `You will go through ${slip.itemCount} thing${slip.itemCount === 1 ? '' : 's'}, one at a time. Nothing is timed, and you can ask for help at any point.`}
+              : `You will go through ${slip.itemCount} thing${slip.itemCount === 1 ? '' : 's'}, one at a time. There is no rush, and you can ask for help at any point.`}
           </p>
         </div>
 
@@ -178,6 +198,8 @@ const SlipPreviewPage = () => {
             See today’s other pallets
           </Button>
         )}
+
+        {exitButtons}
 
         <HelpNote>Not the pallet you are standing at?</HelpNote>
       </GuestScreen>
