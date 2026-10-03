@@ -23,12 +23,13 @@ import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 // anything else cannot touch it.
 const LOCAL = /@(localhost|127\.0\.0\.1)[:/]/.test(process.env.DATABASE_URL || '');
 
-let pool, service, stockRepo, pickingRepo;
+let pool, service, stockRepo, pickingRepo, dashboardRepo;
 if (LOCAL) {
   ({ default: pool } = await import('../../src/config/db.js'));
   ({ default: service } = await import('../../src/services/communityRequest.service.js'));
   ({ default: stockRepo } = await import('../../src/repositories/stock.repository.js'));
   ({ default: pickingRepo } = await import('../../src/repositories/picking.repository.js'));
+  ({ default: dashboardRepo } = await import('../../src/repositories/dashboard.repository.js'));
 }
 
 const TABLES = [
@@ -371,6 +372,39 @@ describe.skipIf(!LOCAL)('benevolent requests against a real database', () => {
     it('only a manager or admin can choose other items', async () => {
       const id = await approved([{ productId: rice, quantity: 2 }]);
       await rejects(service.rechooseItems(id, { items: [{ productId: rice, quantity: 1 }] }, worker), 403);
+    });
+  });
+
+  describe('Needs attention counts', () => {
+    const counts = async () => (await dashboardRepo.getAttention()).communityRequests;
+
+    it('counts awaiting approval, approved-but-unclaimed, and needs-new-items separately', async () => {
+      await log();                                                   // awaiting approval
+      await approved([{ productId: beans, quantity: 1 }]);           // approved, unclaimed
+      const claimed = await approved([{ productId: beans, quantity: 1 }]);
+      await service.claim(claimed, worker);                          // approved, claimed: not counted as unclaimed
+      const assigned = await approved([{ productId: beans, quantity: 1 }]);
+      await service.assign(assigned, { userId: worker2.id }, manager); // approved, assigned: has an owner
+      expect(await counts()).toEqual({ pending: 1, unclaimed: 1, needsItems: 0 });
+    });
+
+    it('a flagged request moves from unclaimed to needs new items, and back when items are re-chosen', async () => {
+      const id = await approved([{ productId: rice, quantity: 8 }]);
+      expect(await counts()).toEqual({ pending: 0, unclaimed: 1, needsItems: 0 });
+
+      await packPallet(rice, 6);
+      expect(await counts()).toEqual({ pending: 0, unclaimed: 0, needsItems: 1 });
+
+      await service.rechooseItems(id, { items: [{ productId: beans, quantity: 2 }] }, manager);
+      expect(await counts()).toEqual({ pending: 0, unclaimed: 1, needsItems: 0 });
+    });
+
+    it('closed requests are not counted', async () => {
+      const a = await approved([{ productId: beans, quantity: 1 }]);
+      await service.decline(a, { reason: 'No' }, manager);
+      const b = await approved([{ productId: beans, quantity: 1 }]);
+      await service.confirm(b, {}, manager);
+      expect(await counts()).toEqual({ pending: 0, unclaimed: 0, needsItems: 0 });
     });
   });
 

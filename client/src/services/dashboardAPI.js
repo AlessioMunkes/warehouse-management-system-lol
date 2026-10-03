@@ -56,7 +56,11 @@ export const toAttention = (row = {}) => {
       awaitingApproval: n(row.purchaseOrders?.awaitingApproval),
       followUp:         n(row.purchaseOrders?.followUp),
     },
-    communityRequests: { pending: n(row.communityRequests?.pending) },
+    communityRequests: {
+      pending:    n(row.communityRequests?.pending),
+      unclaimed:  n(row.communityRequests?.unclaimed),
+      needsItems: n(row.communityRequests?.needsItems),
+    },
   };
 };
 

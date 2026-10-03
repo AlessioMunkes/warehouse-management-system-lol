@@ -125,7 +125,7 @@ export const ROUTES = [
 
   // ── The manager's side of those two programmes ─────────────
   { id: 'communityRequests', path: STAFF.communityRequests, roles: MANAGERS_UP, shell: true,
-    nav: [nav('manager', 'Outbound', 'Benevolent Requests', PhoneCall, (a) => a.communityRequests.pending)] },
+    nav: [nav('manager', 'Outbound', 'Benevolent Requests', PhoneCall, (a) => (a.communityRequests.pending ?? 0) + (a.communityRequests.needsItems ?? 0))] },
   { id: 'feedTheSoil', path: STAFF.feedTheSoil, roles: MANAGERS_UP, shell: true,
     nav: [nav('manager', 'Programmes', 'Feed the Soil', Sprout)] },
 

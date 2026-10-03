@@ -169,7 +169,9 @@ const getSummary = async () => {
 //   pickingSlips   — this week (Monday to Sunday, SAST), the Picking
 //                    Slips page's default range
 //   purchaseOrders — awaiting approval, and those flagged for follow-up
-//   communityRequests — still pending
+//   communityRequests — awaiting approval; approved but nobody has
+//                    claimed or been assigned them; and approved ones that
+//                    need new items because a pallet used their stock
 const EXPIRY_WINDOW_DAYS = 30;
 
 const sastDay = (date) =>
@@ -194,7 +196,15 @@ const getAttention = async ({ now = new Date() } = {}) => {
        FROM purchase_orders`
     ),
     pool.query(
-      `SELECT COUNT(*)::int AS count FROM community_requests WHERE outcome = 'pending'`
+      `SELECT
+         COUNT(*) FILTER (WHERE outcome = 'pending')::int AS pending,
+         COUNT(*) FILTER (WHERE outcome = 'approved'
+                            AND items_short_at IS NULL
+                            AND handled_by IS NULL
+                            AND assigned_to IS NULL)::int AS unclaimed,
+         COUNT(*) FILTER (WHERE outcome = 'approved'
+                            AND items_short_at IS NOT NULL)::int AS needs_items
+       FROM community_requests`
     ),
   ]);
 
@@ -212,7 +222,11 @@ const getAttention = async ({ now = new Date() } = {}) => {
     inventory:         { shortfall, lowStock, expiring },
     pickingSlips:      { unassigned: num(slips.rows[0]?.unassigned), notCollected: num(slips.rows[0]?.not_collected) },
     purchaseOrders:    { awaitingApproval: num(pos.rows[0]?.awaiting_approval), followUp: num(pos.rows[0]?.follow_up) },
-    communityRequests: { pending: num(requests.rows[0]?.count) },
+    communityRequests: {
+      pending:    num(requests.rows[0]?.pending),
+      unclaimed:  num(requests.rows[0]?.unclaimed),
+      needsItems: num(requests.rows[0]?.needs_items),
+    },
   };
 };
 
