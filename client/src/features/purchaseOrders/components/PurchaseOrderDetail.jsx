@@ -170,7 +170,7 @@ export default function PurchaseOrderDetail({
             The order moves to Follow-up required and stops being offered for receiving until someone reopens it.
           </p>
           <div className="flex gap-2">
-            <Button type="button" size="sm" disabled={!reason.trim() || followBusy} onClick={saveFollowUp}>
+            <Button type="button" size="sm" disabled={!reason.trim() || followBusy} onClick={saveFollowUp} loading={followBusy}>
               {followBusy ? 'Saving…' : 'Save follow-up'}
             </Button>
             <Button type="button" variant="ghost" size="sm" disabled={followBusy}
@@ -299,8 +299,7 @@ export default function PurchaseOrderDetail({
             <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
             <Button
               type="button" variant="outline" disabled={deleting} onClick={runDelete}
-              className="border-brand text-brand hover:bg-brand hover:text-white"
-            >
+              className="border-brand text-brand hover:bg-brand hover:text-white" loading={deleting}>
               <Trash2 />
               {deleting ? 'Deleting…' : 'Delete permanently'}
             </Button>

@@ -33,7 +33,7 @@ describe('DonationManagementPage', () => {
   it('renders the title, tab strip and the Pending Product Review tab by default', async () => {
     render(<DonationManagementPage />);
 
-    expect(screen.getByText('Classification Queue')).toBeInTheDocument();
+    expect(screen.getByText('Classification queue')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Pending Product Review/ })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Reconciliation/ })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Processing Failed/ })).toBeInTheDocument();

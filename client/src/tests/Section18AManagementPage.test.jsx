@@ -68,7 +68,7 @@ describe('Section18AManagementPage', () => {
   it('renders queue with donor, reference, date, amount, and no certificate settings navigation', async () => {
     render(<Section18AManagementPage />);
 
-    expect(await screen.findByText('Section 18A Management')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Section 18A' })).toBeInTheDocument();
     expect(await screen.findByText('DON-1001')).toBeInTheDocument();
     expect(screen.getByText('Jane Doe')).toBeInTheDocument();
     expect(screen.getByText('R500.00')).toBeInTheDocument();

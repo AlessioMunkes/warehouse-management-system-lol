@@ -20,19 +20,19 @@ export const SETTINGS = Object.freeze({
   'dispatch.nonCollectionCutoffHour': {
     section: 'notifications',
     label: 'Not-collected cut-off',
-    help: 'After this hour (warehouse time) a pallet still waiting at the gate is flagged as not collected.',
+    help: 'Pallets still at the gate after this hour (warehouse time) are marked not collected.',
     default: 15, min: 0, max: 23, unit: ':00',
   },
   'reminders.runHour': {
     section: 'notifications',
     label: 'Collection reminder send time',
-    help: 'Reminders for tomorrow\'s collections go out at this hour, warehouse time.',
+    help: 'Send reminders for tomorrow\'s collections at this hour (warehouse time).',
     default: 8, min: 0, max: 23, unit: ':00',
   },
   'stock.expiryWarningFirstDays': {
     section: 'stock',
     label: 'First expiry warning',
-    help: 'Managers are told when a delivered batch is this many days from its expiry date.',
+    help: 'Warn managers this many days before a delivered batch expires.',
     default: 14, min: 2, max: 90, unit: 'days before',
     check: (value, all) => (value <= all['stock.expiryWarningSecondDays']
       ? 'The first warning has to come before the second.' : null),
@@ -40,7 +40,7 @@ export const SETTINGS = Object.freeze({
   'stock.expiryWarningSecondDays': {
     section: 'stock',
     label: 'Second expiry warning',
-    help: 'A second, more urgent notice this many days out.',
+    help: 'Send a second, urgent warning this many days before.',
     default: 7, min: 1, max: 60, unit: 'days before',
     check: (value, all) => (value >= all['stock.expiryWarningFirstDays']
       ? 'The second warning has to come after the first.' : null),
@@ -67,7 +67,7 @@ export const SETTINGS = Object.freeze({
   'invites.linkDays': {
     section: 'accounts',
     label: 'Invite link lifetime',
-    help: 'How long a new account\'s invite link works before it has to be resent.',
+    help: 'Invite links stop working after this many days.',
     default: 7, min: 1, max: 30, unit: 'days',
   },
 });

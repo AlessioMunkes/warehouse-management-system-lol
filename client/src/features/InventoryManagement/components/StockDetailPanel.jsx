@@ -208,7 +208,7 @@ export default function StockDetailPanel({
           <Skeleton className="h-16 w-full" />
         ) : batches.rows.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No expiry dates recorded for this product. Expiry is captured when a purchase-order delivery is received.
+            No expiry dates recorded. They are captured when a delivery is received.
           </p>
         ) : (
           <>
@@ -230,7 +230,7 @@ export default function StockDetailPanel({
               })}
             </ul>
             <p className="mt-2 text-xs text-muted-foreground">
-              Quantities are what each delivery brought in, not what is left of it — stock is held as one balance per product.
+              Quantities show what each delivery brought in, not what remains.
             </p>
           </>
         )}

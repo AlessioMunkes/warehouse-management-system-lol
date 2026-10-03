@@ -67,8 +67,8 @@ describe('sidebars built from the table', () => {
         'Packing /noc/packing',
         'Decanting /noc/decanting',
         'Dispatch /staff/dispatch',
-        'Donation Intake /donations/new',
-        'Benevolent Requests /staff/community-requests',
+        'Donation intake /donations/new',
+        'Benevolent requests /staff/community-requests',
         'Feed the Soil /staff/feed-the-soil',
       ]],
     ]);
@@ -77,35 +77,35 @@ describe('sidebars built from the table', () => {
   it('manager', () => {
     expect(menu('manager')).toEqual([
       ['Overview', ['Dashboard /manager']],
-      ['Inbound', ['Purchase Orders /noc/purchase-orders', 'Receipts /noc/receipts']],
-      ['Stock', ['Inventory /noc/inventory', 'Stock Ledger /noc/stock-ledger']],
+      ['Inbound', ['Purchase orders /noc/purchase-orders', 'Receipts /noc/receipts']],
+      ['Stock', ['Inventory /noc/inventory', 'Stock ledger /noc/stock-ledger']],
       ['Outbound', [
-        'Picking Slips /noc/picking-slips',
+        'Picking slips /noc/picking-slips',
         'Beneficiaries /noc/beneficiaries',
-        'Collection Reminders /noc/collection-reminders',
-        'Operating Calendar /noc/operating-calendar',
-        'Benevolent Requests /noc/community-requests',
+        'Collection reminders /noc/collection-reminders',
+        'Operating calendar /noc/operating-calendar',
+        'Benevolent requests /noc/community-requests',
       ]],
-      ['Programmes', ['Feed the Soil /noc/feed-the-soil', 'Volunteer Events /volunteers']],
-      ['Insights', ['Operations Reports /noc/reporting', 'Impact Reports /noc/impact-report']],
+      ['Programmes', ['Feed the Soil /noc/feed-the-soil', 'Volunteer events /volunteers']],
+      ['Insights', ['Operations reports /noc/reporting', 'Impact report /noc/impact-report']],
     ]);
   });
 
   it('admin', () => {
     expect(menu('admin')).toEqual([
-      ['Overview', ['Dashboard /admin', 'Finance Report /admin/finance-report']],
+      ['Overview', ['Dashboard /admin', 'Finance report /admin/finance-report']],
       ['Master data', [
-        'User Management /admin/users',
-        'Product Management /admin/products',
-        'Supplier Management /admin/suppliers',
+        'Users /admin/users',
+        'Products /admin/products',
+        'Suppliers /admin/suppliers',
       ]],
       ['Logs', [
-        'User Activity /admin/activity', 'Volunteer Log /admin/volunteer-log', 'Archive /admin/archive',
-        'Message History /admin/messages',
+        'User activity /admin/activity', 'Volunteer log /admin/volunteer-log', 'Archive /admin/archive',
+        'Message history /admin/messages',
       ]],
       ['Donations', [
-        'Classification Queue /admin/donation-management',
-        'Section 18A Management /admin/section-18a',
+        'Classification queue /admin/donation-management',
+        'Section 18A /admin/section-18a',
       ]],
       // The Gmail screen is Settings' Email section now.
       ['Setup', ['Settings /admin/settings']],
@@ -114,6 +114,6 @@ describe('sidebars built from the table', () => {
 
   it('keeps the attention counts on the manager items that had them', () => {
     const counted = NAV_SECTIONS('manager').flatMap((s) => s.items).filter((i) => i.count).map((i) => i.label);
-    expect(counted).toEqual(['Purchase Orders', 'Inventory', 'Picking Slips', 'Benevolent Requests']);
+    expect(counted).toEqual(['Purchase orders', 'Inventory', 'Picking slips', 'Benevolent requests']);
   });
 });

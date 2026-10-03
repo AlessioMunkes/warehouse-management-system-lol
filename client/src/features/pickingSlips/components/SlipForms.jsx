@@ -115,8 +115,8 @@ export function GenerateSlipsForm({ onGenerated, onDone }) {
       <CardHeader><CardTitle>Generate this week's slips</CardTitle></CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Creates one slip per approved, active beneficiary in the chosen cohort. Safe to
-          run twice: it skips any centre that already has a slip for that date.
+          Choose a dispatch date and cohort to create a slip for every approved, active centre.
+          Centres that already have a slip for that date are skipped.
         </p>
         {error ? <ErrorBanner message={error} /> : null}
         {result ? (
@@ -143,7 +143,7 @@ export function GenerateSlipsForm({ onGenerated, onDone }) {
           </Field>
         </div>
         <Field orientation="horizontal">
-          <Button type="button" onClick={run} disabled={busy || !form.dispatchDate || !form.cohort}>
+          <Button type="button" onClick={run} disabled={busy || !form.dispatchDate || !form.cohort} loading={busy}>
             {busy ? 'Generating' : 'Generate slips'}
           </Button>
           <Button type="button" variant="outline" onClick={onDone}>Done</Button>
@@ -215,8 +215,7 @@ export function CreateSlipForm({ beneficiaries, products, onCreated, onCancel })
       <CardHeader><CardTitle>Create a new slip</CardTitle></CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          For a late registration, a correction, or a make-up delivery outside a
-          beneficiary's normal rotation.
+          Use for a late registration, a correction or a make-up delivery.
         </p>
         {error ? <ErrorBanner message={error} /> : null}
 
@@ -264,8 +263,7 @@ export function CreateSlipForm({ beneficiaries, products, onCreated, onCancel })
           </FieldLabel>
         </Field>
         <FieldDescription>
-          Leave this unchecked to pull the standard product list from the beneficiary's
-          standing order, same as before.
+          Leave unticked to use the centre’s standing order.
         </FieldDescription>
 
         {form.manualItems ? (
@@ -277,8 +275,7 @@ export function CreateSlipForm({ beneficiaries, products, onCreated, onCancel })
                 value={form.mealsToServe} onChange={(e) => applyMealsToServe(e.target.value)}
               />
               <FieldDescription>
-                Calculates each product's quantity from this centre's per-meal ratio. Every line
-                stays editable below, so adjust anything by hand before creating the slip.
+                Fills each quantity from the centre’s per-meal ratio. Adjust any line before creating the slip.
               </FieldDescription>
             </Field>
             <ItemLinesEditor items={form.items} products={products} onChange={(items) => setForm((f) => ({ ...f, items }))} />
@@ -288,8 +285,7 @@ export function CreateSlipForm({ beneficiaries, products, onCreated, onCancel })
         <Field orientation="horizontal">
           <Button
             type="button" onClick={run}
-            disabled={busy || !form.ecdId || !form.dispatchDate || !form.cohort || (form.manualItems && linesInvalid(form.items))}
-          >
+            disabled={busy || !form.ecdId || !form.dispatchDate || !form.cohort || (form.manualItems && linesInvalid(form.items))} loading={busy}>
             {busy ? 'Creating' : 'Create slip'}
           </Button>
           <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
@@ -334,7 +330,7 @@ export function EditSlipForm({ slip, products, onSaved, onCancel }) {
       <CardHeader><CardTitle>Edit slip — {slip.ecd_name}</CardTitle></CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Only while this pallet is still on the floor, unclaimed — once someone picks it up, editing locks.
+          Editing locks once a packer claims the slip.
         </p>
         {error ? <ErrorBanner message={error} /> : null}
 
@@ -366,8 +362,7 @@ export function EditSlipForm({ slip, products, onSaved, onCancel }) {
         <Field orientation="horizontal">
           <Button
             type="button" onClick={run}
-            disabled={busy || !form.dispatchDate || !form.cohort || linesInvalid(form.items)}
-          >
+            disabled={busy || !form.dispatchDate || !form.cohort || linesInvalid(form.items)} loading={busy}>
             {busy ? 'Saving' : 'Save changes'}
           </Button>
           <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>

@@ -44,6 +44,7 @@ import ListToolbar from '@/components/ui/list-toolbar';
 import TablePager from '@/components/ui/table-pager';
 import ErrorBanner from '@/components/ui/error-banner';
 import { Input } from '@/components/ui/input';
+import NativeSelect from '@/components/ui/native-select';
 import StatusBadge from '@/components/ui/status-badge';
 import { VARIANCE_STYLE } from '@/lib/statusStyles';
 import DeliveryNotePDF from '../features/procurement/components/DeliveryNotePDF';
@@ -64,7 +65,6 @@ const TABS = [
 
 // A native select drawn like the app's Input, for the toolbar. Native
 // rather than the Base UI Select so it stays a plain form control.
-const SELECT = 'h-8 rounded-md border border-input bg-transparent px-2 text-sm text-foreground';
 
 const shortDate = (value) => new Date(`${value}T00:00:00`)
   .toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' });
@@ -382,7 +382,7 @@ export default function ReceiptsPage() {
     <PageShell>
       <PageHeader
         title="Receipts"
-        description="Delivery notes for stock that came in, and dispatch notes for stock that went out."
+        description="Find delivery notes for goods in and dispatch notes for goods out."
       />
 
       <ViewTabs
@@ -416,26 +416,27 @@ export default function ReceiptsPage() {
               chips={chips}
               onClearAll={clearAll}
             >
-              <select
+              <NativeSelect
                 aria-label={entityLabel}
-                className={`${SELECT} max-w-48`}
+                size="sm"
+                className="max-w-48"
                 value={filters.entity}
                 onChange={(e) => setFilter({ entity: e.target.value })}
               >
                 <option value="">Any {entityLabel.toLowerCase()}</option>
                 {entityOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
+              </NativeSelect>
               {tab === 'out' ? (
-                <select
+                <NativeSelect
                   aria-label="Cohort"
-                  className={SELECT}
+                  size="sm"
                   value={cohort}
                   onChange={(e) => { setCohort(e.target.value); setOffset(0); }}
                 >
                   <option value="">Any cohort</option>
                   <option value="tuesday">Tuesday</option>
                   <option value="thursday">Thursday</option>
-                </select>
+                </NativeSelect>
               ) : null}
               <Input
                 type="date" aria-label="From" title="From" className="h-8 w-auto"

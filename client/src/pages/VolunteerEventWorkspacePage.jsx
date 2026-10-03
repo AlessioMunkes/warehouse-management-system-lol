@@ -31,6 +31,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import PageHeader, { PageShell } from '@/components/ui/page-header';
 import StatusBadge from '@/components/ui/status-badge';
 import ErrorBanner from '@/components/ui/error-banner';
+import Notice from '@/components/ui/notice';
 
 const formatDate = (value) => value ? new Intl.DateTimeFormat('en-ZA', { dateStyle: 'long' }).format(new Date(`${String(value).slice(0, 10)}T00:00:00`)) : '';
 
@@ -130,7 +131,7 @@ export default function VolunteerEventWorkspacePage() {
         <ChevronLeft /> Back to events
       </Link>
       <ErrorBanner className="mb-4" message={error} onRetry={refresh} />
-      {success && <div role="status" className="mb-4 rounded-lg border bg-muted px-4 py-3 text-sm">{success}</div>}
+      <Notice className="mb-4" message={success} onClear={() => setSuccess('')} />
       {/* Keep all workspace panels backed by the same event snapshot. */}
       {isLoading ? (
         <div role="status" aria-label="Loading event workspace" className="grid gap-4">

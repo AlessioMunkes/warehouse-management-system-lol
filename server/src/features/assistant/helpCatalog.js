@@ -141,27 +141,27 @@ export const SCREENS = [
   { id: 'reporting', label: 'Operations reports', roles: MANAGERS_UP,
     about: 'Ask a question about the figures, or browse reports by area; Generate report explains the chart, gives the business view and lists the actions.',
     aka: ['reporting', 'reports', 'analytics', 'operations analytics', 'statistics'] },
-  { id: 'impactReport', label: 'Impact reports', roles: MANAGERS_UP,
-    about: 'The Impact Calculator: meals, children and adults served, compost processed, poster PDF.',
+  { id: 'impactReport', label: 'Impact report', roles: MANAGERS_UP,
+    about: 'The Impact report: meals, children and adults served, compost processed, poster PDF.',
     aka: ['impact calculator', 'impact report', 'donor report', 'meals served'] },
   { id: 'volunteers', label: 'Volunteer events', roles: MANAGERS_UP,
     about: 'Set up volunteer events and time slots, and see who signed in to each.',
     aka: ['volunteer events', 'volunteer sessions', 'corporate groups'] },
 
   // Admin only.
-  { id: 'products', label: 'Product management', roles: ADMIN_ONLY,
+  { id: 'products', label: 'Products', roles: ADMIN_ONLY,
     about: 'The product catalogue: names, codes, weights, costs, reorder levels.',
     aka: ['products', 'catalogue', 'items'] },
-  { id: 'suppliers', label: 'Supplier management', roles: ADMIN_ONLY,
+  { id: 'suppliers', label: 'Suppliers', roles: ADMIN_ONLY,
     about: 'Who we buy from, and their contact details.',
     aka: ['suppliers', 'vendors'] },
-  { id: 'users', label: 'User management', roles: ADMIN_ONLY,
+  { id: 'users', label: 'Users', roles: ADMIN_ONLY,
     about: 'Staff accounts, roles and passwords.',
     aka: ['users', 'accounts', 'staff accounts', 'logins'] },
-  { id: 'donationManagement', label: 'Donation management', roles: ADMIN_ONLY,
+  { id: 'donationManagement', label: 'Classification queue', roles: ADMIN_ONLY,
     about: 'Check, value and classify donations taken in at the gate.',
     aka: ['classification queue', 'review donations', 'flagged donations'] },
-  { id: 'section18a', label: 'Section 18A certificates', roles: ADMIN_ONLY,
+  { id: 'section18a', label: 'Section 18A', roles: ADMIN_ONLY,
     about: 'Issue and track tax certificates for donors.',
     aka: ['18a', 'tax certificates', 'certificate queue'] },
   { id: 'emailIntegration', label: 'Email settings', roles: ADMIN_ONLY,
@@ -1260,7 +1260,7 @@ export const TOPICS = [
       'A purchase order tells a supplier what to deliver, and gives Receiving the ' +
       'list to check against.',
     steps: [
-      'Open Purchase Orders and choose + New purchase order.',
+      'Open Purchase orders and choose + New purchase order.',
       'Pick the supplier and the expected delivery date.',
       'Add a line per product and set the quantity — or choose Add low-stock items to start with everything that is low.',
       'Check the estimated total and save. It waits under Awaiting approval until a manager approves it.',
@@ -1370,7 +1370,7 @@ export const TOPICS = [
     body:
       'A picking slip tells packing exactly what one centre gets. You don’t type the ' +
       'items in — each slip is filled from that centre’s standard order.\n\n' +
-      'Open Picking Slips and choose one of two options:',
+      'Open Picking slips and choose one of two options:',
     steps: [
       'Generate this week’s slips — one slip for every approved, active centre in a cohort (Tuesday or Thursday), for a dispatch date.',
       'Create an ad-hoc slip — one slip for a single centre, for a late registration, a correction or a make-up delivery.',
@@ -1416,7 +1416,7 @@ export const TOPICS = [
       'hand it to a packer',
     ],
     body:
-      'Open a slip on Picking Slips, choose a worker under Assign to a worker, then ' +
+      'Open a slip on Picking slips, choose a worker under Assign to a worker, then ' +
       'Assign. You can add a second packer when two people are on it. To give many ' +
       'at once, tick them and choose Assign to….\n\n' +
       'Or leave slips unassigned and anyone free can claim one on the floor — ' +
@@ -1441,7 +1441,7 @@ export const TOPICS = [
       'Generate this week’s slips makes one slip for every approved, active centre in' +
       ' the cohort you choose, filled from each centre’s standard order.',
     steps: [
-      'Open Picking Slips and choose Generate this week’s slips.',
+      'Open Picking slips and choose Generate this week’s slips.',
       'Pick the dispatch date and the cohort (Tuesday or Thursday).',
       'Choose Generate slips.',
       'If it says some slips had no lines, check those centres before packing starts.',
@@ -1595,7 +1595,7 @@ export const TOPICS = [
       'When someone phones or walks in asking for a food parcel, log it here instead ' +
       'of on a note.',
     steps: [
-      'Open Benevolent Requests and choose Log a request.',
+      'Open Benevolent requests and choose Log a request.',
       'Enter what was requested, the caller’s name and how to contact them.',
       'Add a quantity note and when they asked.',
       'Save. It then shows under Open requests until it’s dealt with.',
@@ -1852,7 +1852,7 @@ export const TOPICS = [
     ],
     body:
       'Volunteers sign in with their first name when they arrive, against an event. ' +
-      'Open the event under Volunteer Events: Bookings and attendance shows who is ' +
+      'Open the event under Volunteer events: Bookings and attendance shows who is ' +
       'booked and who has been checked in.\n\n' +
       'Admins also have the full door log, with sign-out times.',
     followUp: {
@@ -1871,7 +1871,7 @@ export const TOPICS = [
       'book volunteers', 'schedule volunteers', 'create an event',
     ],
     body:
-      'Choose + Create event on Volunteer Events. Fill in the name, date, venue and ' +
+      'Choose + Create event on Volunteer events. Fill in the name, date, venue and ' +
       'description, then the first time slot: its space, start and end time, and ' +
       'capacity. Add more with Add Timeslot.\n\n' +
       'On the day, volunteers sign in against it — that’s what turns a sign-in into ' +
@@ -1913,7 +1913,7 @@ export const TOPICS = [
       'cost per item', 'weight per item', 'reorder level', 'change a product',
     ],
     body:
-      'Choose + Add product on Product Management, or click a product and choose ' +
+      'Choose + Add product on Products, or click a product and choose ' +
       'Edit details in its panel. Name and stock code are required. Weight, cost and reorder level are optional, but they matter: they ' +
       'fill in purchase order lines and decide when a product shows as low.\n\n' +
       'A wrong number here becomes a wrong number on every order, so double-check it.',
@@ -1956,7 +1956,7 @@ export const TOPICS = [
       'supplier contact', 'we stopped using them',
     ],
     body:
-      'Choose Register supplier on Supplier Management, or click a supplier to see ' +
+      'Choose Register supplier on Suppliers, or click a supplier to see ' +
       'their details, open orders and recent deliveries, and choose Edit details. If ' +
       'you stop using a supplier, deactivate them rather than deleting — past orders ' +
       'still need to show who they were from.',
@@ -2021,7 +2021,7 @@ export const TOPICS = [
       'donation value is wrong', 'approve donations',
     ],
     body:
-      'The Classification Queue is where donations recorded at the gate are checked, ' +
+      'The Classification queue is where donations recorded at the gate are checked, ' +
       'valued properly and classified. Its tabs: Pending Product Review (items that ' +
       'need a decision), Reconciliation (something doesn’t match) and Processing ' +
       'Failed (a system problem — try them again).\n\n' +
@@ -2087,7 +2087,7 @@ export const TOPICS = [
     body:
       'In Settings, Email section, save the Finance recipient’s email address. New purchase ' +
       'orders are sent there automatically.\n\n' +
-      'The Send Finance Report Link button emails Finance a link to the warehouse ' +
+      'The Send report link button emails Finance a link to the warehouse ' +
       'movement report, which they can open without an account.',
     followUp: {
       question: 'Would you like to know what the finance report contains?',
@@ -2205,7 +2205,7 @@ export const TOPICS = [
       'many you have ticked, with what you can do to them.',
     steps: [
       'Inventory — Raise purchase order, Adjust stock (one after another), or Export selected.',
-      'Picking Slips — Assign to…, Assign to floor, or Print pallet labels.',
+      'Picking slips — Assign to…, Assign to floor, or Print pallet labels.',
       'Choose Clear selection on the bar to untick them all.',
     ],
     followUp: {
@@ -2252,7 +2252,7 @@ export const TOPICS = [
     ],
     body:
       'Warehouse staff record deliveries on the floor; you follow them from your own ' +
-      'screens. The In transit tab on Purchase Orders is what is still expected. Once ' +
+      'screens. The In transit tab on Purchase orders is what is still expected. Once ' +
       'a delivery is recorded, its order moves to Partially received or Completed, and' +
       ' the delivery note appears on Receipts under Goods in.\n\n' +
       'A delivery whose count didn’t match shows Flagged and a variance on Receipts, ' +
@@ -2274,7 +2274,7 @@ export const TOPICS = [
       'is the pallet ready', 'packing board', 'packing progress', 'what is still to pack',
     ],
     body:
-      'Picking Slips is your view of the floor’s packing. Its tabs split the week: ' +
+      'Picking slips is your view of the floor’s packing. Its tabs split the week: ' +
       'Unassigned (nobody on it yet), Packing, Ready at gate and Not collected. Each ' +
       'row shows who is packing it and how many lines are packed.\n\n' +
       'Open a slip to see its lines, what was flagged short, and who has it.',
@@ -2296,7 +2296,7 @@ export const TOPICS = [
     body:
       'A pallet nobody collected by the cut-off (15:00 unless an admin changed it in ' +
       'Settings) is marked Not collected automatically. You see them on the Not ' +
-      'collected tab of Picking Slips, which counts red, and the bell tells you.\n\n' +
+      'collected tab of Picking slips, which counts red, and the bell tells you.\n\n' +
       'If a centre keeps missing, check its contact details and reminders on ' +
       'Beneficiaries and Collection reminders.',
     followUp: {
@@ -2422,7 +2422,7 @@ export const TOPICS = [
       'slips for a different week', 'go back to this week',
     ],
     body:
-      'Picking Slips shows one week at a time — the dates are above the tabs. Use the ' +
+      'Picking slips shows one week at a time — the dates are above the tabs. Use the ' +
       'arrows either side to move a week back or forward, and This week to come ' +
       'back. The tabs and their counts are for the week on screen.',
     followUp: {
@@ -2547,7 +2547,7 @@ export const TOPICS = [
       'open requests', 'what requests are waiting', 'log a request', 'food parcel request',
     ],
     body:
-      'Benevolent Requests lists every phoned-in or walk-in request for a food ' +
+      'Benevolent requests lists every phoned-in or walk-in request for a food ' +
       'parcel, with a tab for each outcome. Pending, first and counting red, is what ' +
       'still needs dealing with.\n\n' +
       'Choose + Log a request to add one yourself. Claim a request to show you are ' +
@@ -2592,7 +2592,7 @@ export const TOPICS = [
       'register a walk-in', 'who has arrived', 'mark attendance', 'undo check in',
     ],
     body:
-      'Open the event from Volunteer Events. Schedule and capacity shows each time ' +
+      'Open the event from Volunteer events. Schedule and capacity shows each time ' +
       'slot and how full it is. Under Bookings and attendance, choose Check in as ' +
       'each person arrives (Undo check-in if it was the wrong one).\n\n' +
       'Someone who turns up without a booking: choose Register walk-in, pick the time ' +
@@ -2613,7 +2613,7 @@ export const TOPICS = [
       'edit an event', 'change the event date',
     ],
     body:
-      'On Volunteer Events, each open event has three small buttons at the end of ' +
+      'On Volunteer events, each open event has three small buttons at the end of ' +
       'its row: the pencil edits it, the tick marks it completed, and the cross ' +
       'cancels it. Both ask you to confirm.\n\n' +
       'A completed or cancelled event stays on its tab for the record, but can no ' +
@@ -2636,7 +2636,7 @@ export const TOPICS = [
       'pending invites', 'invite expired', 'revoke an invite',
     ],
     body:
-      'Invites not yet accepted are listed above the users on User Management. For ' +
+      'Invites not yet accepted are listed above the users on Users. For ' +
       'each one: Resend emails a fresh link, Copy link puts a fresh link on your ' +
       'clipboard to send another way, and Revoke cancels it.\n\n' +
       'A link only works for a limited time (set under Settings, Accounts); after ' +
@@ -2678,7 +2678,7 @@ export const TOPICS = [
       'who deleted it', 'what happened yesterday',
     ],
     body:
-      'User Activity lists everything people did, newest first, for the dates you ' +
+      'User activity lists everything people did, newest first, for the dates you ' +
       'choose. Narrow it to one person with the picker (or tap a name under Most ' +
       'active), or to one area under + Filter.\n\n' +
       'Open an entry to see what changed, from what to what, and choose Open the ' +
@@ -2746,7 +2746,7 @@ export const TOPICS = [
       'not a supplier yet', 'register as supplier',
     ],
     body:
-      'The Prospects tab on Supplier Management is a notepad for suppliers we might ' +
+      'The Prospects tab on Suppliers is a notepad for suppliers we might ' +
       'use — a name is enough to start. Mark contacted once you’ve spoken to them, or ' +
       'Not for us. When one comes on board, choose Register as supplier to turn it ' +
       'into a supplier without retyping it.',
@@ -2771,7 +2771,7 @@ export const TOPICS = [
       'collection reminders go out, pallets due that day are not written off as not ' +
       'collected, and the week’s slips can’t be generated for it.',
     steps: [
-      'Open Operating Calendar and choose Add public holidays to add South Africa’s for the year — Good Friday, Family Day and Sunday-to-Monday days included.',
+      'Open Operating calendar and choose Add public holidays to add South Africa’s for the year — Good Friday, Family Day and Sunday-to-Monday days included.',
       'For anything else — a stocktake, a shutdown week — choose Add closed day, pick the first (and last) day and give the reason.',
       'Each closed day shows which cohort misses its collection, so you can plan a make-up day.',
     ],
@@ -2791,7 +2791,7 @@ export const TOPICS = [
       'tuesday cohort on a different day', 'swap the days',
     ],
     body:
-      'Under Collection days on the Operating Calendar, choose the weekday each cohort ' +
+      'Under Collection days on the Operating calendar, choose the weekday each cohort ' +
       'collects on, then Save collection days. The cohorts keep their names — the ' +
       'Tuesday cohort is still the Tuesday cohort — but slips are generated for, and ' +
       'reminders sent before, the new day. The two cohorts need different days.',

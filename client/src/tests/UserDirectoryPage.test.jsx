@@ -36,11 +36,11 @@ beforeEach(() => {
   inviteAPI.getPendingInvites.mockResolvedValue([]);
 });
 
-describe('User Management', () => {
+describe('Users', () => {
   it('lists users with a tab per role', async () => {
     renderPage();
     expect(await screen.findByText('Wes Worker')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'User Management' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Users' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'All 3' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Workers 1' })).toBeInTheDocument();
   });

@@ -257,7 +257,7 @@ export default function VolunteerEventsPage() {
     <PageShell>
       <PageHeader
         title="Volunteer events"
-        description="Plan events, open one to manage its timeslots and sign-ups, and close it off when it is done."
+        description="Create volunteer events, manage sign-ups and record attendance."
         actions={<Button type="button" onClick={openCreate}><Plus /> Create event</Button>}
       />
 

@@ -150,7 +150,7 @@ export default function EcdCollectionRemindersPage() {
         description={closed
           ? `Tomorrow, ${formatDate(collectionDate)}, the warehouse is closed (${closed.label}), so no reminders go out.`
           : collectionDate
-          ? `Reminders queued for ECDs collecting tomorrow, ${formatDate(collectionDate)}.`
+          ? `Send reminders to centres collecting tomorrow, ${formatDate(collectionDate)}.`
           : "Tomorrow's queued reminders for ECD collections."}
         actions={
           <Button type="button" variant="outline" onClick={load}>
@@ -177,8 +177,8 @@ export default function EcdCollectionRemindersPage() {
               <ListToolbar search={{ value: search, onChange: setSearch, placeholder: 'Search by ECD or contact' }} />
               <p className="flex items-start gap-2 text-xs text-muted-foreground">
                 <MessageCircle aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
-                Open WhatsApp uses the ECD mobile number and prefilled reminder text from WMS.
-                The message is sent manually from the WhatsApp account currently logged in on this device or browser.
+                Open WhatsApp fills in the centre’s number and message. Send it from the WhatsApp account on this
+                device, then choose Mark sent.
               </p>
             </div>
           }
@@ -258,7 +258,7 @@ export default function EcdCollectionRemindersPage() {
                         variant="outline"
                         size="sm"
                         disabled={!reminder.whatsappLink || reminder.whatsappStatus === 'sent' || busyId === reminder.id}
-                        title="After sending the WhatsApp message manually, mark it sent in WMS."
+                        title="Choose this after sending the message in WhatsApp."
                         aria-label={`Mark WhatsApp sent for ${reminder.ecdName}`}
                         onClick={() => markSent(reminder)}
                       >

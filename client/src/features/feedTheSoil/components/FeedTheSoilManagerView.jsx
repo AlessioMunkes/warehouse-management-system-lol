@@ -541,7 +541,7 @@ export default function FeedTheSoilManagerView() {
     <PageShell>
       <PageHeader
         title="Feed the Soil"
-        description="Collection kits assigned to community members and the compost logged against each one. The Impact report's compost figure comes straight from what's logged here."
+        description="Assign compost kits to households and log the compost collected."
         actions={headerAction}
       />
 

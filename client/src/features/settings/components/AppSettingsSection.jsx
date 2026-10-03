@@ -67,7 +67,7 @@ export default function AppSettingsSection({ title, description, settings, onSav
 
         {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
         <div className="flex gap-2">
-          <Button type="button" onClick={save} disabled={busy || changed.length === 0}>
+          <Button type="button" onClick={save} disabled={busy || changed.length === 0} loading={busy}>
             {busy ? 'Saving…' : 'Save'}
           </Button>
           <Button

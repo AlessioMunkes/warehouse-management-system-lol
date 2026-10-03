@@ -96,7 +96,7 @@ describe('SettingsPage', () => {
     const user = userEvent.setup();
     renderAt('/admin/settings?section=certificates');
 
-    expect(await screen.findByText(/No certificate details have been saved yet/)).toBeInTheDocument();
+    expect(await screen.findByText(/Enter at least the organisation name/)).toBeInTheDocument();
     await user.type(screen.getByLabelText('PBO number'), '930012345');
     await user.click(screen.getByRole('button', { name: 'Save certificate details' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('organisation name is required');

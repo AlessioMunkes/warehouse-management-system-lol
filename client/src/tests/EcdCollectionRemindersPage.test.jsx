@@ -72,7 +72,7 @@ describe('EcdCollectionRemindersPage', () => {
     render(<EcdCollectionRemindersPage />);
 
     expect(await screen.findByText('Little Stars')).toBeInTheDocument();
-    expect(screen.getByText(/sent manually from the WhatsApp account currently logged in on this device or browser/i))
+    expect(screen.getByText(/Send it from the WhatsApp account on this\s+device, then choose Mark sent/i))
       .toBeInTheDocument();
     expect(screen.getByText('Nomsa')).toBeInTheDocument();
     expect(screen.getByText(/09:00/)).toBeInTheDocument();
@@ -123,7 +123,7 @@ describe('EcdCollectionRemindersPage', () => {
     const markSentButton = within(littleStarsRow).getByRole('button', { name: /mark whatsapp sent for little stars/i });
     expect(markSentButton).toHaveAttribute(
       'title',
-      'After sending the WhatsApp message manually, mark it sent in WMS.'
+      'Choose this after sending the message in WhatsApp.'
     );
     await user.click(markSentButton);
 

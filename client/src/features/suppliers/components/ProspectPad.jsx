@@ -115,8 +115,8 @@ export default function ProspectPad({
       {/* ── List ────────────────────────────────────────────── */}
       {prospects.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No leads noted yet. Anything jotted here stays out of purchase orders and out of
-          reporting until it is converted into a supplier.
+          No prospects yet. Note a possible supplier above — it stays out of orders and reports
+          until you register it.
         </p>
       ) : (
         <div className="space-y-3">

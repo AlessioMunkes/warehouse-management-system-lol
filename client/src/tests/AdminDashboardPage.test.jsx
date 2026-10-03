@@ -153,7 +153,7 @@ describe('AdminDashboardPage — Donation Management badge (D6/Q2)', () => {
     });
     expect(screen.queryByText(/^Needs attention \(/)).not.toBeInTheDocument();
     // The tile itself still renders.
-    expect(screen.getByText('Classification Queue')).toBeInTheDocument();
+    expect(screen.getByText('Classification queue')).toBeInTheDocument();
   });
 
   it('keeps the remaining donation admin screens available', async () => {
@@ -165,8 +165,8 @@ describe('AdminDashboardPage — Donation Management badge (D6/Q2)', () => {
     await waitFor(() => {
       expect(screen.getByText('Needs attention (2)')).toBeInTheDocument();
     });
-    expect(screen.getByText('Classification Queue')).toBeInTheDocument();
-    expect(screen.getByText('Section 18A Management')).toBeInTheDocument();
+    expect(screen.getByText('Classification queue')).toBeInTheDocument();
+    expect(screen.getByText('Section 18A')).toBeInTheDocument();
     expect(screen.queryByText(/Donation Classification/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Category Routing/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Explain Routing/)).not.toBeInTheDocument();
