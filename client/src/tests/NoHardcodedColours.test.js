@@ -39,15 +39,13 @@ const ALLOWED = [
   'features/procurement/components/DeliveryNotePDF.jsx',
   'features/dispatch/components/DispatchNotePDF.jsx',
   'features/decanting/components/DecantingSheetPDF.jsx',
+  'features/reporting/components/ImpactCalculatorPDF.jsx',
   'features/packing/palletLabelPdf.js',
   'features/staff/hooks/usePdfDocument.js',
   // A signature drawn in near-white is an invisible signature.
-  'features/procurement/components/ProofOfDeliveryForm.jsx',
   'features/procurement/components/SignaturePad.jsx',
   // The public page: its visitors are not logged in and have no toggle.
   'pages/LandingPage.jsx',
-  // Dead — its import in App.jsx is commented out.
-  'pages/SelectNOCjob.jsx',
 ];
 
 const UTILITY = /(?:bg|text|border|ring|fill|stroke|divide|placeholder)-\[#[0-9a-fA-F]{3,8}\]/g;

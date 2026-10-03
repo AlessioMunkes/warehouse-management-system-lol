@@ -22,3 +22,45 @@ dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 process.env.JWT_SECRET = 'test-jwt-secret-do-not-use-in-production';
 process.env.NODE_ENV = 'test';
+
+// ── Message history writes ────────────────────────────────────
+// Every email now goes through features/communications, which records
+// it in outbound_messages. A unit test that mocks a sender's own
+// repository (and so never loads config/db.js) would otherwise load it
+// through this one — and db.js connects to whatever DATABASE_URL the
+// .env above names. Stubbed here for every file; the repository's own
+// test (communications.test.js) asks for the real module.
+import { vi } from 'vitest';
+
+vi.mock('../src/features/communications/outboundMessage.repository.js', () => ({
+  default: {
+    record: vi.fn(async () => ({ id: 1 })),
+    list: vi.fn(async () => ({ rows: [], nextCursor: null })),
+  },
+}));
+
+// ── Admin settings ────────────────────────────────────────────
+// The schedulers and services that used to read constants now read
+// features/settings, which opens config/db.js. Stubbed to the
+// defaults — the old constants — for every file, so a test that mocks
+// a service's own repository still never reaches a real database.
+// settings.test.js asks for the real module.
+vi.mock('../src/features/settings/settings.service.js', async () => {
+  const { defaults } = await import('../src/features/settings/settingsDefinitions.js');
+  const get = vi.fn(async (key) => defaults()[key]);
+  const getAll = vi.fn(async () => defaults());
+  return { get, getAll, list: vi.fn(), update: vi.fn(), default: { get, getAll, list: vi.fn(), update: vi.fn() } };
+});
+
+// The operating calendar's closed days live in the database. Every
+// service that asks "is the warehouse shut that day?" (reminders, the
+// sweep, slip generation) gets "open" in tests unless a test says
+// otherwise.
+vi.mock('../src/features/calendar/calendar.repository.js', () => ({
+  default: {
+    list: vi.fn(async () => []),
+    findByDate: vi.fn(async () => null),
+    insertMany: vi.fn(async (days) => days.map((d, i) => ({ id: i + 1, ...d }))),
+    remove: vi.fn(async () => null),
+  },
+}));

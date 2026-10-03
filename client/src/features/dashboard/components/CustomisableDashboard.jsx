@@ -17,7 +17,14 @@
 // them. Chart panels fetch their own report.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Plus, Replace, RotateCcw, Settings2, X } from 'lucide-react';
+import { GripVertical, Plus, Replace, RotateCcw, Settings2, X } from 'lucide-react';
+import {
+  DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors,
+} from '@dnd-kit/core';
+import {
+  SortableContext, rectSortingStrategy, sortableKeyboardCoordinates, useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -88,19 +95,21 @@ function useSources(needed) {
 
 const ready = (widget, data) => (widget.needs ?? []).every((n) => data[n] !== undefined);
 
-function EditBar({ id, index, count, onMove, onRemove, onReplace, vertical }) {
-  const Back = vertical ? ArrowUp : ArrowLeft;
-  const Fwd = vertical ? ArrowDown : ArrowRight;
+// While customising, each widget carries a handle to drag it by, and
+// Replace and Remove. The handle works from the keyboard too: focus it,
+// Space to pick the widget up, the arrow keys to move it, Space to put
+// it down (Escape puts it back).
+function EditBar({ id, handle, onRemove, onReplace }) {
   const title = getWidget(id)?.title;
   return (
-    <div className="absolute right-1.5 top-1.5 z-10 flex gap-0.5 rounded-[4px] border bg-surface p-0.5 shadow-sm">
-      <Button type="button" variant="ghost" size="icon-sm" disabled={index === 0}
-        onClick={() => onMove(id, -1)} aria-label={`Move ${title} earlier`}>
-        <Back />
-      </Button>
-      <Button type="button" variant="ghost" size="icon-sm" disabled={index === count - 1}
-        onClick={() => onMove(id, 1)} aria-label={`Move ${title} later`}>
-        <Fwd />
+    <div className="absolute right-1.5 top-1.5 z-10 flex gap-0.5 rounded-md border bg-surface p-0.5 shadow-sm">
+      <Button
+        type="button" variant="ghost" size="icon-sm"
+        className="cursor-grab touch-none active:cursor-grabbing"
+        aria-label={`Drag ${title} to move it`} title="Drag to move"
+        {...handle}
+      >
+        <GripVertical />
       </Button>
       {onReplace ? (
         <Button type="button" variant="ghost" size="icon-sm"
@@ -113,6 +122,29 @@ function EditBar({ id, index, count, onMove, onRemove, onReplace, vertical }) {
         <X />
       </Button>
     </div>
+  );
+}
+
+// One draggable widget. Only sortable while customising; otherwise it
+// is an ordinary box, so nothing on a normal day can be dragged by
+// accident.
+function Sortable({ id, editing, as: Tag = 'div', className = '', children }) {
+  const {
+    attributes, listeners, setNodeRef, transform, transition, isDragging,
+  } = useSortable({ id, disabled: !editing });
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    transition,
+    zIndex: isDragging ? 20 : undefined,
+  };
+  return (
+    <Tag
+      ref={setNodeRef}
+      style={style}
+      className={`${className} ${isDragging ? 'opacity-80 shadow-lg' : ''}`}
+    >
+      {children({ ...attributes, ...listeners })}
+    </Tag>
   );
 }
 
@@ -242,7 +274,16 @@ function PeriodMenu({ title, value, onChange }) {
 
 export default function CustomisableDashboard({ user, always = [], onData }) {
   const role = user?.role;
-  const { ids, periods, add, remove, replace, move, setPeriod, reset } = useDashboardLayout(user);
+  const { ids, periods, add, remove, replace, reorder, setPeriod, reset } = useDashboardLayout(user);
+  // A few pixels of movement before a drag starts, so a click on the
+  // handle is still a click; arrow keys move a picked-up widget.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  const onDragEnd = ({ active, over }) => {
+    if (over && active.id !== over.id) reorder(active.id, over.id);
+  };
   const [editing, setEditing] = useState(false);
   // null when closed; otherwise which gap was clicked (or none, for
   // the toolbar button) and so what size to offer.
@@ -294,10 +335,16 @@ export default function CustomisableDashboard({ user, always = [], onData }) {
           </>
         ) : (
           <Button type="button" variant="outline" size="sm" onClick={() => setEditing(true)}>
-            <Settings2 /> Customise
+            <Settings2 /> Customise dashboard
           </Button>
         )}
       </div>
+
+      {editing ? (
+        <p className="mb-3 text-sm text-muted-foreground">
+          Drag a widget by its handle to move it. Numbers move among numbers, charts among charts.
+        </p>
+      ) : null}
 
       {failed.length > 0 ? (
         <p role="alert" className="mb-3 text-sm text-muted-foreground">
@@ -308,27 +355,40 @@ export default function CustomisableDashboard({ user, always = [], onData }) {
       {widgets.length === 0 ? (
         <Card>
           <CardContent className="p-6 text-center text-sm text-muted-foreground">
-            Your dashboard is empty. Choose Customise, then Add a widget.
+            Your dashboard is empty. Choose Customise dashboard, then Add a widget.
           </CardContent>
         </Card>
       ) : null}
 
       {tiles.length > 0 || (editing && hasRoom('small')) ? (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <SortableContext items={tiles.map((w) => w.id)} strategy={rectSortingStrategy}>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          {tiles.map((w, i) => (
-            <div key={w.id} className={`relative ${editing ? 'rounded-[4px] outline-dashed outline-1 outline-offset-2 outline-line-strong' : ''}`}>
-              {body(w)}
-              {editing ? <EditBar id={w.id} index={i} count={tiles.length} onMove={move} onRemove={remove} onReplace={canReplace(w) ? startReplace : null} /> : null}
-            </div>
+          {tiles.map((w) => (
+            <Sortable
+              key={w.id} id={w.id} editing={editing}
+              className={`relative ${editing ? 'rounded-md outline-dashed outline-1 outline-offset-2 outline-line-strong' : ''}`}
+            >
+              {(handle) => (
+                <>
+                  {body(w)}
+                  {editing ? <EditBar id={w.id} handle={handle} onRemove={remove} onReplace={canReplace(w) ? startReplace : null} /> : null}
+                </>
+              )}
+            </Sortable>
           ))}
           {editing && hasRoom('small') ? (
             <AddSlot size="small" label="Add a number" className="min-h-20"
               onClick={() => setAdding({ size: 'small', after: tiles[tiles.length - 1]?.id })} />
           ) : null}
         </div>
+        </SortableContext>
+        </DndContext>
       ) : null}
 
       {panels.length > 0 || editing ? (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <SortableContext items={panels.map((w) => w.id)} strategy={rectSortingStrategy}>
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           {panelSlots(panels).map((slot) => {
             if (slot.gap) {
@@ -344,22 +404,27 @@ export default function CustomisableDashboard({ user, always = [], onData }) {
               );
             }
             const w = slot.widget;
-            const i = panels.indexOf(w);
             return (
-              <Card key={w.id} className={`relative ${w.wide ? 'sm:col-span-2' : ''} ${editing ? 'outline-dashed outline-1 outline-offset-2 outline-line-strong' : ''}`}>
-                <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
-                  <CardTitle>{w.title}</CardTitle>
-                  {/* Hidden under the edit toolbar while customising. */}
-                  {w.periods && !editing ? (
-                    <PeriodMenu title={w.title} value={periodById(periodFor(w)).id} onChange={(v) => setPeriod(w.id, v)} />
-                  ) : null}
-                </CardHeader>
-                <CardContent>{body(w)}</CardContent>
-                {editing ? <EditBar id={w.id} index={i} count={panels.length} onMove={move} onRemove={remove} onReplace={canReplace(w) ? startReplace : null} vertical /> : null}
-              </Card>
+              <Sortable key={w.id} id={w.id} editing={editing} className={`relative ${w.wide ? 'sm:col-span-2' : ''}`}>
+                {(handle) => (
+                  <Card className={`relative h-full ${editing ? 'outline-dashed outline-1 outline-offset-2 outline-line-strong' : ''}`}>
+                    <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
+                      <CardTitle>{w.title}</CardTitle>
+                      {/* Hidden under the edit toolbar while customising. */}
+                      {w.periods && !editing ? (
+                        <PeriodMenu title={w.title} value={periodById(periodFor(w)).id} onChange={(v) => setPeriod(w.id, v)} />
+                      ) : null}
+                    </CardHeader>
+                    <CardContent>{body(w)}</CardContent>
+                    {editing ? <EditBar id={w.id} handle={handle} onRemove={remove} onReplace={canReplace(w) ? startReplace : null} /> : null}
+                  </Card>
+                )}
+              </Sortable>
             );
           })}
         </div>
+        </SortableContext>
+        </DndContext>
       ) : null}
 
       <AddWidgetDialog

@@ -106,6 +106,22 @@ describe('getSlips — filters and visibility', () => {
     expect(repoMock.getSlips).not.toHaveBeenCalled();
   });
 
+  it('passes a week range through for the manager list', async () => {
+    await pickingService.getSlips({ from: '2026-09-28', to: '2026-10-04' }, MANAGER);
+    expect(repoMock.getSlips).toHaveBeenCalledWith(
+      expect.objectContaining({ from: '2026-09-28', to: '2026-10-04' }),
+    );
+  });
+
+  it.each([
+    [{ from: '28/09/2026' }],
+    [{ to: 'next week' }],
+    [{ from: '2026-10-04', to: '2026-09-28' }],
+  ])('rejects a malformed or backwards range %j with 400', async (query) => {
+    await expectStatus(pickingService.getSlips(query, MANAGER), 400);
+    expect(repoMock.getSlips).not.toHaveBeenCalled();
+  });
+
   it('scopes a packer to their own slips when they ask for "mine"', async () => {
     await pickingService.getSlips({ mine: 'true' }, WORKER);
     expect(repoMock.getSlips).toHaveBeenCalledWith(expect.objectContaining({ assignedTo: 10 }));
@@ -200,7 +216,7 @@ describe('generateSlips — manager only, strict scheduling', () => {
   it('names the actual pickup day in the error so the mistake is obvious', async () => {
     await expect(
       pickingService.generateSlips({ dispatchDate: TUESDAY_DATE, cohort: 'thursday' }, MANAGER)
-    ).rejects.toThrow(/Tuesday pickup day, not Thursday/);
+    ).rejects.toThrow(/Tuesday cohort pickup day, not Thursday/);
   });
 
   it('refuses a date that is not a Tuesday or Thursday at all', async () => {
@@ -547,7 +563,7 @@ describe('addSecondPacker — a second packer on a pallet', () => {
 describe('releaseSlip — returning a pallet to the floor', () => {
   it('lets a manager release a claimed pallet', async () => {
     await pickingService.releaseSlip(1, MANAGER);
-    expect(repoMock.releaseSlip).toHaveBeenCalledWith({ slipId: 1, actorId: MANAGER.id });
+    expect(repoMock.releaseSlip).toHaveBeenCalledWith({ slipId: 1, actorId: MANAGER.id, beforeCommit: expect.any(Function) });
   });
 
   it('refuses a worker — releasing is a floor-management call, not a packer\'s own claim', async () => {

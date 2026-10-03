@@ -16,11 +16,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
-import { SIDEBAR_KEY } from '../features/taskdashboard/components/shellContext';
+import ManagerLayout from '../components/layout/ManagerLayout';
+import { SIDEBAR_KEY } from '../components/layout/shellContext';
 import { useAuth } from '../context/AuthContext';
 
 vi.mock('../context/AuthContext', () => ({ useAuth: vi.fn() }));
+
+// The sidebar's attention counts (navSections.js `count`).
+const attention = {
+  inventory: { shortfall: 2, lowStock: 9, expiring: 1 },
+  pickingSlips: { unassigned: 40, notCollected: 0 },
+  purchaseOrders: { awaitingApproval: 7, followUp: 4 },
+  communityRequests: { pending: 1 },
+};
+vi.mock('../services/dashboardAPI', () => ({ getAttention: vi.fn(async () => attention) }));
 // Fetches on mount and is not what this is about.
 vi.mock('../features/notifications/components/NotificationBell', () => ({
   default: () => null,
@@ -48,7 +57,7 @@ describe('the collapsing sidebar', () => {
   it('starts expanded, with labels and section headings', () => {
     renderShell();
     expect(screen.getByText('Beneficiaries')).toBeTruthy();
-    expect(screen.getByText('Operations')).toBeTruthy();
+    expect(screen.getByText('Outbound')).toBeTruthy();
     expect(screen.getByRole('button', { name: /collapse sidebar/i })).toBeTruthy();
   });
 
@@ -58,10 +67,11 @@ describe('the collapsing sidebar', () => {
 
     // The visible text goes...
     expect(screen.queryByText('Beneficiaries')).toBeNull();
-    expect(screen.queryByText('Operations')).toBeNull();
+    expect(screen.queryByText('Outbound')).toBeNull();
     // ...the link, and its name, do not.
     expect(screen.getByRole('link', { name: 'Beneficiaries' })).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Purchase Orders' })).toBeTruthy();
+    // With its attention count in the name once the counts arrive.
+    expect(await screen.findByRole('link', { name: 'Purchase Orders, 11 need attention' })).toBeTruthy();
     expect(screen.getByRole('button', { name: /expand sidebar/i })).toBeTruthy();
   });
 
@@ -100,6 +110,19 @@ describe('the collapsing sidebar', () => {
 
     const drawer = await screen.findByRole('dialog');
     expect(within(drawer).getByText('Beneficiaries')).toBeTruthy();
-    expect(within(drawer).getByText('Operations')).toBeTruthy();
+    expect(within(drawer).getByText('Outbound')).toBeTruthy();
+  });
+});
+
+describe('sidebar attention counts', () => {
+  it('puts a count on manager items that need dealing with, said in words', async () => {
+    useAuth.mockReturnValue({ user: { id: 1, firstName: 'T', lastName: 'U', role: 'manager' }, logout: vi.fn() });
+    render(<MemoryRouter><ManagerLayout><p>body</p></ManagerLayout></MemoryRouter>);
+
+    expect(await screen.findByRole('link', { name: 'Purchase Orders, 11 need attention' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Inventory, 3 need attention' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Benevolent Requests, 1 needs attention' })).toBeTruthy();
+    // Unclaimed slips are the normal state of the queue, not a problem.
+    expect(screen.getByRole('link', { name: 'Picking Slips' })).toBeTruthy();
   });
 });

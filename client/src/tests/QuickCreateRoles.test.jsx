@@ -16,7 +16,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
+import ManagerLayout from '../components/layout/ManagerLayout';
 import { useAuth } from '../context/AuthContext';
 
 vi.mock('../context/AuthContext', () => ({ useAuth: vi.fn() }));

@@ -436,10 +436,10 @@ export default function FinanceWarehouseReportView({ loadReport, showReset = tru
   const hasChartData = chartData.some((row) => row.donations || row.po || row.dispatches);
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-6 text-ink sm:px-6">
+    <main className="mx-auto w-full max-w-6xl px-4 py-6">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Warehouse Movement Report</h1>
+          <h1 className="text-2xl font-medium">Warehouse Movement Report</h1>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <Select value={period} onValueChange={setPeriod}>
               <SelectTrigger aria-label="Period" className="min-w-40">
@@ -635,7 +635,7 @@ function SummaryCard({ title, count, totalLabel, total }) {
       <CardContent>
         <div className="flex items-end justify-between gap-4">
           <div>
-            <div className="text-3xl font-bold tracking-tight">{count.toLocaleString('en-ZA')}</div>
+            <div className="text-3xl font-medium tracking-tight tabular-nums">{count.toLocaleString('en-ZA')}</div>
             <div className="mt-1 text-sm text-muted-foreground">Movements</div>
           </div>
           <Badge variant="secondary">{total}</Badge>

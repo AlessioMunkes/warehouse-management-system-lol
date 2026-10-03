@@ -2,20 +2,18 @@
 // server/src/routes/dispatch.routes.js
 // ─────────────────────────────────────────────────────────────
 import express                            from 'express';
-import auth, { requireRole, ROLES }       from '../middleware/auth.middleware.js';
+import auth, { requireRole } from '../middleware/auth.middleware.js';
+import { ALL_STAFF, MANAGERS_UP, WORKERS_ONLY } from '../constants/permissions.js';
 import { validateIntId, validateIntParam } from '../middleware/validate.middleware.js';
 import dispatchController                 from '../controllers/dispatch.controller.js';
 
 const router = express.Router();
 
-const ALL_ROLES       = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
-const DISPATCHERS_UP  = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];  // record a collection at the gate
-const MANAGERS_UP     = [ROLES.MANAGER, ROLES.ADMIN];                // sweep / write-offs need a human decision behind them
 
 // ── Static paths before /:id to prevent shadowing ────────────
 router.post('/sweep',           auth, requireRole(...MANAGERS_UP), dispatchController.sweep);
 router.get('/non-collections',  auth, requireRole(...MANAGERS_UP), dispatchController.getNonCollectionHistory);
-router.get('/history',          auth, requireRole(...ALL_ROLES),   dispatchController.getHistory);
+router.get('/history',          auth, requireRole(...ALL_STAFF),   dispatchController.getHistory);
 
 // ── Dispatch note ─────────────────────────────────────────────
 // Also a static prefix ahead of /:id — the note is keyed by a
@@ -38,24 +36,24 @@ router.get('/notes',
 
 // /notes/:eventId is NOT manager-only, unlike its two siblings above.
 // StaffDispatchHistoryPage.jsx ("View note" on a collected dispatch)
-// is an ALL_ROLES screen and calls this same endpoint — a worker
+// is an ALL_STAFF screen and calls this same endpoint — a worker
 // opening their own team's history hit a 403 here until this was
 // widened to match. The stale premise that "nothing in the gate flow
 // reads it" stopped being true the day that history page shipped.
 router.get('/notes/:eventId',
-  auth, requireRole(...ALL_ROLES),
+  auth, requireRole(...ALL_STAFF),
   validateIntParam('eventId'),
   dispatchController.getDispatchNote
 );
 
 // ── The gate board ──────────────────────────────────────────
-router.get('/', auth, requireRole(...ALL_ROLES), dispatchController.getBoard);
+router.get('/', auth, requireRole(...ALL_STAFF), dispatchController.getBoard);
 
 // ── One pallet at the gate ───────────────────────────────────
-router.get('/:id', auth, requireRole(...ALL_ROLES), validateIntId, dispatchController.getGateView);
+router.get('/:id', auth, requireRole(...ALL_STAFF), validateIntId, dispatchController.getGateView);
 
 router.post('/:id/collect',
-  auth, requireRole(...DISPATCHERS_UP),
+  auth, requireRole(...WORKERS_ONLY),
   validateIntId,
   dispatchController.collect
 );

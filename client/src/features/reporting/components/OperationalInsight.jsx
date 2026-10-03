@@ -34,10 +34,12 @@ const BORDER = 'var(--line)';
 
 const LINKS = {
   beneficiaries:    { to: STAFF.beneficiaries,    label: 'Open beneficiaries' },
-  deliveries:       { to: STAFF.deliveries,       label: 'Open deliveries' },
+  // The floor's screens are not the manager's: deliveries are read on
+  // Receipts, decanting runs on the ledger's Decanting tab.
+  deliveries:       { to: STAFF.receipts,         label: 'Open receipts' },
   purchaseOrders:   { to: STAFF.purchaseOrders,   label: 'Open purchase orders' },
   stockLedger:      { to: STAFF.stockLedger,      label: 'Open stock ledger' },
-  decantingRecords: { to: STAFF.decantingRecords, label: 'Open decanting sheets' },
+  decantingRecords: { to: `${STAFF.stockLedger}?status=decanted`, label: 'Open decanting in the ledger' },
   pickingSlips:     { to: STAFF.pickingSlips,     label: 'Open picking slips' },
 };
 
@@ -104,7 +106,7 @@ function Figure({ f }) {
   const hasDelta = f.delta !== null && f.delta !== undefined;
   const Arrow = f.delta > 0 ? ArrowUpRight : ArrowDownRight;
   return (
-    <div className="rounded-[4px] border-2 bg-surface p-3" style={{ borderColor: BORDER }}>
+    <div className="rounded-4xl bg-card shadow-md ring-1 ring-foreground/5 p-3" style={{ borderColor: BORDER }}>
       <p className="text-xs font-medium" style={{ color: MUTED }}>{f.label}</p>
       <p className="mt-1 text-2xl font-bold tracking-tight">
         {formatValue(f.value, f.unit)}
@@ -147,7 +149,7 @@ export function ActionList({ list, printMode, highlight, onHighlight }) {
   const link = LINKS[list.link];
 
   return (
-    <section className="op-avoid-break rounded-[4px] border-2 bg-surface p-4" style={{ borderColor: BORDER }}>
+    <section className="op-avoid-break rounded-4xl bg-card shadow-md ring-1 ring-foreground/5 p-4" style={{ borderColor: BORDER }}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h4 className="text-sm font-bold">{list.title}</h4>
         {link && !printMode && (
@@ -164,7 +166,7 @@ export function ActionList({ list, printMode, highlight, onHighlight }) {
             {shown.map((e, i) => (
               <li
                 key={`${e.name}-${i}`}
-                className="-mx-1 flex gap-3 rounded-[4px] px-1 text-sm"
+                className="-mx-1 flex gap-3 rounded-lg px-1 text-sm"
                 style={highlight === e.name ? { background: 'color-mix(in srgb, var(--viz-1) 12%, transparent)' } : undefined}
               >
                 <span aria-hidden="true" className="w-5 shrink-0 text-right font-bold" style={{ color: MUTED }}>{i + 1}.</span>
@@ -255,13 +257,13 @@ function ReportBody({ data, narrative, printMode, highlight, onHighlight }) {
   return (
     <div className="space-y-5">
       {narrative && (
-        <section className="op-avoid-break rounded-[4px] border-2 bg-surface p-4 sm:p-5" style={{ borderColor: BORDER }}>
+        <section className="op-avoid-break rounded-4xl bg-card shadow-md ring-1 ring-foreground/5 p-4 sm:p-5" style={{ borderColor: BORDER }}>
           <ChartExplanation n={narrative} />
         </section>
       )}
 
       {narrative && (
-        <section className="op-avoid-break rounded-[4px] border-2 bg-surface p-4 sm:p-5" style={{ borderColor: BORDER }}>
+        <section className="op-avoid-break rounded-4xl bg-card shadow-md ring-1 ring-foreground/5 p-4 sm:p-5" style={{ borderColor: BORDER }}>
           <BusinessView n={narrative} />
         </section>
       )}
@@ -284,7 +286,7 @@ function ReportBody({ data, narrative, printMode, highlight, onHighlight }) {
 
       {combo && (
         <Collapsible id="combo" title={combo.title} printMode={printMode}>
-          <section className="op-avoid-break rounded-[4px] border-2 bg-surface p-4" style={{ borderColor: BORDER }}>
+          <section className="op-avoid-break rounded-4xl bg-card shadow-md ring-1 ring-foreground/5 p-4" style={{ borderColor: BORDER }}>
             <ComboChart combo={combo} syncId={printMode ? 'combo-print' : 'combo'} print={printMode} />
           </section>
         </Collapsible>
@@ -301,7 +303,7 @@ function ReportBody({ data, narrative, printMode, highlight, onHighlight }) {
           </p>
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             {related.map((r, i) => (
-              <section key={r.description} className="op-avoid-break rounded-[4px] border-2 bg-surface p-4" style={{ borderColor: BORDER }}>
+              <section key={r.description} className="op-avoid-break rounded-4xl bg-card shadow-md ring-1 ring-foreground/5 p-4" style={{ borderColor: BORDER }}>
                 <p className="text-xs font-medium">{r.description}</p>
                 {(narrative?.relatedConnections?.[i] || r.why) && (
                   <p className="mb-2 mt-1 text-xs leading-relaxed" style={{ color: MUTED }}>
@@ -388,7 +390,7 @@ export default function OperationalInsight({ report, highlight, onHighlight, onL
     <div className="mt-5">
       {/* Nothing to show while the breakdown loads: the page is the
           chart above until a report is generated. */}
-      {loading && <Skeleton className="h-9 w-44 rounded-[4px]" />}
+      {loading && <Skeleton className="h-9 w-44 rounded-lg" />}
 
       {error && (
         <p className="text-xs" style={{ color: MUTED }}>
@@ -403,7 +405,7 @@ export default function OperationalInsight({ report, highlight, onHighlight, onL
               type="button"
               onClick={writeUp}
               disabled={writing}
-              className="bg-ink hover:bg-ink/90 text-on-ink font-bold text-xs tracking-wider rounded-[4px] px-4"
+              className="bg-ink hover:bg-ink/90 text-on-ink font-bold text-xs tracking-wider rounded-lg px-4"
             >
               <FileText aria-hidden="true" className="mr-2 h-4 w-4" />
               {writing ? 'GENERATING…' : narrative ? 'REGENERATE REPORT' : 'GENERATE REPORT'}
@@ -414,7 +416,7 @@ export default function OperationalInsight({ report, highlight, onHighlight, onL
                 type="button"
                 variant="outline"
                 onClick={() => setPrinting(true)}
-                className="rounded-[4px] border-2 text-xs font-bold tracking-wider"
+                className="rounded-lg border text-xs font-bold tracking-wider"
               >
                 <Printer aria-hidden="true" className="mr-2 h-4 w-4" />
                 PDF REPORT

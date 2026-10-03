@@ -11,13 +11,13 @@
 // it does not belong in a role list for this resource.
 // ─────────────────────────────────────────────────────────────
 import express                      from 'express';
-import auth, { requireRole, ROLES } from '../middleware/auth.middleware.js';
+import auth, { requireRole } from '../middleware/auth.middleware.js';
+import { ADMIN_ONLY } from '../constants/permissions.js';
 import { validateIntId }            from '../middleware/validate.middleware.js';
 import userController               from '../controllers/user.controller.js';
 
 const router = express.Router();
 
-const ADMIN_ONLY = [ROLES.ADMIN];
 
 router.get('/',
   auth, requireRole(...ADMIN_ONLY), userController.list);

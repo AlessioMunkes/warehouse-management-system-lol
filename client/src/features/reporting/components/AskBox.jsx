@@ -72,7 +72,7 @@ export default function AskBox({ onReport, onPickMetric, disabled }) {
   const answerClarification = (option) => submit(`${question} (${option})`);
 
   return (
-    <div className="rounded-[4px] border-2 border-line bg-surface p-4 sm:p-5">
+    <div className="rounded-4xl bg-card shadow-md ring-1 ring-foreground/5 p-4 sm:p-5">
       <label htmlFor="ask" className="block text-sm font-medium mb-2">
         Ask about your data
       </label>
@@ -91,9 +91,9 @@ export default function AskBox({ onReport, onPickMetric, disabled }) {
           type="button"
           onClick={() => submit()}
           disabled={disabled || busy || !question.trim()}
-          className="bg-ink hover:bg-ink/90 text-on-ink font-bold text-xs tracking-wider rounded-[4px] px-5 shrink-0"
+          className="shrink-0"
         >
-          {busy ? '…' : 'ASK'}
+          {busy ? 'Asking…' : 'Ask'}
         </Button>
       </div>
 
@@ -117,7 +117,7 @@ export default function AskBox({ onReport, onPickMetric, disabled }) {
       {noMatch && (
         <div
           role="status"
-          className="mt-4 flex gap-3 rounded-[4px] border-2 border-line p-3 text-sm"
+          className="mt-4 flex gap-3 rounded-lg border border-line p-3 text-sm"
         >
           <Info aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" style={{ color: MUTED }} />
           <div>
@@ -126,7 +126,7 @@ export default function AskBox({ onReport, onPickMetric, disabled }) {
               <button
                 type="button"
                 onClick={() => { setNoMatch(null); onPickMetric(noMatch.closest.id); }}
-                className="mt-2 rounded-full border-2 border-ink px-3 py-1.5 text-xs font-medium hover:bg-ink hover:text-on-ink"
+                className="mt-2 rounded-full border border-ink px-3 py-1.5 text-xs font-medium hover:bg-ink hover:text-on-ink"
               >
                 Open {noMatch.closest.label}
               </button>
@@ -148,7 +148,7 @@ export default function AskBox({ onReport, onPickMetric, disabled }) {
                 type="button"
                 onClick={() => answerClarification(o)}
                 disabled={busy}
-                className="rounded-full border-2 border-ink px-3 py-1.5 text-xs font-medium hover:bg-ink hover:text-on-ink"
+                className="rounded-full border border-ink px-3 py-1.5 text-xs font-medium hover:bg-ink hover:text-on-ink"
               >
                 {o}
               </button>

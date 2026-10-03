@@ -7,25 +7,21 @@
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
 import adminAPI from '../services/adminAPI';
 import { linkFor } from '../features/admin/recordLinks';
-import useDetailFocus  from '../features/masterdata/hooks/useDetailFocus';
 import useTableView    from '../features/masterdata/hooks/useTableView';
 import MasterDataTable from '../features/masterdata/components/MasterDataTable';
-import ColumnToggle    from '../features/masterdata/components/ColumnToggle';
-import FilterPills     from '../features/masterdata/components/FilterPills';
-import {
-  InputGroup, InputGroupAddon, InputGroupInput,
-} from '@/components/ui/input-group';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Badge }    from '@/components/ui/badge';
 import { Input }    from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Card, CardContent, CardHeader, CardTitle,
-} from '@/components/ui/card';
-import { Search, X, ExternalLink } from 'lucide-react';
+import PageHeader, { PageShell } from '@/components/ui/page-header';
+import ListCard from '@/components/ui/list-card';
+import ListToolbar from '@/components/ui/list-toolbar';
+import DetailPanel from '@/components/ui/detail-panel';
+import EmptyState from '@/components/ui/empty-state';
+import ErrorBanner from '@/components/ui/error-banner';
+import { ExternalLink, Activity } from 'lucide-react';
 
 const SAST = 'Africa/Johannesburg';
 const ROLE_LABELS = { admin: 'Admin', manager: 'Manager', warehouse_worker: 'Warehouse staff' };
@@ -60,19 +56,6 @@ const COLUMNS = [
     cell: (e) => (e.actor?.role ? ROLE_LABELS[e.actor.role] ?? e.actor.role : '—') },
 ];
 
-const ErrorBanner = ({ message, onRetry }) => (
-  <div className="p-4 rounded-[4px] bg-danger-soft border-2 border-brand text-ink text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-    <span>{message}</span>
-    {onRetry ? (
-      <button onClick={onRetry} className="text-xs sm:text-sm font-semibold underline hover:text-brand focus:outline-none">
-        Try again
-      </button>
-    ) : null}
-  </div>
-);
-
-// The fields worth showing from an audit entry's before/after, without
-// dumping JSON on the admin: only what changed.
 const changesOf = (detail) => {
   const before = detail?.before ?? {};
   const after = detail?.after ?? {};
@@ -87,38 +70,13 @@ function EntryDetail({ entry, onClose, onFilterPerson }) {
   const href = linkFor(entry.link);
   const changes = entry.source === 'audit' ? changesOf(entry.detail) : [];
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
-        <div>
-          <CardTitle>{entry.actor?.name ?? 'System'} {entry.text}</CardTitle>
-          <p className="text-sm text-muted-foreground">{fmtDateTime(entry.at)} · {entry.area}</p>
-        </div>
-        <Button type="button" variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close">
-          <X />
-        </Button>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <dl className="grid gap-3 text-sm sm:grid-cols-2">
-          <div><dt className="text-muted-foreground">Who</dt><dd>{entry.actor ? `${entry.actor.name} (${entry.actor.username})` : 'The system, automatically'}</dd></div>
-          <div><dt className="text-muted-foreground">Role</dt><dd>{entry.actor?.role ? ROLE_LABELS[entry.actor.role] ?? entry.actor.role : '—'}</dd></div>
-          {entry.subject ? <div><dt className="text-muted-foreground">Record</dt><dd>{entry.subject}</dd></div> : null}
-          {entry.detail?.reason ? <div><dt className="text-muted-foreground">Reason</dt><dd>{entry.detail.reason}</dd></div> : null}
-        </dl>
-
-        {changes.length > 0 ? (
-          <div>
-            <p className="mb-1 text-sm font-medium">What changed</p>
-            <ul className="space-y-1 text-sm">
-              {changes.map((c) => (
-                <li key={c.field}>
-                  <span className="text-muted-foreground">{c.field}:</span> {show(c.from)} → <strong>{show(c.to)}</strong>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-
-        <div className="flex flex-wrap gap-2">
+    <DetailPanel
+      open
+      onClose={onClose}
+      eyebrow={`${fmtDateTime(entry.at)} · ${entry.area}`}
+      title={`${entry.actor?.name ?? 'System'} ${entry.text}`}
+      actions={href || entry.actor ? (
+        <>
           {href ? (
             <Link to={href} className={buttonVariants({ variant: 'outline' })}>
               <ExternalLink /> Open the record
@@ -129,9 +87,29 @@ function EntryDetail({ entry, onClose, onFilterPerson }) {
               Show only {entry.actor.name}
             </Button>
           ) : null}
+        </>
+      ) : null}
+    >
+      <dl className="grid gap-4 text-sm sm:grid-cols-2">
+        <div><dt className="text-muted-foreground">Who</dt><dd>{entry.actor ? `${entry.actor.name} (${entry.actor.username})` : 'The system, automatically'}</dd></div>
+        <div><dt className="text-muted-foreground">Role</dt><dd>{entry.actor?.role ? ROLE_LABELS[entry.actor.role] ?? entry.actor.role : '—'}</dd></div>
+        {entry.subject ? <div><dt className="text-muted-foreground">Record</dt><dd>{entry.subject}</dd></div> : null}
+        {entry.detail?.reason ? <div><dt className="text-muted-foreground">Reason</dt><dd>{entry.detail.reason}</dd></div> : null}
+      </dl>
+
+      {changes.length > 0 ? (
+        <div>
+          <p className="mb-1 text-sm font-medium">What changed</p>
+          <ul className="space-y-1 text-sm">
+            {changes.map((c) => (
+              <li key={c.field}>
+                <span className="text-muted-foreground">{c.field}:</span> {show(c.from)} → <strong>{show(c.to)}</strong>
+              </li>
+            ))}
+          </ul>
         </div>
-      </CardContent>
-    </Card>
+      ) : null}
+    </DetailPanel>
   );
 }
 
@@ -149,7 +127,6 @@ export default function AdminUserActivityPage() {
   // person picker still lists them all while one is selected.
   const [everyone, setEveryone] = useState([]);
 
-  const [detailRef, focusDetail] = useDetailFocus();
   const view = useTableView('admin-activity', COLUMNS);
 
   const load = useCallback(async () => {
@@ -186,96 +163,103 @@ export default function AdminUserActivityPage() {
   const people = data?.people ?? [];
   const areaOptions = (data?.areas ?? []).map((a) => ({ value: a, label: a }));
 
-  const open = (entry) => { setSelected(entry); focusDetail(); };
+  const open = (entry) => setSelected(entry);
   const filterPerson = (id) => { setPerson(id); setSelected(null); };
 
+  const personName = person === 'system'
+    ? 'The system'
+    : (everyone.length ? everyone : people).find((p) => String(p.id) === person)?.name ?? 'One person';
+  const chips = person ? [{ key: 'person', label: personName, onRemove: () => filterPerson('') }] : [];
+
   return (
-    <ManagerLayout>
-      <main className="mx-auto w-full max-w-6xl px-4 py-6">
-        <h1 className="text-2xl font-medium">User Activity</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Everything people did in the system, newest first.
-          {data ? ` ${entries.length} ${entries.length === 1 ? 'action' : 'actions'} by ${people.length} ${people.length === 1 ? 'person' : 'people'} from ${data.from} to ${data.to}.` : ''}
-          {data?.truncated ? ' Showing the latest 2 000; narrow the dates to see earlier ones.' : ''}
-        </p>
+    <PageShell>
+      <PageHeader
+        title="User Activity"
+        description={`Everything people did in the system, newest first.${data ? ` ${entries.length} ${entries.length === 1 ? 'action' : 'actions'} by ${people.length} ${people.length === 1 ? 'person' : 'people'} from ${data.from} to ${data.to}.` : ''}${data?.truncated ? ' Showing the latest 2 000; narrow the dates to see earlier ones.' : ''}`}
+      />
 
-        {error ? <div className="mt-4"><ErrorBanner message={error} onRetry={load} /></div> : null}
+      <ErrorBanner className="mt-4" message={error} onRetry={load} />
 
-        <div className="mt-6 space-y-6">
-          <div className="flex flex-wrap items-center gap-3">
-            <InputGroup className="min-w-56 flex-1">
-              <InputGroupAddon align="inline-start"><Search /></InputGroupAddon>
-              <InputGroupInput placeholder="Search people, actions or records" value={search} onChange={(e) => setSearch(e.target.value)} />
-            </InputGroup>
+      <div className="mt-6">
+        <ListCard
+          header={
+            <div className="space-y-2">
+              <ListToolbar
+                search={{ value: search, onChange: setSearch, placeholder: 'Search people, actions or records' }}
+                // The areas present this period, one at a time.
+                filters={areaOptions.length > 1 ? areaOptions.map((o) => ({
+                  key: o.value, label: o.label, active: area === o.value,
+                  onToggle: () => setArea((cur) => (cur === o.value ? null : o.value)),
+                })) : []}
+                chips={chips}
+                onClearAll={() => { setArea(null); setSearch(''); filterPerson(''); }}
+                columns={{
+                  idPrefix: 'admin-activity',
+                  columns: view.availableColumns,
+                  hidden: view.hidden,
+                  onToggle: view.toggleColumn,
+                  onReset: view.resetColumns,
+                }}
+              >
+                <select
+                  aria-label="Person"
+                  value={person}
+                  onChange={(e) => filterPerson(e.target.value)}
+                  className="h-8 max-w-48 rounded-md border border-input bg-transparent px-2 text-sm"
+                >
+                  <option value="">Everyone</option>
+                  {(everyone.length ? everyone : people).filter((p) => p.id !== 'system').map((p) => (
+                    <option key={p.id} value={String(p.id)}>{p.name} ({p.count})</option>
+                  ))}
+                  <option value="system">The system (automatic)</option>
+                </select>
+                <Input type="date" aria-label="From" title="From" className="h-8 w-auto" value={from} max={to} onChange={(e) => setFrom(e.target.value)} />
+                <span className="text-sm text-muted-foreground">to</span>
+                <Input type="date" aria-label="To" title="To" className="h-8 w-auto" value={to} min={from} onChange={(e) => setTo(e.target.value)} />
+              </ListToolbar>
 
-            <label className="flex items-center gap-2 text-sm">
-              <span className="text-muted-foreground">Person</span>
-              <select value={person} onChange={(e) => filterPerson(e.target.value)}
-                className="h-9 rounded-full border border-input bg-transparent px-3 text-sm">
-                <option value="">Everyone</option>
-                {(everyone.length ? everyone : people).filter((p) => p.id !== 'system').map((p) => (
-                  <option key={p.id} value={String(p.id)}>{p.name} ({p.count})</option>
-                ))}
-                <option value="system">The system (automatic)</option>
-              </select>
-            </label>
-
-            <div className="flex items-center gap-2">
-              <label htmlFor="act-from" className="text-sm text-muted-foreground">From</label>
-              <Input id="act-from" type="date" className="w-auto" value={from} max={to} onChange={(e) => setFrom(e.target.value)} />
-              <label htmlFor="act-to" className="text-sm text-muted-foreground">to</label>
-              <Input id="act-to" type="date" className="w-auto" value={to} min={from} onChange={(e) => setTo(e.target.value)} />
+              {/* The busiest people this period, one tap to see just theirs. */}
+              {!person && people.length > 1 ? (
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="text-muted-foreground">Most active:</span>
+                  {people.slice(0, 6).map((p) => (
+                    <button key={p.id} type="button" onClick={() => filterPerson(String(p.id))}
+                      className="rounded-full border px-2.5 py-1 hover:bg-muted">
+                      {p.name} · {p.count}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
-
-            <ColumnToggle idPrefix="admin-activity" columns={view.availableColumns} hidden={view.hidden}
-              onToggle={view.toggleColumn} onReset={view.resetColumns} />
-          </div>
-
-          {areaOptions.length > 1 ? (
-            <FilterPills label="Filter by area" value={area} onChange={setArea} options={areaOptions} />
-          ) : null}
-
-          {/* The busiest people this period, one tap to see just theirs. */}
-          {!person && people.length > 1 ? (
-            <div className="flex flex-wrap items-center gap-2 text-xs">
-              <span className="text-muted-foreground">Most active:</span>
-              {people.slice(0, 6).map((p) => (
-                <button key={p.id} type="button" onClick={() => filterPerson(String(p.id))}
-                  className="rounded-full border px-2.5 py-1 hover:bg-muted">
-                  {p.name} · {p.count}
-                </button>
-              ))}
-            </div>
-          ) : null}
-
-          <div ref={detailRef} tabIndex={-1} className="scroll-mt-6 outline-none">
-            {selected ? (
-              <EntryDetail entry={selected} onClose={() => setSelected(null)} onFilterPerson={filterPerson} />
-            ) : null}
-          </div>
-
+          }
+        >
           {isLoading ? (
-            <div className="space-y-3">
-              <Skeleton className="h-24 w-full" />
-              <Skeleton className="h-24 w-full" />
+            <div className="space-y-2 p-4" aria-busy="true">
+              {[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
             </div>
           ) : visible.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No activity matches.</p>
+            <EmptyState
+              icon={Activity}
+              title="No activity matches"
+              description="Nothing in this period matches the person, area or search."
+              action={search || area || person ? { label: 'Clear all filters', onClick: () => { setArea(null); setSearch(''); filterPerson(''); } } : undefined}
+            />
           ) : (
-            <Card>
-              <CardContent className="p-0">
-                <MasterDataTable
-                  columns={view.visibleColumns}
-                  rows={visible}
-                  sort={view.sort}
-                  onToggleSort={view.toggleSort}
-                  onOpenRow={open}
-                />
-              </CardContent>
-            </Card>
+            <MasterDataTable
+              columns={view.visibleColumns}
+              rows={visible}
+              sort={view.sort}
+              onToggleSort={view.toggleSort}
+              onOpenRow={open}
+              noun="actions"
+            />
           )}
-        </div>
-      </main>
-    </ManagerLayout>
+        </ListCard>
+      </div>
+
+      {selected ? (
+        <EntryDetail key={selected.id ?? selected.at} entry={selected} onClose={() => setSelected(null)} onFilterPerson={filterPerson} />
+      ) : null}
+    </PageShell>
   );
 }

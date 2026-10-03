@@ -363,11 +363,29 @@ describe('picking routes — service status is honoured', () => {
     ['completeSlip',  'post', `${BASE}/1/complete`,         'Failed to complete picking slip.'],
   ])('masks a raw %s failure with a generic message', async (fn, method, path, expected) => {
     serviceMock[fn].mockRejectedValueOnce(new Error('relation "picking_slips" does not exist'));
+    // Packing a pallet is the floor's; everything else here an admin may do.
+    const role = /\/(items|complete)/.test(path) ? ROLES.WORKER : ROLES.ADMIN;
     const res = await request(app)[method](path)
-      .set('Cookie', cookieFor(ROLES.ADMIN)).send({});
+      .set('Cookie', cookieFor(role)).send({});
 
     expect(res.status).toBe(500);
     expect(res.body.message).toBe(expected);
+  });
+});
+
+// ── Packing is the floor's ────────────────────────────────────
+// Each role works only its own screens: confirming, flagging and
+// completing a pallet is the warehouse worker's alone.
+describe('picking routes — packing a pallet', () => {
+  it.each([
+    ['post', `${BASE}/1/items/2/confirm`],
+    ['post', `${BASE}/1/items/2/flag`],
+    ['post', `${BASE}/1/complete`],
+  ])('%s %s is refused to a manager and an admin', async (method, path) => {
+    for (const role of [ROLES.MANAGER, ROLES.ADMIN]) {
+      const res = await request(app)[method](path).set('Cookie', cookieFor(role)).send({});
+      expect(res.status, role).toBe(403);
+    }
   });
 });
 

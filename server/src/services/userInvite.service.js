@@ -16,7 +16,7 @@
 // bound to one teammate's local tunnel) — that is a routine, expected
 // outcome here, not a bug to surface as a 500.
 //
-// THREE OUTCOMES, NOT TWO. emailProvider.sendEmail returns
+// THREE OUTCOMES, NOT TWO. communications.send returns the provider's reply:
 // { sent: true, stubbed: true, ... } when EMAIL_ENABLED=false — sent
 // is true but nothing was actually transmitted anywhere. Treating
 // that as "sent" would tell an admin an email went out when it did
@@ -48,13 +48,17 @@ import crypto from 'node:crypto';
 import bcrypt from 'bcrypt';
 import inviteRepo    from '../repositories/userInvite.repository.js';
 import userRepo      from '../repositories/user.repository.js';
-import emailProvider from '../providers/email.provider.js';
+import settings from '../features/settings/settings.service.js';
+import communications from '../features/communications/communications.service.js';
 import {
   fail, clean, validUsername, validFirstName, validLastName, validRole, validPassword,
 } from '../utils/userAccountFields.js';
 
 const BCRYPT_COST = 10;
-const INVITE_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
+const DAY_MS = 1000 * 60 * 60 * 24;
+// How long an invite link works: Settings (invites.linkDays), 7 by
+// default.
+const inviteExpiry = async () => new Date(Date.now() + (await settings.get('invites.linkDays')) * DAY_MS);
 
 const inviteBaseUrl = () => {
   const explicit = process.env.USER_INVITE_BASE_URL || process.env.CLIENT_URL || process.env.FRONTEND_URL;
@@ -76,10 +80,13 @@ const ROLE_LABELS = {
   admin:             'Admin',
 };
 
-const composeInviteEmail = ({ email, role, inviterName }, url) => {
+const composeInviteEmail = ({ email, role, inviterName, expires_at: expiresAt }, url) => {
   const roleLabel = ROLE_LABELS[role] ?? role;
   const from = inviterName ? `${inviterName} has` : 'You have been';
-  const expiresLine = 'This link expires in 7 days.';
+  // Read off the invite rather than assumed, so it says what the
+  // Settings value made it.
+  const days = expiresAt ? Math.max(1, Math.round((new Date(expiresAt).getTime() - Date.now()) / DAY_MS)) : 7;
+  const expiresLine = `This link expires in ${days} day${days === 1 ? '' : 's'}.`;
   const text = [
     `${from} invited you to join as a ${roleLabel}.`,
     '',
@@ -98,13 +105,13 @@ const composeInviteEmail = ({ email, role, inviterName }, url) => {
   };
 };
 
-// Wraps emailProvider.sendEmail and reduces its shape to exactly one
+// Wraps communications.send (email.provider underneath) and reduces its shape to exactly one
 // of 'sent' / 'stubbed' / 'failed' — see the file header for why
 // stubbed cannot be treated as sent. Never throws: any failure here
 // (a Gmail account not connected being the routine one — see file
 // header) is caught and reported as a 'failed' outcome, the same way
 // donation.service.js's sendThankYouEmail catches around its own
-// emailProvider.sendEmail call so a broken send can never fail the
+// communications.send call so a broken send can never fail the
 // request that created the record it describes.
 //
 // ALWAYS SENDS AS THE ORGANISATION ACCOUNT (userId = null to the
@@ -124,10 +131,12 @@ const sendInviteEmail = async (invite, url) => {
     const inviter = invite.invited_by ? await userRepo.getUserById(invite.invited_by) : null;
     const inviterName = inviter ? `${inviter.first_name} ${inviter.last_name}`.trim() : null;
 
-    const result = await emailProvider.sendEmail(
-      composeInviteEmail({ ...invite, inviterName }, url),
-      null
-    );
+    const result = await communications.send({
+      type: 'user_invite',
+      ...composeInviteEmail({ ...invite, inviterName }, url),
+      related: { type: 'user_invite', id: invite.id },
+      sendAs: null,
+    });
     if (result?.stubbed) {
       outcome = { status: 'stubbed', error: null };
     } else if (result?.sent) {
@@ -213,7 +222,7 @@ const createInvite = async (body, actorId) => {
     email,
     role,
     tokenHash: hashToken(token),
-    expiresAt: new Date(Date.now() + INVITE_TTL_MS),
+    expiresAt: await inviteExpiry(),
     invitedBy: actorId,
   }, actorId);
 
@@ -254,7 +263,7 @@ const resendInvite = async (rawId, actorId) => {
   const invite = await inviteRepo.resendInvite({
     id,
     tokenHash: hashToken(token),
-    expiresAt: new Date(Date.now() + INVITE_TTL_MS),
+    expiresAt: await inviteExpiry(),
   }, existing, actorId);
 
   if (!invite) throw fail(409, 'This invite is no longer pending.');

@@ -1,32 +1,45 @@
 // ─────────────────────────────────────────────────────────────
 // features/purchaseOrders/components/PurchaseOrderDetail.jsx
 //
-// Mostly read-only — the one action is Approve, shown only while the
-// PO is still pending. Same Card + close-button shape as
-// SupplierDetail in SupplierDirectoryPage.jsx, so opening a PO feels
-// like opening a supplier.
+// One purchase order in the right-hand panel, opened from its row —
+// the shared DetailPanel every manager list now uses.
 //
 // The received column is the whole point of the panel. It comes from
 // delivery_note_items summed across every delivery note logged against
 // the line, which is how BR-07A partial instalments work without a
 // separate receipts table — one PO, many delivery notes.
+//
+// ACTIONS
+//   Approve           pending only
+//   Record follow-up  any order still expecting goods; needs a reason,
+//                     which shows on the order from then on (the same
+//                     status_reason a Returned order carries)
+//   Reopen            a followed-up order back to Approved, so it can be
+//                     received against again — follow_up_required is
+//                     not an open status, and without this it would be
+//                     a dead end
+//   Edit / Delete     pending only — see purchaseOrder.service.js's guard
+//
+// The page mounts this with key={po.id}, so a draft reason or
+// QuickBooks reference never carries over to the next order opened.
 // ─────────────────────────────────────────────────────────────
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Badge }  from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input }  from '@/components/ui/input';
-import {
-  Card, CardContent, CardHeader, CardTitle,
-} from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import StatusBadge from '@/components/ui/status-badge';
+import DetailPanel from '@/components/ui/detail-panel';
 import {
   AlertDialog, AlertDialogContent, AlertDialogDescription,
   AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
-import { Pencil, Trash2, X } from 'lucide-react';
+import { BadgeCheck, Pencil, RotateCcw, Trash2, TriangleAlert } from 'lucide-react';
+import { OPEN_PO_STATUSES } from '@/services/purchaseOrderAPI';
 import PurchaseOrderTimeline from './PurchaseOrderTimeline';
 
 const fmtDate = (value) =>
@@ -39,21 +52,27 @@ const money = (value) =>
     minimumFractionDigits: 2, maximumFractionDigits: 2,
   })}`;
 
+const Section = ({ title, children }) => (
+  <section>
+    <h3 className="mb-2 text-sm font-medium">{title}</h3>
+    {children}
+  </section>
+);
+
 export default function PurchaseOrderDetail({
-  purchaseOrder: po, canManage, onApprove, onSetQuickbooksRef, onEdit, onDelete, onClose,
+  purchaseOrder: po, canManage, onApprove, onRecordFollowUp, onReopen, onSetQuickbooksRef, onEdit, onDelete, onClose,
 }) {
-  // Edit/Delete only make sense on a 'pending' order — see
-  // purchaseOrder.service.js's own guard on both. Same condition
-  // Approve already gates on, so this is one more button beside it,
-  // not a new rule to learn.
-  const canEditOrDelete = canManage && po.status === 'pending';
+  const pending = po.status === 'pending';
+  const canEditOrDelete = canManage && pending;
+  // Still expecting goods: the only orders a follow-up means anything on.
+  const canFollowUp = canManage && OPEN_PO_STATUSES.includes(po.status);
+
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting]           = useState(false);
 
-  // Same success-boolean convention as saveQbo below: the page owns
-  // the try/catch and the error banner, this only decides whether to
-  // close the dialog (success) or leave it open with the failure
-  // still visible behind it (failure).
+  // Same success-boolean convention throughout: the page owns the
+  // try/catch and the error banner; this only decides whether to close
+  // the editor (success) or leave it open with the draft (failure).
   const runDelete = async () => {
     setDeleting(true);
     try {
@@ -64,33 +83,25 @@ export default function PurchaseOrderDetail({
     }
   };
 
-  // "Raised by"/"Raised on" used to live here too — dropped now that
-  // the timeline below covers the same ground with more context
-  // (who, and what's happened since), not repeated in two places on
-  // the same card.
-  const facts = [
-    ['Supplier',   po.supplierName],
-    ['Status',     <StatusBadge key="status" kind="purchaseOrder" status={po.status}>{po.statusLabel}</StatusBadge>],
-    ['Expected',   fmtDate(po.expectedDeliveryDate)],
-  ];
+  const [followingUp, setFollowingUp] = useState(false);
+  const [reason, setReason]           = useState('');
+  const [followBusy, setFollowBusy]   = useState(false);
+  const saveFollowUp = async () => {
+    setFollowBusy(true);
+    try {
+      const ok = await onRecordFollowUp(reason.trim());
+      if (ok) { setFollowingUp(false); setReason(''); }
+    } finally {
+      setFollowBusy(false);
+    }
+  };
 
-  // The QBO reference is usually only known after this PO has already
-  // been raised here and then entered into QuickBooks separately, so
-  // it needs an edit path the other facts don't — kept out of the
-  // static list above for that reason. Local edit state resets off
-  // po.id: the panel re-renders in place when a manager switches
-  // between orders, and a stale draft from a previous PO must not
-  // survive that switch.
+  // The QBO reference is usually only known after this PO has been
+  // raised here and then entered into QuickBooks separately, so it
+  // needs an edit path the other facts don't.
   const [editingQbo, setEditingQbo] = useState(false);
   const [qboDraft, setQboDraft]     = useState(po.quickbooksPoId || '');
   const [qboBusy, setQboBusy]       = useState(false);
-
-  useEffect(() => {
-    setQboDraft(po.quickbooksPoId || '');
-    setEditingQbo(false);
-    setQboBusy(false);
-  }, [po.id]);
-
   const saveQbo = async () => {
     setQboBusy(true);
     try {
@@ -101,89 +112,134 @@ export default function PurchaseOrderDetail({
     }
   };
 
+  // From the order's own lines: the single-order endpoint does not
+  // carry the list's line_count / estimated_value summaries.
+  const received = po.items.filter((l) => l.receivedToDate >= l.expectedQuantity).length;
+  const estimated = po.items.reduce((sum, l) => sum + (l.unitPrice ?? 0) * l.expectedQuantity, 0);
+
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
-        <div>
-          <CardTitle>{po.poNumber}</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            {po.lineCount} {po.lineCount === 1 ? 'line' : 'lines'} · {money(po.estimatedValue)} estimated
+    <DetailPanel
+      open
+      onClose={onClose}
+      eyebrow={`${po.supplierName} · ${po.items.length} ${po.items.length === 1 ? 'line' : 'lines'} · ${money(estimated)} estimated`}
+      title={po.poNumber}
+      badges={<StatusBadge kind="purchaseOrder" status={po.status}>{po.statusLabel}</StatusBadge>}
+      actions={canManage ? (
+        <>
+          {pending ? (
+            <Button type="button" size="sm" onClick={onApprove}>
+              <BadgeCheck /> Approve
+            </Button>
+          ) : null}
+          {po.status === 'follow_up_required' ? (
+            <Button type="button" variant="outline" size="sm" onClick={onReopen}>
+              <RotateCcw /> Reopen for receiving
+            </Button>
+          ) : null}
+          {canFollowUp && !followingUp ? (
+            <Button type="button" variant="outline" size="sm" onClick={() => setFollowingUp(true)}>
+              <TriangleAlert /> Record follow-up
+            </Button>
+          ) : null}
+          {canEditOrDelete ? (
+            <>
+              <Button type="button" variant="outline" size="sm" onClick={onEdit}>
+                <Pencil /> Edit
+              </Button>
+              <Button
+                type="button" variant="outline" size="sm"
+                onClick={() => setConfirmDelete(true)}
+                className="border-brand text-brand hover:bg-brand hover:text-white"
+              >
+                <Trash2 /> Delete
+              </Button>
+            </>
+          ) : null}
+        </>
+      ) : null}
+    >
+      {followingUp ? (
+        <section className="space-y-2 rounded-lg border p-3">
+          <Label htmlFor="po-follow-up">What needs following up with {po.supplierName}?</Label>
+          <Textarea
+            id="po-follow-up" value={reason} onChange={(e) => setReason(e.target.value)}
+            placeholder="e.g. Delivery two weeks late; supplier not answering"
+            maxLength={500} disabled={followBusy}
+          />
+          <p className="text-xs text-muted-foreground">
+            The order moves to Follow-up required and stops being offered for receiving until someone reopens it.
           </p>
-        </div>
-        <Button type="button" variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close">
-          <X />
-        </Button>
-      </CardHeader>
-
-      <CardContent className="space-y-5">
-        <dl className="grid gap-3 text-sm sm:grid-cols-2">
-          {facts.map(([label, value]) => (
-            <div key={label}>
-              <dt className="text-muted-foreground">{label}</dt>
-              <dd>{value}</dd>
-            </div>
-          ))}
-
-          <div>
-            <dt className="text-muted-foreground">QuickBooks</dt>
-            {editingQbo ? (
-              <dd className="flex items-center gap-2">
-                <Input
-                  value={qboDraft}
-                  onChange={(e) => setQboDraft(e.target.value)}
-                  placeholder="QBO reference"
-                  maxLength={50}
-                  className="h-8"
-                  disabled={qboBusy}
-                />
-                <Button type="button" size="sm" onClick={saveQbo} disabled={qboBusy}>
-                  Save
-                </Button>
-                <Button
-                  type="button" variant="ghost" size="sm" disabled={qboBusy}
-                  onClick={() => { setQboDraft(po.quickbooksPoId || ''); setEditingQbo(false); }}
-                >
-                  Cancel
-                </Button>
-              </dd>
-            ) : (
-              <dd className="flex items-center gap-2">
-                {po.quickbooksPoId || 'Not linked'}
-                {canManage ? (
-                  <Button
-                    type="button" variant="ghost" size="icon-sm"
-                    onClick={() => setEditingQbo(true)} aria-label="Edit QuickBooks reference"
-                  >
-                    <Pencil />
-                  </Button>
-                ) : null}
-              </dd>
-            )}
+          <div className="flex gap-2">
+            <Button type="button" size="sm" disabled={!reason.trim() || followBusy} onClick={saveFollowUp}>
+              {followBusy ? 'Saving…' : 'Save follow-up'}
+            </Button>
+            <Button type="button" variant="ghost" size="sm" disabled={followBusy}
+              onClick={() => { setFollowingUp(false); setReason(''); }}>
+              Cancel
+            </Button>
           </div>
-        </dl>
+        </section>
+      ) : null}
 
+      {/* Mandatory on Returned (BR-07B, enforced in SQL) and on a
+          recorded follow-up — so if there is one, it is on screen. */}
+      {po.statusReason ? (
+        <div className="rounded-[4px] border-2 border-brand bg-danger-soft p-3 text-sm">
+          <span className="font-semibold">{po.statusLabel}:</span> {po.statusReason}
+        </div>
+      ) : null}
+
+      <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
         <div>
-          <p className="text-sm text-muted-foreground">Timeline</p>
-          <PurchaseOrderTimeline purchaseOrder={po} />
+          <dt className="text-xs text-muted-foreground">Expected</dt>
+          <dd>{fmtDate(po.expectedDeliveryDate)}</dd>
         </div>
+        <div>
+          <dt className="text-xs text-muted-foreground">Received</dt>
+          <dd className="tabular-nums">{received} of {po.items.length} lines</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted-foreground">QuickBooks</dt>
+          {editingQbo ? (
+            <dd className="flex items-center gap-2">
+              <Input
+                value={qboDraft} onChange={(e) => setQboDraft(e.target.value)}
+                placeholder="QBO reference" maxLength={50} className="h-8" disabled={qboBusy}
+                aria-label="QuickBooks reference"
+              />
+              <Button type="button" size="sm" onClick={saveQbo} disabled={qboBusy}>Save</Button>
+              <Button
+                type="button" variant="ghost" size="sm" disabled={qboBusy}
+                onClick={() => { setQboDraft(po.quickbooksPoId || ''); setEditingQbo(false); }}
+              >
+                Cancel
+              </Button>
+            </dd>
+          ) : (
+            <dd className="flex items-center gap-1">
+              {po.quickbooksPoId || 'Not linked'}
+              {canManage ? (
+                <Button
+                  type="button" variant="ghost" size="icon-sm"
+                  onClick={() => setEditingQbo(true)} aria-label="Edit QuickBooks reference"
+                >
+                  <Pencil />
+                </Button>
+              ) : null}
+            </dd>
+          )}
+        </div>
+      </dl>
 
-        {/* BR-07B makes this mandatory on Returned, and migration 002
-            enforces it in SQL — so if the status is returned, there is
-            a reason and it belongs on screen. */}
-        {po.statusReason ? (
-          <div className="rounded-[4px] border-2 border-brand bg-danger-soft p-3 text-sm">
-            <span className="font-semibold">{po.statusLabel}:</span> {po.statusReason}
-          </div>
-        ) : null}
-
-        <div className="overflow-x-auto rounded-[4px] border-2">
+      <Section title="Lines">
+        <div className="overflow-x-auto rounded-lg border">
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Item</TableHead>
-                <TableHead className="text-center">Expected</TableHead>
-                <TableHead className="text-center">Received</TableHead>
-                <TableHead className="text-center">Unit price</TableHead>
+                <TableHead className="text-right">Expected</TableHead>
+                <TableHead className="text-right">Received</TableHead>
+                <TableHead className="text-right">Unit price</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -191,22 +247,20 @@ export default function PurchaseOrderDetail({
                 const outstanding = line.expectedQuantity - line.receivedToDate;
                 return (
                   <TableRow key={line.id}>
-                    <TableCell>
+                    <TableCell className="whitespace-normal">
                       {line.productName}
-                      {line.sku ? (
-                        <span className="block text-xs text-muted-foreground">{line.sku}</span>
-                      ) : null}
+                      {line.sku ? <span className="block text-xs text-muted-foreground">{line.sku}</span> : null}
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="text-right tabular-nums">
                       {line.expectedQuantity}{line.defaultUnit ? ` ${line.defaultUnit}` : ''}
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="text-right tabular-nums">
                       {line.receivedToDate}
                       {outstanding > 0 && line.receivedToDate > 0 ? (
                         <Badge variant="outline" className="ml-2">{outstanding} short</Badge>
                       ) : null}
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="text-right tabular-nums">
                       {line.unitPrice === null ? '—' : money(line.unitPrice)}
                     </TableCell>
                   </TableRow>
@@ -215,43 +269,20 @@ export default function PurchaseOrderDetail({
             </TableBody>
           </Table>
         </div>
+      </Section>
 
-        {po.notes ? (
-          <div>
-            <p className="text-sm text-muted-foreground">Notes</p>
-            <p className="text-sm">{po.notes}</p>
-          </div>
-        ) : null}
+      <Section title="Timeline">
+        <PurchaseOrderTimeline purchaseOrder={po} />
+      </Section>
 
-        {canEditOrDelete ? (
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" onClick={onApprove}>
-              Approve
-            </Button>
-            <Button type="button" variant="outline" onClick={onEdit}>
-              <Pencil />
-              Edit
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setConfirmDelete(true)}
-              className="border-brand text-brand hover:bg-brand hover:text-white"
-            >
-              <Trash2 />
-              Delete
-            </Button>
-          </div>
-        ) : null}
-      </CardContent>
+      {po.notes ? (
+        <Section title="Notes">
+          <p className="text-sm">{po.notes}</p>
+        </Section>
+      ) : null}
 
-      {/* Delete only ever reaches a 'pending' order (canEditOrDelete
-          already gates the button on that), so there is no "this will
-          also affect N deliveries" warning to give — nothing has
-          happened against this order yet. That is also why this is a
-          real, permanent delete rather than the archive/deactivate
-          pattern suppliers and products use: there is no history here
-          a soft delete would be protecting. */}
+      {/* Delete only ever reaches a 'pending' order, so nothing has
+          happened against it yet — a real delete, not an archive. */}
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent className="gap-4 rounded-lg p-5 sm:max-w-md">
           <AlertDialogHeader className="gap-1">
@@ -267,10 +298,7 @@ export default function PurchaseOrderDetail({
           <AlertDialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
             <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
             <Button
-              type="button"
-              variant="outline"
-              disabled={deleting}
-              onClick={runDelete}
+              type="button" variant="outline" disabled={deleting} onClick={runDelete}
               className="border-brand text-brand hover:bg-brand hover:text-white"
             >
               <Trash2 />
@@ -279,6 +307,6 @@ export default function PurchaseOrderDetail({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </Card>
+    </DetailPanel>
   );
 }

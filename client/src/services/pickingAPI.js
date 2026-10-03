@@ -54,9 +54,12 @@ async function handleResponse(res) {
 
 // GET /api/picking — list slips for the board view, filtered by
 // dispatch date / cohort / status, and "mine" for non-managers.
-export async function fetchPickingSlips({ dispatchDate, cohort, status, mine } = {}) {
+// `from`/`to` (YYYY-MM-DD, inclusive) for the manager's week view.
+export async function fetchPickingSlips({ dispatchDate, from, to, cohort, status, mine } = {}) {
   const params = new URLSearchParams();
   if (dispatchDate) params.set('dispatchDate', dispatchDate);
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
   if (cohort) params.set('cohort', cohort);
   if (status) params.set('status', status);
   if (mine) params.set('mine', 'true');

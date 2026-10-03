@@ -121,7 +121,7 @@ export default function CustomReportBuilder({ datasets, value, preset, onChange,
       <div className="mt-4">
         <Button
           type="button" onClick={onRun} disabled={busy}
-          className="bg-ink hover:bg-ink/90 text-on-ink font-bold text-xs tracking-wider rounded-[4px] px-6"
+          className="bg-ink hover:bg-ink/90 text-on-ink font-bold text-xs tracking-wider rounded-lg px-6"
         >
           {busy ? 'RUNNING…' : 'RUN REPORT'}
         </Button>

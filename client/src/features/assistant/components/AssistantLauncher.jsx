@@ -48,7 +48,7 @@ const GAP   = 16;  // between the button and whatever is under it
 const SIZE  = 56;  // the button itself — 3.5rem, past the ACC-06 minimum
 const CLEAR = 12;  // between the button and whatever is above it
 
-export default function AssistantLauncher() {
+export default function AssistantLauncher({ role } = {}) {
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
   const screen = matchScreen(pathname);
@@ -109,7 +109,7 @@ export default function AssistantLauncher() {
           which is the behaviour you want from a help panel: it opens
           on the screen you are on, not on what you asked yesterday. */}
       {open && (
-        <AssistantPanel open={open} onOpenChange={setOpen} screen={screen} />
+        <AssistantPanel open={open} onOpenChange={setOpen} screen={screen} role={role} />
       )}
     </>
   );

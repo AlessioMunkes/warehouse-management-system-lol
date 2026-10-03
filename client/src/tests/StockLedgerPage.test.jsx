@@ -1,11 +1,12 @@
 // ─────────────────────────────────────────────────────────────
 // StockLedgerPage.test.jsx
 //
-// The page's wiring: does it ask the API for what the filter bar
-// says, and does it render what comes back.
+// The page's wiring: does it ask the API for what the tabs and the
+// toolbar say, and does it render what comes back — including the
+// reference a movement links to.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -41,8 +42,8 @@ const SUMMARY = {
   movementCount: 7, productCount: 3,
 };
 
-const renderPage = () =>
-  render(<MemoryRouter><StockLedgerPage /></MemoryRouter>);
+const renderPage = (url = '/noc/stock-ledger') =>
+  render(<MemoryRouter initialEntries={[url]}><StockLedgerPage /></MemoryRouter>);
 
 beforeEach(() => {
   // StatTile counts up from 0 unless reduced motion is on.
@@ -58,25 +59,26 @@ beforeEach(() => {
   api.getManifest.mockResolvedValue([{ id: 3, name: 'Maize Meal' }]);
 });
 
-// The product name appears twice on screen — once in the filter
-// dropdown, once in the table — so "has the page loaded" is asserted
-// on the reason cell, which only the row has. A bare
-// getByText('Maize Meal') matches both and throws.
+// "Has the page loaded" is asserted on the reason, which only the row
+// carries.
 const rowLoaded = () => screen.findByText('Damaged / spoiled');
 
 describe('StockLedgerPage', () => {
   it('renders a movement row with its running balance', async () => {
     renderPage();
     await rowLoaded();
-    expect(screen.getByRole('cell', { name: 'Maize Meal' })).toBeInTheDocument();
-    expect(screen.getByText('55')).toBeInTheDocument();
+    const table = within(screen.getByRole('table'));
+    expect(table.getByText('Maize Meal')).toBeInTheDocument();
+    expect(table.getByText('55')).toBeInTheDocument();
   });
 
-  it('shows stock out as a positive magnitude, not a minus figure', async () => {
+  it('sums the selection up in one line, out as a signed figure', async () => {
     renderPage();
-    // -35 in the ledger is 35 units of stock leaving; showing "-35"
-    // under a label that already says "out" reads as a double negative.
-    expect(await screen.findByText('35')).toBeInTheDocument();
+    // One line in place of the four tiles; -35 in the ledger reads
+    // "Out −35", the sign carried once.
+    expect(await screen.findByText('−35')).toBeInTheDocument();
+    expect(screen.getByText('+510')).toBeInTheDocument();
+    expect(screen.getByText(/7 movements across 3 products/)).toBeInTheDocument();
   });
 
   it('defaults to the last 30 days', async () => {
@@ -87,11 +89,11 @@ describe('StockLedgerPage', () => {
     expect(args.movementTypes).toEqual([]);
   });
 
-  it('refetches with the type filter when a chip is pressed', async () => {
+  it('refetches with the movement types of the tab chosen', async () => {
     renderPage();
     await rowLoaded();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Wastage' }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Wastage' }));
 
     await waitFor(() => {
       const last = api.getLedger.mock.calls.at(-1)[0];
@@ -99,15 +101,40 @@ describe('StockLedgerPage', () => {
     });
   });
 
+  it('puts received and donated stock together under Stock in', async () => {
+    renderPage('/noc/stock-ledger?status=in');
+    await waitFor(() => expect(api.getLedger).toHaveBeenCalled());
+    expect(api.getLedger.mock.calls.at(-1)[0].movementTypes).toEqual(['received', 'donated']);
+  });
+
   it('drops the date filter entirely when the period is All time', async () => {
     renderPage();
     await rowLoaded();
 
-    await userEvent.selectOptions(screen.getByLabelText(/Period/i), 'all');
+    await userEvent.click(screen.getByRole('combobox', { name: 'Period' }));
+    await userEvent.click(await screen.findByRole('option', { name: 'All time' }));
 
     await waitFor(() => {
       expect(api.getLedger.mock.calls.at(-1)[0].from).toBeNull();
     });
+    // A period away from the default shows as a chip that undoes it.
+    expect(screen.getByRole('button', { name: 'Remove filter: All time' })).toBeInTheDocument();
+  });
+
+  it('links a dispatch to its slip and a receipt to its order', async () => {
+    api.getLedger.mockResolvedValue({
+      movements: [
+        { ...MOVEMENT, id: 8, movementType: 'dispatched', referenceType: 'dispatch_event', reason: null,
+          pickingSlipId: 41, pickingSlipName: 'Sunshine ECD' },
+        { ...MOVEMENT, id: 9, movementType: 'received', referenceType: 'delivery_note', reason: null,
+          purchaseOrderId: 58, poNumber: 'PO-2026-0058' },
+      ],
+      summary: SUMMARY, nextCursor: null,
+    });
+    renderPage();
+
+    expect(await screen.findByRole('link', { name: 'Slip · Sunshine ECD' })).toHaveAttribute('href', '/noc/picking-slips?open=41');
+    expect(screen.getByRole('link', { name: 'PO-2026-0058' })).toHaveAttribute('href', '/noc/purchase-orders?id=58');
   });
 
   it('loads reconciliation only once its tab is opened', async () => {
@@ -115,7 +142,7 @@ describe('StockLedgerPage', () => {
     await rowLoaded();
     expect(api.getReconciliation).not.toHaveBeenCalled();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Reconciliation' }));
+    await userEvent.click(screen.getByRole('tab', { name: /Reconciliation/ }));
 
     await waitFor(() => expect(api.getReconciliation).toHaveBeenCalledTimes(1));
     expect(await screen.findByText(/Every balance matches its ledger/i)).toBeInTheDocument();
@@ -131,7 +158,7 @@ describe('StockLedgerPage', () => {
 
     renderPage();
     await rowLoaded();
-    await userEvent.click(screen.getByRole('button', { name: 'Reconciliation' }));
+    await userEvent.click(screen.getByRole('tab', { name: /Reconciliation/ }));
 
     expect(await screen.findByText('Tinned Pilchards')).toBeInTheDocument();
     expect(screen.getByText(/1 product out of balance/i)).toBeInTheDocument();

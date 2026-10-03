@@ -36,9 +36,14 @@
 // them, so no signature-stripping is needed in the service.
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import ReceiptFilters from '../features/receipts/components/ReceiptFilters';
 import ReceiptsTable from '../features/receipts/components/ReceiptsTable';
+import PageHeader, { PageShell } from '@/components/ui/page-header';
+import ViewTabs from '@/components/ui/view-tabs';
+import ListCard from '@/components/ui/list-card';
+import ListToolbar from '@/components/ui/list-toolbar';
+import TablePager from '@/components/ui/table-pager';
+import ErrorBanner from '@/components/ui/error-banner';
+import { Input } from '@/components/ui/input';
 import StatusBadge from '@/components/ui/status-badge';
 import { VARIANCE_STYLE } from '@/lib/statusStyles';
 import DeliveryNotePDF from '../features/procurement/components/DeliveryNotePDF';
@@ -53,9 +58,16 @@ const PAGE_SIZE = 15;
 
 
 const TABS = [
-  { id: 'in',  label: 'Goods in',  sub: 'Delivery notes' },
-  { id: 'out', label: 'Goods out', sub: 'Dispatch notes' },
+  { id: 'in',  label: 'Goods in · delivery notes' },
+  { id: 'out', label: 'Goods out · dispatch notes' },
 ];
+
+// A native select drawn like the app's Input, for the toolbar. Native
+// rather than the Base UI Select so it stays a plain form control.
+const SELECT = 'h-8 rounded-md border border-input bg-transparent px-2 text-sm text-foreground';
+
+const shortDate = (value) => new Date(`${value}T00:00:00`)
+  .toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' });
 
 const DELIVERY_STATUS_OPTIONS = [
   { value: 'recorded', label: 'Recorded' },
@@ -82,8 +94,6 @@ const EMPTY_SORT = {
 };
 
 export default function ReceiptsPage() {
-  const navigate = useNavigate();
-
   const [tab, setTab]         = useState('in');
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [cohort, setCohort]   = useState('');
@@ -248,7 +258,7 @@ export default function ReceiptsPage() {
       // The note's own record number, matching the "#0011" on the document.
       // Padded so the column reads as a column rather than ragged text.
       render: (r) => (
-        <span className="font-mono text-xs text-ink-soft">
+        <span className="font-mono text-xs text-muted-foreground">
           #{String(r.id).padStart(4, '0')}
         </span>
       ),
@@ -290,7 +300,7 @@ export default function ReceiptsPage() {
     {
       key: 'id', header: 'ID', sortKey: 'id',
       render: (r) => (
-        <span className="font-mono text-xs text-ink-soft">
+        <span className="font-mono text-xs text-muted-foreground">
           #{String(r.dispatch_event_id).padStart(4, '0')}
         </span>
       ),
@@ -335,151 +345,132 @@ export default function ReceiptsPage() {
   const pageCount   = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
 
+  const statusOptions = tab === 'in' ? DELIVERY_STATUS_OPTIONS : DISPATCH_STATUS_OPTIONS;
+  const entityLabel = tab === 'in' ? 'Supplier' : 'Beneficiary';
+  const entityName = entityOptions.find((o) => String(o.value) === String(filters.entity))?.label;
+
+  const clearAll = () => {
+    setFilters(EMPTY_FILTERS);
+    setCohort('');
+    setOffset(0);
+    setSortState(EMPTY_SORT[tab]);
+  };
+  const narrowed = Boolean(filters.from || filters.to || filters.entity || filters.status || filters.search || cohort);
+
+  // Status is a "+ Filter" item, one at a time (the server takes one);
+  // the rest are set in the toolbar and shown as removable chips.
+  const chips = [
+    filters.entity ? { key: 'entity', label: `${entityLabel}: ${entityName ?? filters.entity}`, onRemove: () => setFilter({ entity: '' }) } : null,
+    cohort ? { key: 'cohort', label: cohort === 'thursday' ? 'Thursday cohort' : 'Tuesday cohort', onRemove: () => { setCohort(''); setOffset(0); } } : null,
+    filters.from ? { key: 'from', label: `From ${shortDate(filters.from)}`, onRemove: () => setFilter({ from: '' }) } : null,
+    filters.to ? { key: 'to', label: `To ${shortDate(filters.to)}`, onRemove: () => setFilter({ to: '' }) } : null,
+  ].filter(Boolean);
+
+  // The server pages; the pager is told where it is rather than paging
+  // an array itself.
+  const pager = {
+    page: currentPage,
+    pages: pageCount,
+    from: total ? offset + 1 : 0,
+    to: offset + rows.length,
+    total,
+    prev: () => setOffset(Math.max(0, offset - PAGE_SIZE)),
+    next: () => setOffset(offset + PAGE_SIZE),
+  };
+
   return (
-    <>
+    <PageShell>
+      <PageHeader
+        title="Receipts"
+        description="Delivery notes for stock that came in, and dispatch notes for stock that went out."
+      />
 
-      <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
-        <div className="mb-5">
-          <h1 className="text-2xl font-bold text-ink">Receipts</h1>
-          <p className="mt-1 text-sm text-ink-soft">
-            Delivery notes for stock that came in, and dispatch notes for stock that went out.
-          </p>
-        </div>
+      <ViewTabs
+        className="mt-5"
+        label="Receipt type"
+        value={tab}
+        onChange={switchTab}
+        tabs={TABS}
+      />
 
-        {/* ── Tabs ───────────────────────────────────────────
-            Buttons rather than a Tabs primitive — components/ui has no
-            tabs.jsx, and adding one shadcn component for two buttons is
-            more surface area than it earns. */}
-        <div
-          className="mb-5 flex gap-2 border-b-2 border-line"
-          role="tablist"
-          aria-label="Receipt type"
-        >
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={tab === t.id}
-              onClick={() => switchTab(t.id)}
-              className={`-mb-0.5 border-b-4 px-4 py-2 text-left transition-colors ${
-                tab === t.id
-                  ? 'border-brand text-ink'
-                  : 'border-transparent text-ink-soft hover:text-ink'
-              }`}
+      <ErrorBanner className="mt-4" message={openError} />
+
+      <div className="mt-6">
+        <ListCard
+          header={
+            <ListToolbar
+              search={{
+                value: filters.search,
+                onChange: (v) => setFilter({ search: v }),
+                placeholder: tab === 'in'
+                  ? 'PO, record no. or supplier'
+                  : 'Beneficiary, driver or record',
+                label: 'Search receipts',
+              }}
+              filters={statusOptions.map((o) => ({
+                key: o.value,
+                label: o.label,
+                active: filters.status === o.value,
+                onToggle: () => setFilter({ status: filters.status === o.value ? '' : o.value }),
+              }))}
+              chips={chips}
+              onClearAll={clearAll}
             >
-              <span className="block text-sm font-bold">{t.label}</span>
-              <span className="block text-[11px]">{t.sub}</span>
-            </button>
-          ))}
-        </div>
-
-        <div className="mb-4">
-          <ReceiptFilters
-            from={filters.from}
-            to={filters.to}
-            onFromChange={(v) => setFilter({ from: v })}
-            onToChange={(v) => setFilter({ to: v })}
-            status={filters.status}
-            statusOptions={tab === 'in' ? DELIVERY_STATUS_OPTIONS : DISPATCH_STATUS_OPTIONS}
-            onStatusChange={(v) => setFilter({ status: v })}
-            entityLabel={tab === 'in' ? 'Supplier' : 'Beneficiary'}
-            entityValue={filters.entity}
-            entityOptions={entityOptions}
-            onEntityChange={(v) => setFilter({ entity: v })}
-            search={filters.search}
-            onSearchChange={(v) => setFilter({ search: v })}
-            searchPlaceholder={tab === 'in'
-              ? 'PO number, record number or supplier…'
-              : 'Beneficiary, driver, pallet or record number…'}
-            resultCount={total}
-            isLoading={isLoading}
-            onClear={() => {
-              setFilters(EMPTY_FILTERS);
-              setCohort('');
-              setOffset(0);
-              setSortState(EMPTY_SORT[tab]);
-            }}
-            extra={tab === 'out' ? (
-              <div>
-                <label
-                  className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-ink-soft"
-                  htmlFor="receipts-cohort"
-                >
-                  Cohort
-                </label>
+              <select
+                aria-label={entityLabel}
+                className={`${SELECT} max-w-48`}
+                value={filters.entity}
+                onChange={(e) => setFilter({ entity: e.target.value })}
+              >
+                <option value="">Any {entityLabel.toLowerCase()}</option>
+                {entityOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              {tab === 'out' ? (
                 <select
-                  id="receipts-cohort"
-                  className="w-full rounded-[4px] border-2 border-line bg-surface px-3 py-2 text-sm text-ink focus:border-ink focus:outline-none"
+                  aria-label="Cohort"
+                  className={SELECT}
                   value={cohort}
                   onChange={(e) => { setCohort(e.target.value); setOffset(0); }}
                 >
-                  <option value="">All</option>
+                  <option value="">Any cohort</option>
                   <option value="tuesday">Tuesday</option>
                   <option value="thursday">Thursday</option>
                 </select>
-              </div>
-            ) : null}
-          />
-        </div>
-
-        {openError && (
-          <div className="mb-4 rounded-[4px] border-2 border-brand bg-danger-soft p-3 text-sm text-ink">
-            {openError}
-          </div>
-        )}
-
-        <ReceiptsTable
-          columns={tab === 'in' ? deliveryColumns : dispatchColumns}
-          rows={rows}
-          rowKey={(r) => (tab === 'in' ? `d-${r.id}` : `x-${r.dispatch_event_id}`)}
-          onOpen={openRow}
-          isLoading={isLoading || isOpening}
-          error={error}
-          sort={sortState.sort}
-          dir={sortState.dir}
-          onSortChange={changeSort}
-          emptyMessage={
-            tab === 'in'
-              ? 'No delivery notes match these filters.'
-              : 'No dispatch notes match these filters.'
+              ) : null}
+              <Input
+                type="date" aria-label="From" title="From" className="h-8 w-auto"
+                value={filters.from} onChange={(e) => setFilter({ from: e.target.value })}
+              />
+              <span className="text-sm text-muted-foreground">to</span>
+              <Input
+                type="date" aria-label="To" title="To" className="h-8 w-auto"
+                value={filters.to} onChange={(e) => setFilter({ to: e.target.value })}
+              />
+            </ListToolbar>
           }
-        />
-
-        {pageCount > 1 && (
-          <div className="mt-4 flex items-center justify-between">
-            <button
-              type="button"
-              disabled={offset === 0}
-              onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-              className="rounded-[4px] border-2 border-ink px-4 py-2 text-xs font-bold uppercase tracking-wider text-ink disabled:opacity-40"
-            >
-              Previous
-            </button>
-            <span className="text-xs text-ink-soft">
-              Page {currentPage} of {pageCount}
-            </span>
-            <button
-              type="button"
-              disabled={currentPage >= pageCount}
-              onClick={() => setOffset(offset + PAGE_SIZE)}
-              className="rounded-[4px] border-2 border-ink px-4 py-2 text-xs font-bold uppercase tracking-wider text-ink disabled:opacity-40"
-            >
-              Next
-            </button>
-          </div>
-        )}
-
-        <div className="mt-6">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="text-xs font-bold uppercase tracking-wider text-ink-soft hover:text-ink"
-          >
-            ← Back
-          </button>
-        </div>
-      </main>
+          footer={!isLoading && !error && rows.length
+            ? <TablePager {...pager} noun={tab === 'in' ? 'delivery notes' : 'dispatch notes'} loading={isOpening} alwaysShow />
+            : null}
+        >
+          <ReceiptsTable
+            columns={tab === 'in' ? deliveryColumns : dispatchColumns}
+            rows={rows}
+            rowKey={(r) => (tab === 'in' ? `d-${r.id}` : `x-${r.dispatch_event_id}`)}
+            onOpen={openRow}
+            isLoading={isLoading || isOpening}
+            error={error}
+            sort={sortState.sort}
+            dir={sortState.dir}
+            onSortChange={changeSort}
+            emptyMessage={
+              tab === 'in'
+                ? 'No delivery notes match these filters.'
+                : 'No dispatch notes match these filters.'
+            }
+            emptyAction={narrowed ? { label: 'Clear all filters', onClick: clearAll } : undefined}
+          />
+        </ListCard>
+      </div>
 
       {openDelivery && (
         <DeliveryNotePDF delivery={openDelivery} onClose={() => setOpenDelivery(null)} />
@@ -487,6 +478,6 @@ export default function ReceiptsPage() {
       {openDispatch && (
         <DispatchNotePDF note={openDispatch} onClose={() => setOpenDispatch(null)} />
       )}
-    </>
+    </PageShell>
   );
 }

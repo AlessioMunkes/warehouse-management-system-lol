@@ -8,10 +8,10 @@
 // bug that showed "nothing dispatched" with 43 kg dispatched).
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, renderHook, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { WIDGETS, DEFAULT_LAYOUT, widgetsForRole, sizeOf } from '../features/dashboard/widgetCatalog';
-import { cleanLayout, layoutKey, panelSlots } from '../features/dashboard/useDashboardLayout';
+import useDashboardLayout, { cleanLayout, layoutKey, panelSlots } from '../features/dashboard/useDashboardLayout';
 import { unwrapReport, ragAgainst, byLabel, RAG } from '../features/dashboard/chartTheme';
 
 vi.mock('../services/dashboardAPI', () => ({
@@ -140,7 +140,7 @@ describe('customising the board', () => {
 
   it('removes and adds a widget, and remembers it', async () => {
     const { unmount } = renderBoard();
-    fireEvent.click(screen.getByRole('button', { name: 'Customise' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Customise dashboard' }));
     fireEvent.click(screen.getByRole('button', { name: 'Remove Pending benevolent requests' }));
     fireEvent.click(screen.getByRole('button', { name: 'Add a widget' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Add Slips still to pack' }));
@@ -153,7 +153,7 @@ describe('customising the board', () => {
 
   it('goes back to the default on reset', async () => {
     renderBoard();
-    fireEvent.click(screen.getByRole('button', { name: 'Customise' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Customise dashboard' }));
     fireEvent.click(screen.getByRole('button', { name: 'Remove Pending benevolent requests' }));
     fireEvent.click(screen.getByRole('button', { name: 'Reset to default' }));
     expect(await screen.findByText('Pending benevolent requests')).toBeInTheDocument();
@@ -162,7 +162,7 @@ describe('customising the board', () => {
   it('replaces a widget with one of the same size, in the same place', async () => {
     window.localStorage.setItem(layoutKey(manager), JSON.stringify(['top-products', 'product-health', 'dispatch-trend']));
     renderBoard();
-    fireEvent.click(screen.getByRole('button', { name: 'Customise' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Customise dashboard' }));
     fireEvent.click(screen.getByRole('button', { name: 'Replace Product health' }));
     expect(await screen.findByText('Replace Product health')).toBeInTheDocument();
     // Only medium widgets: a large chart would change the board's shape.
@@ -170,6 +170,37 @@ describe('customising the board', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Use Collection compliance' }));
     const saved = JSON.parse(window.localStorage.getItem(layoutKey(manager)));
     expect(saved.ids).toEqual(['top-products', 'compliance-trend', 'dispatch-trend']);
+  });
+});
+
+describe('dragging widgets around', () => {
+  it('shows a drag handle on each widget while customising, and none otherwise', async () => {
+    window.localStorage.setItem(layoutKey(manager), JSON.stringify(['top-products', 'product-health']));
+    render(<MemoryRouter><CustomisableDashboard user={manager} /></MemoryRouter>);
+    expect(screen.queryByRole('button', { name: /^Drag / })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Customise dashboard' }));
+    expect(screen.getByRole('button', { name: 'Drag Product health to move it' })).toBeInTheDocument();
+  });
+
+  it('reorders among widgets of the same kind, and remembers it', () => {
+    const { result } = renderHook(() => useDashboardLayout(manager));
+    act(() => result.current.reset());
+    const before = result.current.ids;
+    const panels = before.filter((id) => WIDGETS.find((w) => w.id === id)?.kind === 'panel');
+    act(() => result.current.reorder(panels[panels.length - 1], panels[0]));
+    const after = result.current.ids.filter((id) => WIDGETS.find((w) => w.id === id)?.kind === 'panel');
+    expect(after[0]).toBe(panels[panels.length - 1]);
+    expect(JSON.parse(window.localStorage.getItem(layoutKey(manager))).ids).toEqual(result.current.ids);
+  });
+
+  it('never drops a number among the charts', () => {
+    const { result } = renderHook(() => useDashboardLayout(manager));
+    act(() => result.current.reset());
+    const before = result.current.ids;
+    const tile = before.find((id) => WIDGETS.find((w) => w.id === id)?.kind === 'tile');
+    const panel = before.find((id) => WIDGETS.find((w) => w.id === id)?.kind === 'panel');
+    act(() => result.current.reorder(tile, panel));
+    expect(result.current.ids).toEqual(before);
   });
 });
 
@@ -199,7 +230,7 @@ describe('sizes and gaps', () => {
   it('fills the gap it was opened from, with only what fits', async () => {
     window.localStorage.setItem(layoutKey(manager), JSON.stringify(['top-products', 'product-health', 'dispatch-trend']));
     render(<MemoryRouter><CustomisableDashboard user={manager} /></MemoryRouter>);
-    fireEvent.click(screen.getByRole('button', { name: 'Customise' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Customise dashboard' }));
     fireEvent.click(screen.getByRole('button', { name: 'Add a medium widget here' }));
     expect(await screen.findByText('Add a medium widget')).toBeInTheDocument();
     // A large chart does not fit a medium hole.

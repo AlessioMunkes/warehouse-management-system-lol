@@ -148,3 +148,17 @@ describe('runExpiryCheck', () => {
     expect(failingClient.release).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('runExpiryCheck — windows from Settings', () => {
+  it('checks the windows an admin chose, keeping the notification types fixed', async () => {
+    const { default: settings } = await import('../src/features/settings/settings.service.js');
+    settings.getAll.mockResolvedValueOnce({
+      'stock.expiryWarningFirstDays': 21, 'stock.expiryWarningSecondDays': 10,
+    });
+    repoMock.findApproachingExpiry.mockResolvedValue([]);
+
+    await expiryWarningService.runExpiryCheck();
+
+    expect(repoMock.findApproachingExpiry.mock.calls.map(([days]) => days)).toEqual([21, 10]);
+  });
+});

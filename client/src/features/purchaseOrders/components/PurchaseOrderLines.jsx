@@ -32,7 +32,7 @@ import {
 } from '@/components/ui/table';
 import { Plus, Trash2, PackageSearch } from 'lucide-react';
 
-import { blankLine, lineForProduct, relinkLine } from './purchaseOrderLine';
+import { blankLine, lineForProduct, relinkLine, suggestedLine } from './purchaseOrderLine';
 
 const money = (value) =>
   `R ${Number(value || 0).toLocaleString('en-ZA', {
@@ -82,12 +82,7 @@ export default function PurchaseOrderLines({
   const addLowStock = () => {
     const low = products.filter((p) => p.isLowStock && !chosen.has(p.id));
     if (!low.length) return;
-    const seeded = low.map((p) => lineForProduct({
-      ...blankLine(),
-      // Suggests the shortfall, rounded up. A suggestion, not a
-      // decision — the manager overwrites it constantly and should.
-      expectedQuantity: String(Math.max(1, Math.ceil(p.reorderAt - p.available))),
-    }, p));
+    const seeded = low.map(suggestedLine);
     // Drop the trailing empty row rather than stranding it mid-table.
     const kept = lines.filter((l) => l.productId !== '' || l.expectedQuantity !== '');
     onChange([...kept, ...seeded]);

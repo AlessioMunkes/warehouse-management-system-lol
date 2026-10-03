@@ -71,7 +71,7 @@ warehouse.installWarehouseFetch();
 const api = await import('../services/api');
 const outbox = await import('../services/outbox');
 const { AuthProvider, useAuth } = await import('../context/AuthContext');
-const { default: WarehouseSwitcher } = await import('../features/taskdashboard/components/WarehouseSwitcher');
+const { default: WarehouseSwitcher } = await import('../components/layout/WarehouseSwitcher');
 const { default: GuestLoginPage } = await import('../pages/GuestLoginPage');
 
 const CPT = { code: 'cpt', name: 'Cape Town' };

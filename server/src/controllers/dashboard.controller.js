@@ -34,4 +34,15 @@ const getMyWork = async (req, res) => {
   }
 };
 
-export default { getSummary, getMyWork };
+// GET /api/dashboard/attention — the counts behind "Needs attention"
+// and the manager sidebar. See dashboard.repository.js getAttention.
+const getAttention = async (req, res) => {
+  try {
+    const data = await dashboardService.getAttention();
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    respondError(res, err, 'getAttention', 'Failed to load what needs attention.');
+  }
+};
+
+export default { getSummary, getMyWork, getAttention };
