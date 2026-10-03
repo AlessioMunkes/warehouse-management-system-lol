@@ -130,7 +130,7 @@ export default function MessageHistoryPage() {
     <PageShell>
       <PageHeader
         title="Message history"
-        description="Every email the system has sent, and whether it went out. History starts when message recording was switched on."
+        description="Check which emails the system sent and which failed."
       />
 
       <ViewTabs className="mt-5" label="Message outcomes" value={view.id} onChange={changeView}

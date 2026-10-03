@@ -78,7 +78,7 @@ export default function ImpactFactorsForm() {
               onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
             />
           </div>
-          <Button type="button" size="sm" disabled={busy === f.key || !values[f.key]} onClick={() => submit(f.key)}>
+          <Button type="button" size="sm" disabled={busy === f.key || !values[f.key]} onClick={() => submit(f.key)} loading={busy === f.key}>
             {busy === f.key ? 'Saving…' : savedKey === f.key ? 'Saved' : 'Save'}
           </Button>
         </div>

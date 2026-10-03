@@ -14,6 +14,7 @@ import MasterDataTable from '../features/masterdata/components/MasterDataTable';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Badge }    from '@/components/ui/badge';
 import { Input }    from '@/components/ui/input';
+import NativeSelect from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import PageHeader, { PageShell } from '@/components/ui/page-header';
 import ListCard from '@/components/ui/list-card';
@@ -174,8 +175,8 @@ export default function AdminUserActivityPage() {
   return (
     <PageShell>
       <PageHeader
-        title="User Activity"
-        description={`Everything people did in the system, newest first.${data ? ` ${entries.length} ${entries.length === 1 ? 'action' : 'actions'} by ${people.length} ${people.length === 1 ? 'person' : 'people'} from ${data.from} to ${data.to}.` : ''}${data?.truncated ? ' Showing the latest 2 000; narrow the dates to see earlier ones.' : ''}`}
+        title="User activity"
+        description={`Review what people did in the system, newest first.${data ? ` ${entries.length} ${entries.length === 1 ? 'action' : 'actions'} by ${people.length} ${people.length === 1 ? 'person' : 'people'}, ${data.from} to ${data.to}.` : ''}${data?.truncated ? ' Showing the latest 2 000 — narrow the dates to see earlier ones.' : ''}`}
       />
 
       <ErrorBanner className="mt-4" message={error} onRetry={load} />
@@ -201,18 +202,19 @@ export default function AdminUserActivityPage() {
                   onReset: view.resetColumns,
                 }}
               >
-                <select
+                <NativeSelect
                   aria-label="Person"
                   value={person}
                   onChange={(e) => filterPerson(e.target.value)}
-                  className="h-8 max-w-48 rounded-md border border-input bg-transparent px-2 text-sm"
+                  size="sm"
+                  className="max-w-48"
                 >
                   <option value="">Everyone</option>
                   {(everyone.length ? everyone : people).filter((p) => p.id !== 'system').map((p) => (
                     <option key={p.id} value={String(p.id)}>{p.name} ({p.count})</option>
                   ))}
                   <option value="system">The system (automatic)</option>
-                </select>
+                </NativeSelect>
                 <Input type="date" aria-label="From" title="From" className="h-8 w-auto" value={from} max={to} onChange={(e) => setFrom(e.target.value)} />
                 <span className="text-sm text-muted-foreground">to</span>
                 <Input type="date" aria-label="To" title="To" className="h-8 w-auto" value={to} min={from} onChange={(e) => setTo(e.target.value)} />
@@ -241,7 +243,7 @@ export default function AdminUserActivityPage() {
             <EmptyState
               icon={Activity}
               title="No activity matches"
-              description="Nothing in this period matches the person, area or search."
+              description="Try another person, area, search or date range."
               action={search || area || person ? { label: 'Clear all filters', onClick: () => { setArea(null); setSearch(''); filterPerson(''); } } : undefined}
             />
           ) : (

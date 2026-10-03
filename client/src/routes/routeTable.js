@@ -78,7 +78,7 @@ export const ROUTES = [
 
   // ── Inbound ────────────────────────────────────────────────
   { id: 'purchaseOrders', path: STAFF.purchaseOrders, roles: MANAGERS_UP, shell: true,
-    nav: [nav('manager', 'Inbound', 'Purchase Orders', ShoppingCart,
+    nav: [nav('manager', 'Inbound', 'Purchase orders', ShoppingCart,
       (a) => a.purchaseOrders.awaitingApproval + a.purchaseOrders.followUp)] },
   { id: 'receipts', path: STAFF.receipts, roles: MANAGERS_UP, shell: true,
     nav: [nav('manager', 'Inbound', 'Receipts', ReceiptText)] },
@@ -88,19 +88,19 @@ export const ROUTES = [
     nav: [nav('manager', 'Stock', 'Inventory', Boxes,
       (a) => a.inventory.shortfall + a.inventory.expiring)] },
   { id: 'stockLedger', path: STAFF.stockLedger, roles: MANAGERS_UP, shell: true,
-    nav: [nav('manager', 'Stock', 'Stock Ledger', ScrollText)] },
+    nav: [nav('manager', 'Stock', 'Stock ledger', ScrollText)] },
 
   // ── Outbound ───────────────────────────────────────────────
   // Unclaimed slips are the queue's normal state, so only pallets not
   // collected are counted.
   { id: 'pickingSlips', path: STAFF.pickingSlips, roles: MANAGERS_UP, shell: true,
-    nav: [nav('manager', 'Outbound', 'Picking Slips', ClipboardList, (a) => a.pickingSlips.notCollected)] },
+    nav: [nav('manager', 'Outbound', 'Picking slips', ClipboardList, (a) => a.pickingSlips.notCollected)] },
   { id: 'beneficiaries', path: STAFF.beneficiaries, roles: MANAGERS_UP, shell: true,
     nav: [nav('manager', 'Outbound', 'Beneficiaries', Users2)] },
   { id: 'collectionReminders', path: STAFF.collectionReminders, roles: MANAGERS_UP, shell: true,
-    nav: [nav('manager', 'Outbound', 'Collection Reminders', MessageCircle)] },
+    nav: [nav('manager', 'Outbound', 'Collection reminders', MessageCircle)] },
   { id: 'operatingCalendar', path: STAFF.operatingCalendar, roles: MANAGERS_UP, shell: true,
-    nav: [nav('manager', 'Outbound', 'Operating Calendar', CalendarDays)] },
+    nav: [nav('manager', 'Outbound', 'Operating calendar', CalendarDays)] },
 
   // ── The warehouse floor (warehouse staff only) ──────────────
   { id: 'receiving', path: STAFF.receiving, roles: WORKERS_ONLY,
@@ -116,57 +116,57 @@ export const ROUTES = [
     nav: [nav('worker', 'Warehouse', 'Dispatch', ClipboardCheck)] },
   { id: 'dispatchHistory', path: STAFF.dispatchHistory, roles: WORKERS_ONLY },
   { id: 'donationIntake', path: STAFF.donation, roles: WORKERS_ONLY,
-    nav: [nav('worker', 'Warehouse', 'Donation Intake', HandCoins)] },
+    nav: [nav('worker', 'Warehouse', 'Donation intake', HandCoins)] },
   { id: 'donationReview', path: DONATIONS.review, roles: WORKERS_ONLY },
   { id: 'floorRequests', path: STAFF.floorRequests, roles: WORKERS_ONLY,
-    nav: [nav('worker', 'Warehouse', 'Benevolent Requests', PhoneCall)] },
+    nav: [nav('worker', 'Warehouse', 'Benevolent requests', PhoneCall)] },
   { id: 'floorFeedTheSoil', path: STAFF.floorFeedTheSoil, roles: WORKERS_ONLY,
     nav: [nav('worker', 'Warehouse', 'Feed the Soil', Sprout)] },
 
   // ── The manager's side of those two programmes ─────────────
   { id: 'communityRequests', path: STAFF.communityRequests, roles: MANAGERS_UP, shell: true,
-    nav: [nav('manager', 'Outbound', 'Benevolent Requests', PhoneCall, (a) => (a.communityRequests.pending ?? 0) + (a.communityRequests.needsItems ?? 0))] },
+    nav: [nav('manager', 'Outbound', 'Benevolent requests', PhoneCall, (a) => (a.communityRequests.pending ?? 0) + (a.communityRequests.needsItems ?? 0))] },
   { id: 'feedTheSoil', path: STAFF.feedTheSoil, roles: MANAGERS_UP, shell: true,
     nav: [nav('manager', 'Programmes', 'Feed the Soil', Sprout)] },
 
   // ── Programmes ─────────────────────────────────────────────
   { id: 'volunteerEvents', path: VOLUNTEERS.events, roles: MANAGERS_UP, shell: true,
-    nav: [nav('manager', 'Programmes', 'Volunteer Events', HandHeart)] },
+    nav: [nav('manager', 'Programmes', 'Volunteer events', HandHeart)] },
   { id: 'volunteerEvent', path: VOLUNTEERS.eventPattern, roles: MANAGERS_UP, shell: true },
 
   // ── Insights ───────────────────────────────────────────────
   { id: 'reporting', path: STAFF.reporting, roles: MANAGERS_UP, shell: true,
-    nav: [nav('manager', 'Insights', 'Operations Reports', BarChart3)] },
+    nav: [nav('manager', 'Insights', 'Operations reports', BarChart3)] },
   { id: 'impactReport', path: STAFF.impactReport, roles: MANAGERS_UP, shell: true,
-    nav: [nav('manager', 'Insights', 'Impact Reports', HeartHandshake)] },
+    nav: [nav('manager', 'Insights', 'Impact report', HeartHandshake)] },
 
   // ── Admin ──────────────────────────────────────────────────
   { id: 'users', path: ADMIN.users, roles: ADMIN_ONLY, shell: true,
-    nav: [nav('admin', 'Master data', 'User Management', Users2)] },
+    nav: [nav('admin', 'Master data', 'Users', Users2)] },
   { id: 'products', path: ADMIN.products, roles: ADMIN_ONLY, shell: true,
-    nav: [nav('admin', 'Master data', 'Product Management', Package)] },
+    nav: [nav('admin', 'Master data', 'Products', Package)] },
   { id: 'suppliers', path: ADMIN.suppliers, roles: ADMIN_ONLY, shell: true,
-    nav: [nav('admin', 'Master data', 'Supplier Management', Truck)] },
+    nav: [nav('admin', 'Master data', 'Suppliers', Truck)] },
   { id: 'activity', path: ADMIN.activity, roles: ADMIN_ONLY, shell: true,
-    nav: [nav('admin', 'Logs', 'User Activity', Activity)] },
+    nav: [nav('admin', 'Logs', 'User activity', Activity)] },
   // The door sign-in log. Managers use Volunteer Events instead.
   { id: 'volunteerLog', path: ADMIN.volunteerLog, roles: ADMIN_ONLY, shell: true,
-    nav: [nav('admin', 'Logs', 'Volunteer Log', HandHeart)] },
+    nav: [nav('admin', 'Logs', 'Volunteer log', HandHeart)] },
   { id: 'archive', path: ADMIN.archive, roles: ADMIN_ONLY, shell: true,
     nav: [nav('admin', 'Logs', 'Archive', Archive)] },
   { id: 'messageHistory', path: ADMIN.messageHistory, roles: ADMIN_ONLY, shell: true,
-    nav: [nav('admin', 'Logs', 'Message History', Inbox)] },
+    nav: [nav('admin', 'Logs', 'Message history', Inbox)] },
   { id: 'donationManagement', path: ADMIN.donationManagement, roles: ADMIN_ONLY, shell: true,
-    nav: [nav('admin', 'Donations', 'Classification Queue', Gift)] },
+    nav: [nav('admin', 'Donations', 'Classification queue', Gift)] },
   { id: 'section18a', path: ADMIN.section18aManagement, roles: ADMIN_ONLY, shell: true,
-    nav: [nav('admin', 'Donations', 'Section 18A Management', ScrollText)] },
+    nav: [nav('admin', 'Donations', 'Section 18A', ScrollText)] },
   // Settings' Email section, at the address Google's sign-in returns to
   // and older links use. Listed in the menu as Settings.
   { id: 'emailIntegration', path: ADMIN.emailIntegration, roles: ADMIN_ONLY, shell: true },
   // The warehouse movement report finance works from. It was routed
   // but in no menu; listed beside the dashboard.
   { id: 'financeReport', path: ADMIN.financeReport, roles: ADMIN_ONLY, shell: true,
-    nav: [nav('admin', 'Overview', 'Finance Report', Landmark)] },
+    nav: [nav('admin', 'Overview', 'Finance report', Landmark)] },
 
   { id: 'settings', path: ADMIN.settings, roles: ADMIN_ONLY, shell: true,
     nav: [nav('admin', 'Setup', 'Settings', Settings)] },

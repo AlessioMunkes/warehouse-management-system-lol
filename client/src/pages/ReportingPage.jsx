@@ -408,7 +408,7 @@ export default function ReportingPage() {
       <PageHeader
         className="mb-5"
         title="Operations reports"
-        description="Figures come from what was recorded at the gate, not what was planned. Looking for beneficiary impact instead? See Impact Reports in the sidebar."
+        description="Ask a question or browse reports on what was recorded in the warehouse. For people served, use Impact report."
       />
 
       {!catalog && !error && (

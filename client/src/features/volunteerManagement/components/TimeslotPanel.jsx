@@ -19,7 +19,7 @@ export default function TimeslotPanel({
     <Card>
       <CardHeader>
         <CardTitle>Schedule and capacity</CardTitle>
-        <CardDescription>Event setup is managed when the event is created.</CardDescription>
+        <CardDescription>Timeslots, spaces and how full each one is.</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-6">
         {timeslots.length === 0 ? (

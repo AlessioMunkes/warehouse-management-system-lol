@@ -26,6 +26,7 @@ import ListToolbar from '@/components/ui/list-toolbar';
 import DetailPanel from '@/components/ui/detail-panel';
 import EmptyState from '@/components/ui/empty-state';
 import ErrorBanner from '@/components/ui/error-banner';
+import Notice from '@/components/ui/notice';
 import { RotateCcw, ExternalLink, Archive } from 'lucide-react';
 
 const SAST = 'Africa/Johannesburg';
@@ -79,7 +80,7 @@ function ItemDetail({ item, busy, onRestore, onClose }) {
       actions={item.restorable || href ? (
         <>
           {item.restorable ? (
-            <Button type="button" disabled={busy} onClick={onRestore}>
+            <Button type="button" disabled={busy} onClick={onRestore} loading={busy}>
               <RotateCcw /> {busy ? 'Restoring…' : 'Restore'}
             </Button>
           ) : null}
@@ -168,11 +169,11 @@ export default function AdminArchivePage() {
     <PageShell>
       <PageHeader
         title="Archive"
-        description="Everything switched off or deleted across the system, and a way back for what can be restored."
+        description="Find deactivated or deleted records, and restore what can come back."
       />
 
       <ErrorBanner className="mt-4" message={error} onRetry={load} />
-      {notice ? <p role="status" className="mt-4 rounded-lg border bg-good-soft px-4 py-3 text-sm text-good">{notice}</p> : null}
+      <Notice className="mt-4" message={notice} onClear={() => setNotice(null)} />
 
       <ViewTabs
         className="mt-5"
@@ -211,7 +212,7 @@ export default function AdminArchivePage() {
             <EmptyState
               icon={Archive}
               title={items.length ? 'Nothing matches' : 'Nothing archived'}
-              description={items.length ? 'Nothing in this view matches the search or type.' : 'Nothing has been deactivated or deleted.'}
+              description={items.length ? 'Try another search or type.' : 'Deactivated and deleted records appear here.'}
               action={search || kind ? { label: 'Clear all filters', onClick: () => { setKind(null); setSearch(''); } } : undefined}
             />
           ) : (

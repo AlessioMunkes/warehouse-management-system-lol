@@ -33,7 +33,7 @@ export default function TablePager({
       <span className="text-sm text-muted-foreground" aria-live="polite">
         {from}–{to} of {total}{hasMore ? '+' : ''} {noun}
       </span>
-      <Button type="button" variant="outline" size="sm" onClick={next} disabled={(atEnd && !hasMore) || loading}>
+      <Button type="button" variant="outline" size="sm" onClick={next} disabled={(atEnd && !hasMore) || loading} loading={loading}>
         {loading ? 'Loading…' : <>Next <ChevronRight /></>}
       </Button>
     </nav>

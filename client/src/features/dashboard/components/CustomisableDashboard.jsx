@@ -133,7 +133,8 @@ function Sortable({ id, editing, as: Tag = 'div', className = '', children }) {
     attributes, listeners, setNodeRef, transform, transition, isDragging,
   } = useSortable({ id, disabled: !editing });
   const style = {
-    transform: CSS.Translate.toString(transform),
+    // Held: a touch larger, so it reads as lifted off the board.
+    transform: CSS.Transform.toString(transform && { ...transform, scaleX: isDragging ? 1.02 : 1, scaleY: isDragging ? 1.02 : 1 }),
     transition,
     zIndex: isDragging ? 20 : undefined,
   };
@@ -141,7 +142,7 @@ function Sortable({ id, editing, as: Tag = 'div', className = '', children }) {
     <Tag
       ref={setNodeRef}
       style={style}
-      className={`${className} ${isDragging ? 'opacity-80 shadow-lg' : ''}`}
+      className={`${className} ${isDragging ? 'cursor-grabbing rounded-xl opacity-95 shadow-2xl ring-2 ring-ring/40' : ''}`}
     >
       {children({ ...attributes, ...listeners })}
     </Tag>

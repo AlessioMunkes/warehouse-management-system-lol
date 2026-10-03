@@ -77,7 +77,7 @@ export default function PhoneAlerts() {
       {on === null ? null : on ? (
         <Button size="sm" variant="ghost" onClick={turnOff} disabled={busy}>Turn off</Button>
       ) : support === 'ask' || support === 'granted' ? (
-        <Button size="sm" onClick={turnOn} disabled={busy}>{busy ? '…' : 'Turn on'}</Button>
+        <Button size="sm" onClick={turnOn} disabled={busy} loading={busy}>{busy ? '…' : 'Turn on'}</Button>
       ) : null}
     </div>
   );

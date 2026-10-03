@@ -167,7 +167,7 @@ const SlipPreviewPage = () => {
         {!finished && !taken ? (
           alreadySignedIn ? (
             // Already signed in at the gate — no need to ask again.
-            <Button onClick={() => claim()} disabled={busy}>
+            <Button onClick={() => claim()} disabled={busy} loading={busy}>
               {busy ? 'Just a moment…' : `Pack this one, ${user.firstName?.split(' ')[0]}`}
             </Button>
           ) : (

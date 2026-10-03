@@ -260,8 +260,7 @@ const ImpactPanel = ({
           <Skeleton className="h-40 w-full" />
         ) : missingFactor ? (
           <p className="rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-            This needs a conversion factor on record before it can show a number. Use
-            "Adjust factors" above to set one.
+            Set a conversion rate to show this figure: choose Adjust estimates above.
           </p>
         ) : error ? (
           <ErrorBanner message={error} />
@@ -369,7 +368,7 @@ export default function ImpactReportPage() {
     <PageShell>
       <PageHeader
         title="Impact report"
-        description="What the warehouse achieved, at a glance. ECDs and soup kitchens only; dignity kitchens don't require an impact report."
+        description="See what the warehouse achieved for a period, and export it as a PDF. Covers ECDs and soup kitchens."
         actions={<>
           <Select value={preset} onValueChange={setPreset}>
             <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>

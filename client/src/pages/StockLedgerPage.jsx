@@ -277,7 +277,7 @@ export default function StockLedgerPage() {
     <PageShell>
       <PageHeader
         title="Stock ledger"
-        description="Every movement of stock through the warehouse, and whether the balances still add up."
+        description="Trace every stock movement and check that balances add up."
       />
 
       <ViewTabs

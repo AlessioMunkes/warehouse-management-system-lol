@@ -1,5 +1,6 @@
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva } from "class-variance-authority";
+import { Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils"
 
@@ -44,17 +45,30 @@ const rawButtonVariants = cva(
 // Dialog trigger styled as an outline button came out borderless.
 const buttonVariants = (options) => cn(rawButtonVariants(options));
 
+// `loading` is for a button whose action is under way: it shows a
+// spinner in place of the button's own icon and cannot be pressed again.
 function Button({
   className,
   variant = "default",
   size = "default",
+  loading = false,
+  disabled,
+  children,
   ...props
 }) {
   return (
     <ButtonPrimitive
       data-slot="button"
-      className={buttonVariants({ variant, size, className })}
-      {...props} />
+      aria-busy={loading || undefined}
+      disabled={disabled || loading}
+      className={buttonVariants({
+        variant, size,
+        className: cn(loading && "[&>svg:not([data-spinner])]:hidden", className),
+      })}
+      {...props}>
+      {loading ? <Loader2 data-spinner="" aria-hidden="true" className="animate-spin" /> : null}
+      {children}
+    </ButtonPrimitive>
   );
 }
 

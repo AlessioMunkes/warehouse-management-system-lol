@@ -175,7 +175,7 @@ export default function InventoryManagementPage() {
     <PageShell>
       <PageHeader
         title="Inventory"
-        description="What is in the building, what is promised to a pallet, and what is still free to allocate."
+        description="Check stock levels, adjust stock and reorder what is running low."
         actions={canAdjust ? (
           <Button type="button" onClick={() => setPicking(true)} disabled={isLoading || products.length === 0}>
             <Plus /> Adjust stock
@@ -221,7 +221,7 @@ export default function InventoryManagementPage() {
         <ProductPickerDialog
           products={products}
           title="Adjust stock"
-          description="Which product?"
+          description="Choose the product to adjust."
           onPick={(p) => { setPicking(false); startAdjusting([p]); }}
           onClose={() => setPicking(false)}
         />

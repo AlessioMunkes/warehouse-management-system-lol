@@ -22,8 +22,8 @@ export const ACTION_DURATION = 9000;
 
 const VARIANT = {
   default: { icon: Info,          cls: 'border-line-strong bg-surface' },
-  success: { icon: CheckCircle2,  cls: 'border-good bg-good-soft' },
-  error:   { icon: AlertTriangle, cls: 'border-brand bg-danger-soft' },
+  success: { icon: CheckCircle2,  cls: 'border-good/40 bg-good-soft' },
+  error:   { icon: AlertTriangle, cls: 'border-danger/40 bg-danger-soft' },
 };
 
 export function ToastProvider({ children }) {
@@ -97,7 +97,7 @@ export function ToastProvider({ children }) {
             <div
               key={t.id}
               role={t.variant === 'error' ? 'alert' : 'status'}
-              className={`pointer-events-auto flex items-start gap-3 rounded-[4px] border-2 p-3 shadow-md ${cls}`}
+              className={`fx-slide-in pointer-events-auto flex items-start gap-3 rounded-2xl border p-3 shadow-lg ${cls}`}
             >
               <Icon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
 

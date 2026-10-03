@@ -90,7 +90,7 @@ export default function NeedsAttention({ attention, items, storageKey = 'wms.das
 
   return (
     <Card className="gap-0 py-0">
-      <CardHeader className={`py-0 ${collapsed ? '' : 'border-b [.border-b]:pb-0'}`}>
+      <CardHeader className="py-0">
         <CardTitle className="text-base font-medium">
           <button
             type="button"
@@ -99,7 +99,7 @@ export default function NeedsAttention({ attention, items, storageKey = 'wms.das
             aria-controls="needs-attention-list"
             className="flex w-full items-center gap-2 py-4 text-left"
           >
-            <ChevronDown aria-hidden="true" className={`size-4 shrink-0 transition-transform ${collapsed ? '-rotate-90' : ''}`} />
+            <ChevronDown aria-hidden="true" className={`size-4 shrink-0 transition-transform duration-200 ${collapsed ? '-rotate-90' : ''}`} />
             <span className="flex-1">Needs attention</span>
             {!loading ? (
               <span className={`rounded-full px-2 py-0.5 text-xs tabular-nums ${due.length ? 'bg-danger-soft text-danger' : 'bg-muted text-muted-foreground'}`}>
@@ -109,8 +109,17 @@ export default function NeedsAttention({ attention, items, storageKey = 'wms.das
           </button>
         </CardTitle>
       </CardHeader>
-      {collapsed ? null : (
-      <CardContent id="needs-attention-list" className="p-0">
+      {/* Kept in the page and folded to no height, so it can slide
+          rather than snap; `inert` takes the hidden links out of the
+          Tab order and away from a screen reader. */}
+      <div
+        id="needs-attention-list"
+        inert={collapsed}
+        aria-hidden={collapsed || undefined}
+        className={`grid transition-[grid-template-rows] duration-200 ease-out ${collapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]'}`}
+      >
+      <div className="min-h-0 overflow-hidden">
+      <CardContent className="border-t p-0">
         {loading ? (
           <div className="space-y-2 p-4" aria-busy="true">
             <Skeleton className="h-8 w-full" />
@@ -137,7 +146,8 @@ export default function NeedsAttention({ attention, items, storageKey = 'wms.das
           </ul>
         )}
       </CardContent>
-      )}
+      </div>
+      </div>
     </Card>
   );
 }

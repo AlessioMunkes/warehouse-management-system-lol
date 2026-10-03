@@ -157,7 +157,7 @@ export default function ProductForm({
           </Select>
           {unitInvalid
             ? <FieldError>A default unit is required.</FieldError>
-            : <FieldDescription>What receiving and the stock ledger count this in.</FieldDescription>}
+            : <FieldDescription>The unit stock is counted in.</FieldDescription>}
         </Field>
         <Field>
           <FieldLabel htmlFor="product-weight">Weight (kg)</FieldLabel>
@@ -187,8 +187,8 @@ export default function ProductForm({
             onChange={set('unitCost')}
           />
           <FieldDescription>
-            What one costs, before VAT. Used to fill in purchase order lines.
-            Leave blank if it is donated or the price moves every time.
+            Price per item before VAT, used on purchase orders. Leave blank if donated or the
+            price varies.
           </FieldDescription>
         </Field>
       </div>
@@ -228,8 +228,8 @@ export default function ProductForm({
               is packed and waiting for a driver), not the raw on-hand
               figure. */}
           <FieldDescription>
-            Flag as low when available stock falls to this level. Leave blank to keep the
-            current setting; 0 means never flag it.
+            Mark the product low when available stock falls to this level. Enter 0 to turn the
+            warning off.
           </FieldDescription>
         </Field>
       </div>

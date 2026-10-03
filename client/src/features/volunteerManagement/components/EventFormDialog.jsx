@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import NativeSelect from '@/components/ui/native-select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -385,12 +386,12 @@ export default function EventFormDialog({
                         {onRetrySpaces && <Button type="button" size="sm" variant="outline" className="mt-2" onClick={onRetrySpaces}>Try spaces again</Button>}
                       </div>
                     ) : (
-                      <select id="volunteer-event-space" className="h-9 rounded-md border bg-background px-3 text-sm" value={form.spaceId} onChange={update('spaceId')} disabled={busy} aria-invalid={Boolean(validationErrors.spaceId) || undefined} aria-describedby={validationErrors.spaceId ? 'volunteer-event-space-error' : undefined}>
+                      <NativeSelect id="volunteer-event-space" value={form.spaceId} onChange={update('spaceId')} disabled={busy} aria-invalid={Boolean(validationErrors.spaceId) || undefined} aria-describedby={validationErrors.spaceId ? 'volunteer-event-space-error' : undefined}>
                         <option value="">Select a space</option>
                         {spaces.map((space) => (
                           <option key={space.id} value={space.id}>{space.name}{space.location ? ` - ${space.location}` : ''}</option>
                         ))}
-                      </select>
+                      </NativeSelect>
                     )}
                     {validationErrors.spaceId && <p id="volunteer-event-space-error" className="text-xs text-destructive">{validationErrors.spaceId}</p>}
                   </div>
@@ -527,7 +528,7 @@ export default function EventFormDialog({
 
           <DialogFooter className="shrink-0">
             <Button type="button" variant="outline" disabled={busy} onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={busy}>{busy ? 'Saving...' : editing ? 'Save changes' : 'Create event'}</Button>
+            <Button type="submit" disabled={busy} loading={busy}>{busy ? 'Saving…' : editing ? 'Save changes' : 'Create event'}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

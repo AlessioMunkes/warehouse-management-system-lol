@@ -220,8 +220,8 @@ export default function GmailSettingsPage({ embedded = false } = {}) {
             role="status"
             className={
               displayFeedback.type === 'success'
-                ? 'rounded-md border border-good bg-good-soft px-4 py-3 text-sm text-good'
-                : 'rounded-md border border-danger bg-danger-soft px-4 py-3 text-sm text-danger'
+                ? 'fx-fade-in rounded-lg border border-good/40 bg-good-soft px-4 py-3 text-sm text-good'
+                : 'fx-fade-in rounded-lg border border-danger/40 bg-danger-soft px-4 py-3 text-sm text-danger'
             }
           >
             {displayFeedback.message}
@@ -230,47 +230,39 @@ export default function GmailSettingsPage({ embedded = false } = {}) {
 
         <Card className="rounded-lg border border-line shadow-sm">
           <CardHeader>
-            <CardTitle>Gmail Connection</CardTitle>
+            <CardTitle>Gmail account</CardTitle>
             <CardDescription>
               {loading
-                ? 'Checking Gmail connection status...'
+                ? 'Checking the connection…'
                 : connected
-                  ? 'Donation emails are ready to send through the connected account.'
-                  : 'Connect an organisation Gmail account so the Donation system can automatically send thank-you emails.'}
+                  ? 'System emails are sent from this account.'
+                  : 'Connect the account system emails are sent from.'}
             </CardDescription>
             <CardAction>
-              {connected ? <Badge>Connected</Badge> : <Badge variant="outline">Not Connected</Badge>}
+              {connected
+                ? <Badge className="bg-good-soft text-good hover:bg-good-soft">Connected</Badge>
+                : <Badge variant="outline" className="border-danger text-danger">Not connected</Badge>}
             </CardAction>
           </CardHeader>
           <CardContent className="space-y-4">
             {loading ? (
-              <p className="text-sm text-muted-foreground">Checking Gmail connection status...</p>
+              <p className="text-sm text-muted-foreground">Checking the connection…</p>
             ) : statusError ? (
               <p className="text-sm text-danger">{statusError}</p>
             ) : (
               <dl className="grid gap-3 text-sm">
-                <div>
-                  <dt className="font-medium text-muted-foreground">Gmail Status</dt>
-                  <dd className="mt-1">
-                    {connected ? (
-                      <Badge className="bg-good-soft text-good hover:bg-good-soft">Connected</Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-danger border-danger">Disconnected</Badge>
-                    )}
-                  </dd>
-                </div>
                 {connected && (
                   <>
                     <div>
-                      <dt className="font-medium text-muted-foreground">Connected Email Address</dt>
+                      <dt className="font-medium text-muted-foreground">Email address</dt>
                       <dd className="mt-1 break-words text-ink">{status.email || 'Unknown'}</dd>
                     </div>
                     <div>
-                      <dt className="font-medium text-muted-foreground">Display Name</dt>
+                      <dt className="font-medium text-muted-foreground">Sender name</dt>
                       <dd className="mt-1">
                         <form className="flex flex-col gap-2 sm:flex-row sm:items-end" onSubmit={handleSaveDisplayName}>
                           <div className="flex-1">
-                            <Label htmlFor="displayName" className="sr-only">Display Name</Label>
+                            <Label htmlFor="displayName" className="sr-only">Sender name</Label>
                             <Input
                               id="displayName"
                               type="text"
@@ -280,12 +272,12 @@ export default function GmailSettingsPage({ embedded = false } = {}) {
                               maxLength={255}
                             />
                           </div>
-                          <Button type="submit" variant="secondary" disabled={savingDisplayName || !displayName.trim()}>
-                            {savingDisplayName ? 'Saving...' : 'Save Display Name'}
+                          <Button type="submit" variant="secondary" disabled={savingDisplayName || !displayName.trim()} loading={savingDisplayName}>
+                            {savingDisplayName ? 'Saving…' : 'Save name'}
                           </Button>
                         </form>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          This name appears as the sender in donation emails.
+                          Shown as the sender of system emails.
                         </p>
                       </dd>
                     </div>
@@ -315,9 +307,9 @@ export default function GmailSettingsPage({ embedded = false } = {}) {
 
         <Card className="rounded-lg border border-line shadow-sm">
           <CardHeader>
-            <CardTitle>Send Test Email</CardTitle>
+            <CardTitle>Test email</CardTitle>
             <CardDescription>
-              Verify that the connected account can send Donation emails.
+              Send a test to check the account can send.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -333,8 +325,8 @@ export default function GmailSettingsPage({ embedded = false } = {}) {
                   required
                 />
               </div>
-              <Button type="submit" disabled={sendingTest || !connected}>
-                {sendingTest ? 'Sending...' : 'Send Test Email'}
+              <Button type="submit" disabled={sendingTest || !connected} loading={sendingTest}>
+                {sendingTest ? 'Sending…' : 'Send test email'}
               </Button>
             </form>
           </CardContent>
@@ -342,15 +334,15 @@ export default function GmailSettingsPage({ embedded = false } = {}) {
 
         <Card className="rounded-lg border border-line shadow-sm">
           <CardHeader>
-            <CardTitle>Finance Report Link</CardTitle>
+            <CardTitle>Finance</CardTitle>
             <CardDescription>
-              Save the Finance recipient and send a secure read-only report link.
+              Set who receives purchase orders, and send them a read-only link to the warehouse movement report.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <form className="flex flex-col gap-4 sm:flex-row sm:items-end" onSubmit={handleSaveFinanceRecipient}>
               <div className="flex-1 space-y-2">
-                <Label htmlFor="financeRecipientEmail">Finance recipient email</Label>
+                <Label htmlFor="financeRecipientEmail">Finance email address</Label>
                 <Input
                   id="financeRecipientEmail"
                   type="email"
@@ -360,16 +352,15 @@ export default function GmailSettingsPage({ embedded = false } = {}) {
                   required
                 />
               </div>
-              <Button type="submit" variant="secondary" disabled={savingFinanceRecipient || !financeRecipientEmail.trim()}>
-                {savingFinanceRecipient ? 'Saving...' : 'Save Finance Recipient'}
+              <Button type="submit" variant="secondary" disabled={savingFinanceRecipient || !financeRecipientEmail.trim()} loading={savingFinanceRecipient}>
+                {savingFinanceRecipient ? 'Saving…' : 'Save email address'}
               </Button>
             </form>
             <Button
               type="button"
               onClick={handleSendFinanceReportLink}
-              disabled={sendingFinanceLink || !connected}
-            >
-              {sendingFinanceLink ? 'Sending...' : 'Send Finance Report Link'}
+              disabled={sendingFinanceLink || !connected} loading={sendingFinanceLink}>
+              {sendingFinanceLink ? 'Sending…' : 'Send report link'}
             </Button>
           </CardContent>
         </Card>
@@ -380,7 +371,7 @@ export default function GmailSettingsPage({ embedded = false } = {}) {
           <AlertDialogHeader>
             <AlertDialogTitle>Disconnect Gmail?</AlertDialogTitle>
             <AlertDialogDescription>
-              Donation thank-you emails will stop sending until the account is reconnected.
+              Certificates, reminders, invites and Finance emails stop until you reconnect.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

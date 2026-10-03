@@ -17,12 +17,31 @@
 // Arrow keys move between tabs, Home/End jump to the ends, the same as
 // any other tab strip. Only the current tab is in the Tab order, so
 // tabbing past the strip takes one press, not six.
+//
+// The underline is one bar that slides to the chosen tab, measured
+// from the tab itself. Until it has been measured (and wherever there
+// is no layout to measure) the tab draws its own underline instead.
 // ─────────────────────────────────────────────────────────────
-import { useRef } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 export default function ViewTabs({ tabs, value, onChange, label = 'Views', className }) {
   const refs = useRef([]);
+  const [bar, setBar] = useState(null);
+  const activeIndex = tabs.findIndex((t) => t.id === value);
+
+  // Runs after every render: a count changing width moves the tabs
+  // after it. setBar only fires when the numbers really changed.
+  useLayoutEffect(() => {
+    const measure = () => {
+      const el = refs.current[activeIndex];
+      const next = el && el.offsetWidth ? { left: el.offsetLeft, width: el.offsetWidth } : null;
+      setBar((prev) => (prev?.left === next?.left && prev?.width === next?.width ? prev : next));
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  });
 
   const onKeyDown = (e, index) => {
     const last = tabs.length - 1;
@@ -39,7 +58,7 @@ export default function ViewTabs({ tabs, value, onChange, label = 'Views', class
   };
 
   return (
-    <div role="tablist" aria-label={label} className={cn('flex gap-1 overflow-x-auto border-b', className)}>
+    <div role="tablist" aria-label={label} className={cn('relative flex gap-1 overflow-x-auto border-b', className)}>
       {tabs.map((t, i) => {
         const on = t.id === value;
         const hasCount = t.count !== undefined && t.count !== null;
@@ -54,8 +73,9 @@ export default function ViewTabs({ tabs, value, onChange, label = 'Views', class
             onClick={() => onChange(t.id)}
             onKeyDown={(e) => onKeyDown(e, i)}
             className={cn(
-              'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap px-4 py-2 text-sm',
-              on ? 'border-b-2 border-foreground font-medium' : 'text-muted-foreground',
+              'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent px-4 py-2 text-sm transition-colors',
+              on ? 'font-medium' : 'text-muted-foreground hover:text-foreground',
+              on && !bar && 'border-foreground',
             )}
           >
             {t.label}
@@ -75,6 +95,13 @@ export default function ViewTabs({ tabs, value, onChange, label = 'Views', class
           </button>
         );
       })}
+      {bar ? (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute bottom-0 h-0.5 bg-foreground transition-[left,width] duration-200 ease-out"
+          style={{ left: bar.left, width: bar.width }}
+        />
+      ) : null}
     </div>
   );
 }

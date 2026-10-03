@@ -260,8 +260,8 @@ export default function ProductManagementPage() {
   return (
     <PageShell>
       <PageHeader
-        title="Product Management"
-        description="What we stock, and what every other module counts against."
+        title="Products"
+        description="Add and edit the products the warehouse stocks."
         actions={canManage ? (
           <Button type="button" onClick={() => { setSelected(null); setMode('create'); }}>
             <Plus />

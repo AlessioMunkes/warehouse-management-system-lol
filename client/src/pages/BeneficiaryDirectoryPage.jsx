@@ -95,7 +95,7 @@ const BeneficiaryDetail = ({ beneficiary, canManage, onEdit, onToggleActive, onA
 
     {!beneficiary.approvedAt ? (
       <p className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
-        This centre cannot receive a picking slip until it is approved.
+        Approve this centre before it can receive picking slips.
       </p>
     ) : null}
   </DetailPanel>
@@ -221,7 +221,7 @@ export default function BeneficiaryDirectoryPage() {
     <PageShell>
       <PageHeader
         title="Beneficiaries"
-        description="ECDs, soup kitchens, dignity kitchens and benevolent package beneficiaries on record."
+        description="Add, approve and update the centres that collect food."
         actions={canManage ? (
           <Button type="button" onClick={startCreate}>
             <Plus />
