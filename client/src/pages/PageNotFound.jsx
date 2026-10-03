@@ -7,16 +7,12 @@
 // them an actual page and a way back.
 // ─────────────────────────────────────────────────────────────
 import { useNavigate } from "react-router-dom";
+import useGoBack from "../components/layout/useGoBack";
 
 export default function NotFoundPage() {
   const navigate = useNavigate();
+  const goBack = useGoBack();
 
-  // navigate(-1) does nothing when there is no history entry to go back
-  // to, e.g. a link opened from an email in a fresh tab.
-  const goBack = () => {
-    if (window.history.length <= 1) navigate("/");
-    else navigate(-1);
-  };
 
   return (
     <div className="stf-shell">
