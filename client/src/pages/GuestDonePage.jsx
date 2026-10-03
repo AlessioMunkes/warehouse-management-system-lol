@@ -70,7 +70,7 @@ const GuestDonePage = () => {
           <Button onClick={() => navigate('/guest-home')} disabled={busy}>
             Pack another pallet
           </Button>
-          <Button variant="secondary" onClick={signOut} disabled={busy}>
+          <Button variant="secondary" onClick={signOut} disabled={busy} loading={busy}>
             {busy ? 'Signing you out…' : 'Sign out'}
           </Button>
           <HelpNote>Need to tell us something? Let a staff member know before you go.</HelpNote>
@@ -148,7 +148,7 @@ const GuestDonePage = () => {
         <Button onClick={() => navigate('/guest-home')} disabled={busy}>
           Pack another pallet
         </Button>
-        <Button variant="secondary" onClick={signOut} disabled={busy}>
+        <Button variant="secondary" onClick={signOut} disabled={busy} loading={busy}>
           {busy ? 'Signing you out…' : 'Sign out'}
         </Button>
 

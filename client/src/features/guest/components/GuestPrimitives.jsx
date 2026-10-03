@@ -67,8 +67,20 @@ export const PlaceBar = ({ items }) => (
 );
 
 // ── Buttons ───────────────────────────────────────────────────
-export const Button = ({ variant = 'primary', children, ...rest }) => (
-  <button type="button" className={`gst-btn gst-btn-${variant}`} {...rest}>{children}</button>
+// `loading` is for a button whose action is under way: it disables the
+// button, shows a small spinner and sets aria-busy. The label stays so
+// the width does not jump; change the text too if it helps.
+export const Button = ({ variant = 'primary', loading = false, disabled, children, ...rest }) => (
+  <button
+    type="button"
+    className={`gst-btn gst-btn-${variant}`}
+    aria-busy={loading || undefined}
+    disabled={disabled || loading}
+    {...rest}
+  >
+    {loading ? <span className="gst-spinner" aria-hidden="true" /> : null}
+    {children}
+  </button>
 );
 
 export const ButtonRow = ({ children }) => <div className="gst-btn-row">{children}</div>;

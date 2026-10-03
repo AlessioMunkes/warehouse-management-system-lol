@@ -257,6 +257,22 @@
 }
 .gst-btn:active { transform: scale(0.98); }
 .gst-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+.gst-btn[aria-busy="true"] { cursor: progress; }
+
+/* Small spinner for a button whose action is running. */
+.gst-spinner {
+  flex: none;
+  width: 1.125rem;
+  height: 1.125rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: gst-spin 0.7s linear infinite;
+}
+@keyframes gst-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .gst-spinner { animation-duration: 2s; }
+}
 
 .gst-btn-primary { background: var(--gst-accent); color: var(--gst-on-accent); }
 .gst-btn-primary:hover:not(:disabled) { background: var(--gst-accent-deep); }
