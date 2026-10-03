@@ -1,6 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // server/src/features/settings/settings.controller.js
 // ─────────────────────────────────────────────────────────────
+import { checkConnections } from './connections.service.js';
 import settings from './settings.service.js';
 
 const respond = (res, err, where, fallback) => {
@@ -23,4 +24,13 @@ const update = async (req, res) => {
   } catch (err) { respond(res, err, 'updateSettings', 'Failed to save settings.'); }
 };
 
-export default { list, update };
+// GET /api/settings/connections — every outside service, checked now.
+const connections = async (req, res) => {
+  try {
+    return res.status(200).json({ success: true, data: await checkConnections() });
+  } catch (err) {
+    return respond(res, err, 'connections', 'Could not check the connections.');
+  }
+};
+
+export default { list, update, connections };

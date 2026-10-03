@@ -34,6 +34,7 @@ import DonationManagementPage                      from '../pages/DonationManage
 import Section18AManagementPage                    from '../pages/Section18AManagementPage';
 import BeneficiaryDirectoryPage                    from '../pages/BeneficiaryDirectoryPage';
 import EcdCollectionRemindersPage                  from '../pages/EcdCollectionRemindersPage';
+import OperatingCalendarPage                       from '../pages/OperatingCalendarPage';
 import ImpactReportPage                            from '../pages/ImpactReportPage';
 import PickingSlipManagementPage                   from '../pages/PickingSlipManagementPage';
 import UserDirectoryPage                           from '../pages/UserDirectoryPage';
@@ -85,6 +86,7 @@ export const PAGES = {
   pickingSlips:     <PickingSlipManagementPage />,
   beneficiaries:    <BeneficiaryDirectoryPage />,
   collectionReminders: <EcdCollectionRemindersPage />,
+  operatingCalendar: <OperatingCalendarPage />,
 
   receiving:        <ReceivingPage />,
   deliveries:       <StaffDeliveriesPage />,

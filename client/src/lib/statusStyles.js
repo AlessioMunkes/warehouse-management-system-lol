@@ -109,6 +109,18 @@ export const STATUS_STYLES = {
     urgent:  s('bad', AlarmClock),                        // 14 days or less
     expired: s('bad', CalendarX, true),
   },
+  // A closed day on the operating calendar.
+  closure: {
+    public_holiday: s('info', Flag),
+    closure:        s('warn', CalendarX),
+  },
+  // Settings → Connections: one outside service's health.
+  connection: {
+    ok:      s('good', Check),
+    warning: s('warn', TriangleAlert),
+    down:    s('bad', CircleX, true),
+    off:     s('neutral', CircleDashed),
+  },
   // A collection reminder's email or WhatsApp leg.
   reminder: {
     pending:   s('neutral', Clock),

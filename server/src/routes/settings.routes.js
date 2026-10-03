@@ -15,5 +15,7 @@ const router = express.Router();
 
 router.get('/',   auth, requireRole(...ADMIN_ONLY), settingsController.list);
 router.patch('/', auth, requireRole(...ADMIN_ONLY), settingsController.update);
+// Settings → Connections: the health of each outside service.
+router.get('/connections', auth, requireRole(...ADMIN_ONLY), settingsController.connections);
 
 export default router;

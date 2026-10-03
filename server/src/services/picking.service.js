@@ -4,6 +4,7 @@
 // Business logic for the picking workflow.
 // Validates data and enforces rules before touching the DB.
 // ─────────────────────────────────────────────────────────────
+import { closureOn, cohortForDate, cohortWeekdays } from '../features/calendar/calendar.service.js';
 import pickingRepository from '../repositories/picking.repository.js';
 import notices from '../features/communications/notices.js';
 import { isManagerUp } from '../constants/permissions.js';
@@ -22,15 +23,13 @@ const fail = (status, message) => {
 };
 
 // ── Weekly weekday pickup ────────────────────────────────────
-// Every centre collects once a week on a fixed day, Tuesday or
-// Thursday, matching the real picking slips ("Pickup Day: Tuesday").
-// Older data used week1/week2; cohort_weekday_migration.sql converts it.
-const WEEKDAY_FOR_COHORT = { tuesday: 2, thursday: 4 };   // Date#getUTCDay(): 0 = Sunday .. 6 = Saturday
-
-const scheduledCohortFor = (date) => {
-  const day = date.getUTCDay();
-  return Object.entries(WEEKDAY_FOR_COHORT).find(([, d]) => d === day)?.[0] ?? null;
-};
+// Every centre collects once a week with its cohort, Tuesday or
+// Thursday by default, matching the real picking slips ("Pickup Day:
+// Tuesday"). Which weekday each cohort collects on, and the days the
+// warehouse is shut, come from the operating calendar
+// (features/calendar). Older data used week1/week2;
+// cohort_weekday_migration.sql converts it.
+const WEEKDAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 // Same group as the routes' MANAGERS_UP — constants/permissions.js.
 const isManager = isManagerUp;
@@ -105,12 +104,20 @@ const validateDispatchDate = async (dispatchDate, cohort, { allowOverride = fals
   const today = new Date(); today.setHours(0, 0, 0, 0);
   if (date < today) fail(400, 'Cannot create slips for a past date.');
 
-  const scheduled = scheduledCohortFor(date);
+  const isoDate = String(dispatchDate).slice(0, 10);
+  const closed = await closureOn(isoDate);
+  if (closed && !allowOverride) {
+    fail(400,
+      `The warehouse is closed on ${isoDate} (${closed.label}). Choose another date, or check the operating calendar.`);
+  }
+
+  const scheduled = await cohortForDate(isoDate);
   if (scheduled !== cohort && !allowOverride) {
+    const days = await cohortWeekdays();
     fail(400,
       (scheduled
-        ? `${dispatchDate} is a ${cohortLabel(scheduled)} pickup day, not ${cohortLabel(cohort)}.`
-        : `${dispatchDate} is not a Tuesday or Thursday pickup day.`) +
+        ? `${isoDate} is a ${cohortLabel(scheduled)} cohort pickup day, not ${cohortLabel(cohort)}.`
+        : `${isoDate} is not a pickup day: the ${cohortLabel(cohort)} cohort collects on ${WEEKDAY_NAMES[days[cohort] - 1]}.`) +
       ` If this is a deliberate make-up delivery, use "Create a new slip" with the override option.`
     );
   }

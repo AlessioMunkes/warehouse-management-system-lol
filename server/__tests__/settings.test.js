@@ -33,6 +33,10 @@ describe('defaults', () => {
       'stock.expiryWarningFirstDays': 14,
       'stock.expiryWarningSecondDays': 7,
       'invites.linkDays': 7,
+      // The operating calendar's cohort days (were picking.service's
+      // fixed WEEKDAY_FOR_COHORT): Tuesday and Thursday, 1 = Monday.
+      'calendar.tuesdayCohortWeekday': 2,
+      'calendar.thursdayCohortWeekday': 4,
     });
     // The reminder job's own default still lands on 08:00 SAST.
     expect(nextRunAt(new Date('2026-09-23T05:00:00Z')).toISOString()).toBe('2026-09-23T06:00:00.000Z');

@@ -48,6 +48,7 @@ export const SCREEN_PATHS = {
   pickingSlips:       STAFF.pickingSlips,
   beneficiaries:      STAFF.beneficiaries,
   collectionReminders: STAFF.collectionReminders,
+  operatingCalendar:  STAFF.operatingCalendar,
   receipts:           STAFF.receipts,
   reporting:          STAFF.reporting,
   impactReport:       STAFF.impactReport,

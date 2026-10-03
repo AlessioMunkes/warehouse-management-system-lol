@@ -83,6 +83,7 @@ describe('sidebars built from the table', () => {
         'Picking Slips /noc/picking-slips',
         'Beneficiaries /noc/beneficiaries',
         'Collection Reminders /noc/collection-reminders',
+        'Operating Calendar /noc/operating-calendar',
         'Benevolent Requests /noc/community-requests',
       ]],
       ['Programmes', ['Feed the Soil /noc/feed-the-soil', 'Volunteer Events /volunteers']],

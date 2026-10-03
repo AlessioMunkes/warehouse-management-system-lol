@@ -1,5 +1,6 @@
 import reminderRepository from '../repositories/ecdCollectionReminder.repository.js';
 import communications from '../features/communications/communications.service.js';
+import { closureOn } from '../features/calendar/calendar.service.js';
 
 const DEFAULT_CHANNELS = ['sms'];
 const EMAIL_CHANNEL = 'email';
@@ -53,6 +54,16 @@ const queueTomorrowCollectionReminders = async ({
   const today = dateStringInZone(now);
   const collectionDate = addDaysToIsoDate(today, 1);
   const reminderChannels = normaliseChannels(channels);
+
+  // The operating calendar: no reminders for a day the warehouse is
+  // shut, even if slips were generated for it before it was closed.
+  const closed = await closureOn(collectionDate);
+  if (closed) {
+    return {
+      collectionDate, channels: reminderChannels, collectionsFound: 0, created: 0, skipped: 0, reminders: [], closed,
+    };
+  }
+
   const collections = await reminderRepository.findCollectionsByDate(collectionDate);
 
   const reminders = [];
@@ -159,6 +170,13 @@ const sendTomorrowCollectionReminderEmails = async ({ now = new Date() } = {}) =
     now,
   });
 
+  if (queued.closed) {
+    return {
+      collectionDate: queued.collectionDate, queued, closed: queued.closed,
+      attempted: 0, sent: 0, failed: 0, skipped: 0, results: [],
+    };
+  }
+
   const pending = await reminderRepository.listPendingReminderDeliveries({
     collectionDate: queued.collectionDate,
     channel: EMAIL_CHANNEL,
@@ -224,6 +242,10 @@ const listTomorrowWhatsAppReminders = async ({ now = new Date() } = {}) => {
     channels: [WHATSAPP_CHANNEL],
     now,
   });
+
+  if (queued.closed) {
+    return { collectionDate: queued.collectionDate, queued, closed: queued.closed, reminders: [] };
+  }
 
   const reminders = await reminderRepository.listReminderDeliveries({
     collectionDate: queued.collectionDate,

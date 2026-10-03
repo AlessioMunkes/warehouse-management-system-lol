@@ -45,6 +45,8 @@ export const STAFF = {
   receipts: '/noc/receipts',
   beneficiaries: '/noc/beneficiaries',
   collectionReminders: '/noc/collection-reminders',
+  // Cohort collection days, public holidays and closures.
+  operatingCalendar: '/noc/operating-calendar',
   // Weekly slip generation, one-off slips, editing a slip still on the
   // floor, and releasing a claimed pallet back to the floor.
   pickingSlips: '/noc/picking-slips',

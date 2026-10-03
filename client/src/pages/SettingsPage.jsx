@@ -5,6 +5,10 @@
 //
 //   Email                    the Gmail connection, test send, and the
 //                            finance recipient (GmailSettingsPage)
+//   Connections              whether each outside service — database,
+//                            Gmail, email links, scheduled jobs, AI,
+//                            phone notifications, volunteer system —
+//                            is working (ConnectionsSection)
 //   Notifications & reminders the not-collected cut-off and the
 //                            collection reminder send time
 //   Stock rules              the two expiry-warning windows
@@ -29,6 +33,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import GmailSettingsPage from './GmailSettingsPage';
 import AppSettingsSection from '../features/settings/components/AppSettingsSection';
 import CertificateSettingsForm from '../features/settings/components/CertificateSettingsForm';
+import ConnectionsSection from '../features/settings/components/ConnectionsSection';
 import ImpactFactorsForm from '../features/reporting/components/ImpactFactorsForm';
 import { listSettings } from '../services/settingsAPI';
 import PageHeader, { PageShell } from '@/components/ui/page-header';
@@ -36,6 +41,7 @@ import ErrorBanner from '@/components/ui/error-banner';
 
 const SECTIONS = [
   { id: 'email',         label: 'Email' },
+  { id: 'connections',   label: 'Connections' },
   { id: 'notifications', label: 'Notifications & reminders' },
   { id: 'stock',         label: 'Stock rules' },
   { id: 'reporting',     label: 'Reporting' },
@@ -87,6 +93,7 @@ export default function SettingsPage({ defaultSection = 'email' }) {
 
       <div className="mt-6">
         {section === 'email' ? <GmailSettingsPage embedded /> : null}
+        {section === 'connections' ? <ConnectionsSection onSection={changeSection} /> : null}
 
         {valueSection ? (
           error ? (

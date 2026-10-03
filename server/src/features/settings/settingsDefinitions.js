@@ -45,6 +45,25 @@ export const SETTINGS = Object.freeze({
     check: (value, all) => (value >= all['stock.expiryWarningFirstDays']
       ? 'The second warning has to come after the first.' : null),
   },
+  // The operating calendar (managers set these on its screen, not on
+  // admin Settings): the weekday each cohort collects on, 1 = Monday ..
+  // 6 = Saturday. The cohorts keep their names; only the day moves.
+  'calendar.tuesdayCohortWeekday': {
+    section: 'calendar',
+    label: 'Tuesday cohort collects on',
+    help: 'The weekday the Tuesday cohort collects (1 Monday … 6 Saturday).',
+    default: 2, min: 1, max: 6, unit: '',
+    check: (value, all) => (value === all['calendar.thursdayCohortWeekday']
+      ? 'The two cohorts need different collection days.' : null),
+  },
+  'calendar.thursdayCohortWeekday': {
+    section: 'calendar',
+    label: 'Thursday cohort collects on',
+    help: 'The weekday the Thursday cohort collects (1 Monday … 6 Saturday).',
+    default: 4, min: 1, max: 6, unit: '',
+    check: (value, all) => (value === all['calendar.tuesdayCohortWeekday']
+      ? 'The two cohorts need different collection days.' : null),
+  },
   'invites.linkDays': {
     section: 'accounts',
     label: 'Invite link lifetime',

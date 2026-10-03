@@ -15,6 +15,9 @@ export const listSettings = async () => (await apiGet('/api/settings')).data ?? 
 // { key: value, … } — saved together; returns the updated list.
 export const updateSettings = async (changes) => (await apiPatch('/api/settings', changes)).data ?? [];
 
+/** Every outside service, checked now: { checkedAt, connections: [{ id, name, status, summary, detail, fix }] } */
+export const checkConnections = async () => (await apiGet('/api/settings/connections')).data;
+
 // null until someone has saved them once (the server answers 404).
 export const getCertificateSettings = async () => {
   try {
@@ -33,4 +36,4 @@ export const saveCertificateSettings = async (values, { exists }) => {
   return body.data ?? null;
 };
 
-export default { listSettings, updateSettings, getCertificateSettings, saveCertificateSettings };
+export default { listSettings, updateSettings, checkConnections, getCertificateSettings, saveCertificateSettings };

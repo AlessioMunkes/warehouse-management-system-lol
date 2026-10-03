@@ -37,7 +37,7 @@ import {
   LayoutDashboard, Users2, ClipboardList, ShoppingCart, BarChart3, HeartHandshake,
   Package, Truck, Gift, HandHeart, Boxes, ReceiptText, Activity, Archive, Inbox,
   PackageOpen, PackageCheck, FlaskConical, ClipboardCheck, HandCoins, PhoneCall,
-  ScrollText, Sprout, MessageCircle, Settings, Landmark,
+  ScrollText, Sprout, MessageCircle, Settings, Landmark, CalendarDays,
 } from 'lucide-react';
 import { STAFF, ADMIN, VOLUNTEERS, PACKING, DONATIONS } from './paths';
 import {
@@ -99,6 +99,8 @@ export const ROUTES = [
     nav: [nav('manager', 'Outbound', 'Beneficiaries', Users2)] },
   { id: 'collectionReminders', path: STAFF.collectionReminders, roles: MANAGERS_UP, shell: true,
     nav: [nav('manager', 'Outbound', 'Collection Reminders', MessageCircle)] },
+  { id: 'operatingCalendar', path: STAFF.operatingCalendar, roles: MANAGERS_UP, shell: true,
+    nav: [nav('manager', 'Outbound', 'Operating Calendar', CalendarDays)] },
 
   // ── The warehouse floor (warehouse staff only) ──────────────
   { id: 'receiving', path: STAFF.receiving, roles: WORKERS_ONLY,

@@ -60,6 +60,7 @@ const collectionWhen = (reminder, fallbackDate) => {
 
 export default function EcdCollectionRemindersPage() {
   const [collectionDate, setCollectionDate] = useState(null);
+  const [closed, setClosed] = useState(null);
   const [reminders, setReminders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
@@ -72,6 +73,7 @@ export default function EcdCollectionRemindersPage() {
     try {
       const data = await collectionReminderAPI.getTomorrowCollectionReminders();
       setCollectionDate(data.collectionDate);
+      setClosed(data.closed ?? null);
       setReminders(data.reminders);
     } catch (err) {
       setError(err.message || 'Could not load collection reminders.');
@@ -86,6 +88,7 @@ export default function EcdCollectionRemindersPage() {
       .then((data) => {
         if (cancelled) return;
         setCollectionDate(data.collectionDate);
+      setClosed(data.closed ?? null);
         setReminders(data.reminders);
         setError(null);
       })
@@ -144,7 +147,9 @@ export default function EcdCollectionRemindersPage() {
     <PageShell>
       <PageHeader
         title="Collection reminders"
-        description={collectionDate
+        description={closed
+          ? `Tomorrow, ${formatDate(collectionDate)}, the warehouse is closed (${closed.label}), so no reminders go out.`
+          : collectionDate
           ? `Reminders queued for ECDs collecting tomorrow, ${formatDate(collectionDate)}.`
           : "Tomorrow's queued reminders for ECD collections."}
         actions={
@@ -186,8 +191,10 @@ export default function EcdCollectionRemindersPage() {
           ) : reminders.length === 0 ? (
             <EmptyState
               icon={BellOff}
-              title="No reminders queued"
-              description="No reminders are queued for tomorrow."
+              title={closed ? `The warehouse is closed tomorrow: ${closed.label}` : 'No reminders queued'}
+              description={closed
+                ? 'No reminders go out for a closed day. It is set on the operating calendar.'
+                : 'No reminders are queued for tomorrow.'}
             />
           ) : visible.length === 0 ? (
             <EmptyState

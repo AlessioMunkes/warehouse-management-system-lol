@@ -51,3 +51,16 @@ vi.mock('../src/features/settings/settings.service.js', async () => {
   const getAll = vi.fn(async () => defaults());
   return { get, getAll, list: vi.fn(), update: vi.fn(), default: { get, getAll, list: vi.fn(), update: vi.fn() } };
 });
+
+// The operating calendar's closed days live in the database. Every
+// service that asks "is the warehouse shut that day?" (reminders, the
+// sweep, slip generation) gets "open" in tests unless a test says
+// otherwise.
+vi.mock('../src/features/calendar/calendar.repository.js', () => ({
+  default: {
+    list: vi.fn(async () => []),
+    findByDate: vi.fn(async () => null),
+    insertMany: vi.fn(async (days) => days.map((d, i) => ({ id: i + 1, ...d }))),
+    remove: vi.fn(async () => null),
+  },
+}));

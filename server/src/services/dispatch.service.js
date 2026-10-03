@@ -26,6 +26,7 @@
 // day, not to close the gate at 16:00.
 // ─────────────────────────────────────────────────────────────
 import dispatchRepository from '../repositories/dispatch.repository.js';
+import { closureOn } from '../features/calendar/calendar.service.js';
 import settings from '../features/settings/settings.service.js';
 import notices from '../features/communications/notices.js';
 import { isManagerUp } from '../constants/permissions.js';
@@ -198,14 +199,16 @@ const getBoard = async (query, user) => {
   // knows the service runs in UTC and the warehouse does not.
   const gateToday = (!dispatchDate && scope === 'gate') ? todayString() : undefined;
 
+  // The operating calendar: a day the warehouse is shut is never swept,
+  // so pallets due on it are not written off as not collected.
   if (dispatchDate) {
     const today      = todayString();
     const isPast     = dispatchDate < today;
     const pastCutoff = currentHour() >= cutoff;
-    if (isPast || (dispatchDate === today && pastCutoff)) {
+    if ((isPast || (dispatchDate === today && pastCutoff)) && !(await closureOn(dispatchDate))) {
       await dispatchRepository.sweepNonCollections({ dispatchDate, actorId: user.id, beforeCommit: flagNonCollections(cutoff) });
     }
-  } else if (gateToday && currentHour() >= cutoff) {
+  } else if (gateToday && currentHour() >= cutoff && !(await closureOn(gateToday))) {
     // The gate board is the other place the sweep gets triggered from
     // (see the note above this function). Dropping the date filter
     // must not also drop that trigger, or an afternoon where nobody
@@ -414,6 +417,11 @@ const sweep = async (body, user) => {
   const dispatchDate = body.dispatchDate || todayString();
   if (!isValidDateString(dispatchDate)) {
     fail(400, 'Dispatch date must be a real date in YYYY-MM-DD form.');
+  }
+
+  const closed = await closureOn(dispatchDate);
+  if (closed) {
+    fail(409, `The warehouse is closed on ${dispatchDate} (${closed.label}), so pallets due that day are not written off.`);
   }
 
   const cutoff = await cutoffHour();

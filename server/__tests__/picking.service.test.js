@@ -216,7 +216,7 @@ describe('generateSlips — manager only, strict scheduling', () => {
   it('names the actual pickup day in the error so the mistake is obvious', async () => {
     await expect(
       pickingService.generateSlips({ dispatchDate: TUESDAY_DATE, cohort: 'thursday' }, MANAGER)
-    ).rejects.toThrow(/Tuesday pickup day, not Thursday/);
+    ).rejects.toThrow(/Tuesday cohort pickup day, not Thursday/);
   });
 
   it('refuses a date that is not a Tuesday or Thursday at all', async () => {

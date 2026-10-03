@@ -132,6 +132,9 @@ export const SCREENS = [
   { id: 'collectionReminders', label: 'Collection reminders', roles: MANAGERS_UP,
     about: 'Tomorrow’s ECD collection reminders: email status, and WhatsApp messages to send.',
     aka: ['reminders', 'whatsapp reminders', 'ecd reminders', 'collection messages'] },
+  { id: 'operatingCalendar', label: 'Operating calendar', roles: MANAGERS_UP,
+    about: 'Which weekday each cohort collects, and the public holidays and closures when the warehouse is shut.',
+    aka: ['calendar', 'public holidays', 'closures', 'closed days', 'collection days', 'holidays'] },
   { id: 'receipts', label: 'Receipts', roles: MANAGERS_UP,
     about: 'The archive of delivery notes and dispatch notes.',
     aka: ['paperwork', 'notes archive', 'documents'] },
@@ -1525,7 +1528,8 @@ export const TOPICS = [
     ],
     body:
       'The day before a collection, every ECD centre due to collect is emailed a ' +
-      'reminder automatically at 8:00.\n\n' +
+      'reminder automatically at 8:00 — unless that day is closed on the operating ' +
+      'calendar, when none go out.\n\n' +
       'The Collection reminders screen shows tomorrow’s list: whether each email ' +
       'went, and a WhatsApp message ready for you to send by hand. The WhatsApp to ' +
       'send and Email failed tabs show what still needs you.',
@@ -2720,6 +2724,7 @@ export const TOPICS = [
       'everyone.',
     steps: [
       'Email — the sending account, the Finance recipient and the Finance report link.',
+      'Connections — whether the database, Gmail, email links, scheduled jobs, the AI, phone notifications and the volunteer system are working.',
       'Notifications & reminders — the not-collected cut-off and when reminders go out.',
       'Stock rules — when managers are warned about stock nearing its expiry date.',
       'Reporting — the rates that turn kilograms into people fed.',
@@ -2750,6 +2755,74 @@ export const TOPICS = [
       topic: 'supplier-manage',
     },
     related: ['supplier-manage'],
+  },
+  // ═══ Operating calendar (manager) ═════════════════════════
+  {
+    id: 'operating-calendar',
+    title: 'The operating calendar',
+    roles: MANAGERS_UP,
+    screens: ['operatingCalendar'],
+    asks: [
+      'operating calendar', 'public holiday', 'the warehouse is closed', 'close the warehouse',
+      'shutdown', 'stocktake day', 'we are closed on', 'add a holiday', 'closed days',
+    ],
+    body:
+      'The operating calendar holds the days the warehouse is shut. On a closed day no ' +
+      'collection reminders go out, pallets due that day are not written off as not ' +
+      'collected, and the week’s slips can’t be generated for it.',
+    steps: [
+      'Open Operating Calendar and choose Add public holidays to add South Africa’s for the year — Good Friday, Family Day and Sunday-to-Monday days included.',
+      'For anything else — a stocktake, a shutdown week — choose Add closed day, pick the first (and last) day and give the reason.',
+      'Each closed day shows which cohort misses its collection, so you can plan a make-up day.',
+    ],
+    followUp: {
+      question: 'Would you like to know how to change a cohort’s collection day?',
+      topic: 'operating-calendar-cohorts',
+    },
+    related: ['operating-calendar-cohorts', 'collection-reminders', 'missed-collections-manager'],
+  },
+  {
+    id: 'operating-calendar-cohorts',
+    title: 'Changing a cohort’s collection day',
+    roles: MANAGERS_UP,
+    screens: ['operatingCalendar', 'pickingSlips'],
+    asks: [
+      'change collection day', 'collect on wednesday', 'move the cohort', 'collection days per cohort',
+      'tuesday cohort on a different day', 'swap the days',
+    ],
+    body:
+      'Under Collection days on the Operating Calendar, choose the weekday each cohort ' +
+      'collects on, then Save collection days. The cohorts keep their names — the ' +
+      'Tuesday cohort is still the Tuesday cohort — but slips are generated for, and ' +
+      'reminders sent before, the new day. The two cohorts need different days.',
+    followUp: {
+      question: 'Would you like to know how generating the week’s slips works?',
+      topic: 'picking-slip-generate',
+    },
+    related: ['operating-calendar', 'picking-slip-generate'],
+  },
+
+  // ═══ Connections (admin) ══════════════════════════════════
+  {
+    id: 'connections',
+    title: 'Checking the connections',
+    roles: ADMIN_ONLY,
+    screens: ['settings'],
+    asks: [
+      'is everything working', 'connections', 'health check', 'is email working', 'system status',
+      'is the database up', 'why are emails not sending', 'check the integrations',
+    ],
+    body:
+      'Settings → Connections checks everything outside this system that it depends on: ' +
+      'the database, Gmail, the links in emails, the scheduled jobs, the AI assistant, ' +
+      'phone notifications and the volunteer system. Problems come first.\n\n' +
+      'Not working means someone needs to act, and most cards offer the fix. Not set up ' +
+      'is a choice, not a fault. Choose Check again after fixing something.',
+    followUp: {
+      question: 'Would you like to know how email settings work?',
+      topic: 'email-settings',
+    },
+    related: ['email-settings', 'message-history', 'settings-admin'],
   },
 ];
 
