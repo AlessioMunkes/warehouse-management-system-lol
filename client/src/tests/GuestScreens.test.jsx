@@ -459,15 +459,100 @@ describe('the guest session bar', () => {
     expect(screen.getByRole('button', { name: 'Keep packing' })).toBeInTheDocument();
   });
 
-  it('does not sign out blind when it cannot tell whether a pallet is held', async () => {
-    const logout = vi.fn().mockResolvedValue();
-    signedIn(logout);
-    api.fetchMySlip.mockRejectedValue(Object.assign(new Error('boom'), { status: 500 }));
+  describe('when the held-pallet check fails', () => {
+    const failCheck = () => {
+      api.fetchMySlip.mockRejectedValue(Object.assign(new Error('boom'), { status: 500 }));
+      api.fetchAvailableSlips.mockResolvedValue([]);
+      renderAt('/guest-home', <GuestHomePage />, '/guest-home');
+    };
+
+    it('offers Try again and Sign out anyway, with the staff note, and does not sign out yet', async () => {
+      const logout = vi.fn().mockResolvedValue();
+      signedIn(logout);
+      failCheck();
+
+      (await screen.findByRole('button', { name: 'Sign out' })).click();
+      expect(await screen.findByText('We could not check your pallet.')).toBeInTheDocument();
+      expect(screen.getByText('If you were packing a pallet, staff can return it to the floor.')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Sign out anyway' })).toBeInTheDocument();
+      expect(logout).not.toHaveBeenCalled();
+    });
+
+    it('Sign out anyway signs out without releasing', async () => {
+      const logout = vi.fn().mockResolvedValue();
+      signedIn(logout);
+      failCheck();
+
+      (await screen.findByRole('button', { name: 'Sign out' })).click();
+      (await screen.findByRole('button', { name: 'Sign out anyway' })).click();
+
+      expect(await screen.findByText('Landing')).toBeInTheDocument();
+      expect(logout).toHaveBeenCalledTimes(1);
+      expect(api.releaseMySlip).not.toHaveBeenCalled();
+    });
+
+    it('Try again re-checks, and carries on to the confirm if a pallet is held', async () => {
+      const logout = vi.fn().mockResolvedValue();
+      signedIn(logout);
+      failCheck();
+
+      (await screen.findByRole('button', { name: 'Sign out' })).click();
+      await screen.findByRole('button', { name: 'Try again' });
+      api.fetchMySlip.mockReset();
+      api.fetchMySlip.mockResolvedValue(mySlip);
+      screen.getByRole('button', { name: 'Try again' }).click();
+
+      expect(await screen.findByRole('button', { name: 'Sign out and return pallet' })).toBeInTheDocument();
+      expect(screen.queryByText('We could not check your pallet.')).not.toBeInTheDocument();
+      expect(logout).not.toHaveBeenCalled();
+    });
+  });
+});
+
+// ── Return a pallet from the home screen ──────────────────────
+describe('Return this pallet (guest home)', () => {
+  const renderHeld = () => {
+    api.fetchMySlip.mockResolvedValue(mySlip);
     api.fetchAvailableSlips.mockResolvedValue([]);
     renderAt('/guest-home', <GuestHomePage />, '/guest-home');
+  };
 
-    (await screen.findByRole('button', { name: 'Sign out' })).click();
-    expect(await screen.findByText(/could not check your pallet/i)).toBeInTheDocument();
-    expect(logout).not.toHaveBeenCalled();
+  it('asks first, and Keep it changes nothing', async () => {
+    renderHeld();
+    (await screen.findByRole('button', { name: 'Return this pallet' })).click();
+
+    expect(await screen.findByText('Return this pallet to the floor? Your packing so far is saved.')).toBeInTheDocument();
+    screen.getByRole('button', { name: 'Keep it' }).click();
+
+    expect(await screen.findByRole('button', { name: 'Continue packing' })).toBeInTheDocument();
+    expect(api.releaseMySlip).not.toHaveBeenCalled();
+    expect(screen.getByText(/Your pallet in progress/)).toBeInTheDocument();
+  });
+
+  it('Return pallet releases, then shows the pallet list and code box again', async () => {
+    renderHeld();
+    api.releaseMySlip.mockResolvedValue({ released: true });
+    (await screen.findByRole('button', { name: 'Return this pallet' })).click();
+
+    // the pallet just returned is on the list the page reads next
+    api.fetchAvailableSlips.mockResolvedValue([preview135]);
+    (await screen.findByRole('button', { name: 'Return pallet' })).click();
+
+    expect(await screen.findByText('Masibambane Day Care')).toBeInTheDocument();
+    expect(screen.getByLabelText('Pallet code')).toBeInTheDocument();
+    expect(screen.queryByText(/Your pallet in progress/)).not.toBeInTheDocument();
+    expect(api.releaseMySlip).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the error and keeps the pallet when the return fails', async () => {
+    renderHeld();
+    api.releaseMySlip.mockRejectedValue(new Error('Could not return your pallet.'));
+    (await screen.findByRole('button', { name: 'Return this pallet' })).click();
+    (await screen.findByRole('button', { name: 'Return pallet' })).click();
+
+    expect(await screen.findByText('Could not return your pallet.')).toBeInTheDocument();
+    expect(screen.getByText(/Your pallet in progress/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Return pallet' })).toBeInTheDocument();
   });
 });

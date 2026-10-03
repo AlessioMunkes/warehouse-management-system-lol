@@ -65,7 +65,7 @@ const NavShell = ({ children }) => {
           <button
             type="button" className="gst-nav-btn"
             onClick={flow.request}
-            disabled={flow.busy || flow.confirming}
+            disabled={flow.busy || flow.confirming || flow.checkFailed}
             aria-busy={flow.busy || undefined}
           >
             {flow.busy ? <span className="gst-spinner" aria-hidden="true" /> : null}
@@ -86,8 +86,20 @@ const NavShell = ({ children }) => {
 // check or a failed return, so a refusal is never silent.
 export const SignOutConfirm = ({ flow }) => {
   const headingRef = useRef(null);
-  useEffect(() => { if (flow.confirming) headingRef.current?.focus(); }, [flow.confirming]);
+  useEffect(() => { if (flow.confirming || flow.checkFailed) headingRef.current?.focus(); }, [flow.confirming, flow.checkFailed]);
 
+  if (flow.checkFailed) {
+    return (
+      <div className="gst-card gst-confirm gst-stack-tight" role="alertdialog" aria-labelledby="gst-confirm-title" aria-describedby="gst-confirm-text">
+        <h2 className="gst-card-title" id="gst-confirm-title" ref={headingRef} tabIndex={-1}>We could not check your pallet.</h2>
+        <p className="gst-card-meta gst-text-ink" id="gst-confirm-text">
+          If you were packing a pallet, staff can return it to the floor.
+        </p>
+        <Button onClick={flow.request}>Try again</Button>
+        <Button variant="secondary" onClick={flow.signOutAnyway}>Sign out anyway</Button>
+      </div>
+    );
+  }
   if (!flow.confirming) {
     return flow.error ? <Notice tone="warn">{flow.error}</Notice> : null;
   }

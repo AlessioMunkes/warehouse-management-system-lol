@@ -49,11 +49,11 @@ const SlipPreviewPage = () => {
   const exitButtons = (
     <>
       <SignOutConfirm flow={flow} />
-      <Button variant="ghost" onClick={() => navigate(startPath)} disabled={busy || flow.busy || flow.confirming}>
+      <Button variant="ghost" onClick={() => navigate(startPath)} disabled={busy || flow.busy || flow.confirming || flow.checkFailed}>
         Back to start
       </Button>
       {alreadySignedIn ? (
-        <Button variant="ghost" onClick={flow.request} disabled={busy || flow.confirming} loading={flow.busy}>
+        <Button variant="ghost" onClick={flow.request} disabled={busy || flow.confirming || flow.checkFailed} loading={flow.busy}>
           Sign out
         </Button>
       ) : null}

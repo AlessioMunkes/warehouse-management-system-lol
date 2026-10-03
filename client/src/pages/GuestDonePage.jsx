@@ -41,7 +41,7 @@ const GuestDonePage = () => {
   // bounces the volunteer to the staff login) and asks first if they
   // somehow still hold a pallet.
   const flow = useGuestSignOut();
-  const busy = flow.busy || flow.confirming;
+  const busy = flow.busy || flow.confirming || flow.checkFailed;
 
   // Reached without state — a refresh, or a direct link. Say thank you
   // properly rather than inventing numbers to fill the space.

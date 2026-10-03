@@ -11,6 +11,9 @@
 //              out: they would walk away believing it was handed back.
 //   cancel()   "Keep packing".
 //
+// Never a dead end: if the check itself fails, the guest can try again or
+// sign out anyway (without a release; staff can return the pallet).
+//
 // Signing out lands on the front door ("/"), navigating BEFORE the
 // session is cleared so a ProtectedRoute never gets the chance to bounce
 // the volunteer to the staff login (see GuestDonePage). logout() is
@@ -28,7 +31,7 @@ import { fetchMySlip, releaseMySlip } from '../../services/guestSlipAPI';
 export const useGuestSignOut = () => {
   const navigate = useNavigate();
   const { logout } = useAuth();
-  const [phase, setPhase] = useState('idle');   // idle | checking | confirming | releasing | signingOut
+  const [phase, setPhase] = useState('idle');   // idle | checking | confirming | releasing | signingOut | checkFailed
   const [error, setError] = useState(null);
 
   const finish = async () => {
@@ -49,10 +52,10 @@ export const useGuestSignOut = () => {
       held = Boolean(await fetchMySlip());
     } catch (err) {
       // 404 is the server saying "you hold nothing". Anything else means
-      // we do not know, and signing out blind could strand a pallet.
+      // we do not know: say so and let them choose, rather than either
+      // signing out blind or refusing to let them leave.
       if (err?.status !== 404) {
-        setError('We could not check your pallet. Try again.');
-        setPhase('idle');
+        setPhase('checkFailed');
         return;
       }
     }
@@ -80,6 +83,8 @@ export const useGuestSignOut = () => {
 
   return {
     request, confirm, cancel,
+    signOutAnyway: finish,
+    checkFailed: phase === 'checkFailed',
     confirming: phase === 'confirming' || phase === 'releasing',
     releasing: phase === 'releasing',
     busy: phase === 'checking' || phase === 'signingOut',

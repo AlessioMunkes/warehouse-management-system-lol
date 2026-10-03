@@ -23,7 +23,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-  fetchAvailableSlips, fetchMySlip, fetchSlipByCode, claimSlipByCode, claimSlipById,
+  fetchAvailableSlips, fetchMySlip, fetchSlipByCode, claimSlipByCode, claimSlipById, releaseMySlip,
 } from '../services/guestSlipAPI';
 import {
   GuestShell, GuestScreen, Button, Notice, PalletCard, HelpNote, Loading,
@@ -52,6 +52,10 @@ const GuestHomePage = () => {
   const [code, setCode]       = useState('');
   const [codeError, setCodeError] = useState(null);
   const [busy, setBusy]       = useState(false);
+
+  // Handing the held pallet back from this screen: idle → confirming → releasing.
+  const [returning, setReturning] = useState('idle');
+  const [returnError, setReturnError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -95,6 +99,29 @@ const GuestHomePage = () => {
     }
   };
 
+  // Same server release the sign-out uses: the pallet goes back to the
+  // floor with its progress kept. Then the list is read again so the
+  // pallet just returned is on it, and the code box comes back.
+  const returnPallet = async () => {
+    setReturning('releasing');
+    setReturnError(null);
+    try {
+      await releaseMySlip();
+    } catch (err) {
+      setReturnError(err.message || 'We could not return your pallet. Try again.');
+      setReturning('confirming');
+      return;
+    }
+    setMySlip(null);
+    setReturning('idle');
+    try {
+      setSlips(await fetchAvailableSlips());
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
   const pick = async (slip) => {
     setBusy(true);
     setError(null);
@@ -129,7 +156,26 @@ const GuestHomePage = () => {
                 <p className="gst-card-title">
                   Your pallet in progress: {mySlipLabel(mySlip)}
                 </p>
-                <Button onClick={() => navigate('/guest/pack')}>Continue packing</Button>
+                {returning === 'idle' ? (
+                  <>
+                    <Button onClick={() => navigate('/guest/pack')}>Continue packing</Button>
+                    <Button variant="secondary" onClick={() => setReturning('confirming')}>Return this pallet</Button>
+                  </>
+                ) : (
+                  <div className="gst-stack-tight" role="alertdialog" aria-labelledby="gst-return-text">
+                    <p className="gst-card-meta gst-text-ink" id="gst-return-text">
+                      Return this pallet to the floor? Your packing so far is saved.
+                    </p>
+                    {returnError ? <Notice tone="warn">{returnError}</Notice> : null}
+                    <Button onClick={returnPallet} loading={returning === 'releasing'}>Return pallet</Button>
+                    <Button
+                      variant="secondary" disabled={returning === 'releasing'}
+                      onClick={() => { setReturning('idle'); setReturnError(null); }}
+                    >
+                      Keep it
+                    </Button>
+                  </div>
+                )}
               </div>
             ) : null}
 
