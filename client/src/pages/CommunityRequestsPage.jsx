@@ -1,56 +1,46 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/pages/CommunityRequestsPage.jsx
 //
-// ADM-5.0 "Log Benevolent Package Request" (BR-28).
+// Benevolent requests (ADM-5.0 / BR-28), the manager's screen.
 //
-// A member of the public phones or walks in asking for goods; staff
-// record what was asked for and what happened to it. LOG ONLY — this
-// screen never moves stock.
+// A member of the public phones or walks in asking for goods. Staff log
+// the request; a manager approves it by choosing real products and
+// quantities from the stock list (which sets that stock aside); a worker
+// packs it and confirms what actually went out; or the manager declines
+// it. The floor logs and packs on its own screen,
+// StaffCommunityRequestsPage.
 //
-// Two-step workflow, matching the live community_requests table:
-//   log → claim (a staff member takes ownership, sets handled_by)
-//        → resolve (records outcome + a note, sets resolved_at)
-// Claiming and resolving are separate actions and the UI keeps them
-// separate — a request can be resolved whether or not it was claimed
-// first, and claiming does not resolve anything.
-//
-// Construction mirrors SupplierDirectoryPage.jsx: ManagerLayout shell,
-// a header with a one-line description, a search + filter + primary
-// button toolbar, the shared brand error banner, a Card-wrapped Table,
-// and an inline Card form for create / resolve. No new visual patterns.
-//
-// One route, two shapes, picked by role — the same pattern
-// FeedTheSoilPage.jsx and DecantingPage.jsx use. A manager gets the
-// desktop table below (CommunityRequestsManagerView, this file's
-// original body, moved verbatim). A warehouse worker gets
-// CommunityRequestFlow inside StaffShell — the phone-first tab bar
-// and app chrome every other floor task uses, which this page never
-// had: it always rendered <ManagerLayout> regardless of role, so a
-// worker got a desktop sidebar page with no bottom nav, and (when the
-// route also wrapped it in ManagerLayout via ProtectedRoute's shell
-// prop) a doubled-up sidebar whose drawer state fought itself.
+// The tabs follow that flow, and each row offers what comes next:
+//   Awaiting approval  → Approve and choose items
+//   Approved           → Assign packer · Decline
+//   Needs new items    → Choose other items · Decline
+//                        (a pallet used the stock that was set aside;
+//                         pallets always come first)
+//   Fulfilled · Declined · All
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Plus, PhoneIncoming } from 'lucide-react';
+import communityRequestAPI from '../services/communityRequestAPI';
+import { getManifest } from '../services/stockAPI';
+import { fetchAssignableWorkers } from '../services/pickingAPI';
 import CommunityRequestForm from '../features/communityRequests/components/CommunityRequestForm';
-import communityRequestAPI, {
-  OUTCOMES, OUTCOME_LABELS, RESOLVE_OUTCOMES,
-} from '../services/communityRequestAPI';
+import ApproveItemsPanel from '../features/communityRequests/components/ApproveItemsPanel';
+import DeclinePanel from '../features/communityRequests/components/DeclinePanel';
+import AssignPanel from '../features/communityRequests/components/AssignPanel';
+import RequestDetailPanel from '../features/communityRequests/components/RequestDetailPanel';
+import {
+  DISPLAY_LABELS, VIEWS, displayStatus, isFlagged, packerLabel, rowsForView, shortProductNames, viewById,
+} from '../features/communityRequests/requestViews';
+import { timeAgo } from '../features/notifications/notificationMatrix';
+import { fmtQty } from '@/lib/quantity';
 
 import { Button }   from '@/components/ui/button';
 import StatusBadge from '@/components/ui/status-badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Field, FieldGroup, FieldLabel, FieldError,
-} from '@/components/ui/field';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
-import { Plus, Loader2, PhoneIncoming } from 'lucide-react';
 import TablePager from '@/components/ui/table-pager';
 import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
 import PageHeader, { PageShell } from '@/components/ui/page-header';
@@ -61,10 +51,6 @@ import DetailPanel from '@/components/ui/detail-panel';
 import EmptyState from '@/components/ui/empty-state';
 import ErrorBanner from '@/components/ui/error-banner';
 
-// Pending amber, fulfilled solid green, part-fulfilled soft green,
-// referred blue, declined red — each with its own icon
-// (lib/statusStyles.js).
-
 const fmtDateTime = (value) =>
   value
     ? new Date(value).toLocaleString('en-ZA', {
@@ -73,84 +59,14 @@ const fmtDateTime = (value) =>
       })
     : '—';
 
-// Same markup as the global fetch error banner in
-// InventoryManagementPage / SupplierDirectoryPage. One error style.
-// The tabs: one per outcome, Pending first because that is the work.
-// `id` is what goes in ?status=; Pending leaves the URL bare.
-const VIEWS = [
-  ...OUTCOMES.map((o) => ({ id: o, label: OUTCOME_LABELS[o], alert: o === 'pending', test: (r) => r.outcome === o })),
-  { id: 'all', label: 'All', test: () => true },
-];
-const viewById = (id) => VIEWS.find((v) => v.id === id) ?? VIEWS[0];
-
-const ResolvePanel = ({ request, busy, error, onSubmit, onCancel }) => {
-  const [outcome, setOutcome] = useState('fulfilled');
-  const [note, setNote] = useState('');
-  const [touchedNote, setTouchedNote] = useState(false);
-  const noteMissing = !note.trim();
-
-  const submit = () => {
-    setTouchedNote(true);
-    if (noteMissing) return;
-    onSubmit({ outcome, outcomeNote: note });
-  };
-
-  return (
-    <DetailPanel
-      open
-      onClose={onCancel}
-      eyebrow="Resolve request"
-      title={request.callerName || 'An unnamed caller'}
-    >
-        <FieldGroup>
-          {error ? <FieldError>{error}</FieldError> : null}
-
-          <p className="text-sm text-muted-foreground whitespace-pre-line">
-            {request.itemsRequested}
-          </p>
-
-          <Field>
-            <FieldLabel htmlFor="cr-resolve-outcome">Outcome</FieldLabel>
-            <Select value={outcome} onValueChange={setOutcome}>
-              <SelectTrigger id="cr-resolve-outcome" className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {RESOLVE_OUTCOMES.map((o) => (
-                  <SelectItem key={o} value={o}>{OUTCOME_LABELS[o]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-
-          <Field data-invalid={(touchedNote && noteMissing) || undefined}>
-            <FieldLabel htmlFor="cr-resolve-note">Note</FieldLabel>
-            <Textarea
-              id="cr-resolve-note"
-              rows={3}
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              onBlur={() => setTouchedNote(true)}
-              placeholder="What was given, referred, or why it was declined."
-              aria-invalid={(touchedNote && noteMissing) || undefined}
-            />
-            {touchedNote && noteMissing
-              ? <FieldError>A note is required when resolving.</FieldError>
-              : null}
-          </Field>
-
-          <Field orientation="horizontal">
-            <Button type="button" onClick={submit} disabled={busy}>
-              {busy ? <Loader2 className="animate-spin" /> : null}
-              {busy ? 'Saving' : 'Save outcome'}
-            </Button>
-            <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-          </Field>
-        </FieldGroup>
-    </DetailPanel>
-  );
+const EMPTY = {
+  pending:       'Nothing is waiting for approval.',
+  approved:      'No approved request is waiting to be packed.',
+  'needs-items': 'No request needs new items.',
+  fulfilled:     'No request has been fulfilled yet.',
+  declined:      'No request has been declined.',
+  all:           'No requests yet. Log one when someone calls.',
 };
-
 
 // The manager's screen. The floor logs requests on its own screen,
 // StaffCommunityRequestsPage.
@@ -160,8 +76,12 @@ export default function CommunityRequestsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const view = viewById(searchParams.get('status'));
   const changeView = (id) => setSearchParams(id === VIEWS[0].id ? {} : { status: id }, { replace: true });
-  const [mode, setMode] = useState('list');       // list | create
-  const [resolving, setResolving] = useState(null); // request being resolved
+
+  // What panel is open: { type: 'create' | 'approve' | 'rechoose' |
+  // 'decline' | 'assign' | 'detail', request }
+  const [panel, setPanel] = useState(null);
+  const [products, setProducts] = useState(null);   // null until loaded
+  const [workers, setWorkers] = useState(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -200,58 +120,79 @@ export default function CommunityRequestsPage() {
     return () => { cancelled = true; };
   }, [search]);
 
-  const create = async (payload) => {
+  const closePanel = () => { setPanel(null); setFormError(null); };
+
+  // ── Opening a panel ─────────────────────────────────────────
+  // Stock is read fresh each time: what is available changes as pallets
+  // are packed.
+  const openItems = (type, request) => {
+    setFormError(null);
+    setProducts(null);
+    setPanel({ type, request });
+    getManifest()
+      .then(setProducts)
+      .catch((err) => setFormError(err.message || 'Could not load the stock list.'));
+  };
+
+  const openAssign = (request) => {
+    setFormError(null);
+    setWorkers(null);
+    setPanel({ type: 'assign', request });
+    fetchAssignableWorkers()
+      .then((rows) => setWorkers(rows ?? []))
+      .catch((err) => setFormError(err.message || 'Could not load the packers.'));
+  };
+
+  // ── Doing things ────────────────────────────────────────────
+  // One shape for all of them: busy while it runs, the server's message
+  // in the open panel if it is refused, the list reloaded if it works.
+  const act = async (work, failure) => {
     setBusy(true); setFormError(null);
     try {
-      await communityRequestAPI.logRequest(payload);
-      setMode('list');
+      await work();
+      closePanel();
       await load();
     } catch (err) {
-      setFormError(err.message || 'Could not log the request.');
+      setFormError(err.message || failure);
     } finally {
       setBusy(false);
     }
   };
 
-  const claim = async (id) => {
-    setError(null);
-    try {
-      await communityRequestAPI.claimRequest(id);
-      await load();
-    } catch (err) {
-      setError(err.message || 'Could not claim the request.');
-    }
-  };
+  const create = (payload) => act(() => communityRequestAPI.logRequest(payload), 'Could not log the request.');
 
-  const resolve = async ({ outcome, outcomeNote }) => {
-    if (!resolving) return;
-    setBusy(true); setFormError(null);
-    try {
-      await communityRequestAPI.resolveRequest(resolving.id, { outcome, outcomeNote });
-      setResolving(null);
-      await load();
-    } catch (err) {
-      setFormError(err.message || 'Could not resolve the request.');
-    } finally {
-      setBusy(false);
-    }
-  };
+  const submitItems = (items) => act(
+    () => (panel.type === 'rechoose'
+      ? communityRequestAPI.rechooseItems(panel.request.id, items)
+      : communityRequestAPI.approveRequest(panel.request.id, items)),
+    'Could not save the items.',
+  );
 
-  // Requests, fifteen to a page; back to page one when the list changes.
+  const decline = (reason) => act(
+    () => communityRequestAPI.declineRequest(panel.request.id, reason),
+    'Could not decline the request.',
+  );
+
+  const assign = (userId) => act(
+    () => communityRequestAPI.assignRequest(panel.request.id, userId),
+    'Could not assign the packer.',
+  );
+
+  // ── The list ────────────────────────────────────────────────
   const counts = useMemo(
     () => Object.fromEntries(VIEWS.map((v) => [v.id, requests.filter(v.test).length])),
     [requests],
   );
-  const visible = useMemo(() => requests.filter(view.test), [requests, view]);
+  const visible = useMemo(() => rowsForView(requests, view), [requests, view]);
   const requestPage = usePaged(visible, TABLE_PAGE_SIZE, `${search}|${view.id}|${visible.length}`);
 
   return (
     <PageShell>
       <PageHeader
         title="Benevolent requests"
-        description="Phone-in and walk-in requests for goods from the public, and what happened to each one."
+        description="Log what callers ask for, approve what to give, and track what went out."
         actions={
-          <Button type="button" onClick={() => { setMode('create'); setFormError(null); }}>
+          <Button type="button" onClick={() => { setPanel({ type: 'create' }); setFormError(null); }}>
             <Plus />
             Log a request
           </Button>
@@ -290,7 +231,7 @@ export default function CommunityRequestsPage() {
             <EmptyState
               icon={PhoneIncoming}
               title={search ? 'No requests match' : 'Nothing in this view'}
-              description={search ? 'Nothing matches the search.' : 'No request has this outcome.'}
+              description={search ? 'Nothing matches the search.' : EMPTY[view.id]}
               action={search ? { label: 'Clear search', onClick: () => { setIsLoading(true); setSearch(''); } } : undefined}
             />
           ) : (
@@ -302,13 +243,16 @@ export default function CommunityRequestsPage() {
                 <TableHead>Quantity and collection notes</TableHead>
                 <TableHead>Caller</TableHead>
                 <TableHead>Status</TableHead>
-                {/* Sticky so Claim and Resolve stay visible at laptop widths. */}
+                {/* Sticky so the actions stay visible at laptop widths. */}
                 <TableHead className="sticky right-0 bg-card" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {requestPage.slice.map((r) => {
-                const resolved = r.outcome !== 'pending';
+                const resolved = r.outcome !== 'pending' && r.outcome !== 'approved';
+                const status = displayStatus(r);
+                const flagged = isFlagged(r);
+                const packer = packerLabel(r);
                 return (
                   <TableRow key={r.id}>
                     <TableCell className="whitespace-nowrap pl-4 text-muted-foreground sm:pl-5">
@@ -316,29 +260,53 @@ export default function CommunityRequestsPage() {
                     </TableCell>
                     <TableCell className="min-w-40 max-w-xs whitespace-pre-line">
                       {r.itemsRequested}
+                      {r.items.length > 0 ? (
+                        <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground" aria-label="Items chosen">
+                          {r.items.map((i) => (
+                            <li key={i.id} className={i.shortAt ? 'text-warn' : undefined}>
+                              {i.productName} · {fmtQty(i.quantityApproved, i.unit)}{i.shortAt ? ' (short)' : ''}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
                     </TableCell>
                     <TableCell className="min-w-32 max-w-48 whitespace-pre-line text-muted-foreground">
                       {r.quantityNote || '—'}
                     </TableCell>
                     <TableCell className="min-w-36 whitespace-normal text-muted-foreground">
-                      {r.callerName || 'Not given'}
+                      <button
+                        type="button"
+                        onClick={() => setPanel({ type: 'detail', request: r })}
+                        className="text-left text-foreground underline-offset-2 hover:underline focus-visible:underline"
+                      >
+                        {r.callerName || 'Not given'}
+                      </button>
                       {r.callerContact ? (
                         <span className="block text-xs">{r.callerContact}</span>
                       ) : null}
                     </TableCell>
                     <TableCell className="whitespace-normal">
-                      <StatusBadge kind="communityRequest" status={r.outcome}>
-                        {OUTCOME_LABELS[r.outcome] ?? r.outcome}
+                      <StatusBadge kind="communityRequest" status={status}>
+                        {DISPLAY_LABELS[status] ?? status}
                       </StatusBadge>
+                      {flagged ? (
+                        <span className="mt-1 block max-w-xs text-xs text-warn">
+                          Needs new items · flagged {timeAgo(r.itemsShortAt)}
+                          {shortProductNames(r).length ? `. ${shortProductNames(r).join(', ')} ran short.` : ''}
+                        </span>
+                      ) : null}
                       {resolved && r.outcomeNote ? (
                         <span className="mt-1 block max-w-xs text-xs text-muted-foreground whitespace-pre-line">
                           {r.outcomeNote}
                         </span>
                       ) : null}
-                      {r.handledByName ? (
+                      {resolved && r.handledByName ? (
                         <span className="mt-1 block text-xs text-muted-foreground">
-                          {resolved ? 'Handled' : 'Claimed'} by {r.handledByName}
+                          Handled by {r.handledByName}
                         </span>
+                      ) : null}
+                      {!resolved && packer ? (
+                        <span className="mt-1 block text-xs text-muted-foreground">{packer}</span>
                       ) : null}
                     </TableCell>
                     <TableCell className="sticky right-0 whitespace-nowrap bg-card pr-4 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.15)] sm:pr-5">
@@ -346,21 +314,26 @@ export default function CommunityRequestsPage() {
                         <span className="text-xs text-muted-foreground">
                           {fmtDateTime(r.resolvedAt)}
                         </span>
+                      ) : r.outcome === 'pending' ? (
+                        <Button type="button" size="sm" onClick={() => openItems('approve', r)}>
+                          Approve and choose items
+                        </Button>
                       ) : (
                         <div className="flex justify-end gap-2">
-                          {r.handledBy == null ? (
-                            <Button
-                              type="button" variant="outline" size="sm"
-                              onClick={() => claim(r.id)}
-                            >
-                              Claim
+                          {flagged ? (
+                            <Button type="button" size="sm" onClick={() => openItems('rechoose', r)}>
+                              Choose other items
                             </Button>
-                          ) : null}
+                          ) : (
+                            <Button type="button" variant="outline" size="sm" onClick={() => openAssign(r)}>
+                              Assign packer
+                            </Button>
+                          )}
                           <Button
-                            type="button" size="sm"
-                            onClick={() => { setResolving(r); setFormError(null); }}
+                            type="button" variant="outline" size="sm"
+                            onClick={() => { setFormError(null); setPanel({ type: 'decline', request: r }); }}
                           >
-                            Resolve
+                            Decline
                           </Button>
                         </div>
                       )}
@@ -374,26 +347,56 @@ export default function CommunityRequestsPage() {
         </ListCard>
       </div>
 
-      {mode === 'create' ? (
-        <DetailPanel open onClose={() => { setMode('list'); setFormError(null); }} title="Log a request">
+      {panel?.type === 'create' ? (
+        <DetailPanel open onClose={closePanel} title="Log a request">
           <CommunityRequestForm
             onSubmit={create}
-            onCancel={() => { setMode('list'); setFormError(null); }}
+            onCancel={closePanel}
             busy={busy}
             error={formError}
           />
         </DetailPanel>
       ) : null}
 
-      {resolving ? (
-        <ResolvePanel
-          key={resolving.id}
-          request={resolving}
+      {panel?.type === 'approve' || panel?.type === 'rechoose' ? (
+        <ApproveItemsPanel
+          key={`${panel.type}-${panel.request.id}`}
+          request={panel.request}
+          mode={panel.type}
+          products={products}
           busy={busy}
           error={formError}
-          onSubmit={resolve}
-          onCancel={() => { setResolving(null); setFormError(null); }}
+          onSubmit={submitItems}
+          onDecline={() => { setFormError(null); setPanel({ type: 'decline', request: panel.request }); }}
+          onClose={closePanel}
         />
+      ) : null}
+
+      {panel?.type === 'decline' ? (
+        <DeclinePanel
+          key={panel.request.id}
+          request={panel.request}
+          busy={busy}
+          error={formError}
+          onSubmit={decline}
+          onCancel={closePanel}
+        />
+      ) : null}
+
+      {panel?.type === 'assign' ? (
+        <AssignPanel
+          key={panel.request.id}
+          request={panel.request}
+          workers={workers}
+          busy={busy}
+          error={formError}
+          onSubmit={assign}
+          onCancel={closePanel}
+        />
+      ) : null}
+
+      {panel?.type === 'detail' ? (
+        <RequestDetailPanel request={panel.request} onClose={closePanel} />
       ) : null}
     </PageShell>
   );

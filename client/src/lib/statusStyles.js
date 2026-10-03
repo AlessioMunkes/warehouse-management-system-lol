@@ -70,7 +70,9 @@ export const STATUS_STYLES = {
     decanted:   s('neutral', Split),
   },
   communityRequest: {
-    pending:             s('warn', Clock),
+    pending:             s('warn', Clock),                // awaiting approval
+    approved:            s('info', BadgeCheck),           // items chosen, stock set aside
+    needs_items:         s('warn', TriangleAlert),        // approved, but its stock was used
     fulfilled:           s('good', CheckCheck, true),
     partially_fulfilled: s('good', CircleDashed),
     referred:            s('info', Forward),

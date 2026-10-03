@@ -13,7 +13,7 @@
 // all read from here.
 // ─────────────────────────────────────────────────────────────
 import {
-  AlertTriangle, ClipboardList, Clock, Gift, Mail, Package, ShoppingCart, Truck, Users, Bell,
+  AlertTriangle, ClipboardList, Clock, Gift, Mail, Package, PhoneCall, ShoppingCart, Truck, Users, Bell,
 } from 'lucide-react';
 import { matchPath } from 'react-router-dom';
 import { STAFF, ADMIN, PACKING, VOLUNTEERS } from '../../routes/paths';
@@ -62,6 +62,10 @@ const NOTIFICATION_MATRIX = {
   purchase_order_needs_attention: {
     severity: 'action', icon: ShoppingCart,
     destination: (n) => withOpen(STAFF.purchaseOrders, n.entityId, 'id'),
+  },
+  community_request_items_short: {
+    severity: 'action', icon: PhoneCall,
+    destination: () => `${STAFF.communityRequests}?status=needs-items`,
   },
   vms_sync_failed: {
     severity: 'action', icon: Users,
