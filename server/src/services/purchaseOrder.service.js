@@ -23,6 +23,9 @@ import notices from '../features/communications/notices.js';
 // feature/notification-fix brought this service onto staging.
 import financeService from './finance.service.js';
 import { FINANCE_EMAIL_ERRORS, safeFinanceEmailError } from '../utils/financeEmailError.js';
+import {
+  MAX_IMPORT_ROWS, tooManyRowsMessage, normalizePair, findDuplicateIndexes,
+} from '../utils/quickbooksImport.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -442,6 +445,74 @@ const setQuickbooksReference = async (rawId, body = {}, actorId) => {
   return repo.getPurchaseOrderById(id);
 };
 
+// ── QuickBooks links import ──────────────────────────────────
+// The client reads the file and finds the pairs; these two endpoints
+// only look up and fill in links. Nothing here creates or deletes a PO.
+// Rows that can't be trusted are given a status and left out of the
+// database round trip — a row's status never depends on a guess.
+const DUPLICATE_MESSAGE =
+  'This PO number or QuickBooks number appears in more than one row. Nothing is linked for it.';
+
+const prepareImportPairs = (body) => {
+  const raw = body?.pairs;
+  if (!Array.isArray(raw) || raw.length === 0) {
+    throw fail(400, 'Choose a file with at least one PO number in it.');
+  }
+  if (raw.length > MAX_IMPORT_ROWS) throw fail(400, tooManyRowsMessage(raw.length));
+
+  const normalized = raw.map((r) => ({ ...normalizePair(r), overwrite: r?.overwrite === true }));
+  const valid = normalized.filter((n) => !n.invalid);
+  const dupes = findDuplicateIndexes(valid);
+  const checked = valid.filter((_, i) => !dupes.has(i));
+  return { normalized, valid, dupes, checked };
+};
+
+// Walks the submitted order and slots each outcome back in.
+const mergeImportResults = (prepared, checkedResults) => {
+  const byPair = new Map(prepared.checked.map((p, i) => [p, checkedResults[i]]));
+  const dupePairs = new Set([...prepared.dupes].map((i) => prepared.valid[i]));
+  return prepared.normalized.map((n) => {
+    const base = { poNumber: n.poNumber, quickbooksNumber: n.quickbooksNumber };
+    if (n.invalid) return { ...base, status: 'invalid', message: n.invalid };
+    if (dupePairs.has(n)) return { ...base, status: 'duplicate', message: DUPLICATE_MESSAGE };
+    const { poId, displacedPoId, ...outcome } = byPair.get(n); // internal ids stay server-side
+    return { ...base, ...outcome };
+  });
+};
+
+const countByStatus = (rows) => rows.reduce((acc, r) => {
+  acc[r.status] = (acc[r.status] ?? 0) + 1;
+  return acc;
+}, {});
+
+const previewQuickbooksImport = async (body = {}) => {
+  const prepared = prepareImportPairs(body);
+  const checkedResults = prepared.checked.length
+    ? await repo.previewQuickbooksLinks(prepared.checked)
+    : [];
+  const rows = mergeImportResults(prepared, checkedResults);
+  return { rows, counts: countByStatus(rows) };
+};
+
+const applyQuickbooksImport = async (body = {}, actorId) => {
+  const prepared = prepareImportPairs(body);
+  let checkedResults = [];
+  if (prepared.checked.length) {
+    try {
+      checkedResults = await repo.applyQuickbooksLinks(prepared.checked, actorId);
+    } catch (err) {
+      // Someone linked one of these numbers between our check and our
+      // write. The transaction has rolled back, so nothing was changed.
+      if (err?.code === '23505') {
+        throw fail(409, 'A QuickBooks number was linked by someone else while this ran. Nothing was changed. Preview the file again.');
+      }
+      throw err;
+    }
+  }
+  const rows = mergeImportResults(prepared, checkedResults);
+  return { rows, counts: countByStatus(rows) };
+};
+
 // ── Resend the Finance email ─────────────────────────────────
 // Same send + status-write path as creation. Returns the PO as it now
 // stands, so the caller sees the status the attempt left behind.
@@ -531,5 +602,7 @@ export default {
   updatePurchaseOrder,
   deletePurchaseOrder,
   setQuickbooksReference,
+  previewQuickbooksImport,
+  applyQuickbooksImport,
   resendFinanceEmail,
 };

@@ -73,6 +73,26 @@ const setQuickbooksReference = async (req, res) => {
   }
 };
 
+// ── POST /api/purchase-orders/quickbooks-import/preview ────────
+const previewQuickbooksImport = async (req, res) => {
+  try {
+    const data = await purchaseOrderService.previewQuickbooksImport(req.body);
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    respondError(res, err, 'previewQuickbooksImport', 'Could not check the file. Try again.');
+  }
+};
+
+// ── POST /api/purchase-orders/quickbooks-import/apply ──────────
+const applyQuickbooksImport = async (req, res) => {
+  try {
+    const data = await purchaseOrderService.applyQuickbooksImport(req.body, req.user.id);
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    respondError(res, err, 'applyQuickbooksImport', 'Could not link the QuickBooks numbers. Nothing was changed.');
+  }
+};
+
 // ── POST /api/purchase-orders/:id/finance-email/resend ─────────
 const resendFinanceEmail = async (req, res) => {
   try {
@@ -103,4 +123,4 @@ const remove = async (req, res) => {
   }
 };
 
-export default { create, list, getOne, setStatus, setQuickbooksReference, resendFinanceEmail, update, remove };
+export default { create, list, getOne, setStatus, setQuickbooksReference, previewQuickbooksImport, applyQuickbooksImport, resendFinanceEmail, update, remove };

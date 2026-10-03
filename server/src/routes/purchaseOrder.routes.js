@@ -29,6 +29,14 @@ router.get('/',
 router.post('/',
   auth, requireRole(...MANAGERS_UP), purchaseOrderController.create);
 
+// Link QuickBooks PO numbers to ours from an export the client has read.
+// Preview only looks; apply writes, all or nothing.
+router.post('/quickbooks-import/preview',
+  auth, requireRole(...MANAGERS_UP), purchaseOrderController.previewQuickbooksImport);
+
+router.post('/quickbooks-import/apply',
+  auth, requireRole(...MANAGERS_UP), purchaseOrderController.applyQuickbooksImport);
+
 // Last: a static path added below this would be swallowed by :id and
 // then rejected by validateIntId as a non-integer — the trap already
 // documented at the top of supplier.routes.js.

@@ -19,6 +19,7 @@
 import pool           from '../config/db.js';
 import { logAudit }   from './auditLog.repository.js';
 import { safeFinanceEmailError } from '../utils/financeEmailError.js';
+import { buildState, classifyPair } from '../utils/quickbooksImport.js';
 
 const QBO_UNIQUE_CONSTRAINT = 'qbo_map_unique_remote';
 
@@ -402,6 +403,120 @@ const setQuickbooksReference = async (id, quickbooksPoId, actorId) => {
   }
 };
 
+// ── QuickBooks links import ──────────────────────────────────
+// Two statements however many rows: our POs by number, then every link
+// on those POs or holding those QuickBooks numbers. Never one query per
+// row. LEFT JOIN so a link whose PO has been deleted still counts as
+// the holder of its number (the unique index would block the insert
+// regardless).
+const loadImportState = async (db, poNumbers, qbNumbers, { lock = false } = {}) => {
+  const { rows: poRows } = await db.query(
+    `SELECT id, po_number
+       FROM purchase_orders
+      WHERE po_number = ANY($1::text[])
+      ORDER BY id
+      ${lock ? 'FOR UPDATE' : ''}`,
+    [poNumbers]
+  );
+  const { rows: linkRows } = await db.query(
+    `SELECT qom.entity_id, qom.qbo_id, po.po_number
+       FROM quickbooks_object_map qom
+       LEFT JOIN purchase_orders po ON po.id = qom.entity_id
+      WHERE qom.entity_type = 'purchase_order'
+        AND qom.qbo_object_type = 'PurchaseOrder'
+        AND (qom.entity_id = ANY($1::int[]) OR qom.qbo_id = ANY($2::text[]))`,
+    [poRows.map((r) => r.id), qbNumbers]
+  );
+  return buildState(poRows, linkRows);
+};
+
+// pairs: [{ poNumber, quickbooksNumber }] already normalised.
+// → [{ status, linkedQuickbooksNumber?, linkedToPoNumber? }] in order.
+const previewQuickbooksLinks = async (pairs) => {
+  const state = await loadImportState(
+    pool,
+    [...new Set(pairs.map((p) => p.poNumber))],
+    [...new Set(pairs.map((p) => p.quickbooksNumber))]
+  );
+  return pairs.map((p) => classifyPair(p, state));
+};
+
+// pairs: [{ poNumber, quickbooksNumber, overwrite }] already normalised
+// and free of duplicates. All or nothing: one transaction, the POs
+// locked first, everything re-classified against the locked data, then
+// one DELETE, one INSERT and one audit INSERT whatever the row count.
+// The audit rows are the same quickbooks_ref_set rows the manual edit
+// writes, plus a reason, and one for each PO whose link was displaced.
+// → [{ status: linked | overwritten | unchanged | skipped_conflict | not_found, ... }]
+const applyQuickbooksLinks = async (pairs, actorId) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const state = await loadImportState(
+      client,
+      [...new Set(pairs.map((p) => p.poNumber))],
+      [...new Set(pairs.map((p) => p.quickbooksNumber))],
+      { lock: true }
+    );
+
+    const results = [];
+    const deleteIds = new Set();
+    const inserts = []; // { poId, qb }
+    const audits  = []; // { poId, qb } — qb null = link removed
+    for (const pair of pairs) {
+      const c = classifyPair(pair, state);
+      if (c.status === 'not_found' || c.status === 'unchanged') {
+        results.push({ status: c.status });
+        continue;
+      }
+      if (c.status === 'conflict' && !pair.overwrite) {
+        results.push({ status: 'skipped_conflict', linkedQuickbooksNumber: c.linkedQuickbooksNumber, linkedToPoNumber: c.linkedToPoNumber });
+        continue;
+      }
+      deleteIds.add(c.poId);
+      inserts.push({ poId: c.poId, qb: pair.quickbooksNumber });
+      audits.push({ poId: c.poId, qb: pair.quickbooksNumber });
+      if (c.displacedPoId) {
+        deleteIds.add(c.displacedPoId);
+        audits.push({ poId: c.displacedPoId, qb: null });
+      }
+      results.push({ status: c.status === 'conflict' ? 'overwritten' : 'linked' });
+    }
+
+    if (inserts.length) {
+      await client.query(
+        `DELETE FROM quickbooks_object_map
+          WHERE entity_type = 'purchase_order' AND entity_id = ANY($1::int[])`,
+        [[...deleteIds]]
+      );
+      await client.query(
+        `INSERT INTO quickbooks_object_map
+           (entity_type, entity_id, qbo_object_type, qbo_id)
+         SELECT 'purchase_order', t.po_id, 'PurchaseOrder', t.qb
+           FROM unnest($1::int[], $2::text[]) AS t(po_id, qb)`,
+        [inserts.map((r) => r.poId), inserts.map((r) => r.qb)]
+      );
+      await client.query(
+        `INSERT INTO audit_log
+           (entity_type, entity_id, action, actor_id, reason, after_data)
+         SELECT 'purchase_order', t.po_id::text, 'quickbooks_ref_set', $3::int,
+                'QuickBooks import', jsonb_build_object('quickbooksPoId', t.qb)
+           FROM unnest($1::int[], $2::text[]) AS t(po_id, qb)`,
+        [audits.map((r) => r.poId), audits.map((r) => r.qb), actorId]
+      );
+    }
+
+    await client.query('COMMIT');
+    return results;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
 // ── Update (pending only) ───────────────────────────────────────
 // Full header-and-lines replace, only ever reached for a 'pending'
 // order — see purchaseOrder.service.js's updatePurchaseOrder, which
@@ -612,5 +727,7 @@ export default {
   updatePurchaseOrder,
   deletePurchaseOrder,
   setQuickbooksReference,
+  previewQuickbooksLinks,
+  applyQuickbooksLinks,
   recordFinanceEmailAttempt,
 };
