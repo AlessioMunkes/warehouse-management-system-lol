@@ -100,3 +100,20 @@ describe('working out which screen someone is on', () => {
     expect(matchScreen(undefined)).toBeNull();
   });
 });
+
+// Benevolent Requests and Feed the Soil are one screen to the
+// assistant but a page per side: the floor's and the manager's.
+describe('screens with a page per side', () => {
+  it('sends a worker to the floor page and a manager to theirs', () => {
+    expect(pathForScreen('communityRequests', 'warehouse_worker')).toBe('/staff/community-requests');
+    expect(pathForScreen('communityRequests', 'manager')).toBe('/noc/community-requests');
+    expect(pathForScreen('feedTheSoil', 'warehouse_worker')).toBe('/staff/feed-the-soil');
+    expect(pathForScreen('feedTheSoil', 'admin')).toBe('/noc/feed-the-soil');
+  });
+
+  it('recognises either page as the same screen', () => {
+    expect(matchScreen('/staff/community-requests')).toBe('communityRequests');
+    expect(matchScreen('/noc/feed-the-soil')).toBe('feedTheSoil');
+    expect(matchScreen('/staff/feed-the-soil')).toBe('feedTheSoil');
+  });
+});

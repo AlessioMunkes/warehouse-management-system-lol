@@ -27,7 +27,7 @@
 // @vitest-environment node
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect } from 'vitest';
-import { SCREEN_PATHS } from '../features/assistant/screenPaths';
+import { SCREEN_PATHS, pathForScreen } from '../features/assistant/screenPaths';
 import { ROUTES } from '../routes/routeTable';
 import {
   SCREENS,
@@ -68,12 +68,13 @@ describe('what the assistant offers matches what the app allows', () => {
   it.each(
     SCREENS.map((s) => [s.id, s])
   )('%s is never offered to someone the route would refuse', (id, screen) => {
-    const path = SCREEN_PATHS[id];
-    if (!path) return;                     // `home`, per role by design
-    const allowed = routeRoles.get(path);
-    if (!allowed) return;                  // reported by the test above
-
+    // Per role: Benevolent Requests and Feed the Soil send a worker to
+    // the floor's page and everyone else to the manager's.
     for (const role of screen.roles) {
+      const path = pathForScreen(id, role);
+      if (!path) continue;                 // `home`, per role by design
+      const allowed = routeRoles.get(path);
+      if (!allowed) continue;              // reported by the test above
       expect(
         allowed,
         `the assistant offers ${id} to a ${role}, but App.jsx would bounce them`
@@ -87,13 +88,11 @@ describe('what the assistant offers matches what the app allows', () => {
   it.each(
     SCREENS.map((s) => [s.id, s])
   )('%s is offered to everyone the route does allow', (id, screen) => {
-    const path = SCREEN_PATHS[id];
-    if (!path) return;
-    const allowed = routeRoles.get(path);
-    if (!allowed) return;
-
-    for (const role of allowed) {
-      if (role === 'guest') continue;      // never offered the assistant at all
+    for (const role of ['warehouse_worker', 'manager', 'admin']) {
+      const path = pathForScreen(id, role);
+      if (!path) continue;
+      const allowed = routeRoles.get(path);
+      if (!allowed || !allowed.includes(role)) continue;
       expect(
         screen.roles,
         `App.jsx lets a ${role} open ${id}, but the assistant will not take them`

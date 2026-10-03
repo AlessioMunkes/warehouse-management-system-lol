@@ -28,6 +28,10 @@
 // Admins can open the manager screens (MANAGERS_UP includes admin) but
 // their sidebar does not list them — a decision for the team; see the
 // note in navSections.js.
+//
+// The floor is separate: its screens are WORKERS_ONLY, and no worker
+// may open a manager or admin screen. A screen two sides both work on
+// (Benevolent Requests, Feed the Soil) is two routes, one per side.
 // ─────────────────────────────────────────────────────────────
 import {
   LayoutDashboard, Users2, ClipboardList, ShoppingCart, BarChart3, HeartHandshake,
@@ -37,7 +41,7 @@ import {
 } from 'lucide-react';
 import { STAFF, ADMIN, VOLUNTEERS, PACKING, DONATIONS } from './paths';
 import {
-  ALL_STAFF, MANAGERS_UP, ADMIN_ONLY, GUEST_ONLY, DONATION_INTAKE,
+  MANAGERS_UP, ADMIN_ONLY, GUEST_ONLY, WORKERS_ONLY,
 } from './permissions';
 
 // Each sidebar's groups, top to bottom.
@@ -69,7 +73,7 @@ export const ROUTES = [
     nav: [nav('manager', 'Overview', 'Dashboard', LayoutDashboard)] },
   { id: 'adminDashboard', path: ADMIN.dashboard, roles: ADMIN_ONLY, shell: true,
     nav: [nav('admin', 'Overview', 'Dashboard', LayoutDashboard)] },
-  { id: 'staffHome', path: STAFF.home, roles: ALL_STAFF,
+  { id: 'staffHome', path: STAFF.home, roles: WORKERS_ONLY,
     nav: [nav('worker', 'Overview', 'Dashboard', LayoutDashboard)] },
 
   // ── Inbound ────────────────────────────────────────────────
@@ -96,37 +100,32 @@ export const ROUTES = [
   { id: 'collectionReminders', path: STAFF.collectionReminders, roles: MANAGERS_UP, shell: true,
     nav: [nav('manager', 'Outbound', 'Collection Reminders', MessageCircle)] },
 
-  // ── The warehouse floor ────────────────────────────────────
-  // One URL per task: each page shows the manager view or the staff
-  // flow depending on the role. Guests are not allowed here.
-  { id: 'receiving', path: STAFF.receiving, roles: ALL_STAFF,
+  // ── The warehouse floor (warehouse staff only) ──────────────
+  { id: 'receiving', path: STAFF.receiving, roles: WORKERS_ONLY,
     nav: [nav('worker', 'Warehouse', 'Receiving', PackageOpen)] },
-  { id: 'deliveries', path: STAFF.deliveries, roles: ALL_STAFF },
-  { id: 'packing', path: PACKING.board, roles: ALL_STAFF,
+  { id: 'deliveries', path: STAFF.deliveries, roles: WORKERS_ONLY },
+  { id: 'packing', path: PACKING.board, roles: WORKERS_ONLY,
     nav: [nav('worker', 'Warehouse', 'Packing', PackageCheck)] },
-  { id: 'packingDetail', path: PACKING.detailPattern, roles: ALL_STAFF },
-  { id: 'decanting', path: STAFF.decanting, roles: ALL_STAFF,
+  { id: 'packingDetail', path: PACKING.detailPattern, roles: WORKERS_ONLY },
+  { id: 'decanting', path: STAFF.decanting, roles: WORKERS_ONLY,
     nav: [nav('worker', 'Warehouse', 'Decanting', FlaskConical)] },
-  { id: 'decantingRecords', path: STAFF.decantingRecords, roles: ALL_STAFF },
-  { id: 'dispatch', path: STAFF.dispatch, roles: ALL_STAFF,
+  { id: 'decantingRecords', path: STAFF.decantingRecords, roles: WORKERS_ONLY },
+  { id: 'dispatch', path: STAFF.dispatch, roles: WORKERS_ONLY,
     nav: [nav('worker', 'Warehouse', 'Dispatch', ClipboardCheck)] },
-  { id: 'dispatchHistory', path: STAFF.dispatchHistory, roles: ALL_STAFF },
-  // Donation intake: floor work, so not in the manager's menu.
-  { id: 'donationIntake', path: STAFF.donation, roles: DONATION_INTAKE,
+  { id: 'dispatchHistory', path: STAFF.dispatchHistory, roles: WORKERS_ONLY },
+  { id: 'donationIntake', path: STAFF.donation, roles: WORKERS_ONLY,
     nav: [nav('worker', 'Warehouse', 'Donation Intake', HandCoins)] },
-  { id: 'donationReview', path: DONATIONS.review, roles: DONATION_INTAKE },
+  { id: 'donationReview', path: DONATIONS.review, roles: WORKERS_ONLY },
+  { id: 'floorRequests', path: STAFF.floorRequests, roles: WORKERS_ONLY,
+    nav: [nav('worker', 'Warehouse', 'Benevolent Requests', PhoneCall)] },
+  { id: 'floorFeedTheSoil', path: STAFF.floorFeedTheSoil, roles: WORKERS_ONLY,
+    nav: [nav('worker', 'Warehouse', 'Feed the Soil', Sprout)] },
 
-  // ── Open to all staff, each page choosing its layout by role ─
-  { id: 'communityRequests', path: STAFF.communityRequests, roles: ALL_STAFF,
-    nav: [
-      nav('worker', 'Warehouse', 'Benevolent Requests', PhoneCall),
-      nav('manager', 'Outbound', 'Benevolent Requests', PhoneCall, (a) => a.communityRequests.pending),
-    ] },
-  { id: 'feedTheSoil', path: STAFF.feedTheSoil, roles: ALL_STAFF,
-    nav: [
-      nav('worker', 'Warehouse', 'Feed the Soil', Sprout),
-      nav('manager', 'Programmes', 'Feed the Soil', Sprout),
-    ] },
+  // ── The manager's side of those two programmes ─────────────
+  { id: 'communityRequests', path: STAFF.communityRequests, roles: MANAGERS_UP, shell: true,
+    nav: [nav('manager', 'Outbound', 'Benevolent Requests', PhoneCall, (a) => a.communityRequests.pending)] },
+  { id: 'feedTheSoil', path: STAFF.feedTheSoil, roles: MANAGERS_UP, shell: true,
+    nav: [nav('manager', 'Programmes', 'Feed the Soil', Sprout)] },
 
   // ── Programmes ─────────────────────────────────────────────
   { id: 'volunteerEvents', path: VOLUNTEERS.events, roles: MANAGERS_UP, shell: true,

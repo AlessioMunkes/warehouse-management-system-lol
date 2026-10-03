@@ -14,7 +14,7 @@ import { describe, it, expect } from 'vitest';
 import { ROUTES, REDIRECTS } from '../routes/routeTable';
 import { PAGES } from '../routes/pages';
 import { NAV_SECTIONS } from '../components/layout/navSections';
-import { ALL_STAFF, MANAGERS_UP, ADMIN_ONLY, GUEST_ONLY, DONATION_INTAKE } from '../routes/permissions';
+import { ALL_STAFF, MANAGERS_UP, ADMIN_ONLY, GUEST_ONLY, WORKERS_ONLY } from '../routes/permissions';
 
 const ROLE_OF_MENU = { worker: 'warehouse_worker', manager: 'manager', admin: 'admin' };
 
@@ -29,9 +29,19 @@ describe('route table', () => {
   });
 
   it('guards every non-public route with a named group', () => {
-    const groups = [ALL_STAFF, MANAGERS_UP, ADMIN_ONLY, GUEST_ONLY, DONATION_INTAKE];
+    const groups = [ALL_STAFF, MANAGERS_UP, ADMIN_ONLY, GUEST_ONLY, WORKERS_ONLY];
     for (const r of ROUTES.filter((x) => x.roles)) {
       expect(groups, `${r.id} uses a role list that is not in permissions.js`).toContain(r.roles);
+    }
+  });
+
+  // Each role sees only its own screens: nothing a warehouse worker can
+  // open is open to a manager or admin, and the reverse.
+  it('never shares a screen between the floor and the office', () => {
+    for (const r of ROUTES.filter((x) => x.roles)) {
+      const worker = r.roles.includes('warehouse_worker');
+      const office = r.roles.includes('manager') || r.roles.includes('admin');
+      expect(worker && office, `${r.id} is open to the floor and the office alike`).toBe(false);
     }
   });
 
@@ -58,8 +68,8 @@ describe('sidebars built from the table', () => {
         'Decanting /noc/decanting',
         'Dispatch /staff/dispatch',
         'Donation Intake /donations/new',
-        'Benevolent Requests /noc/community-requests',
-        'Feed the Soil /noc/feed-the-soil',
+        'Benevolent Requests /staff/community-requests',
+        'Feed the Soil /staff/feed-the-soil',
       ]],
     ]);
   });

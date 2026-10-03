@@ -19,7 +19,9 @@ export const linkFor = (link) => {
     case 'beneficiaries':   return withOpen(STAFF.beneficiaries, id);
     case 'receipts':        return STAFF.receipts;
     case 'stockLedger':     return STAFF.stockLedger;
-    case 'decantingRecords': return STAFF.decantingRecords;
+    // Decanting sheets live on the floor; the admin sees the run in
+    // the ledger instead.
+    case 'decantingRecords': return `${STAFF.stockLedger}?status=decanted`;
     case 'feedTheSoil':     return STAFF.feedTheSoil;
     case 'volunteerEvent':  return id ? VOLUNTEERS.event(id) : null;
     case 'suppliers':       return withOpen(ADMIN.suppliers, id);

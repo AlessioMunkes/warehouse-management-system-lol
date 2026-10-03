@@ -69,22 +69,32 @@ describe('where each notification goes', () => {
   });
 
   it('gives every type the server sends somewhere to go', () => {
-    const cases = {
-      low_stock: '/noc/inventory?status=lowstock',
-      non_collections_flagged: '/staff/dispatch/history',
-      stock_expiry_warning_2w: '/noc/inventory',
-      stock_expiry_warning_1w: '/noc/inventory',
-      donation_review: '/admin/donation-management',
-      section18a_email_failed: '/admin/section-18a',
-      vms_sync_failed: '/volunteers',
+    const cases = [
+      ['low_stock', 'manager', '/noc/inventory?status=lowstock'],
+      ['non_collections_flagged', 'manager', '/noc/picking-slips?status=notcollected'],
+      ['non_collections_flagged', 'warehouse_worker', '/staff/dispatch/history'],
+      ['stock_expiry_warning_2w', 'manager', '/noc/inventory'],
+      ['stock_expiry_warning_1w', 'manager', '/noc/inventory'],
+      ['donation_review', 'admin', '/admin/donation-management'],
+      ['section18a_email_failed', 'admin', '/admin/section-18a'],
+      ['vms_sync_failed', 'manager', '/volunteers'],
       // Older names still stored on some rows.
-      stock_expiry_2_weeks: '/noc/inventory',
-      section18a_handoff_failed: '/admin/section-18a',
-    };
-    for (const [type, path] of Object.entries(cases)) {
-      expect(notificationDestination(notification({ type }), 'manager'), type).toBe(path);
+      ['stock_expiry_2_weeks', 'manager', '/noc/inventory'],
+      ['section18a_handoff_failed', 'admin', '/admin/section-18a'],
+    ];
+    for (const [type, role, path] of cases) {
+      expect(notificationDestination(notification({ type }), role), `${type} / ${role}`).toBe(path);
     }
     expect(notificationDestination(notification({ type: 'mystery' }), 'manager')).toBeNull();
+  });
+
+  // Each role sees only its own screens, so a notification never opens
+  // another role's: it goes nowhere rather than bounce them home.
+  it('never sends anyone to a screen of another role', () => {
+    expect(notificationDestination(notification({ type: 'low_stock' }), 'warehouse_worker')).toBeNull();
+    expect(notificationDestination(notification({ type: 'donation_review' }), 'manager')).toBeNull();
+    expect(notificationDestination(notification({ type: 'non_collections_flagged' }), 'admin'))
+      .toBe('/noc/picking-slips?status=notcollected');
   });
 
   it('knows how urgent each type is', () => {

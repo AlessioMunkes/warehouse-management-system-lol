@@ -32,14 +32,10 @@
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import ManagerLayout from '../components/layout/ManagerLayout';
-import StaffShell from '../components/layout/StaffShell';
 import CommunityRequestForm from '../features/communityRequests/components/CommunityRequestForm';
-import CommunityRequestFlow from '../features/communityRequests/components/CommunityRequestFlow';
 import communityRequestAPI, {
   OUTCOMES, OUTCOME_LABELS, RESOLVE_OUTCOMES,
 } from '../services/communityRequestAPI';
-import { useAuth } from '../context/AuthContext';
 
 import { Button }   from '@/components/ui/button';
 import StatusBadge from '@/components/ui/status-badge';
@@ -155,9 +151,10 @@ const ResolvePanel = ({ request, busy, error, onSubmit, onCancel }) => {
   );
 };
 
-const isManager = (user) => user?.role === 'manager' || user?.role === 'admin';
 
-function CommunityRequestsManagerView() {
+// The manager's screen. The floor logs requests on its own screen,
+// StaffCommunityRequestsPage.
+export default function CommunityRequestsPage() {
   const [requests, setRequests] = useState([]);
   const [search, setSearch] = useState('');
   const [searchParams, setSearchParams] = useSearchParams();
@@ -248,10 +245,7 @@ function CommunityRequestsManagerView() {
   const visible = useMemo(() => requests.filter(view.test), [requests, view]);
   const requestPage = usePaged(visible, TABLE_PAGE_SIZE, `${search}|${view.id}|${visible.length}`);
 
-  // This route is open to all staff and each role brings its own
-  // layout, so the manager's view wraps itself in the shell.
   return (
-    <ManagerLayout>
     <PageShell>
       <PageHeader
         title="Benevolent requests"
@@ -322,16 +316,16 @@ function CommunityRequestsManagerView() {
                     <TableCell className="min-w-40 max-w-xs whitespace-pre-line">
                       {r.itemsRequested}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="min-w-32 whitespace-normal text-muted-foreground">
                       {r.quantityNote || '—'}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="min-w-36 whitespace-normal text-muted-foreground">
                       {r.callerName || 'Not given'}
                       {r.callerContact ? (
                         <span className="block text-xs">{r.callerContact}</span>
                       ) : null}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="whitespace-normal">
                       <StatusBadge kind="communityRequest" status={r.outcome}>
                         {OUTCOME_LABELS[r.outcome] ?? r.outcome}
                       </StatusBadge>
@@ -401,21 +395,5 @@ function CommunityRequestsManagerView() {
         />
       ) : null}
     </PageShell>
-    </ManagerLayout>
-  );
-}
-
-export default function CommunityRequestsPage() {
-  const { user } = useAuth();
-  const [crumb, setCrumb] = useState('Log a request');
-
-  if (isManager(user)) {
-    return <CommunityRequestsManagerView />;
-  }
-
-  return (
-    <StaffShell crumb={`Benevolent Requests / ${crumb}`}>
-      <CommunityRequestFlow onCrumbChange={setCrumb} />
-    </StaffShell>
   );
 }

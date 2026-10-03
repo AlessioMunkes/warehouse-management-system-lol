@@ -14,11 +14,11 @@ import GuestPackPage                               from '../pages/GuestPackPage'
 import GuestDonePage                               from '../pages/GuestDonePage';
 import SlipPreviewPage                             from '../pages/SlipPreviewPage';
 
-import ProcurementPage                             from '../pages/ProcurementPage';
+import ReceivingPage                               from '../pages/ReceivingPage';
 import StaffDeliveriesPage                         from '../pages/StaffDeliveriesPage';
 import DecantingPage                               from '../pages/DecantingPage';
 import StaffDecantingRecordsPage                   from '../pages/StaffDecantingRecordsPage';
-import PackingSelectPage                           from '../pages/PackingSelectPage';
+import PackingStaffPage                            from '../pages/PackingStaffPage';
 import DispatchPage                                from '../pages/DispatchPage';
 import StaffDispatchHistoryPage                    from '../pages/StaffDispatchHistoryPage';
 import ReceiptsPage                                from '../pages/ReceiptsPage';
@@ -45,6 +45,7 @@ import ProductManagementPage                       from '../pages/ProductManagem
 import VolunteerEventsPage                         from '../pages/VolunteerEventsPage';
 import VolunteerEventWorkspacePage                 from '../pages/VolunteerEventWorkspacePage';
 import CommunityRequestsPage                       from '../pages/CommunityRequestsPage';
+import StaffCommunityRequestsPage                  from '../pages/StaffCommunityRequestsPage';
 import SettingsPage                                from '../pages/SettingsPage';
 import FinanceWarehouseReportPage                  from '../pages/FinanceWarehouseReportPage';
 import PublicFinanceReportPage                     from '../pages/PublicFinanceReportPage';
@@ -52,6 +53,7 @@ import Section18AFormPage                          from '../pages/Section18AForm
 import InviteAcceptPage                            from '../pages/InviteAcceptPage';
 import ResetPasswordPage                           from '../pages/ResetPasswordPage';
 import FeedTheSoilPage                             from '../pages/FeedTheSoilPage';
+import StaffFeedTheSoilPage                        from '../pages/StaffFeedTheSoilPage';
 
 import { DonationDraftProvider }                   from '../features/donation/context/DonationDraftProvider';
 import { DonationDetailsPage }                     from '../pages/DonationDetailsPage';
@@ -84,10 +86,10 @@ export const PAGES = {
   beneficiaries:    <BeneficiaryDirectoryPage />,
   collectionReminders: <EcdCollectionRemindersPage />,
 
-  receiving:        <ProcurementPage />,
+  receiving:        <ReceivingPage />,
   deliveries:       <StaffDeliveriesPage />,
-  packing:          <PackingSelectPage />,
-  packingDetail:    <PackingSelectPage />,
+  packing:          <PackingStaffPage />,
+  packingDetail:    <PackingStaffPage />,
   decanting:        <DecantingPage />,
   decantingRecords: <StaffDecantingRecordsPage />,
   dispatch:         <DispatchPage />,
@@ -97,6 +99,8 @@ export const PAGES = {
   donationIntake:   <DonationDraftProvider><DonationDetailsPage /></DonationDraftProvider>,
   donationReview:   <DonationDraftProvider><DonationReviewPage /></DonationDraftProvider>,
 
+  floorRequests:    <StaffCommunityRequestsPage />,
+  floorFeedTheSoil: <StaffFeedTheSoilPage />,
   communityRequests: <CommunityRequestsPage />,
   feedTheSoil:      <FeedTheSoilPage />,
   volunteerEvents:  <VolunteerEventsPage />,

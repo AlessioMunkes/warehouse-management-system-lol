@@ -43,7 +43,6 @@ const ALLOWED = [
   'features/packing/palletLabelPdf.js',
   'features/staff/hooks/usePdfDocument.js',
   // A signature drawn in near-white is an invisible signature.
-  'features/procurement/components/ProofOfDeliveryForm.jsx',
   'features/procurement/components/SignaturePad.jsx',
   // The public page: its visitors are not logged in and have no toggle.
   'pages/LandingPage.jsx',

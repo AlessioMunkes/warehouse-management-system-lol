@@ -34,10 +34,12 @@ const BORDER = 'var(--line)';
 
 const LINKS = {
   beneficiaries:    { to: STAFF.beneficiaries,    label: 'Open beneficiaries' },
-  deliveries:       { to: STAFF.deliveries,       label: 'Open deliveries' },
+  // The floor's screens are not the manager's: deliveries are read on
+  // Receipts, decanting runs on the ledger's Decanting tab.
+  deliveries:       { to: STAFF.receipts,         label: 'Open receipts' },
   purchaseOrders:   { to: STAFF.purchaseOrders,   label: 'Open purchase orders' },
   stockLedger:      { to: STAFF.stockLedger,      label: 'Open stock ledger' },
-  decantingRecords: { to: STAFF.decantingRecords, label: 'Open decanting sheets' },
+  decantingRecords: { to: `${STAFF.stockLedger}?status=decanted`, label: 'Open decanting in the ledger' },
   pickingSlips:     { to: STAFF.pickingSlips,     label: 'Open picking slips' },
 };
 

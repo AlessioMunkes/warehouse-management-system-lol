@@ -15,7 +15,7 @@ const DONATIONS_NEW = '/donations/new';
 export const LANDING = '/';
 
 export const PACKING = {
-  // Managers see the packing board; warehouse staff see their own flow.
+  // Warehouse staff only (managers follow packing on Picking Slips).
   board: '/noc/packing',
   detailPattern: '/noc/packing/:slipId',
   detail: (slipId) => `/noc/packing/${slipId}`,
@@ -24,12 +24,11 @@ export const PACKING = {
 export const STAFF = {
   // The home screen for warehouse staff (TaskDashboardPage).
   home:      '/noc',
-  // Managers get the procurement dashboard here; staff get the receiving flow.
+  // The floor screens below are for warehouse staff only.
   receiving: '/noc/procurement',
   // Past deliveries, reached from the receiving flow rather than the tab bar.
   deliveries: '/noc/procurement/deliveries',
   packing:   PACKING.board,
-  // Staff get the decanting flow; managers get the week planner.
   decanting: '/noc/decanting',
   // Decanting sheets, reached from the decanting screen.
   decantingRecords: '/noc/decanting/sheets',
@@ -39,7 +38,6 @@ export const STAFF = {
   // Reporting, purchase orders, receipts, beneficiaries, reminders,
   // picking slips and the stock ledger are for managers and admins only.
   reporting: '/noc/reporting',
-  // Donation intake (workers and admins; see DONATION_INTAKE in permissions.js).
   donation:  DONATIONS_NEW,
   impactReport: '/noc/impact-report',
   purchaseOrders: '/noc/purchase-orders',
@@ -52,9 +50,13 @@ export const STAFF = {
   pickingSlips: '/noc/picking-slips',
   inventory: '/noc/inventory',
   stockLedger: '/noc/stock-ledger',
-  // Open to warehouse staff as well as managers and admins.
+  // The manager's screens for two programmes the floor also works on.
   communityRequests: '/noc/community-requests',
   feedTheSoil: '/noc/feed-the-soil',
+  // The floor's own screens for the same two: logging a request, and
+  // assigning kits and weighing compost in.
+  floorRequests: '/staff/community-requests',
+  floorFeedTheSoil: '/staff/feed-the-soil',
 };
 
 export const DONATIONS = {

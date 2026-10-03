@@ -70,7 +70,7 @@ const ProtectedRoute = ({ roles, shell = false } = {}) => {
   return (
     <>
       {content}
-      {user.role !== 'guest' && <AssistantLauncher />}
+      {user.role !== 'guest' && <AssistantLauncher role={user.role} />}
     </>
   );
 };

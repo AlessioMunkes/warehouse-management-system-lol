@@ -39,6 +39,7 @@ function renderAt(path, user) {
         </Route>
         <Route path={STAFF.home}   element={<p>TASK DASHBOARD</p>} />
         <Route path="/manager"     element={<p>MANAGER HOME</p>} />
+        <Route path="/admin"       element={<p>ADMIN HOME</p>} />
         <Route path="/login"       element={<p>LOGIN</p>} />
         <Route path="/guest-home"  element={<p>GUEST HOME</p>} />
         <Route path="*"            element={<Navigate to="/login" replace />} />
@@ -72,9 +73,17 @@ describe('donation intake route guarding', () => {
   // is no signed-in staff role left to bounce — intake is open to all
   // three — so the list itself is what is worth pinning. Narrow it and
   // the .each blocks above start exercising the gate.
-  it('is open to warehouse staff and admin, not managers', () => {
-    expect([...DONATION_INTAKE_ROLES].sort())
-      .toEqual(['admin', 'warehouse_worker']);
+  // Floor work: each role sees only its own screens, so intake is the
+  // warehouse worker's alone. Admins correct donations on the
+  // Classification Queue.
+  it('is open to warehouse staff only', () => {
+    expect([...DONATION_INTAKE_ROLES]).toEqual(['warehouse_worker']);
+  });
+
+  it('sends an admin to their own dashboard', () => {
+    renderAt(DONATIONS.new, user('admin'));
+    expect(screen.getByText('ADMIN HOME')).toBeInTheDocument();
+    expect(screen.queryByText('INTAKE FORM')).not.toBeInTheDocument();
   });
 
   // Taken out of the manager's view on request: an old link or bookmark

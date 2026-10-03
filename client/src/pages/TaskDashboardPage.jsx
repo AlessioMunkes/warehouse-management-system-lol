@@ -65,9 +65,9 @@ const TASKS = [
     meta: 'Portion bulk stock' },
   { to: STAFF.dispatch, icon: 'dispatch-icon', title: 'Dispatch',
     meta: 'Dispatch pallets' },
-  { to: STAFF.communityRequests, icon: 'benevolent-icon', title: 'Benevolent requests',
+  { to: STAFF.floorRequests, icon: 'benevolent-icon', title: 'Benevolent requests',
     meta: 'Log a request' },
-  { to: STAFF.feedTheSoil, icon: 'fts-icon', title: 'Feed the Soil',
+  { to: STAFF.floorFeedTheSoil, icon: 'fts-icon', title: 'Feed the Soil',
     meta: 'Log compost' },
   // Receipts is manager-only and deliberately absent. The item and
   // the route guard in App.jsx have to agree — a hidden item on an
