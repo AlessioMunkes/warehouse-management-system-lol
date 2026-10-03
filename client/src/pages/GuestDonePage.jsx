@@ -73,7 +73,7 @@ const GuestDonePage = () => {
           <Button variant="secondary" onClick={signOut} disabled={busy}>
             {busy ? 'Signing you out…' : 'Sign out'}
           </Button>
-          <HelpNote>Anything you want to tell a staff member before you go?</HelpNote>
+          <HelpNote>Need to tell us something? Let a staff member know before you go.</HelpNote>
         </GuestScreen>
       </GuestShell>
     );
@@ -131,9 +131,8 @@ const GuestDonePage = () => {
 
         {itemsFlagged > 0 ? (
           <Notice tone="info">
-            The {itemsFlagged === 1 ? 'problem' : 'problems'} you reported {itemsFlagged === 1 ? 'has' : 'have'} been
-            passed to a staff member. Thank you for flagging {itemsFlagged === 1 ? 'it' : 'them'} —
-            that is genuinely useful.
+            A staff member has {itemsFlagged === 1 ? 'your report' : 'your reports'}.
+            Thank you for flagging {itemsFlagged === 1 ? 'it' : 'them'}.
           </Notice>
         ) : null}
 
@@ -150,10 +149,10 @@ const GuestDonePage = () => {
           Pack another pallet
         </Button>
         <Button variant="secondary" onClick={signOut} disabled={busy}>
-          {busy ? 'Signing you out…' : 'Sign out — I’m finished'}
+          {busy ? 'Signing you out…' : 'Sign out'}
         </Button>
 
-        <HelpNote>Anything you want to tell a staff member before you go?</HelpNote>
+        <HelpNote>Need to tell us something? Let a staff member know before you go.</HelpNote>
       </GuestScreen>
     </GuestShell>
   );
