@@ -182,7 +182,13 @@ describe('safeFinanceEmailError', () => {
       expect(safeFinanceEmailError(m)).toBe(m);
     }
   });
-it('maps the texts earlier versions stored to the current ones', () => {    expect(safeFinanceEmailError('No Finance recipient saved')).toBe(FINANCE_EMAIL_ERRORS.noRecipient);    expect(safeFinanceEmailError('Gmail not connected')).toBe(FINANCE_EMAIL_ERRORS.notConnected);    expect(safeFinanceEmailError("Couldn't reach the email service")).toBe(FINANCE_EMAIL_ERRORS.unreachable);    expect(safeFinanceEmailError('Send failed')).toBe(FINANCE_EMAIL_ERRORS.generic);  });
+
+  it('maps the texts earlier versions stored to the current ones', () => {
+    expect(safeFinanceEmailError('No Finance recipient saved')).toBe(FINANCE_EMAIL_ERRORS.noRecipient);
+    expect(safeFinanceEmailError('Gmail not connected')).toBe(FINANCE_EMAIL_ERRORS.notConnected);
+    expect(safeFinanceEmailError("Couldn't reach the email service")).toBe(FINANCE_EMAIL_ERRORS.unreachable);
+    expect(safeFinanceEmailError('Send failed')).toBe(FINANCE_EMAIL_ERRORS.generic);
+  });
 });
 
 describe('resendFinanceEmail', () => {
