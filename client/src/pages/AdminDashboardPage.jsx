@@ -20,13 +20,17 @@ import { useState } from 'react';
 import PageHeader, { PageShell } from '@/components/ui/page-header';
 import { timeGreeting } from '../features/dashboard/timeGreeting';
 import CustomisableDashboard from '../features/dashboard/components/CustomisableDashboard';
+import NeedsAttention from '../features/dashboard/components/NeedsAttention';
+import { ADMIN_ATTENTION_SOURCES, adminAttentionItems } from '../features/dashboard/adminAttention';
 import { useAuth } from '@/context/AuthContext';
 
 // The admin home screen: the same customisable board as the manager's,
 // with the admin widgets (users, donation queue, shortcuts) on by
 // default. See features/dashboard/widgetCatalog.jsx.
 // What the greeting line reads, whatever widgets are showing.
-const ALWAYS = ['donations', 's18a'];
+// Loaded whatever widgets are chosen: the summary line and Needs
+// attention read them.
+const ALWAYS = ADMIN_ATTENTION_SOURCES;
 
 export default function AdminDashboardPage() {
   const { user } = useAuth();
@@ -46,10 +50,13 @@ export default function AdminDashboardPage() {
   return (
     <PageShell>
       <PageHeader
-        className="mb-6"
         title={`${timeGreeting()}${user?.firstName ? `, ${user.firstName}` : ''}`}
         description={summaryLine ? `Today: ${summaryLine}.` : 'What would you like to work on today?'}
       />
+      {/* Above the widgets: what to act on before what to read. */}
+      <div className="mb-6 mt-5">
+        <NeedsAttention items={adminAttentionItems(data)} storageKey="wms.dashboard.attention.collapsed:admin" />
+      </div>
       <CustomisableDashboard user={user} always={ALWAYS} onData={setData} />
     </PageShell>
   );

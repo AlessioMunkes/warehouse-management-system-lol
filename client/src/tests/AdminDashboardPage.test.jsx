@@ -139,7 +139,8 @@ describe('AdminDashboardPage — Donation Management badge (D6/Q2)', () => {
     await waitFor(() => {
       expect(getPendingDonationsMock).toHaveBeenCalled();
     });
-    expect(screen.queryByText(/Needs attention/)).not.toBeInTheDocument();
+    // The badge, not the Needs attention section above the widgets.
+    expect(screen.queryByText(/^Needs attention \(/)).not.toBeInTheDocument();
   });
 
   it('shows no badge when the counts fail to load (badge is advisory)', async () => {
@@ -150,7 +151,7 @@ describe('AdminDashboardPage — Donation Management badge (D6/Q2)', () => {
     await waitFor(() => {
       expect(getFlaggedItemsMock).toHaveBeenCalled();
     });
-    expect(screen.queryByText(/Needs attention/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Needs attention \(/)).not.toBeInTheDocument();
     // The tile itself still renders.
     expect(screen.getByText('Classification Queue')).toBeInTheDocument();
   });

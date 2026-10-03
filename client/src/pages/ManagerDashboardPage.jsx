@@ -38,7 +38,7 @@ export default function ManagerDashboardPage() {
       />
       {/* Above the widgets: what to act on before what to read. */}
       <div className="mb-6 mt-5">
-        <NeedsAttention attention={attention} />
+        <NeedsAttention attention={attention} storageKey="wms.dashboard.attention.collapsed:manager" />
       </div>
       <CustomisableDashboard user={user} always={ALWAYS} onData={setData} />
     </PageShell>

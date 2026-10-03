@@ -2213,18 +2213,21 @@ export const TOPICS = [
   {
     id: 'dashboard-manager',
     title: 'Your dashboard',
-    roles: [MANAGER],
+    roles: MANAGERS_UP,
     screens: ['home'],
     asks: [
       'what is on my dashboard', 'needs attention', 'customise the dashboard',
       'add a widget', 'remove a tile', 'what should I do first today',
+      'move a widget', 'drag the tiles', 'rearrange the dashboard', 'hide needs attention',
+      'collapse needs attention',
     ],
     body:
-      'Needs attention, at the top, lists what is waiting on you — orders to approve ' +
-      'or follow up, low products, open requests, unclaimed slips. Tap a line to go ' +
-      'straight to that list.\n\n' +
-      'Under it are figures and charts. Choose Customise to add, remove or reorder ' +
-      'them, or Reset to go back to the standard set.',
+      'Needs attention, at the top, lists what is waiting on you, worst first — tap a ' +
+      'line to go straight to it. Tap its heading to fold it away; it still says how ' +
+      'many things are waiting.\n\n' +
+      'Under it are figures and charts. Choose Customise dashboard to add, remove or ' +
+      'replace them, and drag one by its handle to move it — numbers among numbers, ' +
+      'charts among charts. Done keeps it; Reset to default starts again.',
     followUp: {
       question: 'Would you like to know how the bell works?',
       topic: 'notifications',

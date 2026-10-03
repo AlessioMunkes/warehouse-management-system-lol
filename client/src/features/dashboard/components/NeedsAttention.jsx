@@ -10,10 +10,18 @@
 // is the size of the tab it links to — the Inventory, Picking Slips and
 // Purchase Orders tabs all read ?status=. A line whose count is zero is
 // not shown; nothing at all reads as "nothing needs you".
+//
+// The admin's dashboard passes its own lines as `items` instead
+// (adminAttention.js); `attention` is the manager's counts.
+//
+// The header folds the list away. Folded, it still says how many
+// things are waiting, so folding it never hides that there is work.
+// Remembered per browser, per `storageKey`.
 // ─────────────────────────────────────────────────────────────
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ChevronRight, CircleCheck, CircleX, ClipboardList, Hourglass, PhoneCall,
+  ChevronDown, ChevronRight, CircleCheck, CircleX, ClipboardList, Hourglass, PhoneCall,
   ShoppingCart, TrendingDown, TriangleAlert,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -58,16 +66,46 @@ const TONE = {
   info: 'bg-info-soft text-info',
 };
 
-export default function NeedsAttention({ attention }) {
-  const due = attention ? lines(attention).filter((l) => l.count > 0) : [];
+const readCollapsed = (key) => {
+  try { return window.localStorage.getItem(key) === '1'; } catch { return false; }
+};
+const writeCollapsed = (key, value) => {
+  try { window.localStorage.setItem(key, value ? '1' : '0'); } catch { /* not kept; still works this visit */ }
+};
+
+export default function NeedsAttention({ attention, items, storageKey = 'wms.dashboard.attention.collapsed' }) {
+  // `items` (null while loading) or the manager's `attention` counts.
+  const source = items !== undefined ? items : attention ? lines(attention) : null;
+  const loading = source === null;
+  const due = loading ? [] : source.filter((l) => l.count > 0);
+
+  const [collapsed, setCollapsed] = useState(() => readCollapsed(storageKey));
+  const toggle = () => setCollapsed((c) => { writeCollapsed(storageKey, !c); return !c; });
 
   return (
     <Card className="gap-0 py-0">
-      <CardHeader className="border-b py-4">
-        <CardTitle className="text-base font-medium">Needs attention</CardTitle>
+      <CardHeader className={`py-0 ${collapsed ? '' : 'border-b [.border-b]:pb-0'}`}>
+        <CardTitle className="text-base font-medium">
+          <button
+            type="button"
+            onClick={toggle}
+            aria-expanded={!collapsed}
+            aria-controls="needs-attention-list"
+            className="flex w-full items-center gap-2 py-4 text-left"
+          >
+            <ChevronDown aria-hidden="true" className={`size-4 shrink-0 transition-transform ${collapsed ? '-rotate-90' : ''}`} />
+            <span className="flex-1">Needs attention</span>
+            {!loading ? (
+              <span className={`rounded-full px-2 py-0.5 text-xs tabular-nums ${due.length ? 'bg-danger-soft text-danger' : 'bg-muted text-muted-foreground'}`}>
+                {due.length ? `${due.length} to look at` : 'All clear'}
+              </span>
+            ) : null}
+          </button>
+        </CardTitle>
       </CardHeader>
-      <CardContent className="p-0">
-        {!attention ? (
+      {collapsed ? null : (
+      <CardContent id="needs-attention-list" className="p-0">
+        {loading ? (
           <div className="space-y-2 p-4" aria-busy="true">
             <Skeleton className="h-8 w-full" />
             <Skeleton className="h-8 w-full" />
@@ -93,6 +131,7 @@ export default function NeedsAttention({ attention }) {
           </ul>
         )}
       </CardContent>
+      )}
     </Card>
   );
 }

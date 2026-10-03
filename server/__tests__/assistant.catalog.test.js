@@ -99,8 +99,7 @@ describe('what each role may be told', () => {
   // Everything except the other roles' own "what you can do" answers
   // and the floor's how-tos: each role works only its own screens.
   it('gives an admin everything but the other roles’ job summaries and the floor’s how-tos', () => {
-    // The manager's dashboard topic too: the admin dashboard is different.
-    const others = ['my-role-worker', 'my-role-manager', 'dashboard-manager'];
+    const others = ['my-role-worker', 'my-role-manager'];
     const floorOnly = (t) => t.roles.length === 1 && t.roles[0] === 'warehouse_worker';
     expect(topicsForRole('admin').map((t) => t.id))
       .toEqual(TOPICS.filter((t) => !floorOnly(t)).map((t) => t.id).filter((id) => !others.includes(id)));

@@ -112,6 +112,21 @@ export default function useDashboardLayout(user) {
   }), [update]);
 
   // A chart's Month / 3 months / Year choice, remembered with the layout.
+  // Drag and drop: put `activeId` where `overId` is, among widgets of
+  // its own kind (a number tile never lands among the charts).
+  const reorder = useCallback((activeId, overId) => update((prev) => {
+    const kind = getWidget(activeId)?.kind;
+    if (!kind || getWidget(overId)?.kind !== kind) return prev;
+    const same = prev.filter((x) => getWidget(x)?.kind === kind);
+    const from = same.indexOf(activeId);
+    const to = same.indexOf(overId);
+    if (from < 0 || to < 0 || from === to) return prev;
+    const moved = [...same];
+    moved.splice(to, 0, moved.splice(from, 1)[0]);
+    const others = prev.filter((x) => getWidget(x)?.kind !== kind);
+    return kind === 'tile' ? [...moved, ...others] : [...others, ...moved];
+  }), [update]);
+
   const setPeriod = useCallback((id, period) => commit((prev) => ({
     periods: { ...prev.periods, [id]: period },
   })), [commit]);
@@ -123,7 +138,7 @@ export default function useDashboardLayout(user) {
 
   return {
     ids: current.ids, periods: current.periods,
-    add, remove, replace, move, setPeriod, reset,
+    add, remove, replace, move, reorder, setPeriod, reset,
   };
 }
 
