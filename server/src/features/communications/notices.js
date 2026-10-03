@@ -83,6 +83,25 @@ export const purchaseOrderNeedsAttention = async (client, { purchaseOrder, statu
   });
 };
 
+// communityRequestStock.repository.js recheckProducts — an approved
+// benevolent request lost stock to a pallet (or a stock change) and now
+// needs other items. Sent once per request while it stays flagged; the
+// caller only gets here the first time the flag is raised. Managers and
+// admins, who are the ones who can choose other items.
+export const communityRequestItemsShort = async (client, { requestId, cause }) => {
+  await createNotification(client, {
+    type:        'community_request_items_short',
+    title:       `Benevolent request #${requestId} needs new items`,
+    body:        cause === 'pallet'
+      ? `Pallet packing used stock set aside for benevolent request #${requestId}. Choose other items.`
+      : `Stock changed, so the items set aside for benevolent request #${requestId} are no longer all available. Choose other items.`,
+    entityType:  'community_request',
+    entityId:    requestId,
+    targetRoles: ['manager', 'admin'],
+  });
+};
+
 export default {
   slipsGenerated, slipCreated, slipReleased, nonCollectionsFlagged, purchaseOrderNeedsAttention,
+  communityRequestItemsShort,
 };

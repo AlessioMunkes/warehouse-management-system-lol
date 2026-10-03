@@ -24,6 +24,7 @@
 // ─────────────────────────────────────────────────────────────
 import pool                  from '../config/db.js';
 import { committedStockSql } from './committedStock.sql.js';
+import { recheckProducts } from './communityRequestStock.repository.js';
 
 // ── Audit helper (used inside existing transactions) ──────────
 const logEvent = async (client, slipId, eventType, actorId, detail = null) => {
@@ -900,7 +901,7 @@ const completeSlip = async ({ slipId, palletRef, actorId, actor, canOverride = f
        FROM packed
        JOIN products p ON p.id = packed.product_id
        LEFT JOIN stock_levels sl ON sl.product_id = packed.product_id
-       LEFT JOIN (${committedStockSql({ excludeSlipParam: '$1' })}) c
+       LEFT JOIN (${committedStockSql({ excludeSlipParam: '$1', includeBenevolent: false })}) c
               ON c.product_id = packed.product_id
        ORDER BY packed.product_id ASC`,
       [slipId]
@@ -958,6 +959,12 @@ const completeSlip = async ({ slipId, palletRef, actorId, actor, canOverride = f
     if (unitMismatches.length > 0) {
       await logEvent(client, slipId, 'unit_mismatch', actorUserId(who), actorDetail(who, { unitMismatches }));
     }
+
+    // The pallet is now committed stock. If that leaves an approved
+    // benevolent request short, the request gives way (pallets come
+    // first): see communityRequestStock.repository.js. Same transaction,
+    // in a savepoint, so it can never fail the packing.
+    await recheckProducts(client, availability.rows.map((r) => r.product_id), { cause: 'pallet' });
 
     await client.query('COMMIT');
     return {
