@@ -71,7 +71,7 @@ describe('the collapsing sidebar', () => {
     // ...the link, and its name, do not.
     expect(screen.getByRole('link', { name: 'Beneficiaries' })).toBeTruthy();
     // With its attention count in the name once the counts arrive.
-    expect(await screen.findByRole('link', { name: 'Purchase Orders, 11 need attention' })).toBeTruthy();
+    expect(await screen.findByRole('link', { name: 'Purchase orders, 11 need attention' })).toBeTruthy();
     expect(screen.getByRole('button', { name: /expand sidebar/i })).toBeTruthy();
   });
 
@@ -119,10 +119,10 @@ describe('sidebar attention counts', () => {
     useAuth.mockReturnValue({ user: { id: 1, firstName: 'T', lastName: 'U', role: 'manager' }, logout: vi.fn() });
     render(<MemoryRouter><ManagerLayout><p>body</p></ManagerLayout></MemoryRouter>);
 
-    expect(await screen.findByRole('link', { name: 'Purchase Orders, 11 need attention' })).toBeTruthy();
+    expect(await screen.findByRole('link', { name: 'Purchase orders, 11 need attention' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Inventory, 3 need attention' })).toBeTruthy();
-    expect(screen.getByRole('link', { name: 'Benevolent Requests, 1 needs attention' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Benevolent requests, 1 needs attention' })).toBeTruthy();
     // Unclaimed slips are the normal state of the queue, not a problem.
-    expect(screen.getByRole('link', { name: 'Picking Slips' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Picking slips' })).toBeTruthy();
   });
 });

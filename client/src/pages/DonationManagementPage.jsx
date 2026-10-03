@@ -86,8 +86,8 @@ export default function DonationManagementPage() {
   return (
     <PageShell>
       <PageHeader
-        title="Classification Queue"
-        description="Review donations that need a decision before the warehouse can finish them."
+        title="Classification queue"
+        description="Review and classify donations that need a decision."
       />
 
       {/* The counts live on the tabs, red while anything waits; the

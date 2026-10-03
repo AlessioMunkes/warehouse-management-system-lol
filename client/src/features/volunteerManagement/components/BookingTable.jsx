@@ -31,7 +31,7 @@ export default function BookingTable({ bookings, timeslots = [], spaces = [], at
   const [timeslotFilter, setTimeslotFilter] = useState('');
   const visibleBookings = timeslotFilter ? bookings.filter((booking) => booking.timeslotId === timeslotFilter) : bookings;
   return <Card>
-    <CardHeader className="flex flex-row items-start justify-between gap-3"><div><CardTitle>Bookings and attendance</CardTitle><CardDescription>VMS and local walk-in bookings for this event.</CardDescription></div>{canAddWalkIn && <Button onClick={onAddWalkIn}>Register walk-in</Button>}</CardHeader>
+    <CardHeader className="flex flex-row items-start justify-between gap-3"><div><CardTitle>Bookings and attendance</CardTitle><CardDescription>Check volunteers in as they arrive, and register walk-ins.</CardDescription></div>{canAddWalkIn && <Button onClick={onAddWalkIn}>Register walk-in</Button>}</CardHeader>
     <CardContent className="grid gap-5">
       <AttendanceSummary summaries={summaries} />
       {timeslots.length > 1 && <div className="flex items-center gap-2"><label htmlFor="booking-timeslot-filter" className="text-sm font-medium">Timeslot</label><select id="booking-timeslot-filter" className="h-9 rounded-md border bg-background px-3 text-sm" value={timeslotFilter} onChange={(e) => setTimeslotFilter(e.target.value)}><option value="">All event bookings</option>{timeslots.map((slot) => <option key={slot.id} value={slot.id}>{new Date(slot.startTime).toLocaleString('en-ZA')}</option>)}</select></div>}

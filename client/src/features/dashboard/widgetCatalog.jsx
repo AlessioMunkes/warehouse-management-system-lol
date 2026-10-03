@@ -317,17 +317,17 @@ export const WIDGETS = [
       <div className="grid gap-3 sm:grid-cols-2">
         <ActionCard to={ADMIN.users} icon={Users2} title="Users"
           description="Create accounts, set roles, deactivate someone who has left." />
-        <ActionCard to={ADMIN.volunteerLog} icon={HandHeart} title="Volunteer Log"
-          description="Everyone who signed in at the door — arrival, departure, time on site." />
+        <ActionCard to={ADMIN.volunteerLog} icon={HandHeart} title="Volunteer log"
+          description="See who signed in at the door and sign out open visits." />
         <ActionCard to={ADMIN.products} icon={Package} title="Products"
-          description="The item catalog every delivery, slip and donation references." />
-        <ActionCard to={ADMIN.suppliers} icon={Truck} title="Manage Suppliers"
-          description="Who the warehouse buys from, and the terms on each agreement." />
-        <ActionCard to={ADMIN.donationManagement} icon={Gift} title="Classification Queue"
-          description="Pending donations and flagged items waiting on a decision."
+          description="Add and edit the products the warehouse stocks." />
+        <ActionCard to={ADMIN.suppliers} icon={Truck} title="Suppliers"
+          description="Manage suppliers and their agreements." />
+        <ActionCard to={ADMIN.donationManagement} icon={Gift} title="Classification queue"
+          description="Review donations and flagged items that need a decision."
           badge={donations > 0 ? `Needs attention (${donations})` : null} />
-        <ActionCard to={ADMIN.section18aManagement} icon={ScrollText} title="Section 18A Management"
-          description="Review donations that qualify for tax certificates." />
+        <ActionCard to={ADMIN.section18aManagement} icon={ScrollText} title="Section 18A"
+          description="Issue tax certificates for qualifying donations." />
       </div>
     ),
   },

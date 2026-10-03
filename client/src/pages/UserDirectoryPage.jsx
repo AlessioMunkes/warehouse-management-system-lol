@@ -341,8 +341,8 @@ export default function UserDirectoryPage() {
   return (
     <PageShell>
       <PageHeader
-        title="User Management"
-        description="Staff accounts and access. Guests sign in separately and are not managed here."
+        title="Users"
+        description="Invite staff and manage their roles and access."
         actions={canManage ? (
           <Button type="button" onClick={() => { setSelected(null); setInviteResult(null); setMode('create'); }}>
             <Plus />
@@ -458,7 +458,7 @@ export default function UserDirectoryPage() {
       {mode === 'create' ? (
         <DetailPanel open onClose={() => setMode('list')} title="Invite a user">
           <p className="text-sm text-muted-foreground">
-            They set their own username, name and password when they accept — you never see or choose their password.
+            They choose their own username and password when they accept.
           </p>
           <InviteForm onSubmit={createInvite} onCancel={() => setMode('list')} busy={busy} />
         </DetailPanel>

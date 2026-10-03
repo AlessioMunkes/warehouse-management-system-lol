@@ -61,7 +61,7 @@ function CollectionDays({ saved, onSave, busy }) {
       <CardHeader>
         <CardTitle>Collection days</CardTitle>
         <CardDescription>
-          The weekday each cohort collects on. Picking slips are generated for this day, and reminders go out the day before.
+          Choose the weekday each cohort collects on. Slips are generated for this day; reminders go out the day before.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-wrap items-end gap-4">
@@ -109,7 +109,7 @@ function AddClosurePanel({ busy, error, onSubmit, onClose }) {
       )}
     >
       <p className="text-sm text-muted-foreground">
-        No collection reminders go out for a closed day, and pallets due on it are not written off as not collected.
+        Reminders and the not-collected cut-off skip closed days.
       </p>
       <ErrorBanner message={error} />
       <div className="grid gap-4 sm:grid-cols-2">
@@ -155,9 +155,8 @@ function PublicHolidaysPanel({ busy, error, onSubmit, onClose }) {
       )}
     >
       <p className="text-sm text-muted-foreground">
-        Adds South Africa’s public holidays for the year, including Good Friday, Family Day and the Monday after any
-        holiday that falls on a Sunday. Days already closed are left as they are. Once-off days the President
-        declares are not included — add those as a closed day.
+        Adds South Africa’s public holidays for the year, including Easter and Sunday holidays moved to Monday.
+        Days already closed are kept. Add once-off holidays as a closed day.
       </p>
       <ErrorBanner message={error} />
       <label className="grid gap-1.5 text-sm">
@@ -222,7 +221,7 @@ export default function OperatingCalendarPage() {
     <PageShell>
       <PageHeader
         title="Operating calendar"
-        description="Which day each cohort collects, and the days the warehouse is shut. Reminders and the not-collected cut-off skip closed days."
+        description="Set each cohort’s collection day and the days the warehouse is closed. Reminders and the not-collected cut-off skip closed days."
         actions={(
           <>
             <Button type="button" variant="outline" onClick={() => { setPanelError(null); setPanel('holidays'); }}>

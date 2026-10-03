@@ -89,7 +89,7 @@ export default function CertificateSettingsForm() {
     <div className="space-y-6">
       {!saved ? (
         <p className="rounded-md border bg-muted/50 px-3 py-2 text-sm">
-          No certificate details have been saved yet. Section 18A certificates need at least the organisation name.
+          Enter at least the organisation name before issuing Section 18A certificates.
         </p>
       ) : null}
       {GROUPS.map((g) => (

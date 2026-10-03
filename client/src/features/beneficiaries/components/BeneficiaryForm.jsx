@@ -94,7 +94,7 @@ export default function BeneficiaryForm({
             </SelectContent>
           </Select>
           {cohortInvalid ? <FieldError>A cohort is required.</FieldError> : null}
-          <FieldDescription>Which fortnightly rotation this centre collects on.</FieldDescription>
+          <FieldDescription>The cohort this centre collects with each week.</FieldDescription>
         </Field>
         <Field>
           <FieldLabel htmlFor="beneficiary-contact">Contact person</FieldLabel>

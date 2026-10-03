@@ -117,7 +117,7 @@ describe('InventoryManagementPage — detail panel', () => {
     const panel = within(await screen.findByRole('dialog'));
 
     expect(await panel.findByText(/Acme/)).toBeInTheDocument();
-    expect(panel.getByText(/not what is left of it/)).toBeInTheDocument();
+    expect(panel.getByText(/not what remains/)).toBeInTheDocument();
   });
 
   it('hides the adjust action from roles the server would refuse anyway', async () => {

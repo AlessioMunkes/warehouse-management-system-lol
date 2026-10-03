@@ -273,7 +273,7 @@ export default function PurchaseOrdersPage() {
     <PageShell>
       <PageHeader
         title="Purchase orders"
-        description="What we have asked suppliers for, and what has arrived."
+        description="Raise, approve and track orders to suppliers."
         actions={canManage && mode === 'list' ? (
           <Button
             type="button"

@@ -52,7 +52,7 @@ describe('GmailSettingsPage Finance report link controls', () => {
   it('loads the saved Finance recipient email', async () => {
     renderPage();
 
-    const input = await screen.findByLabelText(/Finance recipient email/i);
+    const input = await screen.findByLabelText(/Finance email address/i);
     expect(input).toHaveValue('finance@example.org');
   });
 
@@ -60,10 +60,10 @@ describe('GmailSettingsPage Finance report link controls', () => {
     renderPage();
     const user = userEvent.setup();
 
-    const input = await screen.findByLabelText(/Finance recipient email/i);
+    const input = await screen.findByLabelText(/Finance email address/i);
     await user.clear(input);
     await user.type(input, 'finance2@example.org');
-    await user.click(screen.getByRole('button', { name: /Save Finance Recipient/i }));
+    await user.click(screen.getByRole('button', { name: 'Save email address' }));
 
     await waitFor(() => {
       expect(financeAPI.saveFinanceEmailSettings).toHaveBeenCalledWith({
@@ -77,8 +77,8 @@ describe('GmailSettingsPage Finance report link controls', () => {
     renderPage();
     const user = userEvent.setup();
 
-    await screen.findByLabelText(/Finance recipient email/i);
-    await user.click(screen.getByRole('button', { name: /Send Finance Report Link/i }));
+    await screen.findByLabelText(/Finance email address/i);
+    await user.click(screen.getByRole('button', { name: /Send report link/i }));
 
     await waitFor(() => expect(financeAPI.sendFinanceReportLink).toHaveBeenCalled());
     expect(await screen.findByText('Finance report link sent.')).toBeInTheDocument();
@@ -89,10 +89,10 @@ describe('GmailSettingsPage Finance report link controls', () => {
     renderPage();
     const user = userEvent.setup();
 
-    const input = await screen.findByLabelText(/Finance recipient email/i);
+    const input = await screen.findByLabelText(/Finance email address/i);
     expect(input).toHaveValue('');
 
-    await user.click(screen.getByRole('button', { name: /Send Finance Report Link/i }));
+    await user.click(screen.getByRole('button', { name: /Send report link/i }));
 
     expect(await screen.findByText('Save a Finance recipient email before sending the report link.')).toBeInTheDocument();
     expect(financeAPI.sendFinanceReportLink).not.toHaveBeenCalled();
@@ -103,7 +103,7 @@ describe('GmailSettingsPage Finance report link controls', () => {
 
     renderPage();
 
-    const button = await screen.findByRole('button', { name: /Send Finance Report Link/i });
+    const button = await screen.findByRole('button', { name: /Send report link/i });
     expect(button).toBeDisabled();
   });
 });

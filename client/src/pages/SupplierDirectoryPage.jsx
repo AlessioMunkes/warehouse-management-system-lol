@@ -409,8 +409,8 @@ export default function SupplierDirectoryPage() {
   return (
     <PageShell>
       <PageHeader
-        title="Supplier Management"
-        description="Who we buy from, and who we might buy from."
+        title="Suppliers"
+        description="Manage suppliers and note possible new ones."
         actions={canManage && tab === 'suppliers' ? (
           <Button type="button" onClick={() => { setSelected(null); setMode('create'); }}>
             <Plus />

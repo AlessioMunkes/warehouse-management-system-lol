@@ -199,7 +199,7 @@ export default function Section18AManagementPage() {
 
   return (
     <PageShell>
-      <PageHeader title="Section 18A Management" description="Manage tax certificates and email delivery." />
+      <PageHeader title="Section 18A" description="Issue donors’ tax certificates and resend certificate emails." />
 
       <ViewTabs
         className="mt-5"
@@ -244,9 +244,9 @@ export default function Section18AManagementPage() {
               {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
             </div>
           ) : certificateQueue.length === 0 ? (
-            <EmptyState icon={FileText} title="No certificates in the queue." description="Donations needing a Section 18A certificate appear here." />
+            <EmptyState icon={FileText} title="No certificates in the queue" description="Donations that need a Section 18A certificate appear here." />
           ) : filteredCertificateQueue.length === 0 ? (
-            <EmptyState icon={FileText} title="No certificates match the current filters." description="Adjust the search, amounts or dates." />
+            <EmptyState icon={FileText} title="No certificates match" description="Try another search, amount or date." />
           ) : (
             <Table>
               <TableHeader>
@@ -325,7 +325,7 @@ export default function Section18AManagementPage() {
               {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
             </div>
           ) : emailHistory.length === 0 ? (
-            <EmptyState icon={Mail} title="No emails match" description="Try clearing search or filters." />
+            <EmptyState icon={Mail} title="No emails match" description="Try another search or filter." />
           ) : (
             <Table>
               <TableHeader>

@@ -45,7 +45,7 @@ const SendStatus = ({ email }) => {
   if (email === undefined) {
     return (
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
-        Not emailed automatically yet. Copy the link below and send it however works best.
+        Copy the link below and send it to them.
       </p>
     );
   }
@@ -53,7 +53,7 @@ const SendStatus = ({ email }) => {
     return (
       <p className="flex items-center gap-2 text-sm text-muted-foreground">
         <MailX className="size-4" />
-        Email sending is switched off in this environment. Copy the link below and send it directly.
+        Email sending is off. Copy the link below and send it to them.
       </p>
     );
   }

@@ -174,8 +174,8 @@ export default function AdminUserActivityPage() {
   return (
     <PageShell>
       <PageHeader
-        title="User Activity"
-        description={`Everything people did in the system, newest first.${data ? ` ${entries.length} ${entries.length === 1 ? 'action' : 'actions'} by ${people.length} ${people.length === 1 ? 'person' : 'people'} from ${data.from} to ${data.to}.` : ''}${data?.truncated ? ' Showing the latest 2 000; narrow the dates to see earlier ones.' : ''}`}
+        title="User activity"
+        description={`Review what people did in the system, newest first.${data ? ` ${entries.length} ${entries.length === 1 ? 'action' : 'actions'} by ${people.length} ${people.length === 1 ? 'person' : 'people'}, ${data.from} to ${data.to}.` : ''}${data?.truncated ? ' Showing the latest 2 000 — narrow the dates to see earlier ones.' : ''}`}
       />
 
       <ErrorBanner className="mt-4" message={error} onRetry={load} />
@@ -241,7 +241,7 @@ export default function AdminUserActivityPage() {
             <EmptyState
               icon={Activity}
               title="No activity matches"
-              description="Nothing in this period matches the person, area or search."
+              description="Try another person, area, search or date range."
               action={search || area || person ? { label: 'Clear all filters', onClick: () => { setArea(null); setSearch(''); filterPerson(''); } } : undefined}
             />
           ) : (

@@ -52,10 +52,10 @@ const SECTIONS = [
 const VALUE_SECTIONS = {
   notifications: {
     title: 'Notifications & reminders',
-    description: 'When the gate writes off an uncollected pallet, and when reminders go out. The finance email recipient is under Email.',
+    description: 'Set when uncollected pallets are written off and when reminders go out.',
   },
-  stock:    { title: 'Stock rules', description: 'When managers are warned about delivered stock nearing its expiry date.' },
-  accounts: { title: 'Accounts', description: 'Invites for new staff accounts.' },
+  stock:    { title: 'Stock rules', description: 'Set when managers are warned about stock nearing its expiry date.' },
+  accounts: { title: 'Accounts', description: 'Set how long invite links stay valid.' },
 };
 
 export default function SettingsPage({ defaultSection = 'email' }) {
@@ -87,7 +87,7 @@ export default function SettingsPage({ defaultSection = 'email' }) {
     // Narrower than the list screens: this page is forms, and a form
     // line stretched across 6xl is hard to read.
     <PageShell width="max-w-4xl">
-      <PageHeader title="Settings" description="How the warehouse system is set up. Changes apply to everyone." />
+      <PageHeader title="Settings" description="Set up email, reminders, stock rules, reporting and accounts. Changes apply to everyone." />
 
       <ViewTabs className="mt-5" label="Settings sections" value={section} onChange={changeSection} tabs={SECTIONS} />
 
@@ -114,9 +114,9 @@ export default function SettingsPage({ defaultSection = 'email' }) {
         {section === 'reporting' ? (
           <Card>
             <CardHeader>
-              <CardTitle>How kilograms become people fed</CardTitle>
+              <CardTitle>Impact estimates</CardTitle>
               <CardDescription>
-                The impact factors behind every meals and people-served figure. Targets are set by each manager on Operations Reports.
+                Set the rates that turn kilograms dispatched into meals and people served.
               </CardDescription>
             </CardHeader>
             <CardContent><ImpactFactorsForm /></CardContent>

@@ -168,7 +168,7 @@ export default function AdminArchivePage() {
     <PageShell>
       <PageHeader
         title="Archive"
-        description="Everything switched off or deleted across the system, and a way back for what can be restored."
+        description="Find deactivated or deleted records, and restore what can come back."
       />
 
       <ErrorBanner className="mt-4" message={error} onRetry={load} />
@@ -211,7 +211,7 @@ export default function AdminArchivePage() {
             <EmptyState
               icon={Archive}
               title={items.length ? 'Nothing matches' : 'Nothing archived'}
-              description={items.length ? 'Nothing in this view matches the search or type.' : 'Nothing has been deactivated or deleted.'}
+              description={items.length ? 'Try another search or type.' : 'Deactivated and deleted records appear here.'}
               action={search || kind ? { label: 'Clear all filters', onClick: () => { setKind(null); setSearch(''); } } : undefined}
             />
           ) : (

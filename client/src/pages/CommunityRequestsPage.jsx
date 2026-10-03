@@ -249,7 +249,7 @@ export default function CommunityRequestsPage() {
     <PageShell>
       <PageHeader
         title="Benevolent requests"
-        description="Phone-in and walk-in requests for goods from the public, and what happened to each one."
+        description="Log phone-in and walk-in requests for food parcels, and record each outcome."
         actions={
           <Button type="button" onClick={() => { setMode('create'); setFormError(null); }}>
             <Plus />

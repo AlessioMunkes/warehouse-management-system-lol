@@ -141,7 +141,7 @@ export default function SupplierForm({
         />
         {/* This is the column on-time reporting measures against, so
             it is worth filling in even approximately. */}
-        <FieldDescription>Order to delivery. On-time reporting compares against this.</FieldDescription>
+        <FieldDescription>Days from order to delivery. Used to report late deliveries.</FieldDescription>
       </Field>
 
       <Field>

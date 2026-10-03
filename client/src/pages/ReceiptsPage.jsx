@@ -382,7 +382,7 @@ export default function ReceiptsPage() {
     <PageShell>
       <PageHeader
         title="Receipts"
-        description="Delivery notes for stock that came in, and dispatch notes for stock that went out."
+        description="Find delivery notes for goods in and dispatch notes for goods out."
       />
 
       <ViewTabs

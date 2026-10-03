@@ -195,7 +195,7 @@ export default function VolunteerManagementPage() {
     <PageShell>
       <PageHeader
         title="Volunteer log"
-        description={`Everyone who has signed in at the door.${onSiteCount > 0
+        description={`See who signed in at the door, and sign out open visits.${onSiteCount > 0
           ? ` ${onSiteCount} ${onSiteCount === 1 ? 'person is' : 'people are'} on site now.`
           : ''}`}
       />
