@@ -106,6 +106,20 @@ describe('createPurchaseOrder — finance email', () => {
     expect(unhandled).not.toHaveBeenCalled();
   });
 
+  it('asks Finance to type the PO number into the QuickBooks Memo, with the number first', async () => {
+    await purchaseOrderService.createPurchaseOrder(VALID_BODY, 7);
+    await sendFinished();
+
+    const [mail] = emailProviderMock.sendEmail.mock.calls[0];
+    const ask = "Capture this order in QuickBooks and type PO-2026-0042 into the QuickBooks PO's Memo field. The system links the two automatically from your QuickBooks export.";
+    expect(mail.subject.startsWith('PO-2026-0042')).toBe(true);
+    expect(mail.text).toContain(ask);
+    expect(mail.html).toContain(ask.replace('PO-2026-0042', '<strong>PO-2026-0042</strong>'));
+    expect(mail.html.trimStart().startsWith('<p style="font-size:16px;"><strong>PO-2026-0042</strong>')).toBe(true);
+    expect(mail.text).not.toMatch(/Batches|add the QuickBooks PO number/);
+    expect(mail.html).not.toMatch(/Batches|add the QuickBooks PO number/);
+  });
+
   it('writes status/error/attemptedAt after a successful send, not before', async () => {
     await purchaseOrderService.createPurchaseOrder(VALID_BODY, 7);
     await sendFinished();

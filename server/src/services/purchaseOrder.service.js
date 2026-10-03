@@ -205,7 +205,7 @@ ${textLines}
 
 Total: ${money(total)}
 
-Please capture this purchase order in QuickBooks, then add the QuickBooks PO number to ${purchaseOrder.po_number} in Batches.`;
+Capture this order in QuickBooks and type ${purchaseOrder.po_number} into the QuickBooks PO's Memo field. The system links the two automatically from your QuickBooks export.`;
 
   const rows = purchaseOrder.items.map((item) => `
     <tr>
@@ -216,7 +216,8 @@ Please capture this purchase order in QuickBooks, then add the QuickBooks PO num
     </tr>`).join('');
 
   const html = `
-    <p>Purchase order <strong>${purchaseOrder.po_number}</strong> has been created and needs to be captured in QuickBooks.</p>
+    <p style="font-size:16px;"><strong>${purchaseOrder.po_number}</strong></p>
+    <p>Purchase order ${purchaseOrder.po_number} has been created and needs to be captured in QuickBooks.</p>
     <p><strong>Supplier:</strong> ${purchaseOrder.supplier_name}<br>
        <strong>Created:</strong> ${formatDate(purchaseOrder.created_at)} by ${createdBy}</p>
     <table style="border-collapse:collapse;width:100%;font-size:14px;">
@@ -232,7 +233,7 @@ Please capture this purchase order in QuickBooks, then add the QuickBooks PO num
         <td style="padding:6px 12px;text-align:right;font-weight:600;">${money(total)}</td>
       </tr></tfoot>
     </table>
-    <p>Please capture this purchase order in QuickBooks, then add the QuickBooks PO number to <strong>${purchaseOrder.po_number}</strong> in Batches.</p>
+    <p>Capture this order in QuickBooks and type <strong>${purchaseOrder.po_number}</strong> into the QuickBooks PO's Memo field. The system links the two automatically from your QuickBooks export.</p>
   `;
 
   return { subject, text, html };

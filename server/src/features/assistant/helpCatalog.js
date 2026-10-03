@@ -2393,17 +2393,19 @@ export const TOPICS = [
   },
   {
     id: 'po-quickbooks',
-    title: 'The QuickBooks reference',
+    title: 'Linking orders to QuickBooks',
     roles: MANAGERS_UP,
     screens: ['purchaseOrders'],
     asks: [
       'quickbooks reference', 'quickbooks number', 'link to quickbooks', 'finance captured it',
-      'where do I put the quickbooks number',
+      'where do I put the quickbooks number', 'import quickbooks', 'memo',
     ],
     body:
-      'Once Finance has captured an order in QuickBooks, open the order and add ' +
-      'their reference in the QuickBooks field, then Save. It ties the two records ' +
-      'together, so anyone can find the order from Finance’s side.',
+      'Finance types our PO number into the Memo field of the QuickBooks PO. Later, ' +
+      'export the QuickBooks POs, then on Purchase orders select Import QuickBooks ' +
+      'links and upload the file. Pick the column with the QuickBooks PO number, ' +
+      'check the preview, then confirm. Anything unclear is skipped and listed.\n\n' +
+      'To fix one order by hand, open it and edit its QuickBooks PO number.',
     followUp: {
       question: 'Would you like to know how orders reach Finance?',
       topic: 'po-finance-email',
