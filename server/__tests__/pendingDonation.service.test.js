@@ -23,6 +23,7 @@ const pendingRepoMock = {
   resolveWarehouseManagerFlag: vi.fn(),
   countUnresolvedFlagsForPendingDonation: vi.fn(),
   setPendingDonationCommittedId: vi.fn(),
+  claimPendingDonationForRetry: vi.fn(),
   markPendingItemResolved: vi.fn(),
   markPendingItemCommitted: vi.fn(),
   markPendingItemRejected: vi.fn(),
@@ -88,6 +89,9 @@ beforeEach(() => {
   poolMock.query.mockResolvedValue({ rows: [] });
   pendingRepoMock.findPendingDonationIdByIdempotencyKey.mockReset();
   pendingRepoMock.getPendingDonationById.mockReset();
+  // Retry claims the donation first; by default it was a failed save.
+  pendingRepoMock.claimPendingDonationForRetry.mockReset();
+  pendingRepoMock.claimPendingDonationForRetry.mockResolvedValue({ id: 10, previous_status: 'commit_failed' });
   pendingRepoMock.findPendingDonationIdByIdempotencyKey.mockResolvedValue(null);
   pendingRepoMock.updatePendingDonationStatus.mockResolvedValue({ id: 10 });
   pendingRepoMock.resolveWarehouseManagerFlag.mockResolvedValue({ id: 1, status: 'resolved' });
@@ -107,6 +111,7 @@ beforeEach(() => {
 
 describe('pendingDonationService.retryCommit', () => {
   it('repairs commit_incomplete by fetching real donation items and linking by line order', async () => {
+    pendingRepoMock.claimPendingDonationForRetry.mockResolvedValue({ id: 10, previous_status: 'commit_incomplete' });
     const client = makeClient();
     poolMock.connect.mockResolvedValueOnce(client);
 
@@ -161,6 +166,7 @@ describe('pendingDonationService.retryCommit', () => {
   });
 
   it('does not mark commit_incomplete committed when donation item pairing is incomplete', async () => {
+    pendingRepoMock.claimPendingDonationForRetry.mockResolvedValue({ id: 10, previous_status: 'commit_incomplete' });
     const client = makeClient();
     poolMock.connect.mockResolvedValueOnce(client);
 
@@ -185,11 +191,17 @@ describe('pendingDonationService.retryCommit', () => {
       expect.anything()
     );
     expect(client.query.mock.calls.map((call) => call[0])).toEqual(['BEGIN', 'ROLLBACK']);
+    // Handed back as it was, so it can be retried again.
+    expect(pendingRepoMock.updatePendingDonationStatus).toHaveBeenCalledWith(10, 'commit_incomplete', {}, poolMock);
   });
 
 
-  it('retry of a commit_failed donation transitions to committing before attemptCommit and succeeds end-to-end', async () => {
+  it('retry of a commit_failed donation claims it before attemptCommit and succeeds end-to-end', async () => {
     const eventLog = [];
+    pendingRepoMock.claimPendingDonationForRetry.mockImplementation(async () => {
+      eventLog.push('claim');
+      return { id: 10, previous_status: 'commit_failed' };
+    });
 
     // First lookup: retryCommit's own read sees commit_failed. Second
     // lookup: attemptCommitForPendingDonation's internal read must see the
@@ -197,16 +209,6 @@ describe('pendingDonationService.retryCommit', () => {
     // attemptCommit's logic (mirrors the setPendingDonationCommittedId
     // WHERE status = 'committing' guard on a real DB).
     pendingRepoMock.getPendingDonationById
-      .mockImplementationOnce(async () => {
-        eventLog.push('lookup');
-        return {
-          id: 10,
-          status: 'commit_failed',
-          items: [
-            { id: 100, line_no: 1, status: 'resolved', description: 'Beans', quantity: 2, unit: 'kg' },
-          ],
-        };
-      })
       .mockImplementationOnce(async () => {
         eventLog.push('attempt-lookup');
         return {
@@ -240,21 +242,15 @@ describe('pendingDonationService.retryCommit', () => {
 
     const result = await pendingDonationService.retryCommit(10);
 
-    // Ordering: the 'committing' transition is stamped between retryCommit's
-    // own lookup and attemptCommit's internal logic — exactly the fix.
+    // Ordering: the claim (which moves it to 'committing') comes before
+    // attemptCommit's own logic, and nothing else stamps 'committing'.
     expect(eventLog).toEqual([
-      'lookup',
-      'status:committing',
+      'claim',
       'attempt-lookup',
       'set-committed-id',
       'status:committed',
     ]);
-    expect(pendingRepoMock.updatePendingDonationStatus).toHaveBeenCalledWith(
-      10,
-      'committing',
-      {},
-      poolMock
-    );
+    expect(pendingRepoMock.claimPendingDonationForRetry).toHaveBeenCalledWith(10, poolMock);
     expect(donationServiceMock.createDonation).toHaveBeenCalledTimes(1);
     expect(pendingRepoMock.setPendingDonationCommittedId).toHaveBeenCalledWith(10, 20, beginClient);
     expect(pendingRepoMock.markPendingItemCommitted).toHaveBeenCalledWith(100, 200, finalizeClient);
@@ -404,6 +400,7 @@ describe('pendingDonationService.retryCommit', () => {
   });
 
   it('retries commit_incomplete with no committed donation id through committing state', async () => {
+    pendingRepoMock.claimPendingDonationForRetry.mockResolvedValue({ id: 12, previous_status: 'commit_incomplete' });
     pendingRepoMock.getPendingDonationById
       .mockResolvedValueOnce({
         id: 12,
@@ -435,7 +432,7 @@ describe('pendingDonationService.retryCommit', () => {
 
     const result = await pendingDonationService.retryCommit(12);
 
-    expect(pendingRepoMock.updatePendingDonationStatus).toHaveBeenCalledWith(12, 'committing', {}, poolMock);
+    expect(pendingRepoMock.claimPendingDonationForRetry).toHaveBeenCalledWith(12, poolMock);
     expect(pendingRepoMock.updatePendingDonationStatus).not.toHaveBeenCalledWith(
       12,
       'commit_failed',
@@ -443,6 +440,35 @@ describe('pendingDonationService.retryCommit', () => {
       expect.anything()
     );
     expect(result).toEqual({ pendingDonationId: 12, donationId: 20, committed: true });
+  });
+
+  describe('when the claim finds nothing to retry', () => {
+    beforeEach(() => {
+      pendingRepoMock.claimPendingDonationForRetry.mockResolvedValue(null);
+    });
+
+    it('refuses a second retry while the first is still running, and creates nothing', async () => {
+      pendingRepoMock.getPendingDonationById.mockResolvedValue({ id: 10, status: 'committing', items: [] });
+      await expect(pendingDonationService.retryCommit(10)).rejects.toMatchObject({
+        status: 409,
+        message: expect.stringMatching(/already being retried/),
+      });
+      expect(donationServiceMock.createDonation).not.toHaveBeenCalled();
+    });
+
+    it('refuses a donation that is not in a retryable status', async () => {
+      pendingRepoMock.getPendingDonationById.mockResolvedValue({ id: 10, status: 'committed', items: [] });
+      await expect(pendingDonationService.retryCommit(10)).rejects.toMatchObject({
+        status: 409,
+        message: expect.stringMatching(/current status is 'committed'/),
+      });
+      expect(donationServiceMock.createDonation).not.toHaveBeenCalled();
+    });
+
+    it('says so when the donation does not exist', async () => {
+      pendingRepoMock.getPendingDonationById.mockResolvedValue(null);
+      await expect(pendingDonationService.retryCommit(99)).rejects.toMatchObject({ status: 404 });
+    });
   });
 });
 
@@ -907,7 +933,7 @@ describe('createPendingDonationFromIntake — idempotent replay', () => {
         entityId: 55,
       })
     );
-    expect(notificationRepoMock.createNotification.mock.calls[0][1]).toHaveProperty('targetRoles', ['admin']);
+    expect(notificationRepoMock.createNotification.mock.calls[0][1]).toHaveProperty('targetRoles', ['manager', 'admin']);
     expect(client.query.mock.calls.map((call) => call[0])).toContain('COMMIT');
   });
 

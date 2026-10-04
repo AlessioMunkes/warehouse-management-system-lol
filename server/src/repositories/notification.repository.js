@@ -28,6 +28,8 @@ const MANAGER_ONLY = [ROLES.MANAGER];
 const FLOOR_AND_MANAGER = [ROLES.WORKER, ROLES.MANAGER];
 const VOLUNTEER_MANAGEMENT_ROLES = [ROLES.MANAGER, ROLES.ADMIN];
 const ADMIN_ONLY = [ROLES.ADMIN];
+// Managers and admins run the Classification queue together.
+const MANAGERS_UP = [ROLES.MANAGER, ROLES.ADMIN];
 
 const TARGET_ROLES_BY_TYPE = {
   low_stock: MANAGER_ONLY,
@@ -41,7 +43,7 @@ const TARGET_ROLES_BY_TYPE = {
   stock_expiry_warning_1w: MANAGER_ONLY,
   stock_expiry_2_weeks: MANAGER_ONLY,
   stock_expiry_1_week: MANAGER_ONLY,
-  donation_review: ADMIN_ONLY,
+  donation_review: MANAGERS_UP,
   section18a_handoff_failed: ADMIN_ONLY,
   picking_slip_created: FLOOR_AND_MANAGER,
   // A manager released a claimed pallet: news for the floor only.

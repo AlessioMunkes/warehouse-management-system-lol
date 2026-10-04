@@ -43,7 +43,7 @@ describe('createNotification duplicate insert SQL', () => {
     ['vms_sync_failed', ['manager']],
     ['stock_expiry_2_weeks', ['manager']],
     ['stock_expiry_1_week', ['manager']],
-    ['donation_review', ['admin']],
+    ['donation_review', ['manager', 'admin']],
     ['section18a_handoff_failed', ['admin']],
     ['stock_expiry_warning_1w', ['manager']],
     ['picking_slip_created', ['warehouse_worker', 'manager']],
@@ -77,9 +77,10 @@ describe('what each role reads', () => {
     expect(hidden).not.toContain('donation_review');
   });
 
-  it('keeps admin work off the manager feed', async () => {
+  it('keeps admin-only work off the manager feed, but not the Classification queue', async () => {
     const hidden = await hiddenFor('manager');
-    expect(hidden).toEqual(expect.arrayContaining(['donation_review', 'section18a_handoff_failed']));
+    expect(hidden).toEqual(expect.arrayContaining(['section18a_handoff_failed']));
+    expect(hidden).not.toContain('donation_review');
     expect(hidden).not.toContain('picking_slip_created');
     expect(hidden).not.toContain('low_stock');
   });

@@ -47,7 +47,7 @@ import {
 // Each sidebar's groups, top to bottom.
 export const MENU_GROUPS = {
   worker:  ['Overview', 'Warehouse'],
-  manager: ['Overview', 'Inbound', 'Stock', 'Outbound', 'Programmes', 'Insights'],
+  manager: ['Overview', 'Inbound', 'Donations', 'Stock', 'Outbound', 'Programmes', 'Insights'],
   admin:   ['Overview', 'Master data', 'Logs', 'Donations', 'Setup'],
 };
 
@@ -155,8 +155,12 @@ export const ROUTES = [
     nav: [nav('admin', 'Logs', 'Archive', Archive)] },
   { id: 'messageHistory', path: ADMIN.messageHistory, roles: ADMIN_ONLY, shell: true,
     nav: [nav('admin', 'Logs', 'Message history', Inbox)] },
-  { id: 'donationManagement', path: ADMIN.donationManagement, roles: ADMIN_ONLY, shell: true,
-    nav: [nav('admin', 'Donations', 'Classification queue', Gift)] },
+  // The queue is run by managers and admins together, so it is in both menus.
+  { id: 'donationManagement', path: ADMIN.donationManagement, roles: MANAGERS_UP, shell: true,
+    nav: [
+      nav('admin', 'Donations', 'Classification queue', Gift),
+      nav('manager', 'Donations', 'Classification queue', Gift),
+    ] },
   { id: 'section18a', path: ADMIN.section18aManagement, roles: ADMIN_ONLY, shell: true,
     nav: [nav('admin', 'Donations', 'Section 18A', ScrollText)] },
   // Settings' Email section, at the address Google's sign-in returns to

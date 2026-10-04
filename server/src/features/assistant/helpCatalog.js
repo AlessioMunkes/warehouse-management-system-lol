@@ -158,7 +158,7 @@ export const SCREENS = [
   { id: 'users', label: 'Users', roles: ADMIN_ONLY,
     about: 'Staff accounts, roles and passwords.',
     aka: ['users', 'accounts', 'staff accounts', 'logins'] },
-  { id: 'donationManagement', label: 'Classification queue', roles: ADMIN_ONLY,
+  { id: 'donationManagement', label: 'Classification queue', roles: MANAGERS_UP,
     about: 'Check, value and classify donations taken in at the gate.',
     aka: ['classification queue', 'review donations', 'flagged donations'] },
   { id: 'section18a', label: 'Section 18A', roles: ADMIN_ONLY,
@@ -239,6 +239,7 @@ export const TOPICS = [
       'Stock — inventory levels, the stock ledger and stock adjustments.',
       'Buying — raise purchase orders; each one is emailed to Finance.',
       'Centres — beneficiaries, this week’s picking slips and collection reminders.',
+      'Donations — the classification queue: donations that need a decision.',
       'Insight — operations reports and impact reports.',
       'People — volunteer events.',
     ],
@@ -2012,7 +2013,7 @@ export const TOPICS = [
   {
     id: 'donation-management-screen',
     title: 'Reviewing donations',
-    roles: ADMIN_ONLY,
+    roles: MANAGERS_UP,
     screens: ['donationManagement'],
     asks: [
       'donation management', 'review donations', 'pending donations', 'check a donation',
@@ -2027,6 +2028,8 @@ export const TOPICS = [
     followUp: {
       question: 'Would you like to know how Section 18A certificates are issued?',
       topic: 'section18a-certificates',
+      // Managers run this queue but certificates are the admin's.
+      otherwise: { question: 'Would you like to know who can do what in the system?', topic: 'who-can-do-what' },
     },
     rules: ['BR-09'],
     related: ['donation-intake', 'section18a-certificates'],

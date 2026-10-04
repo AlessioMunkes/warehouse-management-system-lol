@@ -78,6 +78,7 @@ describe('sidebars built from the table', () => {
     expect(menu('manager')).toEqual([
       ['Overview', ['Dashboard /manager']],
       ['Inbound', ['Purchase orders /noc/purchase-orders', 'Receipts /noc/receipts']],
+      ['Donations', ['Classification queue /admin/donation-management']],
       ['Stock', ['Inventory /noc/inventory', 'Stock ledger /noc/stock-ledger']],
       ['Outbound', [
         'Picking slips /noc/picking-slips',
@@ -110,6 +111,13 @@ describe('sidebars built from the table', () => {
       // The Gmail screen is Settings' Email section now.
       ['Setup', ['Settings /admin/settings']],
     ]);
+  });
+
+  it('opens the classification queue to managers and admins, in both menus', () => {
+    const route = ROUTES.find((r) => r.id === 'donationManagement');
+    expect([...route.roles].sort()).toEqual(['admin', 'manager']);
+    expect(menu('manager').find(([group]) => group === 'Donations')[1]).toEqual(['Classification queue /admin/donation-management']);
+    expect(menu('admin').find(([group]) => group === 'Donations')[1]).toContain('Classification queue /admin/donation-management');
   });
 
   it('keeps the attention counts on the manager items that had them', () => {

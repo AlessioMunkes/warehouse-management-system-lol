@@ -118,6 +118,15 @@ export const WIDGETS = [
     ),
   }),
 
+  // The same queue, for the manager's own board (a widget is one role's).
+  tile({
+    id: 'donations-to-review', title: 'Donations to review', roles: MANAGER_ONLY, needs: ['donations'],
+    description: 'Donations and flagged items waiting in the classification queue.',
+    render: ({ donations }) => (
+      <StatTile icon={Gift} label="Donations to review" value={donations} to={ADMIN.donationManagement} warn />
+    ),
+  }),
+
   // ═══ Manager: charts ═════════════════════════════════════════
   {
     id: 'product-health', kind: 'panel', title: 'Product health', roles: MANAGER_ONLY, needs: ['summary'],
@@ -344,7 +353,7 @@ export const sizeOf = (w) => (w.kind === 'tile' ? 'small' : w.wide ? 'large' : '
 // What each dashboard starts with, and what Reset goes back to.
 export const DEFAULT_LAYOUT = {
   [MANAGER]: [
-    'low-stock', 'open-pos', 'dispatches-today', 'deliveries-today', 'benevolent',
+    'low-stock', 'open-pos', 'dispatches-today', 'deliveries-today', 'benevolent', 'donations-to-review',
     'top-products', 'product-health', 'by-beneficiary', 'dispatch-trend',
   ],
   [ADMIN_ROLE]: [

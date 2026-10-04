@@ -190,6 +190,26 @@ const updatePendingDonationStatus = async (id, status, extraFields = {}, client 
   return result.rows[0] || null;
 };
 
+// Takes a donation for retry in ONE conditional UPDATE: only a row still in
+// commit_failed / commit_incomplete moves to 'committing', and RETURNING
+// says which of the two it was. Two retries arriving together both run
+// this; Postgres lets one update the row and makes the other re-check the
+// status after it, so the second matches nothing and gets null. Without
+// that, both could go on to create the donation, doubling the stock and
+// sending the donor two thank-you emails.
+const claimPendingDonationForRetry = async (id, client = pool) => {
+  const result = await client.query(
+    `UPDATE pending_donations p
+        SET status = 'committing', updated_at = NOW()
+       FROM (SELECT id, status FROM pending_donations WHERE id = $1) prev
+      WHERE p.id = prev.id
+        AND p.status IN ('commit_failed', 'commit_incomplete')
+      RETURNING p.*, prev.status AS previous_status;`,
+    [id]
+  );
+  return result.rows[0] || null;
+};
+
 const lockPendingDonationForUpdate = async (id, client) => {
   if (!client) {
     throw new Error('lockPendingDonationForUpdate requires an explicit client instance.');
@@ -466,6 +486,7 @@ export default {
   createPendingDonationItems,
   getPendingDonationById,
   updatePendingDonationStatus,
+  claimPendingDonationForRetry,
   lockPendingDonationForUpdate,
   lockWarehouseManagerFlagForUpdate,
   createWarehouseManagerFlag,
