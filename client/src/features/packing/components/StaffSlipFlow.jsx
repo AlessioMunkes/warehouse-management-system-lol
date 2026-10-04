@@ -76,7 +76,7 @@ function ItemDecisionPanel({ item, slipId, onDone }) {
   if (mode === 'idle') {
     return (
       <Actions row>
-        <Button onClick={() => setMode('confirm')}>Confirm</Button>
+        <Button variant="step" onClick={() => setMode('confirm')}>Confirm</Button>
         <Button variant="secondary" onClick={() => setMode('flag')}>Flag</Button>
       </Actions>
     );
@@ -96,6 +96,7 @@ function ItemDecisionPanel({ item, slipId, onDone }) {
         {error ? <Notice tone="warn">{error}</Notice> : null}
         <Actions row>
           <Button
+            variant="step"
             disabled={submitting}
             onClick={async () => {
               setSubmitting(true);
@@ -133,6 +134,7 @@ function ItemDecisionPanel({ item, slipId, onDone }) {
       {error ? <Notice tone="warn">{error}</Notice> : null}
       <Actions row>
         <Button
+          variant="step"
           disabled={!reason || submitting}
           onClick={async () => {
             setSubmitting(true);

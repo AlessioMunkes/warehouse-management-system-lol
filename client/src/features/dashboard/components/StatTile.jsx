@@ -86,13 +86,18 @@ function useCountUp(value) {
 // idea as the inventory screen's stock cards — for a figure whose
 // colour is its meaning (stock in green, stock out red). It takes
 // precedence over `warn`.
+//
+// `image` is the name of a drawn icon in public/icons/dashboard, used
+// instead of `icon` on the manager's headline tiles. The drawings carry
+// their own colours, so they sit on a plain white disc rather than the
+// tinted one — the card border still shows the warning.
 const TONE = {
   good: { card: 'border-good/40', icon: 'bg-good-soft text-good' },
   warn: { card: 'border-warn/40', icon: 'bg-warn-soft text-warn' },
   bad:  { card: 'border-danger/40', icon: 'bg-danger-soft text-danger' },
 };
 
-export default function StatTile({ icon: Icon, label, value, to, warn, alarm, tone }) {
+export default function StatTile({ icon: Icon, image, label, value, to, warn, alarm, tone }) {
   const alarming = !tone && (alarm ?? (warn && Number(value) > 0));
   const toned = TONE[tone];
   const display = useCountUp(value);
@@ -100,9 +105,15 @@ export default function StatTile({ icon: Icon, label, value, to, warn, alarm, to
   const content = (
     <Card className={`h-full transition-colors ${toned ? toned.card : alarming ? 'border-brand' : 'hover:border-line-strong'}`}>
       <CardContent className="flex items-center gap-3 p-4">
-        <div className={`rounded-full p-2 ${toned ? toned.icon : alarming ? 'bg-danger-soft text-brand' : 'bg-muted text-muted-foreground'}`}>
-          <Icon className="size-5" />
-        </div>
+        {image ? (
+          <div className="shrink-0 rounded-full border border-line bg-white p-1.5">
+            <img src={`/icons/dashboard/${image}.png`} alt="" aria-hidden="true" className="size-8 object-contain" />
+          </div>
+        ) : (
+          <div className={`rounded-full p-2 ${toned ? toned.icon : alarming ? 'bg-danger-soft text-brand' : 'bg-muted text-muted-foreground'}`}>
+            <Icon className="size-5" />
+          </div>
+        )}
         <div>
           <p className="text-2xl font-semibold leading-none">{display}</p>
           <p className="mt-1 text-xs text-muted-foreground">{label}</p>

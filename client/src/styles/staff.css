@@ -2790,8 +2790,32 @@ button.stf-panel-head:disabled { cursor: default; }
 .stf-shell a:hover { color: var(--brand); }
 
 /* ── Primary action ─────────────────────────────────────────────── */
-.stf-shell .stf-btn-primary { background: var(--brand); color: var(--on-brand); }
-.stf-shell .stf-btn-primary:hover:not([disabled]) { background: var(--brand-deep); }
+/* The fill is --brand-deep, not --brand: white on #ef3a40 is 3.9:1,
+   on #d42d33 it is 5:1 (ACC-02). */
+.stf-shell .stf-btn-primary { background: var(--brand-deep); color: var(--on-brand); }
+.stf-shell .stf-btn-primary:hover:not([disabled]) {
+  background: color-mix(in srgb, var(--brand-deep) 88%, var(--ink));
+}
+
+/* ── Step action ────────────────────────────────────────────────── */
+/* Red is the one button that finishes the screen. An action repeated
+   down a list ("Confirm" on every line of a pallet) is ink instead, so
+   a screen never shows a column of red with the real finish lost at
+   the bottom of it. */
+.stf-shell .stf-btn-step { background: var(--ink); color: var(--on-ink); }
+.stf-shell .stf-btn-step:hover:not([disabled]) {
+  background: color-mix(in srgb, var(--ink) 85%, transparent);
+}
+
+/* A filled button that cannot be pressed yet goes grey. Faded red read
+   as a pink alert with text nobody could read. */
+.stf-shell .stf-btn-primary[disabled],
+.stf-shell .stf-btn-step[disabled] {
+  background: var(--surface-2);
+  color: var(--ink-soft);
+  border-color: var(--line);
+  opacity: 1;
+}
 .stf-shell .stf-btn-secondary:hover:not([disabled]) { border-color: var(--brand); }
 
 /* ── Choices ────────────────────────────────────────────────────── */
@@ -2822,10 +2846,9 @@ button.stf-panel-head:disabled { cursor: default; }
 }
 
 /* ── Badges ─────────────────────────────────────────────────────── */
-.stf-shell .stf-badge.is-active {
-  background: color-mix(in srgb, var(--brand) 12%, transparent);
-  color: var(--brand);
-}
+/* "In progress" is blue, like "Logged": work under way is not a
+   warning, and in red it sat beside "Flagged" looking the same. */
+.stf-shell .stf-badge.is-active { background: var(--info-soft); color: var(--info-ink); }
 
 /* ── Resume card on the worker dashboard (outside .stf-shell) ───── */
 .stf-resume .stf-resume-go,

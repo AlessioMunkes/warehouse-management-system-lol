@@ -17,12 +17,14 @@
 // The header folds the list away. Folded, it still says how many
 // things are waiting, so folding it never hides that there is work.
 // Remembered per browser, per `storageKey`.
+//
+// A line takes a lucide `icon`, or `image`: the name of a drawn icon in
+// public/icons/dashboard, shown on a white disc as on the stat tiles.
 // ─────────────────────────────────────────────────────────────
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ChevronDown, ChevronRight, CircleCheck, CircleX, ClipboardList, Hourglass, PhoneCall,
-  ShoppingCart, TrendingDown, TriangleAlert,
+  ChevronDown, ChevronRight, CircleCheck, CircleX, Hourglass, TrendingDown, TriangleAlert,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -46,16 +48,16 @@ const lines = (a) => [
   { key: 'expiring', tone: 'warn', icon: Hourglass, count: a.inventory.expiring,
     text: (n) => `${plural(n, 'product has', 'products have')} a delivery expiring within 30 days`,
     to: `${INVENTORY}?status=expiring` },
-  { key: 'awaitingApproval', tone: 'warn', icon: ShoppingCart, count: a.purchaseOrders.awaitingApproval,
+  { key: 'awaitingApproval', tone: 'warn', image: 'po-awaiting-approval', count: a.purchaseOrders.awaitingApproval,
     text: (n) => `${plural(n, 'purchase order is', 'purchase orders are')} waiting for approval`,
     to: `${STAFF.purchaseOrders}?status=pending` },
   { key: 'lowStock', tone: 'warn', icon: TrendingDown, count: a.inventory.lowStock,
     text: (n) => `${plural(n, 'product is', 'products are')} at or below the reorder level`,
     to: `${INVENTORY}?status=lowstock` },
-  { key: 'pendingRequests', tone: 'warn', icon: PhoneCall, count: a.communityRequests.pending,
+  { key: 'pendingRequests', tone: 'warn', image: 'pending-benevolent-requests', count: a.communityRequests.pending,
     text: (n) => `${plural(n, 'benevolent request is', 'benevolent requests are')} still open`,
     to: STAFF.communityRequests },
-  { key: 'unassigned', tone: 'info', icon: ClipboardList, count: a.pickingSlips.unassigned,
+  { key: 'unassigned', tone: 'info', image: 'unclaimed-slips', count: a.pickingSlips.unassigned,
     text: (n) => `${plural(n, 'slip', 'slips')} this week nobody has claimed yet`,
     to: `${STAFF.pickingSlips}?status=unassigned` },
 ];
@@ -126,12 +128,18 @@ export default function NeedsAttention({ attention, items, storageKey = 'wms.das
           </p>
         ) : (
           <ul className="divide-y">
-            {due.map(({ key, tone, icon: Icon, count, text, to }) => (
+            {due.map(({ key, tone, icon: Icon, image, count, text, to }) => (
               <li key={key}>
                 <Link to={to} className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-muted/50">
-                  <span className={`rounded-full p-1.5 ${TONE[tone]}`}>
-                    <Icon aria-hidden="true" className="size-4" />
-                  </span>
+                  {image ? (
+                    <span className="shrink-0 rounded-full border border-line bg-white p-1">
+                      <img src={`/icons/dashboard/${image}.png`} alt="" aria-hidden="true" className="size-5 object-contain" />
+                    </span>
+                  ) : (
+                    <span className={`rounded-full p-1.5 ${TONE[tone]}`}>
+                      <Icon aria-hidden="true" className="size-4" />
+                    </span>
+                  )}
                   <span className="min-w-0 flex-1">{text(count)}</span>
                   <ChevronRight aria-hidden="true" className="size-4 text-muted-foreground" />
                 </Link>

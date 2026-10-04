@@ -30,8 +30,8 @@
 // the Month / 3 months / Year menu.
 // ─────────────────────────────────────────────────────────────
 import {
-  AlertTriangle, ClipboardList, FileBadge, Gift, HandHeart, Mail, Package, PackageOpen,
-  PackageSearch, PhoneCall, ScrollText, ShoppingCart, Truck, Users2, Warehouse,
+  ClipboardList, FileBadge, Gift, HandHeart, Mail, Package,
+  PackageSearch, ScrollText, Truck, Users2, Warehouse,
 } from 'lucide-react';
 import StatTile from './components/StatTile';
 import ActionCard from './components/ActionCard';
@@ -70,7 +70,7 @@ export const WIDGETS = [
     id: 'low-stock', title: 'Low or out of stock', roles: MANAGER_ONLY, needs: ['summary'],
     description: 'Products at or below their reorder level, or with nothing available.',
     render: ({ summary }) => (
-      <StatTile icon={AlertTriangle} label="Low or out of stock" value={summary.lowStockCount}
+      <StatTile image="low-stock" label="Low or out of stock" value={summary.lowStockCount}
         to={`${INVENTORY}?status=lowstock`} warn />
     ),
   }),
@@ -78,21 +78,21 @@ export const WIDGETS = [
     id: 'open-pos', title: 'Open purchase orders', roles: MANAGER_ONLY, needs: ['summary'],
     description: 'Orders not yet completed or returned, including ones needing follow-up.',
     render: ({ summary }) => (
-      <StatTile icon={ShoppingCart} label="Open purchase orders" value={summary.openPurchaseOrders} to={STAFF.purchaseOrders} />
+      <StatTile image="open-pos" label="Open purchase orders" value={summary.openPurchaseOrders} to={STAFF.purchaseOrders} />
     ),
   }),
   tile({
     id: 'dispatches-today', title: 'Pallets due out today', roles: MANAGER_ONLY, needs: ['summary'],
     description: 'Packed pallets due to be collected today and not yet collected.',
     render: ({ summary }) => (
-      <StatTile icon={Truck} label="Pallets due out today" value={summary.pendingDispatchesToday} to={`${STAFF.pickingSlips}?status=ready`} />
+      <StatTile image="pallets-out" label="Pallets due out today" value={summary.pendingDispatchesToday} to={`${STAFF.pickingSlips}?status=ready`} />
     ),
   }),
   tile({
     id: 'deliveries-today', title: 'Deliveries expected today', roles: MANAGER_ONLY, needs: ['summary'],
     description: 'Open purchase orders with today as the expected delivery date.',
     render: ({ summary }) => (
-      <StatTile icon={PackageOpen} label="Deliveries expected today" value={summary.deliveriesExpectedToday} to={`${STAFF.purchaseOrders}?status=in_transit`} />
+      <StatTile image="deliveries-expected" label="Deliveries expected today" value={summary.deliveriesExpectedToday} to={`${STAFF.purchaseOrders}?status=in_transit`} />
     ),
   }),
   tile({
@@ -113,7 +113,7 @@ export const WIDGETS = [
     id: 'benevolent', title: 'Pending benevolent requests', roles: MANAGER_ONLY, needs: ['summary'],
     description: 'Food parcel requests that have not been dealt with yet.',
     render: ({ summary }) => (
-      <StatTile icon={PhoneCall} label="Pending benevolent requests" value={summary.pendingCommunityRequests}
+      <StatTile image="pending-benevolent-requests" label="Pending benevolent requests" value={summary.pendingCommunityRequests}
         to={STAFF.communityRequests} warn />
     ),
   }),
