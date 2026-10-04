@@ -309,6 +309,43 @@ describe('assignSlip — ownership', () => {
   });
 });
 
+// A guest holds a pallet through assigned_volunteer_id. The claim used to
+// look only at assigned_to, so a worker could take a pallet a volunteer was
+// packing and leave two holders.
+describe('assignSlip — a pallet a volunteer is packing', () => {
+  const guestHeld = { id: 1, status: 'in_progress', assigned_to: null, assigned_volunteer_id: '7' };
+
+  it('refuses a worker claiming it, and writes nothing', async () => {
+    const client = assignClient(guestHeld);
+    const result = await claim(client);
+    expect(result).toEqual({ volunteerHeld: true });
+    expect(claimed(client)).toBe(false);
+    expect(sql(client)).toContain('ROLLBACK');
+  });
+
+  it('lets a manager override take it, clearing the volunteer in the same UPDATE', async () => {
+    const client = assignClient(guestHeld);
+    const result = await claim(client, { canOverride: true });
+    expect(result.slip).toBeDefined();
+    const update = client.calls.find((s) => /^UPDATE picking_slips/i.test(s));
+    expect(update).toMatch(/assigned_volunteer_id = NULL/);
+    expect(update).toContain('assigned_to = $1');
+  });
+
+  it('records who it was taken from in the event detail', async () => {
+    const client = assignClient(guestHeld);
+    await claim(client, { canOverride: true });
+    const event = client.query.mock.calls.find(([s]) => /INSERT INTO picking_events/i.test(s));
+    expect(event[1][3]).toMatchObject({ taken_from_volunteer_id: '7' });
+  });
+
+  it('still lets a worker claim a pallet nobody holds', async () => {
+    const client = assignClient({ id: 1, status: 'pending', assigned_to: null, assigned_volunteer_id: null });
+    const result = await claim(client);
+    expect(result.slip).toBeDefined();
+  });
+});
+
 // ── addSecondPacker ───────────────────────────────────────────
 // Dual assignment: a slip already held by one packer gains a second.
 // Reuses assignClient's fake, since it already answers both the

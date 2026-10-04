@@ -412,6 +412,14 @@ describe('assignSlip — claiming a pallet', () => {
     );
   });
 
+  it('tells a worker a volunteer is packing the pallet', async () => {
+    repoMock.assignSlip.mockResolvedValueOnce({ volunteerHeld: true });
+    await expect(pickingService.assignSlip(1, {}, WORKER)).rejects.toMatchObject({
+      status: 409,
+      message: 'A volunteer is packing this pallet.',
+    });
+  });
+
   it('ignores a packerId a packer tries to set for someone else', async () => {
     await pickingService.assignSlip(1, { packerId: WORKER2.id }, WORKER);
     expect(repoMock.assignSlip).toHaveBeenCalledWith(

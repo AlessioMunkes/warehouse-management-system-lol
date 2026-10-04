@@ -31,11 +31,12 @@ import { Notice } from '../../staff/components/StepPrimitives';
 import Paged from '../../staff/components/Paged';
 import usePaged from '../../staff/hooks/usePaged';
 import { todayISO, isSpareSlip } from '../spareSlips';
+import { volunteerHolder } from '../../pickingSlips/slipViews';
 
 const COHORT_LABELS = { tuesday: 'Tuesday', thursday: 'Thursday' };
 
 // Centre and packer. Module level so its identity is stable.
-const slipText = (slip) => [slip.ecd_name, slip.packer_name].filter(Boolean).join(' ');
+const slipText = (slip) => [slip.ecd_name, slip.packer_name, volunteerHolder(slip)].filter(Boolean).join(' ');
 const DONE_STATUSES = ['complete', 'collected'];
 const MISSED_COLLECTION_DAYS = 21; // same threshold as the manager board
 
@@ -222,6 +223,7 @@ export default function StaffSlipList({ onOpenSlip }) {
                   <span className="stf-row-meta">
                     {COHORT_LABELS[slip.cohort] || slip.cohort} · {slip.child_count} children ·{' '}
                     {slip.confirmed_items}/{slip.total_items} items packed
+                    {volunteerHolder(slip) ? ` · ${volunteerHolder(slip)}` : ''}
                     {missed && !isDone ? ' · Not collected in a while' : ''}
                   </span>
                 </span>

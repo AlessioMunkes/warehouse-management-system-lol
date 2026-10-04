@@ -31,6 +31,7 @@ import {
   Actions, Button, ChoiceList, Counter, Notice, TextField, ViewToggle, Coachmark,
 } from '../../staff/components/StepPrimitives';
 import useCoachmark from '../../staff/hooks/useCoachmark';
+import { volunteerHolder } from '../../pickingSlips/slipViews';
 
 const MODE_KEY = 'stf_packing_view_mode';
 const MODES = [
@@ -219,7 +220,9 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
   if (!slip) return null;
 
   const locked = slip.status === 'complete' || slip.status === 'collected';
-  const unassigned = !slip.assigned_to;
+  // A pallet a guest volunteer is packing is taken, though assigned_to is empty.
+  const volunteerLabel = volunteerHolder(slip);
+  const unassigned = !slip.assigned_to && !volunteerLabel;
   // Either packer on a dual-assigned pallet may work it — matches
   // picking.repository.js's own ownership check, which the server
   // already enforces either way; this only keeps the client's own
@@ -325,7 +328,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
           <span>
             <span className="stf-kv-key">Packing:</span>{' '}
             <span className="stf-kv-val">
-              {slip.packer_name}
+              {slip.packer_name ? slip.packer_name : volunteerLabel}
               {slip.assigned_to_2 ? `, ${slip.packer_name_2}` : ''}
             </span>
           </span>

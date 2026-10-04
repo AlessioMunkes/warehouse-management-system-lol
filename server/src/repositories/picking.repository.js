@@ -132,6 +132,11 @@ const getSlips = async ({ dispatchDate, from, to, cohort, status, assignedTo }) 
        ps.status,
        ps.assigned_to,
        ps.assigned_to_2,
+       -- A guest holds a slip through assigned_volunteer_id, never
+       -- assigned_to. Returned with their first name so the board shows
+       -- who has it instead of reading as unassigned.
+       ps.assigned_volunteer_id,
+       NULLIF(split_part(trim(v.full_name), ' ', 1), '') AS volunteer_name,
        e.name       AS ecd_name,
        e.child_count,
        e.last_collected_date,
@@ -154,10 +159,11 @@ const getSlips = async ({ dispatchDate, from, to, cohort, status, assignedTo }) 
      JOIN ecd_centres e ON e.id = ps.ecd_id
      LEFT JOIN users u  ON u.id = ps.assigned_to
      LEFT JOIN users u2 ON u2.id = ps.assigned_to_2
+     LEFT JOIN volunteers v ON v.id = ps.assigned_volunteer_id
      LEFT JOIN dispatch_events de ON de.picking_slip_id = ps.id
      LEFT JOIN picking_slip_items psi ON psi.picking_slip_id = ps.id
      ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-     GROUP BY ps.id, e.name, e.child_count, e.last_collected_date, u.first_name, u2.first_name, de.status
+     GROUP BY ps.id, e.name, e.child_count, e.last_collected_date, u.first_name, u2.first_name, v.full_name, de.status
      ORDER BY ps.dispatch_date ASC, e.name ASC`,
     params
   );
@@ -180,11 +186,13 @@ const getSlipById = async (id) => {
        e.contact_name,
        e.last_collected_date,
        u.first_name           AS packer_name,
-       u2.first_name          AS packer_name_2
+       u2.first_name          AS packer_name_2,
+       NULLIF(split_part(trim(v.full_name), ' ', 1), '') AS volunteer_name
      FROM picking_slips ps
      JOIN ecd_centres e ON e.id = ps.ecd_id
      LEFT JOIN users u  ON u.id = ps.assigned_to
      LEFT JOIN users u2 ON u2.id = ps.assigned_to_2
+     LEFT JOIN volunteers v ON v.id = ps.assigned_volunteer_id
      WHERE ps.id = $1`,
     [id]
   );
@@ -415,7 +423,7 @@ const assignSlip = async ({ slipId, packerId, actorId, canOverride = false }) =>
     await client.query('BEGIN');
 
     const current = await client.query(
-      `SELECT id, status, assigned_to FROM picking_slips WHERE id = $1 FOR UPDATE`,
+      `SELECT id, status, assigned_to, assigned_volunteer_id FROM picking_slips WHERE id = $1 FOR UPDATE`,
       [slipId]
     );
     const slip = current.rows[0];
@@ -424,6 +432,16 @@ const assignSlip = async ({ slipId, packerId, actorId, canOverride = false }) =>
     if (!CLAIMABLE_STATUSES.includes(slip.status)) {
       await client.query('ROLLBACK');
       return { locked: true, status: slip.status };
+    }
+
+    // A guest holds a pallet through assigned_volunteer_id, which the
+    // ownership check below never looked at, so a staff claim went
+    // straight through and left two holders. Taken, unless a manager is
+    // overriding (or the pallet is already this packer's).
+    const heldByVolunteer = slip.assigned_volunteer_id !== null && slip.assigned_volunteer_id !== undefined;
+    if (heldByVolunteer && !canOverride && !sameId(slip.assigned_to, packerId)) {
+      await client.query('ROLLBACK');
+      return { volunteerHeld: true };
     }
 
     // Re-claiming a pallet you already hold is not a reassignment —
@@ -439,6 +457,8 @@ const assignSlip = async ({ slipId, packerId, actorId, canOverride = false }) =>
     const result = await client.query(
       `UPDATE picking_slips
        SET assigned_to = $1,
+           -- A manager override takes the pallet from a guest too.
+           assigned_volunteer_id = NULL,
            status      = 'in_progress',
            started_at  = COALESCE(started_at, NOW())
        WHERE id = $2
@@ -457,6 +477,9 @@ const assignSlip = async ({ slipId, packerId, actorId, canOverride = false }) =>
       packer_id: packerId,
       ...(isReassignment
         ? { reassigned_from: slip.assigned_to, previous_status: slip.status }
+        : {}),
+      ...(heldByVolunteer
+        ? { taken_from_volunteer_id: slip.assigned_volunteer_id, previous_status: slip.status }
         : {}),
     });
 
