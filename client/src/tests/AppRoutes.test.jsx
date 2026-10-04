@@ -78,6 +78,7 @@ describe('sidebars built from the table', () => {
     expect(menu('manager')).toEqual([
       ['Overview', ['Dashboard /manager']],
       ['Inbound', ['Purchase orders /noc/purchase-orders', 'Receipts /noc/receipts']],
+      ['Donations', ['Classification queue /admin/donation-management', 'Section 18A /admin/section-18a']],
       ['Stock', ['Inventory /noc/inventory', 'Stock ledger /noc/stock-ledger']],
       ['Outbound', [
         'Picking slips /noc/picking-slips',
@@ -100,7 +101,7 @@ describe('sidebars built from the table', () => {
         'Suppliers /admin/suppliers',
       ]],
       ['Logs', [
-        'User activity /admin/activity', 'Volunteer log /admin/volunteer-log', 'Archive /admin/archive',
+        'Activity log /admin/activity-log', 'Archive /admin/archive',
         'Message history /admin/messages',
       ]],
       ['Donations', [
@@ -110,6 +111,22 @@ describe('sidebars built from the table', () => {
       // The Gmail screen is Settings' Email section now.
       ['Setup', ['Settings /admin/settings']],
     ]);
+  });
+
+  it('opens Section 18A to managers and admins, in both menus, and never to the floor', () => {
+    const route = ROUTES.find((r) => r.id === 'section18a');
+    expect([...route.roles].sort()).toEqual(['admin', 'manager']);
+    expect(menu('manager').find(([group]) => group === 'Donations')[1]).toContain('Section 18A /admin/section-18a');
+    expect(menu('admin').find(([group]) => group === 'Donations')[1]).toContain('Section 18A /admin/section-18a');
+    expect(menu('warehouse_worker').some(([group]) => group === 'Donations')).toBe(false);
+    expect(route.roles).not.toContain('warehouse_worker');
+  });
+
+  it('opens the classification queue to managers and admins, in both menus', () => {
+    const route = ROUTES.find((r) => r.id === 'donationManagement');
+    expect([...route.roles].sort()).toEqual(['admin', 'manager']);
+    expect(menu('manager').find(([group]) => group === 'Donations')[1][0]).toBe('Classification queue /admin/donation-management');
+    expect(menu('admin').find(([group]) => group === 'Donations')[1]).toContain('Classification queue /admin/donation-management');
   });
 
   it('keeps the attention counts on the manager items that had them', () => {

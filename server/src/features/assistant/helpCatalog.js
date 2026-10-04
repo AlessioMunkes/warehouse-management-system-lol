@@ -158,10 +158,10 @@ export const SCREENS = [
   { id: 'users', label: 'Users', roles: ADMIN_ONLY,
     about: 'Staff accounts, roles and passwords.',
     aka: ['users', 'accounts', 'staff accounts', 'logins'] },
-  { id: 'donationManagement', label: 'Classification queue', roles: ADMIN_ONLY,
+  { id: 'donationManagement', label: 'Classification queue', roles: MANAGERS_UP,
     about: 'Check, value and classify donations taken in at the gate.',
     aka: ['classification queue', 'review donations', 'flagged donations'] },
-  { id: 'section18a', label: 'Section 18A', roles: ADMIN_ONLY,
+  { id: 'section18a', label: 'Section 18A', roles: MANAGERS_UP,
     about: 'Issue and track tax certificates for donors.',
     aka: ['18a', 'tax certificates', 'certificate queue'] },
   { id: 'emailIntegration', label: 'Email settings', roles: ADMIN_ONLY,
@@ -170,12 +170,10 @@ export const SCREENS = [
   { id: 'financeReport', label: 'Finance report', roles: ADMIN_ONLY,
     about: 'Warehouse Movement Report: purchase orders, donations and dispatches for a period, with exports.',
     aka: ['warehouse movement report', 'finance', 'movement report', 'quickbooks report'] },
-  { id: 'volunteerLog', label: 'Volunteer log', roles: ADMIN_ONLY,
-    about: 'Every guest sign-in at the door; sign out a visit so its hours count.',
-    aka: ['guest log', 'sign-in log', 'visitor log', 'who was on site'] },
-  { id: 'activity', label: 'User activity', roles: ADMIN_ONLY,
-    about: 'Everything people did in the system, newest first, by person, area and date.',
-    aka: ['activity log', 'audit log', 'who did what', 'user activity'] },
+  { id: 'activityLog', label: 'Activity log', roles: ADMIN_ONLY,
+    about: 'Staff view: everything people did, newest first. Volunteers view: every guest sign-in at the door.',
+    aka: ['activity log', 'audit log', 'who did what', 'user activity', 'volunteer log',
+      'guest log', 'sign-in log', 'visitor log', 'who was on site'] },
   { id: 'archive', label: 'Archive', roles: ADMIN_ONLY,
     about: 'Everything deactivated or deleted, with Restore for what can come back.',
     aka: ['archive', 'deleted items', 'deactivated', 'restore'] },
@@ -241,6 +239,7 @@ export const TOPICS = [
       'Stock — inventory levels, the stock ledger and stock adjustments.',
       'Buying — raise purchase orders; each one is emailed to Finance.',
       'Centres — beneficiaries, this week’s picking slips and collection reminders.',
+      'Donations — the classification queue, and Section 18A certificates for donors.',
       'Insight — operations reports and impact reports.',
       'People — volunteer events.',
     ],
@@ -267,7 +266,7 @@ export const TOPICS = [
       'Accounts — invite staff and set their roles.',
       'Catalogue — products and suppliers.',
       'Donations — the classification queue and Section 18A certificates.',
-      'Logs — user activity, the archive, message history and the volunteer log.',
+      'Logs — the activity log (staff and volunteers), the archive and message history.',
       'Settings — email, reminders, stock rules, reporting and certificates; and the finance report.',
     ],
     followUp: {
@@ -2014,7 +2013,7 @@ export const TOPICS = [
   {
     id: 'donation-management-screen',
     title: 'Reviewing donations',
-    roles: ADMIN_ONLY,
+    roles: MANAGERS_UP,
     screens: ['donationManagement'],
     asks: [
       'donation management', 'review donations', 'pending donations', 'check a donation',
@@ -2036,7 +2035,7 @@ export const TOPICS = [
   {
     id: 'section18a-certificates',
     title: 'Section 18A certificates',
-    roles: ADMIN_ONLY,
+    roles: MANAGERS_UP,
     screens: ['section18a'],
     asks: [
       'section 18a certificate', 'issue a certificate', 'tax certificate for a donor',
@@ -2119,14 +2118,14 @@ export const TOPICS = [
     id: 'volunteer-guest-log',
     title: 'The volunteer log',
     roles: ADMIN_ONLY,
-    screens: ['volunteerLog'],
+    screens: ['activityLog'],
     asks: [
       'guest log', 'sign a volunteer out', 'they forgot to sign out', 'volunteer hours are zero',
       'who was on site', 'delete a sign in',
     ],
     body:
-      'The Volunteer log lists every guest sign-in at the door; the On site tab is ' +
-      'who is here now. If someone left without signing out, open their visit and ' +
+      'Open Activity log and choose Volunteers. It lists every guest sign-in at the ' +
+      'door; the On site tab is who is here now. If someone left without signing out, open their visit and ' +
       'choose Sign out — their hours only count once the visit is closed.\n\n' +
       'There’s no delete button on purpose: it’s a record of who was on site.',
     followUp: {
@@ -2393,17 +2392,19 @@ export const TOPICS = [
   },
   {
     id: 'po-quickbooks',
-    title: 'The QuickBooks reference',
+    title: 'Linking orders to QuickBooks',
     roles: MANAGERS_UP,
     screens: ['purchaseOrders'],
     asks: [
       'quickbooks reference', 'quickbooks number', 'link to quickbooks', 'finance captured it',
-      'where do I put the quickbooks number',
+      'where do I put the quickbooks number', 'import quickbooks', 'memo',
     ],
     body:
-      'Once Finance has captured an order in QuickBooks, open the order and add ' +
-      'their reference in the QuickBooks field, then Save. It ties the two records ' +
-      'together, so anyone can find the order from Finance’s side.',
+      'Finance types our PO number into the Memo field of the QuickBooks PO. Later, ' +
+      'export the QuickBooks POs, then on Purchase orders select Import QuickBooks ' +
+      'links and upload the file. Pick the column with the QuickBooks PO number, ' +
+      'check the preview, then confirm. Anything unclear is skipped and listed.\n\n' +
+      'To fix one order by hand, open it and edit its QuickBooks PO number.',
     followUp: {
       question: 'Would you like to know how orders reach Finance?',
       topic: 'po-finance-email',
@@ -2672,13 +2673,13 @@ export const TOPICS = [
     id: 'user-activity',
     title: 'Who did what',
     roles: ADMIN_ONLY,
-    screens: ['activity'],
+    screens: ['activityLog'],
     asks: [
       'who changed this', 'who did that', 'activity log', 'audit trail', 'what did they do',
       'who deleted it', 'what happened yesterday',
     ],
     body:
-      'User activity lists everything people did, newest first, for the dates you ' +
+      'Open Activity log and choose Staff. It lists everything people did, newest first, for the dates you ' +
       'choose. Narrow it to one person with the picker (or tap a name under Most ' +
       'active), or to one area under + Filter.\n\n' +
       'Open an entry to see what changed, from what to what, and choose Open the ' +

@@ -6,7 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
 vi.mock('../services/adminAPI', () => ({ default: { getArchive: vi.fn(), getActivity: vi.fn() } }));
 
 const { default: adminAPI } = await import('../services/adminAPI');
-const { default: AdminUserActivityPage } = await import('../pages/AdminUserActivityPage');
+const { default: StaffActivityView } = await import('../features/admin/activityLog/StaffActivityView');
 
 const ADA = { id: 1, name: 'Ada Admin', username: 'ada', role: 'admin', count: 2 };
 const MO = { id: 2, name: 'Mo Manager', username: 'mo', role: 'manager', count: 1 };
@@ -16,7 +16,7 @@ const ENTRIES = [
   { id: 'a3', at: '2026-09-30T07:00:00Z', actor: MO, text: 'generated slips', area: 'Picking', source: 'event', detail: {} },
 ];
 
-const renderPage = () => render(<MemoryRouter><AdminUserActivityPage /></MemoryRouter>);
+const renderPage = () => render(<MemoryRouter><StaffActivityView /></MemoryRouter>);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -25,7 +25,7 @@ beforeEach(() => {
   });
 });
 
-describe('User Activity', () => {
+describe('Activity log: Staff view', () => {
   it('lists activity with a summary in the header', async () => {
     renderPage();
     expect(await screen.findByText('approved PO-2026-0007')).toBeInTheDocument();
@@ -58,5 +58,30 @@ describe('User Activity', () => {
     await user.click(screen.getByRole('button', { name: 'Mo Manager · 1' }));
     await waitFor(() => expect(adminAPI.getActivity).toHaveBeenLastCalledWith(expect.objectContaining({ user: '2' })));
     expect(screen.getByRole('button', { name: 'Remove filter: Mo Manager' })).toBeInTheDocument();
+  });
+});
+
+describe('Activity log: Staff view batches', () => {
+  it('opens on the last 30 days', async () => {
+    renderPage();
+    await screen.findByText('approved PO-2026-0007');
+    const call = adminAPI.getActivity.mock.calls[0][0];
+    expect(call.to).toBe(new Date().toISOString().slice(0, 10));
+    expect((Date.parse(call.to) - Date.parse(call.from)) / 86400000).toBe(29);
+  });
+
+  it('says when there is more, and Next loads the next batch', async () => {
+    const user = userEvent.setup();
+    const MORE = { id: 'a4', at: '2026-09-29T07:00:00Z', actor: MO, text: 'raised PO-2026-0001', area: 'Purchasing', source: 'audit', detail: {} };
+    adminAPI.getActivity
+      .mockResolvedValueOnce({ entries: ENTRIES, hasMore: true, from: '2026-09-03', to: '2026-10-02' })
+      .mockResolvedValueOnce({ entries: [MORE], hasMore: false, from: '2026-09-03', to: '2026-10-02' });
+    renderPage();
+    await screen.findByText('approved PO-2026-0007');
+    expect(screen.getByText(/Showing the latest 3\. Use Next to load more, or narrow the dates\./)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Next/ }));
+    expect(await screen.findByText('raised PO-2026-0001')).toBeInTheDocument();
+    expect(adminAPI.getActivity).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 3 }));
+    expect(screen.queryByText(/Showing the latest/)).not.toBeInTheDocument();
   });
 });

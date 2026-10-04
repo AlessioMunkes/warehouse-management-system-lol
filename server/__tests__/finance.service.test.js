@@ -195,6 +195,49 @@ describe('financeService email settings and send', () => {
   });
 });
 
+
+const NO_ADDRESS_VARS = [
+  'APP_BASE_URL', 'USER_INVITE_BASE_URL', 'PASSWORD_RESET_BASE_URL', 'SECTION18A_FORM_BASE_URL',
+  'CLIENT_URL', 'FRONTEND_URL', 'CLIENT_ORIGIN',
+];
+const inProductionWithNoAddress = async (fn) => {
+  vi.stubEnv('NODE_ENV', 'production');
+  NO_ADDRESS_VARS.forEach((name) => vi.stubEnv(name, ''));
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    await fn(log);
+  } finally {
+    log.mockRestore();
+    vi.unstubAllEnvs();
+  }
+};
+
+describe('sendFinanceReportLink — a server with no web address (production)', () => {
+  it('stops before making a new link, so the old one keeps working, and sends nothing', async () => {
+    await inProductionWithNoAddress(async (log) => {
+      await expect(financeService.sendFinanceReportLink({ sentBy: 9 }))
+        .rejects.toMatchObject({ status: 503, message: expect.stringContaining('web address') });
+
+      expect(repoMock.revokeReportAccessLinks).not.toHaveBeenCalled();
+      expect(repoMock.createReportAccessLink).not.toHaveBeenCalled();
+      expect(emailProviderMock.sendEmail).not.toHaveBeenCalled();
+      expect(log.mock.calls.some(([m]) => String(m).includes('[links]'))).toBe(true);
+    });
+  });
+
+  it('links to CLIENT_ORIGIN on a server that only sets the older names', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('APP_BASE_URL', '');
+    vi.stubEnv('CLIENT_ORIGIN', 'https://wms.example/');
+    try {
+      await financeService.sendFinanceReportLink({ sentBy: 9 });
+      expect(emailProviderMock.sendEmail.mock.calls.at(-1)[0].text).toContain('https://wms.example/finance/report/');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+});
+
 describe('financeService report links', () => {
   it('generates a secure token but stores only its hash', async () => {
     const result = await financeService.regenerateReportLink({ createdBy: 9 });

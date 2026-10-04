@@ -9,6 +9,7 @@
 // ─────────────────────────────────────────────────────────────
 import pool                  from '../config/db.js';
 import { committedStockSql } from './committedStock.sql.js';
+import { recheckProducts } from './communityRequestStock.repository.js';
 import { createNotification } from './notification.repository.js';
 
 // ── Adjust stock — the single write path for every stock change ──
@@ -124,6 +125,13 @@ const adjustStock = async (client, { productId, quantityDelta, unit = null, move
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
     [productId, delta, resolvedUnit, movementType, referenceType, referenceId, reason, performedBy]
   );
+
+  // Stock went down: an approved benevolent request may no longer fit.
+  // Pallets come first, so it is the request that gives way. Runs in a
+  // savepoint and never fails the stock change itself.
+  if (delta < 0) {
+    await recheckProducts(client, [productId], { cause: 'stock' });
+  }
 
   if (reorderThreshold > 0 && before > reorderThreshold && after <= reorderThreshold) {
     await createNotification(client, {

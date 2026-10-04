@@ -231,6 +231,9 @@ const assignSlip = async (slipId, body, user) => {
   if (result.conflict) {
     fail(409, 'This pallet is already being packed by someone else. A manager can reassign it.');
   }
+  if (result.volunteerHeld) {
+    fail(409, 'A volunteer is packing this pallet.');
+  }
   return result.slip;
 };
 

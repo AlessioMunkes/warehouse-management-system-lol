@@ -62,10 +62,60 @@ const resolveRequest = async (req, res, next) => {
   }
 };
 
+const approveRequest = async (req, res, next) => {
+  try {
+    const result = await communityRequestService.approve(req.params.id, req.body, req.user);
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const declineRequest = async (req, res, next) => {
+  try {
+    const result = await communityRequestService.decline(req.params.id, req.body, req.user);
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const assignRequest = async (req, res, next) => {
+  try {
+    const result = await communityRequestService.assign(req.params.id, req.body, req.user);
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const rechooseItems = async (req, res, next) => {
+  try {
+    const result = await communityRequestService.rechooseItems(req.params.id, req.body, req.user);
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const confirmRequest = async (req, res, next) => {
+  try {
+    const result = await communityRequestService.confirm(req.params.id, req.body, req.user);
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export default {
   listRequests,
   getRequest,
   createRequest,
   claimRequest,
   resolveRequest,
+  approveRequest,
+  declineRequest,
+  assignRequest,
+  rechooseItems,
+  confirmRequest,
 };

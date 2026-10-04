@@ -70,6 +70,14 @@ describe('the widget catalogue', () => {
     expect(ids).not.toContain('admin-shortcuts');
   });
 
+  it('gives the manager their own tile for the classification queue', () => {
+    const ids = widgetsForRole('manager').map((w) => w.id);
+    expect(ids).toContain('donations-to-review');
+    expect(widgetsForRole('admin').map((w) => w.id)).not.toContain('donations-to-review');
+    expect(ids).toContain('certificates-for-managers');
+    expect(widgetsForRole('admin').map((w) => w.id)).not.toContain('certificates-for-managers');
+  });
+
   // Two jobs, two boards: a manager runs the floor, an admin looks
   // after what it is built on. No widget is offered to both.
   it('gives the manager and the admin different widgets, apart from notifications', () => {

@@ -76,6 +76,53 @@ beforeEach(() => {
   resetRepoMock.confirmReset.mockResolvedValue(existingReset({ used_at: new Date().toISOString() }));
 });
 
+
+const NO_ADDRESS_VARS = [
+  'APP_BASE_URL', 'USER_INVITE_BASE_URL', 'PASSWORD_RESET_BASE_URL', 'SECTION18A_FORM_BASE_URL',
+  'CLIENT_URL', 'FRONTEND_URL', 'CLIENT_ORIGIN',
+];
+const inProductionWithNoAddress = async (fn) => {
+  vi.stubEnv('NODE_ENV', 'production');
+  NO_ADDRESS_VARS.forEach((name) => vi.stubEnv(name, ''));
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    await fn(log);
+  } finally {
+    log.mockRestore();
+    vi.unstubAllEnvs();
+  }
+};
+
+describe('requestReset — a server with no web address (production)', () => {
+  it('creates no reset and sends no email with a broken link, but still answers the same', async () => {
+    await inProductionWithNoAddress(async (log) => {
+      userRepoMock.findUserByEmail.mockResolvedValue(ACTIVE_USER);
+      const result = passwordResetService.requestReset('jane@example.com', '1.2.3.4');
+      await flush();
+
+      expect(result).toEqual({ message: GENERIC });
+      expect(resetRepoMock.createReset).not.toHaveBeenCalled();
+      expect(emailProviderMock.sendEmail).not.toHaveBeenCalled();
+      expect(log.mock.calls.some(([m]) => String(m).includes('[links]'))).toBe(true);
+    });
+  });
+
+  it('builds the link from CLIENT_URL on a server that only sets the older names', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('APP_BASE_URL', '');
+    vi.stubEnv('PASSWORD_RESET_BASE_URL', '');
+    vi.stubEnv('CLIENT_URL', 'https://wms.example');
+    try {
+      userRepoMock.findUserByEmail.mockResolvedValue(ACTIVE_USER);
+      passwordResetService.requestReset('jane@example.com', '1.2.3.4');
+      await flush();
+      expect(emailProviderMock.sendEmail.mock.calls[0][0].text).toContain('https://wms.example/reset-password/');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+});
+
 // ── No account enumeration / no timing oracle ────────────────────
 describe('requestReset — no enumeration, no timing oracle', () => {
   it('returns the generic message for an unknown email', () => {

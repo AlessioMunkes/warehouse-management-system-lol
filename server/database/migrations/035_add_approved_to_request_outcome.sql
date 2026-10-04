@@ -1,0 +1,11 @@
+-- Benevolent requests: a request is approved by a manager before anyone
+-- packs it. "pending" stays and is shown as "Awaiting approval";
+-- "referred" stays in the enum, unused.
+--
+-- Its own file on purpose. The runner wraps every file in one
+-- transaction, and a value added to an enum cannot be used until the
+-- transaction that added it has committed. Everything that refers to
+-- 'approved' is in 036.
+--
+-- Idempotent: safe to run more than once.
+ALTER TYPE request_outcome ADD VALUE IF NOT EXISTS 'approved' AFTER 'pending';

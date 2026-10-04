@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import LogoutConfirmDialog from "@/components/ui/log-out-dialog";
 import { useAuth } from "../../context/AuthContext";
+import useGoBack from "./useGoBack";
 import batchesLogo from "../../assets/Batches_Logo.jpeg";
 import "../../styles/index.css";
 
@@ -37,6 +38,7 @@ export function TopNavbar({ reducedMovement, onToggleMovement }) {
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [movementDialogOpen, setMovementDialogOpen] = useState(false);
   const navigate = useNavigate();
+  const goBack = useGoBack();
   const roleLabel = user?.role ? ROLE_LABELS[user.role] ?? user.role : "";
 
   // Synchronize body class on initial load / route change based on persisted setting
@@ -78,7 +80,7 @@ export function TopNavbar({ reducedMovement, onToggleMovement }) {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => navigate(-1)}
+                onClick={goBack}
                 className="top-navbar__back"
                 aria-label="Go back"
               >

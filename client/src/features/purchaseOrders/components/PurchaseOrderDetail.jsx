@@ -38,7 +38,7 @@ import {
   AlertDialog, AlertDialogContent, AlertDialogDescription,
   AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
-import { BadgeCheck, Pencil, RotateCcw, Trash2, TriangleAlert } from 'lucide-react';
+import { BadgeCheck, Mail, MailCheck, MailX, Pencil, RotateCcw, Trash2, TriangleAlert } from 'lucide-react';
 import { OPEN_PO_STATUSES } from '@/services/purchaseOrderAPI';
 import PurchaseOrderTimeline from './PurchaseOrderTimeline';
 
@@ -46,6 +46,13 @@ const fmtDate = (value) =>
   value
     ? new Date(value).toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' })
     : '—';
+
+const fmtDateTime = (value) =>
+  value
+    ? new Date(value).toLocaleString('en-ZA', {
+        day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+      })
+    : '';
 
 const money = (value) =>
   `R ${Number(value || 0).toLocaleString('en-ZA', {
@@ -60,7 +67,8 @@ const Section = ({ title, children }) => (
 );
 
 export default function PurchaseOrderDetail({
-  purchaseOrder: po, canManage, onApprove, onRecordFollowUp, onReopen, onSetQuickbooksRef, onEdit, onDelete, onClose,
+  purchaseOrder: po, canManage, onApprove, onRecordFollowUp, onReopen, onSetQuickbooksRef,
+  onResendFinanceEmail, onEdit, onDelete, onClose,
 }) {
   const pending = po.status === 'pending';
   const canEditOrDelete = canManage && pending;
@@ -109,6 +117,22 @@ export default function PurchaseOrderDetail({
       if (ok) setEditingQbo(false);
     } finally {
       setQboBusy(false);
+    }
+  };
+
+  // Finance email: the stored status is 'sent' | 'failed' | null. Null
+  // means no attempt has been recorded — "Not sent", the normal state
+  // when no recipient was saved or sending is off.
+  const [resending, setResending] = useState(false);
+  const emailFailed = po.financeEmailStatus === 'failed';
+  const emailSent   = po.financeEmailStatus === 'sent';
+  const canResend   = canManage && !emailSent && Boolean(onResendFinanceEmail);
+  const resend = async () => {
+    setResending(true);
+    try {
+      await onResendFinanceEmail();
+    } finally {
+      setResending(false);
     }
   };
 
@@ -199,35 +223,61 @@ export default function PurchaseOrderDetail({
           <dd className="tabular-nums">{received} of {po.items.length} lines</dd>
         </div>
         <div>
-          <dt className="text-xs text-muted-foreground">QuickBooks</dt>
+          <dt className="text-xs text-muted-foreground">QuickBooks PO number</dt>
           {editingQbo ? (
             <dd className="flex items-center gap-2">
               <Input
                 value={qboDraft} onChange={(e) => setQboDraft(e.target.value)}
-                placeholder="QBO reference" maxLength={50} className="h-8" disabled={qboBusy}
-                aria-label="QuickBooks reference"
+                placeholder="QuickBooks PO number" maxLength={50} className="h-8" disabled={qboBusy}
+                aria-label="QuickBooks PO number"
               />
-              <Button type="button" size="sm" onClick={saveQbo} disabled={qboBusy}>Save</Button>
+              <Button type="button" size="sm" onClick={saveQbo} disabled={qboBusy}>Save number</Button>
               <Button
                 type="button" variant="ghost" size="sm" disabled={qboBusy}
                 onClick={() => { setQboDraft(po.quickbooksPoId || ''); setEditingQbo(false); }}
               >
-                Cancel
+                Discard
               </Button>
             </dd>
           ) : (
             <dd className="flex items-center gap-1">
-              {po.quickbooksPoId || 'Not linked'}
+              {/* Unlinked is the normal state until Finance has entered
+                  the order, so it reads as neutral, not as a problem. */}
+              <StatusBadge tone="neutral" className="max-w-full whitespace-normal break-all">
+                {po.quickbooksPoId ? `Linked to QuickBooks PO number ${po.quickbooksPoId}` : 'Not linked to QuickBooks yet'}
+              </StatusBadge>
               {canManage ? (
                 <Button
                   type="button" variant="ghost" size="icon-sm"
-                  onClick={() => setEditingQbo(true)} aria-label="Edit QuickBooks reference"
+                  onClick={() => setEditingQbo(true)} aria-label="Edit QuickBooks PO number"
                 >
                   <Pencil />
                 </Button>
               ) : null}
             </dd>
           )}
+        </div>
+        <div>
+          <dt className="text-xs text-muted-foreground">Finance email</dt>
+          <dd className="flex flex-wrap items-center gap-2">
+            {emailSent ? (
+              <StatusBadge tone="neutral" icon={MailCheck}>
+                Sent to Finance{po.financeEmailAttemptedAt ? ` · ${fmtDateTime(po.financeEmailAttemptedAt)}` : ''}
+              </StatusBadge>
+            ) : emailFailed ? (
+              <StatusBadge tone="warn" icon={MailX}>Send failed</StatusBadge>
+            ) : (
+              <StatusBadge tone="neutral" icon={Mail}>Not sent</StatusBadge>
+            )}
+            {emailFailed && po.financeEmailError ? (
+              <span className="text-xs text-muted-foreground">{po.financeEmailError}</span>
+            ) : null}
+            {canResend ? (
+              <Button type="button" variant="outline" size="sm" onClick={resend} disabled={resending}>
+                {resending ? 'Sending…' : 'Resend to Finance'}
+              </Button>
+            ) : null}
+          </dd>
         </div>
       </dl>
 

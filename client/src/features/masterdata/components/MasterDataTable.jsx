@@ -41,6 +41,7 @@
 // reads as a row when they share a top edge and as two rows when they
 // are both centred.
 // ─────────────────────────────────────────────────────────────
+import { useState } from 'react';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -75,10 +76,30 @@ export default function MasterDataTable({
   // products, suppliers, beneficiaries, purchase orders, the door log.
   pageSize = TABLE_PAGE_SIZE,
   noun = 'records',
+  // A list the server sends in batches (the activity log): `hasMore`
+  // keeps Next live on the last loaded page, and Next there calls
+  // `onLoadMore` and moves on to the new rows once they arrive, the way
+  // the stock ledger does.
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore,
 }) {
-  // Back to page one when the sort or the filtered set changes.
-  const resetKey = `${sort?.key}|${sort?.direction}|${rows.length}|${rows.length ? rowKey(rows[0]) : ''}`;
+  // Back to page one when the sort or the filtered set changes. A batch
+  // arriving adds rows without changing what the person is looking at,
+  // so for a batched list the count is left out of the key.
+  const resetKey = `${sort?.key}|${sort?.direction}|${onLoadMore ? '' : rows.length}|${rows.length ? rowKey(rows[0]) : ''}`;
   const paged = usePaged(rows, pageSize, resetKey);
+  const [advanceWhenLoaded, setAdvanceWhenLoaded] = useState(false);
+  if (advanceWhenLoaded && paged.page < paged.pages) {
+    setAdvanceWhenLoaded(false);
+    paged.next();
+  }
+  const next = async () => {
+    if (paged.page < paged.pages) { paged.next(); return; }
+    if (!hasMore || !onLoadMore) return;
+    setAdvanceWhenLoaded(true);
+    await onLoadMore();
+  };
   const totalWeight = columns.reduce((sum, c) => sum + (c.weight ?? 1), 0) || 1;
 
   return (
@@ -155,7 +176,7 @@ export default function MasterDataTable({
     {/* Drawn as a ListCard footer would be, and always there once
         there are rows, so the card has the same bottom edge as every
         other list. */}
-    <TablePager {...paged} noun={noun} alwaysShow className="border-t px-4 sm:px-5" />
+    <TablePager {...paged} next={next} hasMore={hasMore} loading={loadingMore} noun={noun} alwaysShow className="border-t px-4 sm:px-5" />
     </>
   );
 }

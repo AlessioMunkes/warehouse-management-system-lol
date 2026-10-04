@@ -52,6 +52,23 @@
 //                      packing-time deduction.
 // ─────────────────────────────────────────────────────────────
 
+//
+// BENEVOLENT REQUESTS ALSO SET STOCK ASIDE
+// A manager approves a benevolent request by choosing products and
+// quantities (community_request_items). Those quantities are held back
+// from Available from approval until the worker confirms what went out,
+// or the request is declined. Same idea as a packed pallet: derived,
+// never stored, so declining or confirming releases them with no write
+// of their own. A request counts while its status is 'approved'; a line
+// flagged short_at has stopped reserving (see
+// communityRequestStock.repository.js).
+//
+// PALLETS COME FIRST. Packing a pallet must never be blocked or
+// shortened by a benevolent request, so the packing check asks for the
+// total WITHOUT the benevolent branch (includeBenevolent: false).
+// Inventory's Committed and Available, and the approval check, include
+// it.
+
 /**
  * Returns the SQL text of a subquery yielding (product_id, committed).
  *
@@ -63,11 +80,17 @@
  *   excluded anyway, but relying on transaction ordering for
  *   correctness is the kind of thing that breaks silently when
  *   someone reorders two statements later.
+ * @param {boolean} [opts.includeBenevolent=true]  false = pallets only.
+ *   The packing check passes false so benevolent reservations never
+ *   count against a pallet.
+ * @param {string}  [opts.excludeRequestParam]  A positional placeholder
+ *   for a benevolent request to leave out, so re-choosing the items on
+ *   a request does not count its own old lines against it.
  *
  *   Only ever pass a literal placeholder built by the caller, never a
  *   user-supplied value — it is interpolated into the SQL text.
  */
-export const committedStockSql = ({ excludeSlipParam = null } = {}) => `
+const PALLETS_BRANCH = (excludeSlipParam) => `
   SELECT
     i.product_id,
     SUM(i.packed_quantity)::numeric AS committed
@@ -83,4 +106,33 @@ export const committedStockSql = ({ excludeSlipParam = null } = {}) => `
   GROUP BY i.product_id
 `;
 
-export default { committedStockSql };
+// Approved, not yet confirmed, and not flagged short.
+export const benevolentBranchSql = ({ excludeRequestParam = null } = {}) => `
+  SELECT
+    cri.product_id,
+    SUM(cri.quantity_approved - cri.quantity_released)::numeric AS committed
+  FROM community_request_items cri
+  JOIN community_requests cr ON cr.id = cri.request_id
+  WHERE cr.outcome = 'approved'
+    AND cri.short_at IS NULL
+    ${excludeRequestParam ? `AND cr.id <> ${excludeRequestParam}` : ''}
+  GROUP BY cri.product_id
+`;
+
+export const committedStockSql = ({
+  excludeSlipParam = null, includeBenevolent = true, excludeRequestParam = null,
+} = {}) => {
+  const pallets = PALLETS_BRANCH(excludeSlipParam);
+  if (!includeBenevolent) return pallets;
+  return `
+  SELECT u.product_id, SUM(u.committed)::numeric AS committed
+  FROM (
+    ${pallets}
+    UNION ALL
+    ${benevolentBranchSql({ excludeRequestParam })}
+  ) u
+  GROUP BY u.product_id
+`;
+};
+
+export default { committedStockSql, benevolentBranchSql };

@@ -47,7 +47,7 @@ import {
 // Each sidebar's groups, top to bottom.
 export const MENU_GROUPS = {
   worker:  ['Overview', 'Warehouse'],
-  manager: ['Overview', 'Inbound', 'Stock', 'Outbound', 'Programmes', 'Insights'],
+  manager: ['Overview', 'Inbound', 'Donations', 'Stock', 'Outbound', 'Programmes', 'Insights'],
   admin:   ['Overview', 'Master data', 'Logs', 'Donations', 'Setup'],
 };
 
@@ -125,7 +125,7 @@ export const ROUTES = [
 
   // ── The manager's side of those two programmes ─────────────
   { id: 'communityRequests', path: STAFF.communityRequests, roles: MANAGERS_UP, shell: true,
-    nav: [nav('manager', 'Outbound', 'Benevolent requests', PhoneCall, (a) => a.communityRequests.pending)] },
+    nav: [nav('manager', 'Outbound', 'Benevolent requests', PhoneCall, (a) => (a.communityRequests.pending ?? 0) + (a.communityRequests.needsItems ?? 0))] },
   { id: 'feedTheSoil', path: STAFF.feedTheSoil, roles: MANAGERS_UP, shell: true,
     nav: [nav('manager', 'Programmes', 'Feed the Soil', Sprout)] },
 
@@ -147,19 +147,25 @@ export const ROUTES = [
     nav: [nav('admin', 'Master data', 'Products', Package)] },
   { id: 'suppliers', path: ADMIN.suppliers, roles: ADMIN_ONLY, shell: true,
     nav: [nav('admin', 'Master data', 'Suppliers', Truck)] },
-  { id: 'activity', path: ADMIN.activity, roles: ADMIN_ONLY, shell: true,
-    nav: [nav('admin', 'Logs', 'User activity', Activity)] },
-  // The door sign-in log. Managers use Volunteer Events instead.
-  { id: 'volunteerLog', path: ADMIN.volunteerLog, roles: ADMIN_ONLY, shell: true,
-    nav: [nav('admin', 'Logs', 'Volunteer log', HandHeart)] },
+  // Staff activity and the door sign-in log. Managers use Volunteer
+  // Events instead.
+  { id: 'activityLog', path: ADMIN.activityLog, roles: ADMIN_ONLY, shell: true,
+    nav: [nav('admin', 'Logs', 'Activity log', Activity)] },
   { id: 'archive', path: ADMIN.archive, roles: ADMIN_ONLY, shell: true,
     nav: [nav('admin', 'Logs', 'Archive', Archive)] },
   { id: 'messageHistory', path: ADMIN.messageHistory, roles: ADMIN_ONLY, shell: true,
     nav: [nav('admin', 'Logs', 'Message history', Inbox)] },
-  { id: 'donationManagement', path: ADMIN.donationManagement, roles: ADMIN_ONLY, shell: true,
-    nav: [nav('admin', 'Donations', 'Classification queue', Gift)] },
-  { id: 'section18a', path: ADMIN.section18aManagement, roles: ADMIN_ONLY, shell: true,
-    nav: [nav('admin', 'Donations', 'Section 18A', ScrollText)] },
+  // The queue is run by managers and admins together, so it is in both menus.
+  { id: 'donationManagement', path: ADMIN.donationManagement, roles: MANAGERS_UP, shell: true,
+    nav: [
+      nav('admin', 'Donations', 'Classification queue', Gift),
+      nav('manager', 'Donations', 'Classification queue', Gift),
+    ] },
+  { id: 'section18a', path: ADMIN.section18aManagement, roles: MANAGERS_UP, shell: true,
+    nav: [
+      nav('admin', 'Donations', 'Section 18A', ScrollText),
+      nav('manager', 'Donations', 'Section 18A', ScrollText),
+    ] },
   // Settings' Email section, at the address Google's sign-in returns to
   // and older links use. Listed in the menu as Settings.
   { id: 'emailIntegration', path: ADMIN.emailIntegration, roles: ADMIN_ONLY, shell: true },
@@ -183,6 +189,8 @@ export const REDIRECTS = [
   { from: '/decanting', to: STAFF.decanting },
   { from: '/programmes/noc/packing', to: PACKING.board },
   { from: '/programmes/noc/packing/:slipId', to: PACKING.board },
+  { from: ADMIN.legacyActivity, to: `${ADMIN.activityLog}?view=staff` },
+  { from: ADMIN.legacyVolunteerLog, to: ADMIN.activityLogVolunteers },
 ];
 
 export const routeById = (id) => ROUTES.find((r) => r.id === id);

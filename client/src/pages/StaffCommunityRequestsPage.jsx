@@ -2,8 +2,9 @@
 // client/src/pages/StaffCommunityRequestsPage.jsx
 //
 // Benevolent Requests on the warehouse floor: log a phoned-in or
-// walk-in request. Warehouse staff only; managers work the same
-// requests on CommunityRequestsPage.
+// walk-in request, and pack the ones a manager has approved (claim,
+// fetch the items, confirm what went out). Warehouse staff only;
+// managers approve, assign and decline on CommunityRequestsPage.
 // ─────────────────────────────────────────────────────────────
 import { useState } from 'react';
 import StaffShell from '../components/layout/StaffShell';

@@ -59,9 +59,16 @@ export const SLIP_STATE_LABEL = {
   cancelled:     'Cancelled',
 };
 
+// A guest volunteer holds a slip through assigned_volunteer_id, not as a
+// packer, so it needs its own label or the slip reads as unassigned.
+export const volunteerHolder = (slip) => {
+  if (!slip.assigned_volunteer_id) return '';
+  return slip.volunteer_name ? `Volunteer: ${slip.volunteer_name}` : 'Volunteer';
+};
+
 // Who holds it, for the Packer column and the panel.
 export const packers = (slip) =>
-  [slip.packer_name, slip.packer_name_2].filter(Boolean).join(' & ');
+  [slip.packer_name, slip.packer_name_2, volunteerHolder(slip)].filter(Boolean).join(' & ');
 
 // ── Views (the tabs) ──────────────────────────────────────────
 // `id` is what goes in ?status=, the value the dashboard's Needs

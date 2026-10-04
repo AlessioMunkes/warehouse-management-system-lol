@@ -87,6 +87,14 @@ describe('slipViews', () => {
 });
 
 describe('PickingSlipManagementPage', () => {
+  it('shows a pallet a volunteer is packing in the Packer column, not as unassigned', async () => {
+    api.fetchPickingSlips.mockResolvedValue([
+      slip({ id: 7, ecd_name: 'Guest Pallet ECD', status: 'in_progress', assigned_volunteer_id: '7', volunteer_name: 'Thandi' }),
+    ]);
+    render(<PickingSlipManagementPage />);
+    expect(await screen.findByText('Volunteer: Thandi')).toBeInTheDocument();
+  });
+
   it('loads the whole week, not one day', async () => {
     render(<PickingSlipManagementPage />);
     await waitFor(() => expect(api.fetchPickingSlips).toHaveBeenCalled());

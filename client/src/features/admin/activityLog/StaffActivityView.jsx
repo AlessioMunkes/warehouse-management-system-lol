@@ -1,22 +1,24 @@
 // ─────────────────────────────────────────────────────────────
-// client/src/pages/AdminUserActivityPage.jsx
+// client/src/features/admin/activityLog/StaffActivityView.jsx
 //
-// User Activity (admin): a timeline of what everyone did, with filters by
-// person, area and date. Click an entry for details; "Open the record"
-// goes to the slip, order or supplier itself. Read-only.
+// The Staff view of the admin Activity log: a timeline of what everyone
+// did, with filters by person, area and date. Click an entry for
+// details; "Open the record" goes to the slip, order or supplier itself.
+// Read-only.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import adminAPI from '../services/adminAPI';
-import { linkFor } from '../features/admin/recordLinks';
-import useTableView    from '../features/masterdata/hooks/useTableView';
-import MasterDataTable from '../features/masterdata/components/MasterDataTable';
+import adminAPI from '../../../services/adminAPI';
+import { linkFor } from '../recordLinks';
+import { fmtDateTime } from './fmtDateTime';
+import { defaultFrom, defaultTo } from './dateRange';
+import useTableView    from '../../masterdata/hooks/useTableView';
+import MasterDataTable from '../../masterdata/components/MasterDataTable';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Badge }    from '@/components/ui/badge';
 import { Input }    from '@/components/ui/input';
 import NativeSelect from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
-import PageHeader, { PageShell } from '@/components/ui/page-header';
 import ListCard from '@/components/ui/list-card';
 import ListToolbar from '@/components/ui/list-toolbar';
 import DetailPanel from '@/components/ui/detail-panel';
@@ -24,19 +26,19 @@ import EmptyState from '@/components/ui/empty-state';
 import ErrorBanner from '@/components/ui/error-banner';
 import { ExternalLink, Activity } from 'lucide-react';
 
-const SAST = 'Africa/Johannesburg';
 const ROLE_LABELS = { admin: 'Admin', manager: 'Manager', warehouse_worker: 'Warehouse staff' };
 
-const fmtDateTime = (value) => {
-  if (!value) return '—';
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString('en-ZA', {
-    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: SAST,
-  });
+// Who did what in the entries loaded so far, busiest first.
+const peopleOf = (entries) => {
+  const byPerson = new Map();
+  for (const e of entries) {
+    const key = e.actor ? e.actor.id : 'system';
+    const p = byPerson.get(key) ?? { id: key, name: e.actor?.name ?? 'System', role: e.actor?.role ?? null, count: 0 };
+    p.count += 1;
+    byPerson.set(key, p);
+  }
+  return [...byPerson.values()].sort((a, b) => b.count - a.count);
 };
-
-const isoDaysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
 
 const COLUMNS = [
   { key: 'when', label: 'When', alwaysOn: true, weight: 2.2,
@@ -114,10 +116,13 @@ function EntryDetail({ entry, onClose, onFilterPerson }) {
   );
 }
 
-export default function AdminUserActivityPage() {
+export default function StaffActivityView() {
+  // What has loaded so far, newest first. The server sends a batch at a
+  // time; Next on the last loaded page asks for the next one.
   const [data, setData] = useState(null);
-  const [from, setFrom] = useState(() => isoDaysAgo(29));
-  const [to, setTo] = useState(() => isoDaysAgo(0));
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [from, setFrom] = useState(defaultFrom);
+  const [to, setTo] = useState(defaultTo);
   const [person, setPerson] = useState('');
   const [area, setArea] = useState(null);
   const [search, setSearch] = useState('');
@@ -135,7 +140,7 @@ export default function AdminUserActivityPage() {
     try {
       const res = await adminAPI.getActivity({ from, to, user: person || undefined });
       setData(res);
-      if (!person) setEveryone(res.people ?? []);
+      if (!person) setEveryone(peopleOf(res.entries ?? []));
     } catch (err) {
       setError(err.message || 'Could not load the activity log.');
     }
@@ -151,6 +156,23 @@ export default function AdminUserActivityPage() {
     return () => { cancelled = true; };
   }, [load]);
 
+  const loadMore = async () => {
+    if (!data?.hasMore || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await adminAPI.getActivity({
+        from, to, user: person || undefined, offset: data.entries.length,
+      });
+      const merged = [...data.entries, ...(res.entries ?? [])];
+      setData({ ...res, entries: merged });
+      if (!person) setEveryone(peopleOf(merged));
+    } catch (err) {
+      setError(err.message || 'Could not load more of the activity log.');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   const entries = useMemo(() => data?.entries ?? [], [data]);
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -161,8 +183,8 @@ export default function AdminUserActivityPage() {
 
   // Everyone who did anything in the period, busiest first — the list
   // for the person picker and the summary line.
-  const people = data?.people ?? [];
-  const areaOptions = (data?.areas ?? []).map((a) => ({ value: a, label: a }));
+  const people = useMemo(() => peopleOf(entries), [entries]);
+  const areaOptions = [...new Set(entries.map((e) => e.area))].sort().map((a) => ({ value: a, label: a }));
 
   const open = (entry) => setSelected(entry);
   const filterPerson = (id) => { setPerson(id); setSelected(null); };
@@ -173,11 +195,10 @@ export default function AdminUserActivityPage() {
   const chips = person ? [{ key: 'person', label: personName, onRemove: () => filterPerson('') }] : [];
 
   return (
-    <PageShell>
-      <PageHeader
-        title="User activity"
-        description={`Review what people did in the system, newest first.${data ? ` ${entries.length} ${entries.length === 1 ? 'action' : 'actions'} by ${people.length} ${people.length === 1 ? 'person' : 'people'}, ${data.from} to ${data.to}.` : ''}${data?.truncated ? ' Showing the latest 2 000 — narrow the dates to see earlier ones.' : ''}`}
-      />
+    <>
+      <p className="mt-4 text-sm text-muted-foreground">
+        {`Review what people did in the system, newest first.${data ? ` ${entries.length} ${entries.length === 1 ? 'action' : 'actions'} by ${people.length} ${people.length === 1 ? 'person' : 'people'}, ${data.from} to ${data.to}.` : ''}${data?.hasMore ? ` Showing the latest ${entries.length}. Use Next to load more, or narrow the dates.` : ''}`}
+      </p>
 
       <ErrorBanner className="mt-4" message={error} onRetry={load} />
 
@@ -254,6 +275,9 @@ export default function AdminUserActivityPage() {
               onToggleSort={view.toggleSort}
               onOpenRow={open}
               noun="actions"
+              hasMore={Boolean(data?.hasMore)}
+              loadingMore={loadingMore}
+              onLoadMore={loadMore}
             />
           )}
         </ListCard>
@@ -262,6 +286,6 @@ export default function AdminUserActivityPage() {
       {selected ? (
         <EntryDetail key={selected.id ?? selected.at} entry={selected} onClose={() => setSelected(null)} onFilterPerson={filterPerson} />
       ) : null}
-    </PageShell>
+    </>
   );
 }

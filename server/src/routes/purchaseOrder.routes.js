@@ -29,6 +29,14 @@ router.get('/',
 router.post('/',
   auth, requireRole(...MANAGERS_UP), purchaseOrderController.create);
 
+// Link QuickBooks PO numbers to ours from an export the client has read.
+// Preview only looks; apply writes, all or nothing.
+router.post('/quickbooks-import/preview',
+  auth, requireRole(...MANAGERS_UP), purchaseOrderController.previewQuickbooksImport);
+
+router.post('/quickbooks-import/apply',
+  auth, requireRole(...MANAGERS_UP), purchaseOrderController.applyQuickbooksImport);
+
 // Last: a static path added below this would be swallowed by :id and
 // then rejected by validateIntId as a non-integer — the trap already
 // documented at the top of supplier.routes.js.
@@ -40,6 +48,11 @@ router.patch('/:id/status',
 
 router.patch('/:id/quickbooks-ref',
   auth, requireRole(...MANAGERS_UP), validateIntId, purchaseOrderController.setQuickbooksReference);
+
+// Resend the "new PO" email to Finance. Only meaningful when the first
+// send failed or never happened; the service refuses overlapping sends.
+router.post('/:id/finance-email/resend',
+  auth, requireRole(...MANAGERS_UP), validateIntId, purchaseOrderController.resendFinanceEmail);
 
 // Header + line edit, and outright removal — both restricted to a
 // 'pending' order by purchaseOrder.service.js, not by the role check

@@ -9,6 +9,7 @@
 // (features/reporting/savedReports.js).
 // ─────────────────────────────────────────────────────────────
 import repo from '../repositories/savedReport.repository.js';
+import { appBaseUrl } from '../config/appUrl.js';
 import reportingService from './reporting.service.js';
 import insightService from './reportingInsight.service.js';
 import communications from '../features/communications/communications.service.js';
@@ -25,7 +26,9 @@ const fail = (status, message) => {
   return err;
 };
 
-const appUrl = () => process.env.CLIENT_URL || process.env.FRONTEND_URL || null;
+// Null when no web address is set (appBaseUrl has logged why): the email
+// still goes, without its "Open Operations reports" link.
+const appUrl = () => appBaseUrl('savedReport');
 
 // The spec without its dates: a saved report runs over a period
 // chosen when it runs, not the one it was saved with.

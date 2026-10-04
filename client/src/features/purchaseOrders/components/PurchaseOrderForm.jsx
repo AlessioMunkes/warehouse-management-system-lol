@@ -199,19 +199,19 @@ export default function PurchaseOrderForm({
           nothing on save. */}
       {!initialValue ? (
         <Field>
-          <FieldLabel htmlFor="po-qbo">QuickBooks reference</FieldLabel>
+          <FieldLabel htmlFor="po-qbo">QuickBooks PO number (optional)</FieldLabel>
           <Input
             id="po-qbo"
             value={form.quickbooksPoId}
             onChange={set('quickbooksPoId')}
-            placeholder="Leave blank unless you have already raised it there"
+            placeholder="Leave blank"
             disabled={busy}
           />
-          {/* Warehouse Visit 2.4: the WMS owns the PO number. This is
+          {/* Warehouse Visit 2.4: we own the PO number. This is
               only where QuickBooks' own reference gets recorded, so the
               two can be reconciled until the OAuth spike lands. */}
           <FieldDescription>
-            The WMS generates the PO number. This is only QuickBooks' reference for the same order.
+            Only fill in if this order was already raised in QuickBooks.
           </FieldDescription>
         </Field>
       ) : null}

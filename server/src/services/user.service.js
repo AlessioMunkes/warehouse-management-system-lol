@@ -25,10 +25,18 @@ import repo from '../repositories/user.repository.js';
 import { isPositiveInt } from '../utils/validation.js';
 import {
   fail, clean, validUsername, validFirstName, validLastName,
-  validRole, validPassword,
+  validRole, validPassword, validOptionalEmail,
 } from '../utils/userAccountFields.js';
 
 const BCRYPT_COST = 10;
+
+// idx_users_email_unique is the last line of defence against two
+// accounts sharing an address; the pre-checks below give the friendly
+// message, this catches the race between check and write.
+const emailTaken = (email) => fail(409, `Another user already has this email address. Use a different one.`);
+
+const isEmailUniqueViolation = (err) =>
+  err?.code === '23505' && /email/i.test(`${err.constraint ?? ''} ${err.detail ?? ''}`);
 
 const requireId = (id, label = 'User') => {
   if (!isPositiveInt(id)) throw fail(400, `A valid ${label.toLowerCase()} ID is required.`);
@@ -41,6 +49,7 @@ const buildUserPayload = (body = {}) => ({
   firstName: validFirstName(body.firstName),
   lastName:  validLastName(body.lastName),
   role:      validRole(body.role),
+  email:     validOptionalEmail(body.email),
 });
 
 // ── Reads ─────────────────────────────────────────────────────
@@ -68,8 +77,18 @@ const createUser = async (body, actorId) => {
     throw fail(409, `A user with the username "${clash.username}" already exists${clash.warehouse ? ' at another warehouse' : ''}${clash.is_active ? '' : ' (currently inactive)'}.`);
   }
 
+  if (payload.email) {
+    const emailClash = await repo.findUserByEmail(payload.email);
+    if (emailClash) throw emailTaken(payload.email);
+  }
+
   const passwordHash = await bcrypt.hash(password, BCRYPT_COST);
-  return repo.insertUser({ ...payload, passwordHash }, actorId);
+  try {
+    return await repo.insertUser({ ...payload, passwordHash }, actorId);
+  } catch (err) {
+    if (isEmailUniqueViolation(err)) throw emailTaken(payload.email);
+    throw err;
+  }
 };
 
 // ── Update ────────────────────────────────────────────────────
@@ -96,6 +115,15 @@ const updateUser = async (rawId, body, actorId) => {
   if (has('lastName')) {
     patch.lastName = validLastName(body.lastName);
   }
+  if (has('email')) {
+    // null clears the address.
+    const email = validOptionalEmail(body.email);
+    if (email) {
+      const emailClash = await repo.findUserByEmail(email);
+      if (emailClash && emailClash.id !== id) throw emailTaken(email);
+    }
+    patch.email = email;
+  }
   if (has('role')) {
     const role = validRole(body.role);
     // Self-lockout guard (b): an admin cannot change their own role
@@ -108,7 +136,12 @@ const updateUser = async (rawId, body, actorId) => {
 
   if (!Object.keys(patch).length) throw fail(400, 'No changes were supplied.');
 
-  return repo.updateUser(id, patch, existing, actorId);
+  try {
+    return await repo.updateUser(id, patch, existing, actorId);
+  } catch (err) {
+    if (patch.email && isEmailUniqueViolation(err)) throw emailTaken(patch.email);
+    throw err;
+  }
 };
 
 // ── Activate / deactivate ────────────────────────────────────

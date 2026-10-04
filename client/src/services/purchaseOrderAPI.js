@@ -99,6 +99,11 @@ export const toPurchaseOrder = (row) => ({
   expectedDeliveryDate: row.expected_delivery_date ?? null,
   notes:                row.notes ?? "",
   quickbooksPoId:       row.quickbooks_po_id ?? "",
+  // Detail only. financeEmailError is already a short safe message
+  // from the server (never raw provider text).
+  financeEmailStatus:      row.finance_email_status ?? null,
+  financeEmailError:       row.finance_email_error ?? "",
+  financeEmailAttemptedAt: row.finance_email_attempted_at ?? null,
   createdByName:        row.created_by_name ?? "",
   createdAt:            row.created_at ?? null,
   lineCount:            Number(row.line_count ?? 0),
@@ -163,6 +168,27 @@ export const setQuickbooksReference = async (id, quickbooksPoId) => {
   return toPurchaseOrder(body.data ?? {});
 };
 
+// ── POST /api/purchase-orders/quickbooks-import/{preview,apply} ─
+// pairs: [{ poNumber, quickbooksNumber, overwrite? }], up to 500.
+// Both answer { rows, counts } with one row per pair, in order.
+export const previewQuickbooksImport = async (pairs) => {
+  const body = await apiPost("/api/purchase-orders/quickbooks-import/preview", { pairs });
+  return body.data ?? { rows: [], counts: {} };
+};
+
+export const applyQuickbooksImport = async (pairs) => {
+  const body = await apiPost("/api/purchase-orders/quickbooks-import/apply", { pairs });
+  return body.data ?? { rows: [], counts: {} };
+};
+
+// ── POST /api/purchase-orders/:id/finance-email/resend ──────────
+// Re-sends the new-PO email to Finance; resolves to the PO with the
+// status the attempt left behind.
+export const resendFinanceEmail = async (id) => {
+  const body = await apiPost(`/api/purchase-orders/${id}/finance-email/resend`, {});
+  return toPurchaseOrder(body.data ?? {});
+};
+
 // ── PUT /api/purchase-orders/:id ────────────────────────────────
 // Same 400 carrying missingProductIds as createPurchaseOrder — the
 // server validates an edit exactly as hard as a fresh order.
@@ -186,5 +212,6 @@ export const deletePurchaseOrder = async (id) => {
 export default {
   getPurchaseOrders, getPurchaseOrder, createPurchaseOrder,
   setPurchaseOrderStatus, approvePurchaseOrder, setQuickbooksReference,
-  updatePurchaseOrder, deletePurchaseOrder,
+  updatePurchaseOrder, deletePurchaseOrder, resendFinanceEmail,
+  previewQuickbooksImport, applyQuickbooksImport,
 };

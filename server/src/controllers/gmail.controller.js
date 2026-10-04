@@ -5,13 +5,16 @@
 // -------------------------------------------------------------
 import gmailService from '../services/gmail.service.js';
 import communications from '../features/communications/communications.service.js';
+import { resolveAppBaseUrl } from '../config/appUrl.js';
 
 const EMAIL_INTEGRATION_PATH = '/admin/email-integration';
 
 const buildEmailIntegrationRedirect = (gmailStatus) => {
   const safeStatus = gmailStatus === 'connected' ? 'connected' : 'error';
   const pathWithQuery = `${EMAIL_INTEGRATION_PATH}?gmail=${safeStatus}`;
-  const clientOrigin = String(process.env.CLIENT_ORIGIN || '').trim();
+  // The same address every other link uses. With none set, the relative
+  // path still works when the app and server share an origin.
+  const clientOrigin = resolveAppBaseUrl('gmailReturn').url || '';
 
   if (!clientOrigin) return pathWithQuery;
 

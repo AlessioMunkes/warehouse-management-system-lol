@@ -43,8 +43,9 @@ describe('createNotification duplicate insert SQL', () => {
     ['vms_sync_failed', ['manager']],
     ['stock_expiry_2_weeks', ['manager']],
     ['stock_expiry_1_week', ['manager']],
-    ['donation_review', ['admin']],
-    ['section18a_handoff_failed', ['admin']],
+    ['donation_review', ['manager', 'admin']],
+    ['section18a_handoff_failed', ['manager', 'admin']],
+    ['section18a_email_failed', ['manager', 'admin']],
     ['stock_expiry_warning_1w', ['manager']],
     ['picking_slip_created', ['warehouse_worker', 'manager']],
   ])('targets %s notifications to %j', async (type, targetRoles) => {
@@ -77,9 +78,12 @@ describe('what each role reads', () => {
     expect(hidden).not.toContain('donation_review');
   });
 
-  it('keeps admin work off the manager feed', async () => {
+  it('keeps the floor off the manager feed, but not the donation work', async () => {
     const hidden = await hiddenFor('manager');
-    expect(hidden).toEqual(expect.arrayContaining(['donation_review', 'section18a_handoff_failed']));
+    expect(hidden).toEqual(expect.arrayContaining(['picking_slip_released']));
+    expect(hidden).not.toContain('donation_review');
+    expect(hidden).not.toContain('section18a_handoff_failed');
+    expect(hidden).not.toContain('section18a_email_failed');
     expect(hidden).not.toContain('picking_slip_created');
     expect(hidden).not.toContain('low_stock');
   });

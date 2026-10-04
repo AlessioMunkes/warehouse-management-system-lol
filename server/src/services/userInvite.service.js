@@ -48,6 +48,7 @@ import crypto from 'node:crypto';
 import bcrypt from 'bcrypt';
 import inviteRepo    from '../repositories/userInvite.repository.js';
 import userRepo      from '../repositories/user.repository.js';
+import { appBaseUrl, missingAddressMessage } from '../config/appUrl.js';
 import settings from '../features/settings/settings.service.js';
 import communications from '../features/communications/communications.service.js';
 import {
@@ -60,17 +61,17 @@ const DAY_MS = 1000 * 60 * 60 * 24;
 // default.
 const inviteExpiry = async () => new Date(Date.now() + (await settings.get('invites.linkDays')) * DAY_MS);
 
-const inviteBaseUrl = () => {
-  const explicit = process.env.USER_INVITE_BASE_URL || process.env.CLIENT_URL || process.env.FRONTEND_URL;
-  return String(explicit || 'http://localhost:5173').replace(/\/$/, '');
-};
-
 const hashToken = (token) =>
   crypto.createHash('sha256').update(String(token)).digest('hex');
 
 const generateToken = () => crypto.randomBytes(32).toString('base64url');
 
-const inviteUrl = (token) => `${inviteBaseUrl()}/invite/${encodeURIComponent(token)}`;
+// null when this server has no web address to build a link from; the
+// caller does not send (see sendInviteEmail).
+const inviteUrl = (token) => {
+  const base = appBaseUrl('invite');
+  return base ? `${base}/invite/${encodeURIComponent(token)}` : null;
+};
 
 // Display labels only — every stored/validated value stays
 // warehouse_worker, matching the live users.role CHECK constraint.
@@ -124,6 +125,15 @@ const composeInviteEmail = ({ email, role, inviterName, expires_at: expiresAt },
 // ever work for that one person and 404 ("No Gmail connection found")
 // for everyone else.
 const sendInviteEmail = async (invite, url) => {
+  // No address to build the link from: never send an email with a broken
+  // one. The invite stays; the failure is recorded so it shows on the row.
+  if (!url) {
+    const failed = { status: 'failed', error: missingAddressMessage('invite') };
+    const attemptedAt = new Date();
+    await inviteRepo.recordEmailAttempt(invite.id, failed);
+    return { status: 'failed', sent: false, stubbed: false, error: failed.error, attemptedAt };
+  }
+
   let outcome;
   try {
     // invite.invited_by is the original inviter, which is who the

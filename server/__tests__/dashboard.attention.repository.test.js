@@ -24,6 +24,7 @@ beforeEach(() => {
   poolMock.query.mockImplementation(async (sql) => {
     if (/FROM picking_slips/.test(sql)) return { rows: [{ unassigned: 4, not_collected: 1 }] };
     if (/FROM purchase_orders/.test(sql)) return { rows: [{ awaiting_approval: 2, follow_up: 3 }] };
+    if (/FROM community_requests/.test(sql)) return { rows: [{ pending: 5, unclaimed: 2, needs_items: 1 }] };
     return { rows: [{ count: 5 }] };
   });
   stockRepoMock.getManifest.mockResolvedValue([
@@ -52,7 +53,7 @@ describe('getAttention', () => {
     const res = await repo.getAttention({ now: NOW });
     expect(res.pickingSlips).toEqual({ unassigned: 4, notCollected: 1 });
     expect(res.purchaseOrders).toEqual({ awaitingApproval: 2, followUp: 3 });
-    expect(res.communityRequests).toEqual({ pending: 5 });
+    expect(res.communityRequests).toEqual({ pending: 5, unclaimed: 2, needsItems: 1 });
   });
 
   it('limits slips to this Monday-to-Sunday week and reads not-collected from dispatch_events', async () => {

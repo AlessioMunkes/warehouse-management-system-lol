@@ -88,14 +88,25 @@ router.get('/',
   auth, requireRole(...MANAGERS_UP),
   async (req, res) => {
     try {
-      const data = await volunteerRepo.listGuestLog({
+      // `limit` / `offset` page through the log; without a limit it is
+      // the latest 500. One extra row is read to know if there is more.
+      const asCount = (v, fallback) => {
+        const n = Math.trunc(Number(v));
+        return Number.isFinite(n) && n >= 0 ? n : fallback;
+      };
+      const limit = Math.min(Math.max(asCount(req.query.limit, 500), 1), 500);
+      const fetched = await volunteerRepo.listGuestLog({
         search: typeof req.query.search === 'string' && req.query.search.trim()
           ? req.query.search.trim()
           : null,
         from: asDate(req.query.from),
         to:   asDate(req.query.to),
+        limit: limit + 1,
+        offset: asCount(req.query.offset, 0),
       });
-      return res.status(200).json({ success: true, data });
+      const hasMore = fetched.length > limit;
+      const data = fetched.slice(0, limit);
+      return res.status(200).json({ success: true, data, hasMore });
     } catch (error) {
       console.error('[volunteers:log]', error.message);
       return res.status(500).json({ success: false, message: 'Failed to load the guest log.' });

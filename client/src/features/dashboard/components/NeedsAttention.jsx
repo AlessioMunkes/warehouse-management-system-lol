@@ -54,12 +54,18 @@ const lines = (a) => [
   { key: 'lowStock', tone: 'warn', icon: TrendingDown, count: a.inventory.lowStock,
     text: (n) => `${plural(n, 'product is', 'products are')} at or below the reorder level`,
     to: `${INVENTORY}?status=lowstock` },
+  { key: 'requestsNeedItems', tone: 'warn', image: 'pending-benevolent-requests', count: a.communityRequests.needsItems,
+    text: (n) => `${plural(n, 'benevolent request needs', 'benevolent requests need')} new items`,
+    to: `${STAFF.communityRequests}?status=needs-items` },
   { key: 'pendingRequests', tone: 'warn', image: 'pending-benevolent-requests', count: a.communityRequests.pending,
-    text: (n) => `${plural(n, 'benevolent request is', 'benevolent requests are')} still open`,
-    to: STAFF.communityRequests },
+    text: (n) => `${plural(n, 'benevolent request is', 'benevolent requests are')} waiting for approval`,
+    to: `${STAFF.communityRequests}?status=pending` },
   { key: 'unassigned', tone: 'info', image: 'unclaimed-slips', count: a.pickingSlips.unassigned,
     text: (n) => `${plural(n, 'slip', 'slips')} this week nobody has claimed yet`,
     to: `${STAFF.pickingSlips}?status=unassigned` },
+  { key: 'unclaimedRequests', tone: 'info', image: 'pending-benevolent-requests', count: a.communityRequests.unclaimed,
+    text: (n) => `${plural(n, 'approved request has', 'approved requests have')} not been claimed yet`,
+    to: `${STAFF.communityRequests}?status=approved` },
 ];
 
 const TONE = {

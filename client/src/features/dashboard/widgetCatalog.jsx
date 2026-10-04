@@ -30,7 +30,7 @@
 // the Month / 3 months / Year menu.
 // ─────────────────────────────────────────────────────────────
 import {
-  ClipboardList, FileBadge, Gift, HandHeart, Mail, Package,
+  Activity, ClipboardList, FileBadge, Gift, HandHeart, Mail, Package,
   PackageSearch, ScrollText, Truck, Users2, Warehouse,
 } from 'lucide-react';
 import StatTile from './components/StatTile';
@@ -115,6 +115,25 @@ export const WIDGETS = [
     render: ({ summary }) => (
       <StatTile image="pending-benevolent-requests" label="Pending benevolent requests" value={summary.pendingCommunityRequests}
         to={STAFF.communityRequests} warn />
+    ),
+  }),
+
+  // The same queue, for the manager's own board (a widget is one role's).
+  tile({
+    id: 'donations-to-review', title: 'Donations to review', roles: MANAGER_ONLY, needs: ['donations'],
+    description: 'Donations and flagged items waiting in the classification queue.',
+    render: ({ donations }) => (
+      <StatTile icon={Gift} label="Donations to review" value={donations} to={ADMIN.donationManagement} warn />
+    ),
+  }),
+
+  // The same certificates, for the manager's own board (a widget is one role's).
+  tile({
+    id: 'certificates-for-managers', title: 'Certificates to issue', roles: MANAGER_ONLY, needs: ['s18a'],
+    description: 'Section 18A certificates queued and ready to be issued to donors.',
+    render: ({ s18a }) => (
+      <StatTile icon={FileBadge} label="Section 18A certificates to issue" value={s18a.queued ?? 0}
+        to={ADMIN.section18aManagement} warn />
     ),
   }),
 
@@ -243,7 +262,7 @@ export const WIDGETS = [
     id: 'on-site-now', title: 'Visitors signed in now', roles: ADMIN_ONLY, needs: ['visits'],
     description: 'Guests signed in at the door who have not signed out.',
     render: ({ visits }) => (
-      <StatTile icon={HandHeart} label="Visitors signed in now" value={visits.filter((v) => !v.signedOutAt).length} to={ADMIN.volunteerLog} />
+      <StatTile icon={HandHeart} label="Visitors signed in now" value={visits.filter((v) => !v.signedOutAt).length} to={ADMIN.activityLogVolunteers} />
     ),
   }),
 
@@ -317,8 +336,8 @@ export const WIDGETS = [
       <div className="grid gap-3 sm:grid-cols-2">
         <ActionCard to={ADMIN.users} icon={Users2} title="Users"
           description="Create accounts, set roles, deactivate someone who has left." />
-        <ActionCard to={ADMIN.volunteerLog} icon={HandHeart} title="Volunteer log"
-          description="See who signed in at the door and sign out open visits." />
+        <ActionCard to={ADMIN.activityLog} icon={Activity} title="Activity log"
+          description="See what staff did, and who signed in at the door." />
         <ActionCard to={ADMIN.products} icon={Package} title="Products"
           description="Add and edit the products the warehouse stocks." />
         <ActionCard to={ADMIN.suppliers} icon={Truck} title="Suppliers"
@@ -344,7 +363,7 @@ export const sizeOf = (w) => (w.kind === 'tile' ? 'small' : w.wide ? 'large' : '
 // What each dashboard starts with, and what Reset goes back to.
 export const DEFAULT_LAYOUT = {
   [MANAGER]: [
-    'low-stock', 'open-pos', 'dispatches-today', 'deliveries-today', 'benevolent',
+    'low-stock', 'open-pos', 'dispatches-today', 'deliveries-today', 'benevolent', 'donations-to-review',
     'top-products', 'product-health', 'by-beneficiary', 'dispatch-trend',
   ],
   [ADMIN_ROLE]: [

@@ -17,6 +17,7 @@ const repoMock = {
   listUsers:         vi.fn(),
   getUserById:       vi.fn(),
   findUserByUsername: vi.fn(),
+  findUserByEmail:   vi.fn(),
   insertUser:        vi.fn(),
   updateUser:        vi.fn(),
   setUserActive:     vi.fn(),
@@ -42,6 +43,7 @@ const body = (over = {}) => ({
 beforeEach(() => {
   vi.clearAllMocks();
   repoMock.findUserByUsername.mockResolvedValue(null);
+  repoMock.findUserByEmail.mockResolvedValue(null);
   repoMock.getUserById.mockResolvedValue(existingUser());
   repoMock.insertUser.mockResolvedValue({ id: 900, ...existingUser() });
   repoMock.updateUser.mockResolvedValue(existingUser());
@@ -203,5 +205,104 @@ describe('setUserStatus', () => {
     const result = await userService.setUserStatus(OTHER_ID, { isActive: false }, ADMIN_ID);
     expect(repoMock.setUserActive).not.toHaveBeenCalled();
     expect(result.is_active).toBe(false);
+  });
+});
+
+describe('email on accounts', () => {
+  const uniqueViolation = () => Object.assign(new Error('duplicate key'), {
+    code: '23505', constraint: 'idx_users_email_unique',
+  });
+
+  describe('update', () => {
+    it('sets an email, trimmed and lowercased', async () => {
+      await userService.updateUser(OTHER_ID, { email: '  Jane.Doe@Example.COM ' }, ADMIN_ID);
+      expect(repoMock.findUserByEmail).toHaveBeenCalledWith('jane.doe@example.com');
+      expect(repoMock.updateUser).toHaveBeenCalledWith(
+        OTHER_ID, { email: 'jane.doe@example.com' }, expect.anything(), ADMIN_ID,
+      );
+    });
+
+    it('changes an existing email', async () => {
+      repoMock.getUserById.mockResolvedValue(existingUser({ email: 'old@example.com' }));
+      await userService.updateUser(OTHER_ID, { email: 'new@example.com' }, ADMIN_ID);
+      expect(repoMock.updateUser.mock.calls[0][1]).toEqual({ email: 'new@example.com' });
+    });
+
+    it.each(['', '   ', null])('clears the email when given %j', async (blank) => {
+      repoMock.getUserById.mockResolvedValue(existingUser({ email: 'old@example.com' }));
+      await userService.updateUser(OTHER_ID, { email: blank }, ADMIN_ID);
+      expect(repoMock.updateUser.mock.calls[0][1]).toEqual({ email: null });
+      expect(repoMock.findUserByEmail).not.toHaveBeenCalled();
+    });
+
+    it.each(['not-an-email', 'a@b', 'a b@c.com', '@c.com'])('rejects an invalid email %j with 400', async (bad) => {
+      await expect(userService.updateUser(OTHER_ID, { email: bad }, ADMIN_ID))
+        .rejects.toMatchObject({ status: 400 });
+      expect(repoMock.updateUser).not.toHaveBeenCalled();
+    });
+
+    it('does not touch email when the body omits it', async () => {
+      await userService.updateUser(OTHER_ID, { firstName: 'Janet' }, ADMIN_ID);
+      expect(repoMock.updateUser.mock.calls[0][1]).toEqual({ firstName: 'Janet' });
+    });
+
+    it('409s when another account already has the email, whatever its case', async () => {
+      repoMock.findUserByEmail.mockResolvedValue({ id: 99, username: 'other', email: 'taken@example.com' });
+      await expect(userService.updateUser(OTHER_ID, { email: 'TAKEN@Example.com' }, ADMIN_ID))
+        .rejects.toMatchObject({ status: 409, message: 'Another user already has this email address. Use a different one.' });
+      expect(repoMock.findUserByEmail).toHaveBeenCalledWith('taken@example.com');
+      expect(repoMock.updateUser).not.toHaveBeenCalled();
+    });
+
+    it('lets an account re-save its own email', async () => {
+      repoMock.findUserByEmail.mockResolvedValue({ id: OTHER_ID, username: 'jdoe', email: 'me@example.com' });
+      await userService.updateUser(OTHER_ID, { email: 'ME@example.com' }, ADMIN_ID);
+      expect(repoMock.updateUser).toHaveBeenCalled();
+    });
+
+    it('turns the unique-index violation from a racing write into a 409', async () => {
+      repoMock.updateUser.mockRejectedValue(uniqueViolation());
+      await expect(userService.updateUser(OTHER_ID, { email: 'race@example.com' }, ADMIN_ID))
+        .rejects.toMatchObject({ status: 409 });
+    });
+
+    it('does not mislabel other database errors as an email clash', async () => {
+      const boom = Object.assign(new Error('boom'), { code: '23505', constraint: 'users_username_key' });
+      repoMock.updateUser.mockRejectedValue(boom);
+      await expect(userService.updateUser(OTHER_ID, { email: 'x@example.com' }, ADMIN_ID))
+        .rejects.toBe(boom);
+    });
+  });
+
+  describe('create', () => {
+    it('stores an optional email, lowercased', async () => {
+      await userService.createUser(body({ email: ' New@Example.com ' }), ADMIN_ID);
+      expect(repoMock.insertUser.mock.calls[0][0]).toMatchObject({ email: 'new@example.com' });
+    });
+
+    it('creates without an email (null)', async () => {
+      await userService.createUser(body(), ADMIN_ID);
+      expect(repoMock.insertUser.mock.calls[0][0].email).toBeNull();
+      expect(repoMock.findUserByEmail).not.toHaveBeenCalled();
+    });
+
+    it('rejects an invalid email with 400', async () => {
+      await expect(userService.createUser(body({ email: 'nope' }), ADMIN_ID))
+        .rejects.toMatchObject({ status: 400 });
+      expect(repoMock.insertUser).not.toHaveBeenCalled();
+    });
+
+    it('409s on a duplicate email', async () => {
+      repoMock.findUserByEmail.mockResolvedValue({ id: 5, username: 'someone', email: 'dup@example.com' });
+      await expect(userService.createUser(body({ email: 'DUP@example.com' }), ADMIN_ID))
+        .rejects.toMatchObject({ status: 409 });
+      expect(repoMock.insertUser).not.toHaveBeenCalled();
+    });
+
+    it('turns the unique-index violation into a 409', async () => {
+      repoMock.insertUser.mockRejectedValue(uniqueViolation());
+      await expect(userService.createUser(body({ email: 'race@example.com' }), ADMIN_ID))
+        .rejects.toMatchObject({ status: 409 });
+    });
   });
 });
