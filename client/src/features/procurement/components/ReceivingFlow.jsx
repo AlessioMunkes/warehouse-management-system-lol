@@ -35,7 +35,7 @@
 // of the numbers, so a tablet that sleeps does not lose the count —
 // see hooks/useDraft.js. That refills the form; it never submits.
 // ─────────────────────────────────────────────────────────────
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { takeUrlParam } from '../../staff/resumeParam';
 import {
   StepScreen, Actions, Button, SelectField, DateField,
@@ -225,6 +225,14 @@ export default function ReceivingFlow({ onCrumbChange }) {
   const [attemptKey, setAttemptKey] = useState(newIdempotencyKey);
 
   const step = STEP_META[phase];
+
+  // The shell's "‹ Choose a delivery" on the counting screen. Going back
+  // keeps the order, the counts and the ticks (startCounting below picks
+  // the same list straight back up). Not offered while something is being
+  // saved or the delivery is waiting to go out.
+  const returned = useRef(false);
+  const goBackToWhich = useCallback(() => { returned.current = true; setPhase('which'); }, []);
+  const canGoBack = phase === 'work' && !saving && !queued;
   const draftKey = orderId ? `receiving-${orderId}` : null;
   // Which order `lines` belongs to, set in the same update as the
   // lines themselves, never from orderId: in Form mode orderId changes
@@ -269,8 +277,10 @@ export default function ReceivingFlow({ onCrumbChange }) {
       label: step.label,
       step: phase === 'done' ? null : step.n,
       total: phase === 'done' ? null : TOTAL_STEPS,
+      back: canGoBack ? goBackToWhich : null,
+      backLabel: canGoBack ? 'Choose a delivery' : null,
     });
-  }, [step.label, step.n, phase, onCrumbChange]);
+  }, [step.label, step.n, phase, canGoBack, goBackToWhich, onCrumbChange]);
 
   const supplierName = useMemo(
     () => suppliers.find((s) => String(s.id) === String(supplierId))?.name ?? 'this supplier',
@@ -313,6 +323,14 @@ export default function ReceivingFlow({ onCrumbChange }) {
   // onChange, in the same tick as setOrderId(value), so a stale read
   // would fetch items for the previously selected order.
   const startCounting = async (poId) => {
+    // Coming back to the same order from the step back: nothing was lost,
+    // so open it as it was, counts and ticks included.
+    if (returned.current && linesKey === `receiving-${poId}` && lines.length > 0) {
+      returned.current = false;
+      setPhase('work');
+      return;
+    }
+    returned.current = false;
     setSaving(true);
     setError(null);
     // A different order is a different job; nothing on it is ticked.

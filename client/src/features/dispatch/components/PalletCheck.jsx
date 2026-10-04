@@ -30,7 +30,7 @@
 // dispatch.service.js's collect(): a pallet booked for another day is
 // recorded rather than gated, same as a written-off one.
 // ─────────────────────────────────────────────────────────────
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   StepScreen, Actions, Button, TextField, Notice, KeyValues,
   ViewToggle, Coachmark,
@@ -129,6 +129,11 @@ export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChan
 
   const draftKey = palletId ? `dispatch-${palletId}` : null;
 
+  // Set when the step back is used, so starting again on the same pallet
+  // keeps its ticks (see startCollection). Declared here, above the effect
+  // that clears it for a new pallet.
+  const returned = useRef(false);
+
   // A fresh pallet is a fresh session — DispatchPage keeps this
   // component mounted across pallets (only `palletId` changes), so
   // none of the previous pallet's state, or its idempotency key, may
@@ -142,6 +147,7 @@ export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChan
       setLoading(true);
       setLoadError(null);
       setPhase('which');
+      returned.current = false;
       setFocusId(null);
       setOverrideReason('');
       setDriverName('');
@@ -195,6 +201,13 @@ export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChan
   }, [palletId]);
 
   const step = STEP_META[phase];
+
+  // Within a pallet, the shell's "‹ Check the pallet" on the loading
+  // screen goes back to the pallet's details (on the first screen the page
+  // keeps its own "‹ Gate queue"). What was entered stays, and so do the
+  // ticks. Not offered while the collection is being saved.
+  const goBackToWhich = useCallback(() => { returned.current = true; setPhase('which'); }, []);
+  const canGoBack = phase === 'work' && !saving && !queued;
   // Matches ReceivingFlow's own placement: visible from the first
   // screen, not held back for the load-and-release step. Hiding it
   // until "work" read, from the floor, as though only Receiving had
@@ -211,8 +224,13 @@ export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChan
       label: step.label,
       step: phase === 'done' ? null : step.n,
       total: phase === 'done' ? null : TOTAL_STEPS,
+      back: canGoBack ? goBackToWhich : null,
+      backLabel: canGoBack ? 'Check the pallet' : null,
+      // While the collection is being saved the page offers no way out at
+      // all, not even its own "‹ Gate queue".
+      locked: phase === 'work' && saving,
     });
-  }, [step.label, step.n, phase, onCrumbChange]);
+  }, [step.label, step.n, phase, canGoBack, saving, goBackToWhich, onCrumbChange]);
   const eligibility = gateView?.eligibility || {};
 
   // Only lines that were actually packed can be loaded — the same
@@ -260,8 +278,10 @@ export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChan
     setPhase('work');
     setFocusId(mode === 'guided' ? (packedLines[0]?.itemId ?? null) : null);
     // A pallet you have just opened has nothing confirmed on it, and
-    // this component stays mounted across pallets.
-    resetConfirmed();
+    // this component stays mounted across pallets. Coming back from the
+    // step back is the same pallet, so its ticks stay.
+    if (!returned.current) resetConfirmed();
+    returned.current = false;
   };
 
   const patchLine = (itemId, patch) =>

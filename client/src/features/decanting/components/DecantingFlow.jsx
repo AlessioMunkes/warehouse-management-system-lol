@@ -57,7 +57,7 @@
 // about what a variance between planned and produced bags should
 // mean, which is not this script's call to make.
 // ─────────────────────────────────────────────────────────────
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   StepScreen, Actions, Button, NumberField, SelectField, Notice,
   KeyValues, ViewToggle, Coachmark,
@@ -207,6 +207,12 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
   const [pdfRecord, setPdfRecord] = useState(null);
 
   const step = STEP_META[phase];
+
+  // The shell's "‹ Choose the sack" on the weighing screen. Everything
+  // typed so far stays in this component, so Next brings it all back. Not
+  // offered while the bag plan or the save is running.
+  const goBackToWhich = useCallback(() => setPhase('which'), []);
+  const canGoBack = phase === 'work' && !busy;
   const weekOf = useMemo(() => mondayOfThisWeek(), []);
   // Matches ReceivingFlow's own placement: visible from the first
   // screen, not held back for the counting step. Hiding it until
@@ -220,8 +226,10 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
       label: step.label,
       step: phase === 'done' ? null : step.n,
       total: phase === 'done' ? null : TOTAL_STEPS,
+      back: canGoBack ? goBackToWhich : null,
+      backLabel: canGoBack ? 'Choose the sack' : null,
     });
-  }, [step.label, step.n, phase, onCrumbChange]);
+  }, [step.label, step.n, phase, canGoBack, goBackToWhich, onCrumbChange]);
 
   useEffect(() => {
     if (!showCoachmark || !showToggle) return undefined;

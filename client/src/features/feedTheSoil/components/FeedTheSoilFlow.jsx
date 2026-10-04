@@ -36,7 +36,7 @@
 // Built from the same StepPrimitives/TaskPage/usePaged vocabulary as
 // Receiving, Packing and Decanting.
 // ─────────────────────────────────────────────────────────────
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Actions, Button, TextField, DateField, NumberField, Notice, KeyValues,
 } from '../../staff/components/StepPrimitives';
@@ -116,6 +116,27 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
   // ── Dispatch form state ───────────────────────────────────
   const [dispatchedTo, setDispatchedTo] = useState('');
 
+  // Each screen's parent: where its shell "‹" goes. The same places the
+  // Cancel and Back buttons on those screens already go. Not offered while
+  // something is being saved. (The functions it calls are declared below;
+  // they are only called later, when the button is pressed.)
+  const backTarget = busy ? null : ({
+    kitDetail: { label: 'Kits', run: () => backToBrowse('kits') },
+    recordDetail: recordOrigin === 'kit' && selectedRecord?.kit_id
+      ? { label: 'Kit', run: () => openKit(selectedRecord.kit_id) }
+      : { label: 'Compost records', run: () => backToBrowse('records') },
+    dispatch: selectedRecord
+      ? { label: 'Record', run: () => openRecord(selectedRecord.id, { fromKit: recordOrigin === 'kit' }) }
+      : null,
+    assign: { label: 'Kits', run: () => backToBrowse('kits') },
+    logPickKit: { label: 'Compost records', run: () => backToBrowse('records') },
+    log: selectedKit ? { label: 'Kit', run: () => openKit(selectedKit.id) } : null,
+  }[phase] ?? null);
+  const backLabel = backTarget?.label ?? null;
+  const backRef = useRef(null);
+  useEffect(() => { backRef.current = backTarget?.run ?? null; });
+  const goBackStep = useCallback(() => backRef.current?.(), []);
+
   useEffect(() => {
     const crumb = phase === 'kitDetail' ? (selectedKit ? `Kit / ${selectedKit.owner_name}` : 'Kit')
       : phase === 'recordDetail' ? 'Record'
@@ -124,8 +145,8 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
       : phase === 'logPickKit' ? 'Log a collection'
       : phase === 'log' ? 'Log compost'
       : tab === 'records' ? 'Compost records' : 'Kits';
-    onCrumbChange?.(crumb);
-  }, [phase, tab, selectedKit, onCrumbChange]);
+    onCrumbChange?.({ crumb, back: backLabel ? goBackStep : null, backLabel });
+  }, [phase, tab, selectedKit, backLabel, goBackStep, onCrumbChange]);
 
   const loadRecords = useCallback(async (search) => {
     setBrowseError(null);
