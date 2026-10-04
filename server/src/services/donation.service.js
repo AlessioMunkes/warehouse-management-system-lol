@@ -45,6 +45,7 @@ import certificateSettingsService from './certificateSettings.service.js';
 import communications from '../features/communications/communications.service.js';
 import pdfProvider from '../providers/pdf.provider.js';
 import crypto from 'crypto';
+import { appBaseUrl, missingAddressMessage } from '../config/appUrl.js';
 
 // ── fail ───────────────────────────────────────────────────────
 // Mirrors stock.service.js and picking.service.js. Without a
@@ -57,15 +58,14 @@ const fail = (status, message) => {
   throw err;
 };
 
-const section18AFormBaseUrl = () => {
-  const explicit = process.env.SECTION18A_FORM_BASE_URL || process.env.CLIENT_URL || process.env.FRONTEND_URL;
-  return String(explicit || 'http://localhost:5173').replace(/\/$/, '');
-};
-
 const hashSection18AToken = (token) =>
   crypto.createHash('sha256').update(String(token)).digest('hex');
 
+// Null when this server has no web address to build the link from: no
+// token is saved for a link nobody can open.
 const createSection18AFormToken = async (donationId) => {
+  const base = appBaseUrl('section18a');
+  if (!base) return null;
   const token = crypto.randomBytes(32).toString('base64url');
   const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30);
   await donationModel.saveSection18AFormToken({
@@ -75,7 +75,7 @@ const createSection18AFormToken = async (donationId) => {
   });
   return {
     token,
-    url: `${section18AFormBaseUrl()}/section-18a/${encodeURIComponent(token)}`,
+    url: `${base}/section-18a/${encodeURIComponent(token)}`,
     expiresAt,
   };
 };
@@ -978,6 +978,26 @@ const sendThankYouEmail = async (donation, sentByUserId = null) => {
   let section18ALink = null;
   if (donation.section_18a_status === 'queued' || donation.section_18a_status === 'qualifying_pending_donor') {
     const token = await createSection18AFormToken(donation.id);
+    if (!token) {
+      // The donor is owed that link. Do not send a thank-you that leaves it
+      // out; record the failure so it shows in Email history to be resent.
+      return await donationModel.logDonationEmail({
+        donationId: donation.id,
+        donorId: donation.donor_id ?? null,
+        certificateId: null,
+        emailType: 'THANK_YOU',
+        recipient,
+        recipientEmail: recipient,
+        recipientName: donation.donor_name || null,
+        subject: 'Thank you for your donation',
+        status: 'FAILED',
+        providerMessageId: null,
+        gmailMessageId: null,
+        gmailThreadId: null,
+        errorMessage: missingAddressMessage('section18a'),
+        sentByUserId,
+      });
+    }
     section18ALink = token.url;
   }
   const emailContent = generateThankYouEmailContent(donation, section18ALink);

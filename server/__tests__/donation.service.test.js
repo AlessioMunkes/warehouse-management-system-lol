@@ -467,6 +467,48 @@ describe('createDonation — records rather than refuses', () => {
     }));
   });
 
+  it('sends no thank-you without the Section 18A link when this server has no web address, and records the failure', async () => {
+    const donation = {
+      id: 42,
+      donation_category: 'recipe_food',
+      estimated_value_zar: 5000,
+      donor_name: 'Pick n Pay',
+      donor_contact: 'tax@example.test',
+      donor_tax_reference: '9012345678',
+      donor_consent_given: true,
+      section_18a_status: 'queued',
+      section_18a_qualifying: true,
+      received_at: '2026-09-10T10:00:00.000Z',
+      items: [{ line_no: 1, description: 'Rice', quantity: 25, unit: 'kg', estimated_value_zar: 5000 }],
+    };
+    repoMock.getDonationById.mockResolvedValue(donation);
+    vi.stubEnv('NODE_ENV', 'production');
+    ['APP_BASE_URL', 'SECTION18A_FORM_BASE_URL', 'CLIENT_URL', 'FRONTEND_URL', 'CLIENT_ORIGIN']
+      .forEach((name) => vi.stubEnv(name, ''));
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      await donationService.createDonation(validBody({
+        estimatedValueZar: 5000,
+        donorName: 'Pick n Pay',
+        donorContact: 'tax@example.test',
+        donorTaxReference: '9012345678',
+        donorConsentGiven: true,
+      }), USER_ID);
+
+      expect(repoMock.saveSection18AFormToken).not.toHaveBeenCalled();
+      expect(repoMock.logDonationEmail).toHaveBeenCalledWith(expect.objectContaining({
+        donationId: 42,
+        emailType: 'THANK_YOU',
+        status: 'FAILED',
+        errorMessage: expect.stringContaining('web address'),
+      }));
+      expect(log.mock.calls.some(([m]) => String(m).includes('[links]'))).toBe(true);
+    } finally {
+      log.mockRestore();
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('records add-on food even when there are no eligible ECDs to split across', async () => {
     repoMock.getEligibleEcdCentres.mockResolvedValue([]);
 

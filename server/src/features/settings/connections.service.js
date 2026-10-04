@@ -24,6 +24,7 @@ import { getAdapter } from '../../services/vmsIntegration.service.js';
 import mockVMSAdapter from '../../integrations/mockVMS.adapter.js';
 import vmsSyncRepo from '../../repositories/vmsSync.repository.js';
 import { EMAIL_ENABLED } from '../../config/email.js';
+import { LINK_KINDS, resolveAppBaseUrl } from '../../config/appUrl.js';
 import { isEnabled as aiEnabled, providerName as aiProvider } from '../reporting/ai/provider.js';
 
 const TIME_LIMIT_MS = 8000;
@@ -135,21 +136,34 @@ const volunteerSystem = async () => {
   };
 };
 
-const emailLinks = async () => {
-  const base = process.env.USER_INVITE_BASE_URL || process.env.PASSWORD_RESET_BASE_URL
-    || process.env.FRONTEND_URL || process.env.CLIENT_URL || process.env.CLIENT_ORIGIN || '';
-  const local = !base || /localhost|127\.0\.0\.1/.test(base);
+// One line per kind of link, from the same helper the code that builds the
+// link asks (config/appUrl.js), so this cannot say "fine" while the link
+// points somewhere else.
+const linkCheck = (kind) => async () => {
+  const { url, source, isDevDefault } = resolveAppBaseUrl(kind);
+  const { detail } = LINK_KINDS[kind];
+  if (!url) {
+    return {
+      status: 'down',
+      summary: 'No web address set',
+      detail: `${detail} Set APP_BASE_URL on the server.`,
+    };
+  }
+  const local = /localhost|127\.0\.0\.1/.test(url);
   if (local && process.env.NODE_ENV === 'production') {
     return {
       status: 'down',
-      summary: base ? `Links point at ${base}` : 'No web address set',
-      detail: 'Invite and password-reset links in emails would not open for anyone else.',
+      summary: `Points at ${url}`,
+      detail: `${detail} A link to this address would not open for anyone else. Set APP_BASE_URL.`,
     };
+  }
+  if (isDevDefault) {
+    return { status: 'warning', summary: `Using the development address ${url}`, detail };
   }
   return {
     status: local ? 'warning' : 'ok',
-    summary: base ? `Links point at ${base}` : 'No web address set',
-    detail: 'The address used in invite and password-reset emails, and on pallet label QR codes.',
+    summary: `Points at ${url}`,
+    detail: `${detail} Read from ${source}.`,
   };
 };
 
@@ -174,7 +188,7 @@ const scheduledJobs = async () => {
 const CHECKS = [
   { id: 'database',  name: 'Database',              run: database },
   { id: 'email',     name: 'Email (Gmail)',         run: email },
-  { id: 'links',     name: 'Links in emails',       run: emailLinks },
+  ...Object.entries(LINK_KINDS).map(([kind, { label }]) => ({ id: `link-${kind}`, name: label, run: linkCheck(kind) })),
   { id: 'jobs',      name: 'Scheduled jobs',        run: scheduledJobs },
   { id: 'assistant', name: 'AI assistant',          run: assistant },
   { id: 'push',      name: 'Phone notifications',   run: push },

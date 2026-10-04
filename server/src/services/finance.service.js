@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import financeRepository from '../repositories/finance.repository.js';
 import communications from '../features/communications/communications.service.js';
+import { appBaseUrl, missingAddressMessage } from '../config/appUrl.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -142,16 +143,7 @@ const saveEmailSettings = async ({ recipientEmail, updatedBy } = {}) => {
   }));
 };
 
-const publicOrigin = () => {
-  const origin = String(process.env.CLIENT_ORIGIN || '').trim();
-  return origin.replace(/\/+$/, '');
-};
-
-const buildPublicFinanceReportUrl = (token) => {
-  const path = `/finance/report/${token}`;
-  const origin = publicOrigin();
-  return origin ? `${origin}${path}` : path;
-};
+const buildPublicFinanceReportUrl = (base, token) => `${base}/finance/report/${token}`;
 
 const sendFinanceReportLink = async ({ sentBy } = {}) => {
   const settings = await getEmailSettings();
@@ -159,8 +151,13 @@ const sendFinanceReportLink = async ({ sentBy } = {}) => {
     fail(400, 'Save a Finance recipient email before sending the report link.');
   }
 
+  // Checked before making a new link: a new link turns the old one off, so
+  // it must not happen for an email that cannot be sent.
+  const base = appBaseUrl('financeReport');
+  if (!base) fail(503, missingAddressMessage('financeReport'));
+
   const link = await regenerateReportLink({ createdBy: sentBy });
-  const url = buildPublicFinanceReportUrl(link.token);
+  const url = buildPublicFinanceReportUrl(base, link.token);
   const subject = 'Warehouse Finance Report Link';
   const text = [
     'Hello,',

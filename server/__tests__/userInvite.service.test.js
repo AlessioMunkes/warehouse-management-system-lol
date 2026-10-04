@@ -92,6 +92,53 @@ beforeEach(() => {
 });
 
 // ── createInvite ────────────────────────────────────────────────
+
+const NO_ADDRESS_VARS = [
+  'APP_BASE_URL', 'USER_INVITE_BASE_URL', 'PASSWORD_RESET_BASE_URL', 'SECTION18A_FORM_BASE_URL',
+  'CLIENT_URL', 'FRONTEND_URL', 'CLIENT_ORIGIN',
+];
+const inProductionWithNoAddress = async (fn) => {
+  vi.stubEnv('NODE_ENV', 'production');
+  NO_ADDRESS_VARS.forEach((name) => vi.stubEnv(name, ''));
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  try {
+    await fn(log);
+  } finally {
+    log.mockRestore();
+    vi.unstubAllEnvs();
+  }
+};
+
+describe('createInvite — a server with no web address (production)', () => {
+  it('keeps the invite but sends nothing, and says why', async () => {
+    await inProductionWithNoAddress(async (log) => {
+      const result = await userInviteService.createInvite({ email: 'jane@example.com', role: 'warehouse_worker' }, ADMIN_ID);
+
+      expect(result.url).toBeNull();
+      expect(emailProviderMock.sendEmail).not.toHaveBeenCalled();
+      expect(result.email).toMatchObject({ sent: false, stubbed: false, error: expect.stringContaining('web address') });
+      expect(result.invite.emailStatus).toBe('failed');
+      expect(inviteRepoMock.recordEmailAttempt).toHaveBeenCalledWith(10, expect.objectContaining({ status: 'failed' }));
+      expect(log.mock.calls.some(([m]) => String(m).includes('[links]'))).toBe(true);
+    });
+  });
+
+  it('still sends when the live site only sets CLIENT_URL and CLIENT_ORIGIN', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('APP_BASE_URL', '');
+    vi.stubEnv('USER_INVITE_BASE_URL', '');
+    vi.stubEnv('CLIENT_URL', 'https://wms.example/');
+    vi.stubEnv('CLIENT_ORIGIN', 'https://wms-origin.example');
+    try {
+      const result = await userInviteService.createInvite({ email: 'jane@example.com', role: 'warehouse_worker' }, ADMIN_ID);
+      expect(result.url).toBe(`https://wms.example/invite/${encodeURIComponent(result.token)}`);
+      expect(emailProviderMock.sendEmail).toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+});
+
 describe('createInvite', () => {
   it('requires an email', async () => {
     await expect(userInviteService.createInvite({ role: 'warehouse_worker' }, ADMIN_ID))

@@ -5,7 +5,7 @@
 // each outside service reports ok / warning / down / off, and one that
 // fails or hangs never takes the others down with it.
 // ─────────────────────────────────────────────────────────────
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const poolMock = { query: vi.fn() };
 const gmailMock = { checkOrganisationConnection: vi.fn() };
@@ -43,7 +43,77 @@ describe('Settings → Connections', () => {
   it('checks every connection, with when it checked', async () => {
     const result = await checkConnections();
     expect(result.checkedAt).toBeTruthy();
-    expect(result.connections.map((c) => c.id)).toEqual(['database', 'email', 'links', 'jobs', 'assistant', 'push', 'vms']);
+    expect(result.connections.map((c) => c.id)).toEqual([
+      'database', 'email',
+      'link-invite', 'link-passwordReset', 'link-section18a', 'link-financeReport', 'link-gmailReturn', 'link-savedReport',
+      'jobs', 'assistant', 'push', 'vms',
+    ]);
+  });
+
+  describe('links in emails, one line per kind', () => {
+    const ALL = [
+      'APP_BASE_URL', 'USER_INVITE_BASE_URL', 'PASSWORD_RESET_BASE_URL', 'SECTION18A_FORM_BASE_URL',
+      'CLIENT_URL', 'FRONTEND_URL', 'CLIENT_ORIGIN',
+    ];
+    const KINDS = ['invite', 'passwordReset', 'section18a', 'financeReport', 'gmailReturn', 'savedReport'];
+    const linkLines = async () => {
+      const all = await byId();
+      return Object.fromEntries(KINDS.map((k) => [k, all[`link-${k}`]]));
+    };
+    const env = (vars, nodeEnv) => {
+      ALL.forEach((n) => vi.stubEnv(n, ''));
+      Object.entries(vars).forEach(([n, v]) => vi.stubEnv(n, v));
+      vi.stubEnv('NODE_ENV', nodeEnv);
+    };
+    afterEach(() => vi.unstubAllEnvs());
+
+    it('names each kind and where its address came from', async () => {
+      env({ APP_BASE_URL: 'https://wms.example' }, 'production');
+      const lines = await linkLines();
+      for (const k of KINDS) {
+        expect(lines[k], k).toMatchObject({ status: 'ok', summary: 'Points at https://wms.example' });
+        expect(lines[k].detail, k).toContain('Read from APP_BASE_URL');
+      }
+      expect(lines.invite.name).toBe('Invite links');
+      expect(lines.financeReport.name).toBe('Finance report links');
+    });
+
+    it('shows a link whose own override points somewhere else', async () => {
+      env({ APP_BASE_URL: 'https://wms.example', USER_INVITE_BASE_URL: 'https://join.example' }, 'production');
+      const lines = await linkLines();
+      expect(lines.invite).toMatchObject({ summary: 'Points at https://join.example' });
+      expect(lines.invite.detail).toContain('Read from USER_INVITE_BASE_URL');
+      expect(lines.passwordReset.summary).toBe('Points at https://wms.example');
+    });
+
+    it('agrees with the code when only the older names are set: the live site stays green', async () => {
+      env({ CLIENT_URL: 'https://wms.example', CLIENT_ORIGIN: 'https://wms-origin.example' }, 'production');
+      const lines = await linkLines();
+      expect(lines.invite.summary).toBe('Points at https://wms.example');
+      expect(lines.financeReport.summary).toBe('Points at https://wms-origin.example');
+      expect(KINDS.every((k) => lines[k].status === 'ok')).toBe(true);
+    });
+
+    it('is down for every kind in production with nothing set', async () => {
+      env({}, 'production');
+      const lines = await linkLines();
+      for (const k of KINDS) {
+        expect(lines[k], k).toMatchObject({ status: 'down', summary: 'No web address set' });
+        expect(lines[k].detail, k).toContain('APP_BASE_URL');
+      }
+    });
+
+    it('is down in production when the address is localhost', async () => {
+      env({ APP_BASE_URL: 'http://localhost:5173' }, 'production');
+      expect((await linkLines()).invite).toMatchObject({ status: 'down', summary: 'Points at http://localhost:5173' });
+    });
+
+    it('is a warning, not a fault, on the development default', async () => {
+      env({}, 'development');
+      expect((await linkLines()).invite).toMatchObject({
+        status: 'warning', summary: 'Using the development address http://localhost:5173',
+      });
+    });
   });
 
   it('reports the database connected', async () => {

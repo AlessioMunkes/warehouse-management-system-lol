@@ -35,6 +35,7 @@ import bcrypt from 'bcrypt';
 import resetRepo     from '../repositories/passwordReset.repository.js';
 import userRepo       from '../repositories/user.repository.js';
 import communications from '../features/communications/communications.service.js';
+import { appBaseUrl } from '../config/appUrl.js';
 import { fail, clean, validPassword } from '../utils/userAccountFields.js';
 
 const BCRYPT_COST      = 10;
@@ -42,14 +43,8 @@ const RESET_TTL_MS     = 1000 * 60 * 60; // 1 hour
 
 const GENERIC_MESSAGE = "If that email is registered, we've sent a link to reset your password.";
 
-const resetBaseUrl = () => {
-  const explicit = process.env.PASSWORD_RESET_BASE_URL || process.env.CLIENT_URL || process.env.FRONTEND_URL;
-  return String(explicit || 'http://localhost:5173').replace(/\/$/, '');
-};
-
 const hashToken    = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
 const generateToken = () => crypto.randomBytes(32).toString('base64url');
-const resetUrl      = (token) => `${resetBaseUrl()}/reset-password/${encodeURIComponent(token)}`;
 
 const composeResetEmail = (email, url) => {
   const expiresLine = 'This link expires in 1 hour and can only be used once.';
@@ -126,6 +121,11 @@ const performRequestSideEffects = async (email, ip) => {
   const recent = await resetRepo.findRecentActiveByUserId(user.id);
   if (recent) return;
 
+  // No web address to build the link from (appBaseUrl has logged why):
+  // do not create a reset nobody can use, or send a broken link.
+  const base = appBaseUrl('passwordReset');
+  if (!base) return;
+
   const token = generateToken();
   const reset = await resetRepo.createReset({
     userId:      user.id,
@@ -134,7 +134,7 @@ const performRequestSideEffects = async (email, ip) => {
     requestedIp: ip || null,
   });
 
-  await sendResetEmail(reset, email, resetUrl(token));
+  await sendResetEmail(reset, email, `${base}/reset-password/${encodeURIComponent(token)}`);
 };
 
 // ── Request (public) ─────────────────────────────────────────
