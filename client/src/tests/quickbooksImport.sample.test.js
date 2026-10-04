@@ -5,6 +5,7 @@
 // showing what the demo script says it shows. If the reader changes and
 // this fails, the script and the file need updating together.
 // ─────────────────────────────────────────────────────────────
+/* global process */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
