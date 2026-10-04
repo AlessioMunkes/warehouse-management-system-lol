@@ -79,7 +79,7 @@ const GuestLoginPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim()) {
-      setError('Name is required.');
+      setError('Enter your name.');
       return;
     }
     if (mustChooseSite && !warehouse) {
@@ -99,7 +99,7 @@ const GuestLoginPage = () => {
       navigate('/guest-home', { replace: true });
     } catch (err) {
       console.error('Guest sign-in failed:', err);
-      setError(err?.message || 'Could not sign you in. Please try again.');
+      setError(err?.message || 'Could not sign you in. Try again.');
       setIsSubmitting(false);
     }
   };
@@ -137,27 +137,25 @@ const GuestLoginPage = () => {
                 onClick={() => navigate(LANDING)}
                 className="login-forgot-link"
               >
-                ← BACK TO HOME
+                ← Back to start
               </button>
             </div>
-            <CardTitle className="login-title">GUEST LOG IN</CardTitle>
+            <CardTitle className="login-title">Volunteer sign in</CardTitle>
             <CardDescription className="login-subtitle">
-              Please fill in your details to continue
+              Enter your name to start.
             </CardDescription>
           </CardHeader>
 
           <CardContent className="login-card-body">
-            <p className="login-section-title">GUEST SIGN IN</p>
-
             {error && (
-              <div className="login-notice-error">⚠ {error.toUpperCase()}</div>
+              <div className="login-notice-error">⚠ {error}</div>
             )}
 
             <form onSubmit={handleSubmit} className="login-form">
 
               {/* Full name field — the only field on this page */}
               <div className="login-field">
-                <Label htmlFor="name" className="login-label">FULL NAME</Label>
+                <Label htmlFor="name" className="login-label">Your name</Label>
                 <Input
                   id="name"
                   type="text"
@@ -166,7 +164,7 @@ const GuestLoginPage = () => {
                     setName(e.target.value);
                     setError('');
                   }}
-                  placeholder="e.g. THABO MOKOENA"
+                  placeholder="e.g. Thabo Mokoena"
                   className="login-input"
                 />
               </div>
@@ -174,7 +172,7 @@ const GuestLoginPage = () => {
               {/* Multi-warehouse only: which site the volunteer is at */}
               {mustChooseSite && (
                 <div className="login-field">
-                  <Label htmlFor="warehouse" className="login-label">WAREHOUSE</Label>
+                  <Label htmlFor="warehouse" className="login-label">Warehouse</Label>
                   <select
                     id="warehouse"
                     value={warehouse}
@@ -195,7 +193,7 @@ const GuestLoginPage = () => {
 
               {/* Primary sign-in button */}
               <Button type="submit" className="login-btn-primary" disabled={isSubmitting} loading={isSubmitting}>
-                {isSubmitting ? 'SIGNING IN…' : 'LOGIN'}
+                {isSubmitting ? 'Signing in…' : 'Sign in'}
               </Button>
 
               {/* Back to employee sign-in */}
@@ -205,7 +203,7 @@ const GuestLoginPage = () => {
                 onClick={() => navigate('/login')}
                 className="login-btn-guest"
               >
-                ← BACK TO EMPLOYEE SIGN IN
+                ← Staff sign in
               </Button>
             </form>
           </CardContent>

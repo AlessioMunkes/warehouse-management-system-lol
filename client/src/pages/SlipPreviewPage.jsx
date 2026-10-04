@@ -19,10 +19,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useGuestSignOut } from '../features/guest/useGuestSignOut';
 import { fetchSlipPreview, claimSlipByToken } from '../services/guestSlipAPI';
 import {
   GuestShell, GuestScreen, PlaceBar, Button, Notice,
-  PalletCard, HelpNote, Loading,
+  PalletCard, HelpNote, Loading, SignOutConfirm,
 } from '../features/guest/components/GuestPrimitives';
 
 const SlipPreviewPage = () => {
@@ -39,6 +40,25 @@ const SlipPreviewPage = () => {
   const [busy, setBusy]   = useState(false);
 
   const alreadySignedIn = user?.role === 'guest';
+  const flow = useGuestSignOut();
+
+  // Explicit routes, never navigate(-1): a scan can be the first page in
+  // the tab, so "back" might leave the app. A signed-in guest's start is
+  // their pallet list; everyone else's is the landing page.
+  const startPath = alreadySignedIn ? '/guest-home' : '/';
+  const exitButtons = (
+    <>
+      <SignOutConfirm flow={flow} />
+      <Button variant="ghost" onClick={() => navigate(startPath)} disabled={busy || flow.busy || flow.confirming || flow.checkFailed}>
+        Back to start
+      </Button>
+      {alreadySignedIn ? (
+        <Button variant="ghost" onClick={flow.request} disabled={busy || flow.confirming || flow.checkFailed} loading={flow.busy}>
+          Sign out
+        </Button>
+      ) : null}
+    </>
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -55,7 +75,11 @@ const SlipPreviewPage = () => {
     try {
       const data = await claimSlipByToken(token, volunteerName);
       refreshFromClaim(data.user);
-      navigate('/guest/pack', { replace: true });
+      // The preview is replaced by the pallet list, then packing is
+      // pushed on top: back from packing (or the thank-you page, which
+      // replaces packing) lands on the list, not on a poster link.
+      navigate('/guest-home', { replace: true });
+      navigate('/guest/pack');
     } catch (err) {
       setError(err.message);
       setBusy(false);
@@ -72,10 +96,11 @@ const SlipPreviewPage = () => {
       <GuestShell>
         <GuestScreen
           title="We could not find that pallet"
-          lede="The code may have been typed wrong, or this pallet may already be finished."
+          lede="The code may be mistyped, or the pallet may be finished."
         >
           <Notice tone="warn">{error || 'That code did not match a pallet.'}</Notice>
           <Button onClick={() => navigate('/guest')}>Sign in without a code</Button>
+          {exitButtons}
           <HelpNote>Still stuck?</HelpNote>
         </GuestScreen>
       </GuestShell>
@@ -93,7 +118,7 @@ const SlipPreviewPage = () => {
       <GuestShell>
         <GuestScreen
           title="First — what should we call you?"
-          lede="So we can thank you properly at the end. That is the only reason we ask."
+          lede="So we can thank you at the end. That is the only reason we ask."
         >
           <PlaceBar items={[
             { text: 'Packing for' },
@@ -129,7 +154,7 @@ const SlipPreviewPage = () => {
               {busy ? 'Just a moment…' : 'Start packing'}
             </button>
             <Button variant="ghost" onClick={() => setStep('preview')} disabled={busy}>
-              Back
+              Back to pallet
             </Button>
           </form>
 
@@ -144,15 +169,15 @@ const SlipPreviewPage = () => {
     <GuestShell>
       <GuestScreen
         title="You’ve found a pallet"
-        lede="Here is what this one is, and who it feeds."
+        lede="Check this is the pallet you are standing at."
       >
         <PalletCard slip={slip} />
 
         <div className="gst-card gst-card-quiet">
-          <p className="gst-card-meta" style={{ color: 'var(--gst-ink)' }}>
+          <p className="gst-card-meta gst-text-ink">
             {slip.itemCount === 0
               ? 'There is nothing listed on this pallet yet. A staff member will need to sort that out before it can be packed.'
-              : `You will go through ${slip.itemCount} thing${slip.itemCount === 1 ? '' : 's'}, one at a time. Nothing is timed, and you can ask for help at any point.`}
+              : `You will go through ${slip.itemCount} thing${slip.itemCount === 1 ? '' : 's'}, one at a time. There is no rush, and you can ask for help at any point.`}
           </p>
         </div>
 
@@ -178,6 +203,8 @@ const SlipPreviewPage = () => {
             See today’s other pallets
           </Button>
         )}
+
+        {exitButtons}
 
         <HelpNote>Not the pallet you are standing at?</HelpNote>
       </GuestScreen>

@@ -20,43 +20,28 @@
 // volunteers.signed_out_at, which is what the volunteer-hours report is
 // built on. Before Phase 0.3 nothing set it and the metric was empty.
 // ─────────────────────────────────────────────────────────────
-import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-  GuestShell, GuestScreen, Button, Notice, HelpNote,
+  GuestShell, GuestScreen, Button, Notice, HelpNote, SignOutConfirm,
 } from '../features/guest/components/GuestPrimitives';
+import { useGuestSignOut } from '../features/guest/useGuestSignOut';
 import { formatDay, displayName, beneficiaryKind as beneficiaryKindOf } from '../features/guest/guestFormat';
 
 const GuestDonePage = () => {
   const { state } = useLocation();
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
-  const [busy, setBusy] = useState(false);
+  const { user } = useAuth();
 
   const summary = state?.summary ?? null;
   const name = displayName(user?.firstName);
 
-  // Navigate BEFORE clearing the session, not after.
-  //
-  // This screen sits inside ProtectedRoute, which renders
-  // <Navigate to="/login"> the moment the user becomes null. Awaiting
-  // logout() first therefore handed the volunteer to the staff login —
-  // "EMPLOYEE LOG IN · AUTHORISED PERSONNEL ONLY" — as the last thing
-  // they saw after giving up their morning. Leaving the protected route
-  // first means that redirect never has a chance to fire.
-  //
-  // The landing page, not /guest: it carries "I'm volunteering today",
-  // so a volunteer coming back tomorrow has a way in, and it reads as
-  // the front door rather than a form.
-  //
-  // logout() is still awaited so the visit is properly signed out; it
-  // just is not what decides where they end up.
-  const signOut = async () => {
-    setBusy(true);
-    navigate('/', { replace: true });
-    await logout();               // closes the visit AND clears the cookie
-  };
+  // Sign-out lives in useGuestSignOut: it lands on the front door
+  // (navigating BEFORE the session is cleared, so ProtectedRoute never
+  // bounces the volunteer to the staff login) and asks first if they
+  // somehow still hold a pallet.
+  const flow = useGuestSignOut();
+  const busy = flow.busy || flow.confirming || flow.checkFailed;
 
   // Reached without state — a refresh, or a direct link. Say thank you
   // properly rather than inventing numbers to fill the space.
@@ -67,13 +52,14 @@ const GuestDonePage = () => {
           title={`Thank you, ${name}`}
           lede="Your pallet is finished and on its way."
         >
-          <Button onClick={signOut} disabled={busy} loading={busy}>
-            {busy ? 'Signing you out…' : 'Sign out'}
-          </Button>
-          <Button variant="ghost" onClick={() => navigate('/guest-home')}>
+          <SignOutConfirm flow={flow} />
+          <Button onClick={() => navigate('/guest-home')} disabled={busy}>
             Pack another pallet
           </Button>
-          <HelpNote>Anything you want to tell a staff member before you go?</HelpNote>
+          <Button variant="secondary" onClick={flow.request} disabled={busy} loading={flow.busy}>
+            {flow.busy ? 'Signing you out…' : 'Sign out'}
+          </Button>
+          <HelpNote>Need to tell us something? Let a staff member know before you go.</HelpNote>
         </GuestScreen>
       </GuestShell>
     );
@@ -93,7 +79,8 @@ const GuestDonePage = () => {
         lede="That pallet is packed and ready to go out. Here is what you did."
       >
         {/* The headline figure — what they physically packed. */}
-        <div className="gst-card gst-animate-pop" style={{ textAlign: 'center' }}>
+        <div className="gst-celebrate gst-animate-pop">
+          <span className="gst-seal" aria-hidden="true">✓</span>
           <span className="gst-figure">{unitsPacked || itemsPacked}</span>
           <span className="gst-figure-label">
             {unitsPacked
@@ -103,14 +90,12 @@ const GuestDonePage = () => {
         </div>
 
         <div className="gst-figure-row">
-          <div className="gst-card">
-            <span className="gst-figure" style={{ fontSize: '2.5rem' }}>{itemsPacked}</span>
+          <div className="gst-card gst-stat">
+            <span className="gst-figure gst-figure-sm is-packed">{itemsPacked}</span>
             <span className="gst-figure-label">things packed</span>
           </div>
-          <div className="gst-card">
-            <span className="gst-figure" style={{ fontSize: '2.5rem', color: 'var(--gst-ink)' }}>
-              {itemsFlagged}
-            </span>
+          <div className="gst-card gst-stat">
+            <span className="gst-figure gst-figure-sm">{itemsFlagged}</span>
             <span className="gst-figure-label">
               {itemsFlagged === 1 ? 'problem reported' : 'problems reported'}
             </span>
@@ -122,7 +107,7 @@ const GuestDonePage = () => {
             a made-up number here would be the worst kind. */}
         <div className="gst-card gst-card-quiet">
           <h2 className="gst-card-title">Where it’s going</h2>
-          <p className="gst-card-meta" style={{ color: 'var(--gst-ink)' }}>
+          <p className="gst-card-meta gst-text-ink">
             This pallet goes to <strong>{beneficiary}</strong>
             {`, ${kind.article} ${kind.noun}`}
             {childCount ? <> that feeds <strong>{childCount} children</strong></> : ''}
@@ -132,27 +117,29 @@ const GuestDonePage = () => {
 
         {itemsFlagged > 0 ? (
           <Notice tone="info">
-            The {itemsFlagged === 1 ? 'problem' : 'problems'} you reported {itemsFlagged === 1 ? 'has' : 'have'} been
-            passed to a staff member. Thank you for flagging {itemsFlagged === 1 ? 'it' : 'them'} —
-            that is genuinely useful.
+            A staff member has {itemsFlagged === 1 ? 'your report' : 'your reports'}.
+            Thank you for flagging {itemsFlagged === 1 ? 'it' : 'them'}.
           </Notice>
         ) : null}
 
-        <div className="gst-card gst-card-quiet">
-          <p className="gst-card-meta" style={{ color: 'var(--gst-ink)', textAlign: 'center' }}>
+        <div className="gst-card gst-card-quiet gst-thanks">
+          <p className="gst-card-meta gst-text-ink">
             Ladles of Love could not do this without people giving up their time.
             Thank you for giving yours today.
           </p>
         </div>
 
-        <Button onClick={signOut} disabled={busy} loading={busy}>
-          {busy ? 'Signing you out…' : 'Sign out — I’m finished'}
-        </Button>
-        <Button variant="secondary" onClick={() => navigate('/guest-home')} disabled={busy}>
+        {/* Keep them going: another pallet is the primary action, and
+            sign-out stays clearly visible as the outlined one. */}
+        <SignOutConfirm flow={flow} />
+        <Button onClick={() => navigate('/guest-home')} disabled={busy}>
           Pack another pallet
         </Button>
+        <Button variant="secondary" onClick={flow.request} disabled={busy} loading={flow.busy}>
+          {flow.busy ? 'Signing you out…' : 'Sign out'}
+        </Button>
 
-        <HelpNote>Anything you want to tell a staff member before you go?</HelpNote>
+        <HelpNote>Need to tell us something? Let a staff member know before you go.</HelpNote>
       </GuestScreen>
     </GuestShell>
   );

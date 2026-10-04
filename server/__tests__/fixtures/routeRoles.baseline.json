@@ -203,6 +203,7 @@
   "slip.routes.js GET /available": "guest",
   "slip.routes.js POST /claim/:id": "guest",
   "slip.routes.js GET /mine": "guest",
+  "slip.routes.js POST /release": "guest",
   "slip.routes.js GET /code/:code": "no role check",
   "slip.routes.js POST /code/:code/claim": "no role check",
   "slip.routes.js GET /:token": "no role check",
