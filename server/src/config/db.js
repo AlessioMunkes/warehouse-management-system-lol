@@ -24,7 +24,7 @@
 // instance that doesn't use SSL at all.
 // ─────────────────────────────────────────────────────────────
 import pg from 'pg';
-import { createDbRouter, parseWarehouseUrls } from './dbRouter.js';
+import { createDbRouter, parseWarehouseUrls, POOL_OPTIONS } from './dbRouter.js';
 import { currentWarehouse } from './warehouseContext.js';
 
 const { Pool } = pg;
@@ -65,11 +65,18 @@ pool.on('error', (err, _client, warehouse) => {
 // Fail fast at startup if any database is unreachable, as before.
 // In multi mode every warehouse is checked: a site whose database is
 // down should stop the deploy, not fail on its first request.
+//
+// It also opens the connections the pool keeps back (POOL_OPTIONS.min),
+// side by side, so the first page somebody opens — which asks five or
+// six things at once — does not wait for each to connect.
 const startupTargets = pool.isMultiWarehouse ? pool.warehouseCodes : [null];
+const warm = Math.max(1, Math.min(POOL_OPTIONS.min, POOL_OPTIONS.max));
 
 Promise.all(
   startupTargets.map((code) =>
-    pool.poolForWarehouse(code).query('SELECT 1').then(
+    Promise.all(
+      Array.from({ length: warm }, () => pool.poolForWarehouse(code).query('SELECT 1'))
+    ).then(
       () => code,
       (err) => { throw Object.assign(err, { warehouse: code }); }
     )

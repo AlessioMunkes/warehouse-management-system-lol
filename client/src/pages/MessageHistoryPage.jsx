@@ -11,6 +11,11 @@
 // tabs by outcome, the message type as a filter chip, the table. The
 // server pages in fifties; Next on the last loaded page fetches more.
 //
+// A row opens the message in the panel every other list uses
+// (ui/detail-panel.jsx): the whole subject, address and failure reason,
+// which the table has to squeeze. With it docked the table keeps only
+// when, what and the outcome.
+//
 // History starts from the day migration 032 was applied: senders
 // recorded their own outcomes elsewhere before that (each sender's own
 // screen still shows those).
@@ -27,6 +32,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import PageHeader, { PageShell } from '@/components/ui/page-header';
 import ListCard from '@/components/ui/list-card';
 import ErrorBanner from '@/components/ui/error-banner';
+import DetailPanel from '@/components/ui/detail-panel';
+import { useDockWidth } from '@/components/layout/detailDock';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -63,8 +70,43 @@ const About = ({ m }) => {
   return <span className="text-muted-foreground">{words.charAt(0).toUpperCase() + words.slice(1)} #{m.relatedId}</span>;
 };
 
+const Fact = ({ label, children }) => (
+  <div className="min-w-0">
+    <dt className="text-muted-foreground">{label}</dt>
+    <dd className="break-words">{children}</dd>
+  </div>
+);
+
+function MessagePanel({ message: m, typeLabel, onClose }) {
+  return (
+    <DetailPanel
+      open
+      onClose={onClose}
+      eyebrow={fmtWhen(m.attemptedAt)}
+      title={typeLabel[m.type] ?? m.type}
+      badges={<StatusBadge kind="message" status={m.status}>{STATUS_LABEL[m.status] ?? m.status}</StatusBadge>}
+    >
+      {m.error ? (
+        <div className="rounded-xl border border-danger/30 bg-danger-soft p-4 text-sm">
+          <p className="font-medium text-danger">Why it failed</p>
+          <p className="mt-1 break-words text-danger">{m.error}</p>
+        </div>
+      ) : null}
+      <dl className="grid gap-4 text-sm sm:grid-cols-2">
+        <div className="sm:col-span-2"><Fact label="Subject">{m.subject || '—'}</Fact></div>
+        <Fact label="To">{m.recipient || '—'}</Fact>
+        <Fact label="Sent by">{m.sentByName || 'The system'}</Fact>
+        <Fact label="About"><About m={m} /></Fact>
+      </dl>
+    </DetailPanel>
+  );
+}
+
 export default function MessageHistoryPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const [openId, setOpenId] = useState(null);
+  // A record docked beside the list: keep when, what and the outcome.
+  const docked = useDockWidth() > 0;
   const view = viewById(searchParams.get('status'));
   const [type, setType] = useState('');
 
@@ -119,6 +161,7 @@ export default function MessageHistoryPage() {
   };
 
   const typeLabel = useMemo(() => Object.fromEntries(types.map((t) => [t.key, t.label])), [types]);
+  const opened = openId == null ? null : messages.find((m) => m.id === openId) ?? null;
 
   const changeView = (id) => {
     setIsLoading(true);
@@ -175,33 +218,45 @@ export default function MessageHistoryPage() {
             <TableRow>
               <TableHead className="w-[150px] pl-4 sm:pl-5">When</TableHead>
               <TableHead>Message</TableHead>
-              <TableHead>To</TableHead>
+              {docked ? null : <TableHead>To</TableHead>}
               <TableHead>Outcome</TableHead>
-              <TableHead>About</TableHead>
-              <TableHead>Sent by</TableHead>
+              {docked ? null : <TableHead>About</TableHead>}
+              {docked ? null : <TableHead>Sent by</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {page.slice.map((m) => (
-              <TableRow key={m.id}>
+              <TableRow
+                key={m.id}
+                className="cursor-pointer"
+                data-state={m.id === openId ? 'selected' : undefined}
+                onClick={() => setOpenId(m.id)}
+              >
                 <TableCell className="whitespace-nowrap pl-4 sm:pl-5 text-xs text-muted-foreground">{fmtWhen(m.attemptedAt)}</TableCell>
                 <TableCell className="max-w-[260px] whitespace-normal">
                   <span className="block font-medium">{typeLabel[m.type] ?? m.type}</span>
                   <span className="block break-words text-xs text-muted-foreground">{m.subject || '—'}</span>
                 </TableCell>
-                <TableCell className="max-w-[200px] break-words whitespace-normal text-sm">{m.recipient || '—'}</TableCell>
+                {docked ? null : (
+                  <TableCell className="max-w-[200px] break-words whitespace-normal text-sm">{m.recipient || '—'}</TableCell>
+                )}
                 <TableCell className="whitespace-normal">
                   <StatusBadge kind="message" status={m.status}>{STATUS_LABEL[m.status] ?? m.status}</StatusBadge>
                   {m.error ? <span className="mt-1 block break-words text-xs text-danger">{m.error}</span> : null}
                 </TableCell>
-                <TableCell className="text-sm"><About m={m} /></TableCell>
-                <TableCell className="text-xs">{m.sentByName || 'The system'}</TableCell>
+                {docked ? null : (
+                  // The link goes to the order; it should not also open the message.
+                  <TableCell className="text-sm" onClick={(e) => e.stopPropagation()}><About m={m} /></TableCell>
+                )}
+                {docked ? null : <TableCell className="text-xs">{m.sentByName || 'The system'}</TableCell>}
               </TableRow>
             ))}
           </TableBody>
         </Table>
         )}
       </ListCard>
+
+      {opened ? <MessagePanel message={opened} typeLabel={typeLabel} onClose={() => setOpenId(null)} /> : null}
     </PageShell>
   );
 }

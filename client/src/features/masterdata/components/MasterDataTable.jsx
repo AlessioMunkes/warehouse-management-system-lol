@@ -48,6 +48,7 @@ import {
 import { ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react';
 import TablePager from '@/components/ui/table-pager';
 import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
+import { rowIntent } from '@/lib/recordCache';
 
 // A number column is centred, header and all, so the label sits over
 // its values.
@@ -71,6 +72,9 @@ export default function MasterDataTable({
   // attribute, so a caller that needs something else does not have to
   // come back here for it.
   rowAttrs,
+  // Called when the pointer rests on a row or presses it, so the page
+  // can ask for that record before the click lands (lib/recordCache.js).
+  onRowIntent,
   // Fifteen rows a page, with Previous / Next underneath once there
   // are more. Every list that renders through here gets it — users,
   // products, suppliers, beneficiaries, purchase orders, the door log.
@@ -159,6 +163,7 @@ export default function MasterDataTable({
             key={rowKey(row)}
             className="cursor-pointer"
             onClick={() => onOpenRow(row)}
+            {...(onRowIntent ? rowIntent(() => onRowIntent(row)) : null)}
             {...(rowAttrs ? rowAttrs(row) : null)}
           >
             {columns.map((col) => (

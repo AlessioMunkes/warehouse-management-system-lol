@@ -98,6 +98,27 @@ export const parseWarehouseUrls = (raw) => {
  * @param {object}   [opts.warehouseUrls] multi mode, from parseWarehouseUrls
  * @param {Function} opts.getWarehouse   returns the active warehouse code or null
  */
+// KEEPING CONNECTIONS OPEN
+// pg's defaults close a connection after ten idle seconds and keep
+// none back. Opening one to a hosted database is several round trips
+// (TCP, TLS, sign-in) — over a second from South Africa to a European
+// region — so every page opened after a short pause paid that before
+// its first query ran. `min` keeps a few open for good, the longer idle
+// time stops the rest being thrown away between two clicks, and
+// keepAlive stops a router in between from quietly dropping them.
+// DB_POOL_MAX / DB_POOL_MIN override the sizes; a hosted pooler caps
+// connections per database, so max stays modest.
+const intFromEnv = (name, fallback) => {
+  const n = Number.parseInt(process.env[name] ?? '', 10);
+  return Number.isInteger(n) && n >= 0 ? n : fallback;
+};
+export const POOL_OPTIONS = Object.freeze({
+  max: intFromEnv('DB_POOL_MAX', 10),
+  min: intFromEnv('DB_POOL_MIN', 6),
+  idleTimeoutMillis: 5 * 60 * 1000,
+  keepAlive: true,
+});
+
 export const createDbRouter = ({ PoolImpl, ssl, databaseUrl, warehouseUrls, getWarehouse }) => {
   const multi = warehouseUrls != null;
   if (!multi && !databaseUrl) {
@@ -115,7 +136,7 @@ export const createDbRouter = ({ PoolImpl, ssl, databaseUrl, warehouseUrls, getW
     if (!connectionString) {
       throw new WarehouseContextError(`[db] Unknown warehouse "${code}".`);
     }
-    p = new PoolImpl({ connectionString, ssl });
+    p = new PoolImpl({ connectionString, ssl, ...POOL_OPTIONS });
     for (const [event, handler] of listeners) {
       p.on(event, (...args) => handler(...args, multi ? code : null));
     }

@@ -36,6 +36,7 @@ import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
 import {
   SLIP_STATE_LABEL, canAssign, canRelease, dayLabel, filterSlips, packers, slipState,
 } from '../slipViews';
+import { rowIntent } from '@/lib/recordCache';
 
 // Problems first when sorting by status.
 const STATE_RANK = {
@@ -99,7 +100,7 @@ function BulkAssign({ slips, workers, onAssign }) {
 
 export default function SlipList({
   slips = [], view = 'all', isLoading = false, workers = [], weekText = '',
-  onOpen, onAssign, onRelease, onPrintLabels,
+  onOpen, onIntent, onAssign, onRelease, onPrintLabels,
 }) {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState(() => new Set());
@@ -212,6 +213,7 @@ export default function SlipList({
                   data-state={ticked ? 'selected' : undefined}
                   className="cursor-pointer"
                   onClick={() => onOpen(slip.id)}
+                  {...(onIntent ? rowIntent(() => onIntent(slip.id)) : null)}
                 >
                   <TableCell className="w-10 pl-4 sm:pl-5" onClick={(e) => e.stopPropagation()}>
                     <Checkbox checked={ticked} onCheckedChange={() => toggleOne(slip.id)} aria-label={`Select ${slip.ecd_name}`} />

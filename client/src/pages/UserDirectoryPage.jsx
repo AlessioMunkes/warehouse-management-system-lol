@@ -44,6 +44,7 @@ import DetailPanel   from '@/components/ui/detail-panel';
 import EmptyState    from '@/components/ui/empty-state';
 import ErrorBanner   from '@/components/ui/error-banner';
 import { Plus, Pencil, Power, Trash2, Users } from 'lucide-react';
+import { useRecordCache } from '@/lib/recordCache';
 
 const CAN_MANAGE = ['admin'];
 
@@ -219,10 +220,13 @@ export default function UserDirectoryPage() {
     return () => { cancelled = true; };
   }, [includeInactive, search]);
 
-  const open = async (id) => {
+  // A row click reuses what resting on the row already asked for; every
+  // other caller (after a save, from a link) reads the record again.
+  const records = useRecordCache((id) => userAPI.getUser(id));
+  const open = async (id, { fresh = true } = {}) => {
     setError(null);
     try {
-      setSelected(await userAPI.getUser(id));
+      setSelected(await records.load(id, { fresh }));
       setMode('list');
     } catch (err) { setError(err.message); }
   };
@@ -428,7 +432,8 @@ export default function UserDirectoryPage() {
               rows={visibleUsers}
               sort={view.sort}
               onToggleSort={view.toggleSort}
-              onOpenRow={(u) => open(u.id)}
+              onOpenRow={(u) => open(u.id, { fresh: false })}
+              onRowIntent={(u) => records.warm(u.id)}
               noun="users"
             />
           )}

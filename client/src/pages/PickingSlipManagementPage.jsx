@@ -45,6 +45,7 @@ import { GenerateSlipsForm, CreateSlipForm, EditSlipForm } from '../features/pic
 import {
   VIEWS, countViews, shiftWeek, todaySast, viewById, weekLabel, weekOf,
 } from '../features/pickingSlips/slipViews';
+import { useRecordCache } from '@/lib/recordCache';
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
@@ -116,12 +117,15 @@ export default function PickingSlipManagementPage() {
     setSearchParams(id === 'all' ? {} : { status: id }, { replace: true });
   };
 
-  const openSlip = useCallback(async (slipId) => {
+  // A row click reuses what resting on the row already asked for; every
+  // other caller (after a change, from a link) reads the slip again.
+  const records = useRecordCache((slipId) => fetchPickingSlip(slipId));
+  const openSlip = useCallback(async (slipId, { fresh = true } = {}) => {
     setError(null);
     try {
-      setOpen(await fetchPickingSlip(slipId));
+      setOpen(await records.load(slipId, { fresh }));
     } catch (err) { setError(err.message); }
-  }, []);
+  }, [records]);
   useOpenFromQuery(openSlip);
 
   // ── One slip, from the panel ───────────────────────────────
@@ -311,7 +315,8 @@ export default function PickingSlipManagementPage() {
               isLoading={isLoading}
               workers={workers}
               weekText={week.from}
-              onOpen={openSlip}
+              onOpen={(slipId) => openSlip(slipId, { fresh: false })}
+              onIntent={(slipId) => records.warm(slipId)}
               onAssign={bulkAssign}
               onRelease={bulkRelease}
               onPrintLabels={printLabels}

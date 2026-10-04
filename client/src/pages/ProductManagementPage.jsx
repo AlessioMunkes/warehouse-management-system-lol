@@ -30,6 +30,7 @@ import DetailPanel   from '@/components/ui/detail-panel';
 import EmptyState    from '@/components/ui/empty-state';
 import ErrorBanner   from '@/components/ui/error-banner';
 import { Plus, Pencil, Power, Trash2, Package } from 'lucide-react';
+import { useRecordCache } from '@/lib/recordCache';
 
 // Admin only, matching requireRole on every write in
 // product.routes.js. The server is the control; this is what stops the
@@ -191,10 +192,13 @@ export default function ProductManagementPage() {
     return () => { cancelled = true; };
   }, [includeInactive, search]);
 
-  const open = async (id) => {
+  // A row click reuses what resting on the row already asked for; every
+  // other caller (after a save, from a link) reads the record again.
+  const records = useRecordCache((id) => productAPI.getProduct(id));
+  const open = async (id, { fresh = true } = {}) => {
     setError(null);
     try {
-      setSelected(await productAPI.getProduct(id));
+      setSelected(await records.load(id, { fresh }));
       setMode('list');
     } catch (err) { setError(err.message); }
   };
@@ -322,7 +326,8 @@ export default function ProductManagementPage() {
               rows={visibleProducts}
               sort={view.sort}
               onToggleSort={view.toggleSort}
-              onOpenRow={(p) => open(p.id)}
+              onOpenRow={(p) => open(p.id, { fresh: false })}
+              onRowIntent={(p) => records.warm(p.id)}
               noun="products"
             />
           )}

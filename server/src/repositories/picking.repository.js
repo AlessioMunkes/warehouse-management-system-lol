@@ -173,7 +173,9 @@ const getSlips = async ({ dispatchDate, from, to, cohort, status, assignedTo }) 
 
 // ── One slip with its lines ───────────────────────────────────
 const getSlipById = async (id) => {
-  const slipResult = await pool.query(
+  // Read together: one wait on the database, not two in a row.
+  const [slipResult, itemsResult] = await Promise.all([
+  pool.query(
     `SELECT
        ps.*,
        -- The calendar day as text, same reason as getSlips: the DATE
@@ -195,11 +197,8 @@ const getSlipById = async (id) => {
      LEFT JOIN volunteers v ON v.id = ps.assigned_volunteer_id
      WHERE ps.id = $1`,
     [id]
-  );
-
-  if (!slipResult.rows[0]) return null;
-
-  const itemsResult = await pool.query(
+  ),
+  pool.query(
     `SELECT
        psi.id,
        psi.product_id,
@@ -217,7 +216,10 @@ const getSlipById = async (id) => {
      WHERE psi.picking_slip_id = $1
      ORDER BY p.name ASC, psi.unit ASC`,
     [id]
-  );
+  ),
+  ]);
+
+  if (!slipResult.rows[0]) return null;
 
   return { ...slipResult.rows[0], items: itemsResult.rows };
 };

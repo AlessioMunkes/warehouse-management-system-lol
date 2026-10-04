@@ -1886,3 +1886,12 @@ color:white;
 .fx-fade-in  { animation: fx-fade-in 200ms ease-out both; }
 /* A toast arriving from the edge it sits on. */
 .fx-slide-in { animation: fx-slide-in 220ms ease-out both; }
+/* A record docking beside its list (ui/detail-panel.jsx): the column
+   opens from nothing, so the list is pushed over rather than jumping,
+   and the record slides in from the edge inside it. Only `from` is
+   given — the end is whatever width the panel has at this screen. */
+@keyframes fx-dock-open {
+  from { width: 0; }
+}
+.fx-dock      { overflow: hidden; animation: fx-dock-open 220ms cubic-bezier(0.2, 0, 0, 1) both; }
+.fx-dock-body { animation: fx-slide-in 220ms cubic-bezier(0.2, 0, 0, 1) both; }

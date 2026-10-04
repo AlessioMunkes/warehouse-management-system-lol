@@ -20,7 +20,7 @@ import MasterDataTable from '@/features/masterdata/components/MasterDataTable';
 import EmptyState from '@/components/ui/empty-state';
 
 export default function PurchaseOrderList({
-  purchaseOrders, selectedId, onSelect, columns, sort, onToggleSort,
+  purchaseOrders, selectedId, onSelect, onIntent, columns, sort, onToggleSort,
 }) {
   if (!purchaseOrders.length) {
     return (
@@ -40,6 +40,7 @@ export default function PurchaseOrderList({
         sort={sort}
         onToggleSort={onToggleSort}
         onOpenRow={(po) => onSelect(po.id)}
+        onRowIntent={onIntent ? (po) => onIntent(po.id) : undefined}
         // Keeps the selected-row highlight the detail panel relies on.
         rowAttrs={(po) => (po.id === selectedId ? { 'data-state': 'selected' } : {})}
         noun="orders"

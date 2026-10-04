@@ -43,6 +43,17 @@ describe('MessageHistoryPage', () => {
     expect(screen.getByText('The system')).toBeInTheDocument();
   });
 
+  it('opens a message in the panel, with the whole reason it failed', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByText('PO-2026-0058'));
+    const panel = await screen.findByRole('dialog', { name: 'Purchase order to finance' });
+    expect(within(panel).getByText('Why it failed')).toBeInTheDocument();
+    expect(within(panel).getByText('Quota exceeded')).toBeInTheDocument();
+    expect(within(panel).getByText('finance@lol.org')).toBeInTheDocument();
+    expect(within(panel).getByText('The system')).toBeInTheDocument();
+  });
+
   it('links a purchase-order email to its order', async () => {
     renderPage();
     expect(await screen.findByRole('link', { name: 'Purchase order' })).toHaveAttribute('href', '/noc/purchase-orders?id=58');

@@ -231,7 +231,10 @@ const listPurchaseOrders = async ({ status = null, supplierId = null, limit = 50
 
 // ── Detail ────────────────────────────────────────────────────
 const getPurchaseOrderById = async (id) => {
-  const { rows } = await pool.query(
+  // The three reads do not depend on each other, so they go together:
+  // one wait on the database instead of three in a row.
+  const [{ rows }, { rows: items }, { rows: deliveries }] = await Promise.all([
+    pool.query(
     `SELECT ${PO_COLUMNS},
             s.name AS supplier_name,
             s.is_active AS supplier_is_active,
@@ -248,16 +251,12 @@ const getPurchaseOrderById = async (id) => {
              AND qom.entity_id = po.id
       WHERE po.id = $1`,
     [id]
-  );
-  const purchaseOrder = rows[0];
-  if (!purchaseOrder) return null;
-  // Whatever is stored, only a short safe message leaves the repository.
-  purchaseOrder.finance_email_error = safeFinanceEmailError(purchaseOrder.finance_email_error);
+  ),
 
   // received_to_date comes from delivery_note_items joined back to the
   // PO line, which is what makes BR-07A work without a new table:
   // one PO, many delivery_notes, each with its own item rows.
-  const { rows: items } = await pool.query(
+    pool.query(
     `SELECT poi.id, poi.product_id, poi.expected_quantity,
             poi.expected_weight_kg, poi.unit_price,
             p.name AS product_name,
@@ -273,7 +272,7 @@ const getPurchaseOrderById = async (id) => {
       WHERE poi.purchase_order_id = $1
       ORDER BY p.name ASC`,
     [id]
-  );
+  ),
 
   // Every delivery actually recorded against this PO, oldest first —
   // real events for the PO detail's timeline (order raised, then one
@@ -282,7 +281,7 @@ const getPurchaseOrderById = async (id) => {
   // status changes (only status_changed_at, the most recent one), so
   // the timeline is built from what's actually there: this table plus
   // the PO's own created_at/status_changed_at.
-  const { rows: deliveries } = await pool.query(
+    pool.query(
     `SELECT dn.id, dn.delivery_date, dn.status, dn.driver_name,
             u.first_name AS received_by_name,
             COALESCE(disc.discrepancy_count, 0) > 0 AS has_discrepancies
@@ -296,7 +295,13 @@ const getPurchaseOrderById = async (id) => {
       WHERE dn.purchase_order_id = $1
       ORDER BY dn.delivery_date ASC, dn.id ASC`,
     [id]
-  );
+  ),
+  ]);
+
+  const purchaseOrder = rows[0];
+  if (!purchaseOrder) return null;
+  // Whatever is stored, only a short safe message leaves the repository.
+  purchaseOrder.finance_email_error = safeFinanceEmailError(purchaseOrder.finance_email_error);
 
   return { ...purchaseOrder, items, deliveries };
 };

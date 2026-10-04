@@ -46,6 +46,7 @@ import DetailPanel   from '@/components/ui/detail-panel';
 import EmptyState    from '@/components/ui/empty-state';
 import ErrorBanner   from '@/components/ui/error-banner';
 import { Plus, Pencil, Power, AlertTriangle, Trash2, Truck } from 'lucide-react';
+import { useRecordCache } from '@/lib/recordCache';
 
 // Admin only, matching supplier.routes.js. The prospect pad is the
 // exception and stays open to managers — see the note on PROSPECTS
@@ -309,10 +310,13 @@ export default function SupplierDirectoryPage() {
     return () => { cancelled = true; };
   }, [tab, includeInactive, search]);
 
-  const open = async (id) => {
+  // A row click reuses what resting on the row already asked for; every
+  // other caller (after a save, from a link) reads the record again.
+  const records = useRecordCache((id) => supplierAPI.getSupplier(id));
+  const open = async (id, { fresh = true } = {}) => {
     setError(null);
     try {
-      setSelected(await supplierAPI.getSupplier(id));
+      setSelected(await records.load(id, { fresh }));
       setMode('list');
     } catch (err) { setError(err.message); }
   };
@@ -494,7 +498,8 @@ export default function SupplierDirectoryPage() {
                 rows={visibleSuppliers}
                 sort={view.sort}
                 onToggleSort={view.toggleSort}
-                onOpenRow={(row) => open(row.id)}
+                onOpenRow={(row) => open(row.id, { fresh: false })}
+              onRowIntent={(row) => records.warm(row.id)}
                 noun="suppliers"
               />
             )}

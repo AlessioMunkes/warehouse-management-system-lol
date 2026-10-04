@@ -52,6 +52,7 @@ import useTableView from '../features/masterdata/hooks/useTableView';
 import useOpenFromQuery from '../features/masterdata/hooks/useOpenFromQuery';
 import { PO_COLUMNS } from '../features/purchaseOrders/components/poColumns';
 import { downloadCsv, toCsv } from '../features/reporting/chartFormat';
+import { useRecordCache } from '@/lib/recordCache';
 
 const CAN_MANAGE = ['manager', 'admin'];
 const LIST_LIMIT = 500;
@@ -143,13 +144,16 @@ export default function PurchaseOrdersPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const open = useCallback(async (id) => {
+  // A row click reuses what resting on the row already asked for; every
+  // other caller (after a status change, from a link) reads it again.
+  const records = useRecordCache((id) => purchaseOrderAPI.getPurchaseOrder(id));
+  const open = useCallback(async (id, { fresh = true } = {}) => {
     setError(null);
     try {
-      setSelected(await purchaseOrderAPI.getPurchaseOrder(id));
+      setSelected(await records.load(id, { fresh }));
       setMode('list');
     } catch (err) { setError(err.message); }
-  }, []);
+  }, [records]);
   useOpenFromQuery(open, { param: 'id' });
 
   // ?products=1,2,3 — the inventory screen's bulk "Raise purchase
@@ -367,7 +371,8 @@ export default function PurchaseOrdersPage() {
               <PurchaseOrderList
                 purchaseOrders={rows}
                 selectedId={selected?.id ?? null}
-                onSelect={open}
+                onSelect={(id) => open(id, { fresh: false })}
+                onIntent={(id) => records.warm(id)}
                 columns={tableView.visibleColumns}
                 sort={tableView.sort}
                 onToggleSort={tableView.toggleSort}

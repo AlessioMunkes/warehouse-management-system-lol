@@ -34,6 +34,7 @@ import DetailPanel   from '@/components/ui/detail-panel';
 import EmptyState    from '@/components/ui/empty-state';
 import ErrorBanner   from '@/components/ui/error-banner';
 import { Plus, Pencil, Power, ShieldCheck, RotateCcw, Building2 } from 'lucide-react';
+import { useRecordCache } from '@/lib/recordCache';
 
 const CAN_MANAGE = ['manager', 'admin'];
 const OTHER_COHORT = { tuesday: 'thursday', thursday: 'tuesday' };
@@ -158,10 +159,13 @@ export default function BeneficiaryDirectoryPage() {
 
   // A centre, and its add/edit form, open in the panel down the right;
   // the list stays where it was behind it.
-  const open = async (id) => {
+  // A row click reuses what resting on the row already asked for; every
+  // other caller (after a save, from a link) reads the record again.
+  const records = useRecordCache((id) => beneficiaryAPI.getBeneficiary(id));
+  const open = async (id, { fresh = true } = {}) => {
     setError(null);
     try {
-      setSelected(await beneficiaryAPI.getBeneficiary(id));
+      setSelected(await records.load(id, { fresh }));
       setMode('list');
     } catch (err) { setError(err.message); }
   };
@@ -282,7 +286,8 @@ export default function BeneficiaryDirectoryPage() {
               rows={visibleBeneficiaries}
               sort={view.sort}
               onToggleSort={view.toggleSort}
-              onOpenRow={(b) => open(b.id)}
+              onOpenRow={(b) => open(b.id, { fresh: false })}
+              onRowIntent={(b) => records.warm(b.id)}
               noun="beneficiaries"
             />
           )}

@@ -25,13 +25,15 @@ const PO_ROW = {
 beforeEach(() => vi.clearAllMocks());
 
 describe('getPurchaseOrderById', () => {
-  it('returns null without querying items or deliveries when the PO does not exist', async () => {
-    poolMock.query.mockResolvedValueOnce({ rows: [] });
+  // The order, its lines and its deliveries are read together (one wait
+  // on the database, not three), so all three are asked for either way.
+  it('returns null when the PO does not exist', async () => {
+    poolMock.query.mockResolvedValue({ rows: [] });
 
     const result = await getPurchaseOrderById(999);
 
     expect(result).toBeNull();
-    expect(poolMock.query).toHaveBeenCalledTimes(1);
+    expect(poolMock.query).toHaveBeenCalledTimes(3);
   });
 
   it('attaches items and deliveries to the found PO', async () => {
