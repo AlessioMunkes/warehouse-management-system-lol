@@ -37,10 +37,8 @@ export default function DispatchPage() {
     <StaffShell
       crumb={palletId ? `Dispatch / ${step.label}` : 'Dispatch'}
       progress={palletId && step.step ? { step: step.step, total: step.total } : null}
-      // On the loading screen the flow offers a step back to the pallet's
-      // details; everywhere else a pallet's back goes to the queue.
-      onBack={palletId && !step.locked ? (step.back ?? backToQueue) : undefined}
-      backLabel={palletId && step.back ? step.backLabel : 'Gate queue'}
+      onBack={palletId ? backToQueue : undefined}
+      backLabel="Gate queue"
       actions={
         palletId ? null : (
           <Link to={STAFF.dispatchHistory} className="stf-crumb-link">

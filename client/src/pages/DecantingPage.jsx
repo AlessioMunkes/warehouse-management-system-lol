@@ -38,10 +38,6 @@ const DecantingPage = () => {
     <StaffShell
       crumb={`Decanting / ${step.label}`}
       progress={step.step ? { step: step.step, total: step.total } : null}
-      // The flow's own step back ("‹ Choose the sack" while weighing).
-      // The arrow at the top left still goes back a page, as before.
-      onBack={step.back ?? undefined}
-      backLabel={step.backLabel ?? undefined}
       actions={
         <Link to={STAFF.decantingRecords} className="stf-crumb-link">
           <i className="ti ti-history" aria-hidden="true" />

@@ -30,10 +30,6 @@ export default function ReceivingPage() {
     <StaffShell
       crumb={`Receiving / ${step.label}`}
       progress={step.step ? { step: step.step, total: step.total } : null}
-      // The flow's own step back ("‹ Choose a delivery" while counting).
-      // The arrow at the top left still goes back a page, as before.
-      onBack={step.back ?? undefined}
-      backLabel={step.backLabel ?? undefined}
       actions={
         <Link to={STAFF.deliveries} className="stf-crumb-link">
           <i className="ti ti-history" aria-hidden="true" />
