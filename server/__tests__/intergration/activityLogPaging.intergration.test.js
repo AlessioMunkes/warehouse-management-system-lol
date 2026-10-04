@@ -16,6 +16,7 @@
 //     npm run test:integration -- activityLogPaging
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
+import { resetTables } from '../helpers/resetTables.js';
 import request from 'supertest';
 
 // SKIPS, never fails, unless DATABASE_URL points at a LOCAL database.
@@ -46,14 +47,14 @@ const tomorrow = () => new Date(Date.now() + 86400000).toISOString().slice(0, 10
 const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString();
 
 describe.skipIf(!LOCAL)('activity log paging against a real database', () => {
-  beforeAll(async () => { await q(`TRUNCATE ${TABLES.join(', ')} RESTART IDENTITY CASCADE`); });
+  beforeAll(async () => { await resetTables(pool, TABLES); });
   afterAll(async () => {
-    await q(`TRUNCATE ${TABLES.join(', ')} RESTART IDENTITY CASCADE`);
+    await resetTables(pool, TABLES);
     await pool.end();
   });
 
   beforeEach(async () => {
-    await q(`TRUNCATE ${TABLES.join(', ')} RESTART IDENTITY CASCADE`);
+    await resetTables(pool, TABLES);
     const { rows } = await q(
       `INSERT INTO users (username, first_name, last_name, password_hash, role)
        VALUES ('ada', 'Ada', 'Admin', 'x', 'admin') RETURNING id, role, username`,

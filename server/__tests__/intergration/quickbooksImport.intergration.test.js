@@ -14,6 +14,7 @@
 // Not part of the default run (vitest.config.js excludes this folder).
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
+import { resetTables } from '../helpers/resetTables.js';
 
 const LOCAL = /@(localhost|127\.0\.0\.1)[:/]/.test(process.env.DATABASE_URL || '');
 
@@ -45,14 +46,14 @@ let p1, p2, p3;
 
 describe.skipIf(!LOCAL)('QuickBooks links import (real SQL)', () => {
   beforeAll(async () => {
-    await q('TRUNCATE quickbooks_object_map, purchase_orders, audit_log, suppliers, users RESTART IDENTITY CASCADE');
+    await resetTables(pool, ['quickbooks_object_map', 'purchase_orders', 'audit_log', 'suppliers', 'users']);
     userId = (await q(`INSERT INTO users (username, first_name, last_name, password_hash, role)
                        VALUES ('mgr', 'M', 'Test', 'x', 'manager') RETURNING id`)).rows[0].id;
     supplierId = (await q(`INSERT INTO suppliers (name) VALUES ('Acme') RETURNING id`)).rows[0].id;
   });
 
   beforeEach(async () => {
-    await q('TRUNCATE quickbooks_object_map, purchase_orders, audit_log RESTART IDENTITY CASCADE');
+    await resetTables(pool, ['quickbooks_object_map', 'purchase_orders', 'audit_log']);
     p1 = await addPo('PO-2026-0101');
     p2 = await addPo('PO-2026-0102');
     p3 = await addPo('PO-2026-0103');

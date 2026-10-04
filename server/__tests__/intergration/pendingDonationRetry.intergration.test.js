@@ -18,6 +18,7 @@
 //     npm run test:integration -- pendingDonationRetry
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
+import { resetTables } from '../helpers/resetTables.js';
 import request from 'supertest';
 
 // SKIPS, never fails, unless DATABASE_URL points at a LOCAL database.
@@ -34,7 +35,7 @@ if (LOCAL) {
 const TABLES = [
   'donation_allocations', 'donation_items', 'donations', 'pending_donation_items',
   'warehouse_manager_flags', 'pending_donations', 'stock_movements', 'stock_levels',
-  'donation_routing_defaults', 'donation_category_routing', 'notifications', 'audit_log',
+  'donation_routing_defaults', 'notifications', 'audit_log',
   'products', 'users',
 ];
 
@@ -82,14 +83,14 @@ const stockOnHand = async () => {
 const count = async (table) => Number((await q(`SELECT count(*) AS n FROM ${table}`)).rows[0].n);
 
 describe.skipIf(!LOCAL)('retrying a failed donation against a real database', () => {
-  beforeAll(async () => { await q(`TRUNCATE ${TABLES.join(', ')} RESTART IDENTITY CASCADE`); });
+  beforeAll(async () => { await resetTables(pool, TABLES); });
   afterAll(async () => {
-    await q(`TRUNCATE ${TABLES.join(', ')} RESTART IDENTITY CASCADE`);
+    await resetTables(pool, TABLES);
     await pool.end();
   });
 
   beforeEach(async () => {
-    await q(`TRUNCATE ${TABLES.join(', ')} RESTART IDENTITY CASCADE`);
+    await resetTables(pool, TABLES);
     manager = await addUser('mo', 'manager');
     admin = await addUser('ada', 'admin');
     worker = await addUser('wendy', 'warehouse_worker');
@@ -97,7 +98,8 @@ describe.skipIf(!LOCAL)('retrying a failed donation against a real database', ()
       `INSERT INTO products (name, stock_keeping_unit, storage_type, is_active)
        VALUES ('Rice 5kg', 'RICE5', 'dry', true) RETURNING id`,
     ));
-    await q(`INSERT INTO donation_category_routing (category, routing_outcome) VALUES ('recipe_food', 'allocated')`);
+    // Shared reference data other suites read: add the row only if it is missing, never empty the table.
+    await q(`INSERT INTO donation_category_routing (category, routing_outcome) VALUES ('recipe_food', 'allocated') ON CONFLICT (category) DO NOTHING`);
     await q(`INSERT INTO donation_routing_defaults (product_id, donation_category) VALUES ($1, 'recipe_food')`, [product.id]);
     pendingId = await seedPending();
   });

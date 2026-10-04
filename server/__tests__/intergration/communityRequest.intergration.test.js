@@ -16,6 +16,7 @@
 // Not part of the default run (vitest.config.js excludes this folder).
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
+import { resetTables } from '../helpers/resetTables.js';
 
 // SKIPS, never fails, unless DATABASE_URL points at a LOCAL database:
 // these tests empty the tables they use, and nothing from the app (not
@@ -113,10 +114,10 @@ const rejects = async (promise, status, text) => {
 
 describe.skipIf(!LOCAL)('benevolent requests against a real database', () => {
   beforeAll(async () => {
-    await q(`TRUNCATE ${TABLES.join(', ')} RESTART IDENTITY CASCADE`);
+    await resetTables(pool, TABLES);
   });
   beforeEach(async () => {
-    await q(`TRUNCATE ${TABLES.join(', ')} RESTART IDENTITY CASCADE`);
+    await resetTables(pool, TABLES);
     manager = await addUser('mgr', 'manager');
     admin   = await addUser('adm', 'admin');
     worker  = await addUser('wrk', 'warehouse_worker');
