@@ -40,6 +40,7 @@ import {
   ReducedMotionContext, MOTION_KEY, readStoredMotion, applyMotionAttribute,
   readStoredSidebar, writeStoredSidebar,
 } from './shellContext';
+import { DetailDockContext } from './detailDock';
 import ThemeToggle from '@/components/layout/ThemeToggle';
 import WarehouseSwitcher from './WarehouseSwitcher';
 import { NAV_SECTIONS, homeForRole } from './navSections';
@@ -97,6 +98,9 @@ function ManagerLayoutShell({ children }) {
   // Seeded from storage at first render, not in an effect: an effect
   // would paint the rail open and then snap it shut on every load.
   const [sidebarCollapsed, setSidebarCollapsedState] = useState(readStoredSidebar);
+  // Where an open record docks (ui/detail-panel.jsx). State, not a ref:
+  // the panel has to re-render once the element exists.
+  const [detailDock, setDetailDock] = useState(null);
 
   // Functional update, so the keyboard shortcut below can share it
   // without capturing a stale value in its one-time listener.
@@ -257,7 +261,14 @@ function ManagerLayoutShell({ children }) {
           </div>
         </header>
 
-        <main className="min-h-0 flex-1 overflow-y-auto">{children}</main>
+        {/* The list, and beside it the record opened from it. The dock
+            is empty, and so takes no width, until a panel portals in. */}
+        <div className="flex min-h-0 flex-1">
+          <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+            <DetailDockContext.Provider value={detailDock}>{children}</DetailDockContext.Provider>
+          </main>
+          <div ref={setDetailDock} className="min-h-0 shrink-0" />
+        </div>
       </div>
 
       <LogoutConfirmDialog
