@@ -70,7 +70,7 @@ const listGuestLog = async ({ search = null, from = null, to = null, limit = 500
        FROM volunteers v
       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
       ORDER BY v.signed_in_at DESC, v.id DESC
-      LIMIT ${params.length - 1} OFFSET ${params.length}`,
+      LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params,
   );
   return rows;

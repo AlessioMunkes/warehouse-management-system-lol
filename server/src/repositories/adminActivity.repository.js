@@ -136,7 +136,7 @@ const listActivity = async ({ from, to, actorId = null, limit = 2000, offset = 0
         AND (a.at AT TIME ZONE 'Africa/Johannesburg')::date BETWEEN $1::date AND $2::date
         ${who}
       ORDER BY a.at DESC, a.source, a.verb, a.subject, a.record_id
-      LIMIT ${params.length - 1} OFFSET ${params.length}`,
+      LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params
   );
   return rows;
