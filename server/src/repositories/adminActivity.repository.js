@@ -118,14 +118,16 @@ const SOURCES = `
 /**
  * The timeline for [from, to] (dates, SAST, inclusive), newest first.
  * `actorId` narrows it to one person; `system` true to only the
- * system's own entries (no person).
+ * system's own entries (no person). `limit` / `offset` page through it:
+ * the extra tie-break columns keep the order the same between pages when
+ * two entries share a timestamp.
  */
-const listActivity = async ({ from, to, actorId = null, limit = 2000 }) => {
+const listActivity = async ({ from, to, actorId = null, limit = 2000, offset = 0 }) => {
   const params = [from, to];
   let who = '';
   if (actorId === 'system') who = 'AND a.actor_id IS NULL';
   else if (actorId) { params.push(actorId); who = `AND a.actor_id = $${params.length}`; }
-  params.push(limit);
+  params.push(limit, offset);
   const { rows } = await pool.query(
     `SELECT a.*, u.username, trim(concat_ws(' ', u.first_name, u.last_name)) AS actor_name, u.role AS actor_role
        FROM (${SOURCES}) a
@@ -133,8 +135,8 @@ const listActivity = async ({ from, to, actorId = null, limit = 2000 }) => {
       WHERE a.at IS NOT NULL
         AND (a.at AT TIME ZONE 'Africa/Johannesburg')::date BETWEEN $1::date AND $2::date
         ${who}
-      ORDER BY a.at DESC
-      LIMIT $${params.length}`,
+      ORDER BY a.at DESC, a.source, a.verb, a.subject, a.record_id
+      LIMIT ${params.length - 1} OFFSET ${params.length}`,
     params
   );
   return rows;

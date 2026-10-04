@@ -31,6 +31,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import volunteerAPI  from '../../../services/volunteerAPI';
 import { fmtDateTime } from './fmtDateTime';
+import { defaultFrom, defaultTo } from './dateRange';
+import useDebouncedValue from '../../../hooks/useDebouncedValue';
 import useTableView    from '../../masterdata/hooks/useTableView';
 import MasterDataTable from '../../masterdata/components/MasterDataTable';
 
@@ -114,10 +116,17 @@ const VisitDetail = ({ visit, busy, onSignOut, onClose }) => (
 );
 
 export default function VolunteerLogView() {
+  // What has loaded so far, newest first. The server sends a batch at a
+  // time; Next on the last loaded page asks for the next one.
   const [visits, setVisits] = useState([]);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [search, setSearch] = useState('');
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  // The last 30 days to start with; widen it with the date boxes.
+  const [from, setFrom] = useState(defaultFrom);
+  const [to, setTo] = useState(defaultTo);
+  // The server is asked once typing pauses, not on every key.
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [tab, setTab] = useState('all');
   const [selected, setSelected] = useState(null);
 
@@ -142,11 +151,29 @@ export default function VolunteerLogView() {
   const loadVisits = useCallback(async () => {
     setError(null);
     try {
-      setVisits(await volunteerAPI.getGuestLog({ search, from, to }));
+      const page = await volunteerAPI.getGuestLogPage({ search: debouncedSearch, from, to });
+      setVisits(page.visits);
+      setHasMore(page.hasMore);
     } catch (err) {
       setError(err.message || 'Could not load the guest log.');
     }
-  }, [search, from, to]);
+  }, [debouncedSearch, from, to]);
+
+  const loadMore = async () => {
+    if (!hasMore || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const page = await volunteerAPI.getGuestLogPage({
+        search: debouncedSearch, from, to, offset: visits.length,
+      });
+      setVisits((cur) => [...cur, ...page.visits]);
+      setHasMore(page.hasMore);
+    } catch (err) {
+      setError(err.message || 'Could not load more of the guest log.');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   // Same stale-response guard as the other master-data screens: a fast
   // keystroke would otherwise let an earlier reply overwrite a later one.
@@ -162,11 +189,7 @@ export default function VolunteerLogView() {
 
   const open = (visit) => setSelected(visit);
 
-  const dateChips = [
-    from ? { key: 'from', label: `From ${from}`, onRemove: () => setFrom('') } : null,
-    to ? { key: 'to', label: `To ${to}`, onRemove: () => setTo('') } : null,
-  ].filter(Boolean);
-  const clearAll = () => { setSearch(''); setFrom(''); setTo(''); };
+  const clearAll = () => { setSearch(''); };
 
   const signOut = async () => {
     setBusy(true); setError(null);
@@ -182,7 +205,7 @@ export default function VolunteerLogView() {
       <p className="mt-4 text-sm text-muted-foreground">
         {`See who signed in at the door, and sign out open visits.${onSiteCount > 0
           ? ` ${onSiteCount} ${onSiteCount === 1 ? 'person is' : 'people are'} on site now.`
-          : ''}`}
+          : ''}${hasMore ? ` Showing the latest ${visits.length}. Use Next to load more, or narrow the dates.` : ''}`}
       </p>
 
       <ErrorBanner className="mt-4" message={error} onRetry={loadVisits} />
@@ -203,7 +226,6 @@ export default function VolunteerLogView() {
           header={
             <ListToolbar
               search={{ value: search, onChange: setSearch, placeholder: 'Search by name' }}
-              chips={dateChips}
               onClearAll={clearAll}
               columns={{
                 idPrefix: 'volunteers',
@@ -215,12 +237,12 @@ export default function VolunteerLogView() {
             >
               <Input
                 type="date" aria-label="From date" title="From date" className="h-8 w-auto"
-                value={from} onChange={(e) => setFrom(e.target.value)}
+                value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)}
               />
               <span className="text-sm text-muted-foreground">to</span>
               <Input
                 type="date" aria-label="To date" title="To date" className="h-8 w-auto"
-                value={to} onChange={(e) => setTo(e.target.value)}
+                value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)}
               />
             </ListToolbar>
           }
@@ -233,8 +255,8 @@ export default function VolunteerLogView() {
             <EmptyState
               icon={Users}
               title="No sign-ins match"
-              description={search || from || to ? 'Nothing matches the search or dates.' : 'Nobody is in this view.'}
-              action={search || from || to ? { label: 'Clear all filters', onClick: clearAll } : undefined}
+              description={search ? 'Nothing matches the search.' : 'Nobody signed in on these dates. Try a wider range.'}
+              action={search ? { label: 'Clear all filters', onClick: clearAll } : undefined}
             />
           ) : (
             <MasterDataTable
@@ -244,6 +266,9 @@ export default function VolunteerLogView() {
               onToggleSort={view.toggleSort}
               onOpenRow={open}
               noun="visits"
+              hasMore={hasMore}
+              loadingMore={loadingMore}
+              onLoadMore={loadMore}
             />
           )}
         </ListCard>

@@ -5,7 +5,7 @@ import { MemoryRouter, Route, Routes, Navigate, useLocation } from 'react-router
 import { REDIRECTS } from '../routes/routeTable';
 
 vi.mock('../services/adminAPI', () => ({ default: { getArchive: vi.fn(), getActivity: vi.fn() } }));
-vi.mock('../services/volunteerAPI', () => ({ default: { getGuestLog: vi.fn(), signOutVisit: vi.fn() } }));
+vi.mock('../services/volunteerAPI', () => ({ default: { getGuestLogPage: vi.fn(), signOutVisit: vi.fn() } }));
 
 const { default: adminAPI } = await import('../services/adminAPI');
 const { default: volunteerAPI } = await import('../services/volunteerAPI');
@@ -38,7 +38,7 @@ beforeEach(() => {
   adminAPI.getActivity.mockResolvedValue({
     entries: [ENTRY], people: [ADA], areas: ['Purchasing'], from: '2026-09-03', to: '2026-10-02',
   });
-  volunteerAPI.getGuestLog.mockResolvedValue([VISIT]);
+  volunteerAPI.getGuestLogPage.mockResolvedValue({ visits: [VISIT], hasMore: false });
 });
 
 describe('Activity log page', () => {
@@ -47,7 +47,7 @@ describe('Activity log page', () => {
     expect(screen.getByRole('heading', { name: 'Activity log' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Staff', selected: true })).toBeInTheDocument();
     expect(await screen.findByText('approved PO-2026-0007')).toBeInTheDocument();
-    expect(volunteerAPI.getGuestLog).not.toHaveBeenCalled();
+    expect(volunteerAPI.getGuestLogPage).not.toHaveBeenCalled();
   });
 
   it('opens on Volunteers from ?view=volunteers', async () => {

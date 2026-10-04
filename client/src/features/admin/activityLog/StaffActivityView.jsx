@@ -11,6 +11,7 @@ import { Link } from 'react-router-dom';
 import adminAPI from '../../../services/adminAPI';
 import { linkFor } from '../recordLinks';
 import { fmtDateTime } from './fmtDateTime';
+import { defaultFrom, defaultTo } from './dateRange';
 import useTableView    from '../../masterdata/hooks/useTableView';
 import MasterDataTable from '../../masterdata/components/MasterDataTable';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -27,7 +28,17 @@ import { ExternalLink, Activity } from 'lucide-react';
 
 const ROLE_LABELS = { admin: 'Admin', manager: 'Manager', warehouse_worker: 'Warehouse staff' };
 
-const isoDaysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+// Who did what in the entries loaded so far, busiest first.
+const peopleOf = (entries) => {
+  const byPerson = new Map();
+  for (const e of entries) {
+    const key = e.actor ? e.actor.id : 'system';
+    const p = byPerson.get(key) ?? { id: key, name: e.actor?.name ?? 'System', role: e.actor?.role ?? null, count: 0 };
+    p.count += 1;
+    byPerson.set(key, p);
+  }
+  return [...byPerson.values()].sort((a, b) => b.count - a.count);
+};
 
 const COLUMNS = [
   { key: 'when', label: 'When', alwaysOn: true, weight: 2.2,
@@ -106,9 +117,12 @@ function EntryDetail({ entry, onClose, onFilterPerson }) {
 }
 
 export default function StaffActivityView() {
+  // What has loaded so far, newest first. The server sends a batch at a
+  // time; Next on the last loaded page asks for the next one.
   const [data, setData] = useState(null);
-  const [from, setFrom] = useState(() => isoDaysAgo(29));
-  const [to, setTo] = useState(() => isoDaysAgo(0));
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [from, setFrom] = useState(defaultFrom);
+  const [to, setTo] = useState(defaultTo);
   const [person, setPerson] = useState('');
   const [area, setArea] = useState(null);
   const [search, setSearch] = useState('');
@@ -126,7 +140,7 @@ export default function StaffActivityView() {
     try {
       const res = await adminAPI.getActivity({ from, to, user: person || undefined });
       setData(res);
-      if (!person) setEveryone(res.people ?? []);
+      if (!person) setEveryone(peopleOf(res.entries ?? []));
     } catch (err) {
       setError(err.message || 'Could not load the activity log.');
     }
@@ -142,6 +156,23 @@ export default function StaffActivityView() {
     return () => { cancelled = true; };
   }, [load]);
 
+  const loadMore = async () => {
+    if (!data?.hasMore || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await adminAPI.getActivity({
+        from, to, user: person || undefined, offset: data.entries.length,
+      });
+      const merged = [...data.entries, ...(res.entries ?? [])];
+      setData({ ...res, entries: merged });
+      if (!person) setEveryone(peopleOf(merged));
+    } catch (err) {
+      setError(err.message || 'Could not load more of the activity log.');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   const entries = useMemo(() => data?.entries ?? [], [data]);
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -152,8 +183,8 @@ export default function StaffActivityView() {
 
   // Everyone who did anything in the period, busiest first — the list
   // for the person picker and the summary line.
-  const people = data?.people ?? [];
-  const areaOptions = (data?.areas ?? []).map((a) => ({ value: a, label: a }));
+  const people = useMemo(() => peopleOf(entries), [entries]);
+  const areaOptions = [...new Set(entries.map((e) => e.area))].sort().map((a) => ({ value: a, label: a }));
 
   const open = (entry) => setSelected(entry);
   const filterPerson = (id) => { setPerson(id); setSelected(null); };
@@ -166,7 +197,7 @@ export default function StaffActivityView() {
   return (
     <>
       <p className="mt-4 text-sm text-muted-foreground">
-        {`Review what people did in the system, newest first.${data ? ` ${entries.length} ${entries.length === 1 ? 'action' : 'actions'} by ${people.length} ${people.length === 1 ? 'person' : 'people'}, ${data.from} to ${data.to}.` : ''}${data?.truncated ? ' Showing the latest 2 000 — narrow the dates to see earlier ones.' : ''}`}
+        {`Review what people did in the system, newest first.${data ? ` ${entries.length} ${entries.length === 1 ? 'action' : 'actions'} by ${people.length} ${people.length === 1 ? 'person' : 'people'}, ${data.from} to ${data.to}.` : ''}${data?.hasMore ? ` Showing the latest ${entries.length}. Use Next to load more, or narrow the dates.` : ''}`}
       </p>
 
       <ErrorBanner className="mt-4" message={error} onRetry={load} />
@@ -244,6 +275,9 @@ export default function StaffActivityView() {
               onToggleSort={view.toggleSort}
               onOpenRow={open}
               noun="actions"
+              hasMore={Boolean(data?.hasMore)}
+              loadingMore={loadingMore}
+              onLoadMore={loadMore}
             />
           )}
         </ListCard>

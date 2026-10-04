@@ -17,6 +17,10 @@ const fail = (status, message) => {
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_DAYS = 366;
 const DAY = 86400000;
+// Entries per request. The screen asks for the next batch when the person
+// pages past the last one it has, so nothing in the range is cut off.
+const PAGE_SIZE = 200;
+const MAX_PAGE_SIZE = 500;
 
 const AREAS = {
   picking: 'Packing', dispatch: 'Dispatch', stock: 'Stock', purchasing: 'Purchasing',
@@ -118,11 +122,17 @@ export const listActivity = async (query = {}) => {
     if (!Number.isInteger(actorId) || actorId <= 0) throw fail(400, 'Unknown user.');
   }
 
-  const rows = await repo.listActivity({ from, to, actorId });
+  const limit = Math.min(Math.max(Math.trunc(Number(query.limit)) || PAGE_SIZE, 1), MAX_PAGE_SIZE);
+  const offset = Math.max(Math.trunc(Number(query.offset)) || 0, 0);
+
+  // One more than asked for, to know whether there is a next batch.
+  const fetched = await repo.listActivity({ from, to, actorId, limit: limit + 1, offset });
+  const hasMore = fetched.length > limit;
+  const rows = fetched.slice(0, limit);
   const entries = rows.map((r, i) => {
     const { area, text } = describe(r);
     return {
-      id: `${r.source}-${new Date(r.at).getTime()}-${i}`,
+      id: `${r.source}-${new Date(r.at).getTime()}-${offset + i}`,
       at: r.at,
       actor: r.actor_id
         ? { id: r.actor_id, name: r.actor_name || r.username, username: r.username, role: r.actor_role }
@@ -148,7 +158,10 @@ export const listActivity = async (query = {}) => {
     from, to, entries,
     people: [...byPerson.values()].sort((a, b) => b.count - a.count),
     areas: [...new Set(entries.map((e) => e.area))].sort(),
-    truncated: rows.length >= 2000,
+    // More entries in the range than this batch holds; ask again with
+    // offset = what you already have.
+    hasMore,
+    truncated: hasMore,
   };
 };
 
