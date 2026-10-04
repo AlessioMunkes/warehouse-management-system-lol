@@ -17,20 +17,105 @@
 //   "no dead ends" — HelpNote belongs on every screen
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { formatDay, foodForPhrase } from '../guestFormat';
+import { useGuestSignOut } from '../useGuestSignOut';
 import '../../../styles/guest.css';
 
 // ── Shell ─────────────────────────────────────────────────────
 // Owns the token scope. Every guest screen renders inside one.
-export const GuestShell = ({ children }) => (
-  <div className="gst-shell">
-    <header className="gst-masthead">
-      <span className="gst-masthead-brand">Ladles<span>·</span>of<span>·</span>Love</span>
-      <span className="gst-masthead-brand" style={{ fontWeight: 500 }}>Love Activist</span>
-    </header>
-    <main className="gst-page">{children}</main>
-  </div>
+const Masthead = () => (
+  <header className="gst-masthead">
+    <span className="gst-masthead-brand">Ladles<span>·</span>of<span>·</span>Love</span>
+    <span className="gst-masthead-brand" style={{ fontWeight: 500 }}>Love Activist</span>
+  </header>
 );
+
+// `nav` adds the volunteer's own bar — Home and Sign out — for the pages
+// a signed-in guest works from. Pages with their own exits (the QR
+// preview, the thank-you page) leave it off rather than show two
+// sign-outs.
+export const GuestShell = ({ children, nav = false }) => (
+  nav ? <NavShell>{children}</NavShell> : (
+    <div className="gst-shell">
+      <Masthead />
+      <main className="gst-page">{children}</main>
+    </div>
+  )
+);
+
+// Explicit routes, never navigate(-1): "back" can mean the poster's
+// camera app. Home keeps any claimed pallet and its progress; the home
+// page offers it back.
+const NavShell = ({ children }) => {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const flow = useGuestSignOut();
+
+  return (
+    <div className="gst-shell">
+      <Masthead />
+      <nav className="gst-nav" aria-label="Your session">
+        <div className="gst-nav-inner">
+          {pathname !== '/guest-home' ? (
+            <button type="button" className="gst-nav-btn" onClick={() => navigate('/guest-home')} disabled={flow.busy}>
+              Home
+            </button>
+          ) : <span />}
+          <button
+            type="button" className="gst-nav-btn"
+            onClick={flow.request}
+            disabled={flow.busy || flow.confirming || flow.checkFailed}
+            aria-busy={flow.busy || undefined}
+          >
+            {flow.busy ? <span className="gst-spinner" aria-hidden="true" /> : null}
+            Sign out
+          </button>
+        </div>
+      </nav>
+      <main className="gst-page">
+        <SignOutConfirm flow={flow} />
+        {children}
+      </main>
+    </div>
+  );
+};
+
+// ── Sign-out confirmation ─────────────────────────────────────
+// Shown only when the guest still holds a pallet. Also carries a failed
+// check or a failed return, so a refusal is never silent.
+export const SignOutConfirm = ({ flow }) => {
+  const headingRef = useRef(null);
+  useEffect(() => { if (flow.confirming || flow.checkFailed) headingRef.current?.focus(); }, [flow.confirming, flow.checkFailed]);
+
+  if (flow.checkFailed) {
+    return (
+      <div className="gst-card gst-confirm gst-stack-tight" role="alertdialog" aria-labelledby="gst-confirm-title" aria-describedby="gst-confirm-text">
+        <h2 className="gst-card-title" id="gst-confirm-title" ref={headingRef} tabIndex={-1}>We could not check your pallet.</h2>
+        <p className="gst-card-meta gst-text-ink" id="gst-confirm-text">
+          If you were packing a pallet, staff can return it to the floor.
+        </p>
+        <Button onClick={flow.request}>Try again</Button>
+        <Button variant="secondary" onClick={flow.signOutAnyway}>Sign out anyway</Button>
+      </div>
+    );
+  }
+  if (!flow.confirming) {
+    return flow.error ? <Notice tone="warn">{flow.error}</Notice> : null;
+  }
+  return (
+    <div className="gst-card gst-confirm gst-stack-tight" role="alertdialog" aria-labelledby="gst-confirm-title" aria-describedby="gst-confirm-text">
+      <h2 className="gst-card-title" id="gst-confirm-title" ref={headingRef} tabIndex={-1}>Sign out?</h2>
+      <p className="gst-card-meta gst-text-ink" id="gst-confirm-text">
+        You haven’t finished this pallet. If you sign out, it goes back to the floor
+        for someone else to finish. Your packing so far is saved.
+      </p>
+      {flow.error ? <Notice tone="warn">{flow.error}</Notice> : null}
+      <Button onClick={flow.confirm} loading={flow.releasing}>Sign out and return pallet</Button>
+      <Button variant="secondary" onClick={flow.cancel} disabled={flow.releasing}>Keep packing</Button>
+    </div>
+  );
+};
 
 // ── Screen ────────────────────────────────────────────────────
 // Moving between screens replaces the content, so focus has to move
@@ -67,8 +152,20 @@ export const PlaceBar = ({ items }) => (
 );
 
 // ── Buttons ───────────────────────────────────────────────────
-export const Button = ({ variant = 'primary', children, ...rest }) => (
-  <button type="button" className={`gst-btn gst-btn-${variant}`} {...rest}>{children}</button>
+// `loading` is for a button whose action is under way: it disables the
+// button, shows a small spinner and sets aria-busy. The label stays so
+// the width does not jump; change the text too if it helps.
+export const Button = ({ variant = 'primary', loading = false, disabled, children, ...rest }) => (
+  <button
+    type="button"
+    className={`gst-btn gst-btn-${variant}`}
+    aria-busy={loading || undefined}
+    disabled={disabled || loading}
+    {...rest}
+  >
+    {loading ? <span className="gst-spinner" aria-hidden="true" /> : null}
+    {children}
+  </button>
 );
 
 export const ButtonRow = ({ children }) => <div className="gst-btn-row">{children}</div>;
@@ -105,14 +202,12 @@ export const StatusPill = ({ status }) => {
 };
 
 // ── Progress ──────────────────────────────────────────────────
+// The worker's bar: a track and an "n / n" count beside it. The count is
+// the words; the bar is the picture (ACC-03).
 export const Progress = ({ done, total }) => {
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   return (
-    <div>
-      <p className="gst-progress-meta">
-        <span>{done} of {total} done</span>
-        <span>{pct}%</span>
-      </p>
+    <div className="gst-progress">
       <div
         className="gst-progress-track"
         role="progressbar"
@@ -123,9 +218,43 @@ export const Progress = ({ done, total }) => {
       >
         <div className="gst-progress-fill" style={{ width: `${pct}%` }} />
       </div>
+      <span className="gst-progress-count" aria-hidden="true">{done} / {total}</span>
     </div>
   );
 };
+
+// ── Item row (the worker's .stf-list / .stf-row, in guest classes) ──
+// One rounded list holding the item in front of them. `children` is the
+// panel under the head: the counter and the buttons.
+export const ItemList = ({ children }) => <div className="gst-list">{children}</div>;
+
+export const ItemRow = ({ position, title, meta, badge, children }) => (
+  <div className="gst-row">
+    <div className="gst-row-head">
+      <div className="gst-row-main">
+        {position ? <span className="gst-row-pos">{position}</span> : null}
+        <h2 className="gst-row-title">{title}</h2>
+        {meta ? <span className="gst-row-meta">{meta}</span> : null}
+      </div>
+      {badge}
+    </div>
+    {children}
+  </div>
+);
+
+// Previous and next among the items still to do, like the worker's
+// "Move between items" bar. Only drawn when there is somewhere to go.
+export const ItemSteps = ({ index, count, onPrevious, onNext, disabled }) => (
+  <nav className="gst-steps" aria-label="Move between items">
+    <button type="button" className="gst-step-btn" onClick={onPrevious} disabled={disabled || index <= 0}>
+      Previous item
+    </button>
+    <span className="gst-steps-count">{index + 1} / {count}</span>
+    <button type="button" className="gst-step-btn" onClick={onNext} disabled={disabled || index >= count - 1}>
+      Next item
+    </button>
+  </nav>
+);
 
 // ── Counter ───────────────────────────────────────────────────
 // Plus and minus rather than a keyboard. A volunteer standing at a

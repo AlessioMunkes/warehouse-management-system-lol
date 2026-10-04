@@ -42,6 +42,10 @@ router.post('/claim/:id',
 // there is nothing to tamper with.
 router.get('/mine', auth, requireRole(...GUEST_ONLY), slipAccessController.getMySlip);
 
+// Give the pallet back to the floor (sign-out before finishing). No id
+// in the URL: it frees the pallet the caller holds and nothing else.
+router.post('/release', auth, requireRole(...GUEST_ONLY), slipAccessController.releaseMySlip);
+
 // ── Public — no session, by necessity ─────────────────────────
 // 1.2 — short code, declared before ':token' (two segments vs one, so
 // they cannot actually collide, but the order documents the intent).

@@ -72,9 +72,13 @@ export const flagItem = (slipId, itemId, reason, packedQuantity) =>
 
 export const completeSlip = (slipId) => post(`/${slipId}/complete`, {});
 
+// Hand the pallet this guest holds back to the floor, progress kept.
+// Takes no id on purpose: the server frees the caller's own pallet only.
+export const releaseMySlip = () => post('/release', {});
+
 export default {
   fetchSlipPreview, fetchSlipByCode,
   claimSlipByToken, claimSlipByCode,
   fetchAvailableSlips, claimSlipById, fetchMySlip,
-  confirmItem, flagItem, completeSlip,
+  confirmItem, flagItem, completeSlip, releaseMySlip,
 };

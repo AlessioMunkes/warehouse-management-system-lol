@@ -418,6 +418,15 @@ describe('releaseSlip', () => {
     expect(client.calls).toContain('COMMIT');
   });
 
+  it('also clears the guest holder, so a pallet a volunteer walked away from is freed', async () => {
+    const client = releaseClient({ id: 1, status: 'in_progress', assigned_to: null });
+    await release(client);
+    const update = client.calls.find((s) => /^UPDATE picking_slips SET assigned_to = NULL/i.test(s));
+    expect(update).toMatch(/assigned_volunteer_id = NULL/i);
+    // item progress is not part of the release
+    expect(client.calls.some((s) => /picking_slip_items/i.test(s))).toBe(false);
+  });
+
   it('refuses a pallet that is not currently claimed', async () => {
     const client = releaseClient({ id: 1, status: 'pending', assigned_to: null });
     const result = await release(client);
