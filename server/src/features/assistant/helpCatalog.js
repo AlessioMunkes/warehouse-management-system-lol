@@ -161,7 +161,7 @@ export const SCREENS = [
   { id: 'donationManagement', label: 'Classification queue', roles: MANAGERS_UP,
     about: 'Check, value and classify donations taken in at the gate.',
     aka: ['classification queue', 'review donations', 'flagged donations'] },
-  { id: 'section18a', label: 'Section 18A', roles: ADMIN_ONLY,
+  { id: 'section18a', label: 'Section 18A', roles: MANAGERS_UP,
     about: 'Issue and track tax certificates for donors.',
     aka: ['18a', 'tax certificates', 'certificate queue'] },
   { id: 'emailIntegration', label: 'Email settings', roles: ADMIN_ONLY,
@@ -239,7 +239,7 @@ export const TOPICS = [
       'Stock — inventory levels, the stock ledger and stock adjustments.',
       'Buying — raise purchase orders; each one is emailed to Finance.',
       'Centres — beneficiaries, this week’s picking slips and collection reminders.',
-      'Donations — the classification queue: donations that need a decision.',
+      'Donations — the classification queue, and Section 18A certificates for donors.',
       'Insight — operations reports and impact reports.',
       'People — volunteer events.',
     ],
@@ -2028,8 +2028,6 @@ export const TOPICS = [
     followUp: {
       question: 'Would you like to know how Section 18A certificates are issued?',
       topic: 'section18a-certificates',
-      // Managers run this queue but certificates are the admin's.
-      otherwise: { question: 'Would you like to know who can do what in the system?', topic: 'who-can-do-what' },
     },
     rules: ['BR-09'],
     related: ['donation-intake', 'section18a-certificates'],
@@ -2037,7 +2035,7 @@ export const TOPICS = [
   {
     id: 'section18a-certificates',
     title: 'Section 18A certificates',
-    roles: ADMIN_ONLY,
+    roles: MANAGERS_UP,
     screens: ['section18a'],
     asks: [
       'section 18a certificate', 'issue a certificate', 'tax certificate for a donor',

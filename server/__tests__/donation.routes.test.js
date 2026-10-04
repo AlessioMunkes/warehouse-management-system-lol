@@ -236,6 +236,31 @@ describe('donation routes — authorisation', () => {
   });
 });
 
+// ── Section 18A is the office's: managers and admins, never the floor ──
+describe('donation routes — Section 18A queue and email history', () => {
+  const paths = ['/section-18a', '/section-18a/emails'];
+
+  it('answers managers and admins', async () => {
+    for (const role of [ROLES.MANAGER, ROLES.ADMIN]) {
+      for (const path of paths) {
+        const res = await request(app).get(`${BASE}${path}`).set('Cookie', cookieFor(role));
+        expect(res.status, `${role} ${path}`).toBe(200);
+      }
+    }
+  });
+
+  it('refuses a warehouse worker', async () => {
+    serviceMock.listSection18AQueue.mockClear();
+    serviceMock.listEmailHistory.mockClear();
+    for (const path of paths) {
+      const res = await request(app).get(`${BASE}${path}`).set('Cookie', cookieFor(ROLES.WORKER));
+      expect(res.status, path).toBe(403);
+    }
+    expect(serviceMock.listSection18AQueue).not.toHaveBeenCalled();
+    expect(serviceMock.listEmailHistory).not.toHaveBeenCalled();
+  });
+});
+
 // ── Route ordering ────────────────────────────────────────────
 // '/unmatched' and '/section-18a' are declared before '/:id'. If that
 // order is ever reversed, validateIntId rejects them as bad ids and

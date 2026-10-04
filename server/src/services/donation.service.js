@@ -1002,7 +1002,7 @@ const notifySection18AEmailFailed = async (donation) => {
     body: `Certificate email for donation #${donation.id} failed.`,
     entityType: 'donation',
     entityId: donation.id,
-    targetRoles: ['admin'],
+    targetRoles: ['manager', 'admin'],
     avoidDuplicate: true,
   });
 };

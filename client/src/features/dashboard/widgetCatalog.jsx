@@ -127,6 +127,16 @@ export const WIDGETS = [
     ),
   }),
 
+  // The same certificates, for the manager's own board (a widget is one role's).
+  tile({
+    id: 'certificates-for-managers', title: 'Certificates to issue', roles: MANAGER_ONLY, needs: ['s18a'],
+    description: 'Section 18A certificates queued and ready to be issued to donors.',
+    render: ({ s18a }) => (
+      <StatTile icon={FileBadge} label="Section 18A certificates to issue" value={s18a.queued ?? 0}
+        to={ADMIN.section18aManagement} warn />
+    ),
+  }),
+
   // ═══ Manager: charts ═════════════════════════════════════════
   {
     id: 'product-health', kind: 'panel', title: 'Product health', roles: MANAGER_ONLY, needs: ['summary'],

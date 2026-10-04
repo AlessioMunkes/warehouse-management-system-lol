@@ -74,6 +74,8 @@ describe('the widget catalogue', () => {
     const ids = widgetsForRole('manager').map((w) => w.id);
     expect(ids).toContain('donations-to-review');
     expect(widgetsForRole('admin').map((w) => w.id)).not.toContain('donations-to-review');
+    expect(ids).toContain('certificates-for-managers');
+    expect(widgetsForRole('admin').map((w) => w.id)).not.toContain('certificates-for-managers');
   });
 
   // Two jobs, two boards: a manager runs the floor, an admin looks

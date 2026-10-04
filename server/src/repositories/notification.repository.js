@@ -44,7 +44,9 @@ const TARGET_ROLES_BY_TYPE = {
   stock_expiry_2_weeks: MANAGER_ONLY,
   stock_expiry_1_week: MANAGER_ONLY,
   donation_review: MANAGERS_UP,
-  section18a_handoff_failed: ADMIN_ONLY,
+  // Managers and admins issue certificates together, so a failed email is both's.
+  section18a_handoff_failed: MANAGERS_UP,
+  section18a_email_failed: MANAGERS_UP,
   picking_slip_created: FLOOR_AND_MANAGER,
   // A manager released a claimed pallet: news for the floor only.
   picking_slip_released: [ROLES.WORKER],
@@ -54,7 +56,7 @@ const TARGET_ROLES_BY_TYPE = {
 
 const targetRolesForType = (type) => {
   if (TARGET_ROLES_BY_TYPE[type]) return TARGET_ROLES_BY_TYPE[type];
-  if (String(type).startsWith('section18a')) return ADMIN_ONLY;
+  if (String(type).startsWith('section18a')) return MANAGERS_UP;
   if (String(type).startsWith('volunteer') || String(type).startsWith('vms')) {
     return VOLUNTEER_MANAGEMENT_ROLES;
   }

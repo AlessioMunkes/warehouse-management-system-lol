@@ -66,7 +66,9 @@ describe('which screens each role may be sent to', () => {
     expect(ids).toContain('reporting');
     expect(ids).not.toContain('products');
     expect(ids).not.toContain('users');
-    expect(ids).not.toContain('section18a');
+    // The office's donation screens are the manager's too.
+    expect(ids).toContain('donationManagement');
+    expect(ids).toContain('section18a');
     // Each role sees only its own screens: no floor screen for a manager.
     for (const floor of ['receiving', 'packing', 'decanting', 'dispatch', 'donation']) {
       expect(ids, floor).not.toContain(floor);
@@ -143,7 +145,7 @@ describe('the second gate, in the service', () => {
     ['warehouse_worker', 'users'],
     ['warehouse_worker', 'reporting'],
     ['manager', 'products'],
-    ['manager', 'section18a'],
+    ['manager', 'emailIntegration'],
   ])('refuses to send a %s to %s', async (role, screenId) => {
     call('open_screen', { screen_id: screenId });
     call('open_screen', { screen_id: screenId });

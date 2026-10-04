@@ -111,7 +111,7 @@ describe('spot checks, in case the parser is ever fooled', () => {
   });
 
   it('keeps a manager off the admin screens', () => {
-    for (const id of ['products', 'suppliers', 'users', 'section18a', 'emailIntegration']) {
+    for (const id of ['products', 'suppliers', 'users', 'activityLog', 'emailIntegration']) {
       expect(rolesFor(id), id).not.toContain('manager');
     }
   });

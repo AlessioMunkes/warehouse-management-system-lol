@@ -161,8 +161,11 @@ export const ROUTES = [
       nav('admin', 'Donations', 'Classification queue', Gift),
       nav('manager', 'Donations', 'Classification queue', Gift),
     ] },
-  { id: 'section18a', path: ADMIN.section18aManagement, roles: ADMIN_ONLY, shell: true,
-    nav: [nav('admin', 'Donations', 'Section 18A', ScrollText)] },
+  { id: 'section18a', path: ADMIN.section18aManagement, roles: MANAGERS_UP, shell: true,
+    nav: [
+      nav('admin', 'Donations', 'Section 18A', ScrollText),
+      nav('manager', 'Donations', 'Section 18A', ScrollText),
+    ] },
   // Settings' Email section, at the address Google's sign-in returns to
   // and older links use. Listed in the menu as Settings.
   { id: 'emailIntegration', path: ADMIN.emailIntegration, roles: ADMIN_ONLY, shell: true },

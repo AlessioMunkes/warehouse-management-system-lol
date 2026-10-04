@@ -78,6 +78,7 @@ describe('where each notification goes', () => {
       ['donation_review', 'admin', '/admin/donation-management'],
       ['donation_review', 'manager', '/admin/donation-management'],
       ['section18a_email_failed', 'admin', '/admin/section-18a'],
+      ['section18a_email_failed', 'manager', '/admin/section-18a'],
       ['vms_sync_failed', 'manager', '/volunteers'],
       // Older names still stored on some rows.
       ['stock_expiry_2_weeks', 'manager', '/noc/inventory'],
@@ -93,7 +94,7 @@ describe('where each notification goes', () => {
   // another role's: it goes nowhere rather than bounce them home.
   it('never sends anyone to a screen of another role', () => {
     expect(notificationDestination(notification({ type: 'low_stock' }), 'warehouse_worker')).toBeNull();
-    expect(notificationDestination(notification({ type: 'section18a_email_failed' }), 'manager')).toBeNull();
+    expect(notificationDestination(notification({ type: 'section18a_email_failed' }), 'warehouse_worker')).toBeNull();
     expect(notificationDestination(notification({ type: 'non_collections_flagged' }), 'admin'))
       .toBe('/noc/picking-slips?status=notcollected');
   });
