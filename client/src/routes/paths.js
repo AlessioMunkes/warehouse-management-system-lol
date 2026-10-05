@@ -40,6 +40,7 @@ export const STAFF = {
   reporting: '/noc/reporting',
   donation:  DONATIONS_NEW,
   impactReport: '/noc/impact-report',
+  operationalGoals: '/noc/operational-goals',
   purchaseOrders: '/noc/purchase-orders',
   // Past delivery notes and dispatch notes.
   receipts: '/noc/receipts',
@@ -95,3 +96,4 @@ export const ADMIN = {
   messageHistory: '/admin/messages',
   archive:  '/admin/archive',
 };
+

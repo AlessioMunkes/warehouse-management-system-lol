@@ -9,6 +9,7 @@ const SAST_OFFSET_HOURS = 2;
 // (reminders.runHour); the scheduler reads it before each wait.
 const RUN_HOUR_SAST = 8;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const WEDNESDAY = 3;
 
 const dateStringInZone = (date, timeZone = 'Africa/Johannesburg') => {
   const parts = new Intl.DateTimeFormat('en-CA', {

@@ -3,8 +3,8 @@
 //
 // Business logic for the decanting calculator.
 //
-// The user chooses which bag sizes to decant into — 5 kg (max),
-// 2.5 kg, 1 kg, 500 g, 250 g — or types in their own custom size.
+// The user chooses which bag sizes to decant into — 10 kg, 5 kg,
+// 2 kg, 1 kg, 500 g — or types in their own custom size.
 // Given the week's required weight per product, the calculator
 // cascades largest-first across the chosen sizes to work out how
 // many bags of each to fill, keeps the error under 0.5 % of the
@@ -18,23 +18,12 @@
 import decantingModel from '../repositories/decanting.repository.js';
 
 // ── Constants ─────────────────────────────────────────────────
-// The three bag weights Ladles of Love actually decants into, per
-// the sponsor's process email and the Decanting Calculator system
-// objective: "500 g, 1 kg, 2 kg".
-//
-// This previously read [5, 2.5, 1, 0.5, 0.25] — which omitted 2 kg
-// (the size they use most) and offered three sizes they do not use.
-// That mismatch was the main source of margin-of-error breaches:
-// with these three sizes the error is 0 % at every realistic weekly
-// weight, because every one is a whole multiple of 500 g.
-//
-// Other sizes remain available through the custom-size field, so
-// nothing is lost if the warehouse starts using a fourth.
-const STANDARD_BAG_SIZES_KG = [2, 1, 0.5];
+// Supported normal bag weights for the Decanting calculator.
+const STANDARD_BAG_SIZES_KG = [10, 5, 2, 1, 0.5];
 
-// Bags may not exceed 5 kg (handling limit) — applies to custom
+// Bags may not exceed 10 kg (handling limit) — applies to custom
 // sizes too.
-const MAX_BAG_SIZE_KG = 5;
+const MAX_BAG_SIZE_KG = 10;
 
 // Objective: the bag combination must land within 0.5 % of the
 // weight being planned (Decanting Calculator system objective).
@@ -63,6 +52,10 @@ const bagLabel = (kg) =>
 // customSizeKg  — an optional custom bag size the user typed in.
 // Returns a de-duplicated, descending list of sizes in kg.
 const resolveSizes = (selectedSizes, customSizeKg) => {
+  if (Array.isArray(selectedSizes) && selectedSizes.length === 0) {
+    throw new Error('At least one bag size must be selected.');
+  }
+
   // An EMPTY array means "nothing ticked", which is not the same as
   // "not specified" — but `??` only falls through on null/undefined,
   // so an empty per-item array used to silently discard the
@@ -221,8 +214,22 @@ const calculatePlanForProduct = (item, defaults = {}) => {
   // rather than `??` so an EMPTY per-item array falls back to the
   // plan-level choice instead of silently discarding it.
   const hasSizes = (v) => Array.isArray(v) && v.length > 0;
+  const itemSelectedSizes = Array.isArray(item.selectedSizes)
+    ? item.selectedSizes
+    : undefined;
+  const defaultSelectedSizes = Array.isArray(defaults.selectedSizes)
+    ? defaults.selectedSizes
+    : undefined;
+  let selectedSizes = hasSizes(itemSelectedSizes)
+    ? itemSelectedSizes
+    : defaultSelectedSizes;
+
+  if (Array.isArray(itemSelectedSizes) && itemSelectedSizes.length === 0 && !hasSizes(defaultSelectedSizes)) {
+    selectedSizes = itemSelectedSizes;
+  }
+
   const sizesKg = resolveSizes(
-    hasSizes(item.selectedSizes) ? item.selectedSizes : defaults.selectedSizes,
+    selectedSizes,
     item.customSizeKg ?? defaults.customSizeKg
   );
 
@@ -286,11 +293,21 @@ const calculatePlanForProduct = (item, defaults = {}) => {
     );
   }
 
-  // Cap at the usable bulk: no combination of bags may total more
+  // Cap at the usable bulk: no combination of full bags may total more
   // than what is physically left in the sack after wastage.
-  const { counts, packedKg } = splitIntoBags(basisKg, sizesKg, usableKg);
+  const { counts, packedKg: fullBagPackedKg } = splitIntoBags(basisKg, sizesKg, usableKg);
 
-  const totalBags = Object.values(counts).reduce((a, b) => a + b, 0);
+  const remainingTargetKg = round3(basisKg - fullBagPackedKg);
+  const partialBag = remainingTargetKg > 0 && remainingTargetKg < 0.5
+    ? {
+        nominalSizeKg: 0.5,
+        actualWeightKg: remainingTargetKg,
+        isPartial: true,
+      }
+    : null;
+  const accountedKg = fullBagPackedKg + (partialBag?.actualWeightKg || 0);
+
+  const totalBags = Object.values(counts).reduce((a, b) => a + b, 0) + (partialBag ? 1 : 0);
 
   // Margin is measured against the weight being PLANNED, not against
   // `required`, so it stays a measure of how well the bag maths hits
@@ -302,7 +319,7 @@ const calculatePlanForProduct = (item, defaults = {}) => {
   // NaN <= MARGIN_OF_ERROR is false, so the line would be flagged
   // with a meaningless error figure.
   const marginBasis  = basisKg > 0 ? basisKg : required;
-  const marginError  = Math.abs(packedKg - marginBasis) / marginBasis;
+  const marginError  = Math.abs(accountedKg - marginBasis) / marginBasis;
   const withinMargin = marginError <= MARGIN_OF_ERROR;
 
   const plan = {
@@ -313,7 +330,8 @@ const calculatePlanForProduct = (item, defaults = {}) => {
     bags:        counts,            // { '2kg': n, '1kg': n, '500g': n }
     totalBags,
     plannedKg:   round3(basisKg),      // what this line set out to pack
-    packedKg:    round3(packedKg),
+    packedKg:    round3(accountedKg),
+    partialBag,
     marginError: round4(marginError),  // fraction, e.g. 0.0032 = 0.32 %
     withinMargin,
     wastageKg:   round3(wastageKg),
@@ -323,7 +341,7 @@ const calculatePlanForProduct = (item, defaults = {}) => {
     // not cover the plan", which read zero whenever the plan had
     // already been cut down to fit the sack, hiding the very gap
     // procurement needs to see.
-    shortfallKg: required > packedKg ? round3(required - packedKg) : 0,
+    shortfallKg: required > accountedKg ? round3(required - accountedKg) : 0,
     surplusKg:   0,
   };
 
@@ -331,7 +349,7 @@ const calculatePlanForProduct = (item, defaults = {}) => {
     plan.actualBulkKg = round3(bulk);        // the real weighed figure
     // Whatever is left in the sack once the bags are filled and the
     // waste is accounted for.
-    const leftover  = bulk - packedKg - wastageKg;
+    const leftover  = bulk - accountedKg - wastageKg;
     plan.surplusKg  = leftover > 0 ? round3(leftover) : 0;
   }
 
@@ -533,7 +551,7 @@ const exportDecantingSheet = async (id) => {
   // ── Column headers ───────────────────────────────────────────
   rows.push([
     'SKU', 'Product', 'Required (kg)', 'Actual Bulk (kg)', 'Packed (kg)',
-    'Bag Sizes Used', ...sizeColumns, 'Total Bags',
+    'Bag Sizes Used', 'Partial 500g bag actual weight (kg)', ...sizeColumns, 'Total Bags',
     'Margin Error (%)', 'Within Margin', 'Wastage (kg)', 'Surplus (kg)',
     'Shortfall (kg)', 'Line Notes',
   ]);
@@ -548,6 +566,7 @@ const exportDecantingSheet = async (id) => {
       line.actual_bulk_kg ?? '',
       line.packed_kg,
       (line.sizes_kg || []).join(' / '),
+      line.partialBag?.actualWeightKg ?? '',
       ...sizeColumns.map((col) => bags[col] ?? 0),
       line.total_bags,
       (Number(line.margin_error) * 100).toFixed(2),

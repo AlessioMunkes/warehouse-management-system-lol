@@ -1,8 +1,8 @@
 /**
  * EventFormDialog - Create/Edit Volunteer Event Dialog.
  *
- * Create mode captures the complete event setup. Edit mode keeps the existing
- * event-only workflow.
+ * Create mode captures the complete event setup. Edit mode lets staff choose
+ * which existing event or timeslot fields to change.
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -19,6 +19,12 @@ import { Input } from '@/components/ui/input';
 import NativeSelect from '@/components/ui/native-select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  dateOnly,
+  johannesburgDatePart,
+  johannesburgWallTimeToUtcIso,
+  johannesburgTimePart,
+} from '../dateTime';
 
 const makeTimeslot = () => ({
   key: crypto.randomUUID?.() ?? String(Date.now() + Math.random()),
@@ -44,14 +50,69 @@ const emptyForm = {
 
 const MAPBOX_SEARCH_URL = 'https://api.mapbox.com/search/geocode/v6/forward';
 const slotField = (index, field) => `timeslots.${index}.${field}`;
+const editField = (field) => `edit.${field}`;
+
+const emptyEditSections = {
+  eventDetails: false,
+  date: false,
+  venue: false,
+  description: false,
+  timeslot: false,
+  capacity: false,
+};
+
+const datePart = dateOnly;
+const timePart = johannesburgTimePart;
+
+const toDateTime = (date, time) => johannesburgWallTimeToUtcIso(date, time);
+
+const describeTimeslot = (slot) => {
+  const date = johannesburgDatePart(slot.startTime);
+  const start = timePart(slot.startTime);
+  const end = timePart(slot.endTime);
+  const capacity = Number(slot.capacity ?? 0);
+  return `${date} ${start}-${end} · capacity ${capacity}`;
+};
 
 const validate = (form, editing) => {
   const errors = {};
-  if (!form.eventName.trim()) errors.eventName = 'Event name is required.';
-  if (!form.description.trim()) errors.description = 'Description is required.';
-  if (!form.eventDate) errors.eventDate = 'Event date is required.';
-  if (!form.venueName.trim()) errors.venueName = 'Venue is required.';
-  if (!form.address.trim()) errors.address = 'Address is required.';
+  if (!editing || form.editSections.eventDetails) {
+    if (!form.eventName.trim()) errors.eventName = 'Event name is required.';
+  }
+  if (!editing || form.editSections.description) {
+    if (!form.description.trim()) errors.description = 'Description is required.';
+  }
+  if (!editing || form.editSections.date) {
+    if (!form.eventDate) errors.eventDate = 'Event date is required.';
+  }
+  if (!editing || form.editSections.venue) {
+    if (!form.venueName.trim()) errors.venueName = 'Venue is required.';
+    if (!form.address.trim()) errors.address = 'Address is required.';
+  }
+
+  if (editing) {
+    if (!Object.values(form.editSections).some(Boolean)) {
+      errors[editField('sections')] = 'Choose at least one part of the event to edit.';
+    }
+    if ((form.editSections.timeslot || form.editSections.capacity) && !form.selectedTimeslotId) {
+      errors.selectedTimeslotId = 'Choose a timeslot to edit.';
+    }
+    const selectedIndex = form.timeslots.findIndex((slot) => slot.id === form.selectedTimeslotId);
+    const selected = selectedIndex >= 0 ? form.timeslots[selectedIndex] : null;
+    if (form.editSections.timeslot && selected) {
+      if (!selected.startTime) errors[slotField(selectedIndex, 'startTime')] = 'Timeslot: start time is required.';
+      if (!selected.endTime) errors[slotField(selectedIndex, 'endTime')] = 'Timeslot: end time is required.';
+      if (selected.startTime && selected.endTime && selected.endTime <= selected.startTime) {
+        errors[slotField(selectedIndex, 'endTime')] = 'Timeslot: end time must be after start time.';
+      }
+    }
+    if (form.editSections.capacity && selected) {
+      if (!selected.capacity) errors[slotField(selectedIndex, 'capacity')] = 'Timeslot: capacity is required.';
+      else if (!Number.isInteger(Number(selected.capacity)) || Number(selected.capacity) <= 0) {
+        errors[slotField(selectedIndex, 'capacity')] = 'Timeslot: capacity must be greater than 0.';
+      }
+    }
+  }
 
   if (!editing) {
     if (form.spaceMode === 'new') {
@@ -93,18 +154,47 @@ const eventPayload = (form) => ({
   description: form.description.trim(),
 });
 
+const editPayload = (form) => {
+  const event = {};
+  if (form.editSections.eventDetails) event.eventName = form.eventName.trim();
+  if (form.editSections.date) event.eventDate = form.eventDate;
+  if (form.editSections.venue) {
+    event.venueName = form.venueName.trim();
+    event.address = form.address.trim();
+  }
+  if (form.editSections.description) event.description = form.description.trim();
+
+  const selected = form.timeslots.find((slot) => slot.id === form.selectedTimeslotId);
+  const timeslotChanges = {};
+  if (selected && form.editSections.timeslot) {
+    const date = datePart(selected.startDate || selected.startTime);
+    timeslotChanges.startTime = toDateTime(date, selected.startTime);
+    timeslotChanges.endTime = toDateTime(date, selected.endTime);
+  }
+  if (selected && form.editSections.capacity) {
+    timeslotChanges.capacity = Number(selected.capacity);
+  }
+
+  return {
+    event,
+    timeslot: selected && Object.keys(timeslotChanges).length > 0
+      ? { timeslotId: selected.id, changes: timeslotChanges }
+      : null,
+  };
+};
+
 const toApiTimeslot = (slot, eventDate) => {
   const sameDay = slot.sameAsEventDate ?? true;
   const startRaw = slot.startTime || '';
   const endRaw = slot.endTime || '';
   const startStr = startRaw.includes('T') ? startRaw.split('T')[1].slice(0, 5) : startRaw;
   const endStr = endRaw.includes('T') ? endRaw.split('T')[1].slice(0, 5) : endRaw;
-  const dateFromStart = startRaw.includes('T') ? startRaw.split('T')[0] : '';
+  const dateFromStart = startRaw.includes('T') ? johannesburgDatePart(startRaw) : '';
   const date = sameDay ? (eventDate || dateFromStart) : (slot.timeslotDate || dateFromStart);
 
   return {
-    startTime: `${date}T${startStr}:00.000Z`,
-    endTime: `${date}T${endStr}:00.000Z`,
+    startTime: johannesburgWallTimeToUtcIso(date, startStr),
+    endTime: johannesburgWallTimeToUtcIso(date, endStr),
     capacity: Number(slot.capacity),
   };
 };
@@ -152,13 +242,26 @@ export default function EventFormDialog({
   onOpenChange,
   onSubmit,
 }) {
+  const editing = Boolean(event);
+  const eventTimeslots = event?.timeslots ?? [];
   const [form, setForm] = useState(() => event ? {
     ...emptyForm,
     eventName: event.name,
-    eventDate: String(event.eventDate ?? '').slice(0, 10),
+    eventDate: datePart(event.eventDate),
     venueName: event.venueName ?? '',
     address: event.address ?? '',
     description: event.description,
+    editSections: { ...emptyEditSections },
+    selectedTimeslotId: eventTimeslots[0]?.id ?? '',
+    timeslots: eventTimeslots.map((slot) => ({
+      id: slot.id,
+      key: slot.id,
+      startDate: johannesburgDatePart(slot.startTime),
+      startTime: timePart(slot.startTime),
+      endTime: timePart(slot.endTime),
+      capacity: String(slot.capacity ?? ''),
+      original: slot,
+    })),
   } : emptyForm);
   const [validationErrors, setValidationErrors] = useState({});
   const [availability, setAvailability] = useState(null);
@@ -167,7 +270,6 @@ export default function EventFormDialog({
   const [addressSuggestions, setAddressSuggestions] = useState([]);
   const [addressSearchError, setAddressSearchError] = useState('');
   const selectedAddressRef = useRef('');
-  const editing = Boolean(event);
 
   const clearValidatedState = () => {
     setAvailability(null);
@@ -205,6 +307,20 @@ export default function EventFormDialog({
     }));
     clearValidatedState();
     clearError(slotField(index, field));
+  };
+
+  const updateEditSection = (field) => (e) => {
+    const checked = e.target.checked;
+    setForm((current) => ({
+      ...current,
+      editSections: { ...current.editSections, [field]: checked },
+    }));
+    clearError(editField('sections'));
+  };
+
+  const selectTimeslot = (timeslotId) => {
+    setForm((current) => ({ ...current, selectedTimeslotId: timeslotId }));
+    clearError('selectedTimeslotId');
   };
 
   const addTimeslot = () => {
@@ -305,7 +421,7 @@ export default function EventFormDialog({
     const nextErrors = validate(form, editing);
     setValidationErrors(nextErrors);
     if (errorList(nextErrors).length > 0) return;
-    onSubmit(editing ? eventPayload(form) : combinedPayload(form));
+    onSubmit(editing ? editPayload(form) : combinedPayload(form));
   };
 
   const errors = errorList(validationErrors);
@@ -317,21 +433,54 @@ export default function EventFormDialog({
           <DialogHeader className="shrink-0">
             <DialogTitle>{editing ? 'Edit event' : 'Create event'}</DialogTitle>
             <DialogDescription>
-              {editing ? 'Update the event details.' : 'Add event details, space and volunteer timeslots.'}
+              {editing ? 'Choose the parts of this event to update.' : 'Add event details, space and volunteer timeslots.'}
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid min-h-0 gap-4 overflow-y-auto py-5 pr-1">
+            {editing && (
+              <div className="grid gap-3 rounded-md border p-4">
+                <div>
+                  <h3 className="font-semibold">What would you like to edit?</h3>
+                  <p className="text-sm text-muted-foreground">Only checked sections will be saved.</p>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {[
+                    ['eventDetails', 'Event details'],
+                    ['date', 'Date'],
+                    ['venue', 'Venue / address'],
+                    ['description', 'Description'],
+                    ['timeslot', 'Timeslot'],
+                    ['capacity', 'Capacity'],
+                  ].map(([field, label]) => (
+                    <label key={field} className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm font-medium">
+                      <input type="checkbox" checked={form.editSections[field]} onChange={updateEditSection(field)} disabled={busy} />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+                {validationErrors[editField('sections')] && (
+                  <p className="text-xs text-destructive">{validationErrors[editField('sections')]}</p>
+                )}
+              </div>
+            )}
+
+            {(!editing || form.editSections.eventDetails) && (
             <div className="grid gap-2">
               <Label htmlFor="volunteer-event-name">Event name</Label>
               <Input id="volunteer-event-name" value={form.eventName} maxLength={200} onChange={update('eventName')} disabled={busy} aria-invalid={Boolean(validationErrors.eventName) || undefined} aria-describedby={validationErrors.eventName ? 'volunteer-event-name-error' : undefined} />
               {validationErrors.eventName && <p id="volunteer-event-name-error" className="text-xs text-destructive">{validationErrors.eventName}</p>}
             </div>
+            )}
+            {(!editing || form.editSections.date) && (
             <div className="grid gap-2">
               <Label htmlFor="volunteer-event-date">Event date</Label>
               <Input id="volunteer-event-date" type="date" value={form.eventDate} onChange={update('eventDate')} disabled={busy} aria-invalid={Boolean(validationErrors.eventDate) || undefined} aria-describedby={validationErrors.eventDate ? 'volunteer-event-date-error' : undefined} />
               {validationErrors.eventDate && <p id="volunteer-event-date-error" className="text-xs text-destructive">{validationErrors.eventDate}</p>}
             </div>
+            )}
+            {(!editing || form.editSections.venue) && (
+            <>
             <div className="grid gap-2">
               <Label htmlFor="volunteer-event-venue">Venue name</Label>
               <Input id="volunteer-event-venue" value={form.venueName} onChange={update('venueName')} disabled={busy} aria-invalid={Boolean(validationErrors.venueName) || undefined} aria-describedby={validationErrors.venueName ? 'volunteer-event-venue-error' : undefined} />
@@ -352,11 +501,104 @@ export default function EventFormDialog({
               )}
               {addressSearchError && <p className="text-xs text-muted-foreground">{addressSearchError}</p>}
             </div>
+            </>
+            )}
+            {(!editing || form.editSections.description) && (
             <div className="grid gap-2">
               <Label htmlFor="volunteer-event-description">Description</Label>
               <Textarea id="volunteer-event-description" value={form.description} onChange={update('description')} disabled={busy} rows={4} aria-invalid={Boolean(validationErrors.description) || undefined} aria-describedby={validationErrors.description ? 'volunteer-event-description-error' : undefined} />
               {validationErrors.description && <p id="volunteer-event-description-error" className="text-xs text-destructive">{validationErrors.description}</p>}
             </div>
+            )}
+
+            {editing && (form.editSections.timeslot || form.editSections.capacity) && (
+              <div className="grid gap-4 rounded-md border p-4">
+                <div>
+                  <h3 className="font-semibold">Timeslot to update</h3>
+                  <p className="text-sm text-muted-foreground">Choose one existing timeslot. Saving updates that row only.</p>
+                </div>
+                {form.timeslots.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No timeslots are configured for this event.</p>
+                ) : (
+                  <div className="grid gap-2">
+                    {form.timeslots.map((slot, index) => (
+                      <label key={slot.id} className="flex items-start gap-3 rounded-md border bg-background p-3 text-sm">
+                        <input
+                          type="radio"
+                          name="edit-timeslot"
+                          value={slot.id}
+                          checked={form.selectedTimeslotId === slot.id}
+                          onChange={() => selectTimeslot(slot.id)}
+                          disabled={busy}
+                        />
+                        <span>
+                          <span className="block font-medium">Timeslot {index + 1}</span>
+                          <span className="text-muted-foreground">{describeTimeslot(slot.original ?? slot)}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {validationErrors.selectedTimeslotId && <p className="text-xs text-destructive">{validationErrors.selectedTimeslotId}</p>}
+
+                {form.timeslots.map((slot, index) => {
+                  if (slot.id !== form.selectedTimeslotId) return null;
+                  return (
+                    <div key={`${slot.id}-fields`} className="grid gap-3 rounded-md bg-muted/20 p-3">
+                      {form.editSections.timeslot && (
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="grid gap-2">
+                            <Label htmlFor={`volunteer-edit-start-${index}`}>Start time</Label>
+                            <Input
+                              id={`volunteer-edit-start-${index}`}
+                              type="time"
+                              value={slot.startTime}
+                              onChange={updateSlot(index, 'startTime')}
+                              disabled={busy}
+                              aria-invalid={Boolean(validationErrors[slotField(index, 'startTime')]) || undefined}
+                            />
+                            {validationErrors[slotField(index, 'startTime')] && (
+                              <p className="text-xs text-destructive">{validationErrors[slotField(index, 'startTime')]}</p>
+                            )}
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor={`volunteer-edit-end-${index}`}>End time</Label>
+                            <Input
+                              id={`volunteer-edit-end-${index}`}
+                              type="time"
+                              value={slot.endTime}
+                              onChange={updateSlot(index, 'endTime')}
+                              disabled={busy}
+                              aria-invalid={Boolean(validationErrors[slotField(index, 'endTime')]) || undefined}
+                            />
+                            {validationErrors[slotField(index, 'endTime')] && (
+                              <p className="text-xs text-destructive">{validationErrors[slotField(index, 'endTime')]}</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {form.editSections.capacity && (
+                        <div className="grid gap-2 sm:max-w-xs">
+                          <Label htmlFor={`volunteer-edit-capacity-${index}`}>Capacity</Label>
+                          <Input
+                            id={`volunteer-edit-capacity-${index}`}
+                            type="number"
+                            min="1"
+                            value={slot.capacity}
+                            onChange={updateSlot(index, 'capacity')}
+                            disabled={busy}
+                            aria-invalid={Boolean(validationErrors[slotField(index, 'capacity')]) || undefined}
+                          />
+                          {validationErrors[slotField(index, 'capacity')] && (
+                            <p className="text-xs text-destructive">{validationErrors[slotField(index, 'capacity')]}</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {!editing && (
               <div className="grid gap-4 rounded-md border p-4">

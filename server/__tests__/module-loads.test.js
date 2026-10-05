@@ -52,6 +52,10 @@ describe('every source module parses', () => {
       .replace(/^\s*import\s[^;]*;?\s*$/gm, '')
       .replace(/^\s*export\s+\*\s+from\s+['"][^'"]+['"];?\s*$/gm, '')
       .replace(/^\s*export\s+\{[^}]+\}\s+from\s+['"][^'"]+['"];?\s*$/gm, '')
+      // A named export list over several lines, and import.meta, are
+      // both valid in a module and neither survives as a classic Script.
+      .replace(/^\s*export\s+\{[^}]*\};?\s*$/gm, '')
+      .replace(/\bimport\.meta\b/g, '({})')
       .replace(/^\s*export\s+default\s+/gm, 'void ')
       .replace(/^\s*export\s+/gm, '');
     expect(() => new vm.Script(stripped, { filename: full })).not.toThrow();

@@ -14,6 +14,7 @@ import repo from '../repositories/beneficiary.repository.js';
 import { isPositiveInt } from '../utils/validation.js';
 
 const COHORTS = ['tuesday', 'thursday'];
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -62,6 +63,15 @@ const validMobileNumber = (value) => {
   return v;
 };
 
+const validEmail = (value) => {
+  const v = clean(value);
+  if (v === null) return null;
+  if (!EMAIL_RE.test(v)) {
+    throw fail(400, 'Email address must be valid, or left blank.');
+  }
+  return v.toLowerCase();
+};
+
 const validCohort = (value) => {
   const v = clean(value);
   if (!COHORTS.includes(v)) throw fail(400, `Cohort must be one of: ${COHORTS.join(', ')}.`);
@@ -78,6 +88,7 @@ const buildBeneficiaryPayload = (body = {}) => {
     name,
     cohort:      validCohort(body.cohort),
     contactName: capped(body.contactName, 100, 'Contact name'),
+    contactEmail: validEmail(body.contactEmail),
     mobileNumber: validMobileNumber(body.mobileNumber),
     childCount:  validChildCount(body.childCount),
   };
@@ -129,6 +140,7 @@ const updateBeneficiary = async (rawId, body) => {
   }
   if (has('cohort'))      patch.cohort      = validCohort(body.cohort);
   if (has('contactName')) patch.contactName = capped(body.contactName, 100, 'Contact name');
+  if (has('contactEmail')) patch.contactEmail = validEmail(body.contactEmail);
   if (has('mobileNumber')) patch.mobileNumber = validMobileNumber(body.mobileNumber);
   if (has('childCount'))  patch.childCount  = validChildCount(body.childCount);
 

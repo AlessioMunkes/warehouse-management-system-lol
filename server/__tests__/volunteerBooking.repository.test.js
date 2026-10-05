@@ -21,6 +21,7 @@ const {
   findByTimeslotId,
   findByExternalBookingId,
   findByExternalVolunteerId,
+  cancelMissingExternalBookings,
   updateBooking,
   upsertExternalBooking,
   countConfirmedByTimeslot,
@@ -33,6 +34,8 @@ const CREATED_ROW = {
   external_volunteer_id: 'VMS-VOL-555',
   volunteer_first_name: 'Ada',
   volunteer_last_name: 'Lovelace',
+  volunteer_email: 'ada@example.test',
+  volunteer_phone: '+2701',
   booking_source: 'VMS',
   booking_status: 'CONFIRMED',
   booked_at: '2026-09-08T10:00:00Z',
@@ -90,6 +93,8 @@ describe('createBooking', () => {
       'VMS-VOL-555',
       'Ada',
       'Lovelace',
+      null,
+      null,
       'VMS',
       'CONFIRMED',
       '2026-09-08T10:00:00Z',
@@ -118,6 +123,8 @@ describe('createBooking', () => {
       null,
       'Grace',
       null,
+      null,
+      null,
       'WMS_GUEST',
       'CONFIRMED',
       null,
@@ -144,9 +151,34 @@ describe('createBooking', () => {
       null,
       'Ada',
       null,
+      null,
+      null,
       'WMS_GUEST',
       'CONFIRMED',
       null,
+    ]);
+  });
+});
+
+describe('cancelMissingExternalBookings', () => {
+  it('cancels only VMS external bookings for the event timeslots', async () => {
+    const client = makeClient({ onQuery: () => ({ rows: [{ ...CREATED_ROW, booking_status: 'CANCELLED' }] }) });
+
+    const result = await cancelMissingExternalBookings({
+      timeslotIds: ['t1', 't2'],
+      presentExternalBookingIds: ['VMS-KEEP'],
+      lastSyncedAt: '2026-10-01T10:00:00Z',
+    }, client);
+
+    expect(result).toHaveLength(1);
+    const update = findCall(client, /^UPDATE public\.volunteer_bookings/i);
+    expect(update.sql).toContain("booking_source = 'VMS'");
+    expect(update.sql).toContain('external_booking_id IS NOT NULL');
+    expect(update.sql).toContain('booking_status <>');
+    expect(update.params).toEqual([
+      ['t1', 't2'],
+      ['VMS-KEEP'],
+      '2026-10-01T10:00:00Z',
     ]);
   });
 });

@@ -115,7 +115,8 @@ describe('createPurchaseOrder — finance email', () => {
     expect(mail.subject.startsWith('PO-2026-0042')).toBe(true);
     expect(mail.text).toContain(ask);
     expect(mail.html).toContain(ask.replace('PO-2026-0042', '<strong>PO-2026-0042</strong>'));
-    expect(mail.html.trimStart().startsWith('<p style="font-size:16px;"><strong>PO-2026-0042</strong>')).toBe(true);
+    // In the branded template the number leads the message, in bold.
+    expect(mail.html).toContain('Purchase order <strong>PO-2026-0042</strong> has been created');
     expect(mail.text).not.toMatch(/Batches|add the QuickBooks PO number/);
     expect(mail.html).not.toMatch(/Batches|add the QuickBooks PO number/);
   });
@@ -128,6 +129,11 @@ describe('createPurchaseOrder — finance email', () => {
       expect.objectContaining({ to: 'finance@example.org' }),
       null
     );
+    const sentEmail = emailProviderMock.sendEmail.mock.calls[0][0];
+    expect(sentEmail.subject).toContain('capture in QuickBooks');
+    expect(sentEmail.text).toContain('Capture this order in QuickBooks');
+    expect(sentEmail.html).toContain('https://wms-lol.onrender.com/images/pdf_logo.png');
+    expect(sentEmail.html).toContain('Purchase order created');
     expect(repoMock.recordFinanceEmailAttempt).toHaveBeenCalledWith(42, {
       status: 'sent',
       error: null,

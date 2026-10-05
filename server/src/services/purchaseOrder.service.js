@@ -18,6 +18,7 @@ import { isPositiveInt, isValidDateString } from '../utils/validation.js';
 import { PO_STATUSES as PO_STATUS_LIST } from '../constants/purchaseOrderStatus.js';
 import communications from '../features/communications/communications.service.js';
 import notices from '../features/communications/notices.js';
+import { emailStyles, escapeHtml, renderLadlesEmail } from '../utils/emailTemplate.js';
 // The Finance recipient managers save in the app (finance_report_email_settings).
 // Replaced financeEmailFallback.service.js, which read FINANCE_EMAIL until
 // feature/notification-fix brought this service onto staging.
@@ -212,33 +213,35 @@ Capture this order in QuickBooks and type ${purchaseOrder.po_number} into the Qu
 
   const rows = purchaseOrder.items.map((item) => `
     <tr>
-      <td style="padding:6px 12px;border-bottom:1px solid #e5e5e5;">${item.product_name}</td>
-      <td style="padding:6px 12px;border-bottom:1px solid #e5e5e5;text-align:right;">${item.expected_quantity} ${item.default_unit || ''}</td>
-      <td style="padding:6px 12px;border-bottom:1px solid #e5e5e5;text-align:right;">${item.unit_price != null ? money(item.unit_price) : '—'}</td>
-      <td style="padding:6px 12px;border-bottom:1px solid #e5e5e5;text-align:right;">${money(lineTotal(item))}</td>
+      <td style="${emailStyles.td}">${escapeHtml(item.product_name)}</td>
+      <td style="${emailStyles.td}text-align:right;">${escapeHtml(`${item.expected_quantity} ${item.default_unit || ''}`.trim())}</td>
+      <td style="${emailStyles.td}text-align:right;">${item.unit_price != null ? escapeHtml(money(item.unit_price)) : '&mdash;'}</td>
+      <td style="${emailStyles.td}text-align:right;">${escapeHtml(money(lineTotal(item)))}</td>
     </tr>`).join('');
 
-  const html = `
-    <p style="font-size:16px;"><strong>${purchaseOrder.po_number}</strong></p>
-    <p>Purchase order ${purchaseOrder.po_number} has been created and needs to be captured in QuickBooks.</p>
-    <p><strong>Supplier:</strong> ${purchaseOrder.supplier_name}<br>
-       <strong>Created:</strong> ${formatDate(purchaseOrder.created_at)} by ${createdBy}</p>
-    <table style="border-collapse:collapse;width:100%;font-size:14px;">
-      <thead><tr>
-        <th style="padding:6px 12px;text-align:left;border-bottom:2px solid #333;">Item</th>
-        <th style="padding:6px 12px;text-align:right;border-bottom:2px solid #333;">Qty</th>
-        <th style="padding:6px 12px;text-align:right;border-bottom:2px solid #333;">Unit price</th>
-        <th style="padding:6px 12px;text-align:right;border-bottom:2px solid #333;">Line total</th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-      <tfoot><tr>
-        <td colspan="3" style="padding:6px 12px;text-align:right;font-weight:600;">Total</td>
-        <td style="padding:6px 12px;text-align:right;font-weight:600;">${money(total)}</td>
-      </tr></tfoot>
-    </table>
-    <p>Capture this order in QuickBooks and type <strong>${purchaseOrder.po_number}</strong> into the QuickBooks PO's Memo field. The system links the two automatically from your QuickBooks export.</p>
-  `;
-
+  const html = renderLadlesEmail({
+    title: 'Purchase order created',
+    preheader: `Purchase order ${purchaseOrder.po_number} needs to be captured in QuickBooks.`,
+    bodyHtml: `
+      <p style="${emailStyles.paragraph}">Purchase order <strong>${escapeHtml(purchaseOrder.po_number)}</strong> has been created and needs to be captured in QuickBooks.</p>
+      <p style="${emailStyles.paragraph}"><strong>Supplier:</strong> ${escapeHtml(purchaseOrder.supplier_name)}<br>
+         <strong>Created:</strong> ${escapeHtml(formatDate(purchaseOrder.created_at))} by ${escapeHtml(createdBy)}</p>
+      <table style="${emailStyles.table}">
+        <thead><tr>
+          <th style="${emailStyles.th}">Item</th>
+          <th style="${emailStyles.th}text-align:right;">Qty</th>
+          <th style="${emailStyles.th}text-align:right;">Unit price</th>
+          <th style="${emailStyles.th}text-align:right;">Line total</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr>
+          <td colspan="3" style="${emailStyles.td}text-align:right;font-weight:700;">Total</td>
+          <td style="${emailStyles.td}text-align:right;font-weight:700;">${escapeHtml(money(total))}</td>
+        </tr></tfoot>
+      </table>
+      <p style="${emailStyles.note}">Capture this order in QuickBooks and type <strong>${escapeHtml(purchaseOrder.po_number)}</strong> into the QuickBooks PO's Memo field. The system links the two automatically from your QuickBooks export.</p>
+    `,
+  });
   return { subject, text, html };
 };
 

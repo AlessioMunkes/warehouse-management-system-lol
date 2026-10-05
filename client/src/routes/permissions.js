@@ -16,6 +16,8 @@ export const ALL_STAFF   = Object.freeze(['warehouse_worker', 'manager', 'admin'
 // never opens a worker screen, and a worker never opens theirs.
 export const WORKERS_ONLY = Object.freeze(['warehouse_worker']);
 export const MANAGERS_UP = Object.freeze(['manager', 'admin']);
+// Managers but not admins: operational goals, matching the server.
+export const MANAGER_ONLY = Object.freeze(['manager']);
 export const ADMIN_ONLY  = Object.freeze(['admin']);
 export const GUEST_ONLY  = Object.freeze(['guest']);
 

@@ -36,12 +36,13 @@ const UPDATABLE = {
   name:        'name',
   cohort:      'cohort',
   contactName: 'contact_name',
+  contactEmail: 'contact_email',
   mobileNumber: 'mobile_number',
   childCount:  'child_count',
 };
 
 const BENEFICIARY_COLUMNS = `
-  e.id, e.name, e.cohort, e.contact_name, e.mobile_number, e.child_count,
+  e.id, e.name, e.cohort, e.contact_name, e.contact_email, e.mobile_number, e.child_count,
   e.is_active, e.approved_at, e.last_collected_date
 `;
 
@@ -92,10 +93,17 @@ const findByName = async (name, { excludeId = null } = {}) => {
 // ── Write ─────────────────────────────────────────────────────
 const insertBeneficiary = async (payload) => {
   const { rows } = await pool.query(
-    `INSERT INTO ecd_centres (name, cohort, contact_name, mobile_number, child_count, is_active)
-     VALUES ($1, $2::cohort_group, $3, $4, $5, true)
+    `INSERT INTO ecd_centres (name, cohort, contact_name, contact_email, mobile_number, child_count, is_active)
+     VALUES ($1, $2::cohort_group, $3, $4, $5, $6, true)
      RETURNING ${BENEFICIARY_COLUMNS.replace(/e\./g, '')}`,
-    [payload.name, payload.cohort, payload.contactName ?? null, payload.mobileNumber ?? null, payload.childCount ?? null]
+    [
+      payload.name,
+      payload.cohort,
+      payload.contactName ?? null,
+      payload.contactEmail ?? null,
+      payload.mobileNumber ?? null,
+      payload.childCount ?? null,
+    ]
   );
   return rows[0];
 };

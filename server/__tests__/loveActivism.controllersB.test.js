@@ -3,7 +3,7 @@
 // Phase 5 targeted controller tests: volunteer + attendance + sync.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-const volSvc = { getBooking: vi.fn(), getBookingsForTimeslot: vi.fn(), getBookingsForEvent: vi.fn(), createWalkIn: vi.fn(), cancelGuestBooking: vi.fn() };
+const volSvc = { getBooking: vi.fn(), getBookingsForTimeslot: vi.fn(), getBookingsForEvent: vi.fn(), syncBookingsForEvent: vi.fn(), createWalkIn: vi.fn(), cancelGuestBooking: vi.fn() };
 const attSvc = { confirmAttendance: vi.fn(), getAttendanceForBooking: vi.fn(), getAttendanceForTimeslot: vi.fn(), getAttendanceForEvent: vi.fn(), getAttendanceSummary: vi.fn() };
 const syncSvc = { getSyncStatus: vi.fn(), retrySync: vi.fn() };
 vi.mock('../src/services/volunteerBooking.service.js', () => ({ default: volSvc }));
@@ -19,16 +19,19 @@ const fwd = async (fn, call) => { const e = Object.assign(new Error('boom'), { s
 describe('volunteerBooking.controller', () => {
   it('reads pass ids; walk-in 201; cancel passes actor', async () => {
     volSvc.getBooking.mockResolvedValueOnce({}); volSvc.getBookingsForTimeslot.mockResolvedValueOnce([]);
-    volSvc.getBookingsForEvent.mockResolvedValueOnce([]); volSvc.createWalkIn.mockResolvedValueOnce({}); volSvc.cancelGuestBooking.mockResolvedValueOnce({});
+    volSvc.getBookingsForEvent.mockResolvedValueOnce([]); volSvc.syncBookingsForEvent.mockResolvedValueOnce({});
+    volSvc.createWalkIn.mockResolvedValueOnce({}); volSvc.cancelGuestBooking.mockResolvedValueOnce({});
     const wr = R();
     await volC.getBooking({ params: { bookingId: 'b1' } }, R(), vi.fn());
     await volC.getBookingsForTimeslot({ params: { timeslotId: 't1' } }, R(), vi.fn());
     await volC.getBookingsForEvent({ params: { eventId: 'e1' } }, R(), vi.fn());
+    await volC.syncBookingsForEvent({ params: { eventId: 'e1' } }, R(), vi.fn());
     await volC.createWalkIn({ params: { timeslotId: 't1' }, body: { volunteerFirstName: 'J' }, user: ACTOR }, wr, vi.fn());
     await volC.cancelGuestBooking({ params: { bookingId: 'b1' }, user: ACTOR }, R(), vi.fn());
     expect(volSvc.getBooking).toHaveBeenCalledWith('b1');
     expect(volSvc.getBookingsForTimeslot).toHaveBeenCalledWith('t1');
     expect(volSvc.getBookingsForEvent).toHaveBeenCalledWith('e1');
+    expect(volSvc.syncBookingsForEvent).toHaveBeenCalledWith('e1');
     expect(volSvc.createWalkIn).toHaveBeenCalledWith('t1', { volunteerFirstName: 'J' }, ACTOR);
     expect(wr.status).toHaveBeenCalledWith(201);
     expect(volSvc.cancelGuestBooking).toHaveBeenCalledWith('b1', ACTOR);

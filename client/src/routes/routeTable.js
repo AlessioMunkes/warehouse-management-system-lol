@@ -37,11 +37,11 @@ import {
   LayoutDashboard, Users2, ClipboardList, ShoppingCart, BarChart3, HeartHandshake,
   Package, Truck, Gift, HandHeart, Boxes, ReceiptText, Activity, Archive, Inbox,
   PackageOpen, PackageCheck, FlaskConical, ClipboardCheck, HandCoins, PhoneCall,
-  ScrollText, Sprout, MessageCircle, Settings, Landmark, CalendarDays,
+  ScrollText, Sprout, MessageCircle, Settings, Landmark, CalendarDays, Target,
 } from 'lucide-react';
 import { STAFF, ADMIN, VOLUNTEERS, PACKING, DONATIONS } from './paths';
 import {
-  MANAGERS_UP, ADMIN_ONLY, GUEST_ONLY, WORKERS_ONLY,
+  MANAGERS_UP, MANAGER_ONLY, ADMIN_ONLY, GUEST_ONLY, WORKERS_ONLY,
 } from './permissions';
 
 // Each sidebar's groups, top to bottom.
@@ -139,6 +139,8 @@ export const ROUTES = [
     nav: [nav('manager', 'Insights', 'Operations reports', BarChart3)] },
   { id: 'impactReport', path: STAFF.impactReport, roles: MANAGERS_UP, shell: true,
     nav: [nav('manager', 'Insights', 'Impact report', HeartHandshake)] },
+  { id: 'operationalGoals', path: STAFF.operationalGoals, roles: MANAGER_ONLY, shell: true,
+    nav: [nav('manager', 'Insights', 'Operational goals', Target)] },
 
   // ── Admin ──────────────────────────────────────────────────
   { id: 'users', path: ADMIN.users, roles: ADMIN_ONLY, shell: true,

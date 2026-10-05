@@ -27,6 +27,8 @@ import { ROLES } from '../middleware/auth.middleware.js';
 
 export const ALL_STAFF   = Object.freeze([ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN]);
 export const MANAGERS_UP = Object.freeze([ROLES.MANAGER, ROLES.ADMIN]);
+// Managers but not admins: operational goals.
+export const MANAGER_ONLY = Object.freeze([ROLES.MANAGER]);
 export const ADMIN_ONLY  = Object.freeze([ROLES.ADMIN]);
 export const GUEST_ONLY  = Object.freeze([ROLES.GUEST]);
 // The floor's own actions. Each role works only its own screens, so
@@ -39,4 +41,4 @@ export const WORKERS_ONLY = Object.freeze([ROLES.WORKER]);
 export const hasRole = (user, group) => Boolean(user && group.includes(user.role));
 export const isManagerUp = (user) => hasRole(user, MANAGERS_UP);
 
-export default { ALL_STAFF, MANAGERS_UP, ADMIN_ONLY, GUEST_ONLY, WORKERS_ONLY, hasRole, isManagerUp };
+export default { ALL_STAFF, MANAGERS_UP, MANAGER_ONLY, ADMIN_ONLY, GUEST_ONLY, WORKERS_ONLY, hasRole, isManagerUp };

@@ -9,7 +9,7 @@
 import pool from '../config/db.js';
 
 const EVENT_COLUMNS = `
-  event_id, event_name, description, event_date, venue_name, address, status,
+  event_id, event_name, description, event_date::text AS event_date, venue_name, address, status,
   created_by, created_at, updated_at
 `;
 

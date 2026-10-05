@@ -88,6 +88,7 @@ const BeneficiaryDetail = ({ beneficiary, canManage, onEdit, onToggleActive, onA
   >
     <dl className="grid gap-4 text-sm sm:grid-cols-2">
       <div><dt className="text-muted-foreground">Contact</dt><dd>{beneficiary.contactName || '—'}</dd></div>
+      <div className="min-w-0"><dt className="text-muted-foreground">Email</dt><dd className="break-words">{beneficiary.contactEmail || '—'}</dd></div>
       <div><dt className="text-muted-foreground">Mobile</dt><dd>{beneficiary.mobileNumber || '—'}</dd></div>
       <div><dt className="text-muted-foreground">Children served</dt><dd>{beneficiary.childCount ?? 'Not recorded'}</dd></div>
       <div><dt className="text-muted-foreground">Approved</dt><dd>{beneficiary.approvedAt ? fmtDate(beneficiary.approvedAt) : 'Not yet approved'}</dd></div>

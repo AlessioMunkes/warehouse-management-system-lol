@@ -94,7 +94,7 @@ describe('queueTomorrowCollectionReminders', () => {
 });
 
 describe('sendTomorrowCollectionReminderEmails', () => {
-  it('uses the existing reminder queue and sends pending email reminders with usable email addresses', async () => {
+  it('on Wednesday 08:00 finds Thursday collections and sends pending email reminders to contact_email', async () => {
     repoMock.findCollectionsByDate.mockResolvedValueOnce([
       { ecd_id: 1, collection_date: '2026-09-24' },
     ]);
@@ -122,14 +122,85 @@ describe('sendTomorrowCollectionReminderEmails', () => {
     expect(repoMock.claimReminderForSending).toHaveBeenCalledWith(10);
     expect(emailProviderMock.sendEmail).toHaveBeenCalledWith(expect.objectContaining({
       to: 'nomsa@example.org',
-      subject: 'Collection reminder for 2026-09-24',
+      subject: 'Reminder: Your Ladles of Love collection is tomorrow',
+      text: expect.stringContaining('Hi Little Stars team,'),
+      html: expect.stringContaining('https://wms-lol.onrender.com/images/pdf_logo.png'),
     }));
+    const emailPayload = emailProviderMock.sendEmail.mock.calls[0][0];
+    expect(emailPayload.text).toContain('Thursday, 24 September 2026');
+    expect(emailPayload.text).toContain('We hope you’re doing well.');
+    expect(emailPayload.text).toContain('Warm regards,\nThe Ladles of Love Team');
+    expect(emailPayload.html).toContain('alt="Ladles of Love"');
+    expect(emailPayload.html).toContain('<strong>Thursday, 24 September 2026</strong>');
+    expect(emailPayload.html).toContain('If your collection arrangements have changed');
     expect(repoMock.markReminderSent).toHaveBeenCalledWith({
       id: 10,
       providerMessageId: 'gmail-1',
     });
     expect(result.sent).toBe(1);
     expect(result.failed).toBe(0);
+  });
+
+  // A run only ever looks at the next day, so Thursday's reminders
+  // cannot go out early on Tuesday...
+  it('on Tuesday looks at Wednesday, not Thursday', async () => {
+    const result = await service.sendTomorrowCollectionReminderEmails({
+      now: new Date('2026-09-22T06:00:00.000Z'),
+    });
+
+    expect(result).toMatchObject({ collectionDate: '2026-09-23', attempted: 0, sent: 0, failed: 0 });
+    expect(repoMock.findCollectionsByDate).toHaveBeenCalledWith('2026-09-23');
+    expect(repoMock.findCollectionsByDate).not.toHaveBeenCalledWith('2026-09-24');
+    expect(emailProviderMock.sendEmail).not.toHaveBeenCalled();
+  });
+
+
+
+  it('uses a safe fallback greeting and escaped HTML when the ECD name is missing', async () => {
+    repoMock.listPendingReminderDeliveries.mockResolvedValueOnce([
+      {
+        id: 42,
+        collection_date: '2026-09-24',
+        ecd_name: null,
+        contact_email: 'test@example.org',
+      },
+    ]);
+
+    const result = await service.sendTomorrowCollectionReminderEmails({
+      now: new Date('2026-09-23T06:00:00.000Z'),
+    });
+
+    const emailPayload = emailProviderMock.sendEmail.mock.calls[0][0];
+    expect(emailPayload.text).toContain('Hi there,');
+    expect(emailPayload.text).toContain('Thursday, 24 September 2026');
+    expect(emailPayload.html).toContain('Hi there,');
+    expect(emailPayload.html).toContain('Friendly reminder that your Ladles of Love collection is scheduled');
+    expect(emailPayload.html).not.toContain('localhost');
+    expect(result.sent).toBe(1);
+  });
+
+  // ...or again on the day itself.
+  it('on Thursday looks at Friday, so Thursday is not reminded twice', async () => {
+    const result = await service.sendTomorrowCollectionReminderEmails({
+      now: new Date('2026-09-24T06:00:00.000Z'),
+    });
+
+    expect(result.collectionDate).toBe('2026-09-25');
+    expect(repoMock.findCollectionsByDate).not.toHaveBeenCalledWith('2026-09-24');
+    expect(emailProviderMock.sendEmail).not.toHaveBeenCalled();
+  });
+
+  it('uses Africa/Johannesburg timezone for the Wednesday workflow', async () => {
+    repoMock.findCollectionsByDate.mockResolvedValueOnce([
+      { ecd_id: 1, collection_date: '2026-09-24' },
+    ]);
+
+    const result = await service.sendTomorrowCollectionReminderEmails({
+      now: new Date('2026-09-22T22:30:00.000Z'),
+    });
+
+    expect(repoMock.findCollectionsByDate).toHaveBeenCalledWith('2026-09-24');
+    expect(result.collectionDate).toBe('2026-09-24');
   });
 
   it('does not send or mark sent when a reminder has no usable email', async () => {
@@ -182,6 +253,7 @@ describe('sendTomorrowCollectionReminderEmails', () => {
     expect(repoMock.markReminderFailed).not.toHaveBeenCalled();
     expect(result.skipped).toBe(1);
   });
+
 });
 
 describe('listTomorrowWhatsAppReminders', () => {
@@ -225,6 +297,17 @@ describe('listTomorrowWhatsAppReminders', () => {
       .toContain('Hello Nomsa,');
     expect(emailProviderMock.sendEmail).not.toHaveBeenCalled();
   });
+
+  it('keeps WhatsApp manual: listing the queue never sends anything', async () => {
+    const result = await service.listTomorrowWhatsAppReminders({
+      now: new Date('2026-09-22T06:00:00.000Z'),
+    });
+
+    expect(result).toMatchObject({ collectionDate: '2026-09-23', reminders: [] });
+    expect(repoMock.findCollectionsByDate).toHaveBeenCalledWith('2026-09-23');
+    expect(emailProviderMock.sendEmail).not.toHaveBeenCalled();
+  });
+
 
   it.each([
     ['+27 82 123 4567', '+27821234567', '27821234567'],
@@ -323,3 +406,5 @@ describe('markWhatsAppReminderSent', () => {
     expect(repoMock.markReminderSent).not.toHaveBeenCalled();
   });
 });
+
+

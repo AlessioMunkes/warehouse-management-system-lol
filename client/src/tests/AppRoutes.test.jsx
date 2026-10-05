@@ -14,7 +14,7 @@ import { describe, it, expect } from 'vitest';
 import { ROUTES, REDIRECTS } from '../routes/routeTable';
 import { PAGES } from '../routes/pages';
 import { NAV_SECTIONS } from '../components/layout/navSections';
-import { ALL_STAFF, MANAGERS_UP, ADMIN_ONLY, GUEST_ONLY, WORKERS_ONLY } from '../routes/permissions';
+import { ALL_STAFF, MANAGERS_UP, MANAGER_ONLY, ADMIN_ONLY, GUEST_ONLY, WORKERS_ONLY } from '../routes/permissions';
 
 const ROLE_OF_MENU = { worker: 'warehouse_worker', manager: 'manager', admin: 'admin' };
 
@@ -29,7 +29,7 @@ describe('route table', () => {
   });
 
   it('guards every non-public route with a named group', () => {
-    const groups = [ALL_STAFF, MANAGERS_UP, ADMIN_ONLY, GUEST_ONLY, WORKERS_ONLY];
+    const groups = [ALL_STAFF, MANAGERS_UP, MANAGER_ONLY, ADMIN_ONLY, GUEST_ONLY, WORKERS_ONLY];
     for (const r of ROUTES.filter((x) => x.roles)) {
       expect(groups, `${r.id} uses a role list that is not in permissions.js`).toContain(r.roles);
     }
@@ -88,7 +88,7 @@ describe('sidebars built from the table', () => {
         'Benevolent requests /noc/community-requests',
       ]],
       ['Programmes', ['Feed the Soil /noc/feed-the-soil', 'Volunteer events /volunteers']],
-      ['Insights', ['Operations reports /noc/reporting', 'Impact report /noc/impact-report']],
+      ['Insights', ['Operations reports /noc/reporting', 'Impact report /noc/impact-report', 'Operational goals /noc/operational-goals']],
     ]);
   });
 

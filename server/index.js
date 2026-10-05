@@ -23,7 +23,10 @@
 // though, which is why it's a fallback here and not the primary
 // mechanism: for anyone who runs `node index.js` directly, bypassing
 // the npm scripts and their .env.local support, entirely.
-import 'dotenv/config';
+//
+// config/env.js is that import, pointed at server/.env by path so it
+// is found whatever directory node was started from.
+import './src/config/env.js';
 import express          from 'express';
 import cors             from 'cors';
 import path             from 'path';
@@ -49,6 +52,7 @@ import dispatchRouter    from './src/routes/dispatch.routes.js';
 import supplierRouter    from './src/routes/supplier.routes.js';
 import purchaseOrderRouter from './src/routes/purchaseOrder.routes.js';
 import reportingRouter   from './src/routes/reporting.routes.js';
+import operationalGoalsRouter from './src/routes/operationalGoals.routes.js';
 import assistantRouter   from './src/routes/assistant.routes.js';
 import userRouter        from './src/routes/user.routes.js';
 import userInviteRouter  from './src/routes/userInvite.routes.js';
@@ -201,6 +205,7 @@ app.use('/api/donations/admin', donationAdminRoutes);
 app.use('/api/suppliers',  supplierRouter);
 app.use('/api/purchase-orders', purchaseOrderRouter);
 app.use('/api/reporting',  reportingRouter);
+app.use('/api/operational-goals', operationalGoalsRouter);
 app.use('/api/assistant',  assistantRouter);
 app.use('/api/users',      userRouter);
 app.use('/api/admin',      adminRouter);

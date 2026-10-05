@@ -33,6 +33,34 @@
 import pool       from '../config/db.js';
 import stockModel from './stock.repository.js';
 
+const PARTIAL_BAG_NOMINAL_KG = 0.5;
+
+const partialActualKgForInsert = (partialBag) => {
+  if (!partialBag) return null;
+
+  const actualWeightKg = Number(partialBag.actualWeightKg);
+  if (!Number.isFinite(actualWeightKg) || actualWeightKg <= 0 || actualWeightKg >= PARTIAL_BAG_NOMINAL_KG) {
+    throw new Error('Partial bag actual weight must be greater than 0 kg and less than 0.5 kg.');
+  }
+
+  return actualWeightKg;
+};
+
+const partialBagFromRow = (partialBagActualKg) => {
+  if (partialBagActualKg === null || partialBagActualKg === undefined) return null;
+
+  const actualWeightKg = Number(partialBagActualKg);
+  if (!Number.isFinite(actualWeightKg) || actualWeightKg <= 0 || actualWeightKg >= PARTIAL_BAG_NOMINAL_KG) {
+    throw new Error('Stored partial bag actual weight is invalid.');
+  }
+
+  return {
+    nominalSizeKg: PARTIAL_BAG_NOMINAL_KG,
+    actualWeightKg,
+    isPartial: true,
+  };
+};
+
 // ── Create a decanting record with its lines ──────────────────
 // Wrapped in a transaction so a header is never left without lines.
 // Decanting records are write-once — there is no update / delete.
@@ -57,8 +85,8 @@ const createDecanting = async ({ weekOf, notes, recordedBy, lines }) => {
         `INSERT INTO decanting_lines
            (decanting_id, product_id, required_kg, actual_bulk_kg, packed_kg,
             total_bags, sizes_kg, bags, margin_error, within_margin,
-            wastage_kg, surplus_kg, shortfall_kg, notes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+            wastage_kg, surplus_kg, shortfall_kg, partial_bag_actual_kg, notes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
         [
           record.id,
           line.productId ?? null,
@@ -73,6 +101,7 @@ const createDecanting = async ({ weekOf, notes, recordedBy, lines }) => {
           line.wastageKg   ?? 0,
           line.surplusKg   ?? 0,
           line.shortfallKg ?? 0,
+          partialActualKgForInsert(line.partialBag),
           line.notes ?? null,
         ]
       );
@@ -214,6 +243,7 @@ const getDecantingById = async (id) => {
        dl.wastage_kg,
        dl.surplus_kg,
        dl.shortfall_kg,
+       dl.partial_bag_actual_kg,
        dl.notes,
        p.name               AS product_name,
        p.stock_keeping_unit AS sku
@@ -226,7 +256,10 @@ const getDecantingById = async (id) => {
 
   return {
     ...recordResult.rows[0],
-    lines: linesResult.rows,
+    lines: linesResult.rows.map((line) => ({
+      ...line,
+      partialBag: partialBagFromRow(line.partial_bag_actual_kg),
+    })),
   };
 };
 

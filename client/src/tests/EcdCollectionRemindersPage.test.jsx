@@ -68,7 +68,7 @@ beforeEach(() => {
 });
 
 describe('EcdCollectionRemindersPage', () => {
-  it('shows tomorrow reminder queue details', async () => {
+  it('shows Thursday reminder queue details', async () => {
     render(<EcdCollectionRemindersPage />);
 
     expect(await screen.findByText('Little Stars')).toBeInTheDocument();

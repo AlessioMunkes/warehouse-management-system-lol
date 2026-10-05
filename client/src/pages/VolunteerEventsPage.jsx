@@ -206,10 +206,19 @@ export default function VolunteerEventsPage() {
     loadSpaces();
   };
 
-  const openEdit = (event) => {
-    setEditing(event);
+  const openEdit = async (event) => {
+    setBusy(true);
     setFormError('');
-    setFormOpen(true);
+    setActionError('');
+    try {
+      const config = await volunteerManagementAPI.getEventBooking(event.id);
+      setEditing({ ...config.event, timeslots: config.timeslots });
+      setFormOpen(true);
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setBusy(false);
+    }
   };
 
   // The dialog serves both creation and editing; refresh the list only after
@@ -217,10 +226,18 @@ export default function VolunteerEventsPage() {
   const saveEvent = async (payload) => {
     setBusy(true);
     setFormError('');
-    try {
+      try {
       let created = null;
-      if (editing) await volunteerManagementAPI.updateEvent(editing.id, payload);
-      else created = await volunteerManagementAPI.createEventWithInitialTimeslot(payload);
+      if (editing) {
+        if (Object.keys(payload.event ?? {}).length > 0) {
+          await volunteerManagementAPI.updateEvent(editing.id, payload.event);
+        }
+        if (payload.timeslot) {
+          await volunteerManagementAPI.updateTimeslot(editing.id, payload.timeslot.timeslotId, payload.timeslot.changes);
+        }
+      } else {
+        created = await volunteerManagementAPI.createEventWithInitialTimeslot(payload);
+      }
       setFormOpen(false);
       setEditing(null);
       await loadEvents();

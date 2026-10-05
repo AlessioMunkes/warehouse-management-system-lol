@@ -30,16 +30,31 @@ beforeEach(() => {
 });
 
 describe('ECD collection reminder scheduler timing', () => {
-  it('runs at the next 08:00 Africa/Johannesburg when today has not passed', () => {
+  // The job runs every morning and sends for tomorrow's collections,
+  // so Thursday's reminders still go out on Wednesday, and Tuesday's
+  // cohort gets its own on Monday.
+  it('runs at 08:00 Africa/Johannesburg today when that has not passed', () => {
     const runAt = nextRunAt(new Date('2026-09-23T05:59:00.000Z'));
 
     expect(runAt.toISOString()).toBe('2026-09-23T06:00:00.000Z');
   });
 
-  it('schedules tomorrow when 08:00 Africa/Johannesburg has passed', () => {
+  it('schedules tomorrow morning once 08:00 Africa/Johannesburg has passed', () => {
     const runAt = nextRunAt(new Date('2026-09-23T06:00:00.000Z'));
 
     expect(runAt.toISOString()).toBe('2026-09-24T06:00:00.000Z');
+  });
+
+  it('runs on Wednesday morning for Thursday collections', () => {
+    const runAt = nextRunAt(new Date('2026-09-22T06:00:00.000Z'));
+
+    expect(runAt.toISOString()).toBe('2026-09-23T06:00:00.000Z');
+  });
+
+  it('uses the Africa/Johannesburg date when working out the morning', () => {
+    const runAt = nextRunAt(new Date('2026-09-22T22:30:00.000Z'));
+
+    expect(runAt.toISOString()).toBe('2026-09-23T06:00:00.000Z');
   });
 });
 
@@ -135,6 +150,7 @@ describe('startEmailReminderScheduler', () => {
     );
     expect(setTimer).toHaveBeenCalledTimes(2);
   });
+
 });
 
 describe('the send hour from Settings', () => {
@@ -178,3 +194,4 @@ describe('runEmailReminderJob with several warehouses', () => {
     await expect(runEmailReminderJob({ logger: quiet, service, codes: [] })).resolves.toMatchObject({ sent: 2 });
   });
 });
+

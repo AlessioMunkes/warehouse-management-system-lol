@@ -51,6 +51,7 @@ import userRepo      from '../repositories/user.repository.js';
 import { appBaseUrl, missingAddressMessage } from '../config/appUrl.js';
 import settings from '../features/settings/settings.service.js';
 import communications from '../features/communications/communications.service.js';
+import { emailStyles, escapeHtml, renderLadlesEmail } from '../utils/emailTemplate.js';
 import {
   fail, clean, validUsername, validFirstName, validLastName, validRole, validPassword,
 } from '../utils/userAccountFields.js';
@@ -95,9 +96,17 @@ const composeInviteEmail = ({ email, role, inviterName, expires_at: expiresAt },
     '',
     expiresLine,
   ].join('\n');
-  const html = `<p>${from} invited you to join as a <strong>${roleLabel}</strong>.</p>`
-    + `<p><a href="${url}">${url}</a></p>`
-    + `<p>${expiresLine}</p>`;
+  const safeUrl = escapeHtml(url);
+  const html = renderLadlesEmail({
+    title: 'You have been invited',
+    preheader: `${from} invited you to join Ladles of Love Warehouse Management.`,
+    bodyHtml: `
+      <p style="${emailStyles.paragraph}">${escapeHtml(from)} invited you to join as a <strong>${escapeHtml(roleLabel)}</strong>.</p>
+      <p style="${emailStyles.paragraph}"><a href="${safeUrl}" style="${emailStyles.cta}">Set up your account</a></p>
+      <p style="${emailStyles.paragraph}"><a href="${safeUrl}" style="color:#d85b2a;text-decoration:none;">${safeUrl}</a></p>
+      <p style="${emailStyles.note}">${escapeHtml(expiresLine)}</p>
+    `,
+  });
   return {
     to: email,
     subject: `You've been invited to Ladles of Love Warehouse Management`,

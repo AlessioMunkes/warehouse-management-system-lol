@@ -12,7 +12,7 @@ import pool from '../config/db.js';
 
 const BOOKING_COLUMNS = `
   booking_id, timeslot_id, external_booking_id, external_volunteer_id,
-  volunteer_first_name, volunteer_last_name, booking_source,
+  volunteer_first_name, volunteer_last_name, volunteer_email, volunteer_phone, booking_source,
   booking_status, booked_at, last_synced_at, created_at, updated_at
 `;
 
@@ -23,6 +23,8 @@ const createBooking = async ({
   externalVolunteerId = null,
   volunteerFirstName,
   volunteerLastName = null,
+  volunteerEmail = null,
+  volunteerPhone = null,
   bookingSource,
   bookingStatus,
   lastSyncedAt = null,
@@ -30,9 +32,9 @@ const createBooking = async ({
   const { rows } = await client.query(
     `INSERT INTO public.volunteer_bookings
        (timeslot_id, external_booking_id, external_volunteer_id,
-        volunteer_first_name, volunteer_last_name, booking_source,
+        volunteer_first_name, volunteer_last_name, volunteer_email, volunteer_phone, booking_source,
         booking_status, last_synced_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      RETURNING ${BOOKING_COLUMNS}`,
     [
       timeslotId,
@@ -40,6 +42,8 @@ const createBooking = async ({
       externalVolunteerId ?? null,
       volunteerFirstName,
       volunteerLastName ?? null,
+      volunteerEmail ?? null,
+      volunteerPhone ?? null,
       bookingSource,
       bookingStatus,
       lastSyncedAt ?? null,
@@ -90,6 +94,19 @@ const findByExternalVolunteerId = async (externalVolunteerId, client = pool) => 
   return rows;
 };
 
+const findExternalByTimeslotIds = async (timeslotIds, client = pool) => {
+  if (!Array.isArray(timeslotIds) || timeslotIds.length === 0) return [];
+  const { rows } = await client.query(
+    `SELECT ${BOOKING_COLUMNS} FROM public.volunteer_bookings
+       WHERE timeslot_id = ANY($1)
+         AND booking_source = 'VMS'
+         AND external_booking_id IS NOT NULL
+       ORDER BY booked_at ASC, created_at ASC`,
+    [timeslotIds]
+  );
+  return rows;
+};
+
 // ── Update only mutable booking fields ────────────────────────
 // booking_id, timeslot_id, created_at are intentionally absent.
 const UPDATABLE = {
@@ -97,6 +114,8 @@ const UPDATABLE = {
   externalVolunteerId: 'external_volunteer_id',
   volunteerFirstName: 'volunteer_first_name',
   volunteerLastName:  'volunteer_last_name',
+  volunteerEmail:     'volunteer_email',
+  volunteerPhone:     'volunteer_phone',
   bookingSource:      'booking_source',
   bookingStatus:      'booking_status',
   lastSyncedAt:       'last_synced_at',
@@ -135,6 +154,8 @@ const upsertExternalBooking = async (data, client = pool) => {
     timeslotId,
     volunteerFirstName,
     volunteerLastName = null,
+    volunteerEmail = null,
+    volunteerPhone = null,
     bookingSource,
     bookingStatus,
     lastSyncedAt = null,
@@ -143,14 +164,16 @@ const upsertExternalBooking = async (data, client = pool) => {
   const { rows } = await client.query(
     `INSERT INTO public.volunteer_bookings
        (external_booking_id, external_volunteer_id, timeslot_id,
-        volunteer_first_name, volunteer_last_name, booking_source,
+        volunteer_first_name, volunteer_last_name, volunteer_email, volunteer_phone, booking_source,
         booking_status, last_synced_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      ON CONFLICT (external_booking_id) DO UPDATE SET
        external_volunteer_id = EXCLUDED.external_volunteer_id,
        timeslot_id = EXCLUDED.timeslot_id,
        volunteer_first_name = EXCLUDED.volunteer_first_name,
        volunteer_last_name = EXCLUDED.volunteer_last_name,
+       volunteer_email = EXCLUDED.volunteer_email,
+       volunteer_phone = EXCLUDED.volunteer_phone,
        booking_source = EXCLUDED.booking_source,
        booking_status = EXCLUDED.booking_status,
        last_synced_at = EXCLUDED.last_synced_at,
@@ -162,12 +185,39 @@ const upsertExternalBooking = async (data, client = pool) => {
       timeslotId,
       volunteerFirstName,
       volunteerLastName ?? null,
+      volunteerEmail ?? null,
+      volunteerPhone ?? null,
       bookingSource,
       bookingStatus,
       lastSyncedAt ?? null,
     ]
   );
   return rows[0];
+};
+
+const cancelMissingExternalBookings = async ({
+  timeslotIds,
+  presentExternalBookingIds,
+  lastSyncedAt = null,
+}, client = pool) => {
+  if (!Array.isArray(timeslotIds) || timeslotIds.length === 0) return [];
+  const keepIds = Array.isArray(presentExternalBookingIds)
+    ? presentExternalBookingIds.map(String)
+    : [];
+  const { rows } = await client.query(
+    `UPDATE public.volunteer_bookings
+        SET booking_status = 'CANCELLED',
+            last_synced_at = $3,
+            updated_at = NOW()
+      WHERE timeslot_id = ANY($1)
+        AND booking_source = 'VMS'
+        AND external_booking_id IS NOT NULL
+        AND NOT (external_booking_id = ANY($2))
+        AND booking_status <> 'CANCELLED'
+      RETURNING ${BOOKING_COLUMNS}`,
+    [timeslotIds, keepIds, lastSyncedAt ?? null]
+  );
+  return rows;
 };
 
 // ── Count confirmed bookings for a timeslot ───────────────────
@@ -187,7 +237,9 @@ export default {
   findByTimeslotId,
   findByExternalBookingId,
   findByExternalVolunteerId,
+  findExternalByTimeslotIds,
   updateBooking,
   upsertExternalBooking,
+  cancelMissingExternalBookings,
   countConfirmedByTimeslot,
 };

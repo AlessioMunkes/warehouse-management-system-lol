@@ -6,7 +6,7 @@
 //
 // name AND cohort ARE REQUIRED, matching
 // beneficiary.service.js's buildBeneficiaryPayload exactly.
-// contactName/childCount are optional.
+// contactName/contactEmail/mobileNumber/childCount are optional.
 //
 // approved_at is NOT a field here — see beneficiary.service.js's
 // comment: approval is a deliberate separate action
@@ -30,7 +30,7 @@ const COHORT_OPTIONS = [
   { value: 'thursday', label: 'Thursday' },
 ];
 
-const BLANK = { name: '', cohort: '', contactName: '', mobileNumber: '', childCount: '' };
+const BLANK = { name: '', cohort: '', contactName: '', contactEmail: '', mobileNumber: '', childCount: '' };
 
 export default function BeneficiaryForm({
   initial = null,
@@ -101,6 +101,18 @@ export default function BeneficiaryForm({
           <Input id="beneficiary-contact" value={form.contactName} onChange={set('contactName')} />
         </Field>
       </div>
+
+      <Field>
+        <FieldLabel htmlFor="beneficiary-email">Email address</FieldLabel>
+        <Input
+          id="beneficiary-email"
+          type="email"
+          value={form.contactEmail ?? ''}
+          onChange={set('contactEmail')}
+          placeholder="ecd@example.org"
+        />
+        <FieldDescription>Used for collection reminder emails.</FieldDescription>
+      </Field>
 
       <Field>
         <FieldLabel htmlFor="beneficiary-mobile">Mobile number</FieldLabel>

@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import ErrorBanner from '@/components/ui/error-banner';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import ListCard from '@/components/ui/list-card';
+import PageHeader, { PageShell } from '@/components/ui/page-header';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Table,
@@ -25,13 +28,6 @@ import {
 } from 'recharts';
 import TablePager from '@/components/ui/table-pager';
 import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
-
-const PERIODS = {
-  this_month: 'This Month',
-  last_30_days: 'Last 30 Days',
-  this_year: 'This Year',
-  all: 'All Time',
-};
 
 const TYPES = {
   all: 'All Types',
@@ -60,26 +56,14 @@ const CHART_COLORS = {
   dispatches: 'var(--good-ink)',
 };
 
-const todayISO = () => new Date().toISOString().slice(0, 10);
-
-const startOfThisMonth = () => {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-};
-
-const startOfThisYear = () => {
-  const now = new Date();
-  return new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10);
-};
-
-const daysAgo = (days) =>
-  new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
-
-const rangeForFinancePeriod = (period) => {
-  if (period === 'all') return {};
-  if (period === 'this_year') return { from: startOfThisYear(), to: todayISO() };
-  if (period === 'last_30_days') return { from: daysAgo(30), to: todayISO() };
-  return { from: startOfThisMonth(), to: todayISO() };
+const PDF_COLORS = {
+  ink: [30, 41, 59],
+  muted: [100, 116, 139],
+  border: [226, 232, 240],
+  soft: [248, 250, 252],
+  donations: [37, 99, 235],
+  po: [220, 38, 38],
+  dispatches: [22, 163, 74],
 };
 
 const formatDate = (value) => {
@@ -137,7 +121,7 @@ const monthLabel = (value) => {
   return new Intl.DateTimeFormat('en-ZA', { month: 'short', year: 'numeric' }).format(date);
 };
 
-const chartLabel = (period, value) => (period === 'this_year' || period === 'all' ? monthLabel(value) : formatDate(value));
+const chartLabel = (groupByMonth, value) => (groupByMonth ? monthLabel(value) : formatDate(value));
 
 const emptyChartRow = (label) => ({
   label,
@@ -146,16 +130,34 @@ const emptyChartRow = (label) => ({
   dispatches: 0,
 });
 
-const buildChartData = (rows, period) => {
+const daysBetweenDates = (from, to) => {
+  if (!from || !to) return 0;
+  const fromDate = new Date(`${from}T00:00:00`);
+  const toDate = new Date(`${to}T00:00:00`);
+  if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) return 0;
+  return Math.abs((toDate.getTime() - fromDate.getTime()) / 86400000);
+};
+
+const shouldGroupChartByMonth = (dateFrom, dateTo) => !dateFrom || !dateTo || daysBetweenDates(dateFrom, dateTo) > 93;
+
+const dateRangeLabel = (dateFrom, dateTo) => {
+  if (!dateFrom && !dateTo) return 'All dates';
+  if (dateFrom && dateTo) return `${formatDate(dateFrom)} to ${formatDate(dateTo)}`;
+  if (dateFrom) return `From ${formatDate(dateFrom)}`;
+  return `Until ${formatDate(dateTo)}`;
+};
+
+const buildChartData = (rows, dateFrom, dateTo) => {
   const groups = new Map();
+  const groupByMonth = shouldGroupChartByMonth(dateFrom, dateTo);
 
   rows.forEach((row) => {
     const typeKey = TYPE_KEYS[movementType(row)];
     if (!typeKey) return;
 
     const rawDate = dateOnly(movementDate(row));
-    const groupKey = period === 'this_year' || period === 'all' ? rawDate.slice(0, 7) : rawDate;
-    const label = chartLabel(period, rawDate);
+    const groupKey = groupByMonth ? rawDate.slice(0, 7) : rawDate;
+    const label = chartLabel(groupByMonth, rawDate);
 
     if (!groups.has(groupKey)) groups.set(groupKey, emptyChartRow(label));
     groups.get(groupKey)[typeKey] += 1;
@@ -172,15 +174,6 @@ const listFileName = (type, extension) =>
   `finance-${LIST_TYPES[type].toLowerCase().replace(/\s+/g, '-')}-${fileStamp()}.${extension}`;
 
 const reportFileName = () => `finance-report-${fileStamp()}.pdf`;
-
-const hexToRgb = (hex) => {
-  const value = String(hex).replace('#', '');
-  return [
-    Number.parseInt(value.slice(0, 2), 16),
-    Number.parseInt(value.slice(2, 4), 16),
-    Number.parseInt(value.slice(4, 6), 16),
-  ];
-};
 
 const listColumns = (type) => {
   const sourceLabel = type === 'dispatched' ? 'ECD/destination' : type === 'received' ? 'supplier' : 'donor';
@@ -216,6 +209,76 @@ const searchListRows = (rows, type, search) => {
   return rows.filter((row) => listSearchText(row, type).includes(query));
 };
 
+const effectiveDateRangeLabel = (dateFrom, dateTo) => dateRangeLabel(dateFrom, dateTo);
+
+const loadLogoDataUrl = async () => {
+  try {
+    const response = await fetch('/images/pdf_logo.png');
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+};
+
+const buildHighlights = ({ purchaseOrders, donations, dispatches, poTotal, donationTotal }) => {
+  const highlights = [];
+
+  if (donations.length > 0 && donationTotal > 0) {
+    highlights.push(`Donations contributed ${formatMoney(donationTotal)} in estimated value.`);
+  }
+  if (purchaseOrders.length > 0 && poTotal > 0 && poTotal >= donationTotal) {
+    highlights.push('Purchase orders represented the largest known inbound value.');
+  }
+  if (dispatches.length > 0) {
+    highlights.push(`${dispatches.length.toLocaleString('en-ZA')} dispatch movements were completed during the period.`);
+  }
+
+  return highlights;
+};
+
+const buildFinanceAttentionItems = (rows) =>
+  rows.flatMap((row) => {
+    const text = [
+      row.finance_attention,
+      row.financeAttention,
+      row.warning,
+      row.warning_message,
+      row.section18a_handoff_error,
+      row.section18aHandoffError,
+      row.finance_email_status === 'failed' ? row.finance_email_error || 'Purchase order finance email failed.' : '',
+    ].filter(Boolean).join(' ');
+
+    return text ? [`${referenceId(row)}: ${text}`] : [];
+  }).slice(0, 4);
+
+const recentActivityRows = (rows, limit = 6) =>
+  [...rows]
+    .sort((a, b) => dateOnly(movementDate(b)).localeCompare(dateOnly(movementDate(a))))
+    .slice(0, limit)
+    .map((row) => ({
+      type: {
+        received: 'Purchase Order',
+        donated: 'Donation',
+        dispatched: 'Dispatch',
+      }[movementType(row)] ?? movementType(row) ?? '-',
+      reference: referenceId(row),
+      date: formatDate(movementDate(row)),
+      details: [sourceDestination(row), productName(row), `${quantity(row)} ${unit(row)}`].filter((value) => value && value !== '-').join(' | '),
+    }));
+
+const addWrappedText = (pdf, text, x, y, maxWidth, lineHeight = 5) => {
+  const lines = pdf.splitTextToSize ? pdf.splitTextToSize(text, maxWidth) : [text];
+  pdf.text(lines.length === 1 ? lines[0] : lines, x, y);
+  return y + lines.length * lineHeight;
+};
+
 const exportCsv = (rows, type) => {
   const columns = listColumns(type);
   const csv = [
@@ -247,73 +310,120 @@ const exportExcel = async (rows, type) => {
   XLSX.writeFile(workbook, listFileName(type, 'xlsx'));
 };
 
-const exportReportPdf = async ({ period, dateFrom, dateTo, type, chartData, purchaseOrders, donations, dispatches, poTotal, donationTotal }) => {
+const exportReportPdf = async ({ dateFrom, dateTo, type, chartData, purchaseOrders, donations, dispatches, poTotal, donationTotal, filteredMovements }) => {
   const { jsPDF } = await import('jspdf');
   const pdf = new jsPDF('p', 'mm', 'a4');
   const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
   const left = 12;
-  const top = 14;
-  const chartTop = 76;
-  const chartHeight = 58;
-  const axisWidth = 12;
-  const chartWidth = pageWidth - left * 2 - axisWidth;
-  const chartLeft = left + axisWidth;
+  const right = pageWidth - left;
+  const logoDataUrl = await loadLogoDataUrl();
+  const reportRows = filteredMovements ?? [...purchaseOrders, ...donations, ...dispatches];
+  const rangeLabel = effectiveDateRangeLabel(dateFrom, dateTo);
+  const generatedAt = new Date();
+  let y = 14;
   const maxValue = Math.max(1, ...chartData.flatMap((row) => [row.donations, row.po, row.dispatches]));
 
+  const addFooter = () => {
+    const pageNumber = pdf.internal.getNumberOfPages ? pdf.internal.getNumberOfPages() : 1;
+    pdf.setDrawColor(...PDF_COLORS.border);
+    pdf.line(left, pageHeight - 15, right, pageHeight - 15);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8);
+    pdf.setTextColor(...PDF_COLORS.muted);
+    pdf.text('Generated by the Ladles of Love Warehouse Management System', left, pageHeight - 9);
+    pdf.text(`Page ${pageNumber}`, right, pageHeight - 9, { align: 'right' });
+  };
+
+  const sectionTitle = (title) => {
+    y += 8;
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(11);
+    pdf.setTextColor(...PDF_COLORS.ink);
+    pdf.text(title, left, y);
+    pdf.setDrawColor(...PDF_COLORS.border);
+    pdf.line(left, y + 3, right, y + 3);
+    y += 10;
+  };
+
+  if (logoDataUrl && pdf.addImage) {
+    pdf.addImage(logoDataUrl, 'PNG', left, y - 2, 30, 16);
+  }
   pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(16);
-  pdf.text('Warehouse Movement Report', left, top);
+  pdf.setFontSize(18);
+  pdf.setTextColor(...PDF_COLORS.ink);
+  pdf.text('Warehouse Finance Report', left + 38, y + 4);
 
   pdf.setFont('helvetica', 'normal');
   pdf.setFontSize(9);
-  pdf.setTextColor(70, 70, 70);
-  pdf.text(`${PERIODS[period] ?? period} | ${dateFrom || 'Any'} to ${dateTo || 'Any'} | ${TYPES[type] ?? type}`, left, top + 8);
+  pdf.setTextColor(...PDF_COLORS.muted);
+  pdf.text(`Reporting period: ${rangeLabel} | ${TYPES[type] ?? type}`, left + 38, y + 11);
+  pdf.text('Prepared for Finance', left + 38, y + 17);
+  y += 26;
+  y = addWrappedText(
+    pdf,
+    'This report summarises inbound and outbound warehouse activity for the selected reporting period.',
+    left,
+    y,
+    pageWidth - left * 2,
+    5,
+  );
 
-  const summaryY = top + 16;
-  const cardWidth = (pageWidth - left * 2 - 8) / 3;
+  sectionTitle('1. Executive Summary');
+  const summaryY = y;
+  const cardGap = 3;
+  const cardWidth = (pageWidth - left * 2 - cardGap * 4) / 5;
   [
-    ['Purchase Orders', purchaseOrders.length, formatMoney(poTotal), CHART_COLORS.po],
-    ['Donations', donations.length, formatMoney(donationTotal), CHART_COLORS.donations],
-    ['Dispatch', dispatches.length, `${dispatches.length.toLocaleString('en-ZA')} moves`, CHART_COLORS.dispatches],
-  ].forEach(([title, count, value, color], index) => {
-    const x = left + index * (cardWidth + 4);
-    pdf.setDrawColor(215, 215, 215);
-    pdf.setFillColor(250, 250, 250);
-    pdf.roundedRect(x, summaryY, cardWidth, 23, 2, 2, 'FD');
-    pdf.setFillColor(...hexToRgb(color));
-    pdf.rect(x, summaryY, 2.4, 23, 'F');
-    pdf.setTextColor(40, 40, 40);
+    ['Purchase Orders', purchaseOrders.length.toLocaleString('en-ZA'), PDF_COLORS.po],
+    ['Donations', donations.length.toLocaleString('en-ZA'), PDF_COLORS.donations],
+    ['Dispatches', dispatches.length.toLocaleString('en-ZA'), PDF_COLORS.dispatches],
+    ['PO value', formatMoney(poTotal), PDF_COLORS.po],
+    ['Donation est. value', formatMoney(donationTotal), PDF_COLORS.donations],
+  ].forEach(([title, value, color], index) => {
+    const x = left + index * (cardWidth + cardGap);
+    pdf.setDrawColor(...PDF_COLORS.border);
+    pdf.setFillColor(...PDF_COLORS.soft);
+    pdf.roundedRect(x, summaryY, cardWidth, 24, 1.5, 1.5, 'FD');
+    pdf.setFillColor(...color);
+    pdf.rect(x, summaryY, cardWidth, 1.5, 'F');
+    pdf.setTextColor(...PDF_COLORS.muted);
     pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(10);
-    pdf.text(title, x + 5, summaryY + 7);
-    pdf.setFontSize(15);
-    pdf.text(String(count), x + 5, summaryY + 17);
-    pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(9);
-    pdf.text(String(value), x + cardWidth - 4, summaryY + 17, { align: 'right', maxWidth: cardWidth - 24 });
+    pdf.text(title, x + 3, summaryY + 8, { maxWidth: cardWidth - 6 });
+    pdf.setTextColor(...PDF_COLORS.ink);
+    pdf.setFontSize(12);
+    pdf.text(String(value), x + 3, summaryY + 18, { maxWidth: cardWidth - 6 });
   });
+  y += 28;
 
-  pdf.setTextColor(25, 25, 25);
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(12);
-  pdf.text('Movement Trends', left, chartTop - 12);
+  sectionTitle('2. Movement Overview');
+  const chartTop = y + 4;
+  const chartHeight = 54;
+  const axisWidth = 14;
+  const chartWidth = pageWidth - left * 2 - axisWidth;
+  const chartLeft = left + axisWidth;
 
   const legend = [
-    ['Donations', CHART_COLORS.donations],
-    ['Purchase Orders', CHART_COLORS.po],
-    ['Dispatch', CHART_COLORS.dispatches],
+    ['Donations', PDF_COLORS.donations],
+    ['Purchase Orders', PDF_COLORS.po],
+    ['Dispatches', PDF_COLORS.dispatches],
   ];
   legend.forEach(([label, color], index) => {
-    const x = left + index * 32;
-    pdf.setFillColor(...hexToRgb(color));
-    pdf.rect(x, chartTop - 7, 4, 4, 'F');
-    pdf.setTextColor(45, 45, 45);
+    const x = left + index * 38;
+    pdf.setFillColor(...color);
+    pdf.rect(x, chartTop - 5, 4, 4, 'F');
+    pdf.setTextColor(...PDF_COLORS.muted);
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(8.5);
-    pdf.text(label, x + 6, chartTop - 3.5);
+    pdf.text(label, x + 6, chartTop - 1.5);
   });
 
-  pdf.setDrawColor(160, 160, 160);
+  pdf.setTextColor(...PDF_COLORS.muted);
+  pdf.setFontSize(8);
+  pdf.text('Movements', left, chartTop + 24, { angle: 90 });
+  pdf.text('Reporting date / period', chartLeft + chartWidth / 2, chartTop + chartHeight + 15, { align: 'center' });
+
+  pdf.setDrawColor(148, 163, 184);
   pdf.line(chartLeft, chartTop + chartHeight, chartLeft + chartWidth, chartTop + chartHeight);
   pdf.line(chartLeft, chartTop, chartLeft, chartTop + chartHeight);
 
@@ -324,7 +434,7 @@ const exportReportPdf = async ({ period, dateFrom, dateTo, type, chartData, purc
   for (let step = 0; step <= gridSteps; step += 1) {
     const value = Math.round((maxValue / gridSteps) * step);
     const y = chartTop + chartHeight - (step / gridSteps) * chartHeight;
-    pdf.setDrawColor(step === 0 ? 160 : 225, step === 0 ? 160 : 225, step === 0 ? 160 : 225);
+    pdf.setDrawColor(step === 0 ? 148 : 226, step === 0 ? 163 : 232, step === 0 ? 184 : 240);
     pdf.line(chartLeft, y, chartLeft + chartWidth, y);
     pdf.text(String(value), chartLeft - 3, y + 2, { align: 'right' });
   }
@@ -340,15 +450,20 @@ const exportReportPdf = async ({ period, dateFrom, dateTo, type, chartData, purc
     chartData.forEach((row, index) => {
       const groupX = chartLeft + index * groupWidth + groupWidth / 2 - barWidth * 1.7;
       [
-        ['donations', CHART_COLORS.donations],
-        ['po', CHART_COLORS.po],
-        ['dispatches', CHART_COLORS.dispatches],
+        ['donations', PDF_COLORS.donations],
+        ['po', PDF_COLORS.po],
+        ['dispatches', PDF_COLORS.dispatches],
       ].forEach(([key, color], barIndex) => {
         const height = (row[key] / maxValue) * (chartHeight - 3);
         const x = groupX + barIndex * (barWidth + 1);
         const y = chartTop + chartHeight - height;
-        pdf.setFillColor(...hexToRgb(color));
+        pdf.setFillColor(...color);
         pdf.rect(x, y, barWidth, height, 'F');
+        if (row[key] > 0 && chartData.length <= 8) {
+          pdf.setFontSize(6.8);
+          pdf.setTextColor(...PDF_COLORS.ink);
+          pdf.text(String(row[key]), x + barWidth / 2, y - 1, { align: 'center' });
+        }
       });
       const label = String(row.label);
       const shouldShowLabel = chartData.length <= 8 || index % Math.ceil(chartData.length / 8) === 0;
@@ -362,12 +477,83 @@ const exportReportPdf = async ({ period, dateFrom, dateTo, type, chartData, purc
       });
     });
   }
+  y = chartTop + chartHeight + 20;
 
+  sectionTitle('3. Key Highlights');
+  const highlights = buildHighlights({ purchaseOrders, donations, dispatches, poTotal, donationTotal });
+  if (highlights.length === 0) {
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(9);
+    pdf.setTextColor(...PDF_COLORS.muted);
+    pdf.text('No finance highlights are available for the selected filters.', left, y);
+    y += 6;
+  } else {
+    highlights.forEach((highlight) => {
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9);
+      pdf.setTextColor(...PDF_COLORS.ink);
+      pdf.text('-', left, y);
+      y = addWrappedText(pdf, highlight, left + 5, y, pageWidth - left * 2 - 5, 5);
+    });
+  }
+
+  const attentionItems = buildFinanceAttentionItems(reportRows);
+  if (attentionItems.length > 0) {
+    sectionTitle('4. Finance Attention');
+    attentionItems.forEach((item) => {
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9);
+      pdf.setTextColor(...PDF_COLORS.ink);
+      pdf.text('-', left, y);
+      y = addWrappedText(pdf, item, left + 5, y, pageWidth - left * 2 - 5, 5);
+    });
+  }
+
+  sectionTitle(attentionItems.length > 0 ? '5. Recent Activity' : '4. Recent Activity');
+  const activityRows = recentActivityRows(reportRows, 4);
+  const columns = [
+    ['Type', 30],
+    ['Reference', 24],
+    ['Date', 30],
+    ['Details', pageWidth - left * 2 - 84],
+  ];
+  let x = left;
+  pdf.setFillColor(...PDF_COLORS.soft);
+  pdf.setDrawColor(...PDF_COLORS.border);
+  pdf.rect(left, y - 5, pageWidth - left * 2, 8, 'FD');
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(8.5);
+  pdf.setTextColor(...PDF_COLORS.ink);
+  columns.forEach(([label, width]) => {
+    pdf.text(label, x + 2, y);
+    x += width;
+  });
+  y += 7;
+  pdf.setFont('helvetica', 'normal');
+  activityRows.forEach((row) => {
+    x = left;
+    [row.type, row.reference, row.date, row.details || '-'].forEach((value, index) => {
+      pdf.text(String(value), x + 2, y, { maxWidth: columns[index][1] - 4 });
+      x += columns[index][1];
+    });
+    pdf.setDrawColor(...PDF_COLORS.border);
+    pdf.line(left, y + 3, right, y + 3);
+    y += 8;
+  });
+  if (activityRows.length === 0) {
+    pdf.setTextColor(...PDF_COLORS.muted);
+    pdf.text('No recent activity matches these filters.', left + 2, y);
+  }
+
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(8);
+  pdf.setTextColor(...PDF_COLORS.muted);
+  pdf.text(`Generated: ${generatedAt.toLocaleString('en-ZA')}`, left, pageHeight - 20);
+  addFooter();
   pdf.save(reportFileName());
 };
 
 export default function FinanceWarehouseReportView({ loadReport, showReset = true }) {
-  const [period, setPeriod] = useState('this_month');
   const [type, setType] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -383,7 +569,7 @@ export default function FinanceWarehouseReportView({ loadReport, showReset = tru
     setLoading(true);
     setError(null);
 
-    loadReport({ ...rangeForFinancePeriod(period), limit: 200 })
+    loadReport({ limit: 200 })
       .then((data) => {
         if (!cancelled) setReport(data);
       })
@@ -395,7 +581,7 @@ export default function FinanceWarehouseReportView({ loadReport, showReset = tru
       });
 
     return () => { cancelled = true; };
-  }, [loadReport, period]);
+  }, [loadReport]);
 
   const movements = report.movements ?? [];
   const donationValueMovements = report.donationValues ?? [];
@@ -417,7 +603,7 @@ export default function FinanceWarehouseReportView({ loadReport, showReset = tru
   const purchaseOrders = useMemo(() => byType(filteredMovements, 'received'), [filteredMovements]);
   const donations = useMemo(() => byType(filteredMovements, 'donated'), [filteredMovements]);
   const dispatches = useMemo(() => byType(filteredMovements, 'dispatched'), [filteredMovements]);
-  const chartData = useMemo(() => buildChartData(filteredMovements, period), [filteredMovements, period]);
+  const chartData = useMemo(() => buildChartData(filteredMovements, dateFrom, dateTo), [dateFrom, dateTo, filteredMovements]);
   const selectedListRows = useMemo(
     () => {
       if (!listType) return [];
@@ -434,89 +620,94 @@ export default function FinanceWarehouseReportView({ loadReport, showReset = tru
     return canUseServerTotal ? serverTotal : moneyTotal(filteredDonationValues);
   }, [dateFrom, dateTo, filteredDonationValues, report.totals?.donations, type]);
   const hasChartData = chartData.some((row) => row.donations || row.po || row.dispatches);
+  const dateRangeInvalid = Boolean(dateFrom && dateTo && dateFrom > dateTo);
+  const reportingPeriodLabel = dateRangeLabel(dateFrom, dateTo);
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-6">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-medium">Warehouse Movement Report</h1>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-            <Select value={period} onValueChange={setPeriod}>
-              <SelectTrigger aria-label="Period" className="min-w-40">
+    <PageShell>
+      <PageHeader
+        title="Warehouse Movement Report"
+        description="Review stock received into and issued from the warehouse for the selected reporting period."
+        actions={loading ? <Badge variant="secondary">Loading</Badge> : null}
+      />
+      <p className="mt-2 text-sm font-medium text-muted-foreground">For the Finance team</p>
+
+      <ErrorBanner message={error} className="mt-5" />
+
+      <Card className="mt-6">
+        <CardContent>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">Filter report</h2>
+            <p className="text-sm text-muted-foreground">Reporting period: {reportingPeriodLabel}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {showReset && (
+              <Button type="button" variant="outline" onClick={() => {
+                setType('all');
+                setDateFrom('');
+                setDateTo('');
+                setListType('');
+                setListSearch('');
+                setListPickerOpen(false);
+              }}>
+                Clear filters
+              </Button>
+            )}
+            <Button type="button" variant="outline" disabled={dateRangeInvalid} onClick={() => exportReportPdf({
+              dateFrom,
+              dateTo,
+              type,
+              chartData,
+              purchaseOrders,
+              donations,
+              dispatches,
+              poTotal,
+              donationTotal,
+              filteredMovements,
+            })}>
+              Export PDF
+            </Button>
+          </div>
+        </div>
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="space-y-2">
+            <Label htmlFor="finance-date-from">From</Label>
+            <Input id="finance-date-from" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="finance-date-to">To</Label>
+            <Input id="finance-date-to" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Type</Label>
+            <Select value={type} onValueChange={setType}>
+              <SelectTrigger aria-label="Movement type">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(PERIODS).map(([value, label]) => (
+                {Object.entries(TYPES).map(([value, label]) => (
                   <SelectItem key={value} value={value}>{label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {loading && <Badge variant="secondary">Loading</Badge>}
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" onClick={() => exportReportPdf({
-            period,
-            dateFrom,
-            dateTo,
-            type,
-            chartData,
-            purchaseOrders,
-            donations,
-            dispatches,
-            poTotal,
-            donationTotal,
-          })}>
-            Export PDF
-          </Button>
-          {showReset && (
-            <Button type="button" variant="outline" onClick={() => {
-              setPeriod('this_month');
-              setType('all');
-              setDateFrom('');
-              setDateTo('');
-              setListType('');
-              setListSearch('');
-              setListPickerOpen(false);
-            }}>
-              Reset filters
-            </Button>
-          )}
-        </div>
-      </header>
-
-      {error && (
-        <div role="alert" className="mt-5 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-          {error}
-        </div>
-      )}
-
-      <section className="mt-6 grid gap-3 md:grid-cols-4">
-        <div className="space-y-2">
-          <Label htmlFor="finance-date-from">From</Label>
-          <Input id="finance-date-from" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="finance-date-to">To</Label>
-          <Input id="finance-date-to" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
-        </div>
-        <div className="space-y-2 md:col-span-2">
-          <Label>Type</Label>
-          <Select value={type} onValueChange={setType}>
-            <SelectTrigger aria-label="Movement type">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(TYPES).map(([value, label]) => (
-                <SelectItem key={value} value={value}>{label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </section>
+        {dateRangeInvalid && (
+          <div role="alert" className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+            From date must be on or before To date.
+          </div>
+        )}
+        </CardContent>
+      </Card>
 
       <div>
-        <section className="mt-6 grid gap-4 md:grid-cols-3">
+        <section className="mt-6 space-y-4">
+          <div>
+            <h2 className="text-xl font-medium tracking-tight">Report Summary</h2>
+            <p className="text-sm text-muted-foreground">Reporting period: {reportingPeriodLabel}</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
           <SummaryCard
             title="Purchase Orders"
             count={purchaseOrders.length}
@@ -535,12 +726,14 @@ export default function FinanceWarehouseReportView({ loadReport, showReset = tru
             totalLabel="Recorded movements"
             total={dispatches.length.toLocaleString('en-ZA')}
           />
+          </div>
         </section>
 
         <section className="mt-6">
           <Card>
             <CardHeader>
               <CardTitle>Movement Trends</CardTitle>
+              <p className="text-sm text-muted-foreground">Warehouse activity for the selected reporting period.</p>
             </CardHeader>
             <CardContent>
               <div
@@ -622,7 +815,7 @@ export default function FinanceWarehouseReportView({ loadReport, showReset = tru
           />
         )}
       </section>
-    </main>
+    </PageShell>
   );
 }
 
@@ -659,19 +852,23 @@ function FinanceList({ rows, type, search, onSearchChange, onExportCsv, onExport
   // Movements, fifteen to a page.
   const rowPage = usePaged(rows, TABLE_PAGE_SIZE, `${type}|${search}|${rows.length}`);
   return (
-    <Card className="mt-4">
-      <CardHeader className="gap-3 sm:flex sm:flex-row sm:items-center sm:justify-between">
-        <CardTitle>{LIST_TYPES[type]}</CardTitle>
-        <div className="flex flex-wrap gap-2">
+    <ListCard
+      className="mt-4"
+      header={(
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <CardTitle>{LIST_TYPES[type]}</CardTitle>
+          <div className="flex flex-wrap gap-2">
           <Button type="button" variant="outline" onClick={onExportCsv}>
             Export CSV
           </Button>
           <Button type="button" variant="outline" onClick={onExportExcel}>
             Export Excel
           </Button>
+          </div>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
+      )}
+    >
+      <div className="space-y-4 p-4 sm:p-5">
         <div className="max-w-sm space-y-2">
           <Label htmlFor="finance-list-search">Search list</Label>
           <Input
@@ -697,8 +894,8 @@ function FinanceList({ rows, type, search, onSearchChange, onExportCsv, onExport
           </TableBody>
         </Table>
         <TablePager {...rowPage} noun="movements" />
-      </CardContent>
-    </Card>
+      </div>
+    </ListCard>
   );
 }
 
@@ -748,3 +945,4 @@ function listSearchText(row, type) {
     type !== 'dispatched' ? formatMoney(monetaryValue(row)) : '',
   ].join(' ').toLowerCase();
 }
+
