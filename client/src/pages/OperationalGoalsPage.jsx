@@ -11,7 +11,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import ListCard from '@/components/ui/list-card';
 import PageHeader, { PageShell } from '@/components/ui/page-header';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -59,7 +59,7 @@ export default function OperationalGoalsPage() {
   const [statusFilter, setStatusFilter] = useState('ACTIVE');
   const [domainFilter, setDomainFilter] = useState('ALL');
   const [sort, setSort] = useState('created_desc');
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [creationView, setCreationView] = useState('dashboard');
   const [editingGoal, setEditingGoal] = useState(null);
   const [dialogBusy, setDialogBusy] = useState(false);
   const [dialogError, setDialogError] = useState('');
@@ -80,7 +80,6 @@ export default function OperationalGoalsPage() {
   const [restoreTarget, setRestoreTarget] = useState(null);
   const [restoreBusy, setRestoreBusy] = useState(false);
   const [restoreError, setRestoreError] = useState('');
-  const [aiDialogOpen, setAiDialogOpen] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiError, setAiError] = useState('');
   const [draftGoal, setDraftGoal] = useState(null);
@@ -126,25 +125,37 @@ export default function OperationalGoalsPage() {
     setDraftGoal(null);
     setDialogError('');
     setAiError('');
-    setAiDialogOpen(true);
+    setCreationView('create');
   };
 
   const openEditDialog = (goal) => {
     setEditingGoal(goal);
     setDraftGoal(null);
     setDialogError('');
-    setDialogOpen(true);
+    setCreationView('edit');
   };
 
   const saveGoal = async (payload) => {
     setDialogBusy(true);
     setDialogError('');
     try {
-      if (editingGoal?.id) await operationalGoalsAPI.updateOperationalGoal(editingGoal.id, payload);
-      else await operationalGoalsAPI.createOperationalGoal(payload);
-      setDialogOpen(false);
+      const savedGoal = editingGoal?.id
+        ? await operationalGoalsAPI.updateOperationalGoal(editingGoal.id, payload)
+        : await operationalGoalsAPI.createOperationalGoal(payload);
       setEditingGoal(null);
+      setDraftGoal(null);
       await loadGoals();
+      setProgressGoal(savedGoal);
+      setProgressData(null);
+      setProgressError('');
+      setAiProgressInsight(null);
+      setAiProgressError('');
+      setAskWhyOpen(false);
+      setAskWhyData(null);
+      setAskWhyError('');
+      setCreationView('progress');
+      void loadProgress(savedGoal);
+      void loadAIProgressInsight(savedGoal);
     } catch (err) {
       setDialogError(err.message || 'Could not save operational goal.');
     } finally {
@@ -201,6 +212,7 @@ export default function OperationalGoalsPage() {
     setAskWhyOpen(false);
     setAskWhyData(null);
     setAskWhyError('');
+    setCreationView('progress');
     void loadProgress(goal);
     void loadAIProgressInsight(goal);
   };
@@ -251,14 +263,38 @@ export default function OperationalGoalsPage() {
   const useAIDraft = (draft) => {
     setDraftGoal(draft);
     setEditingGoal(null);
-    setAiDialogOpen(false);
     setDialogError('');
-    setDialogOpen(true);
+    setCreationView('review');
+  };
+
+  const showDashboard = creationView === 'dashboard';
+  const cancelCreateFlow = () => {
+    if (dialogBusy || aiBusy) return;
+    setCreationView('dashboard');
+    setEditingGoal(null);
+    setDraftGoal(null);
+    setDialogError('');
+    setAiError('');
+  };
+
+  const returnToDashboard = () => {
+    setCreationView('dashboard');
+    setProgressGoal(null);
+    setEditingGoal(null);
+    setProgressData(null);
+    setProgressError('');
+    setAiProgressInsight(null);
+    setAiProgressError('');
+    setAskWhyOpen(false);
+    setAskWhyData(null);
+    setAskWhyError('');
   };
 
   return (
     <div className="min-h-screen bg-canvas text-ink">
       <PageShell>
+        {showDashboard ? (
+        <>
         <PageHeader
           title="Operational Goals"
           description="Track live operational goals using existing WMS data."
@@ -270,8 +306,16 @@ export default function OperationalGoalsPage() {
           }
         />
 
-        <Card className="mt-5">
-          <CardContent>
+        <ListCard
+          className="mt-5"
+          header={
+            <div>
+              <h2 className="text-sm font-medium text-ink">Find goals</h2>
+              <p className="mt-1 text-xs text-muted-foreground">Search, filter and sort the goals shown on this dashboard.</p>
+            </div>
+          }
+        >
+          <div className="p-4 sm:p-5">
             <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_180px_180px_180px] md:items-end">
               <div>
                 <Label htmlFor="operational-goal-search">Search</Label>
@@ -323,8 +367,8 @@ export default function OperationalGoalsPage() {
                 </Select>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </ListCard>
 
         <div className="mt-5">
           <OperationalGoalList
@@ -345,58 +389,85 @@ export default function OperationalGoalsPage() {
             metricsById={metricsById}
           />
         </div>
+        </>
+        ) : creationView === 'create' ? (
+          <>
+            <PageHeader
+              title="Create Operational Goal"
+              description="Describe what you'd like to achieve. We'll prepare a measurable operational goal for you to review before anything is saved."
+            />
+            <OperationalGoalAIAssistDialog
+              onOpenChange={(next) => { if (!next) cancelCreateFlow(); }}
+              onDraft={draftWithAI}
+              onSubmitDraft={useAIDraft}
+              busy={aiBusy}
+              error={aiError}
+            />
+          </>
+        ) : creationView === 'review' ? (
+          <>
+            <PageHeader
+              title="Review Goal"
+              description="We've prepared a draft based on your goal. Review it, make any changes you'd like, then create the goal."
+            />
+            <OperationalGoalDialog
+              key="review-draft"
+              variant="page"
+              goal={null}
+              initialDraft={draftGoal}
+              onOpenChange={(next) => { if (!next) cancelCreateFlow(); }}
+              onSubmit={saveGoal}
+              busy={dialogBusy}
+              submitError={dialogError}
+            />
+          </>
+        ) : creationView === 'edit' ? (
+          <>
+            <PageHeader
+              title="Edit Operational Goal"
+              description="Update your operational goal at any time. Changes will be reflected the next time progress is calculated."
+            />
+            <OperationalGoalDialog
+              key={editingGoal?.id ?? 'edit-goal'}
+              variant="page"
+              goal={editingGoal}
+              initialDraft={null}
+              onOpenChange={(next) => { if (!next) cancelCreateFlow(); }}
+              onSubmit={saveGoal}
+              busy={dialogBusy}
+              submitError={dialogError}
+            />
+          </>
+        ) : (
+          <>
+            <PageHeader
+              title="Goal Progress"
+              description={progressGoal?.title ? `Live progress for ${progressGoal.title}.` : 'Live progress from WMS data.'}
+              actions={<Button type="button" variant="outline" onClick={returnToDashboard}>Back to dashboard</Button>}
+            />
+            <OperationalGoalProgressDialog
+              variant="page"
+              goal={progressGoal}
+              metric={progressGoal ? metricsById.get(progressGoal.metricId) : null}
+              progress={progressData}
+              loading={progressLoading}
+              error={progressError}
+              aiInsight={aiProgressInsight}
+              aiLoading={aiProgressLoading}
+              aiError={aiProgressError}
+              onRetry={() => loadProgress(progressGoal)}
+              onRetryAI={() => loadAIProgressInsight(progressGoal)}
+              askWhyOpen={askWhyOpen}
+              askWhyData={askWhyData}
+              askWhyLoading={askWhyLoading}
+              askWhyError={askWhyError}
+              onAskWhy={() => loadAskWhy(progressGoal)}
+              onRetryAskWhy={() => loadAskWhy(progressGoal)}
+              onAskWhyOpenChange={setAskWhyOpen}
+            />
+          </>
+        )}
       </PageShell>
-
-      {dialogOpen && (
-        <OperationalGoalDialog
-          key={editingGoal?.id ?? 'new'}
-          open={dialogOpen}
-          goal={editingGoal}
-          initialDraft={draftGoal}
-          onOpenChange={setDialogOpen}
-          onSubmit={saveGoal}
-          busy={dialogBusy}
-          submitError={dialogError}
-        />
-      )}
-
-      {aiDialogOpen && (
-        <OperationalGoalAIAssistDialog
-          open={aiDialogOpen}
-          onOpenChange={setAiDialogOpen}
-          onDraft={draftWithAI}
-          onSubmitDraft={useAIDraft}
-          busy={aiBusy}
-          error={aiError}
-        />
-      )}
-
-      {progressGoal && (
-        <OperationalGoalProgressDialog
-          open={Boolean(progressGoal)}
-          goal={progressGoal}
-          metric={metricsById.get(progressGoal.metricId)}
-          progress={progressData}
-          loading={progressLoading}
-          error={progressError}
-          aiInsight={aiProgressInsight}
-          aiLoading={aiProgressLoading}
-          aiError={aiProgressError}
-          onRetry={() => loadProgress(progressGoal)}
-          onRetryAI={() => loadAIProgressInsight(progressGoal)}
-          askWhyOpen={askWhyOpen}
-          askWhyData={askWhyData}
-          askWhyLoading={askWhyLoading}
-          askWhyError={askWhyError}
-          onAskWhy={() => loadAskWhy(progressGoal)}
-          onRetryAskWhy={() => loadAskWhy(progressGoal)}
-          onAskWhyOpenChange={setAskWhyOpen}
-          onOpenChange={(next) => {
-            if (!next) setProgressGoal(null);
-          }}
-        />
-      )}
-
 
       <AlertDialog open={Boolean(restoreTarget)} onOpenChange={(open) => !restoreBusy && !open && setRestoreTarget(null)}>
         <AlertDialogContent>
@@ -432,9 +503,3 @@ export default function OperationalGoalsPage() {
     </div>
   );
 }
-
-
-
-
-
-

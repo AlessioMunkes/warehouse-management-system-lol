@@ -1,0 +1,2 @@
+﻿-- Seed data for a brand-new database.
+-- Intentionally empty in this branch.

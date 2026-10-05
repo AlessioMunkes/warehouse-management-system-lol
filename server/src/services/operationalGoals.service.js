@@ -1,4 +1,4 @@
-// server/src/services/operationalGoals.service.js
+﻿// server/src/services/operationalGoals.service.js
 //
 // Business rules for Operational Goals CRUD and live progress measurement.
 // AI explanation, HTTP handling, and SQL stay out of this layer.
@@ -596,13 +596,6 @@ export default {
   getGoalProgress,
 };
 
-export {
-  createGoal,
-  getGoal,
-  listGoals,
-  updateGoal,
-  archiveGoal,
-  restoreGoal,
-  getGoalProgress,
-};
+export { createGoal, getGoal, listGoals, updateGoal, archiveGoal, restoreGoal, getGoalProgress };
+
 
