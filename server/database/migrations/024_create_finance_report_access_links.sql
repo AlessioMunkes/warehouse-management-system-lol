@@ -1,6 +1,4 @@
-BEGIN;
-
-CREATE TABLE IF NOT EXISTS finance_report_access_links (
+﻿CREATE TABLE IF NOT EXISTS finance_report_access_links (
   id           SERIAL PRIMARY KEY,
   token_hash   TEXT NOT NULL UNIQUE,
   created_by   INTEGER REFERENCES users(id),
@@ -34,5 +32,3 @@ CREATE TABLE IF NOT EXISTS finance_report_email_logs (
 
 CREATE INDEX IF NOT EXISTS idx_finance_report_email_logs_created_at
   ON finance_report_email_logs (created_at DESC);
-
-COMMIT;

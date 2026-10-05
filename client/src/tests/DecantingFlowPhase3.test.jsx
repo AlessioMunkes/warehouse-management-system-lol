@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+﻿import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -403,7 +403,7 @@ describe('DecantingFlow recommended and custom bag plans', () => {
     await user.click(screen.getByRole('button', { name: 'Use selected bag sizes' }));
     await screen.findByText('Custom plan');
 
-    await user.click(screen.getByRole('button', { name: 'On the scale10 kg weighed · 10 kg needed' }));
+    await user.click(screen.getByRole('button', { name: 'On the scale10 kg weighed Â· 10 kg needed' }));
     await user.click(screen.getByRole('button', { name: '10kg' }));
 
     expect(await screen.findByText('Recommended bag plan')).toBeInTheDocument();
@@ -418,7 +418,7 @@ describe('DecantingFlow recommended and custom bag plans', () => {
     await user.click(screen.getByRole('button', { name: 'Use recommended plan' }));
     decantingAPI.calculateDecantingPlan.mockClear();
 
-    await user.click(screen.getByRole('button', { name: 'On the scale10 kg weighed · 10 kg needed' }));
+    await user.click(screen.getByRole('button', { name: 'On the scale10 kg weighed Â· 10 kg needed' }));
     await user.clear(screen.getByLabelText(/Kilograms the centres need/));
     await user.type(screen.getByLabelText(/Kilograms the centres need/), '11');
 
@@ -526,12 +526,9 @@ describe('DecantingFlow recommended and custom bag plans', () => {
 
   it('stale custom requests cannot overwrite the latest custom selection', async () => {
     const user = userEvent.setup();
-    let resolveTen;
     decantingAPI.calculateDecantingPlan.mockImplementation((payload) => {
       const sizes = payload.selectedSizes.join(',');
-      if (sizes === '10') {
-        return new Promise((resolve) => { resolveTen = () => resolve(plan({ bags: { '10kg': 1 } })); });
-      }
+      if (sizes === '10') return Promise.resolve(plan({ bags: { '10kg': 1 } }));
       if (sizes === '10,2') return Promise.resolve(plan({ bags: { '10kg': 1, '2kg': 1 } }));
       return Promise.resolve(plan());
     });
@@ -585,5 +582,7 @@ describe('DecantingFlow recommended and custom bag plans', () => {
     expect(recommendationCalls.length).toBe(1);
   });
 });
+
+
 
 

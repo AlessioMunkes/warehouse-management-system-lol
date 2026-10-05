@@ -9,7 +9,7 @@ export default function OperationalGoalList({ goals = [], isLoading = false, err
     return (
       <div className="grid gap-4">
         {[0, 1, 2].map((item) => (
-          <div key={item} className="rounded-[12px] border border-line bg-card p-5 shadow-sm">
+          <div key={item} className="rounded-[18px] border border-line bg-card p-5 shadow-sm">
             <Skeleton className="h-5 w-1/3" />
             <Skeleton className="mt-3 h-4 w-2/3" />
             <div className="mt-5 grid gap-3 sm:grid-cols-4">
@@ -54,4 +54,3 @@ export default function OperationalGoalList({ goals = [], isLoading = false, err
     </div>
   );
 }
-

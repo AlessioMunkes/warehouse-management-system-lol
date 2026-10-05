@@ -21,13 +21,13 @@ export default function OperationalGoalCard({ goal, metric, onEdit, onViewProgre
   const archived = goal.goalState === 'ARCHIVED';
 
   return (
-    <Card>
-      <CardHeader className="gap-3">
+    <Card className="overflow-hidden rounded-[18px] border border-line shadow-sm">
+      <CardHeader className="gap-3 border-b border-line/70 bg-muted/10">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <CardTitle className="text-base">{goal.title}</CardTitle>
-              <Badge variant="outline" className="rounded-full px-2 py-0.5 text-xs">
+              <Badge variant="outline" className="rounded-full border-line bg-card px-2 py-0.5 text-xs">
                 {labelFromId(goal.goalState)}
               </Badge>
             </div>
@@ -56,7 +56,7 @@ export default function OperationalGoalCard({ goal, metric, onEdit, onViewProgre
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-5">
         <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
           <div>
             <dt className="text-xs uppercase tracking-wide text-muted-foreground">Metric</dt>
@@ -83,5 +83,3 @@ export default function OperationalGoalCard({ goal, metric, onEdit, onViewProgre
     </Card>
   );
 }
-
-

@@ -1,0 +1,3 @@
+﻿-- Baseline schema for a brand-new database.
+-- Intentionally empty in this branch: migrations remain the source of truth.
+-- The migrator applies migrations after init because baseline-migrations.txt is empty.

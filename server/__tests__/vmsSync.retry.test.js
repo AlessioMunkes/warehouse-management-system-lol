@@ -1,4 +1,4 @@
-// server/__tests__/vmsSync.retry.test.js
+﻿// server/__tests__/vmsSync.retry.test.js
 // Phase 4 targeted tests: retry + status reads.
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 const syncRepoMock = { findByEntity: vi.fn(), upsertSyncRecord: vi.fn(), updateSyncStatus: vi.fn(), findFailed: vi.fn() };
@@ -8,7 +8,7 @@ const publishMock = vi.fn();
 vi.mock('../src/repositories/vmsSync.repository.js', () => ({ default: syncRepoMock }));
 vi.mock('../src/repositories/loveActivismEvent.repository.js', () => ({ default: eventRepoMock }));
 vi.mock('../src/repositories/eventTimeslot.repository.js', () => ({ default: timeslotRepoMock }));
-vi.mock('../src/services/vmsIntegration.service.js', () => ({ default: { publishEventBooking: publishMock } }));
+vi.mock('../src/services/vmsIntegration.service.js', () => ({ default: { publishEvent: publishMock } }));
 const mod = await import('../src/services/vmsSync.service.js');
 const svc = mod.default;
 const EVENT = { event_id: 'e1', status: 'SCHEDULED' };
@@ -58,3 +58,4 @@ describe('getSyncStatus', () => {
     await expect(svc.getSyncStatus('event_booking', 'x')).rejects.toMatchObject({ status: 404 });
   });
 });
+

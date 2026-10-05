@@ -30,15 +30,15 @@ const metricContext = () => getAllMetrics().map((metric) => ({
   comparisonType: metric.comparisonType,
 }));
 
-const buildDraftPrompt = () => `You draft Operational Goals for WMS managers.
-Return exactly three drafts by calling draft_operational_goal_options: Conservative, Balanced, and Ambitious.
+const buildDraftPrompt = () => `You draft one measurable Operational Goal for WMS managers.
+Return exactly one draft by calling draft_operational_goal.
 Do not save data. Do not claim current performance. Do not invent insights.
 Use only these metrics: ${JSON.stringify(metricContext())}
 Today in Africa/Johannesburg is ${todayIso()}.
 Choose period_start and period_end as YYYY-MM-DD. If the manager does not specify dates, choose the current calendar quarter.
 Use TARGET when the manager gives a numeric target. Use DIRECTIONAL when they only ask to improve/reduce/maintain compared with a previous period.
 For DIRECTIONAL goals, target_value must be null.
-Make Conservative easiest to achieve, Balanced realistic, and Ambitious stretch-oriented.
+Choose the single best metric, goal type, direction, target and period for the manager's plain-language request.
 If unsure, set confidence below 0.7 and explain why.`;
 
 const buildExplainPrompt = () => `You explain Operational Goal progress for WMS managers.
@@ -76,17 +76,9 @@ const draftShape = {
 };
 
 const draftTools = [{
-  name: 'draft_operational_goal_options',
-  description: 'Create three structured draft Operational Goal options for manager review.',
-  parameters: {
-    type: 'object',
-    properties: {
-      conservative: draftShape,
-      balanced: draftShape,
-      ambitious: draftShape,
-    },
-    required: ['conservative', 'balanced', 'ambitious'],
-  },
+  name: 'draft_operational_goal',
+  description: 'Create one structured Operational Goal draft for manager review.',
+  parameters: draftShape,
 }];
 
 const explainTools = [{
@@ -222,18 +214,11 @@ const draftGoal = async ({ goalText } = {}) => {
     tools: draftTools,
   });
 
-  if (result.name !== 'draft_operational_goal_options') {
+  if (result.name !== 'draft_operational_goal') {
     throw fail(502, 'The AI assistant returned an unexpected draft format.');
   }
 
-  const args = result.args || {};
-  return {
-    drafts: [
-      normalizeDraft(args.conservative, 'Conservative'),
-      normalizeDraft(args.balanced, 'Balanced'),
-      normalizeDraft(args.ambitious, 'Ambitious'),
-    ],
-  };
+  return { draft: normalizeDraft(result.args || {}) };
 };
 
 const buildProgressContext = async (goalId) => {
