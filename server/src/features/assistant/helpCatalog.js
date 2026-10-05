@@ -2303,7 +2303,7 @@ export const TOPICS = [
     screens: ['operationalGoals'],
     asks: [
       'set a goal', 'new goal', 'create a target', 'operational goal', 'track a target',
-      'generate drafts', 'use draft', 'how do I add a goal', 'change a goal',
+      'generate goal', 'review goal', 'how do I add a goal', 'change a goal',
     ],
     body:
       'A goal follows one live figure — volunteer hours, decanting wastage, low stock ' +
@@ -2311,9 +2311,9 @@ export const TOPICS = [
       'the system drafts it for you to check.',
     steps: [
       'Open Operational goals and choose New Goal.',
-      'Describe the goal, for example “Increase volunteer attendance to 200 check-ins this quarter”, and choose Generate Drafts.',
-      'Pick the draft closest to what you meant and choose Use Draft.',
-      'Check the metric, target and period, correct anything that is off, then choose Create goal.',
+      'Under What would you like to achieve?, describe the goal, for example “Increase dispatch volume by 200 this quarter”, and choose Generate Goal.',
+      'On Review Goal, check the name, what it tracks, the target and the period, and correct anything that is off.',
+      'Choose Create Goal.',
     ],
     followUp: {
       question: 'Would you like to know how to see how a goal is doing?',
@@ -2331,9 +2331,9 @@ export const TOPICS = [
       'are we on track', 'how is the goal doing', 'ai insight', 'is the target met',
     ],
     body:
-      'Choose View Progress on a goal. It shows the current value, the target, the ' +
-      'previous period and how far along you are, worked out from what is in the ' +
-      'system right now. AI Insight under it adds the evidence and what to do next.\n\n' +
+      'Choose View Progress on a goal. It shows the current figure against the ' +
+      'target, the percentage, what remains and the time left, worked out from what ' +
+      'is in the system right now. AI Insight under it adds recommended actions.\n\n' +
       'Choose Ask Why? for a plain explanation of why the goal is ahead or behind. ' +
       'If the explanation cannot load, the figures are still shown.',
     followUp: {

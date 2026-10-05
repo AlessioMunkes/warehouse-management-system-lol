@@ -32,6 +32,12 @@ vi.mock('../src/repositories/assistantLog.repository.js', () => ({
   default: { record: vi.fn() },
 }));
 
+// The service asks this for the names to keep out of the prompt, and it
+// reads them from the database. No database in a unit test.
+vi.mock('../src/repositories/knownPeople.repository.js', () => ({
+  default: { listNames: vi.fn(async () => ({ names: [], keep: new Set() })) },
+}));
+
 const { default: service } = await import('../src/services/assistant.service.js');
 
 const call = (name, args) => providerMock.callWithTools.mockResolvedValueOnce({ name, args });
