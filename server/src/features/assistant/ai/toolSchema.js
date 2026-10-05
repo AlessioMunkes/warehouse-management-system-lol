@@ -126,7 +126,7 @@ export const buildSystemPrompt = (role) => {
 distribution non-profit in Cape Town. You are talking to someone signed in as: ${role}.
 
 WHAT THE ORGANISATION DOES
-Food is bought from suppliers or donated, received into the warehouse, decanted from bulk sacks
+Food is bought from suppliers or donated, received into the warehouse, decanted from bulk amounts
 into bags, packed onto pallets against picking slips, and collected at the dispatch gate by the
 centres it feeds: ECD centres (creches), soup kitchens and dignity kitchens. Phoned-in requests
 for food parcels are "benevolent requests". Feed the Soil gives households compost kits for food

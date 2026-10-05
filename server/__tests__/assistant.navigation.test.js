@@ -75,10 +75,13 @@ describe('which screens each role may be sent to', () => {
     }
   });
 
-  it('gives an admin every screen but the floor ones', () => {
+  // Operational goals is the one office screen an admin does not have.
+  it('gives an admin every screen but the floor ones and the manager’s own', () => {
     const floor = SCREENS.filter((s) => s.roles.length === 1 && s.roles[0] === 'warehouse_worker');
+    const managerOnly = SCREENS.filter((s) => s.roles.length === 1 && s.roles[0] === 'manager');
     expect(floor.map((s) => s.id)).toEqual(expect.arrayContaining(['receiving', 'packing', 'donation']));
-    expect(screensForRole('admin')).toHaveLength(SCREENS.length - floor.length);
+    expect(managerOnly.map((s) => s.id)).toEqual(['operationalGoals']);
+    expect(screensForRole('admin')).toHaveLength(SCREENS.length - floor.length - managerOnly.length);
   });
 
   it('never returns a screen the role is not on', () => {

@@ -180,7 +180,7 @@ export const ACTION_LISTS = {
 
   wastage_products: {
     title: 'Products losing the most food in decanting',
-    intro: 'Check the sack quality from the supplier and how these products are being opened and bagged.',
+    intro: 'Check the bulk quality from the supplier and how these products are being opened and bagged.',
     link: 'decantingRecords',
     run: insightRepo.wastageByProduct,
     entry: (r) => ({

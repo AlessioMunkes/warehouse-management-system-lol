@@ -58,7 +58,7 @@ const openWorkPage = async (user, productId = '7') => {
 };
 
 const enterWeights = async (user, { weighed = '7.52', required = '7.52' } = {}) => {
-  if (weighed) await user.type(screen.getByLabelText('Kilograms on the scale'), weighed);
+  if (weighed) await user.type(screen.getByLabelText('Bulk amount on the scale, in kilograms'), weighed);
   if (required) await user.type(screen.getByLabelText(/Kilograms the centres need/), required);
 };
 
@@ -89,11 +89,11 @@ describe('DecantingFlow recommended and custom bag plans', () => {
     expect(screen.queryByText(/Still needed/)).not.toBeInTheDocument();
   });
 
-  it('clicking Save this sack with missing fields shows validation', async () => {
+  it('clicking Save decanted amount with missing fields shows validation', async () => {
     const user = userEvent.setup();
     await openWorkPage(user);
 
-    await user.click(screen.getByRole('button', { name: 'Save this sack' }));
+    await user.click(screen.getByRole('button', { name: 'Save decanted amount' }));
 
     expect(screen.getByText(/Still needed/)).toBeInTheDocument();
     expect(screen.getByText(/Enter the weight shown on the scale/)).toBeInTheDocument();
@@ -218,7 +218,7 @@ describe('DecantingFlow recommended and custom bag plans', () => {
     await user.click(screen.getByRole('button', { name: 'Use recommended plan' }));
 
     expect(screen.getByRole('button', { name: 'I have filled them' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Save this sack' }));
+    await user.click(screen.getByRole('button', { name: 'Save decanted amount' }));
     expect(screen.queryByText(/Still needed: the bag plan/)).not.toBeInTheDocument();
   });
 
@@ -403,7 +403,7 @@ describe('DecantingFlow recommended and custom bag plans', () => {
     await user.click(screen.getByRole('button', { name: 'Use selected bag sizes' }));
     await screen.findByText('Custom plan');
 
-    await user.click(screen.getByRole('button', { name: 'On the scale10 kg weighed · 10 kg needed' }));
+    await user.click(screen.getByRole('button', { name: 'Bulk amount10 kg bulk · 10 kg needed' }));
     await user.click(screen.getByRole('button', { name: '10kg' }));
 
     expect(await screen.findByText('Recommended bag plan')).toBeInTheDocument();
@@ -418,7 +418,7 @@ describe('DecantingFlow recommended and custom bag plans', () => {
     await user.click(screen.getByRole('button', { name: 'Use recommended plan' }));
     decantingAPI.calculateDecantingPlan.mockClear();
 
-    await user.click(screen.getByRole('button', { name: 'On the scale10 kg weighed · 10 kg needed' }));
+    await user.click(screen.getByRole('button', { name: 'Bulk amount10 kg bulk · 10 kg needed' }));
     await user.clear(screen.getByLabelText(/Kilograms the centres need/));
     await user.type(screen.getByLabelText(/Kilograms the centres need/), '11');
 
@@ -505,7 +505,7 @@ describe('DecantingFlow recommended and custom bag plans', () => {
     await openWorkPage(user);
     await enterWeights(user, { weighed: '7..5', required: '7.52' });
 
-    await user.click(screen.getByRole('button', { name: 'Save this sack' }));
+    await user.click(screen.getByRole('button', { name: 'Save decanted amount' }));
 
     expect(screen.getByText('Enter a valid weight.')).toBeInTheDocument();
   });
@@ -518,7 +518,7 @@ describe('DecantingFlow recommended and custom bag plans', () => {
     await user.click(screen.getByRole('button', { name: 'Use recommended plan' }));
     await user.click(screen.getByRole('button', { name: 'I have filled them' }));
     await user.type(screen.getByLabelText('Spilled or spoiled, in kilograms'), '8');
-    await user.click(screen.getByRole('button', { name: 'Save this sack' }));
+    await user.click(screen.getByRole('button', { name: 'Save decanted amount' }));
 
     expect(screen.getByText('Wastage cannot be greater than the weighed amount.')).toBeInTheDocument();
     expect(decantingAPI.recordDecanting).not.toHaveBeenCalled();

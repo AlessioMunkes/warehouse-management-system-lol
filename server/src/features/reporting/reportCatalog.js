@@ -337,7 +337,7 @@ export const METRICS = {
   decanting_wastage: {
     id: 'decanting_wastage', label: 'Decanting wastage', temporal: 'range',
     description:
-      'Food lost when bulk sacks are broken down into family bags, as a share of ' +
+      'Food lost when a bulk amount is decanted into family bags, as a share of ' +
       'what was packed. Rising wastage on one product usually points at a process ' +
       'or supplier problem.',
     repoFn: 'decantingWastage', unit: '%',

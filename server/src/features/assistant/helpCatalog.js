@@ -89,7 +89,7 @@ export const SCREENS = [
     about: 'Every delivery already received, with its delivery note.',
     aka: ['delivery history', 'old deliveries', 'delivery notes'] },
   { id: 'decanting', label: 'Decanting', roles: WORKERS_ONLY,
-    about: 'Split bulk sacks into bags and record what you actually got, plus wastage.',
+    about: 'Split a bulk amount into bags and record the decanted amount, plus wastage.',
     aka: ['bagging', 'repacking', 'splitting sacks', 'decanting sheet'] },
   { id: 'decantingRecords', label: 'Past decanting runs', roles: WORKERS_ONLY,
     about: 'Every past decanting run with expected and actual bags.',
@@ -144,6 +144,10 @@ export const SCREENS = [
   { id: 'impactReport', label: 'Impact report', roles: MANAGERS_UP,
     about: 'The Impact report: meals, children and adults served, compost processed, poster PDF.',
     aka: ['impact calculator', 'impact report', 'donor report', 'meals served'] },
+  // Managers only: an admin has no Operational goals screen.
+  { id: 'operationalGoals', label: 'Operational goals', roles: [MANAGER],
+    about: 'Set a goal against a live figure, follow its progress, and ask why it is ahead or behind.',
+    aka: ['goals', 'targets', 'operational goals', 'kpis', 'goal tracking'] },
   { id: 'volunteers', label: 'Volunteer events', roles: MANAGERS_UP,
     about: 'Set up volunteer events and time slots, and see who signed in to each.',
     aka: ['volunteer events', 'volunteer sessions', 'corporate groups'] },
@@ -210,7 +214,7 @@ export const TOPICS = [
       ' open it from your dashboard, or from the icons along the bottom on a phone.',
     steps: [
       'Receiving — check a delivery in against its order.',
-      'Decanting — split bulk sacks into bags and record any wastage.',
+      'Decanting — split a bulk amount into bags and record any wastage.',
       'Packing — claim a picking slip and pack its pallet.',
       'Dispatch — hand a pallet to a centre’s driver, who signs for it.',
       'Also: donation intake, benevolent requests and Feed the Soil.',
@@ -240,7 +244,7 @@ export const TOPICS = [
       'Buying — raise purchase orders; each one is emailed to Finance.',
       'Centres — beneficiaries, this week’s picking slips and collection reminders.',
       'Donations — the classification queue, and Section 18A certificates for donors.',
-      'Insight — operations reports and impact reports.',
+      'Insight — operations reports, impact reports and operational goals.',
       'People — volunteer events.',
     ],
     followUp: {
@@ -830,14 +834,15 @@ export const TOPICS = [
       'bagging up', 'repacking',
     ],
     body:
-      'Decanting replaces the paper sheet. The system works out how many bags a sack ' +
+      'Decanting replaces the paper sheet. The system works out how many bags a bulk amount ' +
       'should give; you record what you actually got.',
     steps: [
-      'Open Decanting and pick the sack in front of you.',
-      'Weigh it and enter the weight on the scale.',
-      'Fill the number of bags it tells you to.',
-      'Enter what you actually got — or tap Exactly as planned.',
-      'Save. The bags go into stock, and any waste goes on this week’s report.',
+      'Open Decanting and pick the product in front of you.',
+      'Weigh the bulk amount. Enter it under Bulk amount, with the kilograms the centres need this week.',
+      'Tap Use recommended plan — or pick your own bag sizes and tap Use selected bag sizes.',
+      'Fill the bags it lists, then tap I have filled them.',
+      'Under Decanted amount, enter the bags you actually got — or tap Exactly as planned — and anything spilled.',
+      'Tap Save decanted amount. The bags go into stock, and any waste goes on this week’s report.',
     ],
     followUp: {
       question: 'Would you like to know how to record wastage?',
@@ -858,8 +863,8 @@ export const TOPICS = [
     body:
       'Record the real number of bags you filled; the difference is counted as ' +
       'wastage automatically.\n\n' +
-      'You won’t get in trouble for it. Wastage counts against the sack and the ' +
-      'supplier, not against you — and it is how a supplier whose sacks keep coming ' +
+      'You won’t get in trouble for it. Wastage counts against the bulk amount and the ' +
+      'supplier, not against you — and it is how a supplier whose deliveries keep coming ' +
       'in light gets noticed.',
     followUp: {
       question: 'Would you like to know where to find past decanting runs?',
@@ -1142,15 +1147,15 @@ export const TOPICS = [
       'click on a row', 'details of an item',
     ],
     body:
-      'Click a product in Inventory and a panel opens on the right, without losing ' +
-      'your place in the list. It shows the four figures, the balance over time with ' +
+      'Click a product in Inventory and it opens beside the list, which stays in use ' +
+      '— click another product to switch. It shows the four figures, the balance over time with ' +
       'the reorder line on it, expiry by delivery (soonest first), recent movements, ' +
       'and the catalogue details. Adjust stock is at the foot of the panel.',
     followUp: {
       question: 'Would you like to know how to see every stock movement across the warehouse?',
       topic: 'stock-ledger',
     },
-    related: ['inventory-columns', 'stock-ledger'],
+    related: ['inventory-columns', 'stock-ledger', 'record-panel'],
   },
   {
     id: 'stock-adjustment',
@@ -1465,10 +1470,11 @@ export const TOPICS = [
     ],
     body:
       'Beneficiaries are the centres that collect food from us. Each record holds the' +
-      ' centre’s name, its pickup day (Tuesday or Thursday), a contact person, a mobile ' +
-      'number for reminders and, for ECD centres, the number of children.\n\n' +
-      'Choose + Add beneficiary to add one, or click a centre to open it in the panel ' +
-      'on the right, where you can edit, approve or move it.',
+      ' centre’s name, its pickup day (Tuesday or Thursday), a contact person, an email ' +
+      'address and mobile number for reminders and, for ECD centres, the number of ' +
+      'children.\n\n' +
+      'Choose + Add beneficiary to add one, or click a centre to open it beside the ' +
+      'list, where you can edit, approve or move it.',
     followUp: {
       question: 'Would you like to know why the number of children matters?',
       topic: 'beneficiary-ecd-numbers',
@@ -1573,8 +1579,9 @@ export const TOPICS = [
     ],
     body:
       'Open the Email failed tab and choose Retry email on that centre’s row.\n\n' +
-      'If Open WhatsApp is greyed out, the centre has no mobile number. Add it on the' +
-      ' Beneficiaries screen so the next reminder works.',
+      'If the email address is wrong or missing, or Open WhatsApp is greyed out ' +
+      'because there is no mobile number, correct it on the Beneficiaries screen so ' +
+      'the next reminder works.',
     followUp: {
       question: 'Would you like to know how to update a centre’s details?',
       topic: 'beneficiary-manage',
@@ -1592,19 +1599,46 @@ export const TOPICS = [
     ],
     body:
       'When someone phones or walks in asking for a food parcel, log it here instead ' +
-      'of on a note.',
+      'of on a note. A manager then approves it and chooses the items before anyone ' +
+      'packs.',
     steps: [
-      'Open Benevolent requests and choose Log a request.',
-      'Enter what was requested, the caller’s name and how to contact them.',
-      'Add a quantity note and when they asked.',
-      'Save. It then shows under Open requests until it’s dealt with.',
+      'Open Benevolent requests. It starts on Log a request.',
+      'Enter what was requested, the caller’s name and their preferred contact.',
+      'Add quantity and collection notes, and change the date and time if they asked earlier.',
+      'Choose Log request.',
+    ],
+    followUp: {
+      question: 'Would you like to know how to pack a request once it is approved?',
+      topic: 'benevolent-resolve',
+    },
+    rules: ['BR-28'],
+    related: ['benevolent-resolve', 'something-looks-wrong'],
+  },
+  {
+    id: 'benevolent-resolve',
+    title: 'Packing a benevolent request',
+    roles: WORKERS_ONLY,
+    screens: ['communityRequests'],
+    asks: [
+      'pack a request', 'to pack', 'claim a request', 'start packing a request',
+      'confirm what went out', 'we gave them food', 'we did not have everything',
+      'request assigned to me',
+    ],
+    body:
+      'Approved requests wait under To pack, with the items a manager chose.',
+    steps: [
+      'Open Benevolent requests and choose To pack.',
+      'Choose Claim on a request nobody has. One a manager assigned to you is already yours.',
+      'Choose Start packing and fetch the items listed.',
+      'Enter how many of each went out, then choose Confirm what went out.',
+      'Less than approved is recorded as partly fulfilled. If nothing went out, ask a manager to decline it instead.',
     ],
     followUp: {
       question: 'Would you like to know what to do if something about a request looks wrong?',
       topic: 'something-looks-wrong',
     },
     rules: ['BR-28'],
-    related: ['something-looks-wrong'],
+    related: ['benevolent-requests', 'something-looks-wrong'],
   },
 
   // ═══ Feed the Soil ════════════════════════════════════════
@@ -2105,9 +2139,9 @@ export const TOPICS = [
     ],
     body:
       'The Warehouse Movement Report shows purchase orders, donations and dispatches ' +
-      'for a period, with totals and a trend chart. Choose the period at the top. Use' +
-      ' Export PDF for the summary, or open a list and export it as CSV or Excel for ' +
-      'the detail.',
+      'for a period, with totals and a trend chart. Under Filter report set From, To ' +
+      'and Type; Clear filters starts again. Use Export PDF for the summary, or pick ' +
+      'a list under Choose List and use Export CSV or Export Excel for the detail.',
     followUp: {
       question: 'Would you like to know how to send this report to Finance?',
       topic: 'finance-recipient',
@@ -2180,13 +2214,36 @@ export const TOPICS = [
       'the card: search, then + Filter for more ways to narrow it (each one shows as a ' +
       'chip you can remove), Columns to hide or show columns, and Export for a CSV of ' +
       'what is in view.\n\n' +
-      'Click a column name to sort by it, and a row to open it in the panel on the ' +
-      'right.',
+      'Click a column name to sort by it, and a row to open it beside the list.',
     followUp: {
       question: 'Would you like to know what you can do with several rows at once?',
       topic: 'list-bulk-actions',
     },
-    related: ['list-bulk-actions', 'inventory-columns'],
+    related: ['list-bulk-actions', 'record-panel', 'inventory-columns'],
+  },
+  {
+    id: 'record-panel',
+    title: 'The record beside the list',
+    roles: MANAGERS_UP,
+    screens: ['inventory', 'purchaseOrders', 'pickingSlips', 'beneficiaries', 'products', 'suppliers', 'users', 'messageHistory'],
+    general: true,
+    asks: [
+      'close the panel', 'the columns disappeared', 'where did the columns go',
+      'panel on the right', 'open a record', 'go to the next record', 'the list got narrower',
+      'how do I get the table back',
+    ],
+    body:
+      'Click a row and its record opens on the right, next to the list. The list ' +
+      'stays in use: click another row to switch straight to it, without closing ' +
+      'anything first.\n\n' +
+      'While a record is open the list shows fewer columns, to make room. Close the ' +
+      'record with the × at its top, or press Esc, and they come back. On a small ' +
+      'screen the record opens over the list instead.',
+    followUp: {
+      question: 'Would you like to know how to search and filter a list?',
+      topic: 'list-screens',
+    },
+    related: ['list-screens', 'list-bulk-actions'],
   },
   {
     id: 'list-bulk-actions',
@@ -2236,6 +2293,75 @@ export const TOPICS = [
       topic: 'notifications',
     },
     related: ['notifications', 'inventory-low-stock', 'po-approve'],
+  },
+
+  // ═══ Operational goals (manager) ══════════════════════════
+  {
+    id: 'goals-create',
+    title: 'Setting an operational goal',
+    roles: [MANAGER],
+    screens: ['operationalGoals'],
+    asks: [
+      'set a goal', 'new goal', 'create a target', 'operational goal', 'track a target',
+      'generate drafts', 'use draft', 'how do I add a goal', 'change a goal',
+    ],
+    body:
+      'A goal follows one live figure — volunteer hours, decanting wastage, low stock ' +
+      'items — against a target for a period. You describe it in your own words and ' +
+      'the system drafts it for you to check.',
+    steps: [
+      'Open Operational goals and choose New Goal.',
+      'Describe the goal, for example “Increase volunteer attendance to 200 check-ins this quarter”, and choose Generate Drafts.',
+      'Pick the draft closest to what you meant and choose Use Draft.',
+      'Check the metric, target and period, correct anything that is off, then choose Create goal.',
+    ],
+    followUp: {
+      question: 'Would you like to know how to see how a goal is doing?',
+      topic: 'goals-progress',
+    },
+    related: ['goals-progress', 'goals-archive'],
+  },
+  {
+    id: 'goals-progress',
+    title: 'How a goal is doing',
+    roles: [MANAGER],
+    screens: ['operationalGoals'],
+    asks: [
+      'goal progress', 'view progress', 'ask why', 'why is the goal behind',
+      'are we on track', 'how is the goal doing', 'ai insight', 'is the target met',
+    ],
+    body:
+      'Choose View Progress on a goal. It shows the current value, the target, the ' +
+      'previous period and how far along you are, worked out from what is in the ' +
+      'system right now. AI Insight under it adds the evidence and what to do next.\n\n' +
+      'Choose Ask Why? for a plain explanation of why the goal is ahead or behind. ' +
+      'If the explanation cannot load, the figures are still shown.',
+    followUp: {
+      question: 'Would you like to know how to put away a goal you have finished with?',
+      topic: 'goals-archive',
+    },
+    related: ['goals-create', 'goals-archive', 'reporting-ask'],
+  },
+  {
+    id: 'goals-archive',
+    title: 'Archiving and restoring a goal',
+    roles: [MANAGER],
+    screens: ['operationalGoals'],
+    asks: [
+      'archive a goal', 'remove a goal', 'delete a goal', 'restore a goal',
+      'where did my goal go', 'bring a goal back', 'old goals', 'find a goal',
+    ],
+    body:
+      'Choose Archive on a goal you have finished with, then Archive goal. It leaves ' +
+      'the list but is not deleted, and you can still open its progress.\n\n' +
+      'To see it again, change Status from Active to Archived. Choose Restore, then ' +
+      'Restore goal, to bring it back; an archived goal cannot be edited until you ' +
+      'do. Search, Domain and Sort narrow a long list.',
+    followUp: {
+      question: 'Would you like to know how to set a new goal?',
+      topic: 'goals-create',
+    },
+    related: ['goals-create', 'goals-progress'],
   },
 
   // ═══ Following the floor's work (manager) ═════════════════
@@ -2549,37 +2675,64 @@ export const TOPICS = [
     ],
     body:
       'Benevolent requests lists every phoned-in or walk-in request for a food ' +
-      'parcel, with a tab for each outcome. Pending, first and counting red, is what ' +
-      'still needs dealing with.\n\n' +
-      'Choose + Log a request to add one yourself. Claim a request to show you are ' +
-      'handling it, then Resolve it.',
+      'parcel. The tabs follow a request through: Awaiting approval, Approved, Needs ' +
+      'new items, Fulfilled and Declined. A red number is waiting on you.\n\n' +
+      'Choose + Log a request to add one yourself. Warehouse staff pack an approved ' +
+      'request and confirm what went out, which moves it to Fulfilled.',
     followUp: {
-      question: 'Would you like to know how to resolve a request?',
-      topic: 'benevolent-resolve',
+      question: 'Would you like to know how to approve a request?',
+      topic: 'benevolent-approve',
     },
     rules: ['BR-28'],
-    related: ['benevolent-resolve'],
+    related: ['benevolent-approve', 'benevolent-needs-items'],
   },
   {
-    id: 'benevolent-resolve',
-    title: 'Closing off a request',
-    roles: EVERYONE,
+    id: 'benevolent-approve',
+    title: 'Approving or declining a request',
+    roles: MANAGERS_UP,
     screens: ['communityRequests'],
     asks: [
-      'resolve a request', 'we gave them food', 'we cannot help', 'decline a request',
-      'what happened to the request', 'claim a request', 'save outcome',
+      'approve a request', 'choose items for a request', 'assign a packer',
+      'decline a request', 'we cannot help', 'who packs the request',
+      'approve and choose items', 'what do we give them',
     ],
     body:
-      'Claim the request first if nobody has, so two people don’t chase it. Then ' +
-      'resolve it: choose the outcome — Fulfilled, Partially fulfilled or Declined — ' +
-      'and write a short note of what was given or why not, then Save outcome.\n\n' +
-      'The note is required: it is the only record of what happened.',
+      'Nothing is packed until you approve it and say what to give.',
+    steps: [
+      'On the Awaiting approval tab, choose Approve and choose items on the request.',
+      'Add each product and how many to give, then choose Approve. That stock is set aside.',
+      'Choose Assign packer to pick who packs it, or leave it for the floor to claim.',
+      'To refuse a request, choose Decline, give the reason, then Decline request. Any stock set aside is released.',
+    ],
     followUp: {
-      question: 'Would you like to know what to do if something about a request looks wrong?',
-      topic: 'something-looks-wrong',
+      question: 'Would you like to know what Needs new items means?',
+      topic: 'benevolent-needs-items',
     },
     rules: ['BR-28'],
-    related: ['benevolent-requests', 'benevolent-requests-manage'],
+    related: ['benevolent-requests-manage', 'benevolent-needs-items'],
+  },
+  {
+    id: 'benevolent-needs-items',
+    title: 'A request that needs new items',
+    roles: MANAGERS_UP,
+    screens: ['communityRequests', 'home'],
+    asks: [
+      'needs new items', 'request ran short', 'the stock was used', 'choose other items',
+      'why is the request flagged', 'request stuck',
+    ],
+    body:
+      'A request moves to Needs new items when pallet packing has used the stock ' +
+      'that was set aside for it. The row names what ran short, and it shows under ' +
+      'Needs attention on your dashboard.\n\n' +
+      'Choose Choose other items, swap or reduce what is short, then Save new items. ' +
+      'It goes back to Approved, ready to pack. If there is nothing to give, choose ' +
+      'Decline instead.',
+    followUp: {
+      question: 'Would you like to know how to approve a request?',
+      topic: 'benevolent-approve',
+    },
+    rules: ['BR-28'],
+    related: ['benevolent-approve', 'benevolent-requests-manage', 'dashboard-manager'],
   },
 
   // ═══ Volunteers (manager) ═════════════════════════════════
@@ -2702,14 +2855,15 @@ export const TOPICS = [
     ],
     body:
       'Message history lists every email the system has sent, with tabs for Failed, ' +
-      'Sent and Not sent (sending switched off). Narrow it by message type. A failed ' +
-      'one shows why underneath.\n\n' +
+      'Sent and Not sent (sending switched off). Narrow it by message type. Click a ' +
+      'message to open it beside the list: who it went to, what it was about and, ' +
+      'for a failed one, why it failed.\n\n' +
       'If many have failed, check the connection under Settings, Email.',
     followUp: {
       question: 'Would you like to know how email settings work?',
       topic: 'email-settings',
     },
-    related: ['email-settings', 'user-activity'],
+    related: ['email-settings', 'user-activity', 'record-panel'],
   },
   {
     id: 'settings-admin',
