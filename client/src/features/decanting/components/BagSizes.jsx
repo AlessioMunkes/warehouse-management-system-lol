@@ -6,17 +6,14 @@
 // list, so updating one silently left the other offering different
 // sizes — which is exactly what happened.
 //
-// The three weights Ladles of Love actually decants into, per the
-// sponsor's process email and the Decanting Calculator objective:
-// 500 g, 1 kg, 2 kg. Anything else is still reachable through the
-// custom-size field.
+// Supported normal bag sizes for the Decanting calculator.
 //
 // These are DISPLAY LABELS. The API speaks kilograms as numbers, so
 // everything sent to the backend must go through sizeLabelToKg()
 // first — see the note on that function.
 // ─────────────────────────────────────────────────────────────
 
-export const STANDARD_SIZES = ['2kg', '1kg', '500g'];
+export const STANDARD_SIZES = ['10kg', '5kg', '2kg', '1kg', '500g'];
 
 // ── Label -> kilograms ────────────────────────────────────────
 // "2kg" -> 2, "500g" -> 0.5.

@@ -1,11 +1,14 @@
 import reminderRepository from '../repositories/ecdCollectionReminder.repository.js';
 import emailProvider from '../providers/email.provider.js';
+import { emailStyles, escapeHtml, renderLadlesEmail } from '../utils/emailTemplate.js';
 
 const DEFAULT_CHANNELS = ['sms'];
 const EMAIL_CHANNEL = 'email';
 const WHATSAPP_CHANNEL = 'whatsapp';
 const SAST_TIME_ZONE = 'Africa/Johannesburg';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const WEDNESDAY = 3;
+const THURSDAY = 4;
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -31,6 +34,18 @@ const addDaysToIsoDate = (isoDate, days) => {
   return next.toISOString().slice(0, 10);
 };
 
+const dayOfWeekForIsoDate = (isoDate) => {
+  const [year, month, day] = isoDate.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+};
+
+const thursdayCollectionDateForWednesdayRun = (now = new Date()) => {
+  const today = dateStringInZone(now);
+  if (dayOfWeekForIsoDate(today) !== WEDNESDAY) return null;
+  const collectionDate = addDaysToIsoDate(today, 1);
+  return dayOfWeekForIsoDate(collectionDate) === THURSDAY ? collectionDate : null;
+};
+
 const normaliseChannels = (channels = DEFAULT_CHANNELS) => {
   if (!Array.isArray(channels) || channels.length === 0) {
     fail(400, 'At least one reminder channel is required.');
@@ -47,9 +62,10 @@ const normaliseChannels = (channels = DEFAULT_CHANNELS) => {
 const queueTomorrowCollectionReminders = async ({
   channels = DEFAULT_CHANNELS,
   now = new Date(),
+  collectionDate: requestedCollectionDate = null,
 } = {}) => {
   const today = dateStringInZone(now);
-  const collectionDate = addDaysToIsoDate(today, 1);
+  const collectionDate = requestedCollectionDate ?? addDaysToIsoDate(today, 1);
   const reminderChannels = normaliseChannels(channels);
   const collections = await reminderRepository.findCollectionsByDate(collectionDate);
 
@@ -82,28 +98,83 @@ const queueTomorrowCollectionReminders = async ({
   };
 };
 
+const queueThursdayCollectionRemindersForWednesdayRun = async ({
+  channels = DEFAULT_CHANNELS,
+  now = new Date(),
+} = {}) => {
+  const collectionDate = thursdayCollectionDateForWednesdayRun(now);
+  if (!collectionDate) {
+    return {
+      collectionDate: null,
+      channels: normaliseChannels(channels),
+      collectionsFound: 0,
+      created: 0,
+      skipped: 0,
+      reminders: [],
+      skippedReason: 'ECD Thursday collection reminders run only on Wednesday Africa/Johannesburg time.',
+    };
+  }
+  return queueTomorrowCollectionReminders({ channels, now, collectionDate });
+};
+
 const usableEmail = (value) => {
   const email = String(value || '').trim().toLowerCase();
   return EMAIL_RE.test(email) ? email : null;
 };
 
+const formatCollectionDate = (isoDate) => {
+  const [year, month, day] = String(isoDate).split('-').map(Number);
+  if (!year || !month || !day) return String(isoDate || '');
+  return new Intl.DateTimeFormat('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(year, month - 1, day)));
+};
+
 const buildReminderEmail = (reminder) => {
-  const ecdName = reminder.ecd_name || 'your ECD';
   const date = reminder.collection_date;
-  const contactName = reminder.contact_name ? ` ${reminder.contact_name}` : '';
+  const formattedDate = formatCollectionDate(date);
+  const greetingName = reminder.ecd_name ? `${reminder.ecd_name} team` : 'there';
 
   const text = [
-    `Hello${contactName},`,
+    `Hi ${greetingName},`,
     '',
-    `This is a reminder that ${ecdName} is scheduled to collect tomorrow, ${date}.`,
+    'We hope you’re doing well.',
     '',
-    'Kind regards,',
-    'Ladles of Love',
+    `This is a friendly reminder that your Ladles of Love collection is scheduled for ${formattedDate}.`,
+    '',
+    'Please make sure someone from your centre is available to collect your items at the scheduled time.',
+    '',
+    'If your collection arrangements have changed or you are unable to collect, please contact the Ladles of Love team as soon as possible.',
+    '',
+    'Thank you for helping us make sure every collection runs smoothly.',
+    '',
+    'Warm regards,',
+    'The Ladles of Love Team',
   ].join('\n');
 
+  const safeGreetingName = escapeHtml(greetingName);
+  const safeFormattedDate = escapeHtml(formattedDate);
+  const html = renderLadlesEmail({
+    title: 'Reminder: Your Ladles of Love collection is tomorrow',
+    preheader: `Friendly reminder that your Ladles of Love collection is scheduled for ${formattedDate}.`,
+    bodyHtml: `
+      <p style="${emailStyles.paragraph}">Hi ${safeGreetingName},</p>
+      <p style="${emailStyles.paragraph}">We hope you&rsquo;re doing well.</p>
+      <p style="${emailStyles.paragraph}">This is a friendly reminder that your Ladles of Love collection is scheduled for <strong>${safeFormattedDate}</strong>.</p>
+      <p style="${emailStyles.paragraph}">Please make sure someone from your centre is available to collect your items at the scheduled time.</p>
+      <p style="${emailStyles.note}">If your collection arrangements have changed or you are unable to collect, please contact the Ladles of Love team as soon as possible.</p>
+      <p style="${emailStyles.paragraph}">Thank you for helping us make sure every collection runs smoothly.</p>
+    `,
+  });
+
   return {
-    subject: `Collection reminder for ${date}`,
+    subject: 'Reminder: Your Ladles of Love collection is tomorrow',
     text,
+    html,
   };
 };
 
@@ -149,10 +220,22 @@ const decorateWhatsAppReminder = (reminder) => {
 };
 
 const sendTomorrowCollectionReminderEmails = async ({ now = new Date() } = {}) => {
-  const queued = await queueTomorrowCollectionReminders({
+  const queued = await queueThursdayCollectionRemindersForWednesdayRun({
     channels: [EMAIL_CHANNEL],
     now,
   });
+
+  if (!queued.collectionDate) {
+    return {
+      collectionDate: null,
+      queued,
+      attempted: 0,
+      sent: 0,
+      failed: 0,
+      skipped: 0,
+      results: [],
+    };
+  }
 
   const pending = await reminderRepository.listPendingReminderDeliveries({
     collectionDate: queued.collectionDate,
@@ -181,6 +264,7 @@ const sendTomorrowCollectionReminderEmails = async ({ now = new Date() } = {}) =
       to,
       subject: email.subject,
       text: email.text,
+      html: email.html,
     });
 
     if (providerResult?.sent) {
@@ -213,10 +297,18 @@ const sendTomorrowCollectionReminderEmails = async ({ now = new Date() } = {}) =
 };
 
 const listTomorrowWhatsAppReminders = async ({ now = new Date() } = {}) => {
-  const queued = await queueTomorrowCollectionReminders({
+  const queued = await queueThursdayCollectionRemindersForWednesdayRun({
     channels: [WHATSAPP_CHANNEL],
     now,
   });
+
+  if (!queued.collectionDate) {
+    return {
+      collectionDate: null,
+      queued,
+      reminders: [],
+    };
+  }
 
   const reminders = await reminderRepository.listReminderDeliveries({
     collectionDate: queued.collectionDate,
@@ -249,6 +341,7 @@ const markWhatsAppReminderSent = async (id) => {
 
 export default {
   queueTomorrowCollectionReminders,
+  queueThursdayCollectionRemindersForWednesdayRun,
   sendTomorrowCollectionReminderEmails,
   listTomorrowWhatsAppReminders,
   markWhatsAppReminderSent,

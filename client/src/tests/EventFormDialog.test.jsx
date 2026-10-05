@@ -63,8 +63,8 @@ describe('EventFormDialog', () => {
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
       eventDate: '2026-09-16',
       timeslots: [{
-        startTime: '2026-09-16T14:00:00.000Z',
-        endTime: '2026-09-16T16:00:00.000Z',
+        startTime: '2026-09-16T12:00:00.000Z',
+        endTime: '2026-09-16T14:00:00.000Z',
         capacity: 10,
       }],
     }));
@@ -99,8 +99,8 @@ describe('EventFormDialog', () => {
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
       eventDate: '2026-09-16',
       timeslots: [{
-        startTime: '2026-09-17T14:00:00.000Z',
-        endTime: '2026-09-17T16:00:00.000Z',
+        startTime: '2026-09-17T12:00:00.000Z',
+        endTime: '2026-09-17T14:00:00.000Z',
         capacity: 10,
       }],
     }));
@@ -157,9 +157,60 @@ describe('EventFormDialog', () => {
 
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
       timeslots: [
-        { startTime: '2026-09-16T09:00:00.000Z', endTime: '2026-09-16T11:00:00.000Z', capacity: 5 },
-        { startTime: '2026-09-17T14:00:00.000Z', endTime: '2026-09-17T16:00:00.000Z', capacity: 8 },
+        { startTime: '2026-09-16T07:00:00.000Z', endTime: '2026-09-16T09:00:00.000Z', capacity: 5 },
+        { startTime: '2026-09-17T12:00:00.000Z', endTime: '2026-09-17T14:00:00.000Z', capacity: 8 },
       ],
     }));
+  });
+
+  it('converts 09:15 Johannesburg wall-clock input to 07:15Z for API transport', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(<EventFormDialog {...defaultProps} onSubmit={onSubmit} />);
+
+    fireEvent.change(screen.getByLabelText(/Event name/i), { target: { value: 'Packing Drive' } });
+    fireEvent.change(screen.getByLabelText(/Event date/i), { target: { value: '2026-11-15' } });
+    fireEvent.change(screen.getByLabelText(/Venue name/i), { target: { value: 'Warehouse' } });
+    fireEvent.change(screen.getByLabelText(/Address/i), { target: { value: '1 Main Rd' } });
+    fireEvent.change(screen.getByLabelText(/Description/i), { target: { value: 'Food packing' } });
+    await user.selectOptions(screen.getByLabelText(/Space/i), 'space-1');
+    fireEvent.change(screen.getByLabelText(/Start time/i), { target: { value: '09:15' } });
+    fireEvent.change(screen.getByLabelText(/End time/i), { target: { value: '10:15' } });
+    fireEvent.change(screen.getByLabelText(/Capacity/i), { target: { value: '10' } });
+
+    await user.click(screen.getByRole('button', { name: /^Create event$/i }));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      eventDate: '2026-11-15',
+      timeslots: [{
+        startTime: '2026-11-15T07:15:00.000Z',
+        endTime: '2026-11-15T08:15:00.000Z',
+        capacity: 10,
+      }],
+    }));
+  });
+
+  it('shows returned UTC instants as Johannesburg wall-clock times when editing', () => {
+    render(<EventFormDialog
+      {...defaultProps}
+      event={{
+        id: 'e1',
+        name: 'Packing Drive',
+        eventDate: '2026-11-15',
+        venueName: 'Warehouse',
+        address: '1 Main Rd',
+        description: 'Food packing',
+        timeslots: [{
+          id: 't1',
+          startTime: '2026-11-15T07:15:00.000Z',
+          endTime: '2026-11-15T08:15:00.000Z',
+          capacity: 10,
+        }],
+      }}
+    />);
+
+    fireEvent.click(screen.getByLabelText(/Timeslot/i));
+    expect(screen.getByLabelText(/Start time/i)).toHaveValue('09:15');
+    expect(screen.getByLabelText(/End time/i)).toHaveValue('10:15');
   });
 });

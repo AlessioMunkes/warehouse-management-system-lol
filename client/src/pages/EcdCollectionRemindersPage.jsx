@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ExternalLink, Mail, MessageCircle, RefreshCw, Send } from 'lucide-react';
+import { BellOff, ExternalLink, Mail, MessageCircle, RefreshCw, Send } from 'lucide-react';
 import ManagerLayout from '../features/taskdashboard/components/ManagerLayout';
 import collectionReminderAPI from '../services/collectionReminderAPI';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import EmptyState from '@/components/ui/empty-state';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -132,7 +133,7 @@ export default function EcdCollectionRemindersPage() {
           <div>
             <h1 className="text-2xl font-medium">ECD collection reminders</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Tomorrow's queued reminders for ECD collections.
+              Thursday collection reminders are prepared every Wednesday at 08:00.
             </p>
           </div>
           <Button type="button" variant="outline" onClick={load}>
@@ -142,7 +143,7 @@ export default function EcdCollectionRemindersPage() {
         </div>
 
         {error ? (
-          <div className="mt-4 rounded-[4px] border-2 border-brand bg-danger-soft p-4 text-sm text-ink">
+          <div role="alert" className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
             {error}
           </div>
         ) : null}
@@ -156,8 +157,8 @@ export default function EcdCollectionRemindersPage() {
           <div className="mt-6 space-y-5">
             <div className="grid gap-3 sm:grid-cols-3">
               <Card>
-                <CardHeader><CardTitle className="text-sm">Collection date</CardTitle></CardHeader>
-                <CardContent className="text-lg font-medium">{formatDate(collectionDate)}</CardContent>
+                <CardHeader><CardTitle className="text-sm">Next reminder run</CardTitle></CardHeader>
+                <CardContent className="text-lg font-medium">Wednesday 08:00</CardContent>
               </Card>
               <Card>
                 <CardHeader><CardTitle className="text-sm">Queued ECDs</CardTitle></CardHeader>
@@ -181,28 +182,29 @@ export default function EcdCollectionRemindersPage() {
                 </p>
               </CardHeader>
               <CardContent className="p-0">
+                {reminders.length === 0 ? (
+                  <EmptyState
+                    icon={BellOff}
+                    title="No Thursday collection reminders are currently queued."
+                    description="Thursday collection reminders are prepared every Wednesday at 08:00."
+                  />
+                ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>ECD</TableHead>
+                      <TableHead className="pl-4 sm:pl-5">ECD</TableHead>
                       <TableHead>Contact</TableHead>
                       <TableHead>Collection</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>WhatsApp</TableHead>
                       <TableHead>Mobile</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="pr-4 text-right sm:pr-5">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {reminders.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
-                          No reminders are queued for tomorrow.
-                        </TableCell>
-                      </TableRow>
-                    ) : reminders.map((reminder) => (
+                    {reminders.map((reminder) => (
                       <TableRow key={reminder.id}>
-                        <TableCell className="font-medium">{reminder.ecdName}</TableCell>
+                        <TableCell className="pl-4 font-medium sm:pl-5">{reminder.ecdName}</TableCell>
                         <TableCell>{reminder.contactName || 'Not recorded'}</TableCell>
                         <TableCell>{collectionWhen(reminder, collectionDate)}</TableCell>
                         <TableCell>
@@ -218,7 +220,7 @@ export default function EcdCollectionRemindersPage() {
                           </div>
                         </TableCell>
                         <TableCell>{reminder.mobileNumber || 'Not recorded'}</TableCell>
-                        <TableCell>
+                        <TableCell className="pr-4 sm:pr-5">
                           <div className="flex justify-end gap-2">
                             <Button
                               type="button"
@@ -266,6 +268,7 @@ export default function EcdCollectionRemindersPage() {
                     ))}
                   </TableBody>
                 </Table>
+                )}
               </CardContent>
             </Card>
           </div>

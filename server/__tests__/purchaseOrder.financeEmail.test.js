@@ -69,6 +69,11 @@ describe('createPurchaseOrder — finance email', () => {
       expect.objectContaining({ to: 'finance@example.org' }),
       null
     );
+    const sentEmail = emailProviderMock.sendEmail.mock.calls[0][0];
+    expect(sentEmail.subject).toContain('capture in QuickBooks');
+    expect(sentEmail.text).toContain('Please capture this purchase order in QuickBooks');
+    expect(sentEmail.html).toContain('https://wms-lol.onrender.com/images/pdf_logo.png');
+    expect(sentEmail.html).toContain('Purchase order created');
     expect(repoMock.recordFinanceEmailAttempt).toHaveBeenCalledWith(42, {
       status: 'sent',
       error: null,

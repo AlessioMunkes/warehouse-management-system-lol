@@ -4,7 +4,7 @@
 const BagSizeToggle = ({ label, selected, onToggle }) => (
   <button
     type="button"
-    className={`bag-size-toggle ${selected ? 'bag-size-toggle-active' : ''}`}
+    className={`bag-size-toggle stf-segment ${selected ? 'bag-size-toggle-active is-active' : ''}`}
     onClick={onToggle}
     aria-pressed={selected}
   >

@@ -74,8 +74,8 @@ describe('recordDecanting — the stored plan is recalculated server-side', () =
 
     const [line] = repoMock.createDecanting.mock.calls[0][0].lines;
     expect(line.packedKg).toBe(25);
-    expect(line.totalBags).toBe(13); // 12 x 2kg + 1 x 1kg
-    expect(line.bags).toEqual({ '2kg': 12, '1kg': 1, '500g': 0 });
+    expect(line.totalBags).toBe(3); // 2 x 10kg + 1 x 5kg
+    expect(line.bags).toEqual({ '10kg': 2, '5kg': 1, '2kg': 0, '1kg': 0, '500g': 0 });
     expect(line.withinMargin).toBe(true);
   });
 
@@ -112,6 +112,50 @@ describe('recordDecanting — the stored plan is recalculated server-side', () =
       { weekOf: WEEK, items: validItems }, USER_ID
     );
     expect(result).toEqual({ id: 77 });
+  });
+
+  it('passes partial-bag calculation fields through to the repository payload', async () => {
+    await decantingService.recordDecanting({
+      weekOf: WEEK,
+      items: [{
+        productId: 1,
+        productName: 'Rice',
+        requiredKg: 7.52,
+        actualBulkKg: 7.52,
+        selectedSizes: [5, 2, 0.5],
+      }],
+    }, USER_ID);
+
+    const [line] = repoMock.createDecanting.mock.calls[0][0].lines;
+    expect(line.bags).toEqual({ '5kg': 1, '2kg': 1, '500g': 1 });
+    expect(line.totalBags).toBe(4);
+    expect(line.packedKg).toBe(7.52);
+    expect(line.partialBag).toEqual({
+      nominalSizeKg: 0.5,
+      actualWeightKg: 0.02,
+      isPartial: true,
+    });
+    expect(line.surplusKg).toBe(0);
+    expect(line.shortfallKg).toBe(0);
+  });
+
+  it('passes null partialBag for an exact full-bag plan', async () => {
+    await decantingService.recordDecanting({
+      weekOf: WEEK,
+      items: [{
+        productId: 1,
+        productName: 'Rice',
+        requiredKg: 7.5,
+        actualBulkKg: 7.5,
+        selectedSizes: [5, 2, 0.5],
+      }],
+    }, USER_ID);
+
+    const [line] = repoMock.createDecanting.mock.calls[0][0].lines;
+    expect(line.bags).toEqual({ '5kg': 1, '2kg': 1, '500g': 1 });
+    expect(line.totalBags).toBe(3);
+    expect(line.packedKg).toBe(7.5);
+    expect(line.partialBag).toBeNull();
   });
 });
 
@@ -278,6 +322,28 @@ describe('exportDecantingSheet', () => {
     expect(dataRow).toContain('5 / 2.5 / 1 / 0.5 / 0.25');
     expect(dataRow).toContain('Yes');          // within margin
     expect(dataRow).toContain('0.21');         // margin as a percentage
+  });
+
+  it('writes the partial 500g bag actual weight as a separate CSV column', async () => {
+    repoMock.getDecantingById.mockResolvedValueOnce({
+      ...record,
+      lines: [{
+        ...record.lines[0],
+        product_name: 'Rice',
+        packed_kg: 7.52,
+        total_bags: 4,
+        bags: { '5kg': 1, '2kg': 1, '500g': 1 },
+        sizes_kg: [5, 2, 0.5],
+        partialBag: { nominalSizeKg: 0.5, actualWeightKg: 0.02, isPartial: true },
+      }],
+    });
+    const { csv } = await decantingService.exportDecantingSheet(7);
+    const header = lines(csv)[5].split(',');
+    const row = lines(csv)[6].split(',');
+
+    expect(header).toContain('Partial 500g bag actual weight (kg)');
+    expect(row[header.indexOf('Partial 500g bag actual weight (kg)')]).toBe('0.02');
+    expect(Number(row[header.indexOf('Total Bags')])).toBe(4);
   });
 
   it('renders a blank cell, not "null", for a missing bulk weight', async () => {

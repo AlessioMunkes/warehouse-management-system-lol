@@ -57,7 +57,7 @@
 // about what a variance between planned and produced bags should
 // mean, which is not this script's call to make.
 // ─────────────────────────────────────────────────────────────
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   StepScreen, Actions, Button, NumberField, SelectField, Notice,
   KeyValues, ViewToggle, Coachmark,
@@ -73,6 +73,7 @@ import { calculateDecantingPlan, recordDecanting } from '../../../services/decan
 // rather than restating it is the point: a fourth bag size added here
 // appears in both, or in neither.
 import { STANDARD_SIZES, sizesToKg } from './BagSizes';
+import BagSizeToggle from './BagSizeToggle';
 import DecantingSheetPDF from './DecantingSheetPDF';
 
 // Name and SKU: two sacks of maize meal are told apart by the code on
@@ -101,11 +102,7 @@ const STEP_META = {
   done:  { n: 2, label: 'Saved' },
 };
 
-// Sent explicitly rather than relying on the server default, so a
-// change on either side is a visible change here too. sizesToKg is
-// what stops the old NaN bug coming back: the API takes numbers and
-// STANDARD_SIZES are display labels.
-const BAG_SIZES_KG = sizesToKg(STANDARD_SIZES);
+const ALL_SUPPORTED_SIZES_KG = sizesToKg(STANDARD_SIZES);
 
 // Monday of the current week, which is what weekOf means server-side.
 const mondayOfThisWeek = () => {
@@ -123,6 +120,18 @@ const longDate = (iso) =>
 // keys of the bags object; this turns one into a sentence.
 const bagPhrase = (label) => `bags of ${label}`;
 
+const grams = (kg) => `${Math.round(Number(kg || 0) * 1000)}g`;
+const readableKg = (kg) => {
+  const value = Number(kg || 0);
+  if (value >= 1) return `${Number(value.toFixed(2))}kg`;
+  return grams(value);
+};
+
+const partialBagText = (partialBag) => {
+  if (!partialBag?.isPartial) return null;
+  return `Actual contents: ${grams(partialBag.actualWeightKg)}`;
+};
+
 // The margin, said the way someone standing at a scale would say it.
 // A percentage on screen is a number nobody can act on.
 const leftoverSentence = (plan) => {
@@ -130,6 +139,14 @@ const leftoverSentence = (plan) => {
   if (left <= 0) return 'That uses the whole sack.';
   if (left < 1) return 'That leaves a little under a kilo in the sack.';
   return `That leaves about ${Math.round(left)} kg in the sack.`;
+};
+
+const parseKgInput = (raw) => {
+  const text = String(raw ?? '').trim();
+  if (text === '') return { blank: true, value: null };
+  if (!/^-?\d+(?:[.,]\d{1,3})?$/.test(text)) return { invalid: true, value: null };
+  const value = Number(text.replace(',', '.'));
+  return Number.isFinite(value) ? { value } : { invalid: true, value: null };
 };
 
 // ── Panel ──────────────────────────────────────────────────────
@@ -180,12 +197,27 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
   // See HANDOFF.md.
   const [requiredKg, setRequiredKg] = useState('');
 
-  const [plan, setPlan] = useState(null);          // one line from /calculate
+  const [plan, setPlan] = useState(null);          // active accepted/calculated line
+  const [recommendedPlan, setRecommendedPlan] = useState(null);
+  const [, setCustomPlan] = useState(null);
+  const [activePlanSizes, setActivePlanSizes] = useState([]);
+  const [activePlanType, setActivePlanType] = useState(null);
   const [produced, setProduced] = useState({});    // { '2kg': 11, ... }
   const [wastageKg, setWastageKg] = useState('');
+  const [selectedSizes, setSelectedSizes] = useState([]);
+  const [showCustomChooser, setShowCustomChooser] = useState(false);
 
   const [busy, setBusy] = useState(false);
+  const [calculating, setCalculating] = useState(false);
   const [error, setError] = useState(null);
+  const [recommendedError, setRecommendedError] = useState(null);
+  const [customError, setCustomError] = useState(null);
+  const [validationTriggered, setValidationTriggered] = useState(false);
+  const recommendationSuccessKeyRef = useRef(null);
+  const customSuccessKeyRef = useRef(null);
+  const requestSeqRef = useRef(0);
+  const inputsKeyRef = useRef(null);
+  const selectedSizesKeyRef = useRef('');
 
   const [mode, setMode] = useState(readStoredMode);
   // Which panel Guided has open. Form ignores it entirely.
@@ -240,65 +272,250 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
 
   const product = products.find((p) => String(p.id) === String(productId));
 
+  const selectedSizesKg = sizesToKg(selectedSizes);
+
   // Bag labels, largest first, as the plan returned them.
-  const bagLabels = plan
-    ? Object.keys(plan.bags).sort((a, b) => {
-        const kg = (l) => (l.endsWith('kg') ? parseFloat(l) : parseFloat(l) / 1000);
-        return kg(b) - kg(a);
-      })
+  const planLabels = (line) => line
+    ? Object.keys(line.bags)
+        .filter((label) => Number(line.bags[label]) > 0)
+        .sort((a, b) => {
+          const kg = (l) => (l.endsWith('kg') ? parseFloat(l) : parseFloat(l) / 1000);
+          return kg(b) - kg(a);
+    })
     : [];
+  const recommendedBagLabels = planLabels(recommendedPlan);
+  const activeBagLabels = planLabels(plan);
 
-  const madeTotal = bagLabels.reduce((sum, l) => sum + (Number(produced[l]) || 0), 0);
+  const madeTotal = activeBagLabels.reduce((sum, l) => sum + (Number(produced[l]) || 0), 0);
 
-  // ── Ask the server for the split ────────────────────────────
-  const workOutTheBags = async () => {
-    setBusy(true);
+  const clearActivePlan = () => {
+    setPlan(null);
+    setActivePlanSizes([]);
+    setActivePlanType(null);
+    setProduced({});
+    resetConfirmed();
+  };
+
+  const invalidatePlan = () => {
+    clearActivePlan();
+    setRecommendedPlan(null);
+    setCustomPlan(null);
+    setRecommendedError(null);
+    setCustomError(null);
+    setPanel('scale');
+    setShowCustomChooser(false);
+  };
+
+  const toggleBagSize = (size) => {
+    if (activePlanType === 'custom') clearActivePlan();
+    setCustomPlan(null);
+    setCustomError(null);
+    customSuccessKeyRef.current = null;
+    setSelectedSizes((current) => (
+      current.includes(size)
+        ? current.filter((item) => item !== size)
+        : [...current, size]
+    ));
+  };
+
+  const validateWeights = ({ includeWastage = false } = {}) => {
+    const messages = [];
+    if (!product) messages.push('Choose a product.');
+
+    const weighed = parseKgInput(weighedKg);
+    if (weighed.blank) messages.push('Enter the weight shown on the scale.');
+    else if (weighed.invalid) messages.push('Enter a valid weight.');
+    else if (weighed.value <= 0) messages.push('Weight must be greater than 0 kg.');
+
+    const required = parseKgInput(requiredKg);
+    if (required.blank) messages.push('Enter how many kilograms are needed.');
+    else if (required.invalid) messages.push('Enter a valid required weight.');
+    else if (required.value <= 0) messages.push('Required weight must be greater than 0 kg.');
+
+    const wastage = parseKgInput(wastageKg === '' ? '0' : wastageKg);
+    if (includeWastage || wastageKg !== '') {
+      if (wastage.invalid) messages.push('Enter a valid wastage amount.');
+      else if (wastage.value < 0) messages.push('Wastage cannot be negative.');
+      else if (!weighed.blank && !weighed.invalid && wastage.value > weighed.value) {
+        messages.push('Wastage cannot be greater than the weighed amount.');
+      }
+    }
+
+    return {
+      messages,
+      values: {
+        weighedKg: weighed.value,
+        requiredKg: required.value,
+        wastageKg: wastage.value ?? 0,
+      },
+    };
+  };
+
+  const buildCalculationPayload = (sizesKg, values) => ({
+    selectedSizes: sizesKg,
+    items: [{
+      productId: product.id,
+      productName: product.name,
+      requiredKg: values.requiredKg,
+      actualBulkKg: values.weighedKg,
+      wastageKg: values.wastageKg,
+    }],
+  });
+
+  const seedActivePlan = (line, sizesKg, type) => {
+    setPlan(line);
+    setActivePlanSizes(sizesKg);
+    setActivePlanType(type);
+    setProduced({ ...line.bags });
+    setBagFocus(null);
+    setPanel('bags');
+    resetConfirmed();
+  };
+
+  const useRecommendedPlan = () => {
+    if (!recommendedPlan) return;
+    seedActivePlan(recommendedPlan, ALL_SUPPORTED_SIZES_KG, 'recommended');
     setError(null);
+  };
+
+  const useSelectedBagSizes = async () => {
+    const validation = validateWeights({ includeWastage: true });
+    if (validation.messages.length) {
+      setCustomError(validation.messages.join(' '));
+      return;
+    }
+    if (!selectedSizesKg.length) {
+      setCustomError('Choose at least one bag size before calculating.');
+      return;
+    }
+
+    const seq = requestSeqRef.current + 1;
+    requestSeqRef.current = seq;
+    setCalculating(true);
     try {
-      const result = await calculateDecantingPlan({
-        selectedSizes: BAG_SIZES_KG,
-        items: [{
-          productId: product.id,
-          productName: product.name,
-          requiredKg: Number(requiredKg),
-          actualBulkKg: Number(weighedKg),
-        }],
-      });
+      const result = await calculateDecantingPlan(buildCalculationPayload(selectedSizesKg, validation.values));
+      if (requestSeqRef.current !== seq) return;
       const line = result.plans[0];
-      setPlan(line);
-      // Seed the count-back with the plan, so a run that went exactly
-      // as instructed needs no typing at all — only corrections do.
-      setProduced({ ...line.bags });
-      setBagFocus(null);
-      setPanel('bags');
-    } catch (err) {
-      // A validation message from the service is written for a
-      // developer ("must be at least half the smallest selected bag
-      // size"). Shown as-is it is worse than nothing, so the two
-      // cases staff can actually cause get their own sentence.
-      setError(
-        /at least half/.test(err.message)
-          ? 'That weight is too small to fill even one bag. Check the scale and type it again.'
-          : err.message
-      );
+      setCustomPlan(line);
+      setCustomError(null);
+      seedActivePlan(line, selectedSizesKg, 'custom');
+    } catch {
+      if (requestSeqRef.current !== seq) return;
+      setCustomPlan(null);
+      setCustomError("We couldn't calculate that custom bag plan. Your recommended plan is still available.");
     } finally {
-      setBusy(false);
+      if (requestSeqRef.current === seq) setCalculating(false);
     }
   };
 
+  useEffect(() => {
+    if (phase !== 'work') return undefined;
+
+    const validation = validateWeights({ includeWastage: true });
+    if (validation.messages.length) {
+      clearActivePlan();
+      setRecommendedPlan(null);
+      setCustomPlan(null);
+      inputsKeyRef.current = null;
+      selectedSizesKeyRef.current = '';
+      return undefined;
+    }
+
+    const baseKey = JSON.stringify({
+      productId: product.id,
+      weighedKg: validation.values.weighedKg,
+      requiredKg: validation.values.requiredKg,
+      wastageKg: validation.values.wastageKg,
+    });
+    const selectedKey = selectedSizes.join('|');
+    const inputsChanged = inputsKeyRef.current !== baseKey;
+    if (inputsChanged) {
+      inputsKeyRef.current = baseKey;
+      clearActivePlan();
+      setRecommendedPlan(null);
+      setCustomPlan(null);
+      setRecommendedError(null);
+      setCustomError(null);
+      recommendationSuccessKeyRef.current = null;
+      customSuccessKeyRef.current = null;
+      selectedSizesKeyRef.current = selectedKey;
+    }
+    selectedSizesKeyRef.current = selectedKey;
+    const seq = requestSeqRef.current + 1;
+    requestSeqRef.current = seq;
+    let cancelled = false;
+
+    const runCalculation = async ({ sizesKg, key, type }) => {
+      const successRef = type === 'recommended' ? recommendationSuccessKeyRef : customSuccessKeyRef;
+      if (successRef.current === key) return;
+      setCalculating(true);
+      try {
+        const result = await calculateDecantingPlan(buildCalculationPayload(sizesKg, validation.values));
+        if (cancelled || requestSeqRef.current !== seq) return;
+        const line = result.plans[0];
+        successRef.current = key;
+        if (type === 'recommended') {
+          setRecommendedPlan(line);
+          setRecommendedError(null);
+        } else {
+          setCustomPlan(line);
+          setCustomError(null);
+          seedActivePlan(line, sizesKg, 'custom');
+        }
+      } catch {
+        if (cancelled || requestSeqRef.current !== seq) return;
+        if (type === 'recommended') {
+          setRecommendedPlan(null);
+          setRecommendedError("We couldn't create a recommended bag plan. You can still choose your own bag sizes.");
+        } else {
+          setCustomPlan(null);
+          setCustomError("We couldn't calculate that custom bag plan. Your recommended plan is still available.");
+        }
+      } finally {
+        if (!cancelled && requestSeqRef.current === seq) setCalculating(false);
+      }
+    };
+
+    runCalculation({
+      sizesKg: ALL_SUPPORTED_SIZES_KG,
+      key: `${baseKey}:recommended`,
+      type: 'recommended',
+    });
+
+    if (!selectedSizes.length) {
+      setCustomPlan(null);
+      setCustomError(null);
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [phase, product?.id, product?.name, weighedKg, requiredKg, wastageKg, selectedSizes.join('|')]);
+
   // ── Save, once, for good ────────────────────────────────────
   const save = async () => {
+    setValidationTriggered(true);
+    const validation = validateWeights({ includeWastage: true });
+    if (validation.messages.length) {
+      setError(validation.messages.join(' '));
+      return;
+    }
+    if (!plan) {
+      setError('Use the recommended plan or choose bag sizes for a custom plan before saving.');
+      return;
+    }
+
     setBusy(true);
     setError(null);
     try {
       const result = await recordDecanting({
         weekOf,
-        selectedSizes: BAG_SIZES_KG,
+        selectedSizes: activePlanSizes,
         items: [{
           productId: product.id,
-          requiredKg: Number(requiredKg),
-          actualBulkKg: Number(weighedKg),
-          wastageKg: Number(wastageKg || 0),
+          requiredKg: validation.values.requiredKg,
+          actualBulkKg: validation.values.weighedKg,
+          wastageKg: validation.values.wastageKg,
         }],
       });
       setPhase('done');
@@ -323,8 +540,15 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
     setWeighedKg('');
     setRequiredKg('');
     setPlan(null);
+    setRecommendedPlan(null);
+    setCustomPlan(null);
+    setActivePlanSizes([]);
+    setActivePlanType(null);
     setProduced({});
     setWastageKg('');
+    setSelectedSizes([]);
+    setShowCustomChooser(false);
+    setValidationTriggered(false);
     setPanel('scale');
     setBagFocus(null);
     setPdfRecord(null);
@@ -332,9 +556,9 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
 
   // Weight is the thing everything else waits on, so a change to it
   // invalidates the plan rather than leaving a stale one on screen.
-  const changeWeight = (setter) => (value) => {
+  const changeInput = (setter) => (value) => {
     setter(value);
-    if (plan) { setPlan(null); setProduced({}); setPanel('scale'); }
+    invalidatePlan();
   };
 
   // Said above the button rather than hidden in a disabled state. On
@@ -344,17 +568,18 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
   if (!weighedKg)  blockers.push('the weight on the scale');
   if (!requiredKg) blockers.push('what the centres need this week');
   if (!plan)       blockers.push('the bag plan');
-  const blockedNote = blockers.length ? `Still needed: ${blockers.join(', ')}.` : null;
+  const blockedNote = validationTriggered && blockers.length ? `Still needed: ${blockers.join(', ')}.` : null;
 
   const isOpen = (key) => mode === 'full' || panel === key;
   const openPanel = (key) => () => {
-    if (key !== 'scale' && !plan) return;
+    if (key === 'bags' && !plan) return;
+    if (key === 'count' && !plan) return;
     setPanel(key);
   };
 
   const commit = (
     <Actions>
-      <Button disabled={busy || blockers.length > 0} onClick={save}>
+      <Button disabled={busy} onClick={save}>
         {busy ? 'Saving' : 'Save this sack'}
       </Button>
       <Button variant="secondary" onClick={() => setPhase('which')}>
@@ -362,6 +587,62 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
       </Button>
     </Actions>
   );
+
+  const renderPlanResult = ({ title, line, labels, showUseRecommended = false }) => {
+    if (!line) return null;
+    const shortfallKg = Number(line.shortfallKg || 0);
+    const surplusKg = Number(line.surplusKg || 0);
+
+    return (
+      <>
+        <p className="stf-field-label">{title}</p>
+        {labels.map((label) => (
+          <div key={`${title}-${label}`} className="stf-instruction">
+            <span className="stf-instruction-n">{line.bags[label]}</span>
+            <span className="stf-instruction-l">{bagPhrase(label)}</span>
+          </div>
+        ))}
+
+        {line.partialBag ? (
+          <div className="stf-instruction">
+            <span className="stf-instruction-n">1</span>
+            <span className="stf-instruction-l">Partial 500g bag</span>
+            <span className="stf-field-hint">{partialBagText(line.partialBag)}</span>
+          </div>
+        ) : null}
+
+        <p className="stf-field-hint">Packed: {readableKg(line.packedKg)}</p>
+        <p className="stf-field-hint">{leftoverSentence(line)}</p>
+
+        {shortfallKg > 0 ? (
+          <Notice tone="warn">
+            {readableKg(shortfallKg)} still needs to be packed. Choose another bag size if you want
+            to cover the remaining amount.
+          </Notice>
+        ) : null}
+
+        {!shortfallKg && surplusKg >= 0.5 ? (
+          <Notice tone="warn">
+            {grams(surplusKg)} cannot be packed using the selected bag sizes. Choose another
+            bag size or review the remaining amount.
+          </Notice>
+        ) : null}
+
+        {line.isBulkLimited ? (
+          <Notice tone="warn">
+            This sack does not hold everything the centres need this week. Pack what is here
+            and tell your manager, so they can order more.
+          </Notice>
+        ) : null}
+
+        {showUseRecommended ? (
+          <Actions>
+            <Button onClick={useRecommendedPlan}>Use recommended plan</Button>
+          </Actions>
+        ) : null}
+      </>
+    );
+  };
 
   // Same as ReceivingFlow's own toggleControl — see that file's note.
   const toggleControl = showToggle ? (
@@ -420,10 +701,10 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
                 setProductId(value);
                 // A different sack is a different job: the plan and the
                 // count-back belonged to the old one.
-                setPlan(null);
-                setProduced({});
-                setPanel('scale');
-                resetConfirmed();
+                invalidatePlan();
+                setSelectedSizes([]);
+                setShowCustomChooser(false);
+                setValidationTriggered(false);
               }}
             />
           ) : productSearch.searching ? (
@@ -480,22 +761,57 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
               id="stf-weighed"
               label="Kilograms on the scale"
               value={weighedKg}
-              onChange={changeWeight(setWeighedKg)}
+              onChange={changeInput(setWeighedKg)}
             />
             <NumberField
               id="stf-required"
               label="Kilograms the centres need this week"
               hint="Your manager sets this. Ask them if you are not sure."
               value={requiredKg}
-              onChange={changeWeight(setRequiredKg)}
+              onChange={changeInput(setRequiredKg)}
             />
-            {!plan ? (
+            {recommendedError ? <Notice tone="warn">{recommendedError}</Notice> : null}
+            {recommendedPlan ? renderPlanResult({
+              title: 'Recommended bag plan',
+              line: recommendedPlan,
+              labels: recommendedBagLabels,
+              showUseRecommended: activePlanType !== 'recommended',
+            }) : null}
+
+            {recommendedPlan || recommendedError ? (
               <Actions>
-                <Button disabled={!weighedKg || !requiredKg || busy} onClick={workOutTheBags}>
-                  {busy ? 'Working it out' : 'Work out the bags'}
+                <Button variant="secondary" onClick={() => setShowCustomChooser(true)}>
+                  Choose my own plan
                 </Button>
               </Actions>
             ) : null}
+
+            {showCustomChooser ? (
+              <>
+                <div className="stf-field">
+                  <p className="stf-field-label">Bag sizes</p>
+                  <div className="bag-size-toggle-group stf-segments" role="group" aria-label="Bag sizes">
+                    {STANDARD_SIZES.map((size) => (
+                      <BagSizeToggle
+                        key={size}
+                        label={size}
+                        selected={selectedSizes.includes(size)}
+                        onToggle={() => toggleBagSize(size)}
+                      />
+                    ))}
+                  </div>
+                </div>
+                {selectedSizes.length ? (
+                  <Actions>
+                    <Button disabled={calculating} onClick={useSelectedBagSizes}>
+                      {calculating ? 'Working it out' : 'Use selected bag sizes'}
+                    </Button>
+                  </Actions>
+                ) : null}
+                {customError && selectedSizes.length ? <Notice tone="warn">{customError}</Notice> : null}
+              </>
+            ) : null}
+            {calculating ? <p className="stf-field-hint">Working out bag plan…</p> : null}
           </Panel>
 
           {/* ── Panel 2 · the instruction ─────────────────── */}
@@ -508,7 +824,7 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
             onOpen={mode === 'guided' ? openPanel('bags') : null}
             summary={
               plan
-                ? bagLabels.map((l) => `${plan.bags[l]} × ${l}`).join(' · ')
+                ? activeBagLabels.map((l) => `${plan.bags[l]} × ${l}`).join(' · ')
                 : 'Weigh the sack first'
             }
           >
@@ -517,26 +833,20 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
                 {/* Nothing to type here, which is exactly why the
                     numbers can be 34px and read with both hands
                     full. */}
-                {bagLabels.map((label) => (
-                  <div key={label} className="stf-instruction">
-                    <span className="stf-instruction-n">{plan.bags[label]}</span>
-                    <span className="stf-instruction-l">{bagPhrase(label)}</span>
-                  </div>
-                ))}
+                {renderPlanResult({
+                  title: activePlanType === 'custom' ? 'Custom plan' : 'Recommended bag plan',
+                  line: plan,
+                  labels: activeBagLabels,
+                })}
 
-                <p className="stf-field-hint">{leftoverSentence(plan)}</p>
+                {activePlanType === 'custom' && recommendedPlan ? renderPlanResult({
+                  title: 'Recommended bag plan',
+                  line: recommendedPlan,
+                  labels: recommendedBagLabels,
+                  showUseRecommended: true,
+                }) : null}
 
-                {/* The sack was lighter than the week needs: a supply
-                    problem, not a mistake staff made. Said plainly,
-                    and it does not block the run. */}
-                {plan.isBulkLimited ? (
-                  <Notice tone="warn">
-                    This sack does not hold everything the centres need this week. Pack what is here
-                    and tell your manager, so they can order more.
-                  </Notice>
-                ) : null}
-
-                {mode === 'guided' ? (
+                {plan && mode === 'guided' ? (
                   <Actions>
                     <Button onClick={() => setPanel('count')}>I have filled them</Button>
                   </Actions>
@@ -561,7 +871,7 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
                     learned this one. Seeded from the plan, so a run
                     that went exactly as instructed needs no typing. */}
                 <WorkList
-                  lines={bagLabels.map((label) => ({
+                  lines={activeBagLabels.map((label) => ({
                     id:       label,
                     title:    `${label} bags`,
                     expected: plan.bags[label],
@@ -574,7 +884,7 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
                   onChange={(id, value) => setProduced((all) => ({ ...all, [id]: value }))}
                   onAcceptAll={() => {
                     setProduced({ ...plan.bags });
-                    confirmAllBags(bagLabels);
+                    confirmAllBags(activeBagLabels);
                   }}
                   acceptAllLabel="Exactly as planned"
                   confirmed={confirmedIds}
@@ -587,7 +897,7 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
                   hint="Put 0 if none was lost."
                   value={wastageKg}
                   flagged={Number(wastageKg) > 0}
-                  onChange={setWastageKg}
+                  onChange={changeInput(setWastageKg)}
                 />
 
                 {/* Threshold: more than 5% of the sack. Reported to

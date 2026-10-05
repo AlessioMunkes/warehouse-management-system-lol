@@ -48,6 +48,7 @@ import PublicFinanceReportPage                     from './pages/PublicFinanceRe
 import Section18AFormPage                         from './pages/Section18AFormPage';
 import InviteAcceptPage                            from './pages/InviteAcceptPage';
 import FeedTheSoilPage                              from './pages/FeedTheSoilPage';
+import OperationalGoalsPage                         from './pages/OperationalGoalsPage';
 
 // Donations — new feature, own draft context scoped to just these
 // two routes (see features/donation/context/DonationDraftProvider.jsx)
@@ -141,6 +142,10 @@ const App = () => (
           <Route path={STAFF.beneficiaries} element={<BeneficiaryDirectoryPage />} />
           <Route path={STAFF.collectionReminders} element={<EcdCollectionRemindersPage />} />
           <Route path={STAFF.pickingSlips} element={<PickingSlipManagementPage />} />
+        </Route>
+
+        <Route element={<ProtectedRoute roles={['manager']} shell />}>
+          <Route path={STAFF.operationalGoals} element={<OperationalGoalsPage />} />
         </Route>
 
         {/* Protected — warehouse floor staff.
@@ -264,3 +269,5 @@ const App = () => (
 );
 
 export default App;
+
+

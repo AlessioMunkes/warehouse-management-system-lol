@@ -65,6 +65,7 @@ router.get('/timeslots/:timeslotId/capacity', auth, requireRole(...ALL_ROLES), e
 
 // ── Volunteer bookings ────────────────────────────────────────
 router.get('/events/:eventId/bookings', auth, requireRole(...ALL_ROLES), volunteerBookingController.getBookingsForEvent);
+router.post('/events/:eventId/bookings/sync', auth, requireRole(...MANAGERS_UP), volunteerBookingController.syncBookingsForEvent);
 router.get('/timeslots/:timeslotId/bookings', auth, requireRole(...ALL_ROLES), volunteerBookingController.getBookingsForTimeslot);
 router.post('/timeslots/:timeslotId/guests', auth, requireRole(...STAFF_UP), volunteerBookingController.createWalkIn);
 router.get('/bookings/:bookingId', auth, requireRole(...ALL_ROLES), volunteerBookingController.getBooking);

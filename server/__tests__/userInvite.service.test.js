@@ -212,6 +212,9 @@ describe('createInvite', () => {
       expect(userRepoMock.getUserById).toHaveBeenCalledWith(ADMIN_ID);
       const emailArg = emailProviderMock.sendEmail.mock.calls[0][0];
       expect(emailArg.text).toContain('Grizel Goliath');
+      expect(emailArg.subject).toBe("You've been invited to Ladles of Love Warehouse Management");
+      expect(emailArg.html).toContain('https://wms-lol.onrender.com/images/pdf_logo.png');
+      expect(emailArg.html).toContain('Set up your account');
     });
   });
 });

@@ -43,7 +43,7 @@ const bookingResponse = (overrides = {}) => ({
 });
 
 beforeEach(() => {
-  process.env.VMS_BASE_URL = 'https://vms.example.test';
+  process.env.VMS_BASE_URL = 'https://vms.example.test/api/integrations/wms/v1';
   process.env.VMS_API_TOKEN = 'secret-token';
 });
 
@@ -81,7 +81,7 @@ describe('RealVMSAdapter requests', () => {
     }
 
     expect(fetchImpl.mock.calls.map(([url, options]) => [url, options.method])).toEqual([
-      ['https://vms.example.test/health', 'GET'],
+      ['https://vms.example.test/api/integrations/wms/v1/health', 'GET'],
       ['https://vms.example.test/api/integrations/wms/v1/events/event-1', 'PUT'],
       ['https://vms.example.test/api/integrations/wms/v1/events/event%201/bookings', 'GET'],
       ['https://vms.example.test/api/integrations/wms/v1/timeslots/slot%201/capacity', 'PATCH'],
@@ -91,7 +91,6 @@ describe('RealVMSAdapter requests', () => {
   });
 
   it('publishes an event to the exact VMS event endpoint with mapped WMS fields', async () => {
-    process.env.VMS_BASE_URL = 'https://vms.example.test';
     const fetchImpl = vi.fn(async () => jsonResponse({ accepted: true }));
     const adapter = createRealVMSAdapter({ fetchImpl });
 
@@ -139,7 +138,6 @@ describe('RealVMSAdapter requests', () => {
   });
 
   it('maps existing WMS IDs across multiple timeslots', async () => {
-    process.env.VMS_BASE_URL = 'https://vms.example.test';
     const fetchImpl = vi.fn(async () => jsonResponse({ accepted: true }));
     const adapter = createRealVMSAdapter({ fetchImpl });
 
@@ -188,7 +186,6 @@ describe('RealVMSAdapter requests', () => {
   });
 
   it('sends capacity updates to the exact VMS capacity endpoint and payload', async () => {
-    process.env.VMS_BASE_URL = 'https://vms.example.test';
     const fetchImpl = vi.fn(async () => jsonResponse({ accepted: true }));
     const adapter = createRealVMSAdapter({ fetchImpl });
 

@@ -316,7 +316,7 @@ export const createRealVMSAdapter = ({ fetchImpl, timeoutMs = DEFAULT_TIMEOUT_MS
   publishEvent: (event) => {
     const payload = mapEventPayload(event);
     assertExternalId(payload.externalEventId, 'externalEventId');
-    return request(`/api/integrations/wms/v1/events/${encodeURIComponent(payload.externalEventId)}`, {
+    return request(`/events/${encodeURIComponent(payload.externalEventId)}`, {
       method: 'PUT',
       body: payload,
       fetchImpl,
@@ -325,7 +325,7 @@ export const createRealVMSAdapter = ({ fetchImpl, timeoutMs = DEFAULT_TIMEOUT_MS
   },
   getEventBookings: async (externalEventId) => {
     assertExternalId(externalEventId, 'externalEventId');
-    const data = await request(`/api/integrations/wms/v1/events/${encodeURIComponent(externalEventId)}/bookings`, {
+    const data = await request(`/events/${encodeURIComponent(externalEventId)}/bookings`, {
       fetchImpl,
       timeoutMs,
     });
@@ -334,14 +334,14 @@ export const createRealVMSAdapter = ({ fetchImpl, timeoutMs = DEFAULT_TIMEOUT_MS
   updateTimeslotCapacity: (externalTimeslotId, capacity) => {
     assertExternalId(externalTimeslotId, 'externalTimeslotId');
     assertPositiveInteger(capacity, 'capacity');
-    return request(`/api/integrations/wms/v1/timeslots/${encodeURIComponent(externalTimeslotId)}/capacity`, {
+    return request(`/timeslots/${encodeURIComponent(externalTimeslotId)}/capacity`, {
       method: 'PATCH',
       body: { capacity },
       fetchImpl,
       timeoutMs,
     });
   },
-  sendAttendance: (attendance) => request('/api/integrations/wms/v1/attendance', {
+  sendAttendance: (attendance) => request('/attendance', {
     method: 'POST',
     body: mapAttendancePayload(attendance),
     fetchImpl,

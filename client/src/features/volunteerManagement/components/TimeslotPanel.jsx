@@ -5,10 +5,11 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { formatJohannesburgDateTime } from '../dateTime';
 
-const readable = (value) => value ? new Intl.DateTimeFormat('en-ZA', {
+const readable = (value) => formatJohannesburgDateTime(value, {
   dateStyle: 'medium', timeStyle: 'short',
-}).format(new Date(value)) : 'Not set';
+});
 
 export default function TimeslotPanel({
   timeslots,

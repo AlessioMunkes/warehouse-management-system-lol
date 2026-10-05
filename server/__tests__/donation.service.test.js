@@ -412,6 +412,11 @@ describe('createDonation — records rather than refuses', () => {
       recipient: 'donor@example.org',
       status: 'SENT',
     }));
+    const sentEmail = emailMock.sendEmail.mock.calls[0][0];
+    expect(sentEmail.subject).toBe('Thank you for your donation');
+    expect(sentEmail.text).toContain('Thank you for your generous donation');
+    expect(sentEmail.html).toContain('https://wms-lol.onrender.com/images/pdf_logo.png');
+    expect(sentEmail.html).toContain('Thank you for your donation');
   });
 
   it('skips all email for anonymous donors or invalid donor emails', async () => {
@@ -465,6 +470,11 @@ describe('createDonation — records rather than refuses', () => {
       recipient: 'tax@example.test',
       status: 'SENT',
     }));
+    const sentEmail = emailMock.sendEmail.mock.calls[0][0];
+    expect(sentEmail.text).toContain('Your donation qualifies for a Section 18A certificate');
+    expect(sentEmail.text).toContain('/section-18a/');
+    expect(sentEmail.html).toContain('https://wms-lol.onrender.com/images/pdf_logo.png');
+    expect(sentEmail.html).toContain('Complete Section 18A Form');
   });
 
   it('records add-on food even when there are no eligible ECDs to split across', async () => {
@@ -774,6 +784,9 @@ describe('Section 18A certificate engine', () => {
     expect(sentEmail.text).toContain('Estimated donation value: 5000');
     expect(sentEmail.text).toContain('Tax reference: 9012345678');
     expect(sentEmail.text).toContain('- Rice: 25 kg');
+    expect(sentEmail.html).toContain('https://wms-lol.onrender.com/images/pdf_logo.png');
+    expect(sentEmail.html).toContain('Finance/Tax handoff');
+    expect(sentEmail.html).toContain('DON-42');
     expect(sentEmail.text).toContain('- registrationNumber: REG-1');
   });
 

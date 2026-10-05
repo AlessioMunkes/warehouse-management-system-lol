@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import financeRepository from '../repositories/finance.repository.js';
 import emailProvider from '../providers/email.provider.js';
+import { emailStyles, escapeHtml, renderLadlesEmail } from '../utils/emailTemplate.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -170,11 +171,24 @@ const sendFinanceReportLink = async ({ sentBy } = {}) => {
     '',
     'If a new link is generated later, this link may stop working.',
   ].join('\n');
+  const safeUrl = escapeHtml(url);
+  const html = renderLadlesEmail({
+    title: subject,
+    preheader: 'Use this secure link to open the read-only Warehouse Movement Report.',
+    bodyHtml: `
+      <p style="${emailStyles.paragraph}">Hello,</p>
+      <p style="${emailStyles.paragraph}">Use this secure link to open the read-only Warehouse Movement Report:</p>
+      <p style="${emailStyles.paragraph}"><a href="${safeUrl}" style="${emailStyles.cta}">Open Warehouse Movement Report</a></p>
+      <p style="${emailStyles.paragraph}"><a href="${safeUrl}" style="color:#d85b2a;text-decoration:none;">${safeUrl}</a></p>
+      <p style="${emailStyles.note}">If a new link is generated later, this link may stop working.</p>
+    `,
+  });
 
   const result = await emailProvider.sendEmail({
     to: settings.recipientEmail,
     subject,
     text,
+    html,
   }, sentBy);
 
   const sent = result?.sent === true;

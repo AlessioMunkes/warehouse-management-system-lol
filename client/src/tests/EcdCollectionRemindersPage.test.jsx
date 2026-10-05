@@ -68,10 +68,13 @@ beforeEach(() => {
 });
 
 describe('EcdCollectionRemindersPage', () => {
-  it('shows tomorrow reminder queue details', async () => {
+  it('shows Thursday reminder queue details', async () => {
     render(<EcdCollectionRemindersPage />);
 
     expect(await screen.findByText('Little Stars')).toBeInTheDocument();
+    expect(screen.getByText('Thursday collection reminders are prepared every Wednesday at 08:00.')).toBeInTheDocument();
+    expect(screen.getByText('Next reminder run')).toBeInTheDocument();
+    expect(screen.getByText('Wednesday 08:00')).toBeInTheDocument();
     expect(screen.getByText(/sent manually from the WhatsApp account currently logged in on this device or browser/i))
       .toBeInTheDocument();
     expect(screen.getByText('Nomsa')).toBeInTheDocument();

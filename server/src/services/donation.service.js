@@ -44,6 +44,7 @@ import gmailRepository from '../repositories/gmail.repository.js';
 import certificateSettingsService from './certificateSettings.service.js';
 import emailProvider from '../providers/email.provider.js';
 import pdfProvider from '../providers/pdf.provider.js';
+import { escapeHtml, renderLadlesEmail } from '../utils/emailTemplate.js';
 import crypto from 'crypto';
 
 // ── fail ───────────────────────────────────────────────────────
@@ -744,61 +745,12 @@ const BRAND = {
   radiusSm: '8px',
 };
 
-const buildEmailLayout = ({ title, body, footer }) => {
-  const style = `
-    margin:0;padding:0;font-family:${BRAND.fontSans};background:${BRAND.sand};color:${BRAND.text};line-height:1.6;
-  `;
-  const container = `
-    max-width:600px;margin:0 auto;padding:24px;background:${BRAND.white};border-radius:${BRAND.radius};border:1px solid ${BRAND.border};
-  `;
-  const header = `
-    padding:24px 24px 16px;border-bottom:1px solid ${BRAND.border};text-align:center;
-  `;
-  const titleStyle = `
-    margin:0;font-family:${BRAND.fontDisplay};font-size:24px;font-weight:700;color:${BRAND.ink};
-  `;
-  const bodyStyle = `
-    padding:24px;color:${BRAND.text};font-size:16px;line-height:1.7;
-  `;
-  const footerStyle = `
-    padding:16px 24px;border-top:1px solid ${BRAND.border};text-align:center;font-size:13px;color:${BRAND.textMeta};
-  `;
-  const linkStyle = `color:${BRAND.accent};text-decoration:none;`;
-  const buttonStyle = `
-    display:inline-block;padding:12px 24px;background:${BRAND.accent};color:${BRAND.white};
-    border-radius:${BRAND.radiusSm};font-weight:600;text-decoration:none;
-  `;
-
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title}</title>
-</head>
-<body style="${style}">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="width:100%;">
-    <tr>
-      <td align="center" style="padding:24px 12px;">
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="${container}">
-          <tr>
-            <td style="${header}">
-              <h1 style="${titleStyle}">${title}</h1>
-            </td>
-          </tr>
-          <tr>
-            <td style="${bodyStyle}">${body}</td>
-          </tr>
-          <tr>
-            <td style="${footerStyle}">${footer}</td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
-};
+const buildEmailLayout = ({ title, body, footer }) => renderLadlesEmail({
+  title,
+  preheader: title,
+  bodyHtml: body,
+  footerHtml: footer || 'Warm regards,<br>The Ladles of Love Team',
+});
 
 const getRoutingMessage = (category) => {
   switch (category) {
@@ -959,10 +911,30 @@ ${donationItemLines(donation)}
 Submitted Section18A form details:
 ${section18AFormDetailLines(formData)}
 `;
+  const html = buildEmailLayout({
+    title: 'Finance/Tax handoff',
+    body: `
+      <p style="margin:0 0 16px;font-size:16px;">Finance/Tax handoff: Section 18A donor details received.</p>
+      <p style="margin:0 0 16px;font-size:16px;"><strong>${escapeHtml(donorName)}</strong> donated these items. Here are the submitted details Finance/Tax needs to generate the Section 18A certificate.</p>
+      <ul style="margin:0 0 16px;padding-left:20px;font-size:16px;">
+        <li>Donor name: ${escapeHtml(donorName)}</li>
+        <li>Donor email/contact: ${escapeHtml(donorContact)}</li>
+        <li>Donation reference/id: ${escapeHtml(reference)}</li>
+        <li>Estimated donation value: ${escapeHtml(estimatedValue)}</li>
+        <li>Tax reference: ${escapeHtml(taxReference)}</li>
+      </ul>
+      <p style="margin:0 0 8px;font-size:16px;"><strong>Donated items:</strong></p>
+      <pre style="white-space:pre-wrap;margin:0 0 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;">${escapeHtml(donationItemLines(donation))}</pre>
+      <p style="margin:0 0 8px;font-size:16px;"><strong>Submitted Section18A form details:</strong></p>
+      <pre style="white-space:pre-wrap;margin:0 0 16px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;">${escapeHtml(section18AFormDetailLines(formData))}</pre>
+    `,
+    footer: 'Internal Finance/Tax handoff from WMS',
+  });
 
   return {
     subject: `Finance/Tax handoff: Section 18A details for ${reference}`,
     text,
+    html,
   };
 };
 
@@ -1154,6 +1126,7 @@ const submitSection18AForm = async (token, payload = {}) => {
     subject: emailContent.subject,
     email: {
       text: emailContent.text,
+      html: emailContent.html,
     },
     sentByUserId: null,
   });

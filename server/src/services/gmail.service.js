@@ -387,7 +387,11 @@ console.log("User ID:", initiatedByUserId);
   const connection = initiatedByUserId
     ? await gmailRepo.findConnectionByUserId(initiatedByUserId)
     : await gmailRepo.findLatestConnection();
-    console.log ("Connection: ", connection);
+    console.log("Connection:", {
+      exists: Boolean(connection),
+      id: connection?.id ?? null,
+      gmail_email: connection?.gmail_email ?? null,
+    });
 
   if (!connection) {
     fail(

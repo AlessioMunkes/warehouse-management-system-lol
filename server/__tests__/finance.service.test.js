@@ -159,9 +159,12 @@ describe('financeService email settings and send', () => {
         to: 'finance@example.org',
         subject: 'Warehouse Finance Report Link',
         text: expect.stringContaining('/finance/report/'),
+        html: expect.stringContaining('https://wms-lol.onrender.com/images/pdf_logo.png'),
       }),
       9,
     );
+    const sentEmail = emailProviderMock.sendEmail.mock.calls[0][0];
+    expect(sentEmail.html).toContain('Open Warehouse Movement Report');
     expect(repoMock.logFinanceReportEmail).toHaveBeenCalledWith(expect.objectContaining({
       recipientEmail: 'finance@example.org',
       status: 'SENT',

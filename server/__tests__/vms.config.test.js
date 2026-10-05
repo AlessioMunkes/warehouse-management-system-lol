@@ -22,6 +22,7 @@ describe('VMS config', () => {
   it('reads and trims VMS environment variables', () => {
     process.env.VMS_BASE_URL = ' https://vms.example.test ';
     process.env.VMS_API_TOKEN = ' dev-token ';
+    delete process.env.VMS_ADAPTER;
 
     expect(getVmsConfig()).toEqual({
       baseUrl: 'https://vms.example.test',
@@ -33,6 +34,7 @@ describe('VMS config', () => {
   it('returns empty strings when VMS environment variables are unset', () => {
     delete process.env.VMS_BASE_URL;
     delete process.env.VMS_API_TOKEN;
+    delete process.env.VMS_ADAPTER;
 
     expect(getVmsConfig()).toEqual({
       baseUrl: '',
@@ -51,6 +53,7 @@ describe('VMS config', () => {
   it('returns config when active integration settings are present', () => {
     process.env.VMS_BASE_URL = 'https://vms.example.test';
     process.env.VMS_API_TOKEN = 'dev-token';
+    delete process.env.VMS_ADAPTER;
 
     expect(requireVmsConfig()).toEqual({
       baseUrl: 'https://vms.example.test',

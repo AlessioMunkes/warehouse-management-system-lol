@@ -42,7 +42,7 @@ try {
 
 if (!warehouseUrls && !process.env.DATABASE_URL) {
   console.error('[db] Missing required environment variable: DATABASE_URL');
-  console.error('[db] Create a .env.local file — see env.example for the required keys.');
+  console.error('[db] Create a server/.env file — see env.example for the required keys.');
   process.exit(1);
 }
 

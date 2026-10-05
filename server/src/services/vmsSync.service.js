@@ -26,6 +26,44 @@ const fail = (status, message) => {
 };
 
 const nowIso = () => new Date().toISOString();
+const JOHANNESBURG_TIME_ZONE = 'Africa/Johannesburg';
+
+const datePartsFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: JOHANNESBURG_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+const timePartsFormatter = new Intl.DateTimeFormat('en-GB', {
+  timeZone: JOHANNESBURG_TIME_ZONE,
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+
+const toDateOnly = (value) => {
+  if (value === null || value === undefined) return value;
+  if (value instanceof Date) {
+    const parts = Object.fromEntries(datePartsFormatter.formatToParts(value).map((part) => [part.type, part.value]));
+    return `${parts.year}-${parts.month}-${parts.day}`;
+  }
+  const text = String(value).trim();
+  const match = text.match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : text;
+};
+
+const toTimeOnly = (value) => {
+  if (value === null || value === undefined) return value;
+  const text = String(value).trim();
+  if (/^\d{2}:\d{2}/.test(text) && !text.includes('T')) return text.slice(0, 5);
+  const date = value instanceof Date ? value : new Date(text);
+  if (Number.isNaN(date.getTime())) {
+    const timeMatch = text.match(/T(\d{2}:\d{2})/) ?? text.match(/^(\d{2}:\d{2})/);
+    return timeMatch ? timeMatch[1] : text.slice(0, 5);
+  }
+  return timePartsFormatter.format(date).replace(/^24:/, '00:');
+};
 
 // queueSync stores intention only: upsert a PENDING row, no VMS call.
 const queueSync = async (entityType, entityId, client = undefined) => {
@@ -69,6 +107,22 @@ const loadPublishPayload = async (entityType, entityId) => {
   return { entityType, entityId, event, timeslots };
 };
 
+const buildEventPublishPayload = ({ entityId, event, timeslots }) => ({
+  externalEventId: String(event?.event_id ?? entityId),
+  title: event?.event_name,
+  eventDate: toDateOnly(event?.event_date),
+  locationName: event?.venue_name,
+  status: 'scheduled',
+  description: event?.description,
+  locationUrl: event?.location_url,
+  timeslots: (timeslots ?? []).map((timeslot) => ({
+    externalTimeslotId: String(timeslot.timeslot_id),
+    startTime: toTimeOnly(timeslot.start_time),
+    endTime: toTimeOnly(timeslot.end_time),
+    capacity: timeslot.capacity,
+  })),
+});
+
 const markSynced = async (entityType, entityId, externalId) => {
   const at = nowIso();
   const row = await vmsSyncRepo.updateSyncStatus(entityType, entityId, {
@@ -95,6 +149,15 @@ const markFailed = async (entityType, entityId, message) =>
     errorMessage: message ?? 'VMS sync failed.',
   });
 
+const verifyCapacityUpdate = (requestedCapacity, response) => {
+  const returnedCapacity = Number(response?.capacity);
+  if (returnedCapacity !== Number(requestedCapacity)) {
+    throw new Error(
+      `VMS capacity verification failed: requested ${requestedCapacity}, returned ${response?.capacity}`
+    );
+  }
+};
+
 // Post-commit only: publish one entity, then persist SYNCED/FAILED.
 // Local data remains on VMS failure; sync becomes FAILED.
 const syncEntity = async (entityType, entityId) => {
@@ -104,8 +167,29 @@ const syncEntity = async (entityType, entityId) => {
   if (!record) record = await queueSync(entityType, entityId);
   const payload = await loadPublishPayload(entityType, entityId);
   try {
-    const result = await vmsIntegrationService.publishEventBooking(payload);
-    return markSynced(entityType, entityId, result?.externalId ?? null);
+    const result = await vmsIntegrationService.publishEvent(buildEventPublishPayload(payload));
+    return markSynced(
+      entityType,
+      entityId,
+      result?.externalId ?? result?.externalEventId ?? result?.eventId ?? null
+    );
+  } catch (err) {
+    return markFailed(entityType, entityId, err?.message);
+  }
+};
+
+const syncTimeslotCapacity = async (entityType, entityId, timeslotId, capacity) => {
+  if (!entityType) fail(400, 'Entity type is required.');
+  if (entityId === null || entityId === undefined || entityId === '') fail(400, 'Entity ID is required.');
+  if (timeslotId === null || timeslotId === undefined || timeslotId === '') fail(400, 'Timeslot ID is required.');
+
+  const record = await vmsSyncRepo.findByEntity(entityType, entityId);
+  if (!record || record.sync_status !== 'SYNCED') return null;
+
+  try {
+    const result = await vmsIntegrationService.updateTimeslotCapacity(String(timeslotId), capacity);
+    verifyCapacityUpdate(capacity, result);
+    return markSynced(entityType, entityId, record.external_id ?? null);
   } catch (err) {
     return markFailed(entityType, entityId, err?.message);
   }
@@ -145,9 +229,10 @@ const getSyncStatus = async (entityType, entityId) => {
 export default {
   queueSync,
   syncEntity,
+  syncTimeslotCapacity,
   retrySync,
   retryFailedSyncs,
   getSyncStatus,
 };
 
-export { queueSync, syncEntity, retrySync, retryFailedSyncs, getSyncStatus };
+export { queueSync, syncEntity, syncTimeslotCapacity, retrySync, retryFailedSyncs, getSyncStatus };

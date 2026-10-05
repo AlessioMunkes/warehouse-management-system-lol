@@ -78,6 +78,7 @@ export const STAFF = {
   // view for the two impactOnly metrics in reportCatalog.js, rather
   // than one more entry in ReportingPage.jsx's full metric picker.
   impactReport: '/noc/impact-report',
+  operationalGoals: '/noc/operational-goals',
   // Manager-only, like reporting above: POST /api/purchase-orders
   // is requireRole(MANAGER, ADMIN) and the App.jsx gate mirrors
   // that. Reads are open to warehouse staff, but they reach a PO
@@ -187,3 +188,4 @@ export const ADMIN = {
   // audiences, two URLs.
   volunteerLog: '/admin/volunteer-log',
 };
+

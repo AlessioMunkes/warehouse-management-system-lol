@@ -27,6 +27,7 @@ import {
   Mail,
   Sprout,
   MessageCircle,
+  Target,
 } from 'lucide-react';
 import { STAFF, ADMIN, VOLUNTEERS, PACKING } from '../../../routes/paths';
 
@@ -140,6 +141,7 @@ const MANAGER_SECTIONS = [
       { to: STAFF.stockLedger, label: 'Stock Ledger', icon: ScrollText },
       { to: STAFF.reporting, label: 'Operations Reports', icon: BarChart3 },
       { to: STAFF.impactReport, label: 'Impact Reports', icon: HeartHandshake },
+      { to: STAFF.operationalGoals, label: 'Operational Goals', icon: Target },
     ],
   },
 ];

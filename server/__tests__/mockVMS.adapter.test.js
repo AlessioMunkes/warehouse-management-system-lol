@@ -15,6 +15,44 @@ describe('MockVMSAdapter success', () => {
     expect(second.externalId).toBe(first.externalId);
     expect(first.publishedAt).toBeTruthy();
   });
+
+  it('updates timeslot capacity successfully', async () => {
+    const result = await mockAdapter.updateTimeslotCapacity('t1', 25);
+
+    expect(result).toMatchObject({
+      externalTimeslotId: 't1',
+      capacity: 25,
+    });
+    expect(result.updatedAt).toBeTruthy();
+  });
+
+  it('returns an empty booking snapshot for compatibility', async () => {
+    const result = await mockAdapter.getEventBookings('e1');
+
+    expect(result).toEqual({
+      externalEventId: 'e1',
+      bookingCount: 0,
+      capacityTotal: 0,
+      timeslots: [],
+      bookings: [],
+    });
+  });
+
+  it('sends attendance successfully for compatibility', async () => {
+    const result = await mockAdapter.sendAttendance({
+      vmsBookingId: 'VMS-B-100',
+      attendanceStatus: 'attended',
+      source: 'wms',
+      recordedAt: '2026-10-01T09:05:00.000Z',
+    });
+
+    expect(result).toEqual({
+      vmsBookingId: 'VMS-B-100',
+      attendanceStatus: 'attended',
+      source: 'wms',
+      recordedAt: '2026-10-01T09:05:00.000Z',
+    });
+  });
 });
 
 describe('MockVMSAdapter failure', () => {

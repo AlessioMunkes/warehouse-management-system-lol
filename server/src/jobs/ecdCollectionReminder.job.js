@@ -6,6 +6,7 @@ const JOB_NAME = 'ecd_collection_email_reminders';
 const SAST_OFFSET_HOURS = 2;
 const RUN_HOUR_SAST = 8;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const WEDNESDAY = 3;
 
 const dateStringInZone = (date, timeZone = 'Africa/Johannesburg') => {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -20,10 +21,14 @@ const dateStringInZone = (date, timeZone = 'Africa/Johannesburg') => {
 
 export const nextRunAt = (now = new Date()) => {
   const [year, month, day] = dateStringInZone(now).split('-').map(Number);
-  let runAt = new Date(Date.UTC(year, month - 1, day, RUN_HOUR_SAST - SAST_OFFSET_HOURS, 0, 0, 0));
+  const todayRunAt = new Date(Date.UTC(year, month - 1, day, RUN_HOUR_SAST - SAST_OFFSET_HOURS, 0, 0, 0));
+  const todaySast = new Date(Date.UTC(year, month - 1, day));
+  const dayOfWeek = todaySast.getUTCDay();
+  let daysUntilWednesday = (WEDNESDAY - dayOfWeek + 7) % 7;
+  let runAt = new Date(todayRunAt.getTime() + (daysUntilWednesday * DAY_MS));
 
   if (runAt <= now) {
-    runAt = new Date(runAt.getTime() + DAY_MS);
+    runAt = new Date(runAt.getTime() + (7 * DAY_MS));
   }
 
   return runAt;

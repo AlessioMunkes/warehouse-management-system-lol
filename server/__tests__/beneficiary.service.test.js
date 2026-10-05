@@ -28,12 +28,12 @@ const BENEFICIARY_ID = 6;
 
 const existingBeneficiary = (over = {}) => ({
   id: BENEFICIARY_ID, name: 'Sunnyside ECD', cohort: 'week1',
-  contact_name: 'Jane Doe', mobile_number: null, child_count: 40,
+  contact_name: 'Jane Doe', contact_email: null, mobile_number: null, child_count: 40,
   is_active: true, approved_at: null, last_collected_date: null, ...over,
 });
 
 const body = (over = {}) => ({
-  name: 'Sunnyside ECD', cohort: 'week1', contactName: 'Jane Doe', mobileNumber: '+27 82 123 4567', childCount: 40, ...over,
+  name: 'Sunnyside ECD', cohort: 'week1', contactName: 'Jane Doe', contactEmail: 'ECD@Example.ORG', mobileNumber: '+27 82 123 4567', childCount: 40, ...over,
 });
 
 beforeEach(() => {
@@ -98,6 +98,26 @@ describe('createBeneficiary — validation', () => {
     expect(repoMock.insertBeneficiary).toHaveBeenCalledWith(expect.objectContaining({ mobileNumber: null }));
   });
 
+  it('accepts contactEmail and normalizes it for storage', async () => {
+    await beneficiaryService.createBeneficiary(body({ contactEmail: ' ECD@Example.ORG ' }));
+    expect(repoMock.insertBeneficiary).toHaveBeenCalledWith(expect.objectContaining({ contactEmail: 'ecd@example.org' }));
+  });
+
+  it('accepts a missing contactEmail as null', async () => {
+    await beneficiaryService.createBeneficiary(body({ contactEmail: undefined }));
+    expect(repoMock.insertBeneficiary).toHaveBeenCalledWith(expect.objectContaining({ contactEmail: null }));
+  });
+
+  it('accepts a blank contactEmail as null', async () => {
+    await beneficiaryService.createBeneficiary(body({ contactEmail: '  ' }));
+    expect(repoMock.insertBeneficiary).toHaveBeenCalledWith(expect.objectContaining({ contactEmail: null }));
+  });
+
+  it('rejects an invalid contactEmail', async () => {
+    await expect(beneficiaryService.createBeneficiary(body({ contactEmail: 'not-email' })))
+      .rejects.toMatchObject({ status: 400 });
+  });
+
   it('rejects an invalid mobile number', async () => {
     await expect(beneficiaryService.createBeneficiary(body({ mobileNumber: 'call me maybe' })))
       .rejects.toMatchObject({ status: 400 });
@@ -137,6 +157,24 @@ describe('updateBeneficiary — partial patch semantics', () => {
     await beneficiaryService.updateBeneficiary(BENEFICIARY_ID, { mobileNumber: '082 123 4567' });
     const patch = repoMock.updateBeneficiary.mock.calls[0][1];
     expect(patch).toEqual({ mobileNumber: '082 123 4567' });
+  });
+
+  it('allows updating the contactEmail independently', async () => {
+    await beneficiaryService.updateBeneficiary(BENEFICIARY_ID, { contactEmail: ' reminder@ECD.org ' });
+    const patch = repoMock.updateBeneficiary.mock.calls[0][1];
+    expect(patch).toEqual({ contactEmail: 'reminder@ecd.org' });
+  });
+
+  it('allows clearing the contactEmail', async () => {
+    await beneficiaryService.updateBeneficiary(BENEFICIARY_ID, { contactEmail: '' });
+    const patch = repoMock.updateBeneficiary.mock.calls[0][1];
+    expect(patch).toEqual({ contactEmail: null });
+  });
+
+  it('rejects an invalid contactEmail update', async () => {
+    await expect(beneficiaryService.updateBeneficiary(BENEFICIARY_ID, { contactEmail: 'not-email' }))
+      .rejects.toMatchObject({ status: 400 });
+    expect(repoMock.updateBeneficiary).not.toHaveBeenCalled();
   });
 
   it('allows clearing the mobile number', async () => {

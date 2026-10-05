@@ -30,16 +30,28 @@ beforeEach(() => {
 });
 
 describe('ECD collection reminder scheduler timing', () => {
-  it('runs at the next 08:00 Africa/Johannesburg when today has not passed', () => {
+  it('runs at Wednesday 08:00 Africa/Johannesburg when Wednesday has not passed', () => {
     const runAt = nextRunAt(new Date('2026-09-23T05:59:00.000Z'));
 
     expect(runAt.toISOString()).toBe('2026-09-23T06:00:00.000Z');
   });
 
-  it('schedules tomorrow when 08:00 Africa/Johannesburg has passed', () => {
+  it('schedules the next Wednesday when Wednesday 08:00 Africa/Johannesburg has passed', () => {
     const runAt = nextRunAt(new Date('2026-09-23T06:00:00.000Z'));
 
-    expect(runAt.toISOString()).toBe('2026-09-24T06:00:00.000Z');
+    expect(runAt.toISOString()).toBe('2026-09-30T06:00:00.000Z');
+  });
+
+  it('does not schedule a Tuesday automatic run for Thursday reminders', () => {
+    const runAt = nextRunAt(new Date('2026-09-22T06:00:00.000Z'));
+
+    expect(runAt.toISOString()).toBe('2026-09-23T06:00:00.000Z');
+  });
+
+  it('uses Africa/Johannesburg date when calculating Wednesday morning', () => {
+    const runAt = nextRunAt(new Date('2026-09-22T22:30:00.000Z'));
+
+    expect(runAt.toISOString()).toBe('2026-09-23T06:00:00.000Z');
   });
 });
 
@@ -81,7 +93,7 @@ describe('runEmailReminderJob', () => {
 });
 
 describe('startEmailReminderScheduler', () => {
-  it('schedules the first run for 08:00 SAST and can be stopped', () => {
+  it('schedules the first run for Wednesday 08:00 SAST and can be stopped', () => {
     const log = logger();
     const setTimer = vi.fn(() => 123);
     const clearTimer = vi.fn();
@@ -130,6 +142,7 @@ describe('startEmailReminderScheduler', () => {
     );
     expect(setTimer).toHaveBeenCalledTimes(2);
   });
+
 });
 
 describe('runEmailReminderJob with several warehouses', () => {
@@ -156,3 +169,4 @@ describe('runEmailReminderJob with several warehouses', () => {
     await expect(runEmailReminderJob({ logger: quiet, service, codes: [] })).resolves.toMatchObject({ sent: 2 });
   });
 });
+
