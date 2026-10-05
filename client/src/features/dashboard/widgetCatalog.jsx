@@ -30,8 +30,8 @@
 // the Month / 3 months / Year menu.
 // ─────────────────────────────────────────────────────────────
 import {
-  Activity, ClipboardList, FileBadge, Gift, HandHeart, Mail, Package,
-  PackageSearch, ScrollText, Truck, Users2, Warehouse,
+  Activity, ClipboardList, Gift, HandHeart, Package,
+  ScrollText, Truck, Users2, Warehouse,
 } from 'lucide-react';
 import StatTile from './components/StatTile';
 import ActionCard from './components/ActionCard';
@@ -123,7 +123,7 @@ export const WIDGETS = [
     id: 'donations-to-review', title: 'Donations to review', roles: MANAGER_ONLY, needs: ['donations'],
     description: 'Donations and flagged items waiting in the classification queue.',
     render: ({ donations }) => (
-      <StatTile icon={Gift} label="Donations to review" value={donations} to={ADMIN.donationManagement} warn />
+      <StatTile image="donation-queue" label="Donations to review" value={donations} to={ADMIN.donationManagement} warn />
     ),
   }),
 
@@ -132,7 +132,7 @@ export const WIDGETS = [
     id: 'certificates-for-managers', title: 'Certificates to issue', roles: MANAGER_ONLY, needs: ['s18a'],
     description: 'Section 18A certificates queued and ready to be issued to donors.',
     render: ({ s18a }) => (
-      <StatTile icon={FileBadge} label="Section 18A certificates to issue" value={s18a.queued ?? 0}
+      <StatTile image="certificates-to-issue" label="Section 18A certificates to issue" value={s18a.queued ?? 0}
         to={ADMIN.section18aManagement} warn />
     ),
   }),
@@ -201,21 +201,21 @@ export const WIDGETS = [
     id: 'users', title: 'Active user accounts', roles: ADMIN_ONLY, needs: ['users'],
     description: 'Staff accounts that can sign in.',
     render: ({ users }) => (
-      <StatTile icon={Users2} label="Active user accounts" value={users.filter((u) => u.isActive).length} to={ADMIN.users} />
+      <StatTile image="active-user-accounts" label="Active user accounts" value={users.filter((u) => u.isActive).length} to={ADMIN.users} />
     ),
   }),
   tile({
     id: 'donation-queue', title: 'Donation queue', roles: ADMIN_ONLY, needs: ['donations'],
     description: 'Donations and flagged items waiting in the classification queue.',
     render: ({ donations }) => (
-      <StatTile icon={Gift} label="Donation queue" value={donations} to={ADMIN.donationManagement} warn />
+      <StatTile image="donation-queue" label="Donation queue" value={donations} to={ADMIN.donationManagement} warn />
     ),
   }),
   tile({
     id: 'certificates-to-issue', title: 'Certificates to issue', roles: ADMIN_ONLY, needs: ['s18a'],
     description: 'Section 18A certificates queued and ready to be issued to donors.',
     render: ({ s18a }) => (
-      <StatTile icon={FileBadge} label="Section 18A certificates to issue" value={s18a.queued ?? 0}
+      <StatTile image="certificates-to-issue" label="Section 18A certificates to issue" value={s18a.queued ?? 0}
         to={ADMIN.section18aManagement} warn />
     ),
   }),
@@ -231,7 +231,7 @@ export const WIDGETS = [
     id: 'email-status', title: 'Email sending', roles: ADMIN_ONLY, needs: ['gmail'],
     description: 'Whether the account that sends certificates, reminders and Finance emails is connected.',
     render: ({ gmail }) => (
-      <StatTile icon={Mail} label={gmail.connected ? 'Email sending connected' : 'Email sending is off — reconnect'}
+      <StatTile image="email-sending-connected" label={gmail.connected ? 'Email sending connected' : 'Email sending is off — reconnect'}
         value={gmail.connected ? 'On' : 'Off'} to={ADMIN.emailIntegration} alarm={!gmail.connected} />
     ),
   }),
@@ -239,7 +239,7 @@ export const WIDGETS = [
     id: 'catalogue-gaps', title: 'Products missing details', roles: ADMIN_ONLY, needs: ['products'],
     description: 'Active products with no unit cost or no weight, so order estimates cannot be worked out for them.',
     render: ({ products }) => (
-      <StatTile icon={PackageSearch} label="Products missing a cost or weight"
+      <StatTile image="products-missing" label="Products missing a cost or weight"
         value={products.filter((p) => p.isActive && (p.unitCost == null || p.weightKg == null)).length}
         to={ADMIN.products} warn />
     ),
