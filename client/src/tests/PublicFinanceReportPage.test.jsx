@@ -39,21 +39,13 @@ const renderPublicPage = () =>
     </MemoryRouter>,
   );
 
-const expectedThisMonthRange = () => {
-  const now = new Date();
-  return {
-    from: new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10),
-    to: now.toISOString().slice(0, 10),
-    limit: 200,
-  };
-};
-
 describe('PublicFinanceReportPage', () => {
   it('loads the report through the tokenized public API without login context', async () => {
     renderPublicPage();
 
     await waitFor(() => expect(api.getPublicFinanceReport).toHaveBeenCalled());
-    expect(api.getPublicFinanceReport).toHaveBeenCalledWith('public-token-123', expectedThisMonthRange());
+    // The report loads everything and narrows by date on the page.
+    expect(api.getPublicFinanceReport).toHaveBeenCalledWith('public-token-123', { limit: 200 });
     expect(await screen.findByText('Movement Trends')).toBeInTheDocument();
     expect(screen.getByLabelText(/movement chart/i)).toHaveAccessibleName(
       'Movement chart. Donations 0. Purchase Orders 1. Dispatch 0.',

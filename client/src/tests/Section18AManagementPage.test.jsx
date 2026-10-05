@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Section18AManagementPage from '../pages/Section18AManagementPage';
 
-vi.mock('../features/taskdashboard/components/TopNavBar', () => ({
+vi.mock('../components/layout/TopNavBar', () => ({
   TopNavbar: () => <div>TopNavbar</div>,
 }));
 
@@ -68,7 +68,7 @@ describe('Section18AManagementPage', () => {
   it('renders queue with donor, reference, date, amount, and no certificate settings navigation', async () => {
     render(<Section18AManagementPage />);
 
-    expect(await screen.findByText('Section 18A Management')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Section 18A' })).toBeInTheDocument();
     expect(await screen.findByText('DON-1001')).toBeInTheDocument();
     expect(screen.getByText('Jane Doe')).toBeInTheDocument();
     expect(screen.getByText('R500.00')).toBeInTheDocument();
@@ -97,7 +97,7 @@ describe('Section18AManagementPage', () => {
 
     await screen.findByText('DON-1001');
 
-    const emailTabBtn = screen.getByRole('tab', { name: /Email Integration/i });
+    const emailTabBtn = screen.getByRole('tab', { name: /Email history/i });
     await user.click(emailTabBtn);
 
     expect(await screen.findByText('jane@example.com')).toBeInTheDocument();

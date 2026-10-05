@@ -287,6 +287,21 @@ const getConnectionStatus = async (userId) => {
   };
 };
 
+// For Settings → Connections: is the organisation account (the one
+// system emails go out as) connected, and does Google still accept it?
+// Getting a client refreshes an expired token, which is the real test —
+// a revoked or expired grant fails here rather than on the next email.
+const checkOrganisationConnection = async () => {
+  const connection = await gmailRepo.findLatestConnection();
+  if (!connection) return { connected: false };
+  try {
+    await getOAuth2ClientForConnection(connection);
+    return { connected: true, working: true, email: connection.gmail_email, updatedAt: connection.updated_at };
+  } catch (err) {
+    return { connected: true, working: false, email: connection.gmail_email, error: err.message };
+  }
+};
+
 const encodeMimePart = (value) => Buffer.from(String(value || ''), 'utf8').toString('base64');
 
 const toBase64Url = (str) => {
@@ -478,6 +493,7 @@ export default {
   getValidAccessToken,
   getOAuth2ClientWithCredentials,
   getConnectionStatus,
+  checkOrganisationConnection,
   disconnect,
   sendEmail,
   saveDisplayName,

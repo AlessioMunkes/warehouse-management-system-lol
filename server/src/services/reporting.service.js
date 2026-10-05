@@ -13,6 +13,9 @@ import factorRepo       from '../repositories/reportingFactor.repository.js';
 import cache            from '../features/reporting/reportCache.js';
 import { validateSpec } from '../features/reporting/specValidator.js';
 import aiProvider       from '../features/reporting/ai/provider.js';
+import pool             from '../config/db.js';
+import { validateCustom, runCustom, describeDatasets } from '../features/reporting/customQuery.js';
+import { canDrill, planDrill } from '../features/reporting/drillDown.js';
 import {
   METRICS, DIMENSIONS, CACHE_TTL, getMetric, isSnapshot, describeSpec,
 } from '../features/reporting/reportCatalog.js';
@@ -55,9 +58,26 @@ const getCatalog = () => ({
     // list to know what to hide.
     impactOnly: Boolean(m.impactOnly),
   })),
+  // Custom reports: what can be counted, grouped and filtered, for the
+  // builder's Custom mode. Names only — the SQL stays in customQuery.js.
+  datasets: describeDatasets(),
 });
 
+// A custom report ("how many X by Y") goes through its own validator
+// and query builder, and comes back in the same shape.
+const runCustomReport = async (input) => {
+  const spec = validateCustom(input);
+  // Its own key: a custom spec has no metric/filters in the catalog sense.
+  const key = `custom:${JSON.stringify([spec.custom, spec.dateRange ?? null])}`;
+  const hit = cache.get(key);
+  if (hit) return { ...hit, meta: { ...hit.meta, cached: true } };
+  const payload = await runCustom(spec, (sql, params) => pool.query(sql, params));
+  cache.set(key, payload, spec.dateRange ? cache.ttlFor(spec, todayISO()) : CACHE_TTL.SNAPSHOT);
+  return payload;
+};
+
 const runReport = async (input) => {
+  if (input?.custom) return runCustomReport(input);
   const spec   = validateSpec(input);
   const metric = getMetric(spec.metric);
 
@@ -94,6 +114,17 @@ const runReport = async (input) => {
     threshold: metric.threshold,
     cached: false,
   };
+  // How the page should draw it, beyond bars and lines.
+  if (metric.funnel && metric.funnel.dimension === spec.dimension) {
+    meta.funnel = { stages: metric.funnel.stages, exits: metric.funnel.exits };
+  }
+  if (metric.waterfall) meta.waterfall = true;
+  if (metric.flows && metric.flows === spec.dimension) meta.flows = true;
+  if (metric.rag) meta.rag = metric.rag;
+  if (spec.dimension === 'weekday') { meta.ordered = true; meta.preferView = 'bar'; }
+  if (spec.dimension === 'week_weekday') meta.preferView = 'heatmap';
+  // Its bars can be clicked through to the report behind them.
+  if (canDrill(metric, spec.dimension)) meta.drillable = true;
 
   // Factor metrics convert here rather than in SQL, so the raw
   // measurement stays inspectable and one bad factor cannot corrupt
@@ -109,7 +140,7 @@ const runReport = async (input) => {
 
   // Weight metrics state what they excluded, so a total shrunk by
   // unit mismatches is visible rather than silently wrong.
-  if (spec.dateRange && (metric.unit === 'kg' || metric.factorKey)) {
+  if (spec.dateRange && !metric.waterfall && (metric.unit === 'kg' || metric.factorKey)) {
     const skipped = await repo.countNonKgLines(spec);
     if (skipped > 0) meta.excludedLines = skipped;
   }
@@ -117,11 +148,14 @@ const runReport = async (input) => {
   // Percentages average; everything else sums. A summed compliance
   // percentage would be nonsense, and the client should not have to
   // know which is which.
+  // A waterfall's total is where it ends; days of cover average too.
   const total = series.length === 0
     ? 0
-    : metric.unit === '%'
-      ? Number((series.reduce((s, r) => s + r.value, 0) / series.length).toFixed(1))
-      : series.reduce((s, r) => s + r.value, 0);
+    : metric.waterfall
+      ? series[series.length - 1].value
+      : metric.unit === '%' || metric.unit === 'days'
+        ? Number((series.reduce((s, r) => s + r.value, 0) / series.length).toFixed(1))
+        : series.reduce((s, r) => s + r.value, 0);
 
   const payload = {
     spec,
@@ -160,4 +194,25 @@ const setFactor = async ({ factorKey, value, unit, sourceNote, actorId }) => {
 
 const getFactorHistory = (factorKey) => factorRepo.listFactorHistory(factorKey);
 
-export default { getCatalog, runReport, todayISO, setFactor, getFactorHistory };
+// Click a bar → the report behind it (features/reporting/drillDown.js).
+// A name from the chart is turned into its id here; the table name
+// comes from a fixed map, never from the request.
+const drillDown = async ({ spec: parentInput, label }) => {
+  const parent = validateSpec(parentInput);
+  const metric = getMetric(parent.metric);
+  const plan = planDrill(metric, parent, label);
+  if (!plan) throw fail(400, 'This chart cannot be drilled into.');
+  if (plan.lookup) {
+    const { rows } = await pool.query(`SELECT id FROM ${plan.lookup.table} WHERE name = $1 ORDER BY id LIMIT 1`, [plan.lookup.name]);
+    if (!rows.length) throw fail(404, `Could not find "${label}" to drill into.`);
+    plan.spec.filters[plan.filter] = rows[0].id;
+  }
+  const report = await runReport(plan.spec);
+  // "(supplier: 2)" means nothing to a reader; the name it came from does.
+  const description = plan.lookup
+    ? `${label}: ${report.description.replace(/,? \([^()]*: \d+\)/, '')}`
+    : report.description;
+  return { ...report, description, meta: { ...report.meta, drill: { from: label, title: plan.title } } };
+};
+
+export default { getCatalog, runReport, drillDown, todayISO, setFactor, getFactorHistory };

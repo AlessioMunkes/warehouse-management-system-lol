@@ -61,4 +61,21 @@ services:
       # fix is one dashboard edit, but only if you know the knob is
       # here. See provider.js.
       - key: GEMINI_MODEL
-        value: gemini-3.6-flash
+        value: gemini-3.5-flash-lite
+      # Backup models, tried in order when the one above is out of
+      # quota, overloaded or times out. Free-tier limits are per model,
+      # so this is what keeps both the help panel and reporting
+      # answering on a busy day. Declared so it is visible in the
+      # dashboard; it matches provider.js's default.
+      - key: GEMINI_FALLBACK_MODELS
+        value: gemini-3.1-flash-lite,gemini-flash-lite-latest
+      # Phone notifications for the floor (Web Push). Generate the pair
+      # once with `npx web-push generate-vapid-keys` and never rotate it
+      # casually: every phone that turned alerts on is tied to it.
+      # Unset = no phone notifications; the in-app bell still works.
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: VAPID_SUBJECT
+        sync: false            # e.g. mailto:ops@ladlesoflove.org.za

@@ -1,263 +1,56 @@
+// ─────────────────────────────────────────────────────────────
+// client/src/App.jsx
+//
+// The routes come from routes/routeTable.js — path, who may open it,
+// whether it sits in the sidebar shell — and the page each one shows
+// from routes/pages.jsx. This file builds the <Routes> from the two.
+//
+// Guarded routes are grouped by (roles, shell): one ProtectedRoute per
+// group, so moving between two manager screens keeps the same shell
+// mounted rather than rebuilding the sidebar on every click.
+// ─────────────────────────────────────────────────────────────
 import { BrowserRouter, Routes, Route, Navigate }  from 'react-router-dom';
 import { AuthProvider }                            from './context/AuthContext';
 import ThemeProvider                               from './components/layout/ThemeProvider';
 import ProtectedRoute                              from './components/layout/ProtectedRoute';
-import { PACKING, STAFF, DONATIONS, DONATION_INTAKE_ROLES, ADMIN, VOLUNTEERS, VOLUNTEER_MANAGEMENT_ROLES, COMMUNITY_REQUEST_ROLES, STAFF_ROLES, FEED_THE_SOIL_ROLES } from './routes/paths';
-import LandingPage                                 from './pages/LandingPage';
-import LoginPage                                   from './pages/LoginPage';
-import GuestLoginPage                              from './pages/GuestLoginPage';
-import GuestHomePage                               from './pages/GuestHomePage';
-import GuestPackPage                               from './pages/GuestPackPage';
-import GuestDonePage                               from './pages/GuestDonePage';
-import SlipPreviewPage                             from './pages/SlipPreviewPage';
-import PageNotFound                               from "./pages/PageNotFound";
-//import SelectNOCjob                                from './pages/SelectNOCjob';
+import { ROUTES, REDIRECTS }                       from './routes/routeTable';
+import { ToastProvider }                           from './components/ui/toast';
+import { PAGES }                                   from './routes/pages';
+import PageNotFound                                from './pages/PageNotFound';
 
-import ProcurementPage                             from './pages/ProcurementPage';
-import StaffDeliveriesPage                         from './pages/StaffDeliveriesPage';
-import DecantingPage                               from './pages/DecantingPage';
-import StaffDecantingRecordsPage                   from './pages/StaffDecantingRecordsPage';
-import PackingSelectPage                           from './pages/PackingSelectPage';
-import DispatchPage                                from './pages/DispatchPage';
-import StaffDispatchHistoryPage                    from './pages/StaffDispatchHistoryPage';
-import ReceiptsPage                                from './pages/ReceiptsPage';
-import InventoryManagementPage                     from './pages/InventoryManagementPage';
-import ManagerDashboardPage                         from './pages/ManagerDashboardPage';
-import { ToastProvider }                             from './components/ui/toast';
-import StockLedgerPage                               from './pages/StockLedgerPage';
-import AdminActivityScreen                         from './pages/AdminActivityScreen';
-import TaskDashboard from './pages/TaskDashboardPage';
-import SupplierDirectoryPage                       from './pages/SupplierDirectoryPage';
-import PurchaseOrdersPage                          from './pages/PurchaseOrdersPage';
-import ReportingPage                               from './pages/ReportingPage';
-import DonationManagementPage                      from './pages/DonationManagementPage';
-import Section18AManagementPage                    from './pages/Section18AManagementPage';
-import BeneficiaryDirectoryPage                     from './pages/BeneficiaryDirectoryPage';
-import EcdCollectionRemindersPage                  from './pages/EcdCollectionRemindersPage';
-import ImpactReportPage                             from './pages/ImpactReportPage';
-import PickingSlipManagementPage                    from './pages/PickingSlipManagementPage';
-import UserDirectoryPage                            from './pages/UserDirectoryPage';
-import VolunteerManagementPage                      from './pages/VolunteerManagementPage';
-import ProductManagementPage                        from './pages/ProductManagementPage';
-import VolunteerEventsPage                        from './pages/VolunteerEventsPage';
-import VolunteerEventWorkspacePage                from './pages/VolunteerEventWorkspacePage';
-import CommunityRequestsPage                       from './pages/CommunityRequestsPage';
-import GmailSettingsPage                           from './pages/GmailSettingsPage';
-import FinanceWarehouseReportPage                  from './pages/FinanceWarehouseReportPage';
-import PublicFinanceReportPage                     from './pages/PublicFinanceReportPage';
-import Section18AFormPage                         from './pages/Section18AFormPage';
-import InviteAcceptPage                            from './pages/InviteAcceptPage';
-import FeedTheSoilPage                              from './pages/FeedTheSoilPage';
-import OperationalGoalsPage                         from './pages/OperationalGoalsPage';
-
-// Donations — new feature, own draft context scoped to just these
-// two routes (see features/donation/context/DonationDraftProvider.jsx)
-import { DonationDraftProvider }                   from './features/donation/context/DonationDraftProvider';
-import {DonationDetailsPage } from './pages/DonationDetailsPage';
-import { ReviewPage as DonationReviewPage }         from './pages/ReviewPage';
+// Guarded routes, grouped by who may open them and whether they sit in
+// the shell, in the order each group first appears in the table.
+const guardGroups = () => {
+  const groups = new Map();
+  for (const route of ROUTES) {
+    if (!route.roles) continue;
+    const key = `${route.roles.join(',')}|${route.shell ? 'shell' : ''}`;
+    if (!groups.has(key)) groups.set(key, { roles: route.roles, shell: Boolean(route.shell), routes: [] });
+    groups.get(key).routes.push(route);
+  }
+  return [...groups.values()];
+};
 
 const App = () => (
   <AuthProvider>
-    {/* Above the router: the setting outlives any one route, and the
-        login screen is as entitled to it as the dashboard. */}
+    {/* Outside the router so the theme applies to every screen, login included. */}
     <ThemeProvider>
     <BrowserRouter>
       <ToastProvider>
       <Routes>
-        {/* Public */}
-        <Route path="/"      element={<LandingPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/guest" element={<GuestLoginPage />} />
-        <Route path="/finance/report/:token" element={<PublicFinanceReportPage />} />
-        <Route path="/section-18a/:token" element={<Section18AFormPage />} />
-        {/* An invitee has no account and no session yet — the whole
-            point of this route. See InviteAcceptPage.jsx. */}
-        <Route path="/invite/:token" element={<InviteAcceptPage />} />
-        {/* BR-22: the stable public URL behind every pallet's QR code.
-            Deliberately OUTSIDE ProtectedRoute — the whole point is that
-            a volunteer holding a printed poster reaches it with no
-            account and no session. The preview it shows carries only
-            what is already printed on that poster. */}
-        <Route path="/slip/:token" element={<SlipPreviewPage />} />
-         
-        
-        {/* ── Admin only ─────────────────────────────────────
-            Account provisioning and supplier master data — not
-            reachable by managers, per explicit product decision this
-            session (Products moved out of this block below; Users
-            and Suppliers stay here). */}
-        <Route element={<ProtectedRoute roles={['admin']} shell />}>
-          <Route path={ADMIN.dashboard} element={<AdminActivityScreen />} />
-          <Route path={ADMIN.suppliers} element={<SupplierDirectoryPage />} />
-          {/* Admin only, matching product.routes.js. A manager reaching
-              this by URL used to get a working editor for rows the
-              server would now refuse to change. */}
-          <Route path={ADMIN.products}  element={<ProductManagementPage />} />
-          <Route path={ADMIN.donationManagement} element={<DonationManagementPage />} />
-          <Route path={ADMIN.section18aManagement} element={<Section18AManagementPage />} />
-          {/* Account provisioning. Every route in user.routes.js is
-              requireRole(ADMIN), so this was unreachable while it sat in
-              a manager-only block — the client gate now matches the
-              server instead of contradicting it. */}
-          <Route path={ADMIN.users} element={<UserDirectoryPage />} />
-          {/* Gmail integration for donation thank-you emails. The page's
-              server routes are requireRole(ADMIN), so it sits in this
-              admin-only block rather than the manager/admin one. */}
-          <Route path={ADMIN.emailIntegration} element={<GmailSettingsPage />} />
-          <Route path={ADMIN.financeReport} element={<FinanceWarehouseReportPage />} />
-          {/* The guest log. Admin-only on purpose: GET /api/volunteers
-              is requireRole(MANAGER, ADMIN), so a manager is not
-              refused by the server — but the manager's volunteer
-              screen is the event workflow at /volunteers, and giving
-              one role two volunteer screens is how these two got
-              confused in the first place. */}
-          <Route path={ADMIN.volunteerLog} element={<VolunteerManagementPage />} />
-        </Route>
+        {ROUTES.filter((r) => !r.roles).map((r) => (
+          <Route key={r.id} path={r.path} element={PAGES[r.id]} />
+        ))}
 
-        {/* Protected — manager and admin.
-            roles={['manager']} alone silently excluded admin here —
-            ProtectedRoute's role check is a strict allowlist with no
-            admin-bypass, so an admin account could not reach any of
-            these even though every one of their server routes is
-            requireRole(MANAGER, ADMIN). Fixed by listing both. */}
-        {/* 'admin' added: ProtectedRoute has no admin special case, so
-            roles={['manager']} was locking admins out of the manager screen,
-            inventory, reporting and purchase orders — while the server has
-            always treated MANAGERS_UP as [MANAGER, ADMIN]. The two now agree. */}
-        <Route element={<ProtectedRoute roles={['manager', 'admin']} shell />}>
-          <Route path="/manager"       element={<ManagerDashboardPage />} />
-        <Route path="/noc/inventory" element={<InventoryManagementPage />} />
-          {/* The warehouse-wide ledger. Manager/admin only, matching
-              requireRole(MANAGERS_UP) on all three /api/stock/ledger
-              routes — warehouse staff reach movement history through
-              the per-product drawer on the inventory screen. */}
-          <Route path={STAFF.stockLedger} element={<StockLedgerPage />} />
-          <Route path={STAFF.reporting} element={<ReportingPage />} />
-          <Route path={STAFF.impactReport} element={<ImpactReportPage />} />
-          <Route path={STAFF.purchaseOrders} element={<PurchaseOrdersPage />} />
-          {/* Past delivery notes and dispatch notes. Manager and admin only —
-              the server endpoints are gated to the same pair, so the two
-              cannot drift into a UI that hides a route anyone can still call. */}
-          <Route path={STAFF.receipts} element={<ReceiptsPage />} />
-          <Route path={STAFF.beneficiaries} element={<BeneficiaryDirectoryPage />} />
-          <Route path={STAFF.collectionReminders} element={<EcdCollectionRemindersPage />} />
-          <Route path={STAFF.pickingSlips} element={<PickingSlipManagementPage />} />
-        </Route>
+        {guardGroups().map((g) => (
+          <Route key={`${g.roles.join(',')}|${g.shell}`} element={<ProtectedRoute roles={g.roles} shell={g.shell} />}>
+            {g.routes.map((r) => <Route key={r.id} path={r.path} element={PAGES[r.id]} />)}
+          </Route>
+        ))}
 
-        <Route element={<ProtectedRoute roles={['manager']} shell />}>
-          <Route path={STAFF.operationalGoals} element={<OperationalGoalsPage />} />
-        </Route>
-
-        {/* Protected — warehouse floor staff.
-            Was `<ProtectedRoute />` with no roles. ProtectedRoute skips its
-            role check when `roles` is undefined, so "any logged-in user"
-            included a signed-in guest, who could render packing, decanting,
-            procurement and dispatch by typing the URL. Scoped to STAFF_ROLES
-            so the client agrees with the server, which already refuses a
-            guest on every one of these endpoints. */}
-        <Route element={<ProtectedRoute roles={STAFF_ROLES} />}>
-          {/* The warehouse worker's dashboard. No longer split into its
-              own shell='true' group — it wraps itself in StaffShell now,
-              same as the flows below it, rather than the ManagerLayout
-              sidebar it used to get here. See TaskDashboardPage.jsx's
-              own note on why. */}
-          <Route path="/noc" element={<TaskDashboard />} />
-          <Route path="/noc/decanting" element={<DecantingPage />} />
-          <Route path={STAFF.decantingRecords} element={<StaffDecantingRecordsPage />} />
-
-          {/* One URL per task, shared by managers and workers alike —
-              each page picks manager view vs. staff flow by role
-              internally (see ProcurementPage.jsx / PackingSelectPage.jsx
-              / DecantingPage.jsx). */}
-          <Route path={STAFF.receiving}       element={<ProcurementPage />} />
-          <Route path={STAFF.deliveries}      element={<StaffDeliveriesPage />} />
-          <Route path={PACKING.board}         element={<PackingSelectPage />} />
-          <Route path={PACKING.detailPattern} element={<PackingSelectPage />} />
-          <Route path={STAFF.dispatch}        element={<DispatchPage />} />
-          <Route path={STAFF.dispatchHistory} element={<StaffDispatchHistoryPage />} />
-          {/* Receipts lives in the manager block above — a worker who typed
-              the URL would otherwise reach it, tile or no tile. */}
-        </Route>
-
-        {/* Protected — donation intake, RECEIVERS_UP only.
-            Mirrors POST /api/donations in server/src/routes/donation.routes.js,
-            which is auth + requireRole(WORKER, MANAGER, ADMIN). Finance can
-            read the money side but does not intake stock, so it is excluded
-            here exactly as it is there — the client gate is a UX courtesy,
-            the server route is the actual control.
-
-            No shell prop — DonationDetailsPage/ReviewPage wrap themselves in
-            the real StaffShell component now (see their own comments). They
-            used to render a hand-rolled .stf-shell div here AND get wrapped
-            in ManagerLayout by this route's old shell prop, which is the
-            "no bottom nav, sidebar behaves oddly" bug report: neither shell
-            was the one actually meant for this screen.
-
-            The draft context is mounted per-route rather than around the
-            block so the sessionStorage draft is scoped to the two intake
-            pages and cleared by navigating away from them. */}
-        <Route element={<ProtectedRoute roles={DONATION_INTAKE_ROLES} />}>
-          <Route
-            path={STAFF.donation}
-            element={
-              <DonationDraftProvider>
-                <DonationDetailsPage />
-              </DonationDraftProvider>
-            }
-          />
-          <Route
-            path={DONATIONS.review}
-            element={
-              <DonationDraftProvider>
-                <DonationReviewPage />
-              </DonationDraftProvider>
-            }
-          />
-        </Route>
-
-        {/* Volunteer Management — current coordinator workflow is available
-            to the two live management roles only. */}
-        <Route element={<ProtectedRoute roles={VOLUNTEER_MANAGEMENT_ROLES} shell />}>
-          <Route path={VOLUNTEERS.events} element={<VolunteerEventsPage />} />
-          <Route path={VOLUNTEERS.eventPattern} element={<VolunteerEventWorkspacePage />} />
-        </Route>
-
-        {/* Benevolent package request log (ADM-5.0 / BR-28). Warehouse
-            staff and up, mirroring STAFF_UP on every
-            /api/community-requests route. Log only — no stock movement.
-
-            No shell prop — CommunityRequestsPage picks ManagerLayout or
-            StaffShell itself by role now, the same way FeedTheSoilPage
-            does. It used to always render ManagerLayout (no worker-facing
-            view existed at all) while this route's own shell prop wrapped
-            it in a SECOND ManagerLayout — the doubled sidebar whose drawer
-            state fought itself. */}
-        <Route element={<ProtectedRoute roles={COMMUNITY_REQUEST_ROLES} />}>
-          <Route path={STAFF.communityRequests} element={<CommunityRequestsPage />} />
-        </Route>
-
-        {/* Feed the Soil kit logging. Warehouse staff and up, mirroring
-            STAFF_UP on every /api/collection-kits route. No shell here —
-            FeedTheSoilPage picks ManagerLayout or StaffShell itself by
-            role, the same way DecantingPage does for /noc/decanting. */}
-        <Route element={<ProtectedRoute roles={FEED_THE_SOIL_ROLES} />}>
-          <Route path={STAFF.feedTheSoil} element={<FeedTheSoilPage />} />
-        </Route>
-
-        {/* Guest-only — the Love Activist screens. */}
-        <Route element={<ProtectedRoute roles={['guest']} />}>
-          <Route path="/guest-home"  element={<GuestHomePage />} />
-          <Route path="/guest/pack"  element={<GuestPackPage />} />
-          <Route path="/guest/done"  element={<GuestDonePage />} />
-        </Route>
-
-        {/* Redirects */}
-        <Route path="/inventory" element={<Navigate to="/noc/inventory" replace />} />
-        <Route path="/decanting" element={<Navigate to="/noc/decanting" replace />} />
-        <Route path="/programmes/noc/packing"
-               element={<Navigate to={PACKING.board} replace />} />
-        <Route path="/programmes/noc/packing/:slipId"
-               element={<Navigate to={PACKING.board} replace />} />
+        {REDIRECTS.map((r) => (
+          <Route key={r.from} path={r.from} element={<Navigate to={r.to} replace />} />
+        ))}
 
         {/* Catch-all */}
         <Route path="*" element={<PageNotFound />} />

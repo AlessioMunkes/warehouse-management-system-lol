@@ -28,6 +28,7 @@ import { clearReadCache, setReadCacheScope } from '../services/readCache';
 import {
   getActiveWarehouse, setActiveWarehouse, clearActiveWarehouse, runWithWarehouse,
 } from '../services/warehouse';
+import { handPhoneAlertsTo, releasePhoneAlerts } from '../features/notifications/phoneAlerts';
 
 const AuthContext = createContext(null);
 
@@ -154,6 +155,14 @@ export const AuthProvider = ({ children }) => {
     return () => { cancelled = true; };
   }, []);
 
+  // ── Phone notifications follow whoever is signed in ───────────
+  // A shared floor phone that already has alerts on moves to the
+  // person who just signed in. Silent: it never asks for permission.
+  const signedInId = user && user.role !== 'guest' ? user.id : null;
+  useEffect(() => {
+    if (signedInId && !isOffline) handPhoneAlertsTo().catch(() => { /* push is best effort */ });
+  }, [signedInId, isOffline]);
+
   // ── Catch 401s from anywhere else in the app ──────────────────
   // Covers the session expiring mid-shift rather than between shifts.
   useEffect(() => {
@@ -251,6 +260,9 @@ export const AuthProvider = ({ children }) => {
       ? '/api/volunteers/sign-out'
       : '/api/login/logout';
 
+    // Before the session ends: the server needs it to know whose phone
+    // to stop alerting.
+    await releasePhoneAlerts().catch(() => { /* push is best effort */ });
     try {
       await apiPost(endpoint, {});
     } catch {

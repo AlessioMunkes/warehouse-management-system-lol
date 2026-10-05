@@ -1,19 +1,16 @@
 import express from 'express';
-import auth, { requireRole, ROLES } from '../middleware/auth.middleware.js';
+import auth, { requireRole } from '../middleware/auth.middleware.js';
+import { ALL_STAFF, MANAGERS_UP, WORKERS_ONLY } from '../constants/permissions.js';
 import { validateIntParam } from '../middleware/validate.middleware.js';
 import pendingDonationController from '../controllers/pendingDonation.controller.js';
 
 const router = express.Router();
 
-const ALL_ROLES = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
-const RECEIVERS_UP = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
-const MANAGERS_UP = [ROLES.MANAGER, ROLES.ADMIN];
-const ADMIN_ONLY = [ROLES.ADMIN];
 
 router.post(
   '/pending',
   auth,
-  requireRole(...RECEIVERS_UP),
+  requireRole(...WORKERS_ONLY),
   pendingDonationController.createPendingDonation
 );
 
@@ -25,24 +22,26 @@ router.post(
   pendingDonationController.resolvePendingDonationFlag
 );
 
+// The Classification queue is run by managers and admins alike, so its
+// lists and the retry that clears a failed save are theirs together.
 router.get(
   '/pending',
   auth,
-  requireRole(...ADMIN_ONLY),
+  requireRole(...MANAGERS_UP),
   pendingDonationController.listPendingDonations
 );
 
 router.get(
   '/pending/reconciliation',
   auth,
-  requireRole(...ADMIN_ONLY),
+  requireRole(...MANAGERS_UP),
   pendingDonationController.listReconciliationQueue
 );
 
 router.post(
   '/pending/:pendingDonationId/retry-commit',
   auth,
-  requireRole(...ADMIN_ONLY),
+  requireRole(...MANAGERS_UP),
   validateIntParam('pendingDonationId'),
   pendingDonationController.retryPendingDonationCommit
 );
@@ -50,7 +49,7 @@ router.post(
 router.get(
   '/pending/:id',
   auth,
-  requireRole(...ALL_ROLES),
+  requireRole(...ALL_STAFF),
   validateIntParam('id'),
   pendingDonationController.getPendingDonationById
 );

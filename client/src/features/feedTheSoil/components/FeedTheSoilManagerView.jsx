@@ -21,7 +21,7 @@ import collectionKitAPI from '../../../services/collectionKitAPI';
 import formatKitCode from '../kitCode';
 
 import { Button }   from '@/components/ui/button';
-import { Badge }    from '@/components/ui/badge';
+import StatusBadge from '@/components/ui/status-badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input }    from '@/components/ui/input';
 import {
@@ -33,10 +33,22 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Plus, Loader2, Search } from 'lucide-react';
+import { Plus, Loader2, Search, Sprout } from 'lucide-react';
+import TablePager from '@/components/ui/table-pager';
+import SortableHead from '@/components/ui/sortable-head';
+import useSortable from '@/lib/useSortable';
+import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
+import useDetailFocus from '../../masterdata/hooks/useDetailFocus';
+import PageHeader, { PageShell } from '@/components/ui/page-header';
+import ViewTabs from '@/components/ui/view-tabs';
+import ListCard from '@/components/ui/list-card';
+import ListToolbar from '@/components/ui/list-toolbar';
+import EmptyState from '@/components/ui/empty-state';
+import ErrorBanner from '@/components/ui/error-banner';
 
 const STATUS_LABELS = { assigned: 'Assigned', logged: 'Logged', dispatched: 'Dispatched' };
-const STATUS_BADGE  = { assigned: 'outline', logged: 'secondary', dispatched: 'default' };
+// Amber with the household, blue once compost is in and waiting to go
+// to a farm, green when it has gone — lib/statusStyles.js.
 
 const fmtDate = (value) =>
   value ? new Date(value).toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
@@ -50,19 +62,26 @@ const fmtDateTime = (value) =>
 
 const fmtKg = (value) => (value === null || value === undefined ? '—' : `${Number(value).toLocaleString('en-ZA')} kg`);
 
-const StatusBadge = ({ status }) => (
-  <Badge variant={STATUS_BADGE[status] ?? 'outline'}>{STATUS_LABELS[status] ?? status}</Badge>
-);
+// Click a column name to sort by it. Status sorts in the order a kit
+// moves through (assigned → logged → dispatched), not alphabetically.
+const STATUS_ORDER = { assigned: 0, logged: 1, dispatched: 2 };
+const time = (v) => (v ? new Date(v).getTime() : null);
+const KIT_SORT = {
+  kit: (k) => Number(k.id),
+  owner: (k) => k.owner_name,
+  suburb: (k) => k.suburb,
+  status: (k) => STATUS_ORDER[k.status] ?? 9,
+  lastLogged: (k) => time(k.last_logged_at),
+  assigned: (k) => time(k.assigned_at),
+};
+const RECORD_SORT = {
+  kit: (r) => Number(r.kit_id),
+  owner: (r) => r.owner_name,
+  status: (r) => STATUS_ORDER[r.status] ?? 9,
+};
 
-const ErrorBanner = ({ message, onRetry }) => (
-  <div className="p-4 rounded-[4px] bg-danger-soft border-2 border-brand text-ink text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-    <span>{message}</span>
-    {onRetry ? (
-      <button onClick={onRetry} className="text-xs sm:text-sm font-semibold underline hover:text-brand focus:outline-none">
-        Try again
-      </button>
-    ) : null}
-  </div>
+const KitStatus = ({ status }) => (
+  <StatusBadge kind="kit" status={status}>{STATUS_LABELS[status] ?? status}</StatusBadge>
 );
 
 const TABS = [
@@ -258,7 +277,7 @@ const LogPickKitPanel = ({ kits, isLoading, search, onSearch, onPick, onCancel }
                 <TableCell className="font-medium">{formatKitCode(k.id)}</TableCell>
                 <TableCell>{k.owner_name}</TableCell>
                 <TableCell className="text-muted-foreground">{k.suburb || '—'}</TableCell>
-                <TableCell><StatusBadge status={k.status} /></TableCell>
+                <TableCell><KitStatus status={k.status} /></TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -280,7 +299,7 @@ const KitDetail = ({ kit, onLogCompost, onOpenRecord, onClose }) => (
           {formatKitCode(kit.id)} · {kit.owner_name} · {kit.suburb || 'No suburb on record'} · assigned {fmtDate(kit.assigned_at)}
         </p>
       </div>
-      <StatusBadge status={kit.status} />
+      <KitStatus status={kit.status} />
     </CardHeader>
     <CardContent className="space-y-4">
       <Button type="button" size="sm" onClick={() => onLogCompost(kit)}>Log compost</Button>
@@ -299,7 +318,7 @@ const KitDetail = ({ kit, onLogCompost, onOpenRecord, onClose }) => (
             {kit.records.map((r) => (
               <TableRow key={r.id} className="cursor-pointer" onClick={() => onOpenRecord(r.id)}>
                 <TableCell>{fmtDate(r.logged_at)}</TableCell>
-                <TableCell><StatusBadge status={r.status} /></TableCell>
+                <TableCell><KitStatus status={r.status} /></TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -324,7 +343,7 @@ const RecordDetail = ({ record, onDispatch, onOpenKit, onClose, backLabel }) => 
           {formatKitCode(record.kit_id)} · {record.owner_name}{record.suburb ? ` · ${record.suburb}` : ''}
         </p>
       </div>
-      <StatusBadge status={record.status} />
+      <KitStatus status={record.status} />
     </CardHeader>
     <CardContent className="space-y-4">
       <Table>
@@ -377,6 +396,9 @@ export default function FeedTheSoilManagerView() {
   const [selectedRecord, setSelectedRecord] = useState(null);
   // Where a record's "back" action returns to.
   const [recordOrigin, setRecordOrigin] = useState('records');
+  // A kit, a record or a form opens above the list: move the page to it.
+  const [detailRef, focusDetail] = useDetailFocus();
+  const go = (next) => { setView(next); focusDetail(); };
 
   const [kits, setKits] = useState([]);
   const [kitSearch, setKitSearch] = useState('');
@@ -423,6 +445,7 @@ export default function FeedTheSoilManagerView() {
       setSelectedKit(res?.data ?? res);
       setSelectedRecord(null);
       setView('list');
+      focusDetail();
     } catch (err) {
       setError(err.message || 'Could not load this kit.');
     }
@@ -436,6 +459,7 @@ export default function FeedTheSoilManagerView() {
       setSelectedKit(null);
       setRecordOrigin(fromKit ? 'kit' : 'records');
       setView('list');
+      focusDetail();
     } catch (err) {
       setError(err.message || 'Could not load this record.');
     }
@@ -495,31 +519,43 @@ export default function FeedTheSoilManagerView() {
     }
   };
 
+  // Kits, fifteen to a page.
+  const kitSort = useSortable(kits, KIT_SORT);
+  const kitPage = usePaged(kitSort.rows, TABLE_PAGE_SIZE, `${kitSearch}|${kits.length}|${kitSort.sort?.key}|${kitSort.sort?.dir}`);
+  // Records, fifteen to a page.
+  const recordSort = useSortable(records, RECORD_SORT);
+  const recordPage = usePaged(recordSort.rows, TABLE_PAGE_SIZE, `${recordSearch}|${records.length}|${recordSort.sort?.key}|${recordSort.sort?.dir}`);
+  // The page's main action follows the tab, and only on the list itself.
+  const onList = view === 'list' && !selectedKit && !selectedRecord;
+  const headerAction = !onList ? null : tab === 'kits' ? (
+    <Button type="button" onClick={() => go('assign')}>
+      <Plus /> Assign a kit
+    </Button>
+  ) : (
+    <Button type="button" onClick={() => { setFormError(null); go('logPickKit'); }}>
+      <Plus /> Log a collection
+    </Button>
+  );
+
   return (
-    <main className="mx-auto w-full max-w-5xl px-4 py-6">
-      <h1 className="text-2xl font-medium">Feed the Soil</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Collection kits assigned to community members and the compost logged against each one.
-        The Impact Calculator's compost figure comes straight from what's logged here.
-      </p>
+    <PageShell>
+      <PageHeader
+        title="Feed the Soil"
+        description="Assign compost kits to households and log the compost collected."
+        actions={headerAction}
+      />
 
-      {error ? <div className="mt-4"><ErrorBanner message={error} onRetry={tab === 'kits' ? loadKits : loadRecords} /></div> : null}
+      <ErrorBanner className="mt-4" message={error} onRetry={tab === 'kits' ? loadKits : loadRecords} />
 
-      <div className="mt-5 flex gap-1 border-b">
-        {TABS.map((t) => (
-          <button
-            key={t.id} type="button"
-            onClick={() => { setTab(t.id); setView('list'); setSelectedKit(null); setSelectedRecord(null); }}
-            className={t.id === tab
-              ? 'border-b-2 border-foreground px-4 py-2 text-sm font-medium'
-              : 'px-4 py-2 text-sm text-muted-foreground'}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <ViewTabs
+        className="mt-5"
+        label="Feed the Soil views"
+        value={tab}
+        onChange={(id) => { setTab(id); setView('list'); setSelectedKit(null); setSelectedRecord(null); }}
+        tabs={TABS}
+      />
 
-      <div className="mt-6 space-y-6">
+      <div ref={detailRef} tabIndex={-1} className="mt-6 space-y-6 scroll-mt-6 outline-none">
         {view === 'assign' ? (
           <AssignKitPanel busy={busy} error={formError} onSubmit={assignKit} onCancel={() => { setView('list'); setFormError(null); }} />
         ) : view === 'log' && selectedKit ? (
@@ -527,7 +563,7 @@ export default function FeedTheSoilManagerView() {
         ) : view === 'logPickKit' ? (
           <LogPickKitPanel
             kits={kits} isLoading={isLoading} search={kitSearch} onSearch={setKitSearch}
-            onPick={(kit) => { setSelectedKit(kit); setFormError(null); setView('log'); }}
+            onPick={(kit) => { setSelectedKit(kit); setFormError(null); go('log'); }}
             onCancel={() => { setView('list'); setFormError(null); }}
           />
         ) : view === 'dispatch' && selectedRecord ? (
@@ -539,7 +575,7 @@ export default function FeedTheSoilManagerView() {
         ) : selectedRecord ? (
           <RecordDetail
             record={selectedRecord}
-            onDispatch={() => { setFormError(null); setView('dispatch'); }}
+            onDispatch={() => { setFormError(null); go('dispatch'); }}
             onOpenKit={openKit}
             onClose={closeRecord}
             backLabel={recordOrigin === 'kit' ? 'Back to kit' : 'Back to records'}
@@ -547,112 +583,90 @@ export default function FeedTheSoilManagerView() {
         ) : selectedKit ? (
           <KitDetail
             kit={selectedKit}
-            onLogCompost={() => setView('log')}
+            onLogCompost={() => go('log')}
             onOpenRecord={(id) => openRecord(id, { fromKit: true })}
             onClose={() => { setSelectedKit(null); loadKits(); }}
           />
         ) : tab === 'kits' ? (
-          <>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="relative flex-1 min-w-56">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  className="pl-8" placeholder="Search by owner or suburb"
-                  value={kitSearch} onChange={(e) => setKitSearch(e.target.value)}
-                />
-              </div>
-              <Button type="button" onClick={() => setView('assign')}>
-                <Plus /> Assign a kit
-              </Button>
-            </div>
-
+          <ListCard
+            header={<ListToolbar search={{ value: kitSearch, onChange: setKitSearch, placeholder: 'Search by owner or suburb' }} />}
+            footer={!isLoading && kits.length ? <TablePager {...kitPage} noun="kits" alwaysShow /> : null}
+          >
             {isLoading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-24 w-full" />
+              <div className="space-y-2 p-4" aria-busy="true">
+                {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
               </div>
             ) : kits.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No kits match.</p>
+              <EmptyState
+                icon={Sprout}
+                title={kitSearch ? 'No kits match' : 'No kits assigned yet'}
+                description={kitSearch ? 'Nothing matches the search.' : 'Assign a kit to a community member to start.'}
+              />
             ) : (
-              <Card>
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Kit</TableHead>
-                        <TableHead>Owner</TableHead>
-                        <TableHead>Suburb</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Last logged</TableHead>
-                        <TableHead>Assigned</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {kits.map((k) => (
-                        <TableRow key={k.id} className="cursor-pointer" onClick={() => openKit(k.id)}>
-                          <TableCell className="font-medium">{formatKitCode(k.id)}</TableCell>
-                          <TableCell>{k.owner_name}</TableCell>
-                          <TableCell className="text-muted-foreground">{k.suburb || '—'}</TableCell>
-                          <TableCell><StatusBadge status={k.status} /></TableCell>
-                          <TableCell className="text-muted-foreground">{fmtDate(k.last_logged_at)}</TableCell>
-                          <TableCell className="text-muted-foreground">{fmtDate(k.assigned_at)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <SortableHead label="Kit" sortKey="kit" sort={kitSort.sort} onSort={kitSort.toggle} />
+                <SortableHead label="Owner" sortKey="owner" sort={kitSort.sort} onSort={kitSort.toggle} />
+                <SortableHead label="Suburb" sortKey="suburb" sort={kitSort.sort} onSort={kitSort.toggle} />
+                <SortableHead label="Status" sortKey="status" sort={kitSort.sort} onSort={kitSort.toggle} />
+                <SortableHead label="Last logged" sortKey="lastLogged" sort={kitSort.sort} onSort={kitSort.toggle} />
+                <SortableHead label="Assigned" sortKey="assigned" sort={kitSort.sort} onSort={kitSort.toggle} />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {kitPage.slice.map((k) => (
+                <TableRow key={k.id} className="cursor-pointer" onClick={() => openKit(k.id)}>
+                  <TableCell className="font-medium">{formatKitCode(k.id)}</TableCell>
+                  <TableCell>{k.owner_name}</TableCell>
+                  <TableCell className="text-muted-foreground">{k.suburb || '—'}</TableCell>
+                  <TableCell><KitStatus status={k.status} /></TableCell>
+                  <TableCell className="text-muted-foreground">{fmtDate(k.last_logged_at)}</TableCell>
+                  <TableCell className="text-muted-foreground">{fmtDate(k.assigned_at)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
             )}
-          </>
+          </ListCard>
         ) : (
-          <>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="relative flex-1 min-w-56">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  className="pl-8" placeholder="Search by owner or suburb"
-                  value={recordSearch} onChange={(e) => setRecordSearch(e.target.value)}
-                />
-              </div>
-              <Button type="button" onClick={() => { setFormError(null); setView('logPickKit'); }}>
-                <Plus /> Log a collection
-              </Button>
-            </div>
-
+          <ListCard
+            header={<ListToolbar search={{ value: recordSearch, onChange: setRecordSearch, placeholder: 'Search by owner or suburb' }} />}
+            footer={!isLoading && records.length ? <TablePager {...recordPage} noun="records" alwaysShow /> : null}
+          >
             {isLoading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-24 w-full" />
+              <div className="space-y-2 p-4" aria-busy="true">
+                {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
               </div>
             ) : records.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No compost has been logged yet.</p>
+              <EmptyState
+                icon={Sprout}
+                title={recordSearch ? 'No records match' : 'No compost logged yet'}
+                description={recordSearch ? 'Nothing matches the search.' : 'Log a collection against a kit when compost comes in.'}
+              />
             ) : (
-              <Card>
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Kit</TableHead>
-                        <TableHead>Owner</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {records.map((r) => (
-                        <TableRow key={r.id} className="cursor-pointer" onClick={() => openRecord(r.id)}>
-                          <TableCell className="font-medium">{formatKitCode(r.kit_id)}</TableCell>
-                          <TableCell className="text-muted-foreground">{r.owner_name}{r.suburb ? ` · ${r.suburb}` : ''}</TableCell>
-                          <TableCell><StatusBadge status={r.status} /></TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <SortableHead label="Kit" sortKey="kit" sort={recordSort.sort} onSort={recordSort.toggle} />
+                <SortableHead label="Owner" sortKey="owner" sort={recordSort.sort} onSort={recordSort.toggle} />
+                <SortableHead label="Status" sortKey="status" sort={recordSort.sort} onSort={recordSort.toggle} />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {recordPage.slice.map((r) => (
+                <TableRow key={r.id} className="cursor-pointer" onClick={() => openRecord(r.id)}>
+                  <TableCell className="font-medium">{formatKitCode(r.kit_id)}</TableCell>
+                  <TableCell className="text-muted-foreground">{r.owner_name}{r.suburb ? ` · ${r.suburb}` : ''}</TableCell>
+                  <TableCell><KitStatus status={r.status} /></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
             )}
-          </>
+          </ListCard>
         )}
       </div>
-    </main>
+    </PageShell>
   );
 }

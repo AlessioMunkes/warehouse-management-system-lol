@@ -99,9 +99,16 @@ export const toPurchaseOrder = (row) => ({
   expectedDeliveryDate: row.expected_delivery_date ?? null,
   notes:                row.notes ?? "",
   quickbooksPoId:       row.quickbooks_po_id ?? "",
+  // Detail only. financeEmailError is already a short safe message
+  // from the server (never raw provider text).
+  financeEmailStatus:      row.finance_email_status ?? null,
+  financeEmailError:       row.finance_email_error ?? "",
+  financeEmailAttemptedAt: row.finance_email_attempted_at ?? null,
   createdByName:        row.created_by_name ?? "",
   createdAt:            row.created_at ?? null,
   lineCount:            Number(row.line_count ?? 0),
+  // Lines whose full expected quantity has arrived (list only).
+  receivedLineCount:    Number(row.received_line_count ?? 0),
   estimatedValue:       Number(row.estimated_value ?? 0),
   receiptCount:         Number(row.receipt_count ?? 0),
   items:                (row.items ?? []).map(toLine),
@@ -109,10 +116,13 @@ export const toPurchaseOrder = (row) => ({
 });
 
 // ── GET /api/purchase-orders ──────────────────────────────────
-export const getPurchaseOrders = async ({ status = "", supplierId = null } = {}) => {
+// `limit` (1-500): the list page asks for 500 and counts its tabs from
+// what comes back; the server's default is 50.
+export const getPurchaseOrders = async ({ status = "", supplierId = null, limit = null } = {}) => {
   const params = new URLSearchParams();
   if (status) params.set("status", status);
   if (supplierId) params.set("supplierId", String(supplierId));
+  if (limit) params.set("limit", String(limit));
   const qs = params.toString();
   const body = await apiGet(`/api/purchase-orders${qs ? `?${qs}` : ""}`);
   return (body.data ?? []).map(toPurchaseOrder);
@@ -158,6 +168,27 @@ export const setQuickbooksReference = async (id, quickbooksPoId) => {
   return toPurchaseOrder(body.data ?? {});
 };
 
+// ── POST /api/purchase-orders/quickbooks-import/{preview,apply} ─
+// pairs: [{ poNumber, quickbooksNumber, overwrite? }], up to 500.
+// Both answer { rows, counts } with one row per pair, in order.
+export const previewQuickbooksImport = async (pairs) => {
+  const body = await apiPost("/api/purchase-orders/quickbooks-import/preview", { pairs });
+  return body.data ?? { rows: [], counts: {} };
+};
+
+export const applyQuickbooksImport = async (pairs) => {
+  const body = await apiPost("/api/purchase-orders/quickbooks-import/apply", { pairs });
+  return body.data ?? { rows: [], counts: {} };
+};
+
+// ── POST /api/purchase-orders/:id/finance-email/resend ──────────
+// Re-sends the new-PO email to Finance; resolves to the PO with the
+// status the attempt left behind.
+export const resendFinanceEmail = async (id) => {
+  const body = await apiPost(`/api/purchase-orders/${id}/finance-email/resend`, {});
+  return toPurchaseOrder(body.data ?? {});
+};
+
 // ── PUT /api/purchase-orders/:id ────────────────────────────────
 // Same 400 carrying missingProductIds as createPurchaseOrder — the
 // server validates an edit exactly as hard as a fresh order.
@@ -181,5 +212,6 @@ export const deletePurchaseOrder = async (id) => {
 export default {
   getPurchaseOrders, getPurchaseOrder, createPurchaseOrder,
   setPurchaseOrderStatus, approvePurchaseOrder, setQuickbooksReference,
-  updatePurchaseOrder, deletePurchaseOrder,
+  updatePurchaseOrder, deletePurchaseOrder, resendFinanceEmail,
+  previewQuickbooksImport, applyQuickbooksImport,
 };

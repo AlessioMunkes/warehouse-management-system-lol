@@ -42,7 +42,7 @@ const VOLUNTEER_COLUMNS = `
   END AS minutes_on_site`;
 
 // from/to are inclusive SAST dates; either may be null.
-const listGuestLog = async ({ search = null, from = null, to = null, limit = 500 } = {}) => {
+const listGuestLog = async ({ search = null, from = null, to = null, limit = 500, offset = 0 } = {}) => {
   const params = [];
   const where  = [];
 
@@ -59,19 +59,18 @@ const listGuestLog = async ({ search = null, from = null, to = null, limit = 500
     where.push(`(v.signed_in_at ${SAST})::date <= $${params.length}::date`);
   }
 
-  // Capped rather than paginated. This table grows by a handful of rows
-  // a day and 500 is roughly a year of arrivals; a LIMIT keeps one bad
-  // query from pulling the whole table into memory, and the date
-  // filters are the real way to narrow it. If it ever outgrows that,
-  // the cap is the thing that will say so.
-  params.push(limit);
+  // Paged: the screen asks for a batch at a time (limit / offset) and
+  // for the next one when the person pages past the last it has. With
+  // no limit it is the latest 500, which is what the dashboard's
+  // "signed in now" count reads.
+  params.push(limit, offset);
 
   const { rows } = await pool.query(
     `SELECT ${VOLUNTEER_COLUMNS}
        FROM volunteers v
       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-      ORDER BY v.signed_in_at DESC
-      LIMIT $${params.length}`,
+      ORDER BY v.signed_in_at DESC, v.id DESC
+      LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params,
   );
   return rows;

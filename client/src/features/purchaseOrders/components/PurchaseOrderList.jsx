@@ -15,30 +15,35 @@
 // what the row looked like it did anyway — and a button in its own
 // column was costing width the estimated value needed.
 // ─────────────────────────────────────────────────────────────
+import { ShoppingCart } from 'lucide-react';
 import MasterDataTable from '@/features/masterdata/components/MasterDataTable';
+import EmptyState from '@/components/ui/empty-state';
 
 export default function PurchaseOrderList({
-  purchaseOrders, selectedId, onSelect, columns, sort, onToggleSort,
+  purchaseOrders, selectedId, onSelect, onIntent, columns, sort, onToggleSort,
 }) {
   if (!purchaseOrders.length) {
     return (
-      <p className="py-8 text-center text-sm text-muted-foreground">
-        No purchase orders match this filter.
-      </p>
+      <EmptyState
+        icon={ShoppingCart}
+        title="No purchase orders here"
+        description="No order matches this view and search."
+      />
     );
   }
 
   return (
-    <div className="rounded-[4px] border-2">
-      <MasterDataTable
+    // Bare: the page's ListCard is the card, with the toolbar above.
+    <MasterDataTable
         columns={columns}
         rows={purchaseOrders}
         sort={sort}
         onToggleSort={onToggleSort}
         onOpenRow={(po) => onSelect(po.id)}
+        onRowIntent={onIntent ? (po) => onIntent(po.id) : undefined}
         // Keeps the selected-row highlight the detail panel relies on.
         rowAttrs={(po) => (po.id === selectedId ? { 'data-state': 'selected' } : {})}
+        noun="orders"
       />
-    </div>
   );
 }

@@ -71,7 +71,7 @@ warehouse.installWarehouseFetch();
 const api = await import('../services/api');
 const outbox = await import('../services/outbox');
 const { AuthProvider, useAuth } = await import('../context/AuthContext');
-const { default: WarehouseSwitcher } = await import('../features/taskdashboard/components/WarehouseSwitcher');
+const { default: WarehouseSwitcher } = await import('../components/layout/WarehouseSwitcher');
 const { default: GuestLoginPage } = await import('../pages/GuestLoginPage');
 
 const CPT = { code: 'cpt', name: 'Cape Town' };
@@ -305,12 +305,12 @@ describe('GuestLoginPage', () => {
   it('asks which warehouse, and signs in there', async () => {
     respond = server(true);
     renderGuestPage('/guest');
-    const select = await screen.findByLabelText('WAREHOUSE');
-    fireEvent.change(screen.getByLabelText('FULL NAME'), { target: { value: 'Thabo' } });
-    fireEvent.click(screen.getByRole('button', { name: 'LOGIN' }));
-    expect(await screen.findByText(/CHOOSE THE WAREHOUSE/)).toBeInTheDocument();
+    const select = await screen.findByLabelText('Warehouse');
+    fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Thabo' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    expect(await screen.findByText(/Choose the warehouse/)).toBeInTheDocument();
     fireEvent.change(select, { target: { value: 'gauteng' } });
-    fireEvent.click(screen.getByRole('button', { name: 'LOGIN' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     await screen.findByTestId('home');
     expect(sent.find((c) => c.url === '/api/volunteers/sign-in').warehouse).toBe('gauteng');
   });
@@ -319,9 +319,9 @@ describe('GuestLoginPage', () => {
     respond = server(true);
     renderGuestPage('/guest?w=gauteng');
     await waitFor(() => expect(sent.some((c) => c.url === '/api/public/warehouses')).toBe(true));
-    expect(screen.queryByLabelText('WAREHOUSE')).toBeNull();
-    fireEvent.change(screen.getByLabelText('FULL NAME'), { target: { value: 'Thabo' } });
-    fireEvent.click(screen.getByRole('button', { name: 'LOGIN' }));
+    expect(screen.queryByLabelText('Warehouse')).toBeNull();
+    fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Thabo' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     await screen.findByTestId('home');
     expect(sent.find((c) => c.url === '/api/volunteers/sign-in').warehouse).toBe('gauteng');
   });
@@ -330,9 +330,9 @@ describe('GuestLoginPage', () => {
     respond = server(false);
     renderGuestPage('/guest');
     await waitFor(() => expect(sent.some((c) => c.url === '/api/public/warehouses')).toBe(true));
-    expect(screen.queryByLabelText('WAREHOUSE')).toBeNull();
-    fireEvent.change(screen.getByLabelText('FULL NAME'), { target: { value: 'Thabo' } });
-    fireEvent.click(screen.getByRole('button', { name: 'LOGIN' }));
+    expect(screen.queryByLabelText('Warehouse')).toBeNull();
+    fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Thabo' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     await screen.findByTestId('home');
     expect(sent.find((c) => c.url === '/api/volunteers/sign-in').warehouse).toBeNull();
   });

@@ -2,15 +2,13 @@
 // server/src/routes/picking.routes.js
 // ─────────────────────────────────────────────────────────────
 import express                            from 'express';
-import auth, { requireRole, ROLES }       from '../middleware/auth.middleware.js';
+import auth, { requireRole } from '../middleware/auth.middleware.js';
+import { ALL_STAFF, MANAGERS_UP, WORKERS_ONLY } from '../constants/permissions.js';
 import { validateIntId, validateIntParam } from '../middleware/validate.middleware.js';
 import pickingController                  from '../controllers/picking.controller.js';
 
 const router = express.Router();
 
-const ALL_ROLES    = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
-const PACKERS_UP    = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN]; // actually claim/pack/complete slips
-const MANAGERS_UP   = [ROLES.MANAGER, ROLES.ADMIN];               // generate/create slips
 
 // ── Static paths before /:id to prevent shadowing ────────────
 // generateSlips is also re-checked for manager role inside the service
@@ -21,30 +19,38 @@ router.post('/generate', auth, requireRole(...MANAGERS_UP), pickingController.ge
 router.get('/workers',   auth, requireRole(...MANAGERS_UP), pickingController.getAssignableWorkers);
 
 // ── Collection ────────────────────────────────────────────────
-router.get('/',  auth, requireRole(...ALL_ROLES),    pickingController.getSlips);
-router.post('/', auth, requireRole(...MANAGERS_UP),  pickingController.createSlip); // ad-hoc slip, manager only — same reasoning as /generate above
+router.get('/',  auth, requireRole(...ALL_STAFF),    pickingController.getSlips);
+router.post('/', auth, requireRole(...MANAGERS_UP),  pickingController.createSlip); // "Create a new slip", manager only — same reasoning as /generate above
 
 // ── Single slip ───────────────────────────────────────────────
-router.get('/:id',           auth, requireRole(...ALL_ROLES),  validateIntId, pickingController.getSlipById);
-router.post('/:id/assign',   auth, requireRole(...PACKERS_UP), validateIntId, pickingController.assignSlip);
+router.get('/:id',           auth, requireRole(...ALL_STAFF),  validateIntId, pickingController.getSlipById);
+// Manager only, and only while the slip is still pending (enforced in
+// the service/repository) — dispatch date, cohort, and/or the whole
+// product-line list. See PickingSlipManagementPage.jsx.
+router.patch('/:id',         auth, requireRole(...MANAGERS_UP), validateIntId, pickingController.editSlip);
+router.post('/:id/assign',   auth, requireRole(...ALL_STAFF), validateIntId, pickingController.assignSlip);
 // Manager-only, enforced in the service (matches the pattern of
 // packerId in /assign being manager-effective only) — the route
-// itself stays PACKERS_UP so a non-manager gets the service's own
+// itself stays ALL_STAFF so a non-manager gets the service's own
 // 403 message rather than a generic route-level one.
-router.post('/:id/assign-second', auth, requireRole(...PACKERS_UP), validateIntId, pickingController.addSecondPacker);
-router.post('/:id/complete', auth, requireRole(...PACKERS_UP), validateIntId, pickingController.completeSlip);
+router.post('/:id/assign-second', auth, requireRole(...ALL_STAFF), validateIntId, pickingController.addSecondPacker);
+// Manager-only, gated at the route since there's no packer-effective
+// fallback here the way /assign has — releasing is a floor-management
+// call, not something a packer ever does to their own claim.
+router.post('/:id/release',  auth, requireRole(...MANAGERS_UP), validateIntId, pickingController.releaseSlip);
+router.post('/:id/complete', auth, requireRole(...WORKERS_ONLY), validateIntId, pickingController.completeSlip);
 
 // ── Slip items ────────────────────────────────────────────────
 // Both params are validated. :itemId used to be left unchecked, so a
 // non-numeric item id travelled all the way to Postgres and came back
 // as a 500; validateIntParam('itemId') stops it at the door with a 400.
 router.post('/:id/items/:itemId/confirm',
-  auth, requireRole(...PACKERS_UP),
+  auth, requireRole(...WORKERS_ONLY),
   validateIntId, validateIntParam('itemId'),
   pickingController.confirmItem
 );
 router.post('/:id/items/:itemId/flag',
-  auth, requireRole(...PACKERS_UP),
+  auth, requireRole(...WORKERS_ONLY),
   validateIntId, validateIntParam('itemId'),
   pickingController.flagItem
 );

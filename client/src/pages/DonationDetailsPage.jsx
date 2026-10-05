@@ -2,20 +2,10 @@
 // src/pages/DonationDetailsPage.jsx
 // Route: /donations/new
 //
-// Page 1 of 2. Step indicator restored — this page still leads to a
-// separate Review page (step 2). Category selector removed (search-
-// driven item classification instead, handled inside
-// DonationItemsList). Donor fields conditionally rendered based on
-// consent, not just disabled.
-//
-// Wrapped in the real StaffShell component, not a hand-rolled
-// .stf-shell div: this page used to build its own bare markup, which
-// has no app bar, no drawer, and — the actual bug report — no bottom
-// tab bar (StaffTabBar lives inside StaffShell). Donation Intake has
-// no separate manager view (see routes/paths.js's DONATION_INTAKE_ROLES
-// comment — worker, manager and admin all use this same form), so
-// unlike FeedTheSoilPage/DecantingPage there's no role branch here:
-// StaffShell applies unconditionally.
+// Donation intake, page 1 of 2: the donor's details (shown depending on
+// consent) and the items, classified by searching the product list. Leads
+// to the review page. Used by warehouse workers and admins, inside
+// StaffShell so the tab bar is there.
 // ─────────────────────────────────────────────────────────────
 import { useNavigate, useLocation } from "react-router-dom";
 import { useRef, useState, useEffect } from "react";

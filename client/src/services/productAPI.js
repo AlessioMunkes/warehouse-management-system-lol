@@ -63,6 +63,12 @@ export const toProduct = (row) => ({
   unitCost:         row.unit_cost === null || row.unit_cost === undefined
                       ? null
                       : Number(row.unit_cost),
+  // Null means "no ratio set for this product" — drives the "meals to
+  // serve" calculator on Create Slip (PickingSlipManagementPage.jsx).
+  // Same null-survives guard as weightKg/unitCost above.
+  quantityPerMeal:  row.quantity_per_meal === null || row.quantity_per_meal === undefined
+                      ? null
+                      : Number(row.quantity_per_meal),
 });
 
 export const getProducts = async ({ includeInactive = false, search = "" } = {}) => {

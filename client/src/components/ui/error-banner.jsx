@@ -1,4 +1,4 @@
-﻿// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
 // client/src/components/ui/error-banner.jsx
 //
 // A load or save that failed, said above the content it is about, with
@@ -32,4 +32,3 @@ export default function ErrorBanner({ message, onRetry, className }) {
     </div>
   );
 }
-

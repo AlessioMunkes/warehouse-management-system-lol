@@ -16,12 +16,17 @@
 import repo from '../repositories/purchaseOrder.repository.js';
 import { isPositiveInt, isValidDateString } from '../utils/validation.js';
 import { PO_STATUSES as PO_STATUS_LIST } from '../constants/purchaseOrderStatus.js';
-import emailProvider from '../providers/email.provider.js';
+import communications from '../features/communications/communications.service.js';
+import notices from '../features/communications/notices.js';
 import { emailStyles, escapeHtml, renderLadlesEmail } from '../utils/emailTemplate.js';
 // The Finance recipient managers save in the app (finance_report_email_settings).
 // Replaced financeEmailFallback.service.js, which read FINANCE_EMAIL until
 // feature/notification-fix brought this service onto staging.
 import financeService from './finance.service.js';
+import { FINANCE_EMAIL_ERRORS, safeFinanceEmailError } from '../utils/financeEmailError.js';
+import {
+  MAX_IMPORT_ROWS, tooManyRowsMessage, normalizePair, findDuplicateIndexes,
+} from '../utils/quickbooksImport.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -204,7 +209,7 @@ ${textLines}
 
 Total: ${money(total)}
 
-Please capture this purchase order in QuickBooks, then enter the QuickBooks reference back into the WMS against ${purchaseOrder.po_number}.`;
+Capture this order in QuickBooks and type ${purchaseOrder.po_number} into the QuickBooks PO's Memo field. The system links the two automatically from your QuickBooks export.`;
 
   const rows = purchaseOrder.items.map((item) => `
     <tr>
@@ -234,7 +239,7 @@ Please capture this purchase order in QuickBooks, then enter the QuickBooks refe
           <td style="${emailStyles.td}text-align:right;font-weight:700;">${escapeHtml(money(total))}</td>
         </tr></tfoot>
       </table>
-      <p style="${emailStyles.note}">Please capture this purchase order in QuickBooks, then enter the QuickBooks reference back into the WMS against <strong>${escapeHtml(purchaseOrder.po_number)}</strong>.</p>
+      <p style="${emailStyles.note}">Capture this order in QuickBooks and type <strong>${escapeHtml(purchaseOrder.po_number)}</strong> into the QuickBooks PO's Memo field. The system links the two automatically from your QuickBooks export.</p>
     `,
   });
   return { subject, text, html };
@@ -248,31 +253,65 @@ Please capture this purchase order in QuickBooks, then enter the QuickBooks refe
 // A stubbed result (EMAIL_ENABLED=false) is treated the same as no
 // recipient configured: nothing actually left the building, so no
 // status is recorded rather than falsely claiming 'sent'.
-const notifyFinance = async (purchaseOrder) => {
-  const { recipientEmail } = await financeService.getEmailSettings();
-  if (!recipientEmail) return; // nothing configured — leave status null, no attempt logged
+//
+// Returns what happened: 'no_recipient' | 'stubbed' | 'sent' | 'failed'
+// | 'in_progress' (another send for this PO is already running). Only
+// 'sent' and 'failed' touch the status columns.
+//
+// What is stored is a short safe message (utils/financeEmailError.js),
+// never the raw provider text; the raw text goes to the server log.
+//
+// One send per PO at a time: the create-time send and a Resend click
+// cannot overlap and race each other's status write. The flag is
+// always cleared in finally.
+const sendsInFlight = new Set();
 
-  const { subject, text, html } = buildFinanceEmail(purchaseOrder);
-
-  let result;
+const notifyFinance = async (purchaseOrder, sentBy = null) => {
+  if (sendsInFlight.has(purchaseOrder.id)) return 'in_progress';
+  sendsInFlight.add(purchaseOrder.id);
   try {
-    result = await emailProvider.sendEmail({ to: recipientEmail, subject, text, html }, null);
-  } catch (err) {
+    const { recipientEmail } = await financeService.getEmailSettings();
+    if (!recipientEmail) return 'no_recipient'; // nothing configured — status left as is, no attempt logged
+
+    const { subject, text, html } = buildFinanceEmail(purchaseOrder);
+
+    let result;
+    try {
+      // Through the communications module so the send lands in message
+      // history. It returns the provider's reply unchanged, so the
+      // result handling below is the same as before.
+      result = await communications.send({
+        type: 'purchase_order_finance',
+        to: recipientEmail, subject, text, html,
+        related: { type: 'purchase_order', id: purchaseOrder.id },
+        sentBy,
+        sendAs: null,
+      });
+    } catch (err) {
+      console.error('[purchaseOrder:financeEmail]', err.message);
+      await repo.recordFinanceEmailAttempt(purchaseOrder.id, {
+        status: 'failed',
+        error: safeFinanceEmailError(err.message) ?? FINANCE_EMAIL_ERRORS.generic,
+        attemptedAt: new Date(),
+      });
+      return 'failed';
+    }
+
+    if (result?.stubbed) return 'stubbed'; // EMAIL_ENABLED=false — no real attempt was made
+
+    const sent = result?.sent === true;
+    if (!sent) {
+      console.error('[purchaseOrder:financeEmail]', result?.error || result?.reason || 'Provider reported a failure.');
+    }
     await repo.recordFinanceEmailAttempt(purchaseOrder.id, {
-      status: 'failed',
-      error: err.message || 'Finance email send failed.',
+      status: sent ? 'sent' : 'failed',
+      error: sent ? null : (safeFinanceEmailError(result?.error || result?.reason) ?? FINANCE_EMAIL_ERRORS.generic),
       attemptedAt: new Date(),
     });
-    return;
+    return sent ? 'sent' : 'failed';
+  } finally {
+    sendsInFlight.delete(purchaseOrder.id);
   }
-
-  if (result?.stubbed) return; // EMAIL_ENABLED=false — no real attempt was made
-
-  await repo.recordFinanceEmailAttempt(purchaseOrder.id, {
-    status: result?.sent === true ? 'sent' : 'failed',
-    error: result?.sent === true ? null : (result?.error || result?.reason || 'Provider reported a failure.'),
-    attemptedAt: new Date(),
-  });
 };
 
 // ── Create ────────────────────────────────────────────────────
@@ -302,20 +341,28 @@ const createPurchaseOrder = async (body, userId) => {
     throw fail(500, 'Failed to create the purchase order.');
   }
 
-  // Sent after commit, never before. Wrapped so a Gmail outage can
-  // never turn a created PO into a failed API response — notifyFinance
-  // already never throws, this is belt-and-braces.
-  try {
-    await notifyFinance(result.purchaseOrder);
-  } catch {
-    /* notifyFinance records its own failure; nothing more to do here */
-  }
+  // Fire-and-forget, after commit. setImmediate runs it after the
+  // controller has sent the response, so Gmail's latency (or an outage)
+  // never delays or fails the create. The send writes its own status
+  // once the attempt resolves; the catch keeps any error from becoming
+  // an unhandled rejection.
+  const created = result.purchaseOrder;
+  setImmediate(() => {
+    notifyFinance(created, userId).catch((err) => {
+      console.error('[purchaseOrder:financeEmail]', err.message);
+    });
+  });
 
-  return result.purchaseOrder;
+  return created;
 };
 
 // ── Read ──────────────────────────────────────────────────────
-const listPurchaseOrders = async ({ status, supplierId } = {}) => {
+// The list page counts its tabs from what it fetched, so it asks for
+// more than the repository's default of 50. Capped: an unbounded limit
+// from a query string is a full-table read on request.
+const MAX_LIST_LIMIT = 500;
+
+const listPurchaseOrders = async ({ status, supplierId, limit } = {}) => {
   const cleanStatus = clean(status);
   if (cleanStatus && !PO_STATUS_LIST.includes(cleanStatus)) {
     throw fail(400, `Unknown status filter "${cleanStatus}".`);
@@ -325,9 +372,14 @@ const listPurchaseOrders = async ({ status, supplierId } = {}) => {
     throw fail(400, 'A valid supplier ID is required.');
   }
 
+  if (limit !== undefined && limit !== null && limit !== ''
+      && (!isPositiveInt(limit) || Number(limit) > MAX_LIST_LIMIT)) {
+    throw fail(400, `Limit must be a whole number from 1 to ${MAX_LIST_LIMIT}.`);
+  }
   return repo.listPurchaseOrders({
     status:     cleanStatus,
     supplierId: isPositiveInt(supplierId) ? Number(supplierId) : null,
+    ...(isPositiveInt(limit) ? { limit: Number(limit) } : {}),
   });
 };
 
@@ -360,12 +412,19 @@ const setPurchaseOrderStatus = async (rawId, body = {}) => {
   if (status === 'returned' && !reason) {
     throw fail(400, 'A reason is required when marking a purchase order as returned.');
   }
+  // A follow-up is a note to whoever picks it up next; without one it
+  // says only that something is wrong.
+  if (status === 'follow_up_required' && !reason) {
+    throw fail(400, 'Say what needs following up when marking a purchase order for follow-up.');
+  }
 
   const existing = await repo.getPurchaseOrderById(Number(rawId));
   if (!existing) throw fail(404, 'Purchase order not found.');
   if (existing.status === status) return existing;
 
-  return repo.updatePurchaseOrderStatus(Number(rawId), status, reason);
+  return repo.updatePurchaseOrderStatus(Number(rawId), status, reason, {
+    beforeCommit: notices.purchaseOrderNeedsAttention,
+  });
 };
 
 // ── QuickBooks reference ─────────────────────────────────────
@@ -385,6 +444,98 @@ const setQuickbooksReference = async (rawId, body = {}, actorId) => {
 
   const found = await repo.setQuickbooksReference(id, quickbooksPoId, actorId);
   if (!found) throw fail(404, 'Purchase order not found.');
+
+  return repo.getPurchaseOrderById(id);
+};
+
+// ── QuickBooks links import ──────────────────────────────────
+// The client reads the file and finds the pairs; these two endpoints
+// only look up and fill in links. Nothing here creates or deletes a PO.
+// Rows that can't be trusted are given a status and left out of the
+// database round trip — a row's status never depends on a guess.
+const DUPLICATE_MESSAGE =
+  'This PO number or QuickBooks number appears in more than one row. Nothing is linked for it.';
+
+const prepareImportPairs = (body) => {
+  const raw = body?.pairs;
+  if (!Array.isArray(raw) || raw.length === 0) {
+    throw fail(400, 'Choose a file with at least one PO number in it.');
+  }
+  if (raw.length > MAX_IMPORT_ROWS) throw fail(400, tooManyRowsMessage(raw.length));
+
+  const normalized = raw.map((r) => ({ ...normalizePair(r), overwrite: r?.overwrite === true }));
+  const valid = normalized.filter((n) => !n.invalid);
+  const dupes = findDuplicateIndexes(valid);
+  const checked = valid.filter((_, i) => !dupes.has(i));
+  return { normalized, valid, dupes, checked };
+};
+
+// Walks the submitted order and slots each outcome back in.
+const mergeImportResults = (prepared, checkedResults) => {
+  const byPair = new Map(prepared.checked.map((p, i) => [p, checkedResults[i]]));
+  const dupePairs = new Set([...prepared.dupes].map((i) => prepared.valid[i]));
+  return prepared.normalized.map((n) => {
+    const base = { poNumber: n.poNumber, quickbooksNumber: n.quickbooksNumber };
+    if (n.invalid) return { ...base, status: 'invalid', message: n.invalid };
+    if (dupePairs.has(n)) return { ...base, status: 'duplicate', message: DUPLICATE_MESSAGE };
+    const { poId, displacedPoId, ...outcome } = byPair.get(n); // internal ids stay server-side
+    return { ...base, ...outcome };
+  });
+};
+
+const countByStatus = (rows) => rows.reduce((acc, r) => {
+  acc[r.status] = (acc[r.status] ?? 0) + 1;
+  return acc;
+}, {});
+
+const previewQuickbooksImport = async (body = {}) => {
+  const prepared = prepareImportPairs(body);
+  const checkedResults = prepared.checked.length
+    ? await repo.previewQuickbooksLinks(prepared.checked)
+    : [];
+  const rows = mergeImportResults(prepared, checkedResults);
+  return { rows, counts: countByStatus(rows) };
+};
+
+const applyQuickbooksImport = async (body = {}, actorId) => {
+  const prepared = prepareImportPairs(body);
+  let checkedResults = [];
+  if (prepared.checked.length) {
+    try {
+      checkedResults = await repo.applyQuickbooksLinks(prepared.checked, actorId);
+    } catch (err) {
+      // Someone linked one of these numbers between our check and our
+      // write. The transaction has rolled back, so nothing was changed.
+      if (err?.code === '23505') {
+        throw fail(409, 'A QuickBooks number was linked by someone else while this ran. Nothing was changed. Preview the file again.');
+      }
+      throw err;
+    }
+  }
+  const rows = mergeImportResults(prepared, checkedResults);
+  return { rows, counts: countByStatus(rows) };
+};
+
+// ── Resend the Finance email ─────────────────────────────────
+// Same send + status-write path as creation. Returns the PO as it now
+// stands, so the caller sees the status the attempt left behind.
+const resendFinanceEmail = async (rawId, userId = null) => {
+  if (!isPositiveInt(rawId)) throw fail(400, 'A valid purchase order ID is required.');
+  const id = Number(rawId);
+
+  const purchaseOrder = await repo.getPurchaseOrderById(id);
+  if (!purchaseOrder) throw fail(404, 'Purchase order not found.');
+
+  const outcome = await notifyFinance(purchaseOrder, userId);
+  if (outcome === 'in_progress') {
+    throw fail(409, 'Already sending. Wait a moment, then check the status.');
+  }
+  if (outcome === 'no_recipient') {
+    throw fail(400, FINANCE_EMAIL_ERRORS.noRecipient);
+  }
+  if (outcome === 'stubbed') {
+    throw fail(503, 'Email is turned off. Ask an admin to turn it on.');
+  }
 
   return repo.getPurchaseOrderById(id);
 };
@@ -454,4 +605,7 @@ export default {
   updatePurchaseOrder,
   deletePurchaseOrder,
   setQuickbooksReference,
+  previewQuickbooksImport,
+  applyQuickbooksImport,
+  resendFinanceEmail,
 };

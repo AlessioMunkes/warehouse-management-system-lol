@@ -1,9 +1,10 @@
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva } from "class-variance-authority";
+import { Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils"
 
-const buttonVariants = cva(
+const rawButtonVariants = cva(
   "group/button inline-flex shrink-0 items-center justify-center rounded-4xl border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap transition-all outline-none select-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 active:not-aria-[haspopup]:translate-y-px disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
@@ -38,17 +39,36 @@ const buttonVariants = cva(
   }
 )
 
+// Merged, as Button merges its own: the base's border-transparent and a
+// variant's border-border are both in the raw cva output, and without
+// tailwind-merge whichever the stylesheet lists last wins — a Link or a
+// Dialog trigger styled as an outline button came out borderless.
+const buttonVariants = (options) => cn(rawButtonVariants(options));
+
+// `loading` is for a button whose action is under way: it shows a
+// spinner in place of the button's own icon and cannot be pressed again.
 function Button({
   className,
   variant = "default",
   size = "default",
+  loading = false,
+  disabled,
+  children,
   ...props
 }) {
   return (
     <ButtonPrimitive
       data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
-      {...props} />
+      aria-busy={loading || undefined}
+      disabled={disabled || loading}
+      className={buttonVariants({
+        variant, size,
+        className: cn(loading && "[&>svg:not([data-spinner])]:hidden", className),
+      })}
+      {...props}>
+      {loading ? <Loader2 data-spinner="" aria-hidden="true" className="animate-spin" /> : null}
+      {children}
+    </ButtonPrimitive>
   );
 }
 

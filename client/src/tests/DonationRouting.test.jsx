@@ -15,7 +15,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from '../components/layout/ProtectedRoute';
-import { DONATIONS, DONATION_INTAKE_ROLES, STAFF } from '../routes/paths';
+import { DONATIONS, STAFF } from '../routes/paths';
+import { routeById } from '../routes/routeTable';
+
+// The guard the real intake route uses (routes/routeTable.js).
+const DONATION_INTAKE_ROLES = routeById('donationIntake').roles;
 
 const mockAuth = { value: { user: null, isLoading: false } };
 vi.mock('../context/AuthContext', () => ({
@@ -34,6 +38,8 @@ function renderAt(path, user) {
           <Route path={DONATIONS.review} element={<p>REVIEW PAGE</p>} />
         </Route>
         <Route path={STAFF.home}   element={<p>TASK DASHBOARD</p>} />
+        <Route path="/manager"     element={<p>MANAGER HOME</p>} />
+        <Route path="/admin"       element={<p>ADMIN HOME</p>} />
         <Route path="/login"       element={<p>LOGIN</p>} />
         <Route path="/guest-home"  element={<p>GUEST HOME</p>} />
         <Route path="*"            element={<Navigate to="/login" replace />} />
@@ -67,9 +73,25 @@ describe('donation intake route guarding', () => {
   // is no signed-in staff role left to bounce — intake is open to all
   // three — so the list itself is what is worth pinning. Narrow it and
   // the .each blocks above start exercising the gate.
-  it('is open to every staff role and nothing else', () => {
-    expect([...DONATION_INTAKE_ROLES].sort())
-      .toEqual(['admin', 'manager', 'warehouse_worker']);
+  // Floor work: each role sees only its own screens, so intake is the
+  // warehouse worker's alone. Admins correct donations on the
+  // Classification Queue.
+  it('is open to warehouse staff only', () => {
+    expect([...DONATION_INTAKE_ROLES]).toEqual(['warehouse_worker']);
+  });
+
+  it('sends an admin to their own dashboard', () => {
+    renderAt(DONATIONS.new, user('admin'));
+    expect(screen.getByText('ADMIN HOME')).toBeInTheDocument();
+    expect(screen.queryByText('INTAKE FORM')).not.toBeInTheDocument();
+  });
+
+  // Taken out of the manager's view on request: an old link or bookmark
+  // lands them on their own dashboard instead of the intake form.
+  it('sends a manager to their own dashboard', () => {
+    renderAt(DONATIONS.new, user('manager'));
+    expect(screen.getByText('MANAGER HOME')).toBeInTheDocument();
+    expect(screen.queryByText('INTAKE FORM')).not.toBeInTheDocument();
   });
 
   it('bounces a guest to the guest home', () => {
@@ -96,9 +118,11 @@ describe('donation intake route guarding', () => {
     expect(screen.getByRole('status')).toBeInTheDocument();
   });
 
-  it('mirrors RECEIVERS_UP on the server', () => {
-    // server/src/routes/donation.routes.js:12
-    expect([...DONATION_INTAKE_ROLES].sort())
-      .toEqual(['admin', 'manager', 'warehouse_worker']);
+  it('stays within RECEIVERS_UP on the server', () => {
+    // server/src/routes/donation.routes.js:12 allows worker, manager and
+    // admin. The screen is narrower on purpose (managers do not log
+    // donations from here); it must never be wider than the server.
+    const serverRoles = ['admin', 'manager', 'warehouse_worker'];
+    for (const role of DONATION_INTAKE_ROLES) expect(serverRoles).toContain(role);
   });
 });

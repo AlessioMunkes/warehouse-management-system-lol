@@ -26,7 +26,7 @@ export default function ReportBrowser({ metrics, onPick, comparisons = [], onPic
   const groups = groupByArea(metrics);
 
   return (
-    <div className="rounded-[4px] border-2 border-line bg-surface">
+    <div className="rounded-lg border border-line bg-surface">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -54,7 +54,7 @@ export default function ReportBrowser({ metrics, onPick, comparisons = [], onPic
                       type="button"
                       disabled={disabled}
                       onClick={() => onPick(m.id)}
-                      className="w-full rounded-[4px] px-2 py-1.5 text-left hover:bg-ink/5 disabled:opacity-50"
+                      className="w-full rounded-lg px-2 py-1.5 text-left hover:bg-ink/5 disabled:opacity-50"
                     >
                       <span className="block text-sm font-medium">{m.label}</span>
                       <span className="block text-xs" style={{ color: MUTED }}>{firstSentence(m.description)}</span>
@@ -71,7 +71,7 @@ export default function ReportBrowser({ metrics, onPick, comparisons = [], onPic
                 {comparisons.map((c) => (
                   <li key={c.id}>
                     <button type="button" disabled={disabled} onClick={() => onPickComparison(c.id)}
-                      className="w-full rounded-[4px] px-2 py-1.5 text-left hover:bg-ink/5 disabled:opacity-50">
+                      className="w-full rounded-lg px-2 py-1.5 text-left hover:bg-ink/5 disabled:opacity-50">
                       <span className="block text-sm font-medium">{c.label}</span>
                       <span className="block text-xs" style={{ color: MUTED }}>{firstSentence(c.description)}</span>
                     </button>

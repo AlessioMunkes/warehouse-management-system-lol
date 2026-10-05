@@ -1,5 +1,6 @@
 import reminderRepository from '../repositories/ecdCollectionReminder.repository.js';
-import emailProvider from '../providers/email.provider.js';
+import communications from '../features/communications/communications.service.js';
+import { closureOn } from '../features/calendar/calendar.service.js';
 import { emailStyles, escapeHtml, renderLadlesEmail } from '../utils/emailTemplate.js';
 
 const DEFAULT_CHANNELS = ['sms'];
@@ -59,6 +60,8 @@ const normaliseChannels = (channels = DEFAULT_CHANNELS) => {
   return [...new Set(cleaned)];
 };
 
+const QUEUE_CONCURRENCY = 8;
+
 const queueTomorrowCollectionReminders = async ({
   channels = DEFAULT_CHANNELS,
   now = new Date(),
@@ -67,24 +70,37 @@ const queueTomorrowCollectionReminders = async ({
   const today = dateStringInZone(now);
   const collectionDate = requestedCollectionDate ?? addDaysToIsoDate(today, 1);
   const reminderChannels = normaliseChannels(channels);
+
+  // The operating calendar: no reminders for a day the warehouse is
+  // shut, even if slips were generated for it before it was closed.
+  const closed = await closureOn(collectionDate);
+  if (closed) {
+    return {
+      collectionDate, channels: reminderChannels, collectionsFound: 0, created: 0, skipped: 0, reminders: [], closed,
+    };
+  }
+
   const collections = await reminderRepository.findCollectionsByDate(collectionDate);
 
   const reminders = [];
   let skipped = 0;
 
-  for (const collection of collections) {
-    for (const channel of reminderChannels) {
-      const reminder = await reminderRepository.createReminderOnce({
-        ecdId: collection.ecd_id,
-        collectionDate,
-        channel,
-      });
-
-      if (reminder) {
-        reminders.push(reminder);
-      } else {
-        skipped += 1;
-      }
+  // One insert per centre and channel, sent a few at a time. One after
+  // another, 98 centres meant 98 round trips to the database and a
+  // 20-second wait every time the reminders screen opened. Batches of
+  // QUEUE_CONCURRENCY keep the order, and stay well inside the pool.
+  const jobs = collections.flatMap((collection) => reminderChannels.map((channel) => ({
+    ecdId: collection.ecd_id,
+    collectionDate,
+    channel,
+  })));
+  for (let i = 0; i < jobs.length; i += QUEUE_CONCURRENCY) {
+    const created = await Promise.all(
+      jobs.slice(i, i + QUEUE_CONCURRENCY).map((job) => reminderRepository.createReminderOnce(job)),
+    );
+    for (const reminder of created) {
+      if (reminder) reminders.push(reminder);
+      else skipped += 1;
     }
   }
 
@@ -220,20 +236,15 @@ const decorateWhatsAppReminder = (reminder) => {
 };
 
 const sendTomorrowCollectionReminderEmails = async ({ now = new Date() } = {}) => {
-  const queued = await queueThursdayCollectionRemindersForWednesdayRun({
+  const queued = await queueTomorrowCollectionReminders({
     channels: [EMAIL_CHANNEL],
     now,
   });
 
-  if (!queued.collectionDate) {
+  if (queued.closed || !queued.collectionDate) {
     return {
-      collectionDate: null,
-      queued,
-      attempted: 0,
-      sent: 0,
-      failed: 0,
-      skipped: 0,
-      results: [],
+      collectionDate: queued.collectionDate, queued, closed: queued.closed,
+      attempted: 0, sent: 0, failed: 0, skipped: 0, results: [],
     };
   }
 
@@ -260,11 +271,13 @@ const sendTomorrowCollectionReminderEmails = async ({ now = new Date() } = {}) =
     }
 
     const email = buildReminderEmail(reminder);
-    const providerResult = await emailProvider.sendEmail({
+    const providerResult = await communications.send({
+      type: 'collection_reminder',
       to,
       subject: email.subject,
       text: email.text,
       html: email.html,
+      related: { type: 'ecd_collection_reminder', id: reminder.id },
     });
 
     if (providerResult?.sent) {
@@ -297,17 +310,13 @@ const sendTomorrowCollectionReminderEmails = async ({ now = new Date() } = {}) =
 };
 
 const listTomorrowWhatsAppReminders = async ({ now = new Date() } = {}) => {
-  const queued = await queueThursdayCollectionRemindersForWednesdayRun({
+  const queued = await queueTomorrowCollectionReminders({
     channels: [WHATSAPP_CHANNEL],
     now,
   });
 
-  if (!queued.collectionDate) {
-    return {
-      collectionDate: null,
-      queued,
-      reminders: [],
-    };
+  if (queued.closed || !queued.collectionDate) {
+    return { collectionDate: queued.collectionDate, queued, closed: queued.closed, reminders: [] };
   }
 
   const reminders = await reminderRepository.listReminderDeliveries({

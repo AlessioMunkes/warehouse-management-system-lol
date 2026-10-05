@@ -361,7 +361,8 @@ const listDonations = async (range = 'all') => {
 const listUnmatchedItems = async () => {
   const result = await pool.query(
     `SELECT
-       di.id, di.donation_id, di.description, di.quantity, di.unit, di.location_id,
+       di.id, di.donation_id, di.description, di.quantity, di.unit,
+       di.storage_location_id AS location_id,
        d.donation_category, d.received_at, d.donor_name
      FROM donation_items di
      JOIN donations d ON d.id = di.donation_id

@@ -14,7 +14,7 @@ import request from 'supertest';
 import jwt     from 'jsonwebtoken';
 import { ROLES } from '../src/middleware/auth.middleware.js';
 
-const serviceMock = { getSummary: vi.fn() };
+const serviceMock = { getSummary: vi.fn(), getAttention: vi.fn() };
 
 vi.mock('../src/services/dashboard.service.js', () => ({ default: serviceMock }));
 
@@ -39,6 +39,7 @@ const SUMMARY = {
 beforeEach(() => {
   vi.clearAllMocks();
   serviceMock.getSummary.mockResolvedValue(SUMMARY);
+  serviceMock.getAttention.mockResolvedValue({ inventory: { shortfall: 1 } });
 });
 
 describe('dashboard routes — authentication', () => {
@@ -66,6 +67,20 @@ describe('dashboard routes — authorisation', () => {
   });
 });
 
+describe('dashboard routes — attention', () => {
+  it.each([ROLES.MANAGER, ROLES.ADMIN])('%s can read what needs attention', async (role) => {
+    const res = await request(app).get(`${BASE}/attention`).set('Cookie', cookieFor(role));
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, data: { inventory: { shortfall: 1 } } });
+  });
+
+  it.each([ROLES.WORKER, ROLES.GUEST])('%s cannot', async (role) => {
+    const res = await request(app).get(`${BASE}/attention`).set('Cookie', cookieFor(role));
+    expect(res.status).toBe(403);
+    expect(serviceMock.getAttention).not.toHaveBeenCalled();
+  });
+});
+
 describe('dashboard controller — responses', () => {
   it('wraps success in the { success, data } envelope', async () => {
     const res = await request(app).get(`${BASE}/summary`).set('Cookie', cookieFor(ROLES.MANAGER));
@@ -77,5 +92,25 @@ describe('dashboard controller — responses', () => {
     const res = await request(app).get(`${BASE}/summary`).set('Cookie', cookieFor(ROLES.MANAGER));
     expect(res.status).toBe(500);
     expect(res.body.message).not.toMatch(/relation/);
+  });
+});
+
+// Stock health is counted from the inventory screen's own rows, so the
+// tile and the inventory filter it links to cannot disagree. The case
+// that was wrong: a product with no stock and no reorder level used to
+// count as healthy.
+describe('stock health', async () => {
+  const { default: repo } = await import('../src/repositories/dashboard.repository.js');
+  const row = (available, reorder_threshold) => ({ available: String(available), reorder_threshold: String(reorder_threshold) });
+
+  it('splits products into out of stock, low and healthy by what is available', () => {
+    expect(repo.stockHealth([
+      row(0, 0),     // nothing, no reorder level: OUT, not healthy
+      row(-2, 5),    // shortfall: out
+      row(3, 5),     // low
+      row(5, 5),     // at the level: low
+      row(9, 5),     // healthy
+      row(4, 0),     // no level set, some stock: healthy
+    ])).toEqual({ active: 6, out: 2, low: 2, healthy: 2 });
   });
 });

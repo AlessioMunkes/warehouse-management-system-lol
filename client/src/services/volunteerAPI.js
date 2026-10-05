@@ -37,6 +37,18 @@ export const getGuestLog = async ({ search = '', from = '', to = '' } = {}) => {
   return (body.data ?? []).map(toVisit);
 };
 
+// The door log a batch at a time, for the Volunteers view: `visits` plus
+// `hasMore`, with `offset` as how many the screen already has.
+export const getGuestLogPage = async ({ search = '', from = '', to = '', offset = 0, limit = 200 } = {}) => {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (search.trim()) params.set('search', search.trim());
+  if (from) params.set('from', from);
+  if (to)   params.set('to', to);
+  if (offset) params.set('offset', String(offset));
+  const body = await apiGet(`/api/volunteers?${params}`);
+  return { visits: (body.data ?? []).map(toVisit), hasMore: Boolean(body.hasMore) };
+};
+
 // POST, not PATCH: this records an event that happened at a door, it
 // does not edit a field. The server stamps the time — a client clock
 // has no business deciding when somebody left the building.
@@ -45,4 +57,4 @@ export const signOutVisit = async (id) => {
   return toVisit(body.data ?? {});
 };
 
-export default { getGuestLog, signOutVisit };
+export default { getGuestLog, getGuestLogPage, signOutVisit };

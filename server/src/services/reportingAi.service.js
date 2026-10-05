@@ -16,8 +16,11 @@ import { buildTools, buildSystemPrompt } from '../features/reporting/ai/toolSche
 import reportingService  from './reporting.service.js';
 import insightService    from './reportingInsight.service.js';
 import { CHART_VIEWS }   from '../features/reporting/ai/toolSchema.js';
-import { matchQuestion } from '../features/reporting/ai/keywordFallback.js';
+import { matchQuestion, rankReports } from '../features/reporting/ai/keywordFallback.js';
 import logRepo           from '../repositories/reportingLog.repository.js';
+import { DATASETS }      from '../features/reporting/customQuery.js';
+import { redactText }    from '../features/privacy/redact.js';
+import knownPeople       from '../repositories/knownPeople.repository.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -43,10 +46,33 @@ const argsToSpec = (args) => {
   };
 };
 
-// Metrics declare which filters they accept and validateSpec rejects
-// the rest. Rather than burn a retry, drop unsupported filters and
-// tell the caller — "decanting wastage for week1" is a reasonable
-// thing to say even though wastage is not cohort-scoped.
+// A custom report's flat arguments → { custom, dateRange }. A dated
+// dataset with no dates gets the last three months, like run_report.
+const customArgsToSpec = (a, todayISO) => {
+  const ds = DATASETS[a.dataset];
+  const groupBy = [a.group_by, a.group_by_2].filter(Boolean);
+  const filters = a.filter_field && a.filter_value ? { [a.filter_field]: a.filter_value } : {};
+  let dateRange = a.date_from && a.date_to ? { from: a.date_from, to: a.date_to } : undefined;
+  let defaultedRange = false;
+  if (ds?.date && !dateRange) {
+    const to = new Date(`${todayISO}T00:00:00Z`);
+    const from = new Date(to);
+    from.setUTCDate(1);
+    from.setUTCMonth(from.getUTCMonth() - 2);
+    dateRange = { from: from.toISOString().slice(0, 10), to: todayISO };
+    defaultedRange = true;
+  }
+  return {
+    custom: { dataset: a.dataset, groupBy, measure: a.measure || 'count', filters },
+    dateRange: ds?.date ? dateRange : undefined,
+    chartType: undefined,
+    defaultedRange,
+  };
+};
+
+// Each metric only accepts certain filters. Rather than fail, drop the
+// ones it doesn't support and say so: "decanting wastage for Tuesday
+// centres" is a fair question even though wastage isn't split by day.
 const stripUnsupportedFilters = (spec, catalog) => {
   const metric = catalog.metrics.find((m) => m.id === spec.metric);
   if (!metric) return { spec, dropped: [] };
@@ -132,7 +158,23 @@ const keywordAnswer = async ({ question, todayISO, reason, log }) => {
   }
 };
 
-export const ask = async ({ question, userId }) => {
+// "Not what you meant? Try:" — the next closest answers, minus the one
+// shown. Offered under every answer; the page draws them as buttons.
+const alternativesFor = (question, result) => {
+  const shown = result.type === 'comparison' ? `comparison:${result.id}`
+    : result.spec?.custom ? `custom:${result.spec.custom.dataset}` : result.spec?.metric;
+  try { return rankReports(question, { exclude: shown, limit: 3 }); } catch { return []; }
+};
+
+export const ask = async (input) => {
+  const result = await askInner(input);
+  if (result && (result.type === 'report' || result.type === 'comparison')) {
+    return { ...result, alternatives: alternativesFor(input.question, result) };
+  }
+  return result;
+};
+
+const askInner = async ({ question, userId }) => {
   if (!provider.isEnabled()) {
     throw fail(503, 'The AI assistant is not available. Use the report builder below.');
   }
@@ -162,10 +204,16 @@ export const ask = async ({ question, userId }) => {
   // a near miss, and the manager is waiting.
   let lastError = null;
 
+  // The model gets the question with people, phone numbers, emails
+  // and ID numbers taken out. Reports never need them, and this is
+  // the last point before the question leaves our server.
+  const { names, keep } = await knownPeople.listNames();
+  const safe = redactText(question, names, keep).text;
+
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const userMessage = attempt === 0
-      ? question
-      : `${question}\n\nYour previous attempt was rejected: ${lastError}\nTry again, choosing a valid combination.`;
+      ? safe
+      : `${safe}\n\nYour previous attempt was rejected: ${lastError}\nTry again, choosing a valid combination.`;
 
     let call;
     try {
@@ -212,6 +260,29 @@ export const ask = async ({ question, userId }) => {
         });
         await log('ok', { metric: `comparison:${result.id}`, spec: { comparison: result.id, dateRange: result.dateRange } });
         return { ...result, answeredByAI: true };
+      } catch (err) {
+        if (!err.status || err.status >= 500) { await log('error', { errorMessage: err.message }); throw err; }
+        lastError = err.message;
+        continue;
+      }
+    }
+
+    if (call.name === 'run_custom_report') {
+      try {
+        const a = call.args ?? {};
+        const spec = customArgsToSpec(a, todayISO);
+        const report = await reportingService.runReport(spec);
+        await log('ok', { metric: report.spec.metric, spec: report.spec });
+        return {
+          type: 'report',
+          ...report,
+          meta: {
+            ...report.meta,
+            answeredByAI: true,
+            defaultedRange: spec.defaultedRange || undefined,
+            chartHint: CHART_VIEWS.includes(a.chart_type) ? a.chart_type : undefined,
+          },
+        };
       } catch (err) {
         if (!err.status || err.status >= 500) { await log('error', { errorMessage: err.message }); throw err; }
         lastError = err.message;

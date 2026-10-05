@@ -30,25 +30,28 @@ beforeEach(() => {
 });
 
 describe('ECD collection reminder scheduler timing', () => {
-  it('runs at Wednesday 08:00 Africa/Johannesburg when Wednesday has not passed', () => {
+  // The job runs every morning and sends for tomorrow's collections,
+  // so Thursday's reminders still go out on Wednesday, and Tuesday's
+  // cohort gets its own on Monday.
+  it('runs at 08:00 Africa/Johannesburg today when that has not passed', () => {
     const runAt = nextRunAt(new Date('2026-09-23T05:59:00.000Z'));
 
     expect(runAt.toISOString()).toBe('2026-09-23T06:00:00.000Z');
   });
 
-  it('schedules the next Wednesday when Wednesday 08:00 Africa/Johannesburg has passed', () => {
+  it('schedules tomorrow morning once 08:00 Africa/Johannesburg has passed', () => {
     const runAt = nextRunAt(new Date('2026-09-23T06:00:00.000Z'));
 
-    expect(runAt.toISOString()).toBe('2026-09-30T06:00:00.000Z');
+    expect(runAt.toISOString()).toBe('2026-09-24T06:00:00.000Z');
   });
 
-  it('does not schedule a Tuesday automatic run for Thursday reminders', () => {
+  it('runs on Wednesday morning for Thursday collections', () => {
     const runAt = nextRunAt(new Date('2026-09-22T06:00:00.000Z'));
 
     expect(runAt.toISOString()).toBe('2026-09-23T06:00:00.000Z');
   });
 
-  it('uses Africa/Johannesburg date when calculating Wednesday morning', () => {
+  it('uses the Africa/Johannesburg date when working out the morning', () => {
     const runAt = nextRunAt(new Date('2026-09-22T22:30:00.000Z'));
 
     expect(runAt.toISOString()).toBe('2026-09-23T06:00:00.000Z');
@@ -93,7 +96,9 @@ describe('runEmailReminderJob', () => {
 });
 
 describe('startEmailReminderScheduler', () => {
-  it('schedules the first run for Wednesday 08:00 SAST and can be stopped', () => {
+  // Scheduling now waits for the send hour from Settings, so each test
+  // waits for the timer to be set rather than expecting it at once.
+  it('schedules the first run for 08:00 SAST and can be stopped', async () => {
     const log = logger();
     const setTimer = vi.fn(() => 123);
     const clearTimer = vi.fn();
@@ -106,6 +111,7 @@ describe('startEmailReminderScheduler', () => {
       nowFn: () => new Date('2026-09-23T05:30:00.000Z'),
     });
 
+    await vi.waitFor(() => expect(setTimer).toHaveBeenCalled());
     expect(setTimer).toHaveBeenCalledWith(expect.any(Function), 30 * 60 * 1000);
     expect(log.info).toHaveBeenCalledWith(
       '[ecd_collection_email_reminders] scheduled',
@@ -133,7 +139,9 @@ describe('startEmailReminderScheduler', () => {
       nowFn: () => new Date('2026-09-23T06:00:00.000Z'),
     });
 
+    await vi.waitFor(() => expect(callbacks).toHaveLength(1));
     await callbacks[0]();
+    await vi.waitFor(() => expect(setTimer).toHaveBeenCalledTimes(2));
 
     expect(serviceMock.sendTomorrowCollectionReminderEmails).toHaveBeenCalledTimes(1);
     expect(log.error).toHaveBeenCalledWith(
@@ -143,6 +151,23 @@ describe('startEmailReminderScheduler', () => {
     expect(setTimer).toHaveBeenCalledTimes(2);
   });
 
+});
+
+describe('the send hour from Settings', () => {
+  it('waits for the hour an admin chose', async () => {
+    const setTimer = vi.fn(() => 1);
+    startEmailReminderScheduler({
+      logger: logger(), service: serviceMock, setTimer, clearTimer: vi.fn(),
+      nowFn: () => new Date('2026-09-23T05:30:00.000Z'),   // 07:30 SAST
+      runHourFn: async () => 10,                            // 10:00 SAST
+    });
+    await vi.waitFor(() => expect(setTimer).toHaveBeenCalled());
+    expect(setTimer.mock.calls[0][1]).toBe(150 * 60 * 1000);
+  });
+
+  it('takes the hour as an argument when working out the next run', () => {
+    expect(nextRunAt(new Date('2026-09-23T05:59:00.000Z'), 6).toISOString()).toBe('2026-09-24T04:00:00.000Z');
+  });
 });
 
 describe('runEmailReminderJob with several warehouses', () => {

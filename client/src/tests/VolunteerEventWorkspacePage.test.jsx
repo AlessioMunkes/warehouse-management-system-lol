@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
-vi.mock('../features/taskdashboard/components/TopNavBar', () => ({ TopNavbar: () => <div>Navigation</div> }));
+vi.mock('../components/layout/TopNavBar', () => ({ TopNavbar: () => <div>Navigation</div> }));
 
 const mockRole = { value: 'manager' };
 vi.mock('../context/AuthContext', () => ({

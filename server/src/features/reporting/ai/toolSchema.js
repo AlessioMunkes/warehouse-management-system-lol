@@ -14,6 +14,7 @@
 // Nothing here is hand-maintained. Add a metric to the catalog and
 // the model can answer questions about it on the next restart.
 // ─────────────────────────────────────────────────────────────
+import { DATASETS } from '../customQuery.js';
 import {
   METRICS, DIMENSIONS, COHORTS, BENEFICIARY_KINDS,
   MOVEMENT_TYPES, DONATION_CATEGORIES, MAX_RANK_LIMIT,
@@ -44,7 +45,14 @@ const ALL_DIMENSIONS = [...new Set(OPERATIONAL_METRICS.flatMap((m) => m.dimensio
 // it never changes the query, and the page falls back to the
 // default view when the data cannot take the shape asked for (a
 // donut of a trend, say).
-export const CHART_VIEWS = ['bar', 'hbar', 'line', 'area', 'donut', 'pareto', 'stacked', 'heatmap', 'table'];
+// Custom reports: every name the model may use, flattened. The
+// service checks each against its dataset (customQuery.validateCustom).
+const CUSTOM_DATASET_IDS = Object.keys(DATASETS);
+const CUSTOM_GROUP_IDS   = [...new Set(Object.values(DATASETS).flatMap((d) => Object.keys(d.groups)))];
+const CUSTOM_MEASURE_IDS = [...new Set(Object.values(DATASETS).flatMap((d) => Object.keys(d.measures)))];
+const CUSTOM_FILTER_IDS  = [...new Set(Object.values(DATASETS).flatMap((d) => Object.entries(d.filters).filter(([, f]) => f.values).map(([k]) => k)))];
+
+export const CHART_VIEWS = ['bar', 'hbar', 'line', 'area', 'donut', 'pareto', 'stacked', 'heatmap', 'funnel', 'waterfall', 'sankey', 'table'];
 
 export const buildTools = () => ([
   {
@@ -75,7 +83,8 @@ export const buildTools = () => ([
           description:
             'Optional. Only when the user asks for a kind of chart: donut or pie for shares, ' +
             'pareto for "which few cause most", stacked or heatmap for a two-way month breakdown, ' +
-            'area or line for trends, table for the raw figures.',
+            'funnel for a pipeline by status, waterfall for stock_flow, sankey for donation_routing by ' +
+            'category_flow, area or line for trends, table for the raw figures.',
         },
       },
       required: ['metric'],
@@ -95,6 +104,29 @@ export const buildTools = () => ([
         date_to:   { type: STRING, description: 'End date, YYYY-MM-DD.' },
       },
       required: ['comparison'],
+    },
+  },
+  {
+    name: 'run_custom_report',
+    description:
+      'Count or total records from one dataset, grouped by up to two fields, optionally filtered ' +
+      'to one status or value. Use this when no report above answers the question — above all for ' +
+      '"how many X by status", "which statuses", or a combination the prepared reports do not cover. ' +
+      'Prefer run_report when a prepared report answers it.',
+    parameters: {
+      type: OBJECT,
+      properties: {
+        dataset:    { type: STRING, enum: CUSTOM_DATASET_IDS, description: 'What to count.' },
+        group_by:   { type: STRING, enum: CUSTOM_GROUP_IDS, description: 'Optional. The first way to break it down. Must be one of the dataset\'s groups.' },
+        group_by_2: { type: STRING, enum: CUSTOM_GROUP_IDS, description: 'Optional. A second breakdown, drawn stacked (put a time one, like month, first).' },
+        measure:    { type: STRING, enum: CUSTOM_MEASURE_IDS, description: 'Optional. count (default), or a total the dataset offers.' },
+        filter_field: { type: STRING, enum: CUSTOM_FILTER_IDS, description: 'Optional. Restrict to one value of this field.' },
+        filter_value: { type: STRING, description: 'The value for filter_field, exactly as listed for the dataset.' },
+        date_from: { type: STRING, description: 'Start date, YYYY-MM-DD. Omit for datasets marked "as it stands".' },
+        date_to:   { type: STRING, description: 'End date, YYYY-MM-DD.' },
+        chart_type: { type: STRING, enum: CHART_VIEWS, description: 'Optional, only when the user asks for a kind of chart.' },
+      },
+      required: ['dataset'],
     },
   },
   {
@@ -140,10 +172,9 @@ export const buildTools = () => ([
   },
 ]);
 
-// The catalog descriptions carry the domain rules the schema cannot
-// express — that children are counted once per period, that late
-// collections still count, that a fortnightly cycle makes "this
-// month" two cycles rather than one.
+// The catalog descriptions carry the rules the schema can't express:
+// children are counted once per period, late collections still count,
+// and centres collect weekly on a fixed day (Tuesday or Thursday).
 export const buildSystemPrompt = (todayISO) => {
   const live  = [];
   const timed = [];
@@ -159,6 +190,14 @@ export const buildSystemPrompt = (todayISO) => {
     .map((c) => `- ${c.id}\n  What it is: ${c.description}\n  x: ${c.x.label}, y: ${c.y.label}`)
     .join('\n\n');
 
+  const custom = Object.entries(DATASETS).map(([id, d]) => {
+    const groups = Object.entries(d.groups).map(([k, g]) => `${k} (${g.label})`).join(', ');
+    const measures = Object.entries(d.measures).map(([k, m]) => `${k} (${m.label}, ${m.unit})`).join(', ');
+    const filters = Object.entries(d.filters).filter(([, f]) => f.values)
+      .map(([k, f]) => `${k}: ${f.values.join(' | ')}`).join('; ');
+    return `- ${id}: ${d.description}${d.date ? '' : ' As it stands — no dates.'}\n  Group by: ${groups}\n  Measures: ${measures}${filters ? `\n  Filters: ${filters}` : ''}`;
+  }).join('\n\n');
+
   return `You help a warehouse manager at Ladles of Love, a Cape Town food charity, look at their own OPERATIONAL data — what moved, what it cost, what broke. You translate a question into ONE report request. You never write SQL and you never invent figures.
 
 Today's date is ${todayISO} (South African time).
@@ -172,10 +211,19 @@ ${live.join('\n\n')}
 COMPARISONS — scatter plots, one dot per item. Use run_comparison
 ${comparisons}
 
+CUSTOM REPORTS — use run_custom_report when no report above answers the question
+${custom}
+
+Use a custom report for "how many by status" questions (purchase orders by status, slips by packing status, collections by outcome, deliveries flagged, donations by Section 18A status, requests by outcome, compost by status, events by status, stock movements by type, centres active or inactive), and for simple counts or totals the prepared reports do not break down that way. Group by a status field to show every status; use filter_field and filter_value to show just one.
+
 A scatter plot is only available for the comparisons above. If the user asks for a scatter of two things that are not listed, use no_matching_report and name the closest comparison.
 
 CHART TYPES
-If the user names a kind of chart (pie, donut, stacked, heatmap, pareto, area, table), pass it as chart_type on run_report. Choose a breakdown that suits it: donut and pareto need a category breakdown, stacked and heatmap need a two-way month breakdown such as month_supplier.
+If the user names a kind of chart (pie, donut, stacked, heatmap, pareto, funnel, waterfall, sankey, area, table), pass it as chart_type on run_report. Choose a breakdown that suits it: donut and pareto need a category breakdown, stacked and heatmap need a two-way breakdown such as month_supplier.
+
+Busiest days: dispatch_volume, goods_received and stock_movement_volume break down by weekday (Monday to Sunday) and by week_weekday (a week by day heatmap). Use weekday for "which day is busiest", and week_weekday with chart_type heatmap for "a heatmap of days".
+Pipelines (purchase_order_pipeline by po_status, slip_pipeline by slip_status, section18a_pipeline by s18a_status) are drawn as a funnel by default.
+stock_flow is a waterfall from opening to closing stock. days_of_cover forecasts when each product runs out. donation_routing by category_flow is a flow diagram from donation category to where the items ended up.
 
 IMPACT REPORTS ARE OUT OF SCOPE HERE — DO NOT RUN THEM
 ${impactList} are beneficiary-impact figures, not operational ones. None of
@@ -186,7 +234,7 @@ report — call no_matching_report and tell the user in plain language that
 this lives on the separate Impact Calculator (Impact Report) page.
 
 HOW THIS ORGANISATION WORKS
-- Beneficiary centres collect food on a fortnightly rotation, in two cohorts: week1 and week2. A calendar month contains roughly two full cycles.
+- Beneficiary centres collect food every week on a fixed pickup day, in two cohorts: tuesday and thursday. A calendar month contains about four collections per centre.
 - A collection after 16:00 is late but still counts as collected.
 - Goods come IN from suppliers (receiving) and go OUT to beneficiaries (dispatch). "Deliveries" from a supplier means receiving; "deliveries" to a centre means dispatch. If a question is ambiguous between the two, ask.
 

@@ -66,11 +66,22 @@ describe('which screens each role may be sent to', () => {
     expect(ids).toContain('reporting');
     expect(ids).not.toContain('products');
     expect(ids).not.toContain('users');
-    expect(ids).not.toContain('section18a');
+    // The office's donation screens are the manager's too.
+    expect(ids).toContain('donationManagement');
+    expect(ids).toContain('section18a');
+    // Each role sees only its own screens: no floor screen for a manager.
+    for (const floor of ['receiving', 'packing', 'decanting', 'dispatch', 'donation']) {
+      expect(ids, floor).not.toContain(floor);
+    }
   });
 
-  it('gives an admin every screen', () => {
-    expect(screensForRole('admin')).toHaveLength(SCREENS.length);
+  // Operational goals is the one office screen an admin does not have.
+  it('gives an admin every screen but the floor ones and the manager’s own', () => {
+    const floor = SCREENS.filter((s) => s.roles.length === 1 && s.roles[0] === 'warehouse_worker');
+    const managerOnly = SCREENS.filter((s) => s.roles.length === 1 && s.roles[0] === 'manager');
+    expect(floor.map((s) => s.id)).toEqual(expect.arrayContaining(['receiving', 'packing', 'donation']));
+    expect(managerOnly.map((s) => s.id)).toEqual(['operationalGoals']);
+    expect(screensForRole('admin')).toHaveLength(SCREENS.length - floor.length - managerOnly.length);
   });
 
   it('never returns a screen the role is not on', () => {
@@ -118,7 +129,7 @@ describe('the second gate, in the service', () => {
     const res = await service.ask({
       question: 'take me to inventory', userId: 1, role: 'manager',
     });
-    expect(res).toEqual({ type: 'navigate', screen: { id: 'inventory', label: 'Inventory' } });
+    expect(res).toEqual({ type: 'navigate', screen: { id: 'inventory', label: 'Inventory', about: expect.any(String) } });
   });
 
   // The one that matters. Even if the enum were wrong, or the model
@@ -137,7 +148,7 @@ describe('the second gate, in the service', () => {
     ['warehouse_worker', 'users'],
     ['warehouse_worker', 'reporting'],
     ['manager', 'products'],
-    ['manager', 'section18a'],
+    ['manager', 'emailIntegration'],
   ])('refuses to send a %s to %s', async (role, screenId) => {
     call('open_screen', { screen_id: screenId });
     call('open_screen', { screen_id: screenId });

@@ -10,10 +10,14 @@
 // ─────────────────────────────────────────────────────────────
 import { Badge } from '@/components/ui/badge';
 
+// Red / amber / green on the theme's status tokens, so a flagged note
+// reads as a problem and a clean one as done, at a glance.
 const TONE = {
   neutral: 'bg-line text-ink',
-  good:    'bg-ink text-on-ink',
-  warn:    'bg-danger-soft text-brand border-brand',
+  good:    'bg-good-soft text-good border-good/40',
+  warn:    'bg-warn-soft text-warn border-warn/40',
+  bad:     'bg-danger-soft text-danger border-danger/40',
+  info:    'bg-info-soft text-info border-info/40',
   muted:   'bg-surface text-ink-soft border-line',
 };
 

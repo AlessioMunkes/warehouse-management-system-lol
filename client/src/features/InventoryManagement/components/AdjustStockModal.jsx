@@ -38,6 +38,11 @@ export default function AdjustStockModal({
   onUpdateThreshold,
   onClose,
   isSaving = false,
+  // Set when several products were ticked and are being adjusted one
+  // after another: { position, total, onStop }. Cancel then means
+  // "skip this one", and Stop ends the run. Each product still gets
+  // its own reason — BR-02 is per movement, not per batch of them.
+  queue = null,
 }) {
   const [direction, setDirection] = useState("add");
   const [amount, setAmount] = useState("");
@@ -127,6 +132,7 @@ export default function AdjustStockModal({
           <DialogDescription>
             SKU: {product.sku} · Currently {product.onHand} {product.unit} on
             hand. Manual adjustments are logged to the audit ledger.
+            {queue ? ` Product ${queue.position} of ${queue.total}.` : null}
           </DialogDescription>
         </DialogHeader>
 
@@ -250,8 +256,13 @@ export default function AdjustStockModal({
             disabled={isSaving}
             type="button"
           >
-            Cancel
+            {queue ? "Skip" : "Cancel"}
           </Button>
+          {queue ? (
+            <Button variant="ghost" onClick={queue.onStop} disabled={isSaving} type="button">
+              Stop adjusting
+            </Button>
+          ) : null}
           <Button onClick={handleSubmit} disabled={isSaving} type="button">
             {isSaving ? "Saving..." : "Save Adjustment"}
           </Button>

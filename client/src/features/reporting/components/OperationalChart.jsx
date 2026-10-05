@@ -1,45 +1,35 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/features/reporting/components/OperationalChart.jsx
 //
-// The Operations page's chart, on Recharts. One report payload in,
-// drawn whichever way suits its shape:
-//   single figure → a big number
-//   over time     → line, area or columns
-//   by category   → bars, columns, donut (shares) or Pareto
-//   two-way       → stacked or grouped columns, or a heatmap
-//   any           → a table with the same numbers (and CSV)
+// The Operations chart (Recharts). It picks a view that suits the data:
+//   one number       -> a big figure
+//   over time        -> line, area or columns (with last year's line and
+//                       unusual points circled, when available)
+//   by category      -> bars, columns, donut or Pareto
+//   two-way          -> stacked or grouped columns, or a heatmap
+//   pipelines        -> a funnel; stock flow -> a waterfall;
+//   category → where -> a flow (Sankey) diagram
+//   any              -> a table with the same numbers (and CSV)
 //
-// OPERATIONS ONLY. ReportChart.jsx is still what the Impact Report
-// page draws with, and it is not touched by anything in here.
+// Click a bar, point or cell to highlight it. The toolbar has top N,
+// sorting, an average line and the manager's own target line (saved to
+// their profile). `compact` is the small version for cards and related
+// charts; `print` is the PDF version (no controls or animation).
 //
-// INTERACTION
-//   - Click or tap a bar, slice, point or cell to highlight it; the
-//     rest dim. Clicking it again clears. `highlight`/`onHighlight`
-//     let the page share the choice with the "who to act on" lists.
-//   - Top 5 / 10 / all, sort by value or name, an average line, the
-//     report's working target line, and a find box to highlight by
-//     name.
-//   - Stacked charts: click a legend entry to hide that series.
-//   - Targets: with `onTargetChange`, the manager can set, move or
-//     reset their own target line. It is saved to their profile
-//     (PUT /api/reporting/targets/:metric), so it is the same on
-//     every device and no one else's line moves.
-//
-// ACCESSIBILITY (ACC-01, ACC-03): colour is never the only signal —
-// highlighted items are also named in a chip and bolded in the table,
-// two-way charts carry a legend, and every view has the table beside
-// it one click away.
+// Colour is never the only signal: highlights are named, two-way charts
+// have a legend, and the table view is always one click away.
 // ─────────────────────────────────────────────────────────────
 import { useMemo, useState } from 'react';
 import {
-  Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart,
+  Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line, LineChart,
   Pie, PieChart, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import { X } from 'lucide-react';
 import {
-  SERIES, VIEW_LABELS, defaultView, downloadCsv, fmtTick, fmtValue, formatLabel,
-  isAdditive, pivot, shapeOf, toCsv, unitWord, viewsFor,
+  SERIES, VIEW_LABELS, anomaliesOf, defaultView, downloadCsv, fmtTick, fmtValue, formatLabel,
+  isAdditive, pivot, ragColour, shapeOf, toCsv, unitWord, viewsFor,
 } from '../chartFormat';
+import { Flow, Funnel, Waterfall } from './OperationalDiagrams';
 
 const INK    = 'var(--ink)';
 const MUTED  = 'var(--ink-soft)';
@@ -59,7 +49,7 @@ function ChartTooltip({ active, payload, label, unit, labelFor }) {
   if (!active || !payload?.length) return null;
   const title = labelFor ? labelFor(label, payload) : formatLabel(label);
   return (
-    <div className="rounded-[4px] border-2 bg-surface px-3 py-2 text-xs shadow-sm" style={{ borderColor: LINE }}>
+    <div className="rounded-lg border bg-surface px-3 py-2 text-xs shadow-sm" style={{ borderColor: LINE }}>
       <p className="mb-1" style={{ color: MUTED }}>{title}</p>
       {payload.filter((p) => p.value !== undefined && p.value !== null).map((p) => (
         <p key={p.dataKey ?? p.name} className="flex items-center gap-2">
@@ -79,7 +69,7 @@ function ChartTooltip({ active, payload, label, unit, labelFor }) {
 
 function Segmented({ views, view, onChange }) {
   return (
-    <div role="group" aria-label="Chart type" className="inline-flex flex-wrap rounded-[4px] border-2" style={{ borderColor: LINE }}>
+    <div role="group" aria-label="Chart type" className="inline-flex flex-wrap rounded-lg border" style={{ borderColor: LINE }}>
       {views.map((v) => (
         <button
           key={v}
@@ -117,9 +107,9 @@ function TargetEditor({ target, unit, onSave, onReset, saving, error }) {
         <span style={{ color: MUTED }}>My target{unit === '%' ? ' (%)' : unit ? ` (${unitWord(unit) || unit})` : ''}</span>
         <input type="number" min="0" step="any" value={draft} autoFocus
           onChange={(e) => setDraft(e.target.value)}
-          className="w-20 rounded-[4px] border-2 bg-surface px-1.5 py-0.5" style={{ borderColor: LINE }} />
+          className="w-20 rounded-lg border bg-surface px-1.5 py-0.5" style={{ borderColor: LINE }} />
       </label>
-      <button type="submit" disabled={saving || draft === ''} className="rounded-[4px] bg-ink px-2 py-0.5 font-bold text-on-ink disabled:opacity-50">
+      <button type="submit" disabled={saving || draft === ''} className="rounded-lg bg-ink px-2 py-0.5 font-bold text-on-ink disabled:opacity-50">
         {saving ? 'Saving…' : 'Save'}
       </button>
       {target?.custom && (
@@ -162,7 +152,7 @@ function Heatmap({ rows, keys, unit, highlight, onPick }) {
                     key={r.name}
                     onClick={() => onPick(k)}
                     title={`${formatLabel(k)}, ${formatLabel(r.name)}: ${fmtValue(v, unit)}`}
-                    className="h-8 min-w-12 cursor-pointer rounded-[3px] px-1 text-center tabular-nums"
+                    className="h-8 min-w-12 cursor-pointer rounded-md px-1 text-center tabular-nums"
                     style={{
                       background: `color-mix(in srgb, var(--viz-1) ${pct}%, var(--surface))`,
                       // --surface is white in light mode (on dark blue)
@@ -185,7 +175,21 @@ function Heatmap({ rows, keys, unit, highlight, onPick }) {
 
 export default function OperationalChart({
   report, dimensionLabel = 'Category', target = null, hint, compact = false,
+  // For the PDF report: the full-size chart with its value labels, but
+  // no toolbar or clickable extras, and no animation — the page is
+  // captured as an image straight away, and a half-grown bar would be
+  // printed as it stood.
+  print = false,
   highlight: controlledHl, onHighlight, onTargetChange,
+  // Optional (name, value) => colour | null. For charts where colour
+  // carries a status (red/amber/green); null falls back to the palette.
+  colorFor,
+  // Keep the series in the order given instead of largest first — for
+  // stages (a pipeline) where the order is the meaning.
+  keepOrder: keepOrderProp = false,
+  // The same report for the same period a year earlier, drawn as a
+  // dashed line (or pale columns) behind this one. Time charts only.
+  compare = null,
 }) {
   const [targetSaving, setTargetSaving] = useState(false);
   const [targetError, setTargetError]   = useState(null);
@@ -205,9 +209,12 @@ export default function OperationalChart({
   const unit = report?.meta?.unit;
   const series = useMemo(() => report?.series ?? [], [report]);
   const shape = shapeOf(report);
-  const views = viewsFor(shape, unit, series);
+  const meta = report?.meta;
+  const views = viewsFor(shape, unit, series, meta);
+  // Days of the week keep Monday to Sunday.
+  const keepOrder = keepOrderProp || Boolean(meta?.ordered);
 
-  const [view, setView]       = useState(() => defaultView(views, report?.chartType, hint));
+  const [view, setView]       = useState(() => defaultView(views, report?.chartType, hint, meta));
   const [topN, setTopN]       = useState(compact ? 8 : 10);
   const [sortBy, setSortBy]   = useState('value');
   const [showAvg, setShowAvg] = useState(false);
@@ -227,7 +234,7 @@ export default function OperationalChart({
   // Category rows after sort and top-N. Time rows keep their order.
   const rows = useMemo(() => {
     const base = series.map((r) => ({ name: r.label, value: r.value, unit: r.meta?.unit }));
-    if (shape !== 'category') return base;
+    if (shape !== 'category' || keepOrder) return base;
     const sorted = [...base].sort((a, b) =>
       sortBy === 'name' ? String(a.name).localeCompare(String(b.name)) : Math.abs(b.value) - Math.abs(a.value));
     if (activeView === 'pareto') {
@@ -238,7 +245,7 @@ export default function OperationalChart({
         .slice(0, topN === 0 ? undefined : topN);
     }
     return topN === 0 ? sorted : sorted.slice(0, topN);
-  }, [series, shape, sortBy, topN, activeView]);
+  }, [series, shape, sortBy, topN, activeView, keepOrder]);
 
   const twoAxis = useMemo(() => (shape === 'twoAxis' ? pivot(series) : null), [shape, series]);
 
@@ -248,6 +255,16 @@ export default function OperationalChart({
   const additive = isAdditive(unit, series);
 
   const opacityFor = (name) => (highlight && highlight !== name ? DIM : 1);
+  const colourOf = (r, fallback) => colorFor?.(r.name, r.value) ?? ragColour(meta?.rag, r.value) ?? fallback;
+
+  // Time charts: points far off the usual level, and last year's
+  // figures lined up by position (month 1 against month 1).
+  const isTimeView = shape === 'time' && ['line', 'area', 'bar'].includes(activeView);
+  const anomalies = useMemo(() => (shape === 'time' ? anomaliesOf(rows) : []), [shape, rows]);
+  const prevSeries = compare?.series ?? null;
+  const timeRows = useMemo(() => (prevSeries
+    ? rows.map((r, i) => ({ ...r, previous: prevSeries[i]?.value ?? null, previousLabel: prevSeries[i]?.label ?? null }))
+    : rows), [rows, prevSeries]);
   const hbarHeight = Math.max(compact ? 150 : 180, rows.length * (compact ? 24 : 30) + 40);
   const height = compact ? 200 : 300;
 
@@ -258,7 +275,10 @@ export default function OperationalChart({
           label={{ value: `Average ${fmtValue(avg, unit)}`, fill: MUTED, fontSize: 11, position: 'insideTopRight' }} />
       )}
       {target && showTarget && (
-        <ReferenceLine {...{ [axis]: target.value }} stroke={INK} strokeDasharray="6 3" strokeWidth={1.5}
+        // extendDomain: a target above every bar (compliance at 37% against
+        // 90%) is exactly when the line matters, and Recharts would
+        // otherwise drop it for falling outside the axis.
+        <ReferenceLine {...{ [axis]: target.value }} ifOverflow="extendDomain" stroke={INK} strokeDasharray="6 3" strokeWidth={1.5}
           label={{ value: target.label, fill: INK, fontSize: 11, position: 'insideTopLeft' }} />
       )}
     </>
@@ -278,7 +298,7 @@ export default function OperationalChart({
     return <p className="py-8 text-center text-sm" style={{ color: MUTED }}>Nothing recorded for this selection.</p>;
   }
 
-  const tip = <Tooltip content={<ChartTooltip unit={unit} />} cursor={{ fill: 'var(--line)', fillOpacity: 0.4 }} />;
+  const tip = <Tooltip active={print ? false : undefined} content={<ChartTooltip unit={unit} />} cursor={print ? false : { fill: 'var(--line)', fillOpacity: 0.4 }} />;
 
   let body;
   if (activeView === 'number') {
@@ -318,6 +338,12 @@ export default function OperationalChart({
         </table>
       </div>
     );
+  } else if (activeView === 'funnel') {
+    body = <Funnel series={series} funnel={meta.funnel} unit={unit} highlight={highlight} onPick={setHighlight} />;
+  } else if (activeView === 'waterfall') {
+    body = <Waterfall series={series} unit={unit} height={height} compact={compact} />;
+  } else if (activeView === 'sankey') {
+    body = <Flow series={series} unit={unit} height={compact ? 220 : 340} />;
   } else if (activeView === 'heatmap') {
     body = <Heatmap rows={twoAxis.rows} keys={twoAxis.keys} unit={unit} highlight={highlight} onPick={setHighlight} />;
   } else if (activeView === 'stacked' || activeView === 'grouped') {
@@ -328,7 +354,7 @@ export default function OperationalChart({
           <CartesianGrid vertical={false} stroke={LINE} strokeOpacity={0.6} />
           <XAxis dataKey="name" tickFormatter={formatLabel} {...axisProps} />
           <YAxis tickFormatter={(v) => fmtTick(v, unit)} {...axisProps} width={52} />
-          <Tooltip content={<ChartTooltip unit={unit} />} cursor={{ fill: 'var(--line)', fillOpacity: 0.4 }} />
+          <Tooltip active={print ? false : undefined} content={<ChartTooltip unit={unit} />} cursor={print ? false : { fill: 'var(--line)', fillOpacity: 0.4 }} />
           <Legend
             iconType="rect"
             onClick={(e) => setHidden((h) => { const n = new Set(h); if (n.has(e.dataKey)) n.delete(e.dataKey); else n.add(e.dataKey); return n; })}
@@ -339,7 +365,7 @@ export default function OperationalChart({
               key={k} dataKey={k} name={k} stackId={stacked ? 'a' : undefined}
               fill={SERIES[i]} hide={hidden.has(k)} fillOpacity={opacityFor(k)}
               stroke={SURF} strokeWidth={stacked ? 2 : 0}
-              radius={stacked ? 0 : [4, 4, 0, 0]} maxBarSize={48}
+              radius={stacked ? 0 : [4, 4, 0, 0]} maxBarSize={48} isAnimationActive={!print}
               onClick={() => setHighlight(k)} cursor="pointer"
             />
           ))}
@@ -347,20 +373,27 @@ export default function OperationalChart({
       </ResponsiveContainer>
     );
   } else if (activeView === 'line' || activeView === 'area') {
-    const Chart = activeView === 'line' ? LineChart : AreaChart;
+    const Chart = prevSeries ? ComposedChart : activeView === 'line' ? LineChart : AreaChart;
     const hlRow = rows.find((r) => r.name === highlight);
     body = (
       <ResponsiveContainer width="100%" height={height}>
-        <Chart data={rows} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}
+        <Chart data={timeRows} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}
           onClick={(e) => e?.activeLabel && setHighlight(e.activeLabel)}>
           <CartesianGrid vertical={false} stroke={LINE} strokeOpacity={0.6} />
           <XAxis dataKey="name" tickFormatter={formatLabel} {...axisProps} />
           <YAxis tickFormatter={(v) => fmtTick(v, unit)} {...axisProps} width={52} />
-          <Tooltip content={<ChartTooltip unit={unit} />} cursor={{ stroke: MUTED, strokeWidth: 1 }} />
+          <Tooltip active={print ? false : undefined} content={<ChartTooltip unit={unit} />} cursor={print ? false : { stroke: MUTED, strokeWidth: 1 }} />
           {refLines('y')}
+          {prevSeries && (
+            <Line type="monotone" dataKey="previous" name="Same period last year" stroke={MUTED} strokeWidth={2}
+              strokeDasharray="5 4" dot={false} connectNulls isAnimationActive={false} />
+          )}
           {activeView === 'line'
-            ? <Line type="monotone" dataKey="value" stroke={SINGLE} strokeWidth={2} dot={{ r: 4, fill: SINGLE, stroke: SURF, strokeWidth: 2 }} activeDot={{ r: 6 }} />
-            : <Area type="monotone" dataKey="value" stroke={SINGLE} strokeWidth={2} fill={SINGLE} fillOpacity={0.15} />}
+            ? <Line type="monotone" dataKey="value" name="This period" stroke={SINGLE} strokeWidth={2} dot={{ r: 4, fill: SINGLE, stroke: SURF, strokeWidth: 2 }} activeDot={{ r: 6 }} isAnimationActive={!print} />
+            : <Area type="monotone" dataKey="value" name="This period" stroke={SINGLE} strokeWidth={2} fill={SINGLE} fillOpacity={0.15} isAnimationActive={!print} />}
+          {!compact && anomalies.map((a) => (
+            <ReferenceDot key={`anomaly-${a.name}`} x={a.name} y={a.value} r={8} fill="none" stroke="var(--rag-bad)" strokeWidth={2.5} />
+          ))}
           {hlRow && <ReferenceDot x={hlRow.name} y={hlRow.value} r={7} fill={SINGLE} stroke={INK} strokeWidth={2}
             label={{ value: fmtValue(hlRow.value, unit), position: 'top', fill: INK, fontSize: 12, fontWeight: 700 }} />}
         </Chart>
@@ -375,7 +408,7 @@ export default function OperationalChart({
             {tip}
             <Pie data={rows} dataKey="value" nameKey="name" innerRadius="55%" outerRadius="85%" stroke={SURF} strokeWidth={2}
               onClick={(d) => setHighlight(d.name)} cursor="pointer" isAnimationActive={false}>
-              {rows.map((r, i) => <Cell key={r.name} fill={SERIES[i % SERIES.length]} fillOpacity={opacityFor(r.name)} />)}
+              {rows.map((r, i) => <Cell key={r.name} fill={colourOf(r, SERIES[i % SERIES.length])} fillOpacity={opacityFor(r.name)} />)}
             </Pie>
           </PieChart>
         </ResponsiveContainer>
@@ -384,7 +417,7 @@ export default function OperationalChart({
             <li key={r.name}>
               <button type="button" onClick={() => setHighlight(r.name)} className="flex w-full items-center gap-2 text-left"
                 style={{ opacity: opacityFor(r.name) === 1 ? 1 : 0.5, fontWeight: highlight === r.name ? 700 : 400 }}>
-                <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: SERIES[i % SERIES.length] }} />
+                <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: colourOf(r, SERIES[i % SERIES.length]) }} />
                 <span className="min-w-0 flex-1 truncate">{formatLabel(r.name)}</span>
                 <span className="tabular-nums" style={{ color: MUTED }}>{Math.round((r.value / total) * 100)}%</span>
               </button>
@@ -396,9 +429,11 @@ export default function OperationalChart({
   } else {
     // bar, hbar, pareto
     const horizontal = activeView === 'hbar';
+    const odd = new Set(anomalies.map((a) => a.name));
+    const withPrev = isTimeView && prevSeries && !horizontal;
     body = (
       <ResponsiveContainer width="100%" height={horizontal ? hbarHeight : height}>
-        <BarChart data={rows} layout={horizontal ? 'vertical' : 'horizontal'}
+        <BarChart data={withPrev ? timeRows : rows} layout={horizontal ? 'vertical' : 'horizontal'}
           margin={{ top: 12, right: horizontal ? 48 : 8, left: 0, bottom: 0 }} barCategoryGap="20%">
           <CartesianGrid horizontal={!horizontal} vertical={horizontal} stroke={LINE} strokeOpacity={0.6} />
           {horizontal ? (
@@ -420,7 +455,11 @@ export default function OperationalChart({
             <ReferenceLine x={paretoCut} stroke={INK} strokeDasharray="6 3"
               label={{ value: '80% of the total by here', fill: INK, fontSize: 11, position: 'insideTopRight' }} />
           )}
-          <Bar dataKey="value" radius={horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]} maxBarSize={horizontal ? 22 : 48}
+          {withPrev && (
+            <Bar dataKey="previous" name="Same period last year" fill={MUTED} fillOpacity={0.35}
+              radius={[4, 4, 0, 0]} maxBarSize={48} isAnimationActive={false} />
+          )}
+          <Bar dataKey="value" name="This period" radius={horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]} maxBarSize={horizontal ? 22 : 48} isAnimationActive={!print}
             label={!compact && rows.length <= 15 ? {
               position: horizontal ? 'right' : 'top', fill: MUTED, fontSize: 11,
               formatter: (v) => fmtTick(v, unit),
@@ -428,10 +467,10 @@ export default function OperationalChart({
             {rows.map((r) => (
               <Cell
                 key={r.name}
-                fill={SINGLE}
+                fill={colourOf(r, SINGLE)}
                 fillOpacity={opacityFor(r.name)}
-                stroke={highlight === r.name ? INK : 'none'}
-                strokeWidth={highlight === r.name ? 2 : 0}
+                stroke={highlight === r.name ? INK : odd.has(r.name) && !compact ? 'var(--rag-bad)' : 'none'}
+                strokeWidth={highlight === r.name || (odd.has(r.name) && !compact) ? 2 : 0}
                 cursor="pointer"
                 onClick={() => setHighlight(r.name)}
               />
@@ -446,15 +485,15 @@ export default function OperationalChart({
 
   return (
     <figure className="m-0" aria-label={`${VIEW_LABELS[activeView]} chart by ${dimensionLabel.toLowerCase()}`}>
-      {!compact && (
+      {!compact && !print && (
         <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
           <Segmented views={views} view={activeView} onChange={setView} />
 
-          {shape === 'category' && activeView !== 'table' && series.length > 5 && (
+          {shape === 'category' && !['table', 'funnel', 'waterfall', 'sankey'].includes(activeView) && series.length > 5 && (
             <label className="inline-flex items-center gap-1">
               <span style={{ color: MUTED }}>Show</span>
               <select value={topN} onChange={(e) => setTopN(Number(e.target.value))}
-                className="rounded-[4px] border-2 bg-surface px-1.5 py-0.5" style={{ borderColor: LINE }}>
+                className="rounded-lg border bg-surface px-1.5 py-0.5" style={{ borderColor: LINE }}>
                 <option value={5}>Top 5</option>
                 <option value={10}>Top 10</option>
                 <option value={0}>All {series.length}</option>
@@ -466,7 +505,7 @@ export default function OperationalChart({
             <label className="inline-flex items-center gap-1">
               <span style={{ color: MUTED }}>Sort</span>
               <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}
-                className="rounded-[4px] border-2 bg-surface px-1.5 py-0.5" style={{ borderColor: LINE }}>
+                className="rounded-lg border bg-surface px-1.5 py-0.5" style={{ borderColor: LINE }}>
                 <option value="value">By value</option>
                 <option value="name">By name</option>
               </select>
@@ -502,7 +541,7 @@ export default function OperationalChart({
                 list="op-chart-find"
                 placeholder="Find…"
                 onChange={(e) => { const hit = series.find((r) => r.label === e.target.value); if (hit) setHighlight(hit.label); }}
-                className="w-32 rounded-[4px] border-2 bg-surface px-1.5 py-0.5" style={{ borderColor: LINE }}
+                className="w-32 rounded-lg border bg-surface px-1.5 py-0.5" style={{ borderColor: LINE }}
               />
               <datalist id="op-chart-find">
                 {series.map((r) => <option key={r.label} value={r.label} />)}
@@ -514,8 +553,8 @@ export default function OperationalChart({
         </div>
       )}
 
-      {highlight && !compact && (
-        <p className="mb-2 inline-flex items-center gap-1 rounded-full border-2 px-2 py-0.5 text-xs font-medium" style={{ borderColor: INK }}>
+      {highlight && !compact && !print && (
+        <p className="mb-2 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium" style={{ borderColor: INK }}>
           Highlighting: {formatLabel(highlight)}
           <button type="button" aria-label="Clear highlight" onClick={() => setHighlight(highlight)}>
             <X aria-hidden="true" className="h-3 w-3" />
@@ -525,9 +564,25 @@ export default function OperationalChart({
 
       {body}
 
-      {!compact && hiddenCount > 0 && (
+      {!compact && !print && hiddenCount > 0 && (
         <p className="mt-1 text-xs" style={{ color: MUTED }}>
           Showing {rows.length} of {series.length}. Choose “All” to see the rest.
+        </p>
+      )}
+      {!compact && isTimeView && prevSeries && (
+        <p className="mt-1 flex items-center gap-2 text-xs" style={{ color: MUTED }}>
+          <span aria-hidden="true" className="inline-block h-0 w-5 border-t-2 border-dashed" style={{ borderColor: MUTED }} />
+          Same period last year
+          {compact ? null : ` (${compare.spec?.dateRange?.from} to ${compare.spec?.dateRange?.to})`}
+          {!prevSeries.length && ': nothing was recorded then.'}
+        </p>
+      )}
+      {!compact && isTimeView && anomalies.length > 0 && (
+        <p className="mt-1 text-xs" style={{ color: MUTED }}>
+          <span aria-hidden="true" className="mr-1 inline-block h-2.5 w-2.5 rounded-full border align-middle" style={{ borderColor: 'var(--rag-bad)' }} />
+          Stands out from the usual level (about {fmtValue(anomalies[0].usual, unit)} {unitWord(unit)}):{' '}
+          {anomalies.map((a) => `${formatLabel(a.name)} is unusually ${a.direction} at ${fmtValue(a.value, unit)}`).join('; ')}.
+          Worth checking what happened.
         </p>
       )}
       {!compact && activeView === 'pareto' && additive && (

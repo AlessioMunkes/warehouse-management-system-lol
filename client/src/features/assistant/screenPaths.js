@@ -40,15 +40,19 @@ export const SCREEN_PATHS = {
   dispatchHistory:    STAFF.dispatchHistory,
   donation:           DONATIONS.new,
   communityRequests:  STAFF.communityRequests,
+  feedTheSoil:        STAFF.feedTheSoil,
 
   inventory:          INVENTORY,
   stockLedger:        STAFF.stockLedger,
   purchaseOrders:     STAFF.purchaseOrders,
   pickingSlips:       STAFF.pickingSlips,
   beneficiaries:      STAFF.beneficiaries,
+  collectionReminders: STAFF.collectionReminders,
+  operatingCalendar:  STAFF.operatingCalendar,
   receipts:           STAFF.receipts,
   reporting:          STAFF.reporting,
   impactReport:       STAFF.impactReport,
+  operationalGoals:   STAFF.operationalGoals,
   volunteers:         VOLUNTEERS.events,
 
   products:           ADMIN.products,
@@ -57,15 +61,29 @@ export const SCREEN_PATHS = {
   donationManagement: ADMIN.donationManagement,
   section18a:         ADMIN.section18aManagement,
   emailIntegration:   ADMIN.emailIntegration,
+  financeReport:      ADMIN.financeReport,
+  activityLog:        ADMIN.activityLog,
+  archive:            ADMIN.archive,
+  messageHistory:     ADMIN.messageHistory,
+  settings:           ADMIN.settings,
 };
 
-/** Where a screen id points, or null if this build has no such route. */
-export const pathForScreen = (id) => SCREEN_PATHS[id] ?? null;
+// The two screens each side has its own page for. A worker is sent to
+// the floor's; everyone else to the manager's in SCREEN_PATHS.
+export const FLOOR_PATHS = {
+  communityRequests: STAFF.floorRequests,
+  feedTheSoil:       STAFF.floorFeedTheSoil,
+};
+
+/** Where a screen id points for this role, or null if this build has no such route. */
+export const pathForScreen = (id, role) => (
+  (role === 'warehouse_worker' && FLOOR_PATHS[id]) || SCREEN_PATHS[id] || null
+);
 
 // Longest first, so /noc/procurement/deliveries is not swallowed by
 // /noc/procurement — and /noc, which is a prefix of nearly
 // everything, is only ever matched exactly.
-const MATCHABLE = Object.entries(SCREEN_PATHS)
+const MATCHABLE = [...Object.entries(SCREEN_PATHS), ...Object.entries(FLOOR_PATHS)]
   .filter(([, path]) => Boolean(path))
   .sort((a, b) => b[1].length - a[1].length);
 
@@ -90,4 +108,4 @@ export const matchScreen = (pathname) => {
   return null;
 };
 
-export default { SCREEN_PATHS, pathForScreen, matchScreen };
+export default { SCREEN_PATHS, FLOOR_PATHS, pathForScreen, matchScreen };

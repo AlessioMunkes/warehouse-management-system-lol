@@ -1,105 +1,82 @@
 // ─────────────────────────────────────────────────────────────
 // InventoryManagementPage.jsx
-// Styled with Ladles of Love Brand Palette & Typography
+//
+// The manager's stock list, laid out the way every manager list now
+// is (Feed the Soil's pattern): title and one line of what this is,
+// view tabs with counts, a toolbar, the table, and a panel down the
+// right for one product.
+//
+// The current tab lives in the URL as ?status=<view id>, so the
+// dashboard's low-stock tile and the low-stock notification — which
+// both link to ?status=lowstock — land on the right tab, and a tab
+// survives a refresh.
 // ─────────────────────────────────────────────────────────────
-
-import { useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { useReducedMotion } from '../features/taskdashboard/components/shellContext';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import StockHealthBar from "../features/InventoryManagement/components/StockHealthBar";
+import ViewTabs from "@/components/ui/view-tabs";
+import PageHeader, { PageShell } from "@/components/ui/page-header";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
+import ProductPickerDialog from "../features/InventoryManagement/components/ProductPickerDialog";
 import StockManifestTable from "../features/InventoryManagement/components/StockManifestTable";
+import StockDetailPanel from "../features/InventoryManagement/components/StockDetailPanel";
 import AdjustStockModal from "../features/InventoryManagement/components/AdjustStockModal";
-import MovementHistory from "../features/InventoryManagement/components/MovementHistory";
-import StockItemSummary from "../features/InventoryManagement/components/StockItemSummary";
-import { getManifest, getMovements, adjustStock, getStockTrends } from "../services/stockAPI";
+import { VIEWS, countViews, viewById } from "../features/InventoryManagement/inventoryViews";
+import { getManifest, adjustStock } from "../services/stockAPI";
+import { STAFF } from "../routes/paths";
 import { useToast } from "@/components/ui/toastContext";
+import ErrorBanner from "@/components/ui/error-banner";
 
+// Manual adjustment rewrites the ledger; raising an order commits
+// money. Both are manager and admin, matching the server's routes.
 const CAN_ADJUST = ["manager", "admin"];
+const CAN_ORDER  = ["manager", "admin"];
 
 export default function InventoryManagementPage() {
   const { user } = useAuth();
-  const [searchParams] = useSearchParams();
-  const initialStatusFilter = searchParams.get("status") === "lowstock" ? "lowstock" : "all";
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const view = viewById(searchParams.get("status")).id;
 
-  // Accessibility toggle state for TopNavbar
-  const { reducedMotion: reducedMovement } = useReducedMotion();
-
-  // Manifest & data loading state
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
 
-  // Stock adjustment modal state
-  const [isSaving, setIsSaving] = useState(false);
-  const [adjustingProduct, setAdjustingProduct] = useState(null);
+  // The product whose panel is open, by id so a reload of the manifest
+  // shows its new figures rather than the ones it was opened with.
+  const [openId, setOpenId] = useState(null);
 
-  // 30-day sparkline series, keyed by product id. Loaded alongside
-  // the manifest but never blocking it: a failure here costs one
-  // column, and the stock numbers are the reason the page exists.
-  const [trends, setTrends] = useState({});
+  // Products waiting to be adjusted, first one showing. One product is
+  // a queue of one; ticking several and choosing Adjust stock walks
+  // through them.
+  const [adjustQueue, setAdjustQueue] = useState([]);
+  const [queueTotal, setQueueTotal] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
+  // "+ Adjust stock" in the header: which product, first.
+  const [picking, setPicking] = useState(false);
 
   const toast = useToast();
-
-  // Movement history drawer state
-  // The summary panel. It borrows the same movement fetch the history
-  // drawer uses rather than adding a second one — same endpoint, same
-  // product, and two in-flight copies of one list is how they end up
-  // disagreeing.
-  const [summaryFor, setSummaryFor] = useState(null);
-  const [summaryMovements, setSummaryMovements] = useState([]);
-  const [summaryLoading, setSummaryLoading] = useState(false);
-  const [summaryError, setSummaryError] = useState(null);
-
-  const [historyFor, setHistoryFor] = useState(null);
-  const [movements, setMovements] = useState([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyError, setHistoryError] = useState(null);
-
   const canAdjust = CAN_ADJUST.includes(user?.role);
+  const canOrder  = CAN_ORDER.includes(user?.role);
 
-  // ── Initial Data Load ──────────────────────────────────────
+  const counts = useMemo(() => countViews(products), [products]);
+  const openProduct = products.find((p) => p.id === openId) ?? null;
+
+  // ── Data ───────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
-
-    const loadManifest = async () => {
-      try {
-        const rows = await getManifest();
-        if (!cancelled) {
-          setProducts(rows);
-          setLoadError(null);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setLoadError(err.message || "Could not load stock levels.");
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    loadManifest();
-
-    // Deliberately not awaited with the manifest and deliberately
-    // swallowing its error: the sparkline column degrades to dashes
-    // if this fails, which is a smaller loss than a blank screen.
-    getStockTrends(30)
-      .then((series) => { if (!cancelled) setTrends(series); })
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
+    getManifest()
+      .then((rows) => { if (!cancelled) { setProducts(rows); setLoadError(null); } })
+      .catch((err) => { if (!cancelled) setLoadError(err.message || "Could not load stock levels."); })
+      .finally(() => { if (!cancelled) setIsLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
-  // ── Reload Manifest Data ───────────────────────────────────
   const reloadManifest = useCallback(async () => {
     setIsLoading(true);
     try {
-      const rows = await getManifest();
-      setProducts(rows);
+      setProducts(await getManifest());
       setLoadError(null);
     } catch (err) {
       setLoadError(err.message || "Could not load stock levels.");
@@ -108,10 +85,22 @@ export default function InventoryManagementPage() {
     }
   }, []);
 
-  // ── Undo ───────────────────────────────────────────────────
-  // Posts the inverse delta. It does NOT delete the original
-  // movement, and it must not: stock_movements is the audit trail
-  // the reconciliation screen balances against, and a ledger you can
+  const changeView = (id) => {
+    setSearchParams(id === "all" ? {} : { status: id }, { replace: true });
+  };
+
+  // ── Adjusting ──────────────────────────────────────────────
+  const startAdjusting = (list) => {
+    setOpenId(null);
+    setAdjustQueue(list);
+    setQueueTotal(list.length);
+  };
+  const nextInQueue = () => setAdjustQueue((q) => q.slice(1));
+  const stopAdjusting = () => { setAdjustQueue([]); setQueueTotal(0); };
+
+  // Undo posts the inverse delta. It does NOT delete the original
+  // movement, and it must not: stock_movements is the audit trail the
+  // reconciliation screen balances against, and a ledger you can
   // quietly edit is not a ledger. The reversal is its own row, with a
   // reason that says what it reverses.
   //
@@ -143,14 +132,12 @@ export default function InventoryManagementPage() {
     }
   };
 
-  // ── Adjustment Handler ─────────────────────────────────────
   const handleAdjustSave = async (payload) => {
     setIsSaving(true);
     try {
       await adjustStock(payload);
       await reloadManifest();
 
-      // Read the name before the modal closes and clears it.
       const product = products.find((p) => p.id === payload.productId);
       const name    = product?.name ?? "this product";
       const delta   = Number(payload.quantityDelta);
@@ -164,8 +151,6 @@ export default function InventoryManagementPage() {
       });
       return true;
     } catch (err) {
-      // Was window.alert(), which blocks the whole tab and cannot be
-      // read by anything assistive.
       toast({
         variant: "error",
         title: "Could not save that adjustment",
@@ -177,125 +162,87 @@ export default function InventoryManagementPage() {
     }
   };
 
-  // ── Movement History Handler ──────────────────────────────
-  const handleOpenSummary = async (product) => {
-    setSummaryFor(product);
-    setSummaryMovements([]);
-    setSummaryError(null);
-    setSummaryLoading(true);
-    try {
-      setSummaryMovements(await getMovements(product.id));
-    } catch (err) {
-      // The panel still shows every figure and every catalogue fact —
-      // only the chart is missing — so this reports itself in place
-      // rather than closing the panel or blanking it.
-      setSummaryError(err.message || "Could not load the movement history for this product.");
-    } finally {
-      setSummaryLoading(false);
-    }
+  // ── Ordering ───────────────────────────────────────────────
+  // The purchase-order form seeds a line per product, with the
+  // shortfall to the reorder level as a suggested quantity.
+  const raisePurchaseOrder = (list) => {
+    navigate(`${STAFF.purchaseOrders}?products=${list.map((p) => p.id).join(",")}`);
   };
 
-  const handleViewHistory = async (product) => {
-    setHistoryFor(product);
-    setMovements([]);
-    setHistoryError(null);
-    setHistoryLoading(true);
-    try {
-      const history = await getMovements(product.id);
-      setMovements(history);
-    } catch (err) {
-      setHistoryError(err.message || "Could not load movement history.");
-    } finally {
-      setHistoryLoading(false);
-    }
-  };
+  const adjusting = adjustQueue[0] ?? null;
 
   return (
-    <div className="min-h-screen bg-surface text-ink font-['Montserrat',sans-serif] flex flex-col">
-      {/* 1. App Top Navigation Bar Header */}
+    <PageShell>
+      <PageHeader
+        title="Inventory"
+        description="Check stock levels, adjust stock and reorder what is running low."
+        actions={canAdjust ? (
+          <Button type="button" onClick={() => setPicking(true)} disabled={isLoading || products.length === 0}>
+            <Plus /> Adjust stock
+          </Button>
+        ) : null}
+      />
 
-      {/* 2. Main Content Container (Bounded at max-w-6xl for scannability) */}
-      <main className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-6 sm:space-y-8 flex-1">
-        
-        {/* Page Heading Banner with Brand Accent Bar */}
-        <div className="border-l-4 border-brand pl-4 py-1">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink">
-            Inventory Management
-          </h1>
-          <p className="text-xs sm:text-sm text-ink-soft mt-1 font-normal">
-            Real-time stock manifest, manual distribution adjustments, and audit trail logs.
-          </p>
-        </div>
+      {loadError ? <div className="mt-4"><ErrorBanner message={loadError} onRetry={reloadManifest} /></div> : null}
 
-        {/* Global Fetch Error Banner */}
-        {loadError && (
-          <div className="p-4 rounded-[4px] bg-danger-soft border-2 border-brand text-ink text-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-            <span>{loadError}</span>
-            <button
-              onClick={reloadManifest}
-              className="text-xs sm:text-sm font-semibold underline hover:text-brand focus:outline-none"
-            >
-              Try again
-            </button>
-          </div>
-        )}
+      <ViewTabs
+        className="mt-5"
+        label="Stock views"
+        value={view}
+        onChange={changeView}
+        tabs={VIEWS.map((v) => ({ id: v.id, label: v.label, alert: v.alert, count: isLoading ? null : counts[v.id] }))}
+      />
 
-        {/* 3. Stock Health Summary Cards (Passes reducedMovement) */}
-        <StockHealthBar products={products} reducedMovement={reducedMovement} />
-
-        {/* 4. Stock Manifest Data Table */}
-        {/* No overflow-x-auto: the table is fixed-layout and fits its
-            container now, so a scroll region here would only ever hide
-            a regression rather than absorb one. */}
-        <div className="w-full rounded-[4px] border border-line shadow-sm bg-surface">
-          <StockManifestTable
-            products={products}
-            isLoading={isLoading}
-            canAdjust={canAdjust}
-            initialStatusFilter={initialStatusFilter}
-            trends={trends}
-            onAdjust={(prod) => setAdjustingProduct(prod)}
-            onViewHistory={handleViewHistory}
-            onOpenSummary={handleOpenSummary}
-          />
-        </div>
-      </main>
-
-      {/* Single Product Stock Adjustment Modal */}
-      {adjustingProduct && (
-        <AdjustStockModal
-          product={adjustingProduct}
-          onSave={handleAdjustSave}
-          onClose={() => setAdjustingProduct(null)}
-          isSaving={isSaving}
-        />
-      )}
-
-      {/* Item summary — what the row was pointing at all along */}
-      {summaryFor && (
-        <StockItemSummary
-          product={summaryFor}
-          movements={summaryMovements}
-          isLoading={summaryLoading}
-          error={summaryError}
+      <div className="mt-6">
+        <StockManifestTable
+          products={products}
+          view={view}
+          isLoading={isLoading}
           canAdjust={canAdjust}
-          canEditCatalogue={user?.role === 'admin'}
-          onAdjust={(p) => { setSummaryFor(null); setAdjustingProduct(p); }}
-          onViewHistory={(p) => { setSummaryFor(null); handleViewHistory(p); }}
-          onClose={() => setSummaryFor(null)}
+          canOrder={canOrder}
+          onOpen={(p) => setOpenId(p.id)}
+          onBulkAdjust={startAdjusting}
+          onRaisePurchaseOrder={raisePurchaseOrder}
         />
-      )}
+      </div>
 
-      {/* Movement History Drawer */}
-      {historyFor && (
-        <MovementHistory
-          product={historyFor}
-          movements={movements}
-          isLoading={historyLoading}
-          error={historyError}
-          onClose={() => setHistoryFor(null)}
+      {openProduct ? (
+        <StockDetailPanel
+          key={openProduct.id}
+          product={openProduct}
+          canAdjust={canAdjust}
+          canEditCatalogue={user?.role === "admin"}
+          onAdjust={(p) => startAdjusting([p])}
+          onClose={() => setOpenId(null)}
         />
-      )}
-    </div>
+      ) : null}
+
+      {picking ? (
+        <ProductPickerDialog
+          products={products}
+          title="Adjust stock"
+          description="Choose the product to adjust."
+          onPick={(p) => { setPicking(false); startAdjusting([p]); }}
+          onClose={() => setPicking(false)}
+        />
+      ) : null}
+
+      {adjusting ? (
+        <AdjustStockModal
+          // A fresh form for each product in a run, not the last one's
+          // quantity and reason carried over.
+          key={adjusting.id}
+          product={adjusting}
+          onSave={handleAdjustSave}
+          onClose={nextInQueue}
+          isSaving={isSaving}
+          queue={queueTotal > 1 ? {
+            position: queueTotal - adjustQueue.length + 1,
+            total: queueTotal,
+            onStop: stopAdjusting,
+          } : null}
+        />
+      ) : null}
+    </PageShell>
   );
 }

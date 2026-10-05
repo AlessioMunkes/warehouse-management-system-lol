@@ -10,34 +10,33 @@
 // generateSlips both gate purely on is_active/approved_at.
 // ─────────────────────────────────────────────────────────────
 import express                      from 'express';
-import auth, { requireRole, ROLES } from '../middleware/auth.middleware.js';
+import auth, { requireRole } from '../middleware/auth.middleware.js';
+import { ALL_STAFF, MANAGERS_UP } from '../constants/permissions.js';
 import { validateIntId }            from '../middleware/validate.middleware.js';
 import beneficiaryController        from '../controllers/beneficiary.controller.js';
 
 const router = express.Router();
 
-const READERS    = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
-const MANAGES_UP = [ROLES.MANAGER, ROLES.ADMIN];
 
 router.get('/',
-  auth, requireRole(...READERS), beneficiaryController.list);
+  auth, requireRole(...ALL_STAFF), beneficiaryController.list);
 
 router.post('/',
-  auth, requireRole(...MANAGES_UP), beneficiaryController.register);
+  auth, requireRole(...MANAGERS_UP), beneficiaryController.register);
 
 router.get('/:id',
-  auth, requireRole(...READERS), validateIntId, beneficiaryController.getOne);
+  auth, requireRole(...ALL_STAFF), validateIntId, beneficiaryController.getOne);
 
 router.patch('/:id',
-  auth, requireRole(...MANAGES_UP), validateIntId, beneficiaryController.update);
+  auth, requireRole(...MANAGERS_UP), validateIntId, beneficiaryController.update);
 
 router.patch('/:id/status',
-  auth, requireRole(...MANAGES_UP), validateIntId, beneficiaryController.setStatus);
+  auth, requireRole(...MANAGERS_UP), validateIntId, beneficiaryController.setStatus);
 
 router.patch('/:id/approve',
-  auth, requireRole(...MANAGES_UP), validateIntId, beneficiaryController.approve);
+  auth, requireRole(...MANAGERS_UP), validateIntId, beneficiaryController.approve);
 
 router.patch('/:id/rollback-cohort',
-  auth, requireRole(...MANAGES_UP), validateIntId, beneficiaryController.rollbackCohort);
+  auth, requireRole(...MANAGERS_UP), validateIntId, beneficiaryController.rollbackCohort);
 
 export default router;

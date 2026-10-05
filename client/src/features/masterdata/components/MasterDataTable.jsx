@@ -41,10 +41,24 @@
 // reads as a row when they share a top edge and as two rows when they
 // are both centred.
 // ─────────────────────────────────────────────────────────────
+import { useState } from 'react';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react';
+import TablePager from '@/components/ui/table-pager';
+import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
+import { rowIntent } from '@/lib/recordCache';
+
+// A number column is centred, header and all, so the label sits over
+// its values.
+const isCentre = (col) => /(^|\s)text-center(\s|$)/.test(col.cellClass ?? '');
+// Numbers read down a column right-aligned; the header follows its
+// cells so the label sits over the figures it names.
+// The first and last columns line up with the toolbar above them
+// (ListCard's px-4 / sm:px-5).
+const EDGE = 'first:pl-4 last:pr-4 sm:first:pl-5 sm:last:pr-5';
+const isRight = (col) => /(^|\s)text-right(\s|$)/.test(col.cellClass ?? '');
 
 export default function MasterDataTable({
   columns,        // the VISIBLE columns, from useTableView
@@ -58,10 +72,42 @@ export default function MasterDataTable({
   // attribute, so a caller that needs something else does not have to
   // come back here for it.
   rowAttrs,
+  // Called when the pointer rests on a row or presses it, so the page
+  // can ask for that record before the click lands (lib/recordCache.js).
+  onRowIntent,
+  // Fifteen rows a page, with Previous / Next underneath once there
+  // are more. Every list that renders through here gets it — users,
+  // products, suppliers, beneficiaries, purchase orders, the door log.
+  pageSize = TABLE_PAGE_SIZE,
+  noun = 'records',
+  // A list the server sends in batches (the activity log): `hasMore`
+  // keeps Next live on the last loaded page, and Next there calls
+  // `onLoadMore` and moves on to the new rows once they arrive, the way
+  // the stock ledger does.
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore,
 }) {
+  // Back to page one when the sort or the filtered set changes. A batch
+  // arriving adds rows without changing what the person is looking at,
+  // so for a batched list the count is left out of the key.
+  const resetKey = `${sort?.key}|${sort?.direction}|${onLoadMore ? '' : rows.length}|${rows.length ? rowKey(rows[0]) : ''}`;
+  const paged = usePaged(rows, pageSize, resetKey);
+  const [advanceWhenLoaded, setAdvanceWhenLoaded] = useState(false);
+  if (advanceWhenLoaded && paged.page < paged.pages) {
+    setAdvanceWhenLoaded(false);
+    paged.next();
+  }
+  const next = async () => {
+    if (paged.page < paged.pages) { paged.next(); return; }
+    if (!hasMore || !onLoadMore) return;
+    setAdvanceWhenLoaded(true);
+    await onLoadMore();
+  };
   const totalWeight = columns.reduce((sum, c) => sum + (c.weight ?? 1), 0) || 1;
 
   return (
+    <>
     <Table className="w-full table-fixed">
       <colgroup>
         {columns.map((col) => (
@@ -75,7 +121,10 @@ export default function MasterDataTable({
       <TableHeader>
         <TableRow>
           {columns.map((col) => (
-            <TableHead key={col.key} className="align-bottom">
+            // A right-aligned column (a number) gets a right-aligned
+            // header, so the label sits over its values rather than
+            // off to their left.
+            <TableHead key={col.key} className={`${EDGE} ${isCentre(col) ? 'text-center' : isRight(col) ? 'text-right' : ''}`}>
               {col.sort ? (
                 // stopPropagation: without it, sorting by SKU also
                 // opened whichever row happened to be underneath the
@@ -84,7 +133,7 @@ export default function MasterDataTable({
                   type="button"
                   onClick={(e) => { e.stopPropagation(); onToggleSort(col.key); }}
                   aria-label={`Sort by ${col.label}`}
-                  className="flex w-full min-w-0 items-center gap-1 text-left hover:text-foreground"
+                  className={`flex w-full min-w-0 items-center gap-1 hover:text-foreground ${isCentre(col) ? 'justify-center text-center' : isRight(col) ? 'flex-row-reverse text-right' : 'text-left'}`}
                 >
                   {/* Headers truncate; they never wrap and never break
                       mid-word. Letting break-words loose on them turned
@@ -109,17 +158,18 @@ export default function MasterDataTable({
       </TableHeader>
 
       <TableBody>
-        {rows.map((row) => (
+        {paged.slice.map((row) => (
           <TableRow
             key={rowKey(row)}
             className="cursor-pointer"
             onClick={() => onOpenRow(row)}
+            {...(onRowIntent ? rowIntent(() => onRowIntent(row)) : null)}
             {...(rowAttrs ? rowAttrs(row) : null)}
           >
             {columns.map((col) => (
               <TableCell
                 key={col.key}
-                className={`align-top whitespace-normal break-words ${col.cellClass ?? 'text-muted-foreground'}`}
+                className={`align-top whitespace-normal break-words ${EDGE} ${col.cellClass ?? 'text-muted-foreground'}`}
               >
                 {col.cell(row)}
               </TableCell>
@@ -128,5 +178,10 @@ export default function MasterDataTable({
         ))}
       </TableBody>
     </Table>
+    {/* Drawn as a ListCard footer would be, and always there once
+        there are rows, so the card has the same bottom edge as every
+        other list. */}
+    <TablePager {...paged} next={next} hasMore={hasMore} loading={loadingMore} noun={noun} alwaysShow className="border-t px-4 sm:px-5" />
+    </>
   );
 }

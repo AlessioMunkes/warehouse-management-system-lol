@@ -331,7 +331,7 @@ describe.skip('DecantingFlow', () => {
     const user = userEvent.setup();
     await startASack(user);
 
-    expect(screen.getByText('On the scale')).toBeInTheDocument();
+    expect(screen.getByText('Bulk amount')).toBeInTheDocument();
     expect(screen.getByText('Bag this many')).toBeInTheDocument();
     expect(screen.getByText('What you actually got')).toBeInTheDocument();
   });
@@ -340,7 +340,7 @@ describe.skip('DecantingFlow', () => {
     const user = userEvent.setup();
     await startASack(user);
 
-    expect(screen.getByRole('button', { name: 'Save this sack' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Save decanted amount' })).toBeDisabled();
     // And says why, rather than leaving a dead button.
     expect(screen.getByText(/Still needed/)).toBeInTheDocument();
   });
@@ -350,7 +350,7 @@ describe.skip('DecantingFlow', () => {
     decantingAPI.calculateDecantingPlan.mockResolvedValue(PLAN);
     await startASack(user);
 
-    await user.type(screen.getByLabelText('Kilograms on the scale'), '48');
+    await user.type(screen.getByLabelText('Bulk amount on the scale, in kilograms'), '48');
     await user.type(screen.getByLabelText(/Kilograms the centres need/), '30');
     await user.click(screen.getByRole('button', { name: 'Work out the bags' }));
 
@@ -377,12 +377,12 @@ describe.skip('DecantingFlow', () => {
     decantingAPI.recordDecanting.mockResolvedValue({ id: 1 });
     await startASack(user);
 
-    await user.type(screen.getByLabelText('Kilograms on the scale'), '48');
+    await user.type(screen.getByLabelText('Bulk amount on the scale, in kilograms'), '48');
     await user.type(screen.getByLabelText(/Kilograms the centres need/), '30');
     await user.click(screen.getByRole('button', { name: 'Work out the bags' }));
     await screen.findByText('bags of 2kg');
 
-    await user.click(screen.getByRole('button', { name: 'Save this sack' }));
+    await user.click(screen.getByRole('button', { name: 'Save decanted amount' }));
 
     await waitFor(() =>
       expect(decantingAPI.recordDecanting).toHaveBeenCalledWith(

@@ -7,7 +7,7 @@
 // ReportChart.jsx's SVG charts.
 //
 // Honours the shell's "Less movement" setting (ReducedMotionContext,
-// features/taskdashboard/components/shellContext.js) by jumping
+// components/layout/shellContext.js) by jumping
 // straight to the final value instead of animating — the same toggle
 // TaskGrid and StockHealthBar already read, so this does not invent a
 // second reduced-motion opinion.
@@ -21,7 +21,7 @@
 // (the date-range preset changing) still animates old → new.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from 'react';
-import { useReducedMotion } from '../../taskdashboard/components/shellContext';
+import { useReducedMotion } from '../../../components/layout/shellContext';
 
 const DURATION_MS = 900;
 

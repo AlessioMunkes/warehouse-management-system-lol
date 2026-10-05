@@ -1,4 +1,4 @@
-﻿// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
 // client/src/components/ui/list-card.jsx
 //
 // The card a manager list lives in: the toolbar (or the bulk-action bar
@@ -26,4 +26,3 @@ export default function ListCard({ header, footer, children, className }) {
     </Card>
   );
 }
-

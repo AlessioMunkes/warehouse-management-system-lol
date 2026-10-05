@@ -136,9 +136,9 @@ const partialBagText = (partialBag) => {
 // A percentage on screen is a number nobody can act on.
 const leftoverSentence = (plan) => {
   const left = Number(plan.surplusKg ?? 0);
-  if (left <= 0) return 'That uses the whole sack.';
-  if (left < 1) return 'That leaves a little under a kilo in the sack.';
-  return `That leaves about ${Math.round(left)} kg in the sack.`;
+  if (left <= 0) return 'That uses the whole bulk amount.';
+  if (left < 1) return 'That leaves a little under a kilo of the bulk amount.';
+  return `That leaves about ${Math.round(left)} kg of the bulk amount.`;
 };
 
 const parseKgInput = (raw) => {
@@ -526,7 +526,7 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
     } catch (err) {
       setError(
         /cannot exceed/.test(err.message)
-          ? 'You cannot have spilled more than was in the sack. Check that number.'
+          ? 'You cannot have spilled more than the bulk amount. Check that number.'
           : err.message
       );
     } finally {
@@ -580,10 +580,10 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
   const commit = (
     <Actions>
       <Button disabled={busy} onClick={save}>
-        {busy ? 'Saving' : 'Save this sack'}
+        {busy ? 'Saving' : 'Save decanted amount'}
       </Button>
       <Button variant="secondary" onClick={() => setPhase('which')}>
-        Change the sack
+        Change the product
       </Button>
     </Actions>
   );
@@ -630,7 +630,7 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
 
         {line.isBulkLimited ? (
           <Notice tone="warn">
-            This sack does not hold everything the centres need this week. Pack what is here
+            This bulk amount does not cover everything the centres need this week. Pack what is here
             and tell your manager, so they can order more.
           </Notice>
         ) : null}
@@ -662,7 +662,7 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
       {phase === 'which' && (
         <StepScreen
           title="What are you decanting?"
-          sub="Pick the sack in front of you."
+          sub="Pick the product in front of you."
           toggle={toggleControl}
           actions={
             <Actions>
@@ -693,8 +693,8 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
               options={productSearch.filtered.map((p) => ({
                 value: p.id,
                 label: p.weight_kg
-                  ? `${p.name} · big sacks, about ${Number(p.weight_kg)} kg`
-                  : `${p.name} · bulk sacks`,
+                  ? `${p.name} · bulk, about ${Number(p.weight_kg)} kg each`
+                  : `${p.name} · bulk`,
               }))}
               value={productId}
               onChange={(value) => {
@@ -723,19 +723,19 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
       {phase === 'work' && (
         <TaskPage
           title={product ? product.name : 'Decanting'}
-          sub="Weigh the sack, fill the bags it works out to, then say what you actually got."
+          sub="Weigh the bulk amount, fill the bags it works out to, then enter the decanted amount."
           toggle={toggleControl}
           note={blockedNote}
           actions={commit}
           side={
             <div className="stf-summary">
-              <p className="stf-summary-title">This sack</p>
+              <p className="stf-summary-title">This run</p>
               <KeyValues
                 pairs={[
                   ['Product', product ? product.name : '—'],
-                  ['On the scale', weighedKg ? `${weighedKg} kg` : '—'],
+                  ['Bulk amount', weighedKg ? `${weighedKg} kg` : '—'],
                   ['Needed this week', requiredKg ? `${requiredKg} kg` : '—'],
-                  ['Bags counted back', plan ? String(madeTotal) : '—'],
+                  ['Decanted amount', plan ? `${madeTotal} bags` : '—'],
                   ['Spilled', wastageKg ? `${wastageKg} kg` : '0 kg'],
                   ['Filed under', `Week of ${longDate(weekOf)}`],
                 ]}
@@ -747,19 +747,19 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
           {/* ── Panel 1 · the scale ───────────────────────── */}
           <Panel
             n={1}
-            title="On the scale"
+            title="Bulk amount"
             done={Boolean(plan)}
             open={isOpen('scale')}
             onOpen={mode === 'guided' ? openPanel('scale') : null}
             summary={
               weighedKg
-                ? `${weighedKg} kg weighed · ${requiredKg || '—'} kg needed`
+                ? `${weighedKg} kg bulk · ${requiredKg || '—'} kg needed`
                 : 'Not weighed yet'
             }
           >
             <NumberField
               id="stf-weighed"
-              label="Kilograms on the scale"
+              label="Bulk amount on the scale, in kilograms"
               value={weighedKg}
               onChange={changeInput(setWeighedKg)}
             />
@@ -825,7 +825,7 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
             summary={
               plan
                 ? activeBagLabels.map((l) => `${plan.bags[l]} × ${l}`).join(' · ')
-                : 'Weigh the sack first'
+                : 'Weigh the bulk amount first'
             }
           >
             {plan ? (
@@ -858,11 +858,11 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
           {/* ── Panel 3 · count back ──────────────────────── */}
           <Panel
             n={3}
-            title="What you actually got"
+            title="Decanted amount"
             locked={!plan}
             open={isOpen('count')}
             onOpen={mode === 'guided' ? openPanel('count') : null}
-            summary={plan ? `${madeTotal} bags counted back` : 'Weigh the sack first'}
+            summary={plan ? `${madeTotal} bags decanted` : 'Weigh the bulk amount first'}
           >
             {plan ? (
               <>
@@ -905,7 +905,7 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
                     either way. */}
                 {Number(wastageKg) > Number(weighedKg) * 0.05 ? (
                   <Notice tone="warn">
-                    That is more waste than usual for a sack this size. Your manager will look at it.
+                    That is more waste than usual for a bulk amount this size. Your manager will look at it.
                     You can still save.
                   </Notice>
                 ) : null}
@@ -922,7 +922,7 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
           sub="The bags are on the system and the waste is on this week's report."
           actions={
             <Actions>
-              <Button onClick={restart}>Decant another sack</Button>
+              <Button onClick={restart}>Decant another bulk amount</Button>
             </Actions>
           }
         />

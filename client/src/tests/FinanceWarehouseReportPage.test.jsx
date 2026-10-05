@@ -49,7 +49,7 @@ vi.mock('xlsx', () => ({
   },
   writeFile: exportMocks.writeFile,
 }));
-vi.mock('../features/taskdashboard/components/ManagerLayout', () => ({
+vi.mock('../components/layout/ManagerLayout', () => ({
   default: ({ children }) => <div>{children}</div>,
 }));
 

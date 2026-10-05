@@ -27,13 +27,13 @@ const { default: beneficiaryService } = await import('../src/services/beneficiar
 const BENEFICIARY_ID = 6;
 
 const existingBeneficiary = (over = {}) => ({
-  id: BENEFICIARY_ID, name: 'Sunnyside ECD', cohort: 'week1',
+  id: BENEFICIARY_ID, name: 'Sunnyside ECD', cohort: 'tuesday',
   contact_name: 'Jane Doe', contact_email: null, mobile_number: null, child_count: 40,
   is_active: true, approved_at: null, last_collected_date: null, ...over,
 });
 
 const body = (over = {}) => ({
-  name: 'Sunnyside ECD', cohort: 'week1', contactName: 'Jane Doe', contactEmail: 'ECD@Example.ORG', mobileNumber: '+27 82 123 4567', childCount: 40, ...over,
+  name: 'Sunnyside ECD', cohort: 'tuesday', contactName: 'Jane Doe', contactEmail: 'ECD@Example.ORG', mobileNumber: '+27 82 123 4567', childCount: 40, ...over,
 });
 
 beforeEach(() => {
@@ -44,7 +44,7 @@ beforeEach(() => {
   repoMock.updateBeneficiary.mockResolvedValue(existingBeneficiary());
   repoMock.setBeneficiaryActive.mockResolvedValue(existingBeneficiary());
   repoMock.approveBeneficiary.mockResolvedValue(existingBeneficiary({ approved_at: '2026-08-01' }));
-  repoMock.rollbackCohort.mockResolvedValue(existingBeneficiary({ cohort: 'week2' }));
+  repoMock.rollbackCohort.mockResolvedValue(existingBeneficiary({ cohort: 'thursday' }));
 });
 
 describe('listBeneficiaries', () => {

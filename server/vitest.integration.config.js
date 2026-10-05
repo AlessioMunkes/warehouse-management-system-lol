@@ -7,5 +7,8 @@ export default defineConfig({
     environment: 'node',
     setupFiles: ['./__tests__/setup.js'],
     include: ['**/__tests__/intergration/**/*.test.js'],
+    // One file at a time: these suites empty the tables they use, so two
+    // files running side by side wipe each other's data.
+    fileParallelism: false,
   },
 });

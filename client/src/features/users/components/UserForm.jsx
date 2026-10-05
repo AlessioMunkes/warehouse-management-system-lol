@@ -3,7 +3,7 @@
 //
 // EDIT ONLY. Creating a user now goes through InviteForm.jsx (email +
 // role, an emailed link) — see UserDirectoryPage.jsx. This form still
-// changes username, first name, last name and role for an existing
+// changes username, first name, last name, email and role for an existing
 // account; it has never had a password field for that path (see
 // user.service.js: updateUser has no password branch at all — there
 // is still no change-password path anywhere in this codebase).
@@ -31,6 +31,10 @@ import { Loader2 } from 'lucide-react';
 
 // Display labels only — every stored/validated/API value stays
 // warehouse_worker, matching the live users.role CHECK constraint.
+// Same loose shape check as InviteForm.jsx and the server: catches
+// typos, not RFC 5322. Blank is fine — an account may have no email.
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const ROLE_OPTIONS = [
   { value: 'warehouse_worker', label: 'Worker' },
   { value: 'manager',          label: 'Manager' },
@@ -47,7 +51,7 @@ export default function UserForm({
   error = null,
 }) {
   const [form, setForm] = useState({
-    username: '', firstName: '', lastName: '', role: 'warehouse_worker',
+    username: '', firstName: '', lastName: '', email: '', role: 'warehouse_worker',
     ...initial,
   });
   const [touched, setTouched] = useState({});
@@ -58,18 +62,26 @@ export default function UserForm({
   const usernameMissing  = !String(form.username ?? '').trim();
   const firstNameMissing = !String(form.firstName ?? '').trim();
   const lastNameMissing  = !String(form.lastName ?? '').trim();
+  const emailTrimmed     = String(form.email ?? '').trim();
+  const emailInvalid     = Boolean(emailTrimmed) && !EMAIL_PATTERN.test(emailTrimmed);
   const roleLocked       = isSelf && form.role === 'admin';
 
   const submit = () => {
-    setTouched({ username: true, firstName: true, lastName: true });
-    if (usernameMissing || firstNameMissing || lastNameMissing) return;
+    setTouched({ username: true, firstName: true, lastName: true, email: true });
+    if (usernameMissing || firstNameMissing || lastNameMissing || emailInvalid) return;
 
-    onSubmit({
+    const patch = {
       username:  form.username,
       firstName: form.firstName,
       lastName:  form.lastName,
       role:      form.role,
-    });
+    };
+    // Only sent when changed. Blank clears the address (null); the
+    // server lowercases and checks it is not already in use.
+    if (emailTrimmed !== String(initial?.email ?? '').trim()) {
+      patch.email = emailTrimmed || null;
+    }
+    onSubmit(patch);
   };
 
   return (
@@ -130,6 +142,22 @@ export default function UserForm({
             aria-invalid={(touched.lastName && lastNameMissing) || undefined}
           />
           {touched.lastName && lastNameMissing ? <FieldError>A last name is required.</FieldError> : null}
+        </Field>
+
+        <Field data-invalid={(touched.email && emailInvalid) || undefined} className="sm:col-span-2">
+          <FieldLabel htmlFor="user-email">Email</FieldLabel>
+          <Input
+            id="user-email"
+            type="email"
+            value={form.email}
+            onChange={set('email')}
+            onBlur={touch('email')}
+            placeholder="Optional"
+            aria-invalid={(touched.email && emailInvalid) || undefined}
+          />
+          {touched.email && emailInvalid
+            ? <FieldError>Enter a valid email address, like name@example.org.</FieldError>
+            : <FieldDescription>Add an email address so this person can reset their own password. Leave blank to remove it.</FieldDescription>}
         </Field>
       </div>
 

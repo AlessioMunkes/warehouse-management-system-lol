@@ -18,7 +18,36 @@
 // ─────────────────────────────────────────────────────────────
 import pool           from '../config/db.js';
 import { logAudit }   from './auditLog.repository.js';
-import { createNotification } from './notification.repository.js';
+import { safeFinanceEmailError } from '../utils/financeEmailError.js';
+import { buildState, classifyPair } from '../utils/quickbooksImport.js';
+
+const QBO_UNIQUE_CONSTRAINT = 'qbo_map_unique_remote';
+
+// UNIQUE (qbo_object_type, qbo_id): one QuickBooks PO number can be
+// linked to only one PO here. Turns that violation into a 409 naming the
+// PO that already holds it. Must run after ROLLBACK, on a client that
+// is out of the failed transaction.
+const duplicateLinkError = async (client, quickbooksPoId) => {
+  const { rows } = await client.query(
+    `SELECT po.po_number
+       FROM quickbooks_object_map qom
+       JOIN purchase_orders po ON po.id = qom.entity_id
+      WHERE qom.entity_type = 'purchase_order'
+        AND qom.qbo_object_type = 'PurchaseOrder'
+        AND qom.qbo_id = $1
+      LIMIT 1`,
+    [quickbooksPoId]
+  );
+  const other = rows[0]?.po_number;
+  const err = new Error(other
+    ? `QuickBooks PO number ${quickbooksPoId} is already linked to ${other}. Enter a different number.`
+    : `QuickBooks PO number ${quickbooksPoId} is already linked to another purchase order. Enter a different number.`);
+  err.status = 409;
+  return err;
+};
+
+const isDuplicateLink = (err) =>
+  err?.code === '23505' && err.constraint === QBO_UNIQUE_CONSTRAINT;
 
 // Named columns rather than SELECT *, so a column added later does not
 // silently start crossing the API.
@@ -153,6 +182,7 @@ const createPurchaseOrder = async (payload, userId) => {
     };
   } catch (err) {
     await client.query('ROLLBACK');
+    if (quickbooksPoId && isDuplicateLink(err)) throw await duplicateLinkError(client, quickbooksPoId);
     throw err;
   } finally {
     client.release();
@@ -170,6 +200,17 @@ const listPurchaseOrders = async ({ status = null, supplierId = null, limit = 50
             u.first_name AS created_by_name,
             (SELECT COUNT(*) FROM purchase_order_items poi
               WHERE poi.purchase_order_id = po.id)::int AS line_count,
+            -- Lines whose full expected quantity has arrived, summed
+            -- over every delivery against them. The "n of m received"
+            -- the list shows; partially_received is not written
+            -- automatically (see delivery.repository.js), so the status
+            -- alone cannot say how far an order has got.
+            (SELECT COUNT(*) FROM purchase_order_items poi
+              WHERE poi.purchase_order_id = po.id
+                AND COALESCE((SELECT SUM(dni.received_quantity)
+                                FROM delivery_note_items dni
+                               WHERE dni.purchase_order_item_id = poi.id), 0)
+                    >= poi.expected_quantity)::int AS received_line_count,
             (SELECT COALESCE(SUM(poi.expected_quantity * COALESCE(poi.unit_price, 0)), 0)
                FROM purchase_order_items poi
               WHERE poi.purchase_order_id = po.id) AS estimated_value,
@@ -190,12 +231,18 @@ const listPurchaseOrders = async ({ status = null, supplierId = null, limit = 50
 
 // ── Detail ────────────────────────────────────────────────────
 const getPurchaseOrderById = async (id) => {
-  const { rows } = await pool.query(
+  // The three reads do not depend on each other, so they go together:
+  // one wait on the database instead of three in a row.
+  const [{ rows }, { rows: items }, { rows: deliveries }] = await Promise.all([
+    pool.query(
     `SELECT ${PO_COLUMNS},
             s.name AS supplier_name,
             s.is_active AS supplier_is_active,
             u.first_name AS created_by_name,
-            qom.qbo_id AS quickbooks_po_id
+            qom.qbo_id AS quickbooks_po_id,
+            po.finance_email_status,
+            po.finance_email_error,
+            po.finance_email_attempted_at
        FROM purchase_orders po
        JOIN suppliers s ON s.id = po.supplier_id
        LEFT JOIN users u ON u.id = po.created_by
@@ -204,14 +251,12 @@ const getPurchaseOrderById = async (id) => {
              AND qom.entity_id = po.id
       WHERE po.id = $1`,
     [id]
-  );
-  const purchaseOrder = rows[0];
-  if (!purchaseOrder) return null;
+  ),
 
   // received_to_date comes from delivery_note_items joined back to the
   // PO line, which is what makes BR-07A work without a new table:
   // one PO, many delivery_notes, each with its own item rows.
-  const { rows: items } = await pool.query(
+    pool.query(
     `SELECT poi.id, poi.product_id, poi.expected_quantity,
             poi.expected_weight_kg, poi.unit_price,
             p.name AS product_name,
@@ -227,7 +272,7 @@ const getPurchaseOrderById = async (id) => {
       WHERE poi.purchase_order_id = $1
       ORDER BY p.name ASC`,
     [id]
-  );
+  ),
 
   // Every delivery actually recorded against this PO, oldest first —
   // real events for the PO detail's timeline (order raised, then one
@@ -236,7 +281,7 @@ const getPurchaseOrderById = async (id) => {
   // status changes (only status_changed_at, the most recent one), so
   // the timeline is built from what's actually there: this table plus
   // the PO's own created_at/status_changed_at.
-  const { rows: deliveries } = await pool.query(
+    pool.query(
     `SELECT dn.id, dn.delivery_date, dn.status, dn.driver_name,
             u.first_name AS received_by_name,
             COALESCE(disc.discrepancy_count, 0) > 0 AS has_discrepancies
@@ -250,7 +295,13 @@ const getPurchaseOrderById = async (id) => {
       WHERE dn.purchase_order_id = $1
       ORDER BY dn.delivery_date ASC, dn.id ASC`,
     [id]
-  );
+  ),
+  ]);
+
+  const purchaseOrder = rows[0];
+  if (!purchaseOrder) return null;
+  // Whatever is stored, only a short safe message leaves the repository.
+  purchaseOrder.finance_email_error = safeFinanceEmailError(purchaseOrder.finance_email_error);
 
   return { ...purchaseOrder, items, deliveries };
 };
@@ -261,12 +312,14 @@ const getPurchaseOrderById = async (id) => {
 // onto a PO that has since moved past it and read as if it still
 // applies.
 //
-// Runs in its own transaction (rather than a bare pool.query) purely
-// so the notification for 'returned'/'follow_up_required' can use
-// createNotification, which — like logAudit — requires the caller's
-// client so a notification can never survive a change that itself
-// got rolled back.
-const updatePurchaseOrderStatus = async (id, status, reason) => {
+// Runs in its own transaction (rather than a bare pool.query) so the
+// service's notification for 'returned'/'follow_up_required' — passed
+// in as beforeCommit — goes in with the status change or not at all.
+//
+// The reason is kept for both of those statuses: it is what the order
+// shows as needing attention. Every other status clears it, so a
+// reopened order does not keep an old complaint.
+const updatePurchaseOrderStatus = async (id, status, reason, { beforeCommit } = {}) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -278,19 +331,11 @@ const updatePurchaseOrderStatus = async (id, status, reason) => {
               status_changed_at = NOW()
         WHERE id = $1
         RETURNING ${PO_COLUMNS.replace(/po\./g, '')}`,
-      [id, status, status === 'returned' ? reason : null]
+      [id, status, (status === 'returned' || status === 'follow_up_required') ? reason : null]
     );
     const po = rows[0] ?? null;
 
-    if (po && (status === 'returned' || status === 'follow_up_required')) {
-      await createNotification(client, {
-        type:       'purchase_order_needs_attention',
-        title:      `Purchase order ${po.po_number} ${status === 'returned' ? 'returned' : 'needs follow-up'}`,
-        body:       reason ?? null,
-        entityType: 'purchase_order',
-        entityId:   id,
-      });
-    }
+    if (beforeCommit) await beforeCommit(client, { purchaseOrder: po, status, reason });
 
     await client.query('COMMIT');
     return po;
@@ -354,6 +399,121 @@ const setQuickbooksReference = async (id, quickbooksPoId, actorId) => {
 
     await client.query('COMMIT');
     return true;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    if (quickbooksPoId && isDuplicateLink(err)) throw await duplicateLinkError(client, quickbooksPoId);
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
+// ── QuickBooks links import ──────────────────────────────────
+// Two statements however many rows: our POs by number, then every link
+// on those POs or holding those QuickBooks numbers. Never one query per
+// row. LEFT JOIN so a link whose PO has been deleted still counts as
+// the holder of its number (the unique index would block the insert
+// regardless).
+const loadImportState = async (db, poNumbers, qbNumbers, { lock = false } = {}) => {
+  const { rows: poRows } = await db.query(
+    `SELECT id, po_number
+       FROM purchase_orders
+      WHERE po_number = ANY($1::text[])
+      ORDER BY id
+      ${lock ? 'FOR UPDATE' : ''}`,
+    [poNumbers]
+  );
+  const { rows: linkRows } = await db.query(
+    `SELECT qom.entity_id, qom.qbo_id, po.po_number
+       FROM quickbooks_object_map qom
+       LEFT JOIN purchase_orders po ON po.id = qom.entity_id
+      WHERE qom.entity_type = 'purchase_order'
+        AND qom.qbo_object_type = 'PurchaseOrder'
+        AND (qom.entity_id = ANY($1::int[]) OR qom.qbo_id = ANY($2::text[]))`,
+    [poRows.map((r) => r.id), qbNumbers]
+  );
+  return buildState(poRows, linkRows);
+};
+
+// pairs: [{ poNumber, quickbooksNumber }] already normalised.
+// → [{ status, linkedQuickbooksNumber?, linkedToPoNumber? }] in order.
+const previewQuickbooksLinks = async (pairs) => {
+  const state = await loadImportState(
+    pool,
+    [...new Set(pairs.map((p) => p.poNumber))],
+    [...new Set(pairs.map((p) => p.quickbooksNumber))]
+  );
+  return pairs.map((p) => classifyPair(p, state));
+};
+
+// pairs: [{ poNumber, quickbooksNumber, overwrite }] already normalised
+// and free of duplicates. All or nothing: one transaction, the POs
+// locked first, everything re-classified against the locked data, then
+// one DELETE, one INSERT and one audit INSERT whatever the row count.
+// The audit rows are the same quickbooks_ref_set rows the manual edit
+// writes, plus a reason, and one for each PO whose link was displaced.
+// → [{ status: linked | overwritten | unchanged | skipped_conflict | not_found, ... }]
+const applyQuickbooksLinks = async (pairs, actorId) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const state = await loadImportState(
+      client,
+      [...new Set(pairs.map((p) => p.poNumber))],
+      [...new Set(pairs.map((p) => p.quickbooksNumber))],
+      { lock: true }
+    );
+
+    const results = [];
+    const deleteIds = new Set();
+    const inserts = []; // { poId, qb }
+    const audits  = []; // { poId, qb } — qb null = link removed
+    for (const pair of pairs) {
+      const c = classifyPair(pair, state);
+      if (c.status === 'not_found' || c.status === 'unchanged') {
+        results.push({ status: c.status });
+        continue;
+      }
+      if (c.status === 'conflict' && !pair.overwrite) {
+        results.push({ status: 'skipped_conflict', linkedQuickbooksNumber: c.linkedQuickbooksNumber, linkedToPoNumber: c.linkedToPoNumber });
+        continue;
+      }
+      deleteIds.add(c.poId);
+      inserts.push({ poId: c.poId, qb: pair.quickbooksNumber });
+      audits.push({ poId: c.poId, qb: pair.quickbooksNumber });
+      if (c.displacedPoId) {
+        deleteIds.add(c.displacedPoId);
+        audits.push({ poId: c.displacedPoId, qb: null });
+      }
+      results.push({ status: c.status === 'conflict' ? 'overwritten' : 'linked' });
+    }
+
+    if (inserts.length) {
+      await client.query(
+        `DELETE FROM quickbooks_object_map
+          WHERE entity_type = 'purchase_order' AND entity_id = ANY($1::int[])`,
+        [[...deleteIds]]
+      );
+      await client.query(
+        `INSERT INTO quickbooks_object_map
+           (entity_type, entity_id, qbo_object_type, qbo_id)
+         SELECT 'purchase_order', t.po_id, 'PurchaseOrder', t.qb
+           FROM unnest($1::int[], $2::text[]) AS t(po_id, qb)`,
+        [inserts.map((r) => r.poId), inserts.map((r) => r.qb)]
+      );
+      await client.query(
+        `INSERT INTO audit_log
+           (entity_type, entity_id, action, actor_id, reason, after_data)
+         SELECT 'purchase_order', t.po_id::text, 'quickbooks_ref_set', $3::int,
+                'QuickBooks import', jsonb_build_object('quickbooksPoId', t.qb)
+           FROM unnest($1::int[], $2::text[]) AS t(po_id, qb)`,
+        [audits.map((r) => r.poId), audits.map((r) => r.qb), actorId]
+      );
+    }
+
+    await client.query('COMMIT');
+    return results;
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
@@ -572,5 +732,7 @@ export default {
   updatePurchaseOrder,
   deletePurchaseOrder,
   setQuickbooksReference,
+  previewQuickbooksLinks,
+  applyQuickbooksLinks,
   recordFinanceEmailAttempt,
 };

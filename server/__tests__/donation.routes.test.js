@@ -43,7 +43,6 @@ const cookieFor = (role, overrides = {}) => {
 };
 
 const ALL_ROLES    = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
-const RECEIVERS_UP = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 const MANAGERS_UP  = [ROLES.MANAGER, ROLES.ADMIN];
 
 const BODY = {
@@ -136,9 +135,16 @@ describe('donation routes — authorisation', () => {
     expect(res.status).toBe(200);
   });
 
-  it.each(RECEIVERS_UP)('%s can record a donation', async (role) => {
-    const res = await request(app).post(BASE).set('Cookie', cookieFor(role)).send(BODY);
+  // Donation intake is floor work: each role works only its own
+  // screens. Admins correct donations on the Classification Queue.
+  it('a warehouse worker can record a donation', async () => {
+    const res = await request(app).post(BASE).set('Cookie', cookieFor(ROLES.WORKER)).send(BODY);
     expect(res.status).toBe(201);
+  });
+
+  it.each([ROLES.MANAGER, ROLES.ADMIN])('%s cannot record a donation', async (role) => {
+    const res = await request(app).post(BASE).set('Cookie', cookieFor(role)).send(BODY);
+    expect(res.status).toBe(403);
   });
 
   // Finance can read the money side but must not be able to record
@@ -227,6 +233,31 @@ describe('donation routes — authorisation', () => {
     const res = await request(app).get(`${BASE}/unmatched`)
       .set('Cookie', cookieFor(ROLES.WORKER));
     expect(res.status).toBe(403);
+  });
+});
+
+// ── Section 18A is the office's: managers and admins, never the floor ──
+describe('donation routes — Section 18A queue and email history', () => {
+  const paths = ['/section-18a', '/section-18a/emails'];
+
+  it('answers managers and admins', async () => {
+    for (const role of [ROLES.MANAGER, ROLES.ADMIN]) {
+      for (const path of paths) {
+        const res = await request(app).get(`${BASE}${path}`).set('Cookie', cookieFor(role));
+        expect(res.status, `${role} ${path}`).toBe(200);
+      }
+    }
+  });
+
+  it('refuses a warehouse worker', async () => {
+    serviceMock.listSection18AQueue.mockClear();
+    serviceMock.listEmailHistory.mockClear();
+    for (const path of paths) {
+      const res = await request(app).get(`${BASE}${path}`).set('Cookie', cookieFor(ROLES.WORKER));
+      expect(res.status, path).toBe(403);
+    }
+    expect(serviceMock.listSection18AQueue).not.toHaveBeenCalled();
+    expect(serviceMock.listEmailHistory).not.toHaveBeenCalled();
   });
 });
 

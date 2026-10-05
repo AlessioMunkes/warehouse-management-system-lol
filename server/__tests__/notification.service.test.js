@@ -63,3 +63,31 @@ describe('markAllRead', () => {
     expect(repoMock.markAllRead).toHaveBeenCalledWith(USER.id, USER.role);
   });
 });
+
+// ── Floor (worker-facing) ────────────────────────────────────
+// Same repo functions, narrowed to FLOOR_TYPES so a worker's bell
+// never pulls in a manager-only event (BR-14's sweep, a PO return).
+const FLOOR_TYPES = ['picking_slips_generated', 'picking_slip_created', 'picking_slip_released'];
+
+describe('listFloorNotifications', () => {
+  it('scopes the read to floor types only', async () => {
+    await notificationService.listFloorNotifications(USER, {});
+    expect(repoMock.listForUser).toHaveBeenCalledWith(USER.id, null, {
+      unreadOnly: false, types: FLOOR_TYPES,
+    });
+  });
+});
+
+describe('getFloorUnreadCount', () => {
+  it('scopes the count to floor types only', async () => {
+    await notificationService.getFloorUnreadCount(USER);
+    expect(repoMock.getUnreadCount).toHaveBeenCalledWith(USER.id, null, { types: FLOOR_TYPES });
+  });
+});
+
+describe('markAllFloorRead', () => {
+  it('scopes the write to floor types only', async () => {
+    await notificationService.markAllFloorRead(USER);
+    expect(repoMock.markAllRead).toHaveBeenCalledWith(USER.id, null, { types: FLOOR_TYPES });
+  });
+});

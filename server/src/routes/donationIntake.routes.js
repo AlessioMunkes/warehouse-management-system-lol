@@ -12,30 +12,28 @@
 // "which handler actually ran" bugs.
 // ─────────────────────────────────────────────────────────────
 import express from 'express';
-import auth, { requireRole, ROLES } from '../middleware/auth.middleware.js';
+import auth, { requireRole } from '../middleware/auth.middleware.js';
+import { ALL_STAFF, MANAGERS_UP } from '../constants/permissions.js';
 import donationIntakeController from '../controllers/donation.intake.controller.js';
 
 const router = express.Router();
 
-// Same source-of-truth pattern as donationAdmin.routes.js — one array,
-// reused at the route level here AND inside the controller's own
-// allowedRoles check, both importing from ROLES rather than typing the
-// strings twice. Belt-and-suspenders: even if someone mounts this
+// One group, MANAGERS_UP from constants/permissions.js, used at the
+// route level here AND inside the controller's own check, rather than
+// the strings typed twice. Belt-and-suspenders: even if someone mounts this
 // router without auth/requireRole by mistake, the controller's internal
 // check still catches it. Neither layer is trusted alone.
-const ADMIN_OR_MANAGER = [ROLES.ADMIN, ROLES.MANAGER];
 
 // Intake reads are open to every intake role — workers staff the intake
 // desk too, and the product search is a read-only lookup feeding the
 // "Match to stock item" combobox on the intake form.
-const INTAKE_READERS = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
 
 // GET because it is a pure lookup — no rows are created or changed, so
 // the search must never sit behind POST semantics.
 router.get(
   '/intake/products/search',
   auth,
-  requireRole(...INTAKE_READERS),
+  requireRole(...ALL_STAFF),
   donationIntakeController.searchProducts
 );
 
@@ -49,14 +47,14 @@ router.get(
 router.post(
   '/intake',
   auth,
-  requireRole(...ADMIN_OR_MANAGER),
+  requireRole(...MANAGERS_UP),
   donationIntakeController.handleDonationIntake
 );
 
 router.post(
   '/intake/unrecognized',
   auth,
-  requireRole(...ADMIN_OR_MANAGER),
+  requireRole(...MANAGERS_UP),
   donationIntakeController.handleUnrecognizedDonationIntake
 );
 

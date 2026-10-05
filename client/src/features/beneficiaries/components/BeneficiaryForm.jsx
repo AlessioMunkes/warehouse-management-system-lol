@@ -26,8 +26,8 @@ import {
 import { Loader2 } from 'lucide-react';
 
 const COHORT_OPTIONS = [
-  { value: 'week1', label: 'Week 1' },
-  { value: 'week2', label: 'Week 2' },
+  { value: 'tuesday', label: 'Tuesday' },
+  { value: 'thursday', label: 'Thursday' },
 ];
 
 const BLANK = { name: '', cohort: '', contactName: '', contactEmail: '', mobileNumber: '', childCount: '' };
@@ -94,7 +94,7 @@ export default function BeneficiaryForm({
             </SelectContent>
           </Select>
           {cohortInvalid ? <FieldError>A cohort is required.</FieldError> : null}
-          <FieldDescription>Which fortnightly rotation this centre collects on.</FieldDescription>
+          <FieldDescription>The cohort this centre collects with each week.</FieldDescription>
         </Field>
         <Field>
           <FieldLabel htmlFor="beneficiary-contact">Contact person</FieldLabel>

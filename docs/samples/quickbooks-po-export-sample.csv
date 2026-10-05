@@ -1,0 +1,11 @@
+Purchase Orders,,,,,
+
+Date,Num,Vendor,Memo,Amount,Status
+10/01/2026,DEMO-1001,Peninsula Fresh Wholesalers,PO-2026-0101,"R 4,250.00",Open
+10/01/2026,DEMO-1002,Bokomo Foods Distribution,wms po-2026-0102,"R 1,980.50",Open
+10/02/2026,DEMO-1003,Cape Cold Storage,Ref PO-2026-0103 rice order,"R 7,600.00",Open
+10/02/2026,DEMO-1004,Office Supplies Co,Printer paper and toner,R 865.00,Open
+10/03/2026,DEMO-1005,Peninsula Fresh Wholesalers,PO-2026-0999,R 310.00,Open
+10/03/2026,DEMO-1006,Cape Cold Storage,PO-2026-0105 and PO-2026-0106 combined delivery,"R 5,120.00",Open
+10/04/2026,DEMO-1007,Ubuntu Bakery Supplies,PO-2026-0104,"R 1,450.00",Open
+10/04/2026,DEMO-1008,Ubuntu Bakery Supplies,PO-2026-0104 flour top-up,R 640.00,Open

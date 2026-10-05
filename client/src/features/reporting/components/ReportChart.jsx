@@ -36,7 +36,7 @@ const RED = 'var(--brand)', CHARCOAL = 'var(--ink)', BORDER = 'var(--line)', MUT
 // means "third category." A single-series trend (LineView) stays on
 // plain RED: rotating hue along a time axis would read as categories
 // changing, not one thing moving.
-const PALETTE = [CHARCOAL, RED, '#c9a86a', '#6b8f71', '#8a8a8a'];
+const PALETTE = [CHARCOAL, RED, 'var(--chart-tan)', 'var(--chart-sage)', 'var(--chart-grey)'];
 
 // Percentages keep a decimal; counts and weights read better whole.
 // "94.7 children" would be nonsense on screen.
@@ -82,7 +82,7 @@ const formatLabel = (label) => {
 // Children/Adults/Households colours exactly, so the two charts never
 // disagree about what a colour means. Any other group name (a future
 // grouped_bar metric) falls back to rotating the shared PALETTE.
-const GROUP_COLORS = { Children: RED, Adults: '#c9a86a', Households: CHARCOAL };
+const GROUP_COLORS = { Children: RED, Adults: 'var(--chart-tan)', Households: CHARCOAL };
 const colorForGroup = (name, i) => GROUP_COLORS[name] ?? PALETTE[i % PALETTE.length];
 
 const NumberView = ({ series, unit }) => (
@@ -346,6 +346,9 @@ const SORT_OPTIONS = [
 ];
 
 const sortSeries = (series, sort) => {
+  // 'none' keeps the server's order — a month-by-month trend has to
+  // read left to right in time, not tallest first.
+  if (sort === 'none') return series;
   if (sort === 'desc') return [...series].sort((a, b) => b.value - a.value);
   if (sort === 'asc')  return [...series].sort((a, b) => a.value - b.value);
   return [...series].sort((a, b) => formatLabel(a.label).localeCompare(formatLabel(b.label)));
@@ -355,9 +358,9 @@ const sortSeries = (series, sort) => {
 // small preview card (TrendCard.jsx) — the aria-label summary below
 // still carries every value to assistive tech regardless, so this is
 // a visual simplification, not an accessibility trade-off.
-export default function ReportChart({ report, dimensionLabel = 'Category', compact = false }) {
+export default function ReportChart({ report, dimensionLabel = 'Category', compact = false, initialSort = 'desc' }) {
   const [asTable, setAsTable] = useState(false);
-  const [sort, setSort] = useState('desc');
+  const [sort, setSort] = useState(initialSort);
   const { series: rawSeries, chartType, meta } = report;
   const unit = meta?.unit ?? '';
 

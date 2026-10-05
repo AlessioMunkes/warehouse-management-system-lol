@@ -14,42 +14,106 @@
   --viz-5: #d55181; --viz-6: #008300; --viz-7: #9085e9; --viz-8: #e66767;
 }
 
+/* Status colours — red / amber / green — for charts where the colour
+   MEANS something (stock health, a figure against its target). Taken
+   from the validated palette above rather than new hexes, so they
+   keep its contrast and colour-blind separation in both themes; the
+   label or legend always says the status in words too. */
+:root, .dark {
+  --rag-bad:  var(--viz-8);
+  --rag-warn: var(--viz-4);
+  --rag-good: var(--viz-3);
+  --rag-none: var(--chart-grey, #8a8a8a);
+}
+/* A slice that is there for context, not action — it should recede
+   next to the statuses someone has to do something about. */
+:root { --rag-muted: #d3d8da; }
+.dark { --rag-muted: #46535a; }
+
 /* ─────────────────────────────────────────────────────────────
    client/src/features/reporting/operationalReport.css
 
-   Print view for the written operations report
-   (OperationalInsight.jsx). While printing, the component renders a
-   clean copy as a direct child of <body> (.op-print-root) and adds
-   .op-printing to <html>; everything else is switched off.
+   The operations report as a document (OperationsReportPDF.jsx),
+   inside PdfShell's .pdf-document. receipts.css already owns the
+   modal, the letterhead (.pdf-doc-header) and the print rules; this
+   file only adds what is particular to this report.
 
-   display: none, not visibility: hidden, for the same reason
-   receipts.css gives: a hidden element still takes up its box and
-   prints as blank pages.
+   The tokens are PINNED to their light values here. The report body
+   reads var(--ink) etc., and in dark mode those are light colours —
+   white text on a white sheet. Paper has one theme.
    ───────────────────────────────────────────────────────────── */
-@media screen {
-  .op-print-root { display: none; }
+.pdf-document .op-pdf {
+  --canvas: #faf8f5; --surface: #ffffff; --ink: #2b3336; --ink-soft: #676767;
+  --line: #e9e3dd; --brand: #ef3a40; --good-ink: #1d7a3a;
+  --viz-1: #2a78d6; --viz-2: #eb6834; --viz-3: #1baf7a; --viz-4: #eda100;
+  --viz-5: #e87ba4; --viz-6: #008300; --viz-7: #4a3aa7; --viz-8: #e34948;
+  color: #2b3336;
+}
+
+.op-pdf-report-title {
+  margin: 18px 0 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #2b3336;
+}
+
+/* What, when, by whom — one ruled strip, like the notes' meta grid. */
+.op-pdf-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px 20px;
+  margin: 12px 0 22px;
+  padding: 10px 0;
+  border-top: 1px solid #e9e3dd;
+  border-bottom: 1px solid #e9e3dd;
+}
+.op-pdf-meta dt {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #676767;
+}
+.op-pdf-meta dd { margin: 2px 0 0; font-size: 12px; font-weight: 600; }
+
+/* Section headings in the body read as document headings, with the
+   brand rule the notes use, not as screen toggles. */
+.op-pdf-body h3 {
+  margin: 0 0 8px;
+  padding-left: 8px;
+  border-left: 3px solid #ef3a40;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.op-pdf-body section { background: #ffffff; }
+/* Edge labels ("Sept 2026") sit half outside the plot; let them show. */
+.op-pdf-body svg { overflow: visible; }
+
+.op-pdf-caveat {
+  margin: 20px 0 0;
+  padding: 8px 0 0;
+  border-top: 1px solid #e9e3dd;
+  font-size: 10px;
+  color: #676767;
+}
+
+.op-pdf-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 28px;
+  padding-top: 8px;
+  border-top: 2px solid #2b3336;
+  font-size: 9px;
+  color: #676767;
 }
 
 @media print {
-  html.op-printing body > *:not(.op-print-root) { display: none !important; }
-
-  html.op-printing .op-print-root {
-    display: block;
-    padding: 0;
-    background: #fff;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  html.op-printing .op-no-print { display: none !important; }
-
-  html.op-printing .op-avoid-break {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  @page {
-    size: A4 portrait;
-    margin: 14mm;
-  }
+  .op-avoid-break { break-inside: avoid; page-break-inside: avoid; }
+  .op-pdf-footer  { page-break-before: avoid; }
+  /* A heading never ends a page on its own. */
+  .op-pdf-body h3 { break-after: avoid; page-break-after: avoid; }
 }

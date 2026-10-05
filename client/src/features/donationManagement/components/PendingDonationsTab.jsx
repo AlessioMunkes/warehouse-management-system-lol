@@ -27,6 +27,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import usePendingDonations from '../hooks/usePendingDonations';
+import ErrorBanner from '@/components/ui/error-banner';
 
 const isFailureStatus = (status) => status === 'commit_failed' || status === 'commit_incomplete';
 
@@ -125,8 +126,8 @@ const PendingItemRow = ({ item }) => {
         </div>
       </TableCell>
       <TableCell className="text-xs text-muted-foreground">{item.routing_status || '—'}</TableCell>
-      <TableCell className="text-right">
-        <div className="flex flex-col items-end">
+      <TableCell className="text-center">
+        <div className="flex flex-col items-center">
           <span>{Number(item.quantity || 0).toLocaleString('en-ZA')} {item.unit || item.default_unit || ''}</span>
           <ItemStatusChip status={item.status} />
         </div>
@@ -179,7 +180,7 @@ const PendingDonationCard = ({ donation, onStatusClick }) => {
               <TableHead className="w-[40px]">#</TableHead>
               <TableHead>Description</TableHead>
               <TableHead>Routing</TableHead>
-              <TableHead className="text-right">Qty</TableHead>
+              <TableHead className="text-center">Qty</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -197,21 +198,6 @@ const PendingDonationCard = ({ donation, onStatusClick }) => {
     </Card>
   );
 };
-
-const ErrorBanner = ({ message, onRetry }) => (
-  <div className="flex flex-col items-start justify-between gap-3 rounded-[4px] border-2 border-brand bg-danger-soft p-4 text-sm text-ink shadow-sm sm:flex-row sm:items-center">
-    <span>{message}</span>
-    {onRetry ? (
-      <button
-        type="button"
-        onClick={onRetry}
-        className="text-xs font-semibold text-brand underline hover:text-ink focus:outline-none sm:text-sm"
-      >
-        Try again
-      </button>
-    ) : null}
-  </div>
-);
 
 export default function PendingDonationsTab({ onReconcileTab }) {
   const { items: donations, isLoading, error, refresh } = usePendingDonations();

@@ -1,659 +1,344 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/pages/PickingSlipManagementPage.jsx
 //
-// One focused thing at a time, same pattern as every other directory
-// page in this app (BeneficiaryDirectoryPage.jsx / ProductManagement
-// Page.jsx): a search + list view, and quick actions that switch the
-// page into a single form rather than piling every form onto the
-// screen at once.
+// The week's picking slips, laid out like every manager list (the
+// Inventory pattern): title, the week, view tabs with counts, a
+// toolbar, the table, and a panel down the right for one slip.
 //
-// Quick actions are ordered by how often a manager actually reaches
-// for them: generating the week's slips is the recurring weekly job;
-// an ad-hoc slip is the exception (a late registration, a correction,
-// a make-up delivery). Assigning a slip to a worker is not a third
-// quick action or a separate page — it happens inline, on the slip
-// itself, once you've opened it: that is where "who is this for"
-// actually gets decided, not a form competing for space up top.
+// The pieces live in features/pickingSlips: slipViews.js (what each
+// tab means, and the week), SlipList, SlipDetailPanel, SlipForms. This
+// file loads data, holds which slip is open, and runs the actions.
 //
-// "Edit an existing slip" is NOT a button here on purpose: nothing in
-// picking.service.js supports rewriting a slip's lines or metadata
-// after creation — confirmItem/flagItem/completeSlip during packing
-// and assignSlip for who holds it are the only mutations that exist.
-// Listing + opening a slip to see its current state is what this
-// page offers instead; a real "edit" would need new backend support
-// first, not a client-side button pointed at nothing.
+// WHO PACKS A SLIP
+// Workers claim slips from the floor themselves. A manager can also
+// hand slips to a named worker, or send claimed ones back to the floor
+// ("Assign to floor") — one at a time from the panel, or many at once
+// from the bulk bar. Each bulk action is the same per-slip request the
+// panel makes, run for each ticked slip it applies to.
+//
+// URL
+//   ?status=<tab>      the tab (the dashboard's Needs attention links)
+//   ?date=YYYY-MM-DD   open the week holding that day ("slips generated"
+//                      notification)
+//   ?open=<id>         open that slip (the admin Activity screen)
 // ─────────────────────────────────────────────────────────────
-import { useCallback, useEffect, useState } from 'react';
-import ManagerLayout   from '../features/taskdashboard/components/ManagerLayout';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { AlertTriangle, CalendarPlus, ChevronLeft, ChevronRight, PackagePlus, ArrowLeft } from 'lucide-react';
 import beneficiaryAPI from '../services/beneficiaryAPI';
+import productAPI from '../services/productAPI';
 import {
   fetchPickingSlips, fetchPickingSlip, fetchAssignableWorkers,
-  generateSlips, createSlip, assignSlip, addSecondPacker,
+  assignSlip, releaseSlip, addSecondPacker,
 } from '../services/pickingAPI';
-
-import {
-  InputGroup, InputGroupAddon, InputGroupInput,
-} from '@/components/ui/input-group';
-import { Field, FieldLabel, FieldDescription } from '@/components/ui/field';
-import { Input }    from '@/components/ui/input';
-import { Button }   from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
-import {
-  Card, CardContent, CardHeader, CardTitle,
-} from '@/components/ui/card';
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Search, CalendarPlus, PackagePlus, X, ArrowLeft, QrCode, Printer, AlertTriangle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import ViewTabs from '@/components/ui/view-tabs';
+import PageHeader, { PageShell } from '@/components/ui/page-header';
+import ErrorBanner from '@/components/ui/error-banner';
+import { useToast } from '@/components/ui/toastContext';
 import { openLabelPdf, publicAppOrigin, isReachableByPhone } from '../features/packing/palletLabelPdf';
-import { fmtQty } from '../lib/quantity';
+import useOpenFromQuery from '../features/masterdata/hooks/useOpenFromQuery';
+import { takeUrlParam } from '../features/staff/resumeParam';
+import SlipList from '../features/pickingSlips/components/SlipList';
+import SlipDetailPanel from '../features/pickingSlips/components/SlipDetailPanel';
+import { GenerateSlipsForm, CreateSlipForm, EditSlipForm } from '../features/pickingSlips/components/SlipForms';
+import {
+  VIEWS, countViews, shiftWeek, todaySast, viewById, weekLabel, weekOf,
+} from '../features/pickingSlips/slipViews';
+import { useRecordCache } from '@/lib/recordCache';
 
-const COHORT_OPTIONS = [
-  { value: 'week1', label: 'Week 1' },
-  { value: 'week2', label: 'Week 2' },
-];
-
-const todayISO = () => new Date().toISOString().slice(0, 10);
-
-const ErrorBanner = ({ message }) => (
-  <div className="p-4 rounded-[4px] bg-danger-soft border-2 border-brand text-ink text-sm">
-    {message}
-  </div>
-);
-
-const SuccessBanner = ({ message }) => (
-  <div className="p-4 rounded-[4px] bg-good-soft border-2 border-good text-ink text-sm">
-    {message}
-  </div>
-);
-
-// ── Detail panel ──────────────────────────────────────────────
-// Assignment happens right here, not on a separate page — a manager
-// opens a slip because they're already thinking about it, and "who
-// is this for" is the same decision as "what is this slip." Only
-// shown while the slip is still pending (unclaimed); once someone
-// holds it, reassigning is a manager-override case picking.service.js
-// doesn't distinguish from a first assignment, so the same control
-// would still work, but a slip in progress or beyond is read-only
-// here on purpose — this page is for organising the queue, not
-// pulling work out from under whoever already started it.
-const SlipDetail = ({
-  slip, workers, assignChoice, onAssignChoice, onAssign, assigning,
-  secondChoice, onSecondChoice, onAddSecond, addingSecond, onClose,
-}) => (
-  <Card>
-    <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
-      <div>
-        <CardTitle>{slip.ecd_name}</CardTitle>
-        <p className="text-sm text-muted-foreground">
-          {slip.cohort === 'week1' ? 'Week 1' : 'Week 2'} · {slip.dispatch_date}
-        </p>
-      </div>
-      <Button type="button" variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close">
-        <X />
-      </Button>
-    </CardHeader>
-    <CardContent className="space-y-4">
-      <dl className="grid gap-3 text-sm sm:grid-cols-2">
-        <div><dt className="text-muted-foreground">Status</dt><dd><Badge variant="outline">{slip.status}</Badge></dd></div>
-        <div>
-          <dt className="text-muted-foreground">Assigned to</dt>
-          <dd>
-            {slip.status === 'pending' ? (
-              <div className="mt-1 flex items-center gap-2">
-                <Select value={assignChoice || undefined} onValueChange={onAssignChoice}>
-                  <SelectTrigger className="w-40"><SelectValue placeholder="Select a worker" /></SelectTrigger>
-                  <SelectContent>
-                    {workers.map((w) => (
-                      <SelectItem key={w.id} value={String(w.id)}>{w.first_name} {w.last_name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button type="button" size="sm" disabled={!assignChoice || assigning} onClick={onAssign}>
-                  {assigning ? 'Assigning' : 'Assign'}
-                </Button>
-              </div>
-            ) : (slip.packer_name || 'Unassigned')}
-          </dd>
-        </div>
-        {/* Only meaningful once a primary holds the slip — a second
-            packer with nobody to help does not mean anything (see
-            picking.repository.js's addSecondPacker). Read-only once
-            both slots are filled, same "don't pull work out from
-            under whoever already started it" rule as the primary
-            field above. */}
-        {slip.status !== 'pending' ? (
-          <div>
-            <dt className="text-muted-foreground">Second packer</dt>
-            <dd>
-              {slip.assigned_to_2 ? (
-                slip.packer_name_2 || 'Assigned'
-              ) : (
-                <div className="mt-1 flex items-center gap-2">
-                  <Select value={secondChoice || undefined} onValueChange={onSecondChoice}>
-                    <SelectTrigger className="w-40"><SelectValue placeholder="Add a helper" /></SelectTrigger>
-                    <SelectContent>
-                      {workers
-                        .filter((w) => w.id !== slip.assigned_to)
-                        .map((w) => (
-                          <SelectItem key={w.id} value={String(w.id)}>{w.first_name} {w.last_name}</SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                  <Button type="button" size="sm" variant="outline" disabled={!secondChoice || addingSecond} onClick={onAddSecond}>
-                    {addingSecond ? 'Adding' : 'Add'}
-                  </Button>
-                </div>
-              )}
-            </dd>
-          </div>
-        ) : null}
-        <div><dt className="text-muted-foreground">Pallet ref</dt><dd>{slip.pallet_ref || '—'}</dd></div>
-        <div><dt className="text-muted-foreground">Progress</dt><dd>{slip.confirmed_items}/{slip.total_items} confirmed</dd></div>
-      </dl>
-      {slip.items?.length ? (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Item</TableHead>
-              <TableHead>Required</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {slip.items.map((item) => (
-              <TableRow key={item.id}>
-                <TableCell>{item.product_name}</TableCell>
-                <TableCell className="text-muted-foreground">{fmtQty(item.required_quantity, item.unit)}</TableCell>
-                <TableCell><Badge variant="outline">{item.status}</Badge></TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      ) : null}
-    </CardContent>
-  </Card>
-);
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 export default function PickingSlipManagementPage() {
-  const [mode, setMode] = useState('list'); // list | generate | create
+  const toast = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const view = viewById(searchParams.get('status')).id;
+
+  const [mode, setMode] = useState('list'); // list | generate | create | edit
+  const [week, setWeek] = useState(() => {
+    const asked = takeUrlParam('date');
+    return weekOf(asked && /^\d{4}-\d{2}-\d{2}$/.test(asked) ? asked : todaySast());
+  });
+
+  const [slips, setSlips] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [labelError, setLabelError] = useState(null);
 
   const [beneficiaries, setBeneficiaries] = useState([]);
   const [workers, setWorkers] = useState([]);
+  const [products, setProducts] = useState([]);
 
-  const [viewDate, setViewDate] = useState(todayISO());
-  const [search, setSearch] = useState('');
-  const [labelError, setLabelError] = useState(null);
-  const [slips, setSlips] = useState([]);
-  const [selected, setSelected] = useState(null);
-  const [assignChoice, setAssignChoice] = useState('');
-  const [assigning, setAssigning] = useState(false);
-  const [secondChoice, setSecondChoice] = useState('');
-  const [addingSecond, setAddingSecond] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [open, setOpen] = useState(null);     // the slip in the panel, with its items
+  const [busy, setBusy] = useState(false);
 
-  const [genForm, setGenForm] = useState({ dispatchDate: todayISO(), cohort: '' });
-  const [genBusy, setGenBusy] = useState(false);
-  const [genResult, setGenResult] = useState(null);
-  const [genError, setGenError] = useState(null);
+  const counts = useMemo(() => countViews(slips), [slips]);
 
-  const [adHocForm, setAdHocForm] = useState({ ecdId: '', dispatchDate: todayISO(), cohort: '', force: false });
-  const [adHocBusy, setAdHocBusy] = useState(false);
-  const [adHocError, setAdHocError] = useState(null);
-
+  // ── Data ───────────────────────────────────────────────────
   const loadSlips = useCallback(async () => {
     setError(null);
     try {
-      setSlips(await fetchPickingSlips({ dispatchDate: viewDate }));
+      setSlips(await fetchPickingSlips({ from: week.from, to: week.to }));
     } catch (err) {
       setError(err.message || 'Could not load picking slips.');
     }
-  }, [viewDate]);
+  }, [week]);
 
   useEffect(() => {
     let cancelled = false;
-    fetchPickingSlips({ dispatchDate: viewDate })
-      .then((rows) => {
-        if (!cancelled) {
-          setSlips(rows);
-          setError(null);
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err.message || 'Could not load picking slips.');
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
+    fetchPickingSlips({ from: week.from, to: week.to })
+      .then((rows) => { if (!cancelled) { setSlips(rows); setError(null); } })
+      .catch((err) => { if (!cancelled) setError(err.message || 'Could not load picking slips.'); })
+      .finally(() => { if (!cancelled) setIsLoading(false); });
     return () => { cancelled = true; };
-  }, [viewDate]);
+  }, [week]);
 
   useEffect(() => {
     let cancelled = false;
+    // Each surfaced only where it is used: a failure here costs one
+    // picker, not the list.
     beneficiaryAPI.getBeneficiaries({ includeInactive: false })
-      .then((rows) => { if (!cancelled) setBeneficiaries(rows); })
-      .catch(() => { /* surfaced inline only where the picker is used */ });
+      .then((rows) => { if (!cancelled) setBeneficiaries(rows); }).catch(() => {});
     fetchAssignableWorkers()
-      .then((rows) => { if (!cancelled) setWorkers(rows); })
-      .catch(() => { /* surfaced inline only where the picker is used */ });
+      .then((rows) => { if (!cancelled) setWorkers(rows); }).catch(() => {});
+    productAPI.getProducts({ includeInactive: false })
+      .then((rows) => { if (!cancelled) setProducts(rows); }).catch(() => {});
     return () => { cancelled = true; };
   }, []);
 
-  const openSlip = async (slipId) => {
+  const changeWeek = (next) => { setIsLoading(true); setWeek(next); };
+  const showWeekOf = async (day) => {
+    const next = weekOf(day);
+    if (next.from === week.from) await loadSlips();
+    else changeWeek(next);
+  };
+
+  const changeView = (id) => {
+    setSearchParams(id === 'all' ? {} : { status: id }, { replace: true });
+  };
+
+  // A row click reuses what resting on the row already asked for; every
+  // other caller (after a change, from a link) reads the slip again.
+  const records = useRecordCache((slipId) => fetchPickingSlip(slipId));
+  const openSlip = useCallback(async (slipId, { fresh = true } = {}) => {
     setError(null);
-    setAssignChoice('');
-    setSecondChoice('');
     try {
-      setSelected(await fetchPickingSlip(slipId));
+      setOpen(await records.load(slipId, { fresh }));
     } catch (err) { setError(err.message); }
+  }, [records]);
+  useOpenFromQuery(openSlip);
+
+  // ── One slip, from the panel ───────────────────────────────
+  const act = async (fn) => {
+    if (!open) return;
+    setBusy(true);
+    try {
+      await fn(open.id);
+      await loadSlips();
+      await openSlip(open.id);
+    } catch (err) {
+      toast({ variant: 'error', title: 'That did not go through', description: err.message });
+    } finally { setBusy(false); }
   };
 
-  const assign = async () => {
-    if (!assignChoice || !selected) return;
-    setAssigning(true); setError(null);
-    try {
-      await assignSlip(selected.id, Number(assignChoice));
-      await loadSlips();
-      await openSlip(selected.id);
-    } catch (err) { setError(err.message); } finally { setAssigning(false); }
+  // ── Many slips, from the bulk bar ──────────────────────────
+  // One request per slip, in turn: they are row-locked server-side
+  // and a handful at a time, so there is nothing to gain from racing
+  // them. Whatever fails is reported by name; the rest still happen.
+  const runEach = async (list, fn, { done, verb }) => {
+    setBusy(true);
+    const failed = [];
+    for (const slip of list) {
+      try { await fn(slip); } catch (err) { failed.push(`${slip.ecd_name}: ${err.message}`); }
+    }
+    await loadSlips();
+    setBusy(false);
+    const ok = list.length - failed.length;
+    if (ok) toast({ variant: 'success', title: done(ok) });
+    if (failed.length) {
+      toast({ variant: 'error', title: `Could not ${verb} ${plural(failed.length, 'slip')}`, description: failed.join(' · ') });
+    }
   };
 
-  const addSecond = async () => {
-    if (!secondChoice || !selected) return;
-    setAddingSecond(true); setError(null);
-    try {
-      await addSecondPacker(selected.id, Number(secondChoice));
-      await loadSlips();
-      await openSlip(selected.id);
-    } catch (err) { setError(err.message); } finally { setAddingSecond(false); }
+  const bulkAssign = (list, workerId) => {
+    const worker = workers.find((w) => w.id === workerId);
+    return runEach(list, (s) => assignSlip(s.id, workerId), {
+      verb: 'assign',
+      done: (n) => `Assigned ${plural(n, 'slip')} to ${worker ? worker.first_name : 'that worker'}`,
+    });
   };
 
-  const runGenerate = async () => {
-    setGenBusy(true); setGenError(null); setGenResult(null);
-    try {
-      const result = await generateSlips(genForm);
-      setGenResult(result);
-      setViewDate(genForm.dispatchDate);
-      await loadSlips();
-    } catch (err) { setGenError(err.message); } finally { setGenBusy(false); }
-  };
-
-  const runCreateAdHoc = async () => {
-    setAdHocBusy(true); setAdHocError(null);
-    try {
-      await createSlip({ ...adHocForm, ecdId: Number(adHocForm.ecdId) });
-      setViewDate(adHocForm.dispatchDate);
-      await loadSlips();
-      setMode('list');
-    } catch (err) { setAdHocError(err.message); } finally { setAdHocBusy(false); }
-  };
+  const bulkRelease = (list) => runEach(list, (s) => releaseSlip(s.id), {
+    verb: 'release',
+    done: (n) => `${plural(n, 'slip')} back on the floor`,
+  });
 
   // ── BR-22 pallet labels ─────────────────────────────────────
-  // The origin is derived once per render. It is used to decide whether
-  // to warn, and passed to the generator — but it is never shown to the
-  // manager, who cannot act on an address. See the warning block below.
+  // Generated on demand from public_token, never stored: the token does
+  // not change, so a reprint is identical, and a stored PDF could go
+  // stale against a regenerated slip. The origin is checked so the page
+  // can warn when labels would not scan off this machine — the address
+  // itself is not shown; a manager cannot act on a URL.
   const labelOrigin = publicAppOrigin();
   const labelsReachable = isReachableByPhone(labelOrigin);
 
-  // Generated on demand from public_token, which is already on each
-  // row, and never stored. The token does not change, so a reprint is
-  // byte-identical; a stored PDF could go stale against a regenerated
-  // slip and send a volunteer to the wrong pallet.
-  const printLabels = (rows, emptyMessage) => {
+  const printLabels = (rows) => {
     setLabelError(null);
-
     const withToken = rows.filter((r) => r.public_token);
     if (withToken.length === 0) {
-      setLabelError(emptyMessage);
+      setLabelError(rows.length === 1 ? 'This slip has no label code yet.' : 'None of these slips has a label code yet.');
       return;
     }
-
-    // Origin passed explicitly rather than left to the module's default,
-    // so what a label points at is visible here at the call site.
     const { opened, skipped } = openLabelPdf(
       withToken.map((r) => ({
         public_token: r.public_token,
         ecd_name: r.ecd_name,
         beneficiary_name: r.beneficiary_name,
-        // The plain calendar day. r.dispatch_date is a timestamp that
-        // reads as the previous day once a timezone is applied to it.
+        // The plain calendar day; dispatch_date reads as the day before
+        // once a timezone is applied to it.
         dispatch_date_display: r.dispatch_date_iso,
       })),
       { origin: labelOrigin },
     );
-
-    // For a developer, not the manager: the address is deliberately
-    // absent from the visible copy, so leave a trace somewhere a
-    // developer will actually look.
     if (!labelsReachable) {
       console.warn(
         `[pallet labels] Generated against "${labelOrigin}", which a phone on mobile data cannot reach. `
-        + 'These labels will not scan outside this machine. '
         + 'Set VITE_PUBLIC_APP_ORIGIN to override the printed address.',
       );
     }
-
-    if (!opened) {
-      setLabelError('Pop-up blocked — allow pop-ups for this site to open the labels.');
-    } else if (skipped > 0) {
-      setLabelError(`${skipped} slip${skipped === 1 ? '' : 's'} had no label code and were left out.`);
-    }
+    if (!opened) setLabelError('Pop-up blocked — allow pop-ups for this site to open the labels.');
+    else if (skipped > 0) setLabelError(`${skipped} slip${skipped === 1 ? '' : 's'} had no label code and were left out.`);
   };
 
-  const printAllLabels = () =>
-    printLabels(filteredSlips, 'There are no slips to print labels for on this date.');
-
-  const printOneLabel = (slip) =>
-    printLabels([slip], 'This slip has no label code yet.');
-
-  const filteredSlips = search.trim()
-    ? slips.filter((s) => s.ecd_name.toLowerCase().includes(search.trim().toLowerCase()))
-    : slips;
+  const backToList = () => setMode('list');
 
   return (
-    <ManagerLayout>
-      <main className="mx-auto w-full max-w-4xl px-4 py-6">
-        <h1 className="text-2xl font-medium">Picking Slips</h1>
-        <p className="mt-1 text-sm text-muted-foreground">What do you need to do?</p>
-
-        {mode === 'list' ? (
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Button type="button" onClick={() => { setMode('generate'); setGenResult(null); setGenError(null); }}>
-              <CalendarPlus />
-              Generate this week's slips
+    <PageShell>
+      <PageHeader
+        title="Picking slips"
+        description="Generate, assign and track this week’s pallets."
+        actions={mode === 'list' ? (
+          <>
+            <Button type="button" variant="outline" onClick={() => setMode('create')}>
+              <PackagePlus /> Create a new slip
             </Button>
-            <Button type="button" variant="outline" onClick={() => { setMode('create'); setAdHocError(null); }}>
-              <PackagePlus />
-              Create an ad-hoc slip
+            <Button type="button" onClick={() => setMode('generate')}>
+              <CalendarPlus /> Generate this week's slips
             </Button>
-          </div>
-        ) : null}
-
-        {mode !== 'list' ? (
-          <Button
-            type="button" variant="ghost" size="sm" className="mt-4 -ml-2"
-            onClick={() => setMode('list')}
-          >
-            <ArrowLeft />
-            Back to picking slips
+          </>
+        ) : (
+          <Button type="button" variant="ghost" size="sm" onClick={backToList}>
+            <ArrowLeft /> Back to picking slips
           </Button>
-        ) : null}
+        )}
+      />
 
-        {mode === 'generate' ? (
-          <Card className="mt-4">
-            <CardHeader><CardTitle>Generate this week's slips</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Creates one slip per approved, active beneficiary in the chosen cohort. Safe to
-                run twice: it skips any centre that already has a slip for that date.
-              </p>
-              {genError ? <ErrorBanner message={genError} /> : null}
-              {genResult ? (
-                <SuccessBanner
-                  message={
-                    `${genResult.created} slip(s) created.` +
-                    (genResult.emptySlips?.length
-                      ? ` ${genResult.emptySlips.length} had no lines. Check that centre's order first.`
-                      : '')
-                  }
-                />
-              ) : null}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field>
-                  <FieldLabel htmlFor="gen-date">Dispatch date</FieldLabel>
-                  <Input
-                    id="gen-date" type="date" value={genForm.dispatchDate}
-                    onChange={(e) => setGenForm((f) => ({ ...f, dispatchDate: e.target.value }))}
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="gen-cohort">Cohort</FieldLabel>
-                  <Select
-                    value={genForm.cohort || undefined}
-                    onValueChange={(v) => setGenForm((f) => ({ ...f, cohort: v }))}
-                  >
-                    <SelectTrigger id="gen-cohort"><SelectValue placeholder="Select a cohort" /></SelectTrigger>
-                    <SelectContent>
-                      {COHORT_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </Field>
-              </div>
-              <Field orientation="horizontal">
-                <Button
-                  type="button" onClick={runGenerate}
-                  disabled={genBusy || !genForm.dispatchDate || !genForm.cohort}
-                >
-                  {genBusy ? 'Generating' : 'Generate slips'}
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setMode('list')}>Done</Button>
-              </Field>
-            </CardContent>
-          </Card>
-        ) : null}
-
-        {mode === 'create' ? (
-          <Card className="mt-4">
-            <CardHeader><CardTitle>Create an ad-hoc slip</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                For a late registration, a correction, or a make-up delivery outside a
-                beneficiary's normal rotation.
-              </p>
-              {adHocError ? <ErrorBanner message={adHocError} /> : null}
-
-              <Field>
-                <FieldLabel htmlFor="adhoc-ecd">Beneficiary</FieldLabel>
-                <Select
-                  value={adHocForm.ecdId || undefined}
-                  onValueChange={(v) => setAdHocForm((f) => ({ ...f, ecdId: v }))}
-                >
-                  <SelectTrigger id="adhoc-ecd"><SelectValue placeholder="Select a beneficiary" /></SelectTrigger>
-                  <SelectContent>
-                    {beneficiaries.map((b) => (
-                      <SelectItem key={b.id} value={String(b.id)}>
-                        {b.name}{!b.approvedAt ? ' (unapproved)' : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FieldDescription>Only approved, active beneficiaries can actually receive a slip.</FieldDescription>
-              </Field>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field>
-                  <FieldLabel htmlFor="adhoc-date">Dispatch date</FieldLabel>
-                  <Input
-                    id="adhoc-date" type="date" value={adHocForm.dispatchDate}
-                    onChange={(e) => setAdHocForm((f) => ({ ...f, dispatchDate: e.target.value }))}
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="adhoc-cohort">Cohort</FieldLabel>
-                  <Select
-                    value={adHocForm.cohort || undefined}
-                    onValueChange={(v) => setAdHocForm((f) => ({ ...f, cohort: v }))}
-                  >
-                    <SelectTrigger id="adhoc-cohort"><SelectValue placeholder="Select a cohort" /></SelectTrigger>
-                    <SelectContent>
-                      {COHORT_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </Field>
-              </div>
-              <Field orientation="horizontal">
-                <Checkbox
-                  id="adhoc-force"
-                  checked={adHocForm.force}
-                  onCheckedChange={(v) => setAdHocForm((f) => ({ ...f, force: Boolean(v) }))}
-                />
-                <FieldLabel htmlFor="adhoc-force" className="font-normal">
-                  This is a deliberate make-up delivery outside the normal rotation
-                </FieldLabel>
-              </Field>
-              <Field orientation="horizontal">
-                <Button
-                  type="button" onClick={runCreateAdHoc}
-                  disabled={adHocBusy || !adHocForm.ecdId || !adHocForm.dispatchDate || !adHocForm.cohort}
-                >
-                  {adHocBusy ? 'Creating' : 'Create slip'}
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setMode('list')}>Cancel</Button>
-              </Field>
-            </CardContent>
-          </Card>
-        ) : null}
-
-        {mode === 'list' ? (
-          <div className="mt-6 space-y-4">
-            {/* BR-22 pallet labels.
-                Deliberately on its own row, BELOW the two buttons above
-                and ABOVE the search bar. That row creates slips; this
-                acts on slips that already exist, and sitting alongside
-                them would read as a third way to create one.
-                Covers exactly the slips the list is showing, because it
-                prints from filteredSlips - the same rows, same date. */}
-            <div className="flex flex-wrap items-center gap-3">
-              <Button
-                type="button" variant="outline"
-                onClick={printAllLabels}
-                disabled={filteredSlips.length === 0}
-              >
-                <QrCode />
-                Print pallet labels ({filteredSlips.length})
+      {mode === 'generate' ? (
+        <div className="mt-6">
+          <GenerateSlipsForm onGenerated={showWeekOf} onDone={backToList} />
+        </div>
+      ) : mode === 'create' ? (
+        <div className="mt-6">
+          <CreateSlipForm
+            beneficiaries={beneficiaries} products={products}
+            onCreated={async (day) => { await showWeekOf(day); backToList(); }}
+            onCancel={backToList}
+          />
+        </div>
+      ) : mode === 'edit' && open ? (
+        <div className="mt-6">
+          <EditSlipForm
+            slip={open} products={products}
+            onSaved={async (day) => { await showWeekOf(day); await openSlip(open.id); backToList(); }}
+            onCancel={backToList}
+          />
+        </div>
+      ) : (
+        <>
+          {/* The week the list covers. Buttons rather than a week
+              input: <input type="week"> does not exist in Firefox. */}
+          <div className="mt-5 flex flex-wrap items-center gap-2">
+            <Button
+              type="button" variant="outline" size="icon-sm" aria-label="Previous week"
+              onClick={() => changeWeek(shiftWeek(week, -1))}
+            >
+              <ChevronLeft />
+            </Button>
+            <span className="min-w-44 text-center text-sm font-medium tabular-nums" aria-live="polite">
+              {weekLabel(week)}
+            </span>
+            <Button
+              type="button" variant="outline" size="icon-sm" aria-label="Next week"
+              onClick={() => changeWeek(shiftWeek(week, 1))}
+            >
+              <ChevronRight />
+            </Button>
+            {week.from !== weekOf(todaySast()).from ? (
+              <Button type="button" variant="ghost" size="sm" onClick={() => changeWeek(weekOf(todaySast()))}>
+                This week
               </Button>
-              <p className="text-sm text-muted-foreground">
-                One page per pallet, for {viewDate}. Tape each to its pallet before volunteers arrive.
-              </p>
-            </div>
-            {/* Whether the labels will actually work, in words a manager
-                can act on. Not the address itself: a URL tells a
-                non-technical reader nothing, and it is the least useful
-                thing on this screen.
-
-                The real address stays available to a developer through
-                the title attribute and a console line on print — it is
-                just not in the visible copy.
-
-                ACC-03: the icon and the sentence both carry the meaning,
-                so this reads correctly in greyscale and to a colour-blind
-                manager. Colour is the third signal, never the only one.
-
-                Printing is NOT blocked — someone testing the flow has to
-                be able to generate one. */}
-            {!labelsReachable ? (
-              <p
-                className="flex items-start gap-2 rounded-md bg-muted/50 px-3 py-2 text-sm text-destructive"
-                title={`Labels would point at ${labelOrigin || 'an address this app could not determine'}`}
-              >
-                <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                <span>
-                  <strong>These labels will only work on this computer.</strong>{' '}
-                  Please don’t print them for the warehouse — a volunteer scanning one
-                  would not be able to open their pallet.
-                </span>
-              </p>
             ) : null}
-
-            {labelError ? <p className="text-sm text-destructive">{labelError}</p> : null}
-
-            <div className="flex flex-wrap items-center gap-3">
-              <InputGroup className="min-w-56 flex-1">
-                <InputGroupAddon align="inline-start"><Search /></InputGroupAddon>
-                <InputGroupInput
-                  placeholder="Search by beneficiary name"
-                  value={search}
-                  onChange={(e) => { setIsLoading(true); setSearch(e.target.value); }}
-                />
-              </InputGroup>
-              <Input
-                type="date" value={viewDate} className="w-auto"
-                onChange={(e) => { setIsLoading(true); setViewDate(e.target.value); }}
-              />
-            </div>
-
-            {error ? <ErrorBanner message={error} /> : null}
-
-            {isLoading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-24 w-full" />
-              </div>
-            ) : (
-              <>
-                {selected ? (
-                  <SlipDetail
-                    slip={selected}
-                    workers={workers}
-                    assignChoice={assignChoice}
-                    onAssignChoice={setAssignChoice}
-                    onAssign={assign}
-                    assigning={assigning}
-                    secondChoice={secondChoice}
-                    onSecondChoice={setSecondChoice}
-                    onAddSecond={addSecond}
-                    addingSecond={addingSecond}
-                    onClose={() => setSelected(null)}
-                  />
-                ) : null}
-
-                {filteredSlips.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No slips match.</p>
-                ) : (
-                  <Card>
-                    <CardContent className="p-0">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Beneficiary</TableHead>
-                            <TableHead>Cohort</TableHead>
-                            <TableHead>Assigned to</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Items</TableHead>
-                            <TableHead className="text-right">Label</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredSlips.map((slip) => (
-                            <TableRow key={slip.id} className="cursor-pointer" onClick={() => openSlip(slip.id)}>
-                              <TableCell className="font-medium">{slip.ecd_name}</TableCell>
-                              <TableCell className="text-muted-foreground">
-                                {slip.cohort === 'week1' ? 'Week 1' : 'Week 2'}
-                              </TableCell>
-                              <TableCell className="text-muted-foreground">{slip.packer_name || 'Unassigned'}</TableCell>
-                              <TableCell><Badge variant="outline">{slip.status}</Badge></TableCell>
-                              <TableCell className="text-muted-foreground">
-                                {slip.confirmed_items}/{slip.total_items}
-                              </TableCell>
-                              {/* For a slip added late, or a label torn
-                                  off mid-week. stopPropagation so printing
-                                  does not also open the slip detail. */}
-                              <TableCell className="text-right">
-                                <Button
-                                  type="button" variant="ghost" size="sm"
-                                  aria-label={`Print the pallet label for ${slip.ecd_name}`}
-                                  onClick={(e) => { e.stopPropagation(); printOneLabel(slip); }}
-                                >
-                                  <Printer />
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </CardContent>
-                  </Card>
-                )}
-              </>
-            )}
           </div>
-        ) : null}
-      </main>
-    </ManagerLayout>
+
+          <ErrorBanner className="mt-4" message={error} onRetry={loadSlips} />
+
+          <ViewTabs
+            className="mt-4"
+            label="Slip views"
+            value={view}
+            onChange={changeView}
+            tabs={VIEWS.map((v) => ({ id: v.id, label: v.label, alert: v.alert, count: isLoading ? null : counts[v.id] }))}
+          />
+
+          {/* Whether printed labels will scan, in words a manager can
+              act on (ACC-03: icon and sentence both carry it). Printing
+              is not blocked — someone testing has to be able to. */}
+          {!labelsReachable ? (
+            <p
+              className="mt-4 flex items-start gap-2 rounded-md bg-muted/50 px-3 py-2 text-sm text-destructive"
+              title={`Labels would point at ${labelOrigin || 'an address this app could not determine'}`}
+            >
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              <span>
+                <strong>These labels will only work on this computer.</strong>{' '}
+                Please don’t print them for the warehouse — a volunteer scanning one
+                would not be able to open their pallet.
+              </span>
+            </p>
+          ) : null}
+          {labelError ? <p className="mt-2 text-sm text-destructive">{labelError}</p> : null}
+
+          <div className="mt-6">
+            <SlipList
+              slips={slips}
+              view={view}
+              isLoading={isLoading}
+              workers={workers}
+              weekText={week.from}
+              onOpen={(slipId) => openSlip(slipId, { fresh: false })}
+              onIntent={(slipId) => records.warm(slipId)}
+              onAssign={bulkAssign}
+              onRelease={bulkRelease}
+              onPrintLabels={printLabels}
+            />
+          </div>
+        </>
+      )}
+
+      {open && mode === 'list' ? (
+        <SlipDetailPanel
+          key={open.id}
+          slip={open}
+          workers={workers}
+          busy={busy}
+          onAssign={(workerId) => act((id) => assignSlip(id, workerId))}
+          onRelease={() => act((id) => releaseSlip(id))}
+          onAddSecond={(workerId) => act((id) => addSecondPacker(id, workerId))}
+          onEdit={() => setMode('edit')}
+          onPrintLabel={() => printLabels([open])}
+          onClose={() => setOpen(null)}
+        />
+      ) : null}
+    </PageShell>
   );
 }

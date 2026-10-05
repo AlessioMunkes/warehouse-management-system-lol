@@ -8,20 +8,21 @@
 // ERR_MODULE_NOT_FOUND before a single assertion runs.
 //
 // Time is frozen so the "no slips for a past date" rule and the
-// fortnightly rotation are deterministic in CI regardless of when
+// weekday pickup matching are deterministic in CI regardless of when
 // the suite runs or which timezone the runner is in.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ROLES } from '../src/middleware/auth.middleware.js';
 
 const repoMock = {
-  getCohortAnchor:      vi.fn(),
   getSlips:             vi.fn(),
   getSlipById:          vi.fn(),
   generateSlips:        vi.fn(),
   createSlip:           vi.fn(),
   assignSlip:           vi.fn(),
   addSecondPacker:      vi.fn(),
+  releaseSlip:          vi.fn(),
+  editSlip:             vi.fn(),
   setItemStatus:        vi.fn(),
   completeSlip:         vi.fn(),
   getAssignableWorkers: vi.fn(),
@@ -38,15 +39,15 @@ const MANAGER = { id: 20, role: ROLES.MANAGER };
 const ADMIN   = { id: 21, role: ROLES.ADMIN };
 const FINANCE = { id: 30, role: 'finance' };
 
-// Anchor Monday 2026-01-05 puts the week of Mon 2026-08-03 on week1
-// (30 whole weeks later) and the week of Mon 2026-08-10 on week2.
-const ANCHOR      = '2026-01-05';
-const WEEK1_DATE  = '2026-08-03';   // Monday, week1
-const WEEK1_MIDWK = '2026-08-05';   // Wednesday of the same week
-const WEEK2_DATE  = '2026-08-10';   // Monday, week2
-const PAST_DATE   = '2026-07-20';
+// Pickup is weekly, keyed to the date's own weekday — 2026-08-04 is a
+// Tuesday, 2026-08-06 is the Thursday of the same week, 2026-08-05
+// (Wednesday) is neither.
+const TUESDAY_DATE    = '2026-08-04';
+const THURSDAY_DATE   = '2026-08-06';
+const NON_PICKUP_DATE = '2026-08-05';
+const PAST_DATE       = '2026-07-20';
 
-const NOW = new Date('2026-08-01T09:00:00Z');   // Saturday before WEEK1_DATE
+const NOW = new Date('2026-08-01T09:00:00Z');   // Saturday before TUESDAY_DATE
 
 const SLIP = { id: 1, status: 'in_progress', assigned_to: 10 };
 const ITEM = { id: 5, status: 'confirmed', packed_quantity: 3 };
@@ -59,7 +60,6 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(NOW);
   vi.clearAllMocks();
-  repoMock.getCohortAnchor.mockResolvedValue(ANCHOR);
   repoMock.getSlips.mockResolvedValue([]);
   repoMock.getSlipById.mockResolvedValue(SLIP);
   repoMock.generateSlips.mockResolvedValue({ created: 12 });
@@ -68,6 +68,8 @@ beforeEach(() => {
   repoMock.addSecondPacker.mockResolvedValue({ slip: { ...SLIP, assigned_to_2: WORKER2.id } });
   repoMock.setItemStatus.mockResolvedValue({ item: ITEM, assignedTo: 10 });
   repoMock.completeSlip.mockResolvedValue({ slip: SLIP });
+  repoMock.releaseSlip.mockResolvedValue({ slip: { ...SLIP, status: 'pending', assigned_to: null } });
+  repoMock.editSlip.mockResolvedValue({ slip: { ...SLIP, status: 'pending' } });
 });
 
 afterEach(() => {
@@ -78,14 +80,14 @@ afterEach(() => {
 describe('getSlips — filters and visibility', () => {
   it('passes through valid filters untouched', async () => {
     await pickingService.getSlips(
-      { dispatchDate: WEEK1_DATE, cohort: 'week1', status: 'pending' }, MANAGER
+      { dispatchDate: TUESDAY_DATE, cohort: 'tuesday', status: 'pending' }, MANAGER
     );
     expect(repoMock.getSlips).toHaveBeenCalledWith({
-      dispatchDate: WEEK1_DATE, cohort: 'week1', status: 'pending', assignedTo: undefined,
+      dispatchDate: TUESDAY_DATE, cohort: 'tuesday', status: 'pending', assignedTo: undefined,
     });
   });
 
-  it.each(['week1', 'week2'])('accepts the cohort "%s"', async (cohort) => {
+  it.each(['tuesday', 'thursday'])('accepts the cohort "%s"', async (cohort) => {
     await expect(pickingService.getSlips({ cohort }, MANAGER)).resolves.toBeDefined();
   });
 
@@ -101,6 +103,22 @@ describe('getSlips — filters and visibility', () => {
 
   it('rejects an unknown status with 400', async () => {
     await expectStatus(pickingService.getSlips({ status: 'packed' }, MANAGER), 400);
+    expect(repoMock.getSlips).not.toHaveBeenCalled();
+  });
+
+  it('passes a week range through for the manager list', async () => {
+    await pickingService.getSlips({ from: '2026-09-28', to: '2026-10-04' }, MANAGER);
+    expect(repoMock.getSlips).toHaveBeenCalledWith(
+      expect.objectContaining({ from: '2026-09-28', to: '2026-10-04' }),
+    );
+  });
+
+  it.each([
+    [{ from: '28/09/2026' }],
+    [{ to: 'next week' }],
+    [{ from: '2026-10-04', to: '2026-09-28' }],
+  ])('rejects a malformed or backwards range %j with 400', async (query) => {
+    await expectStatus(pickingService.getSlips(query, MANAGER), 400);
     expect(repoMock.getSlips).not.toHaveBeenCalled();
   });
 
@@ -140,25 +158,25 @@ describe('getSlipById', () => {
 });
 
 // ── generateSlips ─────────────────────────────────────────────
-describe('generateSlips — manager only, strict rotation', () => {
+describe('generateSlips — manager only, strict scheduling', () => {
   it.each([[ROLES.MANAGER, MANAGER], [ROLES.ADMIN, ADMIN]])(
     '%s can generate the week\'s slips', async (_role, user) => {
       await expect(
-        pickingService.generateSlips({ dispatchDate: WEEK1_DATE, cohort: 'week1' }, user)
+        pickingService.generateSlips({ dispatchDate: TUESDAY_DATE, cohort: 'tuesday' }, user)
       ).resolves.toEqual({ created: 12 });
     });
 
   it.each([[ROLES.WORKER, WORKER], ['finance', FINANCE]])(
     '%s is refused with 403', async (_role, user) => {
       await expectStatus(
-        pickingService.generateSlips({ dispatchDate: WEEK1_DATE, cohort: 'week1' }, user), 403
+        pickingService.generateSlips({ dispatchDate: TUESDAY_DATE, cohort: 'tuesday' }, user), 403
       );
       expect(repoMock.generateSlips).not.toHaveBeenCalled();
     });
 
   it('takes generatedBy from the JWT, never from the body', async () => {
     await pickingService.generateSlips(
-      { dispatchDate: WEEK1_DATE, cohort: 'week1', generatedBy: 999 }, MANAGER
+      { dispatchDate: TUESDAY_DATE, cohort: 'tuesday', generatedBy: 999 }, MANAGER
     );
     expect(repoMock.generateSlips).toHaveBeenCalledWith(
       expect.objectContaining({ generatedBy: MANAGER.id })
@@ -166,86 +184,81 @@ describe('generateSlips — manager only, strict rotation', () => {
   });
 
   it('requires a dispatch date', async () => {
-    await expectStatus(pickingService.generateSlips({ cohort: 'week1' }, MANAGER), 400);
+    await expectStatus(pickingService.generateSlips({ cohort: 'tuesday' }, MANAGER), 400);
   });
 
   it('requires a valid cohort', async () => {
     await expectStatus(
-      pickingService.generateSlips({ dispatchDate: WEEK1_DATE, cohort: 'week9' }, MANAGER), 400
+      pickingService.generateSlips({ dispatchDate: TUESDAY_DATE, cohort: 'week9' }, MANAGER), 400
     );
   });
 
   it('rejects an unparseable date', async () => {
     await expectStatus(
-      pickingService.generateSlips({ dispatchDate: 'next tuesday', cohort: 'week1' }, MANAGER), 400
+      pickingService.generateSlips({ dispatchDate: 'next tuesday', cohort: 'tuesday' }, MANAGER), 400
     );
   });
 
   it('refuses to generate slips for a past date', async () => {
     await expectStatus(
-      pickingService.generateSlips({ dispatchDate: PAST_DATE, cohort: 'week2' }, MANAGER), 400
+      pickingService.generateSlips({ dispatchDate: PAST_DATE, cohort: 'thursday' }, MANAGER), 400
     );
     expect(repoMock.generateSlips).not.toHaveBeenCalled();
   });
 
-  it('refuses a cohort that is not the scheduled rotation', async () => {
-    // 2026-08-03 is a week1 week; asking for week2 is a mistake.
+  it('refuses a cohort that does not match the date\'s actual weekday', async () => {
+    // 2026-08-04 is a Tuesday; asking for thursday is a mistake.
     await expectStatus(
-      pickingService.generateSlips({ dispatchDate: WEEK1_DATE, cohort: 'week2' }, MANAGER), 400
+      pickingService.generateSlips({ dispatchDate: TUESDAY_DATE, cohort: 'thursday' }, MANAGER), 400
     );
   });
 
-  it('names both cohorts in the rotation error so the mistake is obvious', async () => {
+  it('names the actual pickup day in the error so the mistake is obvious', async () => {
     await expect(
-      pickingService.generateSlips({ dispatchDate: WEEK1_DATE, cohort: 'week2' }, MANAGER)
-    ).rejects.toThrow(/Week 2 is not the scheduled rotation.*Week 1 is/s);
+      pickingService.generateSlips({ dispatchDate: TUESDAY_DATE, cohort: 'thursday' }, MANAGER)
+    ).rejects.toThrow(/Tuesday cohort pickup day, not Thursday/);
+  });
+
+  it('refuses a date that is not a Tuesday or Thursday at all', async () => {
+    await expectStatus(
+      pickingService.generateSlips({ dispatchDate: NON_PICKUP_DATE, cohort: 'tuesday' }, MANAGER), 400
+    );
   });
 
   it('has no override path — force is ignored on the bulk run', async () => {
     await expectStatus(
-      pickingService.generateSlips({ dispatchDate: WEEK1_DATE, cohort: 'week2', force: true }, MANAGER),
+      pickingService.generateSlips({ dispatchDate: TUESDAY_DATE, cohort: 'thursday', force: true }, MANAGER),
       400
     );
   });
 });
 
-// ── Fortnightly rotation ──────────────────────────────────────
-describe('fortnightly cohort rotation', () => {
+// ── Weekly weekday pickup ──────────────────────────────────────
+describe('weekly weekday pickup', () => {
   const generate = (dispatchDate, cohort) =>
     pickingService.generateSlips({ dispatchDate, cohort }, MANAGER);
 
-  it('puts the anchor week and every even week on week1', async () => {
-    await expect(generate(WEEK1_DATE, 'week1')).resolves.toBeDefined();
+  it('matches a Tuesday date to the tuesday cohort', async () => {
+    await expect(generate(TUESDAY_DATE, 'tuesday')).resolves.toBeDefined();
   });
 
-  it('puts the following week on week2', async () => {
-    await expect(generate(WEEK2_DATE, 'week2')).resolves.toBeDefined();
+  it('matches a Thursday date to the thursday cohort', async () => {
+    await expect(generate(THURSDAY_DATE, 'thursday')).resolves.toBeDefined();
   });
 
-  it('alternates again the week after that', async () => {
-    await expect(generate('2026-08-17', 'week1')).resolves.toBeDefined();
+  it('repeats every week, not every other week', async () => {
+    await expect(generate('2026-08-11', 'tuesday')).resolves.toBeDefined();   // the following Tuesday
   });
 
-  it('resolves any weekday to its own Monday', async () => {
-    // Wednesday 2026-08-05 belongs to the Monday 2026-08-03 week.
-    await expect(generate(WEEK1_MIDWK, 'week1')).resolves.toBeDefined();
-    await expectStatus(generate(WEEK1_MIDWK, 'week2'), 400);
-  });
-
-  it('treats Sunday as the end of the week, not the start', async () => {
-    // ISO weeks: Sunday 2026-08-09 still belongs to the 2026-08-03 week.
-    await expect(generate('2026-08-09', 'week1')).resolves.toBeDefined();
-  });
-
-  it('skips the rotation check entirely when no anchor is configured', async () => {
-    repoMock.getCohortAnchor.mockResolvedValueOnce(null);
-    await expect(generate(WEEK1_DATE, 'week2')).resolves.toBeDefined();
+  it('refuses a date that is neither Tuesday nor Thursday, for either cohort', async () => {
+    await expectStatus(generate(NON_PICKUP_DATE, 'tuesday'), 400);
+    await expectStatus(generate(NON_PICKUP_DATE, 'thursday'), 400);
   });
 });
 
 // ── createSlip ────────────────────────────────────────────────
-describe('createSlip — ad-hoc, manager only', () => {
-  const body = { ecdId: 3, dispatchDate: WEEK1_DATE, cohort: 'week1' };
+describe('createSlip — new slip, manager only', () => {
+  const body = { ecdId: 3, dispatchDate: TUESDAY_DATE, cohort: 'tuesday' };
 
   it('creates a slip for a manager', async () => {
     await expect(pickingService.createSlip(body, MANAGER))
@@ -260,7 +273,7 @@ describe('createSlip — ad-hoc, manager only', () => {
 
   it('requires an ECD', async () => {
     await expectStatus(
-      pickingService.createSlip({ dispatchDate: WEEK1_DATE, cohort: 'week1' }, MANAGER), 400
+      pickingService.createSlip({ dispatchDate: TUESDAY_DATE, cohort: 'tuesday' }, MANAGER), 400
     );
     expect(repoMock.createSlip).not.toHaveBeenCalled();
   });
@@ -269,18 +282,18 @@ describe('createSlip — ad-hoc, manager only', () => {
     await expectStatus(pickingService.createSlip({ dispatchDate: PAST_DATE }, MANAGER), 400);
   });
 
-  it('enforces the rotation by default', async () => {
-    await expectStatus(pickingService.createSlip({ ...body, cohort: 'week2' }, MANAGER), 400);
+  it('enforces the scheduled pickup day by default', async () => {
+    await expectStatus(pickingService.createSlip({ ...body, cohort: 'thursday' }, MANAGER), 400);
   });
 
-  it('allows an off-rotation make-up delivery when force is set', async () => {
-    await expect(pickingService.createSlip({ ...body, cohort: 'week2', force: true }, MANAGER))
+  it('allows an off-schedule make-up delivery when force is set', async () => {
+    await expect(pickingService.createSlip({ ...body, cohort: 'thursday', force: true }, MANAGER))
       .resolves.toBeDefined();
   });
 
   it('only accepts a real boolean for force, not the string "true"', async () => {
     await expectStatus(
-      pickingService.createSlip({ ...body, cohort: 'week2', force: 'true' }, MANAGER), 400
+      pickingService.createSlip({ ...body, cohort: 'thursday', force: 'true' }, MANAGER), 400
     );
   });
 
@@ -309,6 +322,87 @@ describe('createSlip — ad-hoc, manager only', () => {
   });
 });
 
+// ── editSlip ──────────────────────────────────────────────────
+describe('editSlip — pending slips only, manager only', () => {
+  const items = [{ productId: 3, quantity: 5, unit: 'kg' }];
+
+  it('lets a manager edit a pending slip\'s date and cohort', async () => {
+    await pickingService.editSlip(1, { dispatchDate: TUESDAY_DATE, cohort: 'tuesday' }, MANAGER);
+    expect(repoMock.editSlip).toHaveBeenCalledWith(expect.objectContaining({
+      slipId: 1, dispatchDate: TUESDAY_DATE, cohort: 'tuesday', actorId: MANAGER.id,
+    }));
+  });
+
+  it.each([[ROLES.WORKER, WORKER], ['finance', FINANCE]])(
+    '%s is refused with 403', async (_role, user) => {
+      await expectStatus(pickingService.editSlip(1, { dispatchDate: TUESDAY_DATE, cohort: 'tuesday' }, user), 403);
+      expect(repoMock.editSlip).not.toHaveBeenCalled();
+    });
+
+  it('requires date and cohort together, not just one', async () => {
+    await expectStatus(pickingService.editSlip(1, { dispatchDate: TUESDAY_DATE }, MANAGER), 400);
+    expect(repoMock.editSlip).not.toHaveBeenCalled();
+  });
+
+  it('enforces the scheduled pickup day by default, same as creating a slip', async () => {
+    await expectStatus(pickingService.editSlip(1, { dispatchDate: TUESDAY_DATE, cohort: 'thursday' }, MANAGER), 400);
+  });
+
+  it('allows an off-schedule move when force is set', async () => {
+    await expect(pickingService.editSlip(1, { dispatchDate: TUESDAY_DATE, cohort: 'thursday', force: true }, MANAGER))
+      .resolves.toBeDefined();
+  });
+
+  it('accepts a clean product line list', async () => {
+    await pickingService.editSlip(1, { items }, MANAGER);
+    expect(repoMock.editSlip).toHaveBeenCalledWith(expect.objectContaining({
+      items: [{ productId: 3, quantity: 5, unit: 'kg' }],
+    }));
+  });
+
+  it('coerces numeric-string productId/quantity off the form', async () => {
+    await pickingService.editSlip(1, { items: [{ productId: '3', quantity: '5.5', unit: 'kg' }] }, MANAGER);
+    expect(repoMock.editSlip).toHaveBeenCalledWith(expect.objectContaining({
+      items: [{ productId: 3, quantity: 5.5, unit: 'kg' }],
+    }));
+  });
+
+  it('rejects an empty line list', async () => {
+    await expectStatus(pickingService.editSlip(1, { items: [] }, MANAGER), 400);
+    expect(repoMock.editSlip).not.toHaveBeenCalled();
+  });
+
+  it('rejects a line with no quantity', async () => {
+    await expectStatus(pickingService.editSlip(1, { items: [{ productId: 3, quantity: 0, unit: 'kg' }] }, MANAGER), 400);
+  });
+
+  it('rejects a line with an invalid product', async () => {
+    await expectStatus(pickingService.editSlip(1, { items: [{ productId: 'abc', quantity: 5, unit: 'kg' }] }, MANAGER), 400);
+  });
+
+  it('rejects the same product appearing twice', async () => {
+    await expectStatus(pickingService.editSlip(1, {
+      items: [{ productId: 3, quantity: 5, unit: 'kg' }, { productId: 3, quantity: 2, unit: 'kg' }],
+    }, MANAGER), 400);
+  });
+
+  it('maps a missing slip to 404', async () => {
+    repoMock.editSlip.mockResolvedValueOnce({ notFound: true });
+    await expectStatus(pickingService.editSlip(1, { items }, MANAGER), 404);
+  });
+
+  it('maps an already-claimed slip to a 409 that says so', async () => {
+    repoMock.editSlip.mockResolvedValueOnce({ locked: true, status: 'in_progress' });
+    await expect(pickingService.editSlip(1, { items }, MANAGER))
+      .rejects.toThrow(/already been claimed/i);
+  });
+
+  it('maps a dispatch-date conflict to 409', async () => {
+    repoMock.editSlip.mockResolvedValueOnce({ dateConflict: true });
+    await expectStatus(pickingService.editSlip(1, { dispatchDate: TUESDAY_DATE, cohort: 'tuesday' }, MANAGER), 409);
+  });
+});
+
 // ── assignSlip ────────────────────────────────────────────────
 describe('assignSlip — claiming a pallet', () => {
   it('lets a packer claim a slip for themselves', async () => {
@@ -316,6 +410,14 @@ describe('assignSlip — claiming a pallet', () => {
     expect(repoMock.assignSlip).toHaveBeenCalledWith(
       { slipId: 1, packerId: WORKER.id, actorId: WORKER.id, canOverride: false }
     );
+  });
+
+  it('tells a worker a volunteer is packing the pallet', async () => {
+    repoMock.assignSlip.mockResolvedValueOnce({ volunteerHeld: true });
+    await expect(pickingService.assignSlip(1, {}, WORKER)).rejects.toMatchObject({
+      status: 409,
+      message: 'A volunteer is packing this pallet.',
+    });
   });
 
   it('ignores a packerId a packer tries to set for someone else', async () => {
@@ -462,6 +564,37 @@ describe('addSecondPacker — a second packer on a pallet', () => {
     repoMock.addSecondPacker.mockResolvedValue({ locked: true, status });
     await expect(pickingService.addSecondPacker(1, { packerId: WORKER2.id }, MANAGER))
       .rejects.toThrow(message);
+  });
+});
+
+// ── releaseSlip ───────────────────────────────────────────────
+describe('releaseSlip — returning a pallet to the floor', () => {
+  it('lets a manager release a claimed pallet', async () => {
+    await pickingService.releaseSlip(1, MANAGER);
+    expect(repoMock.releaseSlip).toHaveBeenCalledWith({ slipId: 1, actorId: MANAGER.id, beforeCommit: expect.any(Function) });
+  });
+
+  it('refuses a worker — releasing is a floor-management call, not a packer\'s own claim', async () => {
+    await expect(pickingService.releaseSlip(1, WORKER))
+      .rejects.toMatchObject({ status: 403 });
+    expect(repoMock.releaseSlip).not.toHaveBeenCalled();
+  });
+
+  it('maps a missing slip to 404', async () => {
+    repoMock.releaseSlip.mockResolvedValueOnce({ notFound: true });
+    await expectStatus(pickingService.releaseSlip(1, MANAGER), 404);
+  });
+
+  it('maps an unclaimed pallet to a 409 that says so', async () => {
+    repoMock.releaseSlip.mockResolvedValueOnce({ notClaimed: true, status: 'pending' });
+    await expect(pickingService.releaseSlip(1, MANAGER))
+      .rejects.toThrow(/not currently claimed/i);
+  });
+
+  it('resolves to the updated slip on success', async () => {
+    repoMock.releaseSlip.mockResolvedValueOnce({ slip: { id: 1, status: 'pending' } });
+    await expect(pickingService.releaseSlip(1, MANAGER))
+      .resolves.toEqual({ id: 1, status: 'pending' });
   });
 });
 

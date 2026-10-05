@@ -28,9 +28,10 @@ import {
 } from '../../../services/pickingAPI';
 import { fmtQty } from '../../../lib/quantity';
 import {
-  Actions, Button, ChoiceList, Counter, Notice, ViewToggle, Coachmark,
+  Actions, Button, ChoiceList, Counter, Notice, TextField, ViewToggle, Coachmark,
 } from '../../staff/components/StepPrimitives';
 import useCoachmark from '../../staff/hooks/useCoachmark';
+import { volunteerHolder } from '../../pickingSlips/slipViews';
 
 const MODE_KEY = 'stf_packing_view_mode';
 const MODES = [
@@ -45,7 +46,7 @@ const readStoredMode = () => {
   }
 };
 
-const COHORT_LABELS = { week1: 'Week 1', week2: 'Week 2' };
+const COHORT_LABELS = { tuesday: 'Tuesday', thursday: 'Thursday' };
 const REASON_OPTIONS = [
   { value: 'Short quantity', label: 'Short quantity' },
   { value: 'Damaged stock', label: 'Damaged stock' },
@@ -67,13 +68,16 @@ function ItemDecisionPanel({ item, slipId, onDone }) {
   const [qty, setQty] = useState(Number(item.required_quantity) || 0);
   const [flagQty, setFlagQty] = useState('');
   const [reason, setReason] = useState('');
+  // The paper slip's "Comment" column — on every line, not only a
+  // flagged one, so it lives here rather than folded into reason.
+  const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
   if (mode === 'idle') {
     return (
       <Actions row>
-        <Button onClick={() => setMode('confirm')}>Confirm</Button>
+        <Button variant="step" onClick={() => setMode('confirm')}>Confirm</Button>
         <Button variant="secondary" onClick={() => setMode('flag')}>Flag</Button>
       </Actions>
     );
@@ -83,15 +87,23 @@ function ItemDecisionPanel({ item, slipId, onDone }) {
     return (
       <div className="stf-field-body">
         <Counter label={item.product_name} value={qty} onChange={setQty} />
+        <TextField
+          id={`stf-note-confirm-${item.id}`}
+          label="Comment (optional)"
+          hint="E.g. a substitution — anything worth the floor knowing that isn't a shortage."
+          value={note}
+          onChange={setNote}
+        />
         {error ? <Notice tone="warn">{error}</Notice> : null}
         <Actions row>
           <Button
+            variant="step"
             disabled={submitting}
             onClick={async () => {
               setSubmitting(true);
               setError(null);
               try {
-                await confirmItem(slipId, item.id, qty);
+                await confirmItem(slipId, item.id, qty, note);
                 onDone();
               } catch (err) {
                 setError(err.message || 'Could not confirm this item.');
@@ -113,15 +125,23 @@ function ItemDecisionPanel({ item, slipId, onDone }) {
       <ChoiceList legend="Why is this flagged?" options={REASON_OPTIONS} value={reason} onChange={setReason} />
       <Counter label="Qty actually packed" value={flagQty === '' ? 0 : Number(flagQty)} onChange={(v) => setFlagQty(String(v))} />
       <p className="stf-field-hint">Whatever you set here comes off stock when the pallet is closed.</p>
+      <TextField
+        id={`stf-note-flag-${item.id}`}
+        label="Comment (optional)"
+        hint="Extra detail beyond the reason above, if there is any."
+        value={note}
+        onChange={setNote}
+      />
       {error ? <Notice tone="warn">{error}</Notice> : null}
       <Actions row>
         <Button
+          variant="step"
           disabled={!reason || submitting}
           onClick={async () => {
             setSubmitting(true);
             setError(null);
             try {
-              await flagItem(slipId, item.id, reason, flagQty === '' ? undefined : Number(flagQty));
+              await flagItem(slipId, item.id, reason, flagQty === '' ? undefined : Number(flagQty), note);
               onDone();
             } catch (err) {
               setError(err.message || 'Could not flag this item.');
@@ -165,22 +185,27 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
 
   const reload = () => setReloadToken((t) => t + 1);
 
-  // Guided renders exactly one pending item, same as WorkList — so it
-  // always needs a focused one. The caller sets it on entering Guided
-  // (handleModeChange) or after a decision (advanceGuidedFocus); this
-  // is the safety net for a list that arrives after that, the same
-  // reason WorkList has its own. Above the early returns below: a hook
-  // after `if (loading) return` runs on some renders and not others,
-  // which React rejects ("Rendered more hooks than during the
-  // previous render") the moment the slip finishes loading.
-  const pendingIdsForFocus = (slip?.items || []).filter((i) => i.status === 'pending').map((i) => i.id);
-  const firstPendingId = pendingIdsForFocus[0] ?? null;
-  const focusIsPending = pendingIdsForFocus.includes(focusId);
+  // Lifted above the loading/error/no-slip returns below, and reading
+  // slip?.items rather than the slip.items used once it's guaranteed
+  // non-null — this hook used to sit after those early returns, so it
+  // was skipped on every render before the slip finished loading and
+  // then called for the first time the moment it did: one more hook
+  // than the previous render saw, which is a Rules-of-Hooks violation
+  // React treats as fatal ("Rendered more hooks than during the
+  // previous render"), crashing this component on every pallet that
+  // wasn't already cached. Guided renders exactly one pending item,
+  // same as WorkList — so it always needs a focused one. The caller
+  // sets it on entering Guided (handleModeChange) or after a decision
+  // (advanceGuidedFocus); this is the safety net for a list that
+  // arrives after that, the same reason WorkList has its own.
+  const pendingItems = (slip?.items ?? []).filter((i) => i.status === 'pending');
+  const guidedIndex = pendingItems.findIndex((i) => i.id === focusId);
   useEffect(() => {
-    if (mode === 'guided' && firstPendingId !== null && !focusIsPending) {
-      setFocusId(firstPendingId);
+    if (mode === 'guided' && pendingItems.length > 0 && guidedIndex < 0) {
+      setFocusId(pendingItems[0].id);
     }
-  }, [mode, firstPendingId, focusIsPending]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, pendingItems.length, guidedIndex]);
 
   if (loading) return <div className="stf-skeleton" aria-label="Loading" />;
 
@@ -197,7 +222,9 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
   if (!slip) return null;
 
   const locked = slip.status === 'complete' || slip.status === 'collected';
-  const unassigned = !slip.assigned_to;
+  // A pallet a guest volunteer is packing is taken, though assigned_to is empty.
+  const volunteerLabel = volunteerHolder(slip);
+  const unassigned = !slip.assigned_to && !volunteerLabel;
   // Either packer on a dual-assigned pallet may work it — matches
   // picking.repository.js's own ownership check, which the server
   // already enforces either way; this only keeps the client's own
@@ -207,10 +234,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
   const items = slip.items || [];
   const confirmed = items.filter((i) => i.status === 'confirmed').length;
   const flagged = items.filter((i) => i.status === 'flagged').length;
-  const pendingItems = items.filter((i) => i.status === 'pending');
   const pending = pendingItems.length;
-
-  const guidedIndex = pendingItems.findIndex((i) => i.id === focusId);
 
   const handleModeChange = (next) => {
     setMode(next);
@@ -297,7 +321,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
 
       {unassigned && !locked ? (
         <Actions>
-          <Button disabled={claiming} onClick={handleClaim}>
+          <Button disabled={claiming} onClick={handleClaim} loading={claiming}>
             {claiming ? 'Claiming…' : 'Claim this pallet'}
           </Button>
         </Actions>
@@ -306,8 +330,8 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
           <span>
             <span className="stf-kv-key">Packing:</span>{' '}
             <span className="stf-kv-val">
-              {slip.packer_name}{slip.assigned_to === currentUser?.id ? ' (you)' : ''}
-              {slip.assigned_to_2 ? `, ${slip.packer_name_2}${slip.assigned_to_2 === currentUser?.id ? ' (you)' : ''}` : ''}
+              {slip.packer_name ? slip.packer_name : volunteerLabel}
+              {slip.assigned_to_2 ? `, ${slip.packer_name_2}` : ''}
             </span>
           </span>
         </p>
@@ -338,9 +362,25 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
                 { className: 'stf-badge', label: 'Pending' };
 
               return (
-                <div key={item.id} className="stf-row is-static" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
-                  <span className="stf-row-main" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span>
+                <div key={item.id} className="stf-row is-static stf-row--check">
+                  {/* .stf-row--check already exists for exactly this
+                      shape (see DonationItemsList.jsx) — a row that
+                      stacks extra content below its main line instead
+                      of squeezing it onto one line.
+                      .stf-row-main is used exactly like this everywhere
+                      else it appears (StaffSlipList.jsx, ReviewSummary.jsx,
+                      FeedTheSoilFlow.jsx, CommunityRequestFlow.jsx): a
+                      sibling of the badge, not its parent — that's what
+                      gives title/meta their own column stack (its own
+                      CSS already does flex-direction: column) instead of
+                      the badge's row-level justify-content fighting it
+                      from one level too high. .stf-row-head restates
+                      .stf-row's own default row layout on an inner
+                      wrapper, since the outer .stf-row here is now in
+                      .stf-row--check's column mode to make room for the
+                      Confirm/Flag panel below. */}
+                  <span className="stf-row-head">
+                    <span className="stf-row-main">
                       {guidedActive ? (
                         <span className="stf-wl-pos">Item {activeGuidedIndex + 1} of {pendingItems.length}</span>
                       ) : null}
@@ -349,6 +389,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
                         Required {fmtQty(item.required_quantity, item.unit)}
                         {item.packed_quantity != null ? ` · Packed ${fmtQty(item.packed_quantity, item.unit)}` : ''}
                         {item.flag_reason ? ` · ${item.flag_reason}` : ''}
+                        {item.packer_note ? ` · ${item.packer_note}` : ''}
                       </span>
                     </span>
                     <span className={badge.className}>{badge.label}</span>

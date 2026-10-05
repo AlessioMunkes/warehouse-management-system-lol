@@ -62,6 +62,21 @@ export const validRole = (value) => {
   return value;
 };
 
+// Optional email for an account. Blank / null clears it (null); a value
+// is trimmed and lowercased so the case-insensitive unique index
+// (idx_users_email_unique, LOWER(email)) and what is stored agree. The
+// format check matches the invite flow's: enough to catch typos, not
+// RFC 5322.
+export const validOptionalEmail = (value) => {
+  const email = clean(value)?.toLowerCase() ?? null;
+  if (email === null) return null;
+  if (email.length > 255) throw fail(400, 'Use an email address of 255 characters or fewer.');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw fail(400, 'Enter a valid email address, like name@example.org.');
+  }
+  return email;
+};
+
 export const validPassword = (value) => {
   if (typeof value !== 'string' || value.length < MIN_PASSWORD_LENGTH) {
     throw fail(400, `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);

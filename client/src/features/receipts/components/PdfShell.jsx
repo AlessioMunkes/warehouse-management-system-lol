@@ -150,7 +150,11 @@ export default function PdfShell({ title, filename, onClose, children }) {
         onclone: (clonedDoc) => sanitiseClonedDocument(clonedDoc),
       });
 
-      const imgData    = canvas.toDataURL('image/png');
+      // JPEG, not PNG: a PNG of a scale-2 A4 page is megabytes per page
+      // (a long operations report came out at 21MB). On a white page
+      // at 0.92 the text is indistinguishable and the file is a
+      // fraction of the size.
+      const imgData    = canvas.toDataURL('image/jpeg', 0.92);
       const pdf        = new jsPDF('p', 'mm', 'a4');
       const pageWidth  = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
@@ -160,7 +164,7 @@ export default function PdfShell({ title, filename, onClose, children }) {
       let yPos = 0;
       while (yPos < imgHeight) {
         if (yPos > 0) pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, -yPos, imgWidth, imgHeight);
+        pdf.addImage(imgData, 'JPEG', 0, -yPos, imgWidth, imgHeight);
         yPos += pageHeight;
       }
 

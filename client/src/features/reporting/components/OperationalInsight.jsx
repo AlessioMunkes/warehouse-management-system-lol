@@ -1,38 +1,30 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/features/reporting/components/OperationalInsight.jsx
 //
-// Everything under an operational chart that turns it into work:
-//   key figures     — the headline, change on the previous period,
-//                     and the biggest contributor or latest bucket
-//   who to act on   — the named centres, suppliers, products and
-//                     packers behind the number, with contact
-//                     details and a link to the screen to fix it on
-//   written report  — on request: what happened, what the related
-//                     charts add, what it means, next steps. Printable.
+// The report under an Operations chart. Until "Generate report" is
+// clicked, only the button shows. Generating asks the server (and the
+// AI, if available) for the write-up, then shows in this order:
+//   1. About this chart: what the chart shows, in plain words
+//   2. Business view: what it means for Ladles of Love
+//   3. Key figures, including the change on the previous period
+//   4. Related diagrams: two charts that help explain this one
+//   5. Actions: the centres, suppliers, products or packers to follow
+//      up with, with contact details and a link to fix it
+// "PDF report" prints the same body with a letterhead.
 //
-// OPERATIONS ONLY. Used on ReportingPage alone; the server refuses
-// impact metrics on /insight, so this cannot drift onto the Impact
-// Report page by accident.
-//
-// Each section can be collapsed; the choice is remembered per
-// browser. Clicking a name in a list highlights it on the main chart
-// and the reverse, through the page's shared `highlight`.
-//
-// The figures and lists load with every report because they are
-// plain SQL. The written report waits for a click because it calls
-// the model, which is rate-limited and sometimes slow.
+// Operations reports only; the server refuses impact metrics here.
+// Clicking a name in Actions highlights it on the chart, and back.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   ArrowDownRight, ArrowUpRight, ChevronDown, FileText, Mail, Phone, Printer, User,
 } from 'lucide-react';
-import ReportChart from './ReportChart';
 import OperationalChart from './OperationalChart';
 import ComboChart from './ComboChart';
+import OperationsReportPDF from './OperationsReportPDF';
 import { getInsight } from '../../../services/reportingAPI';
 import { STAFF } from '../../../routes/paths';
 import '../operationalReport.css';
@@ -42,10 +34,12 @@ const BORDER = 'var(--line)';
 
 const LINKS = {
   beneficiaries:    { to: STAFF.beneficiaries,    label: 'Open beneficiaries' },
-  deliveries:       { to: STAFF.deliveries,       label: 'Open deliveries' },
+  // The floor's screens are not the manager's: deliveries are read on
+  // Receipts, decanting runs on the ledger's Decanting tab.
+  deliveries:       { to: STAFF.receipts,         label: 'Open receipts' },
   purchaseOrders:   { to: STAFF.purchaseOrders,   label: 'Open purchase orders' },
   stockLedger:      { to: STAFF.stockLedger,      label: 'Open stock ledger' },
-  decantingRecords: { to: STAFF.decantingRecords, label: 'Open decanting sheets' },
+  decantingRecords: { to: `${STAFF.stockLedger}?status=decanted`, label: 'Open decanting in the ledger' },
   pickingSlips:     { to: STAFF.pickingSlips,     label: 'Open picking slips' },
 };
 
@@ -112,7 +106,7 @@ function Figure({ f }) {
   const hasDelta = f.delta !== null && f.delta !== undefined;
   const Arrow = f.delta > 0 ? ArrowUpRight : ArrowDownRight;
   return (
-    <div className="rounded-[4px] border-2 bg-surface p-3" style={{ borderColor: BORDER }}>
+    <div className="rounded-4xl bg-card shadow-md ring-1 ring-foreground/5 p-3" style={{ borderColor: BORDER }}>
       <p className="text-xs font-medium" style={{ color: MUTED }}>{f.label}</p>
       <p className="mt-1 text-2xl font-bold tracking-tight">
         {formatValue(f.value, f.unit)}
@@ -149,13 +143,13 @@ function Contact({ c }) {
   );
 }
 
-function ActionList({ list, printMode, highlight, onHighlight }) {
+export function ActionList({ list, printMode, highlight, onHighlight }) {
   const [expanded, setExpanded] = useState(false);
   const shown = printMode || expanded ? list.entries : list.entries.slice(0, LIST_PREVIEW);
   const link = LINKS[list.link];
 
   return (
-    <section className="op-avoid-break rounded-[4px] border-2 bg-surface p-4" style={{ borderColor: BORDER }}>
+    <section className="op-avoid-break rounded-4xl bg-card shadow-md ring-1 ring-foreground/5 p-4" style={{ borderColor: BORDER }}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h4 className="text-sm font-bold">{list.title}</h4>
         {link && !printMode && (
@@ -172,7 +166,7 @@ function ActionList({ list, printMode, highlight, onHighlight }) {
             {shown.map((e, i) => (
               <li
                 key={`${e.name}-${i}`}
-                className="-mx-1 flex gap-3 rounded-[4px] px-1 text-sm"
+                className="-mx-1 flex gap-3 rounded-lg px-1 text-sm"
                 style={highlight === e.name ? { background: 'color-mix(in srgb, var(--viz-1) 12%, transparent)' } : undefined}
               >
                 <span aria-hidden="true" className="w-5 shrink-0 text-right font-bold" style={{ color: MUTED }}>{i + 1}.</span>
@@ -210,34 +204,48 @@ function ActionList({ list, printMode, highlight, onHighlight }) {
   );
 }
 
-function Narrative({ n }) {
+const SOURCE_NOTE = (n) => (n.source === 'ai'
+  ? 'Written by the AI assistant from the figures on this page. Check the numbers before quoting them.'
+  : n.fallbackReason
+    ? 'The AI assistant was unavailable, so this was written from the figures directly.'
+    : 'Written from the figures directly.');
+
+const SectionTitle = ({ children }) => (
+  <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: MUTED }}>{children}</h3>
+);
+
+// 1. What the chart shows, in words anyone can follow — first, so a
+//    reader who has never seen this report knows what they are
+//    looking at before being told what to think about it.
+export function ChartExplanation({ n }) {
   return (
-    <div className="space-y-3 text-sm leading-relaxed">
+    <div className="space-y-2 text-sm leading-relaxed">
+      <SectionTitle>About this chart</SectionTitle>
       <p className="text-base font-bold">{n.headline}</p>
-      <div>
-        <h4 className="text-xs font-bold uppercase tracking-wider" style={{ color: MUTED }}>What happened</h4>
-        <p className="mt-1">{n.whatHappened}</p>
-        {n.context && <p className="mt-2">{n.context}</p>}
-      </div>
-      <div>
-        <h4 className="text-xs font-bold uppercase tracking-wider" style={{ color: MUTED }}>What this means for the operation</h4>
-        <p className="mt-1">{n.meaning}</p>
-      </div>
+      {n.explanation ? <p>{n.explanation}</p> : null}
+      {n.whatHappened ? <p>{n.whatHappened}</p> : null}
+      {n.context ? <p>{n.context}</p> : null}
+    </div>
+  );
+}
+
+// 2. The same figures read against what Ladles of Love's operation
+//    needs to hold true — is it being met, and what is at risk.
+export function BusinessView({ n }) {
+  const text = n.businessView ?? n.meaning;
+  return (
+    <div className="space-y-2 text-sm leading-relaxed">
+      <SectionTitle>Business view</SectionTitle>
+      {text ? <p>{text}</p> : null}
       {n.nextSteps?.length > 0 && (
         <div>
-          <h4 className="text-xs font-bold uppercase tracking-wider" style={{ color: MUTED }}>Next steps</h4>
+          <h4 className="mt-3 text-sm font-bold">Next steps</h4>
           <ol className="mt-1 list-decimal space-y-1 pl-5">
-            {n.nextSteps.map((s) => <li key={s}>{s}</li>)}
+            {n.nextSteps.map((st) => <li key={st}>{st}</li>)}
           </ol>
         </div>
       )}
-      <p className="text-xs" style={{ color: MUTED }}>
-        {n.source === 'ai'
-          ? 'Written by the AI assistant from the figures on this page. Check the numbers before quoting them.'
-          : n.fallbackReason
-            ? 'The AI assistant was unavailable, so this reading was written from the figures directly.'
-            : 'Written from the figures directly.'}
-      </p>
+      <p className="pt-1 text-xs" style={{ color: MUTED }}>{SOURCE_NOTE(n)}</p>
     </div>
   );
 }
@@ -245,31 +253,75 @@ function Narrative({ n }) {
 // The body of the report, shared by the screen view and the printed
 // copy so the two cannot differ.
 function ReportBody({ data, narrative, printMode, highlight, onHighlight }) {
-  const { report, figures, related, actions, listRange, combo } = data;
+  const { report, figures, related, actions, listRange, combo, target } = data;
   return (
     <div className="space-y-5">
+      {narrative && (
+        <section className="op-avoid-break rounded-4xl bg-card shadow-md ring-1 ring-foreground/5 p-4 sm:p-5" style={{ borderColor: BORDER }}>
+          <ChartExplanation n={narrative} />
+        </section>
+      )}
+
+      {narrative && (
+        <section className="op-avoid-break rounded-4xl bg-card shadow-md ring-1 ring-foreground/5 p-4 sm:p-5" style={{ borderColor: BORDER }}>
+          <BusinessView n={narrative} />
+        </section>
+      )}
+
       {figures?.length > 0 && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {figures.map((f) => <Figure key={f.label} f={f} />)}
         </div>
       )}
 
-      {narrative && (
-        <section className="op-avoid-break rounded-[4px] border-2 bg-surface p-4 sm:p-5" style={{ borderColor: BORDER }}>
-          <Narrative n={narrative} />
-        </section>
-      )}
-
       {printMode && (
         <section className="op-avoid-break">
           <h3 className="mb-2 text-sm font-bold">{report.description}</h3>
-          <ReportChart report={report} compact />
+          {/* The same Recharts chart as on screen, drawn for paper. The
+              PDF sheet is a fixed 794px and visible while it is
+              captured, so the chart can measure itself. */}
+          <OperationalChart report={report} target={target} hint={report.meta?.chartHint} print />
         </section>
       )}
 
+      {combo && (
+        <Collapsible id="combo" title={combo.title} printMode={printMode}>
+          <section className="op-avoid-break rounded-4xl bg-card shadow-md ring-1 ring-foreground/5 p-4" style={{ borderColor: BORDER }}>
+            <ComboChart combo={combo} syncId={printMode ? 'combo-print' : 'combo'} print={printMode} />
+          </section>
+        </Collapsible>
+      )}
+
+      {/* Two related diagrams, always shown with the report, each with
+          a short note on how it connects to the main chart (written
+          from the figures when the AI is available). */}
+      {related?.length > 0 && (
+        <section aria-labelledby="op-related-title">
+          <h3 id="op-related-title" className="text-sm font-bold">Related diagrams</h3>
+          <p className="mb-2 mt-0.5 text-xs" style={{ color: MUTED }}>
+            {related.length === 1 ? 'A chart' : 'Two charts'} that help explain the one above, and how they connect.
+          </p>
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            {related.map((r, i) => (
+              <section key={r.description} className="op-avoid-break rounded-4xl bg-card shadow-md ring-1 ring-foreground/5 p-4" style={{ borderColor: BORDER }}>
+                <p className="text-xs font-medium">{r.description}</p>
+                {(narrative?.relatedConnections?.[i] || r.why) && (
+                  <p className="mb-2 mt-1 text-xs leading-relaxed" style={{ color: MUTED }}>
+                    <span className="font-semibold" style={{ color: 'var(--ink)' }}>How it connects: </span>
+                    {narrative?.relatedConnections?.[i] || r.why}
+                  </p>
+                )}
+                <OperationalChart report={r} compact print={printMode} />
+              </section>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Last: who to follow up with, once the reader knows why. */}
       {actions?.length > 0 && (
         <Collapsible
-          id="actions" title="Who to act on" printMode={printMode}
+          id="actions" title="Actions" printMode={printMode}
           note={listRange && (
             <p className="text-xs" style={{ color: MUTED }}>
               Lists cover {listRange.from} to {listRange.to}, since this report has no period of its own.
@@ -279,30 +331,6 @@ function ReportBody({ data, narrative, printMode, highlight, onHighlight }) {
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             {actions.map((a) => (
               <ActionList key={a.id} list={a} printMode={printMode} highlight={highlight} onHighlight={onHighlight} />
-            ))}
-          </div>
-        </Collapsible>
-      )}
-
-      {combo && !printMode && (
-        <Collapsible id="combo" title={combo.title}>
-          <section className="rounded-[4px] border-2 bg-surface p-4" style={{ borderColor: BORDER }}>
-            <ComboChart combo={combo} />
-          </section>
-        </Collapsible>
-      )}
-
-      {related?.length > 0 && (
-        <Collapsible id="related" title="Related views" printMode={printMode}>
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            {related.map((r) => (
-              <section key={r.description} className="op-avoid-break rounded-[4px] border-2 bg-surface p-4" style={{ borderColor: BORDER }}>
-                <p className="mb-2 text-xs font-medium">{r.description}</p>
-                {/* Print keeps the static SVG chart: Recharts measures
-                    its container, which is hidden until the print
-                    dialog opens. */}
-                {printMode ? <ReportChart report={r} compact /> : <OperationalChart report={r} compact />}
-              </section>
             ))}
           </div>
         </Collapsible>
@@ -356,32 +384,13 @@ export default function OperationalInsight({ report, highlight, onHighlight, onL
     }
   };
 
-  // Printing renders a clean copy straight into <body> and hides
-  // everything else (operationalReport.css), so the sidebar, builder
-  // and buttons never reach the paper. "Save as PDF" in the print
-  // dialog is the download.
-  useEffect(() => {
-    if (!printing) return undefined;
-    document.documentElement.classList.add('op-printing');
-    const done = () => setPrinting(false);
-    window.addEventListener('afterprint', done);
-    const t = setTimeout(() => window.print(), 50);
-    return () => {
-      clearTimeout(t);
-      window.removeEventListener('afterprint', done);
-      document.documentElement.classList.remove('op-printing');
-    };
-  }, [printing]);
-
   if (!spec) return null;
 
   return (
     <div className="mt-5">
-      {loading && (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-[4px]" />)}
-        </div>
-      )}
+      {/* Nothing to show while the breakdown loads: the page is the
+          chart above until a report is generated. */}
+      {loading && <Skeleton className="h-9 w-44 rounded-lg" />}
 
       {error && (
         <p className="text-xs" style={{ color: MUTED }}>
@@ -396,20 +405,21 @@ export default function OperationalInsight({ report, highlight, onHighlight, onL
               type="button"
               onClick={writeUp}
               disabled={writing}
-              className="bg-ink hover:bg-ink/90 text-on-ink font-bold text-xs tracking-wider rounded-[4px] px-4"
+              className="bg-ink hover:bg-ink/90 text-on-ink font-bold text-xs tracking-wider rounded-lg px-4"
             >
               <FileText aria-hidden="true" className="mr-2 h-4 w-4" />
-              {writing ? 'WRITING…' : narrative ? 'REWRITE REPORT' : 'WRITE UP THIS REPORT'}
+              {writing ? 'GENERATING…' : narrative ? 'REGENERATE REPORT' : 'GENERATE REPORT'}
             </Button>
+            {/* The PDF is the generated report, so it waits for one. */}
             {narrative && (
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setPrinting(true)}
-                className="rounded-[4px] border-2 text-xs font-bold tracking-wider"
+                className="rounded-lg border text-xs font-bold tracking-wider"
               >
                 <Printer aria-hidden="true" className="mr-2 h-4 w-4" />
-                PRINT / SAVE AS PDF
+                PDF REPORT
               </Button>
             )}
             {writeError && (
@@ -419,25 +429,26 @@ export default function OperationalInsight({ report, highlight, onHighlight, onL
             )}
           </div>
 
-          <ReportBody data={data} narrative={narrative} highlight={highlight} onHighlight={onHighlight} />
+          {/* Until a report is generated the page is just the chart and
+              its table above — the write-up, figures, related views and
+              actions all arrive together, in reading order. */}
+          {narrative ? (
+            <ReportBody data={data} narrative={narrative} highlight={highlight} onHighlight={onHighlight} />
+          ) : (
+            <p className="text-xs" style={{ color: MUTED }}>
+              Generate the report for a plain-English explanation of this chart, what it means for the operation, and who to follow up with.
+            </p>
+          )}
         </>
       )}
 
-      {printing && data && createPortal(
-        <div className="op-print-root text-ink font-['Montserrat',sans-serif]">
-          <header className="mb-4 border-b-2 pb-3" style={{ borderColor: BORDER }}>
-            <p className="text-xs font-bold uppercase tracking-wider" style={{ color: MUTED }}>Ladles of Love · Operations report</p>
-            <h1 className="mt-1 text-xl font-bold">{data.report.description}</h1>
-            <p className="text-xs" style={{ color: MUTED }}>
-              Generated {new Date(data.generatedAt).toLocaleString('en-ZA', { dateStyle: 'medium', timeStyle: 'short' })}
-            </p>
-          </header>
-          <ReportBody data={data} narrative={narrative} printMode />
-          {data.report.meta?.caveat && (
-            <p className="mt-4 text-xs" style={{ color: MUTED }}>{data.report.meta.caveat}</p>
-          )}
-        </div>,
-        document.body,
+      {printing && data && (
+        <OperationsReportPDF
+          data={data}
+          narrative={narrative}
+          onClose={() => setPrinting(false)}
+          renderBody={(p) => <ReportBody {...p} printMode />}
+        />
       )}
     </div>
   );

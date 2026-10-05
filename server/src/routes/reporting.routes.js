@@ -12,12 +12,12 @@
 // ─────────────────────────────────────────────────────────────
 import express                      from 'express';
 import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
-import auth, { requireRole, ROLES } from '../middleware/auth.middleware.js';
+import auth, { requireRole } from '../middleware/auth.middleware.js';
+import { MANAGERS_UP } from '../constants/permissions.js';
 import reportingController          from '../controllers/reporting.controller.js';
 
 const router = express.Router();
 
-const MANAGERS_UP = [ROLES.MANAGER, ROLES.ADMIN];
 
 // Only /ask is limited. It is the one route that costs money per
 // call and draws on a shared free-tier quota, so one person holding
@@ -68,6 +68,13 @@ const writeUpLimiter = rateLimit({
 
 router.get ('/catalog', auth, requireRole(...MANAGERS_UP), reportingController.getCatalog);
 router.post('/report',  auth, requireRole(...MANAGERS_UP), reportingController.runReport);
+router.post('/drill',   auth, requireRole(...MANAGERS_UP), reportingController.drill);
+// Saved and scheduled reports: each manager's own (req.user.id).
+router.get   ('/saved',          auth, requireRole(...MANAGERS_UP), reportingController.listSaved);
+router.post  ('/saved',          auth, requireRole(...MANAGERS_UP), reportingController.createSaved);
+router.patch ('/saved/:id',      auth, requireRole(...MANAGERS_UP), reportingController.updateSaved);
+router.delete('/saved/:id',      auth, requireRole(...MANAGERS_UP), reportingController.removeSaved);
+router.post  ('/saved/:id/send', auth, requireRole(...MANAGERS_UP), askLimiter, reportingController.sendSaved);
 router.post('/ask',     auth, requireRole(...MANAGERS_UP), askLimiter, reportingController.ask);
 router.post('/insight', auth, requireRole(...MANAGERS_UP), writeUpLimiter, reportingController.insight);
 router.get ('/comparisons', auth, requireRole(...MANAGERS_UP), reportingController.getComparisons);

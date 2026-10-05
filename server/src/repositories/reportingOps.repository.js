@@ -147,8 +147,8 @@ const pickingTurnaround = async ({ dimension, filters, dateRange }) => {
   return rows.map((r) => ({ label: r.label, value: num(r.value), meta: { slips: r.slips } }));
 };
 
-// Live: the fortnight around today — last week's stragglers and the
-// next two weeks' pallets.
+// Live: slips due from a week ago to two weeks ahead, so late pallets
+// from last week show alongside the next two weeks.
 const slipPipeline = async ({ dimension, filters }) => {
   const expr = pick({ slip_status: 'ps.status', cohort: 'ps.cohort::text' }, dimension);
   const params = [];
@@ -332,10 +332,17 @@ const communityResponseTime = async ({ dimension, dateRange }) => {
 
 const donationRouting = async ({ dimension, dateRange }) => {
   const d = sastDate('di.created_at');
-  const expr = pick({ routing_status: 'di.routing_status', month: bucketMonth(d) }, dimension);
+  // category_flow: "recipe_food|allocated", drawn as a flow diagram
+  // (donation category on the left, where the items ended up on the
+  // right).
+  const expr = pick({
+    routing_status: 'di.routing_status', month: bucketMonth(d),
+    category_flow: `COALESCE(dn.donation_category, 'uncategorised') || '|' || di.routing_status`,
+  }, dimension);
   const { rows } = await pool.query(
     `SELECT ${expr} AS label, COUNT(*)::numeric AS value
        FROM donation_items di
+       JOIN donations dn ON dn.id = di.donation_id
       WHERE ${d} BETWEEN $1::date AND $2::date
       GROUP BY ${expr} ORDER BY ${dimension === 'month' ? '1' : '2 DESC, 1'}`,
     [dateRange.from, dateRange.to]
@@ -365,7 +372,87 @@ const volunteerEventAttendance = async ({ dimension, dateRange }) => {
   return rows.map((r) => ({ label: r.label, value: num(r.value), meta: { bookings: r.bookings } }));
 };
 
+// ══ Stock flow (waterfall) ════════════════════════════════════
+// Opening + received + donated − dispatched ± adjustments = closing.
+// Anchored on today's stock_levels and walked back through the
+// movements, so it holds even though the ledger did not start at
+// zero: closing = on hand now − everything after the period; opening
+// = on hand now − everything from the start of the period. Kilogram
+// products only — kilograms and crates cannot be added.
+const FLOW_STEPS = [
+  ['received', 'Received'], ['donated', 'Donated'], ['dispatched', 'Dispatched'], ['adjustment', 'Adjustments'],
+];
+const stockFlow = async ({ filters, dateRange }) => {
+  const params = [dateRange.from, dateRange.to];
+  const where = [`sl.unit = 'kg'`];
+  if (filters.product_id)   { params.push(filters.product_id);   where.push(`p.id = $${params.length}`); }
+  if (filters.programme_id) { params.push(filters.programme_id); where.push(`p.programme_id = $${params.length}`); }
+  const d = sastDate('sm.created_at');
+  const { rows: [r] } = await pool.query(
+    `WITH prod AS (
+       SELECT p.id, sl.quantity_on_hand FROM products p JOIN stock_levels sl ON sl.product_id = p.id
+        WHERE ${where.join(' AND ')}
+     ), mv AS (
+       SELECT sm.movement_type, sm.quantity, ${d} AS day FROM stock_movements sm JOIN prod ON prod.id = sm.product_id
+     )
+     SELECT (SELECT COALESCE(SUM(quantity_on_hand), 0) FROM prod)                           AS now,
+            COALESCE(SUM(quantity) FILTER (WHERE day >= $1::date), 0)                          AS since_start,
+            COALESCE(SUM(quantity) FILTER (WHERE day > $2::date), 0)                           AS after_end,
+            ${FLOW_STEPS.map(([t], i) => `COALESCE(SUM(quantity) FILTER (WHERE day BETWEEN $1::date AND $2::date AND movement_type = '${t}'), 0) AS s${i}`).join(', ')},
+            COUNT(*) FILTER (WHERE day BETWEEN $1::date AND $2::date)                          AS moves
+       FROM mv`,
+    params
+  );
+  const now = num(r.now);
+  const opening = now - num(r.since_start);
+  const closing = now - num(r.after_end);
+  const steps = FLOW_STEPS.map(([, label], i) => ({ label, value: num(r[`s${i}`]), meta: { kind: 'change' } }));
+  // Anything the four types above do not cover still has to add up.
+  const other = closing - opening - steps.reduce((s, x) => s + x.value, 0);
+  if (Math.abs(other) > 0.0005) steps.push({ label: 'Other movements', value: other, meta: { kind: 'change' } });
+  if (!num(r.moves) && !now) return [];
+  return [
+    { label: 'Opening stock', value: opening, meta: { kind: 'total' } },
+    ...steps.filter((x) => x.value !== 0),
+    { label: 'Closing stock', value: closing, meta: { kind: 'total' } },
+  ];
+};
+
+// ══ Days of cover ═════════════════════════════════════════════
+// On hand ÷ the average daily dispatch over the last 90 days. A
+// product not dispatched in that window never runs out at this rate
+// and is left out. Most urgent first.
+const COVER_WINDOW_DAYS = 90;
+const daysOfCover = async ({ filters, limit }) => {
+  const params = [COVER_WINDOW_DAYS];
+  const where = [`p.is_active = true`];
+  if (filters.programme_id) { params.push(filters.programme_id); where.push(`p.programme_id = $${params.length}`); }
+  params.push(limit ?? 10);
+  const { rows } = await pool.query(
+    `WITH out AS (
+       SELECT sm.product_id, SUM(-sm.quantity) / $1::numeric AS per_day
+         FROM stock_movements sm
+        WHERE sm.movement_type = 'dispatched' AND sm.quantity < 0
+          AND ${sastDate('sm.created_at')} > ${TODAY} - $1::int
+        GROUP BY sm.product_id
+     )
+     SELECT p.name AS label, GREATEST(sl.quantity_on_hand, 0)::numeric AS on_hand, sl.unit, out.per_day,
+            ROUND(GREATEST(sl.quantity_on_hand, 0) / out.per_day, 1)::numeric AS value,
+            to_char(${TODAY} + FLOOR(GREATEST(sl.quantity_on_hand, 0) / out.per_day)::int, 'YYYY-MM-DD') AS run_out
+       FROM out JOIN products p ON p.id = out.product_id
+       JOIN stock_levels sl ON sl.product_id = p.id
+      WHERE out.per_day > 0 AND ${where.join(' AND ')}
+      ORDER BY value ASC, p.name LIMIT $${params.length}`,
+    params
+  );
+  return rows.map((x) => ({
+    label: x.label, value: num(x.value),
+    meta: { onHand: num(x.on_hand), perDay: Number(num(x.per_day).toFixed(2)), stockUnit: x.unit, runOut: x.run_out },
+  }));
+};
+
 export default {
+  stockFlow, daysOfCover,
   poOnTimeRate, supplierLeadTime, overduePurchaseOrders, purchaseOrderPipeline,
   pickingTurnaround, slipPipeline, gateLoadVariance, lateCollectionRate,
   standingOrderDemand, stockValue, expiringStock, adjustmentReasons,

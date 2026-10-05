@@ -17,11 +17,26 @@
 import pool from '../config/db.js';
 import expiryWarningRepository from '../repositories/expiryWarning.repository.js';
 import { createNotification } from '../repositories/notification.repository.js';
+import settings from '../features/settings/settings.service.js';
 
-const TIERS = [
-  { days: 14, type: 'stock_expiry_warning_2w', label: '2 weeks' },
-  { days: 7,  type: 'stock_expiry_warning_1w', label: '1 week' },
-];
+// The two windows come from Settings (stock.expiryWarningFirstDays /
+// SecondDays), defaulting to 14 and 7. The notification TYPES stay
+// fixed whatever the days: warningAlreadySent dedupes on them, and a
+// type that changed with the setting would warn about every line
+// again the day an admin moved it.
+const daysLabel = (days) => (days % 7 === 0
+  ? `${days / 7} week${days === 7 ? '' : 's'}`
+  : `${days} day${days === 1 ? '' : 's'}`);
+
+const tiers = async () => {
+  const all = await settings.getAll();
+  const first = all['stock.expiryWarningFirstDays'];
+  const second = all['stock.expiryWarningSecondDays'];
+  return [
+    { days: first,  type: 'stock_expiry_warning_2w', label: daysLabel(first) },
+    { days: second, type: 'stock_expiry_warning_1w', label: daysLabel(second) },
+  ];
+};
 
 const formatDate = (value) =>
   new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -58,7 +73,7 @@ const notifyOne = async (item, tier) => {
 const runExpiryCheck = async () => {
   const summary = { checked: 0, notified: 0 };
 
-  for (const tier of TIERS) {
+  for (const tier of await tiers()) {
     const items = await expiryWarningRepository.findApproachingExpiry(tier.days);
     summary.checked += items.length;
 

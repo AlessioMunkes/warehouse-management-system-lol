@@ -141,19 +141,16 @@ describe('sendTomorrowCollectionReminderEmails', () => {
     expect(result.failed).toBe(0);
   });
 
-  it('does not send Thursday reminders on Tuesday', async () => {
+  // A run only ever looks at the next day, so Thursday's reminders
+  // cannot go out early on Tuesday...
+  it('on Tuesday looks at Wednesday, not Thursday', async () => {
     const result = await service.sendTomorrowCollectionReminderEmails({
       now: new Date('2026-09-22T06:00:00.000Z'),
     });
 
-    expect(result).toMatchObject({
-      collectionDate: null,
-      attempted: 0,
-      sent: 0,
-      failed: 0,
-    });
-    expect(repoMock.findCollectionsByDate).not.toHaveBeenCalled();
-    expect(repoMock.listPendingReminderDeliveries).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ collectionDate: '2026-09-23', attempted: 0, sent: 0, failed: 0 });
+    expect(repoMock.findCollectionsByDate).toHaveBeenCalledWith('2026-09-23');
+    expect(repoMock.findCollectionsByDate).not.toHaveBeenCalledWith('2026-09-24');
     expect(emailProviderMock.sendEmail).not.toHaveBeenCalled();
   });
 
@@ -182,13 +179,14 @@ describe('sendTomorrowCollectionReminderEmails', () => {
     expect(result.sent).toBe(1);
   });
 
-  it('does not send the same Thursday reminders again on Thursday', async () => {
+  // ...or again on the day itself.
+  it('on Thursday looks at Friday, so Thursday is not reminded twice', async () => {
     const result = await service.sendTomorrowCollectionReminderEmails({
       now: new Date('2026-09-24T06:00:00.000Z'),
     });
 
-    expect(result.collectionDate).toBeNull();
-    expect(repoMock.findCollectionsByDate).not.toHaveBeenCalled();
+    expect(result.collectionDate).toBe('2026-09-25');
+    expect(repoMock.findCollectionsByDate).not.toHaveBeenCalledWith('2026-09-24');
     expect(emailProviderMock.sendEmail).not.toHaveBeenCalled();
   });
 
@@ -300,14 +298,13 @@ describe('listTomorrowWhatsAppReminders', () => {
     expect(emailProviderMock.sendEmail).not.toHaveBeenCalled();
   });
 
-  it('keeps WhatsApp manual and uses the existing queue/link behavior only on the Wednesday workflow', async () => {
+  it('keeps WhatsApp manual: listing the queue never sends anything', async () => {
     const result = await service.listTomorrowWhatsAppReminders({
       now: new Date('2026-09-22T06:00:00.000Z'),
     });
 
-    expect(result).toMatchObject({ collectionDate: null, reminders: [] });
-    expect(repoMock.findCollectionsByDate).not.toHaveBeenCalled();
-    expect(repoMock.listReminderDeliveries).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ collectionDate: '2026-09-23', reminders: [] });
+    expect(repoMock.findCollectionsByDate).toHaveBeenCalledWith('2026-09-23');
     expect(emailProviderMock.sendEmail).not.toHaveBeenCalled();
   });
 

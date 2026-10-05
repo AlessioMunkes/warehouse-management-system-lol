@@ -27,10 +27,23 @@ import { Input } from '@/components/ui/input';
 import { X, Send, ArrowRight, Loader2 } from 'lucide-react';
 import { pathForScreen } from '../screenPaths';
 import useAssistant from '../useAssistant';
+import { BATCHES_LOGO } from '../brand';
 
 // ── One answer ───────────────────────────────────────────────
 
-function TopicAnswer({ topic, onOpenTopic }) {
+function TopicAnswer({ topic, onOpenTopic, onClose, here, role }) {
+  // Where the answer's screens are, as links — minus the one they are
+  // already on, and minus any id this build has no route for.
+  const links = (topic.open ?? [])
+    .filter((s) => s.id !== here)
+    .map((s) => ({ ...s, to: pathForScreen(s.id, role) }))
+    .filter((s) => s.to);
+
+  // The follow-up is offered as a question, so it is not repeated
+  // among the chips as well.
+  const followUp = topic.followUp ?? null;
+  const related = (topic.related ?? []).filter((r) => r.id !== followUp?.topic.id);
+
   return (
     <div className="space-y-2">
       <p className="font-semibold">{topic.title}</p>
@@ -49,9 +62,24 @@ function TopicAnswer({ topic, onOpenTopic }) {
         </ol>
       )}
 
-      {topic.related?.length > 0 && (
+      {links.length > 0 && (
         <div className="flex flex-wrap gap-1.5 pt-1">
-          {topic.related.map((r) => (
+          {links.map((s) => (
+            <Link
+              key={s.id}
+              to={s.to}
+              onClick={onClose}
+              className={buttonVariants({ size: 'sm', variant: 'secondary' })}
+            >
+              Open {s.label} <ArrowRight className="size-3.5" />
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {related.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 pt-1">
+          {related.map((r) => (
             <button
               key={r.id}
               type="button"
@@ -63,12 +91,26 @@ function TopicAnswer({ topic, onOpenTopic }) {
           ))}
         </div>
       )}
+
+      {/* Last, so the answer ends by offering the natural next step. */}
+      {followUp && (
+        <div className="mt-1 border-t pt-2">
+          <p className="text-sm">{followUp.question}</p>
+          <button
+            type="button"
+            onClick={() => onOpenTopic(followUp.topic.id, followUp.topic.title)}
+            className="mt-1.5 rounded-[4px] border px-2.5 py-1.5 text-xs font-medium hover:bg-muted/60"
+          >
+            Yes, show me
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
-function NavigateAnswer({ screen, onClose }) {
-  const to = pathForScreen(screen.id);
+function NavigateAnswer({ screen, onClose, role }) {
+  const to = pathForScreen(screen.id, role);
 
   // The app has already moved by the time this renders — see the
   // onNavigate handler below. So this confirms rather than offers,
@@ -80,6 +122,7 @@ function NavigateAnswer({ screen, onClose }) {
       {to
         ? <p>Opened <span className="font-semibold">{screen.label}</span>.</p>
         : <p>That is on <span className="font-semibold">{screen.label}</span>.</p>}
+      {screen.about && <p className="text-muted-foreground">{screen.about}</p>}
       {to && (
         // buttonVariants on the Link, NOT <Button asChild><Link/></Button>.
         // This project's Button is a plain styled <button> — Base UI,
@@ -141,10 +184,10 @@ function NotCoveredAnswer({ closest, onOpenTopic }) {
   );
 }
 
-function Answer({ entry, onOpenTopic, onPick, onClose }) {
+function Answer({ entry, onOpenTopic, onPick, onClose, here, role }) {
   switch (entry.kind) {
-    case 'topic':       return <TopicAnswer topic={entry.topic} onOpenTopic={onOpenTopic} />;
-    case 'navigate':    return <NavigateAnswer screen={entry.screen} onClose={onClose} />;
+    case 'topic':       return <TopicAnswer topic={entry.topic} onOpenTopic={onOpenTopic} onClose={onClose} here={here} role={role} />;
+    case 'navigate':    return <NavigateAnswer screen={entry.screen} onClose={onClose} role={role} />;
     case 'clarify':     return <ClarifyAnswer question={entry.question} options={entry.options} onPick={onPick} />;
     case 'not_covered': return <NotCoveredAnswer closest={entry.closest} onOpenTopic={onOpenTopic} />;
     default:            return <p>{entry.text}</p>;
@@ -153,7 +196,9 @@ function Answer({ entry, onOpenTopic, onPick, onClose }) {
 
 // ── The panel ────────────────────────────────────────────────
 
-export default function AssistantPanel({ open, onOpenChange, screen }) {
+// `role` picks the right side's page where a screen has one per side
+// (Benevolent Requests, Feed the Soil); see screenPaths.js.
+export default function AssistantPanel({ open, onOpenChange, screen, role }) {
   const navigate = useNavigate();
   const [draft, setDraft] = useState('');
   const endRef   = useRef(null);
@@ -171,11 +216,11 @@ export default function AssistantPanel({ open, onOpenChange, screen }) {
   // returns a screen their role allows, and pathForScreen returns
   // null for anything this build has no route for.
   const handleNavigate = useCallback((target) => {
-    const to = pathForScreen(target.id);
+    const to = pathForScreen(target.id, role);
     if (!to) return;
     navigate(to);
     if (!window.matchMedia?.('(min-width: 640px)')?.matches) onOpenChange(false);
-  }, [navigate, onOpenChange]);
+  }, [navigate, onOpenChange, role]);
 
   const { entries, busy, suggestions, enabled, ask, openTopic } =
     useAssistant({ open, screen, onNavigate: handleNavigate });
@@ -226,11 +271,17 @@ export default function AssistantPanel({ open, onOpenChange, screen }) {
           ].join(' ')}
         >
           <header className="flex shrink-0 items-center justify-between border-b px-3 py-2">
-            <div className="min-w-0">
-              <p className="font-semibold">Help</p>
-              <p className="truncate text-xs text-muted-foreground">
-                Ask me how to do something
-              </p>
+            <div className="flex min-w-0 items-center gap-2">
+              <img
+                src={BATCHES_LOGO} alt="" aria-hidden="true" draggable={false}
+                className="size-9 shrink-0 rounded-full bg-white object-contain ring-1 ring-black/10"
+              />
+              <div className="min-w-0">
+                <p className="font-semibold">Help</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  Ask me how to do something
+                </p>
+              </div>
             </div>
             {/* Required inside the popup when focus is trapped: it is
                 how a touch screen-reader user gets out. */}
@@ -292,6 +343,8 @@ export default function AssistantPanel({ open, onOpenChange, screen }) {
                       onOpenTopic={openTopic}
                       onPick={(o) => ask(o)}
                       onClose={() => onOpenChange(false)}
+                      here={screen}
+                      role={role}
                     />
                   </div>
                 )

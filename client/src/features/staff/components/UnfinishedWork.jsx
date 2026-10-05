@@ -37,7 +37,8 @@ const describe = ({ key, data }) => {
       detail: counted > 0
         ? `${counted} ${counted === 1 ? 'line' : 'lines'} counted`
         : 'Started, nothing counted yet',
-      to: STAFF.receiving,
+      // ReceivingFlow opens this order straight away, counts refilled.
+      to: `${STAFF.receiving}?resume=${encodeURIComponent(id)}`,
     };
   }
 
@@ -49,7 +50,8 @@ const describe = ({ key, data }) => {
         loaded > 0 ? `${loaded} ${loaded === 1 ? 'line' : 'lines'} checked` : 'Started',
         data?.driverName ? `driver ${data.driverName}` : null,
       ].filter(Boolean).join(' · '),
-      to: STAFF.dispatch,
+      // DispatchPage opens this pallet straight away, checks refilled.
+      to: `${STAFF.dispatch}?pallet=${encodeURIComponent(id)}`,
     };
   }
 

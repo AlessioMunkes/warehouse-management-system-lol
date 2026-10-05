@@ -179,8 +179,15 @@ export const optionalGuest = (req, _res, next) => {
 };
 
 // ── requireRole ───────────────────────────────────────────────
+// Pass a group from constants/permissions.js — requireRole(...MANAGERS_UP)
+// — rather than listing roles at the route.
+//
+// The guard carries the roles it allows as `.roles`. Nothing reads it
+// at request time; routeRoles.test.js walks every router and reads it,
+// so a change to who may call a route shows up as a failing test
+// rather than slipping through a refactor.
 export const requireRole = (...allowedRoles) => {
-  return (req, res, next) => {
+  const guard = (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ message: 'Access denied. Please log in.' });
     }
@@ -191,6 +198,8 @@ export const requireRole = (...allowedRoles) => {
     }
     next();
   };
+  guard.roles = Object.freeze([...allowedRoles]);
+  return guard;
 };
 
 export default auth;

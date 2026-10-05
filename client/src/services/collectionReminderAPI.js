@@ -28,6 +28,8 @@ export const getTomorrowCollectionReminders = async () => {
   const data = body.data ?? {};
   return {
     collectionDate: data.collectionDate ?? data.collection_date ?? null,
+    // Set when tomorrow is a closed day on the operating calendar.
+    closed: data.closed ?? null,
     reminders: (data.reminders ?? []).map(toCollectionReminder),
   };
 };

@@ -494,7 +494,7 @@ export const createPendingDonationFromIntake = async (payload = {}) => {
         body: `Donation #${pendingDonation.id} is waiting in donation management.`,
         entityType: 'pending_donation',
         entityId: pendingDonation.id,
-        targetRoles: ['admin'],
+        targetRoles: ['manager', 'admin'],
         avoidDuplicate: true,
       });
     }
@@ -774,79 +774,72 @@ export const resolveFlagAndMaybeCommit = async (flagId, resolution = {}) => {
   }
 };
 
+// Retrying a failed save. The donation is CLAIMED first, in one conditional
+// UPDATE (claimPendingDonationForRetry): only one of two simultaneous
+// retries gets it, and the other is told it is already being retried. The
+// claim is what stops a double click, or a manager and an admin acting
+// together, from creating the donation twice: two sets of stock movements
+// and two thank-you emails.
 export const retryCommit = async (pendingDonationId) => {
   if (!pendingDonationId) {
     fail(400, 'Pending donation ID is required.');
   }
 
-  const pendingDonation = await pendingDonationRepository.getPendingDonationById(pendingDonationId, pool);
-  if (!pendingDonation) {
-    fail(404, 'Pending donation not found.');
+  const claimed = await pendingDonationRepository.claimPendingDonationForRetry(pendingDonationId, pool);
+  if (!claimed) {
+    const current = await pendingDonationRepository.getPendingDonationById(pendingDonationId, pool);
+    if (!current) {
+      fail(404, 'Pending donation not found.');
+    }
+    if (current.status === 'committing') {
+      fail(409, 'This donation is already being retried. Check again in a moment.');
+    }
+    fail(409, `Retry commit is only valid for status 'commit_failed' or 'commit_incomplete'; current status is '${current.status}'.`);
   }
 
-  if (pendingDonation.status === 'commit_failed') {
-    // attemptCommitForPendingDonation persists the new donationId via
-    // setPendingDonationCommittedId, which only matches rows already in
-    // 'committing' (WHERE status = 'committing'). Every other caller
-    // (createPendingDonationFromIntake, resolveFlagAndMaybeCommit) already
-    // transitions to 'committing' before calling it; retryCommit must do
-    // the same or the guard silently no-ops, the function throws "no
-    // longer in committing state", and the outer catch re-stamps
-    // commit_failed — a real donation gets created but the pending
-    // donation row never reflects it, and the retry appears to fail on
-    // every attempt even though nothing is actually wrong with the data.
-    await pendingDonationRepository.updatePendingDonationStatus(
-      pendingDonationId,
-      'committing',
-      {},
-      pool
-    );
+  // The claim moved it to 'committing' (what attemptCommitForPendingDonation
+  // and setPendingDonationCommittedId expect); previous_status is what it was.
+  if (claimed.previous_status === 'commit_failed') {
     return await attemptCommitForPendingDonation(pendingDonationId);
   }
 
-  if (pendingDonation.status === 'commit_incomplete') {
-    const acceptedItems = (pendingDonation.items || []).filter((item) => item.status === 'resolved');
-    const committedDonationId = pendingDonation.committed_donation_id ?? null;
-    if (!committedDonationId) {
-      await pendingDonationRepository.updatePendingDonationStatus(
-        pendingDonationId,
-        'committing',
-        {},
-        pool
-      );
-      return await attemptCommitForPendingDonation(pendingDonationId);
-    }
-
-    const donationItems = await pendingDonationRepository.listDonationItemsForDonation(committedDonationId, pool);
-
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      await linkPendingItemsToDonationItems(
-        acceptedItems,
-        donationItems,
-        client,
-        `Pending donation ${pendingDonationId} retry finalization`
-      );
-      await pendingDonationRepository.updatePendingDonationStatus(
-        pendingDonationId,
-        'committed',
-        { committed_at: new Date() },
-        client
-      );
-
-      await client.query('COMMIT');
-      return await pendingDonationRepository.getPendingDonationById(pendingDonationId, pool);
-    } catch (error) {
-      await client.query('ROLLBACK');
-      console.error('[pendingDonation.service] retryCommit for commit_incomplete failed:', error);
-      throw error;
-    } finally {
-      client.release();
-    }
+  // commit_incomplete: the real donation may already exist.
+  const pendingDonation = await pendingDonationRepository.getPendingDonationById(pendingDonationId, pool);
+  const acceptedItems = (pendingDonation?.items || []).filter((item) => item.status === 'resolved');
+  const committedDonationId = pendingDonation?.committed_donation_id ?? null;
+  if (!committedDonationId) {
+    return await attemptCommitForPendingDonation(pendingDonationId);
   }
 
-  fail(409, `Retry commit is only valid for status 'commit_failed' or 'commit_incomplete'; current status is '${pendingDonation.status}'.`);
+  const donationItems = await pendingDonationRepository.listDonationItemsForDonation(committedDonationId, pool);
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await linkPendingItemsToDonationItems(
+      acceptedItems,
+      donationItems,
+      client,
+      `Pending donation ${pendingDonationId} retry finalization`
+    );
+    await pendingDonationRepository.updatePendingDonationStatus(
+      pendingDonationId,
+      'committed',
+      { committed_at: new Date() },
+      client
+    );
+
+    await client.query('COMMIT');
+    return await pendingDonationRepository.getPendingDonationById(pendingDonationId, pool);
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('[pendingDonation.service] retryCommit for commit_incomplete failed:', error);
+    // Give it back as it was, so it can be retried again.
+    await pendingDonationRepository.updatePendingDonationStatus(pendingDonationId, 'commit_incomplete', {}, pool);
+    throw error;
+  } finally {
+    client.release();
+  }
 };
 
 export default {

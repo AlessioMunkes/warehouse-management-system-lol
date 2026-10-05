@@ -64,7 +64,9 @@ const fmtKg = (value) => (value === null || value === undefined ? '—' : `${Num
 
 const STATUS_LABEL = { assigned: 'Assigned', logged: 'Logged', dispatched: 'Dispatched' };
 
-const STATUS_BADGE_CLASS = { logged: ' is-warn', dispatched: ' is-done' };
+// Same red / amber / green as the manager's view: amber with the
+// household, blue waiting to go to a farm, green gone.
+const STATUS_BADGE_CLASS = { assigned: ' is-rag-warn', logged: ' is-rag-info', dispatched: ' is-rag-good' };
 
 const StatusBadge = ({ status }) => (
   <span className={`stf-badge${STATUS_BADGE_CLASS[status] ?? ''}`}>

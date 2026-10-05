@@ -9,6 +9,9 @@ import { apiGet } from "./api";
 
 export const toSummary = (row = {}) => ({
   lowStockCount:            Number(row.lowStockCount ?? 0),
+  belowReorderCount:        Number(row.belowReorderCount ?? 0),
+  outOfStockCount:          Number(row.outOfStockCount ?? 0),
+  healthyStockCount:        Number(row.healthyStockCount ?? 0),
   activeProductCount:       Number(row.activeProductCount ?? 0),
   openPurchaseOrders:       Number(row.openPurchaseOrders ?? 0),
   deliveriesExpectedToday:  Number(row.deliveriesExpectedToday ?? 0),
@@ -34,4 +37,36 @@ export const getMyWork = async () => {
   };
 };
 
-export default { getDashboardSummary, getMyWork };
+// ── GET /api/dashboard/attention ──────────────────────────────
+// The counts behind the dashboard's "Needs attention" list and the
+// manager sidebar. Every number is the size of a tab it links to.
+export const toAttention = (row = {}) => {
+  const n = (v) => Number(v ?? 0);
+  return {
+    inventory: {
+      shortfall: n(row.inventory?.shortfall),
+      lowStock:  n(row.inventory?.lowStock),
+      expiring:  n(row.inventory?.expiring),
+    },
+    pickingSlips: {
+      unassigned:   n(row.pickingSlips?.unassigned),
+      notCollected: n(row.pickingSlips?.notCollected),
+    },
+    purchaseOrders: {
+      awaitingApproval: n(row.purchaseOrders?.awaitingApproval),
+      followUp:         n(row.purchaseOrders?.followUp),
+    },
+    communityRequests: {
+      pending:    n(row.communityRequests?.pending),
+      unclaimed:  n(row.communityRequests?.unclaimed),
+      needsItems: n(row.communityRequests?.needsItems),
+    },
+  };
+};
+
+export const getAttention = async () => {
+  const body = await apiGet("/api/dashboard/attention");
+  return toAttention(body.data ?? {});
+};
+
+export default { getDashboardSummary, getMyWork, getAttention };

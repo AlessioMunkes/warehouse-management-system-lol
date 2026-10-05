@@ -115,6 +115,15 @@ const getMySlip = async (req, res) => {
   }
 };
 
+const releaseMySlip = async (req, res) => {
+  try {
+    const data = await slipAccessService.releaseMySlip(req.user);
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    return handle(res, error, '[slip:release]', 'Could not return your pallet.');
+  }
+};
+
 const confirmItem = async (req, res) => {
   try {
     const data = await slipAccessService.confirmItem(
@@ -157,6 +166,7 @@ export default {
   claimById,
   listAvailable,
   getMySlip,
+  releaseMySlip,
   confirmItem,
   flagItem,
   completeSlip,

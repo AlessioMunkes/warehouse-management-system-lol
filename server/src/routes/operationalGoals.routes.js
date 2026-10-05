@@ -1,11 +1,10 @@
 // server/src/routes/operationalGoals.routes.js
 import express from 'express';
-import auth, { requireRole, ROLES } from '../middleware/auth.middleware.js';
+import auth, { requireRole } from '../middleware/auth.middleware.js';
+import { MANAGER_ONLY } from '../constants/permissions.js';
 import operationalGoalsController from '../controllers/operationalGoals.controller.js';
 
 const router = express.Router();
-
-const MANAGER_ONLY = [ROLES.MANAGER];
 
 router.get('/', auth, requireRole(...MANAGER_ONLY), operationalGoalsController.list);
 router.post('/ai/draft', auth, requireRole(...MANAGER_ONLY), operationalGoalsController.draftWithAI);

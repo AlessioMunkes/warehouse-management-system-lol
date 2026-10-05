@@ -10,9 +10,19 @@ import {
   FileText, Mail, Send,
   CheckCircle2, XCircle, Clock, AlertTriangle, Loader2,
 } from 'lucide-react';
-//import { TopNavbar } from '../features/taskdashboard/components/TopNavBar';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
+//import { TopNavbar } from '../components/layout/TopNavBar';
 import { Badge } from '../components/ui/badge';
+import { Input } from '../components/ui/input';
+import NativeSelect from '@/components/ui/native-select';
+import { Skeleton } from '../components/ui/skeleton';
+import StatusBadge from '@/components/ui/status-badge';
+import PageHeader, { PageShell } from '@/components/ui/page-header';
+import ViewTabs from '@/components/ui/view-tabs';
+import ListCard from '@/components/ui/list-card';
+import ListToolbar from '@/components/ui/list-toolbar';
+import EmptyState from '@/components/ui/empty-state';
+import ErrorBanner from '@/components/ui/error-banner';
+import Notice from '@/components/ui/notice';
 import { Button } from '../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import {
@@ -20,10 +30,12 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '../components/ui/alert-dialog';
 import donationManagementAPI from '../services/donationManagementAPI';
+import TablePager from '@/components/ui/table-pager';
+import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
 
 const TABS = [
   { id: 'certificates', label: 'Certificate Queue', icon: FileText, description: 'View and manage Section 18A tax certificates for donations.' },
-  { id: 'emails', label: 'Email Integration', icon: Mail, description: 'Track and resend Section 18A certificate emails.' },
+  { id: 'emails', label: 'Email history', icon: Mail, description: 'Track and resend Section 18A certificate emails.' },
 ];
 
 const EMAIL_STATUS_CONFIG = {
@@ -175,197 +187,188 @@ export default function Section18AManagementPage() {
       return queueDateTimeOf(a) - queueDateTimeOf(b);
     });
 
-  return (
-    <div className="min-h-screen bg-canvas text-ink font-['Montserrat',sans-serif]">
-    
-      <main className="mx-auto w-full max-w-6xl px-4 py-6">
-        <h1 className="text-2xl font-medium">Section 18A Management</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Manage tax certificates and email delivery.</p>
-        <div className="mt-5 flex flex-wrap gap-1 border-b" role="tablist" aria-label="Section 18A management sections">
-          {TABS.map((t) => (
-            <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)}
-              className={tab === t.id ? 'flex items-center gap-2 border-b-2 border-foreground px-4 py-2 text-sm font-medium' : 'flex items-center gap-2 px-4 py-2 text-sm text-muted-foreground'}>
-              <t.icon className="h-4 w-4" />{t.label}
-            </button>
-          ))}
-        </div>
-        <p className="mt-4 text-sm text-muted-foreground">{activeTab.description}</p>
-        {feedback && (
-          <div className={`mt-4 rounded-lg border px-4 py-3 text-sm ${feedback.type === 'success' ? 'border-good bg-good-soft text-good' : 'border-danger bg-danger-soft text-danger'}`} role="alert">
-            {feedback.message}
-          </div>
-        )}
-        {error && (
-          <div className="mt-4 rounded-lg border border-danger bg-danger-soft px-4 py-3 text-sm text-danger" role="alert">{error}</div>
-        )}
-        {loading ? (
-          <div className="mt-8 flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            <span className="ml-3 text-sm text-muted-foreground">Loading Section 18A data...</span>
-          </div>
-        ) : (
-          <>
-            {tab === 'certificates' && (
-              <div className="mt-6">
-                <Card className="rounded-[12px] border border-line shadow-sm">
-                  <CardHeader>
-                    <CardTitle>Certificate Queue</CardTitle>
-                    <CardDescription>{filteredCertificateQueue.length} of {certificateQueue.length} donation{certificateQueue.length !== 1 ? 's' : ''} in the Section 18A certificate queue.</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="mb-4 grid gap-3 md:grid-cols-[minmax(180px,1fr)_repeat(5,minmax(120px,auto))]">
-                      <input type="search" aria-label="Search by donor name" placeholder="Search donor name" value={donorSearch} onChange={(e) => setDonorSearch(e.target.value)} className="rounded-[8px] border border-line bg-surface px-3 py-2 text-sm" />
-                      <input type="number" aria-label="Minimum amount" placeholder="Min amount" value={amountMin} onChange={(e) => setAmountMin(e.target.value)} className="rounded-[8px] border border-line bg-surface px-3 py-2 text-sm" />
-                      <input type="number" aria-label="Maximum amount" placeholder="Max amount" value={amountMax} onChange={(e) => setAmountMax(e.target.value)} className="rounded-[8px] border border-line bg-surface px-3 py-2 text-sm" />
-                      <input type="date" aria-label="Date from" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="rounded-[8px] border border-line bg-surface px-3 py-2 text-sm" />
-                      <input type="date" aria-label="Date to" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="rounded-[8px] border border-line bg-surface px-3 py-2 text-sm" />
-                      <select aria-label="Sort certificate queue" value={queueSort} onChange={(e) => setQueueSort(e.target.value)} className="rounded-[8px] border border-line bg-surface px-3 py-2 text-sm">
-                        <option value="date-asc">Date: oldest first</option>
-                        <option value="date-desc">Date: newest first</option>
-                        <option value="amount-asc">Amount: low to high</option>
-                        <option value="amount-desc">Amount: high to low</option>
-                      </select>
-                    </div>
-                    {certificateQueue.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-8 text-center">
-                        <FileText className="h-12 w-12 text-muted-foreground/40" />
-                        <p className="mt-3 text-sm text-muted-foreground">No certificates in the queue.</p>
-                      </div>
-                    ) : filteredCertificateQueue.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-8 text-center">
-                        <FileText className="h-12 w-12 text-muted-foreground/40" />
-                        <p className="mt-3 text-sm text-muted-foreground">No certificates match the current filters.</p>
-                      </div>
-                    ) : (
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Donation</TableHead>
-                              <TableHead>Donor</TableHead>
-                              <TableHead>Date</TableHead>
-                              <TableHead>Amount</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {filteredCertificateQueue.map((item) => {
-                              const formattedDate = item.received_at
-                                ? new Date(item.received_at).toLocaleDateString()
-                                : item.createdAt
-                                  ? new Date(item.createdAt).toLocaleDateString()
-                                  : item.date || '—';
-                              const formattedAmount = item.estimated_value_zar != null
-                                ? `R${Number(item.estimated_value_zar).toFixed(2)}`
-                                : item.amount != null
-                                  ? `R${item.amount}`
-                                  : '—';
+  // Certificates, fifteen to a page.
+  const certPage = usePaged(filteredCertificateQueue, TABLE_PAGE_SIZE, `${donorSearch}|${filteredCertificateQueue.length}`);
+  // Emails, fifteen to a page.
+  const emailPage = usePaged(emailHistory, TABLE_PAGE_SIZE, emailHistory.length);
+  // The figures the four tiles used to show, now one line above the table.
+  const emailCounts = {
+    sent: emailHistory.filter((e) => ['sent', 'delivered', 'SENT', 'DELIVERED'].includes(e.status)).length,
+    failed: emailHistory.filter((e) => ['failed', 'bounced', 'FAILED', 'BOUNCED'].includes(e.status)).length,
+    pending: emailHistory.filter((e) => ['pending', 'PENDING'].includes(e.status)).length,
+  };
+  const toneOf = (config) => ({ 'text-good': 'good', 'text-danger': 'bad', 'text-warn': 'warn' }[config.color] ?? 'neutral');
 
-                              return (
-                                <TableRow key={item.id}>
-                                  <TableCell className="font-medium">{item.reference || item.id}</TableCell>
-                                  <TableCell>{item.donorName || item.donor_name || '—'}</TableCell>
-                                  <TableCell>{formattedDate}</TableCell>
-                                  <TableCell>{formattedAmount}</TableCell>
-                                </TableRow>
-                              );
-                            })}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-            {tab === 'emails' && (
-              <div className="mt-6 space-y-6">
-                <div className="grid gap-4 sm:grid-cols-4">
-                  <Card className="rounded-[12px] border border-line shadow-sm"><CardContent className="pt-4"><p className="text-sm font-medium text-muted-foreground">Total Emails</p><p className="mt-1 text-2xl font-semibold">{emailHistory.length}</p></CardContent></Card>
-                  <Card className="rounded-[12px] border border-line shadow-sm"><CardContent className="pt-4"><p className="text-sm font-medium text-muted-foreground">Sent</p><p className="mt-1 text-2xl font-semibold text-good">{emailHistory.filter((e) => ['sent', 'delivered', 'SENT', 'DELIVERED'].includes(e.status)).length}</p></CardContent></Card>
-                  <Card className="rounded-[12px] border border-line shadow-sm"><CardContent className="pt-4"><p className="text-sm font-medium text-muted-foreground">Failed</p><p className="mt-1 text-2xl font-semibold text-danger">{emailHistory.filter((e) => ['failed', 'bounced', 'FAILED', 'BOUNCED'].includes(e.status)).length}</p></CardContent></Card>
-                  <Card className="rounded-[12px] border border-line shadow-sm"><CardContent className="pt-4"><p className="text-sm font-medium text-muted-foreground">Pending</p><p className="mt-1 text-2xl font-semibold text-warn">{emailHistory.filter((e) => ['pending', 'PENDING'].includes(e.status)).length}</p></CardContent></Card>
-                </div>
-                <Card className="rounded-[12px] border border-line shadow-sm">
-                  <CardHeader><CardTitle>Email History</CardTitle><CardDescription>Real send history from the database — Thank-you and Section 18A emails, newest first.</CardDescription></CardHeader>
-                  <CardContent>
-                    <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-                      <input
-                        type="search"
-                        aria-label="Search email history"
-                        placeholder="Search recipient, donor, donation ID, subject…"
-                        value={emailSearch}
-                        onChange={(e) => setEmailSearch(e.target.value)}
-                        className="w-full rounded-[8px] border border-line bg-surface px-3 py-2 text-sm sm:max-w-xs"
-                      />
-                      <select
-                        aria-label="Filter by email type"
-                        value={emailTypeFilter}
-                        onChange={(e) => setEmailTypeFilter(e.target.value)}
-                        className="rounded-[8px] border border-line bg-surface px-3 py-2 text-sm"
-                      >
-                        <option value="">All types</option>
-                        <option value="THANK_YOU">Thank you</option>
-                        <option value="SECTION_18A">Section 18A</option>
-                      </select>
-                      <select
-                        aria-label="Filter by email status"
-                        value={emailStatusFilter}
-                        onChange={(e) => setEmailStatusFilter(e.target.value)}
-                        className="rounded-[8px] border border-line bg-surface px-3 py-2 text-sm"
-                      >
-                        <option value="">All statuses</option>
-                        <option value="SENT">Sent</option>
-                        <option value="FAILED">Failed</option>
-                        <option value="PENDING">Pending</option>
-                      </select>
-                      {(emailSearch || emailTypeFilter || emailStatusFilter) && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => { setEmailSearch(''); setEmailTypeFilter(''); setEmailStatusFilter(''); }}
-                        >
-                          Clear
+  return (
+    <PageShell>
+      <PageHeader title="Section 18A" description="Issue donors’ tax certificates and resend certificate emails." />
+
+      <ViewTabs
+        className="mt-5"
+        label="Section 18A management sections"
+        value={tab}
+        onChange={setTab}
+        tabs={TABS.map((t) => ({ id: t.id, label: t.label, count: t.id === 'certificates' && !loading ? certificateQueue.length : null }))}
+      />
+      <p className="mt-4 text-sm text-muted-foreground">{activeTab.description}</p>
+
+      {feedback && (
+        feedback.type === 'success'
+          ? <Notice className="mt-4" message={feedback.message} onClear={() => setFeedback(null)} />
+          : <ErrorBanner className="mt-4" message={feedback.message} />
+      )}
+      <ErrorBanner className="mt-4" message={error} />
+
+      {tab === 'certificates' && (
+        <ListCard
+          className="mt-6"
+          header={
+            <ListToolbar
+              search={{ value: donorSearch, onChange: setDonorSearch, placeholder: 'Search donor name', label: 'Search by donor name' }}
+              note={`${filteredCertificateQueue.length} of ${certificateQueue.length}`}
+            >
+              <Input type="number" aria-label="Minimum amount" placeholder="Min R" value={amountMin} onChange={(e) => setAmountMin(e.target.value)} className="h-8 w-24" />
+              <Input type="number" aria-label="Maximum amount" placeholder="Max R" value={amountMax} onChange={(e) => setAmountMax(e.target.value)} className="h-8 w-24" />
+              <Input type="date" aria-label="Date from" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 w-auto" />
+              <Input type="date" aria-label="Date to" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 w-auto" />
+              <NativeSelect aria-label="Sort certificate queue" value={queueSort} onChange={(e) => setQueueSort(e.target.value)} size="sm">
+                <option value="date-asc">Date: oldest first</option>
+                <option value="date-desc">Date: newest first</option>
+                <option value="amount-asc">Amount: low to high</option>
+                <option value="amount-desc">Amount: high to low</option>
+              </NativeSelect>
+            </ListToolbar>
+          }
+          footer={!loading && filteredCertificateQueue.length ? <TablePager {...certPage} noun="certificates" alwaysShow /> : null}
+        >
+          {loading ? (
+            <div className="space-y-2 p-4" aria-busy="true" aria-label="Loading Section 18A data">
+              {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+            </div>
+          ) : certificateQueue.length === 0 ? (
+            <EmptyState icon={FileText} title="No certificates in the queue" description="Donations that need a Section 18A certificate appear here." />
+          ) : filteredCertificateQueue.length === 0 ? (
+            <EmptyState icon={FileText} title="No certificates match" description="Try another search, amount or date." />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Donation</TableHead>
+                  <TableHead>Donor</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {certPage.slice.map((item) => {
+                  const formattedDate = item.received_at
+                    ? new Date(item.received_at).toLocaleDateString()
+                    : item.createdAt
+                      ? new Date(item.createdAt).toLocaleDateString()
+                      : item.date || '—';
+                  const formattedAmount = item.estimated_value_zar != null
+                    ? `R${Number(item.estimated_value_zar).toFixed(2)}`
+                    : item.amount != null
+                      ? `R${item.amount}`
+                      : '—';
+
+                  return (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium">{item.reference || item.id}</TableCell>
+                      <TableCell>{item.donorName || item.donor_name || '—'}</TableCell>
+                      <TableCell className="text-muted-foreground">{formattedDate}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formattedAmount}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </ListCard>
+      )}
+
+      {tab === 'emails' && (
+        <ListCard
+          className="mt-6"
+          header={
+            <div className="space-y-2">
+              <ListToolbar
+                search={{ value: emailSearch, onChange: setEmailSearch, placeholder: 'Recipient, donor, donation, subject', label: 'Search email history' }}
+              >
+                <NativeSelect aria-label="Filter by email type" value={emailTypeFilter} onChange={(e) => setEmailTypeFilter(e.target.value)} size="sm">
+                  <option value="">All types</option>
+                  <option value="THANK_YOU">Thank you</option>
+                  <option value="SECTION_18A">Section 18A</option>
+                </NativeSelect>
+                <NativeSelect aria-label="Filter by email status" value={emailStatusFilter} onChange={(e) => setEmailStatusFilter(e.target.value)} size="sm">
+                  <option value="">All statuses</option>
+                  <option value="SENT">Sent</option>
+                  <option value="FAILED">Failed</option>
+                  <option value="PENDING">Pending</option>
+                </NativeSelect>
+                {(emailSearch || emailTypeFilter || emailStatusFilter) && (
+                  <Button variant="ghost" size="sm" onClick={() => { setEmailSearch(''); setEmailTypeFilter(''); setEmailStatusFilter(''); }}>
+                    Clear
+                  </Button>
+                )}
+              </ListToolbar>
+              <p className="text-sm text-muted-foreground tabular-nums">
+                {emailHistory.length} email{emailHistory.length === 1 ? '' : 's'}
+                {' · '}<span className="text-good">{emailCounts.sent} sent</span>
+                {' · '}<span className="text-danger">{emailCounts.failed} failed</span>
+                {' · '}<span className="text-warn">{emailCounts.pending} pending</span>
+              </p>
+            </div>
+          }
+          footer={!emailLoading && emailHistory.length ? <TablePager {...emailPage} noun="emails" alwaysShow /> : null}
+        >
+          {emailLoading ? (
+            <div className="space-y-2 p-4" aria-busy="true" aria-label="Loading email history">
+              {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
+            </div>
+          ) : emailHistory.length === 0 ? (
+            <EmptyState icon={Mail} title="No emails match" description="Try another search or filter." />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Recipient</TableHead><TableHead>Donor</TableHead><TableHead>Donation</TableHead><TableHead>Type</TableHead>
+                  <TableHead>Subject</TableHead><TableHead>Status</TableHead><TableHead>Sent At</TableHead><TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {emailPage.slice.map((email) => {
+                  const statusConfig = getEmailStatusConfig(email.status);
+                  const sentAt = emailSentAtOf(email);
+                  return (
+                    <TableRow key={email.id}>
+                      <TableCell className="font-medium">{emailRecipientOf(email)}</TableCell>
+                      <TableCell>{email.donor_name || email.donorName || email.recipient_name || email.recipientName || '—'}</TableCell>
+                      <TableCell>{emailDonationRefOf(email)}</TableCell>
+                      <TableCell><Badge variant="outline">{normaliseTypeLabel(email.email_type || email.emailType)}</Badge></TableCell>
+                      <TableCell className="max-w-[200px] truncate">{email.subject || '—'}</TableCell>
+                      <TableCell><StatusBadge tone={toneOf(statusConfig)} icon={statusConfig.icon}>{statusConfig.label}</StatusBadge></TableCell>
+                      <TableCell className="text-muted-foreground">{sentAt ? new Date(sentAt).toLocaleString() : '—'}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" onClick={() => setConfirmResend(email)} disabled={actionLoading === `resend-${email.id}`}>
+                          {actionLoading === `resend-${email.id}` ? <Loader2 className="animate-spin" /> : <Send />}Resend
                         </Button>
-                      )}
-                    </div>
-                    {emailLoading ? (
-                      <div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /><span className="ml-2 text-sm text-muted-foreground">Loading email history…</span></div>
-                    ) : emailHistory.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-8 text-center"><Mail className="h-12 w-12 text-muted-foreground/40" /><p className="mt-3 text-sm text-muted-foreground">No emails match. Try clearing search or filters.</p></div>
-                    ) : (
-                      <div className="overflow-x-auto"><Table><TableHeader><TableRow><TableHead>Recipient</TableHead><TableHead>Donor</TableHead><TableHead>Donation</TableHead><TableHead>Type</TableHead><TableHead>Subject</TableHead><TableHead>Status</TableHead><TableHead>Sent At</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader><TableBody>
-                        {emailHistory.map((email) => {
-                          const statusConfig = getEmailStatusConfig(email.status);
-                          const StatusIcon = statusConfig.icon;
-                          const sentAt = emailSentAtOf(email);
-                          return (
-                            <TableRow key={email.id}>
-                              <TableCell className="font-medium">{emailRecipientOf(email)}</TableCell>
-                              <TableCell>{email.donor_name || email.donorName || email.recipient_name || email.recipientName || '—'}</TableCell>
-                              <TableCell>{emailDonationRefOf(email)}</TableCell>
-                              <TableCell><Badge variant="outline" className="rounded-[6px] px-2 py-0 text-[11px]">{normaliseTypeLabel(email.email_type || email.emailType)}</Badge></TableCell>
-                              <TableCell className="max-w-[200px] truncate">{email.subject || '—'}</TableCell>
-                              <TableCell><Badge variant="outline" className={`inline-flex items-center gap-1 rounded-[6px] px-2 py-0 text-[11px] ${statusConfig.bg} ${statusConfig.color}`}><StatusIcon className="h-3 w-3" />{statusConfig.label}</Badge></TableCell>
-                              <TableCell>{sentAt ? new Date(sentAt).toLocaleString() : '—'}</TableCell>
-                              <TableCell className="text-right"><Button variant="ghost" size="sm" onClick={() => setConfirmResend(email)} disabled={actionLoading === `resend-${email.id}`}>{actionLoading === `resend-${email.id}` ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Send className="mr-1 h-3 w-3" />}Resend</Button></TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody></Table></div>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-          </>
-        )}
-      </main>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </ListCard>
+      )}
+
       <AlertDialog open={!!confirmResend} onOpenChange={() => setConfirmResend(null)}>
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Resend Email?</AlertDialogTitle><AlertDialogDescription>This will send the donation email to <strong>{confirmResend?.recipient_email || confirmResend?.recipientEmail || confirmResend?.recipient || 'the recipient'}</strong> again.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => confirmResend && handleResendEmail(confirmResend.id)}>Resend Email</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageShell>
   );
 }

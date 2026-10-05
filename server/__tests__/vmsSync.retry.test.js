@@ -9,6 +9,8 @@ vi.mock('../src/repositories/vmsSync.repository.js', () => ({ default: syncRepoM
 vi.mock('../src/repositories/loveActivismEvent.repository.js', () => ({ default: eventRepoMock }));
 vi.mock('../src/repositories/eventTimeslot.repository.js', () => ({ default: timeslotRepoMock }));
 vi.mock('../src/services/vmsIntegration.service.js', () => ({ default: { publishEvent: publishMock } }));
+// The sync service publishes through publishEvent now (the real VMS adapter).
+vi.mock('../src/services/vmsIntegration.service.js', () => ({ default: { publishEventBooking: publishMock, publishEvent: publishMock } }));
 const mod = await import('../src/services/vmsSync.service.js');
 const svc = mod.default;
 const EVENT = { event_id: 'e1', status: 'SCHEDULED' };

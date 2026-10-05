@@ -79,7 +79,11 @@ export const pivot = (series) => {
     const [, , key] = TWO_AXIS.exec(r.label);
     totals.set(key, (totals.get(key) ?? 0) + Math.abs(r.value));
   }
-  const ranked = [...totals.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k);
+  // Days of the week keep their order, all seven, even a quiet one.
+  const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const ranked = [...totals.keys()].every((k) => DAYS.includes(k))
+    ? DAYS
+    : [...totals.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k);
   const kept = ranked.length > MAX_SERIES + 1 ? ranked.slice(0, MAX_SERIES) : ranked;
   const keptSet = new Set(kept);
   const keys = ranked.length > kept.length ? [...kept, 'Other'] : kept;
@@ -96,8 +100,11 @@ export const pivot = (series) => {
 };
 
 // Which ways a report can be drawn, most natural first.
-export const viewsFor = (shape, unit, series) => {
+export const viewsFor = (shape, unit, series, meta = null) => {
   const n = series?.length ?? 0;
+  if (meta?.waterfall) return ['waterfall', 'table'];
+  if (meta?.flows) return ['sankey', 'table'];
+  if (meta?.funnel && shape === 'category') return ['funnel', 'hbar', 'bar', 'table'];
   if (shape === 'number') return ['number', 'table'];
   if (shape === 'twoAxis') return ['stacked', 'grouped', 'heatmap', 'table'];
   if (shape === 'time') return ['line', 'area', 'bar', 'table'];
@@ -112,15 +119,117 @@ export const viewsFor = (shape, unit, series) => {
 export const VIEW_LABELS = {
   number: 'Figure', table: 'Table', line: 'Line', area: 'Area', bar: 'Columns', hbar: 'Bars',
   donut: 'Donut', pareto: 'Pareto', stacked: 'Stacked', grouped: 'Grouped', heatmap: 'Heatmap',
+  funnel: 'Funnel', waterfall: 'Waterfall', sankey: 'Flow',
 };
 
 // The server's chartType, or the AI's hint, mapped onto a view this
 // data can actually take.
-export const defaultView = (views, chartType, hint) => {
+export const defaultView = (views, chartType, hint, meta = null) => {
   if (hint && views.includes(hint)) return hint;
+  if (meta?.preferView && views.includes(meta.preferView)) return meta.preferView;
+  // A report that asked for a diagram opens on it.
+  if (['funnel', 'waterfall', 'sankey'].includes(views[0])) return views[0];
   const fromType = { line: 'line', bar: 'bar', hbar: 'hbar', number: 'number', stacked_bar: 'stacked', grouped_bar: 'grouped' }[chartType];
   if (fromType && views.includes(fromType)) return fromType;
   return views[0];
+};
+
+// ── Funnel ────────────────────────────────────────────────────
+// A pipeline counted by where each item sits NOW, read as stages in
+// order: an item at "in transit" has also been pending and approved,
+// so `reached` for a stage is everything at it or past it. `here` is
+// what is sitting at it. Exits (returned, cancelled) left the path and
+// are listed on their own, not squeezed into a stage.
+export const funnelOf = (series, funnel) => {
+  const by = new Map((series ?? []).map((r) => [r.label, r.value]));
+  const stages = funnel.stages.map((id) => ({ id, here: by.get(id) ?? 0 }));
+  let run = 0;
+  for (let i = stages.length - 1; i >= 0; i -= 1) { run += stages[i].here; stages[i].reached = run; }
+  const top = stages[0]?.reached || 0;
+  stages.forEach((s, i) => {
+    s.ofStart = top ? Math.round((s.reached / top) * 100) : 0;
+    s.fromPrev = i && stages[i - 1].reached ? Math.round((s.reached / stages[i - 1].reached) * 100) : null;
+  });
+  const known = new Set([...funnel.stages, ...(funnel.exits ?? [])]);
+  const exits = (funnel.exits ?? []).map((id) => ({ id, value: by.get(id) ?? 0 })).filter((e) => e.value > 0);
+  // A status the funnel does not know yet still shows, as an exit, so
+  // nothing is silently dropped.
+  for (const r of series ?? []) if (!known.has(r.label) && r.value) exits.push({ id: r.label, value: r.value });
+  return { stages, exits };
+};
+
+// Red / amber / green from a report's own bands (meta.rag): below
+// `red` is bad, below `amber` a warning — for measures where more is
+// better, like days of stock left.
+export const ragColour = (rag, value) => {
+  if (!rag || typeof value !== 'number') return null;
+  if (value < rag.red) return 'var(--rag-bad)';
+  if (value < rag.amber) return 'var(--rag-warn)';
+  return 'var(--rag-good)';
+};
+
+// ── Anomalies ─────────────────────────────────────────────────
+// Points far from the usual level: more than 3 robust deviations
+// (median absolute deviation) from the median. Robust so one spike
+// does not hide itself by dragging the average up. Needs six points;
+// fewer is not a pattern.
+export const anomaliesOf = (rows, key = 'value') => {
+  const vals = rows.map((r) => r[key]).filter((v) => typeof v === 'number');
+  if (vals.length < 6) return [];
+  const median = (a) => { const s = [...a].sort((x, y) => x - y); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+  const med = median(vals);
+  const mad = median(vals.map((v) => Math.abs(v - med))) * 1.4826;
+  // A flat series (MAD 0) only flags values that differ at all by a lot.
+  const spread = mad || (Math.max(...vals) - Math.min(...vals)) / 4;
+  if (!spread) return [];
+  return rows
+    .filter((r) => typeof r[key] === 'number' && Math.abs(r[key] - med) > 3 * spread)
+    .map((r) => ({ name: r.name, value: r[key], direction: r[key] > med ? 'high' : 'low', usual: med }));
+};
+
+// ── Waterfall ─────────────────────────────────────────────────
+// Opening, the changes, closing: each change floats from where the
+// last one ended. `base` is the invisible part of the bar.
+export const waterfallOf = (series) => {
+  let level = 0;
+  return (series ?? []).map((r) => {
+    const kind = r.meta?.kind ?? 'change';
+    if (kind === 'total') { level = r.value; return { name: r.label, base: 0, value: r.value, kind, end: r.value }; }
+    const start = level;
+    level += r.value;
+    return { name: r.label, base: Math.min(start, level), value: Math.abs(r.value), signed: r.value, kind, end: level };
+  });
+};
+
+// ── Flow (Sankey) ─────────────────────────────────────────────
+// "source|target" rows → nodes and links. The two sides are kept
+// apart even if a word appears on both (e.g. "pending").
+export const flowOf = (series) => {
+  const nodes = [];
+  const index = new Map();
+  const node = (side, name) => {
+    const key = `${side}:${name}`;
+    if (!index.has(key)) { index.set(key, nodes.length); nodes.push({ name: formatLabel(name), side }); }
+    return index.get(key);
+  };
+  const links = [];
+  for (const r of series ?? []) {
+    const m = TWO_AXIS.exec(r.label);
+    if (!m || !(r.value > 0)) continue;
+    links.push({ source: node('from', m[1]), target: node('to', m[2]), value: r.value });
+  }
+  return { nodes, links };
+};
+
+// The same dates a year earlier. 29 February becomes the 28th.
+export const yearEarlier = (range) => {
+  if (!range?.from || !range?.to) return null;
+  const back = (iso) => {
+    const [y, m, d] = iso.split('-').map(Number);
+    const day = m === 2 && d === 29 ? 28 : d;
+    return `${y - 1}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  };
+  return { from: back(range.from), to: back(range.to) };
 };
 
 export const toCsv = (rows, columns) => {

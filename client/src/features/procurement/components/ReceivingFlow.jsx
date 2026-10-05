@@ -35,7 +35,8 @@
 // of the numbers, so a tablet that sleeps does not lose the count —
 // see hooks/useDraft.js. That refills the form; it never submits.
 // ─────────────────────────────────────────────────────────────
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { takeUrlParam } from '../../staff/resumeParam';
 import {
   StepScreen, Actions, Button, SelectField, DateField,
   ChoiceList, Notice, KeyValues, ViewToggle, Coachmark,
@@ -355,6 +356,24 @@ export default function ReceivingFlow({ onCrumbChange }) {
       setSaving(false);
     }
   };
+
+  // ?resume=<orderId> (from "Carry on" on the dashboard): once the open
+  // orders have loaded, open that order with its saved counts. If the
+  // order has since been received or closed it is no longer open, so the
+  // worker just starts from the order list as usual.
+  const [resumeId] = useState(() => takeUrlParam('resume'));
+  const resumed = useRef(false);
+  useEffect(() => {
+    if (!resumeId || loading || resumed.current) return;
+    resumed.current = true;
+    if (!openOrders.some((o) => String(o.id) === String(resumeId))) return;
+    Promise.resolve().then(() => {
+      selectOrder(resumeId);
+      startCounting(resumeId);
+    });
+    // selectOrder/startCounting are plain functions recreated each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeId, loading, openOrders]);
 
   const patchLine = (itemId, patch) =>
     setLines((all) => all.map((line) => (

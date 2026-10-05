@@ -28,7 +28,7 @@ function Tip({ active, payload, data }) {
   if (!active || !payload?.length) return null;
   const p = payload[0].payload;
   return (
-    <div className="rounded-[4px] border-2 bg-surface px-3 py-2 text-xs" style={{ borderColor: LINE }}>
+    <div className="rounded-lg border bg-surface px-3 py-2 text-xs" style={{ borderColor: LINE }}>
       <p className="font-bold" style={{ color: INK }}>{p.label}</p>
       <p>{data.x.label}: <strong>{fmtValue(p.x, data.x.unit)}</strong> {unitWord(data.x.unit)}</p>
       <p>{data.y.label}: <strong>{fmtValue(p.y, data.y.unit)}</strong> {unitWord(data.y.unit)}</p>
@@ -37,7 +37,9 @@ function Tip({ active, payload, data }) {
   );
 }
 
-export default function ComparisonChart({ data }) {
+// `compact`: no table / CSV controls — for the printed report, where
+// buttons mean nothing.
+export default function ComparisonChart({ data, compact = false }) {
   const [highlight, setHighlight] = useState(null);
   const [showTable, setShowTable] = useState(false);
   const pts = data.points ?? [];
@@ -52,7 +54,7 @@ export default function ComparisonChart({ data }) {
 
   return (
     <figure className="m-0" aria-label={`Scatter plot: ${data.y.label} against ${data.x.label}`}>
-      <div className="mb-2 flex flex-wrap items-center gap-3 text-xs">
+      <div className={`mb-2 flex-wrap items-center gap-3 text-xs ${compact ? 'hidden' : 'flex'}`}>
         <button type="button" onClick={() => setShowTable((v) => !v)} className="underline underline-offset-2">
           {showTable ? 'Show chart' : 'Show table'}
         </button>
@@ -60,7 +62,7 @@ export default function ComparisonChart({ data }) {
           { key: 'label', label: 'Item' }, { key: 'x', label: data.x.label }, { key: 'y', label: data.y.label }, { key: 'detail', label: 'Detail' },
         ]))} className="underline underline-offset-2">Export CSV</button>
         {highlight && (
-          <button type="button" onClick={() => setHighlight(null)} className="rounded-full border-2 px-2 py-0.5 font-medium" style={{ borderColor: INK }}>
+          <button type="button" onClick={() => setHighlight(null)} className="rounded-full border px-2 py-0.5 font-medium" style={{ borderColor: INK }}>
             Highlighting: {highlight} ✕
           </button>
         )}

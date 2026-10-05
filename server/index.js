@@ -1,6 +1,31 @@
 // ─────────────────────────────────────────────────────────────
 // server/index.js
 // ─────────────────────────────────────────────────────────────
+// .env.local is loaded by the "dev"/"start" npm scripts themselves
+// (node --env-file-if-exists=.env.local), NOT from inside this file.
+// An earlier attempt tried dotenv.config({ path: '.env.local' })
+// called here, textually above the imports below — that does not
+// work in an ES module: a plain statement like a function call always
+// runs after ALL of this file's own static imports have finished
+// loading, no matter where it is written relative to them, because
+// import declarations are resolved during module instantiation,
+// which completes before any of the module's own top-level code
+// (including that call) runs at all. express, cors and — critically —
+// every local route file below (which transitively imports
+// config/db.js, which reads process.env.DATABASE_URL at ITS OWN top
+// level) had therefore already loaded before that dotenv.config()
+// call ever executed, so it was always too late.
+//
+// The plain `import 'dotenv/config'` below doesn't have that problem
+// — it's a real import, evaluated in encounter order like any other,
+// so it runs before express/cors/the route files as long as it's the
+// first one in the file. It only loads a file literally named `.env`
+// though, which is why it's a fallback here and not the primary
+// mechanism: for anyone who runs `node index.js` directly, bypassing
+// the npm scripts and their .env.local support, entirely.
+//
+// config/env.js is that import, pointed at server/.env by path so it
+// is found whatever directory node was started from.
 import './src/config/env.js';
 import express          from 'express';
 import cors             from 'cors';
@@ -20,6 +45,7 @@ import decantingRouter   from './src/routes/decanting.routes.js';
 import stockRouter       from './src/routes/stock.routes.js';
 import pickingRouter     from './src/routes/picking.routes.js';
 import slipRouter        from './src/routes/slip.routes.js';
+import passwordResetRouter from './src/routes/passwordReset.routes.js';
 import donationRouter    from './src/routes/donation.routes.js';
 import pendingDonationRouter from './src/routes/pendingDonation.routes.js';
 import dispatchRouter    from './src/routes/dispatch.routes.js';
@@ -35,16 +61,22 @@ import dashboardRouter   from './src/routes/dashboard.routes.js';
 import financeRouter     from './src/routes/finance.routes.js';
 import beneficiaryRouter from './src/routes/beneficiary.routes.js';
 import notificationRouter from './src/routes/notification.routes.js';
+import pushRouter        from './src/routes/push.routes.js';
 import ecdCollectionReminderRouter from './src/routes/ecdCollectionReminder.routes.js';
 import loveActivismRouter   from './src/routes/loveActivism.routes.js';
 import communityRequestRouter from './src/routes/communityRequest.routes.js';
 import gmailRouter from './src/routes/gmail.routes.js';
 import certificateSettingsRouter from './src/routes/certificateSettings.routes.js';
 import collectionKitRouter from './src/routes/collectionKit.routes.js';
+import communicationsRouter from './src/routes/communications.routes.js';
+import settingsRouter from './src/routes/settings.routes.js';
+import calendarRouter from './src/routes/calendar.routes.js';
 import publicImpactRouter from './src/routes/publicImpact.routes.js';
 import publicWarehousesRouter from './src/routes/publicWarehouses.route.js';
 import publicWarehouse   from './src/middleware/publicWarehouse.middleware.js';
+import adminRouter       from './src/routes/admin.routes.js';
 import expiryWarningJob  from './src/jobs/expiryWarning.job.js';
+import savedReportsJob   from './src/jobs/savedReports.job.js';
 import { startEmailReminderScheduler } from './src/jobs/ecdCollectionReminder.job.js';
 
 console.log('[server] gmailRouter loaded:', typeof gmailRouter, gmailRouter ? 'OK' : 'UNDEFINED');
@@ -161,6 +193,10 @@ app.use('/api/picking',    pickingRouter);
 // authenticated guest routes do not, and the limiter it uses counts
 // only failures so a warehouse behind one NAT address is not locked out.
 app.use('/api/slip',       slipRouter);
+// Public by necessity — nobody has a session at any point in this
+// flow. Rate limiting is applied per-route inside this router, same
+// reasoning as slip.routes.js above.
+app.use('/api/password-reset', passwordResetRouter);
 app.use('/api/dispatch',   dispatchRouter);
 app.use('/api/donations',  pendingDonationRouter);
 app.use('/api/donations',  donationRouter);
@@ -172,18 +208,23 @@ app.use('/api/reporting',  reportingRouter);
 app.use('/api/operational-goals', operationalGoalsRouter);
 app.use('/api/assistant',  assistantRouter);
 app.use('/api/users',      userRouter);
+app.use('/api/admin',      adminRouter);
 app.use('/api/invites',    userInviteRouter);
 app.use('/api/products',   productRouter);
 app.use('/api/dashboard',  dashboardRouter);
 app.use('/api/finance',    financeRouter);
 app.use('/api/beneficiaries', beneficiaryRouter);
 app.use('/api/notifications', notificationRouter);
+app.use('/api/push',          pushRouter);
 app.use('/api/collection-reminders', ecdCollectionReminderRouter);
 app.use('/api/love-activism', loveActivismRouter);
 app.use('/api/community-requests', communityRequestRouter);
 app.use('/api/gmail', gmailRouter);
 app.use('/api/certificate-settings', certificateSettingsRouter);
 app.use('/api/collection-kits', collectionKitRouter);
+app.use('/api/communications', communicationsRouter);
+app.use('/api/settings', settingsRouter);
+app.use('/api/calendar', calendarRouter);
 app.use('/api/public/warehouses', publicWarehousesRouter);
 app.use('/api/public',      publicImpactRouter);
 
@@ -198,9 +239,20 @@ if (process.env.NODE_ENV === 'production') {
 
 // ── Central error handler ─────────────────────────────────────
 // Must be after all routes. Four arguments = Express error handler.
+//
+// req.path is logged raw for every other route, but /api/password-reset/*
+// carries the raw reset token as a path segment (GET /:token and POST
+// /:token/confirm) — an unhandled error on either would otherwise
+// print a live, single-use credential to server logs. Redacted only
+// for this one prefix; every other route's logging is unchanged.
+const loggableRequestPath = (req) =>
+  req.path.startsWith('/api/password-reset/')
+    ? req.path.replace(/^(\/api\/password-reset\/)[^/]+/, '$1[REDACTED]')
+    : req.path;
+
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  console.error(`[error] ${req.method} ${req.path} —`, err.message);
+  console.error(`[error] ${req.method} ${loggableRequestPath(req)} —`, err.message);
   const status = err.status || err.statusCode || 500;
   res.status(status).json({
     success: false,
@@ -217,6 +269,9 @@ app.listen(port, () => {
   console.log(`[env] PORT: ${process.env.PORT || 5000}`);
   console.log(`[env] JWT_SECRET exists: ${!!process.env.JWT_SECRET}`);
   expiryWarningJob.startExpiryWarningJob();
+  if (process.env.NODE_ENV !== 'test' && process.env.SAVED_REPORTS_SCHEDULER !== 'false') {
+    savedReportsJob.startSavedReportsJob();
+  }
 });
 
 if (process.env.NODE_ENV !== 'test' && process.env.ECD_REMINDER_SCHEDULER !== 'false') {

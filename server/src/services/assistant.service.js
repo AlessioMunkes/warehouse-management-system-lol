@@ -28,9 +28,11 @@ import provider from '../features/reporting/ai/provider.js';
 import { buildTools, buildSystemPrompt } from '../features/assistant/ai/toolSchema.js';
 import {
   SCREENS, getTopic, topicsForRole, screensForRole, screenForRole,
-  suggestionsFor, publicTopic,
+  suggestionsFor, publicTopic, publicScreen,
 } from '../features/assistant/helpCatalog.js';
 import logRepo from '../repositories/assistantLog.repository.js';
+import { redactText } from '../features/privacy/redact.js';
+import knownPeople from '../repositories/knownPeople.repository.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -91,7 +93,7 @@ export const getTopicForRole = (id, role) => {
   if (!topic || !topic.roles.includes(role)) {
     throw fail(404, 'That help topic does not exist.');
   }
-  return { type: 'topic', topic: publicTopic(topic) };
+  return { type: 'topic', topic: publicTopic(topic, role) };
 };
 
 export const ask = async ({ question, screen, userId, role }) => {
@@ -124,7 +126,11 @@ export const ask = async ({ question, screen, userId, role }) => {
   // this work" toward what they are looking at, and it is the only
   // thing about their session the model is told.
   const where = screenById.get(screen)?.label;
-  const base  = where ? `They are on: ${where}\n\nThey asked: ${question}` : question;
+  // People, phone numbers, emails and ID numbers never reach the
+  // model: a help answer does not need them.
+  const { names, keep } = await knownPeople.listNames();
+  const safe  = redactText(question, names, keep).text;
+  const base  = where ? `They are on: ${where}\n\nThey asked: ${safe}` : safe;
 
   let lastError = null;
 
@@ -146,7 +152,7 @@ export const ask = async ({ question, screen, userId, role }) => {
           continue;
         }
         log('topic', { topicId: topic.id });
-        return { type: 'topic', topic: publicTopic(topic) };
+        return { type: 'topic', topic: publicTopic(topic, role) };
       }
 
       if (call.name === 'open_screen') {
@@ -160,7 +166,7 @@ export const ask = async ({ question, screen, userId, role }) => {
           continue;
         }
         log('navigate', { screenId: target.id });
-        return { type: 'navigate', screen: { id: target.id, label: target.label } };
+        return { type: 'navigate', screen: publicScreen(target) };
       }
 
       if (call.name === 'ask_clarification') {

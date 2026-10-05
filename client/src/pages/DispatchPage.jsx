@@ -11,13 +11,16 @@
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { takeUrlParam } from '../features/staff/resumeParam';
 import StaffShell from '../components/layout/StaffShell';
 import GateQueue from '../features/dispatch/components/GateQueue';
 import PalletCheck from '../features/dispatch/components/PalletCheck';
 import { STAFF } from '../routes/paths';
 
 export default function DispatchPage() {
-  const [palletId, setPalletId] = useState(null);
+  // ?pallet=<id> (from "Carry on" on the dashboard) opens that pallet
+  // directly; the parameter is then dropped so Back goes to the queue.
+  const [palletId, setPalletId] = useState(() => takeUrlParam('pallet'));
   // Bumped when a collection completes, so the queue refetches and
   // the collected pallet drops out of it.
   const [queueKey, setQueueKey] = useState(0);

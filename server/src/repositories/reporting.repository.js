@@ -39,7 +39,19 @@ const bucketMonth = (dateExpr) => `to_char(${dateExpr}, 'YYYY-MM')`;
 const bucketWeek  = (dateExpr) => `to_char(${dateExpr}, 'IYYY-"W"IW')`;
 
 const num = (v) => (v === null || v === undefined ? 0 : Number(v));
-const rows2series = (rows) => rows.map((r) => ({ label: r.label, value: num(r.value) }));
+const rows2series = (rows) => sortWeekdays(rows.map((r) => ({ label: r.label, value: num(r.value) })));
+
+// Busy days. 'Dy' is Mon…Sun; the rows are put back in week order
+// here rather than by value, because the order is the point.
+const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const weekday     = (d) => `to_char(${d}, 'Dy')`;
+const weekWeekday = (d) => `${bucketWeek(d)} || '|' || to_char(${d}, 'Dy')`;
+function sortWeekdays(series) {
+  if (!series.length || !series.every((r) => WEEKDAYS.includes(r.label))) return series;
+  // All seven, a quiet day as 0: a missing Thursday reads as no data.
+  const by = new Map(series.map((r) => [r.label, r.value]));
+  return WEEKDAYS.map((label) => ({ label, value: by.get(label) ?? 0 }));
+}
 
 // ══ Dispatch-side dimension map ════════════════════════════════
 // Closed map. An unrecognised key throws rather than defaulting: a
@@ -59,6 +71,8 @@ const slipDimension = (dimension) => {
       const e = `${bucketMonth('ps.dispatch_date')} || '|' || ps.beneficiary_kind::text`;
       return { expr: e, group: e };
     }
+    case 'weekday':      return { expr: weekday('ps.dispatch_date'), group: weekday('ps.dispatch_date') };
+    case 'week_weekday': { const e = weekWeekday('ps.dispatch_date'); return { expr: e, group: e }; }
     default: throw new Error(`Unsupported dimension: ${dimension}`);
   }
 };
@@ -81,7 +95,7 @@ const impactClause = (params) => {
 };
 
 // Two-axis "month|category" buckets sort by label, so months stay in order.
-const TIME_ORDERED = new Set(['none', 'month', 'week', 'month_beneficiary', 'month_supplier', 'month_movement']);
+const TIME_ORDERED = new Set(['none', 'month', 'week', 'month_beneficiary', 'month_supplier', 'month_movement', 'week_weekday']);
 const orderFor = (dimension) => (TIME_ORDERED.has(dimension) ? '1' : '2 DESC, 1');
 
 // ══ Impact ═════════════════════════════════════════════════════
@@ -424,6 +438,8 @@ const receivingDimension = (dimension) => {
       const e = `${bucketMonth('dn.delivery_date')} || '|' || s.name`;
       return { expr: e, group: e };
     }
+    case 'weekday':      return { expr: weekday('dn.delivery_date'), group: weekday('dn.delivery_date') };
+    case 'week_weekday': { const e = weekWeekday('dn.delivery_date'); return { expr: e, group: e }; }
     default: throw new Error(`Unsupported dimension: ${dimension}`);
   }
 };
@@ -691,6 +707,8 @@ const stockMovementVolume = async ({ dimension, filters, dateRange }) => {
     product:       `p.name`,
     programme:     `COALESCE(pr.name, 'Unassigned')`,
     month_movement: `${bucketMonth(d)} || '|' || sm.movement_type`,
+    weekday:        weekday(d),
+    week_weekday:   weekWeekday(d),
   }[dimension];
   if (!expr) throw new Error(`Unsupported dimension: ${dimension}`);
 

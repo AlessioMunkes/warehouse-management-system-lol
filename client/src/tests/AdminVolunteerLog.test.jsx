@@ -3,65 +3,76 @@
 //
 // The admin and the manager must not land on the same volunteer
 // screen. They did: every admin entry point pointed at
-// VOLUNTEERS.events — the coordinator's event workflow — while
-// VolunteerManagementPage, the guest log, sat unrouted with its import
-// commented out in App.jsx.
+// VOLUNTEERS.events — the coordinator's event workflow — while the
+// guest log sat unrouted with its import commented out in App.jsx.
 //
-// This test is a source scan rather than a render, deliberately. What
-// broke was wiring, not behaviour: an import, a route, and two links.
-// A render test would have passed throughout, because the page it
-// would have rendered was never the page an admin actually reached.
+// The guest log is now the Volunteers view of the admin Activity log.
+// What broke was wiring, not behaviour: an import, a route, and two
+// links. So this reads the wiring — the route table, the page map and
+// the sidebars built from them — rather than rendering a page, which
+// would have passed throughout.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { isValidElement } from 'react';
 import { ADMIN, VOLUNTEERS } from '../routes/paths';
+import { ROUTES, REDIRECTS } from '../routes/routeTable';
+import { PAGES } from '../routes/pages';
+import { NAV_SECTIONS } from '../components/layout/navSections';
+import AdminActivityLogPage from '../pages/AdminActivityLogPage';
 
 const read = (rel) =>
   readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
 
-const app   = read('../App.jsx');
-const nav   = read('../features/taskdashboard/components/navSections.js');
-const admin = read('../pages/AdminActivityScreen.jsx');
+// The admin dashboard's links now live in its widget catalogue.
+const admin = read('../features/dashboard/widgetCatalog.jsx');
+const labels = (role) => NAV_SECTIONS(role).flatMap((s) => s.items).map((i) => i.label);
+const links = (role) => NAV_SECTIONS(role).flatMap((s) => s.items).map((i) => i.to);
+const route = ROUTES.find((r) => r.path === ADMIN.activityLog);
 
-describe('the admin volunteer log is its own screen', () => {
+describe('the admin Activity log is its own screen', () => {
   it('has a path of its own, under /admin', () => {
-    expect(ADMIN.volunteerLog).toBe('/admin/volunteer-log');
-    expect(ADMIN.volunteerLog).not.toBe(VOLUNTEERS.events);
+    expect(ADMIN.activityLog).toBe('/admin/activity-log');
+    expect(ADMIN.activityLog).not.toBe(VOLUNTEERS.events);
   });
 
-  it('imports the page rather than leaving it commented out', () => {
-    expect(app).toMatch(/^import VolunteerManagementPage\s+from '\.\/pages\/VolunteerManagementPage';$/m);
-    expect(app).not.toMatch(/^\s*\/\/\s*import VolunteerManagementPage/m);
+  it('is routed to the Activity log page, not the events screen', () => {
+    expect(route).toBeTruthy();
+    expect(isValidElement(PAGES[route.id])).toBe(true);
+    expect(PAGES[route.id].type).toBe(AdminActivityLogPage);
   });
 
-  it('routes it, and inside the admin-only guard', () => {
-    expect(app).toContain('<Route path={ADMIN.volunteerLog} element={<VolunteerManagementPage />} />');
-
-    // Walk the route table and find which <ProtectedRoute> group the
-    // log sits in — the same trick AssistantScreenRoles.test.js uses.
-    let group = null;
-    let found = null;
-    for (const line of app.split('\n')) {
-      const opener = line.match(/<Route element=\{<ProtectedRoute([^>]*)\/>\}>/);
-      if (opener) { group = opener[1]; continue; }
-      if (/^\s*<\/Route>\s*$/.test(line)) { group = null; continue; }
-      if (line.includes('ADMIN.volunteerLog')) found = group;
-    }
-    expect(found, 'the volunteer log route is not inside a ProtectedRoute group').toBeTruthy();
-    expect(found).toMatch(/roles=\{\['admin'\]\}/);
+  it('sits behind the admin-only guard', () => {
+    expect([...route.roles]).toEqual(['admin']);
   });
 
-  it('is what the admin sidebar and dashboard link to', () => {
-    expect(nav).toContain('ADMIN.volunteerLog');
-    expect(admin).toContain('ADMIN.volunteerLog');
+  it('has one sidebar entry, and the two old ones are gone', () => {
+    expect(links('admin').filter((to) => to === ADMIN.activityLog)).toHaveLength(1);
+    expect(labels('admin')).toContain('Activity log');
+    expect(labels('admin')).not.toContain('User activity');
+    expect(labels('admin')).not.toContain('Volunteer log');
+    expect(ROUTES.find((r) => r.path === ADMIN.legacyActivity)).toBeUndefined();
+    expect(ROUTES.find((r) => r.path === ADMIN.legacyVolunteerLog)).toBeUndefined();
+  });
+
+  it('is what the admin dashboard links to, volunteers included', () => {
+    expect(admin).toContain('ADMIN.activityLog');
+    expect(admin).toContain('ADMIN.activityLogVolunteers');
+    expect(ADMIN.activityLogVolunteers).toBe('/admin/activity-log?view=volunteers');
+  });
+
+  it('sends the old URLs to the matching view', () => {
+    const to = (from) => REDIRECTS.find((r) => r.from === from)?.to;
+    expect(to('/admin/activity')).toBe('/admin/activity-log?view=staff');
+    expect(to('/admin/volunteer-log')).toBe('/admin/activity-log?view=volunteers');
   });
 
   it('leaves the manager pointed at the events screen', () => {
-    // The nav still links VOLUNTEERS.events — from MANAGER_SECTIONS.
-    expect(nav).toContain('VOLUNTEERS.events');
-    expect(nav).toContain("label: 'Volunteer Events'");
+    expect(links('manager')).toContain(VOLUNTEERS.events);
+    expect(links('manager')).not.toContain(ADMIN.activityLog);
     // And no admin surface does any more.
+    expect(links('admin')).not.toContain(VOLUNTEERS.events);
     expect(admin).not.toContain('VOLUNTEERS');
   });
 });

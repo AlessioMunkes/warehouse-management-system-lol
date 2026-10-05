@@ -39,15 +39,16 @@
 // ─────────────────────────────────────────────────────────────
 import { useLayoutEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { LifeBuoy } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 import { matchScreen } from '../screenPaths';
 import AssistantPanel from './AssistantPanel';
+
 
 const GAP   = 16;  // between the button and whatever is under it
 const SIZE  = 56;  // the button itself — 3.5rem, past the ACC-06 minimum
 const CLEAR = 12;  // between the button and whatever is above it
 
-export default function AssistantLauncher() {
+export default function AssistantLauncher({ role } = {}) {
   const [open, setOpen] = useState(false);
   const { pathname } = useLocation();
   const screen = matchScreen(pathname);
@@ -99,7 +100,7 @@ export default function AssistantLauncher() {
         ].join(' ')}
         style={{ bottom: 'var(--wms-launcher-bottom, 1rem)' }}
       >
-        <LifeBuoy className="size-6" aria-hidden="true" />
+        <MessageCircle className="size-7" aria-hidden="true" />
       </button>
 
       {/* Mounted only while open, so the catalog is not fetched and
@@ -108,7 +109,7 @@ export default function AssistantLauncher() {
           which is the behaviour you want from a help panel: it opens
           on the screen you are on, not on what you asked yesterday. */}
       {open && (
-        <AssistantPanel open={open} onOpenChange={setOpen} screen={screen} />
+        <AssistantPanel open={open} onOpenChange={setOpen} screen={screen} role={role} />
       )}
     </>
   );

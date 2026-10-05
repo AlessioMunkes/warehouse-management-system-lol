@@ -26,4 +26,27 @@ const markRead = async (user, rawId) => {
 
 const markAllRead = async (user) => repo.markAllRead(user.id, user.role);
 
-export default { listNotifications, getUnreadCount, markRead, markAllRead };
+// ── Floor (worker-facing) ────────────────────────────────────
+// Same feed, narrowed to the types a worker's own task view cares
+// about — a picking slip run or an ad-hoc slip becoming available is
+// "new work on the floor"; BR-14's non-collection sweep and a PO's
+// return status are management information a worker never asked for.
+// markRead above is reused as-is for a floor notification too — it
+// only ever touches this user's own read state on a known id, so it
+// doesn't matter which bell called it.
+const FLOOR_TYPES = ['picking_slips_generated', 'picking_slip_created', 'picking_slip_released'];
+
+const listFloorNotifications = async (user, { unreadOnly } = {}) =>
+  repo.listForUser(user.id, null, {
+    unreadOnly: unreadOnly === true || unreadOnly === 'true',
+    types: FLOOR_TYPES,
+  });
+
+const getFloorUnreadCount = async (user) => repo.getUnreadCount(user.id, null, { types: FLOOR_TYPES });
+
+const markAllFloorRead = async (user) => repo.markAllRead(user.id, null, { types: FLOOR_TYPES });
+
+export default {
+  listNotifications, getUnreadCount, markRead, markAllRead,
+  listFloorNotifications, getFloorUnreadCount, markAllFloorRead,
+};

@@ -37,8 +37,13 @@
 // the same fact has to reach the Columns control: a column the layout
 // has dropped must not appear there as a ticked box that changes
 // nothing.
+//
+// A record docked beside the list (ui/detail-panel.jsx) takes its width
+// off that measurement, so opening one drops columns exactly as a
+// narrower window would, and closing it brings them back.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useDockWidth } from '@/components/layout/detailDock';
 
 const keyFor = (table) => `wms_cols_${table}`;
 
@@ -62,9 +67,14 @@ export default function useTableView(table, columns) {
 
   // Rendered server-side or in a test harness without a window: assume
   // wide, so nothing is silently dropped from a snapshot.
-  const [viewport, setViewport] = useState(
+  const [windowWidth, setViewport] = useState(
     () => (typeof window === 'undefined' ? 1280 : window.innerWidth),
   );
+  // The extra 160px: the breakpoints were tuned for a list with the
+  // whole window to itself, and beside a record the same columns were
+  // overlapping until the list had about 700px.
+  const dock = useDockWidth();
+  const viewport = windowWidth - (dock ? dock + 160 : 0);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;

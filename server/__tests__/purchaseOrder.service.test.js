@@ -14,6 +14,7 @@ const repoMock = {
   getPurchaseOrderById:      vi.fn(),
   updatePurchaseOrderStatus: vi.fn(),
   setQuickbooksReference:    vi.fn(),
+  listPurchaseOrders:        vi.fn(),
 };
 
 vi.mock('../src/repositories/purchaseOrder.repository.js', () => ({ default: repoMock }));
@@ -40,6 +41,24 @@ beforeEach(() => {
   repoMock.getPurchaseOrderById.mockResolvedValue(existingPO());
   repoMock.updatePurchaseOrderStatus.mockResolvedValue(existingPO({ status: 'approved' }));
   repoMock.setQuickbooksReference.mockResolvedValue(true);
+  repoMock.listPurchaseOrders.mockResolvedValue([]);
+});
+
+describe('listPurchaseOrders — limit', () => {
+  it('leaves the repository default alone when no limit is asked for', async () => {
+    await purchaseOrderService.listPurchaseOrders({});
+    expect(repoMock.listPurchaseOrders.mock.calls[0][0]).not.toHaveProperty('limit');
+  });
+
+  it('passes a limit the list page asks for', async () => {
+    await purchaseOrderService.listPurchaseOrders({ limit: '500' });
+    expect(repoMock.listPurchaseOrders).toHaveBeenCalledWith(expect.objectContaining({ limit: 500 }));
+  });
+
+  it.each(['0', '501', 'all', '2.5'])('rejects the limit %s with 400', async (limit) => {
+    await expect(purchaseOrderService.listPurchaseOrders({ limit })).rejects.toMatchObject({ status: 400 });
+    expect(repoMock.listPurchaseOrders).not.toHaveBeenCalled();
+  });
 });
 
 describe('setPurchaseOrderStatus', () => {
@@ -86,7 +105,18 @@ describe('setPurchaseOrderStatus', () => {
     await expect(
       purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status: 'returned', reason: 'Damaged in transit' })
     ).resolves.toBeTruthy();
-    expect(repoMock.updatePurchaseOrderStatus).toHaveBeenCalledWith(PO_ID, 'returned', 'Damaged in transit');
+    expect(repoMock.updatePurchaseOrderStatus).toHaveBeenCalledWith(PO_ID, 'returned', 'Damaged in transit', { beforeCommit: expect.any(Function) });
+  });
+
+  it('requires a reason for follow_up_required', async () => {
+    await expect(purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status: 'follow_up_required' }))
+      .rejects.toMatchObject({ status: 400 });
+    expect(repoMock.updatePurchaseOrderStatus).not.toHaveBeenCalled();
+  });
+
+  it('accepts follow_up_required with a reason, and passes the notice to raise', async () => {
+    await purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status: 'follow_up_required', reason: 'Late' });
+    expect(repoMock.updatePurchaseOrderStatus).toHaveBeenCalledWith(PO_ID, 'follow_up_required', 'Late', { beforeCommit: expect.any(Function) });
   });
 
   it('does not require a reason for approved', async () => {

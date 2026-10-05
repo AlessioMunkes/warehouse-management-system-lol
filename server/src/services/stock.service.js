@@ -30,6 +30,12 @@ const getMovements = async (productId) => {
   return await stockModel.getMovements(productId);
 };
 
+// ── Expiry by receipt line for one product ─────────────────────
+const getExpiryBatches = async (productId) => {
+  if (!productId) fail(400, 'Product ID is required.');
+  return await stockModel.getExpiryBatches(productId);
+};
+
 // ── Manual adjustment ──────────────────────────────────────────
 // BR-02: every manual stock change requires a logged reason.
 // Role gating (manager/admin only) happens at the route layer —
@@ -214,7 +220,7 @@ const getStockTrends = async (query = {}) => {
 };
 
 export default {
-  getManifest, getMovements, adjustManually,
+  getManifest, getMovements, getExpiryBatches, adjustManually,
   getLedger, getReconciliation, getLedgerActors,
   getStockTrends,
 };

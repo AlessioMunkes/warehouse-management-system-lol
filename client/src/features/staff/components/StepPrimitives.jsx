@@ -46,6 +46,10 @@ export const StepScreen = ({ title, sub, toggle, children, actions }) => {
 // One primary that commits the step, anything else outlined beneath
 // it. A row splits the width equally, so a pair never reads as two
 // different kinds of control.
+//
+// variant="step" is for an action repeated on every line of a list
+// (a pallet's "Confirm"): filled ink, leaving red for the one button
+// that finishes the screen.
 export const Actions = ({ row = false, children }) => (
   <div className={`stf-actions${row ? ' is-row' : ''}`}>{children}</div>
 );

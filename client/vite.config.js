@@ -60,6 +60,9 @@ export default defineConfig({
         // full-page navigation to /api/gmail/..., and an installed app
         // would otherwise swallow it.
         navigateFallbackDenylist: [/^\/api\//],
+        // Phone notifications: the push and notification-tap handlers
+        // (public/push-sw.js) run inside this generated worker.
+        importScripts: ['push-sw.js'],
       },
       includeAssets: [FAVICON_ASSET, 'icons/apple-touch-icon.png'],
       manifest: {

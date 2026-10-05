@@ -3,7 +3,7 @@
 //
 // What turns an operational chart into something a manager can act
 // on. Per metric: which way is good, which related charts explain
-// it, which "who to act on" lists sit under it, and the business
+// it, which Actions lists sit under it, and the business
 // lens its written reading is framed through.
 //
 // OPERATIONS ONLY. Impact metrics have no entry here and
@@ -180,7 +180,7 @@ export const ACTION_LISTS = {
 
   wastage_products: {
     title: 'Products losing the most food in decanting',
-    intro: 'Check the sack quality from the supplier and how these products are being opened and bagged.',
+    intro: 'Check the bulk quality from the supplier and how these products are being opened and bagged.',
     link: 'decantingRecords',
     run: insightRepo.wastageByProduct,
     entry: (r) => ({
@@ -432,6 +432,16 @@ export const OPERATIONAL_INSIGHTS = {
     area: 'donations', better: null,
     related: [{ metric: 'donation_value', dimension: 'category' }],
     actions: [],
+  },
+  stock_flow: {
+    area: 'stock', better: null,
+    related: [{ metric: 'stock_movement_volume', dimension: 'movement_type' }, { metric: 'adjustment_reasons', dimension: 'reason' }],
+    actions: ['manual_adjustments'],
+  },
+  days_of_cover: {
+    area: 'stock', better: 'up', target: 30,
+    related: [{ metric: 'low_stock_items', dimension: 'product' }, { metric: 'dispatch_volume', dimension: 'product' }],
+    actions: ['low_stock'],
   },
   volunteer_event_attendance: {
     area: 'volunteers', better: 'up', target: 80,

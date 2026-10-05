@@ -42,10 +42,11 @@ import donationModel from '../repositories/donation.repository.js';
 import { createNotification } from '../repositories/notification.repository.js';
 import gmailRepository from '../repositories/gmail.repository.js';
 import certificateSettingsService from './certificateSettings.service.js';
-import emailProvider from '../providers/email.provider.js';
+import communications from '../features/communications/communications.service.js';
 import pdfProvider from '../providers/pdf.provider.js';
 import { escapeHtml, renderLadlesEmail } from '../utils/emailTemplate.js';
 import crypto from 'crypto';
+import { appBaseUrl, missingAddressMessage } from '../config/appUrl.js';
 
 // ── fail ───────────────────────────────────────────────────────
 // Mirrors stock.service.js and picking.service.js. Without a
@@ -58,15 +59,14 @@ const fail = (status, message) => {
   throw err;
 };
 
-const section18AFormBaseUrl = () => {
-  const explicit = process.env.SECTION18A_FORM_BASE_URL || process.env.CLIENT_URL || process.env.FRONTEND_URL;
-  return String(explicit || 'http://localhost:5173').replace(/\/$/, '');
-};
-
 const hashSection18AToken = (token) =>
   crypto.createHash('sha256').update(String(token)).digest('hex');
 
+// Null when this server has no web address to build the link from: no
+// token is saved for a link nobody can open.
 const createSection18AFormToken = async (donationId) => {
+  const base = appBaseUrl('section18a');
+  if (!base) return null;
   const token = crypto.randomBytes(32).toString('base64url');
   const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 30);
   await donationModel.saveSection18AFormToken({
@@ -76,7 +76,7 @@ const createSection18AFormToken = async (donationId) => {
   });
   return {
     token,
-    url: `${section18AFormBaseUrl()}/section-18a/${encodeURIComponent(token)}`,
+    url: `${base}/section-18a/${encodeURIComponent(token)}`,
     expiresAt,
   };
 };
@@ -678,13 +678,19 @@ const logEmailAttempt = async ({ donation, donationId, donorId = null, certifica
   const resolvedRecipientName = recipientName || donation?.donor_name || null;
   const resolvedDonorId = donorId ?? donation?.donor_id ?? null;
   try {
-    const result = await emailProvider.sendEmail({
+    const result = await communications.send({
+      type: emailType === 'THANK_YOU' ? 'donation_thank_you'
+        : certificateId ? 'section_18a'
+        : 'section_18a_handoff',
       to: recipient,
       subject,
       text: email.text,
       html: email.html,
       attachments: email.attachments,
-    }, null);
+      related: { type: 'donation', id: resolvedDonationId },
+      sentBy: sentByUserId,
+      sendAs: null,
+    });
     const success = Boolean(result && result.sent === true);
     return await donationModel.logDonationEmail({
       donationId: resolvedDonationId,
@@ -944,6 +950,26 @@ const sendThankYouEmail = async (donation, sentByUserId = null) => {
   let section18ALink = null;
   if (donation.section_18a_status === 'queued' || donation.section_18a_status === 'qualifying_pending_donor') {
     const token = await createSection18AFormToken(donation.id);
+    if (!token) {
+      // The donor is owed that link. Do not send a thank-you that leaves it
+      // out; record the failure so it shows in Email history to be resent.
+      return await donationModel.logDonationEmail({
+        donationId: donation.id,
+        donorId: donation.donor_id ?? null,
+        certificateId: null,
+        emailType: 'THANK_YOU',
+        recipient,
+        recipientEmail: recipient,
+        recipientName: donation.donor_name || null,
+        subject: 'Thank you for your donation',
+        status: 'FAILED',
+        providerMessageId: null,
+        gmailMessageId: null,
+        gmailThreadId: null,
+        errorMessage: missingAddressMessage('section18a'),
+        sentByUserId,
+      });
+    }
     section18ALink = token.url;
   }
   const emailContent = generateThankYouEmailContent(donation, section18ALink);
@@ -968,7 +994,7 @@ const notifySection18AEmailFailed = async (donation) => {
     body: `Certificate email for donation #${donation.id} failed.`,
     entityType: 'donation',
     entityId: donation.id,
-    targetRoles: ['admin'],
+    targetRoles: ['manager', 'admin'],
     avoidDuplicate: true,
   });
 };

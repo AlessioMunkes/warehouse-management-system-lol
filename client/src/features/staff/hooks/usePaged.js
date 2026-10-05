@@ -23,8 +23,20 @@ export const DEFAULT_PAGE_SIZE = 8;
 // Returns the current slice plus everything the control needs, so a
 // caller renders <Paged {...paged} /> under its own list and nothing
 // else about that list changes.
-export default function usePaged(items, pageSize = DEFAULT_PAGE_SIZE) {
+// The office screens' tables page at fifteen: a desk screen holds
+// more than a bench tablet, and fifteen rows is still one screen.
+export const TABLE_PAGE_SIZE = 15;
+
+// `resetKey`: when it changes (a new filter, a new sort), go back to
+// page one. Page 3 of a re-sorted list is a different set of rows,
+// and staying there reads as the filter having lost things.
+export default function usePaged(items, pageSize = DEFAULT_PAGE_SIZE, resetKey = undefined) {
   const [page, setPage] = useState(1);
+  const [lastKey, setLastKey] = useState(resetKey);
+  if (resetKey !== lastKey) {
+    setLastKey(resetKey);
+    setPage(1);
+  }
   const list  = useMemo(() => (Array.isArray(items) ? items : []), [items]);
   const total = list.length;
   const pages = Math.max(1, Math.ceil(total / pageSize));

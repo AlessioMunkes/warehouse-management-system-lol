@@ -1,4 +1,4 @@
-﻿// ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
 // client/src/components/ui/page-header.jsx
 //
 // The top of every manager and admin screen: the title, one line of
@@ -31,4 +31,3 @@ export default function PageHeader({ title, description, actions, className }) {
 export function PageShell({ children, width = 'max-w-6xl', className }) {
   return <main className={cn('mx-auto w-full px-4 py-6', width, className)}>{children}</main>;
 }
-

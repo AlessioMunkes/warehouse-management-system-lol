@@ -4,14 +4,17 @@
 // Thin HTTP layer for Gmail OAuth connection.
 // -------------------------------------------------------------
 import gmailService from '../services/gmail.service.js';
-import emailProvider from '../providers/email.provider.js';
+import communications from '../features/communications/communications.service.js';
+import { resolveAppBaseUrl } from '../config/appUrl.js';
 
 const EMAIL_INTEGRATION_PATH = '/admin/email-integration';
 
 const buildEmailIntegrationRedirect = (gmailStatus) => {
   const safeStatus = gmailStatus === 'connected' ? 'connected' : 'error';
   const pathWithQuery = `${EMAIL_INTEGRATION_PATH}?gmail=${safeStatus}`;
-  const clientOrigin = String(process.env.CLIENT_ORIGIN || '').trim();
+  // The same address every other link uses. With none set, the relative
+  // path still works when the app and server share an origin.
+  const clientOrigin = resolveAppBaseUrl('gmailReturn').url || '';
 
   if (!clientOrigin) return pathWithQuery;
 
@@ -93,7 +96,11 @@ const testEmail = async (req, res) => {
       });
     }
 
-    const result = await emailProvider.sendEmail({ to, subject, text }, req.user.id);
+    // Through the same service every other email uses, so a test send
+    // shows in the message history beside the real ones.
+    const result = await communications.send({
+      type: 'test_email', to, subject, text, sentBy: req.user.id, sendAs: req.user.id,
+    });
 
     if (!result.sent) {
       return res.status(502).json({

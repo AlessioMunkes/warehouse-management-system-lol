@@ -112,7 +112,7 @@ describe('system prompt', () => {
   });
 
   it('carries the domain rules the schema cannot express', () => {
-    expect(prompt).toMatch(/fortnightly/i);
+    expect(prompt).toMatch(/every week on a fixed pickup day/i);
     expect(prompt).toMatch(/week1/);
     expect(prompt).toMatch(/late/i);
   });

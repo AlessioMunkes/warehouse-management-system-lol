@@ -22,7 +22,8 @@
 // existence checks (fail 404).
 // ─────────────────────────────────────────────────────────────
 import express from 'express';
-import auth, { requireRole, ROLES } from '../middleware/auth.middleware.js';
+import auth, { requireRole } from '../middleware/auth.middleware.js';
+import { ALL_STAFF, MANAGERS_UP } from '../constants/permissions.js';
 import loveActivismEventController from '../controllers/loveActivismEvent.controller.js';
 import eventBookingController from '../controllers/eventBooking.controller.js';
 import volunteerBookingController from '../controllers/volunteerBooking.controller.js';
@@ -32,13 +33,11 @@ import eventSpaceController from '../controllers/eventSpace.controller.js';
 
 const router = express.Router();
 
-// ── Role groups (existing roles only) ─────────────────────────
+// ── Role groups (constants/permissions.js) ────────────────────
 // DEFERRED: Love Activism Coordinator role mapping. No coordinator
 // role exists in auth.middleware.js ROLES, users table, or config.
-// If/when it is introduced, add it to MANAGERS_UP / STAFF_UP below.
-const ALL_ROLES = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
-const MANAGERS_UP = [ROLES.MANAGER, ROLES.ADMIN];
-const STAFF_UP = [ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN];
+// If/when it is introduced, give it a group in constants/permissions.js
+// rather than a list here.
 
 // ── Event spaces (read-only) ─────────────────────────────────
 router.get('/spaces', auth, requireRole(...MANAGERS_UP), eventSpaceController.listActiveSpaces);
@@ -47,39 +46,39 @@ router.post('/spaces', auth, requireRole(...MANAGERS_UP), eventSpaceController.c
 // ── Events ────────────────────────────────────────────────────
 router.post('/events/with-initial-timeslot', auth, requireRole(...MANAGERS_UP), eventBookingController.createEventWithInitialTimeslot);
 router.post('/events', auth, requireRole(...MANAGERS_UP), loveActivismEventController.createEvent);
-router.get('/events', auth, requireRole(...ALL_ROLES), loveActivismEventController.listEvents);
-router.get('/events/:eventId', auth, requireRole(...ALL_ROLES), loveActivismEventController.getEvent);
+router.get('/events', auth, requireRole(...ALL_STAFF), loveActivismEventController.listEvents);
+router.get('/events/:eventId', auth, requireRole(...ALL_STAFF), loveActivismEventController.getEvent);
 router.patch('/events/:eventId', auth, requireRole(...MANAGERS_UP), loveActivismEventController.updateEvent);
 router.patch('/events/:eventId/cancel', auth, requireRole(...MANAGERS_UP), loveActivismEventController.cancelEvent);
 router.patch('/events/:eventId/complete', auth, requireRole(...MANAGERS_UP), loveActivismEventController.completeEvent);
 
 // ── Booking / timeslots ───────────────────────────────────────
 router.post('/events/:eventId/booking', auth, requireRole(...MANAGERS_UP), eventBookingController.bookEventSpaceAndTimeslots);
-router.get('/events/:eventId/booking', auth, requireRole(...ALL_ROLES), eventBookingController.getEventBooking);
+router.get('/events/:eventId/booking', auth, requireRole(...ALL_STAFF), eventBookingController.getEventBooking);
 router.patch('/events/:eventId/booking', auth, requireRole(...MANAGERS_UP), eventBookingController.updateEventBooking);
-router.get('/events/:eventId/timeslots', auth, requireRole(...ALL_ROLES), eventBookingController.getTimeslotsForEvent);
+router.get('/events/:eventId/timeslots', auth, requireRole(...ALL_STAFF), eventBookingController.getTimeslotsForEvent);
 router.post('/timeslots/validate', auth, requireRole(...MANAGERS_UP), eventBookingController.validateTimeslotAvailability);
 router.patch('/timeslots/:timeslotId/close', auth, requireRole(...MANAGERS_UP), eventBookingController.closeTimeslot);
 router.patch('/timeslots/:timeslotId/cancel', auth, requireRole(...MANAGERS_UP), eventBookingController.cancelTimeslot);
-router.get('/timeslots/:timeslotId/capacity', auth, requireRole(...ALL_ROLES), eventBookingController.getCapacitySummary);
+router.get('/timeslots/:timeslotId/capacity', auth, requireRole(...ALL_STAFF), eventBookingController.getCapacitySummary);
 
 // ── Volunteer bookings ────────────────────────────────────────
-router.get('/events/:eventId/bookings', auth, requireRole(...ALL_ROLES), volunteerBookingController.getBookingsForEvent);
+router.get('/events/:eventId/bookings', auth, requireRole(...ALL_STAFF), volunteerBookingController.getBookingsForEvent);
 router.post('/events/:eventId/bookings/sync', auth, requireRole(...MANAGERS_UP), volunteerBookingController.syncBookingsForEvent);
-router.get('/timeslots/:timeslotId/bookings', auth, requireRole(...ALL_ROLES), volunteerBookingController.getBookingsForTimeslot);
-router.post('/timeslots/:timeslotId/guests', auth, requireRole(...STAFF_UP), volunteerBookingController.createWalkIn);
-router.get('/bookings/:bookingId', auth, requireRole(...ALL_ROLES), volunteerBookingController.getBooking);
-router.patch('/bookings/:bookingId/cancel', auth, requireRole(...STAFF_UP), volunteerBookingController.cancelGuestBooking);
+router.get('/timeslots/:timeslotId/bookings', auth, requireRole(...ALL_STAFF), volunteerBookingController.getBookingsForTimeslot);
+router.post('/timeslots/:timeslotId/guests', auth, requireRole(...ALL_STAFF), volunteerBookingController.createWalkIn);
+router.get('/bookings/:bookingId', auth, requireRole(...ALL_STAFF), volunteerBookingController.getBooking);
+router.patch('/bookings/:bookingId/cancel', auth, requireRole(...ALL_STAFF), volunteerBookingController.cancelGuestBooking);
 
 // ── Attendance ────────────────────────────────────────────────
 // Warehouse Staff attendance permission uses the existing
-// warehouse_worker role via STAFF_UP — no new role introduced.
+// warehouse_worker role via ALL_STAFF — no new role introduced.
 // PUT (upsert check-in) is a write; GETs are reads.
-router.put('/bookings/:bookingId/attendance', auth, requireRole(...STAFF_UP), attendanceController.confirmAttendance);
-router.get('/bookings/:bookingId/attendance', auth, requireRole(...ALL_ROLES), attendanceController.getAttendanceForBooking);
-router.get('/timeslots/:timeslotId/attendance/summary', auth, requireRole(...ALL_ROLES), attendanceController.getAttendanceSummary);
-router.get('/timeslots/:timeslotId/attendance', auth, requireRole(...ALL_ROLES), attendanceController.getAttendanceForTimeslot);
-router.get('/events/:eventId/attendance', auth, requireRole(...ALL_ROLES), attendanceController.getAttendanceForEvent);
+router.put('/bookings/:bookingId/attendance', auth, requireRole(...ALL_STAFF), attendanceController.confirmAttendance);
+router.get('/bookings/:bookingId/attendance', auth, requireRole(...ALL_STAFF), attendanceController.getAttendanceForBooking);
+router.get('/timeslots/:timeslotId/attendance/summary', auth, requireRole(...ALL_STAFF), attendanceController.getAttendanceSummary);
+router.get('/timeslots/:timeslotId/attendance', auth, requireRole(...ALL_STAFF), attendanceController.getAttendanceForTimeslot);
+router.get('/events/:eventId/attendance', auth, requireRole(...ALL_STAFF), attendanceController.getAttendanceForEvent);
 
 // ── Sync ──────────────────────────────────────────────────────
 router.get('/sync/:entityType/:entityId', auth, requireRole(...MANAGERS_UP), vmsSyncController.getSyncStatus);
