@@ -56,11 +56,15 @@ const cookieFor = (role) => {
   return [`wms_token=${token}`];
 };
 
-// The archive is manager-and-admin only. WORKER and FINANCE must be refused,
-// and refused by the ROUTE — a test that only checks the tile is missing from
-// a dashboard proves nothing about who can call the endpoint.
+// The dispatch archive is manager-and-admin only. WORKER and FINANCE must be
+// refused, and refused by the ROUTE — a test that only checks the tile is
+// missing from a dashboard proves nothing about who can call the endpoint.
 const ALLOWED_ROLES = [ROLES.MANAGER, ROLES.ADMIN];
 const BLOCKED_ROLES = [ROLES.WORKER, 'finance'];
+// Delivery notes are readable by all staff: the floor's Past deliveries
+// screen lists them and reopens one by id.
+const DELIVERY_ALLOWED_ROLES = [ROLES.MANAGER, ROLES.ADMIN, ROLES.WORKER];
+const DELIVERY_BLOCKED_ROLES = ['finance'];
 const PAGE = { rows: [], total: 0, limit: 25, offset: 0 };
 
 beforeEach(() => { vi.clearAllMocks(); });
@@ -73,7 +77,7 @@ describe('GET /api/deliveries — the goods-in archive', () => {
     expect(deliveryServiceMock.getDeliveries).not.toHaveBeenCalled();
   });
 
-  it.each(ALLOWED_ROLES)('is readable by %s', async (role) => {
+  it.each(DELIVERY_ALLOWED_ROLES)('is readable by %s', async (role) => {
     deliveryServiceMock.getDeliveries.mockResolvedValue(PAGE);
     const res = await request(deliveryApp)
       .get('/api/deliveries')
@@ -81,7 +85,7 @@ describe('GET /api/deliveries — the goods-in archive', () => {
     expect(res.status).toBe(200);
   });
 
-  it.each(BLOCKED_ROLES)('is refused for %s', async (role) => {
+  it.each(DELIVERY_BLOCKED_ROLES)('is refused for %s', async (role) => {
     const res = await request(deliveryApp)
       .get('/api/deliveries')
       .set('Cookie', cookieFor(role));
@@ -91,10 +95,19 @@ describe('GET /api/deliveries — the goods-in archive', () => {
     expect(deliveryServiceMock.getDeliveries).not.toHaveBeenCalled();
   });
 
-  it('refuses a worker the note document itself, not just the list', async () => {
+  it('lets a worker reopen the note document itself, not just the list', async () => {
+    deliveryServiceMock.getDeliveryById.mockResolvedValue({ id: 1 });
     const res = await request(deliveryApp)
       .get('/api/deliveries/1')
       .set('Cookie', cookieFor(ROLES.WORKER));
+    expect(res.status).toBe(200);
+    expect(deliveryServiceMock.getDeliveryById).toHaveBeenCalled();
+  });
+
+  it('refuses finance the note document', async () => {
+    const res = await request(deliveryApp)
+      .get('/api/deliveries/1')
+      .set('Cookie', cookieFor('finance'));
     expect(res.status).toBe(403);
     expect(deliveryServiceMock.getDeliveryById).not.toHaveBeenCalled();
   });

@@ -34,19 +34,17 @@ router.get('/purchase-orders/:id/items',
 );
 
 // ── Delivery notes ────────────────────────────────────────────
-// ── The receipts archive — manager and admin only ────────────
-// Recording a delivery (POST / below) stays open to ALL_STAFF: that is the
-// worker's job. Reading back every delivery ever recorded is a manager's view.
-//
-// /:id is closed too. Nothing in the receiving flow reads it — the worker who
-// records a delivery gets the note back in the POST response — so no worker
-// screen regresses.
+// Reading delivery notes back is open to ALL_STAFF. The floor's Past
+// deliveries screen (StaffDeliveriesPage) lists them and reopens a note
+// by id, so a worker who closed the pop-up after receiving can get back
+// to it. These were manager-and-admin only, which left that screen
+// showing "Access denied" to the only role that can open it.
 router.get('/',
-  auth, requireRole(...MANAGERS_UP),
+  auth, requireRole(...ALL_STAFF),
   deliveryController.getDeliveries
 );
 router.get('/:id',
-  auth, requireRole(...MANAGERS_UP), validateIntId,    // SEC-08
+  auth, requireRole(...ALL_STAFF), validateIntId,    // SEC-08
   deliveryController.getDeliveryById
 );
 router.post('/',
