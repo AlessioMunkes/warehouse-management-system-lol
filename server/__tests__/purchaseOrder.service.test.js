@@ -89,7 +89,8 @@ describe('setPurchaseOrderStatus', () => {
 
   it('accepts every current PO_STATUSES value', async () => {
     for (const status of PO_STATUSES) {
-      repoMock.getPurchaseOrderById.mockResolvedValue(existingPO({ status: 'pending' }));
+      // From approved: a follow-up is refused on an order still pending.
+      repoMock.getPurchaseOrderById.mockResolvedValue(existingPO({ status: status === 'approved' ? 'pending' : 'approved' }));
       await expect(
         purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status, reason: 'because' })
       ).resolves.toBeTruthy();
@@ -115,8 +116,17 @@ describe('setPurchaseOrderStatus', () => {
   });
 
   it('accepts follow_up_required with a reason, and passes the notice to raise', async () => {
+    repoMock.getPurchaseOrderById.mockResolvedValue(existingPO({ status: 'approved' }));
     await purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status: 'follow_up_required', reason: 'Late' });
     expect(repoMock.updatePurchaseOrderStatus).toHaveBeenCalledWith(PO_ID, 'follow_up_required', 'Late', { beforeCommit: expect.any(Function) });
+  });
+
+  it('refuses a follow-up on an order nobody has approved yet', async () => {
+    repoMock.getPurchaseOrderById.mockResolvedValue(existingPO({ status: 'pending' }));
+    await expect(
+      purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status: 'follow_up_required', reason: 'Late' })
+    ).rejects.toMatchObject({ status: 400 });
+    expect(repoMock.updatePurchaseOrderStatus).not.toHaveBeenCalled();
   });
 
   it('does not require a reason for approved', async () => {

@@ -67,6 +67,10 @@ export default function AdjustStockModal({
       nextErrors.amount = "Enter a valid quantity.";
     } else if (magnitude <= 0) {
       nextErrors.amount = "Quantity must be greater than zero.";
+    } else if (direction === "remove" && magnitude > Number(product.onHand || 0)) {
+      // A count correction cannot take out more than is there; the
+      // server refuses it too.
+      nextErrors.amount = `Only ${Number(product.onHand || 0)} ${product.unit || "units"} on hand. Remove that much or less.`;
     }
 
     if (!reason) {
@@ -199,7 +203,7 @@ export default function AdjustStockModal({
 
           {/* Additional Notes */}
           <div className="adjust-field-group">
-            <Label htmlFor="note">Notes / Explanation</Label>
+            <Label htmlFor="note">Notes</Label>
             <Textarea
               id="note"
               rows={2}
@@ -215,7 +219,7 @@ export default function AdjustStockModal({
           {/* Threshold Reorder Level Subsection */}
           <div className="adjust-threshold-section">
             <Label className="adjust-threshold-label">
-              Reorder Warning Threshold
+              Reorder warning threshold
             </Label>
             <div className="adjust-threshold-controls">
               <Input
@@ -232,7 +236,7 @@ export default function AdjustStockModal({
                 disabled={isSavingThreshold}
                 onClick={handleSaveThreshold}
               >
-                {isSavingThreshold ? "Saving..." : "Update Threshold"}
+                {isSavingThreshold ? "Saving..." : "Update threshold"}
               </Button>
             </div>
             {thresholdMsg && (
@@ -264,7 +268,7 @@ export default function AdjustStockModal({
             </Button>
           ) : null}
           <Button onClick={handleSubmit} disabled={isSaving} type="button">
-            {isSaving ? "Saving..." : "Save Adjustment"}
+            {isSaving ? "Saving..." : "Save adjustment"}
           </Button>
         </DialogFooter>
       </DialogContent>

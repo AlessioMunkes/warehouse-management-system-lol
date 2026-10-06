@@ -72,8 +72,10 @@ export default function PurchaseOrderDetail({
 }) {
   const pending = po.status === 'pending';
   const canEditOrDelete = canManage && pending;
-  // Still expecting goods: the only orders a follow-up means anything on.
-  const canFollowUp = canManage && OPEN_PO_STATUSES.includes(po.status);
+  // Approved and still expecting goods: the only orders a follow-up
+  // means anything on. Not a pending one — reopening a followed-up order
+  // returns it to Approved, which would skip the approval.
+  const canFollowUp = canManage && !pending && OPEN_PO_STATUSES.includes(po.status);
 
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting]           = useState(false);

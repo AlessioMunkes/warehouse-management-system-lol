@@ -183,6 +183,21 @@ const manualAdjust = async ({ productId, quantityDelta, unit, reason, performedB
     );
     if (!productCheck.rows[0]) { await client.query('ROLLBACK'); return { productNotFound: true }; }
 
+    // A manual removal cannot take out more than is on hand. adjustStock
+    // itself allows a negative balance, because packing has to be able to
+    // record a shortfall; a person correcting a count does not.
+    if (Number(quantityDelta) < 0) {
+      const level = await client.query(
+        `SELECT quantity_on_hand FROM stock_levels WHERE product_id = $1 FOR UPDATE`,
+        [productId]
+      );
+      const onHand = Number(level.rows[0]?.quantity_on_hand ?? 0);
+      if (onHand + Number(quantityDelta) < 0) {
+        await client.query('ROLLBACK');
+        return { exceedsOnHand: true, onHand };
+      }
+    }
+
     const outcome = await adjustStock(client, {
       productId, quantityDelta, unit,
       movementType:  movementTypeForReason(reason),

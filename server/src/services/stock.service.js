@@ -61,6 +61,9 @@ const adjustManually = async (data, userId) => {
   });
 
   if (result.productNotFound) fail(404, 'Product not found.');
+  if (result.exceedsOnHand) {
+    fail(400, `Only ${result.onHand} on hand. Remove that much or less.`);
+  }
 
   return result;
 };

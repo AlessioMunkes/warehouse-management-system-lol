@@ -46,6 +46,10 @@ const makeClient = ({ existing = null } = {}) => {
       if (/SELECT[\s\S]*quantity_on_hand[\s\S]*reorder_threshold[\s\S]*FROM stock_levels/i.test(sql)) {
         return { rows: existing && existing !== 'no-product' ? [existing] : [] };
       }
+      // manualAdjust's own look at the balance before a removal.
+      if (/SELECT quantity_on_hand FROM stock_levels/i.test(sql)) {
+        return { rows: existing && existing !== 'no-product' ? [{ quantity_on_hand: existing.quantity_on_hand }] : [] };
+      }
       if (/SELECT name FROM products/i.test(sql)) {
         return { rows: [{ name: 'Rice' }] };
       }
@@ -460,10 +464,28 @@ describe('manualAdjust — own transaction', () => {
   });
 
   it('returns the adjustStock outcome to the caller', async () => {
+    const client = makeClient({ existing: { quantity_on_hand: '5', unit: 'kg' } });
+    const result = await runWith(client, { quantityDelta: -2 });
+
+    expect(result).toMatchObject({ before: 5, after: 3 });
+  });
+
+  it('lets a removal take the balance to exactly zero', async () => {
+    const client = makeClient({ existing: { quantity_on_hand: '5', unit: 'kg' } });
+    const result = await runWith(client, { quantityDelta: -5 });
+
+    expect(result).toMatchObject({ before: 5, after: 0 });
+  });
+
+  it('refuses a removal larger than what is on hand, and writes nothing', async () => {
     const client = makeClient({ existing: { quantity_on_hand: '2', unit: 'kg' } });
     const result = await runWith(client, { quantityDelta: -5 });
 
-    expect(result).toMatchObject({ before: 2, after: -3, isShortfall: true });
+    expect(result).toEqual({ exceedsOnHand: true, onHand: 2 });
+    const order = sqlOf(client);
+    expect(order[order.length - 1]).toMatch(/^ROLLBACK/i);
+    expect(order.some((sql) => /INSERT INTO stock_movements|UPDATE stock_levels/i.test(sql))).toBe(false);
+    expect(client.release).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -120,7 +120,7 @@ describe('inventory adjustments — toast and undo', () => {
     await user.selectOptions(modal.getByLabelText('Direction'), 'remove');
     await user.type(modal.getByLabelText(/Quantity/), '12');
     await user.selectOptions(modal.getByLabelText('Reason'), 'Damaged / spoiled');
-    await user.click(modal.getByRole('button', { name: /Save Adjustment/ }));
+    await user.click(modal.getByRole('button', { name: /Save adjustment/ }));
 
     expect(await screen.findByRole('button', { name: 'Undo' })).toBeInTheDocument();
   });
@@ -133,7 +133,7 @@ describe('inventory adjustments — toast and undo', () => {
     await user.selectOptions(modal.getByLabelText('Direction'), 'remove');
     await user.type(modal.getByLabelText(/Quantity/), '12');
     await user.selectOptions(modal.getByLabelText('Reason'), 'Damaged / spoiled');
-    await user.click(modal.getByRole('button', { name: /Save Adjustment/ }));
+    await user.click(modal.getByRole('button', { name: /Save adjustment/ }));
 
     await user.click(await screen.findByRole('button', { name: 'Undo' }));
 
@@ -156,7 +156,7 @@ describe('inventory adjustments — toast and undo', () => {
     const modal = await openAdjustModal(user);
     await user.type(modal.getByLabelText(/Quantity/), '5');
     await user.selectOptions(modal.getByLabelText('Reason'), 'Spillage');
-    await user.click(modal.getByRole('button', { name: /Save Adjustment/ }));
+    await user.click(modal.getByRole('button', { name: /Save adjustment/ }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/Could not save that adjustment/i);
     expect(alertSpy).not.toHaveBeenCalled();

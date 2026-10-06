@@ -144,7 +144,7 @@ describe('InventoryManagementPage — adjusting', () => {
     await user.selectOptions(modal.getByLabelText('Direction'), 'remove');
     await user.type(modal.getByLabelText(/Quantity/), '12');
     await user.selectOptions(modal.getByLabelText('Reason'), 'Damaged / spoiled');
-    await user.click(modal.getByRole('button', { name: /Save Adjustment/ }));
+    await user.click(modal.getByRole('button', { name: /Save adjustment/ }));
 
     // Direction "remove" has to arrive as a negative delta — the server
     // signs nothing for us, it just applies what it is given.
@@ -166,7 +166,7 @@ describe('InventoryManagementPage — adjusting', () => {
 
     const modal = await openAdjustModal(user);
     await user.type(modal.getByLabelText(/Quantity/), '5');
-    await user.click(modal.getByRole('button', { name: /Save Adjustment/ }));
+    await user.click(modal.getByRole('button', { name: /Save adjustment/ }));
 
     expect(await screen.findByText(/Select a reason for the adjustment/)).toBeInTheDocument();
     expect(adjustStock).not.toHaveBeenCalled();
@@ -182,7 +182,7 @@ describe('InventoryManagementPage — adjusting', () => {
     await user.type(modal.getByLabelText(/Quantity/), '5');
     await user.selectOptions(modal.getByLabelText('Reason'), 'Spillage');
     await user.type(modal.getByLabelText(/Notes/), 'Pallet dropped at bay 3');
-    await user.click(modal.getByRole('button', { name: /Save Adjustment/ }));
+    await user.click(modal.getByRole('button', { name: /Save adjustment/ }));
 
     await waitFor(() => expect(adjustStock).toHaveBeenCalledWith(
       expect.objectContaining({ reason: 'Spillage: Pallet dropped at bay 3' })

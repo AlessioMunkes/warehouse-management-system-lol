@@ -35,6 +35,7 @@ import {
 import { Loader2 } from 'lucide-react';
 import PurchaseOrderLines from './PurchaseOrderLines';
 import { blankLine, suggestedLine, unitPriceFor } from './purchaseOrderLine';
+import { calendarDay } from '@/features/receipts/components/noteFormat';
 
 // Render runs UTC and the warehouse does not. Between midnight and
 // 02:00 SAST the container still thinks it is yesterday, so a date
@@ -69,7 +70,9 @@ export default function PurchaseOrderForm({
 }) {
   const [form, setForm] = useState(() => (initialValue ? {
     supplierId: String(initialValue.supplierId ?? ''),
-    expectedDeliveryDate: initialValue.expectedDeliveryDate ?? '',
+    // The order carries a timestamp for this DATE column; a date field
+    // only accepts YYYY-MM-DD and showed it blank.
+    expectedDeliveryDate: initialValue.expectedDeliveryDate ? calendarDay(initialValue.expectedDeliveryDate) : '',
     quickbooksPoId: initialValue.quickbooksPoId ?? '',
     notes: initialValue.notes ?? '',
   } : {

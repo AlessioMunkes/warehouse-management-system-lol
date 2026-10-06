@@ -421,6 +421,12 @@ const setPurchaseOrderStatus = async (rawId, body = {}) => {
   const existing = await repo.getPurchaseOrderById(Number(rawId));
   if (!existing) throw fail(404, 'Purchase order not found.');
   if (existing.status === status) return existing;
+  // Reopening a followed-up order returns it to Approved. Allowing a
+  // follow-up on an order nobody has approved yet made that a way to
+  // reach Approved without the approval.
+  if (status === 'follow_up_required' && existing.status === 'pending') {
+    throw fail(400, 'Approve this order before recording a follow-up.');
+  }
 
   return repo.updatePurchaseOrderStatus(Number(rawId), status, reason, {
     beforeCommit: notices.purchaseOrderNeedsAttention,

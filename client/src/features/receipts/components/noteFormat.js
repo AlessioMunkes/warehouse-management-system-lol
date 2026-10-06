@@ -20,7 +20,7 @@ const SAST = 'Africa/Johannesburg';
 // server on warehouse time, 6 October arrives as '2026-10-05T22:00:00Z',
 // and slicing that printed the 5th. Reading it in warehouse time gives the
 // 6th whether the server runs on UTC or SAST.
-const calendarDay = (value) => {
+export const calendarDay = (value) => {
   const text = String(value);
   if (text.length <= 10) return text;
   const at = new Date(text);
