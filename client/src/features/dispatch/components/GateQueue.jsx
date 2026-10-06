@@ -228,7 +228,8 @@ export default function GateQueue({ onOpenPallet }) {
               // The live cut-off, which is the thing that changes while
               // someone is standing there. Static text saying 16:00 tells
               // a worker nothing they cannot read off the wall clock.
-              meta = [`${row.total_items} items ready for dispatch`, ...flags, cutoffNote()].join(' · ');
+              const itemsNoun = Number(row.total_items) === 1 ? 'item' : 'items';
+              meta = [`${row.total_items} ${itemsNoun} ready for dispatch`, ...flags, cutoffNote()].join(' · ');
             }
 
             const open = () => onOpenPallet(row.picking_slip_id);

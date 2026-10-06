@@ -118,7 +118,7 @@ const longDate = (iso) =>
 
 // "500g" and "2kg" are the labels decanting.service.js returns as the
 // keys of the bags object; this turns one into a sentence.
-const bagPhrase = (label) => `bags of ${label}`;
+const bagPhrase = (label, count) => `${Number(count) === 1 ? 'bag' : 'bags'} of ${label}`;
 
 const grams = (kg) => `${Math.round(Number(kg || 0) * 1000)}g`;
 const readableKg = (kg) => {
@@ -559,6 +559,8 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
   const changeInput = (setter) => (value) => {
     setter(value);
     invalidatePlan();
+    // The message about a missing weight is stale the moment one is typed.
+    setError(null);
   };
 
   // Said above the button rather than hidden in a disabled state. On
@@ -599,7 +601,7 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
         {labels.map((label) => (
           <div key={`${title}-${label}`} className="stf-instruction">
             <span className="stf-instruction-n">{line.bags[label]}</span>
-            <span className="stf-instruction-l">{bagPhrase(label)}</span>
+            <span className="stf-instruction-l">{bagPhrase(label, line.bags[label])}</span>
           </div>
         ))}
 
@@ -862,7 +864,7 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
             locked={!plan}
             open={isOpen('count')}
             onOpen={mode === 'guided' ? openPanel('count') : null}
-            summary={plan ? `${madeTotal} bags decanted` : 'Weigh the bulk amount first'}
+            summary={plan ? `${madeTotal} ${madeTotal === 1 ? 'bag' : 'bags'} decanted` : 'Weigh the bulk amount first'}
           >
             {plan ? (
               <>

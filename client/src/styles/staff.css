@@ -2514,6 +2514,9 @@ button.stf-panel-head:disabled { cursor: default; }
   --stf-text-sub:   var(--ink-soft);
   --stf-text-meta:  var(--ink-faint);
   --stf-white:      var(--surface);
+  /* Was a fixed light grey, so in dark mode every field stayed white
+     with the theme's light text on it. */
+  --stf-field-bg:   var(--surface-2);
 
   --stf-attention:        var(--brand);
   --stf-attention-ink:    var(--danger-ink);

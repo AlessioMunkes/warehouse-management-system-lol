@@ -35,6 +35,10 @@ import { volunteerHolder } from '../../pickingSlips/slipViews';
 
 const COHORT_LABELS = { tuesday: 'Tuesday', thursday: 'Thursday' };
 
+// Soup kitchens and test centres have no child count; say nothing rather
+// than "· children" with the number missing.
+const childCountNote = (count) => (count == null || count === '' ? '' : ` · ${count} children`);
+
 // Centre and packer. Module level so its identity is stable.
 const slipText = (slip) => [slip.ecd_name, slip.packer_name, volunteerHolder(slip)].filter(Boolean).join(' ');
 const DONE_STATUSES = ['complete', 'collected'];
@@ -185,7 +189,7 @@ export default function StaffSlipList({ onOpenSlip }) {
                   <span className="stf-row-main">
                     <span className="stf-row-title">{slip.ecd_name}</span>
                     <span className="stf-row-meta">
-                      {COHORT_LABELS[slip.cohort] || slip.cohort} · {slip.child_count} children
+                      {COHORT_LABELS[slip.cohort] || slip.cohort}{childCountNote(slip.child_count)}
                     </span>
                   </span>
                   <button
@@ -221,7 +225,7 @@ export default function StaffSlipList({ onOpenSlip }) {
                 <span className="stf-row-main">
                   <span className="stf-row-title">{slip.ecd_name}</span>
                   <span className="stf-row-meta">
-                    {COHORT_LABELS[slip.cohort] || slip.cohort} · {slip.child_count} children ·{' '}
+                    {COHORT_LABELS[slip.cohort] || slip.cohort}{childCountNote(slip.child_count)} ·{' '}
                     {slip.confirmed_items}/{slip.total_items} items packed
                     {volunteerHolder(slip) ? ` · ${volunteerHolder(slip)}` : ''}
                     {missed && !isDone ? ' · Not collected in a while' : ''}

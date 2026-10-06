@@ -47,6 +47,10 @@ const readStoredMode = () => {
 };
 
 const COHORT_LABELS = { tuesday: 'Tuesday', thursday: 'Thursday' };
+
+// Soup kitchens and test centres have no child count; say nothing rather
+// than "· children" with the number missing.
+const childCountNote = (count) => (count == null || count === '' ? '' : ` · ${count} children`);
 const REASON_OPTIONS = [
   { value: 'Short quantity', label: 'Short quantity' },
   { value: 'Damaged stock', label: 'Damaged stock' },
@@ -313,7 +317,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
         ) : null}
         <h1 className="stf-step-title" tabIndex={-1}>{slip.ecd_name}</h1>
         <p className="stf-step-sub">
-          {COHORT_LABELS[slip.cohort] || slip.cohort} · {slip.child_count} children · Take the oldest batch first.
+          {COHORT_LABELS[slip.cohort] || slip.cohort}{childCountNote(slip.child_count)} · Take the oldest batch first.
         </p>
       </div>
 
@@ -433,7 +437,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
       {canEdit && !locked && items.length > 0 ? (
         <>
           {pending > 0 ? (
-            <Notice>{pending} item{pending > 1 ? 's' : ''} still need to be confirmed or flagged.</Notice>
+            <Notice>{pending} {pending > 1 ? 'items still need' : 'item still needs'} to be confirmed or flagged.</Notice>
           ) : null}
           {completeError ? <Notice tone="warn">{completeError}</Notice> : null}
           <div className="stf-field">

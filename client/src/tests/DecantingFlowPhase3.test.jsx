@@ -1,4 +1,4 @@
-﻿import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -191,8 +191,8 @@ describe('DecantingFlow recommended and custom bag plans', () => {
     ).toBe(true));
 
     expect(await screen.findByText('Custom plan')).toBeInTheDocument();
-    expect(screen.getAllByText('bags of 10kg').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('bags of 2kg').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/^bags? of 10kg$/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/^bags? of 2kg$/).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'I have filled them' })).toBeInTheDocument();
     expect(screen.queryByText(/couldn't calculate that custom bag plan/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Still needed: the bag plan/)).not.toBeInTheDocument();
@@ -205,7 +205,7 @@ describe('DecantingFlow recommended and custom bag plans', () => {
     await openBagPlanPanel(user);
 
     expect(screen.getByText('Recommended bag plan')).toBeInTheDocument();
-    expect(screen.getByText('bags of 5kg')).toBeInTheDocument();
+    expect(screen.getByText(/^bags? of 5kg$/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Use recommended plan' })).toBeInTheDocument();
   });
 
@@ -387,7 +387,7 @@ describe('DecantingFlow recommended and custom bag plans', () => {
     await user.click(screen.getByRole('button', { name: 'Use selected bag sizes' }));
 
     expect(await screen.findByText('Custom plan')).toBeInTheDocument();
-    expect(screen.getAllByText('bags of 10kg').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/^bags? of 10kg$/).length).toBeGreaterThan(0);
     expect(screen.getByText(/2kg still needs to be packed/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'I have filled them' })).toBeInTheDocument();
     expect(screen.queryByText(/couldn't calculate/)).not.toBeInTheDocument();
@@ -543,7 +543,7 @@ describe('DecantingFlow recommended and custom bag plans', () => {
     await user.click(screen.getByRole('button', { name: '2kg' }));
     await user.click(screen.getByRole('button', { name: 'Use selected bag sizes' }));
     await waitFor(() => expect(findCallBySizes('10,2')).toBeTruthy());
-    await waitFor(() => expect(screen.getAllByText('bags of 2kg').length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByText(/^bags? of 2kg$/).length).toBeGreaterThan(0));
   });
 
   it('genuine selected-size request failure keeps selections and shows the safe error', async () => {

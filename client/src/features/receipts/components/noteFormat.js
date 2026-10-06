@@ -14,10 +14,24 @@
 
 const SAST = 'Africa/Johannesburg';
 
-// A DATE column: 'YYYY-MM-DD' or an ISO string whose date part is the truth.
+// The calendar day a DATE column holds, as 'YYYY-MM-DD'. A bare date is
+// already that. A full timestamp is what the server sends when node-postgres
+// has turned the DATE into midnight in the server's own timezone: from a
+// server on warehouse time, 6 October arrives as '2026-10-05T22:00:00Z',
+// and slicing that printed the 5th. Reading it in warehouse time gives the
+// 6th whether the server runs on UTC or SAST.
+const calendarDay = (value) => {
+  const text = String(value);
+  if (text.length <= 10) return text;
+  const at = new Date(text);
+  if (Number.isNaN(at.getTime())) return text.slice(0, 10);
+  return at.toLocaleDateString('en-CA', { timeZone: SAST });
+};
+
+// A DATE column: 'YYYY-MM-DD', or a timestamp standing for one.
 export const formatDate = (value) => {
   if (!value) return '—';
-  const datePart = String(value).slice(0, 10);
+  const datePart = calendarDay(value);
   const [y, m, d] = datePart.split('-').map(Number);
   if (!y || !m || !d) return '—';
   // Constructed as UTC and formatted as UTC — no shifting either way.
@@ -40,7 +54,7 @@ export const formatDateTime = (value) => {
 // Short form for list rows.
 export const formatDateShort = (value) => {
   if (!value) return '—';
-  const datePart = String(value).slice(0, 10);
+  const datePart = calendarDay(value);
   const [y, m, d] = datePart.split('-').map(Number);
   if (!y || !m || !d) return '—';
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-ZA', {
