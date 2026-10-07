@@ -25,6 +25,7 @@
 import pool                  from '../config/db.js';
 import { committedStockSql } from './committedStock.sql.js';
 import { recheckProducts } from './communityRequestStock.repository.js';
+import recipeRepository   from './recipe.repository.js';
 
 // ── Audit helper (used inside existing transactions) ──────────
 const logEvent = async (client, slipId, eventType, actorId, detail = null) => {
@@ -224,6 +225,33 @@ const getSlipById = async (id) => {
   return { ...slipResult.rows[0], items: itemsResult.rows };
 };
 
+// ── One slip's lines ──────────────────────────────────────────
+// From the recipe when there is one and it applies to this centre —
+// each line times the centre's child count — and otherwise from the
+// centre's own standing order. The standing order is the fallback for a
+// centre marked as keeping its own order, a centre with no child count,
+// and any date no filled-in recipe covers.
+const insertSlipItems = async (client, { slipId, ecdId, dispatchDate, recipe }) => {
+  if (recipe) {
+    const rowCount = await recipeRepository.insertSlipItemsFromRecipe(client, { slipId, ecdId, recipeId: recipe.id });
+    if (rowCount > 0) return { rowCount, source: 'recipe' };
+  }
+
+  const { rowCount } = await client.query(
+    `INSERT INTO picking_slip_items (picking_slip_id, product_id, required_quantity, unit)
+     SELECT $1, ol.product_id, ol.quantity, ol.unit
+     FROM ecd_order_lines ol
+     JOIN products p ON p.id = ol.product_id
+     WHERE ol.ecd_id = $2
+       AND ol.effective_from <= $3::date
+       AND (ol.effective_to IS NULL OR ol.effective_to >= $3::date)
+       AND p.archived_at IS NULL
+     RETURNING id`,
+    [slipId, ecdId, dispatchDate]
+  );
+  return { rowCount, source: 'standing_order' };
+};
+
 // ── Generate a week's slips from ECD master data ──────────────
 // Idempotent: the UNIQUE (ecd_id, dispatch_date) constraint means
 // re-running for the same day updates nothing and creates nothing.
@@ -256,25 +284,22 @@ const generateSlips = async ({ dispatchDate, cohort, generatedBy, beforeCommit }
 
     const emptySlips = [];
 
-    // Snapshot the recipe onto each new slip. Copying (not joining) means a
-    // later change to ecd_order_lines can never rewrite a packed slip.
+    // The recipe for this dispatch date (Settings → Recipes), or null
+    // when there is none to use — then every slip comes from the
+    // centre's standing order, as it always did.
+    const recipe = slips.rowCount > 0 ? await recipeRepository.resolveForDate(client, dispatchDate) : null;
+
+    // Snapshot the lines onto each new slip. Copying (not joining) means a
+    // later change to the recipe or to ecd_order_lines can never rewrite
+    // a packed slip.
     for (const slip of slips.rows) {
-      const items = await client.query(
-        `INSERT INTO picking_slip_items (picking_slip_id, product_id, required_quantity, unit)
-         SELECT $1, ol.product_id, ol.quantity, ol.unit
-         FROM ecd_order_lines ol
-         JOIN products p ON p.id = ol.product_id
-         WHERE ol.ecd_id = $2
-           AND ol.effective_from <= $3::date
-           AND (ol.effective_to IS NULL OR ol.effective_to >= $3::date)
-           AND p.archived_at IS NULL
-         RETURNING id`,
-        [slip.id, slip.ecd_id, dispatchDate]
-      );
+      const items = await insertSlipItems(client, { slipId: slip.id, ecdId: slip.ecd_id, dispatchDate, recipe });
 
       await logEvent(client, slip.id, 'generated', generatedBy, {
         dispatch_date: dispatchDate,
         item_count:    items.rowCount,
+        source:        items.source,
+        ...(items.source === 'recipe' ? { recipe: recipe.name } : {}),
       });
 
       if (items.rowCount === 0) {
@@ -346,18 +371,8 @@ const createSlip = async ({ ecdId, dispatchDate, cohort, generatedBy, items, bef
       }
       itemCount = items.length;
     } else {
-      const itemsResult = await client.query(
-        `INSERT INTO picking_slip_items (picking_slip_id, product_id, required_quantity, unit)
-         SELECT $1, ol.product_id, ol.quantity, ol.unit
-         FROM ecd_order_lines ol
-         JOIN products p ON p.id = ol.product_id
-         WHERE ol.ecd_id = $2
-           AND ol.effective_from <= $3::date
-           AND (ol.effective_to IS NULL OR ol.effective_to >= $3::date)
-           AND p.archived_at IS NULL
-         RETURNING id`,
-        [slipId, ecdId, dispatchDate]
-      );
+      const recipe = await recipeRepository.resolveForDate(client, dispatchDate);
+      const itemsResult = await insertSlipItems(client, { slipId, ecdId, dispatchDate, recipe });
       itemCount = itemsResult.rowCount;
     }
 

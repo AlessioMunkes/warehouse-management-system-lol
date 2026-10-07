@@ -1132,3 +1132,37 @@ CREATE INDEX IF NOT EXISTS idx_operational_goals_period
 CREATE INDEX IF NOT EXISTS idx_operational_goals_active
   ON operational_goals(period_end, created_at)
   WHERE goal_state = 'ACTIVE';
+CREATE TABLE public.recipes (
+  id integer NOT NULL DEFAULT nextval('recipes_id_seq'::regclass),
+  name text NOT NULL CHECK (char_length(name) >= 1 AND char_length(name) <= 80),
+  kind text NOT NULL CHECK (kind = ANY (ARRAY['summer'::text, 'winter'::text, 'override'::text])),
+  season_start_month smallint CHECK (season_start_month >= 1 AND season_start_month <= 12),
+  season_start_day smallint CHECK (season_start_day >= 1 AND season_start_day <= 31),
+  starts_on date,
+  ends_on date,
+  created_by integer,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT recipes_pkey PRIMARY KEY (id),
+  CONSTRAINT recipes_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id),
+  CONSTRAINT recipes_shape_check CHECK ((kind = 'override'::text AND starts_on IS NOT NULL AND ends_on IS NOT NULL AND ends_on >= starts_on AND season_start_month IS NULL AND season_start_day IS NULL) OR (kind <> 'override'::text AND starts_on IS NULL AND ends_on IS NULL AND season_start_month IS NOT NULL AND season_start_day IS NOT NULL))
+);
+CREATE TABLE public.recipe_lines (
+  id integer NOT NULL DEFAULT nextval('recipe_lines_id_seq'::regclass),
+  recipe_id integer NOT NULL,
+  product_id integer NOT NULL,
+  quantity_per_child numeric NOT NULL CHECK (quantity_per_child > 0::numeric),
+  unit character varying NOT NULL,
+  CONSTRAINT recipe_lines_pkey PRIMARY KEY (id),
+  CONSTRAINT recipe_lines_one_per_product UNIQUE (recipe_id, product_id),
+  CONSTRAINT recipe_lines_recipe_id_fkey FOREIGN KEY (recipe_id) REFERENCES public.recipes(id) ON DELETE CASCADE,
+  CONSTRAINT recipe_lines_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
+);
+CREATE TABLE public.recipe_own_order_centres (
+  ecd_id integer NOT NULL,
+  added_by integer,
+  added_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT recipe_own_order_centres_pkey PRIMARY KEY (ecd_id),
+  CONSTRAINT recipe_own_order_centres_ecd_id_fkey FOREIGN KEY (ecd_id) REFERENCES public.ecd_centres(id) ON DELETE CASCADE,
+  CONSTRAINT recipe_own_order_centres_added_by_fkey FOREIGN KEY (added_by) REFERENCES public.users(id)
+);
