@@ -12,6 +12,10 @@
 //   Notifications & reminders the not-collected cut-off and the
 //                            collection reminder send time
 //   Stock rules              the two expiry-warning windows
+//   Recipes                  what picking slips are made from: the
+//                            summer and winter recipes, when each season
+//                            starts, dated overrides, and the centres
+//                            that keep their own order (RecipesSection)
 //   Reporting                how kilograms become people fed (the
 //                            impact factors). Targets are each
 //                            manager's own, on Operations Reports.
@@ -34,6 +38,7 @@ import GmailSettingsPage from './GmailSettingsPage';
 import AppSettingsSection from '../features/settings/components/AppSettingsSection';
 import CertificateSettingsForm from '../features/settings/components/CertificateSettingsForm';
 import ConnectionsSection from '../features/settings/components/ConnectionsSection';
+import RecipesSection from '../features/settings/components/RecipesSection';
 import ImpactFactorsForm from '../features/reporting/components/ImpactFactorsForm';
 import { listSettings } from '../services/settingsAPI';
 import PageHeader, { PageShell } from '@/components/ui/page-header';
@@ -44,6 +49,7 @@ const SECTIONS = [
   { id: 'connections',   label: 'Connections' },
   { id: 'notifications', label: 'Notifications & reminders' },
   { id: 'stock',         label: 'Stock rules' },
+  { id: 'recipes',       label: 'Recipes' },
   { id: 'reporting',     label: 'Reporting' },
   { id: 'certificates',  label: 'Certificates' },
   { id: 'accounts',      label: 'Accounts' },
@@ -87,7 +93,7 @@ export default function SettingsPage({ defaultSection = 'email' }) {
     // Narrower than the list screens: this page is forms, and a form
     // line stretched across 6xl is hard to read.
     <PageShell width="max-w-4xl">
-      <PageHeader title="Settings" description="Set up email, reminders, stock rules, reporting and accounts. Changes apply to everyone." />
+      <PageHeader title="Settings" description="Set up email, reminders, stock rules, recipes, reporting and accounts. Changes apply to everyone." />
 
       <ViewTabs className="mt-5" label="Settings sections" value={section} onChange={changeSection} tabs={SECTIONS} />
 
@@ -110,6 +116,8 @@ export default function SettingsPage({ defaultSection = 'email' }) {
             />
           )
         ) : null}
+
+        {section === 'recipes' ? <RecipesSection /> : null}
 
         {section === 'reporting' ? (
           <Card>
