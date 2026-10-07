@@ -36,7 +36,6 @@ import BeneficiaryDirectoryPage                    from '../pages/BeneficiaryDir
 import EcdCollectionRemindersPage                  from '../pages/EcdCollectionRemindersPage';
 import OperatingCalendarPage                       from '../pages/OperatingCalendarPage';
 import ImpactReportPage                            from '../pages/ImpactReportPage';
-import OperationalGoalsPage                        from '../pages/OperationalGoalsPage';
 import PickingSlipManagementPage                   from '../pages/PickingSlipManagementPage';
 import UserDirectoryPage                           from '../pages/UserDirectoryPage';
 import AdminActivityLogPage                        from '../pages/AdminActivityLogPage';
@@ -109,7 +108,6 @@ export const PAGES = {
   volunteerEvent:   <VolunteerEventWorkspacePage />,
   reporting:        <ReportingPage />,
   impactReport:     <ImpactReportPage />,
-  operationalGoals: <OperationalGoalsPage />,
 
   users:            <UserDirectoryPage />,
   products:         <ProductManagementPage />,

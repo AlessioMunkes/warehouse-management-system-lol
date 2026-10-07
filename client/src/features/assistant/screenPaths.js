@@ -52,7 +52,6 @@ export const SCREEN_PATHS = {
   receipts:           STAFF.receipts,
   reporting:          STAFF.reporting,
   impactReport:       STAFF.impactReport,
-  operationalGoals:   STAFF.operationalGoals,
   volunteers:         VOLUNTEERS.events,
 
   products:           ADMIN.products,

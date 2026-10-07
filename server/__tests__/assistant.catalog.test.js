@@ -97,15 +97,12 @@ describe('what each role may be told', () => {
   });
 
   // Everything except the other roles' own "what you can do" answers,
-  // the floor's how-tos, and operational goals, which only a manager
-  // has: each role works only its own screens.
+  // and the floor's how-tos: each role works only its own screens.
   it('gives an admin everything but the other roles’ job summaries and the floor’s and manager’s own how-tos', () => {
     const others = ['my-role-worker', 'my-role-manager'];
     const oneRoleOnly = (t) => t.roles.length === 1 && t.roles[0] !== 'admin';
     expect(topicsForRole('admin').map((t) => t.id))
       .toEqual(TOPICS.filter((t) => !oneRoleOnly(t)).map((t) => t.id).filter((id) => !others.includes(id)));
-    expect(topicsForRole('admin').map((t) => t.id)).not.toContain('goals-create');
-    expect(topicsForRole('manager').map((t) => t.id)).toContain('goals-create');
   });
 
   it('keeps the floor’s how-tos from managers and admins', () => {

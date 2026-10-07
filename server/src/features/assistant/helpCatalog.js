@@ -144,10 +144,6 @@ export const SCREENS = [
   { id: 'impactReport', label: 'Impact report', roles: MANAGERS_UP,
     about: 'The Impact report: meals, children and adults served, compost processed, poster PDF.',
     aka: ['impact calculator', 'impact report', 'donor report', 'meals served'] },
-  // Managers only: an admin has no Operational goals screen.
-  { id: 'operationalGoals', label: 'Operational goals', roles: [MANAGER],
-    about: 'Set a goal against a live figure, follow its progress, and ask why it is ahead or behind.',
-    aka: ['goals', 'targets', 'operational goals', 'kpis', 'goal tracking'] },
   { id: 'volunteers', label: 'Volunteer events', roles: MANAGERS_UP,
     about: 'Set up volunteer events and time slots, and see who signed in to each.',
     aka: ['volunteer events', 'volunteer sessions', 'corporate groups'] },
@@ -244,7 +240,7 @@ export const TOPICS = [
       'Buying — raise purchase orders; each one is emailed to Finance.',
       'Centres — beneficiaries, this week’s picking slips and collection reminders.',
       'Donations — the classification queue, and Section 18A certificates for donors.',
-      'Insight — operations reports, impact reports and operational goals.',
+      'Insight — operations reports and impact reports.',
       'People — volunteer events.',
     ],
     followUp: {
@@ -2293,75 +2289,6 @@ export const TOPICS = [
       topic: 'notifications',
     },
     related: ['notifications', 'inventory-low-stock', 'po-approve'],
-  },
-
-  // ═══ Operational goals (manager) ══════════════════════════
-  {
-    id: 'goals-create',
-    title: 'Setting an operational goal',
-    roles: [MANAGER],
-    screens: ['operationalGoals'],
-    asks: [
-      'set a goal', 'new goal', 'create a target', 'operational goal', 'track a target',
-      'generate goal', 'review goal', 'how do I add a goal', 'change a goal',
-    ],
-    body:
-      'A goal follows one live figure — volunteer hours, decanting wastage, low stock ' +
-      'items — against a target for a period. You describe it in your own words and ' +
-      'the system drafts it for you to check.',
-    steps: [
-      'Open Operational goals and choose New Goal.',
-      'Under What would you like to achieve?, describe the goal, for example “Increase dispatch volume by 200 this quarter”, and choose Generate Goal.',
-      'On Review Goal, check the name, what it tracks, the target and the period, and correct anything that is off.',
-      'Choose Create Goal.',
-    ],
-    followUp: {
-      question: 'Would you like to know how to see how a goal is doing?',
-      topic: 'goals-progress',
-    },
-    related: ['goals-progress', 'goals-archive'],
-  },
-  {
-    id: 'goals-progress',
-    title: 'How a goal is doing',
-    roles: [MANAGER],
-    screens: ['operationalGoals'],
-    asks: [
-      'goal progress', 'view progress', 'ask why', 'why is the goal behind',
-      'are we on track', 'how is the goal doing', 'ai insight', 'is the target met',
-    ],
-    body:
-      'Choose View Progress on a goal. It shows the current figure against the ' +
-      'target, the percentage, what remains and the time left, worked out from what ' +
-      'is in the system right now. AI Insight under it adds recommended actions.\n\n' +
-      'Choose Ask Why? for a plain explanation of why the goal is ahead or behind. ' +
-      'If the explanation cannot load, the figures are still shown.',
-    followUp: {
-      question: 'Would you like to know how to put away a goal you have finished with?',
-      topic: 'goals-archive',
-    },
-    related: ['goals-create', 'goals-archive', 'reporting-ask'],
-  },
-  {
-    id: 'goals-archive',
-    title: 'Archiving and restoring a goal',
-    roles: [MANAGER],
-    screens: ['operationalGoals'],
-    asks: [
-      'archive a goal', 'remove a goal', 'delete a goal', 'restore a goal',
-      'where did my goal go', 'bring a goal back', 'old goals', 'find a goal',
-    ],
-    body:
-      'Choose Archive on a goal you have finished with, then Archive goal. It leaves ' +
-      'the list but is not deleted, and you can still open its progress.\n\n' +
-      'To see it again, change Status from Active to Archived. Choose Restore, then ' +
-      'Restore goal, to bring it back; an archived goal cannot be edited until you ' +
-      'do. Search, Domain and Sort narrow a long list.',
-    followUp: {
-      question: 'Would you like to know how to set a new goal?',
-      topic: 'goals-create',
-    },
-    related: ['goals-create', 'goals-progress'],
   },
 
   // ═══ Following the floor's work (manager) ═════════════════

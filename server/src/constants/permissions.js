@@ -27,7 +27,7 @@ import { ROLES } from '../middleware/auth.middleware.js';
 
 export const ALL_STAFF   = Object.freeze([ROLES.WORKER, ROLES.MANAGER, ROLES.ADMIN]);
 export const MANAGERS_UP = Object.freeze([ROLES.MANAGER, ROLES.ADMIN]);
-// Managers but not admins: operational goals.
+// Managers but not admins. No route uses it at present.
 export const MANAGER_ONLY = Object.freeze([ROLES.MANAGER]);
 export const ADMIN_ONLY  = Object.freeze([ROLES.ADMIN]);
 export const GUEST_ONLY  = Object.freeze([ROLES.GUEST]);

@@ -88,7 +88,7 @@ describe('sidebars built from the table', () => {
         'Benevolent requests /noc/community-requests',
       ]],
       ['Programmes', ['Feed the Soil /noc/feed-the-soil', 'Volunteer events /volunteers']],
-      ['Insights', ['Operations reports /noc/reporting', 'Impact report /noc/impact-report', 'Operational goals /noc/operational-goals']],
+      ['Insights', ['Operations reports /noc/reporting', 'Impact report /noc/impact-report']],
     ]);
   });
 
