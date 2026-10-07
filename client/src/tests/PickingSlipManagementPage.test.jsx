@@ -27,9 +27,12 @@ vi.mock('../services/pickingAPI', () => ({
 vi.mock('../services/beneficiaryAPI', () => ({ default: { getBeneficiaries: vi.fn(async () => []) } }));
 vi.mock('../services/productAPI', () => ({ default: { getProducts: vi.fn(async () => []) } }));
 vi.mock('../features/packing/palletLabelPdf', () => ({
-  openLabelPdf: vi.fn(() => ({ opened: true, skipped: 0 })),
   publicAppOrigin: () => 'https://example.org',
   isReachableByPhone: () => true,
+}));
+vi.mock('../features/pickingSlips/pickingSlipPdf', () => ({
+  buildPickingSlipPdf: vi.fn(() => ({ pdf: { output: () => 'blob:slips' }, slipCount: 1, pageCount: 1 })),
+  loadSlipLogo: vi.fn(async () => null),
 }));
 vi.mock('../components/layout/ManagerLayout', () => ({ default: ({ children }) => children }));
 vi.mock('@/components/ui/toastContext', () => ({ useToast: () => vi.fn() }));
@@ -40,7 +43,7 @@ vi.mock('react-router-dom', () => ({
 }));
 
 const api = await import('../services/pickingAPI');
-const { openLabelPdf } = await import('../features/packing/palletLabelPdf');
+const { buildPickingSlipPdf } = await import('../features/pickingSlips/pickingSlipPdf');
 const { default: PickingSlipManagementPage } = await import('../pages/PickingSlipManagementPage');
 
 const slip = (over) => ({
@@ -158,14 +161,47 @@ describe('PickingSlipManagementPage', () => {
     expect(api.assignSlip).toHaveBeenCalledWith(2, 11);
   });
 
-  it('prints labels for the ticked slips', async () => {
+  it('prints picking slips, with their items, for the ticked slips', async () => {
     const user = userEvent.setup();
+    const tab = { document: {}, location: {}, close: vi.fn() };
+    const open = vi.spyOn(window, 'open').mockReturnValue(tab);
+    api.fetchPickingSlip.mockImplementation(async (id) => ({
+      ...SLIPS.find((s) => s.id === Number(id)),
+      items: [{ id: 9, product_name: 'Samp', required_quantity: '7.5', unit: 'kg' }],
+    }));
     render(<PickingSlipManagementPage />);
 
     await user.click(await screen.findByRole('checkbox', { name: 'Select Rainbow Kids' }));
-    await user.click(screen.getByRole('button', { name: /Print pallet labels/ }));
+    await user.click(screen.getByRole('button', { name: /Print picking slips/ }));
 
-    expect(openLabelPdf).toHaveBeenCalledTimes(1);
-    expect(openLabelPdf.mock.calls[0][0].map((l) => l.ecd_name)).toEqual(['Rainbow Kids']);
+    await waitFor(() => expect(buildPickingSlipPdf).toHaveBeenCalledTimes(1));
+    const [printed, options] = buildPickingSlipPdf.mock.calls[0];
+    expect(printed.map((s) => s.ecd_name)).toEqual(['Rainbow Kids']);
+    expect(printed[0].items.map((i) => i.product_name)).toEqual(['Samp']);
+    expect(printed[0].dispatch_date_iso).toBe('2026-09-29');
+    expect(options.origin).toBe('https://example.org');
+    // The tab is opened inside the click and pointed at the PDF afterwards.
+    expect(open).toHaveBeenCalledWith('', '_blank');
+    await waitFor(() => expect(tab.location.href).toBe('blob:slips'));
+    open.mockRestore();
+  });
+
+  it('says so when the browser blocks the new tab, and builds nothing', async () => {
+    const user = userEvent.setup();
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    render(<PickingSlipManagementPage />);
+
+    await user.click(await screen.findByRole('checkbox', { name: 'Select Rainbow Kids' }));
+    await user.click(screen.getByRole('button', { name: /Print picking slips/ }));
+
+    expect(await screen.findByText(/Pop-up blocked/)).toBeInTheDocument();
+    expect(buildPickingSlipPdf).not.toHaveBeenCalled();
+    open.mockRestore();
+  });
+
+  it('calls a slip nobody holds "On the floor"', async () => {
+    render(<PickingSlipManagementPage />);
+    expect(await screen.findByRole('tab', { name: /On the floor/ })).toBeInTheDocument();
+    expect(screen.queryByText('Unassigned')).not.toBeInTheDocument();
   });
 });

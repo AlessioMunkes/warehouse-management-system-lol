@@ -36,7 +36,8 @@ import ViewTabs from '@/components/ui/view-tabs';
 import PageHeader, { PageShell } from '@/components/ui/page-header';
 import ErrorBanner from '@/components/ui/error-banner';
 import { useToast } from '@/components/ui/toastContext';
-import { openLabelPdf, publicAppOrigin, isReachableByPhone } from '../features/packing/palletLabelPdf';
+import { publicAppOrigin, isReachableByPhone } from '../features/packing/palletLabelPdf';
+import { buildPickingSlipPdf, loadSlipLogo } from '../features/pickingSlips/pickingSlipPdf';
 import useOpenFromQuery from '../features/masterdata/hooks/useOpenFromQuery';
 import { takeUrlParam } from '../features/staff/resumeParam';
 import SlipList from '../features/pickingSlips/components/SlipList';
@@ -173,41 +174,64 @@ export default function PickingSlipManagementPage() {
     done: (n) => `${plural(n, 'slip')} back on the floor`,
   });
 
-  // ── BR-22 pallet labels ─────────────────────────────────────
-  // Generated on demand from public_token, never stored: the token does
-  // not change, so a reprint is identical, and a stored PDF could go
-  // stale against a regenerated slip. The origin is checked so the page
-  // can warn when labels would not scan off this machine — the address
-  // itself is not shown; a manager cannot act on a URL.
+  // ── Printed picking slips (and their BR-22 QR codes) ────────
+  // Generated on demand, never stored: the token does not change, so a
+  // reprint carries the same code, and a stored PDF could go stale
+  // against an edited slip. The origin is checked so the page can warn
+  // when the codes would not scan off this machine — the address itself
+  // is not shown; a manager cannot act on a URL.
   const labelOrigin = publicAppOrigin();
   const labelsReachable = isReachableByPhone(labelOrigin);
 
-  const printLabels = (rows) => {
+  // What gets printed is the picking slip itself — the sheet that goes
+  // on the pallet, with its items, the logo and the pallet's QR code —
+  // one page per slip. The list rows carry no items, so each slip is read
+  // in full first, a few at a time.
+  const printSlips = async (rows) => {
     setLabelError(null);
-    const withToken = rows.filter((r) => r.public_token);
-    if (withToken.length === 0) {
-      setLabelError(rows.length === 1 ? 'This slip has no label code yet.' : 'None of these slips has a label code yet.');
+    if (rows.length === 0) return;
+
+    // Opened now, inside the click, and pointed at the PDF once it is
+    // built. A window opened after the requests below is a pop-up as far
+    // as the browser is concerned, and gets blocked.
+    const tab = window.open('', '_blank');
+    if (!tab) {
+      setLabelError('Pop-up blocked — allow pop-ups for this site to open the slips.');
       return;
     }
-    const { opened, skipped } = openLabelPdf(
-      withToken.map((r) => ({
-        public_token: r.public_token,
-        ecd_name: r.ecd_name,
-        beneficiary_name: r.beneficiary_name,
-        // The plain calendar day; dispatch_date reads as the day before
-        // once a timezone is applied to it.
-        dispatch_date_display: r.dispatch_date_iso,
-      })),
-      { origin: labelOrigin },
-    );
-    if (!labelsReachable) {
-      console.warn(
-        `[pallet labels] Generated against "${labelOrigin}", which a phone on mobile data cannot reach. `
-        + 'Set VITE_PUBLIC_APP_ORIGIN to override the printed address.',
-      );
+    try { tab.document.title = 'Preparing picking slips…'; } catch { /* another origin's blank page */ }
+
+    setBusy(true);
+    try {
+      const full = [];
+      const BATCH = 6;
+      for (let i = 0; i < rows.length; i += BATCH) {
+        full.push(...await Promise.all(rows.slice(i, i + BATCH).map(async (row) => {
+          const slip = row.items ? row : await fetchPickingSlip(row.id);
+          // The plain calendar day comes from the list row; dispatch_date
+          // reads as the day before once a timezone is applied to it.
+          const listed = slips.find((s) => s.id === row.id);
+          return { ...slip, dispatch_date_iso: listed?.dispatch_date_iso ?? row.dispatch_date_iso ?? slip.dispatch_date_iso };
+        })));
+      }
+      const logo = await loadSlipLogo();
+      const { pdf } = buildPickingSlipPdf(full, { origin: labelOrigin, logo });
+      tab.location.href = pdf.output('bloburl');
+
+      if (!labelsReachable) {
+        console.warn(
+          `[picking slips] QR codes generated against "${labelOrigin}", which a phone on mobile data cannot reach. `
+          + 'Set VITE_PUBLIC_APP_ORIGIN to override the printed address.',
+        );
+      }
+      const noCode = full.filter((s) => !s.public_token).length;
+      if (noCode > 0) setLabelError(`${plural(noCode, 'slip')} had no QR code yet and printed without one.`);
+    } catch (err) {
+      tab.close();
+      setLabelError(err.message || 'Could not prepare the slips. Try again.');
+    } finally {
+      setBusy(false);
     }
-    if (!opened) setLabelError('Pop-up blocked — allow pop-ups for this site to open the labels.');
-    else if (skipped > 0) setLabelError(`${skipped} slip${skipped === 1 ? '' : 's'} had no label code and were left out.`);
   };
 
   const backToList = () => setMode('list');
@@ -216,7 +240,7 @@ export default function PickingSlipManagementPage() {
     <PageShell>
       <PageHeader
         title="Picking slips"
-        description="Generate, assign and track this week’s pallets."
+        description="Generate, print and track this week’s pallets. New slips go to the floor for anyone to claim."
         actions={mode === 'list' ? (
           <>
             <Button type="button" variant="outline" onClick={() => setMode('create')}>
@@ -300,7 +324,7 @@ export default function PickingSlipManagementPage() {
             >
               <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               <span>
-                <strong>These labels will only work on this computer.</strong>{' '}
+                <strong>The QR codes on these slips will only work on this computer.</strong>{' '}
                 Please don’t print them for the warehouse — a volunteer scanning one
                 would not be able to open their pallet.
               </span>
@@ -319,7 +343,7 @@ export default function PickingSlipManagementPage() {
               onIntent={(slipId) => records.warm(slipId)}
               onAssign={bulkAssign}
               onRelease={bulkRelease}
-              onPrintLabels={printLabels}
+              onPrintLabels={printSlips}
             />
           </div>
         </>
@@ -335,7 +359,7 @@ export default function PickingSlipManagementPage() {
           onRelease={() => act((id) => releaseSlip(id))}
           onAddSecond={(workerId) => act((id) => addSecondPacker(id, workerId))}
           onEdit={() => setMode('edit')}
-          onPrintLabel={() => printLabels([open])}
+          onPrintLabel={() => printSlips([open])}
           onClose={() => setOpen(null)}
         />
       ) : null}

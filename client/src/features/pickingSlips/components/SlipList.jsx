@@ -8,7 +8,7 @@
 // Bulk actions, for the ticked slips the action applies to:
 //   Assign to…        hand them to one worker (on the floor or claimed)
 //   Assign to floor   release claimed ones back for anyone to take
-//   Print labels      one pallet label each
+//   Print slips       one picking slip each, with its QR code
 // A ticked slip the action cannot apply to (already packed, say) is
 // left alone, and the bar says how many will actually change.
 // ─────────────────────────────────────────────────────────────
@@ -144,7 +144,7 @@ export default function SlipList({
         <Undo2 /> Assign to floor{releasable.length && releasable.length < selectedSlips.length ? ` (${releasable.length})` : ''}
       </Button>
       <Button type="button" variant="outline" size="sm" onClick={() => onPrintLabels(selectedSlips)}>
-        <Printer /> Print pallet labels
+        <Printer /> Print picking slips
       </Button>
     </BulkActionBar>
   ) : (
@@ -158,9 +158,9 @@ export default function SlipList({
         onReset: tableView.resetColumns,
       }}
     >
-      {/* Labels for exactly the slips the list is showing. */}
+      {/* Slips for exactly the rows the list is showing. */}
       <Button type="button" variant="outline" size="sm" disabled={rows.length === 0} onClick={() => onPrintLabels(rows)}>
-        <Printer /> Print labels ({rows.length})
+        <Printer /> Print slips ({rows.length})
       </Button>
     </ListToolbar>
   );

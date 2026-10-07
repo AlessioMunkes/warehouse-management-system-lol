@@ -173,7 +173,7 @@ export const slipUrlFor = (token, origin) =>
 // gap between them. Some PDF rasterisers leave a white seam between
 // exactly-adjacent fills, and a seam through a QR is read as light
 // modules — the one artefact that actually breaks a scan.
-const drawQr = (pdf, text, x, y, size) => {
+export const drawQr = (pdf, text, x, y, size) => {
   const qr = qrcode(TYPE_NUMBER, ECC_LEVEL);
   qr.addData(text);
   qr.make();

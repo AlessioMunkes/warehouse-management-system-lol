@@ -86,7 +86,7 @@ export default function SlipDetailPanel({
             </Button>
           ) : null}
           <Button type="button" variant="outline" size="sm" onClick={onPrintLabel}>
-            <Printer /> Print pallet label
+            <Printer /> Print picking slip
           </Button>
         </>
       )}
@@ -100,7 +100,7 @@ export default function SlipDetailPanel({
 
       <Section title="Who is packing it">
         <p className="mb-3 text-sm">
-          {slip.status === 'pending' ? 'Nobody yet — it is on the floor for anyone to claim.'
+          {slip.status === 'pending' ? 'Nobody yet — it is on the floor for anyone to claim, worker or guest. Assign it only to give it to one person.'
             : packers(slip) ? packers(slip)
             : '—'}
         </p>
