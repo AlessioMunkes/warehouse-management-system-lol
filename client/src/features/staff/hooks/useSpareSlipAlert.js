@@ -14,7 +14,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from 'react';
 import { fetchPickingSlips } from '../../../services/pickingAPI';
-import { todayISO, isSpareSlip } from '../../packing/spareSlips';
+import { floorWindow, isSpareSlip } from '../../packing/spareSlips';
 import { NOTIFICATIONS_CHANGED } from '../../notifications/notificationMatrix';
 
 const POLL_MS = 45000;
@@ -33,7 +33,7 @@ export default function useSpareSlipAlert(active = true) {
     let cancelled = false;
 
     const poll = () => {
-      fetchPickingSlips({ dispatchDate: todayISO() })
+      fetchPickingSlips(floorWindow())
         .then((rows) => {
           if (cancelled) return;
           const spare = (rows || []).filter(isSpareSlip);

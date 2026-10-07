@@ -110,7 +110,7 @@ const GuestPackPage = () => {
           lede="Pick one and we’ll get started."
         >
           {error ? <Notice tone="info">{error}</Notice> : null}
-          <Button onClick={() => navigate('/guest-home')}>See today’s pallets</Button>
+          <Button onClick={() => navigate('/guest-home')}>See pallets</Button>
           <HelpNote />
         </GuestScreen>
       </GuestShell>

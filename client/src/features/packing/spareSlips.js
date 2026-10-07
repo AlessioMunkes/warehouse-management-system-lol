@@ -17,3 +17,19 @@ export const todayISO = () => {
 };
 
 export const isSpareSlip = (slip) => !slip.assigned_to && slip.status === 'pending';
+
+// The dispatch dates the floor shows: this week from Monday, through the
+// next seven days. It used to be today only, so a slip made on Monday
+// for Tuesday could not be seen or claimed until Tuesday — unless a
+// manager assigned it to someone by name, which is what they ended up
+// doing. Starting at Monday keeps a pallet nobody packed on its day.
+// The server's guest list uses the same window (slipAccess.service.js).
+export const floorWindow = (now = new Date()) => {
+  const pad = (n) => String(n).padStart(2, '0');
+  const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const day = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const sinceMonday = (day.getDay() + 6) % 7;
+  const from = new Date(day); from.setDate(day.getDate() - sinceMonday);
+  const to = new Date(day); to.setDate(day.getDate() + 7);
+  return { from: iso(from), to: iso(to) };
+};

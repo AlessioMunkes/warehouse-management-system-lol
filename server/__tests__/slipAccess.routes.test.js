@@ -28,6 +28,7 @@ const slipAccessRepo = {
   getPreviewByToken:      vi.fn(),
   findPreviewsByShortCode: vi.fn(),
   listUnclaimedForDate:   vi.fn(),
+  listUnclaimedBetween:   vi.fn(),
   claimForVolunteer:      vi.fn(),
   releaseForVolunteer:    vi.fn(),
   findSlipIdForVolunteer: vi.fn(),
@@ -77,6 +78,7 @@ beforeEach(() => {
   slipAccessRepo.getPreviewByToken.mockResolvedValue(previewRow);
   slipAccessRepo.findPreviewsByShortCode.mockResolvedValue([previewRow]);
   slipAccessRepo.listUnclaimedForDate.mockResolvedValue([previewRow]);
+  slipAccessRepo.listUnclaimedBetween.mockResolvedValue([previewRow]);
   slipAccessRepo.volunteerHoldsSlip.mockResolvedValue(true);
   slipAccessRepo.findSlipIdForVolunteer.mockResolvedValue(132);
   // getMySlip merges the calendar day and the COALESCEd beneficiary name

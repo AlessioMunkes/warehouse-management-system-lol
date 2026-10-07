@@ -121,6 +121,24 @@ const listUnclaimedForDate = async (dispatchDate) => {
   return rows;
 };
 
+// The same list across a run of dispatch dates. A pallet is on the
+// floor from the moment its slip exists, so the guest list covers the
+// week, not only today — soonest first, so today's are still on top.
+const listUnclaimedBetween = async (from, to) => {
+  const { rows } = await pool.query(
+    `SELECT ${PREVIEW_COLUMNS}
+       FROM picking_slips ps
+       JOIN ecd_centres e ON e.id = ps.ecd_id
+      WHERE ps.dispatch_date BETWEEN $1::date AND $2::date
+        AND ps.status = ANY($3)
+        AND ps.assigned_volunteer_id IS NULL
+        AND ps.assigned_to IS NULL
+      ORDER BY ps.dispatch_date ASC, ps.id ASC`,
+    [from, to, CLAIMABLE_STATUSES],
+  );
+  return rows;
+};
+
 // ── Claim ─────────────────────────────────────────────────────
 // FOR UPDATE for the same reason the staff claim takes it: two
 // volunteers scanning the same poster at the same moment.
@@ -311,6 +329,7 @@ export default {
   getPreviewByToken,
   findPreviewsByShortCode,
   listUnclaimedForDate,
+  listUnclaimedBetween,
   claimForVolunteer,
   releaseForVolunteer,
   findSlipIdForVolunteer,

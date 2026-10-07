@@ -10,16 +10,15 @@
 //
 // "Spare" has no dedicated query param on the API — a slip is spare
 // simply because assigned_to is null — so it's a second fetch,
-// scoped to today via the existing dispatchDate filter, filtered
-// here. Two small requests rather than growing the API for a
+// scoped to the floor window (spareSlips.js) via the existing
+// from/to filter, filtered here. Two small requests rather than growing the API for a
 // distinction the client can compute itself.
 //
 // Spare slips render in the same stacked list "mine" and "done" use,
 // each row ending in a Claim button instead of a status badge — a
 // worker deciding what to pick up next wants to see the pallets, not
-// pick a name off a dropdown. Scoped to today only — a slip scheduled
-// for another day is not "available on the floor" yet, whatever else
-// is spare. The instant a claim lands, the reload drops that slip out
+// pick a name off a dropdown. A slip is on the floor from the moment a
+// manager creates it, not only on its dispatch day. The instant a claim lands, the reload drops that slip out
 // of the spare fetch entirely, so it's off this list for every other
 // packer too.
 // ─────────────────────────────────────────────────────────────
@@ -30,14 +29,21 @@ import { fetchPickingSlips, assignSlip } from '../../../services/pickingAPI';
 import { Notice } from '../../staff/components/StepPrimitives';
 import Paged from '../../staff/components/Paged';
 import usePaged from '../../staff/hooks/usePaged';
-import { todayISO, isSpareSlip } from '../spareSlips';
-import { volunteerHolder } from '../../pickingSlips/slipViews';
+import { floorWindow, isSpareSlip } from '../spareSlips';
+import { volunteerHolder, dayLabel } from '../../pickingSlips/slipViews';
 
 const COHORT_LABELS = { tuesday: 'Tuesday', thursday: 'Thursday' };
 
 // Soup kitchens and test centres have no child count; say nothing rather
 // than "· children" with the number missing.
 const childCountNote = (count) => (count == null || count === '' ? '' : ` · ${count} children`);
+
+// The day a floor pallet goes out. The floor shows the whole week now,
+// so the row has to say which day each one is for.
+const goingOut = (slip) => {
+  const day = slip.dispatch_date_iso ?? String(slip.dispatch_date ?? '').slice(0, 10);
+  return day ? `Going out ${dayLabel(day)}` : (COHORT_LABELS[slip.cohort] || slip.cohort);
+};
 
 // Centre and packer. Module level so its identity is stable.
 const slipText = (slip) => [slip.ecd_name, slip.packer_name, volunteerHolder(slip)].filter(Boolean).join(' ');
@@ -85,7 +91,7 @@ export default function StaffSlipList({ onOpenSlip }) {
 
     Promise.all([
       fetchPickingSlips({ mine: true }),
-      fetchPickingSlips({ dispatchDate: todayISO() }),
+      fetchPickingSlips(floorWindow()),
     ])
       .then(([mine, all]) => {
         if (cancelled) return;
@@ -168,7 +174,7 @@ export default function StaffSlipList({ onOpenSlip }) {
       ) : rows.length === 0 ? (
         <div className="stf-empty">
           {tab === 'mine' && "You haven't claimed anything yet. Claim one from Assigned to floor, or wait for your manager to assign one."}
-          {tab === 'spare' && 'Nothing on the floor right now. Check back once your manager assigns the next batch.'}
+          {tab === 'spare' && 'Nothing on the floor right now. Check back once your manager creates the next batch.'}
           {tab === 'done' && 'Nothing finished yet today. Completed and collected pallets will show up here.'}
         </div>
       ) : search.filtered.length === 0 ? (
@@ -189,7 +195,7 @@ export default function StaffSlipList({ onOpenSlip }) {
                   <span className="stf-row-main">
                     <span className="stf-row-title">{slip.ecd_name}</span>
                     <span className="stf-row-meta">
-                      {COHORT_LABELS[slip.cohort] || slip.cohort}{childCountNote(slip.child_count)}
+                      {goingOut(slip)}{childCountNote(slip.child_count)}
                     </span>
                   </span>
                   <button

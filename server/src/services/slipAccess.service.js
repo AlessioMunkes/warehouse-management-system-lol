@@ -191,9 +191,21 @@ const claimById = async (user, slipId) => {
   return { slip: { ...toPreview(preview), status: result.slip.status, isClaimed: true } };
 };
 
-// ── 1.4 Today's unclaimed pallets ─────────────────────────────
+// ── 1.4 Unclaimed pallets on the floor ────────────────────────
+// This week from Monday, through the next seven days — the same window
+// the workers' floor list uses (client: features/packing/spareSlips.js).
+// It was today only, which hid a pallet created the day before it goes
+// out from the very people meant to pick it up.
+const floorWindow = (today = todayInSAST()) => {
+  const day = new Date(`${today}T00:00:00Z`);
+  const shift = (days) => new Date(day.getTime() + days * 86400000).toISOString().slice(0, 10);
+  const sinceMonday = (day.getUTCDay() + 6) % 7;
+  return { from: shift(-sinceMonday), to: shift(7) };
+};
+
 const listAvailable = async () => {
-  const rows = await slipAccessRepo.listUnclaimedForDate(todayInSAST());
+  const { from, to } = floorWindow();
+  const rows = await slipAccessRepo.listUnclaimedBetween(from, to);
   return rows.map(toPreview);
 };
 

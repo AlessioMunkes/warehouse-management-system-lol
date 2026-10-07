@@ -50,7 +50,7 @@ export const slipState = (slip) => {
 };
 
 export const SLIP_STATE_LABEL = {
-  pending:       'Unassigned',
+  pending:       'On the floor',
   in_progress:   'Packing',
   complete:      'Ready at gate',
   dispatched:    'Dispatched',
@@ -75,7 +75,7 @@ export const packers = (slip) =>
 // attention list links to.
 export const VIEWS = [
   { id: 'all',          label: 'All this week', test: () => true },
-  { id: 'unassigned',   label: 'Unassigned',    test: (s) => slipState(s) === 'pending' },
+  { id: 'unassigned',   label: 'On the floor',  test: (s) => slipState(s) === 'pending' },
   { id: 'packing',      label: 'Packing',       test: (s) => slipState(s) === 'in_progress' },
   { id: 'ready',        label: 'Ready at gate', test: (s) => slipState(s) === 'complete' },
   { id: 'notcollected', label: 'Not collected', alert: true, test: (s) => slipState(s) === 'not_collected' },

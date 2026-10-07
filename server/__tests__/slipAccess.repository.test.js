@@ -90,6 +90,18 @@ describe('preview SQL', () => {
     expect(sql).toMatch(/assigned_volunteer_id IS NULL/);
     expect(sql).toMatch(/assigned_to IS NULL/);
   });
+
+  // The floor list: a slip is claimable from the day it is created, so
+  // the guest list covers a run of dispatch dates, soonest first.
+  it('lists unclaimed slips across a run of dispatch dates, soonest first', async () => {
+    await repo.listUnclaimedBetween('2026-10-05', '2026-10-14');
+    const sql = lastSql();
+    expect(sql).toMatch(/dispatch_date BETWEEN \$1::date AND \$2::date/);
+    expect(sql).toMatch(/assigned_volunteer_id IS NULL/);
+    expect(sql).toMatch(/assigned_to IS NULL/);
+    expect(sql).toMatch(/ORDER BY ps\.dispatch_date ASC/);
+    expect(poolMock.query.mock.calls.at(-1)[1].slice(0, 2)).toEqual(['2026-10-05', '2026-10-14']);
+  });
 });
 
 describe('claimForVolunteer', () => {

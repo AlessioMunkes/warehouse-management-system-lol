@@ -148,7 +148,7 @@ const GuestHomePage = () => {
           ? 'Pick up where you left off.'
           : 'Thank you for being here today. Pick a pallet below and we’ll take it one step at a time.'}
       >
-        {loading ? <Loading label="Loading today’s pallets" /> : (
+        {loading ? <Loading label="Loading pallets" /> : (
           <>
             {/* Already holding one — offer that before anything else. */}
             {mySlip ? (
@@ -184,10 +184,10 @@ const GuestHomePage = () => {
             {/* ── 1. Pick from the list — no typing ──────────── */}
             {!mySlip ? (
               <div className="gst-stack-tight">
-                <h2 className="gst-title gst-title-sm">Today’s pallets</h2>
+                <h2 className="gst-title gst-title-sm">Pallets to pack</h2>
                 {slips.length === 0 ? (
                   <Notice tone="info">
-                    Every pallet for today has someone on it. Ask a staff member what needs doing next.
+                    Every pallet has someone on it. Ask a staff member what needs doing next.
                   </Notice>
                 ) : (
                   <>
