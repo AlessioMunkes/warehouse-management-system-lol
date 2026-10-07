@@ -7,7 +7,7 @@
 // tests drive picking.repository against a scripted client.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { seasonFor, recipeForDate, isRealDayOfYear } from '../src/features/recipes/recipeSeason.js';
+import { seasonFor, recipeForDate, isRealDayOfYear, bandedChildCount } from '../src/features/recipes/recipeSeason.js';
 
 const repo = {
   listRecipes: vi.fn(), listOwnOrderCentres: vi.fn(), getRecipeById: vi.fn(),
@@ -69,6 +69,28 @@ describe('recipeForDate', () => {
     const later = { ...HOLIDAY, id: 4, starts_on: '2026-12-20', ends_on: '2026-12-24' };
     expect(recipeForDate([SUMMER, WINTER, HOLIDAY, later], '2026-12-22').id).toBe(4);
     expect(recipeForDate([SUMMER, WINTER, HOLIDAY, later], '2026-12-26').id).toBe(3);
+  });
+});
+
+describe('bandedChildCount', () => {
+  it('rounds a child count up to the next band', () => {
+    expect(bandedChildCount(23, 5)).toBe(25);
+    expect(bandedChildCount(21, 5)).toBe(25);
+    expect(bandedChildCount(25, 5)).toBe(25);
+    expect(bandedChildCount(26, 5)).toBe(30);
+    expect(bandedChildCount(1, 5)).toBe(5);
+    expect(bandedChildCount(42, 10)).toBe(50);
+  });
+
+  it('uses the exact count for a band of 1, and nothing for no children', () => {
+    expect(bandedChildCount(23, 1)).toBe(23);
+    expect(bandedChildCount(0, 5)).toBe(0);
+    expect(bandedChildCount(null, 5)).toBe(0);
+  });
+
+  it('treats an unusable band as 1 rather than dividing by it', () => {
+    expect(bandedChildCount(23, 0)).toBe(23);
+    expect(bandedChildCount(23, undefined)).toBe(23);
   });
 });
 

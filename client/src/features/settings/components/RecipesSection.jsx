@@ -5,9 +5,12 @@
 //
 //   Seasons     the day summer starts and the day winter starts. A date
 //               belongs to whichever started most recently.
+//   Bands       the band a centre's child count is rounded up to (5 by
+//               default: 21 to 25 children all get the slip for 25).
+//               One of the /api/settings values, passed in by the page.
 //   Recipes     the summer recipe, the winter recipe, and any overrides
 //               — each a list of products with an amount PER CHILD. A
-//               centre's slip is that amount times its child count. An
+//               centre's slip is that amount times its banded count. An
 //               override has dates, and replaces the season's recipe
 //               inside them.
 //   Own orders  the centres that keep their standing order and ignore
@@ -27,7 +30,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import ViewTabs from '@/components/ui/view-tabs';
 import ErrorBanner from '@/components/ui/error-banner';
 import { useToast } from '@/components/ui/toastContext';
-import { EXAMPLE_CHILDREN, exampleQuantity } from '../recipeMath';
+import { DEFAULT_CHILD_BAND, exampleCentre, exampleQuantity } from '../recipeMath';
+import AppSettingsSection from './AppSettingsSection';
 import productAPI from '../../../services/productAPI';
 import beneficiaryAPI from '../../../services/beneficiaryAPI';
 import {
@@ -132,7 +136,7 @@ const toDraftLines = (recipe) => (recipe?.lines ?? []).map((line) => ({
   productId: String(line.productId), quantityPerChild: String(line.quantityPerChild), unit: line.unit,
 }));
 
-function RecipeEditor({ recipe, products, onSaved, onCreated, onDeleted }) {
+function RecipeEditor({ recipe, products, band, onSaved, onCreated, onDeleted }) {
   const toast = useToast();
   const isNew = !recipe;
   const isOverride = isNew || recipe.kind === 'override';
@@ -212,7 +216,8 @@ function RecipeEditor({ recipe, products, onSaved, onCreated, onDeleted }) {
       <div>
         <p className="text-sm font-medium">Products</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Enter how much one child gets each week. A slip multiplies it by the centre’s child count.
+          Enter how much one child gets each week. A slip multiplies it by the centre’s child count
+          {band > 1 ? `, rounded up to the next ${band}.` : '.'}
         </p>
 
         {draft.lines.length === 0 ? (
@@ -222,7 +227,7 @@ function RecipeEditor({ recipe, products, onSaved, onCreated, onDeleted }) {
         ) : (
           <ul className="mt-3 divide-y rounded-lg border">
             {draft.lines.map((line, index) => {
-              const example = exampleQuantity(line.quantityPerChild);
+              const example = exampleQuantity(line.quantityPerChild, { band });
               const options = products.filter((p) => String(p.id) === line.productId || !used.has(String(p.id)));
               return (
                 // Lines have no id of their own until saved, and a product can only appear once.
@@ -245,8 +250,8 @@ function RecipeEditor({ recipe, products, onSaved, onCreated, onDeleted }) {
                     onChange={(e) => setLine(index, { quantityPerChild: e.target.value })}
                   />
                   <span className="w-28 text-sm text-muted-foreground">{line.unit ? `${line.unit} per child` : 'per child'}</span>
-                  <span className="w-40 text-sm tabular-nums text-muted-foreground">
-                    {example !== null ? `${example} ${line.unit} for ${EXAMPLE_CHILDREN} children` : ''}
+                  <span className="w-64 text-sm tabular-nums text-muted-foreground">
+                    {example !== null ? `${example} ${line.unit} ${exampleCentre({ band })}` : ''}
                   </span>
                   <Button type="button" variant="ghost" size="icon-sm" aria-label={`Remove line ${index + 1}`} onClick={() => removeLine(index)}>
                     <Trash2 />
@@ -358,7 +363,7 @@ function OwnOrderCard({ own, centres, onSaved }) {
 }
 
 // ── The section ───────────────────────────────────────────────
-export default function RecipesSection() {
+export default function RecipesSection({ settings = null, onSettingsSaved }) {
   const [data, setData] = useState(null);
   const [products, setProducts] = useState([]);
   const [centres, setCentres] = useState([]);
@@ -382,6 +387,10 @@ export default function RecipesSection() {
   if (!data) return <Skeleton className="h-64 w-full" />;
 
   const current = data.recipes.find((r) => r.id === data.currentRecipeId) ?? null;
+  // The band a child count is rounded up to. It lives with the other
+  // admin settings (/api/settings), which the page has already loaded.
+  const bandSettings = (settings ?? []).filter((s) => s.key === 'recipes.childBand');
+  const band = Number(bandSettings[0]?.value ?? DEFAULT_CHILD_BAND);
   const selectedId = selected ?? String(current?.id ?? data.recipes[0]?.id ?? NEW);
   const recipe = data.recipes.find((r) => String(r.id) === selectedId) ?? null;
 
@@ -405,6 +414,15 @@ export default function RecipesSection() {
     <div className="space-y-6">
       <SeasonsCard key={JSON.stringify(data.recipes.map((r) => r.seasonStart))} recipes={data.recipes} currentRecipe={current} onSaved={setData} />
 
+      {bandSettings.length > 0 ? (
+        <AppSettingsSection
+          title="Child count bands"
+          description="Set the band centres are supplied in. With bands of 5, a centre of 21 to 25 children gets the slip for 25."
+          settings={bandSettings}
+          onSaved={onSettingsSaved}
+        />
+      ) : null}
+
       <Card>
         <CardHeader>
           <CardTitle>Recipes</CardTitle>
@@ -423,6 +441,7 @@ export default function RecipesSection() {
             key={`${selectedId}-${recipe ? JSON.stringify(recipe) : 'new'}`}
             recipe={selectedId === NEW ? null : recipe}
             products={products}
+            band={band}
             onSaved={setData}
             onCreated={openCreated}
             onDeleted={(overview) => { setData(overview); setSelected(null); }}

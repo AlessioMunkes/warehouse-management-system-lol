@@ -37,6 +37,9 @@ describe('defaults', () => {
       // fixed WEEKDAY_FOR_COHORT): Tuesday and Thursday, 1 = Monday.
       'calendar.tuesdayCohortWeekday': 2,
       'calendar.thursdayCohortWeekday': 4,
+      // New with recipes, not a replaced constant: centres are supplied
+      // in bands of five children.
+      'recipes.childBand': 5,
     });
     // The reminder job's own default still lands on 08:00 SAST.
     expect(nextRunAt(new Date('2026-09-23T05:00:00Z')).toISOString()).toBe('2026-09-23T06:00:00.000Z');

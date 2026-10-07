@@ -45,6 +45,17 @@ export const recipeForDate = (recipes, isoDate) => {
   return season === 'summer' ? summer : winter;
 };
 
+// A centre's child count as its slip counts it: rounded UP to a multiple
+// of the band, so nobody in a band is left short. 23 children in bands
+// of 5 are supplied as 25. A band of 1 is the exact count. The SQL in
+// recipe.repository.js does the same sum.
+export const bandedChildCount = (childCount, band) => {
+  const count = Number(childCount);
+  const size = Number.isInteger(Number(band)) && Number(band) >= 1 ? Number(band) : 1;
+  if (!Number.isFinite(count) || count <= 0) return 0;
+  return Math.ceil(count / size) * size;
+};
+
 // A day that exists every year: 29 February is refused so a season
 // never starts on a date that is missing three years in four.
 export const isRealDayOfYear = (month, day) => {

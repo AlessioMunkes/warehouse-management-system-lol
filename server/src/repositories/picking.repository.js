@@ -227,13 +227,16 @@ const getSlipById = async (id) => {
 
 // ── One slip's lines ──────────────────────────────────────────
 // From the recipe when there is one and it applies to this centre —
-// each line times the centre's child count — and otherwise from the
+// each line times the centre's child count, rounded up to its band —
+// and otherwise from the
 // centre's own standing order. The standing order is the fallback for a
 // centre marked as keeping its own order, a centre with no child count,
 // and any date no filled-in recipe covers.
 const insertSlipItems = async (client, { slipId, ecdId, dispatchDate, recipe }) => {
   if (recipe) {
-    const rowCount = await recipeRepository.insertSlipItemsFromRecipe(client, { slipId, ecdId, recipeId: recipe.id });
+    const rowCount = await recipeRepository.insertSlipItemsFromRecipe(client, {
+      slipId, ecdId, recipeId: recipe.id, childBand: recipe.child_band,
+    });
     if (rowCount > 0) return { rowCount, source: 'recipe' };
   }
 

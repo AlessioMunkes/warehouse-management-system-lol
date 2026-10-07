@@ -29,7 +29,7 @@ vi.mock('@/components/ui/toastContext', () => ({ useToast: () => vi.fn() }));
 
 const api = await import('../services/recipeAPI');
 const { default: RecipesSection } = await import('../features/settings/components/RecipesSection');
-const { exampleQuantity } = await import('../features/settings/recipeMath');
+const { exampleQuantity, exampleCentre, bandedChildCount } = await import('../features/settings/recipeMath');
 
 const OVERVIEW = {
   today: '2026-10-07',
@@ -50,12 +50,27 @@ beforeEach(() => {
   api.saveOwnOrderCentres.mockResolvedValue({ ...OVERVIEW, ownOrderCentres: [] });
 });
 
-describe('exampleQuantity', () => {
-  it('multiplies the amount per child by the children', () => {
-    expect(exampleQuantity('0.3')).toBe(7.5);
-    expect(exampleQuantity(0.58, 25)).toBe(14.5);
+describe('recipe sums', () => {
+  it('rounds a child count up to its band', () => {
+    expect(bandedChildCount(23, 5)).toBe(25);
+    expect(bandedChildCount(25, 5)).toBe(25);
+    expect(bandedChildCount(26, 5)).toBe(30);
+    expect(bandedChildCount(23, 1)).toBe(23);
+    expect(bandedChildCount(0, 5)).toBe(0);
+  });
+
+  it('multiplies the amount per child by the banded count', () => {
+    expect(exampleQuantity('0.3')).toBe(7.5);                                  // 23 children, counted as 25
+    expect(exampleQuantity(0.58, { children: 25, band: 5 })).toBe(14.5);
+    expect(exampleQuantity(0.3, { children: 23, band: 1 })).toBe(6.9);
+    expect(exampleQuantity(0.3, { children: 23, band: 10 })).toBe(9);
     expect(exampleQuantity('')).toBeNull();
     expect(exampleQuantity('-1')).toBeNull();
+  });
+
+  it('says how the example centre is counted', () => {
+    expect(exampleCentre({ band: 5 })).toBe('for 23 children (counted as 25)');
+    expect(exampleCentre({ band: 1 })).toBe('for 23 children');
   });
 });
 
@@ -70,9 +85,18 @@ describe('RecipesSection', () => {
     expect(screen.getByText('Slips dated today use the Summer recipe.')).toBeInTheDocument();
   });
 
-  it('shows what a line comes to for a centre of 25', async () => {
+  it('shows what a line comes to for a centre, rounded up to its band', async () => {
     render(<RecipesSection />);
-    expect(await screen.findByText('7.5 kg for 25 children')).toBeInTheDocument();
+    expect(await screen.findByText('7.5 kg for 23 children (counted as 25)')).toBeInTheDocument();
+  });
+
+  it('uses the band from settings, and lets the admin change it', async () => {
+    const band = { key: 'recipes.childBand', section: 'recipes', label: 'Children per band', help: 'Round up.', default: 5, min: 1, max: 50, unit: 'children', value: 10 };
+    render(<RecipesSection settings={[band]} onSettingsSaved={vi.fn()} />);
+
+    expect(await screen.findByText('9 kg for 23 children (counted as 30)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Children per band')).toHaveValue(10);
+    expect(screen.getByText(/rounded up to the next 10/)).toBeInTheDocument();
   });
 
   it('saves a changed amount per child with the recipe’s lines', async () => {

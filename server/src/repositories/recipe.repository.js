@@ -7,6 +7,9 @@
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
 import { recipeForDate } from '../features/recipes/recipeSeason.js';
+import { SETTINGS } from '../features/settings/settingsDefinitions.js';
+
+const CHILD_BAND = SETTINGS['recipes.childBand'];
 
 const RECIPE_COLUMNS = `
   r.id, r.name, r.kind, r.season_start_month, r.season_start_day,
@@ -164,9 +167,18 @@ const resolveForDate = async (client, dispatchDate) => {
               (SELECT COUNT(*)::int FROM recipe_lines rl WHERE rl.recipe_id = r.id) AS line_count
          FROM recipes r`
     );
+    // The band child counts are rounded up to (Settings → Recipes). Read
+    // here, on the same connection, so a slip and its band come from one
+    // look at the database. Anything unusable falls back to the default.
+    const stored = await client.query(`SELECT value FROM app_settings WHERE key = 'recipes.childBand'`);
     await client.query('RELEASE SAVEPOINT recipe_lookup');
+
     const recipe = recipeForDate(rows, dispatchDate);
-    return recipe && recipe.line_count > 0 ? recipe : null;
+    if (!recipe || recipe.line_count === 0) return null;
+
+    const band = Number(stored.rows[0]?.value);
+    const usable = Number.isInteger(band) && band >= CHILD_BAND.min && band <= CHILD_BAND.max;
+    return { ...recipe, child_band: usable ? band : CHILD_BAND.default };
   } catch (err) {
     await client.query('ROLLBACK TO SAVEPOINT recipe_lookup');
     console.error('[recipes] Using standing orders; could not read recipes:', err.message);
@@ -175,23 +187,29 @@ const resolveForDate = async (client, dispatchDate) => {
 };
 
 // Writes one slip's items from a recipe: each line times the centre's
-// child count. Writes nothing — and the caller falls back to the
-// standing order — for a centre that keeps its own order or has no
-// child count.
-const insertSlipItemsFromRecipe = async (client, { slipId, ecdId, recipeId }) => {
+// child count, with the count first rounded UP to a multiple of
+// `childBand` (bandedChildCount in recipeSeason.js is the same sum).
+// Writes nothing — and the caller falls back to the standing order —
+// for a centre that keeps its own order or has no child count.
+const insertSlipItemsFromRecipe = async (client, { slipId, ecdId, recipeId, childBand = CHILD_BAND.default }) => {
   const { rowCount } = await client.query(
-    `INSERT INTO picking_slip_items (picking_slip_id, product_id, required_quantity, unit)
-     SELECT $1, rl.product_id, ROUND(rl.quantity_per_child * e.child_count, 2), rl.unit
+    `WITH centre AS (
+       SELECT e.id, CEIL(e.child_count::numeric / $4::numeric) * $4::numeric AS children
+         FROM ecd_centres e
+        WHERE e.id = $2
+          AND COALESCE(e.child_count, 0) > 0
+          AND NOT EXISTS (SELECT 1 FROM recipe_own_order_centres o WHERE o.ecd_id = e.id)
+     )
+     INSERT INTO picking_slip_items (picking_slip_id, product_id, required_quantity, unit)
+     SELECT $1, rl.product_id, ROUND(rl.quantity_per_child * c.children, 2), rl.unit
        FROM recipe_lines rl
-       JOIN products p    ON p.id = rl.product_id
-       JOIN ecd_centres e ON e.id = $2
+       JOIN products p ON p.id = rl.product_id
+       CROSS JOIN centre c
       WHERE rl.recipe_id = $3
         AND p.archived_at IS NULL
-        AND COALESCE(e.child_count, 0) > 0
-        AND NOT EXISTS (SELECT 1 FROM recipe_own_order_centres o WHERE o.ecd_id = e.id)
-        AND ROUND(rl.quantity_per_child * e.child_count, 2) > 0
+        AND ROUND(rl.quantity_per_child * c.children, 2) > 0
      RETURNING id`,
-    [slipId, ecdId, recipeId]
+    [slipId, ecdId, recipeId, childBand]
   );
   return rowCount;
 };

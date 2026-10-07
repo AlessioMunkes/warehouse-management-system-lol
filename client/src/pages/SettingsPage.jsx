@@ -117,7 +117,7 @@ export default function SettingsPage({ defaultSection = 'email' }) {
           )
         ) : null}
 
-        {section === 'recipes' ? <RecipesSection /> : null}
+        {section === 'recipes' ? <RecipesSection settings={settings} onSettingsSaved={setSettings} /> : null}
 
         {section === 'reporting' ? (
           <Card>

@@ -64,6 +64,16 @@ export const SETTINGS = Object.freeze({
     check: (value, all) => (value === all['calendar.tuesdayCohortWeekday']
       ? 'The two cohorts need different collection days.' : null),
   },
+  // Recipes are an amount per child. A centre's child count is rounded
+  // up to a multiple of this before its slip is worked out, so centres
+  // are supplied in bands (21 to 25 children all get the slip for 25).
+  // 1 uses the exact count.
+  'recipes.childBand': {
+    section: 'recipes',
+    label: 'Children per band',
+    help: 'Round each centre’s child count up to a multiple of this before working out its slip. Enter 1 to use the exact count.',
+    default: 5, min: 1, max: 50, unit: 'children',
+  },
   'invites.linkDays': {
     section: 'accounts',
     label: 'Invite link lifetime',
