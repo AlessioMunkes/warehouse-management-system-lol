@@ -56,6 +56,21 @@ export const bandedChildCount = (childCount, band) => {
   return Math.ceil(count / size) * size;
 };
 
+// Units that are counted, not weighed or poured. Nobody picks 3.6 cans,
+// so a line in one of these is rounded UP to a whole number.
+export const COUNTED_UNITS = ['each', 'bag', 'box', 'crate', 'punnet'];
+
+// What a slip carries for one recipe line, for a child count already
+// rounded to its band. The SQL in recipe.repository.js does the same sum.
+export const slipQuantity = (quantityPerChild, unit, children) => {
+  const amount = Number(quantityPerChild) * Number(children);
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  // Rounded to six places first: 0.12 × 75 is 9.000000000000002 in
+  // floating point, and that must not become 10 cans.
+  if (COUNTED_UNITS.includes(unit)) return Math.ceil(Math.round(amount * 1e6) / 1e6);
+  return Math.round(amount * 100) / 100;
+};
+
 // A day that exists every year: 29 February is refused so a season
 // never starts on a date that is missing three years in four.
 export const isRealDayOfYear = (month, day) => {

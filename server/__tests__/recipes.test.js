@@ -7,7 +7,7 @@
 // tests drive picking.repository against a scripted client.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { seasonFor, recipeForDate, isRealDayOfYear, bandedChildCount } from '../src/features/recipes/recipeSeason.js';
+import { seasonFor, recipeForDate, isRealDayOfYear, bandedChildCount, slipQuantity } from '../src/features/recipes/recipeSeason.js';
 
 const repo = {
   listRecipes: vi.fn(), listOwnOrderCentres: vi.fn(), getRecipeById: vi.fn(),
@@ -91,6 +91,26 @@ describe('bandedChildCount', () => {
   it('treats an unusable band as 1 rather than dividing by it', () => {
     expect(bandedChildCount(23, 0)).toBe(23);
     expect(bandedChildCount(23, undefined)).toBe(23);
+  });
+});
+
+describe('slipQuantity', () => {
+  it('rounds weighed and poured amounts to two decimals', () => {
+    expect(slipQuantity(0.058, 'kg', 25)).toBe(1.45);
+    expect(slipQuantity(0.0132, 'l', 30)).toBe(0.4);
+    expect(slipQuantity(0.001, 'kg', 25)).toBe(0.03);
+  });
+
+  it('rounds counted units up to a whole one', () => {
+    expect(slipQuantity(0.12, 'each', 25)).toBe(3);
+    expect(slipQuantity(0.12, 'each', 30)).toBe(4);    // 3.6 cans
+    expect(slipQuantity(0.12, 'each', 75)).toBe(9);    // exactly 9, not 10
+    expect(slipQuantity(0.12, 'each', 5)).toBe(1);
+  });
+
+  it('is nothing for no children or no amount', () => {
+    expect(slipQuantity(0.12, 'each', 0)).toBe(0);
+    expect(slipQuantity(0, 'kg', 25)).toBe(0);
   });
 });
 

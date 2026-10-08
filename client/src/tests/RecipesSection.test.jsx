@@ -64,6 +64,10 @@ describe('recipe sums', () => {
     expect(exampleQuantity(0.58, { children: 25, band: 5 })).toBe(14.5);
     expect(exampleQuantity(0.3, { children: 23, band: 1 })).toBe(6.9);
     expect(exampleQuantity(0.3, { children: 23, band: 10 })).toBe(9);
+    // Cans are counted, so they round up to a whole one; kilograms do not.
+    expect(exampleQuantity(0.12, { children: 28, band: 5, unit: 'each' })).toBe(4);   // 3.6
+    expect(exampleQuantity(0.12, { children: 75, band: 5, unit: 'each' })).toBe(9);   // exactly 9, not 10
+    expect(exampleQuantity(0.12, { children: 28, band: 5, unit: 'kg' })).toBe(3.6);
     expect(exampleQuantity('')).toBeNull();
     expect(exampleQuantity('-1')).toBeNull();
   });

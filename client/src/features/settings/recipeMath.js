@@ -14,6 +14,9 @@ export const DEFAULT_CHILD_BAND = 5;
 // Deliberately not a multiple of 5, so the example shows the rounding.
 export const EXAMPLE_CHILDREN = 23;
 
+// Units that are counted, not weighed or poured.
+const COUNTED_UNITS = ['each', 'bag', 'box', 'crate', 'punnet'];
+
 const round2 = (n) => Math.round(n * 100) / 100;
 
 export const bandedChildCount = (childCount, band = DEFAULT_CHILD_BAND) => {
@@ -24,9 +27,15 @@ export const bandedChildCount = (childCount, band = DEFAULT_CHILD_BAND) => {
 };
 
 // What a slip carries for one line, for a centre of `children`.
-export const exampleQuantity = (quantityPerChild, { children = EXAMPLE_CHILDREN, band = DEFAULT_CHILD_BAND } = {}) => {
+// A line in a counted unit is rounded UP to a whole one: nobody picks
+// 3.6 cans.
+export const exampleQuantity = (quantityPerChild, { children = EXAMPLE_CHILDREN, band = DEFAULT_CHILD_BAND, unit } = {}) => {
   const n = Number(quantityPerChild);
-  return Number.isFinite(n) && n > 0 ? round2(n * bandedChildCount(children, band)) : null;
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const amount = n * bandedChildCount(children, band);
+  // Rounded to six places first: 0.12 × 75 is 9.000000000000002 in
+  // floating point, and that must not become 10 cans.
+  return COUNTED_UNITS.includes(unit) ? Math.ceil(Math.round(amount * 1e6) / 1e6) : round2(amount);
 };
 
 // "for 23 children (counted as 25)", or just "for 23 children" when the

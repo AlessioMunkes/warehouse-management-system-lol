@@ -6,7 +6,7 @@
 // what may be saved is recipe.service.js's business.
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
-import { recipeForDate } from '../features/recipes/recipeSeason.js';
+import { recipeForDate, COUNTED_UNITS } from '../features/recipes/recipeSeason.js';
 import { SETTINGS } from '../features/settings/settingsDefinitions.js';
 
 const CHILD_BAND = SETTINGS['recipes.childBand'];
@@ -189,6 +189,8 @@ const resolveForDate = async (client, dispatchDate) => {
 // Writes one slip's items from a recipe: each line times the centre's
 // child count, with the count first rounded UP to a multiple of
 // `childBand` (bandedChildCount in recipeSeason.js is the same sum).
+// A line in a counted unit — cans, bags — is rounded up to a whole one
+// (slipQuantity in recipeSeason.js).
 // Writes nothing — and the caller falls back to the standing order —
 // for a centre that keeps its own order or has no child count.
 const insertSlipItemsFromRecipe = async (client, { slipId, ecdId, recipeId, childBand = CHILD_BAND.default }) => {
@@ -201,15 +203,22 @@ const insertSlipItemsFromRecipe = async (client, { slipId, ecdId, recipeId, chil
           AND NOT EXISTS (SELECT 1 FROM recipe_own_order_centres o WHERE o.ecd_id = e.id)
      )
      INSERT INTO picking_slip_items (picking_slip_id, product_id, required_quantity, unit)
-     SELECT $1, rl.product_id, ROUND(rl.quantity_per_child * c.children, 2), rl.unit
-       FROM recipe_lines rl
-       JOIN products p ON p.id = rl.product_id
-       CROSS JOIN centre c
-      WHERE rl.recipe_id = $3
-        AND p.archived_at IS NULL
-        AND ROUND(rl.quantity_per_child * c.children, 2) > 0
+     SELECT $1, line.product_id, line.quantity, line.unit
+       FROM (
+         SELECT rl.product_id, rl.unit,
+                CASE WHEN rl.unit = ANY($5::text[])
+                     THEN CEIL(rl.quantity_per_child * c.children)
+                     ELSE ROUND(rl.quantity_per_child * c.children, 2)
+                END AS quantity
+           FROM recipe_lines rl
+           JOIN products p ON p.id = rl.product_id
+           CROSS JOIN centre c
+          WHERE rl.recipe_id = $3
+            AND p.archived_at IS NULL
+       ) line
+      WHERE line.quantity > 0
      RETURNING id`,
-    [slipId, ecdId, recipeId, childBand]
+    [slipId, ecdId, recipeId, childBand, COUNTED_UNITS]
   );
   return rowCount;
 };
