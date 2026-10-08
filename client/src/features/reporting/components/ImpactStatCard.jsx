@@ -15,12 +15,13 @@
 // photo, so it gets a small drawn document-stack instead of an empty
 // panel — see PaperGraphic below.
 //
-// The panel behind each illustration is a fixed warm off-white, the
-// same neutral the app already uses for card borders (#e9e3dd) — not
-// each stat's own colour at low opacity. That per-stat tint read as
-// an actual colour difference between cards (children's red came out
-// visibly pink next to the others), which fought the "poster" idea
-// of four cards that belong to one consistent set.
+// The panel behind each illustration is white in both themes, the same
+// as in the PDF export. The illustrations were made to sit on white, and
+// on the dark theme's surface they did not read. It is not each stat's
+// own colour at low opacity either:
+// that per-stat tint read as an actual colour difference between cards
+// (children's red came out visibly pink next to the others), which
+// fought the "poster" idea of four cards that belong to one set.
 // ─────────────────────────────────────────────────────────────
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
@@ -44,7 +45,7 @@ const PaperGraphic = () => (
 );
 
 const Illustration = ({ src, alt }) => (
-  <div className="relative hidden h-full min-h-[180px] w-full items-center justify-center overflow-hidden rounded-2xl bg-surface-2 ring-1 ring-black/5 sm:flex">
+  <div className="relative hidden h-full min-h-[180px] w-full items-center justify-center overflow-hidden rounded-2xl bg-white ring-1 ring-black/5 sm:flex">
     {src ? (
       <img
         src={src}
