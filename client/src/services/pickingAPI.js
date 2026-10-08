@@ -98,10 +98,11 @@ export async function addSecondPacker(slipId, packerId) {
   });
 }
 
-// POST /api/picking/:id/release — manager only. Returns a claimed
-// slip to the floor: clears both packer slots and sets status back to
-// 'pending'. The only way to undo assignSlip's claim — see
-// PickingSlipManagementPage.jsx, the only caller.
+// POST /api/picking/:id/release — returns a claimed slip to the floor:
+// clears both packer slots and sets status back to 'pending'. The only
+// way to undo assignSlip's claim. A manager can release any claimed
+// slip (PickingSlipManagementPage.jsx); a packer only their own, and
+// only before packing anything on it (StaffSlipFlow.jsx).
 export async function releaseSlip(slipId) {
   return request(`/${slipId}/release`, { method: 'POST' });
 }

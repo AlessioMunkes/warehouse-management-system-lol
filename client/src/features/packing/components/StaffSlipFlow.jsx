@@ -24,7 +24,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
 import {
-  fetchPickingSlip, assignSlip, confirmItem, flagItem, completeSlip,
+  fetchPickingSlip, assignSlip, releaseSlip, confirmItem, flagItem, completeSlip,
 } from '../../../services/pickingAPI';
 import { fmtQty } from '../../../lib/quantity';
 import { takeFirstText } from '../takeFirst';
@@ -170,6 +170,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [claiming, setClaiming] = useState(false);
+  const [releasing, setReleasing] = useState(false);
   const [palletRef, setPalletRef] = useState('');
   const [completing, setCompleting] = useState(false);
   const [completeError, setCompleteError] = useState(null);
@@ -240,6 +241,10 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
   const confirmed = items.filter((i) => i.status === 'confirmed').length;
   const flagged = items.filter((i) => i.status === 'flagged').length;
   const pending = pendingItems.length;
+  // A claim can be given back until the first item is confirmed or
+  // flagged. After that the pallet has food on it and only a manager
+  // releases it (the server refuses anyone else).
+  const canRelease = slip.assigned_to === currentUser?.id && !locked && confirmed + flagged === 0;
 
   const handleModeChange = (next) => {
     setMode(next);
@@ -286,6 +291,21 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
       setError(err.message || 'Could not claim this pallet.');
     } finally {
       setClaiming(false);
+    }
+  };
+
+  const handleRelease = async () => {
+    setReleasing(true);
+    setError(null);
+    try {
+      await releaseSlip(slipId);
+      onBack?.();
+    } catch (err) {
+      setError(err.message || 'Could not release this pallet.');
+      // Someone may have changed the pallet since it was loaded.
+      reload();
+    } finally {
+      setReleasing(false);
     }
   };
 
@@ -341,6 +361,14 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
           </span>
         </p>
       )}
+
+      {canRelease ? (
+        <Actions>
+          <Button variant="secondary" disabled={releasing} onClick={handleRelease}>
+            {releasing ? 'Releasing…' : 'Release this pallet'}
+          </Button>
+        </Actions>
+      ) : null}
 
       <div className="stf-progress">
         <div className="stf-progress-track">

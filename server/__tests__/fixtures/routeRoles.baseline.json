@@ -163,7 +163,7 @@
   "picking.routes.js PATCH /:id": "admin,manager",
   "picking.routes.js POST /:id/assign": "admin,manager,warehouse_worker",
   "picking.routes.js POST /:id/assign-second": "admin,manager,warehouse_worker",
-  "picking.routes.js POST /:id/release": "admin,manager",
+  "picking.routes.js POST /:id/release": "admin,manager,warehouse_worker",
   "picking.routes.js POST /:id/complete": "warehouse_worker",
   "picking.routes.js POST /:id/items/:itemId/confirm": "warehouse_worker",
   "picking.routes.js POST /:id/items/:itemId/flag": "warehouse_worker",

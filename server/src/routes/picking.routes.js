@@ -34,10 +34,10 @@ router.post('/:id/assign',   auth, requireRole(...ALL_STAFF), validateIntId, pic
 // itself stays ALL_STAFF so a non-manager gets the service's own
 // 403 message rather than a generic route-level one.
 router.post('/:id/assign-second', auth, requireRole(...ALL_STAFF), validateIntId, pickingController.addSecondPacker);
-// Manager-only, gated at the route since there's no packer-effective
-// fallback here the way /assign has — releasing is a floor-management
-// call, not something a packer ever does to their own claim.
-router.post('/:id/release',  auth, requireRole(...MANAGERS_UP), validateIntId, pickingController.releaseSlip);
+// A manager releases any claimed pallet; a packer only their own, and
+// only before packing anything on it (enforced in the service and the
+// repository).
+router.post('/:id/release',  auth, requireRole(...ALL_STAFF), validateIntId, pickingController.releaseSlip);
 router.post('/:id/complete', auth, requireRole(...WORKERS_ONLY), validateIntId, pickingController.completeSlip);
 
 // ── Slip items ────────────────────────────────────────────────

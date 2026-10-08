@@ -260,19 +260,25 @@ const addSecondPacker = async (slipId, body, user) => {
   return result.slip;
 };
 
-// ── Release a slip back to the floor (manager only) ────────────
+// ── Release a slip back to the floor ───────────────────────────
 // The other half of assignSlip: there was no way to get assigned_to
 // back to NULL once a claim had been made. This replaces the old
 // "pick a specific worker" control — the manager's real lever is
 // releasing a pallet back to the floor for whoever picks it up next,
 // not naming who that has to be.
+//
+// A manager can release any claimed pallet. A packer can release only
+// their own, and only before they have packed anything on it: a claim
+// made by mistake is theirs to undo, a half-packed pallet is not.
 const releaseSlip = async (slipId, user) => {
-  if (!isManager(user)) fail(403, 'Only a manager can release a pallet back to the floor.');
-
-  const result = await pickingRepository.releaseSlip({ slipId, actorId: user.id, beforeCommit: notices.slipReleased });
+  const result = await pickingRepository.releaseSlip({
+    slipId, actorId: user.id, beforeCommit: notices.slipReleased, ownOnly: !isManager(user),
+  });
 
   if (result.notFound) fail(404, 'Picking slip not found.');
   if (result.notClaimed) fail(409, 'This pallet is not currently claimed by anyone.');
+  if (result.notYours) fail(403, 'You can only release a pallet you claimed.');
+  if (result.started) fail(409, 'You have started packing this pallet. Ask a manager to release it.');
 
   if (pushService.isForToday(result.slip.dispatch_date)) {
     pushService.notifyFloor({

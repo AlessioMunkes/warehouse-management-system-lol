@@ -571,13 +571,23 @@ describe('addSecondPacker — a second packer on a pallet', () => {
 describe('releaseSlip — returning a pallet to the floor', () => {
   it('lets a manager release a claimed pallet', async () => {
     await pickingService.releaseSlip(1, MANAGER);
-    expect(repoMock.releaseSlip).toHaveBeenCalledWith({ slipId: 1, actorId: MANAGER.id, beforeCommit: expect.any(Function) });
+    expect(repoMock.releaseSlip).toHaveBeenCalledWith({ slipId: 1, actorId: MANAGER.id, beforeCommit: expect.any(Function), ownOnly: false });
   });
 
-  it('refuses a worker — releasing is a floor-management call, not a packer\'s own claim', async () => {
+  it('lets a worker release, but only as their own claim', async () => {
+    await pickingService.releaseSlip(1, WORKER);
+    expect(repoMock.releaseSlip).toHaveBeenCalledWith({ slipId: 1, actorId: WORKER.id, beforeCommit: expect.any(Function), ownOnly: true });
+  });
+
+  it('refuses a worker releasing a pallet someone else claimed', async () => {
+    repoMock.releaseSlip.mockResolvedValueOnce({ notYours: true });
+    await expect(pickingService.releaseSlip(1, WORKER)).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('refuses a worker who has started packing, and says who can release it', async () => {
+    repoMock.releaseSlip.mockResolvedValueOnce({ started: true });
     await expect(pickingService.releaseSlip(1, WORKER))
-      .rejects.toMatchObject({ status: 403 });
-    expect(repoMock.releaseSlip).not.toHaveBeenCalled();
+      .rejects.toMatchObject({ status: 409, message: expect.stringMatching(/started packing.*manager/i) });
   });
 
   it('maps a missing slip to 404', async () => {

@@ -488,6 +488,33 @@ describe('releaseSlip', () => {
     expect(released(client)).toBe(false);
   });
 
+  // ownOnly: a packer giving back their own claim.
+  it('lets a packer release their own pallet while nothing is packed', async () => {
+    const client = releaseClient({ id: 1, status: 'in_progress', assigned_to: OWNER });
+    const result = await release(client, { ownOnly: true });
+    expect(result.slip).toMatchObject({ status: 'pending' });
+    expect(released(client)).toBe(true);
+  });
+
+  it('refuses a packer releasing a pallet that is not theirs', async () => {
+    const client = releaseClient({ id: 1, status: 'in_progress', assigned_to: OWNER + 1 });
+    expect(await release(client, { ownOnly: true })).toMatchObject({ notYours: true });
+    expect(released(client)).toBe(false);
+    expect(client.calls).toContain('ROLLBACK');
+  });
+
+  it('refuses a packer once a line is confirmed or flagged', async () => {
+    const client = releaseClient({ id: 1, status: 'in_progress', assigned_to: OWNER });
+    const query = client.query.getMockImplementation();
+    client.query.mockImplementation(async (sql, params) => (
+      /FROM picking_slip_items WHERE picking_slip_id = \$1 AND status <> 'pending'/.test(sql)
+        ? (client.calls.push(sql), { rows: [{ '?column?': 1 }] })
+        : query(sql, params)
+    ));
+    expect(await release(client, { ownOnly: true })).toMatchObject({ started: true });
+    expect(released(client)).toBe(false);
+  });
+
   it('locks the row before deciding anything', async () => {
     const client = releaseClient({ id: 1, status: 'in_progress', assigned_to: OWNER });
     await release(client);

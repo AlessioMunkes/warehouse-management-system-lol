@@ -460,16 +460,18 @@ describe('picking routes — PATCH /:id', () => {
   });
 });
 
-// ── POST /:id/release — manager-only, returns a slip to the floor ──
+// ── POST /:id/release — returns a slip to the floor ──
+// Staff reach the service; which pallets a packer may release is the
+// service's rule (picking.service.test.js).
 describe('picking routes — /:id/release', () => {
-  it.each(MANAGERS_UP)('%s can release a slip', async (role) => {
+  it.each([...MANAGERS_UP, ROLES.WORKER])('%s can release a slip', async (role) => {
     const res = await request(app).post(`${BASE}/1/release`)
       .set('Cookie', cookieFor(role)).send({});
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ success: true, data: SLIP });
   });
 
-  it.each([ROLES.WORKER, 'finance'])('%s cannot release a slip', async (role) => {
+  it.each(['finance'])('%s cannot release a slip', async (role) => {
     const res = await request(app).post(`${BASE}/1/release`)
       .set('Cookie', cookieFor(role)).send({});
     expect(res.status).toBe(403);

@@ -609,7 +609,12 @@ const addSecondPacker = async ({ slipId, packerId, actorId }) => {
 // `beforeCommit(client, facts)`, when given, runs inside this
 // transaction just before COMMIT — the service's notification goes in
 // with the change or not at all (features/communications/notices.js).
-const releaseSlip = async ({ slipId, actorId, beforeCommit }) => {
+//
+// `ownOnly` is a packer giving back their own claim rather than a
+// manager freeing someone else's: it must be theirs, and nothing on it
+// may be packed yet. Once a line is confirmed or flagged the pallet has
+// food on it, and handing that on is the manager's call.
+const releaseSlip = async ({ slipId, actorId, beforeCommit, ownOnly = false }) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -624,6 +629,15 @@ const releaseSlip = async ({ slipId, actorId, beforeCommit }) => {
     if (slip.status !== 'in_progress') {
       await client.query('ROLLBACK');
       return { notClaimed: true, status: slip.status };
+    }
+
+    if (ownOnly) {
+      if (Number(slip.assigned_to) !== Number(actorId)) { await client.query('ROLLBACK'); return { notYours: true }; }
+      const started = await client.query(
+        `SELECT 1 FROM picking_slip_items WHERE picking_slip_id = $1 AND status <> 'pending' LIMIT 1`,
+        [slipId]
+      );
+      if (started.rows.length > 0) { await client.query('ROLLBACK'); return { started: true }; }
     }
 
     const result = await client.query(
