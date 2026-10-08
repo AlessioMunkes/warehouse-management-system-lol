@@ -1174,3 +1174,283 @@ CREATE TABLE public.supplier_products (
   CONSTRAINT supplier_products_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES public.suppliers(id) ON DELETE CASCADE,
   CONSTRAINT supplier_products_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
 );
+
+-- ─────────────────────────────────────────────────────────────
+-- ADDED AFTER THE EXPORT ABOVE
+-- The live database also has what follows. These are the statements
+-- that created them, kept here because the numbered migration files
+-- they came from are no longer in the repository. Like the export,
+-- this is for reference: the database already has all of it.
+-- Two views in the live database, vw_low_stock and
+-- vw_ecd_collection_history, are defined nowhere in this repository.
+-- ─────────────────────────────────────────────────────────────
+
+-- ── from 029_create_saved_reports ──
+-- Saved Operations reports: a manager's own shortlist of reports, some
+-- pinned to the top of the page, some emailed to them on a schedule.
+-- `spec` is what to run (a prepared report, a custom report or a
+-- comparison); `preset` is the period when opened on the page. A
+-- scheduled email always covers the last full week or month.
+CREATE TABLE IF NOT EXISTS saved_reports (
+  id            SERIAL PRIMARY KEY,
+  user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title         VARCHAR(120) NOT NULL,
+  kind          VARCHAR(20) NOT NULL CHECK (kind IN ('report', 'custom', 'comparison')),
+  spec          JSONB NOT NULL,
+  preset        VARCHAR(20) NOT NULL DEFAULT 'last_3m',
+  pinned        BOOLEAN NOT NULL DEFAULT FALSE,
+  schedule      VARCHAR(20) NOT NULL DEFAULT 'none' CHECK (schedule IN ('none', 'weekly', 'monthly')),
+  last_sent_at  TIMESTAMPTZ,
+  last_error    TEXT,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_saved_reports_user ON saved_reports(user_id);
+CREATE INDEX IF NOT EXISTS idx_saved_reports_schedule ON saved_reports(schedule) WHERE schedule <> 'none';
+
+-- ── from 031_create_password_resets ──
+-- =============================================================
+-- server/database/migrations/031_create_password_resets.sql
+--
+-- Self-service password reset by email, replacing LoginPage.jsx's
+-- "contact your admin" modal. Modelled directly on migration 023's
+-- user_invites: token hashed at rest, resolved publicly by hash
+-- before any session exists.
+--
+-- ONE ROW PER REQUEST, not one row per user. Unlike user_invites'
+-- overwrite-in-place resend, a reset has no admin-facing "resend"
+-- action — a new request from the same user does not mutate an
+-- existing row, it supersedes it (see superseded_at) and inserts a
+-- new one, so the full request history survives for audit.
+--
+-- token_hash is not UNIQUE, same reasoning as
+-- idx_user_invites_token_hash: a SHA-256 collision guards against
+-- nothing realistic, so this is a plain lookup index.
+--
+-- NOT ENFORCED HERE: single-live-token-per-user. The database allows
+-- more than one live (used_at IS NULL AND superseded_at IS NULL) row
+-- per user_id — the service is responsible for superseding a user's
+-- prior live rows before inserting a new one, and for throttling
+-- repeat requests, so a raced pair of requests can't leave two live
+-- tokens outstanding for the same account.
+--
+-- Idempotent: safe to run more than once.
+-- =============================================================
+
+CREATE TABLE IF NOT EXISTS password_resets (
+  id                  SERIAL PRIMARY KEY,
+  user_id             INTEGER NOT NULL REFERENCES users(id),
+  token_hash          TEXT NOT NULL,
+  expires_at          TIMESTAMPTZ NOT NULL,
+  used_at             TIMESTAMPTZ,
+  -- Set when a newer request for the same user makes this one no
+  -- longer current. Distinct from used_at (this token was never
+  -- consumed) and distinct from simply expiring by time — see
+  -- passwordReset.service.js's loadValidReset, which reports it as
+  -- its own reason ('superseded') rather than folding it into
+  -- 'expired'.
+  superseded_at       TIMESTAMPTZ,
+  requested_ip        TEXT,
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  -- 'sent' | 'stubbed' | 'failed' | NULL (no attempt recorded —
+  -- e.g. the request was throttled before an email was ever composed).
+  email_status        TEXT,
+  email_error         TEXT,
+  email_attempted_at  TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_password_resets_token_hash
+  ON password_resets(token_hash);
+
+-- Matches exactly what the service needs to ask: "does this user have
+-- a live request right now" — the per-email throttle window check and
+-- the supersede-before-insert step both filter on this same shape.
+CREATE INDEX IF NOT EXISTS idx_password_resets_active
+  ON password_resets(user_id, created_at DESC)
+  WHERE used_at IS NULL AND superseded_at IS NULL;
+
+-- ── from 032_create_outbound_messages ──
+-- =============================================================
+-- server/database/migrations/032_create_outbound_messages.sql
+--
+-- One record of every message the system sends, whatever sent it.
+--
+-- Before this, each sender recorded its own outcome in its own place:
+-- donation_email_logs, finance_report_email_logs,
+-- ecd_collection_reminders, columns on user_invites / password_resets /
+-- purchase_orders — and scheduled reports nowhere. "Did that email go
+-- out?" meant knowing which of five tables to look in. Every send now
+-- goes through features/communications/communications.service.js,
+-- which writes one row here.
+--
+-- THE OLD LOGS STAY. Each sender still writes its own record as it
+-- always has; this table is written alongside them, not instead of
+-- them, until each move is verified. Nothing reads the old tables any
+-- less than before.
+--
+--   channel        'email' today; the column is here so SMS or push can
+--                  share the history without another table
+--   type           what kind of message — the keys in
+--                  features/communications/messageTypes.js
+--   recipient      the address it went to
+--   subject        what the recipient saw as the subject, for finding it
+--   status         'sent' | 'stubbed' (EMAIL_ENABLED off) | 'failed'
+--   error          the provider's reason, when it failed
+--   related_type / related_id
+--                  the record it was about (a purchase order, an
+--                  invite, a donation), for linking back
+--   sent_by        the user whose action sent it, when there was one
+--   attempted_at   when the send was tried
+--
+-- Idempotent: safe to run more than once.
+-- =============================================================
+
+CREATE TABLE IF NOT EXISTS outbound_messages (
+  id            BIGSERIAL PRIMARY KEY,
+  channel       TEXT NOT NULL DEFAULT 'email',
+  type          TEXT NOT NULL,
+  recipient     TEXT,
+  subject       TEXT,
+  status        TEXT NOT NULL,
+  error         TEXT,
+  related_type  TEXT,
+  related_id    TEXT,
+  sent_by       INTEGER REFERENCES users(id),
+  attempted_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'outbound_messages_status_check'
+  ) THEN
+    ALTER TABLE outbound_messages
+      ADD CONSTRAINT outbound_messages_status_check
+      CHECK (status IN ('sent', 'stubbed', 'failed'));
+  END IF;
+END $$;
+
+-- The history screen reads newest first, optionally by type.
+CREATE INDEX IF NOT EXISTS idx_outbound_messages_attempted
+  ON outbound_messages (attempted_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_outbound_messages_type_attempted
+  ON outbound_messages (type, attempted_at DESC, id DESC);
+-- "Every message about this purchase order / invite / donation".
+CREATE INDEX IF NOT EXISTS idx_outbound_messages_related
+  ON outbound_messages (related_type, related_id);
+
+-- ── from 033_create_app_settings ──
+-- =============================================================
+-- server/database/migrations/033_create_app_settings.sql
+--
+-- Values an admin can change that used to be constants in the code:
+-- the non-collection cut-off hour, the collection-reminder send hour,
+-- the two expiry-warning windows, and how long an invite link lasts.
+--
+-- ONE ROW PER CHANGED VALUE. A key with no row uses the default in
+-- server/src/features/settings/settingsDefinitions.js, which is the
+-- value the code had before this table existed — so applying this
+-- migration changes nothing until someone saves a setting, and a
+-- database without it behaves exactly as before.
+--
+-- value is JSONB so a setting can be a number, a string or a list
+-- without a column per type; settingsDefinitions.js validates it.
+--
+-- Idempotent: safe to run more than once.
+-- =============================================================
+
+CREATE TABLE IF NOT EXISTS app_settings (
+  key         TEXT PRIMARY KEY,
+  value       JSONB NOT NULL,
+  updated_by  INTEGER REFERENCES users(id),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ── from 034_create_operating_closures ──
+-- ─────────────────────────────────────────────────────────────
+-- 034_create_operating_closures.sql
+--
+-- The operating calendar's closed days: public holidays and other
+-- closures (stocktake, a shutdown week). One row per date. Collection
+-- reminders are not sent for a closed collection day, and the
+-- non-collection sweep does not write off pallets due on one.
+--
+-- Which weekday each cohort collects on is not here: it is two
+-- app_settings keys (calendar.tuesdayCohortWeekday,
+-- calendar.thursdayCohortWeekday), defaulting to Tuesday and Thursday.
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS operating_closures (
+  id          SERIAL PRIMARY KEY,
+  closed_on   DATE NOT NULL UNIQUE,
+  kind        TEXT NOT NULL CHECK (kind IN ('public_holiday', 'closure')),
+  label       TEXT NOT NULL CHECK (char_length(label) BETWEEN 1 AND 120),
+  created_by  INTEGER REFERENCES users(id),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ── from 035_add_approved_to_request_outcome ──
+-- Benevolent requests: a request is approved by a manager before anyone
+-- packs it. "pending" stays and is shown as "Awaiting approval";
+-- "referred" stays in the enum, unused.
+--
+-- Its own file on purpose. The runner wraps every file in one
+-- transaction, and a value added to an enum cannot be used until the
+-- transaction that added it has committed. Everything that refers to
+-- 'approved' is in 036.
+--
+-- Idempotent: safe to run more than once.
+ALTER TYPE request_outcome ADD VALUE IF NOT EXISTS 'approved' AFTER 'pending';
+
+-- ── from 036_create_community_request_items ──
+-- Benevolent requests: the products a manager approves, and the
+-- bookkeeping around approval and the "needs new items" flag.
+--
+-- community_request_items
+--   One row per product on an approved request. quantity_approved is
+--   what the manager set aside; quantity_released is what the worker
+--   confirmed went out (0 until then; never more than approved).
+--   short_at is set on a line when stock for that product dropped below
+--   what pallets and other requests need: the line stops reserving
+--   stock and the request is flagged. Choosing other items clears it.
+--
+-- community_requests
+--   approved_by / approved_at   who approved it and when. The most
+--                               recently approved request is flagged
+--                               first when stock runs short.
+--   assigned_to                 the packer a manager picked, if any.
+--   items_short_at              set while any line is short. This is
+--                               also what stops a second notification
+--                               for the same request.
+--
+-- Existing rows are untouched: no backfill, no data changes.
+--
+-- No BEGIN/COMMIT (the runner wraps the file). Idempotent: safe to run
+-- more than once.
+
+CREATE TABLE IF NOT EXISTS community_request_items (
+  id                 SERIAL PRIMARY KEY,
+  request_id         INTEGER NOT NULL REFERENCES community_requests(id) ON DELETE CASCADE,
+  product_id         INTEGER NOT NULL REFERENCES products(id),
+  unit               VARCHAR(20) NOT NULL,
+  quantity_approved  NUMERIC NOT NULL CHECK (quantity_approved > 0),
+  quantity_released  NUMERIC NOT NULL DEFAULT 0 CHECK (quantity_released >= 0),
+  short_at           TIMESTAMPTZ,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT community_request_items_request_product_key UNIQUE (request_id, product_id),
+  CONSTRAINT community_request_items_released_le_approved CHECK (quantity_released <= quantity_approved)
+);
+
+-- The committed-stock sum groups by product.
+CREATE INDEX IF NOT EXISTS idx_community_request_items_product
+  ON community_request_items (product_id);
+
+ALTER TABLE community_requests
+  ADD COLUMN IF NOT EXISTS approved_by    INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE community_requests
+  ADD COLUMN IF NOT EXISTS approved_at    TIMESTAMPTZ;
+ALTER TABLE community_requests
+  ADD COLUMN IF NOT EXISTS assigned_to    INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE community_requests
+  ADD COLUMN IF NOT EXISTS items_short_at TIMESTAMPTZ;

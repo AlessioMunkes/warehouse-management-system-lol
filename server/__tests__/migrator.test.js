@@ -77,6 +77,9 @@ describe('listMigrationFiles and pendingMigrations', () => {
 });
 
 describe('this repo', () => {
+  // The numbered files were cleared at handover: the database has them
+  // all. No folder lists as no migrations; it comes back with the next
+  // schema change.
   const migrations = listMigrationFiles(path.join(DB_DIR, 'migrations'));
   // baseline.sql, seed.sql and baseline-migrations.txt are only read by
   // `migrate init` and `mark-baseline`, and are not in the repo yet.

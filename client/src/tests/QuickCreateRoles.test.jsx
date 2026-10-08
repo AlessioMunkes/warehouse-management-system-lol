@@ -55,6 +55,14 @@ describe('the quick-create menu', () => {
     expect(screen.queryByText('Set-up')).toBeNull();
   });
 
+  // The floor shares this shell and has no shortcuts in it, so it gets
+  // no button at all rather than one that opens an empty menu.
+  it('shows warehouse staff no quick-create button', () => {
+    useAuth.mockReturnValue({ user: { id: 1, firstName: 'T', lastName: 'U', role: 'warehouse_worker' }, logout: vi.fn(), isLoading: false });
+    render(<MemoryRouter><ManagerLayout><p>PAGE</p></ManagerLayout></MemoryRouter>);
+    expect(screen.queryByRole('button', { name: /quick create/i })).toBeNull();
+  });
+
   // The two are separate: an admin does not open a manager's screens.
   it('offers an admin only the set-up shortcuts', async () => {
     const items = await openQuickCreate('admin');

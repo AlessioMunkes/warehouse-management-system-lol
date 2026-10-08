@@ -1,2 +1,0 @@
-﻿# Migration ids already included in baseline.sql.
-# Empty because baseline.sql does not pre-apply migrations in this branch.

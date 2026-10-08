@@ -220,6 +220,9 @@ function ManagerLayoutShell({ children }) {
           </Button>
 
           <div className="ml-auto flex items-center gap-1">
+            {/* Nothing to offer, no button: the floor's shell is this one
+                too, and a worker has no shortcuts here. */}
+            {quickCreateFor(user?.role).length > 0 ? (
             <Popover open={quickCreateOpen} onOpenChange={setQuickCreateOpen}>
               <PopoverTrigger asChild>
                 <Button type="button" variant="ghost" size="icon" aria-label="Quick create">
@@ -245,6 +248,7 @@ function ManagerLayoutShell({ children }) {
                 ))}
               </PopoverContent>
             </Popover>
+            ) : null}
 
             {/* Was TopNavbar's "Less movement" button. TaskGrid and
                 StockHealthBar read it; deleting that bar without moving

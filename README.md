@@ -31,9 +31,7 @@ server/                 Express API
     middleware/         Sign-in (JWT cookie) and role checks
     constants/          Roles and other fixed lists
   database/
-    schema.sql          The whole database as it stands. Start a new database from this.
-    migrations/         Numbered changes, applied by `npm run migrate`
-    reporting_factors_seed.sql   The rates that turn kilograms into meals and people fed
+    schema.sql          Every table in the database, for reference. Not a script to run.
   scripts/              Command-line tools (see below)
   __tests__/            Vitest + Supertest
 
@@ -79,14 +77,18 @@ features are switched off and everything else works.
 
 ## The database
 
-- A new database: run `server/database/schema.sql`, then `reporting_factors_seed.sql`.
-- An existing one: `cd server` and `npm run migrate` applies any migration not yet run.
-- When you change the database, add a numbered file to `migrations/` and make the same change
-  in `schema.sql`.
+The database lives in Supabase and is the real thing; this repository does not hold a script
+that builds it from nothing.
 
-Some migration numbers are used twice (022, 023, 024, 029, 030, 031). The migrator goes by
-file name, so it still works, but it can report those as pending on a database that already
-has them. Check the table or column exists before running one again.
+- `server/database/schema.sql` is a reference copy of every table, for reading. It is not
+  meant to be run (its first line says so).
+- A second database (a test copy, another warehouse) is made by copying the existing one in
+  Supabase, not from this repository.
+- The numbered migration files that built the database up were removed at handover: it already
+  has all of them, recorded in its `schema_migrations` table.
+- When you change the database: put the change in a new file
+  `server/database/migrations/NNN_what_it_does.sql` (the next number after 039), run
+  `cd server` and `npm run migrate -- up`, and make the same change in `schema.sql`.
 
 ## Tests
 
@@ -102,7 +104,7 @@ When you add or change a route, that test fails until the file is updated: that 
 
 | Script | What it does |
 |---|---|
-| `npm run migrate` | Applies database migrations |
+| `npm run migrate` | Applies new database changes from `database/migrations/` (see The database) |
 | `npm run warehouse-admin` | Looks up and manages people across warehouses, when running more than one |
 | `seedWesternCapeSupply.mjs` | Loads the sponsor's supply sheet: centres, products, standing orders |
 | `loadRealData.mjs` | Loads the summer menu into the Summer recipe and the July 2026 stock count |

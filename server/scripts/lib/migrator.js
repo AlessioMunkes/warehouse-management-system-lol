@@ -14,9 +14,13 @@ import path from 'node:path';
 
 export const MIGRATION_FILE = /^\d{3}_[a-z0-9_]+\.sql$/;
 
-/** Migration files in dir, sorted by name, as { id, file, path }. */
+/**
+ * Migration files in dir, sorted by name, as { id, file, path }.
+ * No folder is no migrations: it was cleared at handover and comes
+ * back with the next schema change.
+ */
 export const listMigrationFiles = (dir) =>
-  fs.readdirSync(dir)
+  (fs.existsSync(dir) ? fs.readdirSync(dir) : [])
     .filter((f) => f.endsWith('.sql'))
     .sort()
     .map((file) => {
