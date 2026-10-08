@@ -1166,3 +1166,11 @@ CREATE TABLE public.recipe_own_order_centres (
   CONSTRAINT recipe_own_order_centres_ecd_id_fkey FOREIGN KEY (ecd_id) REFERENCES public.ecd_centres(id) ON DELETE CASCADE,
   CONSTRAINT recipe_own_order_centres_added_by_fkey FOREIGN KEY (added_by) REFERENCES public.users(id)
 );
+CREATE TABLE public.supplier_products (
+  supplier_id integer NOT NULL,
+  product_id integer NOT NULL,
+  added_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT supplier_products_pkey PRIMARY KEY (supplier_id, product_id),
+  CONSTRAINT supplier_products_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES public.suppliers(id) ON DELETE CASCADE,
+  CONSTRAINT supplier_products_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id)
+);

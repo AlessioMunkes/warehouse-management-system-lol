@@ -14,6 +14,7 @@
 // not the stock one.
 // ─────────────────────────────────────────────────────────────
 import repo from '../repositories/purchaseOrder.repository.js';
+import supplierRepo from '../repositories/supplier.repository.js';
 import { isPositiveInt, isValidDateString } from '../utils/validation.js';
 import { PO_STATUSES as PO_STATUS_LIST } from '../constants/purchaseOrderStatus.js';
 import communications from '../features/communications/communications.service.js';
@@ -314,9 +315,30 @@ const notifyFinance = async (purchaseOrder, sentBy = null) => {
   }
 };
 
+// ── Only what the supplier supplies ───────────────────────────
+// A supplier with products listed against it (Suppliers → Products
+// supplied) can only be ordered from for those. A supplier with none
+// listed is not restricted, so an unfinished list never stops an order.
+// The offending ids go back as missingProductIds, the same field the
+// unknown-product error uses, so the form marks the rows.
+const assertSupplierSupplies = async (payload) => {
+  const allowed = await supplierRepo.getSuppliedProductIds(payload.supplierId);
+  if (allowed.length === 0) return;
+  const offending = [...new Set(payload.items.map((item) => item.productId))]
+    .filter((productId) => !allowed.includes(productId));
+  if (offending.length === 0) return;
+
+  const err = fail(400, offending.length === 1
+    ? 'One item is not something this supplier supplies. Remove it, or add it to the supplier under Suppliers.'
+    : `${offending.length} items are not things this supplier supplies. Remove them, or add them to the supplier under Suppliers.`);
+  err.missingProductIds = offending;
+  throw err;
+};
+
 // ── Create ────────────────────────────────────────────────────
 const createPurchaseOrder = async (body, userId) => {
   const payload = buildPayload(body);
+  await assertSupplierSupplies(payload);
   const result  = await repo.createPurchaseOrder(payload, userId);
 
   if (!result.ok) {
@@ -553,6 +575,7 @@ const resendFinanceEmail = async (rawId, userId = null) => {
 const updatePurchaseOrder = async (rawId, body, userId) => {
   if (!isPositiveInt(rawId)) throw fail(400, 'A valid purchase order ID is required.');
   const payload = buildPayload(body);
+  await assertSupplierSupplies(payload);
   const result  = await repo.updatePurchaseOrder(Number(rawId), payload, userId);
 
   if (!result.ok) {

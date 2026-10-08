@@ -94,6 +94,18 @@ const buildSupplierPayload = (body = {}) => {
   };
 };
 
+// ── What the supplier supplies ────────────────────────────────
+// The products a purchase order to this supplier may carry. An empty
+// list is allowed and means "not restricted".
+const cleanProductIds = async (raw) => {
+  if (!Array.isArray(raw)) throw fail(400, 'Send the products this supplier supplies as a list.');
+  if (!raw.every(isPositiveInt)) throw fail(400, 'One of the products is not valid.');
+  const productIds = [...new Set(raw.map(Number))];
+  const unknown = await repo.unknownProducts(productIds);
+  if (unknown.length) throw fail(400, 'One of the products is archived or no longer exists. Remove it and save again.');
+  return productIds;
+};
+
 // ── Suppliers ─────────────────────────────────────────────────
 const listSuppliers = async ({ includeInactive, search } = {}) =>
   repo.listSuppliers({
@@ -116,6 +128,7 @@ const getSupplier = async (rawId) => {
 
 const registerSupplier = async (body, userId) => {
   const payload = buildSupplierPayload(body);
+  const productIds = body?.productIds === undefined ? null : await cleanProductIds(body.productIds);
 
   // Checked here as well as by the UNIQUE constraint, because the
   // constraint is case-sensitive and this check is not. Postgres
@@ -126,7 +139,9 @@ const registerSupplier = async (body, userId) => {
     throw fail(409, `A supplier named "${clash.name}" already exists${clash.is_active ? '' : ' (currently inactive)'}.`);
   }
 
-  return repo.insertSupplier(payload, userId);
+  const supplier = await repo.insertSupplier(payload, userId);
+  if (productIds?.length) await repo.setSuppliedProducts(supplier.id, productIds);
+  return repo.getSupplierById(supplier.id);
 };
 
 const updateSupplier = async (rawId, body, _userId) => {
@@ -158,9 +173,15 @@ const updateSupplier = async (rawId, body, _userId) => {
   if (has('category'))             patch.category             = capped(body.category, 60, 'Category');
   if (has('notes'))                patch.notes                = clean(body.notes);
 
-  if (!Object.keys(patch).length) throw fail(400, 'No changes were supplied.');
+  // The products list is its own table, saved beside the fields rather
+  // than as one of them.
+  const productIds = has('productIds') ? await cleanProductIds(body.productIds) : null;
 
-  return repo.updateSupplier(id, patch);
+  if (!Object.keys(patch).length && productIds === null) throw fail(400, 'No changes were supplied.');
+
+  if (Object.keys(patch).length) await repo.updateSupplier(id, patch);
+  if (productIds !== null) await repo.setSuppliedProducts(id, productIds);
+  return repo.getSupplierById(id);
 };
 
 // Deactivation is the delete. It is never blocked on outstanding

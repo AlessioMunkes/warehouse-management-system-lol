@@ -149,7 +149,7 @@ export default function PurchaseOrderLines({
                     </Select>
                     {rejected ? (
                       <FieldError className="mt-1">
-                        Not a configured stock code.
+                        This item cannot go on this order.
                       </FieldError>
                     ) : null}
                   </TableCell>

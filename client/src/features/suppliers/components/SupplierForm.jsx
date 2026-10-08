@@ -34,6 +34,8 @@ const BLANK = {
 
 export default function SupplierForm({
   initial = null,
+  // The catalogue, to tick what this supplier supplies from.
+  products = [],
   submitLabel = 'Register supplier',
   onSubmit,
   onCancel,
@@ -42,16 +44,27 @@ export default function SupplierForm({
 }) {
   const [form, setForm] = useState({ ...BLANK, ...(initial ?? {}) });
   const [touchedName, setTouchedName] = useState(false);
+  // What they supply, as product ids. A purchase order to this supplier
+  // offers only these; none ticked leaves it unrestricted.
+  const [productIds, setProductIds] = useState(() => (initial?.suppliedProducts ?? []).map((p) => p.id));
+  const [productSearch, setProductSearch] = useState('');
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
   const nameMissing = !String(form.name ?? '').trim();
   const nameInvalid = touchedName && nameMissing;
+
+  const toggleProduct = (id) => setProductIds((ids) => (
+    ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]
+  ));
+  const needle = productSearch.trim().toLowerCase();
+  const shownProducts = needle ? products.filter((p) => p.name.toLowerCase().includes(needle)) : products;
 
   const submit = () => {
     setTouchedName(true);
     if (nameMissing) return;
     onSubmit({
       ...form,
+      productIds,
       // The service maps '' to null anyway, but sending null is
       // clearer about the intent and keeps the payload honest.
       expectedLeadTimeDays:
@@ -89,8 +102,9 @@ export default function SupplierForm({
             id="supplier-category"
             value={form.category}
             onChange={set('category')}
-            placeholder="Dry goods, fresh produce, cold chain"
+            placeholder="Rice, sugar, lentils"
           />
+          <FieldDescription>Say what they supply in a few words.</FieldDescription>
         </Field>
         <Field>
           <FieldLabel htmlFor="supplier-email">Email</FieldLabel>
@@ -101,6 +115,34 @@ export default function SupplierForm({
           <Input id="supplier-phone" value={form.contactPhone} onChange={set('contactPhone')} />
         </Field>
       </div>
+
+      {products.length > 0 ? (
+        <Field>
+          <FieldLabel htmlFor="supplier-product-search">Products supplied</FieldLabel>
+          <Input
+            id="supplier-product-search" type="search" placeholder="Search products"
+            value={productSearch} onChange={(e) => setProductSearch(e.target.value)}
+          />
+          <div className="max-h-56 overflow-y-auto rounded-md border" role="group" aria-label="Product list">
+            {shownProducts.length === 0 ? (
+              <p className="px-3 py-2 text-sm text-muted-foreground">No product matches the search.</p>
+            ) : shownProducts.map((p) => (
+              <label key={p.id} className="flex cursor-pointer items-center gap-3 border-b px-3 py-2 text-sm last:border-b-0">
+                <input
+                  type="checkbox" className="size-4"
+                  checked={productIds.includes(p.id)} onChange={() => toggleProduct(p.id)}
+                />
+                <span className="min-w-0 break-words">{p.name}</span>
+              </label>
+            ))}
+          </div>
+          <FieldDescription>
+            {productIds.length === 0
+              ? 'Tick what this supplier supplies. Purchase orders to them then offer only those products. With none ticked, every product is offered.'
+              : `${productIds.length} ticked. Purchase orders to this supplier offer only these.`}
+          </FieldDescription>
+        </Field>
+      ) : null}
 
       <Field>
         <FieldLabel htmlFor="supplier-address">Address</FieldLabel>

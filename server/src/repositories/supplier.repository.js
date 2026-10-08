@@ -14,6 +14,9 @@
 // references them.
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
+// archiveSupplier writes its audit row with this. It was called without
+// ever being imported, so deleting a supplier answered 500 every time.
+import { logAudit } from './auditLog.repository.js';
 
 // ── Column whitelist for updates ──────────────────────────────
 // The service hands over a camelCase patch object. Mapping it through
@@ -70,7 +73,7 @@ const listSuppliers = async ({ includeInactive = false, search = null } = {}) =>
       ORDER BY s.is_active DESC, s.name ASC`,
     params
   );
-  return rows;
+  return withSuppliedProducts(rows);
 };
 
 const getSupplierById = async (id) => {
@@ -78,7 +81,93 @@ const getSupplierById = async (id) => {
     `SELECT ${SUPPLIER_COLUMNS} FROM suppliers s WHERE s.id = $1`,
     [id]
   );
-  return rows[0] ?? null;
+  return (await withSuppliedProducts(rows))[0] ?? null;
+};
+
+// ── What a supplier supplies (migration 039) ──────────────────
+// Read in one query for however many suppliers and attached as
+// supplied_products: [{ id, name }]. Kept out of SUPPLIER_COLUMNS
+// because that string is also used, with its "s." stripped, in the
+// RETURNING of the writes below, where a sub-select would not survive.
+//
+// A database without the table (a warehouse not yet migrated) reads as
+// "nothing listed", which is also what leaves ordering unrestricted.
+const withSuppliedProducts = async (suppliers) => {
+  if (suppliers.length === 0) return suppliers;
+  let links = [];
+  try {
+    ({ rows: links } = await pool.query(
+      `SELECT sp.supplier_id, p.id, p.name
+         FROM supplier_products sp
+         JOIN products p ON p.id = sp.product_id
+        WHERE sp.supplier_id = ANY($1::int[])
+          AND p.archived_at IS NULL
+        ORDER BY p.name ASC`,
+      [suppliers.map((s) => s.id)]
+    ));
+  } catch (err) {
+    console.error('[suppliers] Could not read supplier_products:', err.message);
+  }
+  return suppliers.map((supplier) => ({
+    ...supplier,
+    supplied_products: links
+      .filter((link) => link.supplier_id === supplier.id)
+      .map(({ id, name }) => ({ id, name })),
+  }));
+};
+
+// The product ids a supplier is listed as supplying. Empty when nothing
+// is listed, or the table is not there.
+const getSuppliedProductIds = async (supplierId) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT sp.product_id
+         FROM supplier_products sp
+         JOIN products p ON p.id = sp.product_id
+        WHERE sp.supplier_id = $1 AND p.archived_at IS NULL`,
+      [supplierId]
+    );
+    return rows.map((r) => r.product_id);
+  } catch (err) {
+    console.error('[suppliers] Could not read supplier_products:', err.message);
+    return [];
+  }
+};
+
+// The ids in `productIds` that are not products that can be ordered.
+const unknownProducts = async (productIds) => {
+  if (productIds.length === 0) return [];
+  const { rows } = await pool.query(
+    `SELECT id FROM products WHERE id = ANY($1::int[]) AND archived_at IS NULL`,
+    [productIds]
+  );
+  const found = new Set(rows.map((r) => r.id));
+  return productIds.filter((id) => !found.has(id));
+};
+
+// Replaces the whole list for one supplier.
+const setSuppliedProducts = async (supplierId, productIds) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      'DELETE FROM supplier_products WHERE supplier_id = $1 AND NOT (product_id = ANY($2::int[]))',
+      [supplierId, productIds]
+    );
+    for (const productId of productIds) {
+      await client.query(
+        `INSERT INTO supplier_products (supplier_id, product_id) VALUES ($1, $2)
+         ON CONFLICT (supplier_id, product_id) DO NOTHING`,
+        [supplierId, productId]
+      );
+    }
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 };
 
 // Case-insensitive, because suppliers.name carries a UNIQUE
@@ -398,6 +487,9 @@ const convertProspect = async (prospectId, supplierPayload, userId) => {
 };
 
 export default {
+  getSuppliedProductIds,
+  unknownProducts,
+  setSuppliedProducts,
   listSuppliers,
   getSupplierById,
   findSupplierByName,

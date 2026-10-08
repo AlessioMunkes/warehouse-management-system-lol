@@ -25,6 +25,7 @@ import { useAuth }   from '../context/AuthContext';
 import SupplierForm  from '../features/suppliers/components/SupplierForm';
 import ProspectPad   from '../features/suppliers/components/ProspectPad';
 import supplierAPI   from '../services/supplierAPI';
+import productAPI    from '../services/productAPI';
 import ConfirmRemoveDialog from '../features/masterdata/components/ConfirmRemoveDialog';
 import useOpenFromQuery    from '../features/masterdata/hooks/useOpenFromQuery';
 import useTableView        from '../features/masterdata/hooks/useTableView';
@@ -117,6 +118,15 @@ const SupplierDetail = ({ supplier, canManage, onEdit, onToggleActive, onRemove,
         </div>
       </dl>
 
+      <div className="text-sm">
+        <p className="text-muted-foreground">Products supplied</p>
+        <p>
+          {(supplier.suppliedProducts ?? []).length
+            ? supplier.suppliedProducts.map((p) => p.name).join(', ')
+            : 'None listed. Purchase orders to this supplier offer every product.'}
+        </p>
+      </div>
+
       {supplier.notes ? (
         <p className="whitespace-pre-line text-sm text-muted-foreground">{supplier.notes}</p>
       ) : null}
@@ -208,6 +218,15 @@ const categoryOptions = (suppliers) => {
     .map(([value]) => ({ value, label: value }));
 };
 
+// "Rice, Samp and 3 more" — enough to recognise the supplier by, without
+// a row of eleven vegetables.
+const SUPPLIED_NAMES_SHOWN = 3;
+const suppliedText = (supplier) => {
+  const names = (supplier.suppliedProducts ?? []).map((p) => p.name);
+  if (names.length <= SUPPLIED_NAMES_SHOWN) return names.join(', ');
+  return `${names.slice(0, SUPPLIED_NAMES_SHOWN).join(', ')} and ${names.length - SUPPLIED_NAMES_SHOWN} more`;
+};
+
 const COLUMNS = [
   { key: 'name',     label: 'Supplier', alwaysOn: true, weight: 3,
     sort: (s) => (s.name ?? '').toLowerCase(),
@@ -216,6 +235,11 @@ const COLUMNS = [
   { key: 'category', label: 'Category', weight: 2, minWidth: 'md',
     sort: (s) => (s.category ?? '').toLowerCase(),
     cell: (s) => s.category || '—' },
+  // The products a purchase order to this supplier may carry. A count
+  // sorts; the names are what someone reads.
+  { key: 'supplies', label: 'Products supplied', weight: 3, minWidth: 'md',
+    sort: (s) => (s.suppliedProducts ?? []).length,
+    cell: (s) => suppliedText(s) || '—' },
   { key: 'contact',  label: 'Contact', weight: 3, minWidth: 'sm',
     sort: (s) => (s.contactEmail ?? '').toLowerCase(),
     cell: (s) => s.contactEmail || '—' },
@@ -249,6 +273,17 @@ export default function SupplierDirectoryPage() {
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState(null);
   const view = useTableView('suppliers', COLUMNS);
+
+  // The catalogue, for the form's "Products supplied" list. Loaded once;
+  // a failure costs that one list, not the directory.
+  const [products, setProducts] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    productAPI.getProducts({ includeInactive: false })
+      .then((rows) => { if (!cancelled) setProducts(rows); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   const categoryPills = useMemo(() => categoryOptions(suppliers), [suppliers]);
 
@@ -535,7 +570,7 @@ export default function SupplierDirectoryPage() {
 
       {mode === 'create' ? (
         <DetailPanel open onClose={() => setMode('list')} title="Register a supplier">
-          <SupplierForm onSubmit={create} onCancel={() => setMode('list')} busy={busy} />
+          <SupplierForm products={products} onSubmit={create} onCancel={() => setMode('list')} busy={busy} />
         </DetailPanel>
       ) : null}
 
@@ -543,6 +578,7 @@ export default function SupplierDirectoryPage() {
         <DetailPanel open onClose={() => setMode('list')} eyebrow="Edit" title={selected.name}>
           <SupplierForm
             initial={selected}
+            products={products}
             submitLabel="Save changes"
             onSubmit={save}
             onCancel={() => setMode('list')}

@@ -106,6 +106,26 @@ export default function PurchaseOrderForm({
     (s) => s.isActive || String(s.id) === form.supplierId
   );
 
+  // What the chosen supplier supplies (Suppliers → Products supplied).
+  // With a list, the item picker offers only those; with none listed it
+  // offers everything, so an unfinished list never stops an order.
+  const suppliedIds = (supplierId) =>
+    (suppliers.find((s) => String(s.id) === String(supplierId))?.suppliedProducts ?? []).map((p) => p.id);
+  const allowedIds = suppliedIds(form.supplierId);
+  const restricted = allowedIds.length > 0;
+  const offered = restricted ? products.filter((p) => allowedIds.includes(p.id)) : products;
+
+  // Changing supplier clears the lines the new one does not supply. They
+  // would be refused on save, and a row showing a product its own picker
+  // no longer lists reads as a fault.
+  const chooseSupplier = (supplierId) => {
+    setForm((f) => ({ ...f, supplierId }));
+    const allowed = suppliedIds(supplierId);
+    if (allowed.length === 0) return;
+    const kept = lines.filter((l) => !l.productId || allowed.includes(Number(l.productId)));
+    if (kept.length !== lines.length) setLines(kept.length ? kept : [blankLine()]);
+  };
+
   const filled = lines.filter((l) => l.productId && Number(l.expectedQuantity) > 0);
 
   const problems = [];
@@ -144,7 +164,7 @@ export default function PurchaseOrderForm({
           <FieldLabel htmlFor="po-supplier">Supplier</FieldLabel>
           <Select
             value={form.supplierId || null}
-            onValueChange={(v) => setForm((f) => ({ ...f, supplierId: v }))}
+            onValueChange={chooseSupplier}
             disabled={busy}
           >
             <SelectTrigger id="po-supplier">
@@ -185,9 +205,16 @@ export default function PurchaseOrderForm({
 
       <Field>
         <FieldLabel>Items</FieldLabel>
+        {form.supplierId ? (
+          <FieldDescription>
+            {restricted
+              ? `Showing the ${offered.length === 1 ? 'one product' : `${offered.length} products`} this supplier supplies.`
+              : 'No products are listed for this supplier, so every product is shown.'}
+          </FieldDescription>
+        ) : null}
         <PurchaseOrderLines
           lines={lines}
-          products={products}
+          products={offered}
           onChange={setLines}
           disabled={busy}
           invalidProductIds={invalidProductIds}
