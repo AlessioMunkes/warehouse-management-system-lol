@@ -17,6 +17,7 @@
 // ─────────────────────────────────────────────────────────────
 import { jsPDF } from 'jspdf';
 import { drawQr, shortCodeOf, slipUrlFor } from '../packing/palletLabelPdf';
+import { takeFirstDay } from '../packing/takeFirst';
 
 export const SLIP_LOGO_URL = '/images/pdf_logo.png';
 export const DEFAULT_WAREHOUSE_NAME = 'LoL Cape Town';
@@ -200,7 +201,21 @@ const drawSlip = (pdf, slip, opts) => {
       const item = rows[index];
       if (item) {
         pdf.text(quantityText(item), COLS[0].x + 1.5, y + ROW_H - 2.4);
-        const width = colRight(1) - COLS[1].x - 3;
+        let width = colRight(1) - COLS[1].x - 3;
+
+        // FEFO: the use-by date to take first, small, at the right of the
+        // Item cell. The name gives up the room rather than running under it.
+        const day = takeFirstDay(item);
+        if (day) {
+          const note = `Use dated ${day} first`;
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(7.5);
+          pdf.text(note, colRight(1) - 1.5, y + ROW_H - 2.6, { align: 'right' });
+          width -= pdf.getTextWidth(note) + 3;
+          pdf.setFont('helvetica', 'normal');
+          pdf.setFontSize(10);
+        }
+
         const label = pdf.splitTextToSize(String(item.product_name ?? ''), width)[0] ?? '';
         pdf.text(label, COLS[1].x + 1.5, y + ROW_H - 2.4);
       }

@@ -37,6 +37,7 @@ import {
 } from '../features/guest/components/GuestPrimitives';
 import { formatDay, displayName } from '../features/guest/guestFormat';
 import { fmtQty } from '../lib/quantity';
+import { takeFirstText } from '../features/packing/takeFirst';
 
 // Plain words. No "variance", no "SKU", no "cohort" — ACC-09.
 const PROBLEM_REASONS = [
@@ -296,7 +297,11 @@ const GuestPackPage = () => {
             key={current.id}
             position={`Item ${done + 1} of ${total}`}
             title={current.product_name}
-            meta={`Put ${fmtQty(current.required_quantity, current.unit || '')} into the box.`.replace(/\s+/g, ' ')}
+            meta={[
+              `Put ${fmtQty(current.required_quantity, current.unit || '')} into the box.`.replace(/\s+/g, ' '),
+              // FEFO, in the same words the staff screen and the printed slip use.
+              takeFirstText(current) ? `${takeFirstText(current)}.` : '',
+            ].filter(Boolean).join(' ')}
             badge={<StatusPill status="pending" />}
           >
             <Counter label="How many did you pack?" value={qty} onChange={setQty} />

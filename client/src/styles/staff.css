@@ -783,6 +783,9 @@
 .stf-row-main  { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .stf-row-title { font-family: var(--stf-font-display); font-size: 15px; font-weight: 700; color: var(--stf-ink); }
 .stf-row-meta  { font-size: 12px; line-height: 1.45; color: var(--stf-text-sub); }
+/* The use-by date to take first: an instruction, so it reads as the
+   line's own text rather than as its small print. */
+.stf-use-first { display: block; font-weight: 700; color: var(--stf-ink); }
 .stf-row-value {
   font-family: var(--stf-font-display);
   font-size: 18px; font-weight: 700;

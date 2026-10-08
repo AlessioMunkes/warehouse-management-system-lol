@@ -27,6 +27,7 @@ import {
   fetchPickingSlip, assignSlip, confirmItem, flagItem, completeSlip,
 } from '../../../services/pickingAPI';
 import { fmtQty } from '../../../lib/quantity';
+import { takeFirstText } from '../takeFirst';
 import {
   Actions, Button, ChoiceList, Counter, Notice, TextField, ViewToggle, Coachmark,
 } from '../../staff/components/StepPrimitives';
@@ -395,6 +396,11 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
                         {item.flag_reason ? ` · ${item.flag_reason}` : ''}
                         {item.packer_note ? ` · ${item.packer_note}` : ''}
                       </span>
+                      {/* FEFO: only while the line is still to pack — once
+                          it is packed the date has done its job. */}
+                      {item.status === 'pending' && takeFirstText(item) ? (
+                        <span className="stf-row-meta stf-use-first">{takeFirstText(item)}.</span>
+                      ) : null}
                     </span>
                     <span className={badge.className}>{badge.label}</span>
                   </span>
