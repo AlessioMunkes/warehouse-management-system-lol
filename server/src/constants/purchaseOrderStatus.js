@@ -52,6 +52,18 @@ export const OPEN_PO_STATUSES = [
 // Matches supplier.repository.js's open-order count, which reads
 // `status NOT IN ('completed','returned')`. Kept here so the two
 // cannot drift.
+// What the floor may receive against: an order a manager has approved,
+// and not yet closed. 'pending' is open (it counts as outstanding
+// everywhere else) but is NOT here: until someone has signed it off,
+// goods arriving against it are goods nobody agreed to buy. The
+// receiving screen says as much ("ask your manager to approve the
+// order"), and this is what makes that true.
+export const RECEIVABLE_PO_STATUSES = [
+  'approved',
+  'in_transit',
+  'partially_received',
+];
+
 export const CLOSED_PO_STATUSES = ['completed', 'returned'];
 
 // What a fully-received order becomes.
@@ -62,14 +74,17 @@ export const PO_STATUS_FULLY_RECEIVED = 'completed';
 export const PO_STATUS_PARTIALLY_RECEIVED = 'partially_received';
 
 export const isOpenPurchaseOrder = (status) => OPEN_PO_STATUSES.includes(status);
+export const isReceivablePurchaseOrder = (status) => RECEIVABLE_PO_STATUSES.includes(status);
 export const isClosedPurchaseOrder = (status) => CLOSED_PO_STATUSES.includes(status);
 
 export default {
   PO_STATUSES,
   OPEN_PO_STATUSES,
+  RECEIVABLE_PO_STATUSES,
   CLOSED_PO_STATUSES,
   PO_STATUS_FULLY_RECEIVED,
   PO_STATUS_PARTIALLY_RECEIVED,
   isOpenPurchaseOrder,
+  isReceivablePurchaseOrder,
   isClosedPurchaseOrder,
 };

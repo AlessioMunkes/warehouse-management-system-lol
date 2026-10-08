@@ -51,19 +51,31 @@ function TimelineRow({ icon: Icon, tone, title, meta, isLast }) {
   );
 }
 
+// Milliseconds, for putting events in the order they happened. An event
+// with no time of its own sorts last.
+const timeOf = (iso) => {
+  const ms = iso ? new Date(iso).getTime() : NaN;
+  return Number.isNaN(ms) ? Infinity : ms;
+};
+
 export default function PurchaseOrderTimeline({ purchaseOrder: po }) {
   const events = [
     {
+      at: -Infinity,   // always first, whatever the clock says
       icon: PackagePlus,
       tone: 'text-ink border-ink',
       title: 'Order raised',
       meta: `${po.createdByName || 'Unknown'} · ${fmtDateTime(po.createdAt)}`,
     },
+    // The time shown is when the delivery was signed in. The delivery
+    // date is a calendar day, and showing it as a time read "00:00" and
+    // put every delivery ahead of an approval made that same morning.
     ...po.deliveries.map((d) => ({
+      at: timeOf(d.recordedAt ?? d.deliveryDate),
       icon: Truck,
       tone: d.hasDiscrepancies ? 'text-brand border-brand' : 'text-ink border-ink',
       title: d.hasDiscrepancies ? 'Delivery received — with a discrepancy' : 'Delivery received',
-      meta: `${d.receivedByName || 'Unknown'} · ${fmtDateTime(d.deliveryDate)}`,
+      meta: `${d.receivedByName || 'Unknown'} · ${fmtDateTime(d.recordedAt ?? d.deliveryDate)}`,
     })),
   ];
 
@@ -73,12 +85,17 @@ export default function PurchaseOrderTimeline({ purchaseOrder: po }) {
   // nothing new.
   if (po.status !== 'pending') {
     events.push({
+      at: timeOf(po.statusChangedAt),
       icon: STATUS_ICON[po.status] ?? CheckCircle2,
       tone: STATUS_TONE[po.status] ?? 'text-ink border-ink',
       title: po.statusLabel,
       meta: `${fmtDateTime(po.statusChangedAt)}${po.statusReason ? ` · ${po.statusReason}` : ''}`,
     });
   }
+
+  // In the order they happened. Array.sort is stable, so two events at
+  // the same moment keep the order they were listed in.
+  events.sort((a, b) => a.at - b.at);
 
   return (
     <ol className="mt-1">

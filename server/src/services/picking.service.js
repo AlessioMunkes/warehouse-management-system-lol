@@ -403,7 +403,8 @@ const completeSlip = async (slipId, body, user) => {
   if (result.alreadyComplete) fail(409, 'This slip is already complete.');
   if (result.forbidden)       fail(403, 'You can only close a pallet assigned to you.');
   if (result.pendingItems) {
-    fail(422, `${result.pendingItems} item(s) still need to be confirmed or flagged before this pallet can be closed.`);
+    const n = Number(result.pendingItems);
+    fail(422, `${n} ${n === 1 ? 'item still needs' : 'items still need'} to be confirmed or flagged before this pallet can be closed.`);
   }
   return result;
 };

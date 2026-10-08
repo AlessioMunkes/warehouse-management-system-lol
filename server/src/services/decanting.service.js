@@ -204,10 +204,12 @@ const round4 = (n) => Math.round(n * 10000) / 10000;
 const calculatePlanForProduct = (item, defaults = {}) => {
   const { productId, productName, requiredKg, actualBulkKg } = item;
   const required = Number(requiredKg);
-  const label    = productName || productId;
+  // In a message a person reads. The floor sends the name; without one
+  // the sentence says "this product" rather than a product number.
+  const label    = productName ? `"${productName}"` : 'this product';
 
   if (!Number.isFinite(required) || required <= 0)
-    throw new Error(`Required weight for "${label}" must be a positive number.`);
+    throw new Error(`Required weight for ${label} must be a positive number.`);
 
   // Resolve which bag sizes to use — per-item choice wins, else the
   // plan-level default, else all standard sizes. hasSizes() is used
@@ -248,7 +250,7 @@ const calculatePlanForProduct = (item, defaults = {}) => {
   if (hasBulk) {
     bulk = Number(actualBulkKg);
     if (!Number.isFinite(bulk) || bulk < 0)
-      throw new Error(`Actual bulk weight for "${label}" must be zero or a positive number.`);
+      throw new Error(`Actual bulk weight for ${label} must be zero or a positive number.`);
   }
 
   // ── Wastage comes off the top ───────────────────────────────
@@ -262,10 +264,10 @@ const calculatePlanForProduct = (item, defaults = {}) => {
   if (item.wastageKg !== undefined && item.wastageKg !== null && item.wastageKg !== '') {
     wastageKg = Number(item.wastageKg);
     if (!Number.isFinite(wastageKg) || wastageKg < 0)
-      throw new Error(`Wastage for "${label}" must be zero or a positive number.`);
+      throw new Error(`Wastage for ${label} must be zero or a positive number.`);
     if (hasBulk && wastageKg > bulk)
       throw new Error(
-        `Wastage for "${label}" (${round3(wastageKg)} kg) cannot exceed ` +
+        `Wastage for ${label} (${round3(wastageKg)} kg) cannot exceed ` +
         `the bulk bag weight (${round3(bulk)} kg).`
       );
   }
@@ -288,7 +290,7 @@ const calculatePlanForProduct = (item, defaults = {}) => {
   // a silent "0 bags, 0 kg packed, 100 % error" plan.
   if (basisKg > 0 && basisKg < smallest / 2) {
     throw new Error(
-      `Weight to decant for "${label}" (${round3(basisKg)} kg) must be at least half the ` +
+      `Weight to decant for ${label} (${round3(basisKg)} kg) must be at least half the ` +
       `smallest selected bag size (${bagLabel(smallest)}).`
     );
   }

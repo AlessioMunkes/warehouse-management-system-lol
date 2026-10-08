@@ -3,7 +3,7 @@
 // UPDATED: 2 steps instead of 3, since Donor Details merges into
 // Donation Details.
 // ─────────────────────────────────────────────────────────────
-const STEPS = ["Donation Details", "Review"];
+const STEPS = ["Donation details", "Review"];
 
 // currentStep: 0 | 1
 export function DonationRail({ currentStep }) {

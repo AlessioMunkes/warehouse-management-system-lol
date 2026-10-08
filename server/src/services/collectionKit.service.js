@@ -30,7 +30,7 @@ const cleanText = (value) => {
 const asPositiveNumber = (value, field) => {
   const num = Number(value);
   if (!Number.isFinite(num) || num < 0) {
-    fail(400, `${field} must be a non-negative number.`);
+    fail(400, `${field} must be zero or more.`);
   }
   return num;
 };
@@ -60,11 +60,11 @@ const runOrMissingTable = async (fn) => {
 // ── Assign a kit ──────────────────────────────────────────────
 const createKit = async (payload, actorId) => {
   const ownerName = cleanText(payload.ownerName);
-  if (!ownerName) fail(400, 'ownerName is required.');
-  if (ownerName.length > 150) fail(400, 'ownerName must be 150 characters or fewer.');
+  if (!ownerName) fail(400, 'Enter who the kit is for.');
+  if (ownerName.length > 150) fail(400, 'Keep the name to 150 characters or fewer.');
 
   const suburb = cleanText(payload.suburb);
-  if (suburb && suburb.length > 150) fail(400, 'suburb must be 150 characters or fewer.');
+  if (suburb && suburb.length > 150) fail(400, 'Keep the suburb to 150 characters or fewer.');
 
   const assignedAt = payload.assignedAt ? String(payload.assignedAt) : todayISO();
 
@@ -89,7 +89,7 @@ const logCompost = async (rawKitId, payload, actorId) => {
   const kitId = Number(rawKitId);
   if (!isPositiveInt(kitId)) fail(400, 'A valid kit id is required.');
 
-  const kgCompost = asPositiveNumber(payload.kgCompost, 'kgCompost');
+  const kgCompost = asPositiveNumber(payload.kgCompost, 'The compost weight');
   const loggedAt = payload.loggedAt ? String(payload.loggedAt) : todayISO();
   const notes = cleanText(payload.notes);
 
@@ -118,8 +118,8 @@ const markDispatched = async (rawRecordId, payload, actorId) => {
   if (!isPositiveInt(recordId)) fail(400, 'A valid record id is required.');
 
   const dispatchedTo = cleanText(payload?.dispatchedTo);
-  if (!dispatchedTo) fail(400, 'dispatchedTo is required.');
-  if (dispatchedTo.length > 150) fail(400, 'dispatchedTo must be 150 characters or fewer.');
+  if (!dispatchedTo) fail(400, 'Enter where the compost went.');
+  if (dispatchedTo.length > 150) fail(400, 'Keep where it went to 150 characters or fewer.');
 
   const result = await runOrMissingTable(() => kitRepo.markDispatched({ recordId, actorId, dispatchedTo }));
   if (!result.ok && result.code === 'record_not_found') fail(404, 'Record not found.');

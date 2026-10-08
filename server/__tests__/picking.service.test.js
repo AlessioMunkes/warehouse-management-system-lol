@@ -827,7 +827,9 @@ describe('completeSlip', () => {
 
   it('says how many lines are outstanding', async () => {
     repoMock.completeSlip.mockResolvedValueOnce({ pendingItems: 3 });
-    await expect(pickingService.completeSlip(1, {}, WORKER)).rejects.toThrow(/3 item\(s\)/);
+    await expect(pickingService.completeSlip(1, {}, WORKER)).rejects.toThrow(/3 items still need/);
+    repoMock.completeSlip.mockResolvedValueOnce({ pendingItems: 1 });
+    await expect(pickingService.completeSlip(1, {}, WORKER)).rejects.toThrow(/1 item still needs/);
   });
 
   it('completes even when stock went negative — food is never blocked', async () => {

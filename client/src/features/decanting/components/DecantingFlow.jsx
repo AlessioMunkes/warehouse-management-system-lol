@@ -515,6 +515,8 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
         selectedSizes: activePlanSizes,
         items: [{
           productId: product.id,
+          // So a message about this line can name it.
+          productName: product.name,
           requiredKg: validation.values.requiredKg,
           actualBulkKg: validation.values.weighedKg,
           wastageKg: validation.values.wastageKg,

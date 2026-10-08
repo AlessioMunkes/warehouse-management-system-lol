@@ -998,7 +998,8 @@ describe('createPendingDonationFromIntake — idempotent replay', () => {
     const result = await pendingDonationService.createPendingDonationFromIntake({
       donorName: 'Race Donor',
       idempotencyKey: 'KEY-RACE-1',
-      items: [],
+      // A donation always has at least one item; one of nothing is refused.
+      items: [{ description: 'Rice', quantity: 2, unit: 'kg' }],
     });
 
     expect(result.id).toBe(55);

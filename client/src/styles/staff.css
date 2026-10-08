@@ -1047,9 +1047,15 @@
   margin-bottom: 14px;
   border-bottom: 1px solid var(--stf-border);
 }
+/* In the row's own flow, under the toggle, not floated over what
+   follows: as an absolute box it sat on top of the step's heading
+   ("Which delivery is this?") for as long as it showed, which is the
+   first thing a new worker sees. It now pushes the heading down for
+   those few seconds instead. The home screen's arrow is the one hint
+   that floats (.stf-coachmark-fixed, further down). */
 .stf-coachmark {
-  position: absolute;
-  top: calc(100% + 4px);
+  position: static;
+  margin-top: 8px;
   /* left, not right — .stf-card-toggle is its own standalone row
      holding only the toggle (StepScreen, TaskPage, this file all
      render it that way, nothing else sharing the row to push it

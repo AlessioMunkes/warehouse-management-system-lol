@@ -174,7 +174,8 @@ const validateIntakePayload = (data = {}) => {
   }
 
   const items = Array.isArray(data.items) ? data.items : [];
-  if (phasePayload && items.length === 0) errors.items = 'At least one donated item is required.';
+  // Whatever shape the request is in: a donation of nothing is not one.
+  if (items.length === 0) errors.items = 'At least one donated item is required.';
   items.forEach((item, index) => {
     const row = {};
     const quantity = Number(item?.quantity);
@@ -362,7 +363,9 @@ export const createPendingDonationFromIntake = async (payload = {}) => {
         notes: data.notes ?? null,
         section18aStatus: data.section18aStatus ?? data.section_18a_status ?? null,
         section18aQualifying: data.section18aQualifying ?? data.section_18a_qualifying ?? null,
-        draftSnapshot: data.draftSnapshot ?? data.draft_snapshot ?? null,
+        // The column is NOT NULL. It is an archive of what was typed, so
+        // an empty record is the honest value when none was sent.
+        draftSnapshot: data.draftSnapshot ?? data.draft_snapshot ?? '{}',
         idempotencyKey,
         createdBy: data.createdBy ?? data.created_by ?? null,
       },

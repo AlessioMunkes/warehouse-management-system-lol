@@ -133,7 +133,7 @@ export const DonationItemsList = forwardRef(function DonationItemsList(
 
   return (
     <div className="stf-step-body" ref={containerRef}>
-      <div className="stf-field-label">Donation Items</div>
+      <div className="stf-field-label">Donation items</div>
       <div className="stf-list">
         {items.map((item) => (
           <DonationItemRow

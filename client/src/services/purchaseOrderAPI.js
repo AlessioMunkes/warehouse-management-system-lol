@@ -80,6 +80,9 @@ const toLine = (row) => ({
 const toDelivery = (row) => ({
   id:               row.id,
   deliveryDate:     row.delivery_date ?? null,
+  // When it was signed in on the floor. deliveryDate is a calendar day
+  // with no time of its own.
+  recordedAt:       row.recorded_at ?? null,
   status:           row.status,
   driverName:       row.driver_name ?? "",
   receivedByName:   row.received_by_name ?? "",

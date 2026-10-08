@@ -170,7 +170,7 @@ describe('Donation backend validation UX', () => {
 });
 
 describe('Donation completion navigation', () => {
-  it('sends Go to Taskboard to the staff taskboard after a successful donation', async () => {
+  it('sends "Go to home" to the staff home screen after a successful donation', async () => {
     const user = userEvent.setup();
     const onLocation = vi.fn();
     const resetDraft = vi.fn();
@@ -183,7 +183,7 @@ describe('Donation completion navigation', () => {
     renderDonationFlow({ onLocation, resetDraft });
 
     await user.click(screen.getByRole('button', { name: /Yes, submit/i }));
-    await user.click(await screen.findByRole('button', { name: /Go to Taskboard/i }));
+    await user.click(await screen.findByRole('button', { name: /Go to home/i }));
 
     expect(resetDraft).toHaveBeenCalledTimes(1);
     await waitFor(() => expect(onLocation).toHaveBeenLastCalledWith(

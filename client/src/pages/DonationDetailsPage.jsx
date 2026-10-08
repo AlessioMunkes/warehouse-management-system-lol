@@ -76,12 +76,12 @@ export function DonationDetailsPage() {
   ].filter(Boolean);
 
   return (
-    <StaffShell crumb="Donations / Record a Donation" meta={today}>
+    <StaffShell crumb="Donations / Record a donation" meta={today}>
       <DonationRail currentStep={0} />
 
       <section className="stf-step donation-intake-card">
         <div className="stf-step-head">
-          <h1 className="stf-step-title">Record a Donation</h1>
+          <h1 className="stf-step-title">Record a donation</h1>
           <p className="stf-step-sub">Capture donor basics, value and donated items.</p>
         </div>
 
@@ -101,12 +101,12 @@ export function DonationDetailsPage() {
 
         <div className="donation-intake-grid">
           <div className="stf-field">
-            <label htmlFor="donor-name" className="stf-field-label">Donor Name</label>
+            <label htmlFor="donor-name" className="stf-field-label">Donor name</label>
             <input id="donor-name" className="stf-input is-text" value={draft.donorName} onChange={(e) => updateDraft({ donorName: e.target.value })} />
             <span className="stf-field-hint">Leave blank for an anonymous donation.</span>
           </div>
           <div className="stf-field">
-            <label htmlFor="donor-email" className="stf-field-label">Donor Email</label>
+            <label htmlFor="donor-email" className="stf-field-label">Donor email</label>
             <input id="donor-email" type="email" className={`stf-input is-text ${errors.donorContact ? "is-flagged" : ""}`} value={draft.donorContact} onChange={(e) => updateDraft({ donorContact: e.target.value, contactDetails: e.target.value, contactMethod: e.target.value ? "email" : "" })} aria-invalid={Boolean(errors.donorContact)} />
             <span className="stf-field-hint">Required if Section 18A is requested. Leave blank for anonymous donations.</span>
             {errors.donorContact && <span className="stf-field-hint donation-intake-error">{errors.donorContact}</span>}

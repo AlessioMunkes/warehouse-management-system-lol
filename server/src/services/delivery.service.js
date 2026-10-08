@@ -335,6 +335,9 @@ const createDelivery = async (data, userId) => {
     fail(409, 'That purchase order belongs to a different supplier. Check the order number on the delivery note.');
   }
   if (result.purchaseOrderNotOpen) {
+    if (result.status === 'pending') {
+      fail(409, 'This purchase order has not been approved yet. Ask a manager to approve it before signing the delivery in.');
+    }
     fail(409, 'This purchase order was closed off while you were recording this delivery. Ask a manager to reopen it.');
   }
 

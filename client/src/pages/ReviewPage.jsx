@@ -99,12 +99,12 @@ export function ReviewPage() {
   });
 
   return (
-    <StaffShell crumb="Donations / Review Donation" meta={today}>
+    <StaffShell crumb="Donations / Review donation" meta={today}>
       <DonationRail currentStep={1} />
 
       <div className="stf-step">
         <div className="stf-step-head">
-          <h1 className="stf-step-title">Review Donation</h1>
+          <h1 className="stf-step-title">Review donation</h1>
           <p className="stf-step-sub">Does everything look okay?</p>
         </div>
 

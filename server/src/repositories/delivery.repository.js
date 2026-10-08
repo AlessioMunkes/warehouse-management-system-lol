@@ -32,8 +32,8 @@ import pool       from "../config/db.js";
 import stockModel from "./stock.repository.js";
 import { DELIVERY_SORTS, buildOrderBy } from "../constants/receiptSort.js";
 import {
-  isOpenPurchaseOrder,
-  OPEN_PO_STATUSES,
+  isReceivablePurchaseOrder,
+  RECEIVABLE_PO_STATUSES,
   PO_STATUS_FULLY_RECEIVED,
   PO_STATUS_PARTIALLY_RECEIVED,   // eslint-disable-line no-unused-vars -- see createDelivery
 } from "../constants/purchaseOrderStatus.js";
@@ -339,7 +339,11 @@ const createDelivery = async ({
     // below offered pending/in_transit/partially_received. The two disagreed,
     // so every order the dropdown offered was rejected here and the only
     // orders that passed were ones the dropdown never showed.
-    if (!isOpenPurchaseOrder(purchaseOrder.status)) {
+    //
+    // 'pending' is refused too: it is open, but nobody has approved it
+    // yet (RECEIVABLE_PO_STATUSES). The two lists below read the same
+    // constant, so what is offered and what is accepted cannot disagree.
+    if (!isReceivablePurchaseOrder(purchaseOrder.status)) {
       await client.query("ROLLBACK");
       return { purchaseOrderNotOpen: true, status: purchaseOrder.status };
     }
@@ -498,7 +502,7 @@ const getSuppliers = async () => {
 
 // ── Get suppliers with at least one order still open ──────────
 // For the Form view's supplier picker: no point offering a supplier
-// there is nothing to receive from. Reads OPEN_PO_STATUSES, the same
+// there is nothing to receive from. Reads RECEIVABLE_PO_STATUSES, the same
 // list listOpenPurchaseOrders below uses, so the two can never
 // disagree about what counts as open. It used to hard-code
 // status = 'approved', which stopped matching anything the moment
@@ -513,7 +517,7 @@ const getSuppliersWithOpenOrders = async () => {
      WHERE po.status = ANY($1)
        AND s.is_active = true
      ORDER BY s.name ASC`,
-    [OPEN_PO_STATUSES],
+    [RECEIVABLE_PO_STATUSES],
   );
   return result.rows;
 };
@@ -531,7 +535,7 @@ const getProducts = async () => {
 
 // ── Get purchase orders for a supplier ───────────────────────
 // Only returns orders still expecting goods — can't receive against
-// one already closed off. Reads the same OPEN_PO_STATUSES as
+// one already closed off, or not yet approved. Reads the same RECEIVABLE_PO_STATUSES as
 // getSuppliersWithOpenOrders above, so the two agree by construction
 // rather than by two people remembering to edit both.
 // supplierId is OPTIONAL. Passed, this is the old per-supplier list;
@@ -565,7 +569,7 @@ const listOpenPurchaseOrders = async (supplierId = null) => {
      WHERE ($1::int IS NULL OR po.supplier_id = $1::int)
        AND po.status = ANY($2)
      ORDER BY po.expected_delivery_date ASC NULLS LAST, po.id ASC`,
-    [supplierId ?? null, OPEN_PO_STATUSES],
+    [supplierId ?? null, RECEIVABLE_PO_STATUSES],
   );
   return result.rows;
 };
