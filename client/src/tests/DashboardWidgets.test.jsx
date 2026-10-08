@@ -95,6 +95,15 @@ describe('the widget catalogue', () => {
     expect(ids).not.toContain('low-stock');
   });
 
+  it('offers each board the newer tiles, and only that board', () => {
+    const manager = widgetsForRole('manager').map((w) => w.id);
+    const admin = widgetsForRole('admin').map((w) => w.id);
+    expect(manager).toEqual(expect.arrayContaining(['expiring-stock', 'pos-awaiting-approval', 'unclaimed-slips', 'not-collected']));
+    expect(admin).toEqual(expect.arrayContaining(['suppliers-no-products', 'recipe-in-use']));
+    expect(admin).not.toContain('expiring-stock');
+    expect(manager).not.toContain('recipe-in-use');
+  });
+
   it('starts each role on widgets it is allowed', () => {
     for (const role of ['manager', 'admin']) {
       expect(cleanLayout(DEFAULT_LAYOUT[role], role)).toEqual(DEFAULT_LAYOUT[role]);

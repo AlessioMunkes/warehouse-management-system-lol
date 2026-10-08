@@ -41,6 +41,7 @@ import { getUsers } from '../../../services/userAPI';
 import { getProducts } from '../../../services/productAPI';
 import { getSuppliers } from '../../../services/supplierAPI';
 import { getGuestLog } from '../../../services/volunteerAPI';
+import { getRecipes } from '../../../services/recipeAPI';
 import { PERIODS, periodById } from '../chartTheme';
 import { getWidget, widgetsForRole, sizeOf } from '../widgetCatalog';
 import useDashboardLayout, { panelSlots } from '../useDashboardLayout';
@@ -52,6 +53,8 @@ const countBy = (rows, field) => rows.reduce((acc, r) => ({ ...acc, [r[field]]: 
 const SOURCES = {
   summary:   () => dashboardAPI.getDashboardSummary(),
   myWork:    () => dashboardAPI.getMyWork(),
+  attention: () => dashboardAPI.getAttention(),
+  recipes:   () => getRecipes(),
   users:     () => getUsers({ includeInactive: true }),
   donations: () => donationManagementAPI.getAttentionCounts().then((c) => c.total),
   s18a:      () => donationManagementAPI.getSection18AQueue().then((rows) => countBy(rows, 'section_18a_status')),

@@ -48,11 +48,19 @@ beforeEach(() => vi.clearAllMocks());
 describe('the quick-create menu', () => {
   it('offers a manager nothing they cannot create', async () => {
     const items = await openQuickCreate('manager');
-    expect(items).toEqual(['Picking slip', 'Purchase order', 'Beneficiary']);
+    expect(items).toEqual([
+      'Picking slip', 'Purchase order', 'Beneficiary', 'Benevolent request', 'Stock adjustment', 'Report',
+    ]);
+    // With nothing of the admin's to show, their group heading goes too.
+    expect(screen.queryByText('Set-up')).toBeNull();
   });
 
-  it('still offers an admin the product shortcut', async () => {
+  it('offers an admin the set-up shortcuts as well, in their own group', async () => {
     const items = await openQuickCreate('admin');
-    expect(items).toEqual(['Picking slip', 'Purchase order', 'Product', 'Beneficiary']);
+    expect(items).toEqual([
+      'Picking slip', 'Purchase order', 'Beneficiary', 'Benevolent request', 'Stock adjustment', 'Report',
+      'Product', 'Supplier', 'User', 'Recipe',
+    ]);
+    expect(screen.getByText('Set-up')).toBeTruthy();
   });
 });

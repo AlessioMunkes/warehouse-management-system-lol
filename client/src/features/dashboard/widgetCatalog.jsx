@@ -30,7 +30,7 @@
 // the Month / 3 months / Year menu.
 // ─────────────────────────────────────────────────────────────
 import {
-  Activity, ClipboardList, Gift, HandHeart, Package,
+  Activity, ClipboardList, CookingPot, Gift, HandHeart, Hourglass, Package, PackageX,
   ScrollText, Truck, Users2, Warehouse,
 } from 'lucide-react';
 import StatTile from './components/StatTile';
@@ -115,6 +115,41 @@ export const WIDGETS = [
     render: ({ summary }) => (
       <StatTile image="pending-benevolent-requests" label="Pending benevolent requests" value={summary.pendingCommunityRequests}
         to={STAFF.communityRequests} warn />
+    ),
+  }),
+
+  // Four counts from the "needs attention" source, each the size of the
+  // tab it opens.
+  tile({
+    id: 'expiring-stock', title: 'Stock expiring soon', roles: MANAGER_ONLY, needs: ['attention'],
+    description: 'Products with a delivery that expires within 30 days.',
+    render: ({ attention }) => (
+      <StatTile icon={Hourglass} label="Products expiring within 30 days" value={attention.inventory.expiring}
+        to={`${INVENTORY}?status=expiring`} warn />
+    ),
+  }),
+  tile({
+    id: 'pos-awaiting-approval', title: 'Orders awaiting approval', roles: MANAGER_ONLY, needs: ['attention'],
+    description: 'Purchase orders waiting for a manager to approve them.',
+    render: ({ attention }) => (
+      <StatTile image="po-awaiting-approval" label="Purchase orders awaiting approval"
+        value={attention.purchaseOrders.awaitingApproval} to={`${STAFF.purchaseOrders}?status=pending`} warn />
+    ),
+  }),
+  tile({
+    id: 'unclaimed-slips', title: 'Slips nobody has claimed', roles: MANAGER_ONLY, needs: ['attention'],
+    description: 'This week’s picking slips still on the floor with no packer.',
+    render: ({ attention }) => (
+      <StatTile image="unclaimed-slips" label="Slips nobody has claimed" value={attention.pickingSlips.unassigned}
+        to={`${STAFF.pickingSlips}?status=unassigned`} />
+    ),
+  }),
+  tile({
+    id: 'not-collected', title: 'Pallets not collected', roles: MANAGER_ONLY, needs: ['attention'],
+    description: 'Packed pallets this week that the centre did not come for.',
+    render: ({ attention }) => (
+      <StatTile icon={PackageX} label="Pallets not collected this week" value={attention.pickingSlips.notCollected}
+        to={`${STAFF.pickingSlips}?status=notcollected`} warn />
     ),
   }),
 
@@ -257,6 +292,27 @@ export const WIDGETS = [
     render: ({ suppliers }) => (
       <StatTile icon={Truck} label="Active suppliers" value={suppliers.filter((s) => s.isActive).length} to={ADMIN.suppliers} />
     ),
+  }),
+  tile({
+    id: 'suppliers-no-products', title: 'Suppliers with no products', roles: ADMIN_ONLY, needs: ['suppliers'],
+    description: 'Active suppliers with nothing listed as supplied, so an order to them offers every product.',
+    render: ({ suppliers }) => (
+      <StatTile icon={Truck} label="Suppliers with no products listed"
+        value={suppliers.filter((s) => s.isActive && (s.suppliedProducts ?? []).length === 0).length}
+        to={ADMIN.suppliers} />
+    ),
+  }),
+  tile({
+    id: 'recipe-in-use', title: 'Recipe in use', roles: ADMIN_ONLY, needs: ['recipes'],
+    description: 'The recipe today’s picking slips are made from. Red when it has no products, so slips fall back to standing orders.',
+    render: ({ recipes }) => {
+      const current = (recipes.recipes ?? []).find((r) => r.id === recipes.currentRecipeId);
+      const empty = !current || current.lines.length === 0;
+      return (
+        <StatTile icon={CookingPot} label={empty ? 'Recipe in use has no products' : 'Recipe in use'}
+          value={current?.name ?? 'None'} to={`${ADMIN.settings}?section=recipes`} alarm={empty} />
+      );
+    },
   }),
   tile({
     id: 'on-site-now', title: 'Visitors signed in now', roles: ADMIN_ONLY, needs: ['visits'],

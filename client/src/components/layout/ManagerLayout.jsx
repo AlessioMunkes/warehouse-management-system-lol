@@ -34,7 +34,11 @@ import { Button } from '@/components/ui/button';
 import {
   Popover, PopoverContent, PopoverTrigger,
 } from '@/components/ui/popover';
-import { Plus, LogOut, EyeOff, Eye, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import {
+  Plus, LogOut, EyeOff, Eye, PanelLeftClose, PanelLeftOpen,
+  ClipboardList, ShoppingCart, HeartHandshake, HandHeart, Scale, ChartColumn,
+  Package, Truck, UserPlus, CookingPot,
+} from 'lucide-react';
 import {
   ShellContext, useInsideShell,
   ReducedMotionContext, MOTION_KEY, readStoredMotion, applyMotionAttribute,
@@ -59,22 +63,37 @@ const ROLE_LABELS = {
 // just be a dead end with extra steps.
 // Ordered by how often a manager actually reaches for each — same
 // reasoning PickingSlipManagementPage.jsx's own quick actions use.
+//
+// Two groups: what the warehouse makes day to day, and what it is set
+// up with. The second is the admin's — every write behind it is
+// requireRole(ADMIN) and App.jsx gates the routes to match, so offering
+// one to a manager is a shortcut to a screen that bounces them.
+const ADMIN_ONLY = ['admin'];
 const QUICK_CREATE = [
-  { to: STAFF.pickingSlips, label: 'Picking slip' },
-  { to: STAFF.purchaseOrders, label: 'Purchase order' },
-  // Product creation is admin-only since script 35 — every write in
-  // product.routes.js is requireRole(ADMIN), and App.jsx gates the
-  // route to match. Offering it to a manager is a shortcut to a screen
-  // that bounces them.
-  { to: ADMIN.products, label: 'Product', roles: ['admin'] },
-  { to: STAFF.beneficiaries, label: 'Beneficiary' },
+  { group: 'Warehouse', to: STAFF.pickingSlips, label: 'Picking slip', icon: ClipboardList },
+  { group: 'Warehouse', to: STAFF.purchaseOrders, label: 'Purchase order', icon: ShoppingCart },
+  { group: 'Warehouse', to: STAFF.beneficiaries, label: 'Beneficiary', icon: HeartHandshake },
+  { group: 'Warehouse', to: STAFF.communityRequests, label: 'Benevolent request', icon: HandHeart },
+  { group: 'Warehouse', to: STAFF.inventory, label: 'Stock adjustment', icon: Scale },
+  { group: 'Warehouse', to: STAFF.reporting, label: 'Report', icon: ChartColumn },
+  { group: 'Set-up', to: ADMIN.products, label: 'Product', icon: Package, roles: ADMIN_ONLY },
+  { group: 'Set-up', to: ADMIN.suppliers, label: 'Supplier', icon: Truck, roles: ADMIN_ONLY },
+  { group: 'Set-up', to: ADMIN.users, label: 'User', icon: UserPlus, roles: ADMIN_ONLY },
+  { group: 'Set-up', to: `${ADMIN.settings}?section=recipes`, label: 'Recipe', icon: CookingPot, roles: ADMIN_ONLY },
 ];
 
 // An entry with no `roles` is for everyone who reaches this shell.
 // Filtering here rather than at the render site means the next
-// admin-only shortcut is one word, not another conditional.
-const quickCreateFor = (role) =>
-  QUICK_CREATE.filter((item) => !item.roles || item.roles.includes(role));
+// admin-only shortcut is one word, not another conditional. Returned
+// as [group, items] pairs, in the order above, with no empty group.
+const quickCreateFor = (role) => {
+  const groups = new Map();
+  for (const item of QUICK_CREATE) {
+    if (item.roles && !item.roles.includes(role)) continue;
+    groups.set(item.group, [...(groups.get(item.group) ?? []), item]);
+  }
+  return [...groups];
+};
 
 export default function ManagerLayout({ children }) {
   // Already inside a shell — ProtectedRoute supplied one at the route
@@ -207,16 +226,22 @@ function ManagerLayoutShell({ children }) {
                   <Plus />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent align="end" className="w-48 p-1">
-                {quickCreateFor(user?.role).map((item) => (
-                  <Link
-                    key={item.to}
-                    to={item.to}
-                    onClick={() => setQuickCreateOpen(false)}
-                    className="block rounded-[4px] px-2.5 py-1.5 text-sm hover:bg-muted/50"
-                  >
-                    {item.label}
-                  </Link>
+              <PopoverContent align="end" className="w-56 p-1">
+                {quickCreateFor(user?.role).map(([group, items], index) => (
+                  <div key={group} className={index > 0 ? 'mt-1 border-t border-line pt-1' : ''}>
+                    <p className="px-2.5 pb-1 pt-1.5 text-xs font-medium text-muted-foreground">{group}</p>
+                    {items.map(({ to, label, icon: Icon }) => (
+                      <Link
+                        key={to}
+                        to={to}
+                        onClick={() => setQuickCreateOpen(false)}
+                        className="flex items-center gap-2.5 rounded-[4px] px-2.5 py-1.5 text-sm hover:bg-muted/50"
+                      >
+                        <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                        {label}
+                      </Link>
+                    ))}
+                  </div>
                 ))}
               </PopoverContent>
             </Popover>
