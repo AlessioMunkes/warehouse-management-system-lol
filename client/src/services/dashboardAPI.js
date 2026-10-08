@@ -69,4 +69,29 @@ export const getAttention = async () => {
   return toAttention(body.data ?? {});
 };
 
-export default { getDashboardSummary, getMyWork, getAttention };
+// ── GET /api/dashboard/insights ───────────────────────────────
+// Three figures for the manager's board: weeks of stock left on the
+// recipe in use, this week's packing, and centres missing collections.
+export const toInsights = (row = {}) => {
+  const n = (v) => Number(v ?? 0);
+  return {
+    recipeName: row.recipeName ?? null,
+    stockCover: (row.stockCover ?? []).map((p) => ({
+      productId: p.productId, name: p.name, unit: p.unit,
+      onHand: n(p.onHand), weeklyUse: n(p.weeklyUse), weeklyUnit: p.weeklyUnit ?? p.unit,
+      weeks: p.weeks == null ? null : Number(p.weeks),
+    })),
+    packing: { total: n(row.packing?.total), packed: n(row.packing?.packed), inProgress: n(row.packing?.inProgress) },
+    missedWeeks: n(row.missedWeeks),
+    missedCollections: (row.missedCollections ?? []).map((c) => ({
+      id: c.id, name: c.name, missed: n(c.missed), lastMissed: c.lastMissed ?? null,
+    })),
+  };
+};
+
+export const getInsights = async () => {
+  const body = await apiGet("/api/dashboard/insights");
+  return toInsights(body.data ?? {});
+};
+
+export default { getDashboardSummary, getMyWork, getAttention, getInsights };

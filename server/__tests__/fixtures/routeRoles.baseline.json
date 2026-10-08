@@ -41,6 +41,7 @@
   "dashboard.routes.js GET /summary": "admin,manager",
   "dashboard.routes.js GET /my-work": "admin,manager,warehouse_worker",
   "dashboard.routes.js GET /attention": "admin,manager",
+  "dashboard.routes.js GET /insights": "manager",
   "decanting.routes.js POST /calculate": "warehouse_worker",
   "decanting.routes.js GET /report": "admin,manager,warehouse_worker",
   "decanting.routes.js GET /": "admin,manager,warehouse_worker",

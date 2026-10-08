@@ -32,6 +32,8 @@ describe('SupplierForm — products supplied', () => {
     render(<SupplierForm products={PRODUCTS} onSubmit={onSubmit} />);
 
     await user.type(screen.getByLabelText('Supplier name'), 'Wema');
+    // With a lead time, so the form has nothing blank to ask about.
+    await user.type(screen.getByLabelText('Expected lead time (days)'), '3');
     const list = screen.getByRole('group', { name: 'Product list' });
     await user.click(within(list).getByLabelText('Rice'));
     await user.click(within(list).getByLabelText('Samp'));
@@ -47,7 +49,7 @@ describe('SupplierForm — products supplied', () => {
     render(
       <SupplierForm
         products={PRODUCTS} submitLabel="Save changes" onSubmit={onSubmit}
-        initial={{ name: 'Wema', suppliedProducts: [{ id: 1270, name: 'Rice' }, { id: 10, name: 'Samp' }] }}
+        initial={{ name: 'Wema', expectedLeadTimeDays: 3, suppliedProducts: [{ id: 1270, name: 'Rice' }, { id: 10, name: 'Samp' }] }}
       />,
     );
 
@@ -64,7 +66,7 @@ describe('SupplierForm — products supplied', () => {
   it('narrows the list as the admin searches, without losing what is ticked', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
-    render(<SupplierForm products={PRODUCTS} onSubmit={onSubmit} initial={{ name: 'Wema', suppliedProducts: [{ id: 1270, name: 'Rice' }] }} />);
+    render(<SupplierForm products={PRODUCTS} onSubmit={onSubmit} initial={{ name: 'Wema', expectedLeadTimeDays: 3, suppliedProducts: [{ id: 1270, name: 'Rice' }] }} />);
 
     await user.type(screen.getByLabelText('Products supplied'), 'sa');
     const list = screen.getByRole('group', { name: 'Product list' });

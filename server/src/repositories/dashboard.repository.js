@@ -22,6 +22,8 @@
 import pool from '../config/db.js';
 import { OPEN_PO_STATUSES, CLOSED_PO_STATUSES } from '../constants/purchaseOrderStatus.js';
 import stockRepo from './stock.repository.js';
+import { COUNTED_UNITS } from '../features/recipes/recipeSeason.js';
+import { toStockUnitSql, unitRatioSql } from '../features/units/unitConversion.js';
 
 const num = (v) => (v === null || v === undefined ? 0 : Number(v));
 
@@ -230,4 +232,108 @@ const getAttention = async ({ now = new Date() } = {}) => {
   };
 };
 
-export default { getSummary, getMyWork, getAttention, stockHealth };
+// ── Three figures for the manager's board ──────────────────────
+// Behind the "Weeks of stock left", "Slips packed this week" and
+// "Centres missing collections" widgets.
+//
+//   stockCover        — for each product on the recipe in use: what one
+//                       week of slips takes (every active centre with a
+//                       child count that follows the recipe, counted the
+//                       way its slip is — banded, cans rounded up) against
+//                       what is on hand. Fewest weeks first. Empty when no
+//                       recipe with products applies today: slips then
+//                       come from standing orders, which are not weekly
+//                       amounts.
+//   packing           — this week's slips (Monday to Sunday, SAST), and
+//                       how many are packed.
+//   missedCollections — centres with two or more pallets not collected
+//                       in the last eight weeks.
+const MISSED_WEEKS = 8;
+const MISSED_AT_LEAST = 2;
+const COVER_ROWS = 8;
+
+const getInsights = async ({ recipe = null, childBand = 1 } = {}) => {
+  const [cover, packing, missed] = await Promise.all([
+    recipe
+      ? pool.query(
+        `WITH centres AS (
+           SELECT CEIL(e.child_count::numeric / $2::numeric) * $2::numeric AS children
+             FROM ecd_centres e
+            WHERE e.is_active AND e.approved_at IS NOT NULL
+              AND COALESCE(e.child_count, 0) > 0
+              AND NOT EXISTS (SELECT 1 FROM recipe_own_order_centres o WHERE o.ecd_id = e.id)
+         ),
+         weekly AS (
+           SELECT rl.product_id, rl.unit,
+                  SUM(CASE WHEN rl.unit = ANY($3::text[])
+                           THEN CEIL(rl.quantity_per_child * c.children)
+                           ELSE ROUND(rl.quantity_per_child * c.children, 2) END) AS quantity
+             FROM recipe_lines rl
+             CROSS JOIN centres c
+            WHERE rl.recipe_id = $1
+            GROUP BY rl.product_id, rl.unit
+         )
+         SELECT p.id, p.name,
+                COALESCE(sl.unit, w.unit)                 AS unit,
+                COALESCE(sl.quantity_on_hand, 0)::numeric AS on_hand,
+                w.unit                                    AS weekly_unit,
+                ${toStockUnitSql('w.quantity', 'w.unit', 'sl.unit')}::numeric AS weekly_use,
+                -- Stock in crates against a recipe in kilograms, with no
+                -- crate weight set: the two cannot be compared.
+                (sl.unit IS NULL OR ${unitRatioSql('w.unit', 'sl.unit')} IS NOT NULL) AS comparable
+           FROM weekly w
+           JOIN products p ON p.id = w.product_id AND p.archived_at IS NULL
+           LEFT JOIN stock_levels sl ON sl.product_id = w.product_id
+          WHERE w.quantity > 0
+          ORDER BY (sl.unit IS NULL OR ${unitRatioSql('w.unit', 'sl.unit')} IS NOT NULL) DESC,
+                   COALESCE(sl.quantity_on_hand, 0) / ${toStockUnitSql('w.quantity', 'w.unit', 'sl.unit')} ASC, p.name ASC
+          LIMIT ${COVER_ROWS}`,
+        [recipe.id, childBand, COUNTED_UNITS]
+      )
+      : { rows: [] },
+    pool.query(
+      `SELECT COUNT(*)::int AS total,
+              COUNT(*) FILTER (WHERE status NOT IN ('pending', 'in_progress'))::int AS packed,
+              COUNT(*) FILTER (WHERE status = 'in_progress')::int AS in_progress
+         FROM picking_slips
+        WHERE status <> 'cancelled'
+          AND dispatch_date >= date_trunc('week', ${SAST_TODAY})::date
+          AND dispatch_date <  date_trunc('week', ${SAST_TODAY})::date + 7`
+    ),
+    pool.query(
+      `SELECT e.id, e.name, COUNT(*)::int AS missed, MAX(ps.dispatch_date)::text AS last_missed
+         FROM dispatch_events de
+         JOIN picking_slips ps ON ps.id = de.picking_slip_id
+         JOIN ecd_centres e ON e.id = ps.ecd_id
+        WHERE de.status = 'not_collected'
+          AND ps.dispatch_date >= ${SAST_TODAY} - ${MISSED_WEEKS * 7}
+        GROUP BY e.id, e.name
+       HAVING COUNT(*) >= ${MISSED_AT_LEAST}
+        ORDER BY COUNT(*) DESC, MAX(ps.dispatch_date) DESC, e.name ASC
+        LIMIT 8`
+    ),
+  ]);
+
+  return {
+    recipeName: recipe?.name ?? null,
+    stockCover: cover.rows.map((r) => {
+      const weeklyUse = num(r.weekly_use);
+      return {
+        productId: r.id, name: r.name, unit: r.unit,
+        onHand: num(r.on_hand), weeklyUse, weeklyUnit: r.weekly_unit,
+        // One decimal: "3.4 weeks" is as fine as this estimate is. No
+        // figure at all where the two units cannot be compared.
+        weeks: r.comparable && weeklyUse > 0 ? Math.round((num(r.on_hand) / weeklyUse) * 10) / 10 : null,
+      };
+    }),
+    packing: {
+      total: num(packing.rows[0]?.total),
+      packed: num(packing.rows[0]?.packed),
+      inProgress: num(packing.rows[0]?.in_progress),
+    },
+    missedWeeks: MISSED_WEEKS,
+    missedCollections: missed.rows.map((r) => ({ id: r.id, name: r.name, missed: num(r.missed), lastMissed: r.last_missed })),
+  };
+};
+
+export default { getSummary, getMyWork, getAttention, getInsights, stockHealth };

@@ -8,7 +8,7 @@
 // ─────────────────────────────────────────────────────────────
 import express                      from 'express';
 import auth, { requireRole } from '../middleware/auth.middleware.js';
-import { ALL_STAFF, MANAGERS_UP } from '../constants/permissions.js';
+import { ALL_STAFF, MANAGERS_UP, MANAGER_ONLY } from '../constants/permissions.js';
 import dashboardController          from '../controllers/dashboard.controller.js';
 
 const router = express.Router();
@@ -19,5 +19,7 @@ router.get('/summary', auth, requireRole(...MANAGERS_UP), dashboardController.ge
 // catalog or supplier spend, which is why it is not behind MANAGERS_UP.
 router.get('/my-work', auth, requireRole(...ALL_STAFF),   dashboardController.getMyWork);
 router.get('/attention', auth, requireRole(...MANAGERS_UP), dashboardController.getAttention);
+// The manager's board only: an admin's has no widget that reads it.
+router.get('/insights', auth, requireRole(...MANAGER_ONLY), dashboardController.getInsights);
 
 export default router;

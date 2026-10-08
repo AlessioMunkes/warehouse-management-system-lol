@@ -54,6 +54,7 @@ const SOURCES = {
   summary:   () => dashboardAPI.getDashboardSummary(),
   myWork:    () => dashboardAPI.getMyWork(),
   attention: () => dashboardAPI.getAttention(),
+  insights:  () => dashboardAPI.getInsights(),
   recipes:   () => getRecipes(),
   users:     () => getUsers({ includeInactive: true }),
   donations: () => donationManagementAPI.getAttentionCounts().then((c) => c.total),

@@ -45,4 +45,15 @@ const getAttention = async (req, res) => {
   }
 };
 
-export default { getSummary, getMyWork, getAttention };
+// GET /api/dashboard/insights — weeks of stock left, this week's packing
+// and the centres missing collections. See dashboard.repository.js.
+const getInsights = async (req, res) => {
+  try {
+    const data = await dashboardService.getInsights();
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    respondError(res, err, 'getInsights', 'Failed to load the dashboard figures.');
+  }
+};
+
+export default { getSummary, getMyWork, getAttention, getInsights };

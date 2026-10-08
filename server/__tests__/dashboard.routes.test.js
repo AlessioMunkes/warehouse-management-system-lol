@@ -14,7 +14,7 @@ import request from 'supertest';
 import jwt     from 'jsonwebtoken';
 import { ROLES } from '../src/middleware/auth.middleware.js';
 
-const serviceMock = { getSummary: vi.fn(), getAttention: vi.fn() };
+const serviceMock = { getSummary: vi.fn(), getAttention: vi.fn(), getInsights: vi.fn() };
 
 vi.mock('../src/services/dashboard.service.js', () => ({ default: serviceMock }));
 
@@ -40,6 +40,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   serviceMock.getSummary.mockResolvedValue(SUMMARY);
   serviceMock.getAttention.mockResolvedValue({ inventory: { shortfall: 1 } });
+  serviceMock.getInsights.mockResolvedValue({ packing: { total: 4, packed: 1 } });
 });
 
 describe('dashboard routes — authentication', () => {
@@ -78,6 +79,21 @@ describe('dashboard routes — attention', () => {
     const res = await request(app).get(`${BASE}/attention`).set('Cookie', cookieFor(role));
     expect(res.status).toBe(403);
     expect(serviceMock.getAttention).not.toHaveBeenCalled();
+  });
+});
+
+// The manager's board only: the admin's has no widget that reads it.
+describe('dashboard routes — insights', () => {
+  it('a manager can read the board figures', async () => {
+    const res = await request(app).get(`${BASE}/insights`).set('Cookie', cookieFor(ROLES.MANAGER));
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true, data: { packing: { total: 4, packed: 1 } } });
+  });
+
+  it.each([ROLES.ADMIN, ROLES.WORKER, ROLES.GUEST])('%s cannot', async (role) => {
+    const res = await request(app).get(`${BASE}/insights`).set('Cookie', cookieFor(role));
+    expect(res.status).toBe(403);
+    expect(serviceMock.getInsights).not.toHaveBeenCalled();
   });
 });
 

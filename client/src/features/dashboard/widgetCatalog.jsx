@@ -30,7 +30,7 @@
 // the Month / 3 months / Year menu.
 // ─────────────────────────────────────────────────────────────
 import {
-  Activity, ClipboardList, CookingPot, Gift, HandHeart, Hourglass, Package, PackageX,
+  Activity, ClipboardList, CookingPot, Gift, HandHeart, Hourglass, Package, PackageCheck, PackageX,
   ScrollText, Truck, Users2, Warehouse,
 } from 'lucide-react';
 import StatTile from './components/StatTile';
@@ -38,6 +38,7 @@ import ActionCard from './components/ActionCard';
 import ReportPanel from './components/ReportPanel';
 import StaticChart from './components/StaticChart';
 import NotificationsPanel from './components/NotificationsPanel';
+import { StockCoverPanel, MissedCollectionsPanel } from './components/InsightPanels';
 import { STAFF, ADMIN } from '../../routes/paths';
 import { RAG, byLabel } from './chartTheme';
 
@@ -153,6 +154,16 @@ export const WIDGETS = [
     ),
   }),
 
+  tile({
+    id: 'packing-progress', title: 'Slips packed this week', roles: MANAGER_ONLY, needs: ['insights'],
+    description: 'How many of this week’s picking slips are packed, out of all of them.',
+    render: ({ insights }) => (
+      <StatTile icon={PackageCheck} label="Slips packed this week"
+        value={`${insights.packing.packed} / ${insights.packing.total}`} to={STAFF.pickingSlips}
+        tone={insights.packing.total > 0 && insights.packing.packed === insights.packing.total ? 'good' : undefined} />
+    ),
+  }),
+
   // The same queue, for the manager's own board (a widget is one role's).
   tile({
     id: 'donations-to-review', title: 'Donations to review', roles: MANAGER_ONLY, needs: ['donations'],
@@ -187,6 +198,16 @@ export const WIDGETS = [
         ]}
       />
     ),
+  },
+  {
+    id: 'stock-cover', kind: 'panel', title: 'Weeks of stock left', roles: MANAGER_ONLY, needs: ['insights'],
+    description: 'How long the stock on hand lasts at what the recipe in use takes each week. Fewest weeks first.',
+    render: ({ insights }) => <StockCoverPanel insights={insights} />,
+  },
+  {
+    id: 'missed-collections', kind: 'panel', title: 'Centres missing collections', roles: MANAGER_ONLY, needs: ['insights'],
+    description: 'Centres that have not collected two or more pallets in the last eight weeks.',
+    render: ({ insights }) => <MissedCollectionsPanel insights={insights} />,
   },
   report({
     id: 'top-products', title: 'Most dispatched products', roles: MANAGER_ONLY, wide: true,

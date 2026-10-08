@@ -16,6 +16,11 @@
 // Ubuntu Bakery Supplies has no agreement_ref on record today, and a
 // form that insists on one cannot represent the suppliers that
 // actually exist.
+//
+// Two of the optional fields matter later: the lead time and the
+// products supplied. Saving with either blank shows
+// MissingDetailsNotice first — what will go without it, and "Save
+// anyway".
 // ─────────────────────────────────────────────────────────────
 import { useState } from 'react';
 import {
@@ -25,6 +30,7 @@ import { Button }   from '@/components/ui/button';
 import { Input }    from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 }  from 'lucide-react';
+import MissingDetailsNotice from '@/components/ui/missing-details-notice';
 
 const BLANK = {
   name: '', contactName: '', contactEmail: '', contactPhone: '',
@@ -59,10 +65,10 @@ export default function SupplierForm({
   const needle = productSearch.trim().toLowerCase();
   const shownProducts = needle ? products.filter((p) => p.name.toLowerCase().includes(needle)) : products;
 
-  const submit = () => {
-    setTouchedName(true);
-    if (nameMissing) return;
-    onSubmit({
+  // The blank details being asked about, while the notice is showing.
+  const [missing, setMissing] = useState(null);
+
+  const payload = () => ({
       ...form,
       productIds,
       // The service maps '' to null anyway, but sending null is
@@ -71,7 +77,20 @@ export default function SupplierForm({
         form.expectedLeadTimeDays === '' || form.expectedLeadTimeDays === null
           ? null
           : Number(form.expectedLeadTimeDays),
-    });
+  });
+
+  const submit = () => {
+    setTouchedName(true);
+    if (nameMissing) return;
+    const blank = [];
+    if (form.expectedLeadTimeDays === '' || form.expectedLeadTimeDays === null || form.expectedLeadTimeDays === undefined) {
+      blank.push({ field: 'Expected lead time', consequence: 'Reports cannot tell whether this supplier’s deliveries arrive late.' });
+    }
+    if (products.length > 0 && productIds.length === 0) {
+      blank.push({ field: 'Products supplied', consequence: 'Purchase orders to this supplier will offer every product, not only what they supply.' });
+    }
+    if (blank.length > 0) { setMissing(blank); return; }
+    onSubmit(payload());
   };
 
   return (
@@ -191,15 +210,23 @@ export default function SupplierForm({
         <Textarea id="supplier-notes" rows={3} value={form.notes} onChange={set('notes')} />
       </Field>
 
-      <Field orientation="horizontal">
-        <Button type="button" onClick={submit} disabled={busy}>
-          {busy ? <Loader2 className="animate-spin" /> : null}
-          {busy ? 'Saving' : submitLabel}
-        </Button>
-        {onCancel ? (
-          <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-        ) : null}
-      </Field>
+      {missing ? (
+        <MissingDetailsNotice
+          items={missing} busy={busy}
+          onConfirm={() => onSubmit(payload())}
+          onCancel={() => setMissing(null)}
+        />
+      ) : (
+        <Field orientation="horizontal">
+          <Button type="button" onClick={submit} disabled={busy}>
+            {busy ? <Loader2 className="animate-spin" /> : null}
+            {busy ? 'Saving' : submitLabel}
+          </Button>
+          {onCancel ? (
+            <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+          ) : null}
+        </Field>
+      )}
     </FieldGroup>
   );
 }

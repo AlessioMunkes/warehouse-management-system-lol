@@ -25,6 +25,12 @@
 // but there is no storage-locations list endpoint yet to populate a
 // picker from — that's a later change, not a text box standing in for
 // one now.
+//
+// BLANK OPTIONAL FIELDS THAT MATTER LATER. Weight, cost and (on a new
+// product) the reorder threshold can be left blank, but each has a
+// consequence somewhere else. Saving with one blank shows
+// MissingDetailsNotice first — what will go without it, and "Save
+// anyway". MISSING_DETAILS below is the list.
 // ─────────────────────────────────────────────────────────────
 import { useState } from 'react';
 import {
@@ -38,12 +44,27 @@ import {
 } from '@/components/ui/select';
 import { Loader2 }   from 'lucide-react';
 import { STOCK_UNITS } from '@/services/productAPI';
+import MissingDetailsNotice from '@/components/ui/missing-details-notice';
 
 // products.storage_type's own CHECK constraint — 'dry' or 'cold', and
 // nothing else. Small and closed enough that it isn't worth exporting
 // from productAPI.js the way STOCK_UNITS is; product.service.js keeps
 // its own equivalent unexported for the same reason.
 const STORAGE_TYPES = ['dry', 'cold'];
+
+const isBlank = (value) => value === '' || value === null || value === undefined;
+
+// Optional fields something else relies on, and what goes without each.
+// `when` narrows one to where it applies.
+const MISSING_DETAILS = [
+  { key: 'weightKg', field: 'Weight',
+    consequence: 'Purchase orders cannot work out the expected weight, so it has to be typed in on each order.' },
+  { key: 'unitCost', field: 'Cost per item',
+    consequence: 'Purchase orders cannot work out the cost, so it has to be typed in on each order.' },
+  // On an edit, a blank threshold means "leave it as it is".
+  { key: 'reorderThreshold', field: 'Reorder threshold', when: ({ isNew }) => isNew,
+    consequence: 'The product is never marked as low stock, however little is left.' },
+];
 
 const BLANK = {
   name: '', sku: '', defaultUnit: '', weightKg: '', unitCost: '',
@@ -72,12 +93,10 @@ export default function ProductForm({
   const unitMissing = !String(form.defaultUnit ?? '').trim();
   const unitInvalid = touchedUnit && unitMissing;
 
-  const submit = () => {
-    setTouchedName(true);
-    setTouchedSku(true);
-    setTouchedUnit(true);
-    if (nameMissing || skuMissing || unitMissing) return;
-    onSubmit({
+  // The blank details being asked about, while the notice is showing.
+  const [missing, setMissing] = useState(null);
+
+  const payload = () => ({
       ...form,
       // The service maps '' to null anyway, but sending null is
       // clearer about the intent, same reasoning SupplierForm's
@@ -90,7 +109,16 @@ export default function ProductForm({
         form.reorderThreshold === '' || form.reorderThreshold === null
           ? null
           : Number(form.reorderThreshold),
-    });
+  });
+
+  const submit = () => {
+    setTouchedName(true);
+    setTouchedSku(true);
+    setTouchedUnit(true);
+    if (nameMissing || skuMissing || unitMissing) return;
+    const blank = MISSING_DETAILS.filter((d) => isBlank(form[d.key]) && (!d.when || d.when({ isNew: !initial })));
+    if (blank.length > 0) { setMissing(blank); return; }
+    onSubmit(payload());
   };
 
   return (
@@ -245,15 +273,23 @@ export default function ProductForm({
         </FieldLabel>
       </Field>
 
-      <Field orientation="horizontal">
-        <Button type="button" onClick={submit} disabled={busy}>
-          {busy ? <Loader2 className="animate-spin" /> : null}
-          {busy ? 'Saving' : submitLabel}
-        </Button>
-        {onCancel ? (
-          <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-        ) : null}
-      </Field>
+      {missing ? (
+        <MissingDetailsNotice
+          items={missing} busy={busy}
+          onConfirm={() => onSubmit(payload())}
+          onCancel={() => setMissing(null)}
+        />
+      ) : (
+        <Field orientation="horizontal">
+          <Button type="button" onClick={submit} disabled={busy}>
+            {busy ? <Loader2 className="animate-spin" /> : null}
+            {busy ? 'Saving' : submitLabel}
+          </Button>
+          {onCancel ? (
+            <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+          ) : null}
+        </Field>
+      )}
     </FieldGroup>
   );
 }
