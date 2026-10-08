@@ -27,6 +27,8 @@ import { useAuth } from '../../context/AuthContext';
 import OfflineBar from './OfflineBar';
 import useGoBack from './useGoBack';
 import useSpareSlipAlert from '../../features/staff/hooks/useSpareSlipAlert';
+import usePressFlash from '../../features/staff/hooks/usePressFlash';
+import useKeepAwake from '../../features/staff/hooks/useKeepAwake';
 import { STAFF } from '../../routes/paths';
 
 // 'Packing / Little Stars ECD' → title 'Packing', sub 'Little Stars ECD'.
@@ -65,6 +67,12 @@ export default function StaffShell({
   // picking-slip notifications through their bell.
   const isManager = user?.role === 'manager' || user?.role === 'admin';
   const { spareCount, justArrived, dismiss } = useSpareSlipAlert(!isManager);
+  // The pressed button flashes, on every floor screen. The screen is
+  // kept awake inside a task, not on the home screen: a tablet left on
+  // the bench showing Home should still go to sleep.
+  usePressFlash(true);
+  useKeepAwake(user?.role === 'warehouse_worker' && pathname !== STAFF.home);
+
   // No pop-up on the Packing screen itself; its tabs already show it.
   const onPackingPage = pathname.startsWith(STAFF.packing);
 

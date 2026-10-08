@@ -3039,3 +3039,25 @@ button.stf-panel-head:disabled { cursor: default; }
    hide it and give back the space reserved for it. */
 .stf-shell.no-tabbar { --stf-tabbar-h: 0px; }
 .stf-shell.is-in-app.no-tabbar .stf-tabbar { display: none; }
+
+/* ── The pressed button flashes (usePressFlash.js) ─────────────────
+   One ring, on the one control that was pressed, for 400ms: "that
+   press landed", on a phone with no click to hear. Nothing else on the
+   screen moves.
+
+   Two parts on purpose. The outline is not an animation: it is simply
+   there while the class is, so it still shows for someone who has asked
+   for less movement (the blanket rule above stops the pulse, not the
+   outline). The pulse on top is the animated part.
+
+   currentColor, so the ring matches whichever button it is on without
+   a colour of its own to keep in step with the theme. */
+@keyframes stf-press-flash {
+  from { box-shadow: 0 0 0 0 currentColor; filter: brightness(1.18); }
+  to   { box-shadow: 0 0 0 12px transparent; filter: none; }
+}
+.stf-shell .is-pressed {
+  outline: 3px solid currentColor;
+  outline-offset: 2px;
+  animation: stf-press-flash 400ms ease-out;
+}
