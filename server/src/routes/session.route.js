@@ -68,6 +68,42 @@ const rejectSession = (res, message) => {
   return res.status(401).json({ success: false, message });
 };
 
+// ── GET / PATCH /api/me/language ──────────────────────────────
+// The language this person reads the floor screens in (migration 042).
+// On the account rather than the device, because tablets are shared.
+// English for a guest, and for a database without the column yet:
+// a missing preference must never stop anyone working.
+const LANGUAGES = ['en', 'af', 'xh'];
+
+router.get('/language', auth, async (req, res) => {
+  if (req.user.role === 'guest') return res.json({ success: true, data: { language: 'en' } });
+  try {
+    const { rows } = await pool.query(`SELECT language FROM users WHERE id = $1`, [req.user.id]);
+    const language = LANGUAGES.includes(rows[0]?.language) ? rows[0].language : 'en';
+    return res.json({ success: true, data: { language } });
+  } catch (error) {
+    console.error('[session] language not read, using English:', error.message);
+    return res.json({ success: true, data: { language: 'en' } });
+  }
+});
+
+router.patch('/language', auth, async (req, res) => {
+  const language = req.body?.language;
+  if (!LANGUAGES.includes(language)) {
+    return res.status(400).json({ success: false, message: 'Choose English, Afrikaans or isiXhosa.' });
+  }
+  if (req.user.role === 'guest') {
+    return res.status(403).json({ success: false, message: 'A language can only be saved on a staff account.' });
+  }
+  try {
+    await pool.query(`UPDATE users SET language = $2 WHERE id = $1`, [req.user.id, language]);
+    return res.json({ success: true, data: { language } });
+  } catch (error) {
+    console.error('[session] language not saved:', error.message);
+    return res.status(500).json({ success: false, message: 'Could not save your language.' });
+  }
+});
+
 router.get('/', auth, async (req, res) => {
   try {
     // ── Guests live in `volunteers`, not `users` ────────────────

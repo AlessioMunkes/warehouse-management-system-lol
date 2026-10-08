@@ -41,6 +41,7 @@ import {
 import { BadgeCheck, Mail, MailCheck, MailX, Pencil, RotateCcw, Trash2, TriangleAlert } from 'lucide-react';
 import { OPEN_PO_STATUSES } from '@/services/purchaseOrderAPI';
 import PurchaseOrderTimeline from './PurchaseOrderTimeline';
+import PhotoStrip from '@/components/ui/photo-strip';
 
 const fmtDate = (value) =>
   value
@@ -326,6 +327,10 @@ export default function PurchaseOrderDetail({
       <Section title="Timeline">
         <PurchaseOrderTimeline purchaseOrder={po} />
       </Section>
+
+      {/* Pictures the floor took as the delivery arrived. Shows nothing
+          when there are none. */}
+      <PhotoStrip entityType="purchase_order" entityId={po.id} label="Photos from receiving" />
 
       {po.notes ? (
         <Section title="Notes">

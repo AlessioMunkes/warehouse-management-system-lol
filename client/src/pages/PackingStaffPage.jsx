@@ -8,6 +8,7 @@
 //
 // PackingPage.jsx is left in place for the manager's board view.
 // ─────────────────────────────────────────────────────────────
+import { useT } from '../i18n';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { PACKING } from '../routes/paths';
@@ -21,13 +22,14 @@ export default function PackingStaffPage() {
   const { user } = useAuth();
 
   const backToList = () => navigate(PACKING.board);
-
+
+  const t = useT();
   return (
     <StaffShell
-      crumb={slipId ? 'Packing / this pallet' : 'Packing'}
-      meta={slipId ? `Pallet ${slipId}` : 'Your pallets'}
+      crumb={slipId ? `${t('packing.title')} / ${t('slip.thisPallet')}` : t('packing.title')}
+      meta={slipId ? t('slip.palletNo', { id: slipId }) : t('slip.yourPallets')}
       onBack={slipId ? backToList : undefined}
-      backLabel="Your pallets"
+      backLabel={t('slip.yourPallets')}
     >
       {slipId ? (
         <StaffSlipFlow

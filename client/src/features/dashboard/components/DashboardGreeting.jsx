@@ -19,15 +19,22 @@
 // The staff floor's dashboard. Manager and admin dashboards open with
 // the ordinary PageHeader instead, so they match the screens around them.
 import { timeGreeting } from '../timeGreeting';
+import { useT } from '../../../i18n';
+
+// timeGreeting() answers in English; this is the same three, by key.
+const GREETING_KEYS = { 'Good morning': 'home.morning', 'Good afternoon': 'home.afternoon', 'Good evening': 'home.evening' };
 
 export default function DashboardGreeting({ name }) {
+  const t = useT();
+  const english = timeGreeting();
+  const greeting = GREETING_KEYS[english] ? t(GREETING_KEYS[english]) : english;
   return (
     <div>
       <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight text-ink">
-        {timeGreeting()}{name ? `, ${name}` : ''}!
+        {greeting}{name ? `, ${name}` : ''}!
       </h1>
       <p className="mt-2 text-base text-muted-foreground">
-        What would you like to work on today?
+        {t('home.question')}
       </p>
     </div>
   );

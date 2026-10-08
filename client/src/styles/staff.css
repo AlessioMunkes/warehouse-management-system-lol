@@ -3061,3 +3061,15 @@ button.stf-panel-head:disabled { cursor: default; }
   outline-offset: 2px;
   animation: stf-press-flash 400ms ease-out;
 }
+
+/* ── Add a photo (PhotoButton.jsx) ─────────────────────────────────
+   The file input is the real control and stays in the page for the
+   camera to answer to, but is never seen: the button beside it opens
+   it. */
+.stf-photo { display: flex; flex-direction: column; gap: 6px; }
+.stf-photo-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.stf-photo-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.stf-photo-error { color: var(--stf-attention, #b3261e); }
+
+/* ── Language (LanguagePicker.jsx) ─────────────────────────────── */
+.stf-language { margin: 16px 0 4px; max-width: 26rem; }

@@ -33,11 +33,14 @@ import {
 } from '../../staff/components/StepPrimitives';
 import useCoachmark from '../../staff/hooks/useCoachmark';
 import { volunteerHolder } from '../../pickingSlips/slipViews';
+import PhotoButton from '../../staff/components/PhotoButton';
+import { useT } from '../../../i18n';
 
 const MODE_KEY = 'stf_packing_view_mode';
+// label and hint are keys in i18n/messages.js.
 const MODES = [
-  { value: 'guided', label: 'Guided', hint: 'One item at a time' },
-  { value: 'full',   label: 'Form',   hint: 'Every item at once' },
+  { value: 'guided', label: 'slip.view.guided', hint: 'slip.view.guidedHint' },
+  { value: 'full',   label: 'slip.view.form',   hint: 'slip.view.formHint' },
 ];
 const readStoredMode = () => {
   try {
@@ -47,17 +50,25 @@ const readStoredMode = () => {
   }
 };
 
-const COHORT_LABELS = { tuesday: 'Tuesday', thursday: 'Thursday' };
+const cohortLabel = (cohort, t) => (cohort === 'tuesday' || cohort === 'thursday' ? t(`day.${cohort}`) : cohort);
 
 // Soup kitchens and test centres have no child count; say nothing rather
 // than "· children" with the number missing.
-const childCountNote = (count) => (count == null || count === '' ? '' : ` · ${count} children`);
+const childCountNote = (count, t) => (count == null || count === '' ? '' : ` · ${t('common.children', { n: count })}`);
+// `value` is what is saved and what the manager's screens and reports
+// read, so it stays in English whatever language the packer reads.
 const REASON_OPTIONS = [
-  { value: 'Short quantity', label: 'Short quantity' },
-  { value: 'Damaged stock', label: 'Damaged stock' },
-  { value: 'Substituted item', label: 'Substituted item' },
-  { value: 'Other', label: 'Other' },
+  { value: 'Short quantity', label: 'slip.reason.short' },
+  { value: 'Damaged stock', label: 'slip.reason.damaged' },
+  { value: 'Substituted item', label: 'slip.reason.substituted' },
+  { value: 'Other', label: 'slip.reason.other' },
 ];
+
+// A saved flag reason is the English value; shown in the reader's language.
+const reasonLabel = (value, t) => {
+  const option = REASON_OPTIONS.find((o) => o.value === value);
+  return option ? t(option.label) : value;
+};
 
 function isManager(user) {
   return user?.role === 'manager' || user?.role === 'admin';
@@ -78,12 +89,13 @@ function ItemDecisionPanel({ item, slipId, onDone }) {
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const t = useT();
 
   if (mode === 'idle') {
     return (
       <Actions row>
-        <Button variant="step" onClick={() => setMode('confirm')}>Confirm</Button>
-        <Button variant="secondary" onClick={() => setMode('flag')}>Flag</Button>
+        <Button variant="step" onClick={() => setMode('confirm')}>{t('slip.confirm')}</Button>
+        <Button variant="secondary" onClick={() => setMode('flag')}>{t('slip.flag')}</Button>
       </Actions>
     );
   }
@@ -94,8 +106,8 @@ function ItemDecisionPanel({ item, slipId, onDone }) {
         <Counter label={item.product_name} value={qty} onChange={setQty} />
         <TextField
           id={`stf-note-confirm-${item.id}`}
-          label="Comment (optional)"
-          hint="E.g. a substitution — anything worth the floor knowing that isn't a shortage."
+          label={t('slip.comment')}
+          hint={t('slip.commentHintConfirm')}
           value={note}
           onChange={setNote}
         />
@@ -111,15 +123,15 @@ function ItemDecisionPanel({ item, slipId, onDone }) {
                 await confirmItem(slipId, item.id, qty, note);
                 onDone();
               } catch (err) {
-                setError(err.message || 'Could not confirm this item.');
+                setError(err.message || t('slip.confirmFailed'));
               } finally {
                 setSubmitting(false);
               }
             }}
           >
-            {submitting ? 'Saving' : 'Save'}
+            {submitting ? t('common.saving') : t('common.save')}
           </Button>
-          <Button variant="secondary" onClick={() => setMode('idle')}>Cancel</Button>
+          <Button variant="secondary" onClick={() => setMode('idle')}>{t('common.cancel')}</Button>
         </Actions>
       </div>
     );
@@ -127,13 +139,18 @@ function ItemDecisionPanel({ item, slipId, onDone }) {
 
   return (
     <div className="stf-field-body">
-      <ChoiceList legend="Why is this flagged?" options={REASON_OPTIONS} value={reason} onChange={setReason} />
-      <Counter label="Qty actually packed" value={flagQty === '' ? 0 : Number(flagQty)} onChange={(v) => setFlagQty(String(v))} />
-      <p className="stf-field-hint">Whatever you set here comes off stock when the pallet is closed.</p>
+      <ChoiceList
+        legend={t('slip.whyFlagged')} value={reason} onChange={setReason}
+        options={REASON_OPTIONS.map((o) => ({ value: o.value, label: t(o.label) }))}
+      />
+      <Counter label={t('slip.qtyPacked')} value={flagQty === '' ? 0 : Number(flagQty)} onChange={(v) => setFlagQty(String(v))} />
+      <p className="stf-field-hint">{t('slip.comesOffStock')}</p>
+      {/* Optional, and saved the moment it is taken: see PhotoButton. */}
+      <PhotoButton entityType="picking_slip_item" entityId={item.id} hint={t('photo.hintFlag')} />
       <TextField
         id={`stf-note-flag-${item.id}`}
-        label="Comment (optional)"
-        hint="Extra detail beyond the reason above, if there is any."
+        label={t('slip.comment')}
+        hint={t('slip.commentHintFlag')}
         value={note}
         onChange={setNote}
       />
@@ -149,15 +166,15 @@ function ItemDecisionPanel({ item, slipId, onDone }) {
               await flagItem(slipId, item.id, reason, flagQty === '' ? undefined : Number(flagQty), note);
               onDone();
             } catch (err) {
-              setError(err.message || 'Could not flag this item.');
+              setError(err.message || t('slip.flagFailed'));
             } finally {
               setSubmitting(false);
             }
           }}
         >
-          {submitting ? 'Saving' : 'Flag item'}
+          {submitting ? t('common.saving') : t('slip.flagItem')}
         </Button>
-        <Button variant="secondary" onClick={() => setMode('idle')}>Cancel</Button>
+        <Button variant="secondary" onClick={() => setMode('idle')}>{t('common.cancel')}</Button>
       </Actions>
     </div>
   );
@@ -165,6 +182,7 @@ function ItemDecisionPanel({ item, slipId, onDone }) {
 
 export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished }) {
   const manager = isManager(currentUser);
+  const t = useT();
 
   const [slip, setSlip] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -184,7 +202,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
     let cancelled = false;
     fetchPickingSlip(slipId)
       .then((data) => { if (!cancelled) { setSlip(data); setError(null); } })
-      .catch((err) => { if (!cancelled) setError(err.message || 'Could not load this pallet.'); })
+      .catch((err) => { if (!cancelled) setError(err.message || t('slip.loadFailed')); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [slipId, reloadToken]);
@@ -213,14 +231,14 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, pendingItems.length, guidedIndex]);
 
-  if (loading) return <div className="stf-skeleton" aria-label="Loading" />;
+  if (loading) return <div className="stf-skeleton" aria-label={t('common.loading')} />;
 
   if (error && !slip) {
     return (
       <>
         <Notice tone="warn">{error}</Notice>
         <Actions>
-          <Button variant="secondary" onClick={onBack}>Your pallets</Button>
+          <Button variant="secondary" onClick={onBack}>{t('slip.yourPallets')}</Button>
         </Actions>
       </>
     );
@@ -288,7 +306,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
       await assignSlip(slipId);
       reload();
     } catch (err) {
-      setError(err.message || 'Could not claim this pallet.');
+      setError(err.message || t('packing.claimFailed'));
     } finally {
       setClaiming(false);
     }
@@ -301,7 +319,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
       await releaseSlip(slipId);
       onBack?.();
     } catch (err) {
-      setError(err.message || 'Could not release this pallet.');
+      setError(err.message || t('slip.releaseFailed'));
       // Someone may have changed the pallet since it was loaded.
       reload();
     } finally {
@@ -316,7 +334,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
       await completeSlip(slipId, palletRef || undefined);
       onFinished?.();
     } catch (err) {
-      setCompleteError(err.message || 'Could not log this pallet as packed.');
+      setCompleteError(err.message || t('slip.logFailed'));
     } finally {
       setCompleting(false);
     }
@@ -330,15 +348,15 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
             using StepScreen, so the same markup goes here directly. */}
         {canEdit && !locked && items.length > 0 ? (
           <div className="stf-card-toggle">
-            <ViewToggle options={MODES} value={mode} onChange={handleModeChange} />
+            <ViewToggle options={MODES.map((m) => ({ value: m.value, label: t(m.label), hint: t(m.hint) }))} value={mode} onChange={handleModeChange} />
             <Coachmark show={showCoachmark} onDismiss={dismissCoachmark}>
-              Tap here to switch view
+              {t('slip.switchView')}
             </Coachmark>
           </div>
         ) : null}
         <h1 className="stf-step-title" tabIndex={-1}>{slip.ecd_name}</h1>
         <p className="stf-step-sub">
-          {COHORT_LABELS[slip.cohort] || slip.cohort}{childCountNote(slip.child_count)} · Take the oldest batch first.
+          {cohortLabel(slip.cohort, t)}{childCountNote(slip.child_count, t)} · {t('slip.oldestFirst')}
         </p>
       </div>
 
@@ -347,13 +365,13 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
       {unassigned && !locked ? (
         <Actions>
           <Button disabled={claiming} onClick={handleClaim} loading={claiming}>
-            {claiming ? 'Claiming…' : 'Claim this pallet'}
+            {claiming ? t('packing.claiming') : t('slip.claimThis')}
           </Button>
         </Actions>
       ) : (
         <p className="stf-kv">
           <span>
-            <span className="stf-kv-key">Packing:</span>{' '}
+            <span className="stf-kv-key">{t('slip.packing')}</span>{' '}
             <span className="stf-kv-val">
               {slip.packer_name ? slip.packer_name : volunteerLabel}
               {slip.assigned_to_2 ? `, ${slip.packer_name_2}` : ''}
@@ -365,7 +383,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
       {canRelease ? (
         <Actions>
           <Button variant="secondary" disabled={releasing} onClick={handleRelease}>
-            {releasing ? 'Releasing…' : 'Release this pallet'}
+            {releasing ? t('slip.releasing') : t('slip.releaseThis')}
           </Button>
         </Actions>
       ) : null}
@@ -381,7 +399,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
       </div>
 
       {items.length === 0 ? (
-        <Notice>This slip has no items. Ask a manager to add order lines before this pallet goes out.</Notice>
+        <Notice>{t('slip.noItems')}</Notice>
       ) : (
         <>
           <div className="stf-list">
@@ -389,10 +407,10 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
               const variance = hasQuantityVariance(item);
               const showPanel = canEdit && !locked && item.status === 'pending';
               const badge =
-                item.status === 'confirmed' && variance ? { className: 'stf-badge is-warn', label: 'Qty differs' } :
-                item.status === 'confirmed' ? { className: 'stf-badge is-done', label: 'Confirmed' } :
-                item.status === 'flagged'   ? { className: 'stf-badge is-warn', label: 'Flagged' } :
-                { className: 'stf-badge', label: 'Pending' };
+                item.status === 'confirmed' && variance ? { className: 'stf-badge is-warn', label: t('slip.badge.differs') } :
+                item.status === 'confirmed' ? { className: 'stf-badge is-done', label: t('slip.badge.confirmed') } :
+                item.status === 'flagged'   ? { className: 'stf-badge is-warn', label: t('slip.badge.flagged') } :
+                { className: 'stf-badge', label: t('slip.badge.pending') };
 
               return (
                 <div key={item.id} className="stf-row is-static stf-row--check">
@@ -415,13 +433,13 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
                   <span className="stf-row-head">
                     <span className="stf-row-main">
                       {guidedActive ? (
-                        <span className="stf-wl-pos">Item {activeGuidedIndex + 1} of {pendingItems.length}</span>
+                        <span className="stf-wl-pos">{t('slip.itemOf', { n: activeGuidedIndex + 1, all: pendingItems.length })}</span>
                       ) : null}
                       <span className="stf-row-title">{item.product_name}</span>
                       <span className="stf-row-meta">
-                        Required {fmtQty(item.required_quantity, item.unit)}
-                        {item.packed_quantity != null ? ` · Packed ${fmtQty(item.packed_quantity, item.unit)}` : ''}
-                        {item.flag_reason ? ` · ${item.flag_reason}` : ''}
+                        {t('slip.required', { qty: fmtQty(item.required_quantity, item.unit) })}
+                        {item.packed_quantity != null ? ` · ${t('slip.packed', { qty: fmtQty(item.packed_quantity, item.unit) })}` : ''}
+                        {item.flag_reason ? ` · ${reasonLabel(item.flag_reason, t)}` : ''}
                         {item.packer_note ? ` · ${item.packer_note}` : ''}
                       </span>
                       {/* FEFO: only while the line is still to pack — once
@@ -445,14 +463,14 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
           </div>
 
           {guidedActive && pendingItems.length > 1 ? (
-            <nav className="stf-wl-steps" aria-label="Move between items">
+            <nav className="stf-wl-steps" aria-label={t('slip.moveBetween')}>
               <button
                 type="button"
                 className="stf-wl-step-btn"
                 onClick={() => goToPending(activeGuidedIndex - 1)}
                 disabled={activeGuidedIndex <= 0}
               >
-                Previous item
+                {t('slip.previous')}
               </button>
               <span className="stf-wl-steps-count">{activeGuidedIndex + 1} / {pendingItems.length}</span>
               <button
@@ -461,7 +479,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
                 onClick={() => goToPending(activeGuidedIndex + 1)}
                 disabled={activeGuidedIndex >= pendingItems.length - 1}
               >
-                Next item
+                {t('slip.next')}
               </button>
             </nav>
           ) : null}
@@ -471,11 +489,11 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
       {canEdit && !locked && items.length > 0 ? (
         <>
           {pending > 0 ? (
-            <Notice>{pending} {pending > 1 ? 'items still need' : 'item still needs'} to be confirmed or flagged.</Notice>
+            <Notice>{t.n('slip.stillNeeded', pending)}</Notice>
           ) : null}
           {completeError ? <Notice tone="warn">{completeError}</Notice> : null}
           <div className="stf-field">
-            <label className="stf-field-label" htmlFor="stf-pallet-ref">Pallet reference (optional)</label>
+            <label className="stf-field-label" htmlFor="stf-pallet-ref">{t('slip.palletRef')}</label>
             <input
               id="stf-pallet-ref"
               className="stf-input is-text"
@@ -486,7 +504,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
           </div>
           <Actions>
             <Button disabled={pending > 0 || completing} onClick={handleComplete}>
-              {completing ? 'Logging…' : 'Log pallet packed'}
+              {completing ? t('slip.logging') : t('slip.logPacked')}
             </Button>
           </Actions>
         </>
@@ -494,7 +512,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
 
       {locked ? (
         <Notice>
-          Pallet {slip.status === 'collected' ? 'collected' : 'packed'}{slip.pallet_ref ? ` · Ref ${slip.pallet_ref}` : ''}.
+          {slip.status === 'collected' ? t('slip.palletCollected') : t('slip.palletPacked')}{slip.pallet_ref ? ` · ${t('slip.ref', { ref: slip.pallet_ref })}` : ''}.
         </Notice>
       ) : null}
 
@@ -502,7 +520,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
           record of it, not yet the server's (pickingAPI.withQueuedPacking). */}
       {slip.waitingToSend ? (
         <Notice>
-          No signal. What you packed is saved on this phone and sends itself when you are back in range. Carry on.
+          {t('slip.savedOnPhone')}
         </Notice>
       ) : null}
     </section>

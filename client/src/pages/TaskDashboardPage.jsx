@@ -50,25 +50,22 @@ import UnfinishedWork from '../features/staff/components/UnfinishedWork';
 import TaskNode from '../features/dashboard/components/TaskNode';
 import { useAuth } from '../context/AuthContext';
 import useCoachmark from '../features/staff/hooks/useCoachmark';
+import LanguagePicker from '../features/staff/components/LanguagePicker';
+import { useT } from '../i18n';
 import { STAFF, PACKING } from '../routes/paths';
 
 // What to do there, three words or fewer — see this file's own note
 // above on why the live counts were dropped.
+// `key` is the task's entry in i18n/messages.js: its name, and
+// `<key>.meta` for the line under it.
 const TASKS = [
-  { to: STAFF.receiving, icon: 'receiving-icon', title: 'Receiving',
-    meta: 'Record deliveries' },
-  { to: STAFF.donation, icon: 'donate-icon', title: 'Donation intake',
-    meta: 'Log donations' },
-  { to: PACKING.board, icon: 'packing-icon', title: 'Packing',
-    meta: 'Pack picking slips' },
-  { to: STAFF.decanting, icon: 'decanting-icon', title: 'Decanting',
-    meta: 'Portion bulk stock' },
-  { to: STAFF.dispatch, icon: 'dispatch-icon', title: 'Dispatch',
-    meta: 'Dispatch pallets' },
-  { to: STAFF.floorRequests, icon: 'benevolent-icon', title: 'Benevolent requests',
-    meta: 'Log a request' },
-  { to: STAFF.floorFeedTheSoil, icon: 'fts-icon', title: 'Feed the Soil',
-    meta: 'Log compost' },
+  { to: STAFF.receiving, icon: 'receiving-icon', key: 'task.receiving' },
+  { to: STAFF.donation, icon: 'donate-icon', key: 'task.donation' },
+  { to: PACKING.board, icon: 'packing-icon', key: 'task.packing' },
+  { to: STAFF.decanting, icon: 'decanting-icon', key: 'task.decanting' },
+  { to: STAFF.dispatch, icon: 'dispatch-icon', key: 'task.dispatch' },
+  { to: STAFF.floorRequests, icon: 'benevolent-icon', key: 'task.requests' },
+  { to: STAFF.floorFeedTheSoil, icon: 'fts-icon', key: 'task.fts' },
   // Receipts is manager-only and deliberately absent. The item and
   // the route guard in App.jsx have to agree — a hidden item on an
   // open route is not access control, just a tidier way to lose
@@ -77,6 +74,7 @@ const TASKS = [
 
 export default function TaskDashboardPage() {
   const { user } = useAuth();
+  const t = useT();
   const { show: showHamburgerHint, dismiss: dismissHamburgerHint } = useCoachmark('dashboard-hamburger');
 
   // Same 5s auto-dismiss every other Coachmark in this app already
@@ -92,13 +90,13 @@ export default function TaskDashboardPage() {
   }, [showHamburgerHint, dismissHamburgerHint]);
 
   return (
-    <StaffShell crumb="Home" wide>
+    <StaffShell crumb={t('home.title')} wide>
       {showHamburgerHint ? (
         <button
           type="button"
           className="stf-coachmark stf-coachmark-fixed stf-coachmark-arrow-only"
           onClick={dismissHamburgerHint}
-          aria-label="Dismiss hint: everything else is in the menu"
+          aria-label={t('home.menuHint')}
         >
           <span className="stf-coachmark-arrow" aria-hidden="true">&#8593;</span>
         </button>
@@ -106,13 +104,17 @@ export default function TaskDashboardPage() {
 
       <DashboardGreeting name={user?.firstName} />
 
+      {/* Under the greeting, where it is seen on arriving. Each choice is
+          written in its own language. */}
+      <LanguagePicker />
+
       {/* Renders nothing when there is nothing half-done, which is
           most days. */}
       <UnfinishedWork />
 
       <div className="stf-tasks">
         {TASKS.map((task) => (
-          <TaskNode key={task.to} {...task} />
+          <TaskNode key={task.to} to={task.to} icon={task.icon} title={t(task.key)} meta={t(`${task.key}.meta`)} />
         ))}
       </div>
     </StaffShell>

@@ -21,22 +21,21 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { listDrafts, clearDraft } from '../hooks/useDraft';
 import { STAFF } from '../../../routes/paths';
+import { useT } from '../../../i18n';
 
 // Draft keys are written by the flows as `receiving-<poId>` and
 // `dispatch-<slipId>`. Parsing them here rather than storing a label
 // in the draft keeps the flows from having to know how they will be
 // described later, and an unrecognised prefix is simply not offered
 // rather than shown as something nobody can act on.
-const describe = ({ key, data }) => {
+const describe = ({ key, data }, t) => {
   const [kind, id] = key.split('-');
 
   if (kind === 'receiving') {
     const counted = Object.keys(data?.counted ?? {}).length;
     return {
-      title: `Delivery · Order ${id}`,
-      detail: counted > 0
-        ? `${counted} ${counted === 1 ? 'line' : 'lines'} counted`
-        : 'Started, nothing counted yet',
+      title: t('resume.delivery', { id }),
+      detail: counted > 0 ? t.n('resume.linesCounted', counted) : t('resume.startedNothing'),
       // ReceivingFlow opens this order straight away, counts refilled.
       to: `${STAFF.receiving}?resume=${encodeURIComponent(id)}`,
     };
@@ -45,10 +44,10 @@ const describe = ({ key, data }) => {
   if (kind === 'dispatch') {
     const loaded = Object.values(data?.loaded ?? {}).filter((v) => v !== '' && v != null).length;
     return {
-      title: `Pallet ${id} at the gate`,
+      title: t('resume.pallet', { id }),
       detail: [
-        loaded > 0 ? `${loaded} ${loaded === 1 ? 'line' : 'lines'} checked` : 'Started',
-        data?.driverName ? `driver ${data.driverName}` : null,
+        loaded > 0 ? t.n('resume.linesChecked', loaded) : t('resume.started'),
+        data?.driverName ? t('resume.driver', { name: data.driverName }) : null,
       ].filter(Boolean).join(' · '),
       // DispatchPage opens this pallet straight away, checks refilled.
       to: `${STAFF.dispatch}?pallet=${encodeURIComponent(id)}`,
@@ -59,12 +58,11 @@ const describe = ({ key, data }) => {
 };
 
 // "23 minutes ago" beats a timestamp on a screen someone glances at.
-const sinceWords = (at) => {
+const sinceWords = (at, t) => {
   const mins = Math.round((Date.now() - at) / 60000);
-  if (mins < 1)  return 'just now';
-  if (mins < 60) return `${mins} ${mins === 1 ? 'minute' : 'minutes'} ago`;
-  const hours = Math.round(mins / 60);
-  return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
+  if (mins < 1)  return t('time.justNow');
+  if (mins < 60) return t.n('time.minutesAgo', mins);
+  return t.n('time.hoursAgo', Math.round(mins / 60));
 };
 
 export default function UnfinishedWork() {
@@ -72,9 +70,10 @@ export default function UnfinishedWork() {
   // its own writes, and re-reading on an interval would be polling a
   // thing that only changes when the worker leaves this screen.
   const [drafts, setDrafts] = useState(() => listDrafts());
+  const t = useT();
 
   const items = drafts
-    .map((draft) => ({ draft, ...(describe(draft) ?? {}) }))
+    .map((draft) => ({ draft, ...(describe(draft, t) ?? {}) }))
     .filter((item) => item.to);
 
   if (items.length === 0) return null;
@@ -87,7 +86,7 @@ export default function UnfinishedWork() {
   return (
     <section className="stf-resume" aria-labelledby="stf-resume-title">
       <h2 className="stf-resume-title" id="stf-resume-title">
-        {items.length === 1 ? 'You did not finish this' : 'You did not finish these'}
+        {t.n('resume.title', items.length)}
       </h2>
 
       <ul className="stf-resume-list">
@@ -95,10 +94,10 @@ export default function UnfinishedWork() {
           <li key={draft.key} className="stf-resume-row">
             <span className="stf-resume-text">
               <span className="stf-resume-name">{title}</span>
-              <span className="stf-resume-meta">{detail} · {sinceWords(draft.savedAt)}</span>
+              <span className="stf-resume-meta">{detail} · {sinceWords(draft.savedAt, t)}</span>
             </span>
 
-            <Link className="stf-resume-go" to={to}>Carry on</Link>
+            <Link className="stf-resume-go" to={to}>{t('resume.carryOn')}</Link>
 
             {/* Discarding is deliberately the quieter of the two and
                 says what it does. "Dismiss" would be a lie: the counts
@@ -108,7 +107,7 @@ export default function UnfinishedWork() {
               className="stf-resume-drop"
               onClick={() => discard(draft.key)}
             >
-              Throw away
+              {t('resume.throwAway')}
             </button>
           </li>
         ))}

@@ -35,6 +35,7 @@
 // of the numbers, so a tablet that sleeps does not lose the count —
 // see hooks/useDraft.js. That refills the form; it never submits.
 // ─────────────────────────────────────────────────────────────
+import PhotoButton from '../../staff/components/PhotoButton';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { takeUrlParam } from '../../staff/resumeParam';
 import {
@@ -656,6 +657,11 @@ export default function ReceivingFlow({ onCrumbChange }) {
                 value={deliveryDate}
                 onChange={setDeliveryDate}
               />
+              {/* A picture of the delivery as it arrived, kept against its
+                  order. Optional, and saved the moment it is taken. */}
+              {orderId ? (
+                <PhotoButton entityType="purchase_order" entityId={orderId} hintKey="photo.hintDelivery" />
+              ) : null}
               {shortLines.length > 0 ? (
                 <Notice tone="warn">
                   {shortLines.length} {shortLines.length === 1 ? 'line is' : 'lines are'} short.

@@ -29,6 +29,8 @@ import useGoBack from './useGoBack';
 import useSpareSlipAlert from '../../features/staff/hooks/useSpareSlipAlert';
 import usePressFlash from '../../features/staff/hooks/usePressFlash';
 import useKeepAwake from '../../features/staff/hooks/useKeepAwake';
+import useAccountLanguage from '../../features/staff/hooks/useAccountLanguage';
+import { useT } from '../../i18n';
 import { STAFF } from '../../routes/paths';
 
 // 'Packing / Little Stars ECD' → title 'Packing', sub 'Little Stars ECD'.
@@ -71,6 +73,9 @@ export default function StaffShell({
   // kept awake inside a task, not on the home screen: a tablet left on
   // the bench showing Home should still go to sleep.
   usePressFlash(true);
+  // The language this worker chose follows them to this tablet.
+  useAccountLanguage(user?.role === 'warehouse_worker' ? user.id : null);
+  const t = useT();
   useKeepAwake(user?.role === 'warehouse_worker' && pathname !== STAFF.home);
 
   // No pop-up on the Packing screen itself; its tabs already show it.
@@ -91,13 +96,13 @@ export default function StaffShell({
                       variant="ghost"
                       size="icon"
                       onClick={goBack}
-                      aria-label="Go back"
+                      aria-label={t('common.goBack')}
                     >
                       <ArrowLeft className="h-5 w-5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Go back to previous page</p>
+                    <p>{t('common.goBackHint')}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>

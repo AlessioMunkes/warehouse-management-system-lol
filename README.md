@@ -129,6 +129,16 @@ pasted into the Render dashboard, not stored here. It currently deploys the
   request, a compost weigh-in, a gate collection) is kept on the phone and sent when the signal
   returns; a bar at the top says what is waiting. Claiming or releasing a pallet needs a signal.
   See `client/src/services/outbox.js` and `server/src/middleware/idempotency.middleware.js`.
+- The floor reads in English, Afrikaans or isiXhosa. A worker chooses on their home screen and
+  the choice is saved on their account. So far the home screen, the tab bar, the no-signal bar
+  and Packing are translated; the other floor tasks are still in English. All the text is in
+  `client/src/i18n/messages.js`. The Afrikaans and isiXhosa there were drafted without a fluent
+  speaker checking them: have one read that file before relying on it.
+- A worker can add a photo when flagging an item in Packing, and of a delivery in Receiving.
+  The manager sees them on the picking slip and the purchase order. The phone shrinks each to
+  about 1280 pixels first. They are stored in the database (`photos` table), which has room for
+  a few thousand; `server/src/repositories/photo.repository.js` is the one place to change to
+  move them to file storage.
 - Stock is taken off at dispatch, not at packing. A packed pallet waiting for collection counts
   as committed, not gone.
 - Picking slips are made from the recipe in use (Settings -> Recipes). With no recipe filled

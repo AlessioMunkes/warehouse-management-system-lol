@@ -71,6 +71,7 @@ import communicationsRouter from './src/routes/communications.routes.js';
 import settingsRouter from './src/routes/settings.routes.js';
 import calendarRouter from './src/routes/calendar.routes.js';
 import recipeRouter from './src/routes/recipe.routes.js';
+import photoRouter from './src/routes/photo.routes.js';
 import publicImpactRouter from './src/routes/publicImpact.routes.js';
 import publicWarehousesRouter from './src/routes/publicWarehouses.route.js';
 import publicWarehouse   from './src/middleware/publicWarehouse.middleware.js';
@@ -225,6 +226,8 @@ app.use('/api/communications', communicationsRouter);
 app.use('/api/settings', settingsRouter);
 app.use('/api/calendar', calendarRouter);
 app.use('/api/recipes', recipeRouter);
+// Photos a worker takes of a flagged item or a delivery.
+app.use('/api/photos', photoRouter);
 app.use('/api/public/warehouses', publicWarehousesRouter);
 app.use('/api/public',      publicImpactRouter);
 

@@ -28,21 +28,21 @@
 // ─────────────────────────────────────────────────────────────
 import useOutbox from '../../hooks/useOutbox';
 import { useServedFromCache } from '../../services/readCache';
+import { useT } from '../../i18n';
 
 // "at 14:05" today, "on 12 Sep at 14:05" otherwise.
-const savedWords = (at) => {
+const savedWords = (at, t) => {
   const d = new Date(at);
   const time = d.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
-  if (d.toDateString() === new Date().toDateString()) return `at ${time}`;
-  return `on ${d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' })} at ${time}`;
+  if (d.toDateString() === new Date().toDateString()) return t('offline.atTime', { time });
+  return t('offline.onDate', { date: d.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short' }), time });
 };
-
-const countOf = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
 export default function OfflineBar() {
   const { online, waiting, stuck, sending, send } = useOutbox();
   const savedAt = useServedFromCache();
-  const savedNote = savedAt ? ` Showing what was saved ${savedWords(savedAt)}.` : '';
+  const t = useT();
+  const savedNote = savedAt ? ` ${t('offline.showingSaved', { when: savedWords(savedAt, t) })}` : '';
 
   // Everything is fine and nothing is waiting: say nothing.
   if (online && waiting === 0) return null;
@@ -51,8 +51,8 @@ export default function OfflineBar() {
     return (
       <div className="stf-netbar is-stuck" role="status">
         <span className="stf-netbar-text">
-          {countOf(stuck.length, 'thing', 'things')} could not be sent.{' '}
-          {stuck[0].label ? `${stuck[0].label}: ` : ''}{stuck[0].error} Tell your manager.
+          {t.n('offline.stuck', stuck.length)}{' '}
+          {stuck[0].label ? `${stuck[0].label}: ` : ''}{stuck[0].error} {t('offline.tellManager')}
         </span>
       </div>
     );
@@ -62,9 +62,7 @@ export default function OfflineBar() {
     return (
       <div className="stf-netbar" role="status">
         <span className="stf-netbar-text">
-          {waiting > 0
-            ? `No signal. ${countOf(waiting, 'thing is', 'things are')} saved on this phone and will send when you are back in range.`
-            : 'No signal. Your work is saved on this phone, carry on.'}
+          {waiting > 0 ? t.n('offline.noSignalWaiting', waiting) : t('offline.noSignal')}
           {savedNote}
         </span>
       </div>
@@ -75,13 +73,11 @@ export default function OfflineBar() {
   return (
     <div className="stf-netbar is-sending" role="status">
       <span className="stf-netbar-text">
-        {sending
-          ? `Sending ${countOf(waiting, 'thing', 'things')}…`
-          : `${countOf(waiting, 'thing', 'things')} waiting to send.`}
+        {sending ? t.n('offline.sending', waiting) : t.n('offline.waiting', waiting)}
       </span>
       {!sending ? (
         <button type="button" className="stf-netbar-btn" onClick={send}>
-          Send now
+          {t('offline.sendNow')}
         </button>
       ) : null}
     </div>

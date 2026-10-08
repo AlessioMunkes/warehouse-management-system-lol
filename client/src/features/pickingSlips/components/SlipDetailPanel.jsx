@@ -17,6 +17,7 @@
 // then. A packed, dispatched or cancelled slip is read-only here: this
 // screen organises the queue, it does not pull finished work apart.
 // ─────────────────────────────────────────────────────────────
+import PhotoStrip from '@/components/ui/photo-strip';
 import { useState } from 'react';
 import { Pencil, Printer, Undo2, UserPlus, UserRoundCheck } from 'lucide-react';
 import DetailPanel from '@/components/ui/detail-panel';
@@ -156,6 +157,10 @@ export default function SlipDetailPanel({
                   <div className="min-w-0">
                     <p className="break-words text-sm">{item.product_name}</p>
                     {comment ? <p className="break-words text-xs text-muted-foreground">{comment}</p> : null}
+                    {/* What the packer photographed when they flagged it. */}
+                    {item.status === 'flagged' ? (
+                      <div className="mt-1.5"><PhotoStrip entityType="picking_slip_item" entityId={item.id} /></div>
+                    ) : null}
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="text-sm tabular-nums">{fmtQty(item.required_quantity, item.unit)}</p>

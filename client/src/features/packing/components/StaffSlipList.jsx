@@ -31,18 +31,19 @@ import Paged from '../../staff/components/Paged';
 import usePaged from '../../staff/hooks/usePaged';
 import { floorWindow, isSpareSlip } from '../spareSlips';
 import { volunteerHolder, dayLabel } from '../../pickingSlips/slipViews';
+import { useT } from '../../../i18n';
 
-const COHORT_LABELS = { tuesday: 'Tuesday', thursday: 'Thursday' };
+const cohortLabel = (cohort, t) => (cohort === 'tuesday' || cohort === 'thursday' ? t(`day.${cohort}`) : cohort);
 
 // Soup kitchens and test centres have no child count; say nothing rather
 // than "· children" with the number missing.
-const childCountNote = (count) => (count == null || count === '' ? '' : ` · ${count} children`);
+const childCountNote = (count, t) => (count == null || count === '' ? '' : ` · ${t('common.children', { n: count })}`);
 
 // The day a floor pallet goes out. The floor shows the whole week now,
 // so the row has to say which day each one is for.
-const goingOut = (slip) => {
+const goingOut = (slip, t) => {
   const day = slip.dispatch_date_iso ?? String(slip.dispatch_date ?? '').slice(0, 10);
-  return day ? `Going out ${dayLabel(day)}` : (COHORT_LABELS[slip.cohort] || slip.cohort);
+  return day ? t('packing.goingOut', { day: dayLabel(day) }) : cohortLabel(slip.cohort, t);
 };
 
 // Centre and packer. Module level so its identity is stable.
@@ -58,12 +59,12 @@ function daysSinceCollection(lastCollectedDate, dispatchDate) {
   return Math.round((due - last) / (24 * 60 * 60 * 1000));
 }
 
-function badgeFor(slip) {
-  if (slip.status === 'collected') return { className: 'stf-badge is-done', label: 'Collected' };
-  if (slip.status === 'complete') return { className: 'stf-badge is-done', label: 'Complete' };
-  if (slip.status === 'in_progress') return { className: 'stf-badge is-active', label: 'In progress' };
-  if (slip.status === 'cancelled') return { className: 'stf-badge', label: 'Cancelled' };
-  return { className: 'stf-badge', label: 'Pending' };
+function badgeFor(slip, t) {
+  if (slip.status === 'collected') return { className: 'stf-badge is-done', label: t('status.collected') };
+  if (slip.status === 'complete') return { className: 'stf-badge is-done', label: t('status.complete') };
+  if (slip.status === 'in_progress') return { className: 'stf-badge is-active', label: t('status.inProgress') };
+  if (slip.status === 'cancelled') return { className: 'stf-badge', label: t('status.cancelled') };
+  return { className: 'stf-badge', label: t('status.pending') };
 }
 
 // Floor, then claimed, then done — the three states a pallet actually
@@ -72,9 +73,9 @@ function badgeFor(slip) {
 // what they've already got. Same 'spare'/'mine' keys and data as
 // before, only the labels and the order changed.
 const TABS = [
-  { key: 'spare', label: 'Assigned to floor' },
-  { key: 'mine', label: 'Claimed by me' },
-  { key: 'done', label: 'Done' },
+  { key: 'spare', label: 'packing.tab.floor' },
+  { key: 'mine', label: 'packing.tab.mine' },
+  { key: 'done', label: 'packing.tab.done' },
 ];
 
 export default function StaffSlipList({ onOpenSlip }) {
@@ -85,6 +86,7 @@ export default function StaffSlipList({ onOpenSlip }) {
   const [error, setError] = useState(null);
   const [claimingId, setClaimingId] = useState(null);
   const [reloadToken, setReloadToken] = useState(0);
+  const t = useT();
 
   useEffect(() => {
     let cancelled = false;
@@ -100,7 +102,7 @@ export default function StaffSlipList({ onOpenSlip }) {
         setError(null);
       })
       .catch((err) => {
-        if (!cancelled) setError(err.message || 'Could not load your pallets.');
+        if (!cancelled) setError(err.message || 'packing.loadFailed');
       })
       .finally(() => { if (!cancelled) setLoading(false); });
 
@@ -130,7 +132,7 @@ export default function StaffSlipList({ onOpenSlip }) {
       setTab('mine');
       setReloadToken((t) => t + 1);
     } catch (err) {
-      setError(err.message || 'Could not claim this pallet.');
+      setError(err.message || 'packing.claimFailed');
     } finally {
       setClaimingId(null);
     }
@@ -139,23 +141,24 @@ export default function StaffSlipList({ onOpenSlip }) {
   return (
     <div className="stf-step">
       <div className="stf-step-head">
-        <h1 className="stf-step-title" tabIndex={-1}>Packing</h1>
-        <p className="stf-step-sub">Claim a pallet, confirm what's packed, flag what's short.</p>
+        <h1 className="stf-step-title" tabIndex={-1}>{t('packing.title')}</h1>
+        <p className="stf-step-sub">{t('packing.sub')}</p>
       </div>
 
-      {error ? <Notice tone="warn">{error}</Notice> : null}
+      {/* A key when the message is ours, the server's own words otherwise. */}
+      {error ? <Notice tone="warn">{t(error)}</Notice> : null}
 
-      <div className="stf-segments" role="tablist" aria-label="Pallet lists">
-        {TABS.map((t) => (
+      <div className="stf-segments" role="tablist" aria-label={t('packing.lists')}>
+        {TABS.map((tabItem) => (
           <button
-            key={t.key}
+            key={tabItem.key}
             type="button"
             role="tab"
-            aria-selected={tab === t.key}
-            className={`stf-segment${tab === t.key ? ' is-active' : ''}`}
-            onClick={() => setTab(t.key)}
+            aria-selected={tab === tabItem.key}
+            className={`stf-segment${tab === tabItem.key ? ' is-active' : ''}`}
+            onClick={() => setTab(tabItem.key)}
           >
-            {t.label} ({counts[t.key]})
+            {t(tabItem.label)} ({counts[tabItem.key]})
           </button>
         ))}
       </div>
@@ -165,17 +168,17 @@ export default function StaffSlipList({ onOpenSlip }) {
           id="stf-slip-search"
           query={search.query}
           onQuery={search.setQuery}
-          placeholder={tab === 'spare' ? 'Search by centre' : 'Search by centre or packer'}
+          placeholder={tab === 'spare' ? t('packing.searchCentre') : t('packing.searchCentrePacker')}
         />
       ) : null}
 
       {loading ? (
-        <div className="stf-skeleton" aria-label="Loading" />
+        <div className="stf-skeleton" aria-label={t('common.loading')} />
       ) : rows.length === 0 ? (
         <div className="stf-empty">
-          {tab === 'mine' && "You haven't claimed anything yet. Claim one from Assigned to floor, or wait for your manager to assign one."}
-          {tab === 'spare' && 'Nothing on the floor right now. Check back once your manager creates the next batch.'}
-          {tab === 'done' && 'Nothing finished yet today. Completed and collected pallets will show up here.'}
+          {tab === 'mine' && t('packing.empty.mine')}
+          {tab === 'spare' && t('packing.empty.floor')}
+          {tab === 'done' && t('packing.empty.done')}
         </div>
       ) : search.filtered.length === 0 ? (
         <NoMatches
@@ -195,7 +198,7 @@ export default function StaffSlipList({ onOpenSlip }) {
                   <span className="stf-row-main">
                     <span className="stf-row-title">{slip.ecd_name}</span>
                     <span className="stf-row-meta">
-                      {goingOut(slip)}{childCountNote(slip.child_count)}
+                      {goingOut(slip, t)}{childCountNote(slip.child_count, t)}
                     </span>
                   </span>
                   <button
@@ -204,13 +207,13 @@ export default function StaffSlipList({ onOpenSlip }) {
                     onClick={() => handleClaim(slip.id)}
                     disabled={claimingId === slip.id}
                   >
-                    {claimingId === slip.id ? 'Claiming…' : 'Claim'}
+                    {claimingId === slip.id ? t('packing.claiming') : t('packing.claim')}
                   </button>
                 </div>
               );
             }
 
-            const badge = badgeFor(slip);
+            const badge = badgeFor(slip, t);
             const gap = daysSinceCollection(slip.last_collected_date, slip.dispatch_date);
             const missed = !slip.last_collected_date || (gap !== null && gap >= MISSED_COLLECTION_DAYS);
             const isDone = tab === 'done';
@@ -231,10 +234,10 @@ export default function StaffSlipList({ onOpenSlip }) {
                 <span className="stf-row-main">
                   <span className="stf-row-title">{slip.ecd_name}</span>
                   <span className="stf-row-meta">
-                    {COHORT_LABELS[slip.cohort] || slip.cohort}{childCountNote(slip.child_count)} ·{' '}
-                    {slip.confirmed_items}/{slip.total_items} items packed
+                    {cohortLabel(slip.cohort, t)}{childCountNote(slip.child_count, t)} ·{' '}
+                    {t('packing.itemsPacked', { done: slip.confirmed_items, all: slip.total_items })}
                     {volunteerHolder(slip) ? ` · ${volunteerHolder(slip)}` : ''}
-                    {missed && !isDone ? ' · Not collected in a while' : ''}
+                    {missed && !isDone ? ` · ${t('packing.notCollected')}` : ''}
                   </span>
                 </span>
                 <span className={badge.className}>{badge.label}</span>
