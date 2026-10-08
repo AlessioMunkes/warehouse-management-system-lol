@@ -30,8 +30,8 @@
 // remove, that's a separate, deliberate step — see the printed summary
 // at the end for what to check by hand.
 //
-// REQUIRES server/database/cohort_weekday_migration.sql's Step 1 (the
-// ALTER TYPE lines) to have already run — this script inserts
+// REQUIRES the cohort_group enum to have 'tuesday' and 'thursday'
+// (schema.sql has them) — this script inserts
 // 'tuesday'/'thursday' cohort values directly, which only exist on
 // the enum once that migration adds them.
 //

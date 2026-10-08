@@ -27,8 +27,7 @@ export const ReducedMotionContext = createContext({
 
 export const useReducedMotion = () => useContext(ReducedMotionContext);
 
-// The same key features/staff/hooks/useReducedMotion.js has always
-// used. They were separate ('wms_reduced_movement' here), which meant
+// The same key the floor's shell has always used. They were separate ('wms_reduced_movement' here), which meant
 // the shell's toggle and StaffShell's toggle were two settings wearing
 // the same label — turn it on in one, still animating in the other.
 export const MOTION_KEY = 'stf_reduced_motion';

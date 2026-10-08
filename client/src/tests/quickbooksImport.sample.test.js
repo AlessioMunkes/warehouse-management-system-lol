@@ -1,9 +1,9 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/tests/quickbooksImport.sample.test.js
 //
-// The demo file (docs/samples/quickbooks-po-export-sample.csv) must keep
-// showing what the demo script says it shows. If the reader changes and
-// this fails, the script and the file need updating together.
+// A sample shaped like a QuickBooks Online purchase-order export
+// (fixtures/quickbooks-po-export-sample.csv): a title row, a blank row,
+// then the columns. The reader must keep making sense of it.
 // ─────────────────────────────────────────────────────────────
 /* global process */
 import { describe, it, expect } from 'vitest';
@@ -12,7 +12,7 @@ import { resolve } from 'node:path';
 import { parseCSV } from '../features/reporting/parseUpload';
 import { readTable, guessNumberColumn, extractRows, sortRows } from '../features/purchaseOrders/quickbooksImport';
 
-const text = readFileSync(resolve(process.cwd(), '../docs/samples/quickbooks-po-export-sample.csv'), 'utf8');
+const text = readFileSync(resolve(process.cwd(), 'src/tests/fixtures/quickbooks-po-export-sample.csv'), 'utf8');
 
 describe('the demo export', () => {
   const table = readTable(parseCSV(text));

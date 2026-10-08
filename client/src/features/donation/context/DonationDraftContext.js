@@ -36,7 +36,7 @@ export const emptyItem = () => ({
 // Shape mirrors donation.service.js's createDonation payload closely,
 // so mapping draft -> POST body at submit time is close to 1:1.
 export const emptyDraft = () => ({
-  category: "",              // ⚠ placeholder pending Alessio — see CategorySelector.jsx
+  category: "",              // not asked for on the form yet
   items: [emptyItem()],
   estimatedValueZar: "",
   isFood: null,

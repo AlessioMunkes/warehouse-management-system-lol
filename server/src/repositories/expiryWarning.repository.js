@@ -3,14 +3,14 @@
 //
 // Sponsor change request: capture an expiry date during receiving
 // (already done — see the note on delivery_note_items.expiry_date in
-// database.md, migration 018) and warn the Warehouse Manager as
+// schema.sql) and warn the Warehouse Manager as
 // perishable stock approaches it, two weeks out and again at one
 // week out.
 //
 // WHAT THIS WARNS ON, AND WHAT IT DOESN'T
 // expiry_date lives on delivery_note_items — one row per receiving
-// line, not per unit of stock still on the shelf. database.md is
-// explicit that per-batch stock is "still open": stock_levels is one
+// line, not per unit of stock still on the shelf. Per-batch
+// stock is not tracked: stock_levels is one
 // balance per product, so there is no data yet on how much of a given
 // delivery is still on hand versus already dispatched or decanted.
 // This warns on the DELIVERY LINE'S own expiry date regardless of

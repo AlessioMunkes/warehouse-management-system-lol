@@ -316,8 +316,8 @@ const getManifest = async () => {
 //
 // RECEIVED, NOT REMAINING. received_quantity is what came in on that
 // delivery; stock_levels holds one balance per product, so how much of
-// a given line is still on the shelf is not known (database.md, "per-
-// batch stock — still open"). The panel labels it that way.
+// a given line is still on the shelf is not known (per-
+// batch stock — is not tracked). The panel labels it that way.
 //
 // Lines that expired more than EXPIRED_GRACE_DAYS ago are dropped for
 // the same reason getManifest drops past dates: after a month the

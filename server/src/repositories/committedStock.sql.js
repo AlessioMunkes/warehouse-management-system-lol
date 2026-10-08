@@ -1,6 +1,5 @@
 // ─────────────────────────────────────────────────────────────
 // server/src/repositories/committedStock.sql.js
-//debug
 //
 // The single definition of "committed stock".
 //

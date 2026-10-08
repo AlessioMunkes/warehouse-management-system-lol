@@ -1554,7 +1554,7 @@ body.reduced-movement .decorative-icon {
 }
 /* ── ACC-08 · reduced motion ─────────────────────────────────────── */
 /* Honoured from the OS setting, and from the in-app "Less movement"
-   toggle (useReducedMotion.js), which sets data-stf-motion="reduced"
+   toggle (components/layout/shellContext.js), which sets data-stf-motion="reduced"
    on <html> so it also covers a shared tablet whose OS setting nobody
    can change.
 

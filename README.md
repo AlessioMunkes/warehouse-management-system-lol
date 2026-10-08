@@ -1,118 +1,130 @@
-# Ladles of Love — Warehouse Management System (WMS)
+# Ladles of Love — Warehouse Management System
 
-A web-based warehouse management system for Ladles of Love NPC.
-
+A web app for the Ladles of Love warehouse: purchase orders and receiving, stock, decanting,
+picking slips and packing, dispatch, donations and Section 18A certificates, benevolent
+requests, Feed the Soil, volunteer events, and reporting.
 
 Built by UCT INF3003W Team 22, 2026.
 
----
-
-
-A Progressive Web App that replaces Ladles of Love's manual, multi-spreadsheet warehouse
-process (Google Sheets + QuickBooks + paper forms) with one system covering receiving,
-decanting, picking/packing, dispatch, donations, and reporting across their three
-programmes (NOC, Feed the Soil, Love Activism).
-
-Nth architecture: **View → Application → Domain → Data Access**, backed by Supabase
-(Postgres). See `docs/database.md` for the schema.
-
-
-
-## Repository structure
+## What is in this repository
 
 ```
-client/
-├─ src/
-│  ├─ pages/          # One file per screen/route — see "Pages" below
-│  ├─ components/      # Reusable UI shared across pages — forms, cards, tables
-│  └─ styles/           # index.css — shared design tokens and component styles
-server/
-├─ src/
-│  ├─ repositories/     # Raw DB queries only. No business logic, no validation.
-│  ├─ services/         # Business logic, validation, orchestration. Calls repositories.
-│  ├─ controllers/      # Thin HTTP handlers — parse request, call service, shape response.
-│  ├─ routes/           # Express route definitions, mapped 1:1 to controller methods.
-│  └─ middleware/        # Auth (JWT) and role-based access guards.
-├─ database/
-│  └─ schema.sql        # Source of truth for the live schema — keep in sync with database.md
-docs/
-├─ README.md            # this file
-├─ database.md          # schema reference
-└─ known-issues.md       # known bugs / open TODOs (create alongside this file)
+client/                 React app (Vite, Tailwind). Installs as a PWA.
+  src/
+    pages/              One file per screen
+    features/           Each feature's components, hooks and helpers
+    components/         Shared UI (components/ui) and the app shells (components/layout)
+    routes/             routeTable.js lists every screen, who may open it, and its menu entry
+    services/           One file per API area; the only place that calls the server
+    tests/              Vitest + Testing Library
+  public/               Icons and images served as they are
+
+server/                 Express API
+  index.js              Starts the server and mounts every route
+  src/
+    routes/             URL -> controller, with the role check on each line
+    controllers/        Read the request, call a service, shape the response
+    services/           Rules and validation
+    repositories/       SQL only
+    features/           Larger areas that keep their own files together (reporting, recipes, settings, units)
+    jobs/               Scheduled work (collection reminders, expiry warnings, saved reports)
+    middleware/         Sign-in (JWT cookie) and role checks
+    constants/          Roles and other fixed lists
+  database/
+    schema.sql          The whole database as it stands. Start a new database from this.
+    migrations/         Numbered changes, applied by `npm run migrate`
+    reporting_factors_seed.sql   The rates that turn kilograms into meals and people fed
+  scripts/              Command-line tools (see below)
+  __tests__/            Vitest + Supertest
+
+render.yaml             Deployment to Render
+.github/workflows/      Lint, build and test on every push
 ```
 
-**Request flow:** `pages/components` → `routes` → `middleware` (auth check) →
-`controllers` (HTTP shaping) → `services` (business rules) → `repositories` (SQL) →
-Supabase.
+A request goes: screen -> `client/src/services` -> `server/src/routes` (sign-in and role
+check) -> controller -> service -> repository -> Postgres.
 
+## Who uses it
 
-## Pages (`client/src/pages`)
-
-| Page | Who uses it | Notes |
+| Role | Signs in at | Sees |
 |---|---|---|
-| `LandingPage` | Public | Marketing/about page, sits in front of login. See warehouse visit doc §6.1. |
-| `LoginPage` | Everyone | Standard credentialed login. |
-| `JobSelectPage` / `ProgrammeSelectPage` | Staff | Picks which programme's data the session is scoped to. |
-| `PickingDashboard` | Packers | ⚠ currently named `PackingDashboard` in the diagram — rename to `Picking*` throughout, see note below. |
-| `DispatchDashboard` | Dispatch staff (Bheki) | Gate confirmation, non-collection flags. |
-| `DecantingPage` | Decanting team (Mapelo) | Offline-first stock count screen lives here or adjacent — see database.md notes on offline sync. |
-| `DonationWindow` | Warehouse staff | Low-friction intake form (max 3 fields), see §5.2. |
-| `AdminDashboard` | Administrator | User management, ECD onboarding/offboarding. |
-| `FinanceDashboard` | Finance team | Invoices, QuickBooks sync status. |
-| `ProcurementDashboard` | Warehouse manager | PO creation/status, supplier management. |
-| `FTSDashboard` | Feed the Soil team | Bin tracking, farm exchanges. |
-| `LoveActivismDashboard` | Volunteers/guests | Guest sign-in, events, bookings. |
-| `Reporting&Analytics` | Management | Impact calculator, dashboards — see §Impact Calculator in warehouse visit doc. |
+| Warehouse staff (`warehouse_worker`) | `/login` | The floor: receiving, packing, decanting, dispatch, donation intake |
+| Manager (`manager`) | `/login` | Orders, stock, picking slips, beneficiaries, reports |
+| Admin (`admin`) | `/login` | Users, products, suppliers, logs, settings |
+| Guest volunteer (`guest`) | `/guest` | One pallet to pack, by QR code or code |
 
-## Components (`client/src/components`)
+Each role opens only its own screens. The classification queue and Section 18A are the two
+screens a manager and an admin share. `client/src/routes/routeTable.js` is where this is set,
+and `server/src/routes` is where the server enforces it.
 
-Key forms: `PickingSlipWindow`, `DeliveryNoteWindow`, `DecantingSheet`, `DonationForm`,
-`DonationCertificate`.
+## Running it on your machine
 
-`PickingSlipWindow` needs a guest-accessible variant reachable via QR/unique URL without
-a full login — see database.md §Picking Slips and warehouse visit doc §3.5.
+You need Node.js 22 and a Postgres database (the project uses Supabase).
 
-## Server modules
+```
+cd server
+copy env.example .env        # then fill it in: DATABASE_URL and JWT_SECRET at least
+npm install
+npm run dev                  # http://localhost:5000
 
-**Controllers:** `AuthController`, `ProcurementController`, `InventoryController`,
-`ProgrammeController`, `PickingController` , `DecantingController`,
-`DispatchController`, `DonationController`, `AdminController`, `AnalyticsController`,
-`FTSController`, `LoveActivismController`
+cd client
+copy env.local.example .env.local
+npm install
+npm run dev                  # http://localhost:5173
+```
 
-**Services:** `AuthService`, `DeliveryService`, `PickingService`,
-`StockMovementService`, `FinanceSync`, `WastageService`, `DonationService`,
-`DecantingService`, `FTSBinsService`, `LoveActivismService`, `AuditingService`,
-`AdminService`, `ReportingService`, `DispatchService`
+`server/env.example` explains every setting. The AI help panel and the reporting question box
+need `GEMINI_API_KEY`; phone notifications need the three `VAPID_` keys; without them those
+features are switched off and everything else works.
 
-**Repositories:** `UserRepository`, `DecantingRepository`, `ProcurementRepository`,
-`PickingRepository`, `DonationRepository`,
-`LoveActivismRepository`, `ECDRepository`, `DispatchRepository`, `ReportingRepository`,
-`FTSRepository`
+## The database
 
-**Middleware:** `SecureJWTToken` (issues/verifies JWTs), `ProtectedRoleBasedAccess`
-(role guard). A narrow, read-only, unauthenticated exception path needs to be added here
-for guest QR access to a single picking slip — don't widen the general guard to cover
-this, keep it scoped (see database.md).
+- A new database: run `server/database/schema.sql`, then `reporting_factors_seed.sql`.
+- An existing one: `cd server` and `npm run migrate` applies any migration not yet run.
+- When you change the database, add a numbered file to `migrations/` and make the same change
+  in `schema.sql`.
 
-## External integrations
+Some migration numbers are used twice (022, 023, 024, 029, 030, 031). The migrator goes by
+file name, so it still works, but it can report those as pending on a database that already
+has them. Check the table or column exists before running one again.
 
-- **Supabase (Postgres)** — primary data store, Row-Level Security for programme
-  isolation. See database.md.
-- **QuickBooks Online** — REST API, bidirectional for invoices/stock. PO-ID creation via
-  API is **blocked pending a spike** (warehouse visit doc §2.4) — don't build further
-  procurement-module code that assumes an outcome until that's resolved.
-- **Volunteer Management System (VMS)** — unidirectional, receive-only from WMS. WMS does
-  not call VMS. Full volunteer hour tracking stays out of scope here (business case
-  §11.2); the WMS only needs enough local data for its own session summaries (§6.3).
+## Tests
 
-## Non-functional requirements that apply to code, not just design
+```
+cd client && npm run lint && npm test
+cd server && npm test
+```
 
-- WCAG 2.1 AA minimum on every non-management screen (large tap targets, plain language,
-  high contrast, single-action workflows). Applies to dispatch, decanting, and any guest
-  screen. Management/reporting dashboards are exempt.
-- The stock count screen must work fully offline and sync on reconnect — this is a
-  frontend/local-storage concern as much as a schema one, see database.md.
+`server/__tests__/fixtures/routeRoles.baseline.json` records which roles may call each URL.
+When you add or change a route, that test fails until the file is updated: that is the point.
 
+## Command-line tools (`server/scripts`)
 
+| Script | What it does |
+|---|---|
+| `npm run migrate` | Applies database migrations |
+| `npm run warehouse-admin` | Looks up and manages people across warehouses, when running more than one |
+| `seedWesternCapeSupply.mjs` | Loads the sponsor's supply sheet: centres, products, standing orders |
+| `loadRealData.mjs` | Loads the summer menu into the Summer recipe and the July 2026 stock count |
+| `evalReportingQuestions.js` | Checks the reporting question box against a list of sample questions |
 
+The two load scripts have a `--dry-run` that prints what they would do.
 
+## Deployment
+
+`render.yaml` deploys one web service on Render: Express serves the API and the built client
+from the same address. The secrets (`DATABASE_URL`, `GEMINI_API_KEY`, the `VAPID_` keys) are
+pasted into the Render dashboard, not stored here. It currently deploys the
+`staging/(DEVELOPMENT-TESTING)` branch on the free plan, which sleeps when idle.
+
+## Things to know
+
+- The Supabase session pooler allows 15 connections. Several developers running the server
+  against the same database can use them up; set `DB_POOL_MAX=3` locally.
+- Stock is taken off at dispatch, not at packing. A packed pallet waiting for collection counts
+  as committed, not gone.
+- Picking slips are made from the recipe in use (Settings -> Recipes). With no recipe filled
+  in, they fall back to each centre's standing order.
+- Products counted in crates, bags, boxes or punnets but packed by weight need those weights
+  set in Settings -> Stock rules.
+- The `operational_goals` table is still in the database; the feature that used it was removed.

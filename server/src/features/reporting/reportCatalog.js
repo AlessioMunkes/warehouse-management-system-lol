@@ -30,8 +30,8 @@ import { MOVEMENT_TYPES } from '../../constants/movementTypes.js';
 import { STORAGE_AREAS } from '../../constants/storageAreas.js';
 
 // ── Enum values ─────────────────────────────────────────────
-// Each centre's weekly pickup day. (These were week1/week2 before
-// server/database/cohort_weekday_migration.sql.)
+// Each centre's weekly pickup day. (Very old data used week1/week2;
+// the enum still lists them, unused.)
 export const COHORTS = ['tuesday', 'thursday'];
 export const BENEFICIARY_KINDS = ['ecd', 'dignity_kitchen', 'soup_kitchen', 'community'];
 // NFR-20: impact reporting covers ECDs and soup kitchens only.

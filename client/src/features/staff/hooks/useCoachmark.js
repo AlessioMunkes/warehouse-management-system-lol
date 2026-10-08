@@ -3,7 +3,7 @@
 //
 // A first-time-only hint, shown once per browser and never again —
 // not a per-account preference synced anywhere, the same "storage
-// first, nothing fancier" approach useReducedMotion.js takes, for the
+// first, nothing fancier" approach the reduced-motion setting takes, for the
 // same reason: this is a shared warehouse tablet, not a personal
 // login session worth a server-side seen/unseen flag.
 //

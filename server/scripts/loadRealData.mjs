@@ -2,8 +2,8 @@
 // ─────────────────────────────────────────────────────────────
 // server/scripts/loadRealData.mjs
 //
-// Loads two of the warehouse's own documents (docs/real-data) into a
-// running system:
+// Loads two of the warehouse's own documents into a running system.
+// Their figures are written out below, so the files are not needed:
 //
 //   ECD SUMMER MENU with quantities.pdf        -> the Summer recipe
 //   Ladles_of_Love_CapeTown_Stock_Report.xlsx  -> the catalogue and the

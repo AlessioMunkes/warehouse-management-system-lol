@@ -27,8 +27,8 @@ const fail = (status, message) => {
 // Thursday by default, matching the real picking slips ("Pickup Day:
 // Tuesday"). Which weekday each cohort collects on, and the days the
 // warehouse is shut, come from the operating calendar
-// (features/calendar). Older data used week1/week2;
-// cohort_weekday_migration.sql converts it.
+// (features/calendar). Very old data used week1/week2; the enum still
+// lists them, unused.
 const WEEKDAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 // Same group as the routes' MANAGERS_UP — constants/permissions.js.
