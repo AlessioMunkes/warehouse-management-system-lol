@@ -12,13 +12,27 @@
 // Shared fetch wrapper: same-origin /api path (Vite dev proxy forwards to
 // the Express backend) and credentials included so the httpOnly wms_token
 // cookie reaches the server. All donation endpoints go through this.
+import { newIdempotencyKey } from "./api";
+import { reportUnreachable } from "./connection";
+import { queueIfOffline } from "./outbox";
+
 async function apiPost(path, payload) {
-  const res = await fetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify(payload),
-  });
+  let res;
+  try {
+    res = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    if (err?.name === "AbortError") throw err;
+    // fetch only rejects when the request never arrived.
+    reportUnreachable();
+    const offline = new Error("Could not reach the server. Check your connection and try again.");
+    offline.isNetworkError = true;
+    throw offline;
+  }
 
   let json;
   try {
@@ -98,7 +112,19 @@ export async function createPendingDonation(draft) {
     payload.estimatedValueZar = Number(draft.estimatedValueZar);
   }
 
-  return apiPost("/api/donations/pending", payload);
+  // The server recognises a repeat of the same donation by this key, so
+  // a donation taken with no signal can wait on the phone and be sent
+  // later (outbox.js). Returns { queued: true, label } when it does.
+  payload.idempotencyKey = payload.idempotencyKey || newIdempotencyKey();
+  try {
+    return await apiPost("/api/donations/pending", payload);
+  } catch (err) {
+    const label = payload.donorName ? `Donation from ${payload.donorName}` : "A donation";
+    if (await queueIfOffline(err, { endpoint: "/api/donations/pending", body: payload, kind: "donation", label })) {
+      return { queued: true, label };
+    }
+    throw err;
+  }
 }
 
 // ── Staff intake product search (Part A) ─────────────────────

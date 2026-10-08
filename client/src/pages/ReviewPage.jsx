@@ -52,6 +52,8 @@ export function ReviewPage() {
       const result = await createPendingDonation(draft);
       const items = result?.items || [];
       setCompletionResult({
+        // No signal: the donation is waiting on the phone.
+        queued: Boolean(result?.queued),
         pendingDonationId: result?.id ?? null,
         status: result?.status ?? null,
         resolvedCount: items.filter((it) => it.status === "resolved" || it.status === "committed").length,

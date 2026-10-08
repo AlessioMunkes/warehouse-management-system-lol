@@ -7,6 +7,7 @@
 // server exactly — see collectionKit.service.js's own note on why.
 // ─────────────────────────────────────────────────────────────
 import { apiGet, apiPost, apiPatch } from './api';
+import { postOrQueue } from './offlinePost';
 
 // GET /api/collection-kits?search=
 export const listKits = (search) =>
@@ -32,8 +33,13 @@ export const listRecords = (params = {}) => {
 export const getRecord = (recordId) => apiGet(`/api/collection-kits/records/${recordId}`);
 
 // POST /api/collection-kits/:id/records — log a compost weigh-in
-export const logCompost = (kitId, payload) =>
-  apiPost(`/api/collection-kits/${kitId}/records`, payload);
+// `keepOffline` is the floor's: with no signal the weigh-in is kept on
+// the phone and this returns { queued: true, label } (offlinePost.js).
+// The manager's screen leaves it off, because only the floor's shell
+// shows what is waiting and sends it.
+export const logCompost = (kitId, payload, { keepOffline = false } = {}) => (keepOffline
+  ? postOrQueue(`/api/collection-kits/${kitId}/records`, payload, { kind: 'compost', label: 'A compost weigh-in' })
+  : apiPost(`/api/collection-kits/${kitId}/records`, payload));
 
 // PATCH /api/collection-kits/records/:recordId/dispatch
 export const markDispatched = (recordId, dispatchedTo) =>

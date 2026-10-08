@@ -84,10 +84,11 @@ that builds it from nothing.
   meant to be run (its first line says so).
 - A second database (a test copy, another warehouse) is made by copying the existing one in
   Supabase, not from this repository.
-- The numbered migration files that built the database up were removed at handover: it already
-  has all of them, recorded in its `schema_migrations` table.
+- The numbered migration files that built the database up (019 to 039) were removed at
+  handover: it already has all of them, recorded in its `schema_migrations` table. The ones in
+  `server/database/migrations/` now are changes made since, and are applied too.
 - When you change the database: put the change in a new file
-  `server/database/migrations/NNN_what_it_does.sql` (the next number after 039), run
+  `server/database/migrations/NNN_what_it_does.sql` (the next number up), run
   `cd server` and `npm run migrate -- up`, and make the same change in `schema.sql`.
 
 ## Tests
@@ -123,6 +124,11 @@ pasted into the Render dashboard, not stored here. It currently deploys the
 
 - The Supabase session pooler allows 15 connections. Several developers running the server
   against the same database can use them up; set `DB_POOL_MAX=3` locally.
+- The floor works without a signal. Screens show the last copy they loaded, and what a worker
+  submits (a delivery, a packed item or pallet, a decanting sheet, a donation, a benevolent
+  request, a compost weigh-in, a gate collection) is kept on the phone and sent when the signal
+  returns; a bar at the top says what is waiting. Claiming or releasing a pallet needs a signal.
+  See `client/src/services/outbox.js` and `server/src/middleware/idempotency.middleware.js`.
 - Stock is taken off at dispatch, not at packing. A packed pallet waiting for collection counts
   as committed, not gone.
 - Picking slips are made from the recipe in use (Settings -> Recipes). With no recipe filled

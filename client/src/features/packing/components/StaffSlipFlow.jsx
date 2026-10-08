@@ -497,6 +497,14 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
           Pallet {slip.status === 'collected' ? 'collected' : 'packed'}{slip.pallet_ref ? ` · Ref ${slip.pallet_ref}` : ''}.
         </Notice>
       ) : null}
+
+      {/* Packed with no signal: what shows above is the phone's own
+          record of it, not yet the server's (pickingAPI.withQueuedPacking). */}
+      {slip.waitingToSend ? (
+        <Notice>
+          No signal. What you packed is saved on this phone and sends itself when you are back in range. Carry on.
+        </Notice>
+      ) : null}
     </section>
   );
 }

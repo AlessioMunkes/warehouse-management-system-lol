@@ -292,8 +292,10 @@ export default function CommunityRequestFlow({ onCrumbChange }) {
     setLogBusy(true);
     setLogError(null);
     try {
-      await communityRequestAPI.logRequest(payload);
-      setNotice('Request logged. A manager approves it before anyone packs.');
+      const logged = await communityRequestAPI.logRequest(payload, { keepOffline: true });
+      setNotice(logged.queued
+        ? 'No signal, so this is saved on your phone. It sends itself when you are back in range. Do not log it again.'
+        : 'Request logged. A manager approves it before anyone packs.');
       setLogKey((k) => k + 1);   // a clean form for the next call
     } catch (err) {
       setLogError(err.message || 'Could not log the request.');
@@ -325,9 +327,11 @@ export default function CommunityRequestFlow({ onCrumbChange }) {
     try {
       const done = await communityRequestAPI.confirmRequest(packing.id, items);
       setPacking(null);
-      setNotice(done.outcome === 'partially_fulfilled'
-        ? 'Done. Marked partly fulfilled, with what went out.'
-        : 'Done. Marked fulfilled.');
+      setNotice(done.queued
+        ? 'No signal, so this is saved on your phone. It sends itself when you are back in range. Do not confirm it again.'
+        : done.outcome === 'partially_fulfilled'
+          ? 'Done. Marked partly fulfilled, with what went out.'
+          : 'Done. Marked fulfilled.');
       setReloadToken((t) => t + 1);
     } catch (err) {
       setPackError(err.message || 'Could not confirm this request.');

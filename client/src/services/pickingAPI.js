@@ -5,6 +5,8 @@
 // shapes stay in one place.
 
 import { API_BASE } from './api';
+import { postOrQueue } from './offlinePost';
+import { list as listOutbox } from './outbox';
 
 const BASE_URL = `${API_BASE}/api/picking`;
 
@@ -21,16 +23,30 @@ const BASE_URL = `${API_BASE}/api/picking`;
 //     the Vite dev server and 404. In production Express serves
 //     both from one origin and API_BASE is ''.
 const request = async (path, options = {}) => {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    credentials: 'include',
-    ...options,
-    headers: {
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-      ...options.headers,
-    },
-  });
+  let res;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      credentials: 'include',
+      ...options,
+      headers: {
+        ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+        ...options.headers,
+      },
+    });
+  } catch (err) {
+    if (err?.name === 'AbortError') throw err;
+    // fetch only rejects when the request never arrived. Said in words
+    // a packer can act on, rather than the browser's "Failed to fetch".
+    const offline = new Error('No signal. This needs a connection; try again when you are back in range.');
+    offline.isNetworkError = true;
+    throw offline;
+  }
   return handleResponse(res);
 };
+
+// postOrQueue hands back the server's { success, data } envelope, or
+// { queued: true } when the work is waiting on the phone.
+const unwrap = (result) => (result?.queued ? result : result?.data);
 
 // Unwraps the { success, data, message } envelope every endpoint
 // returns. Throws on failure so callers can just try/catch.
@@ -70,9 +86,39 @@ export async function fetchPickingSlips({ dispatchDate, from, to, cohort, status
 
 // GET /api/picking/:id — one slip plus its full item list, for
 // the detail view.
+//
+// Packing done with no signal is waiting on this phone (see confirmItem
+// below). It is laid over the slip here, so an item the packer just
+// confirmed shows as confirmed instead of jumping back to pending when
+// the screen re-reads a saved copy of the slip.
 export async function fetchPickingSlip(slipId) {
-  return request(`/${slipId}`);
+  const slip = await request(`/${slipId}`);
+  return withQueuedPacking(slip, await listOutbox());
 }
+
+// A slip with the packing still waiting to send applied to it. Pure, so
+// it can be tested without a queue. Work the server refused for good is
+// left out: it did not happen.
+export const withQueuedPacking = (slip, queued) => {
+  const mine = (queued ?? []).filter((q) => q.kind === 'packing' && !q.permanent
+    && Number(q.meta?.slipId) === Number(slip?.id));
+  if (!slip || mine.length === 0) return slip;
+
+  let next = { ...slip, items: (slip.items ?? []).map((i) => ({ ...i })), waitingToSend: mine.length };
+  for (const { meta, body } of mine) {
+    if (meta.action === 'complete') {
+      next = { ...next, status: 'complete', pallet_ref: body.palletRef ?? next.pallet_ref };
+      continue;
+    }
+    const item = next.items.find((i) => Number(i.id) === Number(meta.itemId));
+    if (!item) continue;
+    item.status = meta.action === 'flag' ? 'flagged' : 'confirmed';
+    item.packed_quantity = body.packedQuantity ?? null;
+    item.flag_reason = meta.action === 'flag' ? body.flagReason : null;
+    item.packer_note = body.note ?? null;
+  }
+  return next;
+};
 
 // POST /api/picking/:id/assign — claim a slip. A packer calling this
 // with no packerId claims for themselves (packerId is ignored for
@@ -145,13 +191,19 @@ export async function createSlip({ ecdId, dispatchDate, cohort, force, items }) 
 
 // POST /api/picking/:id/items/:itemId/confirm — mark one item as
 // packed as required.
+//
+// confirmItem, flagItem and completeSlip are kept on the phone when
+// there is no signal and sent once it is back (offlinePost.js). They
+// then return { queued: true } instead of the server's answer, and
+// fetchPickingSlip shows the slip as the packer left it. Claiming and
+// releasing are not kept: whether a pallet is free depends on what
+// everyone else has done, so they need a signal.
 export async function confirmItem(slipId, itemId, packedQuantity, note) {
   const body = { packedQuantity };
   if (note !== undefined && note !== '') body.note = note;
-  return request(`/${slipId}/items/${itemId}/confirm`, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
+  return unwrap(await postOrQueue(`/api/picking/${slipId}/items/${itemId}/confirm`, body, {
+    kind: 'packing', label: `Pallet ${slipId}`, meta: { slipId, itemId, action: 'confirm' },
+  }));
 }
 
 // POST /api/picking/:id/items/:itemId/flag — mark one item as
@@ -163,10 +215,9 @@ export async function flagItem(slipId, itemId, flagReason, packedQuantity, note)
   const body = { flagReason };
   if (packedQuantity !== undefined && packedQuantity !== '') body.packedQuantity = packedQuantity;
   if (note !== undefined && note !== '') body.note = note;
-  return request(`/${slipId}/items/${itemId}/flag`, {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
+  return unwrap(await postOrQueue(`/api/picking/${slipId}/items/${itemId}/flag`, body, {
+    kind: 'packing', label: `Pallet ${slipId}`, meta: { slipId, itemId, action: 'flag' },
+  }));
 }
 
 // GET /api/picking/workers — active warehouse_worker accounts
@@ -181,8 +232,7 @@ export async function fetchAssignableWorkers() {
 // is confirmed or flagged. May return shortfalls for the caller
 // to surface as a discrepancy notice.
 export async function completeSlip(slipId, palletRef) {
-  return request(`/${slipId}/complete`, {
-    method: 'POST',
-    body: JSON.stringify(palletRef ? { palletRef } : {}),
-  });
+  return unwrap(await postOrQueue(`/api/picking/${slipId}/complete`, palletRef ? { palletRef } : {}, {
+    kind: 'packing', label: `Pallet ${slipId}`, meta: { slipId, action: 'complete' },
+  }));
 }

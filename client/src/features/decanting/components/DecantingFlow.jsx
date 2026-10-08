@@ -237,6 +237,8 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
   // The sheet just saved, fetched in full by recordDecanting itself —
   // null hides the pop-up; set once by save() on success.
   const [pdfRecord, setPdfRecord] = useState(null);
+  // True when the last sheet could not be sent and is on the phone.
+  const [queued, setQueued] = useState(false);
 
   const step = STEP_META[phase];
   const weekOf = useMemo(() => mondayOfThisWeek(), []);
@@ -519,6 +521,10 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
         }],
       });
       setPhase('done');
+      // No signal: the sheet is waiting on the phone, so there is no
+      // record to show yet.
+      setQueued(Boolean(result?.queued));
+      if (result?.queued) return;
       // recordDecanting already returns the full joined record (see
       // decanting.repository.js's own getDecantingById-after-insert
       // pattern) — no second fetch needed for the pop-up.
@@ -920,8 +926,10 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
       {/* ── Done ───────────────────────────────────────────── */}
       {phase === 'done' && (
         <StepScreen
-          title="Saved"
-          sub="The bags are on the system and the waste is on this week's report."
+          title={queued ? 'Saved on this phone' : 'Saved'}
+          sub={queued
+            ? 'There was no signal, so this sheet is waiting on your phone. It sends itself as soon as you are back in range; the bar at the top says when it has gone. Do not record it again.'
+            : "The bags are on the system and the waste is on this week's report."}
           actions={
             <Actions>
               <Button onClick={restart}>Decant another bulk amount</Button>

@@ -21,13 +21,16 @@ import express from 'express';
 import auth, { requireRole } from '../middleware/auth.middleware.js';
 import { ALL_STAFF, MANAGERS_UP } from '../constants/permissions.js';
 import { validateIntId } from '../middleware/validate.middleware.js';
+import { idempotent } from '../middleware/idempotency.middleware.js';
 import communityRequestController from '../controllers/communityRequest.controller.js';
 
 const router = express.Router();
 
 
 router.get('/',  auth, requireRole(...ALL_STAFF), communityRequestController.listRequests);
-router.post('/', auth, requireRole(...ALL_STAFF), communityRequestController.createRequest);
+// idempotent() on the two the floor can send late, after a spell with
+// no signal (middleware/idempotency.middleware.js).
+router.post('/', auth, requireRole(...ALL_STAFF), idempotent('communityRequest.log'), communityRequestController.createRequest);
 
 router.get('/:id',           auth, requireRole(...ALL_STAFF), communityRequestController.getRequest);
 router.patch('/:id/claim',   auth, requireRole(...ALL_STAFF), communityRequestController.claimRequest);
@@ -39,7 +42,7 @@ router.post('/:id/approve',  auth, requireRole(...MANAGERS_UP), validateIntId, c
 router.post('/:id/decline',  auth, requireRole(...MANAGERS_UP), validateIntId, communityRequestController.declineRequest);
 router.patch('/:id/assign',  auth, requireRole(...MANAGERS_UP), validateIntId, communityRequestController.assignRequest);
 router.put('/:id/items',     auth, requireRole(...MANAGERS_UP), validateIntId, communityRequestController.rechooseItems);
-router.post('/:id/confirm',  auth, requireRole(...ALL_STAFF), validateIntId,   communityRequestController.confirmRequest);
+router.post('/:id/confirm',  auth, requireRole(...ALL_STAFF), validateIntId, idempotent('communityRequest.confirm'), communityRequestController.confirmRequest);
 
 // The old resolve call. Narrowed to "decline" for managers and admins;
 // a request can no longer be fulfilled without being approved first.

@@ -102,6 +102,9 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
 
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState(null);
+  // Said on the list after a weigh-in that could not be sent and is
+  // waiting on the phone.
+  const [queuedNote, setQueuedNote] = useState(null);
 
   // ── Assign form state ─────────────────────────────────────
   const [ownerName, setOwnerName] = useState('');
@@ -242,6 +245,7 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
   // ── Log compost ────────────────────────────────────────────
   const logDraftKey = (kitId) => `feedTheSoil-log-${kitId}`;
   const startLog = (kit) => {
+    setQueuedNote(null);
     setSelectedKit(kit);
     const draft = readDraft(logDraftKey(kit.id));
     setKgCompost(draft?.kgCompost ?? '');
@@ -262,10 +266,17 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
     setBusy(true);
     setFormError(null);
     try {
-      await collectionKitAPI.logCompost(selectedKit.id, {
+      const logged = await collectionKitAPI.logCompost(selectedKit.id, {
         kgCompost: Number(kgCompost), loggedAt, notes: notes.trim(),
-      });
+      }, { keepOffline: true });
       clearDraft(logDraftKey(selectedKit.id));
+      if (logged?.queued) {
+        // No signal: it is on the phone, not yet on the kit's history.
+        // Back to the list, with the reason on screen.
+        backToBrowse();
+        setQueuedNote('No signal, so that weigh-in is saved on your phone. It sends itself when you are back in range. Do not log it again.');
+        return;
+      }
       await loadRecords(recordSearch);
       await openKit(selectedKit.id);
     } catch (err) {
@@ -327,6 +338,7 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
     return (
       <TaskPage title="Feed the Soil" sub="Compost logged from every collection kit, most recent first. Dispatched records sink to the bottom.">
         {browseError ? <Notice tone="warn">{browseError}</Notice> : null}
+        {queuedNote ? <Notice>{queuedNote}</Notice> : null}
         <FilterSegments label="View" value={tab} onChange={setTab} options={[{ key: 'records', label: 'Records' }, { key: 'kits', label: 'Kits' }]} />
 
         <ListTools
@@ -362,6 +374,7 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
     return (
       <TaskPage title="Feed the Soil" sub="Every collection kit assigned to a community member.">
         {browseError ? <Notice tone="warn">{browseError}</Notice> : null}
+        {queuedNote ? <Notice>{queuedNote}</Notice> : null}
         <FilterSegments label="View" value={tab} onChange={setTab} options={[{ key: 'records', label: 'Records' }, { key: 'kits', label: 'Kits' }]} />
 
         <ListTools
@@ -423,6 +436,7 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
         actions={<Actions><Button variant="secondary" onClick={() => backToBrowse('records')}>Cancel</Button></Actions>}
       >
         {browseError ? <Notice tone="warn">{browseError}</Notice> : null}
+        {queuedNote ? <Notice>{queuedNote}</Notice> : null}
         <ListTools
           id="fts-log-pick-search" query={kitSearch} onQuery={setKitSearch}
           placeholder="Search by owner or suburb"
@@ -486,6 +500,7 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
         }
       >
         {browseError ? <Notice tone="warn">{browseError}</Notice> : null}
+        {queuedNote ? <Notice>{queuedNote}</Notice> : null}
 
         <p className="stf-summary-title">Collection records</p>
         {selectedKit.records.length === 0 ? (
@@ -541,6 +556,7 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
         }
       >
         {browseError ? <Notice tone="warn">{browseError}</Notice> : null}
+        {queuedNote ? <Notice>{queuedNote}</Notice> : null}
 
         <p className="stf-summary-title">Collection</p>
         <KeyValues

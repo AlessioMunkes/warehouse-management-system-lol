@@ -38,9 +38,23 @@ describe('Log a request (worker)', () => {
     await user.type(screen.getByLabelText('What was requested'), 'Samp and oil');
     await user.click(screen.getByRole('button', { name: 'Log request' }));
 
-    await waitFor(() => expect(api.logRequest).toHaveBeenCalledWith(expect.objectContaining({ itemsRequested: 'Samp and oil' })));
+    // The floor asks for it to be kept on the phone if there is no signal.
+    await waitFor(() => expect(api.logRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ itemsRequested: 'Samp and oil' }), { keepOffline: true },
+    ));
     expect(await screen.findByText('Request logged. A manager approves it before anyone packs.')).toBeTruthy();
     expect(screen.getByLabelText('What was requested').value).toBe('');
+  });
+
+  it('says the request is saved on the phone when there was no signal', async () => {
+    api.logRequest.mockResolvedValue({ queued: true, label: 'A benevolent request' });
+    const user = userEvent.setup();
+    render(<CommunityRequestFlow />);
+    await user.type(screen.getByLabelText('What was requested'), 'Samp and oil');
+    await user.click(screen.getByRole('button', { name: 'Log request' }));
+
+    expect(await screen.findByText(/saved on your phone/)).toBeTruthy();
+    expect(screen.queryByText('Request logged. A manager approves it before anyone packs.')).toBeNull();
   });
 
   it('keeps the future-date block and the notes label', async () => {

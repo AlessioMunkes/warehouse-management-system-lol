@@ -45,9 +45,23 @@ export function CompletionDialog({ open, result, onRecordAnother, onGoHome }) {
       <DialogContent className="stf-shell" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>
-            {pendingReview ? "Donation received, pending manager review" : "Donation recorded"}
+            {result.queued
+              ? "Saved on this phone"
+              : pendingReview ? "Donation received, pending manager review" : "Donation recorded"}
           </DialogTitle>
         </DialogHeader>
+
+        {result.queued && (
+          <div className="stf-notice">
+            <div className="stf-notice-body">
+              <p style={{ margin: 0 }}>
+                There was no signal, so this donation is waiting on your phone. It sends itself as
+                soon as you are back in range; the bar at the top says when it has gone. Do not
+                record it again.
+              </p>
+            </div>
+          </div>
+        )}
 
         {pendingReview && (
           <div className="stf-notice is-warn">

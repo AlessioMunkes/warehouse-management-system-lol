@@ -19,6 +19,7 @@
 //   chooses other items.
 // ─────────────────────────────────────────────────────────────
 import { apiGet, apiPost, apiPatch, apiPut } from './api';
+import { postOrQueue } from './offlinePost';
 
 // request_outcome enum. 'pending' is shown as "Awaiting approval".
 // 'referred' exists in the DB but is not used.
@@ -86,9 +87,15 @@ export const getRequest = async (id) => {
 };
 
 // ── POST /api/community-requests ─────────────────────────────
-export const logRequest = async (payload) => {
-  const body = await apiPost('/api/community-requests', payload);
-  return toRequest(body.data ?? {});
+// `keepOffline` is the floor's: with no signal the request is kept on
+// the phone and this returns { queued: true, label } (offlinePost.js).
+// The manager's screen leaves it off, because only the floor's shell
+// shows what is waiting and sends it.
+export const logRequest = async (payload, { keepOffline = false } = {}) => {
+  const body = keepOffline
+    ? await postOrQueue('/api/community-requests', payload, { kind: 'request', label: 'A benevolent request' })
+    : await apiPost('/api/community-requests', payload);
+  return body.queued ? body : toRequest(body.data ?? {});
 };
 
 // ── POST /:id/approve ────────────────────────────────────────
@@ -131,8 +138,10 @@ export const claimRequest = async (id) => {
 // items: [{ productId, quantityReleased }]; leave it out to release
 // everything that was approved.
 export const confirmRequest = async (id, items) => {
-  const body = await apiPost(`/api/community-requests/${id}/confirm`, items ? { items } : {});
-  return toRequest(body.data ?? {});
+  const body = await postOrQueue(`/api/community-requests/${id}/confirm`, items ? { items } : {}, {
+    kind: 'request', label: `Request ${id}`,
+  });
+  return body.queued ? body : toRequest(body.data ?? {});
 };
 
 export default {

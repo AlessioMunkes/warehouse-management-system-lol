@@ -19,6 +19,7 @@ import express from 'express';
 import auth, { requireRole } from '../middleware/auth.middleware.js';
 import { ALL_STAFF } from '../constants/permissions.js';
 import { validateIntId, validateIntParam } from '../middleware/validate.middleware.js';
+import { idempotent } from '../middleware/idempotency.middleware.js';
 import kitController from '../controllers/collectionKit.controller.js';
 
 const router = express.Router();
@@ -43,6 +44,6 @@ router.get('/:id',
   auth, requireRole(...ALL_STAFF), validateIntId, kitController.getKit);
 
 router.post('/:id/records',
-  auth, requireRole(...ALL_STAFF), validateIntId, kitController.logCompost);
+  auth, requireRole(...ALL_STAFF), validateIntId, idempotent('collectionKit.log'), kitController.logCompost);
 
 export default router;

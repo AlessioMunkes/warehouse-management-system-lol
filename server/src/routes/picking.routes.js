@@ -5,6 +5,7 @@ import express                            from 'express';
 import auth, { requireRole } from '../middleware/auth.middleware.js';
 import { ALL_STAFF, MANAGERS_UP, WORKERS_ONLY } from '../constants/permissions.js';
 import { validateIntId, validateIntParam } from '../middleware/validate.middleware.js';
+import { idempotent }                     from '../middleware/idempotency.middleware.js';
 import pickingController                  from '../controllers/picking.controller.js';
 
 const router = express.Router();
@@ -38,7 +39,9 @@ router.post('/:id/assign-second', auth, requireRole(...ALL_STAFF), validateIntId
 // only before packing anything on it (enforced in the service and the
 // repository).
 router.post('/:id/release',  auth, requireRole(...ALL_STAFF), validateIntId, pickingController.releaseSlip);
-router.post('/:id/complete', auth, requireRole(...WORKERS_ONLY), validateIntId, pickingController.completeSlip);
+// idempotent(): a phone that packed with no signal sends these later,
+// possibly twice (middleware/idempotency.middleware.js).
+router.post('/:id/complete', auth, requireRole(...WORKERS_ONLY), validateIntId, idempotent('picking.complete'), pickingController.completeSlip);
 
 // ── Slip items ────────────────────────────────────────────────
 // Both params are validated. :itemId used to be left unchecked, so a
@@ -46,12 +49,12 @@ router.post('/:id/complete', auth, requireRole(...WORKERS_ONLY), validateIntId, 
 // as a 500; validateIntParam('itemId') stops it at the door with a 400.
 router.post('/:id/items/:itemId/confirm',
   auth, requireRole(...WORKERS_ONLY),
-  validateIntId, validateIntParam('itemId'),
+  validateIntId, validateIntParam('itemId'), idempotent('picking.confirm'),
   pickingController.confirmItem
 );
 router.post('/:id/items/:itemId/flag',
   auth, requireRole(...WORKERS_ONLY),
-  validateIntId, validateIntParam('itemId'),
+  validateIntId, validateIntParam('itemId'), idempotent('picking.flag'),
   pickingController.flagItem
 );
 

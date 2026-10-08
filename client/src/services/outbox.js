@@ -8,12 +8,19 @@
 // Only submissions that carry an idempotency key. A queued request is
 // a request that will be sent later, possibly twice if a flush is
 // interrupted mid-flight, and the only thing that makes that safe is
-// the server recognising the retry. Receiving and dispatch both send
-// one (see newIdempotencyKey and the ON CONFLICT (idempotency_key)
-// insert in delivery.repository.js / dispatch). Decanting does NOT,
-// and decanting cannot be un-recorded, so it is deliberately left out
-// — it fails honestly instead, and the worker's numbers stay on the
-// screen.
+// the server recognising the retry.
+//
+// Receiving, dispatch and donation intake keep the key in a column of
+// their own (see the ON CONFLICT (idempotency_key) insert in
+// delivery.repository.js). Everything else the floor submits (packing
+// an item, logging a pallet packed, a decanting sheet, a benevolent
+// request, a compost weigh-in) goes through offlinePost.js, and the
+// server remembers those keys in one table
+// (server/src/middleware/idempotency.middleware.js).
+//
+// NOT kept: anything whose answer depends on what other people did in
+// the meantime. Claiming or releasing a pallet, and claiming a
+// request, need a signal and say so.
 //
 // WHY IndexedDB AND NOT localStorage
 // A receiving submission carries a signature as a PNG data URL. A few
@@ -124,7 +131,8 @@ export const list = async () => {
  * @param {string} item.endpoint  e.g. '/api/deliveries'
  * @param {object} item.body      must contain an idempotency key
  * @param {string} item.label     what a worker should see: 'Order 86'
- * @param {string} item.kind      'delivery' | 'collection'
+ * @param {string} item.kind      'delivery' | 'collection' | 'packing' | 'decanting' | …
+ * @param {object} [item.meta]   what a screen needs to show the work as done while it waits
  */
 export const enqueue = async (item) => {
   // Multi-warehouse: remember where this was recorded. It is sent there
