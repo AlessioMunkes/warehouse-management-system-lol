@@ -68,6 +68,7 @@
 // total WITHOUT the benevolent branch (includeBenevolent: false).
 // Inventory's Committed and Available, and the approval check, include
 // it.
+import { toStockUnitSql } from '../features/units/unitConversion.js';
 
 /**
  * Returns the SQL text of a subquery yielding (product_id, committed).
@@ -90,12 +91,16 @@
  *   Only ever pass a literal placeholder built by the caller, never a
  *   user-supplied value — it is interpolated into the SQL text.
  */
+// A pallet line is in the slip's unit, which is not always the unit the
+// product's stock is kept in (kilograms packed from crates), so each
+// line is turned into the stock unit before it is added up.
 const PALLETS_BRANCH = (excludeSlipParam) => `
   SELECT
     i.product_id,
-    SUM(i.packed_quantity)::numeric AS committed
+    SUM(${toStockUnitSql('i.packed_quantity', 'i.unit', 'isl.unit')})::numeric AS committed
   FROM picking_slip_items i
   JOIN picking_slips ps ON ps.id = i.picking_slip_id
+  LEFT JOIN stock_levels isl ON isl.product_id = i.product_id
   LEFT JOIN dispatch_events de ON de.picking_slip_id = ps.id
   WHERE ps.status = 'complete'
     AND (de.id IS NULL OR de.status = 'awaiting')

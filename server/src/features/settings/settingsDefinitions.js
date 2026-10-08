@@ -45,6 +45,34 @@ export const SETTINGS = Object.freeze({
     check: (value, all) => (value >= all['stock.expiryWarningFirstDays']
       ? 'The second warning has to come after the first.' : null),
   },
+  // What one crate, bag, box or punnet weighs. Stock counted in one of
+  // these is packed and received by weight, and these are what turn one
+  // into the other (features/units/unitConversion.js). 0 is "not set":
+  // that unit is then not converted, which is how it was before.
+  'units.crateKg': {
+    section: 'stock',
+    label: 'One crate weighs',
+    help: 'Used when stock is counted in crates but packed or received by weight. Enter 0 to leave crates unconverted.',
+    default: 0, min: 0, max: 1000, unit: 'kg',
+  },
+  'units.bagKg': {
+    section: 'stock',
+    label: 'One bag weighs',
+    help: 'Used when stock is counted in bags but packed or received by weight. Enter 0 to leave bags unconverted.',
+    default: 0, min: 0, max: 1000, unit: 'kg',
+  },
+  'units.boxKg': {
+    section: 'stock',
+    label: 'One box weighs',
+    help: 'Used when stock is counted in boxes but packed or received by weight. Enter 0 to leave boxes unconverted.',
+    default: 0, min: 0, max: 1000, unit: 'kg',
+  },
+  'units.punnetGrams': {
+    section: 'stock',
+    label: 'One punnet weighs',
+    help: 'Used when stock is counted in punnets but packed or received by weight. Enter 0 to leave punnets unconverted.',
+    default: 0, min: 0, max: 5000, unit: 'g',
+  },
   // The operating calendar (managers set these on its screen, not on
   // admin Settings): the weekday each cohort collects on, 1 = Monday ..
   // 6 = Saturday. The cohorts keep their names; only the day moves.

@@ -11,6 +11,7 @@ import pool                  from '../config/db.js';
 import { committedStockSql } from './committedStock.sql.js';
 import { recheckProducts } from './communityRequestStock.repository.js';
 import { createNotification } from './notification.repository.js';
+import { convertQuantity, readUnitSizes } from '../features/units/unitConversion.js';
 
 // ── Adjust stock — the single write path for every stock change ──
 // Must be called with a client already inside BEGIN/COMMIT — either
@@ -28,8 +29,10 @@ import { createNotification } from './notification.repository.js';
 // Similarly, if the caller's unit doesn't match the unit already on
 // record for this product, the movement still goes through — the
 // ledger's established unit wins so the running total never silently
-// drifts between units — but isUnitMismatch comes back so the caller
-// can surface it. quantity_on_hand is NUMERIC, which node-postgres
+// drifts between units. The quantity is converted into that unit where
+// the two convert (features/units/unitConversion.js); where they do
+// not, it goes in as it stands and isUnitMismatch comes back so the
+// caller can surface it. quantity_on_hand is NUMERIC, which node-postgres
 // returns as a string, not a number — every value read back off it
 // gets an explicit Number() cast below.
 const adjustStock = async (client, { productId, quantityDelta, unit = null, movementType, referenceType = null, referenceId = null, reason = null, performedBy }) => {
@@ -50,7 +53,7 @@ const adjustStock = async (client, { productId, quantityDelta, unit = null, move
     throw new Error('Stock adjustment quantity must be a finite number (received: no value).');
   }
 
-  const delta = Number(quantityDelta);
+  let delta = Number(quantityDelta);
   if (!Number.isFinite(delta)) {
     throw new Error(`Stock adjustment quantity must be a finite number (received: ${quantityDelta}).`);
   }
@@ -78,7 +81,14 @@ const adjustStock = async (client, { productId, quantityDelta, unit = null, move
     resolvedUnit = existing.rows[0].unit;
     reorderThreshold = Number(existing.rows[0].reorder_threshold);
     productName = existing.rows[0].product_name;
-    if (unit && unit !== resolvedUnit) isUnitMismatch = true;
+    if (unit && unit !== resolvedUnit) {
+      // Kilograms packed from stock counted in crates: turn the quantity
+      // into the ledger's unit (Settings → Stock rules says what a crate
+      // weighs). Units that do not convert go in as they stand, flagged.
+      const converted = convertQuantity(delta, unit, resolvedUnit, await readUnitSizes(client));
+      if (converted === null) isUnitMismatch = true;
+      else delta = converted;
+    }
   } else {
     if (!unit) throw new Error("Unit is required for a product's first stock movement.");
     before = 0;

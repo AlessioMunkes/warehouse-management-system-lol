@@ -40,6 +40,12 @@ describe('defaults', () => {
       // New with recipes, not a replaced constant: centres are supplied
       // in bands of five children.
       'recipes.childBand': 5,
+      // New with unit sizes: 0 is "not set", so no unit is converted
+      // until an admin says what one weighs.
+      'units.crateKg': 0,
+      'units.bagKg': 0,
+      'units.boxKg': 0,
+      'units.punnetGrams': 0,
     });
     // The reminder job's own default still lands on 08:00 SAST.
     expect(nextRunAt(new Date('2026-09-23T05:00:00Z')).toISOString()).toBe('2026-09-23T06:00:00.000Z');

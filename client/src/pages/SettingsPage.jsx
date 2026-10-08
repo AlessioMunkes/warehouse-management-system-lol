@@ -11,7 +11,8 @@
 //                            is working (ConnectionsSection)
 //   Notifications & reminders the not-collected cut-off and the
 //                            collection reminder send time
-//   Stock rules              the two expiry-warning windows
+//   Stock rules              the two expiry-warning windows, and what a
+//                            crate, bag, box and punnet weigh
 //   Recipes                  what picking slips are made from: the
 //                            summer and winter recipes, when each season
 //                            starts, dated overrides, and the centres
@@ -60,7 +61,7 @@ const VALUE_SECTIONS = {
     title: 'Notifications & reminders',
     description: 'Set when uncollected pallets are written off and when reminders go out.',
   },
-  stock:    { title: 'Stock rules', description: 'Set when managers are warned about stock nearing its expiry date.' },
+  stock:    { title: 'Stock rules', description: 'Set when managers are warned about expiring stock, and what a crate, bag, box and punnet weigh.' },
   accounts: { title: 'Accounts', description: 'Set how long invite links stay valid.' },
 };
 

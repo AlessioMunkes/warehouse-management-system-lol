@@ -24,6 +24,7 @@
 // ─────────────────────────────────────────────────────────────
 import pool                  from '../config/db.js';
 import { committedStockSql } from './committedStock.sql.js';
+import { toStockUnitSql, unitRatioSql } from '../features/units/unitConversion.js';
 import { recheckProducts } from './communityRequestStock.repository.js';
 import recipeRepository   from './recipe.repository.js';
 
@@ -933,9 +934,14 @@ const completeSlip = async ({ slipId, palletRef, actorId, actor, canOverride = f
       `WITH packed AS (
          SELECT
            psi.product_id,
-           SUM(psi.packed_quantity)::numeric  AS packed_quantity,
-           ARRAY_AGG(DISTINCT psi.unit)       AS units
+           -- In the unit the stock is kept in, so it can be compared
+           -- with what is available; "units" lists only the slip units
+           -- that do not convert to it.
+           SUM(${toStockUnitSql('psi.packed_quantity', 'psi.unit', 'psl.unit')})::numeric AS packed_quantity,
+           COALESCE(ARRAY_AGG(DISTINCT psi.unit)
+             FILTER (WHERE ${unitRatioSql('psi.unit', 'psl.unit')} IS NULL), '{}') AS units
          FROM picking_slip_items psi
+         LEFT JOIN stock_levels psl ON psl.product_id = psi.product_id
          WHERE psi.picking_slip_id = $1
            AND psi.status IN ('confirmed', 'flagged')
            AND psi.packed_quantity IS NOT NULL
