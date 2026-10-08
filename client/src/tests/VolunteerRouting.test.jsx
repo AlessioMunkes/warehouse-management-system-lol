@@ -28,10 +28,17 @@ const renderRoute = (path = VOLUNTEERS.events) => render(
 beforeEach(() => vi.clearAllMocks());
 
 describe('Volunteer Management routing', () => {
-  it.each(['manager', 'admin'])('allows %s management access', (role) => {
-    useAuth.mockReturnValue({ user: { id: 1, role }, isLoading: false });
+  it('allows a manager management access', () => {
+    useAuth.mockReturnValue({ user: { id: 1, role: 'manager' }, isLoading: false });
     renderRoute('/volunteers/events/event-1');
     expect(screen.getByText('Event workspace')).toBeInTheDocument();
+  });
+
+  // Volunteer events is a manager's screen; an admin has their own.
+  it('keeps an admin out', () => {
+    useAuth.mockReturnValue({ user: { id: 1, role: 'admin' }, isLoading: false });
+    renderRoute('/volunteers/events/event-1');
+    expect(screen.queryByText('Event workspace')).toBeNull();
   });
 
   // Only warehouse_worker. The other name here was 'finance', a role

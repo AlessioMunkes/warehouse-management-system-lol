@@ -54,9 +54,12 @@ describe('MessageHistoryPage', () => {
     expect(within(panel).getByText('The system')).toBeInTheDocument();
   });
 
-  it('links a purchase-order email to its order', async () => {
+  // Purchase orders are a manager's screen; the admin's history names
+  // the order without linking to it.
+  it('names what an email was about without linking to a manager screen', async () => {
     renderPage();
-    expect(await screen.findByRole('link', { name: 'Purchase order' })).toHaveAttribute('href', '/noc/purchase-orders?id=58');
+    expect(await screen.findByText('Purchase order #58')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /purchase order/i })).toBeNull();
   });
 
   it('asks the server for one outcome when a tab says so', async () => {

@@ -10,10 +10,8 @@
 // Workers get the floor tasks; managers run the day-to-day; admins
 // look after accounts, master data, the logs and donations.
 //
-// FOR THE TEAM TO DECIDE: admins may open every manager screen
-// (MANAGERS_UP includes admin, on the server and here), but the admin
-// menu does not list them, so today they reach them by URL. Listing
-// them is one `nav('admin', …)` entry per route in routeTable.js.
+// The two never open each other's screens (routeTable.js), apart from
+// the two donation screens both run.
 // ─────────────────────────────────────────────────────────────
 import { ROUTES, MENU_GROUPS } from '../../routes/routeTable';
 import { STAFF, ADMIN } from '../../routes/paths';

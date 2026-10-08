@@ -45,6 +45,15 @@ describe('route table', () => {
     }
   });
 
+  // Manager and admin are separate too. The two donation screens are
+  // the only ones both run.
+  it('never shares a screen between a manager and an admin, apart from the donation screens', () => {
+    const shared = ROUTES
+      .filter((r) => r.roles && r.roles.includes('manager') && r.roles.includes('admin'))
+      .map((r) => r.id);
+    expect(shared.sort()).toEqual(['donationManagement', 'section18a']);
+  });
+
   it('lists a screen in a menu only for a role allowed to open it', () => {
     for (const r of ROUTES) {
       for (const n of r.nav ?? []) {

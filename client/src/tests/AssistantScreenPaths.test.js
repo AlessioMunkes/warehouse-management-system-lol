@@ -108,7 +108,17 @@ describe('screens with a page per side', () => {
     expect(pathForScreen('communityRequests', 'warehouse_worker')).toBe('/staff/community-requests');
     expect(pathForScreen('communityRequests', 'manager')).toBe('/noc/community-requests');
     expect(pathForScreen('feedTheSoil', 'warehouse_worker')).toBe('/staff/feed-the-soil');
-    expect(pathForScreen('feedTheSoil', 'admin')).toBe('/noc/feed-the-soil');
+    expect(pathForScreen('feedTheSoil', 'manager')).toBe('/noc/feed-the-soil');
+  });
+
+  // An answer never links someone to a screen of another role's.
+  it('gives no link to a screen the reader cannot open', () => {
+    expect(pathForScreen('feedTheSoil', 'admin')).toBeNull();
+    expect(pathForScreen('pickingSlips', 'admin')).toBeNull();
+    expect(pathForScreen('products', 'manager')).toBeNull();
+    expect(pathForScreen('inventory', 'warehouse_worker')).toBeNull();
+    expect(pathForScreen('products', 'admin')).toBe('/admin/products');
+    expect(pathForScreen('donationManagement', 'manager')).toBe('/admin/donation-management');
   });
 
   it('recognises either page as the same screen', () => {

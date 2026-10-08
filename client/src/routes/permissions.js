@@ -15,8 +15,9 @@ export const ALL_STAFF   = Object.freeze(['warehouse_worker', 'manager', 'admin'
 // The floor. Each role sees only its own screens: a manager or admin
 // never opens a worker screen, and a worker never opens theirs.
 export const WORKERS_ONLY = Object.freeze(['warehouse_worker']);
+// Only the two donation screens both run. Every other office screen
+// belongs to one of them: MANAGER_ONLY or ADMIN_ONLY.
 export const MANAGERS_UP = Object.freeze(['manager', 'admin']);
-// Managers but not admins, matching the server. No route uses it at present.
 export const MANAGER_ONLY = Object.freeze(['manager']);
 export const ADMIN_ONLY  = Object.freeze(['admin']);
 export const GUEST_ONLY  = Object.freeze(['guest']);

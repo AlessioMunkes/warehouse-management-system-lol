@@ -95,8 +95,11 @@ describe('where each notification goes', () => {
   it('never sends anyone to a screen of another role', () => {
     expect(notificationDestination(notification({ type: 'low_stock' }), 'warehouse_worker')).toBeNull();
     expect(notificationDestination(notification({ type: 'section18a_email_failed' }), 'warehouse_worker')).toBeNull();
-    expect(notificationDestination(notification({ type: 'non_collections_flagged' }), 'admin'))
+    // An admin does not open a manager's screens either.
+    expect(notificationDestination(notification({ type: 'non_collections_flagged' }), 'admin')).toBeNull();
+    expect(notificationDestination(notification({ type: 'non_collections_flagged' }), 'manager'))
       .toBe('/noc/picking-slips?status=notcollected');
+    expect(notificationDestination(notification({ type: 'donation_review' }), 'admin')).toBe('/admin/donation-management');
   });
 
   it('knows how urgent each type is', () => {

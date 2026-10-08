@@ -19,11 +19,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import StatusBadge from '@/components/ui/status-badge';
 import ErrorBanner from '@/components/ui/error-banner';
 import { checkConnections } from '../../../services/settingsAPI';
-import { ADMIN, VOLUNTEERS } from '../../../routes/paths';
+import { ADMIN } from '../../../routes/paths';
 
 const STATUS_LABEL = { ok: 'Working', warning: 'Needs a look', down: 'Not working', off: 'Not set up' };
 const ORDER = { down: 0, warning: 1, ok: 2, off: 3 };
-const SCREENS = { messageHistory: ADMIN.messageHistory, volunteers: VOLUNTEERS.events };
+// Only the admin's own screens: Volunteer events is a manager's.
+const SCREENS = { messageHistory: ADMIN.messageHistory };
 
 const fmtTime = (iso) => new Date(iso).toLocaleTimeString('en-ZA', {
   hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Johannesburg',

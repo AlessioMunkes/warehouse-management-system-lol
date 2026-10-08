@@ -117,9 +117,12 @@ export default function ReportPanel({ def, period }) {
         key={requestKey} report={report} hint={def.hint} compact keepOrder={Boolean(def.order)}
         colorFor={colorFor} target={def.rag && target?.value != null ? target : null}
       />
-      <Link to={STAFF.reporting} className="mt-2 inline-block text-xs text-muted-foreground underline underline-offset-2">
-        More in Operations reports
-      </Link>
+      {/* Operations reports is a manager's screen; an admin's chart has no link. */}
+      {def.roles?.includes('manager') ? (
+        <Link to={STAFF.reporting} className="mt-2 inline-block text-xs text-muted-foreground underline underline-offset-2">
+          More in Operations reports
+        </Link>
+      ) : null}
     </div>
   );
 }

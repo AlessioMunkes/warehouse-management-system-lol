@@ -21,7 +21,7 @@
 // screen still shows those).
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Inbox } from 'lucide-react';
 import ViewTabs from '@/components/ui/view-tabs';
 import ListToolbar from '@/components/ui/list-toolbar';
@@ -42,7 +42,6 @@ import {
 } from '@/components/ui/table';
 import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
 import { getMessages } from '../services/communicationsAPI';
-import { STAFF } from '../routes/paths';
 
 const VIEWS = [
   { id: 'all',     label: 'All',      status: null },
@@ -60,12 +59,11 @@ const fmtWhen = (iso) => (iso
     })
   : '—');
 
-// What the message was about, as a link where there is a screen for it.
+// What the message was about. Not a link: the records messages are
+// about (purchase orders) live on manager screens, which an admin
+// cannot open.
 const About = ({ m }) => {
   if (!m.relatedType || !m.relatedId) return <span className="text-muted-foreground">—</span>;
-  if (m.relatedType === 'purchase_order') {
-    return <Link className="underline-offset-2 hover:underline" to={`${STAFF.purchaseOrders}?id=${m.relatedId}`}>Purchase order</Link>;
-  }
   const words = m.relatedType.replace(/_/g, ' ');
   return <span className="text-muted-foreground">{words.charAt(0).toUpperCase() + words.slice(1)} #{m.relatedId}</span>;
 };

@@ -55,12 +55,11 @@ describe('the quick-create menu', () => {
     expect(screen.queryByText('Set-up')).toBeNull();
   });
 
-  it('offers an admin the set-up shortcuts as well, in their own group', async () => {
+  // The two are separate: an admin does not open a manager's screens.
+  it('offers an admin only the set-up shortcuts', async () => {
     const items = await openQuickCreate('admin');
-    expect(items).toEqual([
-      'Picking slip', 'Purchase order', 'Beneficiary', 'Benevolent request', 'Stock adjustment', 'Report',
-      'Product', 'Supplier', 'User', 'Recipe',
-    ]);
+    expect(items).toEqual(['Product', 'Supplier', 'User', 'Recipe']);
     expect(screen.getByText('Set-up')).toBeTruthy();
+    expect(screen.queryByText('Warehouse')).toBeNull();
   });
 });

@@ -64,25 +64,25 @@ const ROLE_LABELS = {
 // Ordered by how often a manager actually reaches for each — same
 // reasoning PickingSlipManagementPage.jsx's own quick actions use.
 //
-// Two groups: what the warehouse makes day to day, and what it is set
-// up with. The second is the admin's — every write behind it is
-// requireRole(ADMIN) and App.jsx gates the routes to match, so offering
-// one to a manager is a shortcut to a screen that bounces them.
+// Two groups, one per role: what the warehouse makes day to day is the
+// manager's, what it is set up with is the admin's. Neither opens the
+// other's screens (routeTable.js), so offering one across is a shortcut
+// to a screen that bounces them.
+const MANAGER_ONLY = ['manager'];
 const ADMIN_ONLY = ['admin'];
 const QUICK_CREATE = [
-  { group: 'Warehouse', to: STAFF.pickingSlips, label: 'Picking slip', icon: ClipboardList },
-  { group: 'Warehouse', to: STAFF.purchaseOrders, label: 'Purchase order', icon: ShoppingCart },
-  { group: 'Warehouse', to: STAFF.beneficiaries, label: 'Beneficiary', icon: HeartHandshake },
-  { group: 'Warehouse', to: STAFF.communityRequests, label: 'Benevolent request', icon: HandHeart },
-  { group: 'Warehouse', to: STAFF.inventory, label: 'Stock adjustment', icon: Scale },
-  { group: 'Warehouse', to: STAFF.reporting, label: 'Report', icon: ChartColumn },
+  { group: 'Warehouse', to: STAFF.pickingSlips, label: 'Picking slip', icon: ClipboardList, roles: MANAGER_ONLY },
+  { group: 'Warehouse', to: STAFF.purchaseOrders, label: 'Purchase order', icon: ShoppingCart, roles: MANAGER_ONLY },
+  { group: 'Warehouse', to: STAFF.beneficiaries, label: 'Beneficiary', icon: HeartHandshake, roles: MANAGER_ONLY },
+  { group: 'Warehouse', to: STAFF.communityRequests, label: 'Benevolent request', icon: HandHeart, roles: MANAGER_ONLY },
+  { group: 'Warehouse', to: STAFF.inventory, label: 'Stock adjustment', icon: Scale, roles: MANAGER_ONLY },
+  { group: 'Warehouse', to: STAFF.reporting, label: 'Report', icon: ChartColumn, roles: MANAGER_ONLY },
   { group: 'Set-up', to: ADMIN.products, label: 'Product', icon: Package, roles: ADMIN_ONLY },
   { group: 'Set-up', to: ADMIN.suppliers, label: 'Supplier', icon: Truck, roles: ADMIN_ONLY },
   { group: 'Set-up', to: ADMIN.users, label: 'User', icon: UserPlus, roles: ADMIN_ONLY },
   { group: 'Set-up', to: `${ADMIN.settings}?section=recipes`, label: 'Recipe', icon: CookingPot, roles: ADMIN_ONLY },
 ];
 
-// An entry with no `roles` is for everyone who reaches this shell.
 // Filtering here rather than at the render site means the next
 // admin-only shortcut is one word, not another conditional. Returned
 // as [group, items] pairs, in the order above, with no empty group.

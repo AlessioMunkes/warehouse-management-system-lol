@@ -18,7 +18,9 @@
 // turns the URL the user is on into the id the catalog understands,
 // so opening the assistant on Receiving offers receiving help.
 // ─────────────────────────────────────────────────────────────
+import { matchPath } from 'react-router-dom';
 import { STAFF, ADMIN, PACKING, DONATIONS, VOLUNTEERS } from '../../routes/paths';
+import { ROUTES } from '../../routes/routeTable';
 
 // Not in paths.js — the inventory route is declared inline in
 // App.jsx and navSections.js. Written once here rather than a third
@@ -74,10 +76,19 @@ export const FLOOR_PATHS = {
   feedTheSoil:       STAFF.floorFeedTheSoil,
 };
 
-/** Where a screen id points for this role, or null if this build has no such route. */
-export const pathForScreen = (id, role) => (
-  (role === 'warehouse_worker' && FLOOR_PATHS[id]) || SCREEN_PATHS[id] || null
-);
+// Each role opens only its own screens, so an answer never links a
+// person to one that would bounce them home.
+const canOpen = (path, role) => {
+  if (!role) return true;
+  const route = ROUTES.find((r) => matchPath({ path: r.path, end: true }, path));
+  return !route || !route.roles || route.roles.includes(role);
+};
+
+/** Where a screen id points for this role, or null if they have no such screen. */
+export const pathForScreen = (id, role) => {
+  const path = (role === 'warehouse_worker' && FLOOR_PATHS[id]) || SCREEN_PATHS[id] || null;
+  return path && canOpen(path, role) ? path : null;
+};
 
 // Longest first, so /noc/procurement/deliveries is not swallowed by
 // /noc/procurement — and /noc, which is a prefix of nearly

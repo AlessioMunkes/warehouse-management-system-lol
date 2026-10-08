@@ -9,21 +9,28 @@ import { linkFor, archiveLinkFor } from '../features/admin/recordLinks';
 
 describe('record links', () => {
   it('opens the record on its own screen', () => {
-    expect(linkFor({ screen: 'pickingSlips', id: '357' })).toBe('/noc/picking-slips?open=357');
-    expect(linkFor({ screen: 'purchaseOrders', id: '12' })).toBe('/noc/purchase-orders?id=12');
     expect(linkFor({ screen: 'suppliers', id: '3' })).toBe('/admin/suppliers?open=3');
-    expect(linkFor({ screen: 'volunteerEvent', id: 'abc' })).toBe('/volunteers/events/abc');
+    expect(linkFor({ screen: 'products', id: '8' })).toBe('/admin/products?open=8');
+    expect(linkFor({ screen: 'users', id: '5' })).toBe('/admin/users?open=5');
+  });
+
+  // Both screens are the admin's, and an admin cannot open a manager's
+  // screen: those records are listed with no link.
+  it('links nothing that lives on a manager screen', () => {
+    for (const screen of ['pickingSlips', 'purchaseOrders', 'beneficiaries', 'receipts', 'stockLedger', 'decantingRecords', 'feedTheSoil', 'volunteerEvent']) {
+      expect(linkFor({ screen, id: '1' }), screen).toBeNull();
+    }
   });
 
   it('goes to the list when there is no single record, and nowhere for an unknown screen', () => {
-    expect(linkFor({ screen: 'stockLedger', id: null })).toBe('/noc/stock-ledger');
-    expect(linkFor({ screen: 'pickingSlips', id: null })).toBe('/noc/picking-slips');
+    expect(linkFor({ screen: 'suppliers', id: null })).toBe('/admin/suppliers');
     expect(linkFor({ screen: 'nope', id: '1' })).toBeNull();
     expect(linkFor(null)).toBeNull();
   });
 
-  it('opens an archived item where it lives, if it has a screen', () => {
-    expect(archiveLinkFor({ kind: 'beneficiary', id: '9' })).toBe('/noc/beneficiaries?open=9');
+  it('opens an archived item where it lives, if the admin has that screen', () => {
+    expect(archiveLinkFor({ kind: 'product', id: '9' })).toBe('/admin/products?open=9');
+    expect(archiveLinkFor({ kind: 'beneficiary', id: '9' })).toBeNull();
     expect(archiveLinkFor({ kind: 'programme', id: '2' })).toBeNull();
   });
 });
