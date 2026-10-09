@@ -24,7 +24,6 @@ import LogoutConfirmDialog from "@/components/ui/log-out-dialog";
 import { useAuth } from "../../context/AuthContext";
 import useGoBack from "./useGoBack";
 import batchesLogo from "../../assets/Batches_Logo.jpeg";
-import "../../styles/index.css";
 
 const ROLE_LABELS = {
   warehouse_worker: "Warehouse staff",

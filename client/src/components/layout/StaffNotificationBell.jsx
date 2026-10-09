@@ -16,9 +16,9 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet';
 import notificationAPI from '../../services/notificationAPI';
-import NotificationList from '../../features/notifications/components/NotificationList';
+import NotificationList from '../../features/notifications/NotificationList';
 import { notificationDestination, NOTIFICATIONS_CHANGED } from '../../features/notifications/notificationMatrix';
-import PhoneAlerts from '../../features/notifications/components/PhoneAlerts';
+import PhoneAlerts from '../../features/notifications/PhoneAlerts';
 
 const POLL_MS = 60_000;
 const ROLE = 'warehouse_worker';

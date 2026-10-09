@@ -6,7 +6,7 @@
 // exercised end-to-end through the hook.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import ReconciliationTab from '../features/donationManagement/components/ReconciliationTab';
+import ReconciliationTab from '../features/donationManagement/ReconciliationTab';
 import { RECONCILIATION_STATUSES } from '../services/donationManagementAPI';
 
 vi.mock('../services/donationManagementAPI', async (importOriginal) => {

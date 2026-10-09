@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { CalendarDays, CheckCircle2, Pencil, Plus, XCircle } from 'lucide-react';
-import EventFormDialog from '../features/volunteerManagement/components/EventFormDialog';
+import EventFormDialog from '../features/volunteerManagement/EventFormDialog';
 import volunteerManagementAPI from '../services/volunteerManagementAPI';
 import { VOLUNTEERS } from '../routes/paths';
 import StatusBadge from '@/components/ui/status-badge';
@@ -38,7 +38,7 @@ import {
 import TablePager from '@/components/ui/table-pager';
 import SortableHead from '@/components/ui/sortable-head';
 import { compareValues } from '@/lib/useSortable';
-import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
+import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/usePaged';
 
 // Terminal events remain visible for history, but no longer expose edit or
 // lifecycle actions that would be invalid after completion/cancellation.

@@ -13,8 +13,8 @@ import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { takeUrlParam } from '../features/staff/resumeParam';
 import StaffShell from '../components/layout/StaffShell';
-import GateQueue from '../features/dispatch/components/GateQueue';
-import PalletCheck from '../features/dispatch/components/PalletCheck';
+import GateQueue from '../features/dispatch/GateQueue';
+import PalletCheck from '../features/dispatch/PalletCheck';
 import { STAFF } from '../routes/paths';
 
 export default function DispatchPage() {

@@ -26,9 +26,9 @@
 // the sentence it is on. This is not an emergency, it is a fact about
 // the building.
 // ─────────────────────────────────────────────────────────────
-import useOutbox from '../../hooks/useOutbox';
+import useOutbox from '../../lib/useOutbox';
 import { useServedFromCache } from '../../services/readCache';
-import { useT } from '../../i18n';
+import { useT } from '../../translations';
 
 // "at 14:05" today, "on 12 Sep at 14:05" otherwise.
 const savedWords = (at, t) => {

@@ -38,7 +38,7 @@ vi.mock('../services/donationManagementAPI', () => ({
   default: { getAttentionCounts: vi.fn().mockResolvedValue({ total: 0 }) },
 }));
 
-import CustomisableDashboard from '../features/dashboard/components/CustomisableDashboard';
+import CustomisableDashboard from '../features/dashboard/CustomisableDashboard';
 
 const manager = { id: 2, role: 'manager', firstName: 'Grizel' };
 

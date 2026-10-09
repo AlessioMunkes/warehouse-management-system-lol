@@ -25,14 +25,14 @@ vi.mock('../services/decantingAPI', () => ({
   getDecantingRecords: vi.fn(),
   getDecantingById: vi.fn(),
 }));
-vi.mock('../features/decanting/components/DecantingSheetPDF', () => ({
+vi.mock('../features/decanting/DecantingSheetPDF', () => ({
   default: () => null,
 }));
 
-const { default: WorkList } = await import('../features/staff/components/WorkList');
-const { default: Paged } = await import('../features/staff/components/Paged');
-const { default: usePaged } = await import('../features/staff/hooks/usePaged');
-const { default: DecantingFlow } = await import('../features/decanting/components/DecantingFlow');
+const { default: WorkList } = await import('../features/staff/WorkList');
+const { default: Paged } = await import('../features/staff/Paged');
+const { default: usePaged } = await import('../features/staff/usePaged');
+const { default: DecantingFlow } = await import('../features/decanting/DecantingFlow');
 const decantingAPI = await import('../services/decantingAPI');
 
 const LINES = [

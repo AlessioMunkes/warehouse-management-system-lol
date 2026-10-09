@@ -6,7 +6,7 @@
 // timezone. Both have to print the same calendar day.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect } from 'vitest';
-import { formatDate, formatDateShort } from '../features/receipts/components/noteFormat';
+import { formatDate, formatDateShort } from '../features/receipts/noteFormat';
 
 describe('noteFormat — a DATE column', () => {
   it('prints a bare date as it stands', () => {

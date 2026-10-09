@@ -28,7 +28,7 @@ vi.mock('../services/beneficiaryAPI', () => ({
 vi.mock('@/components/ui/toastContext', () => ({ useToast: () => vi.fn() }));
 
 const api = await import('../services/recipeAPI');
-const { default: RecipesSection } = await import('../features/settings/components/RecipesSection');
+const { default: RecipesSection } = await import('../features/settings/RecipesSection');
 const { exampleQuantity, exampleCentre, bandedChildCount } = await import('../features/settings/recipeMath');
 
 const OVERVIEW = {

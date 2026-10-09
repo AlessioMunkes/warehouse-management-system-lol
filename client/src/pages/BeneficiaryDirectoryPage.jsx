@@ -14,14 +14,14 @@
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth }     from '../context/AuthContext';
-import BeneficiaryForm from '../features/beneficiaries/components/BeneficiaryForm';
+import BeneficiaryForm from '../features/beneficiaries/BeneficiaryForm';
 import beneficiaryAPI  from '../services/beneficiaryAPI';
-import useTableView    from '../features/masterdata/hooks/useTableView';
-import useOpenFromQuery from '../features/masterdata/hooks/useOpenFromQuery';
-import MasterDataTable from '../features/masterdata/components/MasterDataTable';
+import useTableView    from '../features/masterdata/useTableView';
+import useOpenFromQuery from '../features/masterdata/useOpenFromQuery';
+import MasterDataTable from '../features/masterdata/MasterDataTable';
 import {
   BENEFICIARY_COLUMNS, COHORT_LABELS,
-} from '../features/beneficiaries/components/beneficiaryColumns';
+} from '../features/beneficiaries/beneficiaryColumns';
 
 import { Button }    from '@/components/ui/button';
 import { Skeleton }  from '@/components/ui/skeleton';

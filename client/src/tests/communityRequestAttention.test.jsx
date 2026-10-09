@@ -1,7 +1,7 @@
 import { beforeEach, describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import NeedsAttention from '../features/dashboard/components/NeedsAttention';
+import NeedsAttention from '../features/dashboard/NeedsAttention';
 import { toAttention } from '../services/dashboardAPI';
 import { ROUTES } from '../routes/routeTable';
 

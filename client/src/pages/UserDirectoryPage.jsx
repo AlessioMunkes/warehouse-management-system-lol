@@ -20,18 +20,18 @@
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth }   from '../context/AuthContext';
-import UserForm      from '../features/users/components/UserForm';
-import InviteForm    from '../features/users/components/InviteForm';
-import InviteResultPanel from '../features/users/components/InviteResultPanel';
-import PendingInvitesSection from '../features/users/components/PendingInvitesSection';
+import UserForm      from '../features/users/UserForm';
+import InviteForm    from '../features/users/InviteForm';
+import InviteResultPanel from '../features/users/InviteResultPanel';
+import PendingInvitesSection from '../features/users/PendingInvitesSection';
 import userAPI        from '../services/userAPI';
 import userInviteAPI  from '../services/userInviteAPI';
 import { copyToClipboard } from '../lib/clipboard';
 import { useToast } from '@/components/ui/toastContext';
-import ConfirmRemoveDialog from '../features/masterdata/components/ConfirmRemoveDialog';
-import useOpenFromQuery    from '../features/masterdata/hooks/useOpenFromQuery';
-import useTableView        from '../features/masterdata/hooks/useTableView';
-import MasterDataTable     from '../features/masterdata/components/MasterDataTable';
+import ConfirmRemoveDialog from '../features/masterdata/ConfirmRemoveDialog';
+import useOpenFromQuery    from '../features/masterdata/useOpenFromQuery';
+import useTableView        from '../features/masterdata/useTableView';
+import MasterDataTable     from '../features/masterdata/MasterDataTable';
 
 import { Button }    from '@/components/ui/button';
 import { Skeleton }  from '@/components/ui/skeleton';

@@ -20,7 +20,7 @@ vi.mock('../services/pickingAPI', () => ({
 }));
 
 const pickingAPI = await import('../services/pickingAPI');
-const { default: StaffSlipList } = await import('../features/packing/components/StaffSlipList');
+const { default: StaffSlipList } = await import('../features/packing/StaffSlipList');
 
 const MINE_SLIP = {
   id: 1, ecd_name: 'Sunshine ECD', cohort: 'tuesday', child_count: 12,

@@ -14,8 +14,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const { default: WorkList } = await import('../features/staff/components/WorkList');
-const { readDraft, writeDraft, clearDraft } = await import('../features/staff/hooks/useDraft');
+const { default: WorkList } = await import('../features/staff/WorkList');
+const { readDraft, writeDraft, clearDraft } = await import('../features/staff/useDraft');
 
 const LINES = [
   { id: 1, title: 'Butternut',   sku: 'VEG-BUTT',   expected: 1,  unit: 'crate', value: '1'  },

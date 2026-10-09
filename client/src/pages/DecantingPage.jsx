@@ -4,7 +4,7 @@
 // One route, two shapes, picked by role — there is no /staff/decanting
 // (see routes/paths.js). A manager gets the week planner
 // (DecantingPlanner, the old body of this file, moved verbatim into
-// features/decanting/components). Everyone else gets the phone flow
+// features/decanting). Everyone else gets the phone flow
 // for one sack at a time (DecantingFlow). Both call the same
 // endpoints, so neither can drift from the other's arithmetic.
 //
@@ -14,7 +14,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import DecantingFlow from '../features/decanting/components/DecantingFlow';
+import DecantingFlow from '../features/decanting/DecantingFlow';
 import StaffShell from '../components/layout/StaffShell';
 import { getProducts } from '../services/decantingAPI';
 import { STAFF } from '../routes/paths';

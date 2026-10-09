@@ -51,10 +51,10 @@ vi.mock('../context/AuthContext', () => ({
   useAuth: () => ({ user: { id: 1, firstName: 'Mcebisi', lastName: 'Ndlovu', role: 'warehouse_worker' } }),
 }));
 
-vi.mock('../features/procurement/components/DeliveryNotePDF', () => ({ default: () => null }));
+vi.mock('../features/receiving/DeliveryNotePDF', () => ({ default: () => null }));
 
 const receivingAPI = (await import('../services/receivingAPI')).default;
-const { default: ReceivingFlow } = await import('../features/procurement/components/ReceivingFlow');
+const { default: ReceivingFlow } = await import('../features/receiving/ReceivingFlow');
 
 const SUPPLIERS = [
   { id: 1, name: 'Bokomo Foods Distribution' },

@@ -38,11 +38,11 @@ import ErrorBanner from '@/components/ui/error-banner';
 import { useToast } from '@/components/ui/toastContext';
 import { publicAppOrigin, isReachableByPhone } from '../features/packing/palletLabelPdf';
 import { buildPickingSlipPdf, loadSlipLogo } from '../features/pickingSlips/pickingSlipPdf';
-import useOpenFromQuery from '../features/masterdata/hooks/useOpenFromQuery';
+import useOpenFromQuery from '../features/masterdata/useOpenFromQuery';
 import { takeUrlParam } from '../features/staff/resumeParam';
-import SlipList from '../features/pickingSlips/components/SlipList';
-import SlipDetailPanel from '../features/pickingSlips/components/SlipDetailPanel';
-import { GenerateSlipsForm, CreateSlipForm, EditSlipForm } from '../features/pickingSlips/components/SlipForms';
+import SlipList from '../features/pickingSlips/SlipList';
+import SlipDetailPanel from '../features/pickingSlips/SlipDetailPanel';
+import { GenerateSlipsForm, CreateSlipForm, EditSlipForm } from '../features/pickingSlips/SlipForms';
 import {
   VIEWS, countViews, shiftWeek, todaySast, viewById, weekLabel, weekOf,
 } from '../features/pickingSlips/slipViews';

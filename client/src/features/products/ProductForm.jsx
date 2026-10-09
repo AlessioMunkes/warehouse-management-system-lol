@@ -1,0 +1,321 @@
+// ─────────────────────────────────────────────────────────────
+// client/src/features/products/ProductForm.jsx
+//
+// Registration and edit in one component, same reasoning as
+// SupplierForm.jsx/UserForm.jsx — the fields are identical and two
+// copies would drift.
+//
+// `name`, `sku` AND `defaultUnit` ARE REQUIRED, matching
+// product.service.js. SKU used to be described here as optional; that
+// was wrong against the database — products.stock_keeping_unit is NOT
+// NULL and UNIQUE, so it can neither be omitted nor defaulted to ''
+// (the second product to try that collides on the unique index).
+// Category, weight and is_perishable are genuinely optional.
+//
+// The unit is a dropdown, not a text box, because stock_levels.unit
+// and stock_movements.unit both carry a CHECK constraint allowing
+// exactly the nine values in STOCK_UNITS. A free-typed "bags" is not a
+// validation message, it is a 23514 raised mid-transaction. Storage
+// type is the same story on a smaller enum — products.storage_type
+// allows only 'dry' or 'cold' — so it gets the same Select treatment
+// rather than a free-typed value or a checkbox.
+//
+// default_location_id is deliberately NOT a field here. It exists on
+// the product and is round-tripped by productAPI's toProduct mapper,
+// but there is no storage-locations list endpoint yet to populate a
+// picker from — that's a later change, not a text box standing in for
+// one now.
+//
+// BLANK OPTIONAL FIELDS THAT MATTER LATER. Weight, cost and (on a new
+// product) the reorder threshold can be left blank, but each has a
+// consequence somewhere else. Saving with one blank shows
+// MissingDetailsNotice first — what will go without it, and "Save
+// anyway". MISSING_DETAILS below is the list.
+// ─────────────────────────────────────────────────────────────
+import { useState } from 'react';
+import {
+  Field, FieldGroup, FieldLabel, FieldDescription, FieldError,
+} from '@/components/ui/field';
+import { Button }    from '@/components/ui/button';
+import { Input }     from '@/components/ui/input';
+import { Checkbox }  from '@/components/ui/checkbox';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import { Loader2 }   from 'lucide-react';
+import { STOCK_UNITS } from '@/services/productAPI';
+import MissingDetailsNotice from '@/components/ui/missing-details-notice';
+
+// products.storage_type's own CHECK constraint — 'dry' or 'cold', and
+// nothing else. Small and closed enough that it isn't worth exporting
+// from productAPI.js the way STOCK_UNITS is; product.service.js keeps
+// its own equivalent unexported for the same reason.
+const STORAGE_TYPES = ['dry', 'cold'];
+
+const isBlank = (value) => value === '' || value === null || value === undefined;
+
+// Optional fields something else relies on, and what goes without each.
+// `when` narrows one to where it applies.
+const MISSING_DETAILS = [
+  { key: 'weightKg', field: 'Weight',
+    consequence: 'Purchase orders cannot work out the expected weight, so it has to be typed in on each order.' },
+  { key: 'unitCost', field: 'Cost per item',
+    consequence: 'Purchase orders cannot work out the cost, so it has to be typed in on each order.' },
+  // On an edit, a blank threshold means "leave it as it is".
+  { key: 'reorderThreshold', field: 'Reorder threshold', when: ({ isNew }) => isNew,
+    consequence: 'The product is never marked as low stock, however little is left.' },
+];
+
+// Units that are weighed or poured. The server uses the same list for a
+// product saved without the choice (product.service.js).
+const LOOSE_UNITS = ['kg', 'g', 'l', 'ml'];
+
+const BLANK = {
+  name: '', sku: '', defaultUnit: '', weightKg: '', unitCost: '',
+  // null until someone ticks or unticks it: a new product then follows
+  // its unit (weighed or poured is decantable, counted is not).
+  category: '', isPerishable: false, isDecantable: null, reorderThreshold: '',
+  storageType: 'dry',
+};
+
+export default function ProductForm({
+  initial = null,
+  submitLabel = 'Add product',
+  onSubmit,
+  onCancel,
+  busy = false,
+  error = null,
+}) {
+  const [form, setForm] = useState({ ...BLANK, ...(initial ?? {}) });
+  const [touchedName, setTouchedName] = useState(false);
+  const [touchedSku,  setTouchedSku]  = useState(false);
+  const [touchedUnit, setTouchedUnit] = useState(false);
+
+  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+  const nameMissing = !String(form.name ?? '').trim();
+  const nameInvalid = touchedName && nameMissing;
+  const skuMissing  = !String(form.sku ?? '').trim();
+  const skuInvalid  = touchedSku && skuMissing;
+  const unitMissing = !String(form.defaultUnit ?? '').trim();
+  const unitInvalid = touchedUnit && unitMissing;
+
+  const isDecantable = form.isDecantable ?? LOOSE_UNITS.includes(form.defaultUnit);
+
+  // The blank details being asked about, while the notice is showing.
+  const [missing, setMissing] = useState(null);
+
+  const payload = () => ({
+      ...form,
+      isDecantable,
+      // The service maps '' to null anyway, but sending null is
+      // clearer about the intent, same reasoning SupplierForm's
+      // expectedLeadTimeDays uses.
+      weightKg: form.weightKg === '' || form.weightKg === null ? null : Number(form.weightKg),
+      unitCost: form.unitCost === '' || form.unitCost === null ? null : Number(form.unitCost),
+      // Blank means "leave it alone" on an edit, and the column
+      // default (0) on a create — not zero typed deliberately.
+      reorderThreshold:
+        form.reorderThreshold === '' || form.reorderThreshold === null
+          ? null
+          : Number(form.reorderThreshold),
+  });
+
+  const submit = () => {
+    setTouchedName(true);
+    setTouchedSku(true);
+    setTouchedUnit(true);
+    if (nameMissing || skuMissing || unitMissing) return;
+    const blank = MISSING_DETAILS.filter((d) => isBlank(form[d.key]) && (!d.when || d.when({ isNew: !initial })));
+    if (blank.length > 0) { setMissing(blank); return; }
+    onSubmit(payload());
+  };
+
+  return (
+    <FieldGroup>
+      {error ? <FieldError>{error}</FieldError> : null}
+
+      <Field data-invalid={nameInvalid || undefined}>
+        <FieldLabel htmlFor="product-name">Product name</FieldLabel>
+        <Input
+          id="product-name"
+          value={form.name}
+          onChange={set('name')}
+          onBlur={() => setTouchedName(true)}
+          placeholder="Maize meal 10kg"
+          aria-invalid={nameInvalid || undefined}
+        />
+        {nameInvalid ? <FieldError>A name is required.</FieldError> : null}
+      </Field>
+
+      <div className="grid gap-7 sm:grid-cols-2">
+        <Field data-invalid={skuInvalid || undefined}>
+          <FieldLabel htmlFor="product-sku">SKU</FieldLabel>
+          <Input
+            id="product-sku"
+            value={form.sku}
+            onChange={set('sku')}
+            onBlur={() => setTouchedSku(true)}
+            placeholder="MM-10KG"
+            aria-invalid={skuInvalid || undefined}
+          />
+          {skuInvalid
+            ? <FieldError>A SKU is required.</FieldError>
+            : <FieldDescription>Must be unique across the catalogue.</FieldDescription>}
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="product-category">Category</FieldLabel>
+          <Input
+            id="product-category"
+            value={form.category}
+            onChange={set('category')}
+            placeholder="Dry goods, fresh produce, cold chain"
+          />
+        </Field>
+      </div>
+
+      <div className="grid gap-7 sm:grid-cols-2">
+        <Field data-invalid={unitInvalid || undefined}>
+          <FieldLabel htmlFor="product-unit">Default unit</FieldLabel>
+          <Select
+            value={form.defaultUnit || undefined}
+            onValueChange={(v) => {
+              setForm((f) => ({ ...f, defaultUnit: v }));
+              setTouchedUnit(true);
+            }}
+          >
+            <SelectTrigger id="product-unit" aria-invalid={unitInvalid || undefined}>
+              <SelectValue placeholder="Select a unit" />
+            </SelectTrigger>
+            <SelectContent>
+              {STOCK_UNITS.map((u) => (
+                <SelectItem key={u} value={u}>{u}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {unitInvalid
+            ? <FieldError>A default unit is required.</FieldError>
+            : <FieldDescription>The unit stock is counted in.</FieldDescription>}
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="product-weight">Weight (kg)</FieldLabel>
+          <Input
+            id="product-weight"
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.weightKg ?? ''}
+            onChange={set('weightKg')}
+          />
+          {/* Genuinely optional — plenty of products are counted, not
+              weighed. */}
+          <FieldDescription>Leave blank for items that are counted, not weighed.</FieldDescription>
+        </Field>
+      </div>
+
+      <div className="grid gap-7 sm:grid-cols-2">
+        <Field>
+          <FieldLabel htmlFor="product-cost">Cost per item (R)</FieldLabel>
+          <Input
+            id="product-cost"
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.unitCost ?? ''}
+            onChange={set('unitCost')}
+          />
+          <FieldDescription>
+            Price per item before VAT, used on purchase orders. Leave blank if donated or the
+            price varies.
+          </FieldDescription>
+        </Field>
+      </div>
+
+      <div className="grid gap-7 sm:grid-cols-2">
+        <Field>
+          <FieldLabel htmlFor="product-storage-type">Storage type</FieldLabel>
+          <Select
+            value={form.storageType || undefined}
+            onValueChange={(v) => setForm((f) => ({ ...f, storageType: v }))}
+          >
+            <SelectTrigger id="product-storage-type">
+              <SelectValue placeholder="Select a storage type" />
+            </SelectTrigger>
+            <SelectContent>
+              {STORAGE_TYPES.map((t) => (
+                <SelectItem key={t} value={t}>{t}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <FieldDescription>Dry storage or cold chain.</FieldDescription>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="product-reorder">Reorder threshold</FieldLabel>
+          <Input
+            id="product-reorder"
+            type="number"
+            min="0"
+            step="any"
+            inputMode="decimal"
+            value={form.reorderThreshold ?? ''}
+            onChange={set('reorderThreshold')}
+          />
+          {/* Read by the inventory manifest, the manager dashboard and
+              the reorder report, and until now settable by nothing. The
+              comparison is against AVAILABLE stock (on hand minus what
+              is packed and waiting for a driver), not the raw on-hand
+              figure. */}
+          <FieldDescription>
+            Mark the product low when available stock falls to this level. Enter 0 to turn the
+            warning off.
+          </FieldDescription>
+        </Field>
+      </div>
+
+      <Field orientation="horizontal">
+        <Checkbox
+          id="product-perishable"
+          checked={form.isPerishable}
+          onCheckedChange={(checked) => setForm((f) => ({ ...f, isPerishable: checked === true }))}
+        />
+        <FieldLabel htmlFor="product-perishable" className="font-normal">
+          This item is perishable
+        </FieldLabel>
+      </Field>
+
+      <Field orientation="horizontal">
+        <Checkbox
+          id="product-decantable"
+          checked={isDecantable}
+          onCheckedChange={(checked) => setForm((f) => ({ ...f, isDecantable: checked === true }))}
+        />
+        <div>
+          <FieldLabel htmlFor="product-decantable" className="font-normal">
+            This item can be decanted
+          </FieldLabel>
+          <FieldDescription>
+            Tick for food kept loose and portioned out, like rice or oil. It shows on the
+            Decanting screen and can be a part quantity. Everything else is whole numbers only.
+          </FieldDescription>
+        </div>
+      </Field>
+
+      {missing ? (
+        <MissingDetailsNotice
+          items={missing} busy={busy}
+          onConfirm={() => onSubmit(payload())}
+          onCancel={() => setMissing(null)}
+        />
+      ) : (
+        <Field orientation="horizontal">
+          <Button type="button" onClick={submit} disabled={busy}>
+            {busy ? <Loader2 className="animate-spin" /> : null}
+            {busy ? 'Saving' : submitLabel}
+          </Button>
+          {onCancel ? (
+            <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
+          ) : null}
+        </Field>
+      )}
+    </FieldGroup>
+  );
+}

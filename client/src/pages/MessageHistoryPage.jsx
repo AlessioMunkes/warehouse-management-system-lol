@@ -40,7 +40,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
+import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/usePaged';
 import { getMessages } from '../services/communicationsAPI';
 
 const VIEWS = [

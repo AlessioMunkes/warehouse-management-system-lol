@@ -22,11 +22,11 @@ vi.mock('../services/photoAPI', () => ({
   shrinkPhoto: (...a) => shrinkPhoto(...a), uploadPhoto: (...a) => uploadPhoto(...a), listPhotos: vi.fn(),
 }));
 
-const { MESSAGES } = await import('../i18n/messages');
-const { translator, setLanguage, getLanguage, LANGUAGES } = await import('../i18n');
-const { default: LanguagePicker } = await import('../features/staff/components/LanguagePicker');
-const { default: PhotoButton } = await import('../features/staff/components/PhotoButton');
-const { default: DashboardGreeting } = await import('../features/dashboard/components/DashboardGreeting');
+const { MESSAGES } = await import('../translations/messages');
+const { translator, setLanguage, getLanguage, LANGUAGES } = await import('../translations');
+const { default: LanguagePicker } = await import('../features/staff/LanguagePicker');
+const { default: PhotoButton } = await import('../features/staff/PhotoButton');
+const { default: DashboardGreeting } = await import('../features/dashboard/DashboardGreeting');
 
 const placeholders = (text) => (String(text).match(/\{\w+\}/g) ?? []).sort().join(',');
 

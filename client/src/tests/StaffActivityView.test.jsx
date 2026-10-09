@@ -6,7 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
 vi.mock('../services/adminAPI', () => ({ default: { getArchive: vi.fn(), getActivity: vi.fn() } }));
 
 const { default: adminAPI } = await import('../services/adminAPI');
-const { default: StaffActivityView } = await import('../features/admin/activityLog/StaffActivityView');
+const { default: StaffActivityView } = await import('../features/activityLog/StaffActivityView');
 
 const ADA = { id: 1, name: 'Ada Admin', username: 'ada', role: 'admin', count: 2 };
 const MO = { id: 2, name: 'Mo Manager', username: 'mo', role: 'manager', count: 1 };

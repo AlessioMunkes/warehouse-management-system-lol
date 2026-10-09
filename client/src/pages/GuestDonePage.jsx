@@ -24,7 +24,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   GuestShell, GuestScreen, Button, Notice, HelpNote, SignOutConfirm,
-} from '../features/guest/components/GuestPrimitives';
+} from '../features/guest/GuestPrimitives';
 import { useGuestSignOut } from '../features/guest/useGuestSignOut';
 import { formatDay, displayName, beneficiaryKind as beneficiaryKindOf } from '../features/guest/guestFormat';
 

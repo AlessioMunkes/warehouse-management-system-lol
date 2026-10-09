@@ -33,12 +33,12 @@ import {
   Activity, ClipboardList, CookingPot, Gift, HandHeart, Hourglass, Package, PackageCheck, PackageX,
   ScrollText, Truck, Users2, Warehouse,
 } from 'lucide-react';
-import StatTile from './components/StatTile';
-import ActionCard from './components/ActionCard';
-import ReportPanel from './components/ReportPanel';
-import StaticChart from './components/StaticChart';
-import NotificationsPanel from './components/NotificationsPanel';
-import { StockCoverPanel, MissedCollectionsPanel } from './components/InsightPanels';
+import StatTile from './StatTile';
+import ActionCard from './ActionCard';
+import ReportPanel from './ReportPanel';
+import StaticChart from './StaticChart';
+import NotificationsPanel from './NotificationsPanel';
+import { StockCoverPanel, MissedCollectionsPanel } from './InsightPanels';
 import { STAFF, ADMIN } from '../../routes/paths';
 import { RAG, byLabel } from './chartTheme';
 

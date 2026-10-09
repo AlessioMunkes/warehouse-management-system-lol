@@ -23,7 +23,7 @@
 import { lazy } from 'react';
 import LandingPage                 from '../pages/LandingPage';
 import LoginPage                   from '../pages/LoginPage';
-import { DonationDraftProvider }   from '../features/donation/context/DonationDraftProvider';
+import { DonationDraftProvider }   from '../features/donation/DonationDraftProvider';
 
 // What each lazily loaded screen is fetched from. Exported so a test can
 // check a route still leads to the page it should.

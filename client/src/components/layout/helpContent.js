@@ -8,7 +8,7 @@
 // with the steps in the order the screen asks for them. When a screen
 // changes, change its topic here.
 //
-// The warehouse-staff topics are also in i18n/phrases.js, so they read
+// The warehouse-staff topics are also in translations/phrases.js, so they read
 // in Afrikaans and isiXhosa: a line changed here needs changing there.
 // ─────────────────────────────────────────────────────────────
 

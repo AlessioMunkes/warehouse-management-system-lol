@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import BeneficiaryForm from '../features/beneficiaries/components/BeneficiaryForm';
+import BeneficiaryForm from '../features/beneficiaries/BeneficiaryForm';
 
 describe('BeneficiaryForm', () => {
   it('submits optional email and mobile contact fields with the beneficiary payload', async () => {

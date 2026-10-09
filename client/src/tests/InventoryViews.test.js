@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest';
 import {
   countViews, daysBetween, expiryLabel, expiryState, filterProducts, isIdle,
   rowTone, stockStatus, todaySast, viewById,
-} from '../features/InventoryManagement/inventoryViews';
+} from '../features/inventory/inventoryViews';
 
 const NOW = new Date('2026-10-02T10:00:00+02:00');
 const daysAgo = (n) => new Date(NOW.getTime() - n * 86400000).toISOString();

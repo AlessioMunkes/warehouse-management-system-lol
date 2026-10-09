@@ -18,9 +18,9 @@ vi.mock('recharts', async (orig) => {
   };
 });
 
-import OperationalChart from '../features/reporting/components/OperationalChart';
-import ComparisonChart from '../features/reporting/components/ComparisonChart';
-import ComboChart from '../features/reporting/components/ComboChart';
+import OperationalChart from '../features/reporting/OperationalChart';
+import ComparisonChart from '../features/reporting/ComparisonChart';
+import ComboChart from '../features/reporting/ComboChart';
 import { pivot, shapeOf, viewsFor } from '../features/reporting/chartFormat';
 
 const category = {

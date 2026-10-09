@@ -18,7 +18,7 @@ vi.mock('../services/pickingAPI', () => ({
 }));
 
 const pickingAPI = await import('../services/pickingAPI');
-const { default: StaffSlipFlow } = await import('../features/packing/components/StaffSlipFlow');
+const { default: StaffSlipFlow } = await import('../features/packing/StaffSlipFlow');
 
 const ME = { id: 7, role: 'warehouse_worker' };
 const item = (id, status) => ({ id, product_name: `Product ${id}`, required_quantity: 2, unit: 'kg', status, packed_quantity: status === 'pending' ? null : 2 });

@@ -22,12 +22,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StaffShell from '../components/layout/StaffShell';
-import DispatchNotePDF from '../features/dispatch/components/DispatchNotePDF';
-import { Notice } from '../features/staff/components/StepPrimitives';
+import DispatchNotePDF from '../features/dispatch/DispatchNotePDF';
+import { Notice } from '../features/staff/StepPrimitives';
 import dispatchAPI from '../services/dispatchAPI';
 import { STAFF } from '../routes/paths';
-import Paged from '../features/staff/components/Paged';
-import usePaged from '../features/staff/hooks/usePaged';
+import Paged from '../features/staff/Paged';
+import usePaged from '../features/staff/usePaged';
 
 const RANGES = [
   { key: 'today', label: 'Today' },

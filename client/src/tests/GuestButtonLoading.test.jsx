@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { Button } from '../features/guest/components/GuestPrimitives';
+import { Button } from '../features/guest/GuestPrimitives';
 
 describe('guest Button — loading state', () => {
   it('is disabled, aria-busy and shows a spinner while loading', () => {

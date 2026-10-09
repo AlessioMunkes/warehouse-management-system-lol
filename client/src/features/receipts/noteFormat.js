@@ -1,0 +1,119 @@
+// ─────────────────────────────────────────────────────────────
+// client/src/features/receipts/noteFormat.js
+//
+// Formatting shared by both note documents and the archive list.
+//
+// Dates are rendered in en-ZA. A delivery_date is a plain DATE column
+// with no timezone, so it is sliced rather than passed through
+// new Date(), which would treat "2026-08-12" as UTC midnight and
+// print the 11th for anyone west of Greenwich. Timestamps
+// (created_at, collected_at) ARE timestamptz and get the full
+// conversion, pinned to Africa/Johannesburg so a manager checking
+// from anywhere sees warehouse time.
+// ─────────────────────────────────────────────────────────────
+
+const SAST = 'Africa/Johannesburg';
+
+// The calendar day a DATE column holds, as 'YYYY-MM-DD'. A bare date is
+// already that. A full timestamp is what the server sends when node-postgres
+// has turned the DATE into midnight in the server's own timezone: from a
+// server on warehouse time, 6 October arrives as '2026-10-05T22:00:00Z',
+// and slicing that printed the 5th. Reading it in warehouse time gives the
+// 6th whether the server runs on UTC or SAST.
+export const calendarDay = (value) => {
+  const text = String(value);
+  if (text.length <= 10) return text;
+  const at = new Date(text);
+  if (Number.isNaN(at.getTime())) return text.slice(0, 10);
+  return at.toLocaleDateString('en-CA', { timeZone: SAST });
+};
+
+// A DATE column: 'YYYY-MM-DD', or a timestamp standing for one.
+export const formatDate = (value) => {
+  if (!value) return '—';
+  const datePart = calendarDay(value);
+  const [y, m, d] = datePart.split('-').map(Number);
+  if (!y || !m || !d) return '—';
+  // Constructed as UTC and formatted as UTC — no shifting either way.
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-ZA', {
+    year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC',
+  });
+};
+
+// A TIMESTAMPTZ column. Shown in warehouse time.
+export const formatDateTime = (value) => {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString('en-ZA', {
+    year: 'numeric', month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit', timeZone: SAST,
+  });
+};
+
+// Short form for list rows.
+export const formatDateShort = (value) => {
+  if (!value) return '—';
+  const datePart = calendarDay(value);
+  const [y, m, d] = datePart.split('-').map(Number);
+  if (!y || !m || !d) return '—';
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-ZA', {
+    year: '2-digit', month: 'short', day: 'numeric', timeZone: 'UTC',
+  });
+};
+
+// Quantities arrive from pg as strings, because numeric does not fit in a JS
+// number safely and node-postgres refuses to guess. Number() them at the edge.
+//
+// Script 54: both of these moved to lib/quantity.js — packing, the
+// gate, receiving and the ledger print quantities too, and two copies
+// of a formatter is how "1.000" ended up in a number box. Re-exported
+// here so every existing import of noteFormat keeps working.
+import { qty, fmtQty } from '../../lib/quantity';
+
+export { qty, fmtQty };
+
+// ── Variance ─────────────────────────────────────────────────
+// Returns { diff, label, className } or null when the two match.
+// Used by both notes: goods-in compares received against expected,
+// goods-out compares loaded against packed.
+//
+// label is a signed number ("-1", "+1"), not prose ("1 short",
+// "1 over") — a receiver reconciling a stack of these wants a column
+// they can sum, not a sentence they have to re-parse into a sign
+// first. The className still carries short-vs-over as a colour, so
+// the distinction isn't lost, only moved out of the text.
+export const variance = (actual, expected) => {
+  const a = qty(actual);
+  const e = qty(expected);
+  if (a === null || e === null) return null;
+  const diff = a - e;
+  if (diff === 0) return null;
+  return {
+    diff,
+    label:     diff > 0 ? `+${diff}` : String(diff),
+    className: diff > 0 ? 'pdf-variance-over' : 'pdf-variance-short',
+  };
+};
+
+// Human labels for the dispatch_events.status enum.
+export const DISPATCH_STATUS_LABEL = {
+  awaiting:       'Awaiting collection',
+  collected:      'Collected',
+  late_collected: 'Collected late',
+  not_collected:  'Not collected',
+  cancelled:      'Cancelled',
+};
+
+export const DELIVERY_STATUS_LABEL = {
+  recorded: 'Recorded',
+  flagged:  'Flagged',
+  closed:   'Closed',
+};
+
+export const BENEFICIARY_LABEL = {
+  ecd:             'ECD centre',
+  dignity_kitchen: 'Dignity Kitchen',
+  soup_kitchen:    'Soup kitchen',
+  community:       'Community',
+};

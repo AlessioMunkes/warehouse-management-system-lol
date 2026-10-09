@@ -9,7 +9,7 @@ vi.mock('@/services/donationManagementAPI', () => ({
 }));
 
 import donationManagementAPI from '@/services/donationManagementAPI';
-import useFlaggedItems from '../features/donationManagement/hooks/useFlaggedItems';
+import useFlaggedItems from '../features/donationManagement/useFlaggedItems';
 
 const FLAG = {
   flag_id: 1,

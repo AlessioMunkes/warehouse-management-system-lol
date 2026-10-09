@@ -6,7 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
 vi.mock('../services/settingsAPI', () => ({ checkConnections: vi.fn() }));
 
 const { checkConnections } = await import('../services/settingsAPI');
-const { default: ConnectionsSection } = await import('../features/settings/components/ConnectionsSection');
+const { default: ConnectionsSection } = await import('../features/settings/ConnectionsSection');
 
 const RESULT = {
   checkedAt: '2026-10-03T08:15:00Z',

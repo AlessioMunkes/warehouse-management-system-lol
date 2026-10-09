@@ -27,12 +27,12 @@ import ListToolbar from "@/components/ui/list-toolbar";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import LedgerTable from "../features/InventoryManagement/components/LedgerTable";
+import LedgerTable from "../features/inventory/LedgerTable";
 import TablePager from "@/components/ui/table-pager";
 import useSortable from "@/lib/useSortable";
-import { LEDGER_SORT } from "../features/InventoryManagement/ledgerSort";
-import usePaged, { TABLE_PAGE_SIZE } from "@/features/staff/hooks/usePaged";
-import ReconciliationPanel from "../features/InventoryManagement/components/ReconciliationPanel";
+import { LEDGER_SORT } from "../features/inventory/ledgerSort";
+import usePaged, { TABLE_PAGE_SIZE } from "@/features/staff/usePaged";
+import ReconciliationPanel from "../features/inventory/ReconciliationPanel";
 import { Card, CardContent } from "@/components/ui/card";
 import { getLedger, getReconciliation, getLedgerActors, getManifest } from "../services/stockAPI";
 

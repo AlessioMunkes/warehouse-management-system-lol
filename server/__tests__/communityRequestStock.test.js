@@ -6,7 +6,7 @@
 //     variant the packing check uses);
 //   - planShortage: which approved requests give way, in what order;
 //   - recheckProducts: flags, releases, notifies ONCE, never throws;
-//   - the two hooks (a pallet packed, stock going down) and the
+//   - the two lib (a pallet packed, stock going down) and the
 //     priority rule (the packing check never sees a benevolent
 //     reservation).
 //
@@ -257,7 +257,7 @@ describe('recheckProducts', () => {
   });
 });
 
-// ── The hooks ─────────────────────────────────────────────────
+// ── The lib ─────────────────────────────────────────────────
 describe('adjustStock hook', () => {
   const makeStockClient = () => {
     const queries = [];

@@ -26,12 +26,12 @@ import StaffTabBar from './StaffTabBar';
 import { useAuth } from '../../context/AuthContext';
 import OfflineBar from './OfflineBar';
 import useGoBack from './useGoBack';
-import useSpareSlipAlert from '../../features/staff/hooks/useSpareSlipAlert';
-import usePressFlash from '../../features/staff/hooks/usePressFlash';
-import useKeepAwake from '../../features/staff/hooks/useKeepAwake';
-import useAccountLanguage from '../../features/staff/hooks/useAccountLanguage';
-import useFloorTranslation from '../../features/staff/hooks/useFloorTranslation';
-import { useT } from '../../i18n';
+import useSpareSlipAlert from '../../features/staff/useSpareSlipAlert';
+import usePressFlash from '../../features/staff/usePressFlash';
+import useKeepAwake from '../../features/staff/useKeepAwake';
+import useAccountLanguage from '../../features/staff/useAccountLanguage';
+import useFloorTranslation from '../../features/staff/useFloorTranslation';
+import { useT } from '../../translations';
 import { STAFF } from '../../routes/paths';
 
 // 'Packing / Little Stars ECD' → title 'Packing', sub 'Little Stars ECD'.

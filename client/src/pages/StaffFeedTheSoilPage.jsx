@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useState } from 'react';
 import StaffShell from '../components/layout/StaffShell';
-import FeedTheSoilFlow from '../features/feedTheSoil/components/FeedTheSoilFlow';
+import FeedTheSoilFlow from '../features/feedTheSoil/FeedTheSoilFlow';
 
 export default function StaffFeedTheSoilPage() {
   const [crumb, setCrumb] = useState('Kits');

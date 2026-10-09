@@ -13,7 +13,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
-import AssistantLauncher from '../features/assistant/components/AssistantLauncher';
+import AssistantLauncher from '../features/assistant/AssistantLauncher';
 
 // Shows where the router actually is, so "it takes you there" can be
 // asserted rather than inferred from a link's href.

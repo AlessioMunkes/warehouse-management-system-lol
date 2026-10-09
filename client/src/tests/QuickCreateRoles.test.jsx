@@ -21,7 +21,7 @@ import { useAuth } from '../context/AuthContext';
 
 vi.mock('../context/AuthContext', () => ({ useAuth: vi.fn() }));
 // Fetches on mount and is not what this is about.
-vi.mock('../features/notifications/components/NotificationBell', () => ({
+vi.mock('../features/notifications/NotificationBell', () => ({
   default: () => null,
 }));
 

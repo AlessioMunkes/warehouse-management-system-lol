@@ -2,7 +2,7 @@
 // client/src/tests/FloorTranslator.test.jsx
 //
 // The floor's text that is translated on the page, by phrase
-// (i18n/phrases.js and i18n/floorTranslator.js).
+// (translations/phrases.js and translations/floorTranslator.js).
 //
 // The table is checked as a whole for the mistakes that would show on a
 // screen: a missing language, a {} dropped in translation. The page
@@ -13,10 +13,10 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, act, waitFor } from '@testing-library/react';
 import { useState } from 'react';
 
-const { PHRASES } = await import('../i18n/phrases');
+const { PHRASES } = await import('../translations/phrases');
 const {
   buildTables, translatePhrase, startFloorTranslation, stopFloorTranslation,
-} = await import('../i18n/floorTranslator');
+} = await import('../translations/floorTranslator');
 
 const table = buildTables(PHRASES);
 const holes = (text) => (text.match(/\{\}/g) ?? []).length;

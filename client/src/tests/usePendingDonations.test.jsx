@@ -9,7 +9,7 @@ vi.mock('@/services/donationManagementAPI', () => ({
 }));
 
 import donationManagementAPI, { PENDING_DONATION_STATUSES } from '@/services/donationManagementAPI';
-import usePendingDonations from '../features/donationManagement/hooks/usePendingDonations';
+import usePendingDonations from '../features/donationManagement/usePendingDonations';
 
 const DONATION = {
   id: 21,

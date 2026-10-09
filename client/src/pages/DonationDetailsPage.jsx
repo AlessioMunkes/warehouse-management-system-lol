@@ -11,10 +11,10 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useRef, useState, useEffect } from "react";
 import StaffShell from "../components/layout/StaffShell";
 
-import { useDonationDraft, validateDonationDraft } from "../features/donation/context/DonationDraftContext";
+import { useDonationDraft, validateDonationDraft } from "../features/donation/DonationDraftContext";
 import { DONATIONS } from "../routes/paths";
-import { DonationRail } from "../features/donation/components/DonationRail";
-import { DonationItemsList } from "../features/donation/components/DonationItemsList";
+import { DonationRail } from "../features/donation/DonationRail";
+import { DonationItemsList } from "../features/donation/DonationItemsList";
 
 export function DonationDetailsPage() {
   const navigate = useNavigate();

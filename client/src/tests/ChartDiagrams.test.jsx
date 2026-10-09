@@ -12,7 +12,7 @@ import { render, screen } from '@testing-library/react';
 import {
   anomaliesOf, defaultView, flowOf, funnelOf, ragColour, viewsFor, waterfallOf, yearEarlier,
 } from '../features/reporting/chartFormat';
-import { Funnel } from '../features/reporting/components/OperationalDiagrams';
+import { Funnel } from '../features/reporting/OperationalDiagrams';
 
 const PO_FUNNEL = { stages: ['pending', 'approved', 'in_transit', 'completed'], exits: ['returned'] };
 const PO_SERIES = [

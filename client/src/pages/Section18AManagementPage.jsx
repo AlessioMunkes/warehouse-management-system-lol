@@ -31,7 +31,7 @@ import {
 } from '../components/ui/alert-dialog';
 import donationManagementAPI from '../services/donationManagementAPI';
 import TablePager from '@/components/ui/table-pager';
-import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
+import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/usePaged';
 
 const TABS = [
   { id: 'certificates', label: 'Certificate Queue', icon: FileText, description: 'View and manage Section 18A tax certificates for donations.' },

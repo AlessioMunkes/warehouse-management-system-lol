@@ -258,7 +258,7 @@ describe('manager screen copy', () => {
     const { readFileSync } = await import('node:fs');
     const { fileURLToPath } = await import('node:url');
     const list = readFileSync(
-      fileURLToPath(new URL('../features/pickingSlips/components/SlipList.jsx', import.meta.url)), 'utf8');
+      fileURLToPath(new URL('../features/pickingSlips/SlipList.jsx', import.meta.url)), 'utf8');
     const button = list.slice(list.indexOf('onPrintLabels(rows)') - 200, list.indexOf('Print slips ('));
     expect(button).toContain('disabled={rows.length === 0}');
     expect(list).not.toContain('labelsReachable');

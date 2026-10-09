@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import PurchaseOrderDetail from '../features/purchaseOrders/components/PurchaseOrderDetail';
-import PurchaseOrderForm from '../features/purchaseOrders/components/PurchaseOrderForm';
+import PurchaseOrderDetail from '../features/purchaseOrders/PurchaseOrderDetail';
+import PurchaseOrderForm from '../features/purchaseOrders/PurchaseOrderForm';
 import { toPurchaseOrder } from '../services/purchaseOrderAPI';
 
 const row = (over = {}) => ({

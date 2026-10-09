@@ -12,10 +12,13 @@ Built by UCT INF3003W Team 22, 2026.
 client/                 React app (Vite, Tailwind). Installs as a PWA.
   src/
     pages/              One file per screen
-    features/           Each feature's components, hooks and helpers
+    features/           One flat folder per area, holding that area's parts
     components/         Shared UI (components/ui) and the app shells (components/layout)
     routes/             routeTable.js lists every screen, who may open it, and its menu entry
     services/           One file per API area; the only place that calls the server
+    styles/             Every stylesheet
+    translations/       Afrikaans and isiXhosa for the warehouse floor
+    lib/                Helpers and hooks used across features
     tests/              Vitest + Testing Library
   public/               Icons and images served as they are
 
@@ -38,6 +41,8 @@ server/                 Express API
 render.yaml             Deployment to Render
 .github/workflows/      Lint, build and test on every push
 ```
+
+[CODEBASE.md](CODEBASE.md) goes through every folder and says where new work belongs.
 
 A request goes: screen -> `client/src/services` -> `server/src/routes` (sign-in and role
 check) -> controller -> service -> repository -> Postgres.
@@ -132,7 +137,7 @@ pasted into the Render dashboard, not stored here. It currently deploys the
 - The floor reads in English, Afrikaans or isiXhosa. A worker chooses on their home screen and
   the choice is saved on their account. So far the home screen, the tab bar, the no-signal bar
   and Packing are translated; the other floor tasks are still in English. All the text is in
-  `client/src/i18n/messages.js`. The Afrikaans and isiXhosa there were drafted without a fluent
+  `client/src/translations/messages.js`. The Afrikaans and isiXhosa there were drafted without a fluent
   speaker checking them: have one read that file before relying on it.
 - A worker can add a photo when flagging an item in Packing, and of a delivery in Receiving.
   The manager sees them on the picking slip and the purchase order. The phone shrinks each to

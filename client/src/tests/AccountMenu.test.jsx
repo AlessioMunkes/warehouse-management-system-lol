@@ -15,7 +15,7 @@ const { default: AccountMenu } = await import('../components/layout/AccountMenu'
 const { helpFor } = await import('../components/layout/helpContent');
 const { shortcutGroups, goToFor } = await import('../components/layout/shortcuts');
 const { ROUTES } = await import('../routes/routeTable');
-const { PHRASES } = await import('../i18n/phrases');
+const { PHRASES } = await import('../translations/phrases');
 
 const WORKER = { id: 3, firstName: 'Mcebisi', lastName: 'Ndlovu', username: 'worker001', role: 'warehouse_worker', email: 'mcebisi@example.org' };
 const MANAGER = { id: 2, firstName: 'Grizel', lastName: 'Goliath', username: 'manager001', role: 'manager', email: null };

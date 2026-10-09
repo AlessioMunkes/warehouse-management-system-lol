@@ -17,7 +17,7 @@
 import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import StaffShell from '../components/layout/StaffShell';
-import ReceivingFlow from '../features/procurement/components/ReceivingFlow';
+import ReceivingFlow from '../features/receiving/ReceivingFlow';
 import { STAFF } from '../routes/paths';
 
 export default function ReceivingPage() {

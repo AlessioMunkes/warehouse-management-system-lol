@@ -1,0 +1,175 @@
+// ─────────────────────────────────────────────────────────────
+// features/donationManagement/ReconciliationTab.jsx
+//
+// The Reconciliation tab of the Donation Management page. Shows
+// pending_donations stuck in commit_failed / commit_incomplete, each with
+// a single Retry commit action — this is the ONLY place in the whole
+// feature that offers that action (D3/D4). The Pending Donations tab only
+// cross-links here; it never retries directly.
+//
+// Data comes from getPendingDonations(['commit_failed', 'commit_incomplete'])
+// rather than the narrower GET /pending/reconciliation endpoint, so each
+// row already carries .items / .item_counts, letting commit_incomplete
+// rows show how many items got resolved before the commit failed.
+// ─────────────────────────────────────────────────────────────
+import { useState } from 'react';
+import { Loader2, RefreshCw } from 'lucide-react';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
+import useReconciliationQueue from './useReconciliation';
+import ErrorBanner from '@/components/ui/error-banner';
+
+const fmtValue = (value) => {
+  if (value === null || value === undefined || value === '') return '—';
+  return `R ${Number(value).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+const fmtDate = (value) =>
+  value
+    ? new Date(value).toLocaleString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : '—';
+
+const STATUS_META = {
+  commit_failed: { label: 'Commit failed' },
+  commit_incomplete: { label: 'Commit incomplete' },
+};
+
+const statusMeta = (status) => STATUS_META[status] || { label: status || '—' };
+
+const failureTimestamp = (donation) =>
+  donation.status === 'commit_failed' ? donation.commit_failed_at : donation.commit_incomplete_at;
+
+const inDateRange = (value, fromValue, toValue) => {
+  const time = value ? new Date(value).getTime() : NaN;
+  const from = fromValue ? new Date(`${fromValue}T00:00:00`).getTime() : null;
+  const to = toValue ? new Date(`${toValue}T23:59:59`).getTime() : null;
+  if (from !== null && (!Number.isFinite(time) || time < from)) return false;
+  if (to !== null && (!Number.isFinite(time) || time > to)) return false;
+  return true;
+};
+
+const resolvedItemCount = (donation) =>
+  (donation.items || []).filter((item) => item.status === 'resolved' || item.status === 'committed').length;
+
+const ReconciliationRow = ({ donation, busy, rowError, onRetry, actionLabel = 'Retry' }) => {
+  const meta = statusMeta(donation.status);
+  const isIncomplete = donation.status === 'commit_incomplete';
+  const totalItems = donation.item_counts?.total ?? (donation.items || []).length;
+
+  return (
+    <Card className="rounded-[12px] border border-line shadow-sm">
+      <CardHeader className="border-b border-line pb-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium text-ink">{donation.donor_name || '—'}</span>
+              <Badge className="bg-warn-soft text-warn hover:bg-warn-soft">{meta.label}</Badge>
+            </div>
+            <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
+              <span>{fmtValue(donation.estimated_value_zar)}</span>
+              <span>{fmtDate(failureTimestamp(donation))}</span>
+              {isIncomplete ? (
+                <span>{resolvedItemCount(donation)} of {totalItems} item{totalItems === 1 ? '' : 's'} already resolved before the failure</span>
+              ) : null}
+            </div>
+          </div>
+          <Button type="button" size="sm" onClick={() => onRetry(donation.id)} disabled={busy}>
+            {busy ? <Loader2 className="mr-1 animate-spin" /> : null} {actionLabel}
+          </Button>
+        </div>
+      </CardHeader>
+
+      {rowError ? (
+        <CardContent className="pt-4">
+          <ErrorBanner message={rowError} onRetry={() => onRetry(donation.id)} />
+        </CardContent>
+      ) : null}
+    </Card>
+  );
+};
+
+export default function ReconciliationTab({
+  statuses,
+  summaryText,
+  emptyText = 'Nothing needs reconciling right now.',
+  actionLabel = 'Retry',
+}) {
+  const [donorSearch, setDonorSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const {
+    items,
+    isLoading,
+    error,
+    retryingIds,
+    rowErrors,
+    refresh,
+    retryCommit,
+  } = useReconciliationQueue(statuses);
+
+  const busyFor = (id) => retryingIds.includes(Number(id));
+  const filteredItems = items.filter((donation) => {
+    const donor = String(donation.donor_name || '').toLowerCase();
+    if (donorSearch.trim() && !donor.includes(donorSearch.trim().toLowerCase())) return false;
+    return inDateRange(failureTimestamp(donation), dateFrom, dateTo);
+  });
+  const summary = summaryText || `${items.length} donation${items.length === 1 ? '' : 's'} stuck in a commit failure state.`;
+
+  return (
+    <div className="mt-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          {summary}
+        </p>
+        <Button type="button" variant="outline" size="sm" onClick={refresh} disabled={isLoading}>
+          <RefreshCw className={`mr-1 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
+        </Button>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <Input type="search" aria-label={`${actionLabel} queue donor search`} placeholder="Search donor name" value={donorSearch} onChange={(e) => setDonorSearch(e.target.value)} />
+        <Input type="date" aria-label={`${actionLabel} queue date from`} value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+        <Input type="date" aria-label={`${actionLabel} queue date to`} value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+      </div>
+
+      {error ? <ErrorBanner message={error} onRetry={refresh} /> : null}
+
+      {isLoading && !error ? (
+        <div className="space-y-3">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-24 w-full" />
+        </div>
+      ) : null}
+
+      {!isLoading && items.length === 0 && !error ? (
+        <div className="rounded-[12px] border border-dashed border-line-strong bg-surface p-8 text-center text-sm text-muted-foreground">
+          {emptyText}
+        </div>
+      ) : null}
+
+      {!isLoading && items.length > 0 && filteredItems.length === 0 && !error ? (
+        <div className="rounded-[12px] border border-dashed border-line-strong bg-surface p-8 text-center text-sm text-muted-foreground">
+          No donations match the current filters.
+        </div>
+      ) : null}
+
+      {!isLoading && filteredItems.length > 0 && !error ? (
+        <div className="space-y-4">
+          {filteredItems.map((donation) => (
+            <ReconciliationRow
+              key={donation.id}
+              donation={donation}
+              busy={busyFor(donation.id)}
+              rowError={rowErrors[donation.id]}
+              onRetry={retryCommit}
+              actionLabel={actionLabel}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}

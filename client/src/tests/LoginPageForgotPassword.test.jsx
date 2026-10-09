@@ -5,7 +5,7 @@
 // (username/password/redirect-by-role) has no existing test file to
 // extend, and is out of scope for this change. useAuth and
 // react-router-dom are mocked the same way DispatchWiring.test.jsx
-// mocks them for a page with several router hooks.
+// mocks them for a page with several router lib.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';

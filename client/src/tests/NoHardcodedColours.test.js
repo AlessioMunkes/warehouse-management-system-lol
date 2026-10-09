@@ -35,15 +35,15 @@ const SOURCES = import.meta.glob('../**/*.{js,jsx}', {
 const ALLOWED = [
   // Printed on paper, or rasterised by html2canvas-pro, which cannot
   // read oklch() — the reason these hold literal hex at all.
-  'features/receipts/components/PdfShell.jsx',
-  'features/procurement/components/DeliveryNotePDF.jsx',
-  'features/dispatch/components/DispatchNotePDF.jsx',
-  'features/decanting/components/DecantingSheetPDF.jsx',
-  'features/reporting/components/ImpactCalculatorPDF.jsx',
+  'features/receipts/PdfShell.jsx',
+  'features/receiving/DeliveryNotePDF.jsx',
+  'features/dispatch/DispatchNotePDF.jsx',
+  'features/decanting/DecantingSheetPDF.jsx',
+  'features/reporting/ImpactCalculatorPDF.jsx',
   'features/packing/palletLabelPdf.js',
-  'features/staff/hooks/usePdfDocument.js',
+  'features/staff/usePdfDocument.js',
   // A signature drawn in near-white is an invisible signature.
-  'features/procurement/components/SignaturePad.jsx',
+  'features/receiving/SignaturePad.jsx',
   // The public page: its visitors are not logged in and have no toggle.
   'pages/LandingPage.jsx',
 ];

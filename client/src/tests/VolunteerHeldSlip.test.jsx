@@ -19,7 +19,7 @@ vi.mock('../services/pickingAPI', () => ({
 }));
 
 const api = await import('../services/pickingAPI');
-const { default: StaffSlipFlow } = await import('../features/packing/components/StaffSlipFlow');
+const { default: StaffSlipFlow } = await import('../features/packing/StaffSlipFlow');
 
 const GUEST_HELD = {
   id: 5, ecd_name: 'Sunshine ECD', cohort: 'tuesday', child_count: 12, status: 'in_progress',

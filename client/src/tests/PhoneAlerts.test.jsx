@@ -17,9 +17,9 @@ vi.mock('../services/pushAPI', () => ({
   removePushSubscription: vi.fn().mockResolvedValue(),
 }));
 
-import PhoneAlerts from '../features/notifications/components/PhoneAlerts';
+import PhoneAlerts from '../features/notifications/PhoneAlerts';
 import usePushMessages from '../features/notifications/usePushMessages';
-import { phoneAlertSupport } from '../features/notifications/phoneAlerts';
+import { phoneAlertSupport } from '../features/notifications/phoneAlertSubscription';
 import { NOTIFICATIONS_CHANGED } from '../features/notifications/notificationMatrix';
 
 const realUA = navigator.userAgent;

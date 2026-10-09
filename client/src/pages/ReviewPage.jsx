@@ -9,11 +9,11 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import StaffShell from "../components/layout/StaffShell";
 
-import { useDonationDraft, validateDonationDraft } from "../features/donation/context/DonationDraftContext";
+import { useDonationDraft, validateDonationDraft } from "../features/donation/DonationDraftContext";
 import { DONATIONS } from "../routes/paths";
-import { DonationRail } from "../features/donation/components/DonationRail";
-import { ReviewSummary, SectionPicker, EditSectionDialog } from "../features/donation/components/ReviewSummary";
-import { CompletionDialog } from "../features/donation/components/WarningsNotice";
+import { DonationRail } from "../features/donation/DonationRail";
+import { ReviewSummary, SectionPicker, EditSectionDialog } from "../features/donation/ReviewSummary";
+import { CompletionDialog } from "../features/donation/WarningsNotice";
 import { createPendingDonation } from "../services/donationAPI";
 
 export function ReviewPage() {

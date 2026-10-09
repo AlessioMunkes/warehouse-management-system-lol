@@ -13,8 +13,8 @@
 import { useSearchParams } from 'react-router-dom';
 import PageHeader, { PageShell } from '@/components/ui/page-header';
 import ViewTabs from '@/components/ui/view-tabs';
-import StaffActivityView from '../features/admin/activityLog/StaffActivityView';
-import VolunteerLogView  from '../features/admin/activityLog/VolunteerLogView';
+import StaffActivityView from '../features/activityLog/StaffActivityView';
+import VolunteerLogView  from '../features/activityLog/VolunteerLogView';
 
 const VIEWS = [
   { id: 'staff',      label: 'Staff' },

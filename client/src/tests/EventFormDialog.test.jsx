@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import EventFormDialog from '../features/volunteerManagement/components/EventFormDialog';
+import EventFormDialog from '../features/volunteerManagement/EventFormDialog';
 
 vi.mock('@/components/ui/dialog', () => ({
   Dialog: ({ open, disablePointerDismissal, children }) => (

@@ -34,7 +34,7 @@ import {
   GuestShell, GuestScreen, PlaceBar, Button, ButtonRow, Notice,
   StatusPill, Progress, Counter, HelpNote, Loading,
   ItemList, ItemRow, ItemSteps,
-} from '../features/guest/components/GuestPrimitives';
+} from '../features/guest/GuestPrimitives';
 import { formatDay, displayName } from '../features/guest/guestFormat';
 import { fmtQty } from '../lib/quantity';
 import { takeFirstText } from '../features/packing/takeFirst';

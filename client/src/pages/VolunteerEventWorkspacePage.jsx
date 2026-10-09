@@ -17,10 +17,10 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import TimeslotPanel from '../features/volunteerManagement/components/TimeslotPanel';
-import BookingTable from '../features/volunteerManagement/components/BookingTable';
-import WalkInDialog from '../features/volunteerManagement/components/WalkInDialog';
-import SyncStatusCard from '../features/volunteerManagement/components/SyncStatusCard';
+import TimeslotPanel from '../features/volunteerManagement/TimeslotPanel';
+import BookingTable from '../features/volunteerManagement/BookingTable';
+import WalkInDialog from '../features/volunteerManagement/WalkInDialog';
+import SyncStatusCard from '../features/volunteerManagement/SyncStatusCard';
 import volunteerManagementAPI from '../services/volunteerManagementAPI';
 import { VOLUNTEERS } from '../routes/paths';
 import { ALL_STAFF, MANAGERS_UP } from '../routes/permissions';

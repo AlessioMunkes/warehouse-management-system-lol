@@ -18,10 +18,10 @@ vi.mock('react-router-dom', () => ({
   Link: ({ to, children, ...rest }) => <a href={to} {...rest}>{children}</a>,
 }));
 
-const { listDrafts, writeDraft } = await import('../features/staff/hooks/useDraft');
-const { default: UnfinishedWork } = await import('../features/staff/components/UnfinishedWork');
-const { default: useUndo } = await import('../features/staff/hooks/useUndo');
-const { default: WorkList } = await import('../features/staff/components/WorkList');
+const { listDrafts, writeDraft } = await import('../features/staff/useDraft');
+const { default: UnfinishedWork } = await import('../features/staff/UnfinishedWork');
+const { default: useUndo } = await import('../features/staff/useUndo');
+const { default: WorkList } = await import('../features/staff/WorkList');
 
 beforeEach(() => {
   try { localStorage.clear(); } catch { /* private window */ }

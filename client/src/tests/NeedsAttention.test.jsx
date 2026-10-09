@@ -8,7 +8,7 @@ import { beforeEach, describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { adminAttentionItems } from '../features/dashboard/adminAttention';
 import { MemoryRouter } from 'react-router-dom';
-import NeedsAttention from '../features/dashboard/components/NeedsAttention';
+import NeedsAttention from '../features/dashboard/NeedsAttention';
 
 const zero = {
   inventory: { shortfall: 0, lowStock: 0, expiring: 0 },

@@ -9,8 +9,8 @@
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import PurchaseOrderForm from '../features/purchaseOrders/components/PurchaseOrderForm';
-import { suggestedLine } from '../features/purchaseOrders/components/purchaseOrderLine';
+import PurchaseOrderForm from '../features/purchaseOrders/PurchaseOrderForm';
+import { suggestedLine } from '../features/purchaseOrders/purchaseOrderLine';
 
 const BEANS = { id: 8, name: 'Sugar beans', sku: 'BEA-001', available: 30, reorderAt: 50, weightKg: 1, unitCost: 20 };
 const RICE  = { id: 7, name: 'Rice', sku: 'RICE-10', available: 100, reorderAt: 20, weightKg: null, unitCost: null };

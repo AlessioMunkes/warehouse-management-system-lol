@@ -8,7 +8,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useState } from 'react';
 import StaffShell from '../components/layout/StaffShell';
-import CommunityRequestFlow from '../features/communityRequests/components/CommunityRequestFlow';
+import CommunityRequestFlow from '../features/communityRequests/CommunityRequestFlow';
 
 export default function StaffCommunityRequestsPage() {
   const [crumb, setCrumb] = useState('Log a request');

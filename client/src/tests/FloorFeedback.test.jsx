@@ -6,8 +6,8 @@
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
-import usePressFlash, { PRESSED_CLASS } from '../features/staff/hooks/usePressFlash';
-import useKeepAwake from '../features/staff/hooks/useKeepAwake';
+import usePressFlash, { PRESSED_CLASS } from '../features/staff/usePressFlash';
+import useKeepAwake from '../features/staff/useKeepAwake';
 
 function Floor({ flash = true }) {
   usePressFlash(flash);

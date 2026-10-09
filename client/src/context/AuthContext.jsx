@@ -28,7 +28,7 @@ import { clearReadCache, setReadCacheScope } from '../services/readCache';
 import {
   getActiveWarehouse, setActiveWarehouse, clearActiveWarehouse, runWithWarehouse,
 } from '../services/warehouse';
-import { handPhoneAlertsTo, releasePhoneAlerts } from '../features/notifications/phoneAlerts';
+import { handPhoneAlertsTo, releasePhoneAlerts } from '../features/notifications/phoneAlertSubscription';
 
 const AuthContext = createContext(null);
 

@@ -27,7 +27,7 @@ import {
 } from '../services/guestSlipAPI';
 import {
   GuestShell, GuestScreen, Button, Notice, PalletCard, HelpNote, Loading,
-} from '../features/guest/components/GuestPrimitives';
+} from '../features/guest/GuestPrimitives';
 import { displayName } from '../features/guest/guestFormat';
 
 // "<beneficiary>, <n> of <total> packed", from the /mine payload the page

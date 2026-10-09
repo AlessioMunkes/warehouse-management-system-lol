@@ -45,17 +45,17 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect } from 'react';
 import StaffShell from '../components/layout/StaffShell';
-import DashboardGreeting from '../features/dashboard/components/DashboardGreeting';
-import UnfinishedWork from '../features/staff/components/UnfinishedWork';
-import TaskNode from '../features/dashboard/components/TaskNode';
+import DashboardGreeting from '../features/dashboard/DashboardGreeting';
+import UnfinishedWork from '../features/staff/UnfinishedWork';
+import TaskNode from '../features/dashboard/TaskNode';
 import { useAuth } from '../context/AuthContext';
-import useCoachmark from '../features/staff/hooks/useCoachmark';
-import { useT } from '../i18n';
+import useCoachmark from '../features/staff/useCoachmark';
+import { useT } from '../translations';
 import { STAFF, PACKING } from '../routes/paths';
 
 // What to do there, three words or fewer — see this file's own note
 // above on why the live counts were dropped.
-// `key` is the task's entry in i18n/messages.js: its name, and
+// `key` is the task's entry in translations/messages.js: its name, and
 // `<key>.meta` for the line under it.
 const TASKS = [
   { to: STAFF.receiving, icon: 'receiving-icon', key: 'task.receiving' },

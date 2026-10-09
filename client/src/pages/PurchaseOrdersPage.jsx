@@ -32,9 +32,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth }   from '../context/AuthContext';
-import PurchaseOrderForm   from '../features/purchaseOrders/components/PurchaseOrderForm';
-import PurchaseOrderList   from '../features/purchaseOrders/components/PurchaseOrderList';
-import PurchaseOrderDetail from '../features/purchaseOrders/components/PurchaseOrderDetail';
+import PurchaseOrderForm   from '../features/purchaseOrders/PurchaseOrderForm';
+import PurchaseOrderList   from '../features/purchaseOrders/PurchaseOrderList';
+import PurchaseOrderDetail from '../features/purchaseOrders/PurchaseOrderDetail';
 import purchaseOrderAPI, { PO_STATUS_LABELS, needsFollowUp } from '../services/purchaseOrderAPI';
 import supplierAPI from '../services/supplierAPI';
 import stockAPI    from '../services/stockAPI';
@@ -47,10 +47,10 @@ import ErrorBanner from '@/components/ui/error-banner';
 import ListToolbar from '@/components/ui/list-toolbar';
 import { useToast } from '@/components/ui/toastContext';
 import { Plus, Link2 } from 'lucide-react';
-import QuickbooksImportDialog from '../features/purchaseOrders/components/QuickbooksImportDialog';
-import useTableView from '../features/masterdata/hooks/useTableView';
-import useOpenFromQuery from '../features/masterdata/hooks/useOpenFromQuery';
-import { PO_COLUMNS } from '../features/purchaseOrders/components/poColumns';
+import QuickbooksImportDialog from '../features/purchaseOrders/QuickbooksImportDialog';
+import useTableView from '../features/masterdata/useTableView';
+import useOpenFromQuery from '../features/masterdata/useOpenFromQuery';
+import { PO_COLUMNS } from '../features/purchaseOrders/poColumns';
 import { downloadCsv, toCsv } from '../features/reporting/chartFormat';
 import { useRecordCache } from '@/lib/recordCache';
 

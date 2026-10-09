@@ -20,7 +20,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { displayName, beneficiaryKind, foodForPhrase, formatDay } from '../features/guest/guestFormat';
-import { PalletCard } from '../features/guest/components/GuestPrimitives';
+import { PalletCard } from '../features/guest/GuestPrimitives';
 
 // ── Defect 2 — names are never cut ────────────────────────────
 describe('displayName — the whole name, always', () => {

@@ -7,11 +7,11 @@ vi.mock('../services/decantingAPI', () => ({
   recordDecanting: vi.fn(),
 }));
 
-vi.mock('../features/decanting/components/DecantingSheetPDF', () => ({
+vi.mock('../features/decanting/DecantingSheetPDF', () => ({
   default: () => null,
 }));
 
-const { default: DecantingFlow } = await import('../features/decanting/components/DecantingFlow');
+const { default: DecantingFlow } = await import('../features/decanting/DecantingFlow');
 const decantingAPI = await import('../services/decantingAPI');
 
 const PRODUCTS = [

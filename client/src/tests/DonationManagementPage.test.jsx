@@ -6,11 +6,11 @@ vi.mock('../components/layout/TopNavBar', () => ({
   TopNavbar: () => <div>Top Navbar</div>,
 }));
 
-vi.mock('../features/donationManagement/components/FlaggedItemsTab', () => ({
+vi.mock('../features/donationManagement/FlaggedItemsTab', () => ({
   default: () => <div>Pending Product Review Tab</div>,
 }));
 
-vi.mock('../features/donationManagement/components/ReconciliationTab', () => ({
+vi.mock('../features/donationManagement/ReconciliationTab', () => ({
   default: ({ actionLabel }) => <div>{actionLabel} Tab</div>,
 }));
 

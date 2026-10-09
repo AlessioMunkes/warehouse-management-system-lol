@@ -5,7 +5,7 @@
 // record itself: the screen, with the record's id for it to open.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect } from 'vitest';
-import { linkFor, archiveLinkFor } from '../features/admin/recordLinks';
+import { linkFor, archiveLinkFor } from '../features/activityLog/recordLinks';
 
 describe('record links', () => {
   it('opens the record on its own screen', () => {

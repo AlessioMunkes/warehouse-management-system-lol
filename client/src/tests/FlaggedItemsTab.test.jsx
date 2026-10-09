@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import FlaggedItemsTab from '../features/donationManagement/components/FlaggedItemsTab';
+import FlaggedItemsTab from '../features/donationManagement/FlaggedItemsTab';
 
 const mockUseFlaggedItems = vi.fn();
 
-vi.mock('../features/donationManagement/hooks/useFlaggedItems', () => ({
+vi.mock('../features/donationManagement/useFlaggedItems', () => ({
   default: (...args) => mockUseFlaggedItems(...args),
 }));
 
-vi.mock('../features/donation/components/ProductMatchComboBox', () => ({
+vi.mock('../features/donation/ProductMatchComboBox', () => ({
   ProductMatchCombobox: ({ onSelect }) => (
     <button type="button" onClick={() => onSelect(777, 'Rice 5kg')}>
       Pick Rice

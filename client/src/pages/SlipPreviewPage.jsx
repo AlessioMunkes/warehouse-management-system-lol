@@ -24,7 +24,7 @@ import { fetchSlipPreview, claimSlipByToken } from '../services/guestSlipAPI';
 import {
   GuestShell, GuestScreen, PlaceBar, Button, Notice,
   PalletCard, HelpNote, Loading, SignOutConfirm,
-} from '../features/guest/components/GuestPrimitives';
+} from '../features/guest/GuestPrimitives';
 
 const SlipPreviewPage = () => {
   const { token } = useParams();

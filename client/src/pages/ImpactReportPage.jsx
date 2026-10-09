@@ -49,12 +49,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PageHeader, { PageShell } from '@/components/ui/page-header';
 import ErrorBanner from '@/components/ui/error-banner';
-import ReportChart    from '../features/reporting/components/ReportChart';
-import ImpactStatCard from '../features/reporting/components/ImpactStatCard';
-import BeneficiaryTypeChart from '../features/reporting/components/BeneficiaryTypeChart';
-import ImpactCalculatorPDF from '../features/reporting/components/ImpactCalculatorPDF';
+import ReportChart    from '../features/reporting/ReportChart';
+import ImpactStatCard from '../features/reporting/ImpactStatCard';
+import BeneficiaryTypeChart from '../features/reporting/BeneficiaryTypeChart';
+import ImpactCalculatorPDF from '../features/reporting/ImpactCalculatorPDF';
 import { runReport }  from '../services/reportingAPI';
-import ImpactFactorsForm from '../features/reporting/components/ImpactFactorsForm';
+import ImpactFactorsForm from '../features/reporting/ImpactFactorsForm';
 import { RANGE_PRESETS, DEFAULT_PRESET, resolvePreset } from '../features/reporting/dateRanges';
 import { STAFF } from '../routes/paths';
 

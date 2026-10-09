@@ -36,7 +36,7 @@
 // them, so no signature-stripping is needed in the service.
 // ─────────────────────────────────────────────────────────────
 import { useState, useEffect } from 'react';
-import ReceiptsTable from '../features/receipts/components/ReceiptsTable';
+import ReceiptsTable from '../features/receipts/ReceiptsTable';
 import PageHeader, { PageShell } from '@/components/ui/page-header';
 import ViewTabs from '@/components/ui/view-tabs';
 import ListCard from '@/components/ui/list-card';
@@ -47,11 +47,11 @@ import { Input } from '@/components/ui/input';
 import NativeSelect from '@/components/ui/native-select';
 import StatusBadge from '@/components/ui/status-badge';
 import { VARIANCE_STYLE } from '@/lib/statusStyles';
-import DeliveryNotePDF from '../features/procurement/components/DeliveryNotePDF';
-import DispatchNotePDF from '../features/receipts/components/DispatchNotePDF';
+import DeliveryNotePDF from '../features/receiving/DeliveryNotePDF';
+import DispatchNotePDF from '../features/receipts/DispatchNotePDF';
 import {
   formatDateShort, DISPATCH_STATUS_LABEL, DELIVERY_STATUS_LABEL,
-} from '../features/receipts/components/noteFormat';
+} from '../features/receipts/noteFormat';
 import receivingAPI from '../services/receivingAPI';
 import dispatchAPI from '../services/dispatchAPI';
 

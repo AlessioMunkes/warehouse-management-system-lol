@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import PendingDonationsTab from '../features/donationManagement/components/PendingDonationsTab';
+import PendingDonationsTab from '../features/donationManagement/PendingDonationsTab';
 
 const mockUsePendingDonations = vi.fn();
 
-vi.mock('../features/donationManagement/hooks/usePendingDonations', () => ({
+vi.mock('../features/donationManagement/usePendingDonations', () => ({
   default: (...args) => mockUsePendingDonations(...args),
 }));
 

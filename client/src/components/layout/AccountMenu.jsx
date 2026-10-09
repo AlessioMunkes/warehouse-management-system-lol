@@ -21,7 +21,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
-import LanguagePicker from '../../features/staff/components/LanguagePicker';
+import LanguagePicker from '../../features/staff/LanguagePicker';
 import { helpFor } from './helpContent';
 import { shortcutGroups } from './shortcuts';
 import useKeyboardShortcuts from './useKeyboardShortcuts';

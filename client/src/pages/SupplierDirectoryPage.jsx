@@ -22,14 +22,14 @@
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth }   from '../context/AuthContext';
-import SupplierForm  from '../features/suppliers/components/SupplierForm';
-import ProspectPad   from '../features/suppliers/components/ProspectPad';
+import SupplierForm  from '../features/suppliers/SupplierForm';
+import ProspectPad   from '../features/suppliers/ProspectPad';
 import supplierAPI   from '../services/supplierAPI';
 import productAPI    from '../services/productAPI';
-import ConfirmRemoveDialog from '../features/masterdata/components/ConfirmRemoveDialog';
-import useOpenFromQuery    from '../features/masterdata/hooks/useOpenFromQuery';
-import useTableView        from '../features/masterdata/hooks/useTableView';
-import MasterDataTable     from '../features/masterdata/components/MasterDataTable';
+import ConfirmRemoveDialog from '../features/masterdata/ConfirmRemoveDialog';
+import useOpenFromQuery    from '../features/masterdata/useOpenFromQuery';
+import useTableView        from '../features/masterdata/useTableView';
+import MasterDataTable     from '../features/masterdata/MasterDataTable';
 import { PO_STATUS_LABELS } from '../services/purchaseOrderAPI';
 
 import { Button }    from '@/components/ui/button';

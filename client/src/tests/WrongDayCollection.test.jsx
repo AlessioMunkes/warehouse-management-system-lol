@@ -34,7 +34,7 @@ vi.mock('react-router-dom', () => ({
 }));
 
 const dispatchAPI = (await import('../services/dispatchAPI')).default;
-const { default: PalletCheck } = await import('../features/dispatch/components/PalletCheck');
+const { default: PalletCheck } = await import('../features/dispatch/PalletCheck');
 
 const ELIGIBILITY = {
   ecdInactive: false, slipNotPacked: false, wrongDay: false,

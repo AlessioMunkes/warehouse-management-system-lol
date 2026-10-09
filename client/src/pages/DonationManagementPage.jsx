@@ -12,9 +12,9 @@
 import { useEffect, useState } from 'react';
 import PageHeader, { PageShell } from '@/components/ui/page-header';
 import ViewTabs from '@/components/ui/view-tabs';
-import FlaggedItemsTab from '../features/donationManagement/components/FlaggedItemsTab';
+import FlaggedItemsTab from '../features/donationManagement/FlaggedItemsTab';
 import { isUnresolvedFlag } from '../features/donationManagement/flagStatus';
-import ReconciliationTab from '../features/donationManagement/components/ReconciliationTab';
+import ReconciliationTab from '../features/donationManagement/ReconciliationTab';
 import donationManagementAPI, { RECONCILIATION_STATUSES } from '@/services/donationManagementAPI';
 
 const TABS = [

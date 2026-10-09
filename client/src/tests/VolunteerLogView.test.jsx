@@ -8,7 +8,7 @@ vi.mock('../services/volunteerAPI', () => ({
 }));
 
 const { default: api } = await import('../services/volunteerAPI');
-const { default: VolunteerLogView } = await import('../features/admin/activityLog/VolunteerLogView');
+const { default: VolunteerLogView } = await import('../features/activityLog/VolunteerLogView');
 
 const ON_SITE = {
   id: 'v1', fullName: 'Thandi Mokoena', source: 'guest', signedInAt: '2026-10-01T07:00:00Z',

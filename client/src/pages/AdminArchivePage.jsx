@@ -9,13 +9,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import adminAPI from '../services/adminAPI';
-import { archiveLinkFor } from '../features/admin/recordLinks';
+import { archiveLinkFor } from '../features/activityLog/recordLinks';
 import { setUserStatus } from '../services/userAPI';
 import { setProductStatus } from '../services/productAPI';
 import { setSupplierStatus } from '../services/supplierAPI';
 import { setBeneficiaryStatus } from '../services/beneficiaryAPI';
-import useTableView    from '../features/masterdata/hooks/useTableView';
-import MasterDataTable from '../features/masterdata/components/MasterDataTable';
+import useTableView    from '../features/masterdata/useTableView';
+import MasterDataTable from '../features/masterdata/MasterDataTable';
 import { Button, buttonVariants } from '@/components/ui/button';
 import StatusBadge from '@/components/ui/status-badge';
 import { Skeleton } from '@/components/ui/skeleton';

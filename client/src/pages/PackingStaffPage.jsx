@@ -8,13 +8,13 @@
 //
 // PackingPage.jsx is left in place for the manager's board view.
 // ─────────────────────────────────────────────────────────────
-import { useT } from '../i18n';
+import { useT } from '../translations';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { PACKING } from '../routes/paths';
 import StaffShell from '../components/layout/StaffShell';
-import StaffSlipList from '../features/packing/components/StaffSlipList';
-import StaffSlipFlow from '../features/packing/components/StaffSlipFlow';
+import StaffSlipList from '../features/packing/StaffSlipList';
+import StaffSlipFlow from '../features/packing/StaffSlipFlow';
 
 export default function PackingStaffPage() {
   const { slipId } = useParams();

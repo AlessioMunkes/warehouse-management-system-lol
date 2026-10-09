@@ -8,7 +8,7 @@ const api = vi.hoisted(() => ({
 vi.mock('../services/communityRequestAPI', () => ({ default: api }));
 vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: { id: 7, role: 'warehouse_worker' } }) }));
 
-import CommunityRequestFlow from '../features/communityRequests/components/CommunityRequestFlow';
+import CommunityRequestFlow from '../features/communityRequests/CommunityRequestFlow';
 
 const item = (over = {}) => ({
   id: 1, productId: 5, productName: 'Rice', unit: 'kg', quantityApproved: 6, quantityReleased: 0, shortAt: null, ...over,

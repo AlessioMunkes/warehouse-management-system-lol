@@ -10,7 +10,7 @@ import { render, screen, renderHook } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import DetailPanel from '@/components/ui/detail-panel';
 import { DetailDockContext, setDockWidth, useDockWidth } from '@/components/layout/detailDock';
-import useTableView from '../features/masterdata/hooks/useTableView';
+import useTableView from '../features/masterdata/useTableView';
 
 const wideScreen = (matches) => {
   window.matchMedia = vi.fn().mockReturnValue({

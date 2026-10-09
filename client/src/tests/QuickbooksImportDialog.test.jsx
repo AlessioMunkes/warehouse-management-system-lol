@@ -30,7 +30,7 @@ vi.mock('react-router-dom', () => ({
 }));
 
 const { default: api } = await import('../services/purchaseOrderAPI');
-const { default: QuickbooksImportDialog } = await import('../features/purchaseOrders/components/QuickbooksImportDialog');
+const { default: QuickbooksImportDialog } = await import('../features/purchaseOrders/QuickbooksImportDialog');
 const { default: PurchaseOrdersPage } = await import('../pages/PurchaseOrdersPage');
 
 // Every case in one export: will link (101), unchanged (102), PO already

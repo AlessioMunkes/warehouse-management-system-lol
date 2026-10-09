@@ -3,7 +3,7 @@
 
    Styles for the two staff-facing document popups that never moved
    onto PdfShell/receipts.css: DispatchNotePDF.jsx (the dispatch-
-   history one, features/dispatch/components) and DecantingSheetPDF.jsx.
+   history one, features/dispatch) and DecantingSheetPDF.jsx.
    DeliveryNotePDF.jsx itself moved off this file when PdfShell.jsx was
    built — see that component's own header comment — but this one was
    never deleted, so it kept shaping two other documents' names.

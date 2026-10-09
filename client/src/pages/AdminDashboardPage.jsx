@@ -19,8 +19,8 @@
 import { useState } from 'react';
 import PageHeader, { PageShell } from '@/components/ui/page-header';
 import { timeGreeting } from '../features/dashboard/timeGreeting';
-import CustomisableDashboard from '../features/dashboard/components/CustomisableDashboard';
-import NeedsAttention from '../features/dashboard/components/NeedsAttention';
+import CustomisableDashboard from '../features/dashboard/CustomisableDashboard';
+import NeedsAttention from '../features/dashboard/NeedsAttention';
 import { ADMIN_ATTENTION_SOURCES, adminAttentionItems } from '../features/dashboard/adminAttention';
 import { useAuth } from '@/context/AuthContext';
 

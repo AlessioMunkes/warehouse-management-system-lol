@@ -5,7 +5,7 @@ import { render, screen } from '@testing-library/react';
 vi.mock('jspdf', () => ({ default: vi.fn() }));
 vi.mock('html2canvas', () => ({ default: vi.fn() }));
 
-const { default: PdfShell } = await import('../features/receipts/components/PdfShell');
+const { default: PdfShell } = await import('../features/receipts/PdfShell');
 
 describe('PdfShell', () => {
   it('renders as a direct child of body so print can hide its siblings', () => {

@@ -26,7 +26,7 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { STAFF, ADMIN } from '../../routes/paths';
-import NotificationBell from '../../features/notifications/components/NotificationBell';
+import NotificationBell from '../../features/notifications/NotificationBell';
 import StaffNotificationBell from './StaffNotificationBell';
 import usePushMessages from '../../features/notifications/usePushMessages';
 import LogoutConfirmDialog from '@/components/ui/log-out-dialog';

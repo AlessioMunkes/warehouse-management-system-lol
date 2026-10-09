@@ -31,7 +31,7 @@ const attention = {
 };
 vi.mock('../services/dashboardAPI', () => ({ getAttention: vi.fn(async () => attention) }));
 // Fetches on mount and is not what this is about.
-vi.mock('../features/notifications/components/NotificationBell', () => ({
+vi.mock('../features/notifications/NotificationBell', () => ({
   default: () => null,
 }));
 

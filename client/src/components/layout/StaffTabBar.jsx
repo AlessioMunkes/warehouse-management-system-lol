@@ -17,7 +17,7 @@ import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { STAFF_TABS } from './staffTasks';
 import { STAFF } from '../../routes/paths';
-import { useT } from '../../i18n';
+import { useT } from '../../translations';
 
 
 const isCurrent = (pathname, to, exact) =>

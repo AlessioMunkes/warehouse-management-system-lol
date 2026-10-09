@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { DonationItemsList } from '../features/donation/components/DonationItemsList';
+import { DonationItemsList } from '../features/donation/DonationItemsList';
 import { createPendingDonation } from '../services/donationAPI';
 
 const okResponse = () => Promise.resolve({

@@ -4,7 +4,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
-import NotificationBell from '../features/notifications/components/NotificationBell';
+import NotificationBell from '../features/notifications/NotificationBell';
 import {
   notificationDestination,
   notificationSeverity,

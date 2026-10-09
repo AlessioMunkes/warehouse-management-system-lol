@@ -11,12 +11,12 @@
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth }  from '../context/AuthContext';
-import ProductForm  from '../features/products/components/ProductForm';
+import ProductForm  from '../features/products/ProductForm';
 import productAPI   from '../services/productAPI';
-import ConfirmRemoveDialog from '../features/masterdata/components/ConfirmRemoveDialog';
-import useOpenFromQuery    from '../features/masterdata/hooks/useOpenFromQuery';
-import useTableView        from '../features/masterdata/hooks/useTableView';
-import MasterDataTable     from '../features/masterdata/components/MasterDataTable';
+import ConfirmRemoveDialog from '../features/masterdata/ConfirmRemoveDialog';
+import useOpenFromQuery    from '../features/masterdata/useOpenFromQuery';
+import useTableView        from '../features/masterdata/useTableView';
+import MasterDataTable     from '../features/masterdata/MasterDataTable';
 
 import { Button }    from '@/components/ui/button';
 import { Badge }     from '@/components/ui/badge';

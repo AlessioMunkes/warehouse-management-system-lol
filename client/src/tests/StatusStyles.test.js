@@ -11,7 +11,7 @@ import { STATUS_STYLES } from '../lib/statusStyles';
 import { PO_STATUS_LABELS } from '../services/purchaseOrderAPI';
 import { OUTCOMES } from '../services/communityRequestAPI';
 import { EVENT_STATUS_LABELS } from '../services/volunteerManagementAPI';
-import { DELIVERY_STATUS_LABEL, DISPATCH_STATUS_LABEL } from '../features/receipts/components/noteFormat';
+import { DELIVERY_STATUS_LABEL, DISPATCH_STATUS_LABEL } from '../features/receipts/noteFormat';
 
 const LEDGER_TYPES = ['adjustment', 'decanted', 'dispatched', 'donated', 'picked', 'received', 'wastage'];
 

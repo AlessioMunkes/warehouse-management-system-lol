@@ -24,11 +24,11 @@ import { Plus, PhoneIncoming } from 'lucide-react';
 import communityRequestAPI from '../services/communityRequestAPI';
 import { getManifest } from '../services/stockAPI';
 import { fetchAssignableWorkers } from '../services/pickingAPI';
-import CommunityRequestForm from '../features/communityRequests/components/CommunityRequestForm';
-import ApproveItemsPanel from '../features/communityRequests/components/ApproveItemsPanel';
-import DeclinePanel from '../features/communityRequests/components/DeclinePanel';
-import AssignPanel from '../features/communityRequests/components/AssignPanel';
-import RequestDetailPanel from '../features/communityRequests/components/RequestDetailPanel';
+import CommunityRequestForm from '../features/communityRequests/CommunityRequestForm';
+import ApproveItemsPanel from '../features/communityRequests/ApproveItemsPanel';
+import DeclinePanel from '../features/communityRequests/DeclinePanel';
+import AssignPanel from '../features/communityRequests/AssignPanel';
+import RequestDetailPanel from '../features/communityRequests/RequestDetailPanel';
 import {
   DISPLAY_LABELS, VIEWS, displayStatus, isFlagged, packerLabel, rowsForView, shortProductNames, viewById,
 } from '../features/communityRequests/requestViews';
@@ -42,7 +42,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import TablePager from '@/components/ui/table-pager';
-import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/hooks/usePaged';
+import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/usePaged';
 import PageHeader, { PageShell } from '@/components/ui/page-header';
 import ViewTabs from '@/components/ui/view-tabs';
 import ListCard from '@/components/ui/list-card';

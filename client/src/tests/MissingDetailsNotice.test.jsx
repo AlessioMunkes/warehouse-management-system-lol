@@ -8,8 +8,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import ProductForm from '../features/products/components/ProductForm';
-import SupplierForm from '../features/suppliers/components/SupplierForm';
+import ProductForm from '../features/products/ProductForm';
+import SupplierForm from '../features/suppliers/SupplierForm';
 
 const FULL = { name: 'Rice', sku: 'WC-RICE', defaultUnit: 'kg', weightKg: 1, unitCost: 20, reorderThreshold: 50 };
 

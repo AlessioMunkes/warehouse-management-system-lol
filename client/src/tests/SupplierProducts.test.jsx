@@ -8,7 +8,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import SupplierForm from '../features/suppliers/components/SupplierForm';
+import SupplierForm from '../features/suppliers/SupplierForm';
 import { toSupplier } from '../services/supplierAPI';
 
 const PRODUCTS = [
