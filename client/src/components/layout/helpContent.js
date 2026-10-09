@@ -34,6 +34,7 @@ const WORKER = [
     steps: [
       'Open Decanting and choose the product in front of you. Only products marked decantable are listed.',
       'Weigh the bulk amount and enter the weight, then the kilograms the centres need this week.',
+      'The weight cannot be more than is in stock. If the screen refuses it, weigh again or ask your manager to check the stock.',
       'Use the recommended bag plan, or choose your own bag sizes.',
       'Fill the bags, enter anything that was spilled or spoiled, then save. A saved sheet cannot be changed.',
     ] },

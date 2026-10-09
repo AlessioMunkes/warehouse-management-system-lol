@@ -15,6 +15,7 @@
 // Calculation logic lives here (domain layer) — the repository only
 // persists and retrieves.
 // ─────────────────────────────────────────────────────────────
+import pool from '../config/db.js';
 import { assertDecantable } from '../features/units/wholeItems.js';
 import decantingModel from '../repositories/decanting.repository.js';
 
@@ -434,6 +435,69 @@ const calculateDecantingPlan = (data) => {
   return { plans, summary };
 };
 
+// ── The bulk weight cannot be more than is in stock ───────────
+// Someone weighing a sack cannot be holding more of a product than the
+// warehouse has. A bulk weight above the balance is a slip of the
+// finger (500 for 50) or stock that was never received in, and either
+// way the sheet and its wastage would be recorded against stock that is
+// not there. Checked when the weight is first entered, so nobody fills
+// bags and is refused afterwards, and again when the sheet is saved.
+//
+// Lines for one product are added together: two sacks of rice on one
+// sheet are measured against the one balance.
+//
+// Only a balance kept by weight can be compared. Stock in litres (oil)
+// or in a counted unit is left alone. And if the balance cannot be read
+// the sheet is not held up: the same rule as wholeItems.js.
+const KG_PER = { kg: 1, g: 0.001 };
+const TOLERANCE_KG = 0.001;
+
+const assertBulkInStock = async (items, db = pool) => {
+  const weighed = new Map();
+  for (const item of Array.isArray(items) ? items : []) {
+    const productId = Number(item?.productId);
+    const bulk = Number(item?.actualBulkKg);
+    if (!Number.isInteger(productId) || productId <= 0) continue;
+    if (item?.actualBulkKg === '' || item?.actualBulkKg === null || item?.actualBulkKg === undefined) continue;
+    if (!Number.isFinite(bulk) || bulk <= 0) continue;
+    weighed.set(productId, (weighed.get(productId) ?? 0) + bulk);
+  }
+  if (weighed.size === 0) return;
+
+  let rows;
+  try {
+    ({ rows } = await db.query(
+      `SELECT p.id, p.name, COALESCE(sl.quantity_on_hand, 0)::numeric AS on_hand, sl.unit
+         FROM products p
+         LEFT JOIN stock_levels sl ON sl.product_id = p.id
+        WHERE p.id = ANY($1::int[])
+        ORDER BY p.name ASC`,
+      [[...weighed.keys()]]
+    ));
+  } catch (err) {
+    console.error('[decanting] bulk weight not checked against stock, carrying on:', err.message);
+    return;
+  }
+
+  for (const row of rows) {
+    // No stock row at all is nothing in stock; a unit that is not a
+    // weight cannot be compared.
+    const perUnit = row.unit ? KG_PER[row.unit] : 1;
+    if (!perUnit) continue;
+    const inStockKg = Number(row.on_hand) * perUnit;
+    const bulkKg = weighed.get(row.id);
+    if (bulkKg > inStockKg + TOLERANCE_KG) {
+      const err = new Error(
+        `${row.name}: the bulk amount (${round3(bulkKg)} kg) is more than the ${round3(Math.max(0, inStockKg))} kg in stock. ` +
+        'Weigh it again, or ask your manager to check the stock.'
+      );
+      err.status = 400;
+      err.code = 'BULK_EXCEEDS_STOCK';
+      throw err;
+    }
+  }
+};
+
 // ── Record a completed decanting operation ────────────────────
 // Persists the plan plus the real wastage measured after decanting.
 // Decanting records are irreversible once saved (per the domain
@@ -452,6 +516,7 @@ const recordDecanting = async (data, userId) => {
 
   // Only a product kept loose can be portioned out (migration 044).
   await assertDecantable(items.map((item) => item?.productId));
+  await assertBulkInStock(items);
 
   const defaults = {
     selectedSizes: data.selectedSizes,
@@ -594,6 +659,7 @@ const exportDecantingSheet = async (id) => {
 };
 
 export default {
+  assertBulkInStock,
   // exposed for the UI preview + unit testing
   calculateDecantingPlan,
   calculatePlanForProduct,

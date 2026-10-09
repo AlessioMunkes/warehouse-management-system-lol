@@ -20,6 +20,8 @@ import { ROLES } from '../src/middleware/auth.middleware.js';
 // ── Service mock ──────────────────────────────────────────────
 // Keys match the methods decanting.controller.js actually calls.
 const decantingServiceMock = {
+  // Runs before a calculation: refuses a bulk weight above what is in stock.
+  assertBulkInStock:          vi.fn(async () => {}),
   calculateDecantingPlan:     vi.fn(),   // NOTE: sync in the controller
   recordDecanting:            vi.fn(),
   getDecantingRecords:        vi.fn(),
@@ -387,5 +389,35 @@ describe('decanting routes — CSV export', () => {
 
     expect(res.text).toContain('product,bag_size_kg,count');
     expect(res.text).not.toContain('"success"');
+  });
+});
+// ── The bulk weight against stock ─────────────────────────────
+describe('decanting routes: a bulk weight above what is in stock', () => {
+  const over = Object.assign(
+    new Error('Rice: the bulk amount (500 kg) is more than the 40 kg in stock. Weigh it again, or ask your manager to check the stock.'),
+    { status: 400, code: 'BULK_EXCEEDS_STOCK' },
+  );
+
+  it('is refused when the weight is entered, before any plan is worked out', async () => {
+    decantingServiceMock.assertBulkInStock.mockRejectedValueOnce(over);
+    const res = await request(app)
+      .post(`${BASE}/calculate`)
+      .set('Cookie', cookieFor(ROLES.WORKER))
+      .send({ items: [{ productId: 1, requiredKg: 20, actualBulkKg: 500 }] });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ success: false, message: over.message });
+    expect(decantingServiceMock.calculateDecantingPlan).not.toHaveBeenCalled();
+  });
+
+  it('is refused with the same words when the sheet is saved', async () => {
+    decantingServiceMock.recordDecanting.mockRejectedValueOnce(over);
+    const res = await request(app)
+      .post(BASE)
+      .set('Cookie', cookieFor(ROLES.WORKER))
+      .send({ weekOf: '2026-10-05', items: [{ productId: 1, requiredKg: 20, actualBulkKg: 500 }] });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe(over.message);
   });
 });

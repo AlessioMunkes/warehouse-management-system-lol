@@ -185,6 +185,11 @@ function Panel({ n, title, summary, open, done, locked, onOpen, children }) {
 
 // products comes from the page above, which fetches it once for both
 // this flow and the week planner.
+// The server refuses a bulk weight above what is in stock, and says how
+// much there is. That is shown as it stands; anything else gets the
+// screen's own wording.
+const stockMessage = (err) => (/in stock\./.test(err?.message ?? '') ? err.message : null);
+
 export default function DecantingFlow({ products = [], onCrumbChange }) {
   const [phase, setPhase] = useState('which');
 
@@ -401,10 +406,10 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
       setCustomPlan(line);
       setCustomError(null);
       seedActivePlan(line, selectedSizesKg, 'custom');
-    } catch {
+    } catch (err) {
       if (requestSeqRef.current !== seq) return;
       setCustomPlan(null);
-      setCustomError("We couldn't calculate that custom bag plan. Your recommended plan is still available.");
+      setCustomError(stockMessage(err) ?? "We couldn't calculate that custom bag plan. Your recommended plan is still available.");
     } finally {
       if (requestSeqRef.current === seq) setCalculating(false);
     }
@@ -464,14 +469,17 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
           setCustomError(null);
           seedActivePlan(line, sizesKg, 'custom');
         }
-      } catch {
+      } catch (err) {
         if (cancelled || requestSeqRef.current !== seq) return;
+        // More than is in stock: the weight is wrong, so no plan of
+        // either kind, and the reason in the server's own words.
+        const overStock = stockMessage(err);
         if (type === 'recommended') {
           setRecommendedPlan(null);
-          setRecommendedError("We couldn't create a recommended bag plan. You can still choose your own bag sizes.");
+          setRecommendedError(overStock ?? "We couldn't create a recommended bag plan. You can still choose your own bag sizes.");
         } else {
           setCustomPlan(null);
-          setCustomError("We couldn't calculate that custom bag plan. Your recommended plan is still available.");
+          setCustomError(overStock ?? "We couldn't calculate that custom bag plan. Your recommended plan is still available.");
         }
       } finally {
         if (!cancelled && requestSeqRef.current === seq) setCalculating(false);

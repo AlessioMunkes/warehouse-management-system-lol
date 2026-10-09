@@ -312,6 +312,8 @@ export const PHRASES = [
   ["kg wastage", "kg vermorsing", "kg echithekileyo"],
   ["View sheet", "Bekyk blad", "Jonga iphepha"],
 
+  ["{}: the bulk amount ({} kg) is more than the {} kg in stock. Weigh it again, or ask your manager to check the stock.", "{}: die grootmaathoeveelheid ({} kg) is meer as die {} kg in voorraad. Weeg dit weer, of vra jou bestuurder om die voorraad na te gaan.", "{}: isambuku ({} kg) singaphezu kwe-{} kg ekhoyo esitokhweni. Silinganise kwakhona, okanye ucele umphathi wakho ajonge isitokhwe."],
+
   // ── Dispatch ──
   ["Dispatch / {}", "Versending / {}", "Ukuthumela / {}"],
   ["Gate queue", "Hek-tou", "Umgca wasesangweni"],
@@ -650,6 +652,7 @@ export const PHRASES = [
   ["Decant bulk stock", "Skep grootmaatvoorraad oor", "Yahlula isitokhwe esikhulu"],
   ["Open Decanting and choose the product in front of you. Only products marked decantable are listed.", "Maak Oorskep oop en kies die produk voor jou. Slegs produkte wat as oorskepbaar gemerk is, word gelys.", "Vula Ukwahlula uze ukhethe imveliso ephambi kwakho. Kudweliswa kuphela iimveliso eziphawulwe njengezahlulwayo."],
   ["Weigh the bulk amount and enter the weight, then the kilograms the centres need this week.", "Weeg die grootmaathoeveelheid en voer die gewig in, en dan die kilogram wat die sentrums hierdie week nodig het.", "Linganisa isambuku uze ufake ubunzima, emva koko iikhilogram ezifunwa ngamaziko kule veki."],
+  ["The weight cannot be more than is in stock. If the screen refuses it, weigh again or ask your manager to check the stock.", "Die gewig kan nie meer wees as wat in voorraad is nie. As die skerm dit weier, weeg weer of vra jou bestuurder om die voorraad na te gaan.", "Ubunzima abunakuba ngaphezu koko kusesitokhweni. Ukuba isikrini siyabukhaba, linganisa kwakhona okanye ucele umphathi wakho ajonge isitokhwe."],
   ["Use the recommended bag plan, or choose your own bag sizes.", "Gebruik die aanbevole sakplan, of kies jou eie sakgroottes.", "Sebenzisa icebo leengxowa elicetyiswayo, okanye uzikhethele ubukhulu beengxowa."],
   ["Fill the bags, enter anything that was spilled or spoiled, then save. A saved sheet cannot be changed.", "Vul die sakke, voer in wat gemors of bederf het, en stoor dan. 'n Gestoorde blad kan nie verander word nie.", "Gcwalisa iingxowa, faka nantoni na echithekileyo okanye eyonakeleyo, uze ugcine. Iphepha eligciniweyo alinakutshintshwa."],
   ["Release a pallet at the gate", "Stel 'n palet by die hek vry", "Khulula ipalethi esangweni"],

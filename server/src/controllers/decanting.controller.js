@@ -3,6 +3,9 @@ import decantingService from '../services/decanting.service.js';
 // POST /api/decanting/calculate
 const calculatePlan = async (req, res) => {
   try {
+    // Refused here, at the moment the weight is entered, so nobody fills
+    // bags from a figure the stock cannot bear.
+    await decantingService.assertBulkInStock(req.body?.items);
     const result = decantingService.calculateDecantingPlan(req.body);
     res.json({ success: true, data: result });
   } catch (err) {
