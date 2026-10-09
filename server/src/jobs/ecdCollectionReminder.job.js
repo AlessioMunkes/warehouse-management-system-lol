@@ -1,5 +1,5 @@
 import reminderService from '../services/ecdCollectionReminder.service.js';
-import settings from '../features/settings/settings.service.js';
+import settings from '../services/settings.service.js';
 import { runInWarehouse } from '../config/warehouseContext.js';
 import { warehouseCodes } from '../config/warehouses.js';
 

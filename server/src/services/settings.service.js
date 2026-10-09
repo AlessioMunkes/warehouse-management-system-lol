@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// server/src/features/settings/settings.service.js
+// server/src/services/settings.service.js
 //
 // Reading and changing the admin-editable values in app_settings
 // (migration 033), against settingsDefinitions.js.
@@ -15,10 +15,10 @@
 // request, and a cache would need clearing on every warehouse when an
 // admin saves.
 // ─────────────────────────────────────────────────────────────
-import pool from '../../config/db.js';
+import pool from '../config/db.js';
 import {
   SETTINGS, SETTING_KEYS, defaults, isSettingKey, validateValue,
-} from './settingsDefinitions.js';
+} from '../features/settings/settingsDefinitions.js';
 
 const fail = (status, message) => Object.assign(new Error(message), { status });
 

@@ -1,11 +1,11 @@
 // ─────────────────────────────────────────────────────────────
-// server/src/features/calendar/calendar.repository.js
+// server/src/repositories/calendar.repository.js
 //
 // operating_closures (migration 034): the days the warehouse is shut.
 // Dates go in and come out as 'YYYY-MM-DD' strings — ::text on the way
 // out, so node-postgres never turns a DATE into a midnight-UTC Date.
 // ─────────────────────────────────────────────────────────────
-import pool from '../../config/db.js';
+import pool from '../config/db.js';
 
 const COLUMNS = `id, closed_on::text AS date, kind, label, created_by AS "createdBy", created_at AS "createdAt"`;
 

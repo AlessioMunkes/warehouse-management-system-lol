@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// server/src/features/communications/communications.service.js
+// server/src/services/communications.service.js
 //
 // The one way the system sends a message.
 //
@@ -31,9 +31,9 @@
 // | 'failed', the same three userInvite.service.js and
 // passwordReset.service.js already use.
 // ─────────────────────────────────────────────────────────────
-import emailProvider from '../../providers/email.provider.js';
-import outboundMessages from './outboundMessage.repository.js';
-import { MESSAGE_TYPES, isMessageType } from './messageTypes.js';
+import emailProvider from '../integrations/email.provider.js';
+import outboundMessages from '../repositories/outboundMessage.repository.js';
+import { MESSAGE_TYPES, isMessageType } from '../features/communications/messageTypes.js';
 
 export const outcomeOf = (result) => {
   if (result?.stubbed) return { status: 'stubbed', error: null };

@@ -12,7 +12,7 @@ import repo from '../repositories/savedReport.repository.js';
 import { appBaseUrl } from '../config/appUrl.js';
 import reportingService from './reporting.service.js';
 import insightService from './reportingInsight.service.js';
-import communications from '../features/communications/communications.service.js';
+import communications from './communications.service.js';
 import { validateSpec } from '../features/reporting/specValidator.js';
 import { validateCustom } from '../features/reporting/customQuery.js';
 import { getComparison } from '../features/reporting/reportComparisons.js';

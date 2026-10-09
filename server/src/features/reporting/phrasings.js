@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// server/src/features/reporting/ai/phrasings.js
+// server/src/features/reporting/phrasings.js
 //
 // Real ways a Ladles of Love manager asks for a report, each with the
 // answer it should reach. The yardstick for question matching:

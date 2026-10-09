@@ -66,7 +66,7 @@ const repoMock = {
 const emailMock = { sendEmail: vi.fn(async () => ({ sent: true })) };
 const reportingMock = { runReport: vi.fn(async () => ({ description: 'd', total: 1, series: [{ label: 'a', value: 1 }], meta: {} })), todayISO: () => '2026-09-28' };
 vi.mock('../src/repositories/savedReport.repository.js', () => ({ default: repoMock }));
-vi.mock('../src/providers/email.provider.js', () => ({ default: emailMock }));
+vi.mock('../src/integrations/email.provider.js', () => ({ default: emailMock }));
 vi.mock('../src/services/reporting.service.js', () => ({ default: reportingMock }));
 vi.mock('../src/services/reportingInsight.service.js', () => ({ default: { runComparison: vi.fn() } }));
 

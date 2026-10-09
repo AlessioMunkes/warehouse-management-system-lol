@@ -82,8 +82,8 @@ describe('the new diagrams in the catalog', () => {
 
 describe('related diagrams', () => {
   it('always has at least two candidates, each with a note on how it connects', async () => {
-    const { candidatesFor } = await import('../src/features/reporting/insights/relatedCharts.js');
-    const { OPERATIONAL_INSIGHTS } = await import('../src/features/reporting/insights/operationalInsights.js');
+    const { candidatesFor } = await import('../src/features/reporting/relatedCharts.js');
+    const { OPERATIONAL_INSIGHTS } = await import('../src/features/reporting/operationalInsights.js');
     for (const id of Object.keys(OPERATIONAL_INSIGHTS)) {
       const m = getMetric(id);
       const c = candidatesFor(m, { metric: id, dimension: m.dimensions[0] });
@@ -96,7 +96,7 @@ describe('related diagrams', () => {
   });
 
   it('a custom report gets the same count over time and another split', async () => {
-    const { customCandidatesFor } = await import('../src/features/reporting/insights/relatedCharts.js');
+    const { customCandidatesFor } = await import('../src/features/reporting/relatedCharts.js');
     const c = customCandidatesFor({ dataset: 'purchase_orders', groupBy: ['status'], measure: 'count', filters: {} });
     expect(c[0].custom.groupBy).toEqual(['month']);
     expect(c.length).toBeGreaterThanOrEqual(2);

@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // server/scripts/evalReportingQuestions.js
 //
-// Puts every question in src/features/reporting/ai/phrasings.js to the
+// Puts every question in src/features/reporting/phrasings.js to the
 // live model, through the same reportingAi.ask the page uses, and
 // scores the answers: right first time, and right within the
 // "Not what you meant? Try:" suggestions.
@@ -13,7 +13,7 @@
 // ─────────────────────────────────────────────────────────────
 import 'dotenv/config';
 
-const { PHRASINGS, answerId } = await import('../src/features/reporting/ai/phrasings.js');
+const { PHRASINGS, answerId } = await import('../src/features/reporting/phrasings.js');
 const { ask } = await import('../src/services/reportingAi.service.js');
 
 const only = process.argv[2];

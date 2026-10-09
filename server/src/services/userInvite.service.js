@@ -49,8 +49,8 @@ import bcrypt from 'bcrypt';
 import inviteRepo    from '../repositories/userInvite.repository.js';
 import userRepo      from '../repositories/user.repository.js';
 import { appBaseUrl, missingAddressMessage } from '../config/appUrl.js';
-import settings from '../features/settings/settings.service.js';
-import communications from '../features/communications/communications.service.js';
+import settings from './settings.service.js';
+import communications from './communications.service.js';
 import { emailStyles, escapeHtml, renderLadlesEmail } from '../utils/emailTemplate.js';
 import {
   fail, clean, validUsername, validFirstName, validLastName, validRole, validPassword,

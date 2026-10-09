@@ -151,7 +151,7 @@ describe('runExpiryCheck', () => {
 
 describe('runExpiryCheck — windows from Settings', () => {
   it('checks the windows an admin chose, keeping the notification types fixed', async () => {
-    const { default: settings } = await import('../src/features/settings/settings.service.js');
+    const { default: settings } = await import('../src/services/settings.service.js');
     settings.getAll.mockResolvedValueOnce({
       'stock.expiryWarningFirstDays': 21, 'stock.expiryWarningSecondDays': 10,
     });

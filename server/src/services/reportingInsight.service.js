@@ -23,13 +23,13 @@ import reportingService from './reporting.service.js';
 import { getMetric, isSnapshot, DIMENSIONS } from '../features/reporting/reportCatalog.js';
 import {
   ACTION_LISTS, LENSES, getInsightConfig, OPERATIONAL_INSIGHTS,
-} from '../features/reporting/insights/operationalInsights.js';
-import { writeNarrative, writeComparisonNarrative } from '../features/reporting/insights/narrative.js';
+} from '../features/reporting/operationalInsights.js';
+import { writeNarrative, writeComparisonNarrative } from '../features/reporting/narrative.js';
 import { COMPARISONS, getComparison } from '../features/reporting/reportComparisons.js';
 import { MAX_RANGE_DAYS } from '../features/reporting/reportCatalog.js';
 import { DATASETS } from '../features/reporting/customQuery.js';
 import targetRepo from '../repositories/reportingTarget.repository.js';
-import { RELATED_COUNT, candidatesFor, customCandidatesFor } from '../features/reporting/insights/relatedCharts.js';
+import { RELATED_COUNT, candidatesFor, customCandidatesFor } from '../features/reporting/relatedCharts.js';
 
 // Two related diagrams: the candidates are tried in order, a few at a
 // time, and the first two with data are kept. If fewer than two have

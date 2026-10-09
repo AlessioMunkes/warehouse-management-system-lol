@@ -19,7 +19,7 @@ import { isPositiveInt, isValidDateString } from '../utils/validation.js';
 import {
   PO_STATUSES as PO_STATUS_LIST, PO_MANUAL_TRANSITIONS, canMovePurchaseOrder,
 } from '../constants/purchaseOrderStatus.js';
-import communications from '../features/communications/communications.service.js';
+import communications from './communications.service.js';
 import notices from '../features/communications/notices.js';
 import { emailStyles, escapeHtml, renderLadlesEmail } from '../utils/emailTemplate.js';
 // The Finance recipient managers save in the app (finance_report_email_settings).

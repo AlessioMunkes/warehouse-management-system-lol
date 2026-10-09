@@ -1281,7 +1281,7 @@ CREATE INDEX IF NOT EXISTS idx_password_resets_active
 -- ecd_collection_reminders, columns on user_invites / password_resets /
 -- purchase_orders — and scheduled reports nowhere. "Did that email go
 -- out?" meant knowing which of five tables to look in. Every send now
--- goes through features/communications/communications.service.js,
+-- goes through services/communications.service.js,
 -- which writes one row here.
 --
 -- THE OLD LOGS STAY. Each sender still writes its own record as it

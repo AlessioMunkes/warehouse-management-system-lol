@@ -1,9 +1,9 @@
 // ─────────────────────────────────────────────────────────────
-// server/src/features/communications/outboundMessage.repository.js
+// server/src/repositories/outboundMessage.repository.js
 //
 // outbound_messages — one row per message sent (migration 032).
 // ─────────────────────────────────────────────────────────────
-import pool from '../../config/db.js';
+import pool from '../config/db.js';
 
 const record = async ({
   channel = 'email', type, recipient = null, subject = null, status, error = null,

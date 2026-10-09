@@ -8,7 +8,7 @@
 // target and which way it is moving — without inventing anything.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect } from 'vitest';
-import { explainChart, businessRead, fallbackNarrative } from '../src/features/reporting/insights/narrative.js';
+import { explainChart, businessRead, fallbackNarrative } from '../src/features/reporting/narrative.js';
 
 const metric = { label: 'Collection compliance', unit: '%', description: 'The share of pallets collected.' };
 const report = {
@@ -78,7 +78,7 @@ describe('the whole fallback', () => {
 // ── Scatter comparisons ────────────────────────────────────────
 import { attentionPoints } from '../src/services/reportingInsight.service.js';
 import { getComparison } from '../src/features/reporting/reportComparisons.js';
-import { fallbackComparisonNarrative } from '../src/features/reporting/insights/narrative.js';
+import { fallbackComparisonNarrative } from '../src/features/reporting/narrative.js';
 
 describe('which dots a comparison report flags', () => {
   it('flags packers above the average flag rate, worst first', () => {

@@ -20,7 +20,7 @@ vi.mock('../src/repositories/purchaseOrder.repository.js', () => ({ default: rep
 // purchaseOrder.service also emails Finance on create. Both are faked
 // so the test never loads Gmail, and through it the database module,
 // which exits the process when DATABASE_URL is unset (as in CI).
-vi.mock('../src/providers/email.provider.js', () => ({ default: { send: vi.fn(), sendEmail: vi.fn() } }));
+vi.mock('../src/integrations/email.provider.js', () => ({ default: { send: vi.fn(), sendEmail: vi.fn() } }));
 vi.mock('../src/services/finance.service.js', () => ({
   default: { getEmailSettings: vi.fn(async () => ({ recipientEmail: null })) },
 }));

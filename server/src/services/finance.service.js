@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import financeRepository from '../repositories/finance.repository.js';
-import communications from '../features/communications/communications.service.js';
+import communications from './communications.service.js';
 import { appBaseUrl, missingAddressMessage } from '../config/appUrl.js';
 import { emailStyles, escapeHtml, renderLadlesEmail } from '../utils/emailTemplate.js';
 

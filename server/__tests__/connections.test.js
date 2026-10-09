@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // server/__tests__/connections.test.js
 //
-// Settings → Connections (features/settings/connections.service.js):
+// Settings → Connections (services/connections.service.js):
 // each outside service reports ok / warning / down / off, and one that
 // fails or hangs never takes the others down with it.
 // ─────────────────────────────────────────────────────────────
@@ -23,9 +23,9 @@ vi.mock('../src/repositories/vmsSync.repository.js', () => ({ default: vmsSyncMo
 vi.mock('../src/integrations/mockVMS.adapter.js', () => ({ default: mockAdapter }));
 vi.mock('../src/services/vmsIntegration.service.js', () => ({ getAdapter: vmsMock.getAdapter, default: vmsMock }));
 vi.mock('../src/config/email.js', () => ({ EMAIL_ENABLED: emailConfig.EMAIL_ENABLED }));
-vi.mock('../src/features/reporting/ai/provider.js', () => ({ isEnabled: aiMock.isEnabled, providerName: aiMock.providerName }));
+vi.mock('../src/features/reporting/provider.js', () => ({ isEnabled: aiMock.isEnabled, providerName: aiMock.providerName }));
 
-const { checkConnections } = await import('../src/features/settings/connections.service.js');
+const { checkConnections } = await import('../src/services/connections.service.js');
 
 const byId = async () => Object.fromEntries((await checkConnections()).connections.map((c) => [c.id, c]));
 

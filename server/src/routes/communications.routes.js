@@ -10,7 +10,7 @@
 import express from 'express';
 import auth, { requireRole } from '../middleware/auth.middleware.js';
 import { ADMIN_ONLY } from '../constants/permissions.js';
-import communicationsController from '../features/communications/communications.controller.js';
+import communicationsController from '../controllers/communications.controller.js';
 
 const router = express.Router();
 

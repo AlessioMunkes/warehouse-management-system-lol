@@ -4,7 +4,7 @@
 // and the lines are replaced as one unit.
 //
 // Against a real database the same transitions run in
-// __tests__/intergration/communityRequest.intergration.test.js.
+// __tests__/integration/communityRequest.integration.test.js.
 import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('../src/config/db.js', () => ({ default: { query: vi.fn() } }));

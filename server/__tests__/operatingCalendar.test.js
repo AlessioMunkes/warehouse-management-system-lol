@@ -25,9 +25,9 @@ vi.mock('../src/repositories/dispatch.repository.js', () => ({ default: dispatch
 vi.mock('../src/repositories/picking.repository.js', () => ({ default: pickingRepo }));
 
 const { saPublicHolidays, easterSunday } = await import('../src/features/calendar/saPublicHolidays.js');
-const { default: calendar } = await import('../src/features/calendar/calendar.service.js');
-const { default: repo } = await import('../src/features/calendar/calendar.repository.js');
-const { default: settings } = await import('../src/features/settings/settings.service.js');
+const { default: calendar } = await import('../src/services/calendar.service.js');
+const { default: repo } = await import('../src/repositories/calendar.repository.js');
+const { default: settings } = await import('../src/services/settings.service.js');
 const { default: reminders } = await import('../src/services/ecdCollectionReminder.service.js');
 const { default: dispatch } = await import('../src/services/dispatch.service.js');
 const { default: picking } = await import('../src/services/picking.service.js');

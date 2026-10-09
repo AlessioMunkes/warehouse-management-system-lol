@@ -24,8 +24,8 @@
 // both. This layer cannot grant access to anything — at most it
 // declines to offer it, and the two real gates never move.
 // ─────────────────────────────────────────────────────────────
-import provider from '../features/reporting/ai/provider.js';
-import { buildTools, buildSystemPrompt } from '../features/assistant/ai/toolSchema.js';
+import provider from '../features/reporting/provider.js';
+import { buildTools, buildSystemPrompt } from '../features/assistant/toolSchema.js';
 import {
   SCREENS, getTopic, topicsForRole, screensForRole, screenForRole,
   suggestionsFor, publicTopic, publicScreen,

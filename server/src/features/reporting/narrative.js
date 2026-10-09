@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// server/src/features/reporting/insights/narrative.js
+// server/src/features/reporting/narrative.js
 //
 // The written reading of an operational report, in the order the
 // page shows it:
@@ -24,9 +24,9 @@
 // by fallbackNarrative(). A missing field in a model reply takes the
 // templated version of that one field, so no section is ever blank.
 // ─────────────────────────────────────────────────────────────
-import provider from '../ai/provider.js';
-import { DIMENSIONS } from '../reportCatalog.js';
-import { pseudonymise, restore } from '../../privacy/redact.js';
+import provider from './provider.js';
+import { DIMENSIONS } from './reportCatalog.js';
+import { pseudonymise, restore } from '../privacy/redact.js';
 
 const STRING = 'STRING', ARRAY = 'ARRAY', OBJECT = 'OBJECT';
 

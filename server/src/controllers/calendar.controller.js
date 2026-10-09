@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
-// server/src/features/calendar/calendar.controller.js
+// server/src/controllers/calendar.controller.js
 // ─────────────────────────────────────────────────────────────
-import calendar from './calendar.service.js';
+import calendar from '../services/calendar.service.js';
 
 const respond = (res, err, where, fallback) => {
   if (!err.status || err.status >= 500) console.error(`[calendar] ${where}:`, err);

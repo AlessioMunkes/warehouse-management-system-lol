@@ -10,7 +10,7 @@
 // hand-written.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect } from 'vitest';
-import { buildTools, buildSystemPrompt } from '../src/features/reporting/ai/toolSchema.js';
+import { buildTools, buildSystemPrompt } from '../src/features/reporting/toolSchema.js';
 import { validateSpec } from '../src/features/reporting/specValidator.js';
 import {
   METRIC_IDS, METRICS, COHORTS, BENEFICIARY_KINDS, MOVEMENT_TYPES, isSnapshot,

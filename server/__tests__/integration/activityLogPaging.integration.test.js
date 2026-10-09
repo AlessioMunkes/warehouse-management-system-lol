@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// server/__tests__/intergration/activityLogPaging.intergration.test.js
+// server/__tests__/integration/activityLogPaging.integration.test.js
 //
 // GET /api/admin/activity and GET /api/volunteers against a REAL
 // Postgres, through the real routers, service and repositories.

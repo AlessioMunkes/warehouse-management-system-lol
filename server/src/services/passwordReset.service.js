@@ -34,7 +34,7 @@ import crypto from 'node:crypto';
 import bcrypt from 'bcrypt';
 import resetRepo     from '../repositories/passwordReset.repository.js';
 import userRepo       from '../repositories/user.repository.js';
-import communications from '../features/communications/communications.service.js';
+import communications from './communications.service.js';
 import { appBaseUrl } from '../config/appUrl.js';
 import { fail, clean, validPassword } from '../utils/userAccountFields.js';
 

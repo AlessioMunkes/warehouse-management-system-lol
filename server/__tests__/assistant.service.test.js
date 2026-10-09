@@ -24,7 +24,7 @@ const providerMock = {
 };
 const logMock = { record: vi.fn() };
 
-vi.mock('../src/features/reporting/ai/provider.js', () => ({ default: providerMock }));
+vi.mock('../src/features/reporting/provider.js', () => ({ default: providerMock }));
 vi.mock('../src/repositories/assistantLog.repository.js', () => ({ default: logMock }));
 
 // The service asks this for the names to keep out of the prompt, and it

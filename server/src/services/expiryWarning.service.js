@@ -17,7 +17,7 @@
 import pool from '../config/db.js';
 import expiryWarningRepository from '../repositories/expiryWarning.repository.js';
 import { createNotification } from '../repositories/notification.repository.js';
-import settings from '../features/settings/settings.service.js';
+import settings from './settings.service.js';
 
 // The two windows come from Settings (stock.expiryWarningFirstDays /
 // SecondDays), defaulting to 14 and 7. The notification TYPES stay

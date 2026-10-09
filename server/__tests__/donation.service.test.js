@@ -51,8 +51,8 @@ vi.mock('../src/repositories/gmail.repository.js', () => ({ default: gmailRepoMo
 vi.mock('../src/repositories/notification.repository.js', () => ({
   createNotification: vi.fn(),
 }));
-vi.mock('../src/lib/donationRouting.js', () => ({ determineRouting: routeMock.determineRouting }));
-vi.mock('../src/providers/email.provider.js', () => ({ default: emailMock }));
+vi.mock('../src/utils/donationRouting.js', () => ({ determineRouting: routeMock.determineRouting }));
+vi.mock('../src/integrations/email.provider.js', () => ({ default: emailMock }));
 vi.mock('../src/services/certificateSettings.service.js', () => ({
   default: { getSettings: vi.fn() },
 }));

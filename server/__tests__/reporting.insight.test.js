@@ -15,12 +15,12 @@ const { METRICS, getMetric } = await import('../src/features/reporting/reportCat
 const { validateSpec } = await import('../src/features/reporting/specValidator.js');
 const {
   OPERATIONAL_INSIGHTS, ACTION_LISTS, LENSES,
-} = await import('../src/features/reporting/insights/operationalInsights.js');
+} = await import('../src/features/reporting/operationalInsights.js');
 const {
   previousRange, pctChange, toneFor, buildFigures, buildInsight,
 } = await import('../src/services/reportingInsight.service.js');
-const { fallbackNarrative, buildPayload } = await import('../src/features/reporting/insights/narrative.js');
-const { buildTools } = await import('../src/features/reporting/ai/toolSchema.js');
+const { fallbackNarrative, buildPayload } = await import('../src/features/reporting/narrative.js');
+const { buildTools } = await import('../src/features/reporting/toolSchema.js');
 
 const RANGE = { from: '2026-06-01', to: '2026-08-31' };
 const operationalIds = Object.values(METRICS).filter((m) => !m.impactOnly).map((m) => m.id);

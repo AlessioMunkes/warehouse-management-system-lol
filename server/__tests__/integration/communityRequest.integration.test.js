@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// server/__tests__/intergration/communityRequest.intergration.test.js
+// server/__tests__/integration/communityRequest.integration.test.js
 //
 // Benevolent requests against a REAL Postgres: the SQL the mocked unit
 // tests cannot see (reservation in Available, the row locks, the

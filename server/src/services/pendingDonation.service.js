@@ -1,12 +1,12 @@
 import pool from '../config/db.js';
-import { determineRouting } from '../lib/donationRouting.js';
+import { determineRouting } from '../utils/donationRouting.js';
 import { logAudit } from '../repositories/auditLog.repository.js';
 import { createNotification } from '../repositories/notification.repository.js';
 import pendingDonationRepository from '../repositories/pendingDonation.repository.js';
 import productRepository from '../repositories/product.repository.js';
 import donationAdminService from './donationAdmin.service.js';
 import donationService from './donation.service.js';
-import { validateEmail } from '../lib/validation/donationIntake.part1.js';
+import { validateEmail } from '../utils/donationIntake/donationIntake.part1.js';
 
 const fail = (status, message) => {
   const err = new Error(message);

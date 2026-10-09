@@ -33,14 +33,13 @@ server/                     The API (Node, Express, Postgres)
     controllers/            Read the request, call a service, shape the answer
     services/               The rules: what is allowed, what is refused and why
     repositories/           SQL only
-    features/               Areas that keep their own files together (see below)
+    features/               Logic that is not a request, one flat folder per area (see below)
     middleware/             Sign-in, role checks, rate limits, repeat-request protection
     constants/              Fixed lists: roles, order statuses, movement types
     config/                 Database connection, environment, cookies, multi-warehouse
     jobs/                   Work that runs on a timer
-    integrations/           The volunteer-management system (VMS) connection
-    providers/              Sending email, making PDFs
-    utils/, lib/            Small shared helpers; lib/validation is donation-intake validation
+    integrations/           Everything that talks to an outside system: email, PDFs, the volunteer system (VMS)
+    utils/                  Small shared helpers; utils/donationIntake is the donation form's validation
   database/
     schema.sql              Every table, for reference. Not a script to run
     migrations/             Numbered changes to the database, applied in order
@@ -203,19 +202,21 @@ Helpers with no home in one feature: `quantity.js` (formatting amounts), `status
 | Services | `src/services/` | `picking.service.js` | The rules. Refuses with `fail(status, message)` |
 | Repositories | `src/repositories/` | `picking.repository.js` | The SQL |
 
-To follow a feature, open the same name in each folder.
+To follow a feature, open the same name in each folder. Every `*.controller.js` is in
+`controllers/`, every `*.service.js` in `services/`, every `*.repository.js` in
+`repositories/`. None live anywhere else.
 
 ### `src/features/`
 
-A few areas keep their files together instead of across the four layers, because they are
-mostly logic and not requests:
+Logic that the layers call but that is not itself a request: calculations, catalogues and
+wording. One flat folder per area, with no folders inside.
 
 | Folder | What it is |
 |---|---|
-| `reporting` | The report catalogue, custom queries, saved reports, the question-answering helper |
-| `communications` | Every email and in-app notice the system sends, and its wording (`notices.js`) |
+| `reporting` | The report catalogue, custom queries, saved reports, insights, the question-answering helper |
+| `communications` | The wording of every in-app notice (`notices.js`) and the kinds of message sent (`messageTypes.js`) |
 | `settings` | What can be set in Settings, with defaults and limits (`settingsDefinitions.js`) |
-| `calendar` | Pickup days, public holidays, closures |
+| `calendar` | South African public holidays |
 | `recipes` | Which recipe applies on a date, and how a slip quantity is worked out |
 | `units` | Converting between units, and the whole-number rule for items that are not decantable |
 | `assistant` | What the chat helper knows |
@@ -250,7 +251,7 @@ file to `database/migrations/` and append the same change to `schema.sql`, then 
 |---|---|---|
 | `client/src/tests/` | `npm test` in `client/` | Screens and helpers, in a simulated browser |
 | `server/__tests__/` | `npm test` in `server/` | Routes, services and repositories against a mocked database |
-| `server/__tests__/intergration/` | `npm run test:integration` in `server/` | The same against a real database |
+| `server/__tests__/integration/` | `npm run test:integration` in `server/` | The same against a real database |
 
 `npm run lint` and `npm run build` in `client/` must also pass; CI runs all of them.
 
@@ -258,7 +259,7 @@ file to `database/migrations/` and append the same change to `schema.sql`, then 
 
 - `features/donationManagement/PendingDonationsTab.jsx` and `usePendingDonations.js` are
   not shown on any screen. Only their tests use them.
-- `lib/validation/donationIntake.part1.js` and `.part2c.js` are oddly named halves of one
-  validator; the server has the full set under `server/src/lib/validation/`.
-- The server has both `src/utils/` and `src/lib/`. They do the same job and could be one folder.
-- The server's test folder is spelled `intergration`. The test command depends on that spelling.
+- `client/src/lib/validation/donationIntake.part1.js` and `.part2c.js` are oddly named halves
+  of one validator; the server has the full set under `server/src/utils/donationIntake/`.
+- `server/__tests__/helpers/buildDonationAdminApp.js` imports a route file by a path that
+  does not exist. Only the integration tests use it, and they need a real database to run.

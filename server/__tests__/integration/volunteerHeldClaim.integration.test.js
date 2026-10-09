@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// server/__tests__/intergration/volunteerHeldClaim.intergration.test.js
+// server/__tests__/integration/volunteerHeldClaim.integration.test.js
 //
 // A pallet a guest volunteer is packing, against a REAL Postgres, through
 // the real picking router: POST /:id/assign and GET /.

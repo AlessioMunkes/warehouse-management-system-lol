@@ -38,7 +38,7 @@ const emailProviderMock = {
 
 vi.mock('../src/repositories/passwordReset.repository.js', () => ({ default: resetRepoMock }));
 vi.mock('../src/repositories/user.repository.js', () => ({ default: userRepoMock }));
-vi.mock('../src/providers/email.provider.js', () => ({ default: emailProviderMock }));
+vi.mock('../src/integrations/email.provider.js', () => ({ default: emailProviderMock }));
 
 const { default: passwordResetService } = await import('../src/services/passwordReset.service.js');
 

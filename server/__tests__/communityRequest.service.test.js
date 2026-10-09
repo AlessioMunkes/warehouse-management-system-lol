@@ -8,7 +8,7 @@
 //
 // The SQL itself — reservation in Available, the row locks, the
 // shortage flag — is exercised against a real Postgres in
-// __tests__/intergration/communityRequest.intergration.test.js.
+// __tests__/integration/communityRequest.integration.test.js.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 

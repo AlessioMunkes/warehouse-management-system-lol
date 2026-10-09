@@ -2,15 +2,15 @@
 // server/__tests__/reporting.phrasings.test.js
 //
 // The keyword fallback (no AI) against the real phrasings in
-// src/features/reporting/ai/phrasings.js. Pass marks are the scores
+// src/features/reporting/phrasings.js. Pass marks are the scores
 // it reached when they were set, so a change can only raise them:
 // if one of these fails, a keyword or synonym edit made matching worse.
 //
 // The live model is measured separately — scripts/evalReportingQuestions.js.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect } from 'vitest';
-import { PHRASINGS, answerId } from '../src/features/reporting/ai/phrasings.js';
-import { matchQuestion, rankReports } from '../src/features/reporting/ai/keywordFallback.js';
+import { PHRASINGS, answerId } from '../src/features/reporting/phrasings.js';
+import { matchQuestion, rankReports } from '../src/features/reporting/keywordFallback.js';
 
 const TODAY = '2026-09-27';
 

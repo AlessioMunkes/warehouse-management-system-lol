@@ -48,7 +48,7 @@ if (process.env.WMS_TEST_REAL_DB === '1' && process.env.ALLOW_REMOTE_TEST_DB !==
 // test (communications.test.js) asks for the real module.
 import { vi } from 'vitest';
 
-vi.mock('../src/features/communications/outboundMessage.repository.js', () => ({
+vi.mock('../src/repositories/outboundMessage.repository.js', () => ({
   default: {
     record: vi.fn(async () => ({ id: 1 })),
     list: vi.fn(async () => ({ rows: [], nextCursor: null })),
@@ -81,7 +81,7 @@ vi.mock('../src/config/db.js', async (importOriginal) => {
 // defaults — the old constants — for every file, so a test that mocks
 // a service's own repository still never reaches a real database.
 // settings.test.js asks for the real module.
-vi.mock('../src/features/settings/settings.service.js', async () => {
+vi.mock('../src/services/settings.service.js', async () => {
   const { defaults } = await import('../src/features/settings/settingsDefinitions.js');
   const get = vi.fn(async (key) => defaults()[key]);
   const getAll = vi.fn(async () => defaults());
@@ -92,7 +92,7 @@ vi.mock('../src/features/settings/settings.service.js', async () => {
 // service that asks "is the warehouse shut that day?" (reminders, the
 // sweep, slip generation) gets "open" in tests unless a test says
 // otherwise.
-vi.mock('../src/features/calendar/calendar.repository.js', () => ({
+vi.mock('../src/repositories/calendar.repository.js', () => ({
   default: {
     list: vi.fn(async () => []),
     findByDate: vi.fn(async () => null),

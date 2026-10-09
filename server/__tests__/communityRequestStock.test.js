@@ -11,7 +11,7 @@
 //     reservation).
 //
 // The same behaviour against real SQL is in
-// __tests__/intergration/communityRequest.intergration.test.js.
+// __tests__/integration/communityRequest.integration.test.js.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 

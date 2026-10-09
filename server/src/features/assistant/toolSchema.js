@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// server/src/features/assistant/ai/toolSchema.js
+// server/src/features/assistant/toolSchema.js
 //
 // Builds the model's function declarations and system prompt FROM
 // helpCatalog.js, per request, scoped to the asker's role.
@@ -20,7 +20,7 @@
 // ProtectedRoute plus the server's requireRole stand behind both.
 // Nothing here can grant access — only decline to offer it.
 // ─────────────────────────────────────────────────────────────
-import { screensForRole, topicsForRole } from '../helpCatalog.js';
+import { screensForRole, topicsForRole } from './helpCatalog.js';
 
 const STRING = 'STRING', ARRAY = 'ARRAY', OBJECT = 'OBJECT';
 

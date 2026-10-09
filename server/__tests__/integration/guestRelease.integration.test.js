@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// server/__tests__/intergration/guestRelease.intergration.test.js
+// server/__tests__/integration/guestRelease.integration.test.js
 //
 // Real SQL for handing a guest's pallet back to the floor. The mocked
 // suites prove the statement's shape; only a real Postgres proves the

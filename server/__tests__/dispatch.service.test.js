@@ -573,7 +573,7 @@ describe('collect — the note comes back with the collection', () => {
 
 describe('the not-collected cut-off from Settings', () => {
   it('judges the gate against the hour an admin chose', async () => {
-    const { default: settings } = await import('../src/features/settings/settings.service.js');
+    const { default: settings } = await import('../src/services/settings.service.js');
     settings.get.mockImplementation(async (key) => (key === 'dispatch.nonCollectionCutoffHour' ? 16 : undefined));
     vi.setSystemTime(new Date('2026-08-19T13:30:00Z'));   // 15:30 SAST: past the old 15:00, before 16:00
     repoMock.getGateView.mockResolvedValue(gateView());

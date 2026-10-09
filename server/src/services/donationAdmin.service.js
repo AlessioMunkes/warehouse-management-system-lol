@@ -2,7 +2,7 @@
 // server/src/services/donationAdmin.service.js
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
-import { determineRouting } from '../lib/donationRouting.js';
+import { determineRouting } from '../utils/donationRouting.js';
 import classificationRepo from '../repositories/donation.classification.js';
 import productRepo        from '../repositories/product.repository.js';
 

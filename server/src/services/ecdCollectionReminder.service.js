@@ -1,6 +1,6 @@
 import reminderRepository from '../repositories/ecdCollectionReminder.repository.js';
-import communications from '../features/communications/communications.service.js';
-import { closureOn } from '../features/calendar/calendar.service.js';
+import communications from './communications.service.js';
+import { closureOn } from './calendar.service.js';
 import { emailStyles, escapeHtml, renderLadlesEmail } from '../utils/emailTemplate.js';
 
 const DEFAULT_CHANNELS = ['sms'];

@@ -19,7 +19,7 @@ const emailProviderMock = {
   sendEmail: vi.fn(),
 };
 
-vi.mock('../src/providers/email.provider.js', () => ({ default: emailProviderMock }));
+vi.mock('../src/integrations/email.provider.js', () => ({ default: emailProviderMock }));
 
 const { default: financeService } = await import('../src/services/finance.service.js');
 

@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────────────────────
-// server/src/features/settings/settings.controller.js
+// server/src/controllers/settings.controller.js
 // ─────────────────────────────────────────────────────────────
-import { checkConnections } from './connections.service.js';
-import settings from './settings.service.js';
+import { checkConnections } from '../services/connections.service.js';
+import settings from '../services/settings.service.js';
 
 const respond = (res, err, where, fallback) => {
   console.error(`[${where}]`, err.message);

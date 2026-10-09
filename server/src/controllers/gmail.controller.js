@@ -4,7 +4,7 @@
 // Thin HTTP layer for Gmail OAuth connection.
 // -------------------------------------------------------------
 import gmailService from '../services/gmail.service.js';
-import communications from '../features/communications/communications.service.js';
+import communications from '../services/communications.service.js';
 import { resolveAppBaseUrl } from '../config/appUrl.js';
 
 const EMAIL_INTEGRATION_PATH = '/admin/email-integration';

@@ -17,7 +17,7 @@
 // as a warning for someone to resolve later. Same principle as
 // isShortfall in the stock repository: a flag, not an error.
 // ─────────────────────────────────────────────────────────────
-import { determineRouting } from '../lib/donationRouting.js';
+import { determineRouting } from '../utils/donationRouting.js';
 import {
   validateDonorName,
   validateCompanyName,
@@ -37,13 +37,13 @@ import {
   validateMoney,
   validateIsoDate,
   donationFingerprint,
-} from '../lib/validation/donationIntake.js';
+} from '../utils/donationIntake/donationIntake.js';
 import donationModel from '../repositories/donation.repository.js';
 import { createNotification } from '../repositories/notification.repository.js';
 import gmailRepository from '../repositories/gmail.repository.js';
 import certificateSettingsService from './certificateSettings.service.js';
-import communications from '../features/communications/communications.service.js';
-import pdfProvider from '../providers/pdf.provider.js';
+import communications from './communications.service.js';
+import pdfProvider from '../integrations/pdf.provider.js';
 import { escapeHtml, renderLadlesEmail } from '../utils/emailTemplate.js';
 import crypto from 'crypto';
 import { appBaseUrl, missingAddressMessage } from '../config/appUrl.js';

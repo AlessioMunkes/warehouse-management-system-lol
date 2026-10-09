@@ -27,8 +27,8 @@
 // ─────────────────────────────────────────────────────────────
 import { assertWholeBySlipItem } from '../features/units/wholeItems.js';
 import dispatchRepository from '../repositories/dispatch.repository.js';
-import { closureOn } from '../features/calendar/calendar.service.js';
-import settings from '../features/settings/settings.service.js';
+import { closureOn } from './calendar.service.js';
+import settings from './settings.service.js';
 import notices from '../features/communications/notices.js';
 import { isManagerUp } from '../constants/permissions.js';
 import { isValidDateString, isPositiveInt } from '../utils/validation.js';

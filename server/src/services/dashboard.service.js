@@ -8,7 +8,7 @@
 // ─────────────────────────────────────────────────────────────
 import repo from '../repositories/dashboard.repository.js';
 import recipeRepository from '../repositories/recipe.repository.js';
-import settings from '../features/settings/settings.service.js';
+import settings from './settings.service.js';
 import { recipeForDate } from '../features/recipes/recipeSeason.js';
 
 const getSummary = async () => repo.getSummary();

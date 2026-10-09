@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// server/src/features/reporting/insights/operationalInsights.js
+// server/src/features/reporting/operationalInsights.js
 //
 // What turns an operational chart into something a manager can act
 // on. Per metric: which way is good, which related charts explain
@@ -15,7 +15,7 @@
 // key the client maps to a route in routes/paths.js, so a path is
 // never duplicated here.
 // ─────────────────────────────────────────────────────────────
-import insightRepo from '../../../repositories/reportingInsight.repository.js';
+import insightRepo from '../../repositories/reportingInsight.repository.js';
 
 const fmtDate = (d) => {
   if (!d) return null;

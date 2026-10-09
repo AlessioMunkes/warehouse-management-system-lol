@@ -14,8 +14,8 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 
 vi.mock('../src/config/db.js', () => ({ default: { query: vi.fn() } }));
 
-const { matchQuestion, resolveDates } = await import('../src/features/reporting/ai/keywordFallback.js');
-const provider = (await import('../src/features/reporting/ai/provider.js')).default;
+const { matchQuestion, resolveDates } = await import('../src/features/reporting/keywordFallback.js');
+const provider = (await import('../src/features/reporting/provider.js')).default;
 
 const TODAY = '2026-09-24';
 const route = (q) => {

@@ -15,7 +15,7 @@ import {
   TOPICS, TOPIC_IDS, SCREENS, SCREEN_IDS,
   getTopic, topicsForRole, screensForRole, suggestionsFor, publicTopic, followUpFor,
 } from '../src/features/assistant/helpCatalog.js';
-import { buildTools, buildSystemPrompt } from '../src/features/assistant/ai/toolSchema.js';
+import { buildTools, buildSystemPrompt } from '../src/features/assistant/toolSchema.js';
 
 const ROLES = ['warehouse_worker', 'manager', 'admin'];
 

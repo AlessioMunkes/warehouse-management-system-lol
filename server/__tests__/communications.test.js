@@ -7,15 +7,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const providerMock = { sendEmail: vi.fn() };
-vi.mock('../src/providers/email.provider.js', () => ({ default: providerMock }));
+vi.mock('../src/integrations/email.provider.js', () => ({ default: providerMock }));
 
 const createNotification = vi.fn();
 vi.mock('../src/repositories/notification.repository.js', () => ({ createNotification }));
 
 // setup.js stubs the history repository for every file; this file
 // inspects the stub.
-const { default: outbound } = await import('../src/features/communications/outboundMessage.repository.js');
-const { send, listMessages, outcomeOf } = await import('../src/features/communications/communications.service.js');
+const { default: outbound } = await import('../src/repositories/outboundMessage.repository.js');
+const { send, listMessages, outcomeOf } = await import('../src/services/communications.service.js');
 const { default: notices } = await import('../src/features/communications/notices.js');
 
 beforeEach(() => {

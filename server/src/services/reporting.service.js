@@ -12,7 +12,7 @@ import repo             from '../repositories/reporting.repository.js';
 import factorRepo       from '../repositories/reportingFactor.repository.js';
 import cache            from '../features/reporting/reportCache.js';
 import { validateSpec } from '../features/reporting/specValidator.js';
-import aiProvider       from '../features/reporting/ai/provider.js';
+import aiProvider       from '../features/reporting/provider.js';
 import pool             from '../config/db.js';
 import { validateCustom, runCustom, describeDatasets } from '../features/reporting/customQuery.js';
 import { canDrill, planDrill } from '../features/reporting/drillDown.js';

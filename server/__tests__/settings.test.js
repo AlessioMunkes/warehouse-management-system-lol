@@ -8,13 +8,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // setup.js stubs the service for every file; this one tests it.
-vi.unmock('../src/features/settings/settings.service.js');
+vi.unmock('../src/services/settings.service.js');
 
 const client = { query: vi.fn(async () => ({ rows: [] })), release: vi.fn() };
 const poolMock = { query: vi.fn(), connect: vi.fn(async () => client) };
 vi.mock('../src/config/db.js', () => ({ default: poolMock }));
 
-const { default: settings } = await import('../src/features/settings/settings.service.js');
+const { default: settings } = await import('../src/services/settings.service.js');
 const { defaults } = await import('../src/features/settings/settingsDefinitions.js');
 const { NON_COLLECTION_CUTOFF_HOUR } = await import('../src/services/dispatch.service.js');
 const { nextRunAt } = await import('../src/jobs/ecdCollectionReminder.job.js');

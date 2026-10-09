@@ -18,7 +18,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   SCREENS, SCREEN_IDS, screensForRole, screenForRole,
 } from '../src/features/assistant/helpCatalog.js';
-import { buildTools, buildSystemPrompt } from '../src/features/assistant/ai/toolSchema.js';
+import { buildTools, buildSystemPrompt } from '../src/features/assistant/toolSchema.js';
 
 const ROLES = ['warehouse_worker', 'manager', 'admin'];
 
@@ -27,7 +27,7 @@ const providerMock = {
   providerName:  vi.fn(() => 'google:test'),
   callWithTools: vi.fn(),
 };
-vi.mock('../src/features/reporting/ai/provider.js', () => ({ default: providerMock }));
+vi.mock('../src/features/reporting/provider.js', () => ({ default: providerMock }));
 vi.mock('../src/repositories/assistantLog.repository.js', () => ({
   default: { record: vi.fn() },
 }));

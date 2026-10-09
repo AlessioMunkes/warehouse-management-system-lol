@@ -2,8 +2,8 @@
 // server/__tests__/donationValidation.test.js
 //
 // Unit tests for the shared donation-intake validators in
-// server/src/lib/validation/*. These are the same rules the client
-// mirrors (client/src/lib/validation/*), and the backend treats them
+// server/src/utils/donationIntake/*. These are the same rules the client
+// mirrors (client/src/utils/donationIntake/*), and the backend treats them
 // as source of truth at submit time.
 //
 // Coverage maps to the Donation Intake validation checklist:
@@ -29,7 +29,7 @@ import {
   validateIsoDate,
   validateDonationPayload,
   donationFingerprint,
-} from '../src/lib/validation/donationIntake.js';
+} from '../src/utils/donationIntake/donationIntake.js';
 
 // ── SA ID number ─────────────────────────────────────────────
 describe('validateSaIdNumber', () => {

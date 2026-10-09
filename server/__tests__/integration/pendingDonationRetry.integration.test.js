@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// server/__tests__/intergration/pendingDonationRetry.intergration.test.js
+// server/__tests__/integration/pendingDonationRetry.integration.test.js
 //
 // Retrying a failed donation save against a REAL Postgres, through the
 // real router, service and repositories, as a manager.

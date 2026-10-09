@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// server/__tests__/intergration/quickbooksImport.intergration.test.js
+// server/__tests__/integration/quickbooksImport.integration.test.js
 //
 // The QuickBooks links import against a REAL Postgres: the array casts,
 // the unnest inserts, the row locks, the unique index and the audit

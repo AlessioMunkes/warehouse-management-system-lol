@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// server/src/features/reporting/ai/provider.js
+// server/src/features/reporting/provider.js
 //
 // The ONLY file that knows which AI provider we use.
 //

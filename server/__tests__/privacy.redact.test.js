@@ -56,7 +56,7 @@ describe('pseudonymise and restore', () => {
 
 // ── The services send only the redacted question ──────────────
 const providerMock = { isEnabled: vi.fn(() => true), providerName: vi.fn(() => 'google:test'), callWithTools: vi.fn() };
-vi.mock('../src/features/reporting/ai/provider.js', () => ({ default: providerMock }));
+vi.mock('../src/features/reporting/provider.js', () => ({ default: providerMock }));
 vi.mock('../src/repositories/knownPeople.repository.js', () => ({
   default: { listNames: vi.fn(async () => ({ names: NAMES, keep: KEEP })) },
 }));
@@ -86,7 +86,7 @@ describe('what the model is sent', () => {
 
 describe('a scatter whose dots are people', () => {
   it('sends aliases and writes the names back into the report', async () => {
-    const { writeComparisonNarrative } = await import('../src/features/reporting/insights/narrative.js');
+    const { writeComparisonNarrative } = await import('../src/features/reporting/narrative.js');
     const { getComparison } = await import('../src/features/reporting/reportComparisons.js');
     const def = getComparison('packer_workload_vs_flags');
     const comparison = {

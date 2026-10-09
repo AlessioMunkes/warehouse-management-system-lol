@@ -67,7 +67,7 @@ vi.mock('../src/repositories/product.repository.js', () => ({ default: productRe
 vi.mock('../src/repositories/auditLog.repository.js', () => auditRepoMock);
 vi.mock('../src/repositories/notification.repository.js', () => notificationRepoMock);
 vi.mock('../src/repositories/donation.repository.js', () => ({ default: donationModelMock }));
-vi.mock('../src/lib/donationRouting.js', () => ({ determineRouting: routingMock.determineRouting }));
+vi.mock('../src/utils/donationRouting.js', () => ({ determineRouting: routingMock.determineRouting }));
 vi.mock('../src/services/donationAdmin.service.js', () => ({ default: donationAdminServiceMock }));
 vi.mock('../src/services/donation.service.js', () => ({
   default: donationServiceMock,

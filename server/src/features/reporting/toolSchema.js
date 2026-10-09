@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// server/src/features/reporting/ai/toolSchema.js
+// server/src/features/reporting/toolSchema.js
 //
 // Builds the model's function declarations and system prompt FROM
 // reportCatalog.js at module load.
@@ -14,12 +14,12 @@
 // Nothing here is hand-maintained. Add a metric to the catalog and
 // the model can answer questions about it on the next restart.
 // ─────────────────────────────────────────────────────────────
-import { DATASETS } from '../customQuery.js';
+import { DATASETS } from './customQuery.js';
 import {
   METRICS, DIMENSIONS, COHORTS, BENEFICIARY_KINDS,
   MOVEMENT_TYPES, DONATION_CATEGORIES, MAX_RANK_LIMIT,
-} from '../reportCatalog.js';
-import { COMPARISONS, COMPARISON_IDS } from '../reportComparisons.js';
+} from './reportCatalog.js';
+import { COMPARISONS, COMPARISON_IDS } from './reportComparisons.js';
 
 const STRING = 'STRING', INTEGER = 'INTEGER', ARRAY = 'ARRAY', OBJECT = 'OBJECT';
 

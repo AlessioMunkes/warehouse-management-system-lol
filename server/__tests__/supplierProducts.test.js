@@ -18,7 +18,7 @@ const poRepo = { createPurchaseOrder: vi.fn(), updatePurchaseOrder: vi.fn(), get
 
 vi.mock('../src/repositories/supplier.repository.js', () => ({ default: supplierRepo }));
 vi.mock('../src/repositories/purchaseOrder.repository.js', () => ({ default: poRepo }));
-vi.mock('../src/providers/email.provider.js', () => ({ default: { send: vi.fn(), sendEmail: vi.fn() } }));
+vi.mock('../src/integrations/email.provider.js', () => ({ default: { send: vi.fn(), sendEmail: vi.fn() } }));
 vi.mock('../src/services/finance.service.js', () => ({
   default: { getEmailSettings: vi.fn(async () => ({ recipientEmail: null })) },
 }));

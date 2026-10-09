@@ -20,7 +20,7 @@ import {
   METRICS, METRIC_IDS, DIMENSIONS, FILTERS, CHART_TYPES, isSnapshot,
 } from '../src/features/reporting/reportCatalog.js';
 import { validateSpec } from '../src/features/reporting/specValidator.js';
-import { buildTools, buildSystemPrompt } from '../src/features/reporting/ai/toolSchema.js';
+import { buildTools, buildSystemPrompt } from '../src/features/reporting/toolSchema.js';
 import repo from '../src/repositories/reporting.repository.js';
 
 const RANGE = { from: '2026-06-01', to: '2026-08-01' };

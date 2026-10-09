@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
-// server/src/features/communications/communications.controller.js
+// server/src/controllers/communications.controller.js
 // ─────────────────────────────────────────────────────────────
-import { listMessages as list } from './communications.service.js';
+import { listMessages as list } from '../services/communications.service.js';
 
 // GET /api/communications/messages?type=&status=&limit=&cursor=
 const listMessages = async (req, res) => {

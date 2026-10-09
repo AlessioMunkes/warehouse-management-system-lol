@@ -16,12 +16,12 @@ const emailProviderMock = { sendEmail: vi.fn() };
 const financeEmailFallbackMock = { getEmailSettings: vi.fn() };
 
 vi.mock('../src/repositories/purchaseOrder.repository.js', () => ({ default: repoMock }));
-vi.mock('../src/providers/email.provider.js', () => ({ default: emailProviderMock }));
+vi.mock('../src/integrations/email.provider.js', () => ({ default: emailProviderMock }));
 vi.mock('../src/services/finance.service.js', () => ({ default: financeEmailFallbackMock }));
 
 const { default: purchaseOrderService } = await import('../src/services/purchaseOrder.service.js');
 const { safeFinanceEmailError, FINANCE_EMAIL_ERRORS } = await import('../src/utils/financeEmailError.js');
-const { default: outboundMessages } = await import('../src/features/communications/outboundMessage.repository.js');
+const { default: outboundMessages } = await import('../src/repositories/outboundMessage.repository.js');
 
 const VALID_BODY = {
   supplierId: 1,

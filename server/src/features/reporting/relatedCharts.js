@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// server/src/features/reporting/insights/relatedCharts.js
+// server/src/features/reporting/relatedCharts.js
 //
 // Picks the two related diagrams shown with every generated report, and a
 // short note on how each connects. Candidates, best first: the report's
@@ -7,9 +7,9 @@
 // way, then another report from the same area. The service keeps the
 // first two that have data.
 // ─────────────────────────────────────────────────────────────
-import { METRICS, DIMENSIONS, isSnapshot } from '../reportCatalog.js';
+import { METRICS, DIMENSIONS, isSnapshot } from './reportCatalog.js';
 import { OPERATIONAL_INSIGHTS } from './operationalInsights.js';
-import { DATASETS } from '../customQuery.js';
+import { DATASETS } from './customQuery.js';
 
 export const RELATED_COUNT = 2;
 

@@ -44,7 +44,7 @@ const emailProviderMock = {
 
 vi.mock('../src/repositories/userInvite.repository.js', () => ({ default: inviteRepoMock }));
 vi.mock('../src/repositories/user.repository.js', () => ({ default: userRepoMock }));
-vi.mock('../src/providers/email.provider.js', () => ({ default: emailProviderMock }));
+vi.mock('../src/integrations/email.provider.js', () => ({ default: emailProviderMock }));
 
 const { default: userInviteService } = await import('../src/services/userInvite.service.js');
 
@@ -469,7 +469,7 @@ describe('acceptInvite', () => {
 
 describe('invite link lifetime from Settings', () => {
   it('expires a new invite after the days an admin chose, and the email says so', async () => {
-    const { default: settings } = await import('../src/features/settings/settings.service.js');
+    const { default: settings } = await import('../src/services/settings.service.js');
     settings.get.mockImplementation(async (key) => (key === 'invites.linkDays' ? 3 : undefined));
     const before = Date.now();
 

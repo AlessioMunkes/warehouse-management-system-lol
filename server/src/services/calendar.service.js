@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// server/src/features/calendar/calendar.service.js
+// server/src/services/calendar.service.js
 //
 // The operating calendar: which weekday each cohort collects on, and
 // the days the warehouse is shut (public holidays and closures).
@@ -12,9 +12,9 @@
 //   • picking slip generation — the weekly run refuses a closed day,
 //     and a cohort's day is the one set here
 // ─────────────────────────────────────────────────────────────
-import settings from '../settings/settings.service.js';
-import repo from './calendar.repository.js';
-import { saPublicHolidays } from './saPublicHolidays.js';
+import settings from './settings.service.js';
+import repo from '../repositories/calendar.repository.js';
+import { saPublicHolidays } from '../features/calendar/saPublicHolidays.js';
 
 const fail = (status, message) => Object.assign(new Error(message), { status });
 

@@ -5,7 +5,7 @@
 // Validates data and enforces rules before touching the DB.
 // ─────────────────────────────────────────────────────────────
 import { assertWholeBySlipItem } from '../features/units/wholeItems.js';
-import { closureOn, cohortForDate, cohortWeekdays } from '../features/calendar/calendar.service.js';
+import { closureOn, cohortForDate, cohortWeekdays } from './calendar.service.js';
 import pickingRepository from '../repositories/picking.repository.js';
 import notices from '../features/communications/notices.js';
 import { isManagerUp } from '../constants/permissions.js';

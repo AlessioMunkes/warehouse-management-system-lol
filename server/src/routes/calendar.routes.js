@@ -8,7 +8,7 @@ import express from 'express';
 import auth, { requireRole } from '../middleware/auth.middleware.js';
 import { MANAGERS_UP } from '../constants/permissions.js';
 import { validateIntId } from '../middleware/validate.middleware.js';
-import calendarController from '../features/calendar/calendar.controller.js';
+import calendarController from '../controllers/calendar.controller.js';
 
 const router = express.Router();
 

@@ -11,12 +11,12 @@
 // widened range, or a prompt injection buried in a centre name all
 // fail at validateSpec() before pg is touched.
 // ─────────────────────────────────────────────────────────────
-import provider          from '../features/reporting/ai/provider.js';
-import { buildTools, buildSystemPrompt } from '../features/reporting/ai/toolSchema.js';
+import provider          from '../features/reporting/provider.js';
+import { buildTools, buildSystemPrompt } from '../features/reporting/toolSchema.js';
 import reportingService  from './reporting.service.js';
 import insightService    from './reportingInsight.service.js';
-import { CHART_VIEWS }   from '../features/reporting/ai/toolSchema.js';
-import { matchQuestion, rankReports } from '../features/reporting/ai/keywordFallback.js';
+import { CHART_VIEWS }   from '../features/reporting/toolSchema.js';
+import { matchQuestion, rankReports } from '../features/reporting/keywordFallback.js';
 import logRepo           from '../repositories/reportingLog.repository.js';
 import { DATASETS }      from '../features/reporting/customQuery.js';
 import { redactText }    from '../features/privacy/redact.js';

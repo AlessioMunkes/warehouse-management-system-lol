@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// server/src/features/reporting/ai/keywordFallback.js
+// server/src/features/reporting/keywordFallback.js
 //
 // Question → report WITHOUT the model. Used by reportingAi.service.js
 // only when every model in the chain has failed (quota, overload,
@@ -14,9 +14,9 @@
 // word 1, and a question has to reach MIN_SCORE before anything is
 // run — a weak guess is worse than the soft "no match" note.
 // ─────────────────────────────────────────────────────────────
-import { DATASETS } from '../customQuery.js';
-import { METRICS, DIMENSIONS } from '../reportCatalog.js';
-import { COMPARISONS } from '../reportComparisons.js';
+import { DATASETS } from './customQuery.js';
+import { METRICS, DIMENSIONS } from './reportCatalog.js';
+import { COMPARISONS } from './reportComparisons.js';
 
 export const MIN_SCORE = 3;
 

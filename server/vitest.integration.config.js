@@ -9,7 +9,7 @@ export default defineConfig({
     // setup.js stubs config/db.js for the unit run; these suites are the
     // ones that need the real connection.
     env: { WMS_TEST_REAL_DB: '1' },
-    include: ['**/__tests__/intergration/**/*.test.js'],
+    include: ['**/__tests__/integration/**/*.test.js'],
     // One file at a time: these suites empty the tables they use, so two
     // files running side by side wipe each other's data.
     fileParallelism: false,

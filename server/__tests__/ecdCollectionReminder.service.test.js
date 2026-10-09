@@ -16,7 +16,7 @@ const emailProviderMock = {
 };
 
 vi.mock('../src/repositories/ecdCollectionReminder.repository.js', () => ({ default: repoMock }));
-vi.mock('../src/providers/email.provider.js', () => ({ default: emailProviderMock }));
+vi.mock('../src/integrations/email.provider.js', () => ({ default: emailProviderMock }));
 
 const { default: service } = await import('../src/services/ecdCollectionReminder.service.js');
 

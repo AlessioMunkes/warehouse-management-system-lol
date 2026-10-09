@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// server/src/features/settings/connections.service.js
+// server/src/services/connections.service.js
 //
 // Settings → Connections: everything outside this server the system
 // depends on, and whether each one is working right now. One check per
@@ -17,15 +17,15 @@
 // checks read configuration and recent history, and for Gmail refresh
 // the token, which is what proves Google still accepts it.
 // ─────────────────────────────────────────────────────────────
-import pool from '../../config/db.js';
-import gmailService from '../../services/gmail.service.js';
-import pushService from '../../services/push.service.js';
-import { getAdapter } from '../../services/vmsIntegration.service.js';
-import mockVMSAdapter from '../../integrations/mockVMS.adapter.js';
-import vmsSyncRepo from '../../repositories/vmsSync.repository.js';
-import { EMAIL_ENABLED } from '../../config/email.js';
-import { LINK_KINDS, resolveAppBaseUrl } from '../../config/appUrl.js';
-import { isEnabled as aiEnabled, providerName as aiProvider } from '../reporting/ai/provider.js';
+import pool from '../config/db.js';
+import gmailService from './gmail.service.js';
+import pushService from './push.service.js';
+import { getAdapter } from './vmsIntegration.service.js';
+import mockVMSAdapter from '../integrations/mockVMS.adapter.js';
+import vmsSyncRepo from '../repositories/vmsSync.repository.js';
+import { EMAIL_ENABLED } from '../config/email.js';
+import { LINK_KINDS, resolveAppBaseUrl } from '../config/appUrl.js';
+import { isEnabled as aiEnabled, providerName as aiProvider } from '../features/reporting/provider.js';
 
 const TIME_LIMIT_MS = 8000;
 

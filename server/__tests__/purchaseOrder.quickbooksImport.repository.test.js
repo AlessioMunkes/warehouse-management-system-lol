@@ -4,7 +4,7 @@
 // The QuickBooks links import against a fake pg client that answers the
 // two state lookups from an in-memory table and records every other
 // statement. Mocks can't see SQL errors, so the same flows also run
-// against a real database in intergration/quickbooksImport.*.
+// against a real database in integration/quickbooksImport.*.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 

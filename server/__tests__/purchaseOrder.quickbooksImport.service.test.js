@@ -12,7 +12,7 @@ const repoMock = {
   applyQuickbooksLinks: vi.fn(),
 };
 vi.mock('../src/repositories/purchaseOrder.repository.js', () => ({ default: repoMock }));
-vi.mock('../src/features/communications/communications.service.js', () => ({ default: { send: vi.fn() } }));
+vi.mock('../src/services/communications.service.js', () => ({ default: { send: vi.fn() } }));
 
 const { default: service } = await import('../src/services/purchaseOrder.service.js');
 
