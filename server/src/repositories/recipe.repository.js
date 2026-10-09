@@ -189,8 +189,8 @@ const resolveForDate = async (client, dispatchDate) => {
 // Writes one slip's items from a recipe: each line times the centre's
 // child count, with the count first rounded UP to a multiple of
 // `childBand` (bandedChildCount in recipeSeason.js is the same sum).
-// A line in a counted unit — cans, bags — is rounded up to a whole one
-// (slipQuantity in recipeSeason.js).
+// A line in a counted unit — cans, bags — or for any product that is not
+// decantable is rounded up to a whole one (slipQuantity in recipeSeason.js).
 // Writes nothing — and the caller falls back to the standing order —
 // for a centre that keeps its own order or has no child count.
 const insertSlipItemsFromRecipe = async (client, { slipId, ecdId, recipeId, childBand = CHILD_BAND.default }) => {
@@ -206,7 +206,7 @@ const insertSlipItemsFromRecipe = async (client, { slipId, ecdId, recipeId, chil
      SELECT $1, line.product_id, line.quantity, line.unit
        FROM (
          SELECT rl.product_id, rl.unit,
-                CASE WHEN rl.unit = ANY($5::text[])
+                CASE WHEN rl.unit = ANY($5::text[]) OR NOT p.is_decantable
                      THEN CEIL(rl.quantity_per_child * c.children)
                      ELSE ROUND(rl.quantity_per_child * c.children, 2)
                 END AS quantity

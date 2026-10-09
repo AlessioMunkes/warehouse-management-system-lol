@@ -66,9 +66,15 @@ const MISSING_DETAILS = [
     consequence: 'The product is never marked as low stock, however little is left.' },
 ];
 
+// Units that are weighed or poured. The server uses the same list for a
+// product saved without the choice (product.service.js).
+const LOOSE_UNITS = ['kg', 'g', 'l', 'ml'];
+
 const BLANK = {
   name: '', sku: '', defaultUnit: '', weightKg: '', unitCost: '',
-  category: '', isPerishable: false, reorderThreshold: '',
+  // null until someone ticks or unticks it: a new product then follows
+  // its unit (weighed or poured is decantable, counted is not).
+  category: '', isPerishable: false, isDecantable: null, reorderThreshold: '',
   storageType: 'dry',
 };
 
@@ -93,11 +99,14 @@ export default function ProductForm({
   const unitMissing = !String(form.defaultUnit ?? '').trim();
   const unitInvalid = touchedUnit && unitMissing;
 
+  const isDecantable = form.isDecantable ?? LOOSE_UNITS.includes(form.defaultUnit);
+
   // The blank details being asked about, while the notice is showing.
   const [missing, setMissing] = useState(null);
 
   const payload = () => ({
       ...form,
+      isDecantable,
       // The service maps '' to null anyway, but sending null is
       // clearer about the intent, same reasoning SupplierForm's
       // expectedLeadTimeDays uses.
@@ -271,6 +280,23 @@ export default function ProductForm({
         <FieldLabel htmlFor="product-perishable" className="font-normal">
           This item is perishable
         </FieldLabel>
+      </Field>
+
+      <Field orientation="horizontal">
+        <Checkbox
+          id="product-decantable"
+          checked={isDecantable}
+          onCheckedChange={(checked) => setForm((f) => ({ ...f, isDecantable: checked === true }))}
+        />
+        <div>
+          <FieldLabel htmlFor="product-decantable" className="font-normal">
+            This item can be decanted
+          </FieldLabel>
+          <FieldDescription>
+            Tick for food kept loose and portioned out, like rice or oil. It shows on the
+            Decanting screen and can be a part quantity. Everything else is whole numbers only.
+          </FieldDescription>
+        </div>
       </Field>
 
       {missing ? (

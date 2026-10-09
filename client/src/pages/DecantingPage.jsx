@@ -26,10 +26,7 @@ const DecantingPage = () => {
   const [step, setStep] = useState({ label: 'What you are working with', step: 1, total: 2 });
   const handleCrumb = useCallback((next) => setStep(next), []);
 
-  // NOTE: reusing the procurement products endpoint as a stopgap —
-  // decanting.service.js has getDecantableProducts commented out, so
-  // this shows all products, not just decantable ones, until that's
-  // fixed backend-side. Not something to fix here — just a known limit.
+  // Only products marked decantable (decantingAPI.getProducts).
   useEffect(() => {
     getProducts().then(setProducts).catch((err) => console.error('Failed to load products:', err));
   }, []);

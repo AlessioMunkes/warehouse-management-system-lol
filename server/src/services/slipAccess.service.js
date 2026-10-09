@@ -16,6 +16,7 @@
 import pool              from '../config/db.js';
 import slipAccessRepo    from '../repositories/slipAccess.repository.js';
 import pickingRepository from '../repositories/picking.repository.js';
+import { assertWholeBySlipItem } from '../features/units/wholeItems.js';
 
 const fail = (status, message, extra = {}) => {
   const err = new Error(message);
@@ -260,8 +261,22 @@ const requireOwnSlip = async (user, slipId) => {
   if (!holds) fail(403, 'That pallet is not yours to pack.');
 };
 
-const confirmItem = async (user, slipId, itemId, { packedQuantity }) => {
+// The same rules the staff screens apply (picking.service.js): a real
+// number, and a whole one unless the product is decantable. A guest's
+// quantity used to reach the repository unchecked.
+const checkedQuantity = async (itemId, raw, { allowZero }) => {
+  const quantity = Number(raw);
+  if (raw === null || raw === undefined || raw === '' || !Number.isFinite(quantity) || quantity < 0) {
+    fail(400, 'Enter how many you packed.');
+  }
+  if (!allowZero && quantity === 0) fail(400, 'Enter how many you packed. If there was none, tap "There’s a problem".');
+  await assertWholeBySlipItem([{ itemId, quantity }]);
+  return quantity;
+};
+
+const confirmItem = async (user, slipId, itemId, { packedQuantity: raw }) => {
   await requireOwnSlip(user, slipId);
+  const packedQuantity = await checkedQuantity(itemId, raw, { allowZero: false });
 
   const result = await pickingRepository.setItemStatus({
     slipId, itemId,
@@ -277,9 +292,13 @@ const confirmItem = async (user, slipId, itemId, { packedQuantity }) => {
   return result;
 };
 
-const flagItem = async (user, slipId, itemId, { reason, packedQuantity }) => {
+const flagItem = async (user, slipId, itemId, { reason, packedQuantity: raw }) => {
   await requireOwnSlip(user, slipId);
   if (!reason || !String(reason).trim()) fail(400, 'Please say what the problem is.');
+  // A flag may come with no count at all; one that is given is checked.
+  const packedQuantity = raw === null || raw === undefined || raw === ''
+    ? raw
+    : await checkedQuantity(itemId, raw, { allowZero: true });
 
   const result = await pickingRepository.setItemStatus({
     slipId, itemId,

@@ -15,6 +15,7 @@
 // Calculation logic lives here (domain layer) — the repository only
 // persists and retrieves.
 // ─────────────────────────────────────────────────────────────
+import { assertDecantable } from '../features/units/wholeItems.js';
 import decantingModel from '../repositories/decanting.repository.js';
 
 // ── Constants ─────────────────────────────────────────────────
@@ -448,6 +449,9 @@ const recordDecanting = async (data, userId) => {
   if (!weekOf)                                     throw new Error('Week (weekOf) is required.');
   if (!Array.isArray(items) || items.length === 0) throw new Error('At least one decanting line is required.');
   if (!userId)                                     throw new Error('User is required.');
+
+  // Only a product kept loose can be portioned out (migration 044).
+  await assertDecantable(items.map((item) => item?.productId));
 
   const defaults = {
     selectedSizes: data.selectedSizes,

@@ -81,6 +81,9 @@ const COLUMNS = [
   { key: 'perishable', label: 'Perishable', weight: 1.7, minWidth: 'lg',
     sort: (p) => (p.isPerishable ? 'yes' : 'no'),
     cell: (p) => (p.isPerishable ? 'Yes' : 'No') },
+  { key: 'decantable', label: 'Decantable', weight: 1.7, minWidth: 'lg',
+    sort: (p) => (p.isDecantable ? 'yes' : 'no'),
+    cell: (p) => (p.isDecantable ? 'Yes' : 'No') },
   { key: 'status',   label: '', sort: null, alwaysOn: true, weight: 1.8,
     cell: (p) => (!p.isActive ? <Badge variant="outline">Inactive</Badge> : null) },
 ];
@@ -129,6 +132,10 @@ const ProductDetail = ({ product, canManage, onEdit, onToggleActive, onRemove, o
           : `R ${product.unitCost.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</dd>
       </div>
       <div><dt className="text-muted-foreground">Perishable</dt><dd>{product.isPerishable ? 'Yes' : 'No'}</dd></div>
+      <div>
+        <dt className="text-muted-foreground">Decantable</dt>
+        <dd>{product.isDecantable ? 'Yes' : 'No, whole numbers only'}</dd>
+      </div>
     </dl>
   </DetailPanel>
 );

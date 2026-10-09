@@ -6,6 +6,7 @@
 // ─────────────────────────────────────────────────────────────
 import stockModel        from '../repositories/stock.repository.js';
 import { isMovementType } from '../constants/movementTypes.js';
+import { assertWholeByProduct } from '../features/units/wholeItems.js';
 
 // ── fail ───────────────────────────────────────────────────────
 // Mirrors picking.service.js. Without a `.status` on the error, the
@@ -51,6 +52,9 @@ const adjustManually = async (data, userId) => {
   if (quantityDelta === undefined || quantityDelta === null || !Number.isFinite(delta) || delta === 0)
                                                        fail(400, 'A non-zero quantity change is required.');
   if (!reason || !reason.trim())                      fail(400, 'A reason is required for manual adjustments.');
+
+  // Only a decantable product can be adjusted by a part quantity.
+  await assertWholeByProduct([{ productId, quantity: delta }]);
 
   const result = await stockModel.manualAdjust({
     productId,

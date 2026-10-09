@@ -15,10 +15,12 @@ import { postOrQueue } from './offlinePost';
 // fresh route mount every visit to Decanting, and the product list
 // barely changes minute to minute, so without this every visit re-
 // paid the round trip before either view mode had anything to show.
+// Only what is marked decantable on the Products screen. A row with no
+// flag at all (a server not yet on migration 044) is kept.
 export const getProducts = async () =>
   cachedGet('decanting:products', 60_000, async () => {
     const res = await apiGet('/api/deliveries/products');
-    return res.data;
+    return (res.data ?? []).filter((p) => p.is_decantable !== false);
   });
 
 export const calculateDecantingPlan = async (data) => {

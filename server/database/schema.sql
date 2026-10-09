@@ -1456,7 +1456,7 @@ ALTER TABLE community_requests
   ADD COLUMN IF NOT EXISTS items_short_at TIMESTAMPTZ;
 
 -- ── from 040_create_idempotency_keys ──
--- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+-- ─────────────────────────────────────────────────────────────
 -- 040_create_idempotency_keys.sql
 --
 -- Lets the server recognise a submission it has already handled.
@@ -1478,7 +1478,7 @@ ALTER TABLE community_requests
 -- running.
 --
 -- Additive only: one new table.
--- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+-- ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS idempotency_keys (
   key         TEXT PRIMARY KEY CHECK (char_length(key) BETWEEN 8 AND 100),
   scope       TEXT NOT NULL,
@@ -1493,7 +1493,7 @@ CREATE INDEX IF NOT EXISTS idempotency_keys_created_at_idx ON idempotency_keys (
 
 
 -- from 041_create_photos
--- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+-- ─────────────────────────────────────────────────────────────
 -- 041_create_photos.sql
 --
 -- A photo a worker takes on the floor: of an item they flagged while
@@ -1513,7 +1513,7 @@ CREATE INDEX IF NOT EXISTS idempotency_keys_created_at_idx ON idempotency_keys (
 -- and keep the rest of the row (see photo.repository.js).
 --
 -- Additive only: one new table.
--- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+-- ─────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS photos (
   id           BIGSERIAL PRIMARY KEY,
   entity_type  TEXT NOT NULL CHECK (entity_type IN ('picking_slip_item', 'purchase_order')),
@@ -1529,7 +1529,7 @@ CREATE INDEX IF NOT EXISTS photos_entity_idx ON photos (entity_type, entity_id);
 
 
 -- from 042_add_user_language
--- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+-- ─────────────────────────────────────────────────────────────
 -- 042_add_user_language.sql
 --
 -- The language a person reads the floor screens in: English, Afrikaans
@@ -1537,8 +1537,60 @@ CREATE INDEX IF NOT EXISTS photos_entity_idx ON photos (entity_type, entity_id);
 -- shared: it follows whoever signs in.
 --
 -- Additive only: one new column, English for everyone until they choose.
--- â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+-- ─────────────────────────────────────────────────────────────
 ALTER TABLE users
   ADD COLUMN IF NOT EXISTS language TEXT NOT NULL DEFAULT 'en'
   CHECK (language IN ('en', 'af', 'xh'));
 
+
+-- from 043_add_purchase_order_follow_up
+-- ─────────────────────────────────────────────────────────────
+-- 043_add_purchase_order_follow_up.sql
+--
+-- A follow-up order: a second purchase order for what was short on the
+-- first. follow_up_of points at the order it follows.
+--
+-- How an order now moves when a delivery comes in short:
+--
+--   approved ── short delivery ──> follow_up_required
+--   follow_up_required ── a manager creates the follow-up order ──> partially_received
+--   the follow-up order is fully received ──> both become completed
+--
+-- A follow-up can itself come in short and get a follow-up of its own;
+-- completing the last one completes every order behind it.
+--
+-- Additive only: one new column and its index.
+-- ─────────────────────────────────────────────────────────────
+ALTER TABLE purchase_orders
+  ADD COLUMN IF NOT EXISTS follow_up_of INTEGER REFERENCES purchase_orders(id);
+
+CREATE INDEX IF NOT EXISTS purchase_orders_follow_up_of_idx
+  ON purchase_orders (follow_up_of) WHERE follow_up_of IS NOT NULL;
+
+
+-- from 044_add_product_decantable
+-- ─────────────────────────────────────────────────────────────
+-- 044_add_product_decantable.sql
+--
+-- Decantable: a product kept loose, by weight or volume, that the team
+-- portions out of bulk (maize meal, rice, sugar, oil).
+--
+-- The flag decides two things:
+--   - only a decantable product is offered on the Decanting screen
+--   - only a decantable product can have a part quantity anywhere:
+--     on a slip, when packing, receiving, dispatching or adjusting
+--     stock. Everything else (a can, a crate, a jar) is a whole number.
+--
+-- Starting point: whatever is measured in kilograms, grams, litres or
+-- millilitres is decantable, whatever is counted is not. An admin
+-- changes any of them on the Products screen.
+--
+-- Additive only: one new column.
+-- ─────────────────────────────────────────────────────────────
+ALTER TABLE products
+  ADD COLUMN IF NOT EXISTS is_decantable BOOLEAN NOT NULL DEFAULT false;
+
+UPDATE products
+   SET is_decantable = true
+ WHERE default_unit IN ('kg', 'g', 'l', 'ml')
+   AND is_decantable = false;

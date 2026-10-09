@@ -84,6 +84,18 @@ const parsePerishable = (raw) => {
 // nine values in STOCK_UNITS. Anything else is a 23514 raised halfway
 // through the transaction, surfacing as a 500 with Postgres wording in
 // it — so it is rejected here as a 400 with a sentence instead.
+const parseDecantable = (raw) => {
+  if (typeof raw === 'boolean') return raw;
+  if (raw === 'true')  return true;
+  if (raw === 'false') return false;
+  fail(400, 'Decantable must be true or false.');
+};
+
+// What a new product starts as when nobody says: measured out by weight
+// or volume is decantable, counted is not. Same rule migration 044 used
+// for the products that already existed.
+const LOOSE_UNITS = ['kg', 'g', 'l', 'ml'];
+
 const parseUnit = (raw, { required = false } = {}) => {
   const unit = cleanText(raw);
   if (unit === null) {
@@ -158,6 +170,7 @@ const createProduct = async (data = {}) => {
     defaultUnit,
     category:     cleanText(data.category),
     isPerishable: data.isPerishable === undefined ? false : parsePerishable(data.isPerishable),
+    isDecantable: data.isDecantable === undefined ? LOOSE_UNITS.includes(defaultUnit) : parseDecantable(data.isDecantable),
     storageType:       parseStorageType(data.storageType),
     defaultLocationId: parseLocationId(data.defaultLocationId),
     reorderThreshold:  parseThreshold(data.reorderThreshold),
@@ -210,6 +223,7 @@ const updateProduct = async (id, data = {}) => {
   if (has('unitCost'))          patch.unitCost          = parseUnitCost(data.unitCost);
   if (has('category'))          patch.category          = cleanText(data.category);
   if (has('isPerishable'))      patch.isPerishable      = parsePerishable(data.isPerishable);
+  if (has('isDecantable'))      patch.isDecantable      = parseDecantable(data.isDecantable);
   if (has('storageType'))       patch.storageType       = parseStorageType(data.storageType);
   if (has('defaultLocationId')) patch.defaultLocationId = parseLocationId(data.defaultLocationId);
   if (has('reorderThreshold'))  patch.reorderThreshold  = parseThreshold(data.reorderThreshold);

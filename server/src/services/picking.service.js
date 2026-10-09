@@ -4,6 +4,7 @@
 // Business logic for the picking workflow.
 // Validates data and enforces rules before touching the DB.
 // ─────────────────────────────────────────────────────────────
+import { assertWholeBySlipItem } from '../features/units/wholeItems.js';
 import { closureOn, cohortForDate, cohortWeekdays } from '../features/calendar/calendar.service.js';
 import pickingRepository from '../repositories/picking.repository.js';
 import notices from '../features/communications/notices.js';
@@ -346,6 +347,8 @@ const confirmItem = async (slipId, itemId, body, user) => {
 
   if (!Number.isFinite(packedQuantity)) fail(400, 'Packed quantity is required.');
   if (packedQuantity <= 0)              fail(400, 'Packed quantity must be greater than zero. Flag the item instead if you packed none.');
+  // Half a can cannot be packed: only a decantable product can be a part quantity.
+  await assertWholeBySlipItem([{ itemId, quantity: packedQuantity }]);
 
   const result = await pickingRepository.setItemStatus({
     slipId, itemId, status: 'confirmed', packedQuantity, note: cleanNote(body.note),
@@ -370,6 +373,7 @@ const flagItem = async (slipId, itemId, body, user) => {
   if (packedQuantity !== null && (!Number.isFinite(packedQuantity) || packedQuantity < 0)) {
     fail(400, 'Packed quantity must be zero or more.');
   }
+  await assertWholeBySlipItem([{ itemId, quantity: packedQuantity }]);
 
   const result = await pickingRepository.setItemStatus({
     slipId, itemId, status: 'flagged', packedQuantity, flagReason: reason, note: cleanNote(body.note),

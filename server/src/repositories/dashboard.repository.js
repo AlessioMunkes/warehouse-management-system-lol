@@ -265,10 +265,11 @@ const getInsights = async ({ recipe = null, childBand = 1 } = {}) => {
          ),
          weekly AS (
            SELECT rl.product_id, rl.unit,
-                  SUM(CASE WHEN rl.unit = ANY($3::text[])
+                  SUM(CASE WHEN rl.unit = ANY($3::text[]) OR NOT rp.is_decantable
                            THEN CEIL(rl.quantity_per_child * c.children)
                            ELSE ROUND(rl.quantity_per_child * c.children, 2) END) AS quantity
              FROM recipe_lines rl
+             JOIN products rp ON rp.id = rl.product_id
              CROSS JOIN centres c
             WHERE rl.recipe_id = $1
             GROUP BY rl.product_id, rl.unit

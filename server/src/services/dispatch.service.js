@@ -25,6 +25,7 @@
 // exists to keep the non-collection history honest at the end of a
 // day, not to close the gate at 16:00.
 // ─────────────────────────────────────────────────────────────
+import { assertWholeBySlipItem } from '../features/units/wholeItems.js';
 import dispatchRepository from '../repositories/dispatch.repository.js';
 import { closureOn } from '../features/calendar/calendar.service.js';
 import settings from '../features/settings/settings.service.js';
@@ -296,6 +297,8 @@ const validateCollectBody = (body) => {
 // ── Record a collection ───────────────────────────────────────
 const collect = async (slipId, body, user) => {
   const payload = validateCollectBody(body);
+  // What was loaded is a whole number unless the product is decantable.
+  await assertWholeBySlipItem(payload.lines.map((l) => ({ itemId: l.itemId, quantity: l.loadedQuantity })));
 
   const gateView = await dispatchRepository.getGateView(slipId);
   if (!gateView) fail(404, 'Picking slip not found.');

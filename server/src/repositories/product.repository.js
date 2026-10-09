@@ -28,7 +28,7 @@ import { logAudit } from './auditLog.repository.js';
 // the dispatch gate, which both report available (on hand - committed).
 const PRODUCT_COLUMNS = `
   p.id, p.name, p.stock_keeping_unit AS sku, p.weight_kg,
-  p.is_active, p.created_at, p.category, p.is_perishable,
+  p.is_active, p.created_at, p.category, p.is_perishable, p.is_decantable,
   p.default_unit, p.storage_type, p.default_location_id,
   p.archived_at, p.unit_cost, p.quantity_per_meal,
   COALESCE(sl.reorder_threshold, 0) AS reorder_threshold,
@@ -126,7 +126,7 @@ const findByNameOrSku = async (name, sku, { excludeId = null } = {}) => {
 // same client, inside the same transaction.
 const createProduct = async ({
   name, stockKeepingUnit, weightKg = null,
-  defaultUnit = 'kg', category = null, isPerishable = false,
+  defaultUnit = 'kg', category = null, isPerishable = false, isDecantable = false,
   storageType = null, defaultLocationId = null, reorderThreshold = null,
   unitCost = null,
 }) => {
@@ -141,12 +141,12 @@ const createProduct = async ({
       `INSERT INTO products
          (name, stock_keeping_unit, weight_kg, default_unit, category,
           is_perishable, storage_type, default_location_id, unit_cost,
-          is_active, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, 'dry'), $8, $9, true, NOW())
+          is_decantable, is_active, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, 'dry'), $8, $9, $10, true, NOW())
        RETURNING id`,
       [
         name, stockKeepingUnit, weightKg, defaultUnit, category,
-        isPerishable, storageType, defaultLocationId, unitCost,
+        isPerishable, storageType, defaultLocationId, unitCost, isDecantable,
       ],
     );
     const id = rows[0].id;
@@ -182,6 +182,9 @@ const PRODUCT_PATCH_COLUMNS = {
   defaultUnit:       'default_unit',
   category:          'category',
   isPerishable:      'is_perishable',
+  // Kept loose and portioned out; the only kind of product that can be
+  // a part quantity (features/units/wholeItems.js).
+  isDecantable:      'is_decantable',
   storageType:       'storage_type',
   defaultLocationId: 'default_location_id',
   unitCost:          'unit_cost',

@@ -17,6 +17,7 @@
 // request row, so two people acting at once take turns and the second
 // reads what the first left.
 // ─────────────────────────────────────────────────────────────
+import { assertWholeByProduct } from '../features/units/wholeItems.js';
 import requestRepo from '../repositories/communityRequest.repository.js';
 import stockModel from '../repositories/stock.repository.js';
 import { getAvailability } from '../repositories/communityRequestStock.repository.js';
@@ -152,6 +153,7 @@ const approve = async (id, data = {}, actor) => {
   requireActor(actor, 'approve a request');
   requireManager(actor, 'approve a request');
   const wanted = parseItems(data.items);
+  await assertWholeByProduct(wanted);
 
   return withTransaction(async (client) => {
     const row = await requestRepo.lockRequest(id, client);
@@ -177,6 +179,7 @@ const rechooseItems = async (id, data = {}, actor) => {
   requireActor(actor, 'change a request');
   requireManager(actor, 'choose items for a request');
   const wanted = parseItems(data.items);
+  await assertWholeByProduct(wanted);
 
   return withTransaction(async (client) => {
     const row = await requestRepo.lockRequest(id, client);
@@ -292,6 +295,7 @@ const confirm = async (id, data = {}, actor) => {
         if (!Number.isFinite(released) || released < 0) fail(400, 'Enter how many went out, zero or more.');
         asked.set(productId, released);
       }
+      await assertWholeByProduct([...asked].map(([productId, quantity]) => ({ productId, quantity })));
     }
 
     const released = lines.map((line) => {

@@ -31,6 +31,7 @@
 // the common failure comes back as a clean 404/409 without opening
 // one.
 // ─────────────────────────────────────────────────────────────
+import { assertWholeByProduct } from '../features/units/wholeItems.js';
 import deliveryModel from '../repositories/delivery.repository.js';
 import { isStorageArea } from '../constants/storageAreas.js';
 import { isValidDateString, isPositiveInt, isUuid } from '../utils/validation.js';
@@ -312,6 +313,9 @@ const createDelivery = async (data, userId) => {
       expiryDate,                      // BR-06 — null unless perishable
     });
   }
+
+  // A part quantity only for a decantable product: 2.5 cans did not arrive.
+  await assertWholeByProduct(resolved.map((l) => ({ productId: l.productId, quantity: l.receivedQuantity })));
 
   const result = await deliveryModel.createDelivery({
     supplierId,

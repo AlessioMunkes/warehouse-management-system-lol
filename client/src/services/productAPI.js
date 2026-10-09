@@ -50,6 +50,7 @@ export const toProduct = (row) => ({
   // which is only correct if that's what was actually intended.
   defaultLocationId: row.default_location_id ?? null,
   isPerishable:     Boolean(row.is_perishable),
+  isDecantable:     Boolean(row.is_decantable),
   reorderThreshold: Number(row.reorder_threshold ?? 0),
   // What the ledger has actually been accumulating in. Normally equal
   // to defaultUnit; a difference means a product moved before the

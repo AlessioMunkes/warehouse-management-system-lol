@@ -724,7 +724,7 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
               noun="products"
             />
           ) : (
-            <Notice>No products in the catalogue yet.</Notice>
+            <Notice>Nothing is marked as decantable yet. An admin sets that on the Products screen.</Notice>
           )}
         </StepScreen>
       )}

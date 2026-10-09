@@ -227,7 +227,9 @@ function RecipeEditor({ recipe, products, band, onSaved, onCreated, onDeleted })
         ) : (
           <ul className="mt-3 divide-y rounded-lg border">
             {draft.lines.map((line, index) => {
-              const example = exampleQuantity(line.quantityPerChild, { band, unit: line.unit });
+              const example = exampleQuantity(line.quantityPerChild, {
+                band, unit: line.unit, whole: productById.get(line.productId)?.isDecantable === false,
+              });
               const options = products.filter((p) => String(p.id) === line.productId || !used.has(String(p.id)));
               return (
                 // Lines have no id of their own until saved, and a product can only appear once.

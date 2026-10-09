@@ -254,7 +254,11 @@ const insertSlipItems = async (client, { slipId, ecdId, dispatchDate, recipe }) 
 
   const { rowCount } = await client.query(
     `INSERT INTO picking_slip_items (picking_slip_id, product_id, required_quantity, unit)
-     SELECT $1, ol.product_id, ol.quantity, ol.unit
+     SELECT $1, ol.product_id,
+            -- Only a decantable product can be a part quantity; a
+            -- standing order for 2.5 of anything else is 3 on the slip.
+            CASE WHEN p.is_decantable THEN ol.quantity ELSE CEIL(ol.quantity) END,
+            ol.unit
      FROM ecd_order_lines ol
      JOIN products p ON p.id = ol.product_id
      WHERE ol.ecd_id = $2
