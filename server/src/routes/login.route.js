@@ -28,7 +28,7 @@ const router = express.Router();
 const SESSION_HOURS = 8;
 
 const USER_SQL =
-  `SELECT id, username, first_name, last_name, role, password_hash, is_active
+  `SELECT id, username, first_name, last_name, role, password_hash, is_active, email
    FROM users
    WHERE LOWER(username) = LOWER($1)`;
 
@@ -90,6 +90,7 @@ const loginSingle = async (req, res, username, password) => {
       firstName: user.first_name,
       lastName:  user.last_name,
       role:      user.role,
+      email:     user.email ?? null,
     },
   });
 };
@@ -161,6 +162,7 @@ const loginMulti = async (req, res, username, password) => {
       firstName:  primary.user.first_name,
       lastName:   primary.user.last_name,
       role:       primary.user.role,
+      email:      primary.user.email ?? null,
       warehouse:  primary.code,
       warehouses: active.map(({ code, user }) => ({
         code,

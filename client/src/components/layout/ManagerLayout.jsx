@@ -35,7 +35,7 @@ import {
   Popover, PopoverContent, PopoverTrigger,
 } from '@/components/ui/popover';
 import {
-  Plus, LogOut, EyeOff, Eye, PanelLeftClose, PanelLeftOpen,
+  Plus, EyeOff, Eye, PanelLeftClose, PanelLeftOpen,
   ClipboardList, ShoppingCart, HeartHandshake, HandHeart, Scale, ChartColumn,
   Package, Truck, UserPlus, CookingPot,
 } from 'lucide-react';
@@ -47,15 +47,9 @@ import {
 import { DetailDockContext } from './detailDock';
 import ThemeToggle from '@/components/layout/ThemeToggle';
 import WarehouseSwitcher from './WarehouseSwitcher';
+import AccountMenu from './AccountMenu';
 import { NAV_SECTIONS, homeForRole } from './navSections';
 import { SidebarNav, AppNavDrawer } from './AppNav';
-
-const ROLE_LABELS = {
-  warehouse_worker: 'Warehouse staff',
-  manager: 'Manager',
-  admin: 'Admin',
-  guest: 'Guest',
-};
 
 // to: null items are admin-only and simply omitted for a manager,
 // rather than shown disabled — a manager was never going to reach
@@ -158,7 +152,6 @@ function ManagerLayoutShell({ children }) {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
-  const roleLabel = user?.role ? ROLE_LABELS[user.role] ?? user.role : '';
   const sections = NAV_SECTIONS(user?.role);
   const homeTo = homeForRole(user?.role);
 
@@ -273,20 +266,9 @@ function ManagerLayoutShell({ children }) {
             {/* Multi-warehouse only; renders nothing with one database. */}
             <WarehouseSwitcher />
 
-            {user ? (
-              <span className="ml-2 hidden text-sm sm:inline">
-                {user.firstName} {user.lastName}
-                <span className="text-muted-foreground"> · {roleLabel}</span>
-              </span>
-            ) : null}
-
-            <Button
-              type="button" variant="ghost" size="icon"
-              onClick={() => setLogoutOpen(true)}
-              aria-label="Log out"
-            >
-              <LogOut />
-            </Button>
+            {/* The person's name is the way into their profile, help,
+                shortcuts, language and log out (AccountMenu.jsx). */}
+            <AccountMenu user={user} onLogout={() => setLogoutOpen(true)} />
           </div>
         </header>
 

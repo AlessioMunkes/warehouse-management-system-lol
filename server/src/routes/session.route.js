@@ -128,7 +128,7 @@ router.get('/', auth, async (req, res) => {
 
     // ── Staff ──────────────────────────────────────────────────
     const result = await pool.query(
-      `SELECT id, username, first_name, last_name, role, is_active
+      `SELECT id, username, first_name, last_name, role, is_active, email
        FROM users
        WHERE id = $1`,
       [req.user.id]
@@ -148,6 +148,8 @@ router.get('/', auth, async (req, res) => {
         firstName: user.first_name,
         lastName:  user.last_name,
         role:      user.role,
+        // For the read-only Profile window. Changed by an admin only.
+        email:     user.email ?? null,
         ...warehouseFields(req),
       },
     });

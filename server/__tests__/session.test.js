@@ -73,8 +73,16 @@ describe('GET /api/me — staff', () => {
       user: {
         id: 1, username: 'JDOE', firstName: 'Jane',
         lastName: 'Doe', role: 'warehouse_worker',
+        // For the read-only Profile window; null when none is on record.
+        email: null,
       },
     });
+  });
+
+  it('includes the registered email, for the Profile window', async () => {
+    queryMock.mockResolvedValue({ rows: [{ ...STAFF_ROW, email: 'jane@example.org' }] });
+    const res = await request(app).get('/api/me').set('Cookie', cookieFor(STAFF));
+    expect(res.body.user.email).toBe('jane@example.org');
   });
 
   it('never leaks the password hash', async () => {

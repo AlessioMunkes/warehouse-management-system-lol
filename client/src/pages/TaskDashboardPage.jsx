@@ -50,7 +50,6 @@ import UnfinishedWork from '../features/staff/components/UnfinishedWork';
 import TaskNode from '../features/dashboard/components/TaskNode';
 import { useAuth } from '../context/AuthContext';
 import useCoachmark from '../features/staff/hooks/useCoachmark';
-import LanguagePicker from '../features/staff/components/LanguagePicker';
 import { useT } from '../i18n';
 import { STAFF, PACKING } from '../routes/paths';
 
@@ -103,10 +102,6 @@ export default function TaskDashboardPage() {
       ) : null}
 
       <DashboardGreeting name={user?.firstName} />
-
-      {/* Under the greeting, where it is seen on arriving. Each choice is
-          written in its own language. */}
-      <LanguagePicker />
 
       {/* Renders nothing when there is nothing half-done, which is
           most days. */}
