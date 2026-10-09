@@ -364,7 +364,14 @@ const createDelivery = async (data, userId) => {
   // getDeliveryById always did, just moved to where it's cheap.
   const { warnings = [] } = result;
   const note = await deliveryModel.getDeliveryById(result.id);
-  return { note, warnings, duplicate: false };
+  // follow_up rides on the note: { required, reason } when this delivery
+  // left the order part received, so the receiving screen can show the
+  // "Follow-up required" flag to the person who counted it in.
+  return {
+    note: note ? { ...note, follow_up: result.follow_up ?? { required: false, reason: null } } : note,
+    warnings,
+    duplicate: false,
+  };
 };
 
 // ── Get suppliers ─────────────────────────────────────────────

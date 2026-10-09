@@ -455,8 +455,13 @@ const createDelivery = async ({
     //
     //   nothing owed   -> completed, and so is every order it was a
     //                     follow-up to (they were waiting on this one)
-    //   something owed -> follow_up_required, saying what was short, for
-    //                     a manager to raise a follow-up order or reopen
+    //   something owed -> partially_received, with what was short kept as
+    //                     its reason. That pair IS the "follow-up
+    //                     required" flag the floor and the manager see:
+    //                     the status says part of it is in, the flag
+    //                     says the rest needs chasing. The flag clears
+    //                     when a follow-up order is raised, and the
+    //                     status stays until that order is received.
     const owed = await client.query(
       `SELECT p.name, p.default_unit AS unit,
               (poi.expected_quantity - COALESCE(SUM(dni.received_quantity), 0))::numeric AS short
@@ -470,6 +475,7 @@ const createDelivery = async ({
       [purchaseOrderId],
     );
 
+    let followUp = { required: false, reason: null };
     if (poCompleted || owed.rows.length === 0) {
       await client.query(
         `WITH RECURSIVE chain AS (
@@ -489,14 +495,17 @@ const createDelivery = async ({
       const short = owed.rows.map((r) => `${r.name} ${Number(r.short)} ${r.unit}`).join(', ');
       await client.query(
         `UPDATE purchase_orders
-            SET status = 'follow_up_required', status_reason = $2, status_changed_at = NOW()
+            SET status = $3, status_reason = $2, status_changed_at = NOW()
           WHERE id = $1`,
-        [purchaseOrderId, `Delivered short: ${short}.`.slice(0, 500)],
+        [purchaseOrderId, `Delivered short: ${short}.`.slice(0, 500), PO_STATUS_PARTIALLY_RECEIVED],
       );
+      followUp = { required: true, reason: `Delivered short: ${short}.`.slice(0, 500) };
     }
 
     await client.query("COMMIT");
-    return { ...noteResult.rows[0], warnings };
+    // follow_up tells the receiving screen to show the flag to the
+    // person who just counted the delivery in.
+    return { ...noteResult.rows[0], warnings, follow_up: followUp };
   } catch (err) {
     // ONE rollback. There were two here. In the happy failure case the
     // second is a harmless Postgres warning, but if the first throws —

@@ -217,7 +217,12 @@ const listPurchaseOrders = async ({ status = null, supplierId = null, limit = 50
               WHERE poi.purchase_order_id = po.id) AS estimated_value,
             -- BR-07A: instalments are delivery_notes against this PO.
             (SELECT COUNT(*) FROM delivery_notes dn
-              WHERE dn.purchase_order_id = po.id)::int AS receipt_count
+              WHERE dn.purchase_order_id = po.id)::int AS receipt_count,
+            -- Follow-up orders still on their way. A part-received order
+            -- with none is flagged "follow-up required".
+            (SELECT COUNT(*) FROM purchase_orders child
+              WHERE child.follow_up_of = po.id
+                AND child.status NOT IN ('completed', 'returned'))::int AS open_follow_up_count
        FROM purchase_orders po
        JOIN suppliers s ON s.id = po.supplier_id
        LEFT JOIN users u ON u.id = po.created_by
@@ -754,7 +759,11 @@ const createFollowUpOrder = async (parentId, userId, { expectedDeliveryDate }) =
     const parent = parents[0];
     const stop = async (result) => { await client.query('ROLLBACK'); return result; };
     if (!parent) return stop({ ok: false, code: 'not_found' });
-    if (parent.status !== 'follow_up_required') return stop({ ok: false, code: 'not_awaiting_follow_up', status: parent.status });
+    // Flagged for follow-up: part received (the usual way in), or marked
+    // by a manager before anything arrived.
+    if (parent.status !== 'partially_received' && parent.status !== 'follow_up_required') {
+      return stop({ ok: false, code: 'not_awaiting_follow_up', status: parent.status });
+    }
     if (!parent.supplier_is_active) return stop({ ok: false, code: 'supplier_inactive', supplierName: parent.supplier_name });
 
     const { rows: open } = await client.query(

@@ -194,7 +194,11 @@ const getAttention = async ({ now = new Date() } = {}) => {
     pool.query(
       `SELECT
          COUNT(*) FILTER (WHERE status = 'pending')::int            AS awaiting_approval,
-         COUNT(*) FILTER (WHERE status = 'follow_up_required')::int AS follow_up
+         -- Flagged for follow-up: part received with no follow-up order on
+         -- its way, or marked by a manager.
+         COUNT(*) FILTER (WHERE (status = 'follow_up_required' OR (status = 'partially_received' AND NOT EXISTS (
+                   SELECT 1 FROM purchase_orders c
+                    WHERE c.follow_up_of = purchase_orders.id AND c.status NOT IN ('completed', 'returned')))))::int AS follow_up
        FROM purchase_orders`
     ),
     pool.query(

@@ -166,6 +166,9 @@ export default function ReceivingFlow({ onCrumbChange }) {
   // True when the submit went to the device queue instead of the
   // server. The done screen has to say so.
   const [queued, setQueued] = useState(false);
+  // What the server said was short, when the delivery left the order
+  // part received. Shown as the follow-up flag on the done screen.
+  const [followUp, setFollowUp] = useState(null);
 
   // Every open order in the building, fetched once at mount.
   //
@@ -465,6 +468,7 @@ export default function ReceivingFlow({ onCrumbChange }) {
         setQueued(true);
         return;
       }
+      setFollowUp(result?.follow_up?.required ? (result.follow_up.reason || 'Delivered short.') : null);
 
       setQueued(false);
       // recordDelivery's response already carries the full joined
@@ -485,6 +489,7 @@ export default function ReceivingFlow({ onCrumbChange }) {
     setDeliveryDate(todayISO());
     setSignature(null);
     setPdfDelivery(null);
+    setFollowUp(null);
     // A new delivery is a new attempt. Keeping the old key would make
     // the server treat the next genuine delivery as a replay of the
     // last one and silently record nothing.
@@ -777,7 +782,17 @@ export default function ReceivingFlow({ onCrumbChange }) {
               <Button onClick={restart}>Receive another delivery</Button>
             </Actions>
           }
-        />
+        >
+          {/* The follow-up flag: the order is part received, and the
+              manager sees the same flag on it. */}
+          {followUp && !queued ? (
+            <Notice tone="warn">
+              <p style={{ margin: 0, fontWeight: 600 }}>Follow-up required</p>
+              <p style={{ margin: '4px 0 0' }}>{followUp}</p>
+              <p style={{ margin: '4px 0 0' }}>The order is marked Partially received. Your manager has been flagged to follow up on the rest.</p>
+            </Notice>
+          ) : null}
+        </StepScreen>
       )}
 
       {/* The note pops up the moment it can be fetched back in full;

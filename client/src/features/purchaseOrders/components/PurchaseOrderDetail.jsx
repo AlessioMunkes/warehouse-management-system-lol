@@ -42,7 +42,7 @@ import {
   BadgeCheck, CircleCheck, Mail, MailCheck, MailX, Pencil, RotateCcw, CopyPlus, Trash2, TriangleAlert, Truck, Undo2,
 } from 'lucide-react';
 import {
-  RECEIVABLE_PO_STATUSES, PO_STATUS_LABELS, canMovePurchaseOrder, isAlsoPartlyReceived,
+  RECEIVABLE_PO_STATUSES, canMovePurchaseOrder, needsFollowUp,
 } from '@/services/purchaseOrderAPI';
 import PurchaseOrderTimeline from './PurchaseOrderTimeline';
 import PhotoStrip from '@/components/ui/photo-strip';
@@ -87,6 +87,9 @@ export default function PurchaseOrderDetail({
   // follow-up order to carry.
   const outstanding = po.items.some((l) => l.receivedToDate < l.expectedQuantity);
   const followUps = po.followUpOrders ?? [];
+  // The follow-up flag (see needsFollowUp): shown as the message box
+  // under the status, and what the follow-up buttons hang off.
+  const flagged = needsFollowUp(po);
   const [creatingFollowUp, setCreatingFollowUp] = useState(false);
   const createFollowUp = async () => {
     setCreatingFollowUp(true);
@@ -196,14 +199,7 @@ export default function PurchaseOrderDetail({
       onClose={onClose}
       eyebrow={`${po.supplierName} · ${po.items.length} ${po.items.length === 1 ? 'line' : 'lines'} · ${money(estimated)} estimated`}
       title={po.poNumber}
-      badges={(
-        <>
-          {isAlsoPartlyReceived(po) ? (
-            <StatusBadge kind="purchaseOrder" status="partially_received">{PO_STATUS_LABELS.partially_received}</StatusBadge>
-          ) : null}
-          <StatusBadge kind="purchaseOrder" status={po.status}>{po.statusLabel}</StatusBadge>
-        </>
-      )}
+      badges={<StatusBadge kind="purchaseOrder" status={po.status}>{po.statusLabel}</StatusBadge>}
       actions={canManage ? (
         <>
           {pending ? (
@@ -214,12 +210,12 @@ export default function PurchaseOrderDetail({
           {/* What to do about a short delivery: order the rest (the usual
               answer), or reopen this order if the supplier will bring the
               rest against it. */}
-          {po.status === 'follow_up_required' && outstanding && onCreateFollowUp ? (
+          {flagged && outstanding && onCreateFollowUp ? (
             <Button type="button" size="sm" onClick={createFollowUp} disabled={creatingFollowUp} loading={creatingFollowUp}>
               <CopyPlus /> {creatingFollowUp ? 'Creating…' : 'Create follow-up order'}
             </Button>
           ) : null}
-          {po.status === 'follow_up_required' ? (
+          {flagged ? (
             <Button type="button" variant="outline" size="sm" onClick={onReopen}>
               <RotateCcw /> Reopen for receiving
             </Button>
@@ -317,7 +313,7 @@ export default function PurchaseOrderDetail({
             maxLength={500} disabled={followBusy}
           />
           <p className="text-xs text-muted-foreground">
-            The order moves to Follow-up required and stops being offered for receiving until someone reopens it.
+            The order is flagged Follow-up required and stops being offered for receiving until someone reopens it.
           </p>
           <div className="flex gap-2">
             <Button type="button" size="sm" disabled={!reason.trim() || followBusy} onClick={saveFollowUp} loading={followBusy}>
@@ -333,7 +329,17 @@ export default function PurchaseOrderDetail({
 
       {/* Mandatory on Returned (BR-07B, enforced in SQL) and on a
           recorded follow-up — so if there is one, it is on screen. */}
-      {po.statusReason ? (
+      {flagged ? (
+        <div role="status" className="rounded-[4px] border-2 border-brand bg-danger-soft p-3 text-sm">
+          <p className="flex items-center gap-1.5 font-semibold">
+            <TriangleAlert className="size-4" aria-hidden="true" /> Follow-up required
+          </p>
+          <p className="mt-1">
+            {po.statusReason || 'Some of this order has not arrived.'}
+            {outstanding ? ' Create a follow-up order for the rest, or reopen this one if the supplier will still deliver against it.' : ''}
+          </p>
+        </div>
+      ) : po.statusReason ? (
         <div className="rounded-[4px] border-2 border-brand bg-danger-soft p-3 text-sm">
           <span className="font-semibold">{po.statusLabel}:</span> {po.statusReason}
         </div>

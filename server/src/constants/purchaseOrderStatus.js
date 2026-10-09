@@ -84,11 +84,16 @@ export const CLOSED_PO_STATUSES = ['completed', 'returned'];
 //   follow_up_required -> approved                       Reopen for receiving
 //                      -> completed                      Close order (accept it as it is)
 //                      -> returned
-//   partially_received -> completed                      Close order (the follow-up is not coming)
+//   partially_received -> approved                       Reopen for receiving (only while no
+//                                                        follow-up order is on its way)
+//                      -> completed                      Close order (accept it as it is)
+//                      -> returned
 //   completed, returned: closed. Nothing leads out.
 //
 // Two moves are the system's own and are not in this table:
-//   receiving a delivery     -> completed, or follow_up_required when short
+//   receiving a delivery     -> completed, or partially_received when short
+//                               (flagged "follow-up required" until a
+//                               follow-up order is raised)
 //   raising a follow-up order -> partially_received (and completed when
 //                               that follow-up is received in full)
 export const PO_MANUAL_TRANSITIONS = {
@@ -96,7 +101,7 @@ export const PO_MANUAL_TRANSITIONS = {
   approved:           ['in_transit', 'follow_up_required', 'returned'],
   in_transit:         ['approved', 'follow_up_required', 'returned'],
   follow_up_required: ['approved', 'completed', 'returned'],
-  partially_received: ['completed'],
+  partially_received: ['approved', 'completed', 'returned'],
   completed:          [],
   returned:           [],
 };

@@ -68,17 +68,28 @@ export const PO_MANUAL_TRANSITIONS = {
   approved:           ["in_transit", "follow_up_required", "returned"],
   in_transit:         ["approved", "follow_up_required", "returned"],
   follow_up_required: ["approved", "completed", "returned"],
-  partially_received: ["completed"],
+  partially_received: ["approved", "completed", "returned"],
   completed:          [],
   returned:           [],
 };
 export const canMovePurchaseOrder = (from, to) => (PO_MANUAL_TRANSITIONS[from] ?? []).includes(to);
 
-// An order marked for follow-up after some of it arrived carries both
-// statuses: part of it is in, and the rest needs chasing. The stored
-// status is Follow-up required; this is the second badge.
-export const isAlsoPartlyReceived = (po) =>
-  po?.status === "follow_up_required" && ((po.receiptCount ?? 0) > 0 || (po.deliveries ?? []).length > 0);
+// THE FOLLOW-UP FLAG
+// "Partially received" is the status of an order that came in short.
+// "Follow-up required" is a flag on top of it, shown until a follow-up
+// order is raised for the rest (or the order is reopened or closed). It
+// is not stored: an order is flagged while it is part received and no
+// follow-up order is on its way. An order a manager marked for follow-up
+// before anything arrived is flagged too.
+export const needsFollowUp = (po) => {
+  if (!po) return false;
+  if (po.status === "follow_up_required") return true;
+  if (po.status !== "partially_received") return false;
+  const coming = po.followUpOrders?.length
+    ? po.followUpOrders.filter((o) => o.status !== "completed" && o.status !== "returned").length
+    : (po.openFollowUpCount ?? 0);
+  return coming === 0;
+};
 
 // ── Row mappers ───────────────────────────────────────────────
 const toLine = (row) => ({
@@ -142,6 +153,9 @@ export const toPurchaseOrder = (row) => ({
   receivedLineCount:    Number(row.received_line_count ?? 0),
   estimatedValue:       Number(row.estimated_value ?? 0),
   receiptCount:         Number(row.receipt_count ?? 0),
+  // Follow-up orders still on their way (list only; the detail has them
+  // in followUpOrders).
+  openFollowUpCount:    Number(row.open_follow_up_count ?? 0),
   items:                (row.items ?? []).map(toLine),
   deliveries:           (row.deliveries ?? []).map(toDelivery),
 });

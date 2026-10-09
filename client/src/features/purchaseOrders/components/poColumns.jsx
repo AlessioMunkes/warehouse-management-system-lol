@@ -14,7 +14,7 @@
 // purchase order for R 9 000 is not larger than one for R 10 000.
 // ─────────────────────────────────────────────────────────────
 import StatusBadge from '@/components/ui/status-badge';
-import { OPEN_PO_STATUSES, PO_STATUS_LABELS, isAlsoPartlyReceived } from '@/services/purchaseOrderAPI';
+import { OPEN_PO_STATUSES, PO_STATUS_LABELS, needsFollowUp } from '@/services/purchaseOrderAPI';
 
 const fmtDate = (value) =>
   value
@@ -48,12 +48,13 @@ export const PO_COLUMNS = [
     cellClass: '',
     cell: (po) => (
       <>
-        {isAlsoPartlyReceived(po) ? (
-          <StatusBadge kind="purchaseOrder" status="partially_received" className="mr-1.5">
-            {PO_STATUS_LABELS.partially_received}
+        <StatusBadge kind="purchaseOrder" status={po.status}>{po.statusLabel}</StatusBadge>
+        {/* The flag, beside the status it sits on. */}
+        {po.status === 'partially_received' && needsFollowUp(po) ? (
+          <StatusBadge kind="purchaseOrder" status="follow_up_required" className="ml-1.5">
+            {PO_STATUS_LABELS.follow_up_required}
           </StatusBadge>
         ) : null}
-        <StatusBadge kind="purchaseOrder" status={po.status}>{po.statusLabel}</StatusBadge>
         {/* An instalment count only means something while the order is
             still open — BR-07A partial receipts. */}
         {po.receiptCount > 0 && OPEN_PO_STATUSES.includes(po.status) ? (

@@ -106,11 +106,28 @@ describe('setPurchaseOrderStatus', () => {
     expect([...reached].sort()).toEqual([...PO_STATUSES].sort());
   });
 
+  it('reopens a part-received order for receiving only while no follow-up order is on its way', async () => {
+    // Flagged for follow-up, nothing raised yet: the supplier may still deliver against it.
+    repoMock.getPurchaseOrderById.mockResolvedValue(existingPO({ status: 'partially_received', follow_up_orders: [] }));
+    await expect(purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status: 'approved' })).resolves.toBeTruthy();
+
+    // A follow-up that was returned is not on its way either.
+    repoMock.getPurchaseOrderById.mockResolvedValue(existingPO({ status: 'partially_received', follow_up_orders: [{ id: 9, po_number: 'PO-2026-0009', status: 'returned' }] }));
+    await expect(purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status: 'approved' })).resolves.toBeTruthy();
+
+    // The rest is coming on another order: receiving both would count it twice.
+    repoMock.updatePurchaseOrderStatus.mockClear();
+    repoMock.getPurchaseOrderById.mockResolvedValue(existingPO({ status: 'partially_received', follow_up_orders: [{ id: 9, po_number: 'PO-2026-0009', status: 'approved' }] }));
+    await expect(purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status: 'approved' }))
+      .rejects.toMatchObject({ status: 409, message: 'The rest of this order is on follow-up order PO-2026-0009. Receive against that order instead.' });
+    expect(repoMock.updatePurchaseOrderStatus).not.toHaveBeenCalled();
+  });
+
   it('refuses a move that is not in the table, saying what the order can become', async () => {
     const refused = [
       ['pending', 'completed'], ['pending', 'in_transit'], ['approved', 'pending'], ['approved', 'completed'],
       ['approved', 'partially_received'], ['follow_up_required', 'partially_received'],
-      ['completed', 'approved'], ['completed', 'pending'], ['returned', 'approved'], ['partially_received', 'approved'],
+      ['completed', 'approved'], ['completed', 'pending'], ['returned', 'approved'], ['partially_received', 'in_transit'],
     ];
     for (const [from, status] of refused) {
       repoMock.getPurchaseOrderById.mockResolvedValue(existingPO({ status: from }));

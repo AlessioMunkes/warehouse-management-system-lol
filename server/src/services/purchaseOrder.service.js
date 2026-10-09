@@ -459,6 +459,15 @@ const setPurchaseOrderStatus = async (rawId, body = {}) => {
     throw fail(400, 'Approve this order before recording a follow-up.');
   }
 
+  // The rest of a part-received order is coming on its follow-up order.
+  // Reopening it as well would let the same goods be received twice.
+  if (existing.status === 'partially_received' && status === 'approved') {
+    const coming = (existing.follow_up_orders ?? []).find((o) => o.status !== 'completed' && o.status !== 'returned');
+    if (coming) {
+      throw fail(409, `The rest of this order is on follow-up order ${coming.po_number}. Receive against that order instead.`);
+    }
+  }
+
   if (!canMovePurchaseOrder(existing.status, status)) {
     const label = (s) => PO_STATUS_WORDS[s] ?? s;
     const next = PO_MANUAL_TRANSITIONS[existing.status] ?? [];
@@ -495,7 +504,7 @@ const createFollowUpOrder = async (rawId, body = {}, userId) => {
   if (!result.ok) {
     if (result.code === 'not_found') throw fail(404, 'Purchase order not found.');
     if (result.code === 'not_awaiting_follow_up') {
-      throw fail(409, 'A follow-up order can only be raised on an order marked Follow-up required.');
+      throw fail(409, 'A follow-up order can only be raised on an order that is flagged Follow-up required.');
     }
     if (result.code === 'has_follow_up') {
       throw fail(409, `This order already has a follow-up order, ${result.poNumber}.`);
