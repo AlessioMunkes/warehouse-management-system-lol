@@ -223,7 +223,49 @@ const insertSlipItemsFromRecipe = async (client, { slipId, ecdId, recipeId, chil
   return rowCount;
 };
 
+// The same, for every slip of a cohort in ONE statement. Generating 98
+// slips one at a time was 98 of these round trips; on a hosted database
+// that is most of a minute. `slips` is [{ id, ecd_id }]. Returns a Map
+// of slip id -> how many lines it was given (a slip left out got none,
+// and takes its standing order instead).
+const insertSlipItemsFromRecipeForMany = async (client, { slips, recipeId, childBand = CHILD_BAND.default }) => {
+  const counts = new Map();
+  if (slips.length === 0) return counts;
+  const { rows } = await client.query(
+    `WITH slip AS (
+       SELECT * FROM unnest($1::int[], $2::int[]) AS s(slip_id, ecd_id)
+     ),
+     centre AS (
+       SELECT s.slip_id, CEIL(e.child_count::numeric / $4::numeric) * $4::numeric AS children
+         FROM slip s
+         JOIN ecd_centres e ON e.id = s.ecd_id
+        WHERE COALESCE(e.child_count, 0) > 0
+          AND NOT EXISTS (SELECT 1 FROM recipe_own_order_centres o WHERE o.ecd_id = e.id)
+     )
+     INSERT INTO picking_slip_items (picking_slip_id, product_id, required_quantity, unit)
+     SELECT line.slip_id, line.product_id, line.quantity, line.unit
+       FROM (
+         SELECT c.slip_id, rl.product_id, rl.unit,
+                CASE WHEN rl.unit = ANY($5::text[]) OR NOT p.is_decantable
+                     THEN CEIL(rl.quantity_per_child * c.children)
+                     ELSE ROUND(rl.quantity_per_child * c.children, 2)
+                END AS quantity
+           FROM recipe_lines rl
+           JOIN products p ON p.id = rl.product_id
+           CROSS JOIN centre c
+          WHERE rl.recipe_id = $3
+            AND p.archived_at IS NULL
+       ) line
+      WHERE line.quantity > 0
+     RETURNING picking_slip_id`,
+    [slips.map((s) => s.id), slips.map((s) => s.ecd_id), recipeId, childBand, COUNTED_UNITS]
+  );
+  for (const row of rows) counts.set(row.picking_slip_id, (counts.get(row.picking_slip_id) ?? 0) + 1);
+  return counts;
+};
+
 export default {
+  insertSlipItemsFromRecipeForMany,
   listRecipes, getRecipeById, missingProducts, createOverride, updateRecipe, deleteOverride,
   setSeasonStarts, listOwnOrderCentres, missingCentres, setOwnOrderCentres,
   resolveForDate, insertSlipItemsFromRecipe,

@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { isValidElement } from 'react';
 import { ADMIN, VOLUNTEERS } from '../routes/paths';
 import { ROUTES, REDIRECTS } from '../routes/routeTable';
-import { PAGES } from '../routes/pages';
+import { PAGES, PAGE_LOADERS } from '../routes/pages';
 import { NAV_SECTIONS } from '../components/layout/navSections';
 import AdminActivityLogPage from '../pages/AdminActivityLogPage';
 
@@ -37,10 +37,11 @@ describe('the admin Activity log is its own screen', () => {
     expect(ADMIN.activityLog).not.toBe(VOLUNTEERS.events);
   });
 
-  it('is routed to the Activity log page, not the events screen', () => {
+  it('is routed to the Activity log page, not the events screen', async () => {
     expect(route).toBeTruthy();
     expect(isValidElement(PAGES[route.id])).toBe(true);
-    expect(PAGES[route.id].type).toBe(AdminActivityLogPage);
+    // The screen is loaded when first opened; this is the file it loads.
+    expect((await PAGE_LOADERS[route.id]()).default).toBe(AdminActivityLogPage);
   });
 
   it('sits behind the admin-only guard', () => {

@@ -9,6 +9,7 @@
 // group, so moving between two manager screens keeps the same shell
 // mounted rather than rebuilding the sidebar on every click.
 // ─────────────────────────────────────────────────────────────
+import { Suspense }                                from 'react';
 import { BrowserRouter, Routes, Route, Navigate }  from 'react-router-dom';
 import { AuthProvider }                            from './context/AuthContext';
 import ThemeProvider                               from './components/layout/ThemeProvider';
@@ -17,6 +18,16 @@ import { ROUTES, REDIRECTS }                       from './routes/routeTable';
 import { ToastProvider }                           from './components/ui/toast';
 import { PAGES }                                   from './routes/pages';
 import PageNotFound                                from './pages/PageNotFound';
+
+// A screen's own file is fetched the first time it is opened
+// (routes/pages.jsx). The wait is around the page only, so the sidebar
+// and top bar stay where they are while it arrives.
+const PageLoading = () => (
+  <div role="status" aria-live="polite" className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
+    Loading
+  </div>
+);
+const page = (id) => <Suspense fallback={<PageLoading />}>{PAGES[id]}</Suspense>;
 
 // Guarded routes, grouped by who may open them and whether they sit in
 // the shell, in the order each group first appears in the table.
@@ -39,12 +50,12 @@ const App = () => (
       <ToastProvider>
       <Routes>
         {ROUTES.filter((r) => !r.roles).map((r) => (
-          <Route key={r.id} path={r.path} element={PAGES[r.id]} />
+          <Route key={r.id} path={r.path} element={page(r.id)} />
         ))}
 
         {guardGroups().map((g) => (
           <Route key={`${g.roles.join(',')}|${g.shell}`} element={<ProtectedRoute roles={g.roles} shell={g.shell} />}>
-            {g.routes.map((r) => <Route key={r.id} path={r.path} element={PAGES[r.id]} />)}
+            {g.routes.map((r) => <Route key={r.id} path={r.path} element={page(r.id)} />)}
           </Route>
         ))}
 

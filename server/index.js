@@ -32,6 +32,7 @@ import cors             from 'cors';
 import path             from 'path';
 import { fileURLToPath } from 'url';
 import helmet           from 'helmet';
+import compression      from 'compression';
 
 import donationAdminRoutes from './src/routes/donationAdmin.routes.js';
 import donationIntakeRouter from './src/routes/donationIntake.routes.js';
@@ -145,6 +146,17 @@ app.use(helmet({
 }));
 
 // ── Middleware ────────────────────────────────────────────────
+// Responses go out compressed: lists of centres, stock and slips are
+// repetitive JSON and shrink to about a tenth, and in production so do
+// the app's own files (served just below). Streams are left alone: a
+// compressed event stream is held back until its buffer fills.
+app.use(compression({
+  filter: (req, res) => {
+    if (String(req.headers.accept || '').includes('text/event-stream')) return false;
+    if (String(res.getHeader('Content-Type') || '').includes('text/event-stream')) return false;
+    return compression.filter(req, res);
+  },
+}));
 app.use(express.json({ limit: '5mb' }));
 app.use(cookieParser());
 app.use(cors({
@@ -164,7 +176,18 @@ app.use(cors({
 // preflight is involved. In dev the Vite server on :5173 handles this.
 if (process.env.NODE_ENV === 'production') {
   const clientDist = path.join(__dirname, '..', 'client', 'dist');
-  app.use(express.static(clientDist));
+  // Files under /assets carry a hash of their contents in the name, so
+  // a browser may keep one for a year without asking again: a changed
+  // file is a new name. Everything else (index.html, the service
+  // worker, the manifest) is checked every time, so a new release is
+  // picked up at once. Without this each screen's file was re-checked
+  // with the server on every visit.
+  app.use(express.static(clientDist, {
+    setHeaders: (res, filePath) => {
+      const hashed = /[\\/]assets[\\/]/.test(filePath);
+      res.setHeader('Cache-Control', hashed ? 'public, max-age=31536000, immutable' : 'no-cache');
+    },
+  }));
 }
 
 // ── Health check ──────────────────────────────────────────────

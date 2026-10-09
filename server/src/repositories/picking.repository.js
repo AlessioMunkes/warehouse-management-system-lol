@@ -271,6 +271,42 @@ const insertSlipItems = async (client, { slipId, ecdId, dispatchDate, recipe }) 
   return { rowCount, source: 'standing_order' };
 };
 
+// The standing-order half of insertSlipItems, for many slips in one
+// statement. `slips` is [{ id, ecd_id }]; returns slip id -> line count.
+const insertStandingOrderItemsForMany = async (client, { slips, dispatchDate }) => {
+  const counts = new Map();
+  if (slips.length === 0) return counts;
+  const { rows } = await client.query(
+    `INSERT INTO picking_slip_items (picking_slip_id, product_id, required_quantity, unit)
+     SELECT s.slip_id, ol.product_id,
+            CASE WHEN p.is_decantable THEN ol.quantity ELSE CEIL(ol.quantity) END,
+            ol.unit
+       FROM unnest($1::int[], $2::int[]) AS s(slip_id, ecd_id)
+       JOIN ecd_order_lines ol ON ol.ecd_id = s.ecd_id
+       JOIN products p ON p.id = ol.product_id
+      WHERE ol.effective_from <= $3::date
+        AND (ol.effective_to IS NULL OR ol.effective_to >= $3::date)
+        AND p.archived_at IS NULL
+     RETURNING picking_slip_id`,
+    [slips.map((s) => s.id), slips.map((s) => s.ecd_id), dispatchDate]
+  );
+  for (const row of rows) counts.set(row.picking_slip_id, (counts.get(row.picking_slip_id) ?? 0) + 1);
+  return counts;
+};
+
+// Many history lines in one statement, in the order given.
+// `events` is [{ slipId, type, detail }].
+const logEvents = async (client, events, actorId) => {
+  if (events.length === 0) return;
+  await client.query(
+    `INSERT INTO picking_events (picking_slip_id, event_type, actor_id, detail)
+     SELECT e.slip_id, e.event_type, $3::int, e.detail::jsonb
+       FROM unnest($1::int[], $2::text[], $4::text[]) WITH ORDINALITY AS e(slip_id, event_type, detail, n)
+      ORDER BY e.n`,
+    [events.map((e) => e.slipId), events.map((e) => e.type), actorId, events.map((e) => JSON.stringify(e.detail ?? null))]
+  );
+};
+
 // ── Generate a week's slips from ECD master data ──────────────
 // Idempotent: the UNIQUE (ecd_id, dispatch_date) constraint means
 // re-running for the same day updates nothing and creates nothing.
@@ -311,21 +347,36 @@ const generateSlips = async ({ dispatchDate, cohort, generatedBy, beforeCommit }
     // Snapshot the lines onto each new slip. Copying (not joining) means a
     // later change to the recipe or to ecd_order_lines can never rewrite
     // a packed slip.
+    //
+    // For the whole cohort at once: the recipe lines in one statement,
+    // the standing orders of whoever the recipe did not cover in a
+    // second, the history in a third. It was two or three statements for
+    // every slip, which for a hundred centres on a hosted database was
+    // most of a minute with the manager watching a spinner.
+    const fromRecipe = recipe
+      ? await recipeRepository.insertSlipItemsFromRecipeForMany(client, {
+          slips: slips.rows, recipeId: recipe.id, childBand: recipe.child_band,
+        })
+      : new Map();
+    const rest = slips.rows.filter((slip) => !fromRecipe.has(slip.id));
+    const fromOrder = await insertStandingOrderItemsForMany(client, { slips: rest, dispatchDate });
+
+    const events = [];
     for (const slip of slips.rows) {
-      const items = await insertSlipItems(client, { slipId: slip.id, ecdId: slip.ecd_id, dispatchDate, recipe });
-
-      await logEvent(client, slip.id, 'generated', generatedBy, {
+      const source = fromRecipe.has(slip.id) ? 'recipe' : 'standing_order';
+      const itemCount = fromRecipe.get(slip.id) ?? fromOrder.get(slip.id) ?? 0;
+      events.push({ slipId: slip.id, type: 'generated', detail: {
         dispatch_date: dispatchDate,
-        item_count:    items.rowCount,
-        source:        items.source,
-        ...(items.source === 'recipe' ? { recipe: recipe.name } : {}),
-      });
-
-      if (items.rowCount === 0) {
+        item_count:    itemCount,
+        source,
+        ...(source === 'recipe' ? { recipe: recipe.name } : {}),
+      } });
+      if (itemCount === 0) {
         emptySlips.push({ slipId: slip.id, ecdId: slip.ecd_id });
-        await logEvent(client, slip.id, 'no_order_lines', generatedBy, { dispatch_date: dispatchDate });
+        events.push({ slipId: slip.id, type: 'no_order_lines', detail: { dispatch_date: dispatchDate } });
       }
     }
+    await logEvents(client, events, generatedBy);
 
     if (beforeCommit) {
       await beforeCommit(client, { created: slips.rowCount, cohort, dispatchDate, emptySlips });
