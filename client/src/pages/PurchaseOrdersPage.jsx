@@ -35,7 +35,7 @@ import { useAuth }   from '../context/AuthContext';
 import PurchaseOrderForm   from '../features/purchaseOrders/components/PurchaseOrderForm';
 import PurchaseOrderList   from '../features/purchaseOrders/components/PurchaseOrderList';
 import PurchaseOrderDetail from '../features/purchaseOrders/components/PurchaseOrderDetail';
-import purchaseOrderAPI, { PO_STATUS_LABELS } from '../services/purchaseOrderAPI';
+import purchaseOrderAPI, { PO_STATUS_LABELS, isAlsoPartlyReceived } from '../services/purchaseOrderAPI';
 import supplierAPI from '../services/supplierAPI';
 import stockAPI    from '../services/stockAPI';
 import { Button }   from '@/components/ui/button';
@@ -65,6 +65,10 @@ const PO_VIEWS = [
   { id: 'pending',            label: 'Awaiting approval', alert: true, test: (po) => po.status === 'pending' },
   { id: 'in_transit',         label: 'In transit',         test: (po) => po.status === 'in_transit' },
   { id: 'follow_up_required', label: 'Follow-up required', alert: true, test: (po) => po.status === 'follow_up_required' },
+  // Waiting on a follow-up order, or part in and needing a follow-up.
+  { id: 'partially_received', label: 'Partially received',
+    test: (po) => po.status === 'partially_received' || isAlsoPartlyReceived(po) },
+  { id: 'closed',             label: 'Closed', test: (po) => po.status === 'completed' || po.status === 'returned' },
   { id: 'all',                label: 'All',                test: () => true },
 ];
 const viewById = (id) => PO_VIEWS.find((v) => v.id === id) ?? PO_VIEWS[0];
@@ -405,6 +409,10 @@ export default function PurchaseOrdersPage() {
           onApprove={() => changeStatus('approved', null, `${selected.poNumber} approved`)}
           onRecordFollowUp={(reason) => changeStatus('follow_up_required', reason, `Follow-up recorded on ${selected.poNumber}`)}
           onReopen={() => changeStatus('approved', null, `${selected.poNumber} reopened for receiving`)}
+          onMarkInTransit={() => changeStatus('in_transit', null, `${selected.poNumber} marked as in transit`)}
+          onNotInTransit={() => changeStatus('approved', null, `${selected.poNumber} is no longer in transit`)}
+          onMarkReturned={(reason) => changeStatus('returned', reason, `${selected.poNumber} marked as returned`)}
+          onCloseOrder={() => changeStatus('completed', null, `${selected.poNumber} closed`)}
           onCreateFollowUp={createFollowUp}
           onOpenOrder={open}
           onSetQuickbooksRef={setQuickbooksRef}

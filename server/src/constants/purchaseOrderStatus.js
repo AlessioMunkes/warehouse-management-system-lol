@@ -69,6 +69,40 @@ export const RECEIVABLE_PO_STATUSES = [
 
 export const CLOSED_PO_STATUSES = ['completed', 'returned'];
 
+// ── The moves a manager may make by hand ──────────────────────
+// From each status, the statuses its buttons lead to. Everything else
+// is refused: before this any status could be set from any other, so a
+// completed order could be sent back to Pending and an order could be
+// approved by "reopening" it.
+//
+//   pending            -> approved                       Approve
+//   approved           -> in_transit                     Mark as in transit
+//                      -> follow_up_required             Record follow-up
+//                      -> returned                       Mark as returned
+//   in_transit         -> approved                       Not in transit after all
+//                      -> follow_up_required, returned
+//   follow_up_required -> approved                       Reopen for receiving
+//                      -> completed                      Close order (accept it as it is)
+//                      -> returned
+//   partially_received -> completed                      Close order (the follow-up is not coming)
+//   completed, returned: closed. Nothing leads out.
+//
+// Two moves are the system's own and are not in this table:
+//   receiving a delivery     -> completed, or follow_up_required when short
+//   raising a follow-up order -> partially_received (and completed when
+//                               that follow-up is received in full)
+export const PO_MANUAL_TRANSITIONS = {
+  pending:            ['approved'],
+  approved:           ['in_transit', 'follow_up_required', 'returned'],
+  in_transit:         ['approved', 'follow_up_required', 'returned'],
+  follow_up_required: ['approved', 'completed', 'returned'],
+  partially_received: ['completed'],
+  completed:          [],
+  returned:           [],
+};
+
+export const canMovePurchaseOrder = (from, to) => (PO_MANUAL_TRANSITIONS[from] ?? []).includes(to);
+
 // What a fully-received order becomes.
 export const PO_STATUS_FULLY_RECEIVED = 'completed';
 
@@ -90,4 +124,6 @@ export default {
   isOpenPurchaseOrder,
   isReceivablePurchaseOrder,
   isClosedPurchaseOrder,
+  PO_MANUAL_TRANSITIONS,
+  canMovePurchaseOrder,
 };

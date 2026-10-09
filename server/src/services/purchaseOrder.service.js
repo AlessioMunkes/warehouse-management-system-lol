@@ -16,7 +16,9 @@
 import repo from '../repositories/purchaseOrder.repository.js';
 import supplierRepo from '../repositories/supplier.repository.js';
 import { isPositiveInt, isValidDateString } from '../utils/validation.js';
-import { PO_STATUSES as PO_STATUS_LIST } from '../constants/purchaseOrderStatus.js';
+import {
+  PO_STATUSES as PO_STATUS_LIST, PO_MANUAL_TRANSITIONS, canMovePurchaseOrder,
+} from '../constants/purchaseOrderStatus.js';
 import communications from '../features/communications/communications.service.js';
 import notices from '../features/communications/notices.js';
 import { emailStyles, escapeHtml, renderLadlesEmail } from '../utils/emailTemplate.js';
@@ -418,6 +420,13 @@ const getPurchaseOrder = async (rawId) => {
 // 'follow_up_required' need the same mechanism and the same
 // mandatory-reason rule the CHECK constraint already enforces on
 // Returned (see PurchaseOrderDetail.jsx's own comment on that).
+// The statuses in words, for a refusal a manager reads.
+const PO_STATUS_WORDS = {
+  pending: 'Pending approval', approved: 'Approved', in_transit: 'In transit',
+  partially_received: 'Partially received', completed: 'Completed',
+  returned: 'Returned', follow_up_required: 'Follow-up required',
+};
+
 const setPurchaseOrderStatus = async (rawId, body = {}) => {
   if (!isPositiveInt(rawId)) throw fail(400, 'A valid purchase order ID is required.');
 
@@ -448,6 +457,14 @@ const setPurchaseOrderStatus = async (rawId, body = {}) => {
   // reach Approved without the approval.
   if (status === 'follow_up_required' && existing.status === 'pending') {
     throw fail(400, 'Approve this order before recording a follow-up.');
+  }
+
+  if (!canMovePurchaseOrder(existing.status, status)) {
+    const label = (s) => PO_STATUS_WORDS[s] ?? s;
+    const next = PO_MANUAL_TRANSITIONS[existing.status] ?? [];
+    throw fail(409, next.length === 0
+      ? `This order is ${label(existing.status)} and is closed. Its status cannot be changed.`
+      : `An order that is ${label(existing.status)} cannot be changed to ${label(status)}. It can become: ${next.map(label).join(', ')}.`);
   }
 
   return repo.updatePurchaseOrderStatus(Number(rawId), status, reason, {

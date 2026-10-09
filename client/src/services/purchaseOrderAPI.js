@@ -61,6 +61,25 @@ export const OPEN_PO_STATUSES = [
 // order is not: the rest comes on its follow-up order.
 export const RECEIVABLE_PO_STATUSES = ["approved", "in_transit"];
 
+// Mirrors PO_MANUAL_TRANSITIONS on the server: from each status, the
+// statuses a manager's buttons lead to. The server refuses anything else.
+export const PO_MANUAL_TRANSITIONS = {
+  pending:            ["approved"],
+  approved:           ["in_transit", "follow_up_required", "returned"],
+  in_transit:         ["approved", "follow_up_required", "returned"],
+  follow_up_required: ["approved", "completed", "returned"],
+  partially_received: ["completed"],
+  completed:          [],
+  returned:           [],
+};
+export const canMovePurchaseOrder = (from, to) => (PO_MANUAL_TRANSITIONS[from] ?? []).includes(to);
+
+// An order marked for follow-up after some of it arrived carries both
+// statuses: part of it is in, and the rest needs chasing. The stored
+// status is Follow-up required; this is the second badge.
+export const isAlsoPartlyReceived = (po) =>
+  po?.status === "follow_up_required" && ((po.receiptCount ?? 0) > 0 || (po.deliveries ?? []).length > 0);
+
 // ── Row mappers ───────────────────────────────────────────────
 const toLine = (row) => ({
   id:               row.id,

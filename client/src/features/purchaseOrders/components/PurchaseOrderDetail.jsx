@@ -38,8 +38,12 @@ import {
   AlertDialog, AlertDialogContent, AlertDialogDescription,
   AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
-import { BadgeCheck, Mail, MailCheck, MailX, Pencil, RotateCcw, CopyPlus, Trash2, TriangleAlert } from 'lucide-react';
-import { RECEIVABLE_PO_STATUSES } from '@/services/purchaseOrderAPI';
+import {
+  BadgeCheck, CircleCheck, Mail, MailCheck, MailX, Pencil, RotateCcw, CopyPlus, Trash2, TriangleAlert, Truck, Undo2,
+} from 'lucide-react';
+import {
+  RECEIVABLE_PO_STATUSES, PO_STATUS_LABELS, canMovePurchaseOrder, isAlsoPartlyReceived,
+} from '@/services/purchaseOrderAPI';
 import PurchaseOrderTimeline from './PurchaseOrderTimeline';
 import PhotoStrip from '@/components/ui/photo-strip';
 
@@ -69,6 +73,7 @@ const Section = ({ title, children }) => (
 
 export default function PurchaseOrderDetail({
   purchaseOrder: po, canManage, onApprove, onRecordFollowUp, onReopen, onCreateFollowUp, onOpenOrder, onSetQuickbooksRef,
+  onMarkInTransit, onNotInTransit, onMarkReturned, onCloseOrder,
   onResendFinanceEmail, onEdit, onDelete, onClose,
 }) {
   const pending = po.status === 'pending';
@@ -107,6 +112,33 @@ export default function PurchaseOrderDetail({
       setDeleting(false);
     }
   };
+
+  // Returned needs a reason (the database insists); closing an order
+  // that is short is asked about first, because nothing leads back.
+  const [returning, setReturning]       = useState(false);
+  const [returnReason, setReturnReason] = useState('');
+  const [returnBusy, setReturnBusy]     = useState(false);
+  const saveReturn = async () => {
+    setReturnBusy(true);
+    try {
+      const ok = await onMarkReturned(returnReason.trim());
+      if (ok) { setReturning(false); setReturnReason(''); }
+    } finally {
+      setReturnBusy(false);
+    }
+  };
+  const [confirmClose, setConfirmClose] = useState(false);
+  const [closing, setClosing]           = useState(false);
+  const runClose = async () => {
+    setClosing(true);
+    try {
+      const ok = await onCloseOrder();
+      if (ok) setConfirmClose(false);
+    } finally {
+      setClosing(false);
+    }
+  };
+  const can = (to) => canManage && canMovePurchaseOrder(po.status, to);
 
   const [followingUp, setFollowingUp] = useState(false);
   const [reason, setReason]           = useState('');
@@ -164,7 +196,14 @@ export default function PurchaseOrderDetail({
       onClose={onClose}
       eyebrow={`${po.supplierName} · ${po.items.length} ${po.items.length === 1 ? 'line' : 'lines'} · ${money(estimated)} estimated`}
       title={po.poNumber}
-      badges={<StatusBadge kind="purchaseOrder" status={po.status}>{po.statusLabel}</StatusBadge>}
+      badges={(
+        <>
+          {isAlsoPartlyReceived(po) ? (
+            <StatusBadge kind="purchaseOrder" status="partially_received">{PO_STATUS_LABELS.partially_received}</StatusBadge>
+          ) : null}
+          <StatusBadge kind="purchaseOrder" status={po.status}>{po.statusLabel}</StatusBadge>
+        </>
+      )}
       actions={canManage ? (
         <>
           {pending ? (
@@ -183,6 +222,26 @@ export default function PurchaseOrderDetail({
           {po.status === 'follow_up_required' ? (
             <Button type="button" variant="outline" size="sm" onClick={onReopen}>
               <RotateCcw /> Reopen for receiving
+            </Button>
+          ) : null}
+          {po.status === 'approved' && can('in_transit') && onMarkInTransit ? (
+            <Button type="button" variant="outline" size="sm" onClick={onMarkInTransit}>
+              <Truck /> Mark as in transit
+            </Button>
+          ) : null}
+          {po.status === 'in_transit' && can('approved') && onNotInTransit ? (
+            <Button type="button" variant="outline" size="sm" onClick={onNotInTransit}>
+              <RotateCcw /> Not in transit
+            </Button>
+          ) : null}
+          {can('completed') && onCloseOrder ? (
+            <Button type="button" variant="outline" size="sm" onClick={() => setConfirmClose(true)}>
+              <CircleCheck /> Close order
+            </Button>
+          ) : null}
+          {can('returned') && onMarkReturned && !returning ? (
+            <Button type="button" variant="outline" size="sm" onClick={() => setReturning(true)}>
+              <Undo2 /> Mark as returned
             </Button>
           ) : null}
           {canFollowUp && !followingUp ? (
@@ -207,6 +266,48 @@ export default function PurchaseOrderDetail({
         </>
       ) : null}
     >
+      {returning ? (
+        <section className="space-y-2 rounded-lg border p-3">
+          <Label htmlFor="po-return">Why is this order being returned to {po.supplierName}?</Label>
+          <Textarea
+            id="po-return" value={returnReason} onChange={(e) => setReturnReason(e.target.value)}
+            placeholder="e.g. Wrong goods delivered; sent back with the driver"
+            maxLength={500} disabled={returnBusy}
+          />
+          <p className="text-xs text-muted-foreground">
+            The order closes as Returned and cannot be reopened. Stock already received is not changed: adjust it on Inventory if goods went back.
+          </p>
+          <div className="flex gap-2">
+            <Button type="button" size="sm" disabled={!returnReason.trim() || returnBusy} onClick={saveReturn} loading={returnBusy}>
+              {returnBusy ? 'Saving…' : 'Mark as returned'}
+            </Button>
+            <Button type="button" variant="ghost" size="sm" disabled={returnBusy}
+              onClick={() => { setReturning(false); setReturnReason(''); }}>
+              Cancel
+            </Button>
+          </div>
+        </section>
+      ) : null}
+
+      {confirmClose ? (
+        <section className="space-y-2 rounded-lg border p-3 text-sm">
+          <p className="font-medium">Close {po.poNumber} as it is?</p>
+          <p className="text-muted-foreground">
+            {outstanding
+              ? 'Some of this order has not arrived. Closing it means nothing more is expected. It becomes Completed and cannot be reopened.'
+              : 'It becomes Completed and cannot be reopened.'}
+          </p>
+          <div className="flex gap-2">
+            <Button type="button" size="sm" disabled={closing} onClick={runClose} loading={closing}>
+              {closing ? 'Closing…' : 'Close order'}
+            </Button>
+            <Button type="button" variant="ghost" size="sm" disabled={closing} onClick={() => setConfirmClose(false)}>
+              Cancel
+            </Button>
+          </div>
+        </section>
+      ) : null}
+
       {followingUp ? (
         <section className="space-y-2 rounded-lg border p-3">
           <Label htmlFor="po-follow-up">What needs following up with {po.supplierName}?</Label>

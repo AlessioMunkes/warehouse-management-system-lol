@@ -29,6 +29,7 @@ vi.mock('../src/services/finance.service.js', () => ({
 
 
 const { default: purchaseOrderService, PO_STATUSES } = await import('../src/services/purchaseOrder.service.js');
+const { PO_MANUAL_TRANSITIONS } = await import('../src/constants/purchaseOrderStatus.js');
 
 const PO_ID = 12;
 
@@ -82,19 +83,48 @@ describe('setPurchaseOrderStatus', () => {
       .rejects.toMatchObject({ status: 400 });
   });
 
-  it('accepts "completed", the fully-received state', async () => {
-    await expect(purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status: 'completed' }))
-      .resolves.toBeTruthy();
+  it('closes an order that is waiting on a follow-up as "completed"', async () => {
+    for (const from of ['follow_up_required', 'partially_received']) {
+      repoMock.getPurchaseOrderById.mockResolvedValue(existingPO({ status: from }));
+      await expect(purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status: 'completed' }))
+        .resolves.toBeTruthy();
+    }
   });
 
-  it('accepts every current PO_STATUSES value', async () => {
-    for (const status of PO_STATUSES) {
-      // From approved: a follow-up is refused on an order still pending.
-      repoMock.getPurchaseOrderById.mockResolvedValue(existingPO({ status: status === 'approved' ? 'pending' : 'approved' }));
-      await expect(
-        purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status, reason: 'because' })
-      ).resolves.toBeTruthy();
+  it('allows every move in PO_MANUAL_TRANSITIONS, and every status has a way in', async () => {
+    const reached = new Set(['pending']);                       // where every order starts
+    for (const [from, targets] of Object.entries(PO_MANUAL_TRANSITIONS)) {
+      for (const status of targets) {
+        repoMock.getPurchaseOrderById.mockResolvedValue(existingPO({ status: from }));
+        await expect(
+          purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status, reason: 'because' })
+        ).resolves.toBeTruthy();
+        reached.add(status);
+      }
     }
+    reached.add('partially_received');                          // set by raising a follow-up order
+    expect([...reached].sort()).toEqual([...PO_STATUSES].sort());
+  });
+
+  it('refuses a move that is not in the table, saying what the order can become', async () => {
+    const refused = [
+      ['pending', 'completed'], ['pending', 'in_transit'], ['approved', 'pending'], ['approved', 'completed'],
+      ['approved', 'partially_received'], ['follow_up_required', 'partially_received'],
+      ['completed', 'approved'], ['completed', 'pending'], ['returned', 'approved'], ['partially_received', 'approved'],
+    ];
+    for (const [from, status] of refused) {
+      repoMock.getPurchaseOrderById.mockResolvedValue(existingPO({ status: from }));
+      await expect(purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status, reason: 'because' }))
+        .rejects.toMatchObject({ status: from === 'pending' && status === 'follow_up_required' ? 400 : 409 });
+    }
+    expect(repoMock.updatePurchaseOrderStatus).not.toHaveBeenCalled();
+
+    repoMock.getPurchaseOrderById.mockResolvedValue(existingPO({ status: 'completed' }));
+    await expect(purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status: 'approved' }))
+      .rejects.toThrow('This order is Completed and is closed. Its status cannot be changed.');
+    repoMock.getPurchaseOrderById.mockResolvedValue(existingPO({ status: 'pending' }));
+    await expect(purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status: 'in_transit' }))
+      .rejects.toThrow('An order that is Pending approval cannot be changed to In transit. It can become: Approved.');
   });
 
   it('requires a reason when marking a PO as returned', async () => {
@@ -103,6 +133,7 @@ describe('setPurchaseOrderStatus', () => {
   });
 
   it('accepts "returned" once a reason is given', async () => {
+    repoMock.getPurchaseOrderById.mockResolvedValue(existingPO({ status: 'approved' }));
     await expect(
       purchaseOrderService.setPurchaseOrderStatus(PO_ID, { status: 'returned', reason: 'Damaged in transit' })
     ).resolves.toBeTruthy();
