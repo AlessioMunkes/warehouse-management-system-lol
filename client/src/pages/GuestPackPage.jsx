@@ -151,7 +151,15 @@ const GuestPackPage = () => {
       // this volunteer actually just worked through — never placeholders.
       const packed  = items.filter((i) => i.status === 'confirmed');
       const flagged = items.filter((i) => i.status === 'flagged');
-      const units   = packed.reduce((sum, i) => sum + (Number(i.packed_quantity) || 0), 0);
+      // Things put into the box: every can or bag counts, and a line
+      // that is weighed or poured counts once. Adding 2.1 kg of cabbage
+      // to 5 cans gave "27.040000000000003 items".
+      const WEIGHED = ['kg', 'g', 'l', 'ml'];
+      const units   = Math.round(packed.reduce((sum, i) => {
+        const quantity = Number(i.packed_quantity) || 0;
+        if (quantity <= 0) return sum;
+        return sum + (WEIGHED.includes(i.unit) ? 1 : quantity);
+      }, 0));
 
       navigate('/guest/done', {
         replace: true,
@@ -298,7 +306,7 @@ const GuestPackPage = () => {
             position={`Item ${done + 1} of ${total}`}
             title={current.product_name}
             meta={[
-              `Put ${fmtQty(current.required_quantity, current.unit || '')} into the box.`.replace(/\s+/g, ' '),
+              `Put ${fmtQty(current.required_quantity, current.unit === 'each' ? '' : (current.unit || ''))} into the box.`.replace(/\s+/g, ' '),
               // FEFO, in the same words the staff screen and the printed slip use.
               takeFirstText(current) ? `${takeFirstText(current)}.` : '',
             ].filter(Boolean).join(' ')}

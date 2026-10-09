@@ -24,6 +24,7 @@ const stockRepo = await import('../src/repositories/communityRequestStock.reposi
 const {
   planShortage, recheckProducts,
   SHORTAGE_CANDIDATES_SQL, SHORTAGE_STATE_SQL, FLAG_LINE_SQL, FLAG_REQUEST_SQL, LOCK_STOCK_SQL,
+  PRODUCTS_WITH_APPROVED_LINES_SQL,
 } = stockRepo;
 const { default: stockRepository } = await import('../src/repositories/stock.repository.js');
 const { default: pickingRepository } = await import('../src/repositories/picking.repository.js');
@@ -108,6 +109,10 @@ const makeDb = ({ onHand, pallets = 0, lines }) => {
   const query = vi.fn(async (sql, params) => {
     const text = squash(sql);
     state.log.push(text.split(' ')[0]);
+    if (text === squash(PRODUCTS_WITH_APPROVED_LINES_SQL)) {
+      const ids = [...new Set(state.lines.filter((l) => !l.short_at && params[0].includes(l.product_id)).map((l) => l.product_id))];
+      return { rows: ids.map((product_id) => ({ product_id })) };
+    }
     if (text === squash(SHORTAGE_CANDIDATES_SQL)) {
       const rows = state.lines
         .filter((l) => !l.short_at && l.product_id === params[0])
@@ -206,6 +211,7 @@ describe('recheckProducts', () => {
       query: vi.fn(async (sql) => {
         const t = squash(sql);
         calls.push(t);
+        if (t === squash(PRODUCTS_WITH_APPROVED_LINES_SQL)) return { rows: [{ product_id: 5 }] };
         if (t === squash(SHORTAGE_CANDIDATES_SQL)) throw new Error('boom');
         return { rows: [], rowCount: 0 };
       }),
@@ -216,13 +222,38 @@ describe('recheckProducts', () => {
     spy.mockRestore();
   });
 
-  it('checks each product once, in id order', async () => {
-    const { client: c } = makeDb({ onHand: 10, lines: [] });
-    await recheckProducts(c, [9, 3, 3, 'x', 0]);
+  it('checks every product the slow way when the pre-check itself fails', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const asked = [];
+    const c = {
+      query: vi.fn(async (sql, params) => {
+        const t = squash(sql);
+        if (t === squash(PRODUCTS_WITH_APPROVED_LINES_SQL)) throw new Error('boom');
+        if (t === squash(SHORTAGE_CANDIDATES_SQL)) asked.push(params[0]);
+        return { rows: [], rowCount: 0 };
+      }),
+    };
+    await expect(recheckProducts(c, [9, 3])).resolves.toEqual([]);
+    expect(asked).toEqual([3, 9]);
+    spy.mockRestore();
+  });
+
+  it('asks once which products a request is waiting on, then checks only those, in id order', async () => {
+    const { client: c } = makeDb({ onHand: 10, lines: [req(1, 9, 1, 1000), req(2, 3, 1, 2000)] });
+    await recheckProducts(c, [9, 3, 3, 7, 'x', 0]);
+    const pre = c.query.mock.calls.filter(([s]) => squash(s) === squash(PRODUCTS_WITH_APPROVED_LINES_SQL));
+    expect(pre).toHaveLength(1);
+    expect(pre[0][1]).toEqual([[3, 7, 9]]);
     const asked = c.query.mock.calls
       .filter(([s]) => squash(s) === squash(SHORTAGE_CANDIDATES_SQL))
       .map(([, p]) => p[0]);
-    expect(asked).toEqual([3, 9]);
+    expect(asked).toEqual([3, 9]);          // 7 has no request against it
+  });
+
+  it('a pallet of many products with no request against them costs one query, not three each', async () => {
+    const { client: c } = makeDb({ onHand: 10, lines: [] });
+    await recheckProducts(c, Array.from({ length: 21 }, (_, i) => i + 1));
+    expect(c.query.mock.calls.length).toBe(3);   // savepoint, the one question, release
   });
 });
 
@@ -243,7 +274,7 @@ describe('adjustStock hook', () => {
       }),
     };
   };
-  const ran = (c) => c.queries.some((t) => t === squash(SHORTAGE_CANDIDATES_SQL));
+  const ran = (c) => c.queries.some((t) => t === squash(PRODUCTS_WITH_APPROVED_LINES_SQL));
 
   it('re-checks the product when stock goes down', async () => {
     const c = makeStockClient();
@@ -289,7 +320,7 @@ describe('PALLETS FIRST — completeSlip', () => {
 
   it('after packing, it re-checks the packed products for benevolent shortages (in the same transaction, before COMMIT)', async () => {
     await pickingRepository.completeSlip({ slipId: 132, actorId: 3, actor: { type: 'user', id: 3 }, canOverride: true });
-    const recheck = sqlSeen.indexOf(squash(SHORTAGE_CANDIDATES_SQL));
+    const recheck = sqlSeen.indexOf(squash(PRODUCTS_WITH_APPROVED_LINES_SQL));
     const commit = sqlSeen.indexOf('COMMIT');
     expect(recheck).toBeGreaterThan(-1);
     expect(recheck).toBeLessThan(commit);

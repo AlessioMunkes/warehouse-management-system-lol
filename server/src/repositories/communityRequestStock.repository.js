@@ -137,6 +137,35 @@ export const planShortage = ({ onHand, pallets, benevolent, candidates }) => {
   return toFlag;
 };
 
+// The products, of those given, that an approved request is waiting on.
+// One query, so a pallet of 21 products with no request against any of
+// them costs one round trip instead of three per product: on a hosted
+// database that was the 14 seconds "Finishing…" sat on the screen.
+// If it cannot be answered, every product is checked the slow way.
+export const PRODUCTS_WITH_APPROVED_LINES_SQL = `
+  SELECT DISTINCT cri.product_id
+    FROM community_request_items cri
+    JOIN community_requests cr ON cr.id = cri.request_id
+   WHERE cr.outcome = 'approved'
+     AND cri.short_at IS NULL
+     AND cri.product_id = ANY($1::int[])`;
+
+const withApprovedLines = async (client, ids) => {
+  if (ids.length === 0) return ids;
+  await client.query('SAVEPOINT community_request_products');
+  try {
+    const { rows } = await client.query(PRODUCTS_WITH_APPROVED_LINES_SQL, [ids]);
+    await client.query('RELEASE SAVEPOINT community_request_products');
+    const waiting = new Set(rows.map((r) => r.product_id));
+    return ids.filter((id) => waiting.has(id));
+  } catch (err) {
+    await client.query('ROLLBACK TO SAVEPOINT community_request_products');
+    await client.query('RELEASE SAVEPOINT community_request_products');
+    console.error('[communityRequestStock] checking every product:', err.message);
+    return ids;
+  }
+};
+
 /**
  * Re-checks each product after something took stock or committed it
  * (a pallet packed, an adjustment, wastage, a dispatch). Flags approved
@@ -155,7 +184,7 @@ export const planShortage = ({ onHand, pallets, benevolent, candidates }) => {
  */
 export const recheckProducts = async (client, productIds, { cause = 'stock' } = {}) => {
   const flagged = [];
-  for (const productId of uniqueSorted(productIds)) {
+  for (const productId of await withApprovedLines(client, uniqueSorted(productIds))) {
     await client.query('SAVEPOINT community_request_shortage');
     try {
       const { rows: candidates } = await client.query(SHORTAGE_CANDIDATES_SQL, [productId]);
