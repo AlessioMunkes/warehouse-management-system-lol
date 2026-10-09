@@ -30,6 +30,7 @@
 // ─────────────────────────────────────────────────────────────
 import pool       from "../config/db.js";
 import stockModel from "./stock.repository.js";
+import { purchaseOrderDeliveredShort } from "../features/communications/notices.js";
 import { DELIVERY_SORTS, buildOrderBy } from "../constants/receiptSort.js";
 import {
   isReceivablePurchaseOrder,
@@ -493,13 +494,27 @@ const createDelivery = async ({
       );
     } else {
       const short = owed.rows.map((r) => `${r.name} ${Number(r.short)} ${r.unit}`).join(', ');
-      await client.query(
+      const reason = `Delivered short: ${short}.`.slice(0, 500);
+      const flagged = await client.query(
         `UPDATE purchase_orders
             SET status = $3, status_reason = $2, status_changed_at = NOW()
-          WHERE id = $1`,
-        [purchaseOrderId, `Delivered short: ${short}.`.slice(0, 500), PO_STATUS_PARTIALLY_RECEIVED],
+          WHERE id = $1
+        RETURNING id, po_number`,
+        [purchaseOrderId, reason, PO_STATUS_PARTIALLY_RECEIVED],
       );
-      followUp = { required: true, reason: `Delivered short: ${short}.`.slice(0, 500) };
+      followUp = { required: true, reason };
+
+      // Tell the managers' bell, in this transaction so the notice and
+      // the flag land together. In a savepoint: a notice that cannot be
+      // written must never cost the floor the delivery it just counted.
+      await client.query('SAVEPOINT follow_up_notice');
+      try {
+        await purchaseOrderDeliveredShort(client, { purchaseOrder: flagged.rows[0], reason });
+        await client.query('RELEASE SAVEPOINT follow_up_notice');
+      } catch (noticeError) {
+        await client.query('ROLLBACK TO SAVEPOINT follow_up_notice');
+        console.error('[delivery] follow-up notice not sent:', noticeError.message);
+      }
     }
 
     await client.query("COMMIT");

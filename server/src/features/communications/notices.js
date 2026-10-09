@@ -83,6 +83,21 @@ export const purchaseOrderNeedsAttention = async (client, { purchaseOrder, statu
   });
 };
 
+// delivery.repository.js createDelivery — a delivery came in short, so
+// the order is Partially received and flagged Follow-up required. The
+// same type as above, so it goes to the same people and opens the
+// order; the body is what was short.
+export const purchaseOrderDeliveredShort = async (client, { purchaseOrder, reason }) => {
+  if (!purchaseOrder) return;
+  await createNotification(client, {
+    type:       'purchase_order_needs_attention',
+    title:      `Follow-up required: ${purchaseOrder.po_number} was delivered short`,
+    body:       reason ?? null,
+    entityType: 'purchase_order',
+    entityId:   purchaseOrder.id,
+  });
+};
+
 // communityRequestStock.repository.js recheckProducts — an approved
 // benevolent request lost stock to a pallet (or a stock change) and now
 // needs other items. Sent once per request while it stays flagged; the
@@ -103,5 +118,6 @@ export const communityRequestItemsShort = async (client, { requestId, cause }) =
 
 export default {
   slipsGenerated, slipCreated, slipReleased, nonCollectionsFlagged, purchaseOrderNeedsAttention,
+  purchaseOrderDeliveredShort,
   communityRequestItemsShort,
 };

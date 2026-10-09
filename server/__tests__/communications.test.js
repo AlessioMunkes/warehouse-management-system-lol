@@ -137,4 +137,19 @@ describe('notices', () => {
       title: 'Purchase order PO-3 needs follow-up', body: 'Late', entityId: 3,
     }));
   });
+
+  it('tells managers when a delivery came in short, saying what was short', async () => {
+    await notices.purchaseOrderDeliveredShort(client, {
+      purchaseOrder: { id: 3, po_number: 'PO-3' }, reason: 'Delivered short: Sugar 10 kg.',
+    });
+    expect(createNotification).toHaveBeenCalledWith(client, {
+      type: 'purchase_order_needs_attention',
+      title: 'Follow-up required: PO-3 was delivered short',
+      body: 'Delivered short: Sugar 10 kg.',
+      entityType: 'purchase_order', entityId: 3,
+    });
+    createNotification.mockClear();
+    await notices.purchaseOrderDeliveredShort(client, { purchaseOrder: null, reason: 'x' });
+    expect(createNotification).not.toHaveBeenCalled();
+  });
 });
