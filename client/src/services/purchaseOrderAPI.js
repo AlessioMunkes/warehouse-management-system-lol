@@ -57,6 +57,10 @@ export const OPEN_PO_STATUSES = [
   "pending", "approved", "in_transit", "partially_received",
 ];
 
+// Still expecting goods against this order itself. A part-received
+// order is not: the rest comes on its follow-up order.
+export const RECEIVABLE_PO_STATUSES = ["approved", "in_transit"];
+
 // ── Row mappers ───────────────────────────────────────────────
 const toLine = (row) => ({
   id:               row.id,
@@ -98,6 +102,11 @@ export const toPurchaseOrder = (row) => ({
   status:               row.status,
   statusLabel:          PO_STATUS_LABELS[row.status] ?? row.status,
   statusReason:         row.status_reason ?? "",
+  // The order this one is a follow-up to, and any raised to follow it.
+  followUpOf:           row.follow_up_of ? { id: row.follow_up_of, poNumber: row.follow_up_of_number ?? "" } : null,
+  followUpOrders:       (row.follow_up_orders ?? []).map((o) => ({
+    id: o.id, poNumber: o.po_number ?? "", status: o.status, statusLabel: PO_STATUS_LABELS[o.status] ?? o.status,
+  })),
   statusChangedAt:      row.status_changed_at ?? null,
   expectedDeliveryDate: row.expected_delivery_date ?? null,
   notes:                row.notes ?? "",
@@ -164,6 +173,14 @@ export const setPurchaseOrderStatus = async (id, status, reason = null) => {
 
 export const approvePurchaseOrder = async (id) => setPurchaseOrderStatus(id, "approved");
 
+// ── POST /api/purchase-orders/:id/follow-up-order ───────────────
+// A second order for what came short. Answers with the new order; the
+// first moves to Partially received.
+export const createFollowUpOrder = async (id, expectedDeliveryDate = null) => {
+  const body = await apiPost(`/api/purchase-orders/${id}/follow-up-order`, expectedDeliveryDate ? { expectedDeliveryDate } : {});
+  return toPurchaseOrder(body.data ?? {});
+};
+
 // ── PATCH /api/purchase-orders/:id/quickbooks-ref ───────────────
 // quickbooksPoId "" clears the reference — see purchaseOrder.service.js.
 export const setQuickbooksReference = async (id, quickbooksPoId) => {
@@ -214,7 +231,7 @@ export const deletePurchaseOrder = async (id) => {
 
 export default {
   getPurchaseOrders, getPurchaseOrder, createPurchaseOrder,
-  setPurchaseOrderStatus, approvePurchaseOrder, setQuickbooksReference,
+  setPurchaseOrderStatus, approvePurchaseOrder, createFollowUpOrder, setQuickbooksReference,
   updatePurchaseOrder, deletePurchaseOrder, resendFinanceEmail,
   previewQuickbooksImport, applyQuickbooksImport,
 };

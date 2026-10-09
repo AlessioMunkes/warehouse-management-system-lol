@@ -38,8 +38,8 @@ import {
   AlertDialog, AlertDialogContent, AlertDialogDescription,
   AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
-import { BadgeCheck, Mail, MailCheck, MailX, Pencil, RotateCcw, Trash2, TriangleAlert } from 'lucide-react';
-import { OPEN_PO_STATUSES } from '@/services/purchaseOrderAPI';
+import { BadgeCheck, Mail, MailCheck, MailX, Pencil, RotateCcw, CopyPlus, Trash2, TriangleAlert } from 'lucide-react';
+import { RECEIVABLE_PO_STATUSES } from '@/services/purchaseOrderAPI';
 import PurchaseOrderTimeline from './PurchaseOrderTimeline';
 import PhotoStrip from '@/components/ui/photo-strip';
 
@@ -68,7 +68,7 @@ const Section = ({ title, children }) => (
 );
 
 export default function PurchaseOrderDetail({
-  purchaseOrder: po, canManage, onApprove, onRecordFollowUp, onReopen, onSetQuickbooksRef,
+  purchaseOrder: po, canManage, onApprove, onRecordFollowUp, onReopen, onCreateFollowUp, onOpenOrder, onSetQuickbooksRef,
   onResendFinanceEmail, onEdit, onDelete, onClose,
 }) {
   const pending = po.status === 'pending';
@@ -76,7 +76,21 @@ export default function PurchaseOrderDetail({
   // Approved and still expecting goods: the only orders a follow-up
   // means anything on. Not a pending one — reopening a followed-up order
   // returns it to Approved, which would skip the approval.
-  const canFollowUp = canManage && !pending && OPEN_PO_STATUSES.includes(po.status);
+  const canFollowUp = canManage && !pending && RECEIVABLE_PO_STATUSES.includes(po.status);
+
+  // Something is still owed on it: only then is there anything for a
+  // follow-up order to carry.
+  const outstanding = po.items.some((l) => l.receivedToDate < l.expectedQuantity);
+  const followUps = po.followUpOrders ?? [];
+  const [creatingFollowUp, setCreatingFollowUp] = useState(false);
+  const createFollowUp = async () => {
+    setCreatingFollowUp(true);
+    try {
+      await onCreateFollowUp();
+    } finally {
+      setCreatingFollowUp(false);
+    }
+  };
 
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting]           = useState(false);
@@ -158,6 +172,14 @@ export default function PurchaseOrderDetail({
               <BadgeCheck /> Approve
             </Button>
           ) : null}
+          {/* What to do about a short delivery: order the rest (the usual
+              answer), or reopen this order if the supplier will bring the
+              rest against it. */}
+          {po.status === 'follow_up_required' && outstanding && onCreateFollowUp ? (
+            <Button type="button" size="sm" onClick={createFollowUp} disabled={creatingFollowUp} loading={creatingFollowUp}>
+              <CopyPlus /> {creatingFollowUp ? 'Creating…' : 'Create follow-up order'}
+            </Button>
+          ) : null}
           {po.status === 'follow_up_required' ? (
             <Button type="button" variant="outline" size="sm" onClick={onReopen}>
               <RotateCcw /> Reopen for receiving
@@ -213,6 +235,31 @@ export default function PurchaseOrderDetail({
       {po.statusReason ? (
         <div className="rounded-[4px] border-2 border-brand bg-danger-soft p-3 text-sm">
           <span className="font-semibold">{po.statusLabel}:</span> {po.statusReason}
+        </div>
+      ) : null}
+
+      {/* How this order is tied to others: the one it follows, and any
+          raised to follow it. */}
+      {po.followUpOf || followUps.length > 0 ? (
+        <div className="space-y-1 rounded-lg border p-3 text-sm">
+          {po.followUpOf ? (
+            <p>
+              Follow-up to{' '}
+              <button type="button" className="font-medium underline underline-offset-2" onClick={() => onOpenOrder?.(po.followUpOf.id)}>
+                {po.followUpOf.poNumber}
+              </button>
+              . Receiving this in full completes both.
+            </p>
+          ) : null}
+          {followUps.map((o) => (
+            <p key={o.id}>
+              The rest is on follow-up order{' '}
+              <button type="button" className="font-medium underline underline-offset-2" onClick={() => onOpenOrder?.(o.id)}>
+                {o.poNumber}
+              </button>
+              {' '}({o.statusLabel.toLowerCase()}).
+            </p>
+          ))}
         </div>
       ) : null}
 

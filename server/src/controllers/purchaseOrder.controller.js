@@ -123,4 +123,15 @@ const remove = async (req, res) => {
   }
 };
 
-export default { create, list, getOne, setStatus, setQuickbooksReference, previewQuickbooksImport, applyQuickbooksImport, resendFinanceEmail, update, remove };
+// POST /api/purchase-orders/:id/follow-up-order — a second order for
+// what came short. Answers with the new order.
+const createFollowUp = async (req, res) => {
+  try {
+    const data = await purchaseOrderService.createFollowUpOrder(req.params.id, req.body, req.user.id);
+    res.status(201).json({ success: true, data });
+  } catch (err) {
+    respondError(res, err, 'createFollowUpOrder', 'Failed to create the follow-up order.');
+  }
+};
+
+export default { create, list, getOne, setStatus, createFollowUp, setQuickbooksReference, previewQuickbooksImport, applyQuickbooksImport, resendFinanceEmail, update, remove };

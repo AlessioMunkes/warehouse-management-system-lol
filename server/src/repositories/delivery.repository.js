@@ -35,7 +35,7 @@ import {
   isReceivablePurchaseOrder,
   RECEIVABLE_PO_STATUSES,
   PO_STATUS_FULLY_RECEIVED,
-  PO_STATUS_PARTIALLY_RECEIVED,   // eslint-disable-line no-unused-vars -- see createDelivery
+  PO_STATUS_PARTIALLY_RECEIVED,
 } from "../constants/purchaseOrderStatus.js";
 
 // ── The goods-in archive ──────────────────────────────────────
@@ -449,10 +449,49 @@ const createDelivery = async ({
     // status only moves when the receiver ticks the box, which means a PO
     // that has had three partial deliveries still reads 'pending'. The
     // constant is imported and ready if the answer is yes.
-    if (poCompleted) {
+    //
+    // ANSWERED (migration 043). What is still owed on the order, across
+    // every delivery against it including this one, decides where it goes:
+    //
+    //   nothing owed   -> completed, and so is every order it was a
+    //                     follow-up to (they were waiting on this one)
+    //   something owed -> follow_up_required, saying what was short, for
+    //                     a manager to raise a follow-up order or reopen
+    const owed = await client.query(
+      `SELECT p.name, p.default_unit AS unit,
+              (poi.expected_quantity - COALESCE(SUM(dni.received_quantity), 0))::numeric AS short
+         FROM purchase_order_items poi
+         JOIN products p ON p.id = poi.product_id
+         LEFT JOIN delivery_note_items dni ON dni.purchase_order_item_id = poi.id
+        WHERE poi.purchase_order_id = $1
+        GROUP BY poi.id, p.name, p.default_unit, poi.expected_quantity
+       HAVING poi.expected_quantity - COALESCE(SUM(dni.received_quantity), 0) > 0
+        ORDER BY p.name ASC`,
+      [purchaseOrderId],
+    );
+
+    if (poCompleted || owed.rows.length === 0) {
       await client.query(
-        `UPDATE purchase_orders SET status = $2 WHERE id = $1`,
-        [purchaseOrderId, PO_STATUS_FULLY_RECEIVED],
+        `WITH RECURSIVE chain AS (
+           SELECT id, follow_up_of FROM purchase_orders WHERE id = $1
+           UNION ALL
+           SELECT parent.id, parent.follow_up_of
+             FROM purchase_orders parent
+             JOIN chain ON parent.id = chain.follow_up_of
+            WHERE parent.status = $3
+         )
+         UPDATE purchase_orders
+            SET status = $2, status_reason = NULL, status_changed_at = NOW()
+          WHERE id IN (SELECT id FROM chain)`,
+        [purchaseOrderId, PO_STATUS_FULLY_RECEIVED, PO_STATUS_PARTIALLY_RECEIVED],
+      );
+    } else {
+      const short = owed.rows.map((r) => `${r.name} ${Number(r.short)} ${r.unit}`).join(', ');
+      await client.query(
+        `UPDATE purchase_orders
+            SET status = 'follow_up_required', status_reason = $2, status_changed_at = NOW()
+          WHERE id = $1`,
+        [purchaseOrderId, `Delivered short: ${short}.`.slice(0, 500)],
       );
     }
 
@@ -525,7 +564,7 @@ const getSuppliersWithOpenOrders = async () => {
 // ── Get all active products ───────────────────────────────────
 const getProducts = async () => {
   const result = await pool.query(
-    `SELECT id, name, stock_keeping_unit AS sku, weight_kg, default_unit
+    `SELECT id, name, stock_keeping_unit AS sku, weight_kg, default_unit, is_decantable
      FROM products
      WHERE is_active = true
      ORDER BY name ASC`,

@@ -60,6 +60,7 @@ const PO_COLUMNS = `
   po.notes,
   po.status_reason,
   po.status_changed_at,
+  po.follow_up_of,
   po.created_by,
   po.created_at
 `;
@@ -240,6 +241,11 @@ const getPurchaseOrderById = async (id) => {
             s.is_active AS supplier_is_active,
             u.first_name AS created_by_name,
             qom.qbo_id AS quickbooks_po_id,
+            -- The order this one is a follow-up to, and any raised to
+            -- follow it (migration 043).
+            (SELECT parent.po_number FROM purchase_orders parent WHERE parent.id = po.follow_up_of) AS follow_up_of_number,
+            (SELECT COALESCE(json_agg(json_build_object('id', child.id, 'po_number', child.po_number, 'status', child.status) ORDER BY child.id), '[]'::json)
+               FROM purchase_orders child WHERE child.follow_up_of = po.id) AS follow_up_orders,
             po.finance_email_status,
             po.finance_email_error,
             po.finance_email_attempted_at
@@ -724,8 +730,89 @@ const recordFinanceEmailAttempt = async (id, { status, error, attemptedAt }) => 
   );
 };
 
+// ── Follow-up order ───────────────────────────────────────────
+// A second order for what came short on `parentId` (migration 043):
+// same supplier, the outstanding quantity of each short line at the
+// same unit price, already approved (it is the goods a manager already
+// signed off, not a new purchase). The first order moves to
+// 'partially_received' and waits for this one.
+//
+// One transaction, the first order locked throughout, so two managers
+// pressing the button together cannot raise two follow-ups.
+const createFollowUpOrder = async (parentId, userId, { expectedDeliveryDate }) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows: parents } = await client.query(
+      `SELECT po.id, po.po_number, po.supplier_id, po.status, s.is_active AS supplier_is_active, s.name AS supplier_name
+         FROM purchase_orders po JOIN suppliers s ON s.id = po.supplier_id
+        WHERE po.id = $1
+          FOR UPDATE OF po`,
+      [parentId]
+    );
+    const parent = parents[0];
+    const stop = async (result) => { await client.query('ROLLBACK'); return result; };
+    if (!parent) return stop({ ok: false, code: 'not_found' });
+    if (parent.status !== 'follow_up_required') return stop({ ok: false, code: 'not_awaiting_follow_up', status: parent.status });
+    if (!parent.supplier_is_active) return stop({ ok: false, code: 'supplier_inactive', supplierName: parent.supplier_name });
+
+    const { rows: open } = await client.query(
+      `SELECT po_number FROM purchase_orders
+        WHERE follow_up_of = $1 AND status NOT IN ('completed', 'returned') LIMIT 1`,
+      [parentId]
+    );
+    if (open[0]) return stop({ ok: false, code: 'has_follow_up', poNumber: open[0].po_number });
+
+    // What is still owed, line by line. Rounded up: an order line is a
+    // whole number, and a part-unit short is still a unit to order.
+    const { rows: owed } = await client.query(
+      `SELECT poi.product_id, poi.unit_price,
+              CEIL(poi.expected_quantity - COALESCE(SUM(dni.received_quantity), 0))::int AS quantity
+         FROM purchase_order_items poi
+         LEFT JOIN delivery_note_items dni ON dni.purchase_order_item_id = poi.id
+        WHERE poi.purchase_order_id = $1
+        GROUP BY poi.id, poi.product_id, poi.unit_price, poi.expected_quantity
+       HAVING poi.expected_quantity - COALESCE(SUM(dni.received_quantity), 0) > 0
+        ORDER BY poi.id ASC`,
+      [parentId]
+    );
+    if (owed.length === 0) return stop({ ok: false, code: 'nothing_outstanding' });
+
+    const { rows: created } = await client.query(
+      `INSERT INTO purchase_orders
+         (supplier_id, created_by, status, expected_delivery_date, notes, follow_up_of, status_changed_at)
+       VALUES ($1, $2, 'approved', $3, $4, $5, NOW())
+       RETURNING id`,
+      [parent.supplier_id, userId, expectedDeliveryDate,
+       `Follow-up to ${parent.po_number}: what was short on its delivery.`, parentId]
+    );
+    await client.query(
+      `INSERT INTO purchase_order_items (purchase_order_id, product_id, expected_quantity, expected_weight_kg, unit_price)
+       SELECT $1::int, p, q, NULL, u
+         FROM unnest($2::int[], $3::int[], $4::numeric[]) AS t(p, q, u)`,
+      [created[0].id, owed.map((l) => l.product_id), owed.map((l) => l.quantity), owed.map((l) => l.unit_price)]
+    );
+    await client.query(
+      `UPDATE purchase_orders
+          SET status = 'partially_received', status_reason = NULL, status_changed_at = NOW()
+        WHERE id = $1`,
+      [parentId]
+    );
+
+    await client.query('COMMIT');
+    return { ok: true, id: created[0].id };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+};
+
 export default {
   createPurchaseOrder,
+  createFollowUpOrder,
   listPurchaseOrders,
   getPurchaseOrderById,
   updatePurchaseOrderStatus,

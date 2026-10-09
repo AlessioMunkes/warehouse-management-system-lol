@@ -58,10 +58,13 @@ export const OPEN_PO_STATUSES = [
 // goods arriving against it are goods nobody agreed to buy. The
 // receiving screen says as much ("ask your manager to approve the
 // order"), and this is what makes that true.
+//
+// 'partially_received' is not here either. It now means "the rest is
+// coming on a follow-up order" (migration 043): the remainder is
+// received against that order, not this one.
 export const RECEIVABLE_PO_STATUSES = [
   'approved',
   'in_transit',
-  'partially_received',
 ];
 
 export const CLOSED_PO_STATUSES = ['completed', 'returned'];

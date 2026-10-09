@@ -182,6 +182,7 @@
   "purchaseOrder.routes.js POST /quickbooks-import/apply": "admin,manager",
   "purchaseOrder.routes.js GET /:id": "admin,manager,warehouse_worker",
   "purchaseOrder.routes.js PATCH /:id/status": "admin,manager",
+  "purchaseOrder.routes.js POST /:id/follow-up-order": "admin,manager",
   "purchaseOrder.routes.js PATCH /:id/quickbooks-ref": "admin,manager",
   "purchaseOrder.routes.js POST /:id/finance-email/resend": "admin,manager",
   "purchaseOrder.routes.js PUT /:id": "admin,manager",

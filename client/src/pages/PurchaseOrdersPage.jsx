@@ -232,6 +232,21 @@ export default function PurchaseOrdersPage() {
     }
   };
 
+  // A second order for what came short. The first moves to Partially
+  // received; the new one opens, since it is the one to act on next.
+  const createFollowUp = async () => {
+    try {
+      const followUp = await purchaseOrderAPI.createFollowUpOrder(selected.id);
+      await loadPurchaseOrders();
+      await open(followUp.id);
+      toast({ variant: 'success', title: `${followUp.poNumber} created`, description: `Follow-up to ${selected.poNumber}.` });
+      return true;
+    } catch (err) {
+      toast({ variant: 'error', title: 'Could not create the follow-up order', description: err.message });
+      return false;
+    }
+  };
+
   const remove = async () => {
     try {
       await purchaseOrderAPI.deletePurchaseOrder(selected.id);
@@ -390,6 +405,8 @@ export default function PurchaseOrdersPage() {
           onApprove={() => changeStatus('approved', null, `${selected.poNumber} approved`)}
           onRecordFollowUp={(reason) => changeStatus('follow_up_required', reason, `Follow-up recorded on ${selected.poNumber}`)}
           onReopen={() => changeStatus('approved', null, `${selected.poNumber} reopened for receiving`)}
+          onCreateFollowUp={createFollowUp}
+          onOpenOrder={open}
           onSetQuickbooksRef={setQuickbooksRef}
           onResendFinanceEmail={resendFinanceEmail}
           onEdit={() => { setMode('edit'); setFormError(null); setInvalidProductIds([]); }}

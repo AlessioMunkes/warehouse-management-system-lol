@@ -455,6 +455,45 @@ const setPurchaseOrderStatus = async (rawId, body = {}) => {
   });
 };
 
+// ── Follow-up order ───────────────────────────────────────────
+// What a manager does about an order that came in short: a second
+// order for the remainder (see createFollowUpOrder in the repository
+// and migration 043). The expected date is theirs to give; a week from
+// today when they do not.
+const FOLLOW_UP_DAYS = 7;
+
+const createFollowUpOrder = async (rawId, body = {}, userId) => {
+  if (!isPositiveInt(rawId)) throw fail(400, 'A valid purchase order ID is required.');
+
+  let expectedDeliveryDate = clean(body.expectedDeliveryDate);
+  if (expectedDeliveryDate && !isValidDateString(expectedDeliveryDate)) {
+    throw fail(400, 'Choose a real date for when the follow-up is expected.');
+  }
+  if (!expectedDeliveryDate) {
+    expectedDeliveryDate = new Date(Date.now() + FOLLOW_UP_DAYS * 86400000)
+      .toLocaleDateString('en-CA', { timeZone: 'Africa/Johannesburg' });
+  }
+
+  const result = await repo.createFollowUpOrder(Number(rawId), userId, { expectedDeliveryDate });
+  if (!result.ok) {
+    if (result.code === 'not_found') throw fail(404, 'Purchase order not found.');
+    if (result.code === 'not_awaiting_follow_up') {
+      throw fail(409, 'A follow-up order can only be raised on an order marked Follow-up required.');
+    }
+    if (result.code === 'has_follow_up') {
+      throw fail(409, `This order already has a follow-up order, ${result.poNumber}.`);
+    }
+    if (result.code === 'supplier_inactive') {
+      throw fail(409, `${result.supplierName} is no longer an active supplier. Raise a new order with another supplier instead.`);
+    }
+    if (result.code === 'nothing_outstanding') {
+      throw fail(409, 'Nothing is outstanding on this order. Reopen it or mark it complete instead.');
+    }
+    throw fail(500, 'Failed to create the follow-up order.');
+  }
+  return repo.getPurchaseOrderById(result.id);
+};
+
 // ── QuickBooks reference ─────────────────────────────────────
 // Same validation as buildPayload's quickbooksPoId at create time,
 // applied again here since this is now the second place a manager can
@@ -628,6 +667,7 @@ const deletePurchaseOrder = async (rawId, userId) => {
 
 export default {
   createPurchaseOrder,
+  createFollowUpOrder,
   listPurchaseOrders,
   getPurchaseOrder,
   setPurchaseOrderStatus,

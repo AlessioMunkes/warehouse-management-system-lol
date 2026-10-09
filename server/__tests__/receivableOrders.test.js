@@ -12,8 +12,8 @@ import {
 } from '../src/constants/purchaseOrderStatus.js';
 
 describe('which purchase orders can be received against', () => {
-  it('an approved, in-transit or part-received order can', () => {
-    for (const status of ['approved', 'in_transit', 'partially_received']) {
+  it('an approved or in-transit order can', () => {
+    for (const status of ['approved', 'in_transit']) {
       expect(isReceivablePurchaseOrder(status), status).toBe(true);
     }
   });
@@ -23,8 +23,10 @@ describe('which purchase orders can be received against', () => {
     expect(isReceivablePurchaseOrder('pending')).toBe(false);
   });
 
-  it('a closed or flagged order cannot', () => {
-    for (const status of [...CLOSED_PO_STATUSES, 'follow_up_required', 'nonsense', undefined]) {
+  // Part-received means the rest is coming on a follow-up order, and is
+  // received against that one.
+  it('a closed, flagged or part-received order cannot', () => {
+    for (const status of [...CLOSED_PO_STATUSES, 'follow_up_required', 'partially_received', 'nonsense', undefined]) {
       expect(isReceivablePurchaseOrder(status), String(status)).toBe(false);
     }
   });
