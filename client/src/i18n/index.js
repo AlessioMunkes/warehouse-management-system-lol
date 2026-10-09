@@ -25,6 +25,13 @@
 // nothing has to be wrapped in a provider, so a screen rendered on its
 // own (every test, for one) reads English and just works.
 //
+// TWO WAYS TEXT IS TRANSLATED
+// By key, here: home, the tab bar, the no-signal bar and Packing ask for
+// their text with t(). By phrase, on the page: every other floor screen
+// is written in English and floorTranslator.js swaps each phrase it
+// finds in phrases.js. New floor text can use either; a phrase missing
+// from both stays in English.
+//
 // ONLY THE FLOOR. Manager and admin screens are not translated and do
 // not read this.
 // ─────────────────────────────────────────────────────────────

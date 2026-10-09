@@ -28,6 +28,7 @@ const en = {
 
   // ── Language ──
   'language.label': 'Language',
+  'language.choose': 'Choose your language',
   'language.saved': 'Language saved.',
   'language.savedHere': 'Saved on this phone. It will be saved to your account when there is a signal.',
 
@@ -191,6 +192,7 @@ const af = {
   'common.children': '{n} kinders',
 
   'language.label': 'Taal',
+  'language.choose': 'Kies jou taal',
   'language.saved': 'Taal gestoor.',
   'language.savedHere': 'Op hierdie foon gestoor. Dit word op jou rekening gestoor sodra daar sein is.',
 
@@ -348,6 +350,7 @@ const xh = {
   'common.children': 'abantwana abayi-{n}',
 
   'language.label': 'Ulwimi',
+  'language.choose': 'Khetha ulwimi lwakho',
   'language.saved': 'Ulwimi lugciniwe.',
   'language.savedHere': 'Kugcinwe kule foni. Kuza kugcinwa kwi-akhawunti yakho xa kukho isignali.',
 

@@ -30,6 +30,7 @@ import useSpareSlipAlert from '../../features/staff/hooks/useSpareSlipAlert';
 import usePressFlash from '../../features/staff/hooks/usePressFlash';
 import useKeepAwake from '../../features/staff/hooks/useKeepAwake';
 import useAccountLanguage from '../../features/staff/hooks/useAccountLanguage';
+import useFloorTranslation from '../../features/staff/hooks/useFloorTranslation';
 import { useT } from '../../i18n';
 import { STAFF } from '../../routes/paths';
 
@@ -76,6 +77,9 @@ export default function StaffShell({
   // The language this worker chose follows them to this tablet.
   useAccountLanguage(user?.role === 'warehouse_worker' ? user.id : null);
   const t = useT();
+  // Everything on a floor screen that is not asked for by key is put
+  // into that language on the page.
+  useFloorTranslation(user?.role === 'warehouse_worker');
   useKeepAwake(user?.role === 'warehouse_worker' && pathname !== STAFF.home);
 
   // No pop-up on the Packing screen itself; its tabs already show it.

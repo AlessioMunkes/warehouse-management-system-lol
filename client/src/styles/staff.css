@@ -3078,4 +3078,6 @@ button.stf-panel-head:disabled { cursor: default; }
 .stf-photo-error { color: var(--stf-attention, #b3261e); }
 
 /* ── Language (LanguagePicker.jsx) ─────────────────────────────── */
-.stf-language { margin: 16px 0 4px; max-width: 26rem; }
+.stf-language { margin: 16px 0 4px; max-width: 22rem; display: flex; flex-direction: column; gap: 6px; }
+.stf-language-label { font: 600 14px/1.3 var(--stf-font-sans); color: var(--stf-ink); }
+.stf-language-select { cursor: pointer; }

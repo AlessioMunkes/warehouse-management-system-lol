@@ -86,20 +86,26 @@ describe('LanguagePicker', () => {
     render(<><LanguagePicker /><DashboardGreeting name="Mcebisi" /></>);
     expect(screen.getByText('What would you like to work on today?')).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Afrikaans' }));
+    // A drop-down labelled "Choose your language", each choice in its own language.
+    const select = screen.getByLabelText('Choose your language');
+    expect(select.tagName).toBe('SELECT');
+    expect([...select.options].map((o) => o.textContent)).toEqual(['English', 'Afrikaans', 'isiXhosa']);
+
+    fireEvent.change(select, { target: { value: 'af' } });
     expect(await screen.findByText('Waaraan wil jy vandag werk?')).toBeTruthy();
     expect(getLanguage()).toBe('af');
     expect(apiPatch).toHaveBeenCalledWith('/api/me/language', { language: 'af' });
-    expect(screen.getByRole('button', { name: 'Afrikaans' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByLabelText('Kies jou taal').value).toBe('af');
 
-    fireEvent.click(screen.getByRole('button', { name: 'isiXhosa' }));
+    fireEvent.change(screen.getByLabelText('Kies jou taal'), { target: { value: 'xh' } });
     expect(await screen.findByText('Ungathanda ukusebenza entwenini namhlanje?')).toBeTruthy();
+    expect(screen.getByLabelText('Khetha ulwimi lwakho').value).toBe('xh');
   });
 
   it('keeps the choice on the phone, and says so, when it cannot be saved', async () => {
     apiPatch.mockRejectedValue(Object.assign(new Error('no signal'), { isNetworkError: true }));
     render(<LanguagePicker />);
-    fireEvent.click(screen.getByRole('button', { name: 'isiXhosa' }));
+    fireEvent.change(screen.getByLabelText('Choose your language'), { target: { value: 'xh' } });
     expect(await screen.findByText(/Kugcinwe kule foni/)).toBeTruthy();
     expect(getLanguage()).toBe('xh');
   });
