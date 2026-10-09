@@ -11,7 +11,7 @@
 // isn't a component lives here.
 //
 // This file also holds the client-side draft validators. They mirror
-// server/src/lib/validation/* exactly so the two layers agree; the
+// server/src/utils/donationValidation.js exactly so the two layers agree; the
 // backend remains the source of truth and re-validates on submit.
 // ─────────────────────────────────────────────────────────────
 import { createContext, useContext } from "react";
@@ -76,13 +76,13 @@ export function useDonationDraft() {
   return ctx;
 }
 
-// ─── Draft validation — mirrors server/src/lib/validation/* exactly ──
+// ─── Draft validation — mirrors server/src/utils/donationValidation.js exactly ──
 import {
   validateDonorName, validateEmail, trimOrEmpty,
-} from "../../lib/validation/donationIntake.part1.js";
+} from "../../lib/donationValidation.js";
 import {
   validateDescription, validateQuantity, validateMoney,
-} from "../../lib/validation/donationIntake.part2c.js";
+} from "../../lib/donationValidation.js";
 
 export { trimOrEmpty };
 

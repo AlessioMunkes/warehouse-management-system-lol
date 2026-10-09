@@ -39,7 +39,7 @@ server/                     The API (Node, Express, Postgres)
     config/                 Database connection, environment, cookies, multi-warehouse
     jobs/                   Work that runs on a timer
     integrations/           Everything that talks to an outside system: email, PDFs, the volunteer system (VMS)
-    utils/                  Small shared helpers; utils/donationIntake is the donation form's validation
+    utils/                  Small shared helpers: email layout, donation validation and routing, transactions
   database/
     schema.sql              Every table, for reference. Not a script to run
     migrations/             Numbered changes to the database, applied in order
@@ -189,7 +189,7 @@ isiXhosa are drafts and have not been checked by a fluent speaker.
 Helpers with no home in one feature: `quantity.js` (formatting amounts), `statusStyles.js`
 (the colour and icon for every status), `recordCache.js`, `theme.js`, `clipboard.js`,
 `utils.js`, and three hooks (`useSortable`, `useDebouncedValue`, `useOutbox`).
-`lib/validation/` is the donation form's validation.
+`donationValidation.js` is the donation form's rules as shown while typing; the server's copy is the one that decides.
 
 ## Server
 
@@ -245,6 +245,35 @@ wording. One flat folder per area, with no folders inside.
 file to `database/migrations/` and append the same change to `schema.sql`, then run
 `npm run migrate` in `server/`.
 
+## Walking someone through the code
+
+Follow one action from the screen to the database. Receiving a delivery touches every layer
+and is short enough to read in a sitting. Open these in order:
+
+| Step | File | What to point at |
+|---|---|---|
+| 1. The address | `client/src/routes/routeTable.js` | The `receiving` line: its path, and that only warehouse staff may open it |
+| 2. The screen | `client/src/pages/ReceivingPage.jsx` | It is thin: a shell and one feature component |
+| 3. The steps | `client/src/features/receiving/ReceivingFlow.jsx` | Choosing the order, counting each line, the signature, the done screen |
+| 4. The call | `client/src/services/receivingAPI.js` | `recordDelivery`: the one place the screen talks to the server, and how it queues with no signal |
+| 5. The door | `server/src/routes/delivery.routes.js` | The address, `auth`, and `requireRole` on the same line |
+| 6. The request | `server/src/controllers/delivery.controller.js` | Reads the body, calls the service, shapes the answer |
+| 7. The rules | `server/src/services/delivery.service.js` | What is refused and why: an unapproved order, a part quantity of a whole item |
+| 8. The SQL | `server/src/repositories/delivery.repository.js` | `createDelivery`: one transaction that writes the note, adds the stock, and sets the order's status |
+| 9. The ledger | `server/src/repositories/stock.repository.js` | `adjustStock`: the balance and the ledger line change together |
+| 10. The proof | `server/__tests__/` and `client/src/tests/` | A test for the rule you just read |
+
+Then show the three things that cut across every feature:
+
+- **Who may do what**: `routeTable.js` on the client and `requireRole` on the server, with
+  `__tests__/routeRoles.test.js` holding them to a recorded baseline.
+- **No signal**: `services/outbox.js` on the client and `middleware/idempotency.middleware.js`
+  on the server.
+- **Language**: `translations/phrases.js` and `floorTranslator.js`.
+
+To find anything else, start from the screen's name in `routeTable.js` and follow the same
+ten steps: the file names match across the layers.
+
 ## Tests
 
 | Where | Run with | What |
@@ -259,7 +288,5 @@ file to `database/migrations/` and append the same change to `schema.sql`, then 
 
 - `features/donationManagement/PendingDonationsTab.jsx` and `usePendingDonations.js` are
   not shown on any screen. Only their tests use them.
-- `client/src/lib/validation/donationIntake.part1.js` and `.part2c.js` are oddly named halves
-  of one validator; the server has the full set under `server/src/utils/donationIntake/`.
 - `server/__tests__/helpers/buildDonationAdminApp.js` imports a route file by a path that
   does not exist. Only the integration tests use it, and they need a real database to run.

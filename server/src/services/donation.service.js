@@ -37,7 +37,7 @@ import {
   validateMoney,
   validateIsoDate,
   donationFingerprint,
-} from '../utils/donationIntake/donationIntake.js';
+} from '../utils/donationValidation.js';
 import donationModel from '../repositories/donation.repository.js';
 import { createNotification } from '../repositories/notification.repository.js';
 import gmailRepository from '../repositories/gmail.repository.js';

@@ -6,7 +6,7 @@ import pendingDonationRepository from '../repositories/pendingDonation.repositor
 import productRepository from '../repositories/product.repository.js';
 import donationAdminService from './donationAdmin.service.js';
 import donationService from './donation.service.js';
-import { validateEmail } from '../utils/donationIntake/donationIntake.part1.js';
+import { validateEmail } from '../utils/donationValidation.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
