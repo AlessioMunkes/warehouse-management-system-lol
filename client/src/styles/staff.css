@@ -2967,10 +2967,11 @@ button.stf-panel-head:disabled { cursor: default; }
 .stf-task-icon {
   position: relative;
   flex-shrink: 0;
+  box-sizing: border-box;
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  border: 1.5px solid var(--stf-border);
+  border: 2px solid var(--stf-border);
   background: var(--stf-white);
   display: flex;
   align-items: center;
@@ -2978,7 +2979,13 @@ button.stf-panel-head:disabled { cursor: default; }
   transition: border-color 150ms ease, background 150ms ease;
 }
 .stf-task-item:hover .stf-task-icon { border-color: var(--stf-gold); background: var(--stf-sand); }
-.stf-task-icon img { width: 30px; height: 30px; object-fit: contain; }
+.stf-task-icon img {
+  display: block;
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  image-rendering: -webkit-optimize-contrast;
+}
 .stf-task-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .stf-task-title {
   font-family: var(--stf-font-display);

@@ -116,6 +116,19 @@ const sanitiseClonedDocument = (clonedDoc) => {
   }
 };
 
+const prepareClonedPdfDocument = (clonedDoc) => {
+  const pdfRoot = clonedDoc.querySelector('[data-pdf-root]');
+  if (!pdfRoot) return;
+
+  pdfRoot.style.setProperty('width', '794px', 'important');
+  pdfRoot.style.setProperty('max-width', 'none', 'important');
+  pdfRoot.style.setProperty('box-sizing', 'border-box', 'important');
+
+  if (!pdfRoot.querySelector('.pdf-poster')) {
+    pdfRoot.style.setProperty('padding', '40px 44px', 'important');
+  }
+};
+
 export default function PdfShell({ title, filename, onClose, children }) {
   const documentRef = useRef(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -147,7 +160,10 @@ export default function PdfShell({ title, filename, onClose, children }) {
         logging: false,
         // Runs against html2canvas's internal clone, before it rasterises.
         // Mutating the clone leaves the visible page untouched.
-        onclone: (clonedDoc) => sanitiseClonedDocument(clonedDoc),
+        onclone: (clonedDoc) => {
+          sanitiseClonedDocument(clonedDoc);
+          prepareClonedPdfDocument(clonedDoc);
+        },
       });
 
       // JPEG, not PNG: a PNG of a scale-2 A4 page is megabytes per page
