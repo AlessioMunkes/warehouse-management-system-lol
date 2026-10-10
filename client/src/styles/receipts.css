@@ -120,19 +120,19 @@
 
 .pdf-scroll-area {
   flex: 1;
-  overflow-y: auto;
+  overflow: auto;
   padding: 20px 12px 48px;
   -webkit-overflow-scrolling: touch;
 }
 
 /* ── The document itself ──────────────────────────────────── */
-/* Fixed 794px = A4 at 96dpi. html2canvas rasterises at the node's
-   layout width, so letting this be fluid makes the PDF's proportions
-   depend on the reader's window size. It is deliberately NOT
-   responsive; the wrapper scrolls instead. */
+/* 794px = A4 at 96dpi. The visible preview can shrink to the phone
+   viewport so it is not clipped; PdfShell forces the cloned export
+   document back to 794px immediately before html2canvas rasterises it. */
 .pdf-document {
-  width: 794px;
-  max-width: 100%;
+  width: min(794px, calc(100vw - 24px));
+  max-width: 794px;
+  box-sizing: border-box;
   margin: 0 auto;
   padding: 40px 44px;
   background: #ffffff;
@@ -445,6 +445,56 @@
 
 .pdf-footer-stamp p { margin: 0; }
 .pdf-footer-stamp--spaced { margin-top: 4px !important; }
+@media (max-width: 640px) {
+  .pdf-scroll-area {
+    padding: 16px 8px 32px;
+  }
+
+  .pdf-document {
+    width: calc(100vw - 16px);
+    padding: 32px 18px;
+  }
+
+  .pdf-doc-header {
+    gap: 14px;
+  }
+
+  .pdf-doc-header-right {
+    gap: 10px;
+  }
+
+  .pdf-doc-logo {
+    max-width: 54px;
+    max-height: 42px;
+  }
+
+  .pdf-meta-grid {
+    columns: 2;
+    column-gap: 16px;
+  }
+
+  .pdf-table {
+    table-layout: fixed;
+    font-size: 11px;
+  }
+
+  .pdf-table thead th,
+  .pdf-table tbody td,
+  .pdf-table-foot td {
+    padding-left: 6px;
+    padding-right: 6px;
+    overflow-wrap: anywhere;
+  }
+
+  .pdf-table thead th {
+    font-size: 8px;
+    letter-spacing: 0.05em;
+  }
+
+  .pdf-signature-section {
+    gap: 20px;
+  }
+}
 
 /* ─────────────────────────────────────────────────────────────
    POSTER PAGES (Impact Calculator PDF only)
@@ -648,3 +698,4 @@
     min-height: 0 !important;
   }
 }
+
