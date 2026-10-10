@@ -327,6 +327,15 @@ export default function PurchaseOrderDetail({
         </section>
       ) : null}
 
+      {/* A new order is not in Receiving until it is approved. */}
+      {pending ? (
+        <div role="status" className="rounded-lg border p-3 text-sm">
+          {canManage
+            ? 'Approve this order to show it in Receiving.'
+            : 'This order shows in Receiving once a manager approves it.'}
+        </div>
+      ) : null}
+
       {/* Mandatory on Returned (BR-07B, enforced in SQL) and on a
           recorded follow-up — so if there is one, it is on screen. */}
       {flagged ? (

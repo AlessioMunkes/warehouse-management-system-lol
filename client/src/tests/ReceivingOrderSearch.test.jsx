@@ -236,3 +236,47 @@ describe('receiving: every line has to be ticked', () => {
     expect(screen.getByRole('button', { name: 'Finish this delivery' })).toBeDisabled();
   });
 });
+
+describe('receiving: what Form used to leave out', () => {
+  it('has the use-by date for a fresh line', async () => {
+    const user = userEvent.setup();
+    await openOrder86Form(user);
+
+    // Apples is fresh and has no date yet, so Form opens on it.
+    const useBy = screen.getByLabelText(/What is the date on the box/i);
+    await user.type(useBy, '2026-11-01');
+    await waitFor(() =>
+      expect(screen.queryByText(/a use-by date on/)).not.toBeInTheDocument());
+  });
+
+  it('opens a line when it is tapped', async () => {
+    const user = userEvent.setup();
+    await openOrder86Form(user);
+
+    await user.click(screen.getByRole('button', { name: /Canned Baked Beans 410g/, expanded: false }));
+    expect(screen.getByText(/Where the Canned Baked Beans 410g is going/)).toBeInTheDocument();
+  });
+
+  it('shows the order number the manager sees, and finds the order by it', async () => {
+    receivingAPI.getPurchaseOrders.mockResolvedValue(
+      ORDERS.map((o) => ({ ...o, po_number: `PO-2026-00${o.id}` })),
+    );
+    setMode('guided');
+    const user = userEvent.setup();
+    render(<ReceivingFlow />);
+    const select = await screen.findByRole('combobox', { name: /Which order/i });
+    expect(within(select).getByRole('option', { name: /PO-2026-0086/ })).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/Search by order number/), 'PO-2026-0074');
+    expect(within(select).queryByRole('option', { name: /PO-2026-0086/ })).not.toBeInTheDocument();
+  });
+
+  it('names an order still waiting for approval', async () => {
+    receivingAPI.getOrdersAwaitingApproval = vi.fn().mockResolvedValue([
+      { id: 90, po_number: 'PO-2026-0090', supplier_name: 'Bokomo Foods Distribution' },
+    ]);
+    setMode('guided');
+    render(<ReceivingFlow />);
+    expect(await screen.findByText(/Waiting for a manager to approve: PO-2026-0090/)).toBeInTheDocument();
+  });
+});

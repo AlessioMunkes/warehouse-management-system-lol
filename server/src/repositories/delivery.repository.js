@@ -143,6 +143,7 @@ const getDeliveryById = async (id) => {
        dn.created_at,
        dn.signature,
        dn.purchase_order_id,
+       po.po_number,
        s.name           AS supplier_name,
        s.address        AS supplier_address,
        s.contact_phone  AS supplier_phone,
@@ -150,6 +151,7 @@ const getDeliveryById = async (id) => {
      FROM delivery_notes dn
      LEFT JOIN suppliers s ON s.id = dn.supplier_id
      LEFT JOIN users u ON u.id = dn.received_by
+     LEFT JOIN purchase_orders po ON po.id = dn.purchase_order_id
      WHERE dn.id = $1`,
     [id],
   );
@@ -620,6 +622,7 @@ const listOpenPurchaseOrders = async (supplierId = null) => {
   const result = await pool.query(
     `SELECT
        po.id,
+       po.po_number,
        po.status,
        po.supplier_id,
        s.name AS supplier_name,
@@ -641,12 +644,21 @@ const listOpenPurchaseOrders = async (supplierId = null) => {
 // Returns product name, expected quantity and weight so the form can
 // auto-populate. default_unit is what the stock ledger is keyed on —
 // without it, a product's first movement has no unit to record.
+//
+// expected_quantity is what is STILL OWED on the line, not what was
+// ordered. They are the same until something has been received; they
+// differ on a part-received order a manager reopened, and offering the
+// full order again there put the first delivery into stock twice the
+// moment someone pressed "Everything as ordered". ordered_quantity and
+// received_to_date are the two numbers it comes from.
 const getPurchaseOrderItems = async (purchaseOrderId) => {
   const result = await pool.query(
     `SELECT
        poi.id                  AS purchase_order_item_id,
        poi.product_id,
-       poi.expected_quantity,
+       GREATEST(poi.expected_quantity - COALESCE(got.received, 0), 0) AS expected_quantity,
+       poi.expected_quantity   AS ordered_quantity,
+       COALESCE(got.received, 0) AS received_to_date,
        poi.expected_weight_kg,
        poi.unit_price,
        p.name                  AS product_name,
@@ -656,6 +668,11 @@ const getPurchaseOrderItems = async (purchaseOrderId) => {
        p.is_perishable
      FROM purchase_order_items poi
      JOIN products p ON p.id = poi.product_id
+     LEFT JOIN LATERAL (
+       SELECT SUM(dni.received_quantity) AS received
+         FROM delivery_note_items dni
+        WHERE dni.purchase_order_item_id = poi.id
+     ) got ON TRUE
      WHERE poi.purchase_order_id = $1
      ORDER BY p.name ASC`,
     [purchaseOrderId],

@@ -36,7 +36,7 @@
 // see lib/useDraft.js. That refills the form; it never submits.
 // ─────────────────────────────────────────────────────────────
 import PhotoButton from '../staff/PhotoButton';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { takeUrlParam } from '../staff/resumeParam';
 import {
   StepScreen, Actions, Button, SelectField, DateField,
@@ -138,11 +138,17 @@ const longDate = (value) =>
 const orderText = (order) => [
   'order',
   order.id,
+  order.po_number,
   order.supplier_name,
   order.status,
   order.expected_delivery_date,
   order.expected_delivery_date ? longDate(order.expected_delivery_date) : '',
 ].filter(Boolean).join(' ');
+
+// The order's own number, the one the manager's screen and the
+// supplier's paperwork carry. poCode's id-based code is only for an
+// order that somehow has none.
+const orderCode = (order) => order?.po_number || formatPoCode(order?.id);
 
 export default function ReceivingFlow({ onCrumbChange }) {
   const { user } = useAuth();
@@ -158,8 +164,8 @@ export default function ReceivingFlow({ onCrumbChange }) {
   const acceptUndo = useUndo();
 
   const [suppliers, setSuppliers] = useState([]);
-  // Narrower than `suppliers` — only those with an approved order.
-  const [openSuppliers, setOpenSuppliers] = useState([]);
+  // Raised but not approved yet: named on step 1, never selectable.
+  const [waitingOrders, setWaitingOrders] = useState([]);
   const [deliveryDate, setDeliveryDate] = useState(todayISO);
   const [signature, setSignature] = useState(null);
   const [pdfDelivery, setPdfDelivery] = useState(null);
@@ -186,6 +192,20 @@ export default function ReceivingFlow({ onCrumbChange }) {
   const orders = supplierId
     ? openOrders.filter((o) => String(o.supplier_id) === String(supplierId))
     : openOrders;
+
+  // Form's supplier list: only those with an order to receive. Read off
+  // the orders themselves, so the two can never disagree. It used to be
+  // its own request, cached for a minute, and an order approved inside
+  // that minute had no supplier to find it under.
+  const openSuppliers = useMemo(() => {
+    const byId = new Map();
+    for (const o of openOrders) {
+      if (o.supplier_id && !byId.has(String(o.supplier_id))) {
+        byId.set(String(o.supplier_id), { id: o.supplier_id, name: o.supplier_name });
+      }
+    }
+    return [...byId.values()].sort((a, b) => String(a.name).localeCompare(String(b.name)));
+  }, [openOrders]);
 
   const orderSearch = useListSearch(openOrders, orderText);
 
@@ -236,25 +256,25 @@ export default function ReceivingFlow({ onCrumbChange }) {
   // off it would save the previous order's counts under the new name.
   const [linesKey, setLinesKey] = useState(null);
 
-  // ── Suppliers, once ─────────────────────────────────────────
-  // Both lists up front rather than lazily on first switch to Form:
-  // mode is remembered per device and can already be 'full' on load.
+  // ── The orders ──────────────────────────────────────────────
+  // No supplier argument: every open order, all suppliers. One call
+  // instead of one per supplier tap.
+  const loadOrders = useCallback(async () => {
+    setOpenOrders(await receivingAPI.getPurchaseOrders());
+    // The waiting list is a note, not the job. If it fails the screen
+    // still works, it just cannot say why an order is missing.
+    try {
+      setWaitingOrders(await receivingAPI.getOrdersAwaitingApproval());
+    } catch { /* leave what was there */ }
+  }, []);
+
+  // ── Suppliers and orders, at mount ──────────────────────────
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [list, openList, orderList] = await Promise.all([
-          receivingAPI.getSuppliers(),
-          receivingAPI.getSuppliersWithOpenOrders(),
-          // No supplier argument: every open order, all suppliers. One
-          // call at mount instead of one per supplier tap.
-          receivingAPI.getPurchaseOrders(),
-        ]);
-        if (!cancelled) {
-          setSuppliers(list);
-          setOpenSuppliers(openList);
-          setOpenOrders(orderList);
-        }
+        const [list] = await Promise.all([receivingAPI.getSuppliers(), loadOrders()]);
+        if (!cancelled) setSuppliers(list);
       } catch (err) {
         if (!cancelled) setError(err.message);
       } finally {
@@ -262,7 +282,23 @@ export default function ReceivingFlow({ onCrumbChange }) {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [loadOrders]);
+
+  // An order approved while this screen sat open was never in the list
+  // fetched at mount. Coming back to the tab asks again, so "my manager
+  // just approved it" is true here without a reload.
+  useEffect(() => {
+    if (phase !== 'which') return undefined;
+    const refresh = () => {
+      if (document.visibilityState === 'visible') loadOrders().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      document.removeEventListener('visibilitychange', refresh);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [phase, loadOrders]);
 
 
   // step/total omitted on the done screen — no progress bar makes sense
@@ -335,7 +371,11 @@ export default function ReceivingFlow({ onCrumbChange }) {
           productId:  item.product_id,
           name:       item.product_name,
           sku:        item.sku,
+          // What is still owed on the line. The same as what was ordered
+          // until part of it has been received.
           expected:   Number(item.expected_quantity ?? 0),
+          alreadyReceived: Number(item.received_to_date ?? 0),
+          ordered:    Number(item.ordered_quantity ?? item.expected_quantity ?? 0),
           expectedKg: item.expected_weight_kg === null ? null : Number(item.expected_weight_kg),
           fresh,
           // Exception-first: start at what the order says, in both
@@ -353,7 +393,12 @@ export default function ReceivingFlow({ onCrumbChange }) {
       setLinesKey(`receiving-${poId}`);
       if (draft?.deliveryDate) setDeliveryDate(draft.deliveryDate);
       setPhase('work');
-      setFocusId(mode === 'guided' ? (built[0]?.purchaseOrderItemId ?? null) : null);
+      // Form opens on the first fresh line still missing its date, since
+      // that is the one thing its collapsed rows cannot show.
+      const needsDate = built.find((l) => l.fresh && !l.useBy);
+      setFocusId(mode === 'guided'
+        ? (built[0]?.purchaseOrderItemId ?? null)
+        : (needsDate?.purchaseOrderItemId ?? null));
     } catch (err) {
       setError(err.message);
     } finally {
@@ -418,8 +463,12 @@ export default function ReceivingFlow({ onCrumbChange }) {
   if (unconfirmed > 0) {
     blockers.push(`a tick on ${unconfirmed} more ${unconfirmed === 1 ? 'line' : 'lines'}`);
   }
+  // Named when there are few enough to name: the date lives in the
+  // line's own panel, so "which line" is the whole question.
   if (missingUseBy.length) {
-    blockers.push(`a use-by date on ${missingUseBy.length} fresh ${missingUseBy.length === 1 ? 'line' : 'lines'}`);
+    blockers.push(missingUseBy.length <= 2
+      ? `a use-by date on ${missingUseBy.map((l) => l.name).join(' and ')} (tap the line)`
+      : `a use-by date on ${missingUseBy.length} fresh lines (tap each line)`);
   }
   if (!signature) blockers.push("the driver's signature");
   const blockedNote = blockers.length ? `Still needed: ${blockers.join(', ')}.` : null;
@@ -592,7 +641,7 @@ export default function ReceivingFlow({ onCrumbChange }) {
                 placeholder="Choose an order"
                 options={visibleOrders.map((o) => ({
                   value: o.id,
-                  label: [formatPoCode(o.id), o.supplier_name].filter(Boolean).join(' · '),
+                  label: [orderCode(o), o.supplier_name].filter(Boolean).join(' · '),
                 }))}
                 value={orderId}
                 onChange={selectOrder}
@@ -618,7 +667,7 @@ export default function ReceivingFlow({ onCrumbChange }) {
               placeholder="Choose an order"
               options={formOrders.map((o) => ({
                 value: o.id,
-                label: formatPoCode(o.id),
+                label: orderCode(o),
               }))}
               value={orderId}
               onChange={selectOrder}
@@ -635,13 +684,26 @@ export default function ReceivingFlow({ onCrumbChange }) {
               before you sign anything in.
             </Notice>
           )}
+
+          {/* An order nobody has approved is not in the lists above.
+              Saying so here is what stops "it is not showing up". */}
+          {waitingOrders.length > 0 ? (
+            <Notice>
+              Waiting for a manager to approve:{' '}
+              {waitingOrders.slice(0, 5)
+                .map((o) => [orderCode(o), o.supplier_name].filter(Boolean).join(' · '))
+                .join(', ')}
+              {waitingOrders.length > 5 ? ` and ${waitingOrders.length - 5} more` : ''}.
+              {' '}They show here once approved.
+            </Notice>
+          ) : null}
         </StepScreen>
       )}
 
       {/* ── 2 · Count and put away ─────────────────────────── */}
       {phase === 'work' && (
         <TaskPage
-          title={`${supplierName}${orderId ? ` · ${formatPoCode(orderId)}` : ''}`}
+          title={`${supplierName}${orderId ? ` · ${orderCode(openOrders.find((o) => String(o.id) === String(orderId)) ?? { id: orderId })}` : ''}`}
           sub="Check what is on the floor against the note, then sign it in."
           toggle={toggleControl}
           note={blockedNote}
@@ -687,10 +749,13 @@ export default function ReceivingFlow({ onCrumbChange }) {
                 expected: line.expected,
                 value:    line.counted,
               }))}
-              expectedLabel="ordered"
+              expectedLabel={lines.some((l) => l.alreadyReceived > 0) ? 'still to come' : 'ordered'}
               guided={mode === 'guided'}
-              focusId={mode === 'guided' ? focusId : null}
-              onFocus={(id) => setFocusId(mode === 'guided' ? id : null)}
+              // Form too: where it goes and the use-by date are in the
+              // panel under the line, and a row that never opened had
+              // no way to take a date the finish button asks for.
+              focusId={focusId}
+              onFocus={setFocusId}
               onChange={(id, value) => patchLine(id, { counted: value })}
               onAcceptAll={acceptAllAsOrdered}
               acceptAllLabel="Everything as ordered"
@@ -710,7 +775,9 @@ export default function ReceivingFlow({ onCrumbChange }) {
                     <KeyValues
                       pairs={[
                         ['Code', line.sku],
-                        ['Ordered', `${line.expected}${line.expectedKg ? ` (${line.expectedKg} kg)` : ''}`],
+                        ['Ordered', `${line.ordered}${line.expectedKg ? ` (${line.expectedKg} kg)` : ''}`],
+                        line.alreadyReceived > 0 ? ['Already received', line.alreadyReceived] : null,
+                        line.alreadyReceived > 0 ? ['Still to come', line.expected] : null,
                         ['Type', line.fresh ? 'Fresh, needs a use-by date' : 'Dry'],
                       ]}
                     />

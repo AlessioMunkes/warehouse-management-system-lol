@@ -34,7 +34,7 @@
 import { assertWholeByProduct } from '../features/units/wholeItems.js';
 import deliveryModel from '../repositories/delivery.repository.js';
 import { isStorageArea } from '../constants/storageAreas.js';
-import { isValidDateString, isPositiveInt, isUuid } from '../utils/validation.js';
+import { isValidDateString, isPositiveInt, isUuid, toQuantity } from '../utils/validation.js';
 import { isOpenPurchaseOrder, CLOSED_PO_STATUSES } from '../constants/purchaseOrderStatus.js';
 import { DELIVERY_SORTS, SORT_DIRECTIONS } from '../constants/receiptSort.js';
 
@@ -195,6 +195,11 @@ const createDelivery = async (data, userId) => {
   if (!isValidDateString(deliveryDate)) {
     fail(400, 'Delivery date must be a real date in YYYY-MM-DD form.');
   }
+  // A delivery is signed in when it arrives. A later date is a slip of
+  // the picker, and it would sit ahead of every real note in the list.
+  if (deliveryDate > todayInSAST()) {
+    fail(400, 'Delivery date cannot be after today.');
+  }
 
   if (idempotencyKey !== undefined && idempotencyKey !== null && !isUuid(idempotencyKey)) {
     fail(400, 'Invalid request key.');
@@ -251,7 +256,9 @@ const createDelivery = async (data, userId) => {
     seen.add(key);
 
     const expected = Number(po.expected_quantity);
-    const received = Number(line.receivedQuantity);
+    // toQuantity, not Number: a line sent with no count is not a count
+    // of zero.
+    const received = toQuantity(line.receivedQuantity);
 
     if (!Number.isFinite(received) || received < 0) {
       fail(400, `Received quantity for ${po.product_name} must be zero or more.`);

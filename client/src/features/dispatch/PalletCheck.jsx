@@ -508,8 +508,8 @@ export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChan
               }))}
               expectedLabel="packed"
               guided={mode === 'guided'}
-              focusId={mode === 'guided' ? focusId : null}
-              onFocus={(id) => setFocusId(mode === 'guided' ? id : null)}
+              focusId={focusId}
+              onFocus={setFocusId}
               onChange={(id, value) => patchLine(id, { loaded: value })}
               onAcceptAll={acceptAllAsPacked}
               acceptAllLabel="Everything as packed"

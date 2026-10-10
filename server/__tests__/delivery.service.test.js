@@ -281,6 +281,40 @@ describe('createDelivery — a retry is not a second delivery', () => {
 });
 
 // ── Statuses, not string-matching ─────────────────────────────
+describe('createDelivery — what counts as a count, and as a date', () => {
+  // Number(null) is 0. With a reason attached, a line sent with no
+  // count at all used to be recorded as "none arrived".
+  it.each([null, '', true, [20]])('a line with %j for its count is refused, not read as a number', async (receivedQuantity) => {
+    await expect(deliveryService.createDelivery(
+      body({ lineItems: [{ purchaseOrderItemId: 100, receivedQuantity, overAction: 'accept',
+                           location: 'dry_store', discrepancyReason: 'Short count at receiving' }] }), USER_ID,
+    )).rejects.toMatchObject({ status: 400, message: expect.stringContaining('zero or more') });
+    expect(repoMock.createDelivery).not.toHaveBeenCalled();
+  });
+
+  it('a delivery dated after today is refused', async () => {
+    await expect(deliveryService.createDelivery(body({ deliveryDate: '2099-01-01' }), USER_ID))
+      .rejects.toMatchObject({ status: 400, message: 'Delivery date cannot be after today.' });
+    expect(repoMock.createDelivery).not.toHaveBeenCalled();
+  });
+
+  // A reopened part-received order: the repository hands back what is
+  // still owed as expected_quantity, so receiving exactly that is clean.
+  it('receiving what is still owed on a reopened order is not a discrepancy', async () => {
+    repoMock.getPurchaseOrderItems.mockResolvedValue([
+      poItem({ expected_quantity: 5, ordered_quantity: 8, received_to_date: 3 }),
+    ]);
+    await deliveryService.createDelivery(
+      body({ lineItems: [{ purchaseOrderItemId: 100, receivedQuantity: 5, overAction: 'accept', location: 'dry_store' }] }),
+      USER_ID,
+    );
+    expect(repoMock.createDelivery).toHaveBeenCalledWith(expect.objectContaining({
+      hasDiscrepancy: false,
+      lineItems: [expect.objectContaining({ expectedQuantity: 5, receivedQuantity: 5 })],
+    }));
+  });
+});
+
 describe('createDelivery — every refusal carries a status', () => {
   // These two are the reason this matters. Neither message contains
   // the word "required", so the old controller sent both as 500s.
