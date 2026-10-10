@@ -185,14 +185,17 @@ export const Notice = ({ tone = 'info', children }) => (
 // ── Status pill (ACC-03) ──────────────────────────────────────
 // Mark + word together. Colour is the third signal, never the only one,
 // so this reads correctly in greyscale and to a colour-blind volunteer.
+//
+// Only drawn for an item that has been dealt with. The item on screen is
+// always still to do, so a "To do" pill there told the volunteer nothing.
 const STATES = {
   confirmed: { cls: 'done',    mark: '✓', label: 'Packed' },
   flagged:   { cls: 'problem', mark: '!', label: 'Problem' },
-  pending:   { cls: 'todo',    mark: '•', label: 'To do' },
 };
 
 export const StatusPill = ({ status }) => {
-  const s = STATES[status] ?? STATES.pending;
+  const s = STATES[status];
+  if (!s) return null;
   return (
     <span className={`gst-state gst-state-${s.cls}`}>
       <span className="gst-state-mark" aria-hidden="true">{s.mark}</span>

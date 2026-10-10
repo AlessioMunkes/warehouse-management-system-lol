@@ -316,7 +316,6 @@ const GuestPackPage = () => {
               // FEFO, in the same words the staff screen and the printed slip use.
               takeFirstText(current) ? `${takeFirstText(current)}.` : '',
             ].filter(Boolean).join(' ')}
-            badge={<StatusPill status="pending" />}
           >
             <Counter label="How many did you pack?" value={qty} onChange={setQty} />
 

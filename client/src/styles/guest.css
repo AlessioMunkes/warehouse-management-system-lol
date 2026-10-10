@@ -49,7 +49,7 @@
               warnings are --danger-ink. index.css documents and
               maintains those ratios in both themes.
    ACC-03     Status is never colour alone. Every state pairs a mark
-              (✓ ! •) with a word. See .gst-state.
+              (✓ !) with a word. See .gst-state.
    ACC-04     200% zoom: everything is rem/ch based and single column,
               no fixed heights on text containers, no overflow hidden
               on anything that holds words.
@@ -395,7 +395,6 @@
 .gst-state-mark { font-size: 1rem; line-height: 1; }
 .gst-state-done    { background: var(--gst-good-bg); color: var(--gst-good); border-color: color-mix(in srgb, var(--gst-good) 30%, transparent); }
 .gst-state-problem { background: var(--gst-attention-bg); color: var(--gst-attention); border-color: color-mix(in srgb, var(--gst-attention) 30%, transparent); }
-.gst-state-todo    { background: var(--gst-sand); color: var(--gst-text-sub); border-color: var(--gst-border); }
 
 /* ── "What you've done so far" list ───────────────────────────── */
 /* Was inline flex styles on the <li>. A long product name beside a

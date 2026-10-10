@@ -600,6 +600,14 @@ describe('the packing screen (guided look)', () => {
     expect(screen.getByRole('navigation', { name: 'Move between items' })).toBeInTheDocument();
   });
 
+  it('has no "To do" pill on the item in front of them', async () => {
+    api.fetchMySlip.mockResolvedValue(mySlip);
+    renderAt('/guest/pack', <GuestPackPage />, '/guest/pack');
+
+    await screen.findByRole('heading', { level: 2, name: 'Butternut' });
+    expect(screen.queryByText('To do')).not.toBeInTheDocument();
+  });
+
   it('has no previous / next when only one item is left', async () => {
     api.fetchMySlip.mockResolvedValue({ ...mySlip, items: [mySlip.items[0]] });
     renderAt('/guest/pack', <GuestPackPage />, '/guest/pack');
