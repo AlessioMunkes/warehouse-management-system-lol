@@ -27,7 +27,7 @@ import '../../styles/guest.css';
 const Masthead = () => (
   <header className="gst-masthead">
     <span className="gst-masthead-brand">Ladles<span>·</span>of<span>·</span>Love</span>
-    <span className="gst-masthead-brand" style={{ fontWeight: 500 }}>Love Activist</span>
+    <span className="gst-masthead-brand gst-masthead-role">Love Activist</span>
   </header>
 );
 
@@ -307,7 +307,7 @@ export const PalletCard = ({ slip, onClick, actionLabel, disabled = false }) => 
       </p>
       <p className="gst-card-meta">Going out {formatDay(slip.dispatchDate)}</p>
       {actionLabel ? (
-        <p className="gst-card-meta" style={{ marginTop: '0.75rem', fontWeight: 700, color: 'var(--gst-accent)' }}>
+        <p className="gst-card-meta gst-card-action">
           {actionLabel} →
         </p>
       ) : null}
@@ -329,7 +329,7 @@ export const PalletCard = ({ slip, onClick, actionLabel, disabled = false }) => 
 export const HelpNote = ({ children = 'Not sure what to do, or something looks wrong?' }) => (
   <div className="gst-help">
     <p className="gst-help-text">{children}</p>
-    <p className="gst-help-text" style={{ margin: 0, fontWeight: 700, color: 'var(--gst-ink)' }}>
+    <p className="gst-help-text gst-help-strong">
       Ask any staff member — they are happy to help.
     </p>
   </div>

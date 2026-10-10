@@ -232,7 +232,9 @@ describe('(c) guest home', () => {
 
     expect(await screen.findByRole('button', { name: 'Continue packing' })).toBeInTheDocument();
     // The in-progress card names the beneficiary and how far they got.
-    expect(screen.getByText('Your pallet in progress: Masibambane Day Care, 0 of 2 packed')).toBeInTheDocument();
+    expect(screen.getByText('Your pallet in progress')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Masibambane Day Care' })).toBeInTheDocument();
+    expect(screen.getByText('0 of 2 packed')).toBeInTheDocument();
     // …and does not offer a second pallet on top of it.
     expect(screen.queryByText(/today.s pallets/i)).not.toBeInTheDocument();
   });
@@ -249,7 +251,7 @@ describe('(c) guest home', () => {
     api.fetchAvailableSlips.mockResolvedValue([]);
     renderAt('/guest-home', <GuestHomePage />, '/guest-home');
 
-    expect(await screen.findByText('Your pallet in progress: Masibambane Day Care, 2 of 3 packed')).toBeInTheDocument();
+    expect(await screen.findByText('2 of 3 packed')).toBeInTheDocument();
   });
 
   it('Continue packing goes to the packing screen', async () => {
@@ -597,8 +599,8 @@ describe('Return this pallet (guest home)', () => {
     api.fetchAvailableSlips.mockResolvedValue([preview135]);
     (await screen.findByRole('button', { name: 'Return pallet' })).click();
 
-    expect(await screen.findByText('Masibambane Day Care')).toBeInTheDocument();
-    expect(screen.getByLabelText('Pallet code')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Pallet code')).toBeInTheDocument();
+    expect(screen.getByText('Masibambane Day Care')).toBeInTheDocument();
     expect(screen.queryByText(/Your pallet in progress/)).not.toBeInTheDocument();
     expect(api.releaseMySlip).toHaveBeenCalledTimes(1);
   });

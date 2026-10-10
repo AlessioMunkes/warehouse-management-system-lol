@@ -245,7 +245,7 @@ const GuestPackPage = () => {
         >
           <PlaceBar items={[{ text: current.product_name, strong: true }]} />
 
-          <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
+          <fieldset className="gst-fieldset">
             <legend className="gst-sr">Why is there a problem?</legend>
             <div className="gst-stack-tight">
               {PROBLEM_REASONS.map((r) => (
@@ -256,7 +256,7 @@ const GuestPackPage = () => {
                   aria-pressed={reason === r.value}
                   onClick={() => setReason(r.value)}
                 >
-                  <span className="gst-card-title" style={{ fontSize: '1rem' }}>
+                  <span className="gst-card-title gst-choice-label">
                     {reason === r.value ? '✓ ' : ''}{r.label}
                   </span>
                 </button>
@@ -363,7 +363,7 @@ const GuestPackPage = () => {
             alone (ACC-03). */}
         {done > 0 ? (
           <details className="gst-card gst-card-quiet">
-            <summary style={{ minHeight: 'var(--gst-tap)', display: 'flex', alignItems: 'center', cursor: 'pointer', fontWeight: 700 }}>
+            <summary className="gst-summary">
               What you’ve done so far ({done})
             </summary>
             <ul className="gst-done-list gst-stack-tight">

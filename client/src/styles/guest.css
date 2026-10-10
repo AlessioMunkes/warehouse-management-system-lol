@@ -146,6 +146,7 @@
   overflow-wrap: anywhere;
 }
 .gst-masthead-brand span { color: var(--gst-accent); }
+.gst-masthead-role { font-weight: 500; }
 
 /* ── Session bar: Home and Sign out ───────────────────────────── */
 .gst-nav {
@@ -245,6 +246,16 @@
   color: var(--gst-ink);
 }
 .gst-card-meta { margin: 0; font-size: 0.9375rem; color: var(--gst-text-sub); overflow-wrap: break-word; }
+.gst-card-action { margin-top: 0.75rem; font-weight: 700; color: var(--gst-accent); }
+.gst-choice-label { font-size: 1rem; }
+.gst-fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.gst-summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--gst-tap);
+  cursor: pointer;
+  font-weight: 700;
+}
 
 /* A whole card that is a tap target (choose-a-pallet list). */
 .gst-card-button {
@@ -467,6 +478,8 @@
 }
 .gst-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.25rem; }
 .gst-row-pos {
+  display: block;
+  margin: 0;
   font: 700 0.75rem/1.4 var(--gst-font-sans);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -580,6 +593,7 @@
   text-align: center;
 }
 .gst-help-text { margin: 0 0 0.75rem; font-size: 0.9375rem; color: var(--gst-text-sub); }
+.gst-help-strong { margin: 0; font-weight: 700; color: var(--gst-ink); }
 
 /* ── Skeleton ─────────────────────────────────────────────────── */
 .gst-skeleton {

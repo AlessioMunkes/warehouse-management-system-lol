@@ -30,14 +30,16 @@ import {
 } from '../features/guest/GuestPrimitives';
 import { displayName } from '../features/guest/guestFormat';
 
-// "<beneficiary>, <n> of <total> packed", from the /mine payload the page
+// Name and "<n> of <total> packed", from the /mine payload the page
 // already has. "n" counts every item dealt with (packed or flagged), the
 // same count the packing screen's progress uses.
-const mySlipLabel = (slip) => {
+const mySlipSummary = (slip) => {
   const items = slip.items ?? [];
-  const done = items.filter((i) => i.status !== 'pending').length;
-  const who = slip.ecd_name || slip.beneficiary_name || 'a community partner';
-  return `${who}, ${done} of ${items.length} packed`;
+  return {
+    who: slip.ecd_name || slip.beneficiary_name || 'A community partner',
+    done: items.filter((i) => i.status !== 'pending').length,
+    total: items.length,
+  };
 };
 
 const GuestHomePage = () => {
@@ -139,6 +141,7 @@ const GuestHomePage = () => {
   };
 
   const name = displayName(user?.firstName);
+  const held = mySlip ? mySlipSummary(mySlip) : null;
 
   return (
     <GuestShell nav>
@@ -153,9 +156,13 @@ const GuestHomePage = () => {
             {/* Already holding one — offer that before anything else. */}
             {mySlip ? (
               <div className="gst-card gst-stack-tight">
-                <p className="gst-card-title">
-                  Your pallet in progress: {mySlipLabel(mySlip)}
-                </p>
+                {/* Laid out like the worker's pallet row: the name as the
+                    heading, progress on its own line under it. */}
+                <div>
+                  <p className="gst-row-pos">Your pallet in progress</p>
+                  <h2 className="gst-card-title">{held.who}</h2>
+                  <p className="gst-card-meta">{held.done} of {held.total} packed</p>
+                </div>
                 {returning === 'idle' ? (
                   <>
                     <Button onClick={() => navigate('/guest/pack')}>Continue packing</Button>
