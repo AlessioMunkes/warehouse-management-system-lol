@@ -19,8 +19,8 @@
 //
 // But null must survive the cast. Number(null) is 0, and a line whose
 // price nobody recorded would then render "R 0.00" as though the goods
-// were free. expectedQuantity is INTEGER, which pg already returns as
-// a number, so it needs no such care.
+// were free. expectedQuantity is NUMERIC too (12.5 kg is an order) and
+// is cast the same way; it is never null.
 //
 // updatePurchaseOrder and deletePurchaseOrder both only ever reach a
 // 'pending' order server-side — see purchaseOrder.service.js. Nothing

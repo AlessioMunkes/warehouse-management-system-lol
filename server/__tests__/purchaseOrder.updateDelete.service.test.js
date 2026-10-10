@@ -50,6 +50,29 @@ describe('updatePurchaseOrder', () => {
     expect(repoMock.updatePurchaseOrder).not.toHaveBeenCalled();
   });
 
+  // An order line holds three decimal places: 12.5 kg is an order.
+  it('passes a part quantity through to three decimal places', async () => {
+    repoMock.updatePurchaseOrder.mockResolvedValue({ ok: true, purchaseOrder: { id: PO_ID } });
+    await purchaseOrderService.updatePurchaseOrder(
+      PO_ID, { ...VALID_BODY, items: [{ productId: 5, expectedQuantity: '12.125' }] }, 1);
+    expect(repoMock.updatePurchaseOrder).toHaveBeenCalledWith(
+      PO_ID, expect.objectContaining({ items: [expect.objectContaining({ expectedQuantity: 12.125 })] }), 1);
+  });
+
+  it.each([
+    [12.1234, 'at most 3 decimal places'],
+    [0, 'above zero'],
+    [-1, 'above zero'],
+    [null, 'above zero'],
+    ['', 'above zero'],
+    [true, 'above zero'],
+  ])('refuses a quantity of %j', async (expectedQuantity, message) => {
+    await expect(purchaseOrderService.updatePurchaseOrder(
+      PO_ID, { ...VALID_BODY, items: [{ productId: 5, expectedQuantity }] }, 1,
+    )).rejects.toMatchObject({ status: 400, message: expect.stringContaining(message) });
+    expect(repoMock.updatePurchaseOrder).not.toHaveBeenCalled();
+  });
+
   it('turns not_found into a 404', async () => {
     repoMock.updatePurchaseOrder.mockResolvedValue({ ok: false, code: 'not_found' });
     await expect(purchaseOrderService.updatePurchaseOrder(PO_ID, VALID_BODY, 1))

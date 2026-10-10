@@ -15,7 +15,8 @@
 // ─────────────────────────────────────────────────────────────
 import repo from '../repositories/purchaseOrder.repository.js';
 import supplierRepo from '../repositories/supplier.repository.js';
-import { isPositiveInt, isValidDateString } from '../utils/validation.js';
+import { isPositiveInt, isValidDateString, toQuantity } from '../utils/validation.js';
+import { assertWholeByProduct } from '../features/units/wholeItems.js';
 import {
   PO_STATUSES as PO_STATUS_LIST, PO_MANUAL_TRANSITIONS, canMovePurchaseOrder,
 } from '../constants/purchaseOrderStatus.js';
@@ -97,9 +98,16 @@ const buildItems = (raw) => {
     }
     seen.add(productId);
 
-    const quantity = Number(line.expectedQuantity);
-    if (!Number.isInteger(quantity) || quantity <= 0) {
-      throw fail(400, `Line ${position}: quantity must be a whole number above zero.`);
+    // Up to three decimal places: 12.5 kg of maize meal is an order.
+    // Whether THIS product may be a part quantity is checked against
+    // the catalogue afterwards (assertWholeLines), the same rule
+    // receiving, packing and the gate apply.
+    const quantity = toQuantity(line.expectedQuantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw fail(400, `Line ${position}: quantity must be above zero.`);
+    }
+    if (Math.abs(Math.round(quantity * 1000) / 1000 - quantity) > 1e-9) {
+      throw fail(400, `Line ${position}: quantity can have at most 3 decimal places.`);
     }
     if (quantity > 1_000_000) {
       throw fail(400, `Line ${position}: quantity looks like a typo, check it.`);
@@ -337,9 +345,15 @@ const assertSupplierSupplies = async (payload) => {
   throw err;
 };
 
+// A part quantity only for a decantable product: 2.5 crates cannot be
+// ordered, because 2.5 crates can never be received.
+const assertWholeLines = (payload) => assertWholeByProduct(
+  payload.items.map((l) => ({ productId: l.productId, quantity: l.expectedQuantity })));
+
 // ── Create ────────────────────────────────────────────────────
 const createPurchaseOrder = async (body, userId) => {
   const payload = buildPayload(body);
+  await assertWholeLines(payload);
   await assertSupplierSupplies(payload);
   const result  = await repo.createPurchaseOrder(payload, userId);
 
@@ -640,6 +654,7 @@ const resendFinanceEmail = async (rawId, userId = null) => {
 const updatePurchaseOrder = async (rawId, body, userId) => {
   if (!isPositiveInt(rawId)) throw fail(400, 'A valid purchase order ID is required.');
   const payload = buildPayload(body);
+  await assertWholeLines(payload);
   await assertSupplierSupplies(payload);
   const result  = await repo.updatePurchaseOrder(Number(rawId), payload, userId);
 

@@ -19,10 +19,11 @@
 //   weight  w    -> cost   = w x (costPerUnit / weightPerUnit)
 //   cost    c    -> weight = c x (weightPerUnit / costPerUnit)
 //
-// WEIGHT AND COST DO NOT DRIVE QUANTITY, deliberately. expected_quantity
-// is an integer — you order three crates, not 1.4 of them — so
+// WEIGHT AND COST DO NOT DRIVE QUANTITY, deliberately. A counted
+// product is a whole number (you order three crates, not 1.4 of them)
+// and only a loose one may be a part quantity, to three places, so
 // back-computing it from a weight would either produce a fraction the
-// column cannot hold or round the number the buyer actually typed. The
+// server refuses or round the number the buyer actually typed. The
 // realistic case is the other way round: you ordered 3 crates, this
 // supplier's crates run heavy, so you correct the expected weight and
 // the money follows it.

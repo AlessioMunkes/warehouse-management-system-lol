@@ -153,7 +153,7 @@ export default function PurchaseOrderLines({
 
                   <TableCell>
                     <Input
-                      type="number" min="1" step="1"
+                      type="number" min="0.001" step="0.001"
                       aria-label={`Quantity for line ${index + 1}`}
                       value={line.expectedQuantity}
                       onChange={(e) => relink(line.key, 'expectedQuantity', e.target.value)}

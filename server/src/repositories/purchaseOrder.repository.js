@@ -131,7 +131,7 @@ const createPurchaseOrder = async (payload, userId) => {
       `INSERT INTO purchase_order_items
          (purchase_order_id, product_id, expected_quantity, expected_weight_kg, unit_price)
        SELECT $1::int, p, q, w, u
-         FROM unnest($2::int[], $3::int[], $4::numeric[], $5::numeric[])
+         FROM unnest($2::int[], $3::numeric[], $4::numeric[], $5::numeric[])
               AS t(p, q, w, u)
        RETURNING id, product_id, expected_quantity, expected_weight_kg, unit_price`,
       [
@@ -604,7 +604,7 @@ const updatePurchaseOrder = async (id, payload, userId) => {
       `INSERT INTO purchase_order_items
          (purchase_order_id, product_id, expected_quantity, expected_weight_kg, unit_price)
        SELECT $1::int, p, q, w, u
-         FROM unnest($2::int[], $3::int[], $4::numeric[], $5::numeric[])
+         FROM unnest($2::int[], $3::numeric[], $4::numeric[], $5::numeric[])
               AS t(p, q, w, u)
        RETURNING id, product_id, expected_quantity, expected_weight_kg, unit_price`,
       [
@@ -773,11 +773,11 @@ const createFollowUpOrder = async (parentId, userId, { expectedDeliveryDate }) =
     );
     if (open[0]) return stop({ ok: false, code: 'has_follow_up', poNumber: open[0].po_number });
 
-    // What is still owed, line by line. Rounded up: an order line is a
-    // whole number, and a part-unit short is still a unit to order.
+    // What is still owed, line by line, to the three places an order
+    // line holds.
     const { rows: owed } = await client.query(
       `SELECT poi.product_id, poi.unit_price,
-              CEIL(poi.expected_quantity - COALESCE(SUM(dni.received_quantity), 0))::int AS quantity
+              ROUND(poi.expected_quantity - COALESCE(SUM(dni.received_quantity), 0), 3) AS quantity
          FROM purchase_order_items poi
          LEFT JOIN delivery_note_items dni ON dni.purchase_order_item_id = poi.id
         WHERE poi.purchase_order_id = $1
@@ -799,7 +799,7 @@ const createFollowUpOrder = async (parentId, userId, { expectedDeliveryDate }) =
     await client.query(
       `INSERT INTO purchase_order_items (purchase_order_id, product_id, expected_quantity, expected_weight_kg, unit_price)
        SELECT $1::int, p, q, NULL, u
-         FROM unnest($2::int[], $3::int[], $4::numeric[]) AS t(p, q, u)`,
+         FROM unnest($2::int[], $3::numeric[], $4::numeric[]) AS t(p, q, u)`,
       [created[0].id, owed.map((l) => l.product_id), owed.map((l) => l.quantity), owed.map((l) => l.unit_price)]
     );
     await client.query(

@@ -88,7 +88,7 @@ CREATE TABLE public.purchase_order_items (
   id integer NOT NULL DEFAULT nextval('purchase_order_items_id_seq'::regclass),
   purchase_order_id integer NOT NULL,
   product_id integer NOT NULL,
-  expected_quantity integer NOT NULL CHECK (expected_quantity > 0),
+  expected_quantity numeric NOT NULL CHECK (expected_quantity > 0::numeric AND expected_quantity = round(expected_quantity, 3)),
   expected_weight_kg numeric CHECK (expected_weight_kg IS NULL OR expected_weight_kg >= 0::numeric),
   unit_price numeric CHECK (unit_price IS NULL OR unit_price >= 0::numeric),
   created_at timestamp with time zone NOT NULL DEFAULT now(),
