@@ -101,9 +101,18 @@ const canWorkSlip = (actor, slip) =>
 // 'confirmed', so without this count the board shows the pallet as
 // clean and dispatch has no reason to look twice — which is exactly
 // the Monday packing error the gate re-check exists to catch.
-const getSlips = async ({ dispatchDate, from, to, cohort, status, assignedTo }) => {
+const getSlips = async ({ dispatchDate, from, to, cohort, status, assignedTo, stillOpenOrSince }) => {
   const params = [];
   const where  = [];
+
+  // Everything not yet through the gate, whatever its date, plus what
+  // has gone out since the given day. A packer's own list uses this:
+  // without it "mine" was every pallet they had ever packed, which after
+  // three months is 800 rows on a phone for a tab that shows the last few.
+  if (stillOpenOrSince) {
+    params.push(stillOpenOrSince);
+    where.push(`(ps.status IN ('pending', 'in_progress', 'complete') OR ps.dispatch_date >= $${params.length}::date)`);
+  }
 
   if (dispatchDate) { params.push(dispatchDate); where.push(`ps.dispatch_date = $${params.length}`); }
   // A range, for the manager's week view. Inclusive both ends.

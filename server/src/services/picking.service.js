@@ -66,6 +66,8 @@ const cleanItemLines = (items) => {
 // a packer to the pallets already assigned to them; for a manager it
 // is ignored, because a manager's board is the whole floor.
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+// How far back a packer's own finished pallets are listed.
+const MINE_DAYS = 14;
 
 const getSlips = async (query, user) => {
   const { dispatchDate, from, to, cohort, status, mine } = query;
@@ -80,7 +82,15 @@ const getSlips = async (query, user) => {
 
   const assignedTo = (!isManager(user) && mine === 'true') ? user.id : undefined;
 
-  return await pickingRepository.getSlips({ dispatchDate, from, to, cohort, status, assignedTo });
+  // "Mine" with no dates asked for: the pallets this packer still has
+  // in hand, and what they finished in the last two weeks. Their whole
+  // history is on the manager's Picking slips screen, not their phone.
+  const datesGiven = Boolean(dispatchDate || from || to);
+  const stillOpenOrSince = assignedTo && !datesGiven
+    ? new Date(Date.now() - MINE_DAYS * 86400000).toLocaleDateString('en-CA', { timeZone: 'Africa/Johannesburg' })
+    : undefined;
+
+  return await pickingRepository.getSlips({ dispatchDate, from, to, cohort, status, assignedTo, stillOpenOrSince });
 };
 
 // ── One slip ──────────────────────────────────────────────────
