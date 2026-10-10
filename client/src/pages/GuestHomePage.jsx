@@ -36,7 +36,7 @@ import { displayName } from '../features/guest/guestFormat';
 const mySlipLabel = (slip) => {
   const items = slip.items ?? [];
   const done = items.filter((i) => i.status !== 'pending').length;
-  const who = slip.beneficiary_name || slip.ecd_name || 'a community partner';
+  const who = slip.ecd_name || slip.beneficiary_name || 'a community partner';
   return `${who}, ${done} of ${items.length} packed`;
 };
 

@@ -122,7 +122,7 @@ const GuestPackPage = () => {
     );
   }
 
-  const beneficiary = slip.beneficiary_name || slip.ecd_name || 'a community partner';
+  const beneficiary = slip.ecd_name || slip.beneficiary_name || 'a community partner';
 
   const act = async (fn, successMessage) => {
     setBusy(true);

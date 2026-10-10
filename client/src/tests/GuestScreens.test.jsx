@@ -283,6 +283,17 @@ describe('(d) the packing screen', () => {
     expect(screen.queryByText('Rice')).not.toBeInTheDocument();
   });
 
+  it('names an ECD pallet the way the worker sees it, and falls back for one with no ECD', async () => {
+    api.fetchMySlip.mockResolvedValue({ ...mySlip, ecd_name: 'Masibambane Day Care', beneficiary_name: 'Old copy of the name' });
+    const { unmount } = renderAt('/guest/pack', <GuestPackPage />, '/guest/pack');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Masibambane Day Care' })).toBeInTheDocument();
+    unmount();
+
+    api.fetchMySlip.mockResolvedValue({ ...mySlip, ecd_name: null, beneficiary_name: 'Rondebosch Soup Kitchen', beneficiary_kind: 'soup_kitchen' });
+    renderAt('/guest/pack', <GuestPackPage />, '/guest/pack');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Rondebosch Soup Kitchen' })).toBeInTheDocument();
+  });
+
   it('keeps the volunteer’s sense of place — who it is for, and the day', async () => {
     api.fetchMySlip.mockResolvedValue(mySlip);
     renderAt('/guest/pack', <GuestPackPage />, '/guest/pack');
