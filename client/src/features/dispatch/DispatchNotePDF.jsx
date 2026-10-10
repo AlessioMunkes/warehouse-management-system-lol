@@ -152,7 +152,12 @@ const DispatchNotePDF = ({ note, onClose }) => {
               {lines.length ? (
                 lines.map((line, i) => (
                   <tr key={line.id ?? i}>
-                    <td className="pdfnote-table-product">{line.product_name || '—'}</td>
+                    <td className="pdfnote-table-product">
+                      {line.product_name || '—'}
+                      {Number(line.packed_quantity) === 0
+                        ? ` (not packed${line.variance_reason ? `: ${line.variance_reason}` : ''})`
+                        : ''}
+                    </td>
                     <td className="pdfnote-table-sku">{line.sku || '—'}</td>
                     <td className="pdfnote-table-center">
                       {fmtQty(line.packed_quantity, line.unit)}

@@ -200,7 +200,9 @@ const DispatchNotePDF = ({ note, onClose }) => {
                     {v ? v.label : '0'}
                   </td>
                 </tr>,
-                v && line.variance_reason ? (
+                // A line packing flagged with none packed: no variance at
+                // the gate, but the centre still needs the reason.
+                (v || Number(line.packed_quantity) === 0) && line.variance_reason ? (
                   <tr key={`${line.id ?? i}-reason`} className="pdf-reason-row">
                     <td colSpan={6}>
                       <span className="pdf-reason-label">Reason </span>

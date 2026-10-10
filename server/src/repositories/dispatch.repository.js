@@ -350,13 +350,16 @@ const collect = async ({
     const isLate = existing?.status === 'not_collected';
 
     // ── Resolve what actually goes in the vehicle ──────────────
+    // Every line packing dealt with, including one flagged with none
+    // packed. That line loads nothing and deducts nothing, but it stays
+    // on the note with packing's reason: a centre that ordered spinach
+    // and got none should read that on the note, not work it out from
+    // a line that is missing.
     const packedResult = await client.query(
-      `SELECT id, product_id, packed_quantity, unit
+      `SELECT id, product_id, COALESCE(packed_quantity, 0) AS packed_quantity, unit, flag_reason
        FROM picking_slip_items
        WHERE picking_slip_id = $1
          AND status IN ('confirmed', 'flagged')
-         AND packed_quantity IS NOT NULL
-         AND packed_quantity > 0
        ORDER BY product_id ASC, id ASC`,
       [slipId]
     );
@@ -425,7 +428,8 @@ const collect = async ({
             packed_quantity, loaded_quantity, unit, variance_reason)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [event.id, item.id, item.product_id, item.packed_quantity,
-         loaded, item.unit, override?.varianceReason ?? null]
+         loaded, item.unit,
+         override?.varianceReason ?? (Number(item.packed_quantity) === 0 ? (item.flag_reason ?? null) : null)]
       );
     }
 
