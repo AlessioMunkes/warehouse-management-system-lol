@@ -202,6 +202,21 @@ describe('(c) guest home', () => {
     expect(screen.getByText('Rondebosch Soup Kitchen')).toBeInTheDocument();
   });
 
+  it('keeps the pallet cards as disabled buttons while a claim is saving', async () => {
+    api.fetchMySlip.mockRejectedValue(Object.assign(new Error('none'), { status: 404 }));
+    api.fetchAvailableSlips.mockResolvedValue([preview135, preview136Empty]);
+    api.claimSlipById.mockReturnValue(new Promise(() => {}));   // never settles
+    renderAt('/guest-home', <GuestHomePage />, '/guest-home');
+
+    const card = (await screen.findByText('Masibambane Day Care')).closest('button');
+    card.click();
+    await waitFor(() => expect(card).toBeDisabled());
+    const other = screen.getByText('Rondebosch Soup Kitchen').closest('button');
+    expect(other).not.toBeNull();
+    expect(other).toBeDisabled();
+    expect(other).toHaveClass('gst-card', 'gst-card-button');
+  });
+
   it('offers the typed-code route as a first-class option', async () => {
     api.fetchMySlip.mockRejectedValue(Object.assign(new Error('none'), { status: 404 }));
     api.fetchAvailableSlips.mockResolvedValue([preview135]);

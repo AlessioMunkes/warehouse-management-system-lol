@@ -288,11 +288,13 @@ export const Counter = ({ label, value, onChange, min = 0 }) => (
 // ── Pallet card ───────────────────────────────────────────────
 // The preview shape, shown identically wherever a pallet appears: the
 // public preview, the choose-a-pallet list, the summary. `onClick`
-// turns the whole card into one 56px-plus target.
+// turns the whole card into one 56px-plus target. `disabled` keeps the
+// same button while a claim is saving, so the card does not change shape
+// or lose its styling under the volunteer's finger.
 //
 // An empty pallet says so in words HERE, rather than the screen
 // rendering "0 items" and leaving a first-timer to interpret it.
-export const PalletCard = ({ slip, onClick, actionLabel }) => {
+export const PalletCard = ({ slip, onClick, actionLabel, disabled = false }) => {
   const body = (
     <>
       <h2 className="gst-card-title">{slip.beneficiaryName || 'A community partner'}</h2>
@@ -314,7 +316,7 @@ export const PalletCard = ({ slip, onClick, actionLabel }) => {
 
   if (!onClick) return <div className="gst-card">{body}</div>;
   return (
-    <button type="button" className="gst-card gst-card-button" onClick={onClick}>
+    <button type="button" className="gst-card gst-card-button" onClick={onClick} disabled={disabled}>
       {body}
     </button>
   );

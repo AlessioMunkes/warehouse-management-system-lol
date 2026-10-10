@@ -256,8 +256,10 @@
   font: inherit;
   transition: border-color 0.15s ease, transform 0.15s ease;
 }
-.gst-card-button:hover { border-color: var(--gst-accent); }
-.gst-card-button:active { transform: scale(0.995); }
+.gst-card-button:hover:not(:disabled) { border-color: var(--gst-accent); }
+.gst-card-button:active:not(:disabled) { transform: scale(0.995); }
+/* Saving a claim: same card, just not tappable. */
+.gst-card-button:disabled { cursor: progress; color: inherit; }
 
 /* ── Buttons ──────────────────────────────────────────────────── */
 .gst-btn {

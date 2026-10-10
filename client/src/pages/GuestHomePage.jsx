@@ -197,7 +197,8 @@ const GuestHomePage = () => {
                         key={slip.id}
                         slip={slip}
                         actionLabel="Pack this one"
-                        onClick={busy ? undefined : () => pick(slip)}
+                        onClick={() => pick(slip)}
+                        disabled={busy}
                       />
                     ))}
                   </>
