@@ -303,7 +303,9 @@ const GuestPackPage = () => {
         <ItemList>
           <ItemRow
             key={current.id}
-            position={`Item ${done + 1} of ${total}`}
+            // Counted among the items still to do, like the worker's guided
+            // view, so it always matches the Previous / Next count below.
+            position={`Item ${activeAt + 1} of ${pending.length}`}
             title={current.product_name}
             meta={[
               `Put ${fmtQty(current.required_quantity, current.unit === 'each' ? '' : (current.unit || ''))} into the box.`.replace(/\s+/g, ' '),

@@ -655,4 +655,29 @@ describe('the packing screen (guided look)', () => {
     expect(screen.queryByText(/that.s everything/i)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Finish this pallet' })).not.toBeInTheDocument();
   });
+
+  it('keeps "Item n of n" and the previous / next count in step after items are done', async () => {
+    const mk = (id, name, status) => ({ id, product_name: name, required_quantity: '1.000', unit: 'each', packed_quantity: status === 'pending' ? null : '1.000', status, flag_reason: null });
+    api.fetchMySlip.mockResolvedValue({
+      ...mySlip,
+      items: [
+        mk(1, 'Oats', 'confirmed'), mk(2, 'Milk', 'flagged'), mk(3, 'Tea', 'confirmed'),
+        mk(4, 'Butternut', 'pending'), mk(5, 'Rice', 'pending'), mk(6, 'Beans', 'pending'),
+      ],
+    });
+    renderAt('/guest/pack', <GuestPackPage />, '/guest/pack');
+
+    await screen.findByRole('heading', { level: 2, name: 'Butternut' });
+    expect(screen.getByText('Item 1 of 3')).toBeInTheDocument();
+    expect(screen.getByText('1 / 3')).toBeInTheDocument();
+
+    screen.getByRole('button', { name: 'Next item' }).click();
+    await screen.findByRole('heading', { level: 2, name: 'Rice' });
+    screen.getByRole('button', { name: 'Next item' }).click();
+    await screen.findByRole('heading', { level: 2, name: 'Beans' });
+
+    expect(screen.getByText('Item 3 of 3')).toBeInTheDocument();
+    expect(screen.getByText('3 / 3')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: '3 of 6 items done' })).toBeInTheDocument();
+  });
 });
