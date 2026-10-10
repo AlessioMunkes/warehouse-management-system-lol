@@ -21,6 +21,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { formatDay, foodForPhrase, RICH_MARK } from './guestFormat';
 import { useGuestSignOut } from './useGuestSignOut';
 import { useT } from '../../translations';
+import GuestLanguageSwitch from './GuestLanguageSwitch';
 import '../../styles/guest.css';
 
 // ── Shell ─────────────────────────────────────────────────────
@@ -68,15 +69,18 @@ const NavShell = ({ children }) => {
               {t('guest.nav.home')}
             </button>
           ) : <span />}
-          <button
-            type="button" className="gst-nav-btn"
-            onClick={flow.request}
-            disabled={flow.busy || flow.confirming || flow.checkFailed}
-            aria-busy={flow.busy || undefined}
-          >
-            {flow.busy ? <span className="gst-spinner" aria-hidden="true" /> : null}
-            {t('guest.nav.signOut')}
-          </button>
+          <span className="gst-nav-end">
+            <GuestLanguageSwitch />
+            <button
+              type="button" className="gst-nav-btn"
+              onClick={flow.request}
+              disabled={flow.busy || flow.confirming || flow.checkFailed}
+              aria-busy={flow.busy || undefined}
+            >
+              {flow.busy ? <span className="gst-spinner" aria-hidden="true" /> : null}
+              {t('guest.nav.signOut')}
+            </button>
+          </span>
         </div>
       </nav>
       <main className="gst-page">

@@ -9,6 +9,7 @@ import logo from '../assets/Batches_Logo.jpeg';
 import Log_In_Background from '../assets/Log_In_Background.jpg';
 import { LANDING } from '../routes/paths';
 import { useT } from '../translations';
+import GuestLanguageSwitch from '../features/guest/GuestLanguageSwitch';
 
 // shadcn/ui components
 import { Button } from '@/components/ui/button';
@@ -141,6 +142,9 @@ const GuestLoginPage = () => {
               >
                 {t('guest.login.back')}
               </button>
+              {/* First screen a volunteer sees: they may need to switch
+                  before they can read anything else. */}
+              <GuestLanguageSwitch />
             </div>
             <CardTitle className="login-title">{t('guest.login.title')}</CardTitle>
             <CardDescription className="login-subtitle">
