@@ -72,16 +72,39 @@ pool.on('error', (err, _client, warehouse) => {
 const startupTargets = pool.isMultiWarehouse ? pool.warehouseCodes : [null];
 const warm = Math.max(1, Math.min(POOL_OPTIONS.min, POOL_OPTIONS.max));
 
-Promise.all(
-  startupTargets.map((code) =>
-    Promise.all(
-      Array.from({ length: warm }, () => pool.poolForWarehouse(code).query('SELECT 1'))
-    ).then(
-      () => code,
-      (err) => { throw Object.assign(err, { warehouse: code }); }
-    )
-  )
-)
+//
+// A FULL DATABASE IS WAITED FOR, NOT FATAL
+// During a deploy the new server starts while the old one is still
+// holding its connections, and the database allows only so many
+// (dbRouter.js). The first try can find it full. Exiting there failed
+// the deploy every time; the old server lets go within a minute, so
+// this tries again for about that long before giving up. Any other
+// failure (wrong password, wrong host) still stops at once.
+const FULL = /EMAXCONN|max clients reached|too many clients|remaining connection slots/i;
+const ATTEMPTS = 12;
+const WAIT_MS = 5000;
+
+const connectOnce = (code) =>
+  // One connection proves the database is there. The rest of the ones
+  // kept back are opened if there is room, and never fail the start.
+  pool.poolForWarehouse(code).query('SELECT 1').then(() => {
+    for (let i = 1; i < warm; i += 1) pool.poolForWarehouse(code).query('SELECT 1').catch(() => {});
+    return code;
+  });
+
+const connectWithPatience = async (code) => {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await connectOnce(code);
+    } catch (err) {
+      if (!FULL.test(err.message ?? '') || attempt >= ATTEMPTS) throw Object.assign(err, { warehouse: code });
+      console.warn(`[db] The database has no free connections (try ${attempt} of ${ATTEMPTS}); trying again in ${WAIT_MS / 1000}s.`);
+      await new Promise((resolve) => { setTimeout(resolve, WAIT_MS); });
+    }
+  }
+};
+
+Promise.all(startupTargets.map(connectWithPatience))
   .then((codes) => {
     if (pool.isMultiWarehouse) {
       console.log(`[db] Connected to ${codes.length} warehouse database(s): ${codes.join(', ')}`);

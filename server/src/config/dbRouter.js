@@ -106,15 +106,22 @@ export const parseWarehouseUrls = (raw) => {
 // its first query ran. `min` keeps a few open for good, the longer idle
 // time stops the rest being thrown away between two clicks, and
 // keepAlive stops a router in between from quietly dropping them.
-// DB_POOL_MAX / DB_POOL_MIN override the sizes; a hosted pooler caps
-// connections per database, so max stays modest.
+// DB_POOL_MAX / DB_POOL_MIN override the sizes.
+//
+// WHY 5 AND 2
+// Supabase's session pooler allows 15 connections to the database in
+// all, shared by everything that connects: the live server, the new one
+// starting beside it during a deploy, and a developer's own machine. At
+// 10 and 6 two of those were enough to fill it, and a deploy then died
+// at start-up with "max clients reached in session mode". Three servers
+// at 5 fit under the cap with nothing to spare; two leave room.
 const intFromEnv = (name, fallback) => {
   const n = Number.parseInt(process.env[name] ?? '', 10);
   return Number.isInteger(n) && n >= 0 ? n : fallback;
 };
 export const POOL_OPTIONS = Object.freeze({
-  max: intFromEnv('DB_POOL_MAX', 10),
-  min: intFromEnv('DB_POOL_MIN', 6),
+  max: intFromEnv('DB_POOL_MAX', 5),
+  min: intFromEnv('DB_POOL_MIN', 2),
   idleTimeoutMillis: 5 * 60 * 1000,
   keepAlive: true,
 });
