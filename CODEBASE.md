@@ -282,11 +282,13 @@ ten steps: the file names match across the layers.
 | `server/__tests__/` | `npm test` in `server/` | Routes, services and repositories against a mocked database |
 | `server/__tests__/integration/` | `npm run test:integration` in `server/` | The same against a real database |
 
-`npm run lint` and `npm run build` in `client/` must also pass; CI runs all of them.
+`npm run lint` and `npm run build` in `client/` must also pass. CI lints and builds the
+client and runs the server's tests on every push.
 
 ## Known loose ends
 
-- `features/donationManagement/PendingDonationsTab.jsx` and `usePendingDonations.js` are
-  not shown on any screen. Only their tests use them.
+- CI does not run the client's tests. Run `npm test` in `client/` before pushing. Adding the
+  step means editing `.github/workflows/ci.yml`, which needs a GitHub sign-in with the
+  `workflow` permission.
 - `server/__tests__/helpers/buildDonationAdminApp.js` imports a route file by a path that
   does not exist. Only the integration tests use it, and they need a real database to run.
