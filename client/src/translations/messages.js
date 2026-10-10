@@ -180,6 +180,140 @@ const en = {
   'photo.hintFlag': 'A picture of what is wrong helps your manager sort it out.',
   'photo.hintDelivery': 'Take a picture if anything arrived damaged or short.',
   'photo.delivery': 'Photos of this delivery',
+
+  // ── Guest (Love Activist) screens ──
+  // Session bar, sign-out and shared pieces
+  'guest.brand.role': 'Love Activist',
+  'guest.nav.label': 'Your session',
+  'guest.nav.home': 'Home',
+  'guest.nav.signOut': 'Sign out',
+  'guest.nav.signingOut': 'Signing you out…',
+  'guest.signOut.checkFailedTitle': 'We could not check your pallet.',
+  'guest.signOut.checkFailedText': 'If you were packing a pallet, staff can return it to the floor.',
+  'guest.signOut.tryAgain': 'Try again',
+  'guest.signOut.anyway': 'Sign out anyway',
+  'guest.signOut.confirmTitle': 'Sign out?',
+  'guest.signOut.confirmText': 'You haven’t finished this pallet. If you sign out, it goes back to the floor for someone else to finish. Your packing so far is saved.',
+  'guest.signOut.confirm': 'Sign out and return pallet',
+  'guest.signOut.keepPacking': 'Keep packing',
+  'guest.signOut.returnFailed': 'We could not return your pallet. Try again.',
+  'guest.status.packed': 'Packed',
+  'guest.status.problem': 'Problem',
+  'guest.progress.label': '{done} of {all} items done',
+  'guest.steps.label': 'Move between items',
+  'guest.steps.previous': 'Previous item',
+  'guest.steps.next': 'Next item',
+  'guest.counter.fewer': 'One fewer',
+  'guest.counter.more': 'One more',
+  'guest.card.partner': 'A community partner',
+  'guest.card.nothingListed': 'Nothing listed on it yet',
+  'guest.card.thingsToPack': { one: '{n} thing to pack', other: '{n} things to pack' },
+  'guest.card.goingOut': 'Going out {day}',
+  'guest.help.default': 'Not sure what to do, or something looks wrong?',
+  'guest.help.ask': 'Ask any staff member — they are happy to help.',
+  'guest.loading': 'Loading',
+  'guest.api.unreachable': 'We could not reach the system. Ask a staff member for help.',
+  'guest.api.failed': 'Something went wrong.',
+  // Days, who the food is for, names
+  'guest.day.today': 'today',
+  'guest.day.tomorrow': 'tomorrow',
+  'guest.day.soon': 'soon',
+  'guest.kind.ecd': 'a creche',
+  'guest.kind.dignity_kitchen': 'a dignity kitchen',
+  'guest.kind.soup_kitchen': 'a soup kitchen',
+  'guest.kind.community': 'a community group',
+  'guest.kind.other': 'a community partner',
+  'guest.foodFor': 'Food for {kind}',
+  'guest.name.fallback': 'there',
+  // Sign in
+  'guest.login.back': '← Back to start',
+  'guest.login.title': 'Volunteer sign in',
+  'guest.login.subtitle': 'Enter your name to start.',
+  'guest.login.nameLabel': 'Your name',
+  'guest.login.namePlaceholder': 'e.g. Thabo Mokoena',
+  'guest.login.warehouse': 'Warehouse',
+  'guest.login.warehouseChoose': 'Choose where you are today',
+  'guest.login.signIn': 'Sign in',
+  'guest.login.signingIn': 'Signing in…',
+  'guest.login.staff': '← Staff sign in',
+  'guest.login.nameRequired': 'Enter your name.',
+  'guest.login.siteRequired': 'Choose the warehouse you are at.',
+  'guest.login.failed': 'Could not sign you in. Try again.',
+  // Home
+  'guest.home.welcome': 'Welcome, {name}',
+  'guest.home.ledeHeld': 'Pick up where you left off.',
+  'guest.home.lede': 'Thank you for being here today. Pick a pallet below and we’ll take it one step at a time.',
+  'guest.home.loading': 'Loading pallets',
+  'guest.home.inProgress': 'Your pallet in progress',
+  'guest.home.packedOf': '{done} of {all} packed',
+  'guest.home.continue': 'Continue packing',
+  'guest.home.return': 'Return this pallet',
+  'guest.home.returnAsk': 'Return this pallet to the floor? Your packing so far is saved.',
+  'guest.home.returnConfirm': 'Return pallet',
+  'guest.home.keep': 'Keep it',
+  'guest.home.listTitle': 'Pallets to pack',
+  'guest.home.allTaken': 'Every pallet has someone on it. Ask a staff member what needs doing next.',
+  'guest.home.tapHint': 'Tap the one you are standing at.',
+  'guest.home.packThis': 'Pack this one',
+  'guest.home.codeTitle': 'Have a code instead?',
+  'guest.home.codeHint': 'There are 6 characters printed under the QR code on the pallet.',
+  'guest.home.codeLabel': 'Pallet code',
+  'guest.home.codeWrong': 'The code is 6 characters, printed under the QR code.',
+  'guest.home.codeFind': 'Find this pallet',
+  'guest.home.codeBusy': 'Just a moment…',
+  'guest.home.help': 'New here, or not sure which pallet is yours?',
+  // Packing
+  'guest.pack.loading': 'Loading your pallet',
+  'guest.pack.noneTitle': 'You don’t have a pallet yet',
+  'guest.pack.noneLede': 'Pick one and we’ll get started.',
+  'guest.pack.seePallets': 'See pallets',
+  'guest.pack.reason.short': 'There isn’t enough of it',
+  'guest.pack.reason.damaged': 'It looks damaged or spoiled',
+  'guest.pack.reason.substituted': 'I packed something else instead',
+  'guest.pack.reason.other': 'Something else',
+  'guest.pack.emptyTitle': 'This pallet is empty',
+  'guest.pack.emptyLede': 'There is nothing listed for {beneficiary} yet, so there is nothing to pack right now.',
+  'guest.pack.packingFor': 'Packing for',
+  'guest.pack.emptyNotice': 'This is not something you have done wrong — the list for this pallet has not been set up yet. A staff member needs to sort it out.',
+  'guest.pack.backHome': 'Back to home',
+  'guest.pack.emptyHelp': 'Please let a staff member know about this one.',
+  'guest.pack.allDoneTitle': 'That’s everything',
+  'guest.pack.allDoneLede': { one: 'You have been through all {n} item. One last step.', other: 'You have been through all {n} items. One last step.' },
+  'guest.pack.finish': 'Finish this pallet',
+  'guest.pack.finishing': 'Finishing…',
+  'guest.pack.allDoneHelp': 'Spotted something you want to change first?',
+  'guest.pack.problemTitle': 'What’s wrong with it?',
+  'guest.pack.problemLede': 'Whatever you pick, it gets passed to a staff member. Nothing here is a mistake on your part.',
+  'guest.pack.problemLegend': 'Why is there a problem?',
+  'guest.pack.actuallyPacked': 'How many did you actually pack?',
+  'guest.pack.noteLabel': 'Anything staff should know? (optional)',
+  'guest.pack.reportIt': 'Report it',
+  'guest.pack.saving': 'Saving…',
+  'guest.pack.back': 'Back',
+  'guest.pack.reported': 'Thanks — a staff member will look at the {product}.',
+  'guest.pack.itemLede': 'Going out {day}. Take the oldest stock first.',
+  'guest.pack.itemOf': 'Item {n} of {all}',
+  'guest.pack.putInBox': 'Put {qty} into the box.',
+  'guest.pack.howMany': 'How many did you pack?',
+  'guest.pack.packedIt': 'Packed it',
+  'guest.pack.problem': 'There’s a problem',
+  'guest.pack.packedNice': '{product} — packed. Nice one, {name}.',
+  'guest.pack.doneSoFar': 'What you’ve done so far ({n})',
+  // Thank-you page
+  'guest.done.thanks': 'Thank you, {name}',
+  'guest.done.finishedLede': 'Your pallet is finished and on its way.',
+  'guest.done.another': 'Pack another pallet',
+  'guest.done.help': 'Need to tell us something? Let a staff member know before you go.',
+  'guest.done.lede': 'That pallet is packed and ready to go out. Here is what you did.',
+  'guest.done.unitsLabel': 'items packed into this pallet',
+  'guest.done.checkedLabel': 'things checked off this pallet',
+  'guest.done.thingsPacked': 'things packed',
+  'guest.done.problems': { one: 'problem reported', other: 'problems reported' },
+  'guest.done.whereTitle': 'Where it’s going',
+  'guest.done.goesTo': 'This pallet goes to {beneficiary}, {kind}. It leaves {day}.',
+  'guest.done.goesToFeeds': 'This pallet goes to {beneficiary}, {kind} that feeds {children}. It leaves {day}.',
+  'guest.done.flagged': { one: 'A staff member has your report. Thank you for flagging it.', other: 'A staff member has your reports. Thank you for flagging them.' },
+  'guest.done.gratitude': 'Ladles of Love could not do this without people giving up their time. Thank you for giving yours today.',
 };
 
 const af = {
@@ -338,6 +472,143 @@ const af = {
   'photo.hintFlag': '’n Foto van wat fout is, help jou bestuurder om dit reg te stel.',
   'photo.hintDelivery': 'Neem ’n foto as enigiets beskadig of kort aangekom het.',
   'photo.delivery': 'Foto’s van hierdie aflewering',
+
+  // ── Guest (Love Activist) screens ── NOT YET TRANSLATED ──────────
+  // Every line below is the ENGLISH text, kept as a placeholder so the
+  // screen still reads. Each is marked TODO(translate). Replace the text
+  // and delete the marker; do not leave a guess here.
+  // Session bar, sign-out and shared pieces
+  'guest.brand.role': 'Love Activist',  // TODO(translate)
+  'guest.nav.label': 'Your session',  // TODO(translate)
+  'guest.nav.home': 'Home',  // TODO(translate)
+  'guest.nav.signOut': 'Sign out',  // TODO(translate)
+  'guest.nav.signingOut': 'Signing you out…',  // TODO(translate)
+  'guest.signOut.checkFailedTitle': 'We could not check your pallet.',  // TODO(translate)
+  'guest.signOut.checkFailedText': 'If you were packing a pallet, staff can return it to the floor.',  // TODO(translate)
+  'guest.signOut.tryAgain': 'Try again',  // TODO(translate)
+  'guest.signOut.anyway': 'Sign out anyway',  // TODO(translate)
+  'guest.signOut.confirmTitle': 'Sign out?',  // TODO(translate)
+  'guest.signOut.confirmText': 'You haven’t finished this pallet. If you sign out, it goes back to the floor for someone else to finish. Your packing so far is saved.',  // TODO(translate)
+  'guest.signOut.confirm': 'Sign out and return pallet',  // TODO(translate)
+  'guest.signOut.keepPacking': 'Keep packing',  // TODO(translate)
+  'guest.signOut.returnFailed': 'We could not return your pallet. Try again.',  // TODO(translate)
+  'guest.status.packed': 'Packed',  // TODO(translate)
+  'guest.status.problem': 'Problem',  // TODO(translate)
+  'guest.progress.label': '{done} of {all} items done',  // TODO(translate)
+  'guest.steps.label': 'Move between items',  // TODO(translate)
+  'guest.steps.previous': 'Previous item',  // TODO(translate)
+  'guest.steps.next': 'Next item',  // TODO(translate)
+  'guest.counter.fewer': 'One fewer',  // TODO(translate)
+  'guest.counter.more': 'One more',  // TODO(translate)
+  'guest.card.partner': 'A community partner',  // TODO(translate)
+  'guest.card.nothingListed': 'Nothing listed on it yet',  // TODO(translate)
+  'guest.card.thingsToPack': { one: '{n} thing to pack', other: '{n} things to pack' },  // TODO(translate)
+  'guest.card.goingOut': 'Going out {day}',  // TODO(translate)
+  'guest.help.default': 'Not sure what to do, or something looks wrong?',  // TODO(translate)
+  'guest.help.ask': 'Ask any staff member — they are happy to help.',  // TODO(translate)
+  'guest.loading': 'Loading',  // TODO(translate)
+  'guest.api.unreachable': 'We could not reach the system. Ask a staff member for help.',  // TODO(translate)
+  'guest.api.failed': 'Something went wrong.',  // TODO(translate)
+  // Days, who the food is for, names
+  'guest.day.today': 'today',  // TODO(translate)
+  'guest.day.tomorrow': 'tomorrow',  // TODO(translate)
+  'guest.day.soon': 'soon',  // TODO(translate)
+  'guest.kind.ecd': 'a creche',  // TODO(translate)
+  'guest.kind.dignity_kitchen': 'a dignity kitchen',  // TODO(translate)
+  'guest.kind.soup_kitchen': 'a soup kitchen',  // TODO(translate)
+  'guest.kind.community': 'a community group',  // TODO(translate)
+  'guest.kind.other': 'a community partner',  // TODO(translate)
+  'guest.foodFor': 'Food for {kind}',  // TODO(translate)
+  'guest.name.fallback': 'there',  // TODO(translate)
+  // Sign in
+  'guest.login.back': '← Back to start',  // TODO(translate)
+  'guest.login.title': 'Volunteer sign in',  // TODO(translate)
+  'guest.login.subtitle': 'Enter your name to start.',  // TODO(translate)
+  'guest.login.nameLabel': 'Your name',  // TODO(translate)
+  'guest.login.namePlaceholder': 'e.g. Thabo Mokoena',  // TODO(translate)
+  'guest.login.warehouse': 'Warehouse',  // TODO(translate)
+  'guest.login.warehouseChoose': 'Choose where you are today',  // TODO(translate)
+  'guest.login.signIn': 'Sign in',  // TODO(translate)
+  'guest.login.signingIn': 'Signing in…',  // TODO(translate)
+  'guest.login.staff': '← Staff sign in',  // TODO(translate)
+  'guest.login.nameRequired': 'Enter your name.',  // TODO(translate)
+  'guest.login.siteRequired': 'Choose the warehouse you are at.',  // TODO(translate)
+  'guest.login.failed': 'Could not sign you in. Try again.',  // TODO(translate)
+  // Home
+  'guest.home.welcome': 'Welcome, {name}',  // TODO(translate)
+  'guest.home.ledeHeld': 'Pick up where you left off.',  // TODO(translate)
+  'guest.home.lede': 'Thank you for being here today. Pick a pallet below and we’ll take it one step at a time.',  // TODO(translate)
+  'guest.home.loading': 'Loading pallets',  // TODO(translate)
+  'guest.home.inProgress': 'Your pallet in progress',  // TODO(translate)
+  'guest.home.packedOf': '{done} of {all} packed',  // TODO(translate)
+  'guest.home.continue': 'Continue packing',  // TODO(translate)
+  'guest.home.return': 'Return this pallet',  // TODO(translate)
+  'guest.home.returnAsk': 'Return this pallet to the floor? Your packing so far is saved.',  // TODO(translate)
+  'guest.home.returnConfirm': 'Return pallet',  // TODO(translate)
+  'guest.home.keep': 'Keep it',  // TODO(translate)
+  'guest.home.listTitle': 'Pallets to pack',  // TODO(translate)
+  'guest.home.allTaken': 'Every pallet has someone on it. Ask a staff member what needs doing next.',  // TODO(translate)
+  'guest.home.tapHint': 'Tap the one you are standing at.',  // TODO(translate)
+  'guest.home.packThis': 'Pack this one',  // TODO(translate)
+  'guest.home.codeTitle': 'Have a code instead?',  // TODO(translate)
+  'guest.home.codeHint': 'There are 6 characters printed under the QR code on the pallet.',  // TODO(translate)
+  'guest.home.codeLabel': 'Pallet code',  // TODO(translate)
+  'guest.home.codeWrong': 'The code is 6 characters, printed under the QR code.',  // TODO(translate)
+  'guest.home.codeFind': 'Find this pallet',  // TODO(translate)
+  'guest.home.codeBusy': 'Just a moment…',  // TODO(translate)
+  'guest.home.help': 'New here, or not sure which pallet is yours?',  // TODO(translate)
+  // Packing
+  'guest.pack.loading': 'Loading your pallet',  // TODO(translate)
+  'guest.pack.noneTitle': 'You don’t have a pallet yet',  // TODO(translate)
+  'guest.pack.noneLede': 'Pick one and we’ll get started.',  // TODO(translate)
+  'guest.pack.seePallets': 'See pallets',  // TODO(translate)
+  'guest.pack.reason.short': 'There isn’t enough of it',  // TODO(translate)
+  'guest.pack.reason.damaged': 'It looks damaged or spoiled',  // TODO(translate)
+  'guest.pack.reason.substituted': 'I packed something else instead',  // TODO(translate)
+  'guest.pack.reason.other': 'Something else',  // TODO(translate)
+  'guest.pack.emptyTitle': 'This pallet is empty',  // TODO(translate)
+  'guest.pack.emptyLede': 'There is nothing listed for {beneficiary} yet, so there is nothing to pack right now.',  // TODO(translate)
+  'guest.pack.packingFor': 'Packing for',  // TODO(translate)
+  'guest.pack.emptyNotice': 'This is not something you have done wrong — the list for this pallet has not been set up yet. A staff member needs to sort it out.',  // TODO(translate)
+  'guest.pack.backHome': 'Back to home',  // TODO(translate)
+  'guest.pack.emptyHelp': 'Please let a staff member know about this one.',  // TODO(translate)
+  'guest.pack.allDoneTitle': 'That’s everything',  // TODO(translate)
+  'guest.pack.allDoneLede': { one: 'You have been through all {n} item. One last step.', other: 'You have been through all {n} items. One last step.' },  // TODO(translate)
+  'guest.pack.finish': 'Finish this pallet',  // TODO(translate)
+  'guest.pack.finishing': 'Finishing…',  // TODO(translate)
+  'guest.pack.allDoneHelp': 'Spotted something you want to change first?',  // TODO(translate)
+  'guest.pack.problemTitle': 'What’s wrong with it?',  // TODO(translate)
+  'guest.pack.problemLede': 'Whatever you pick, it gets passed to a staff member. Nothing here is a mistake on your part.',  // TODO(translate)
+  'guest.pack.problemLegend': 'Why is there a problem?',  // TODO(translate)
+  'guest.pack.actuallyPacked': 'How many did you actually pack?',  // TODO(translate)
+  'guest.pack.noteLabel': 'Anything staff should know? (optional)',  // TODO(translate)
+  'guest.pack.reportIt': 'Report it',  // TODO(translate)
+  'guest.pack.saving': 'Saving…',  // TODO(translate)
+  'guest.pack.back': 'Back',  // TODO(translate)
+  'guest.pack.reported': 'Thanks — a staff member will look at the {product}.',  // TODO(translate)
+  'guest.pack.itemLede': 'Going out {day}. Take the oldest stock first.',  // TODO(translate)
+  'guest.pack.itemOf': 'Item {n} of {all}',  // TODO(translate)
+  'guest.pack.putInBox': 'Put {qty} into the box.',  // TODO(translate)
+  'guest.pack.howMany': 'How many did you pack?',  // TODO(translate)
+  'guest.pack.packedIt': 'Packed it',  // TODO(translate)
+  'guest.pack.problem': 'There’s a problem',  // TODO(translate)
+  'guest.pack.packedNice': '{product} — packed. Nice one, {name}.',  // TODO(translate)
+  'guest.pack.doneSoFar': 'What you’ve done so far ({n})',  // TODO(translate)
+  // Thank-you page
+  'guest.done.thanks': 'Thank you, {name}',  // TODO(translate)
+  'guest.done.finishedLede': 'Your pallet is finished and on its way.',  // TODO(translate)
+  'guest.done.another': 'Pack another pallet',  // TODO(translate)
+  'guest.done.help': 'Need to tell us something? Let a staff member know before you go.',  // TODO(translate)
+  'guest.done.lede': 'That pallet is packed and ready to go out. Here is what you did.',  // TODO(translate)
+  'guest.done.unitsLabel': 'items packed into this pallet',  // TODO(translate)
+  'guest.done.checkedLabel': 'things checked off this pallet',  // TODO(translate)
+  'guest.done.thingsPacked': 'things packed',  // TODO(translate)
+  'guest.done.problems': { one: 'problem reported', other: 'problems reported' },  // TODO(translate)
+  'guest.done.whereTitle': 'Where it’s going',  // TODO(translate)
+  'guest.done.goesTo': 'This pallet goes to {beneficiary}, {kind}. It leaves {day}.',  // TODO(translate)
+  'guest.done.goesToFeeds': 'This pallet goes to {beneficiary}, {kind} that feeds {children}. It leaves {day}.',  // TODO(translate)
+  'guest.done.flagged': { one: 'A staff member has your report. Thank you for flagging it.', other: 'A staff member has your reports. Thank you for flagging them.' },  // TODO(translate)
+  'guest.done.gratitude': 'Ladles of Love could not do this without people giving up their time. Thank you for giving yours today.',  // TODO(translate)
 };
 
 const xh = {
@@ -496,6 +767,143 @@ const xh = {
   'photo.hintFlag': 'Ifoto yento engalunganga inceda umphathi wakho ayilungise.',
   'photo.hintDelivery': 'Thatha ifoto ukuba kukho into efike yonakele okanye ishota.',
   'photo.delivery': 'Iifoto zale nto ifikileyo',
+
+  // ── Guest (Love Activist) screens ── NOT YET TRANSLATED ──────────
+  // Every line below is the ENGLISH text, kept as a placeholder so the
+  // screen still reads. Each is marked TODO(translate). Replace the text
+  // and delete the marker; do not leave a guess here.
+  // Session bar, sign-out and shared pieces
+  'guest.brand.role': 'Love Activist',  // TODO(translate)
+  'guest.nav.label': 'Your session',  // TODO(translate)
+  'guest.nav.home': 'Home',  // TODO(translate)
+  'guest.nav.signOut': 'Sign out',  // TODO(translate)
+  'guest.nav.signingOut': 'Signing you out…',  // TODO(translate)
+  'guest.signOut.checkFailedTitle': 'We could not check your pallet.',  // TODO(translate)
+  'guest.signOut.checkFailedText': 'If you were packing a pallet, staff can return it to the floor.',  // TODO(translate)
+  'guest.signOut.tryAgain': 'Try again',  // TODO(translate)
+  'guest.signOut.anyway': 'Sign out anyway',  // TODO(translate)
+  'guest.signOut.confirmTitle': 'Sign out?',  // TODO(translate)
+  'guest.signOut.confirmText': 'You haven’t finished this pallet. If you sign out, it goes back to the floor for someone else to finish. Your packing so far is saved.',  // TODO(translate)
+  'guest.signOut.confirm': 'Sign out and return pallet',  // TODO(translate)
+  'guest.signOut.keepPacking': 'Keep packing',  // TODO(translate)
+  'guest.signOut.returnFailed': 'We could not return your pallet. Try again.',  // TODO(translate)
+  'guest.status.packed': 'Packed',  // TODO(translate)
+  'guest.status.problem': 'Problem',  // TODO(translate)
+  'guest.progress.label': '{done} of {all} items done',  // TODO(translate)
+  'guest.steps.label': 'Move between items',  // TODO(translate)
+  'guest.steps.previous': 'Previous item',  // TODO(translate)
+  'guest.steps.next': 'Next item',  // TODO(translate)
+  'guest.counter.fewer': 'One fewer',  // TODO(translate)
+  'guest.counter.more': 'One more',  // TODO(translate)
+  'guest.card.partner': 'A community partner',  // TODO(translate)
+  'guest.card.nothingListed': 'Nothing listed on it yet',  // TODO(translate)
+  'guest.card.thingsToPack': { one: '{n} thing to pack', other: '{n} things to pack' },  // TODO(translate)
+  'guest.card.goingOut': 'Going out {day}',  // TODO(translate)
+  'guest.help.default': 'Not sure what to do, or something looks wrong?',  // TODO(translate)
+  'guest.help.ask': 'Ask any staff member — they are happy to help.',  // TODO(translate)
+  'guest.loading': 'Loading',  // TODO(translate)
+  'guest.api.unreachable': 'We could not reach the system. Ask a staff member for help.',  // TODO(translate)
+  'guest.api.failed': 'Something went wrong.',  // TODO(translate)
+  // Days, who the food is for, names
+  'guest.day.today': 'today',  // TODO(translate)
+  'guest.day.tomorrow': 'tomorrow',  // TODO(translate)
+  'guest.day.soon': 'soon',  // TODO(translate)
+  'guest.kind.ecd': 'a creche',  // TODO(translate)
+  'guest.kind.dignity_kitchen': 'a dignity kitchen',  // TODO(translate)
+  'guest.kind.soup_kitchen': 'a soup kitchen',  // TODO(translate)
+  'guest.kind.community': 'a community group',  // TODO(translate)
+  'guest.kind.other': 'a community partner',  // TODO(translate)
+  'guest.foodFor': 'Food for {kind}',  // TODO(translate)
+  'guest.name.fallback': 'there',  // TODO(translate)
+  // Sign in
+  'guest.login.back': '← Back to start',  // TODO(translate)
+  'guest.login.title': 'Volunteer sign in',  // TODO(translate)
+  'guest.login.subtitle': 'Enter your name to start.',  // TODO(translate)
+  'guest.login.nameLabel': 'Your name',  // TODO(translate)
+  'guest.login.namePlaceholder': 'e.g. Thabo Mokoena',  // TODO(translate)
+  'guest.login.warehouse': 'Warehouse',  // TODO(translate)
+  'guest.login.warehouseChoose': 'Choose where you are today',  // TODO(translate)
+  'guest.login.signIn': 'Sign in',  // TODO(translate)
+  'guest.login.signingIn': 'Signing in…',  // TODO(translate)
+  'guest.login.staff': '← Staff sign in',  // TODO(translate)
+  'guest.login.nameRequired': 'Enter your name.',  // TODO(translate)
+  'guest.login.siteRequired': 'Choose the warehouse you are at.',  // TODO(translate)
+  'guest.login.failed': 'Could not sign you in. Try again.',  // TODO(translate)
+  // Home
+  'guest.home.welcome': 'Welcome, {name}',  // TODO(translate)
+  'guest.home.ledeHeld': 'Pick up where you left off.',  // TODO(translate)
+  'guest.home.lede': 'Thank you for being here today. Pick a pallet below and we’ll take it one step at a time.',  // TODO(translate)
+  'guest.home.loading': 'Loading pallets',  // TODO(translate)
+  'guest.home.inProgress': 'Your pallet in progress',  // TODO(translate)
+  'guest.home.packedOf': '{done} of {all} packed',  // TODO(translate)
+  'guest.home.continue': 'Continue packing',  // TODO(translate)
+  'guest.home.return': 'Return this pallet',  // TODO(translate)
+  'guest.home.returnAsk': 'Return this pallet to the floor? Your packing so far is saved.',  // TODO(translate)
+  'guest.home.returnConfirm': 'Return pallet',  // TODO(translate)
+  'guest.home.keep': 'Keep it',  // TODO(translate)
+  'guest.home.listTitle': 'Pallets to pack',  // TODO(translate)
+  'guest.home.allTaken': 'Every pallet has someone on it. Ask a staff member what needs doing next.',  // TODO(translate)
+  'guest.home.tapHint': 'Tap the one you are standing at.',  // TODO(translate)
+  'guest.home.packThis': 'Pack this one',  // TODO(translate)
+  'guest.home.codeTitle': 'Have a code instead?',  // TODO(translate)
+  'guest.home.codeHint': 'There are 6 characters printed under the QR code on the pallet.',  // TODO(translate)
+  'guest.home.codeLabel': 'Pallet code',  // TODO(translate)
+  'guest.home.codeWrong': 'The code is 6 characters, printed under the QR code.',  // TODO(translate)
+  'guest.home.codeFind': 'Find this pallet',  // TODO(translate)
+  'guest.home.codeBusy': 'Just a moment…',  // TODO(translate)
+  'guest.home.help': 'New here, or not sure which pallet is yours?',  // TODO(translate)
+  // Packing
+  'guest.pack.loading': 'Loading your pallet',  // TODO(translate)
+  'guest.pack.noneTitle': 'You don’t have a pallet yet',  // TODO(translate)
+  'guest.pack.noneLede': 'Pick one and we’ll get started.',  // TODO(translate)
+  'guest.pack.seePallets': 'See pallets',  // TODO(translate)
+  'guest.pack.reason.short': 'There isn’t enough of it',  // TODO(translate)
+  'guest.pack.reason.damaged': 'It looks damaged or spoiled',  // TODO(translate)
+  'guest.pack.reason.substituted': 'I packed something else instead',  // TODO(translate)
+  'guest.pack.reason.other': 'Something else',  // TODO(translate)
+  'guest.pack.emptyTitle': 'This pallet is empty',  // TODO(translate)
+  'guest.pack.emptyLede': 'There is nothing listed for {beneficiary} yet, so there is nothing to pack right now.',  // TODO(translate)
+  'guest.pack.packingFor': 'Packing for',  // TODO(translate)
+  'guest.pack.emptyNotice': 'This is not something you have done wrong — the list for this pallet has not been set up yet. A staff member needs to sort it out.',  // TODO(translate)
+  'guest.pack.backHome': 'Back to home',  // TODO(translate)
+  'guest.pack.emptyHelp': 'Please let a staff member know about this one.',  // TODO(translate)
+  'guest.pack.allDoneTitle': 'That’s everything',  // TODO(translate)
+  'guest.pack.allDoneLede': { one: 'You have been through all {n} item. One last step.', other: 'You have been through all {n} items. One last step.' },  // TODO(translate)
+  'guest.pack.finish': 'Finish this pallet',  // TODO(translate)
+  'guest.pack.finishing': 'Finishing…',  // TODO(translate)
+  'guest.pack.allDoneHelp': 'Spotted something you want to change first?',  // TODO(translate)
+  'guest.pack.problemTitle': 'What’s wrong with it?',  // TODO(translate)
+  'guest.pack.problemLede': 'Whatever you pick, it gets passed to a staff member. Nothing here is a mistake on your part.',  // TODO(translate)
+  'guest.pack.problemLegend': 'Why is there a problem?',  // TODO(translate)
+  'guest.pack.actuallyPacked': 'How many did you actually pack?',  // TODO(translate)
+  'guest.pack.noteLabel': 'Anything staff should know? (optional)',  // TODO(translate)
+  'guest.pack.reportIt': 'Report it',  // TODO(translate)
+  'guest.pack.saving': 'Saving…',  // TODO(translate)
+  'guest.pack.back': 'Back',  // TODO(translate)
+  'guest.pack.reported': 'Thanks — a staff member will look at the {product}.',  // TODO(translate)
+  'guest.pack.itemLede': 'Going out {day}. Take the oldest stock first.',  // TODO(translate)
+  'guest.pack.itemOf': 'Item {n} of {all}',  // TODO(translate)
+  'guest.pack.putInBox': 'Put {qty} into the box.',  // TODO(translate)
+  'guest.pack.howMany': 'How many did you pack?',  // TODO(translate)
+  'guest.pack.packedIt': 'Packed it',  // TODO(translate)
+  'guest.pack.problem': 'There’s a problem',  // TODO(translate)
+  'guest.pack.packedNice': '{product} — packed. Nice one, {name}.',  // TODO(translate)
+  'guest.pack.doneSoFar': 'What you’ve done so far ({n})',  // TODO(translate)
+  // Thank-you page
+  'guest.done.thanks': 'Thank you, {name}',  // TODO(translate)
+  'guest.done.finishedLede': 'Your pallet is finished and on its way.',  // TODO(translate)
+  'guest.done.another': 'Pack another pallet',  // TODO(translate)
+  'guest.done.help': 'Need to tell us something? Let a staff member know before you go.',  // TODO(translate)
+  'guest.done.lede': 'That pallet is packed and ready to go out. Here is what you did.',  // TODO(translate)
+  'guest.done.unitsLabel': 'items packed into this pallet',  // TODO(translate)
+  'guest.done.checkedLabel': 'things checked off this pallet',  // TODO(translate)
+  'guest.done.thingsPacked': 'things packed',  // TODO(translate)
+  'guest.done.problems': { one: 'problem reported', other: 'problems reported' },  // TODO(translate)
+  'guest.done.whereTitle': 'Where it’s going',  // TODO(translate)
+  'guest.done.goesTo': 'This pallet goes to {beneficiary}, {kind}. It leaves {day}.',  // TODO(translate)
+  'guest.done.goesToFeeds': 'This pallet goes to {beneficiary}, {kind} that feeds {children}. It leaves {day}.',  // TODO(translate)
+  'guest.done.flagged': { one: 'A staff member has your report. Thank you for flagging it.', other: 'A staff member has your reports. Thank you for flagging them.' },  // TODO(translate)
+  'guest.done.gratitude': 'Ladles of Love could not do this without people giving up their time. Thank you for giving yours today.',  // TODO(translate)
 };
 
 export const MESSAGES = { en, af, xh };

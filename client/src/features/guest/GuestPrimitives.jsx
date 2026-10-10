@@ -18,18 +18,23 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { formatDay, foodForPhrase } from './guestFormat';
+import { formatDay, foodForPhrase, RICH_MARK } from './guestFormat';
 import { useGuestSignOut } from './useGuestSignOut';
+import { useT } from '../../translations';
 import '../../styles/guest.css';
 
 // ── Shell ─────────────────────────────────────────────────────
 // Owns the token scope. Every guest screen renders inside one.
-const Masthead = () => (
-  <header className="gst-masthead">
-    <span className="gst-masthead-brand">Ladles<span>·</span>of<span>·</span>Love</span>
-    <span className="gst-masthead-brand gst-masthead-role">Love Activist</span>
-  </header>
-);
+// The brand name is never translated.
+const Masthead = () => {
+  const t = useT();
+  return (
+    <header className="gst-masthead">
+      <span className="gst-masthead-brand" translate="no">Ladles<span>·</span>of<span>·</span>Love</span>
+      <span className="gst-masthead-brand gst-masthead-role">{t('guest.brand.role')}</span>
+    </header>
+  );
+};
 
 // `nav` adds the volunteer's own bar — Home and Sign out — for the pages
 // a signed-in guest works from. Pages with their own exits (the QR
@@ -51,15 +56,16 @@ const NavShell = ({ children }) => {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const flow = useGuestSignOut();
+  const t = useT();
 
   return (
     <div className="gst-shell">
       <Masthead />
-      <nav className="gst-nav" aria-label="Your session">
+      <nav className="gst-nav" aria-label={t('guest.nav.label')}>
         <div className="gst-nav-inner">
           {pathname !== '/guest-home' ? (
             <button type="button" className="gst-nav-btn" onClick={() => navigate('/guest-home')} disabled={flow.busy}>
-              Home
+              {t('guest.nav.home')}
             </button>
           ) : <span />}
           <button
@@ -69,7 +75,7 @@ const NavShell = ({ children }) => {
             aria-busy={flow.busy || undefined}
           >
             {flow.busy ? <span className="gst-spinner" aria-hidden="true" /> : null}
-            Sign out
+            {t('guest.nav.signOut')}
           </button>
         </div>
       </nav>
@@ -85,18 +91,19 @@ const NavShell = ({ children }) => {
 // Shown only when the guest still holds a pallet. Also carries a failed
 // check or a failed return, so a refusal is never silent.
 export const SignOutConfirm = ({ flow }) => {
+  const t = useT();
   const headingRef = useRef(null);
   useEffect(() => { if (flow.confirming || flow.checkFailed) headingRef.current?.focus(); }, [flow.confirming, flow.checkFailed]);
 
   if (flow.checkFailed) {
     return (
       <div className="gst-card gst-confirm gst-stack-tight" role="alertdialog" aria-labelledby="gst-confirm-title" aria-describedby="gst-confirm-text">
-        <h2 className="gst-card-title" id="gst-confirm-title" ref={headingRef} tabIndex={-1}>We could not check your pallet.</h2>
+        <h2 className="gst-card-title" id="gst-confirm-title" ref={headingRef} tabIndex={-1}>{t('guest.signOut.checkFailedTitle')}</h2>
         <p className="gst-card-meta gst-text-ink" id="gst-confirm-text">
-          If you were packing a pallet, staff can return it to the floor.
+          {t('guest.signOut.checkFailedText')}
         </p>
-        <Button onClick={flow.request}>Try again</Button>
-        <Button variant="secondary" onClick={flow.signOutAnyway}>Sign out anyway</Button>
+        <Button onClick={flow.request}>{t('guest.signOut.tryAgain')}</Button>
+        <Button variant="secondary" onClick={flow.signOutAnyway}>{t('guest.signOut.anyway')}</Button>
       </div>
     );
   }
@@ -105,14 +112,13 @@ export const SignOutConfirm = ({ flow }) => {
   }
   return (
     <div className="gst-card gst-confirm gst-stack-tight" role="alertdialog" aria-labelledby="gst-confirm-title" aria-describedby="gst-confirm-text">
-      <h2 className="gst-card-title" id="gst-confirm-title" ref={headingRef} tabIndex={-1}>Sign out?</h2>
+      <h2 className="gst-card-title" id="gst-confirm-title" ref={headingRef} tabIndex={-1}>{t('guest.signOut.confirmTitle')}</h2>
       <p className="gst-card-meta gst-text-ink" id="gst-confirm-text">
-        You haven’t finished this pallet. If you sign out, it goes back to the floor
-        for someone else to finish. Your packing so far is saved.
+        {t('guest.signOut.confirmText')}
       </p>
       {flow.error ? <Notice tone="warn">{flow.error}</Notice> : null}
-      <Button onClick={flow.confirm} loading={flow.releasing}>Sign out and return pallet</Button>
-      <Button variant="secondary" onClick={flow.cancel} disabled={flow.releasing}>Keep packing</Button>
+      <Button onClick={flow.confirm} loading={flow.releasing}>{t('guest.signOut.confirm')}</Button>
+      <Button variant="secondary" onClick={flow.cancel} disabled={flow.releasing}>{t('guest.signOut.keepPacking')}</Button>
     </div>
   );
 };
@@ -189,17 +195,18 @@ export const Notice = ({ tone = 'info', children }) => (
 // Only drawn for an item that has been dealt with. The item on screen is
 // always still to do, so a "To do" pill there told the volunteer nothing.
 const STATES = {
-  confirmed: { cls: 'done',    mark: '✓', label: 'Packed' },
-  flagged:   { cls: 'problem', mark: '!', label: 'Problem' },
+  confirmed: { cls: 'done',    mark: '✓', label: 'guest.status.packed' },
+  flagged:   { cls: 'problem', mark: '!', label: 'guest.status.problem' },
 };
 
 export const StatusPill = ({ status }) => {
+  const t = useT();
   const s = STATES[status];
   if (!s) return null;
   return (
     <span className={`gst-state gst-state-${s.cls}`}>
       <span className="gst-state-mark" aria-hidden="true">{s.mark}</span>
-      {s.label}
+      {t(s.label)}
     </span>
   );
 };
@@ -208,6 +215,7 @@ export const StatusPill = ({ status }) => {
 // The worker's bar: a track and an "n / n" count beside it. The count is
 // the words; the bar is the picture (ACC-03).
 export const Progress = ({ done, total }) => {
+  const t = useT();
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
   return (
     <div className="gst-progress">
@@ -217,7 +225,7 @@ export const Progress = ({ done, total }) => {
         aria-valuemin={0}
         aria-valuemax={total}
         aria-valuenow={done}
-        aria-label={`${done} of ${total} items done`}
+        aria-label={t('guest.progress.label', { done, all: total })}
       >
         <div className="gst-progress-fill" style={{ width: `${pct}%` }} />
       </div>
@@ -247,23 +255,28 @@ export const ItemRow = ({ position, title, meta, badge, children }) => (
 
 // Previous and next among the items still to do, like the worker's
 // "Move between items" bar. Only drawn when there is somewhere to go.
-export const ItemSteps = ({ index, count, onPrevious, onNext, disabled }) => (
-  <nav className="gst-steps" aria-label="Move between items">
-    <button type="button" className="gst-step-btn" onClick={onPrevious} disabled={disabled || index <= 0}>
-      Previous item
-    </button>
-    <span className="gst-steps-count">{index + 1} / {count}</span>
-    <button type="button" className="gst-step-btn" onClick={onNext} disabled={disabled || index >= count - 1}>
-      Next item
-    </button>
-  </nav>
-);
+export const ItemSteps = ({ index, count, onPrevious, onNext, disabled }) => {
+  const t = useT();
+  return (
+    <nav className="gst-steps" aria-label={t('guest.steps.label')}>
+      <button type="button" className="gst-step-btn" onClick={onPrevious} disabled={disabled || index <= 0}>
+        {t('guest.steps.previous')}
+      </button>
+      <span className="gst-steps-count">{index + 1} / {count}</span>
+      <button type="button" className="gst-step-btn" onClick={onNext} disabled={disabled || index >= count - 1}>
+        {t('guest.steps.next')}
+      </button>
+    </nav>
+  );
+};
 
 // ── Counter ───────────────────────────────────────────────────
 // Plus and minus rather than a keyboard. A volunteer standing at a
 // pallet counting tins should not have to find the number row, and
 // type="number" spinners are unusable one-handed.
-export const Counter = ({ label, value, onChange, min = 0 }) => (
+export const Counter = ({ label, value, onChange, min = 0 }) => {
+  const t = useT();
+  return (
   <div className="gst-field">
     <span className="gst-label" id="gst-counter-label">{label}</span>
     <div className="gst-counter">
@@ -271,7 +284,7 @@ export const Counter = ({ label, value, onChange, min = 0 }) => (
         type="button" className="gst-counter-btn"
         onClick={() => onChange(Math.max(min, value - 1))}
         disabled={value <= min}
-        aria-label="One fewer"
+        aria-label={t('guest.counter.fewer')}
       >−</button>
       <output className="gst-counter-value" aria-live="polite" aria-labelledby="gst-counter-label">
         {value}
@@ -279,11 +292,12 @@ export const Counter = ({ label, value, onChange, min = 0 }) => (
       <button
         type="button" className="gst-counter-btn"
         onClick={() => onChange(value + 1)}
-        aria-label="One more"
+        aria-label={t('guest.counter.more')}
       >+</button>
     </div>
   </div>
-);
+  );
+};
 
 // ── Pallet card ───────────────────────────────────────────────
 // The preview shape, shown identically wherever a pallet appears: the
@@ -295,17 +309,18 @@ export const Counter = ({ label, value, onChange, min = 0 }) => (
 // An empty pallet says so in words HERE, rather than the screen
 // rendering "0 items" and leaving a first-timer to interpret it.
 export const PalletCard = ({ slip, onClick, actionLabel, disabled = false }) => {
+  const t = useT();
   const body = (
     <>
-      <h2 className="gst-card-title">{slip.beneficiaryName || 'A community partner'}</h2>
+      <h2 className="gst-card-title">{slip.beneficiaryName || t('guest.card.partner')}</h2>
       <p className="gst-card-meta">
-        {foodForPhrase(slip.beneficiaryKind)}
+        {foodForPhrase(slip.beneficiaryKind, t)}
         {' · '}
         {slip.itemCount === 0
-          ? 'Nothing listed on it yet'
-          : `${slip.itemCount} thing${slip.itemCount === 1 ? '' : 's'} to pack`}
+          ? t('guest.card.nothingListed')
+          : t.n('guest.card.thingsToPack', slip.itemCount)}
       </p>
-      <p className="gst-card-meta">Going out {formatDay(slip.dispatchDate)}</p>
+      <p className="gst-card-meta">{t('guest.card.goingOut', { day: formatDay(slip.dispatchDate, t) })}</p>
       {actionLabel ? (
         <p className="gst-card-meta gst-card-action">
           {actionLabel} →
@@ -326,16 +341,29 @@ export const PalletCard = ({ slip, onClick, actionLabel, disabled = false }) => 
 // Every screen ends with a way out that is not "go back". A volunteer
 // who is stuck, or who has found something wrong with the pallet, must
 // never be looking at a screen with nothing on it for them.
-export const HelpNote = ({ children = 'Not sure what to do, or something looks wrong?' }) => (
-  <div className="gst-help">
-    <p className="gst-help-text">{children}</p>
-    <p className="gst-help-text gst-help-strong">
-      Ask any staff member — they are happy to help.
-    </p>
-  </div>
+export const HelpNote = ({ children }) => {
+  const t = useT();
+  return (
+    <div className="gst-help">
+      <p className="gst-help-text">{children ?? t('guest.help.default')}</p>
+      <p className="gst-help-text gst-help-strong">{t('guest.help.ask')}</p>
+    </div>
+  );
+};
+
+// ── A translated sentence with parts in bold ──────────────────
+// `text` comes from t() with each bold part passed as mark('name')
+// (guestFormat.js), and `parts` holds what goes there. The word order is
+// the translation's, so a language that puts the name elsewhere in the
+// sentence still works.
+export const Rich = ({ text, parts }) => (
+  <>
+    {text.split(RICH_MARK).map((bit, i) => (i % 2 ? <strong key={i}>{parts[bit]}</strong> : bit))}
+  </>
 );
 
 // ── Loading ───────────────────────────────────────────────────
-export const Loading = ({ label = 'Loading' }) => (
-  <div className="gst-skeleton" role="status" aria-label={label} />
-);
+export const Loading = ({ label }) => {
+  const t = useT();
+  return <div className="gst-skeleton" role="status" aria-label={label ?? t('guest.loading')} />;
+};

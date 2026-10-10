@@ -8,6 +8,7 @@ import { apiGet } from '../services/api';
 import logo from '../assets/Batches_Logo.jpeg';
 import Log_In_Background from '../assets/Log_In_Background.jpg';
 import { LANDING } from '../routes/paths';
+import { useT } from '../translations';
 
 // shadcn/ui components
 import { Button } from '@/components/ui/button';
@@ -34,6 +35,7 @@ import {
 const GuestLoginPage = () => {
   const { loginAsGuest } = useAuth();
   const navigate = useNavigate();
+  const t = useT();
 
   const [name, setName] = useState('');
   const [error, setError] = useState('');
@@ -79,11 +81,11 @@ const GuestLoginPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim()) {
-      setError('Enter your name.');
+      setError(t('guest.login.nameRequired'));
       return;
     }
     if (mustChooseSite && !warehouse) {
-      setError('Choose the warehouse you are at.');
+      setError(t('guest.login.siteRequired'));
       return;
     }
     if (isSubmitting) return; // a double tap is two arrivals otherwise
@@ -99,7 +101,7 @@ const GuestLoginPage = () => {
       navigate('/guest-home', { replace: true });
     } catch (err) {
       console.error('Guest sign-in failed:', err);
-      setError(err?.message || 'Could not sign you in. Try again.');
+      setError(err?.message || t('guest.login.failed'));
       setIsSubmitting(false);
     }
   };
@@ -137,12 +139,12 @@ const GuestLoginPage = () => {
                 onClick={() => navigate(LANDING)}
                 className="login-forgot-link"
               >
-                ← Back to start
+                {t('guest.login.back')}
               </button>
             </div>
-            <CardTitle className="login-title">Volunteer sign in</CardTitle>
+            <CardTitle className="login-title">{t('guest.login.title')}</CardTitle>
             <CardDescription className="login-subtitle">
-              Enter your name to start.
+              {t('guest.login.subtitle')}
             </CardDescription>
           </CardHeader>
 
@@ -155,7 +157,7 @@ const GuestLoginPage = () => {
 
               {/* Full name field — the only field on this page */}
               <div className="login-field">
-                <Label htmlFor="name" className="login-label">Your name</Label>
+                <Label htmlFor="name" className="login-label">{t('guest.login.nameLabel')}</Label>
                 <Input
                   id="name"
                   type="text"
@@ -164,7 +166,7 @@ const GuestLoginPage = () => {
                     setName(e.target.value);
                     setError('');
                   }}
-                  placeholder="e.g. Thabo Mokoena"
+                  placeholder={t('guest.login.namePlaceholder')}
                   className="login-input"
                 />
               </div>
@@ -172,7 +174,7 @@ const GuestLoginPage = () => {
               {/* Multi-warehouse only: which site the volunteer is at */}
               {mustChooseSite && (
                 <div className="login-field">
-                  <Label htmlFor="warehouse" className="login-label">Warehouse</Label>
+                  <Label htmlFor="warehouse" className="login-label">{t('guest.login.warehouse')}</Label>
                   <select
                     id="warehouse"
                     value={warehouse}
@@ -183,7 +185,7 @@ const GuestLoginPage = () => {
                     // Same shape as the name field above (components/ui/input.jsx).
                     className="login-input h-9 w-full rounded-3xl border border-input bg-input/50 px-3 py-1 text-base outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 md:text-sm"
                   >
-                    <option value="">Choose where you are today</option>
+                    <option value="">{t('guest.login.warehouseChoose')}</option>
                     {sites.map((site) => (
                       <option key={site.code} value={site.code}>{site.name}</option>
                     ))}
@@ -193,7 +195,7 @@ const GuestLoginPage = () => {
 
               {/* Primary sign-in button */}
               <Button type="submit" className="login-btn-primary" disabled={isSubmitting} loading={isSubmitting}>
-                {isSubmitting ? 'Signing in…' : 'Sign in'}
+                {isSubmitting ? t('guest.login.signingIn') : t('guest.login.signIn')}
               </Button>
 
               {/* Back to employee sign-in */}
@@ -203,7 +205,7 @@ const GuestLoginPage = () => {
                 onClick={() => navigate('/login')}
                 className="login-btn-guest"
               >
-                ← Staff sign in
+                {t('guest.login.staff')}
               </Button>
             </form>
           </CardContent>

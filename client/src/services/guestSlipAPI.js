@@ -11,6 +11,9 @@
 // to happen.
 // ─────────────────────────────────────────────────────────────
 import { API_BASE } from './api';
+import { getLanguage, translator } from '../translations';
+
+const t = (key) => translator(getLanguage())(key);
 
 const BASE_URL = `${API_BASE}/api/slip`;
 
@@ -28,12 +31,12 @@ const request = async (path, options = {}) => {
 
   const contentType = res.headers.get('content-type') || '';
   if (!contentType.includes('application/json')) {
-    throw new Error('We could not reach the system. Ask a staff member for help.');
+    throw new Error(t('guest.api.unreachable'));
   }
 
   const json = await res.json();
   if (!json.success) {
-    const err = new Error(json.message || 'Something went wrong.');
+    const err = new Error(json.message || t('guest.api.failed'));
     err.status = res.status;
     // The short-code screen needs to tell "no such code" from "that code
     // matches more than one pallet" — they need different wording.

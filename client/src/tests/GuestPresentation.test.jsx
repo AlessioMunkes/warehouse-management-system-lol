@@ -62,7 +62,7 @@ describe('beneficiaryKind — all four enum values', () => {
     ['soup_kitchen',    'soup kitchen'],
     ['community',       'community group'],
   ])('%s reads as "%s"', (kind, noun) => {
-    expect(beneficiaryKind(kind).noun).toBe(noun);
+    expect(beneficiaryKind(kind)).toBe(`a ${noun}`);
   });
 
   it('does not call a soup kitchen a creche', () => {
@@ -77,8 +77,8 @@ describe('beneficiaryKind — all four enum values', () => {
   });
 
   it('falls back to neutral wording for an unknown or missing kind', () => {
-    expect(beneficiaryKind('something_new').noun).toBe('community partner');
-    expect(beneficiaryKind(undefined).noun).toBe('community partner');
+    expect(beneficiaryKind('something_new')).toBe('a community partner');
+    expect(beneficiaryKind(undefined)).toBe('a community partner');
   });
 });
 
