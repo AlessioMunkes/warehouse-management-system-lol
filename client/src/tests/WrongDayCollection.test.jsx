@@ -81,6 +81,6 @@ describe('a pallet booked for another day', () => {
 
     const start = await screen.findByRole('button', { name: /Start the collection/ });
     expect(start).toBeDisabled();
-    expect(screen.getByText(/Ask a manager to authorise/)).toBeInTheDocument();
+    expect(screen.getByText(/Finish packing it first/)).toBeInTheDocument();
   });
 });

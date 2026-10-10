@@ -447,11 +447,14 @@ describe('a pallet written off at 15:00 can still be collected', () => {
     expect(repoMock.collect).not.toHaveBeenCalled();
   });
 
-  it('still needs a manager when packing has not closed the slip', async () => {
+  it('still refuses a pallet packing has not closed, and says to finish packing', async () => {
     repoMock.getGateView.mockResolvedValue(
       gateView({ dispatch_status: 'not_collected', slip_status: 'in_progress' })
     );
-    await expect(dispatchService.collect(1, body, WORKER)).rejects.toMatchObject({ status: 403 });
+    await expect(dispatchService.collect(1, body, WORKER)).rejects.toMatchObject({
+      status: 409, message: expect.stringContaining('Finish packing it first'),
+    });
+    expect(repoMock.collect).not.toHaveBeenCalled();
   });
 });
 
@@ -517,11 +520,11 @@ describe('a pallet booked for another day can still be collected', () => {
     await expect(dispatchService.collect(1, body, WORKER)).rejects.toMatchObject({ status: 409 });
   });
 
-  it('still needs a manager when packing has not closed the slip', async () => {
+  it('still refuses a pallet packing has not closed', async () => {
     repoMock.getGateView.mockResolvedValue(
       gateView({ dispatch_date: new Date(2026, 7, 17), slip_status: 'in_progress' })
     );
-    await expect(dispatchService.collect(1, body, WORKER)).rejects.toMatchObject({ status: 403 });
+    await expect(dispatchService.collect(1, body, WORKER)).rejects.toMatchObject({ status: 409 });
   });
 });
 

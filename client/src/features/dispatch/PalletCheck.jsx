@@ -427,7 +427,7 @@ export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChan
               </div>
             ) : (
               <Notice tone="warn">
-                {overrideReasonText}. Ask a manager to authorise this collection at the gate.
+                Packing has not closed this pallet off yet. Finish packing it first.
               </Notice>
             )
           ) : null}

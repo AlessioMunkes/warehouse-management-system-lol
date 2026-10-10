@@ -373,10 +373,11 @@ const collect = async (slipId, body, user) => {
   // disagreement here is with a clock.
 
   if (needsOverride.length > 0) {
+    // The gate is the worker's screen and so is Packing, so the way out
+    // is theirs: close the pallet off, then release it. This used to
+    // say "ask a manager to authorise", which no manager's screen can do.
     if (!isManager(user)) {
-      fail(403,
-        `${needsOverride.join(', and ')}. Ask a manager to authorise this collection at the gate.`
-      );
+      fail(409, 'This pallet has not been closed off by packing yet. Finish packing it first.');
     }
     if (!payload.overrideReason) {
       fail(400,
