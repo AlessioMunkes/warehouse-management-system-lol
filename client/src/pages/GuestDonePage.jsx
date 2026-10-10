@@ -75,7 +75,7 @@ const GuestDonePage = () => {
   return (
     <GuestShell>
       <GuestScreen
-        title={<>Thank you, <span className="gst-underline">{name}</span></>}
+        title={`Thank you, ${name}`}
         lede="That pallet is packed and ready to go out. Here is what you did."
       >
         {/* The headline figure — what they physically packed. */}

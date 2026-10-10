@@ -197,7 +197,7 @@ describe('(c) guest home', () => {
     renderAt('/guest-home', <GuestHomePage />, '/guest-home');
 
     // NFR-19: the whole name they signed in with, not the first word.
-    expect(await screen.findByText('Thabo Mokoena')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Welcome, Thabo Mokoena' })).toBeInTheDocument();
     expect(screen.getByText('Masibambane Day Care')).toBeInTheDocument();
     expect(screen.getByText('Rondebosch Soup Kitchen')).toBeInTheDocument();
   });
@@ -350,7 +350,7 @@ describe('(e) the thank-you and contribution summary', () => {
   it('thanks the volunteer by name and shows the real numbers', async () => {
     renderDone({ summary });
 
-    expect(await screen.findByText('Thabo Mokoena')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Thank you, Thabo Mokoena' })).toBeInTheDocument();
     expect(screen.getByText('49')).toBeInTheDocument();      // units actually packed
     expect(screen.getByText('8')).toBeInTheDocument();       // items confirmed
     expect(screen.getByText('1')).toBeInTheDocument();       // problems reported

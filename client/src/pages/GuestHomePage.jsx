@@ -143,7 +143,7 @@ const GuestHomePage = () => {
   return (
     <GuestShell nav>
       <GuestScreen
-        title={<>Welcome, <span className="gst-underline">{name}</span></>}
+        title={`Welcome, ${name}`}
         lede={mySlip
           ? 'Pick up where you left off.'
           : 'Thank you for being here today. Pick a pallet below and we’ll take it one step at a time.'}

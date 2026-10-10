@@ -36,9 +36,7 @@
       experienced packer needs it. A first-timer needs one thing.
 
    3. WARMER. Cream rather than sand, and the warmth NFR-06 asks for
-      carried by the copy, the palette and the type — plus one small
-      editorial touch, the hand-drawn underline on the greeting, which
-      marks the volunteer's own name and so is doing a job.
+      carried by the copy, the palette and the type.
       There is deliberately NO abstract decorative shape: see .gst-hero.
 
    ── Accessibility, ACC-01 to ACC-10 ───────────────────────────────────
@@ -229,15 +227,6 @@
   margin: 0.625rem 0 0;
   font-size: 1.0625rem;
   color: var(--gst-text);
-}
-
-/* Hand-drawn underline under the greeting — the illustrated touch,
-   done with a border rather than an asset. */
-.gst-underline {
-  display: inline-block;
-  padding-bottom: 0.2em;
-  border-bottom: 4px solid var(--gst-accent);
-  border-radius: 0 0 40% 20%;
 }
 
 /* ── Cards ────────────────────────────────────────────────────── */
