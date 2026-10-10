@@ -27,10 +27,12 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { fetchMySlip, releaseMySlip } from '../../services/guestSlipAPI';
+import { useT } from '../../translations';
 
 export const useGuestSignOut = () => {
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const t = useT();
   const [phase, setPhase] = useState('idle');   // idle | checking | confirming | releasing | signingOut | checkFailed
   const [error, setError] = useState(null);
 
@@ -69,7 +71,7 @@ export const useGuestSignOut = () => {
     try {
       await releaseMySlip();
     } catch (err) {
-      setError(err?.message || 'We could not return your pallet. Try again.');
+      setError(err?.message || t('guest.signOut.returnFailed'));
       setPhase('confirming');
       return;
     }

@@ -4,7 +4,14 @@
 // Formatting helpers for the guest screens. Split out of
 // GuestPrimitives.jsx because that file exports components and mixing
 // the two breaks React Fast Refresh.
+//
+// Words come from translations/messages.js (guest.day.*, guest.kind.*).
+// Each helper takes the screen's own `t` so it re-renders with the
+// language; with none it reads the language currently chosen.
 // ─────────────────────────────────────────────────────────────
+import { getLanguage, translator } from '../../translations';
+
+const tFor = (t) => t ?? translator(getLanguage());
 
 // The API sends a plain calendar day ("2026-09-16") precisely so it is
 // not shifted by a timezone.
@@ -17,18 +24,19 @@
 //
 // Building the Date from (y, m-1, d) makes it local midnight, which is
 // the calendar day the warehouse means.
-export const formatDay = (isoDay) => {
-  if (typeof isoDay !== 'string') return 'soon';
+export const formatDay = (isoDay, t) => {
+  const tr = tFor(t);
+  if (typeof isoDay !== 'string') return tr('guest.day.soon');
   const [y, m, d] = isoDay.slice(0, 10).split('-').map(Number);
-  if (!y || !m || !d) return 'soon';
+  if (!y || !m || !d) return tr('guest.day.soon');
 
   const date = new Date(y, m - 1, d);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const days = Math.round((date - today) / 86400000);
 
-  if (days === 0) return 'today';
-  if (days === 1) return 'tomorrow';
+  if (days === 0) return tr('guest.day.today');
+  if (days === 1) return tr('guest.day.tomorrow');
   return date.toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'long' });
 };
 
@@ -42,26 +50,17 @@ export const formatDay = (isoDay) => {
 // before (ACC-09) — so "creche" rather than "ECD", which is a sector
 // term a first-time volunteer has no reason to know.
 //
-// `article` exists because "a" and "an" are not interchangeable and a
-// summary sentence reads badly with the wrong one.
-const BENEFICIARY_KINDS = {
-  ecd:              { noun: 'creche',        article: 'a'  },
-  dignity_kitchen:  { noun: 'dignity kitchen', article: 'a'  },
-  soup_kitchen:     { noun: 'soup kitchen',  article: 'a'  },
-  community:        { noun: 'community group', article: 'a' },
-};
-
-const FALLBACK_KIND = { noun: 'community partner', article: 'a' };
+// Each key holds the whole phrase, article included ("a creche"), so a
+// language with no articles, or different ones, is free to word it.
+const BENEFICIARY_KINDS = ['ecd', 'dignity_kitchen', 'soup_kitchen', 'community'];
 
 // An unrecognised value falls back to neutral wording rather than
 // printing a raw enum like "dignity_kitchen" at a volunteer.
-export const beneficiaryKind = (kind) => BENEFICIARY_KINDS[kind] ?? FALLBACK_KIND;
+export const beneficiaryKind = (kind, t) =>
+  tFor(t)(BENEFICIARY_KINDS.includes(kind) ? `guest.kind.${kind}` : 'guest.kind.other');
 
 // "Food for a soup kitchen"
-export const foodForPhrase = (kind) => {
-  const k = beneficiaryKind(kind);
-  return `Food for ${k.article} ${k.noun}`;
-};
+export const foodForPhrase = (kind, t) => tFor(t)('guest.foodFor', { kind: beneficiaryKind(kind, t) });
 
 // The name to greet somebody by: the whole thing, exactly as they
 // typed it.
@@ -83,5 +82,10 @@ export const foodForPhrase = (kind) => {
 // A long name is a LAYOUT problem, and it is solved in CSS
 // (.gst-name wraps and breaks). It is never solved by throwing away
 // part of what somebody told us their name is.
-export const displayName = (full, fallback = 'there') =>
-  (typeof full === 'string' ? full.trim() : '') || fallback;
+export const displayName = (full, t) =>
+  (typeof full === 'string' ? full.trim() : '') || tFor(t)('guest.name.fallback');
+
+// Marks a part of a translated sentence to be shown in bold by <Rich>
+// (GuestPrimitives.jsx): t('guest.done.goesTo', { beneficiary: mark('beneficiary') }).
+export const RICH_MARK = '\u0001';
+export const mark = (name) => `${RICH_MARK}${name}${RICH_MARK}`;

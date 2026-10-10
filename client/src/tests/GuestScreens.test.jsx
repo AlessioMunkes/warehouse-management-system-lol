@@ -16,7 +16,7 @@
 // screen told the volunteer the pallet went out yesterday.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 vi.mock('../services/guestSlipAPI', () => ({
@@ -197,9 +197,24 @@ describe('(c) guest home', () => {
     renderAt('/guest-home', <GuestHomePage />, '/guest-home');
 
     // NFR-19: the whole name they signed in with, not the first word.
-    expect(await screen.findByText('Thabo Mokoena')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Welcome, Thabo Mokoena' })).toBeInTheDocument();
     expect(screen.getByText('Masibambane Day Care')).toBeInTheDocument();
     expect(screen.getByText('Rondebosch Soup Kitchen')).toBeInTheDocument();
+  });
+
+  it('keeps the pallet cards as disabled buttons while a claim is saving', async () => {
+    api.fetchMySlip.mockRejectedValue(Object.assign(new Error('none'), { status: 404 }));
+    api.fetchAvailableSlips.mockResolvedValue([preview135, preview136Empty]);
+    api.claimSlipById.mockReturnValue(new Promise(() => {}));   // never settles
+    renderAt('/guest-home', <GuestHomePage />, '/guest-home');
+
+    const card = (await screen.findByText('Masibambane Day Care')).closest('button');
+    card.click();
+    await waitFor(() => expect(card).toBeDisabled());
+    const other = screen.getByText('Rondebosch Soup Kitchen').closest('button');
+    expect(other).not.toBeNull();
+    expect(other).toBeDisabled();
+    expect(other).toHaveClass('gst-card', 'gst-card-button');
   });
 
   it('offers the typed-code route as a first-class option', async () => {
@@ -217,7 +232,9 @@ describe('(c) guest home', () => {
 
     expect(await screen.findByRole('button', { name: 'Continue packing' })).toBeInTheDocument();
     // The in-progress card names the beneficiary and how far they got.
-    expect(screen.getByText('Your pallet in progress: Masibambane Day Care, 0 of 2 packed')).toBeInTheDocument();
+    expect(screen.getByText('Your pallet in progress')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Masibambane Day Care' })).toBeInTheDocument();
+    expect(screen.getByText('0 of 2 packed')).toBeInTheDocument();
     // …and does not offer a second pallet on top of it.
     expect(screen.queryByText(/today.s pallets/i)).not.toBeInTheDocument();
   });
@@ -234,7 +251,7 @@ describe('(c) guest home', () => {
     api.fetchAvailableSlips.mockResolvedValue([]);
     renderAt('/guest-home', <GuestHomePage />, '/guest-home');
 
-    expect(await screen.findByText('Your pallet in progress: Masibambane Day Care, 2 of 3 packed')).toBeInTheDocument();
+    expect(await screen.findByText('2 of 3 packed')).toBeInTheDocument();
   });
 
   it('Continue packing goes to the packing screen', async () => {
@@ -268,6 +285,17 @@ describe('(d) the packing screen', () => {
     expect(screen.queryByText('Rice')).not.toBeInTheDocument();
   });
 
+  it('names an ECD pallet the way the worker sees it, and falls back for one with no ECD', async () => {
+    api.fetchMySlip.mockResolvedValue({ ...mySlip, ecd_name: 'Masibambane Day Care', beneficiary_name: 'Old copy of the name' });
+    const { unmount } = renderAt('/guest/pack', <GuestPackPage />, '/guest/pack');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Masibambane Day Care' })).toBeInTheDocument();
+    unmount();
+
+    api.fetchMySlip.mockResolvedValue({ ...mySlip, ecd_name: null, beneficiary_name: 'Rondebosch Soup Kitchen', beneficiary_kind: 'soup_kitchen' });
+    renderAt('/guest/pack', <GuestPackPage />, '/guest/pack');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Rondebosch Soup Kitchen' })).toBeInTheDocument();
+  });
+
   it('keeps the volunteer’s sense of place — who it is for, and the day', async () => {
     api.fetchMySlip.mockResolvedValue(mySlip);
     renderAt('/guest/pack', <GuestPackPage />, '/guest/pack');
@@ -282,6 +310,38 @@ describe('(d) the packing screen', () => {
     renderAt('/guest/pack', <GuestPackPage />, '/guest/pack');
 
     expect(await screen.findByRole('button', { name: /there’s a problem/i })).toBeInTheDocument();
+  });
+
+  it('starts the problem count at 0, not at the amount the slip asks for', async () => {
+    api.fetchMySlip.mockResolvedValue(mySlip);
+    api.flagItem.mockResolvedValue({});
+    const { container } = renderAt('/guest/pack', <GuestPackPage />, '/guest/pack');
+
+    await screen.findByRole('heading', { level: 2, name: 'Butternut' });
+    screen.getByRole('button', { name: 'One more' }).click();          // main counter now 2
+    screen.getByRole('button', { name: 'There’s a problem' }).click();
+    await screen.findByText(/how many did you actually pack/i);
+    expect(container.querySelector('.gst-counter-value').textContent).toBe('0');
+
+    screen.getByRole('button', { name: /there isn.t enough/i }).click();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Report it' })).toBeEnabled());
+    screen.getByRole('button', { name: 'Report it' }).click();
+    await waitFor(() => expect(api.flagItem).toHaveBeenCalledWith(135, 207, 'Short quantity', 0, undefined));
+  });
+
+  it('sends an optional note for staff with a problem report', async () => {
+    api.fetchMySlip.mockResolvedValue(mySlip);
+    api.flagItem.mockResolvedValue({});
+    renderAt('/guest/pack', <GuestPackPage />, '/guest/pack');
+
+    await screen.findByRole('heading', { level: 2, name: 'Butternut' });
+    screen.getByRole('button', { name: 'There’s a problem' }).click();
+    const box = await screen.findByLabelText(/anything staff should know/i);
+    fireEvent.change(box, { target: { value: 'Crate was wet' } });
+    screen.getByRole('button', { name: /looks damaged/i }).click();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Report it' })).toBeEnabled());
+    screen.getByRole('button', { name: 'Report it' }).click();
+    await waitFor(() => expect(api.flagItem).toHaveBeenCalledWith(135, 207, 'Damaged stock', 0, 'Crate was wet'));
   });
 
   it('handles an empty pallet in plain language, with a way out', async () => {
@@ -333,7 +393,7 @@ describe('(e) the thank-you and contribution summary', () => {
   it('thanks the volunteer by name and shows the real numbers', async () => {
     renderDone({ summary });
 
-    expect(await screen.findByText('Thabo Mokoena')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Thank you, Thabo Mokoena' })).toBeInTheDocument();
     expect(screen.getByText('49')).toBeInTheDocument();      // units actually packed
     expect(screen.getByText('8')).toBeInTheDocument();       // items confirmed
     expect(screen.getByText('1')).toBeInTheDocument();       // problems reported
@@ -539,8 +599,8 @@ describe('Return this pallet (guest home)', () => {
     api.fetchAvailableSlips.mockResolvedValue([preview135]);
     (await screen.findByRole('button', { name: 'Return pallet' })).click();
 
-    expect(await screen.findByText('Masibambane Day Care')).toBeInTheDocument();
-    expect(screen.getByLabelText('Pallet code')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Pallet code')).toBeInTheDocument();
+    expect(screen.getByText('Masibambane Day Care')).toBeInTheDocument();
     expect(screen.queryByText(/Your pallet in progress/)).not.toBeInTheDocument();
     expect(api.releaseMySlip).toHaveBeenCalledTimes(1);
   });
@@ -581,6 +641,14 @@ describe('the packing screen (guided look)', () => {
     expect(screen.getByRole('button', { name: 'There’s a problem' })).toBeInTheDocument();
     // two items is "next" territory only if there is somewhere to go
     expect(screen.getByRole('navigation', { name: 'Move between items' })).toBeInTheDocument();
+  });
+
+  it('has no "To do" pill on the item in front of them', async () => {
+    api.fetchMySlip.mockResolvedValue(mySlip);
+    renderAt('/guest/pack', <GuestPackPage />, '/guest/pack');
+
+    await screen.findByRole('heading', { level: 2, name: 'Butternut' });
+    expect(screen.queryByText('To do')).not.toBeInTheDocument();
   });
 
   it('has no previous / next when only one item is left', async () => {
@@ -654,5 +722,30 @@ describe('the packing screen (guided look)', () => {
     expect(screen.getByText('1 / 3')).toBeInTheDocument();   // progress: one of three done
     expect(screen.queryByText(/that.s everything/i)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Finish this pallet' })).not.toBeInTheDocument();
+  });
+
+  it('keeps "Item n of n" and the previous / next count in step after items are done', async () => {
+    const mk = (id, name, status) => ({ id, product_name: name, required_quantity: '1.000', unit: 'each', packed_quantity: status === 'pending' ? null : '1.000', status, flag_reason: null });
+    api.fetchMySlip.mockResolvedValue({
+      ...mySlip,
+      items: [
+        mk(1, 'Oats', 'confirmed'), mk(2, 'Milk', 'flagged'), mk(3, 'Tea', 'confirmed'),
+        mk(4, 'Butternut', 'pending'), mk(5, 'Rice', 'pending'), mk(6, 'Beans', 'pending'),
+      ],
+    });
+    renderAt('/guest/pack', <GuestPackPage />, '/guest/pack');
+
+    await screen.findByRole('heading', { level: 2, name: 'Butternut' });
+    expect(screen.getByText('Item 1 of 3')).toBeInTheDocument();
+    expect(screen.getByText('1 / 3')).toBeInTheDocument();
+
+    screen.getByRole('button', { name: 'Next item' }).click();
+    await screen.findByRole('heading', { level: 2, name: 'Rice' });
+    screen.getByRole('button', { name: 'Next item' }).click();
+    await screen.findByRole('heading', { level: 2, name: 'Beans' });
+
+    expect(screen.getByText('Item 3 of 3')).toBeInTheDocument();
+    expect(screen.getByText('3 / 3')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: '3 of 6 items done' })).toBeInTheDocument();
   });
 });

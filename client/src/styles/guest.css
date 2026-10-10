@@ -36,9 +36,7 @@
       experienced packer needs it. A first-timer needs one thing.
 
    3. WARMER. Cream rather than sand, and the warmth NFR-06 asks for
-      carried by the copy, the palette and the type — plus one small
-      editorial touch, the hand-drawn underline on the greeting, which
-      marks the volunteer's own name and so is doing a job.
+      carried by the copy, the palette and the type.
       There is deliberately NO abstract decorative shape: see .gst-hero.
 
    ── Accessibility, ACC-01 to ACC-10 ───────────────────────────────────
@@ -49,7 +47,7 @@
               warnings are --danger-ink. index.css documents and
               maintains those ratios in both themes.
    ACC-03     Status is never colour alone. Every state pairs a mark
-              (✓ ! •) with a word. See .gst-state.
+              (✓ !) with a word. See .gst-state.
    ACC-04     200% zoom: everything is rem/ch based and single column,
               no fixed heights on text containers, no overflow hidden
               on anything that holds words.
@@ -148,6 +146,7 @@
   overflow-wrap: anywhere;
 }
 .gst-masthead-brand span { color: var(--gst-accent); }
+.gst-masthead-role { font-weight: 500; }
 
 /* ── Session bar: Home and Sign out ───────────────────────────── */
 .gst-nav {
@@ -162,7 +161,7 @@
   width: 100%;
   max-width: 34rem;
   margin: 0 auto;
-  padding: 0 0.75rem;
+  padding: 0.375rem 0.75rem;   /* room round the 56px language switch */
 }
 .gst-nav-btn {
   display: inline-flex;
@@ -178,6 +177,35 @@
 }
 .gst-nav-btn:hover:not(:disabled) { color: var(--gst-accent); }
 .gst-nav-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.gst-nav-end { display: inline-flex; align-items: center; gap: 0.25rem; }
+
+/* ── Language switch (GuestLanguageSwitch.jsx) ────────────────────
+   App tokens directly, not --gst-*, because it also sits on the
+   sign-in page, which is outside .gst-shell. 56px tall (ACC-06). */
+.gst-lang {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.gst-lang-icon {
+  position: absolute;
+  left: 0.75rem;
+  font-size: 1.125rem;
+  line-height: 1;
+  pointer-events: none;
+}
+.gst-lang-select {
+  min-height: 56px;
+  padding: 0 0.75rem 0 2.5rem;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 700 1rem/1.2 "Inter Variable", "Inter", system-ui, -apple-system, sans-serif;
+  cursor: pointer;
+}
+.gst-lang-select:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
 
 .gst-confirm { border-color: var(--gst-ink); }
 
@@ -231,15 +259,6 @@
   color: var(--gst-text);
 }
 
-/* Hand-drawn underline under the greeting — the illustrated touch,
-   done with a border rather than an asset. */
-.gst-underline {
-  display: inline-block;
-  padding-bottom: 0.2em;
-  border-bottom: 4px solid var(--gst-accent);
-  border-radius: 0 0 40% 20%;
-}
-
 /* ── Cards ────────────────────────────────────────────────────── */
 .gst-card {
   background: var(--gst-white);
@@ -256,6 +275,16 @@
   color: var(--gst-ink);
 }
 .gst-card-meta { margin: 0; font-size: 0.9375rem; color: var(--gst-text-sub); overflow-wrap: break-word; }
+.gst-card-action { margin-top: 0.75rem; font-weight: 700; color: var(--gst-accent); }
+.gst-choice-label { font-size: 1rem; }
+.gst-fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.gst-summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--gst-tap);
+  cursor: pointer;
+  font-weight: 700;
+}
 
 /* A whole card that is a tap target (choose-a-pallet list). */
 .gst-card-button {
@@ -267,8 +296,10 @@
   font: inherit;
   transition: border-color 0.15s ease, transform 0.15s ease;
 }
-.gst-card-button:hover { border-color: var(--gst-accent); }
-.gst-card-button:active { transform: scale(0.995); }
+.gst-card-button:hover:not(:disabled) { border-color: var(--gst-accent); }
+.gst-card-button:active:not(:disabled) { transform: scale(0.995); }
+/* Saving a claim: same card, just not tappable. */
+.gst-card-button:disabled { cursor: progress; color: inherit; }
 
 /* ── Buttons ──────────────────────────────────────────────────── */
 .gst-btn {
@@ -346,6 +377,7 @@
   color: var(--gst-ink);
 }
 .gst-input:focus { border-color: var(--gst-ink); }
+.gst-textarea { resize: vertical; }
 .gst-input-code {
   font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
   font-size: 1.5rem;
@@ -395,7 +427,6 @@
 .gst-state-mark { font-size: 1rem; line-height: 1; }
 .gst-state-done    { background: var(--gst-good-bg); color: var(--gst-good); border-color: color-mix(in srgb, var(--gst-good) 30%, transparent); }
 .gst-state-problem { background: var(--gst-attention-bg); color: var(--gst-attention); border-color: color-mix(in srgb, var(--gst-attention) 30%, transparent); }
-.gst-state-todo    { background: var(--gst-sand); color: var(--gst-text-sub); border-color: var(--gst-border); }
 
 /* ── "What you've done so far" list ───────────────────────────── */
 /* Was inline flex styles on the <li>. A long product name beside a
@@ -476,6 +507,8 @@
 }
 .gst-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.25rem; }
 .gst-row-pos {
+  display: block;
+  margin: 0;
   font: 700 0.75rem/1.4 var(--gst-font-sans);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -589,6 +622,7 @@
   text-align: center;
 }
 .gst-help-text { margin: 0 0 0.75rem; font-size: 0.9375rem; color: var(--gst-text-sub); }
+.gst-help-strong { margin: 0; font-weight: 700; color: var(--gst-ink); }
 
 /* ── Skeleton ─────────────────────────────────────────────────── */
 .gst-skeleton {

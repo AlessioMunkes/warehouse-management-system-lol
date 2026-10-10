@@ -23,18 +23,20 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-  GuestShell, GuestScreen, Button, Notice, HelpNote, SignOutConfirm,
+  GuestShell, GuestScreen, Button, Notice, HelpNote, SignOutConfirm, Rich,
 } from '../features/guest/GuestPrimitives';
 import { useGuestSignOut } from '../features/guest/useGuestSignOut';
-import { formatDay, displayName, beneficiaryKind as beneficiaryKindOf } from '../features/guest/guestFormat';
+import { formatDay, displayName, beneficiaryKind as beneficiaryKindOf, mark } from '../features/guest/guestFormat';
+import { useT } from '../translations';
 
 const GuestDonePage = () => {
   const { state } = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const t = useT();
 
   const summary = state?.summary ?? null;
-  const name = displayName(user?.firstName);
+  const name = displayName(user?.firstName, t);
 
   // Sign-out lives in useGuestSignOut: it lands on the front door
   // (navigating BEFORE the session is cleared, so ProtectedRoute never
@@ -49,17 +51,17 @@ const GuestDonePage = () => {
     return (
       <GuestShell>
         <GuestScreen
-          title={`Thank you, ${name}`}
-          lede="Your pallet is finished and on its way."
+          title={t('guest.done.thanks', { name })}
+          lede={t('guest.done.finishedLede')}
         >
           <SignOutConfirm flow={flow} />
           <Button onClick={() => navigate('/guest-home')} disabled={busy}>
-            Pack another pallet
+            {t('guest.done.another')}
           </Button>
           <Button variant="secondary" onClick={flow.request} disabled={busy} loading={flow.busy}>
-            {flow.busy ? 'Signing you out…' : 'Sign out'}
+            {flow.busy ? t('guest.nav.signingOut') : t('guest.nav.signOut')}
           </Button>
-          <HelpNote>Need to tell us something? Let a staff member know before you go.</HelpNote>
+          <HelpNote>{t('guest.done.help')}</HelpNote>
         </GuestScreen>
       </GuestShell>
     );
@@ -70,35 +72,31 @@ const GuestDonePage = () => {
     itemsPacked, itemsFlagged, unitsPacked,
   } = summary;
 
-  const kind = beneficiaryKindOf(beneficiaryKind);
+  const kind = beneficiaryKindOf(beneficiaryKind, t);
 
   return (
     <GuestShell>
       <GuestScreen
-        title={<>Thank you, <span className="gst-underline">{name}</span></>}
-        lede="That pallet is packed and ready to go out. Here is what you did."
+        title={t('guest.done.thanks', { name })}
+        lede={t('guest.done.lede')}
       >
         {/* The headline figure — what they physically packed. */}
         <div className="gst-celebrate gst-animate-pop">
           <span className="gst-seal" aria-hidden="true">✓</span>
           <span className="gst-figure">{unitsPacked || itemsPacked}</span>
           <span className="gst-figure-label">
-            {unitsPacked
-              ? `items packed into this pallet`
-              : `things checked off this pallet`}
+            {unitsPacked ? t('guest.done.unitsLabel') : t('guest.done.checkedLabel')}
           </span>
         </div>
 
         <div className="gst-figure-row">
           <div className="gst-card gst-stat">
             <span className="gst-figure gst-figure-sm is-packed">{itemsPacked}</span>
-            <span className="gst-figure-label">things packed</span>
+            <span className="gst-figure-label">{t('guest.done.thingsPacked')}</span>
           </div>
           <div className="gst-card gst-stat">
             <span className="gst-figure gst-figure-sm">{itemsFlagged}</span>
-            <span className="gst-figure-label">
-              {itemsFlagged === 1 ? 'problem reported' : 'problems reported'}
-            </span>
+            <span className="gst-figure-label">{t.n('guest.done.problems', itemsFlagged)}</span>
           </div>
         </div>
 
@@ -106,40 +104,39 @@ const GuestDonePage = () => {
             Only states the child count when the data actually has one;
             a made-up number here would be the worst kind. */}
         <div className="gst-card gst-card-quiet">
-          <h2 className="gst-card-title">Where it’s going</h2>
+          <h2 className="gst-card-title">{t('guest.done.whereTitle')}</h2>
           <p className="gst-card-meta gst-text-ink">
-            This pallet goes to <strong>{beneficiary}</strong>
-            {`, ${kind.article} ${kind.noun}`}
-            {childCount ? <> that feeds <strong>{childCount} children</strong></> : ''}
-            . It leaves {formatDay(dispatchDate)}.
+            <Rich
+              text={t(childCount ? 'guest.done.goesToFeeds' : 'guest.done.goesTo', {
+                beneficiary: mark('beneficiary'),
+                kind,
+                children: mark('children'),
+                day: formatDay(dispatchDate, t),
+              })}
+              parts={{ beneficiary, children: t('common.children', { n: childCount }) }}
+            />
           </p>
         </div>
 
         {itemsFlagged > 0 ? (
-          <Notice tone="info">
-            A staff member has {itemsFlagged === 1 ? 'your report' : 'your reports'}.
-            Thank you for flagging {itemsFlagged === 1 ? 'it' : 'them'}.
-          </Notice>
+          <Notice tone="info">{t.n('guest.done.flagged', itemsFlagged)}</Notice>
         ) : null}
 
         <div className="gst-card gst-card-quiet gst-thanks">
-          <p className="gst-card-meta gst-text-ink">
-            Ladles of Love could not do this without people giving up their time.
-            Thank you for giving yours today.
-          </p>
+          <p className="gst-card-meta gst-text-ink">{t('guest.done.gratitude')}</p>
         </div>
 
         {/* Keep them going: another pallet is the primary action, and
             sign-out stays clearly visible as the outlined one. */}
         <SignOutConfirm flow={flow} />
         <Button onClick={() => navigate('/guest-home')} disabled={busy}>
-          Pack another pallet
+          {t('guest.done.another')}
         </Button>
         <Button variant="secondary" onClick={flow.request} disabled={busy} loading={flow.busy}>
-          {flow.busy ? 'Signing you out…' : 'Sign out'}
+          {flow.busy ? t('guest.nav.signingOut') : t('guest.nav.signOut')}
         </Button>
 
-        <HelpNote>Need to tell us something? Let a staff member know before you go.</HelpNote>
+        <HelpNote>{t('guest.done.help')}</HelpNote>
       </GuestScreen>
     </GuestShell>
   );
