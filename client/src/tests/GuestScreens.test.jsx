@@ -284,6 +284,23 @@ describe('(d) the packing screen', () => {
     expect(await screen.findByRole('button', { name: /there’s a problem/i })).toBeInTheDocument();
   });
 
+  it('starts the problem count at 0, not at the amount the slip asks for', async () => {
+    api.fetchMySlip.mockResolvedValue(mySlip);
+    api.flagItem.mockResolvedValue({});
+    const { container } = renderAt('/guest/pack', <GuestPackPage />, '/guest/pack');
+
+    await screen.findByRole('heading', { level: 2, name: 'Butternut' });
+    screen.getByRole('button', { name: 'One more' }).click();          // main counter now 2
+    screen.getByRole('button', { name: 'There’s a problem' }).click();
+    await screen.findByText(/how many did you actually pack/i);
+    expect(container.querySelector('.gst-counter-value').textContent).toBe('0');
+
+    screen.getByRole('button', { name: /there isn.t enough/i }).click();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Report it' })).toBeEnabled());
+    screen.getByRole('button', { name: 'Report it' }).click();
+    await waitFor(() => expect(api.flagItem).toHaveBeenCalledWith(135, 207, 'Short quantity', 0));
+  });
+
   it('handles an empty pallet in plain language, with a way out', async () => {
     api.fetchMySlip.mockResolvedValue({ ...mySlip, id: 136, ecd_name: 'Rondebosch Soup Kitchen', beneficiary_name: 'Rondebosch Soup Kitchen', items: [] });
     renderAt('/guest/pack', <GuestPackPage />, '/guest/pack');

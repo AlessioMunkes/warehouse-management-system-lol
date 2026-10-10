@@ -63,6 +63,10 @@ const GuestPackPage = () => {
   // Deriving it during render means it is never briefly wrong.
   const [qtyFor, setQtyFor] = useState(null);   // { itemId, value }
   const [reason, setReason] = useState('');
+  // The problem screen's own count. Starts at 0 each time, like the
+  // worker's flag counter: a short or damaged item should not arrive
+  // pre-filled with the full amount the slip asked for.
+  const [flagQty, setFlagQty] = useState(0);
   const [busy, setBusy]   = useState(false);
   const [saidSo, setSaidSo] = useState(null);   // the confirmation after every action
   const [focusId, setFocusId] = useState(null);  // which pending item is on screen
@@ -259,7 +263,7 @@ const GuestPackPage = () => {
             </div>
           </fieldset>
 
-          <Counter label="How many did you actually pack?" value={qty} onChange={setQty} />
+          <Counter label="How many did you actually pack?" value={flagQty} onChange={setFlagQty} />
 
           {error ? <Notice tone="warn">{error}</Notice> : null}
 
@@ -267,7 +271,7 @@ const GuestPackPage = () => {
             <Button
               disabled={!reason || busy}
               onClick={() => act(
-                () => flagItem(slip.id, current.id, reason, qty),
+                () => flagItem(slip.id, current.id, reason, flagQty),
                 `Thanks — a staff member will look at the ${current.product_name}.`,
               )} loading={busy}>
               {busy ? 'Saving…' : 'Report it'}
@@ -325,7 +329,7 @@ const GuestPackPage = () => {
                 )} loading={busy}>
                 {busy ? 'Saving…' : 'Packed it'}
               </Button>
-              <Button variant="secondary" onClick={() => setMode('problem')} disabled={busy}>
+              <Button variant="secondary" onClick={() => { setFlagQty(0); setMode('problem'); }} disabled={busy}>
                 There’s a problem
               </Button>
             </ButtonRow>
