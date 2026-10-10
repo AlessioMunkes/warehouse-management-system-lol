@@ -337,6 +337,7 @@
   color: var(--gst-ink);
 }
 .gst-input:focus { border-color: var(--gst-ink); }
+.gst-textarea { resize: vertical; }
 .gst-input-code {
   font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
   font-size: 1.5rem;

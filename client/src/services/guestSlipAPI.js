@@ -67,8 +67,8 @@ export const fetchMySlip         = () => request('/mine');
 export const confirmItem = (slipId, itemId, packedQuantity) =>
   post(`/${slipId}/items/${itemId}/confirm`, { packedQuantity });
 
-export const flagItem = (slipId, itemId, reason, packedQuantity) =>
-  post(`/${slipId}/items/${itemId}/flag`, { reason, packedQuantity });
+export const flagItem = (slipId, itemId, reason, packedQuantity, note) =>
+  post(`/${slipId}/items/${itemId}/flag`, { reason, packedQuantity, note });
 
 export const completeSlip = (slipId) => post(`/${slipId}/complete`, {});
 

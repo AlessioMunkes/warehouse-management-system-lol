@@ -16,7 +16,7 @@
 // screen told the volunteer the pallet went out yesterday.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 vi.mock('../services/guestSlipAPI', () => ({
@@ -324,7 +324,22 @@ describe('(d) the packing screen', () => {
     screen.getByRole('button', { name: /there isn.t enough/i }).click();
     await waitFor(() => expect(screen.getByRole('button', { name: 'Report it' })).toBeEnabled());
     screen.getByRole('button', { name: 'Report it' }).click();
-    await waitFor(() => expect(api.flagItem).toHaveBeenCalledWith(135, 207, 'Short quantity', 0));
+    await waitFor(() => expect(api.flagItem).toHaveBeenCalledWith(135, 207, 'Short quantity', 0, undefined));
+  });
+
+  it('sends an optional note for staff with a problem report', async () => {
+    api.fetchMySlip.mockResolvedValue(mySlip);
+    api.flagItem.mockResolvedValue({});
+    renderAt('/guest/pack', <GuestPackPage />, '/guest/pack');
+
+    await screen.findByRole('heading', { level: 2, name: 'Butternut' });
+    screen.getByRole('button', { name: 'There’s a problem' }).click();
+    const box = await screen.findByLabelText(/anything staff should know/i);
+    fireEvent.change(box, { target: { value: 'Crate was wet' } });
+    screen.getByRole('button', { name: /looks damaged/i }).click();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Report it' })).toBeEnabled());
+    screen.getByRole('button', { name: 'Report it' }).click();
+    await waitFor(() => expect(api.flagItem).toHaveBeenCalledWith(135, 207, 'Damaged stock', 0, 'Crate was wet'));
   });
 
   it('handles an empty pallet in plain language, with a way out', async () => {

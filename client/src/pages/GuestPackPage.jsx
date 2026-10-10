@@ -67,6 +67,7 @@ const GuestPackPage = () => {
   // worker's flag counter: a short or damaged item should not arrive
   // pre-filled with the full amount the slip asked for.
   const [flagQty, setFlagQty] = useState(0);
+  const [note, setNote] = useState('');          // optional word for staff
   const [busy, setBusy]   = useState(false);
   const [saidSo, setSaidSo] = useState(null);   // the confirmation after every action
   const [focusId, setFocusId] = useState(null);  // which pending item is on screen
@@ -265,13 +266,25 @@ const GuestPackPage = () => {
 
           <Counter label="How many did you actually pack?" value={flagQty} onChange={setFlagQty} />
 
+          <div className="gst-field">
+            <label className="gst-label" htmlFor="gst-flag-note">Anything staff should know? (optional)</label>
+            <textarea
+              id="gst-flag-note"
+              className="gst-input gst-textarea"
+              rows={2}
+              maxLength={200}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </div>
+
           {error ? <Notice tone="warn">{error}</Notice> : null}
 
           <ButtonRow>
             <Button
               disabled={!reason || busy}
               onClick={() => act(
-                () => flagItem(slip.id, current.id, reason, flagQty),
+                () => flagItem(slip.id, current.id, reason, flagQty, note.trim() || undefined),
                 `Thanks — a staff member will look at the ${current.product_name}.`,
               )} loading={busy}>
               {busy ? 'Saving…' : 'Report it'}
@@ -328,7 +341,7 @@ const GuestPackPage = () => {
                 )} loading={busy}>
                 {busy ? 'Saving…' : 'Packed it'}
               </Button>
-              <Button variant="secondary" onClick={() => { setFlagQty(0); setMode('problem'); }} disabled={busy}>
+              <Button variant="secondary" onClick={() => { setFlagQty(0); setNote(''); setMode('problem'); }} disabled={busy}>
                 There’s a problem
               </Button>
             </ButtonRow>
