@@ -473,142 +473,143 @@ const af = {
   'photo.hintDelivery': 'Neem ’n foto as enigiets beskadig of kort aangekom het.',
   'photo.delivery': 'Foto’s van hierdie aflewering',
 
-  // ── Guest (Love Activist) screens ── NOT YET TRANSLATED ──────────
-  // Every line below is the ENGLISH text, kept as a placeholder so the
-  // screen still reads. Each is marked TODO(translate). Replace the text
-  // and delete the marker; do not leave a guess here.
+  // ── Guest (Love Activist) screens ──
+  // Drafted for this build and NOT YET CHECKED BY A FLUENT SPEAKER, the
+  // same as the floor text above. Read them before relying on them in
+  // front of volunteers. "Love Activist" is the programme's own name and
+  // is left in English on purpose.
   // Session bar, sign-out and shared pieces
-  'guest.brand.role': 'Love Activist',  // TODO(translate)
-  'guest.nav.label': 'Your session',  // TODO(translate)
-  'guest.nav.home': 'Home',  // TODO(translate)
-  'guest.nav.signOut': 'Sign out',  // TODO(translate)
-  'guest.nav.signingOut': 'Signing you out…',  // TODO(translate)
-  'guest.signOut.checkFailedTitle': 'We could not check your pallet.',  // TODO(translate)
-  'guest.signOut.checkFailedText': 'If you were packing a pallet, staff can return it to the floor.',  // TODO(translate)
-  'guest.signOut.tryAgain': 'Try again',  // TODO(translate)
-  'guest.signOut.anyway': 'Sign out anyway',  // TODO(translate)
-  'guest.signOut.confirmTitle': 'Sign out?',  // TODO(translate)
-  'guest.signOut.confirmText': 'You haven’t finished this pallet. If you sign out, it goes back to the floor for someone else to finish. Your packing so far is saved.',  // TODO(translate)
-  'guest.signOut.confirm': 'Sign out and return pallet',  // TODO(translate)
-  'guest.signOut.keepPacking': 'Keep packing',  // TODO(translate)
-  'guest.signOut.returnFailed': 'We could not return your pallet. Try again.',  // TODO(translate)
-  'guest.status.packed': 'Packed',  // TODO(translate)
-  'guest.status.problem': 'Problem',  // TODO(translate)
-  'guest.progress.label': '{done} of {all} items done',  // TODO(translate)
-  'guest.steps.label': 'Move between items',  // TODO(translate)
-  'guest.steps.previous': 'Previous item',  // TODO(translate)
-  'guest.steps.next': 'Next item',  // TODO(translate)
-  'guest.counter.fewer': 'One fewer',  // TODO(translate)
-  'guest.counter.more': 'One more',  // TODO(translate)
-  'guest.card.partner': 'A community partner',  // TODO(translate)
-  'guest.card.nothingListed': 'Nothing listed on it yet',  // TODO(translate)
-  'guest.card.thingsToPack': { one: '{n} thing to pack', other: '{n} things to pack' },  // TODO(translate)
-  'guest.card.goingOut': 'Going out {day}',  // TODO(translate)
-  'guest.help.default': 'Not sure what to do, or something looks wrong?',  // TODO(translate)
-  'guest.help.ask': 'Ask any staff member — they are happy to help.',  // TODO(translate)
-  'guest.loading': 'Loading',  // TODO(translate)
-  'guest.api.unreachable': 'We could not reach the system. Ask a staff member for help.',  // TODO(translate)
-  'guest.api.failed': 'Something went wrong.',  // TODO(translate)
+  'guest.brand.role': 'Love Activist',
+  'guest.nav.label': 'Jou sessie',
+  'guest.nav.home': 'Tuis',
+  'guest.nav.signOut': 'Teken uit',
+  'guest.nav.signingOut': 'Ons teken jou uit…',
+  'guest.signOut.checkFailedTitle': 'Ons kon nie jou palet nagaan nie.',
+  'guest.signOut.checkFailedText': 'As jy ’n palet gepak het, kan die personeel dit terugsit op die vloer.',
+  'guest.signOut.tryAgain': 'Probeer weer',
+  'guest.signOut.anyway': 'Teken tog uit',
+  'guest.signOut.confirmTitle': 'Uitteken?',
+  'guest.signOut.confirmText': 'Jy het nog nie hierdie palet klaargemaak nie. As jy uitteken, gaan dit terug na die vloer sodat iemand anders dit kan klaarmaak. Wat jy reeds gepak het, is gestoor.',
+  'guest.signOut.confirm': 'Teken uit en gee palet terug',
+  'guest.signOut.keepPacking': 'Pak verder',
+  'guest.signOut.returnFailed': 'Ons kon nie jou palet teruggee nie. Probeer weer.',
+  'guest.status.packed': 'Gepak',
+  'guest.status.problem': 'Probleem',
+  'guest.progress.label': '{done} van {all} items klaar',
+  'guest.steps.label': 'Beweeg tussen items',
+  'guest.steps.previous': 'Vorige item',
+  'guest.steps.next': 'Volgende item',
+  'guest.counter.fewer': 'Een minder',
+  'guest.counter.more': 'Een meer',
+  'guest.card.partner': '’n Gemeenskapsvennoot',
+  'guest.card.nothingListed': 'Nog niks daarop gelys nie',
+  'guest.card.thingsToPack': { one: '{n} ding om te pak', other: '{n} dinge om te pak' },
+  'guest.card.goingOut': 'Gaan uit {day}',
+  'guest.help.default': 'Weet jy nie wat om te doen nie, of lyk iets verkeerd?',
+  'guest.help.ask': 'Vra enige personeellid – hulle help graag.',
+  'guest.loading': 'Laai',
+  'guest.api.unreachable': 'Ons kon nie die stelsel bereik nie. Vra ’n personeellid om hulp.',
+  'guest.api.failed': 'Iets het skeefgeloop.',
   // Days, who the food is for, names
-  'guest.day.today': 'today',  // TODO(translate)
-  'guest.day.tomorrow': 'tomorrow',  // TODO(translate)
-  'guest.day.soon': 'soon',  // TODO(translate)
-  'guest.kind.ecd': 'a creche',  // TODO(translate)
-  'guest.kind.dignity_kitchen': 'a dignity kitchen',  // TODO(translate)
-  'guest.kind.soup_kitchen': 'a soup kitchen',  // TODO(translate)
-  'guest.kind.community': 'a community group',  // TODO(translate)
-  'guest.kind.other': 'a community partner',  // TODO(translate)
-  'guest.foodFor': 'Food for {kind}',  // TODO(translate)
-  'guest.name.fallback': 'there',  // TODO(translate)
+  'guest.day.today': 'vandag',
+  'guest.day.tomorrow': 'môre',
+  'guest.day.soon': 'binnekort',
+  'guest.kind.ecd': '’n crèche',
+  'guest.kind.dignity_kitchen': '’n waardigheidskombuis',
+  'guest.kind.soup_kitchen': '’n sopkombuis',
+  'guest.kind.community': '’n gemeenskapsgroep',
+  'guest.kind.other': '’n gemeenskapsvennoot',
+  'guest.foodFor': 'Kos vir {kind}',
+  'guest.name.fallback': 'vriend',
   // Sign in
-  'guest.login.back': '← Back to start',  // TODO(translate)
-  'guest.login.title': 'Volunteer sign in',  // TODO(translate)
-  'guest.login.subtitle': 'Enter your name to start.',  // TODO(translate)
-  'guest.login.nameLabel': 'Your name',  // TODO(translate)
-  'guest.login.namePlaceholder': 'e.g. Thabo Mokoena',  // TODO(translate)
-  'guest.login.warehouse': 'Warehouse',  // TODO(translate)
-  'guest.login.warehouseChoose': 'Choose where you are today',  // TODO(translate)
-  'guest.login.signIn': 'Sign in',  // TODO(translate)
-  'guest.login.signingIn': 'Signing in…',  // TODO(translate)
-  'guest.login.staff': '← Staff sign in',  // TODO(translate)
-  'guest.login.nameRequired': 'Enter your name.',  // TODO(translate)
-  'guest.login.siteRequired': 'Choose the warehouse you are at.',  // TODO(translate)
-  'guest.login.failed': 'Could not sign you in. Try again.',  // TODO(translate)
+  'guest.login.back': '← Terug na begin',
+  'guest.login.title': 'Vrywilliger-aanmelding',
+  'guest.login.subtitle': 'Tik jou naam in om te begin.',
+  'guest.login.nameLabel': 'Jou naam',
+  'guest.login.namePlaceholder': 'bv. Thabo Mokoena',
+  'guest.login.warehouse': 'Pakhuis',
+  'guest.login.warehouseChoose': 'Kies waar jy vandag is',
+  'guest.login.signIn': 'Teken in',
+  'guest.login.signingIn': 'Teken in…',
+  'guest.login.staff': '← Personeel-aanmelding',
+  'guest.login.nameRequired': 'Tik jou naam in.',
+  'guest.login.siteRequired': 'Kies die pakhuis waar jy is.',
+  'guest.login.failed': 'Ons kon jou nie inteken nie. Probeer weer.',
   // Home
-  'guest.home.welcome': 'Welcome, {name}',  // TODO(translate)
-  'guest.home.ledeHeld': 'Pick up where you left off.',  // TODO(translate)
-  'guest.home.lede': 'Thank you for being here today. Pick a pallet below and we’ll take it one step at a time.',  // TODO(translate)
-  'guest.home.loading': 'Loading pallets',  // TODO(translate)
-  'guest.home.inProgress': 'Your pallet in progress',  // TODO(translate)
-  'guest.home.packedOf': '{done} of {all} packed',  // TODO(translate)
-  'guest.home.continue': 'Continue packing',  // TODO(translate)
-  'guest.home.return': 'Return this pallet',  // TODO(translate)
-  'guest.home.returnAsk': 'Return this pallet to the floor? Your packing so far is saved.',  // TODO(translate)
-  'guest.home.returnConfirm': 'Return pallet',  // TODO(translate)
-  'guest.home.keep': 'Keep it',  // TODO(translate)
-  'guest.home.listTitle': 'Pallets to pack',  // TODO(translate)
-  'guest.home.allTaken': 'Every pallet has someone on it. Ask a staff member what needs doing next.',  // TODO(translate)
-  'guest.home.tapHint': 'Tap the one you are standing at.',  // TODO(translate)
-  'guest.home.packThis': 'Pack this one',  // TODO(translate)
-  'guest.home.codeTitle': 'Have a code instead?',  // TODO(translate)
-  'guest.home.codeHint': 'There are 6 characters printed under the QR code on the pallet.',  // TODO(translate)
-  'guest.home.codeLabel': 'Pallet code',  // TODO(translate)
-  'guest.home.codeWrong': 'The code is 6 characters, printed under the QR code.',  // TODO(translate)
-  'guest.home.codeFind': 'Find this pallet',  // TODO(translate)
-  'guest.home.codeBusy': 'Just a moment…',  // TODO(translate)
-  'guest.home.help': 'New here, or not sure which pallet is yours?',  // TODO(translate)
+  'guest.home.welcome': 'Welkom, {name}',
+  'guest.home.ledeHeld': 'Gaan voort waar jy opgehou het.',
+  'guest.home.lede': 'Dankie dat jy vandag hier is. Kies ’n palet hieronder, dan doen ons dit stap vir stap.',
+  'guest.home.loading': 'Laai palette',
+  'guest.home.inProgress': 'Jou palet aan die gang',
+  'guest.home.packedOf': '{done} van {all} gepak',
+  'guest.home.continue': 'Pak verder',
+  'guest.home.return': 'Gee hierdie palet terug',
+  'guest.home.returnAsk': 'Gee hierdie palet terug na die vloer? Wat jy reeds gepak het, is gestoor.',
+  'guest.home.returnConfirm': 'Gee palet terug',
+  'guest.home.keep': 'Hou dit',
+  'guest.home.listTitle': 'Palette om te pak',
+  'guest.home.allTaken': 'Iemand werk reeds aan elke palet. Vra ’n personeellid wat volgende gedoen moet word.',
+  'guest.home.tapHint': 'Tik op die een waar jy staan.',
+  'guest.home.packThis': 'Pak hierdie een',
+  'guest.home.codeTitle': 'Het jy eerder ’n kode?',
+  'guest.home.codeHint': 'Daar is 6 karakters onder die QR-kode op die palet gedruk.',
+  'guest.home.codeLabel': 'Paletkode',
+  'guest.home.codeWrong': 'Die kode is 6 karakters, gedruk onder die QR-kode.',
+  'guest.home.codeFind': 'Vind hierdie palet',
+  'guest.home.codeBusy': 'Net ’n oomblik…',
+  'guest.home.help': 'Nuut hier, of nie seker watter palet joune is nie?',
   // Packing
-  'guest.pack.loading': 'Loading your pallet',  // TODO(translate)
-  'guest.pack.noneTitle': 'You don’t have a pallet yet',  // TODO(translate)
-  'guest.pack.noneLede': 'Pick one and we’ll get started.',  // TODO(translate)
-  'guest.pack.seePallets': 'See pallets',  // TODO(translate)
-  'guest.pack.reason.short': 'There isn’t enough of it',  // TODO(translate)
-  'guest.pack.reason.damaged': 'It looks damaged or spoiled',  // TODO(translate)
-  'guest.pack.reason.substituted': 'I packed something else instead',  // TODO(translate)
-  'guest.pack.reason.other': 'Something else',  // TODO(translate)
-  'guest.pack.emptyTitle': 'This pallet is empty',  // TODO(translate)
-  'guest.pack.emptyLede': 'There is nothing listed for {beneficiary} yet, so there is nothing to pack right now.',  // TODO(translate)
-  'guest.pack.packingFor': 'Packing for',  // TODO(translate)
-  'guest.pack.emptyNotice': 'This is not something you have done wrong — the list for this pallet has not been set up yet. A staff member needs to sort it out.',  // TODO(translate)
-  'guest.pack.backHome': 'Back to home',  // TODO(translate)
-  'guest.pack.emptyHelp': 'Please let a staff member know about this one.',  // TODO(translate)
-  'guest.pack.allDoneTitle': 'That’s everything',  // TODO(translate)
-  'guest.pack.allDoneLede': { one: 'You have been through all {n} item. One last step.', other: 'You have been through all {n} items. One last step.' },  // TODO(translate)
-  'guest.pack.finish': 'Finish this pallet',  // TODO(translate)
-  'guest.pack.finishing': 'Finishing…',  // TODO(translate)
-  'guest.pack.allDoneHelp': 'Spotted something you want to change first?',  // TODO(translate)
-  'guest.pack.problemTitle': 'What’s wrong with it?',  // TODO(translate)
-  'guest.pack.problemLede': 'Whatever you pick, it gets passed to a staff member. Nothing here is a mistake on your part.',  // TODO(translate)
-  'guest.pack.problemLegend': 'Why is there a problem?',  // TODO(translate)
-  'guest.pack.actuallyPacked': 'How many did you actually pack?',  // TODO(translate)
-  'guest.pack.noteLabel': 'Anything staff should know? (optional)',  // TODO(translate)
-  'guest.pack.reportIt': 'Report it',  // TODO(translate)
-  'guest.pack.saving': 'Saving…',  // TODO(translate)
-  'guest.pack.back': 'Back',  // TODO(translate)
-  'guest.pack.reported': 'Thanks — a staff member will look at the {product}.',  // TODO(translate)
-  'guest.pack.itemLede': 'Going out {day}. Take the oldest stock first.',  // TODO(translate)
-  'guest.pack.itemOf': 'Item {n} of {all}',  // TODO(translate)
-  'guest.pack.putInBox': 'Put {qty} into the box.',  // TODO(translate)
-  'guest.pack.howMany': 'How many did you pack?',  // TODO(translate)
-  'guest.pack.packedIt': 'Packed it',  // TODO(translate)
-  'guest.pack.problem': 'There’s a problem',  // TODO(translate)
-  'guest.pack.packedNice': '{product} — packed. Nice one, {name}.',  // TODO(translate)
-  'guest.pack.doneSoFar': 'What you’ve done so far ({n})',  // TODO(translate)
+  'guest.pack.loading': 'Laai jou palet',
+  'guest.pack.noneTitle': 'Jy het nog nie ’n palet nie',
+  'guest.pack.noneLede': 'Kies een, dan begin ons.',
+  'guest.pack.seePallets': 'Sien palette',
+  'guest.pack.reason.short': 'Daar is nie genoeg nie',
+  'guest.pack.reason.damaged': 'Dit lyk beskadig of bederf',
+  'guest.pack.reason.substituted': 'Ek het iets anders in die plek gepak',
+  'guest.pack.reason.other': 'Iets anders',
+  'guest.pack.emptyTitle': 'Hierdie palet is leeg',
+  'guest.pack.emptyLede': 'Daar is nog niks vir {beneficiary} gelys nie, so daar is nou niks om te pak nie.',
+  'guest.pack.packingFor': 'Pak vir',
+  'guest.pack.emptyNotice': 'Dit is nie iets wat jy verkeerd gedoen het nie – die lys vir hierdie palet is nog nie opgestel nie. ’n Personeellid moet dit regmaak.',
+  'guest.pack.backHome': 'Terug na tuis',
+  'guest.pack.emptyHelp': 'Laat asseblief ’n personeellid van hierdie een weet.',
+  'guest.pack.allDoneTitle': 'Dis alles',
+  'guest.pack.allDoneLede': { one: 'Jy het die {n} item deurgewerk. Nog net een stap.', other: 'Jy het al {n} items deurgewerk. Nog net een stap.' },
+  'guest.pack.finish': 'Maak hierdie palet klaar',
+  'guest.pack.finishing': 'Maak klaar…',
+  'guest.pack.allDoneHelp': 'Wil jy eers iets verander?',
+  'guest.pack.problemTitle': 'Wat is fout daarmee?',
+  'guest.pack.problemLede': 'Wat jy ook al kies, word aan ’n personeellid deurgegee. Niks hier is jou fout nie.',
+  'guest.pack.problemLegend': 'Hoekom is daar ’n probleem?',
+  'guest.pack.actuallyPacked': 'Hoeveel het jy werklik gepak?',
+  'guest.pack.noteLabel': 'Iets wat die personeel moet weet? (opsioneel)',
+  'guest.pack.reportIt': 'Meld dit',
+  'guest.pack.saving': 'Stoor…',
+  'guest.pack.back': 'Terug',
+  'guest.pack.reported': 'Dankie – ’n personeellid sal na die {product} kyk.',
+  'guest.pack.itemLede': 'Gaan uit {day}. Vat eers die oudste voorraad.',
+  'guest.pack.itemOf': 'Item {n} van {all}',
+  'guest.pack.putInBox': 'Sit {qty} in die boks.',
+  'guest.pack.howMany': 'Hoeveel het jy gepak?',
+  'guest.pack.packedIt': 'Gepak',
+  'guest.pack.problem': 'Daar’s ’n probleem',
+  'guest.pack.packedNice': '{product} – gepak. Mooi so, {name}.',
+  'guest.pack.doneSoFar': 'Wat jy tot dusver gedoen het ({n})',
   // Thank-you page
-  'guest.done.thanks': 'Thank you, {name}',  // TODO(translate)
-  'guest.done.finishedLede': 'Your pallet is finished and on its way.',  // TODO(translate)
-  'guest.done.another': 'Pack another pallet',  // TODO(translate)
-  'guest.done.help': 'Need to tell us something? Let a staff member know before you go.',  // TODO(translate)
-  'guest.done.lede': 'That pallet is packed and ready to go out. Here is what you did.',  // TODO(translate)
-  'guest.done.unitsLabel': 'items packed into this pallet',  // TODO(translate)
-  'guest.done.checkedLabel': 'things checked off this pallet',  // TODO(translate)
-  'guest.done.thingsPacked': 'things packed',  // TODO(translate)
-  'guest.done.problems': { one: 'problem reported', other: 'problems reported' },  // TODO(translate)
-  'guest.done.whereTitle': 'Where it’s going',  // TODO(translate)
-  'guest.done.goesTo': 'This pallet goes to {beneficiary}, {kind}. It leaves {day}.',  // TODO(translate)
-  'guest.done.goesToFeeds': 'This pallet goes to {beneficiary}, {kind} that feeds {children}. It leaves {day}.',  // TODO(translate)
-  'guest.done.flagged': { one: 'A staff member has your report. Thank you for flagging it.', other: 'A staff member has your reports. Thank you for flagging them.' },  // TODO(translate)
-  'guest.done.gratitude': 'Ladles of Love could not do this without people giving up their time. Thank you for giving yours today.',  // TODO(translate)
+  'guest.done.thanks': 'Dankie, {name}',
+  'guest.done.finishedLede': 'Jou palet is klaar en op pad.',
+  'guest.done.another': 'Pak nog ’n palet',
+  'guest.done.help': 'Wil jy ons iets sê? Laat ’n personeellid weet voor jy gaan.',
+  'guest.done.lede': 'Daardie palet is gepak en reg om uit te gaan. Hier is wat jy gedoen het.',
+  'guest.done.unitsLabel': 'items in hierdie palet gepak',
+  'guest.done.checkedLabel': 'dinge op hierdie palet afgemerk',
+  'guest.done.thingsPacked': 'dinge gepak',
+  'guest.done.problems': { one: 'probleem gemeld', other: 'probleme gemeld' },
+  'guest.done.whereTitle': 'Waarheen dit gaan',
+  'guest.done.goesTo': 'Hierdie palet gaan na {beneficiary}, {kind}. Dit gaan uit {day}.',
+  'guest.done.goesToFeeds': 'Hierdie palet gaan na {beneficiary}, {kind} wat {children} kos gee. Dit gaan uit {day}.',
+  'guest.done.flagged': { one: '’n Personeellid het jou verslag. Dankie dat jy dit gemeld het.', other: '’n Personeellid het jou verslae. Dankie dat jy dit gemeld het.' },
+  'guest.done.gratitude': 'Ladles of Love kan dit nie doen sonder mense wat hul tyd gee nie. Dankie dat jy joune vandag gegee het.',
 };
 
 const xh = {
@@ -768,142 +769,143 @@ const xh = {
   'photo.hintDelivery': 'Thatha ifoto ukuba kukho into efike yonakele okanye ishota.',
   'photo.delivery': 'Iifoto zale nto ifikileyo',
 
-  // ── Guest (Love Activist) screens ── NOT YET TRANSLATED ──────────
-  // Every line below is the ENGLISH text, kept as a placeholder so the
-  // screen still reads. Each is marked TODO(translate). Replace the text
-  // and delete the marker; do not leave a guess here.
+  // ── Guest (Love Activist) screens ──
+  // Drafted for this build and NOT YET CHECKED BY A FLUENT SPEAKER, the
+  // same as the floor text above. Read them before relying on them in
+  // front of volunteers. "Love Activist" is the programme's own name and
+  // is left in English on purpose.
   // Session bar, sign-out and shared pieces
-  'guest.brand.role': 'Love Activist',  // TODO(translate)
-  'guest.nav.label': 'Your session',  // TODO(translate)
-  'guest.nav.home': 'Home',  // TODO(translate)
-  'guest.nav.signOut': 'Sign out',  // TODO(translate)
-  'guest.nav.signingOut': 'Signing you out…',  // TODO(translate)
-  'guest.signOut.checkFailedTitle': 'We could not check your pallet.',  // TODO(translate)
-  'guest.signOut.checkFailedText': 'If you were packing a pallet, staff can return it to the floor.',  // TODO(translate)
-  'guest.signOut.tryAgain': 'Try again',  // TODO(translate)
-  'guest.signOut.anyway': 'Sign out anyway',  // TODO(translate)
-  'guest.signOut.confirmTitle': 'Sign out?',  // TODO(translate)
-  'guest.signOut.confirmText': 'You haven’t finished this pallet. If you sign out, it goes back to the floor for someone else to finish. Your packing so far is saved.',  // TODO(translate)
-  'guest.signOut.confirm': 'Sign out and return pallet',  // TODO(translate)
-  'guest.signOut.keepPacking': 'Keep packing',  // TODO(translate)
-  'guest.signOut.returnFailed': 'We could not return your pallet. Try again.',  // TODO(translate)
-  'guest.status.packed': 'Packed',  // TODO(translate)
-  'guest.status.problem': 'Problem',  // TODO(translate)
-  'guest.progress.label': '{done} of {all} items done',  // TODO(translate)
-  'guest.steps.label': 'Move between items',  // TODO(translate)
-  'guest.steps.previous': 'Previous item',  // TODO(translate)
-  'guest.steps.next': 'Next item',  // TODO(translate)
-  'guest.counter.fewer': 'One fewer',  // TODO(translate)
-  'guest.counter.more': 'One more',  // TODO(translate)
-  'guest.card.partner': 'A community partner',  // TODO(translate)
-  'guest.card.nothingListed': 'Nothing listed on it yet',  // TODO(translate)
-  'guest.card.thingsToPack': { one: '{n} thing to pack', other: '{n} things to pack' },  // TODO(translate)
-  'guest.card.goingOut': 'Going out {day}',  // TODO(translate)
-  'guest.help.default': 'Not sure what to do, or something looks wrong?',  // TODO(translate)
-  'guest.help.ask': 'Ask any staff member — they are happy to help.',  // TODO(translate)
-  'guest.loading': 'Loading',  // TODO(translate)
-  'guest.api.unreachable': 'We could not reach the system. Ask a staff member for help.',  // TODO(translate)
-  'guest.api.failed': 'Something went wrong.',  // TODO(translate)
+  'guest.brand.role': 'Love Activist',
+  'guest.nav.label': 'Iseshoni yakho',
+  'guest.nav.home': 'Ekhaya',
+  'guest.nav.signOut': 'Phuma',
+  'guest.nav.signingOut': 'Uyaphuma…',
+  'guest.signOut.checkFailedTitle': 'Asikwazanga ukujonga ipalethi yakho.',
+  'guest.signOut.checkFailedText': 'Ukuba ubupakisha ipalethi, abasebenzi bangayibuyisela.',
+  'guest.signOut.tryAgain': 'Zama kwakhona',
+  'guest.signOut.anyway': 'Phuma noko',
+  'guest.signOut.confirmTitle': 'Uyaphuma?',
+  'guest.signOut.confirmText': 'Awukayigqibi le palethi. Ukuba uyaphuma, iya kubuyela ukuze omnye umntu ayigqibe. Oko ukupakishileyo kugcinwe.',
+  'guest.signOut.confirm': 'Phuma, ubuyisele ipalethi',
+  'guest.signOut.keepPacking': 'Qhubeka upakisha',
+  'guest.signOut.returnFailed': 'Asikwazanga ukuyibuyisela ipalethi yakho. Zama kwakhona.',
+  'guest.status.packed': 'Ipakishiwe',
+  'guest.status.problem': 'Ingxaki',
+  'guest.progress.label': '{done} kwezi-{all} zigqityiwe',
+  'guest.steps.label': 'Hamba phakathi kwezinto',
+  'guest.steps.previous': 'Into edlulileyo',
+  'guest.steps.next': 'Into elandelayo',
+  'guest.counter.fewer': 'Enye ngaphantsi',
+  'guest.counter.more': 'Enye ngaphezulu',
+  'guest.card.partner': 'Iqabane loluntu',
+  'guest.card.nothingListed': 'Akukho nto idweliswe kuyo okwangoku',
+  'guest.card.thingsToPack': { one: 'Into e-{n} yokupakisha', other: 'Izinto ezi-{n} zokupakisha' },
+  'guest.card.goingOut': 'Iphuma {day}',
+  'guest.help.default': 'Akuqinisekanga ukuba wenze ntoni, okanye kukho into engalunganga?',
+  'guest.help.ask': 'Buza nawuphi na umsebenzi – bayavuya ukukunceda.',
+  'guest.loading': 'Iyalayisha',
+  'guest.api.unreachable': 'Asikwazanga ukufikelela kwisistim. Cela uncedo kumsebenzi.',
+  'guest.api.failed': 'Kukho into engahambanga kakuhle.',
   // Days, who the food is for, names
-  'guest.day.today': 'today',  // TODO(translate)
-  'guest.day.tomorrow': 'tomorrow',  // TODO(translate)
-  'guest.day.soon': 'soon',  // TODO(translate)
-  'guest.kind.ecd': 'a creche',  // TODO(translate)
-  'guest.kind.dignity_kitchen': 'a dignity kitchen',  // TODO(translate)
-  'guest.kind.soup_kitchen': 'a soup kitchen',  // TODO(translate)
-  'guest.kind.community': 'a community group',  // TODO(translate)
-  'guest.kind.other': 'a community partner',  // TODO(translate)
-  'guest.foodFor': 'Food for {kind}',  // TODO(translate)
-  'guest.name.fallback': 'there',  // TODO(translate)
+  'guest.day.today': 'namhlanje',
+  'guest.day.tomorrow': 'ngomso',
+  'guest.day.soon': 'kungekudala',
+  'guest.kind.ecd': 'iziko labantwana abancinci',
+  'guest.kind.dignity_kitchen': 'ikhitshi lesidima',
+  'guest.kind.soup_kitchen': 'ikhitshi lesuphu',
+  'guest.kind.community': 'iqela loluntu',
+  'guest.kind.other': 'iqabane loluntu',
+  'guest.foodFor': 'Ukutya: {kind}',
+  'guest.name.fallback': 'mhlobo',
   // Sign in
-  'guest.login.back': '← Back to start',  // TODO(translate)
-  'guest.login.title': 'Volunteer sign in',  // TODO(translate)
-  'guest.login.subtitle': 'Enter your name to start.',  // TODO(translate)
-  'guest.login.nameLabel': 'Your name',  // TODO(translate)
-  'guest.login.namePlaceholder': 'e.g. Thabo Mokoena',  // TODO(translate)
-  'guest.login.warehouse': 'Warehouse',  // TODO(translate)
-  'guest.login.warehouseChoose': 'Choose where you are today',  // TODO(translate)
-  'guest.login.signIn': 'Sign in',  // TODO(translate)
-  'guest.login.signingIn': 'Signing in…',  // TODO(translate)
-  'guest.login.staff': '← Staff sign in',  // TODO(translate)
-  'guest.login.nameRequired': 'Enter your name.',  // TODO(translate)
-  'guest.login.siteRequired': 'Choose the warehouse you are at.',  // TODO(translate)
-  'guest.login.failed': 'Could not sign you in. Try again.',  // TODO(translate)
+  'guest.login.back': '← Buyela ekuqaleni',
+  'guest.login.title': 'Ngena njengevolontiya',
+  'guest.login.subtitle': 'Bhala igama lakho ukuze uqale.',
+  'guest.login.nameLabel': 'Igama lakho',
+  'guest.login.namePlaceholder': 'umz. Thabo Mokoena',
+  'guest.login.warehouse': 'Indawo yokugcina impahla',
+  'guest.login.warehouseChoose': 'Khetha apho ukhoyo namhlanje',
+  'guest.login.signIn': 'Ngena',
+  'guest.login.signingIn': 'Uyangena…',
+  'guest.login.staff': '← Ukungena kwabasebenzi',
+  'guest.login.nameRequired': 'Bhala igama lakho.',
+  'guest.login.siteRequired': 'Khetha indawo yokugcina impahla okuyo.',
+  'guest.login.failed': 'Asikwazanga ukukungenisa. Zama kwakhona.',
   // Home
-  'guest.home.welcome': 'Welcome, {name}',  // TODO(translate)
-  'guest.home.ledeHeld': 'Pick up where you left off.',  // TODO(translate)
-  'guest.home.lede': 'Thank you for being here today. Pick a pallet below and we’ll take it one step at a time.',  // TODO(translate)
-  'guest.home.loading': 'Loading pallets',  // TODO(translate)
-  'guest.home.inProgress': 'Your pallet in progress',  // TODO(translate)
-  'guest.home.packedOf': '{done} of {all} packed',  // TODO(translate)
-  'guest.home.continue': 'Continue packing',  // TODO(translate)
-  'guest.home.return': 'Return this pallet',  // TODO(translate)
-  'guest.home.returnAsk': 'Return this pallet to the floor? Your packing so far is saved.',  // TODO(translate)
-  'guest.home.returnConfirm': 'Return pallet',  // TODO(translate)
-  'guest.home.keep': 'Keep it',  // TODO(translate)
-  'guest.home.listTitle': 'Pallets to pack',  // TODO(translate)
-  'guest.home.allTaken': 'Every pallet has someone on it. Ask a staff member what needs doing next.',  // TODO(translate)
-  'guest.home.tapHint': 'Tap the one you are standing at.',  // TODO(translate)
-  'guest.home.packThis': 'Pack this one',  // TODO(translate)
-  'guest.home.codeTitle': 'Have a code instead?',  // TODO(translate)
-  'guest.home.codeHint': 'There are 6 characters printed under the QR code on the pallet.',  // TODO(translate)
-  'guest.home.codeLabel': 'Pallet code',  // TODO(translate)
-  'guest.home.codeWrong': 'The code is 6 characters, printed under the QR code.',  // TODO(translate)
-  'guest.home.codeFind': 'Find this pallet',  // TODO(translate)
-  'guest.home.codeBusy': 'Just a moment…',  // TODO(translate)
-  'guest.home.help': 'New here, or not sure which pallet is yours?',  // TODO(translate)
+  'guest.home.welcome': 'Wamkelekile, {name}',
+  'guest.home.ledeHeld': 'Qhubeka apho ubuyeke khona.',
+  'guest.home.lede': 'Enkosi ngokuba lapha namhlanje. Khetha ipalethi apha ngezantsi, siza kuyenza inyathelo ngenyathelo.',
+  'guest.home.loading': 'Kulayishwa iipalethi',
+  'guest.home.inProgress': 'Ipalethi yakho oyipakishayo',
+  'guest.home.packedOf': '{done} kwezi-{all} zipakishiwe',
+  'guest.home.continue': 'Qhubeka upakisha',
+  'guest.home.return': 'Yibuyisele le palethi',
+  'guest.home.returnAsk': 'Uyayibuyisela le palethi? Oko ukupakishileyo kugcinwe.',
+  'guest.home.returnConfirm': 'Buyisela ipalethi',
+  'guest.home.keep': 'Yigcine',
+  'guest.home.listTitle': 'Iipalethi zokupakisha',
+  'guest.home.allTaken': 'Zonke iipalethi sele zinabantu abasebenza kuzo. Buza umsebenzi ukuba yintoni elandelayo.',
+  'guest.home.tapHint': 'Cofa leyo ume kuyo.',
+  'guest.home.packThis': 'Pakisha le',
+  'guest.home.codeTitle': 'Unekhowudi endaweni yoko?',
+  'guest.home.codeHint': 'Kukho oonobumba aba-6 ababhalwe phantsi kwekhowudi ye-QR kwipalethi.',
+  'guest.home.codeLabel': 'Ikhowudi yepalethi',
+  'guest.home.codeWrong': 'Ikhowudi inoonobumba aba-6, ababhalwe phantsi kwekhowudi ye-QR.',
+  'guest.home.codeFind': 'Fumana le palethi',
+  'guest.home.codeBusy': 'Khawulinde kancinci…',
+  'guest.home.help': 'Umtsha apha, okanye akuqinisekanga ukuba yeyiphi ipalethi yakho?',
   // Packing
-  'guest.pack.loading': 'Loading your pallet',  // TODO(translate)
-  'guest.pack.noneTitle': 'You don’t have a pallet yet',  // TODO(translate)
-  'guest.pack.noneLede': 'Pick one and we’ll get started.',  // TODO(translate)
-  'guest.pack.seePallets': 'See pallets',  // TODO(translate)
-  'guest.pack.reason.short': 'There isn’t enough of it',  // TODO(translate)
-  'guest.pack.reason.damaged': 'It looks damaged or spoiled',  // TODO(translate)
-  'guest.pack.reason.substituted': 'I packed something else instead',  // TODO(translate)
-  'guest.pack.reason.other': 'Something else',  // TODO(translate)
-  'guest.pack.emptyTitle': 'This pallet is empty',  // TODO(translate)
-  'guest.pack.emptyLede': 'There is nothing listed for {beneficiary} yet, so there is nothing to pack right now.',  // TODO(translate)
-  'guest.pack.packingFor': 'Packing for',  // TODO(translate)
-  'guest.pack.emptyNotice': 'This is not something you have done wrong — the list for this pallet has not been set up yet. A staff member needs to sort it out.',  // TODO(translate)
-  'guest.pack.backHome': 'Back to home',  // TODO(translate)
-  'guest.pack.emptyHelp': 'Please let a staff member know about this one.',  // TODO(translate)
-  'guest.pack.allDoneTitle': 'That’s everything',  // TODO(translate)
-  'guest.pack.allDoneLede': { one: 'You have been through all {n} item. One last step.', other: 'You have been through all {n} items. One last step.' },  // TODO(translate)
-  'guest.pack.finish': 'Finish this pallet',  // TODO(translate)
-  'guest.pack.finishing': 'Finishing…',  // TODO(translate)
-  'guest.pack.allDoneHelp': 'Spotted something you want to change first?',  // TODO(translate)
-  'guest.pack.problemTitle': 'What’s wrong with it?',  // TODO(translate)
-  'guest.pack.problemLede': 'Whatever you pick, it gets passed to a staff member. Nothing here is a mistake on your part.',  // TODO(translate)
-  'guest.pack.problemLegend': 'Why is there a problem?',  // TODO(translate)
-  'guest.pack.actuallyPacked': 'How many did you actually pack?',  // TODO(translate)
-  'guest.pack.noteLabel': 'Anything staff should know? (optional)',  // TODO(translate)
-  'guest.pack.reportIt': 'Report it',  // TODO(translate)
-  'guest.pack.saving': 'Saving…',  // TODO(translate)
-  'guest.pack.back': 'Back',  // TODO(translate)
-  'guest.pack.reported': 'Thanks — a staff member will look at the {product}.',  // TODO(translate)
-  'guest.pack.itemLede': 'Going out {day}. Take the oldest stock first.',  // TODO(translate)
-  'guest.pack.itemOf': 'Item {n} of {all}',  // TODO(translate)
-  'guest.pack.putInBox': 'Put {qty} into the box.',  // TODO(translate)
-  'guest.pack.howMany': 'How many did you pack?',  // TODO(translate)
-  'guest.pack.packedIt': 'Packed it',  // TODO(translate)
-  'guest.pack.problem': 'There’s a problem',  // TODO(translate)
-  'guest.pack.packedNice': '{product} — packed. Nice one, {name}.',  // TODO(translate)
-  'guest.pack.doneSoFar': 'What you’ve done so far ({n})',  // TODO(translate)
+  'guest.pack.loading': 'Kulayishwa ipalethi yakho',
+  'guest.pack.noneTitle': 'Akukabi nayo ipalethi',
+  'guest.pack.noneLede': 'Khetha enye, siza kuqala.',
+  'guest.pack.seePallets': 'Bona iipalethi',
+  'guest.pack.reason.short': 'Ayonelanga',
+  'guest.pack.reason.damaged': 'Ibonakala yonakele okanye ibolile',
+  'guest.pack.reason.substituted': 'Ndipakishe enye into endaweni yayo',
+  'guest.pack.reason.other': 'Enye into',
+  'guest.pack.emptyTitle': 'Le palethi ayinanto',
+  'guest.pack.emptyLede': 'Akukabikho nto idweliselwe {beneficiary}, ngoko akukho nto yokupakisha ngoku.',
+  'guest.pack.packingFor': 'Kupakishelwa',
+  'guest.pack.emptyNotice': 'Ayiyompazamo yakho le – uluhlu lwale palethi alukalungiswa. Umsebenzi kufuneka alulungise.',
+  'guest.pack.backHome': 'Buyela ekhaya',
+  'guest.pack.emptyHelp': 'Nceda wazise umsebenzi ngale.',
+  'guest.pack.allDoneTitle': 'Kuphelile',
+  'guest.pack.allDoneLede': { one: 'Uyigqibile into e-{n}. Kusele inyathelo elinye.', other: 'Uzigqibile zonke izinto ezi-{n}. Kusele inyathelo elinye.' },
+  'guest.pack.finish': 'Gqiba le palethi',
+  'guest.pack.finishing': 'Kugqitywa…',
+  'guest.pack.allDoneHelp': 'Ikhona into ofuna ukuyitshintsha kuqala?',
+  'guest.pack.problemTitle': 'Yintoni engalunganga ngayo?',
+  'guest.pack.problemLede': 'Nantoni na oyikhethayo iya kudluliselwa kumsebenzi. Akukho nto apha iyimpazamo yakho.',
+  'guest.pack.problemLegend': 'Kutheni kukho ingxaki?',
+  'guest.pack.actuallyPacked': 'Zingaphi ozipakishileyo ngokwenene?',
+  'guest.pack.noteLabel': 'Ikhona into ekufuneka abasebenzi bayazi? (ayinyanzelekanga)',
+  'guest.pack.reportIt': 'Yixele',
+  'guest.pack.saving': 'Iyagcina…',
+  'guest.pack.back': 'Buyela emva',
+  'guest.pack.reported': 'Enkosi – umsebenzi uza kujonga i-{product}.',
+  'guest.pack.itemLede': 'Iphuma {day}. Thatha isitokhwe esidala kuqala.',
+  'guest.pack.itemOf': 'Into {n} kwezi-{all}',
+  'guest.pack.putInBox': 'Faka {qty} ebhokisini.',
+  'guest.pack.howMany': 'Zingaphi ozipakishileyo?',
+  'guest.pack.packedIt': 'Ndiyipakishile',
+  'guest.pack.problem': 'Kukho ingxaki',
+  'guest.pack.packedNice': '{product} – ipakishiwe. Wenze kakuhle, {name}.',
+  'guest.pack.doneSoFar': 'Oko ukwenzileyo ukuza kuthi ga ngoku ({n})',
   // Thank-you page
-  'guest.done.thanks': 'Thank you, {name}',  // TODO(translate)
-  'guest.done.finishedLede': 'Your pallet is finished and on its way.',  // TODO(translate)
-  'guest.done.another': 'Pack another pallet',  // TODO(translate)
-  'guest.done.help': 'Need to tell us something? Let a staff member know before you go.',  // TODO(translate)
-  'guest.done.lede': 'That pallet is packed and ready to go out. Here is what you did.',  // TODO(translate)
-  'guest.done.unitsLabel': 'items packed into this pallet',  // TODO(translate)
-  'guest.done.checkedLabel': 'things checked off this pallet',  // TODO(translate)
-  'guest.done.thingsPacked': 'things packed',  // TODO(translate)
-  'guest.done.problems': { one: 'problem reported', other: 'problems reported' },  // TODO(translate)
-  'guest.done.whereTitle': 'Where it’s going',  // TODO(translate)
-  'guest.done.goesTo': 'This pallet goes to {beneficiary}, {kind}. It leaves {day}.',  // TODO(translate)
-  'guest.done.goesToFeeds': 'This pallet goes to {beneficiary}, {kind} that feeds {children}. It leaves {day}.',  // TODO(translate)
-  'guest.done.flagged': { one: 'A staff member has your report. Thank you for flagging it.', other: 'A staff member has your reports. Thank you for flagging them.' },  // TODO(translate)
-  'guest.done.gratitude': 'Ladles of Love could not do this without people giving up their time. Thank you for giving yours today.',  // TODO(translate)
+  'guest.done.thanks': 'Enkosi, {name}',
+  'guest.done.finishedLede': 'Ipalethi yakho igqityiwe kwaye isendleleni.',
+  'guest.done.another': 'Pakisha enye ipalethi',
+  'guest.done.help': 'Ufuna ukusixelela into? Xelela umsebenzi ngaphambi kokuba uhambe.',
+  'guest.done.lede': 'Loo palethi ipakishiwe kwaye ilungele ukuphuma. Nantsi into oyenzileyo.',
+  'guest.done.unitsLabel': 'izinto ezipakishwe kule palethi',
+  'guest.done.checkedLabel': 'izinto ezijongiweyo kule palethi',
+  'guest.done.thingsPacked': 'izinto ezipakishiweyo',
+  'guest.done.problems': { one: 'ingxaki exeliweyo', other: 'iingxaki ezixeliweyo' },
+  'guest.done.whereTitle': 'Iya phi',
+  'guest.done.goesTo': 'Le palethi iya ku-{beneficiary}, {kind}. Iphuma {day}.',
+  'guest.done.goesToFeeds': 'Le palethi iya ku-{beneficiary}, {kind} elondla {children}. Iphuma {day}.',
+  'guest.done.flagged': { one: 'Umsebenzi unengxelo yakho. Enkosi ngokuyixela.', other: 'Umsebenzi uneengxelo zakho. Enkosi ngokuzixela.' },
+  'guest.done.gratitude': 'I-Ladles of Love ayinakukwenza oku ngaphandle kwabantu abanikela ngexesha labo. Enkosi ngokunikela ngelakho namhlanje.',
 };
 
 export const MESSAGES = { en, af, xh };

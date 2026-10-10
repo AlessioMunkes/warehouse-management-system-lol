@@ -2,9 +2,9 @@
 // client/src/tests/GuestTranslations.test.jsx
 //
 // The guest screens read their words from translations/messages.js.
-// Afrikaans and isiXhosa hold English placeholders until a fluent
-// speaker fills them in, so what matters here is that nothing a
-// volunteer sees is ever blank or a raw key name, whatever is chosen.
+// Nothing a volunteer sees may be blank or a raw key name, whatever
+// language is chosen; nothing may be left in English by accident; and
+// every {placeholder} must survive translation.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -49,6 +49,30 @@ describe('guest translation keys', () => {
     }
   });
 
+  // Words that are the same in every language on purpose.
+  const SAME_IN_EVERY_LANGUAGE = ['guest.brand.role'];
+  const braces = (entry) => (typeof entry === 'object' ? `${entry.one} ${entry.other}` : entry).match(/\{\w+\}/g)?.sort() ?? [];
+
+  it.each(['af', 'xh'])('leaves no guest text in English by accident in %s', (lang) => {
+    const untranslated = guestKeys.filter((k) => !SAME_IN_EVERY_LANGUAGE.includes(k)
+      && JSON.stringify(MESSAGES[lang][k]) === JSON.stringify(MESSAGES.en[k]));
+    expect(untranslated).toEqual([]);
+  });
+
+  it.each(['af', 'xh'])('keeps every {placeholder} and the one/other shape in %s', (lang) => {
+    for (const key of guestKeys) {
+      const en = MESSAGES.en[key];
+      const tr = MESSAGES[lang][key];
+      expect(typeof tr, key).toBe(typeof en);
+      if (typeof en === 'object') {
+        expect(braces(tr.one), `${key}.one`).toEqual(braces(en.one));
+        expect(braces(tr.other), `${key}.other`).toEqual(braces(en.other));
+      } else {
+        expect(braces(tr), key).toEqual(braces(en));
+      }
+    }
+  });
+
   it('falls back to English when a language is missing the key altogether', () => {
     const key = 'guest.home.continue';
     const saved = MESSAGES.af[key];
@@ -86,7 +110,7 @@ describe('guest translation keys', () => {
     expect([...used].filter((k) => !(k in MESSAGES.en) && !k.startsWith('guest.kind.'))).toEqual([]);
   });
 
-  it('renders a guest screen in isiXhosa with no raw keys while the text is still a placeholder', async () => {
+  it('renders a guest screen in isiXhosa with no raw keys', async () => {
     api.fetchMySlip.mockRejectedValue(Object.assign(new Error('none'), { status: 404 }));
     api.fetchAvailableSlips.mockResolvedValue([]);
     setLanguage('xh');
