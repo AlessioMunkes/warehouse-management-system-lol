@@ -19,6 +19,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import collectionKitAPI from '../../services/collectionKitAPI';
 import formatKitCode from './kitCode';
+import { todayISO } from '../packing/spareSlips';
 
 import { Button }   from '@/components/ui/button';
 import StatusBadge from '@/components/ui/status-badge';
@@ -93,7 +94,7 @@ const TABS = [
 const AssignKitPanel = ({ busy, error, onSubmit, onCancel }) => {
   const [ownerName, setOwnerName] = useState('');
   const [suburb, setSuburb] = useState('');
-  const [assignedAt, setAssignedAt] = useState(new Date().toISOString().slice(0, 10));
+  const [assignedAt, setAssignedAt] = useState(todayISO());
   const [touched, setTouched] = useState(false);
   const ownerMissing = !ownerName.trim();
 
@@ -147,7 +148,7 @@ const AssignKitPanel = ({ busy, error, onSubmit, onCancel }) => {
 // ── Log-compost panel ────────────────────────────────────────
 const LogCompostPanel = ({ kit, busy, error, onSubmit, onCancel }) => {
   const [kg, setKg] = useState('');
-  const [loggedAt, setLoggedAt] = useState(new Date().toISOString().slice(0, 10));
+  const [loggedAt, setLoggedAt] = useState(todayISO());
   const [touched, setTouched] = useState(false);
   const kgInvalid = kg === '' || Number.isNaN(Number(kg)) || Number(kg) < 0;
 

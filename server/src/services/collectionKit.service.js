@@ -14,7 +14,7 @@
 // "recorded" was itself part of what made the previous version unclear.
 // ─────────────────────────────────────────────────────────────
 import kitRepo from '../repositories/collectionKit.repository.js';
-import { isPositiveInt } from '../utils/validation.js';
+import { isPositiveInt, isValidDateString, toQuantity } from '../utils/validation.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -28,14 +28,29 @@ const cleanText = (value) => {
 };
 
 const asPositiveNumber = (value, field) => {
-  const num = Number(value);
+  const num = toQuantity(value);
   if (!Number.isFinite(num) || num < 0) {
     fail(400, `${field} must be zero or more.`);
   }
   return num;
 };
 
-const todayISO = () => new Date().toISOString().slice(0, 10);
+// The warehouse's date, not the server's: the server runs in UTC and
+// Cape Town is UTC+2, so a plain toISOString() is yesterday until
+// 02:00. Same fixed offset delivery.service.js uses.
+const SAST_OFFSET_MS = 2 * 60 * 60 * 1000;
+const todayISO = () => new Date(Date.now() + SAST_OFFSET_MS).toISOString().slice(0, 10);
+
+// A date the client sent, or today when it sent none. Calendar-checked
+// here so 2026-02-30 is a 400 rather than a Postgres error.
+const asDate = (value, field) => {
+  if (value === undefined || value === null || value === '') return todayISO();
+  if (!isValidDateString(value)) fail(400, `${field} must be a real date (YYYY-MM-DD).`);
+  return value;
+};
+
+// How many records one list call may return.
+const MAX_RECORD_LIMIT = 500;
 
 // A metric can depend on a table that only exists once its own
 // migration has run — collection_kits/collection_kit_records is the
@@ -66,7 +81,7 @@ const createKit = async (payload, actorId) => {
   const suburb = cleanText(payload.suburb);
   if (suburb && suburb.length > 150) fail(400, 'Keep the suburb to 150 characters or fewer.');
 
-  const assignedAt = payload.assignedAt ? String(payload.assignedAt) : todayISO();
+  const assignedAt = asDate(payload.assignedAt, 'The date assigned');
 
   return runOrMissingTable(() => kitRepo.createKit({ ownerName, suburb, assignedAt, actorId }));
 };
@@ -90,7 +105,7 @@ const logCompost = async (rawKitId, payload, actorId) => {
   if (!isPositiveInt(kitId)) fail(400, 'A valid kit id is required.');
 
   const kgCompost = asPositiveNumber(payload.kgCompost, 'The compost weight');
-  const loggedAt = payload.loggedAt ? String(payload.loggedAt) : todayISO();
+  const loggedAt = asDate(payload.loggedAt, 'The date collected');
   const notes = cleanText(payload.notes);
 
   const result = await runOrMissingTable(() =>
@@ -133,12 +148,15 @@ const listRecords = async (filters = {}) => {
   if (status && !['logged', 'dispatched'].includes(status)) {
     fail(400, "status filter must be 'logged' or 'dispatched'.");
   }
+  let limit = 200;
+  if (filters.limit !== undefined && filters.limit !== null && filters.limit !== '') {
+    if (!isPositiveInt(filters.limit) || Number(filters.limit) > MAX_RECORD_LIMIT) {
+      fail(400, `limit must be a whole number from 1 to ${MAX_RECORD_LIMIT}.`);
+    }
+    limit = Number(filters.limit);
+  }
   return runOrMissingTable(() =>
-    kitRepo.listRecords({
-      status,
-      search: cleanText(filters.search),
-      limit: filters.limit ? Number(filters.limit) : 200,
-    }));
+    kitRepo.listRecords({ status, search: cleanText(filters.search), limit }));
 };
 
 export default { createKit, listKits, getKit, getRecord, logCompost, markDispatched, listRecords };

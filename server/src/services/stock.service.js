@@ -7,6 +7,7 @@
 import stockModel        from '../repositories/stock.repository.js';
 import { isMovementType } from '../constants/movementTypes.js';
 import { assertWholeByProduct } from '../features/units/wholeItems.js';
+import { toQuantity } from '../utils/validation.js';
 
 // ── fail ───────────────────────────────────────────────────────
 // Mirrors picking.service.js. Without a `.status` on the error, the
@@ -46,12 +47,12 @@ const getExpiryBatches = async (productId) => {
 // product's first-ever movement, in which case it's required.
 const adjustManually = async (data, userId) => {
   const { productId, quantityDelta, unit, reason } = data;
-  const delta = Number(quantityDelta);
+  const delta = toQuantity(quantityDelta);
 
   if (!productId)                                    fail(400, 'Product is required.');
-  if (quantityDelta === undefined || quantityDelta === null || !Number.isFinite(delta) || delta === 0)
+  if (!Number.isFinite(delta) || delta === 0)
                                                        fail(400, 'A non-zero quantity change is required.');
-  if (!reason || !reason.trim())                      fail(400, 'A reason is required for manual adjustments.');
+  if (typeof reason !== 'string' || !reason.trim())  fail(400, 'A reason is required for manual adjustments.');
 
   // Only a decantable product can be adjusted by a part quantity.
   await assertWholeByProduct([{ productId, quantity: delta }]);

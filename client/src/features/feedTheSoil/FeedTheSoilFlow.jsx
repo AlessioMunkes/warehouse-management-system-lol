@@ -47,8 +47,7 @@ import Paged from '../staff/Paged';
 import { readDraft, writeDraft, clearDraft } from '../staff/useDraft';
 import collectionKitAPI from '../../services/collectionKitAPI';
 import formatKitCode from './kitCode';
-
-const todayISO = () => new Date().toISOString().slice(0, 10);
+import { todayISO } from '../packing/spareSlips';
 
 const fmtDate = (value) =>
   value ? new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';

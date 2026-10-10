@@ -31,7 +31,7 @@ import { closureOn } from './calendar.service.js';
 import settings from './settings.service.js';
 import notices from '../features/communications/notices.js';
 import { isManagerUp } from '../constants/permissions.js';
-import { isValidDateString, isPositiveInt } from '../utils/validation.js';
+import { isValidDateString, isPositiveInt, toQuantity } from '../utils/validation.js';
 import { DISPATCH_SORTS, SORT_DIRECTIONS } from '../constants/receiptSort.js';
 
 const COHORTS  = ['tuesday', 'thursday'];
@@ -62,6 +62,8 @@ const flagNonCollections = (cutoff) => (client, facts) =>
 // cannot push a multi-megabyte payload into a TEXT column on every
 // collection.
 const MAX_SIGNATURE_BYTES = 512 * 1024;
+// The canvas only ever produces a PNG, so that is all that is taken.
+const SIGNATURE_PATTERN = /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/;
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -251,7 +253,7 @@ const validateCollectBody = (body) => {
   // paper register — a collection recorded without it is worth less
   // than the paper it replaced.
   const signature = body.signature;
-  if (!signature || typeof signature !== 'string' || !signature.startsWith('data:image/')) {
+  if (!signature || typeof signature !== 'string' || !SIGNATURE_PATTERN.test(signature)) {
     fail(400, 'The driver needs to sign before the collection can be recorded.');
   }
   if (Buffer.byteLength(signature, 'utf8') > MAX_SIGNATURE_BYTES) {
@@ -268,7 +270,9 @@ const validateCollectBody = (body) => {
     const itemId = Number(line?.itemId);
     if (!Number.isInteger(itemId) || itemId <= 0) fail(400, 'Each line correction needs a valid item.');
 
-    const loadedQuantity = Number(line.loadedQuantity);
+    // A correction with no count is not a count of zero: zero means
+    // nothing was loaded and nothing is deducted.
+    const loadedQuantity = toQuantity(line.loadedQuantity);
     if (!Number.isFinite(loadedQuantity) || loadedQuantity < 0) {
       fail(400, 'A loaded quantity must be zero or more.');
     }
