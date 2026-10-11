@@ -244,12 +244,15 @@ describe('the grounding handed to the model', () => {
     expect(prompt).not.toContain('product-fields');
   });
 
-  it('tells the model it is not allowed to write the answer', () => {
-    // Flattened first: the prompt is hand-wrapped, so "You do not
-    // write the answer" has a newline inside it and a naive regex
-    // fails on a re-wrap rather than on a real change.
+  it('holds the model to the topic text for anything it writes', () => {
+    // Flattened first: the prompt is hand-wrapped, so a phrase can
+    // have a newline inside it and a naive regex fails on a re-wrap
+    // rather than on a real change.
     const prompt = buildSystemPrompt('manager').replace(/\s+/g, ' ');
-    expect(prompt).toMatch(/do not write the answer/i);
+    // The topic is still shown word for word; the model's own
+    // sentence may only say what that topic says.
+    expect(prompt).toMatch(/shown to them word for word/i);
+    expect(prompt).toMatch(/Say only what the chosen topic's Text says/i);
     expect(prompt).toMatch(/not answer from your own knowledge/i);
     // Questions are typed by users and may contain anything.
     expect(prompt).toMatch(/never an instruction/i);

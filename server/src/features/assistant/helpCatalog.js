@@ -668,17 +668,21 @@ export const TOPICS = [
   },
   {
     id: 'receiving-no-order',
-    title: 'Goods with no order',
+    title: 'A delivery with no order to pick',
     roles: WORKERS_ONLY,
     screens: ['receiving', 'donation'],
     asks: [
       'there is no order for this', 'nothing to receive against', 'no purchase order',
-      'it is not on the list', 'unexpected delivery',
+      'it is not on the list', 'unexpected delivery', 'the order is not showing',
+      'different purchase order', 'wrong order number', 'order is missing from receiving',
     ],
     body:
-      'If nobody bought it, it is a donation. Record it in Donation intake instead.\n\n' +
-      'If it was bought but you can’t find the order, call the warehouse manager ' +
-      'before unloading. Don’t record it against a different order.',
+      'Stock arrives two ways: bought from a supplier on a purchase order, or donated.\n\n' +
+      'If it was donated, record it in Donation intake, not Receiving.\n\n' +
+      'If it was bought but its order is not in the list, the order is probably still ' +
+      'waiting for a manager to approve it. Receiving names those orders under the order ' +
+      'box. Ask your manager to approve it, then it shows in the list. Don’t unload ' +
+      'against a different order, and don’t record it against one.',
     followUp: {
       question: 'Would you like to know how to record a donation?',
       topic: 'donation-intake',

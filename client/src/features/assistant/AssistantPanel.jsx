@@ -31,7 +31,7 @@ import { BATCHES_LOGO } from './brand';
 
 // ── One answer ───────────────────────────────────────────────
 
-function TopicAnswer({ topic, onOpenTopic, onClose, here, role }) {
+function TopicAnswer({ topic, answer, onOpenTopic, onClose, here, role }) {
   // Where the answer's screens are, as links — minus the one they are
   // already on, and minus any id this build has no route for.
   const links = (topic.open ?? [])
@@ -46,6 +46,10 @@ function TopicAnswer({ topic, onOpenTopic, onClose, here, role }) {
 
   return (
     <div className="space-y-2">
+      {/* A sentence or two answering what was actually typed, when the
+          server let one through (it is checked against this topic).
+          The topic underneath is still the answer of record. */}
+      {answer ? <p className="rounded-lg bg-muted px-3 py-2">{answer}</p> : null}
       <p className="font-semibold">{topic.title}</p>
 
       {/* The catalog writes in paragraphs separated by a blank line.
@@ -186,7 +190,7 @@ function NotCoveredAnswer({ closest, onOpenTopic }) {
 
 function Answer({ entry, onOpenTopic, onPick, onClose, here, role }) {
   switch (entry.kind) {
-    case 'topic':       return <TopicAnswer topic={entry.topic} onOpenTopic={onOpenTopic} onClose={onClose} here={here} role={role} />;
+    case 'topic':       return <TopicAnswer topic={entry.topic} answer={entry.answer} onOpenTopic={onOpenTopic} onClose={onClose} here={here} role={role} />;
     case 'navigate':    return <NavigateAnswer screen={entry.screen} onClose={onClose} role={role} />;
     case 'clarify':     return <ClarifyAnswer question={entry.question} options={entry.options} onPick={onPick} />;
     case 'not_covered': return <NotCoveredAnswer closest={entry.closest} onOpenTopic={onOpenTopic} />;

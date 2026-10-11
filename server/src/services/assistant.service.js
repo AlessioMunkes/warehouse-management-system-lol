@@ -5,9 +5,18 @@
 //   question → model → { topic_id } → catalogue lookup → answer
 //                    → { screen_id } → role check → navigate
 //
-// THE MODEL CHOOSES WHICH ANSWER, NEVER WHAT THE ANSWER SAYS, AND
-// NEVER WHERE IT GOES. Everything the user reads is written in
-// helpCatalog.js and looked up by id. Every screen it can open is in
+// THE MODEL CHOOSES WHICH ANSWER, AND NEVER WHERE IT GOES. The topic
+// the user reads is written in helpCatalog.js and looked up by id.
+//
+// It may add one or two sentences of its own in front of that topic,
+// answering the person's own words. Those are checked against the
+// topic by groundedAnswer.js and dropped if they say anything the
+// topic does not, so the catalogue is still the only source of what
+// the assistant says.
+//
+// Each question may carry the one before it (the previous message and
+// the topic it was answered with), so "that's not what I meant" is read
+// as a reply and not as a fresh question about whichever word matched. Every screen it can open is in
 // SCREENS with a role list. A hallucinated id, a topic or screen
 // belonging to another role, or a prompt injection buried in the
 // question all end in the same place: a lookup that fails.
@@ -25,7 +34,8 @@
 // declines to offer it, and the two real gates never move.
 // ─────────────────────────────────────────────────────────────
 import provider from '../features/reporting/provider.js';
-import { buildTools, buildSystemPrompt } from '../features/assistant/toolSchema.js';
+import { buildTools, buildSystemPrompt, ORG_CONTEXT } from '../features/assistant/toolSchema.js';
+import { checkAnswer } from '../features/assistant/groundedAnswer.js';
 import {
   SCREENS, getTopic, topicsForRole, screensForRole, screenForRole,
   suggestionsFor, publicTopic, publicScreen,
@@ -96,7 +106,7 @@ export const getTopicForRole = (id, role) => {
   return { type: 'topic', topic: publicTopic(topic, role) };
 };
 
-export const ask = async ({ question, screen, userId, role }) => {
+export const ask = async ({ question, screen, userId, role, previous }) => {
   if (!provider.isEnabled()) {
     throw fail(503, 'The help assistant is not switched on.');
   }
@@ -130,7 +140,28 @@ export const ask = async ({ question, screen, userId, role }) => {
   // model: a help answer does not need them.
   const { names, keep } = await knownPeople.listNames();
   const safe  = redactText(question, names, keep).text;
-  const base  = where ? `They are on: ${where}\n\nThey asked: ${safe}` : safe;
+
+  // The turn before this one, when the client sent it. Treated like
+  // the question: text someone typed, redacted, never an instruction.
+  // The topic id is checked against this role's catalogue, so a client
+  // cannot use it to make the model read a topic it may not see.
+  const before = [];
+  if (previous && typeof previous === 'object') {
+    if (typeof previous.question === 'string' && previous.question.trim()) {
+      const said = redactText(previous.question.slice(0, MAX_QUESTION), names, keep).text;
+      before.push(`Their previous message: ${said}`);
+    }
+    const lastTopic = getTopic(previous.topicId);
+    if (lastTopic && lastTopic.roles.includes(role)) {
+      before.push(`You answered it with the topic: ${lastTopic.id} (${lastTopic.title})`);
+    }
+  }
+
+  const base = [
+    ...before,
+    where ? `They are on: ${where}` : null,
+    before.length > 0 || where ? `They asked: ${safe}` : safe,
+  ].filter(Boolean).join('\n\n');
 
   let lastError = null;
 
@@ -152,7 +183,13 @@ export const ask = async ({ question, screen, userId, role }) => {
           continue;
         }
         log('topic', { topicId: topic.id });
-        return { type: 'topic', topic: publicTopic(topic, role) };
+        return {
+          type: 'topic',
+          topic: publicTopic(topic, role),
+          // The model's own sentence or two, only if every word of it
+          // is the topic's. null is the ordinary case, not a failure.
+          answer: checkAnswer(call.args?.direct_answer, topic, ORG_CONTEXT),
+        };
       }
 
       if (call.name === 'open_screen') {

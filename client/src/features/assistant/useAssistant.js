@@ -59,6 +59,10 @@ export default function useAssistant({ open, screen, onNavigate }) {
     }
   }, [push]);
 
+  // The last thing asked and the topic it was answered with. Sent with
+  // the next question so the assistant can tell a reply from a new one.
+  const lastTurn = useRef(null);
+
   const ask = useCallback(async (question) => {
     const text = question.trim();
     if (!text || busy) return;
@@ -66,7 +70,8 @@ export default function useAssistant({ open, screen, onNavigate }) {
     push({ from: 'user', text });
     setBusy(true);
     try {
-      const res = await askAssistant(text, screen ?? undefined);
+      const res = await askAssistant(text, screen ?? undefined, lastTurn.current);
+      lastTurn.current = { question: text, topicId: res.type === 'topic' ? res.topic?.id : lastTurn.current?.topicId };
       push({ from: 'assistant', kind: res.type, ...res });
       // "Take me to inventory" should take them to inventory. The
       // server has already checked the screen against their role —
@@ -90,7 +95,7 @@ export default function useAssistant({ open, screen, onNavigate }) {
     }
   }, [busy, push, screen, onNavigate]);
 
-  const clear = useCallback(() => setEntries([]), []);
+  const clear = useCallback(() => { lastTurn.current = null; setEntries([]); }, []);
 
   // The chips for the screen they are on, falling back to the
   // general ones so the panel is never blank.

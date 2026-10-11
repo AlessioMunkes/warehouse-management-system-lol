@@ -59,7 +59,7 @@ const getTopic = async (req, res) => {
 
 // POST /api/assistant/ask
 // Returns one of:
-//   { type:'topic',       topic }
+//   { type:'topic',       topic, answer }   answer: a checked sentence or two, or null
 //   { type:'navigate',    screen }
 //   { type:'clarify',     question, options }
 //   { type:'not_covered', closest }
@@ -68,6 +68,7 @@ const ask = async (req, res) => {
     const result = await assistantService.ask({
       question: req.body?.question,
       screen:   req.body?.screen,
+      previous: req.body?.previous,
       userId:   req.user?.id,
       role:     req.user?.role,
     });
