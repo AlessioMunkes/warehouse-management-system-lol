@@ -710,9 +710,7 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
               placeholder="Choose a product"
               options={productSearch.filtered.map((p) => ({
                 value: p.id,
-                label: p.weight_kg
-                  ? `${p.name} · bulk, about ${Number(p.weight_kg)} kg each`
-                  : `${p.name} · bulk`,
+                label: p.name,
               }))}
               value={productId}
               onChange={(value) => {
@@ -745,7 +743,7 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
       {phase === 'work' && (
         <TaskPage
           title={product ? product.name : 'Decanting'}
-          sub="Weigh the bulk amount, fill the bags it works out to, then enter the decanted amount."
+          sub="Weigh it, bag it, then record what you made."
           toggle={toggleControl}
           note={blockedNote}
           actions={commit}
@@ -942,8 +940,8 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
         <StepScreen
           title={queued ? 'Saved on this phone' : 'Saved'}
           sub={queued
-            ? 'There was no signal, so this sheet is waiting on your phone. It sends itself as soon as you are back in range; the bar at the top says when it has gone. Do not record it again.'
-            : "The bags are on the system and the waste is on this week's report."}
+            ? 'No signal. It sends itself when you are back in range. Do not record it again.'
+            : 'Bags and waste recorded.'}
           actions={
             <Actions>
               <Button onClick={restart}>Decant another bulk amount</Button>

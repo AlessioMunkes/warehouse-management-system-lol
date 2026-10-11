@@ -138,8 +138,7 @@ export default function PurchaseOrderLines({
                             value={String(p.id)}
                             disabled={isDuplicate(p.id)}
                           >
-                            {p.name}{p.sku ? ` · ${p.sku}` : ''}
-                            {p.isLowStock ? ' · low' : ''}
+                            {p.name}
                           </SelectItem>
                         ))}
                       </SelectContent>

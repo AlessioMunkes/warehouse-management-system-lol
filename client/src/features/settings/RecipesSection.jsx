@@ -419,7 +419,7 @@ export default function RecipesSection({ settings = null, onSettingsSaved }) {
       {bandSettings.length > 0 ? (
         <AppSettingsSection
           title="Child count bands"
-          description="Set the band centres are supplied in. With bands of 5, a centre of 21 to 25 children gets the slip for 25."
+          description="Set the band centres are supplied in, for example every 5 children."
           settings={bandSettings}
           onSaved={onSettingsSaved}
         />

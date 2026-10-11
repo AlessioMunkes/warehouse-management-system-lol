@@ -242,7 +242,7 @@ export default function ProductForm({
             </SelectTrigger>
             <SelectContent>
               {STORAGE_TYPES.map((t) => (
-                <SelectItem key={t} value={t}>{t}</SelectItem>
+                <SelectItem key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</SelectItem>
               ))}
             </SelectContent>
           </Select>

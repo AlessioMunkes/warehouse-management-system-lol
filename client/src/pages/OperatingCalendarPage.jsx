@@ -222,7 +222,7 @@ export default function OperatingCalendarPage() {
     <PageShell>
       <PageHeader
         title="Operating calendar"
-        description="Set each cohort’s collection day and the days the warehouse is closed. Reminders and the not-collected cut-off skip closed days."
+        description="Set collection days and the days the warehouse is closed."
         actions={(
           <>
             <Button type="button" variant="outline" onClick={() => { setPanelError(null); setPanel('holidays'); }}>
@@ -267,7 +267,7 @@ export default function OperatingCalendarPage() {
             <EmptyState
               icon={CalendarOff}
               title={tab === 'past' ? 'No past closed days' : 'No closed days coming up'}
-              description="Add this year’s public holidays, and any day the warehouse will be shut."
+              description="Add public holidays and other closed days."
               action={tab === 'past' ? undefined : { label: 'Add public holidays', onClick: () => setPanel('holidays') }}
             />
           ) : (

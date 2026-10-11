@@ -45,68 +45,77 @@ import { Notice } from '../staff/StepPrimitives';
 import Paged from '../staff/Paged';
 import usePaged from '../staff/usePaged';
 
-// The four states a row can be in, and how each reads on the floor.
-// Kept as one table so the label, the styling and the "can you open
-// it?" decision cannot drift apart.
-// 16:00 SAST is when the sweep writes off whatever is still standing
-// (BR-14). Computed in Africa/Johannesburg rather than from the
-// tablet's own clock: a device left on another timezone would other-
-// wise count down to the wrong moment, and this is the one number on
-// the screen a worker might act on.
-const CUTOFF_HOUR = 16;
-
-const sastHourMinute = () => {
-  const parts = new Intl.DateTimeFormat('en-ZA', {
-    timeZone: 'Africa/Johannesburg',
-    hour: '2-digit', minute: '2-digit', hour12: false,
-  }).formatToParts(new Date());
-  const get = (type) => Number(parts.find((p) => p.type === type)?.value ?? 0);
-  return { hour: get('hour'), minute: get('minute') };
-};
-
-const cutoffNote = () => {
-  const { hour, minute } = sastHourMinute();
-  const left = CUTOFF_HOUR * 60 - (hour * 60 + minute);
-  if (left <= 0) return 'past the 16:00 cut-off';
-  const h = Math.floor(left / 60);
-  const m = left % 60;
-  return h > 0 ? `${h}h ${m}m to the 16:00 cut-off` : `${m}m to the 16:00 cut-off`;
-};
-
+// What a row is, in the gate's own words: a pallet is awaiting dispatch,
+// dispatched, or late. Late means its day's cut-off passed with nobody
+// to take it; it is still on the floor and can still go, so it opens
+// like any other. Kept as one table so the tab, the styling and the
+// "can you open it?" decision cannot drift apart.
 const STATE = {
-  awaiting:       { label: 'Waiting for collection', tone: '',           openable: true  },
-  collected:      { label: 'Collected',              tone: ' is-static', openable: false },
-  late_collected: { label: 'Collected (late)',       tone: ' is-static', openable: false },
-  // Openable. The 16:00 sweep records that a day ended without this
-  // pallet leaving; it does not put the pallet out of reach. A driver
-  // arriving at 16:40 is collecting the same food off the same floor,
-  // so the row opens and the collection runs normally — it is filed
-  // as 'late_collected' afterwards. Marked warn so it still reads as
-  // an exception on the board, but not is-static, which is what made
-  // it un-tappable.
-  not_collected:  { label: 'Not collected',          tone: ' is-warn',   openable: true  },
-  cancelled:      { label: 'Cancelled',              tone: ' is-static', openable: false },
+  awaiting:       { tab: 'awaiting',   tone: '',           openable: true  },
+  collected:      { tab: 'dispatched', tone: ' is-static', openable: false },
+  late_collected: { tab: 'dispatched', tone: ' is-static', openable: false },
+  not_collected:  { tab: 'late',       tone: ' is-warn',   openable: true  },
+  cancelled:      { tab: null,         tone: ' is-static', openable: false },
 };
 
 const stateOf = (row) => STATE[row.dispatch_status] || STATE.awaiting;
 
 // Centre, pallet reference, driver and cohort in one haystack. At a
 // gate the thing a worker has been told is usually one of those and
-// never reliably the same one — a driver says a name, a note says a
-// pallet number.
-//
-// Module level, so its identity is stable and useListSearch's memo
-// does not recompute on every keystroke of an unrelated render.
+// never reliably the same one: a driver says a name, a note says a
+// pallet number. Module level, so its identity is stable and
+// useListSearch's memo holds.
 const searchText = (row) => [
   row.ecd_name, row.pallet_ref, row.driver_name, row.cohort,
 ].filter(Boolean).join(' ');
 
-// Time formatted for a glance, not a report.
+// The day a pallet is booked for, short: "Tue, 13 Oct". Read in the
+// warehouse's timezone, not the tablet's.
+const dayOf = (row) => {
+  if (!row.dispatch_date) return null;
+  const d = new Date(row.dispatch_date);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString('en-ZA', {
+    timeZone: 'Africa/Johannesburg', weekday: 'short', day: 'numeric', month: 'short',
+  });
+};
+
 const timeOf = (value) => {
   if (!value) return null;
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return null;
   return d.toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' });
+};
+
+// The second line of a row: the pallet's own number first, then the one
+// thing worth knowing about it. Being on this list already says the
+// pallet is ready, so the row does not say so again. It used to carry a
+// countdown to "the 16:00 cut-off" on every row; the hour is a setting
+// (and was not 16:00), and twenty-seven copies of one clock told nobody
+// anything the tab does not.
+const metaOf = (row) => {
+  const state = stateOf(row);
+  const at = timeOf(row.collected_at);
+  const parts = [row.pallet_ref];
+  if (state.tab === 'late') {
+    parts.push('Missed its cut-off');
+  } else if (at) {
+    parts.push(row.dispatch_status === 'late_collected' ? `Late, ${at}` : at, row.driver_name);
+    // The centre going inactive afterwards does not rewrite this
+    // pallet's history; it is information, never a reason to hide it.
+    if (row.ecd_is_active === false) parts.push('Centre now inactive');
+  } else {
+    parts.push(dayOf(row));
+    if (Number(row.flagged_items) > 0)  parts.push(`${row.flagged_items} flagged`);
+    if (Number(row.variance_items) > 0) parts.push(`${row.variance_items} short or over`);
+  }
+  return parts.filter(Boolean).join(' · ');
+};
+
+const EMPTY = {
+  awaiting:   'No pallets awaiting dispatch.',
+  late:       'No late pallets.',
+  dispatched: 'Nothing dispatched yet.',
 };
 
 export default function GateQueue({ onOpenPallet }) {
@@ -120,9 +129,9 @@ export default function GateQueue({ onOpenPallet }) {
     dispatchAPI.getGateQueue()
       .then((board) => {
         if (cancelled) return;
-        // Hide a centre with nothing outstanding — see the header
-        // comment above. A completed dispatch is kept regardless of
-        // the centre's current status.
+        // Everything still to go, and anything already gone. A centre
+        // that has since gone inactive keeps its dispatched rows and
+        // loses the ones that can no longer be released to it.
         const visible = (board || []).filter((row) =>
           row.ecd_is_active !== false ||
           ['collected', 'late_collected'].includes(row.dispatch_status)
@@ -137,33 +146,24 @@ export default function GateQueue({ onOpenPallet }) {
     return () => { cancelled = true; };
   }, []);
 
-  const done    = rows.filter((r) => ['collected', 'late_collected'].includes(r.dispatch_status));
-  const waiting = rows.filter((r) => stateOf(r).openable);
+  const count = (tab) => rows.filter((r) => stateOf(r).tab === tab).length;
 
   const search = useListSearch(rows, searchText);
-  const [only, setOnly] = useState('all');
+  // Opens on what there is to do. There is no "All": the three tabs
+  // between them are everything, and a search looks across all three.
+  const [only, setOnly] = useState('awaiting');
 
-  const visible = search.filtered.filter((row) => {
-    if (only === 'waiting') return stateOf(row).openable;
-    if (only === 'done') return ['collected', 'late_collected'].includes(row.dispatch_status);
-    return true;
-  });
+  const visible = search.searching
+    ? search.filtered
+    : rows.filter((row) => stateOf(row).tab === only);
 
-  // Paged over what is actually on screen. The summary line above
-  // still counts the whole board on purpose — "3 of 9 collected" is a
-  // fact about the day, and it should not change because someone
-  // typed in the search box.
   const paged = usePaged(visible);
-
-  const summary = rows.length === 0
-    ? 'Nothing waiting for collection.'
-    : `${done.length} of ${rows.length} collected · ${waiting.length} still waiting`;
 
   return (
     <section className="stf-step">
       <div className="stf-step-head">
         <h1 className="stf-step-title" tabIndex={-1}>At the gate</h1>
-        <p className="stf-step-sub">{summary}</p>
+        <p className="stf-step-sub">Hand each pallet to its driver.</p>
       </div>
 
       {error ? <Notice tone="warn">{error}</Notice> : null}
@@ -180,9 +180,9 @@ export default function GateQueue({ onOpenPallet }) {
             value={only}
             onChange={setOnly}
             options={[
-              { key: 'all',     label: 'All',       count: rows.length },
-              { key: 'waiting', label: 'Waiting',   count: waiting.length },
-              { key: 'done',    label: 'Collected', count: done.length },
+              { key: 'awaiting',   label: 'Awaiting dispatch', count: count('awaiting') },
+              { key: 'late',       label: 'Late',              count: count('late') },
+              { key: 'dispatched', label: 'Dispatched',        count: count('dispatched') },
             ]}
           />
         </ListTools>
@@ -191,48 +191,22 @@ export default function GateQueue({ onOpenPallet }) {
       {loading ? (
         <div className="stf-skeleton" aria-label="Loading" />
       ) : rows.length === 0 ? (
-        <div className="stf-empty">No pallets are waiting for collection.</div>
-      ) : visible.length === 0 ? (
+        <div className="stf-empty">{EMPTY.awaiting}</div>
+      ) : visible.length === 0 && search.searching ? (
         <NoMatches
           query={search.query}
-          onClear={() => { search.setQuery(''); setOnly('all'); }}
+          onClear={() => search.setQuery('')}
           noun="pallets"
         />
+      ) : visible.length === 0 ? (
+        <div className="stf-empty">{EMPTY[only]}</div>
       ) : (
         <div className="stf-list">
           {paged.slice.map((row) => {
             const state    = stateOf(row);
             const openable = state.openable;
-            const at       = timeOf(row.collected_at);
-
-            // What the second line says, in order of what matters
-            // most to someone standing at a gate.
-            let meta;
-            if (row.dispatch_status === 'not_collected') {
-              // Was "Awaiting late collection. Written off at 16:00."
-              // on every such row at any hour and with no date, which
-              // reads at 22:41 as though it had just happened. What a
-              // person at the gate needs to know is what collecting it
-              // now actually does.
-              meta = 'Written off as not collected. Collecting it now records a late collection.';
-            } else if (at) {
-              meta = `${state.label} at ${at}${row.driver_name ? ` · ${row.driver_name}` : ''}`;
-              // The centre going inactive afterwards doesn't rewrite
-              // this pallet's history — it's shown here purely as
-              // information, never as a reason to hide a completed row.
-              if (row.ecd_is_active === false) meta += ' · Centre now inactive';
-            } else {
-              const flags = [];
-              if (Number(row.flagged_items) > 0)  flags.push(`${row.flagged_items} flagged`);
-              if (Number(row.variance_items) > 0) flags.push(`${row.variance_items} short or over`);
-              // The live cut-off, which is the thing that changes while
-              // someone is standing there. Static text saying 16:00 tells
-              // a worker nothing they cannot read off the wall clock.
-              const itemsNoun = Number(row.total_items) === 1 ? 'item' : 'items';
-              meta = [`${row.total_items} ${itemsNoun} ready for dispatch`, ...flags, cutoffNote()].join(' · ');
-            }
-
-            const open = () => onOpenPallet(row.picking_slip_id);
+            const meta     = metaOf(row);
+            const open     = () => onOpenPallet(row.picking_slip_id);
 
             return (
               <div
@@ -250,11 +224,8 @@ export default function GateQueue({ onOpenPallet }) {
                 }
               >
                 <span className="stf-row-main">
-                  <span className="stf-row-title">
-                    {row.ecd_name}
-                    {row.pallet_ref ? ` · ${row.pallet_ref}` : ''}
-                  </span>
-                  <span className="stf-row-meta">{meta}</span>
+                  <span className="stf-row-title">{row.ecd_name}</span>
+                  {meta ? <span className="stf-row-meta">{meta}</span> : null}
                 </span>
               </div>
             );

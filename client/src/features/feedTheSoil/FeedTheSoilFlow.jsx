@@ -335,7 +335,7 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
   // ── Records tab ────────────────────────────────────────────
   if (phase === 'browse' && tab === 'records') {
     return (
-      <TaskPage title="Feed the Soil" sub="Compost logged from every collection kit, most recent first. Dispatched records sink to the bottom.">
+      <TaskPage title="Feed the Soil" sub="Compost logged, newest first.">
         {browseError ? <Notice tone="warn">{browseError}</Notice> : null}
         {queuedNote ? <Notice>{queuedNote}</Notice> : null}
         <FilterSegments label="View" value={tab} onChange={setTab} options={[{ key: 'records', label: 'Records' }, { key: 'kits', label: 'Kits' }]} />
@@ -371,7 +371,7 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
   // ── Kits tab ───────────────────────────────────────────────
   if (phase === 'browse' && tab === 'kits') {
     return (
-      <TaskPage title="Feed the Soil" sub="Every collection kit assigned to a community member.">
+      <TaskPage title="Feed the Soil" sub="Kits given out.">
         {browseError ? <Notice tone="warn">{browseError}</Notice> : null}
         {queuedNote ? <Notice>{queuedNote}</Notice> : null}
         <FilterSegments label="View" value={tab} onChange={setTab} options={[{ key: 'records', label: 'Records' }, { key: 'kits', label: 'Kits' }]} />
@@ -617,7 +617,7 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
     return (
       <TaskPage
         title="Assign a kit"
-        sub="A new collection kit given to a community member."
+        sub="Give a kit to a community member."
         note={ownerMissing ? 'Still needed: the owner\'s name.' : null}
         actions={
           <Actions>

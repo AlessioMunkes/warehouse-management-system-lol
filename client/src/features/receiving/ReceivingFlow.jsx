@@ -565,7 +565,7 @@ export default function ReceivingFlow({ onCrumbChange }) {
       {phase === 'which' && (
         <StepScreen
           title="Which delivery is this?"
-          sub="The driver has a note with a number on it."
+          sub="Find the order on the driver's note."
           toggle={toggleControl}
           actions={
             <Actions>
@@ -649,7 +649,7 @@ export default function ReceivingFlow({ onCrumbChange }) {
       {phase === 'work' && (
         <TaskPage
           title={`${supplierName}${orderId ? ` · ${orderCode(openOrders.find((o) => String(o.id) === String(orderId)) ?? { id: orderId })}` : ''}`}
-          sub="Check what is on the floor against the note, then sign it in."
+          sub="Count each line, then sign it in."
           toggle={toggleControl}
           note={blockedNote}
           actions={
@@ -787,8 +787,8 @@ export default function ReceivingFlow({ onCrumbChange }) {
         <StepScreen
           title={queued ? 'Saved on this phone' : 'Delivery received'}
           sub={queued
-            ? 'There was no signal, so this is waiting on your phone. It sends itself as soon as you are back in range; the bar at the top says when it has gone. Do not count it again.'
-            : 'The stock is on the system. You can put the next one in, or move on to packing.'}
+            ? 'No signal. It sends itself when you are back in range. Do not count it again.'
+            : 'Stock updated.'}
           actions={
             <Actions>
               <Button onClick={restart}>Receive another delivery</Button>

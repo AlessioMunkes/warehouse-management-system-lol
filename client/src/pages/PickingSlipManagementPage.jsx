@@ -240,7 +240,7 @@ export default function PickingSlipManagementPage() {
     <PageShell>
       <PageHeader
         title="Picking slips"
-        description="Generate, print and track this week’s pallets. New slips go to the floor for anyone to claim."
+        description="Generate, print and track this week’s pallets."
         actions={mode === 'list' ? (
           <>
             <Button type="button" variant="outline" onClick={() => setMode('create')}>

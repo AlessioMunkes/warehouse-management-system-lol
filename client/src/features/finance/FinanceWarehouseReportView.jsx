@@ -627,7 +627,7 @@ export default function FinanceWarehouseReportView({ loadReport, showReset = tru
     <PageShell>
       <PageHeader
         title="Warehouse Movement Report"
-        description="Review stock received into and issued from the warehouse for the selected reporting period."
+        description="Review stock received and issued for a period."
         actions={loading ? <Badge variant="secondary">Loading</Badge> : null}
       />
       <p className="mt-2 text-sm font-medium text-muted-foreground">For the Finance team</p>

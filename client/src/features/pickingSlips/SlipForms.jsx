@@ -224,10 +224,11 @@ export function CreateSlipForm({ beneficiaries, products, onCreated, onCancel })
           <Select value={form.ecdId || undefined} onValueChange={(v) => setForm((f) => ({ ...f, ecdId: v }))}>
             <SelectTrigger id="adhoc-ecd"><SelectValue placeholder="Select a beneficiary" /></SelectTrigger>
             <SelectContent>
-              {beneficiaries.map((b) => (
-                <SelectItem key={b.id} value={String(b.id)}>
-                  {b.name}{!b.approvedAt ? ' (unapproved)' : ''}
-                </SelectItem>
+              {/* Only centres a slip can be made for. An unapproved one
+                  was listed with "(unapproved)" after its name and then
+                  refused on save. */}
+              {beneficiaries.filter((b) => b.approvedAt).map((b) => (
+                <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>

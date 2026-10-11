@@ -94,7 +94,7 @@ export default function SettingsPage({ defaultSection = 'email' }) {
     // Narrower than the list screens: this page is forms, and a form
     // line stretched across 6xl is hard to read.
     <PageShell width="max-w-4xl">
-      <PageHeader title="Settings" description="Set up email, reminders, stock rules, recipes, reporting and accounts. Changes apply to everyone." />
+      <PageHeader title="Settings" description="Set up email, reminders, stock rules, recipes and accounts." />
 
       <ViewTabs className="mt-5" label="Settings sections" value={section} onChange={changeSection} tabs={SECTIONS} />
 

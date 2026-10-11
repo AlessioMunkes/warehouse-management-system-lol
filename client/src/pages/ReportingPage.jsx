@@ -408,7 +408,7 @@ export default function ReportingPage() {
       <PageHeader
         className="mb-5"
         title="Operations reports"
-        description="Ask a question or browse reports on what was recorded in the warehouse. For people served, use Impact report."
+        description="Ask a question or browse the warehouse’s reports."
       />
 
       {!catalog && !error && (

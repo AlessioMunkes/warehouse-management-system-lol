@@ -82,7 +82,7 @@ export function DonationDetailsPage() {
       <section className="stf-step donation-intake-card">
         <div className="stf-step-head">
           <h1 className="stf-step-title">Record a donation</h1>
-          <p className="stf-step-sub">Capture donor basics, value and donated items.</p>
+          <p className="stf-step-sub">Record the donor, the value and the items.</p>
         </div>
 
         {validationMessages.length > 0 && (

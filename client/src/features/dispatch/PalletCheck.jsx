@@ -552,8 +552,8 @@ export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChan
         <StepScreen
           title={queued ? 'Saved on this phone' : 'Collection confirmed'}
           sub={queued
-            ? 'There was no signal, so this collection is waiting on your phone, signature and all. It sends itself as soon as you are back in range. Let the driver go.'
-            : 'The stock is off the system and the pallet is on its way.'}
+            ? 'No signal. It sends itself when you are back in range. Let the driver go.'
+            : 'Stock updated. The pallet can go.'}
           actions={
             <Actions>
               <Button onClick={backToQueue}>Back to the gate queue</Button>

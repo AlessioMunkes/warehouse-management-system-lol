@@ -368,7 +368,7 @@ export default function ImpactReportPage() {
     <PageShell>
       <PageHeader
         title="Impact report"
-        description="See what the warehouse achieved for a period, and export it as a PDF. Covers ECDs and soup kitchens."
+        description="See the impact for a period and export it as a PDF."
         actions={<>
           <Select value={preset} onValueChange={setPreset}>
             <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
