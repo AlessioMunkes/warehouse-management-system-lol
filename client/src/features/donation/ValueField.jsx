@@ -1,27 +1,30 @@
 // ─────────────────────────────────────────────────────────────
-// features/donation/ValueProgrammeFields.jsx
-// UPDATED: live validity message, catches non-numeric input.
+// features/donation/ValueField.jsx
+//
+// The donation's estimated value in rand. Needed when the donor wants a
+// Section 18A certificate, and optional otherwise.
+//
+// This file also asked which programme the donation was for. Nothing
+// used the answer, so the question is gone.
 // ─────────────────────────────────────────────────────────────
 import { useState } from "react";
 
-const PROGRAMMES = [
-  { value: "NOC",           label: "NOC" },
-  { value: "FTS",           label: "FTS" },
-  { value: "LOVE_ACTIVISM", label: "Love Activism" },
-];
-
-const valueMessage = (v) => {
-  if (v === "") return { valid: false, message: "An estimated value is required (enter 0 if none)." };
+const valueMessage = (v, required) => {
+  if (v === "" || v === null || v === undefined) {
+    return required
+      ? { valid: false, message: "Enter a value for the certificate (0 if none)." }
+      : { valid: true, message: "" };
+  }
   if (Number.isNaN(Number(v))) return { valid: false, message: "Enter a number, not text." };
   if (Number(v) < 0) return { valid: false, message: "Value cannot be negative." };
   return { valid: true, message: "Looks good." };
 };
 
-export function ValueProgrammeFields({ estimatedValueZar, programmeCode, onChange, error }) {
+export function ValueField({ estimatedValueZar, onChange, error, required = false }) {
   const [touched, setTouched] = useState(false);
-  const state = valueMessage(estimatedValueZar);
-  const showValidation = touched || Boolean(error);
+  const state = valueMessage(estimatedValueZar, required);
   const message = error || state.message;
+  const showValidation = (touched || Boolean(error)) && Boolean(message);
 
   return (
     <div className="stf-step-body">
@@ -50,24 +53,13 @@ export function ValueProgrammeFields({ estimatedValueZar, programmeCode, onChang
           </span>
         ) : (
           <span className="stf-field-hint">
-            Required for every donation. Enter 0 if it has no assessable value.
+            {required
+              ? "Needed for the Section 18A certificate. Enter 0 if it has no value."
+              : "Optional. Leave blank if you do not know it."}
           </span>
         )}
       </div>
 
-      <div className="stf-field">
-        <span className="stf-field-label">Programme (optional)</span>
-        <select
-          className="stf-select"
-          value={programmeCode}
-          onChange={(e) => onChange({ programmeCode: e.target.value })}
-        >
-          <option value="">No programme</option>
-          {PROGRAMMES.map((p) => (
-            <option key={p.value} value={p.value}>{p.label}</option>
-          ))}
-        </select>
-      </div>
     </div>
   );
 }

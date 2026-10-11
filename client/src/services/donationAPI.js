@@ -55,7 +55,6 @@ export async function createDonation(draft) {
   const payload = {
     category: draft.category,
     estimatedValueZar: Number(draft.estimatedValueZar) || 0,
-    programmeCode: draft.programmeCode || undefined,
     donorName: draft.donorName,
     donorContact: draft.donorContact,
     donorConsentGiven: draft.donorConsentGiven === true,
@@ -108,7 +107,10 @@ export async function createPendingDonation(draft) {
 
     })),
   };
-  if (wantsSection18A) {
+  // Needed with a Section 18A request; sent whenever one was typed.
+  const typedValue = draft.estimatedValueZar !== "" && draft.estimatedValueZar !== null
+    && draft.estimatedValueZar !== undefined;
+  if (wantsSection18A || typedValue) {
     payload.estimatedValueZar = Number(draft.estimatedValueZar);
   }
 

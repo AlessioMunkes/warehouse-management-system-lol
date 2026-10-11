@@ -24,7 +24,6 @@ const baseDraft = () => ({
     requestedCategory: '',
   }],
   estimatedValueZar: '120',
-  programmeCode: 'NOC',
   donorConsentGiven: false,
 });
 

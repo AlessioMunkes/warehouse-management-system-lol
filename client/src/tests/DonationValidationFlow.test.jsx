@@ -71,7 +71,7 @@ function renderDonationFlow({ draft = validDraft(), updateDraft = vi.fn(), reset
 }
 
 describe('Donation backend validation UX', () => {
-  it('hides estimated value when Section 18A is no and clears it when switched from yes', async () => {
+  it('offers the estimated value with or without Section 18A, and keeps it when switched to no', async () => {
     const user = userEvent.setup();
     const updateDraft = vi.fn();
 
@@ -90,7 +90,8 @@ describe('Donation backend validation UX', () => {
       </MemoryRouter>
     );
 
-    expect(screen.queryByLabelText(/Estimated Donation Value/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/Estimated value \(ZAR\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Optional\. Leave blank/)).toBeInTheDocument();
     cleanup();
 
     render(
@@ -108,9 +109,10 @@ describe('Donation backend validation UX', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByLabelText(/Estimated Donation Value/i)).toHaveValue(250);
+    expect(screen.getByLabelText(/Estimated value \(ZAR\)/i)).toHaveValue(250);
+    expect(screen.getByText(/Needed for the Section 18A certificate/)).toBeInTheDocument();
     await user.click(within(screen.getByRole('group', { name: /Section 18A/i })).getByRole('radio', { name: /^No$/i }));
-    expect(updateDraft).toHaveBeenCalledWith({ donorConsentGiven: false, estimatedValueZar: '' });
+    expect(updateDraft).toHaveBeenCalledWith({ donorConsentGiven: false });
   });
 
   it('moves from donation intake to the donation summary page when valid', async () => {

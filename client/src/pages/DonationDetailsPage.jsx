@@ -119,21 +119,27 @@ export function DonationDetailsPage() {
                 Yes
               </label>
               <label className={`donation-intake-option ${draft.donorConsentGiven === false ? "is-chosen" : ""}`}>
-                <input name="section-18a" type="radio" checked={draft.donorConsentGiven === false} onChange={() => updateDraft({ donorConsentGiven: false, estimatedValueZar: "" })} />
+                <input name="section-18a" type="radio" checked={draft.donorConsentGiven === false} onChange={() => updateDraft({ donorConsentGiven: false })} />
                 No
               </label>
             </div>
             {errors.donorConsentGiven && <span className="stf-field-hint donation-intake-error">{errors.donorConsentGiven}</span>}
           </fieldset>
-          {/* The value is only needed for a Section 18A certificate, and
-              is only validated then (DonationDraftContext). */}
-          {draft.donorConsentGiven === true && (
-            <div className="stf-field">
-              <label htmlFor="estimated-value-zar" className="stf-field-label">Estimated Donation Value</label>
-              <input id="estimated-value-zar" className={`stf-input ${errors.value ? "is-flagged" : ""}`} type="number" min="0" value={draft.estimatedValueZar} onChange={(e) => updateDraft({ estimatedValueZar: e.target.value })} aria-invalid={Boolean(errors.value)} />
-              {errors.value && <span className="stf-field-hint donation-intake-error">{errors.value}</span>}
-            </div>
-          )}
+          {/* Always offered. Needed for a Section 18A certificate and
+              optional otherwise (DonationDraftContext validates both). */}
+          <div className="stf-field">
+            <label htmlFor="estimated-value-zar" className="stf-field-label">Estimated value (ZAR)</label>
+            <input id="estimated-value-zar" className={`stf-input ${errors.value ? "is-flagged" : ""}`} type="number" min="0" step="0.01" inputMode="decimal" placeholder="0.00" value={draft.estimatedValueZar} onChange={(e) => updateDraft({ estimatedValueZar: e.target.value })} aria-invalid={Boolean(errors.value)} />
+            {errors.value
+              ? <span className="stf-field-hint donation-intake-error">{errors.value}</span>
+              : (
+                <span className="stf-field-hint">
+                  {draft.donorConsentGiven === true
+                    ? "Needed for the Section 18A certificate. Enter 0 if it has no value."
+                    : "Optional. Leave blank if you do not know it."}
+                </span>
+              )}
+          </div>
           <fieldset className="stf-field donation-intake-choice" aria-label="Food donation">
             <legend className="stf-field-label">Food?</legend>
             <div className="donation-intake-options">

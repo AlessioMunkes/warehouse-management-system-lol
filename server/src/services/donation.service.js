@@ -119,9 +119,6 @@ export const CATEGORIES = ['recipe_food', 'add_on_food', 'non_recipe_food', 'non
 // written.
 export const ALLOWED_UNITS = ['kg', 'g', 'l', 'ml', 'each', 'bag', 'box', 'crate', 'punnet'];
 
-// The three programme codes in the live programmes table.
-export const PROGRAMME_CODES = ['NOC', 'FTS', 'LOVE_ACTIVISM'];
-
 // Quantities are NUMERIC. All splitting arithmetic happens in integer
 // thousandths so no float ever touches an allocated figure.
 const UNITS_PER_QTY = 1000;
@@ -427,7 +424,7 @@ const createDonation = async (data, userId) => {
   const donorClean = validateDonorFields(data);
 
   const {
-    category, programmeCode, estimatedValueZar, donorName, donorContact,
+    category, estimatedValueZar, donorName, donorContact,
     donorTaxReference, donorConsentGiven, idempotencyKey, items,
   } = data || {};
   // Use sanitised donor values where present, else raw trimmed values.
@@ -455,17 +452,10 @@ const createDonation = async (data, userId) => {
 
   const normalised = items.map(normaliseItem);
 
-  // ── Programme ───────────────────────────────────────────────
-  // Optional: donations.programme_id is nullable, and a donor at the
-  // gate does not always map cleanly onto one programme. Resolved from
-  // a code rather than accepting an id from the body, so a malformed
-  // id cannot reach the FK.
-  let programmeId = null;
-  if (programmeCode) {
-    const programme = await donationModel.getProgrammeByCode(String(programmeCode).trim());
-    if (!programme) fail(400, `Unknown programme code "${programmeCode}".`);
-    programmeId = programme.id;
-  }
+  // A donation is not filed under a programme. Intake used to ask and
+  // nothing read the answer; the column stays, empty, for the donations
+  // recorded while it did.
+  const programmeId = null;
 
   // ── Retried submit ──────────────────────────────────────────
   // Checked here so the common case returns without opening a
@@ -1409,5 +1399,4 @@ export default {
   updateSection18ASettings,
   CATEGORIES,
   ALLOWED_UNITS,
-  PROGRAMME_CODES,
 };

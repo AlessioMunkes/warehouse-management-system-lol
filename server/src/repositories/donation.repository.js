@@ -80,18 +80,6 @@ const getEligibleEcdCentres = async () => {
   }));
 };
 
-// ── Programme lookup ──────────────────────────────────────────
-// donations.programme_id is a real FK, so the service resolves a
-// programme code (NOC / FTS / LOVE_ACTIVISM) to an id rather than
-// trusting an id from the request body.
-const getProgrammeByCode = async (code) => {
-  const result = await pool.query(
-    `SELECT id, code, name FROM programmes WHERE code = $1 AND is_active = TRUE`,
-    [code]
-  );
-  return result.rows[0] || null;
-};
-
 // ── Idempotency lookup ────────────────────────────────────────
 // Called before a write. A retried submit from the gate must return
 // the original donation, not create a second one.
@@ -919,7 +907,6 @@ const getDonationEvents = async (donationId) => {
 export default {
   getSection18AThreshold,
   getEligibleEcdCentres,
-  getProgrammeByCode,
   findByIdempotencyKey,
   createDonation,
   getDonationById,

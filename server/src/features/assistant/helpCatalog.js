@@ -743,7 +743,7 @@ export const TOPICS = [
     steps: [
       'Open Donation intake and choose what kind of donation it is.',
       'Add each item with its quantity and unit.',
-      'Enter a rough value in rand (0 if you really can’t say) and the programme.',
+      'Enter a rough value in rand if you know it. It is needed when the donor wants a certificate.',
       'Say whether the donor wants a Section 18A tax certificate. If so, take their name and email.',
       'Check the summary and submit.',
     ],

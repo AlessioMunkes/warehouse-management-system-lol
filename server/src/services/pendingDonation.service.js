@@ -359,7 +359,6 @@ export const createPendingDonationFromIntake = async (payload = {}) => {
         donorConsentGiven: data.donorConsentGiven ?? data.donor_consent_given ?? null,
         estimatedValueZar: data.estimatedValueZar ?? data.estimated_value_zar ?? null,
         donationCategory: data.donationCategory ?? data.donation_category ?? null,
-        programmeId: data.programmeId ?? data.programme_id ?? null,
         notes: data.notes ?? null,
         section18aStatus: data.section18aStatus ?? data.section_18a_status ?? null,
         section18aQualifying: data.section18aQualifying ?? data.section_18a_qualifying ?? null,

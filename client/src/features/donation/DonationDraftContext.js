@@ -42,7 +42,6 @@ export const emptyDraft = () => ({
   isFood: null,
   contactMethod: "",
   contactDetails: "",
-  programmeCode: "",
   notes: "",
   donorConsentGiven: false,   // null = not yet answered (distinct from false)
   donorName: "",
@@ -95,8 +94,11 @@ export function validateDraftField(draft, field) {
     && draft?.isAnonymousDonation !== true && draft?.anonymous !== true;
   switch (field) {
     case "estimatedValueZar":
-      if (draft?.donorConsentGiven !== true) return null;
-      return validateMoney(draft?.estimatedValueZar, { required: true, field: "Estimated value" }).error;
+      // Needed for a Section 18A certificate. Otherwise optional, but
+      // still a real amount when one is typed.
+      return validateMoney(draft?.estimatedValueZar, {
+        required: draft?.donorConsentGiven === true, field: "Estimated value",
+      }).error;
     case "donorConsentGiven":
       return (draft?.donorConsentGiven === null || draft?.donorConsentGiven === undefined)
         ? "Select whether donor consent was given." : null;
@@ -122,8 +124,10 @@ export function validateDonationDraft(draft) {
   const errors = {};
   const itemErrors = {};
 
-  if (d.donorConsentGiven === true) {
-    const money = validateMoney(d.estimatedValueZar, { required: true, field: "Estimated value" });
+  {
+    const money = validateMoney(d.estimatedValueZar, {
+      required: d.donorConsentGiven === true, field: "Estimated value",
+    });
     if (money.error) errors.value = money.error;
   }
 

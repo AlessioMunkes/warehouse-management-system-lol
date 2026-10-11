@@ -86,7 +86,7 @@ describe('Donation phase 1-4 intake', () => {
     expect(payload).not.toHaveProperty('donorIdNumber');
   });
 
-  it('omits estimated value when Section 18A is no', async () => {
+  it('sends a value typed without a Section 18A request, and omits it when none was typed', async () => {
     const fetch = vi.fn(okResponse);
     vi.stubGlobal('fetch', fetch);
 
@@ -94,7 +94,11 @@ describe('Donation phase 1-4 intake', () => {
 
     const payload = JSON.parse(fetch.mock.calls[0][1].body);
     expect(payload.donorConsentGiven).toBe(false);
-    expect(payload).not.toHaveProperty('estimatedValueZar');
+    expect(payload.estimatedValueZar).toBe(100);
+
+    await createPendingDonation(draft({ donorConsentGiven: false, estimatedValueZar: '' }));
+    const blank = JSON.parse(fetch.mock.calls[1][1].body);
+    expect(blank).not.toHaveProperty('estimatedValueZar');
   });
 
   it('keeps unknown food products pending review', async () => {

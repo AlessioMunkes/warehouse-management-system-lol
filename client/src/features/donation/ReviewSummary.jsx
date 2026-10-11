@@ -10,13 +10,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 
 
 import { DonationItemsList } from "./DonationItemsList";
-import { ValueProgrammeFields } from "./ValueProgrammeFields";
+import { ValueField } from "./ValueField";
 import { DonorConsentSection, DonorInfoFields } from "./DonationSection";
 import { NotesField } from "./NotesField";
 
 const SECTION_LABELS = {
   items: "Items",
-  value: "Value & Programme",
+  value: "Value",
   donor: "Donor Details",
   notes: "Notes",
 };
@@ -42,16 +42,16 @@ export function ReviewSummary({ draft }) {
       </div>
 
       <div className="stf-list">
-        {draft.donorConsentGiven === true && (
         <div className="stf-row is-static">
           <div className="stf-row-main">
-            <span className="stf-row-title">Value & Programme</span>
+            <span className="stf-row-title">Value</span>
             <span className="stf-row-meta">
-              R{draft.estimatedValueZar || "0"} · {draft.programmeCode || "No programme"}
+              {draft.estimatedValueZar === "" || draft.estimatedValueZar === null || draft.estimatedValueZar === undefined
+                ? "Not given"
+                : `R${draft.estimatedValueZar}`}
             </span>
           </div>
         </div>
-        )}
 
         <div className="stf-row is-static">
           <div className="stf-row-main">
@@ -67,7 +67,7 @@ export function ReviewSummary({ draft }) {
                   draft.donorName || "Anonymous donor",
                   draft.donorContact || draft.contactDetails || "No email",
                   "No Section 18A",
-                ].join(" Â· ")}
+                ].join(" · ")}
             </span>
           </div>
         </div>
@@ -192,9 +192,9 @@ export function EditSectionDialog({ open, onOpenChange, sections, draft, updateD
             />
           )}
           {sections.includes("value") && (
-            <ValueProgrammeFields
+            <ValueField
               estimatedValueZar={localDraft.estimatedValueZar}
-              programmeCode={localDraft.programmeCode}
+              required={localDraft.donorConsentGiven === true}
               onChange={updateLocalDraft}
             />
           )}

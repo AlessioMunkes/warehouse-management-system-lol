@@ -219,7 +219,6 @@ export function validateDonationPayload(body={}) {
   else sanitized.category=trimOrEmpty(body.category);
   const money=validateMoney(body.estimatedValueZar,{required:true,field:'Estimated value'});
   if(money.error) errors.estimatedValueZar=money.error; else sanitized.estimatedValueZar=money.value;
-  if(body.programmeCode!==undefined&&body.programmeCode!==null&&trimOrEmpty(body.programmeCode)!=='') sanitized.programmeCode=trimOrEmpty(body.programmeCode);
   if(!anonymous){
     const n=validateDonorName(body.donorName,{});
     if(n.error)errors.donorName=n.error; else sanitized.donorName=n.value;

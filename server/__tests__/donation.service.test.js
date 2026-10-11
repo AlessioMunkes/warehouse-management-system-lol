@@ -13,7 +13,6 @@ const repoMock = {
   getSection18AThreshold: vi.fn(),
   getEligibleEcdCentres:  vi.fn(),
   findByIdempotencyKey:   vi.fn(),
-  getProgrammeByCode:     vi.fn(),
   getLocationIdForArea:   vi.fn(),
   createDonation:         vi.fn(),
   getDonationById:        vi.fn(),
