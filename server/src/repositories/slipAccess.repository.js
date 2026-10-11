@@ -31,9 +31,11 @@ import pool from '../config/db.js';
 // leave the others behind — that is how an item list ends up on a
 // public endpoint.
 //
-// beneficiary_name falls back to the ECD's own name: picking_slips
-// carries its own denormalised copy, but it is nullable and most rows
-// have not got one.
+// beneficiary_name is the ECD's own name first, the same name the
+// worker's screen and every report show (COALESCE(e.name,
+// ps.beneficiary_name) elsewhere). picking_slips.beneficiary_name is a
+// nullable copy that only matters for a pallet with no ECD behind it,
+// such as a soup kitchen or community group, so it is the fallback.
 // dispatch_date is cast to text deliberately.
 //
 // node-postgres turns a `date` into a JS Date at LOCAL midnight, which
@@ -46,7 +48,7 @@ const PREVIEW_COLUMNS = `
   ps.dispatch_date::text AS dispatch_date,
   ps.status,
   ps.beneficiary_kind,
-  COALESCE(ps.beneficiary_name, e.name) AS beneficiary_name,
+  COALESCE(e.name, ps.beneficiary_name) AS beneficiary_name,
   (SELECT COUNT(*)::int FROM picking_slip_items i WHERE i.picking_slip_id = ps.id) AS item_count,
   (ps.assigned_volunteer_id IS NOT NULL OR ps.assigned_to IS NOT NULL) AS is_claimed`;
 

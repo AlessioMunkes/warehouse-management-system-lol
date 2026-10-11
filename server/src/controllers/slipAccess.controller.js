@@ -140,7 +140,7 @@ const flagItem = async (req, res) => {
   try {
     const data = await slipAccessService.flagItem(
       req.user, Number(req.params.id), Number(req.params.itemId),
-      { reason: req.body?.reason, packedQuantity: req.body?.packedQuantity },
+      { reason: req.body?.reason, packedQuantity: req.body?.packedQuantity, note: req.body?.note },
     );
     return res.status(200).json({ success: true, data });
   } catch (error) {

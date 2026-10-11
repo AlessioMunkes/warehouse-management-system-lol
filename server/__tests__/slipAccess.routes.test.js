@@ -452,6 +452,26 @@ describe('guest writes', () => {
     );
   });
 
+  it('passes an optional note through with the flag, trimmed', async () => {
+    const res = await request(app)
+      .post('/api/slip/132/items/1/flag')
+      .set('Cookie', authCookie(GUEST))
+      .send({ reason: 'Damaged stock', note: '  two tins dented  ' });
+
+    expect(res.status).toBe(200);
+    expect(pickingRepo.setItemStatus).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'flagged', note: 'two tins dented' }),
+    );
+  });
+
+  it('refuses a flag note over 500 characters', async () => {
+    const res = await request(app)
+      .post('/api/slip/132/items/1/flag')
+      .set('Cookie', authCookie(GUEST))
+      .send({ reason: 'Other', note: 'x'.repeat(501) });
+    expect(res.status).toBe(400);
+  });
+
   it('refuses a flag with no reason', async () => {
     const res = await request(app)
       .post('/api/slip/132/items/1/flag')
