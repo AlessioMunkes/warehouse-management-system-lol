@@ -83,7 +83,7 @@ const DecantingSheetPDF = ({ record, onClose }) => {
         <div className="pdfnote-toolbar-actions">
           {genError && <span className="pdfnote-toolbar-error">{genError}</span>}
           <button
-            onClick={handleViewPdf}
+            onClick={() => handleViewPdf(`decanting-sheet-${record.id}`)}
             disabled={isGenerating}
             className="btn-primary btn-sm"
           >

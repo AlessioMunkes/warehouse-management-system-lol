@@ -44,7 +44,7 @@ import useUndo from '../staff/useUndo';
 import { useAuth } from '../../context/AuthContext';
 import dispatchAPI, { newIdempotencyKey } from '../../services/dispatchAPI';
 import SignaturePad from '../receiving/SignaturePad';
-import DispatchNotePDF from './DispatchNotePDF';
+import DispatchNotePDF from '../receipts/DispatchNotePDF';
 
 const isManager = (user) => user?.role === 'manager' || user?.role === 'admin';
 

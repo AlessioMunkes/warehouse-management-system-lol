@@ -47,6 +47,7 @@ import {
   VIEWS, countViews, shiftWeek, todaySast, viewById, weekLabel, weekOf,
 } from '../features/pickingSlips/slipViews';
 import { useRecordCache } from '@/lib/recordCache';
+import { reservePdfTab } from '@/lib/pdfTab';
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
@@ -194,12 +195,11 @@ export default function PickingSlipManagementPage() {
     // Opened now, inside the click, and pointed at the PDF once it is
     // built. A window opened after the requests below is a pop-up as far
     // as the browser is concerned, and gets blocked.
-    const tab = window.open('', '_blank');
+    const tab = reservePdfTab('Preparing picking slips…');
     if (!tab) {
       setLabelError('Pop-up blocked — allow pop-ups for this site to open the slips.');
       return;
     }
-    try { tab.document.title = 'Preparing picking slips…'; } catch { /* another origin's blank page */ }
 
     setBusy(true);
     try {

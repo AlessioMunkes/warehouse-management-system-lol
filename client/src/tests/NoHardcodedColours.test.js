@@ -37,7 +37,7 @@ const ALLOWED = [
   // read oklch() — the reason these hold literal hex at all.
   'features/receipts/PdfShell.jsx',
   'features/receiving/DeliveryNotePDF.jsx',
-  'features/dispatch/DispatchNotePDF.jsx',
+  'features/receipts/DispatchNotePDF.jsx',
   'features/decanting/DecantingSheetPDF.jsx',
   'features/reporting/ImpactCalculatorPDF.jsx',
   'features/packing/palletLabelPdf.js',

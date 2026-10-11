@@ -473,26 +473,61 @@
     column-gap: 16px;
   }
 
+  /* Columns sized by what is in them, not six equal slices: equal
+     slices gave "Received" the same room as "Unit" and broke headers
+     and codes in the middle of a word (PRODUC/T, LENTIL/S). Words wrap
+     whole; only a stock code, which has no spaces, may break. */
   .pdf-table {
-    table-layout: fixed;
     font-size: 11px;
   }
 
   .pdf-table thead th,
   .pdf-table tbody td,
   .pdf-table-foot td {
-    padding-left: 6px;
-    padding-right: 6px;
-    overflow-wrap: anywhere;
+    padding-left: 5px;
+    padding-right: 5px;
+    overflow-wrap: break-word;
   }
 
   .pdf-table thead th {
-    font-size: 8px;
-    letter-spacing: 0.05em;
+    font-size: 7.5px;
+    letter-spacing: 0;
+    white-space: nowrap;
+  }
+
+  .pdf-table-sku {
+    font-size: 10px;
+    overflow-wrap: anywhere;
   }
 
   .pdf-signature-section {
     gap: 20px;
+  }
+}
+
+/* The narrowest phones (320 to 380px): six columns still have to fit. */
+@media (max-width: 380px) {
+  .pdf-document {
+    padding: 28px 12px;
+  }
+
+  .pdf-table {
+    font-size: 10px;
+  }
+
+  .pdf-table thead th,
+  .pdf-table tbody td,
+  .pdf-table-foot td {
+    padding-left: 3px;
+    padding-right: 3px;
+  }
+
+  .pdf-table thead th {
+    font-size: 7px;
+  }
+
+  .pdf-table-sku {
+    font-size: 9px;
   }
 }
 

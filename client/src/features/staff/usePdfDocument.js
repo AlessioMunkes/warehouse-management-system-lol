@@ -37,6 +37,7 @@ import jsPDF from 'jspdf';
 // variables directly. -pro is the actively maintained fork that added
 // support for the color spaces Tailwind v4 actually ships with.
 import html2canvas from 'html2canvas-pro';
+import { reservePdfTab, showPdf, releasePdfTab, A4_WIDTH_PX, EXPORT_WINDOW_WIDTH } from '../../lib/pdfTab';
 
 export default function usePdfDocument() {
   const documentRef = useRef(null);
@@ -45,8 +46,10 @@ export default function usePdfDocument() {
 
   // bloburl opens in the browser's own PDF viewer — no forced
   // download; the viewer can still save/print from there if needed.
-  const openPdf = async () => {
+  const openPdf = async (filename = 'document') => {
     if (!documentRef.current) return;
+    // Before anything is awaited: see lib/pdfTab.js.
+    const tab = reservePdfTab();
     setIsGenerating(true);
     setError('');
     try {
@@ -54,6 +57,15 @@ export default function usePdfDocument() {
 
       const canvas = await html2canvas(documentRef.current, {
         scale: 2, useCORS: true, backgroundColor: '#FFFFFF', logging: false,
+        // Laid out as the A4 page, not as the phone preview: without
+        // these a sheet exported on a phone was the narrow on-screen
+        // column blown up to fill the page.
+        windowWidth: EXPORT_WINDOW_WIDTH,
+        onclone: (clonedDoc, clonedElement) => {
+          clonedElement.style.setProperty('width', `${A4_WIDTH_PX}px`, 'important');
+          clonedElement.style.setProperty('max-width', 'none', 'important');
+          clonedElement.style.setProperty('box-sizing', 'border-box', 'important');
+        },
       });
 
       const pdf = new jsPDF('p', 'mm', 'a4');
@@ -94,12 +106,11 @@ export default function usePdfDocument() {
         pageIndex  += 1;
       }
 
-      const blobUrl = pdf.output('bloburl');
-      const opened  = window.open(blobUrl, '_blank');
-      if (!opened) {
-        setError('Pop-up blocked — allow pop-ups for this site to view the PDF.');
+      if (showPdf(pdf, tab, typeof filename === 'string' ? filename : 'document') === 'saved') {
+        setError('Pop-up blocked, so the PDF was downloaded instead.');
       }
     } catch (err) {
+      releasePdfTab(tab);
       console.error('PDF generation failed:', err);
       setError('Could not generate the PDF. Please try again.');
     } finally {

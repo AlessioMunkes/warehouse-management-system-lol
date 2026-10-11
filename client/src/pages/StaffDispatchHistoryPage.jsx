@@ -22,7 +22,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StaffShell from '../components/layout/StaffShell';
-import DispatchNotePDF from '../features/dispatch/DispatchNotePDF';
+import DispatchNotePDF from '../features/receipts/DispatchNotePDF';
 import { Notice } from '../features/staff/StepPrimitives';
 import dispatchAPI from '../services/dispatchAPI';
 import { STAFF } from '../routes/paths';

@@ -43,6 +43,7 @@ import jsPDF from 'jspdf';
 // colours receipts.css and Tailwind v4 both emit, which this shell walks
 // on every generation.
 import html2canvas from 'html2canvas-pro';
+import { reservePdfTab, showPdf, releasePdfTab, A4_WIDTH_PX, EXPORT_WINDOW_WIDTH } from '../../lib/pdfTab';
 
 // Colour functions html2canvas 1.4.1 cannot parse.
 const UNSUPPORTED = /(oklch|oklab|color-mix|\blab\(|\blch\()/i;
@@ -120,7 +121,7 @@ const prepareClonedPdfDocument = (clonedDoc) => {
   const pdfRoot = clonedDoc.querySelector('[data-pdf-root]');
   if (!pdfRoot) return;
 
-  pdfRoot.style.setProperty('width', '794px', 'important');
+  pdfRoot.style.setProperty('width', `${A4_WIDTH_PX}px`, 'important');
   pdfRoot.style.setProperty('max-width', 'none', 'important');
   pdfRoot.style.setProperty('box-sizing', 'border-box', 'important');
 
@@ -150,6 +151,8 @@ export default function PdfShell({ title, filename, onClose, children }) {
 
   const handleViewPdf = async () => {
     if (!documentRef.current) return;
+    // Before anything is awaited: see lib/pdfTab.js.
+    const tab = reservePdfTab();
     setIsGenerating(true);
     setGenError('');
     try {
@@ -158,6 +161,9 @@ export default function PdfShell({ title, filename, onClose, children }) {
         useCORS: true,
         backgroundColor: '#FFFFFF',
         logging: false,
+        // The phone-layout rules in receipts.css are for reading the
+        // preview on a phone. The PDF is laid out as the A4 page.
+        windowWidth: EXPORT_WINDOW_WIDTH,
         // Runs against html2canvas's internal clone, before it rasterises.
         // Mutating the clone leaves the visible page untouched.
         onclone: (clonedDoc) => {
@@ -184,12 +190,11 @@ export default function PdfShell({ title, filename, onClose, children }) {
         yPos += pageHeight;
       }
 
-      const blobUrl = pdf.output('bloburl');
-      const opened  = window.open(blobUrl, '_blank');
-      if (!opened) {
-        setGenError('Pop-up blocked. Allow pop-ups for this site, or use Print.');
+      if (showPdf(pdf, tab, filename) === 'saved') {
+        setGenError('Pop-up blocked, so the PDF was downloaded instead.');
       }
     } catch (err) {
+      releasePdfTab(tab);
       // The real message. When this failed on every record the UI said only
       // "please try again", which told nobody anything.
       console.error('PDF generation failed:', err);

@@ -218,6 +218,14 @@
   .pdfnote-doc-parties { flex-direction: column; }
   .pdfnote-doc-meta-box { width: 100%; }
   .pdfnote-signature-section { grid-template-columns: 1fr; }
+  /* The title and logo together were wider than a phone, which pushed
+     the logo off the page. */
+  .pdfnote-doc-header { gap: 12px; }
+  .pdfnote-doc-title { font-size: 28px; }
+  .pdfnote-doc-logo { max-width: 72px; max-height: 72px; }
+  /* The table ran a few pixels past the page at phone width. */
+  .pdfnote-table th { padding: 8px 6px; font-size: 10px; }
+  .pdfnote-table td { padding: 10px 6px; font-size: 12px; }
 }
 
 /* -- Variance on the items table ----------------------------------
