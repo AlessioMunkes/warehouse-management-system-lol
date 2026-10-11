@@ -7,6 +7,7 @@
 //   Help               how to do each job your role does
 //   Shortcuts          the keyboard shortcuts
 //   Change language…   warehouse staff only: the floor is what is translated
+//   Refresh cache      clear what this device has saved and load it again
 //   Log out
 //
 // Profile is read only on purpose. A name, email or role is changed by
@@ -25,6 +26,7 @@ import LanguagePicker from '../../features/staff/LanguagePicker';
 import { helpFor } from './helpContent';
 import { shortcutGroups } from './shortcuts';
 import useKeyboardShortcuts from './useKeyboardShortcuts';
+import { refreshCache } from '../../lib/refreshCache';
 
 const ROLE_LABELS = {
   warehouse_worker: 'Warehouse staff',
@@ -73,7 +75,20 @@ const itemClass =
 
 export default function AccountMenu({ user, onLogout }) {
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState(null);       // 'profile' | 'help' | 'shortcuts' | 'language'
+  const [view, setView] = useState(null);       // 'profile' | 'help' | 'shortcuts' | 'language' | 'refresh'
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState(null);
+
+  const runRefresh = async () => {
+    setRefreshing(true);
+    setRefreshError(null);
+    try {
+      await refreshCache();      // reloads the page when it is done
+    } catch (err) {
+      setRefreshError(err.message || 'Could not refresh. Try again.');
+      setRefreshing(false);
+    }
+  };
   const isWorker = user?.role === 'warehouse_worker';
 
   // ? opens the list of shortcuts from anywhere.
@@ -122,6 +137,7 @@ export default function AccountMenu({ user, onLogout }) {
             {isWorker ? (
               <button type="button" className={itemClass} onClick={() => show('language')}>Change language…</button>
             ) : null}
+            <button type="button" className={itemClass} onClick={() => { setRefreshError(null); show('refresh'); }}>Refresh cache</button>
           </div>
           <div className="border-t border-line pt-1">
             <button type="button" className={itemClass} onClick={() => { setOpen(false); onLogout(); }}>Log out</button>
@@ -211,6 +227,36 @@ export default function AccountMenu({ user, onLogout }) {
             <DialogDescription>The screens change as soon as you choose. It is saved to your account.</DialogDescription>
           </DialogHeader>
           <LanguagePicker />
+        </DialogContent>
+      </Dialog>
+      {/* ── Refresh cache ───────────────────────────────────── */}
+      <Dialog open={view === 'refresh'} onOpenChange={close}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Refresh cache</DialogTitle>
+            <DialogDescription>
+              Clears what this device has saved and loads everything again. Work waiting to send and half-filled forms are kept.
+            </DialogDescription>
+          </DialogHeader>
+          {refreshError ? <p role="alert" className="text-sm font-medium text-destructive">{refreshError}</p> : null}
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              className="rounded-[4px] border border-line px-4 py-2 text-sm font-semibold"
+              onClick={() => setView(null)}
+              disabled={refreshing}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="rounded-[4px] bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+              onClick={runRefresh}
+              disabled={refreshing}
+            >
+              {refreshing ? 'Refreshing' : 'Refresh'}
+            </button>
+          </div>
         </DialogContent>
       </Dialog>
     </>
