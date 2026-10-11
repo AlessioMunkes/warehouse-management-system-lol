@@ -28,17 +28,25 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { fetchMySlip, releaseMySlip } from '../../services/guestSlipAPI';
 import { useT } from '../../translations';
+import { useToast } from '../../components/ui/toastContext';
 
 export const useGuestSignOut = () => {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const t = useT();
+  const toast = useToast();
   const [phase, setPhase] = useState('idle');   // idle | checking | confirming | releasing | signingOut | checkFailed
   const [error, setError] = useState(null);
 
   const finish = async () => {
     setPhase('signingOut');
+    // Said in the language they were using, and worked out before the
+    // session (and their name with it) is gone. The toast lives above
+    // the routes, so it is still there on the page they land on.
+    const name = typeof user?.firstName === 'string' ? user.firstName.trim() : '';
+    const thanks = name ? t('guest.signOut.thanks', { name }) : t('guest.signOut.thanksPlain');
     navigate('/', { replace: true });
+    toast({ variant: 'success', title: thanks, description: t('guest.signOut.seeYou'), duration: 9000 });
     try {
       await logout();
     } finally {
