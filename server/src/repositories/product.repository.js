@@ -376,7 +376,39 @@ const getProductRoutingDefault = async (productId) => {
     WHERE d.product_id = $1 AND p.is_active = true;
   `;
   const result = await pool.query(query, [productId]);
-  return result.rows[0] || null;
+  if (result.rows[0]) return result.rows[0];
+
+  // Nobody has set a category for this product, but the recipes already
+  // say what it is: an ingredient on a recipe is recipe food. Without
+  // this every donated bag of soya mince or rice went to a manager to
+  // be told so, because only a handful of products had a saved category.
+  if (await isRecipeIngredient(productId)) {
+    return { product_id: Number(productId), donation_category: RECIPE_FOOD, inferred_from: 'recipe' };
+  }
+  return null;
+};
+
+// The donation category an ingredient on any recipe belongs to.
+const RECIPE_FOOD = 'recipe_food';
+
+// True when an active product is a line on a recipe. Read on the pool,
+// never inside a caller's transaction, and never fatal: a database
+// without the recipes tables simply has nothing to infer from.
+const isRecipeIngredient = async (productId) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT 1
+         FROM recipe_lines rl
+         JOIN products p ON p.id = rl.product_id
+        WHERE rl.product_id = $1 AND p.is_active = true
+        LIMIT 1`,
+      [productId],
+    );
+    return rows.length > 0;
+  } catch (err) {
+    console.error('[product] recipe membership not checked:', err.message);
+    return false;
+  }
 };
 
 /**
@@ -566,6 +598,7 @@ export default {
   searchProductsByName,
   getAllProductsWithDefaults,
   getProductRoutingDefault,
+  isRecipeIngredient,
   getPendingClassifications,
   upsertProductRoutingDefault,
   deleteProductRoutingDefault,

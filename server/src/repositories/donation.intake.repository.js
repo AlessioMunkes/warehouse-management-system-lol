@@ -8,6 +8,7 @@
 // - Retains core database queries for product master data, routing rules, and stock level upserts.
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
+import productRepo from './product.repository.js';
 /**
  * Fetches product details and its default donation category routing.
  * @param {Object} [client] - Optional database client for transaction scope
@@ -23,7 +24,13 @@ export const getProductWithRoutingDefault = async (client, productId) => {
     WHERE p.id = $1 AND p.is_active = true;
   `;
   const res = await dbClient.query(query, [productId]);
-  return res.rows[0] || null;
+  const product = res.rows[0] || null;
+  // Same rule as product.repository's getProductRoutingDefault: with no
+  // saved category, an ingredient on a recipe is recipe food.
+  if (product && !product.default_category && await productRepo.isRecipeIngredient(productId)) {
+    product.default_category = 'recipe_food';
+  }
+  return product;
 };
 
 /**

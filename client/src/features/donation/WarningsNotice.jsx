@@ -74,11 +74,19 @@ export function CompletionDialog({ open, result, onRecordAnother, onGoHome }) {
               </p>
               {result.awaitingItems?.map((it) => (
                 <p key={it.id} style={{ margin: "6px 0 0" }}>
-                  • {it.description || "Untitled item"} — {fmtQty(it.quantity, it.unit)}
+                  • {it.description || "Untitled item"}: {fmtQty(it.quantity, it.unit)}
                 </p>
               ))}
+              {/* The whole donation waits on a flagged item: nothing on
+                  it reaches stock until a manager has dealt with it. So
+                  this never says the rest "has been recorded", and it
+                  only mentions other items when there are some. */}
               <p style={{ margin: "6px 0 0" }}>
-                Everything else has been recorded. A manager will review the flagged items.
+                {(result.resolvedCount || 0) > 0
+                  ? "The other items are saved, but nothing goes into stock until a manager has reviewed the flagged items."
+                  : result.awaitingCount === 1
+                    ? "Nothing is in stock yet. A manager will review this item."
+                    : "Nothing is in stock yet. A manager will review these items."}
               </p>
             </div>
           </div>
