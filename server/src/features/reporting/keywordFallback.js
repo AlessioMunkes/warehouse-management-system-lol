@@ -17,6 +17,7 @@
 import { DATASETS } from './customQuery.js';
 import { METRICS, DIMENSIONS } from './reportCatalog.js';
 import { COMPARISONS } from './reportComparisons.js';
+import { periodFromQuestion } from './periods.js';
 
 export const MIN_SCORE = 3;
 
@@ -142,25 +143,25 @@ const scoreTerms = (q, terms) => {
 const iso = (d) => d.toISOString().slice(0, 10);
 const utc = (y, m, d) => new Date(Date.UTC(y, m, d));
 
-// "last month", "this year", "last 6 weeks"… else the ask box's
-// default of the last three months.
+// The period the question names (periods.js: today, yesterday, this
+// week, last 7 days, in September…), else the ask box's default of
+// the last three months.
 export const resolveDates = (question, todayISO) => {
-  const q = norm(question);
-  const [y, m, d] = todayISO.split('-').map(Number);
-  const today = utc(y, m - 1, d);
-  if (/ last month /.test(q)) return { from: iso(utc(y, m - 2, 1)), to: iso(utc(y, m - 1, 0)) };
-  if (/ this month /.test(q)) return { from: iso(utc(y, m - 1, 1)), to: todayISO };
-  if (/ this year /.test(q)) return { from: iso(utc(y, 0, 1)), to: todayISO };
-  if (/ last year /.test(q)) return { from: iso(utc(y - 1, 0, 1)), to: iso(utc(y - 1, 11, 31)) };
-  const n = / last (\d{1,2}) (week|month)s? /.exec(q);
-  if (n) {
-    const count = Number(n[1]);
-    const from = n[2] === 'week'
-      ? new Date(today.getTime() - count * 7 * 86400000)
-      : utc(y, m - 1 - count, d);
-    return { from: iso(from), to: todayISO };
-  }
+  const named = periodFromQuestion(question, todayISO);
+  if (named) return { from: named.from, to: named.to };
+  const [y, m] = todayISO.split('-').map(Number);
   return { from: iso(utc(y, m - 3, 1)), to: todayISO };
+};
+
+// A question about what came in AND what went out is one report, not
+// a choice between two: stock movements by type shows both side by
+// side. Without this the louder half of the question won, and "stock
+// received and dispatched today" came back as dispatch alone.
+const STOCK_IN  = / (received|receiving|receive|came in|come in|goods in|stock in|incoming|arrived) /;
+const STOCK_OUT = / (dispatched|dispatch|left the warehouse|leaving the warehouse|stock out|outgoing|sent out) /;
+export const asksInAndOut = (question) => {
+  const q = norm(synonyms(norm(question)));
+  return STOCK_IN.test(q) && STOCK_OUT.test(q);
 };
 
 export const matchQuestion = (question, todayISO) => {
@@ -181,6 +182,20 @@ export const matchQuestion = (question, todayISO) => {
     if (best && best.score >= 2) {
       return { kind: 'comparison', id: best.id, dateRange: resolveDates(question, todayISO), score: best.score, label: COMPARISONS[best.id].label };
     }
+  }
+
+  if (asksInAndOut(q) && METRICS.stock_movement_volume) {
+    return {
+      kind: 'report',
+      spec: {
+        metric: 'stock_movement_volume',
+        dimension: /\bproducts?|items?\b/.test(q) ? 'product' : 'movement_type',
+        filters: {},
+        dateRange: resolveDates(question, todayISO),
+      },
+      chartHint: CHART_WORDS.find(([re]) => re.test(q))?.[1],
+      score: MIN_SCORE,
+    };
   }
 
   let best = null;

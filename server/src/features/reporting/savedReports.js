@@ -9,7 +9,10 @@
 // Emails only contain totals, never names or contact details.
 // ─────────────────────────────────────────────────────────────
 export const SCHEDULES = ['none', 'weekly', 'monthly'];
-export const PRESETS = ['this_month', 'last_month', 'last_3m', 'last_6m', 'this_year'];
+export const PRESETS = [
+  'today', 'yesterday', 'this_week', 'last_week', 'last_7d', 'last_30d',
+  'this_month', 'last_month', 'last_3m', 'last_6m', 'this_year',
+];
 export const MAX_SAVED = 20;
 
 const iso = (d) => d.toISOString().slice(0, 10);
@@ -52,7 +55,15 @@ export const presetRange = (preset, todayISO) => {
   const t = parse(todayISO);
   const y = t.getUTCFullYear();
   const m = t.getUTCMonth();
+  const d = t.getUTCDate();
+  const monday = d - ((t.getUTCDay() + 6) % 7);          // Monday = 0
   switch (preset) {
+    case 'today':      return { from: todayISO, to: todayISO };
+    case 'yesterday':  return { from: iso(utc(y, m, d - 1)), to: iso(utc(y, m, d - 1)) };
+    case 'this_week':  return { from: iso(utc(y, m, monday)), to: todayISO };
+    case 'last_week':  return { from: iso(utc(y, m, monday - 7)), to: iso(utc(y, m, monday - 1)) };
+    case 'last_7d':    return { from: iso(utc(y, m, d - 6)), to: todayISO };
+    case 'last_30d':   return { from: iso(utc(y, m, d - 29)), to: todayISO };
     case 'this_month': return { from: iso(utc(y, m, 1)), to: todayISO };
     case 'last_month': return { from: iso(utc(y, m - 1, 1)), to: iso(utc(y, m, 0)) };
     case 'last_6m':    return { from: iso(utc(y, m - 5, 1)), to: todayISO };

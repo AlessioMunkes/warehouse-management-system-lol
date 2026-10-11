@@ -168,12 +168,12 @@ export default function ReportingPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const runComparisonById = async (id) => {
+  const runComparisonById = async (id, range) => {
     setBusy(true);
     setError(null);
     focusResult();
     try {
-      const res = await runComparison(id, resolvePreset(preset));
+      const res = await runComparison(id, range ?? resolvePreset(preset));
       showComparison(res.data ?? res);
     } catch (err) {
       setError(err.message);
@@ -208,14 +208,14 @@ export default function ReportingPage() {
     }
   };
 
-  const runCustomSpec = async (spec) => {
+  const runCustomSpec = async (spec, range) => {
     setMode('custom');
     setCustom(spec);
     setBusy(true);
     setError(null);
     focusResult();
     try {
-      const res = await runReport({ custom: spec, dateRange: resolvePreset(preset) });
+      const res = await runReport({ custom: spec, dateRange: range ?? resolvePreset(preset) });
       showReport(res.data ?? res);
     } catch (err) {
       setError(err.message);
@@ -224,11 +224,14 @@ export default function ReportingPage() {
     }
   };
 
+  // An alternative answers the same question, so it covers the same
+  // days as the answer it replaces: asked about today, it stays today.
   const pickAlternative = (a) => {
-    if (a.kind === 'comparison') return runComparisonById(a.id);
-    if (a.kind === 'custom') return runCustomSpec(a.custom);
+    const range = (report ?? comparison)?.spec?.dateRange ?? comparison?.dateRange ?? undefined;
+    if (a.kind === 'comparison') return runComparisonById(a.id, range);
+    if (a.kind === 'custom') return runCustomSpec(a.custom, range);
     setMode('prepared');
-    return runMetric(a.id);
+    return runMetric(a.id, undefined, range);
   };
 
   // FOCUS ON THE ANSWER
@@ -355,7 +358,7 @@ export default function ReportingPage() {
   // Browse all reports, and the ask box's "closest report" button:
   // pick a metric and run it straight away with its first breakdown
   // and the current period, so one tap gives an answer, not a form.
-  const runMetric = async (id, preferredDimension) => {
+  const runMetric = async (id, preferredDimension, range) => {
     const next = catalog?.metrics.find((m) => m.id === id);
     if (!next) return;
     const dim = next.dimensions.some((d) => d.id === preferredDimension)
@@ -369,7 +372,7 @@ export default function ReportingPage() {
     showReport(null);
     focusResult();
     try {
-      const res = await runReport({ metric: id, dimension: dim, filters: {}, dateRange: resolvePreset(preset) });
+      const res = await runReport({ metric: id, dimension: dim, filters: {}, dateRange: range ?? resolvePreset(preset) });
       showReport(res.data ?? res);
     } catch (err) {
       setError(err.message);

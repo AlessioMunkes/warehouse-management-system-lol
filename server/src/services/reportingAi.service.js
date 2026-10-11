@@ -16,7 +16,8 @@ import { buildTools, buildSystemPrompt } from '../features/reporting/toolSchema.
 import reportingService  from './reporting.service.js';
 import insightService    from './reportingInsight.service.js';
 import { CHART_VIEWS }   from '../features/reporting/toolSchema.js';
-import { matchQuestion, rankReports } from '../features/reporting/keywordFallback.js';
+import { matchQuestion, rankReports, asksInAndOut } from '../features/reporting/keywordFallback.js';
+import { singlePeriod }  from '../features/reporting/periods.js';
 import logRepo           from '../repositories/reportingLog.repository.js';
 import { DATASETS }      from '../features/reporting/customQuery.js';
 import { redactText }    from '../features/privacy/redact.js';
@@ -204,6 +205,13 @@ const askInner = async ({ question, userId }) => {
   // a near miss, and the manager is waiting.
   let lastError = null;
 
+  // The period the question names, worked out here. When there is
+  // exactly one ("today", "last week", "in September") it replaces the
+  // dates the model sent: a model that drifts to a wider range cannot
+  // answer a question about today with three months of figures.
+  const named = singlePeriod(question, todayISO);
+  const heldRange = named ? { from: named.from, to: named.to } : null;
+
   // The model gets the question with people, phone numbers, emails
   // and ID numbers taken out. Reports never need them, and this is
   // the last point before the question leaves our server.
@@ -256,7 +264,7 @@ const askInner = async ({ question, userId }) => {
         const a = call.args ?? {};
         const result = await insightService.runComparison({
           id: a.comparison,
-          dateRange: a.date_from && a.date_to ? { from: a.date_from, to: a.date_to } : undefined,
+          dateRange: heldRange ?? (a.date_from && a.date_to ? { from: a.date_from, to: a.date_to } : undefined),
         });
         await log('ok', { metric: `comparison:${result.id}`, spec: { comparison: result.id, dateRange: result.dateRange } });
         return { ...result, answeredByAI: true };
@@ -271,6 +279,7 @@ const askInner = async ({ question, userId }) => {
       try {
         const a = call.args ?? {};
         const spec = customArgsToSpec(a, todayISO);
+        if (heldRange && spec.dateRange) { spec.dateRange = heldRange; spec.defaultedRange = false; }
         const report = await reportingService.runReport(spec);
         await log('ok', { metric: report.spec.metric, spec: report.spec });
         return {
@@ -280,6 +289,7 @@ const askInner = async ({ question, userId }) => {
             ...report.meta,
             answeredByAI: true,
             defaultedRange: spec.defaultedRange || undefined,
+            period: heldRange && spec.dateRange ? named.label : undefined,
             chartHint: CHART_VIEWS.includes(a.chart_type) ? a.chart_type : undefined,
           },
         };
@@ -293,9 +303,19 @@ const askInner = async ({ question, userId }) => {
     if (call.name !== 'run_report') { lastError = `Unknown function: ${call.name}`; continue; }
 
     try {
-      const raw = argsToSpec(call.args);
+      let raw = argsToSpec(call.args);
+      // Asked for what came in AND what went out, the model sometimes
+      // answers half of it. Stock movements by type shows both, so a
+      // one-sided pick is widened to that; the dates are untouched.
+      if (asksInAndOut(question) && ['goods_received', 'dispatch_volume'].includes(raw.metric)
+        && catalog.metrics.some((m) => m.id === 'stock_movement_volume')) {
+        raw = { ...raw, metric: 'stock_movement_volume', dimension: 'movement_type', filters: {} };
+      }
       const { spec: cleaned, dropped } = stripUnsupportedFilters(raw, catalog);
-      const withRange = applyDefaultRange(cleaned, catalog, todayISO);
+      const ranged = catalog.metrics.find((m) => m.id === cleaned.metric)?.temporal !== 'snapshot';
+      const withRange = heldRange && ranged
+        ? { ...cleaned, dateRange: heldRange }
+        : applyDefaultRange(cleaned, catalog, todayISO);
       const report = await reportingService.runReport(withRange);
 
       await log('ok', { metric: report.spec.metric, spec: report.spec });
@@ -310,6 +330,8 @@ const askInner = async ({ question, userId }) => {
           // broader than the question, and the manager should know.
           droppedFilters: dropped.length ? dropped : undefined,
           defaultedRange: withRange.defaultedRange || undefined,
+          // The period read from the question itself, e.g. "today".
+          period: heldRange && ranged ? named.label : undefined,
           // Display only: how the manager asked to see it.
           chartHint: CHART_VIEWS.includes(call.args.chart_type) ? call.args.chart_type : undefined,
         },
