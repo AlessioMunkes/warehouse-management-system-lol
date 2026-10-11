@@ -676,8 +676,11 @@
     margin: 12mm;
   }
 
-  /* Everything except the note. #root holds the whole app. */
-  body > *:not(.pdf-modal) { display: none !important; }
+  /* Everything except the note. #root holds the whole app. Both note
+     shells are named: this file is loaded everywhere, so naming only
+     .pdf-modal hid the other shell's note as well and printed a blank
+     page. */
+  body > *:not(.pdf-modal):not(.pdfnote-modal) { display: none !important; }
 
   .pdf-modal {
     position: static !important;

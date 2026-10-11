@@ -214,6 +214,13 @@
 }
 
 @media (max-width: 640px) {
+  /* Three buttons and a title do not fit one row on a phone: Close was
+     pushed off the right edge. The title takes the first row and the
+     buttons the second, each on one line. */
+  .pdfnote-toolbar { flex-wrap: wrap; gap: 8px; }
+  .pdfnote-toolbar-title { flex: 1 1 100%; }
+  .pdfnote-toolbar-actions { flex: 1 1 100%; flex-wrap: wrap; gap: 8px; }
+  .pdfnote-toolbar-actions button { white-space: nowrap; }
   .pdfnote-document { padding: 32px 24px; }
   .pdfnote-doc-parties { flex-direction: column; }
   .pdfnote-doc-meta-box { width: 100%; }
@@ -246,3 +253,47 @@
   color: #6f6a5e;
 }
 .pdf-reason-row strong { color: #2b3336; font-weight: 600; }
+
+/* -- Printing ------------------------------------------------------
+   The Print button calls window.print(). On paper the note is the
+   page: no dimmed backdrop, no toolbar, no scrolling box, and the
+   sheet takes the width the page gives it. (Everything else on the
+   screen is hidden by the print rule in receipts.css, which names
+   this shell.) */
+@media print {
+  @page { size: A4 portrait; margin: 12mm; }
+
+  .pdfnote-modal {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    background: none !important;
+  }
+  .pdfnote-toolbar { display: none !important; }
+  .pdfnote-scroll-area {
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+  .pdfnote-document {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    /* Keep the red rule, the grey details box and the status colour:
+       they carry meaning, and browsers drop backgrounds to save ink. */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Break between rows, never through one, and keep a reason with its
+     line and the signatures with what they sign. */
+  .pdfnote-table       { page-break-inside: auto; }
+  .pdfnote-table tr    { page-break-inside: avoid; break-inside: avoid; }
+  .pdfnote-table thead { display: table-header-group; }
+  .pdf-reason-row      { page-break-before: avoid; }
+  .pdfnote-signature-section,
+  .pdfnote-doc-meta-box,
+  .pdfnote-doc-additional { page-break-inside: avoid; break-inside: avoid; }
+}

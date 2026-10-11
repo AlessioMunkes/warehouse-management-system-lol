@@ -4,7 +4,7 @@
 // The one layout every note in the system is printed in: delivery note,
 // dispatch note, decanting sheet. The dispatch note was the one people
 // liked, so this is that note with its contents taken out: the same
-// toolbar, the big title over a red rule, the warehouse and the other
+// toolbar (View PDF, Print, Close), the big title over a red rule, the warehouse and the other
 // party on the left, the grey details box on the right, the line of
 // additional information, a light table and the signatures.
 //
@@ -69,6 +69,11 @@ export default function NoteSheet({
           >
             {isGenerating ? 'GENERATING...' : '⤢ VIEW PDF'}
           </button>
+          {/* The browser's own printing, straight from this page. It does
+              not go through the PDF, so it works when the PDF cannot be
+              made, and on a phone it opens the print sheet. The print
+              rules are in deliveryNotePDF.css. */}
+          <button type="button" onClick={() => window.print()} className="btn-ghost">PRINT</button>
           <button type="button" onClick={onClose} className="btn-ghost">✕ CLOSE</button>
         </div>
       </div>
