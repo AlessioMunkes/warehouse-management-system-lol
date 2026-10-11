@@ -6,11 +6,12 @@
 // child of <body> under the class the print stylesheet keeps, because
 // that stylesheet hides everything else on the page.
 // ─────────────────────────────────────────────────────────────
+/* global process */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 
 vi.mock('jspdf', () => ({ default: vi.fn() }));
 vi.mock('html2canvas-pro', () => ({ default: vi.fn() }));
@@ -18,7 +19,7 @@ vi.mock('html2canvas-pro', () => ({ default: vi.fn() }));
 const { default: NoteSheet } = await import('../features/receipts/NoteSheet');
 // Read from disk: Vitest does not process stylesheets, so importing one
 // gives an empty string.
-const css = (name) => readFileSync(fileURLToPath(new URL(`../styles/${name}`, import.meta.url)), 'utf8');
+const css = (name) => readFileSync(resolve(process.cwd(), 'src/styles', name), 'utf8');
 const receiptsCss = css('receipts.css');
 const noteCss = css('deliveryNotePDF.css');
 
