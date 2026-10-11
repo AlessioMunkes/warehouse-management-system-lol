@@ -50,7 +50,7 @@ const fmtDateTime = (value) =>
     ? new Date(value).toLocaleString('en-ZA', {
         day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
       })
-    : '—';
+    : '-';
 
 // The phone-first equivalent of CommunityRequestForm.jsx — same
 // fields, same validation (itemsRequested is the only required one,

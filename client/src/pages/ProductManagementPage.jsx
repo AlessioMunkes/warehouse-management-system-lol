@@ -59,16 +59,16 @@ const COLUMNS = [
     cell: (p) => p.name },
   { key: 'sku',      label: 'SKU', weight: 2.2,
     sort: (p) => (p.sku ?? '').toLowerCase(),
-    cell: (p) => p.sku || '—' },
+    cell: (p) => p.sku || '-' },
   { key: 'category', label: 'Category', weight: 2, minWidth: 'sm',
     sort: (p) => (p.category ?? '').toLowerCase(),
-    cell: (p) => p.category || '—' },
+    cell: (p) => p.category || '-' },
   { key: 'unit',     label: 'Unit', weight: 1.2, minWidth: 'md',
     sort: (p) => (p.defaultUnit ?? '').toLowerCase(),
-    cell: (p) => p.defaultUnit || '—' },
+    cell: (p) => p.defaultUnit || '-' },
   { key: 'storage',  label: 'Storage', weight: 1.5, minWidth: 'lg',
     sort: (p) => (p.storageType ?? '').toLowerCase(),
-    cell: (p) => (p.storageType ? p.storageType.replace(/^./, (c) => c.toUpperCase()) : '—') },
+    cell: (p) => (p.storageType ? p.storageType.replace(/^./, (c) => c.toUpperCase()) : '-') },
   { key: 'cost',     label: 'Cost', weight: 1.6, minWidth: 'lg', numeric: true,
     // Sorts on the number and shows the currency. Null is "not priced",
     // which sorts last in both directions rather than reading as the
@@ -76,7 +76,7 @@ const COLUMNS = [
     sort: (p) => (p.unitCost ?? null),
     cellClass: 'text-center',
     cell: (p) => (p.unitCost === null || p.unitCost === undefined
-      ? '—'
+      ? '-'
       : `R ${p.unitCost.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`) },
   { key: 'perishable', label: 'Perishable', weight: 1.7, minWidth: 'lg',
     sort: (p) => (p.isPerishable ? 'yes' : 'no'),
@@ -119,8 +119,8 @@ const ProductDetail = ({ product, canManage, onEdit, onToggleActive, onRemove, o
     ) : null}
   >
     <dl className="grid gap-4 text-sm sm:grid-cols-2">
-      <div><dt className="text-muted-foreground">SKU</dt><dd>{product.sku || '—'}</dd></div>
-      <div><dt className="text-muted-foreground">Default unit</dt><dd>{product.defaultUnit || '—'}</dd></div>
+      <div><dt className="text-muted-foreground">SKU</dt><dd>{product.sku || '-'}</dd></div>
+      <div><dt className="text-muted-foreground">Default unit</dt><dd>{product.defaultUnit || '-'}</dd></div>
       <div>
         <dt className="text-muted-foreground">Weight</dt>
         <dd>{product.weightKg === null ? 'Not recorded' : `${product.weightKg} kg`}</dd>

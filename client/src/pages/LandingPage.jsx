@@ -591,7 +591,7 @@ const LandingPage = () => {
                 ) : (
                   <div key={c.id} className="lol-impact-stat">
                     <Icon name={c.icon} size={28} />
-                    <span className="lol-impact-value">—</span>
+                    <span className="lol-impact-value">-</span>
                     <span className="lol-impact-label">{c.label}</span>
                   </div>
                 )

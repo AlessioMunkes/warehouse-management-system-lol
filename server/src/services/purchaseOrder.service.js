@@ -189,7 +189,7 @@ const money = (value) =>
 const formatDate = (value) =>
   value
     ? new Date(value).toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' })
-    : '—';
+    : '-';
 
 // Matches the estimated_value convention in listPurchaseOrders: a
 // missing unit price counts as 0 rather than making the total unknown.
@@ -662,7 +662,7 @@ const updatePurchaseOrder = async (rawId, body, userId) => {
     if (result.code === 'not_found') throw fail(404, 'Purchase order not found.');
     if (result.code === 'not_editable') {
       throw fail(409,
-        `This purchase order is "${result.status}" and can no longer be edited — ` +
+        `This purchase order is "${result.status}" and can no longer be edited: ` +
         'only a pending order, not yet approved, can be changed.');
     }
     if (result.code === 'supplier_not_found') {
@@ -695,7 +695,7 @@ const deletePurchaseOrder = async (rawId, userId) => {
     if (result.code === 'not_found') throw fail(404, 'Purchase order not found.');
     if (result.code === 'not_deletable') {
       throw fail(409,
-        `This purchase order is "${result.status}" and can no longer be deleted — ` +
+        `This purchase order is "${result.status}" and can no longer be deleted: ` +
         'only a pending order, not yet approved, can be removed. Mark it Returned instead.');
     }
     if (result.code === 'has_deliveries') {

@@ -750,10 +750,10 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
               <p className="stf-summary-title">This run</p>
               <KeyValues
                 pairs={[
-                  ['Product', product ? product.name : '—'],
-                  ['Bulk amount', weighedKg ? `${weighedKg} kg` : '—'],
-                  ['Needed this week', requiredKg ? `${requiredKg} kg` : '—'],
-                  ['Decanted amount', plan ? `${madeTotal} bags` : '—'],
+                  ['Product', product ? product.name : '-'],
+                  ['Bulk amount', weighedKg ? `${weighedKg} kg` : '-'],
+                  ['Needed this week', requiredKg ? `${requiredKg} kg` : '-'],
+                  ['Decanted amount', plan ? `${madeTotal} bags` : '-'],
                   ['Spilled', wastageKg ? `${wastageKg} kg` : '0 kg'],
                   ['Filed under', `Week of ${longDate(weekOf)}`],
                 ]}
@@ -771,7 +771,7 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
             onOpen={mode === 'guided' ? openPanel('scale') : null}
             summary={
               weighedKg
-                ? `${weighedKg} kg bulk · ${requiredKg || '—'} kg needed`
+                ? `${weighedKg} kg bulk · ${requiredKg || '-'} kg needed`
                 : 'Not weighed yet'
             }
           >

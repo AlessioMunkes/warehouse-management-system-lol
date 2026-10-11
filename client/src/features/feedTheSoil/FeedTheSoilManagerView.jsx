@@ -52,16 +52,16 @@ const STATUS_LABELS = { assigned: 'Assigned', logged: 'Logged', dispatched: 'Dis
 // to a farm, green when it has gone — lib/statusStyles.js.
 
 const fmtDate = (value) =>
-  value ? new Date(value).toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+  value ? new Date(value).toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
 
 const fmtDateTime = (value) =>
   value
     ? new Date(value).toLocaleString('en-ZA', {
         year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
       })
-    : '—';
+    : '-';
 
-const fmtKg = (value) => (value === null || value === undefined ? '—' : `${Number(value).toLocaleString('en-ZA')} kg`);
+const fmtKg = (value) => (value === null || value === undefined ? '-' : `${Number(value).toLocaleString('en-ZA')} kg`);
 
 // Click a column name to sort by it. Status sorts in the order a kit
 // moves through (assigned → logged → dispatched), not alphabetically.
@@ -277,7 +277,7 @@ const LogPickKitPanel = ({ kits, isLoading, search, onSearch, onPick, onCancel }
               <TableRow key={k.id} className="cursor-pointer" onClick={() => onPick(k)}>
                 <TableCell className="font-medium">{formatKitCode(k.id)}</TableCell>
                 <TableCell>{k.owner_name}</TableCell>
-                <TableCell className="text-muted-foreground">{k.suburb || '—'}</TableCell>
+                <TableCell className="text-muted-foreground">{k.suburb || '-'}</TableCell>
                 <TableCell><KitStatus status={k.status} /></TableCell>
               </TableRow>
             ))}
@@ -359,7 +359,7 @@ const RecordDetail = ({ record, onDispatch, onOpenKit, onClose, backLabel }) => 
           </TableRow>
           <TableRow>
             <TableCell className="text-muted-foreground">Notes</TableCell>
-            <TableCell>{record.notes || '—'}</TableCell>
+            <TableCell>{record.notes || '-'}</TableCell>
           </TableRow>
           {record.status === 'dispatched' ? (
             <>
@@ -369,7 +369,7 @@ const RecordDetail = ({ record, onDispatch, onOpenKit, onClose, backLabel }) => 
               </TableRow>
               <TableRow>
                 <TableCell className="text-muted-foreground">Sent to</TableCell>
-                <TableCell>{record.dispatched_to || '—'}</TableCell>
+                <TableCell>{record.dispatched_to || '-'}</TableCell>
               </TableRow>
             </>
           ) : null}
@@ -620,7 +620,7 @@ export default function FeedTheSoilManagerView() {
                 <TableRow key={k.id} className="cursor-pointer" onClick={() => openKit(k.id)}>
                   <TableCell className="font-medium">{formatKitCode(k.id)}</TableCell>
                   <TableCell>{k.owner_name}</TableCell>
-                  <TableCell className="text-muted-foreground">{k.suburb || '—'}</TableCell>
+                  <TableCell className="text-muted-foreground">{k.suburb || '-'}</TableCell>
                   <TableCell><KitStatus status={k.status} /></TableCell>
                   <TableCell className="text-muted-foreground">{fmtDate(k.last_logged_at)}</TableCell>
                   <TableCell className="text-muted-foreground">{fmtDate(k.assigned_at)}</TableCell>

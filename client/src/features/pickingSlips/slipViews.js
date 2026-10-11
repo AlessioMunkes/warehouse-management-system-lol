@@ -38,7 +38,7 @@ const fmt = (day, opts) => parseDay(day).toLocaleDateString('en-ZA', { timeZone:
 export const weekLabel = ({ from, to }) =>
   `${fmt(from, { day: 'numeric', month: 'short' })} – ${fmt(to, { day: 'numeric', month: 'short', year: 'numeric' })}`;
 
-export const dayLabel = (day) => (day ? fmt(day, { weekday: 'short', day: 'numeric', month: 'short' }) : '—');
+export const dayLabel = (day) => (day ? fmt(day, { weekday: 'short', day: 'numeric', month: 'short' }) : '-');
 
 // ── State ─────────────────────────────────────────────────────
 export const slipState = (slip) => {

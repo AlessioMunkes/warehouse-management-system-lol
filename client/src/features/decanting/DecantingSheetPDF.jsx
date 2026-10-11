@@ -29,7 +29,7 @@ const WAREHOUSE = {
 };
 
 const formatDate = (d) => {
-  if (!d) return '—';
+  if (!d) return '-';
   return new Date(d).toLocaleDateString('en-ZA', {
     year: 'numeric', month: 'long', day: 'numeric',
   });
@@ -41,7 +41,7 @@ const formatDate = (d) => {
 const bagKg = (label) => (label.endsWith('kg') ? parseFloat(label) : parseFloat(label) / 1000);
 const bagLabelsOf = (bags) => Object.keys(bags || {}).sort((a, b) => bagKg(b) - bagKg(a));
 const bagSummaryOf = (bags) =>
-  bagLabelsOf(bags).map((label) => `${bags[label]} × ${label}`).join(', ') || '—';
+  bagLabelsOf(bags).map((label) => `${bags[label]} × ${label}`).join(', ') || '-';
 
 // 5%, same threshold DecantingFlow's own count-back screen warns at —
 // one number in one place would be worse than this repeating it, but
@@ -164,16 +164,16 @@ const DecantingSheetPDF = ({ record, onClose }) => {
               {lines.length ? (
                 lines.map((line, i) => (
                   <tr key={line.id ?? i}>
-                    <td className="pdfnote-table-product">{line.product_name || '—'}</td>
+                    <td className="pdfnote-table-product">{line.product_name || '-'}</td>
                     <td className="pdfnote-table-center">
-                      {line.actual_bulk_kg != null ? `${line.actual_bulk_kg} kg` : '—'}
+                      {line.actual_bulk_kg != null ? `${line.actual_bulk_kg} kg` : '-'}
                     </td>
                     <td className="pdfnote-table-center">
-                      {line.packed_kg != null ? `${line.packed_kg} kg` : '—'}
+                      {line.packed_kg != null ? `${line.packed_kg} kg` : '-'}
                     </td>
                     <td className="pdfnote-table-sku">{bagSummaryOf(line.bags)}</td>
                     <td className="pdfnote-table-center">
-                      {Number(line.wastage_kg || 0) > 0 ? `${line.wastage_kg} kg` : '—'}
+                      {Number(line.wastage_kg || 0) > 0 ? `${line.wastage_kg} kg` : '-'}
                     </td>
                   </tr>
                 ))

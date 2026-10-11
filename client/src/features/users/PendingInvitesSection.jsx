@@ -145,7 +145,7 @@ export default function PendingInvitesSection({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <p className="text-sm text-muted-foreground">
-            The link already sent will stop working immediately. This cannot be undone — send a new invite instead.
+            The link already sent will stop working immediately. This cannot be undone: send a new invite instead.
           </p>
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
             <Button type="button" variant="ghost" size="sm" onClick={() => setRevokeTarget(null)}>

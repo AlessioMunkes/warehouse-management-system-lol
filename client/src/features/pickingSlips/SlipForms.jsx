@@ -327,7 +327,7 @@ export function EditSlipForm({ slip, products, onSaved, onCancel }) {
 
   return (
     <Card>
-      <CardHeader><CardTitle>Edit slip — {slip.ecd_name}</CardTitle></CardHeader>
+      <CardHeader><CardTitle>Edit slip: {slip.ecd_name}</CardTitle></CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
           Editing locks once a packer claims the slip.

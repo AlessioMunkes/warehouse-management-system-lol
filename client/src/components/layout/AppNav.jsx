@@ -108,7 +108,7 @@ export const SidebarNav = ({ sections, pathname, homeTo, collapsed = false, onNa
       <Link
         to={homeTo}
         onClick={onNavigate}
-        aria-label={collapsed ? 'Batches — home' : undefined}
+        aria-label={collapsed ? 'Batches, home' : undefined}
         className={`mb-6 flex items-center ${collapsed ? 'justify-center px-0' : 'gap-2 px-2'}`}
       >
         <img src={batchesLogo} alt="" className="h-8 w-8 shrink-0 rounded-[4px] object-cover" />

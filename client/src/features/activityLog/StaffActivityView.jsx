@@ -56,7 +56,7 @@ const COLUMNS = [
     cell: (e) => <Badge variant="outline">{e.area}</Badge> },
   { key: 'role', label: 'Role', weight: 1.6, minWidth: 'lg',
     sort: (e) => e.actor?.role ?? '',
-    cell: (e) => (e.actor?.role ? ROLE_LABELS[e.actor.role] ?? e.actor.role : '—') },
+    cell: (e) => (e.actor?.role ? ROLE_LABELS[e.actor.role] ?? e.actor.role : '-') },
 ];
 
 const changesOf = (detail) => {
@@ -67,7 +67,7 @@ const changesOf = (detail) => {
     .slice(0, 8)
     .map((k) => ({ field: k.replace(/_/g, ' '), from: before[k], to: after[k] }));
 };
-const show = (v) => (v === null || v === undefined || v === '' ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v));
+const show = (v) => (v === null || v === undefined || v === '' ? '-' : typeof v === 'object' ? JSON.stringify(v) : String(v));
 
 function EntryDetail({ entry, onClose, onFilterPerson }) {
   const href = linkFor(entry.link);
@@ -95,7 +95,7 @@ function EntryDetail({ entry, onClose, onFilterPerson }) {
     >
       <dl className="grid gap-4 text-sm sm:grid-cols-2">
         <div><dt className="text-muted-foreground">Who</dt><dd>{entry.actor ? `${entry.actor.name} (${entry.actor.username})` : 'The system, automatically'}</dd></div>
-        <div><dt className="text-muted-foreground">Role</dt><dd>{entry.actor?.role ? ROLE_LABELS[entry.actor.role] ?? entry.actor.role : '—'}</dd></div>
+        <div><dt className="text-muted-foreground">Role</dt><dd>{entry.actor?.role ? ROLE_LABELS[entry.actor.role] ?? entry.actor.role : '-'}</dd></div>
         {entry.subject ? <div><dt className="text-muted-foreground">Record</dt><dd>{entry.subject}</dd></div> : null}
         {entry.detail?.reason ? <div><dt className="text-muted-foreground">Reason</dt><dd>{entry.detail.reason}</dd></div> : null}
       </dl>

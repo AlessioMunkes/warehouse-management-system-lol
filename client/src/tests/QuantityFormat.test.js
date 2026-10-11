@@ -28,8 +28,8 @@ describe('quantity formatting', () => {
   });
 
   it('shows a dash for nothing, and an empty box for an input', () => {
-    expect(fmtQty(null)).toBe('—');
-    expect(fmtQty('')).toBe('—');
+    expect(fmtQty(null)).toBe('-');
+    expect(fmtQty('')).toBe('-');
     expect(qtyInput(null)).toBe('');
     expect(qtyInput('1.000')).toBe('1');
   });

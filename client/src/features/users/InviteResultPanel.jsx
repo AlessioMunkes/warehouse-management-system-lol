@@ -68,7 +68,7 @@ const SendStatus = ({ email }) => {
   return (
     <p className="flex items-center gap-2 text-sm text-danger">
       <MailWarning className="size-4" />
-      {`Could not send the email${email?.error ? ` (${email.error})` : ''}. The link below still works — share it another way.`}
+      {`Could not send the email${email?.error ? ` (${email.error})` : ''}. The link below still works. Share it another way.`}
     </p>
   );
 };

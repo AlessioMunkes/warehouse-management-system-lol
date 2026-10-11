@@ -33,7 +33,7 @@ export const qty = (value) => {
 };
 
 // "1.000" → "1", "2.500" → "2.5", null → "—" (or the dash you pass).
-export const fmtQty = (value, unit, dash = '—') => {
+export const fmtQty = (value, unit, dash = '-') => {
   const n = qty(value);
   if (n === null) return dash;
   const text = Number.isInteger(n) ? String(n) : String(Number(n.toFixed(3)));

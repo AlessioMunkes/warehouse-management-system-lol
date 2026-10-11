@@ -172,7 +172,7 @@ export const callWithTools = async ({ systemPrompt, userMessage, tools }) => {
     throw fail(429, 'The AI assistant has hit its usage limit for now. Use the report builder below.', 'rate_limit');
   }
   if (last.status === 503 || last.status === 500) {
-    throw fail(503, 'The AI assistant is busy right now — this usually clears in a minute. Try again, or use the report builder below.', 'busy');
+    throw fail(503, 'The AI assistant is busy right now. This usually clears in a minute. Try again, or use the report builder below.', 'busy');
   }
   if (last.status === 504 || last.timedOut) {
     throw fail(504, 'The AI assistant took too long to respond. Try again, or use the report builder below.', 'timeout');

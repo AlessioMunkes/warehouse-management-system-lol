@@ -91,7 +91,7 @@ const COLUMNS = [
   { key: 'email',    label: 'Email', weight: 2.6, minWidth: 'md',
     sort: (u) => (u.email ?? '').toLowerCase(),
     cellClass: 'truncate',
-    cell: (u) => u.email || <span className="text-muted-foreground">—</span> },
+    cell: (u) => u.email || <span className="text-muted-foreground">-</span> },
   { key: 'role',     label: 'Role', weight: 1.6, minWidth: 'md',
     sort: (u) => (ROLE_LABELS[u.role] ?? u.role ?? '').toLowerCase(),
     cell: (u) => ROLE_LABELS[u.role] ?? u.role },
@@ -313,7 +313,7 @@ export default function UserDirectoryPage() {
       await loadInvites();
       toast(ok
         ? { variant: 'success', title: 'Link copied', description: `A fresh link for ${invite.email} is on your clipboard.` }
-        : { variant: 'error', title: 'Could not copy automatically', description: 'The new link is shown below — copy it from there.' });
+        : { variant: 'error', title: 'Could not copy automatically', description: 'The new link is shown below. Copy it from there.' });
     } catch (err) {
       toast({ variant: 'error', title: 'Could not create a new link', description: err.message });
     } finally { setInviteBusyId(null); }

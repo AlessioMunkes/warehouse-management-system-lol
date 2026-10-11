@@ -131,7 +131,7 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
         </div>
         <div>
           <p className="pdf-meta-label">Supplier</p>
-          <p className="pdf-meta-value">{delivery.supplier_name || '—'}</p>
+          <p className="pdf-meta-value">{delivery.supplier_name || '-'}</p>
         </div>
         <div>
           <p className="pdf-meta-label">Delivery date</p>
@@ -143,7 +143,7 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
         </div>
         <div>
           <p className="pdf-meta-label">Received by</p>
-          <p className="pdf-meta-value">{delivery.received_by_name || '—'}</p>
+          <p className="pdf-meta-value">{delivery.received_by_name || '-'}</p>
         </div>
         <div>
           {/* delivery_notes.driver_name exists but createDelivery has never
@@ -155,7 +155,7 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
         <div>
           <p className="pdf-meta-label">Purchase order</p>
           <p className="pdf-meta-value">
-            {delivery.po_number || `#${delivery.po_id || delivery.purchase_order_id || '—'}`}
+            {delivery.po_number || `#${delivery.po_id || delivery.purchase_order_id || '-'}`}
             {' · '}{isClosed ? 'Closed off' : 'Still open'}
           </p>
         </div>
@@ -184,12 +184,12 @@ const DeliveryNotePDF = ({ delivery, onClose }) => {
               return [
                 <tr key={key} className={v ? 'pdf-table-row--variance' : undefined}>
                   <td className="pdf-table-product">{item.product_name}</td>
-                  <td className="pdf-table-sku">{item.sku || '—'}</td>
+                  <td className="pdf-table-sku">{item.sku || '-'}</td>
                   <td className="pdf-table-center">{fmtQty(item.expected_quantity)}</td>
                   {!fromPO && (
                     <td className="pdf-table-center">{fmtQty(item.received_quantity)}</td>
                   )}
-                  <td className="pdf-table-center">{item.unit || '—'}</td>
+                  <td className="pdf-table-center">{item.unit || '-'}</td>
                   {!fromPO && (
                     <td className={`pdf-table-center ${v ? v.className : 'pdf-variance-none'}`}>
                       {v ? v.label : '0'}

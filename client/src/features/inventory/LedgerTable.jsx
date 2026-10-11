@@ -24,9 +24,9 @@ import {
 // Colour, fill and icon per movement type: lib/statusStyles.js (ledger).
 
 const fmtWhen = (iso) => {
-  if (!iso) return "—";
+  if (!iso) return "-";
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "-";
   // Africa/Johannesburg explicitly: a manager opening this from a
   // laptop still set to another timezone should see warehouse time,
   // which is also the timezone the server filtered on.
@@ -65,7 +65,7 @@ const Reference = ({ m }) => {
   }
   return (
     <span className="text-xs text-muted-foreground">
-      {REFERENCE_WORDS[m.referenceType] ?? (m.referenceType ? m.referenceType.replace(/_/g, " ") : "—")}
+      {REFERENCE_WORDS[m.referenceType] ?? (m.referenceType ? m.referenceType.replace(/_/g, " ") : "-")}
     </span>
   );
 };

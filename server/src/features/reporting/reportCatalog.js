@@ -200,7 +200,7 @@ export const METRICS = {
       'Estimated meals served, grouped by who received them: children (ECDs), adults ' +
       '(soup kitchens) or households (community requests). Converted from kilograms ' +
       'dispatched using the same factor meals enabled uses. Dignity kitchens are not ' +
-      'counted here — see the separate dignity kitchen estimate.',
+      'counted here. See the separate dignity kitchen estimate.',
     repoFn: 'mealsServedByGroup', unit: 'meals',
     dimensions: ['group_month', 'group', 'none', 'month', 'week', 'cohort'],
     filters: ['cohort'],
@@ -240,7 +240,7 @@ export const METRICS = {
     id: 'dignity_kitchen_served', label: 'Dignity kitchen guests served (estimate)', temporal: 'range',
     description:
       'Estimated guests served through dignity kitchens, converted from kilograms ' +
-      'dispatched using a factor the manager can edit — the same way adults reached ' +
+      'dispatched using a factor the manager can edit, the same way adults reached ' +
       'works for soup kitchens. Dignity kitchens keep no headcount of their own, so this ' +
       'is a rough aggregate estimate, never broken down by kitchen.',
     repoFn: 'dignityKitchenServed', unit: 'people',

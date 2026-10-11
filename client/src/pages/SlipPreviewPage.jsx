@@ -117,7 +117,7 @@ const SlipPreviewPage = () => {
     return (
       <GuestShell>
         <GuestScreen
-          title="First — what should we call you?"
+          title="First, what should we call you?"
           lede="So we can thank you at the end. That is the only reason we ask."
         >
           <PlaceBar items={[

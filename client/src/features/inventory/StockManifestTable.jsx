@@ -77,7 +77,7 @@ const fmtDay = (day) => (day
   ? new Date(`${day}T00:00:00Z`).toLocaleDateString('en-ZA', {
       day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
     })
-  : '—');
+  : '-');
 
 const exportFile = (label) => `inventory-${label}-${todaySast()}.csv`;
 

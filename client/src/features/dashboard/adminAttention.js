@@ -21,7 +21,7 @@ export const adminAttentionItems = (data) => {
   const gaps = products.filter((p) => p.isActive && (p.unitCost == null || p.weightKg == null)).length;
   return [
     { key: 'email', tone: 'bad', icon: Mail, count: gmail?.connected ? 0 : 1,
-      text: () => 'Email sending is off — certificates, reminders and Finance emails are not going out',
+      text: () => 'Email sending is off: certificates, reminders and Finance emails are not going out',
       to: ADMIN.emailIntegration },
     { key: 'donations', tone: 'warn', icon: Gift, count: donations ?? 0,
       text: (n) => `${plural(n, 'donation is', 'donations are')} waiting in the classification queue`,

@@ -110,7 +110,7 @@ export const readGrid = async (file) => {
     const grid = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {
       header: 1, blankrows: false, raw: false, defval: '',
     });
-    return { grid, sourceName: `${name} — ${sheetName}`, sheetNames: wb.SheetNames };
+    return { grid, sourceName: `${name}: ${sheetName}`, sheetNames: wb.SheetNames };
   }
 
   throw new Error(`Cannot read .${ext} files. Use CSV or Excel.`);

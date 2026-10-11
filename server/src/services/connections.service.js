@@ -79,7 +79,7 @@ const email = async () => {
   if (!gmail.working) {
     return {
       status: 'down',
-      summary: `${gmail.email} — Google no longer accepts it`,
+      summary: `${gmail.email}: Google no longer accepts it`,
       detail: gmail.error,
       fix: { label: 'Reconnect Gmail', section: 'email' },
     };
@@ -103,7 +103,7 @@ const assistant = async () => (aiEnabled()
   }
   : {
     status: 'off',
-    summary: 'Not set up — answers come from keyword matching',
+    summary: 'Not set up: answers come from keyword matching',
     detail: 'Add a GEMINI_API_KEY to the server to turn on the help assistant’s understanding and report questions.',
   });
 

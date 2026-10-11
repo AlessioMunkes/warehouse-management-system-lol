@@ -58,19 +58,19 @@ const fmtDay = (day) => (day
   ? new Date(`${day}T00:00:00Z`).toLocaleDateString('en-ZA', {
       day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
     })
-  : '—');
+  : '-');
 
 const fmtWhen = (iso) => {
-  if (!iso) return '—';
+  if (!iso) return '-';
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('en-ZA', {
+  return Number.isNaN(d.getTime()) ? '-' : d.toLocaleString('en-ZA', {
     day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
   });
 };
 
 const text = (v) => {
   const s = (v ?? '').toString().trim();
-  return s === '' ? '—' : s;
+  return s === '' ? '-' : s;
 };
 
 const Section = ({ title, note, children }) => (
@@ -279,11 +279,11 @@ export default function StockDetailPanel({
           <Fact label="Category"      value={text(product.category)} />
           <Fact label="Default unit"  value={text(product.defaultUnit || product.unit)} />
           <Fact label="Ledger unit"   value={text(product.unit)} />
-          <Fact label="Storage"       value={product.storageType ? product.storageType.charAt(0).toUpperCase() + product.storageType.slice(1) : '—'} />
-          <Fact label="Perishable"    value={product.isPerishable === undefined ? '—' : (product.isPerishable ? 'Yes' : 'No')} />
-          <Fact label="Weight"        value={product.weightKg === null || product.weightKg === undefined ? '—' : `${product.weightKg} kg`} />
+          <Fact label="Storage"       value={product.storageType ? product.storageType.charAt(0).toUpperCase() + product.storageType.slice(1) : '-'} />
+          <Fact label="Perishable"    value={product.isPerishable === undefined ? '-' : (product.isPerishable ? 'Yes' : 'No')} />
+          <Fact label="Weight"        value={product.weightKg === null || product.weightKg === undefined ? '-' : `${product.weightKg} kg`} />
           <Fact label="Cost per item" value={product.unitCost === null || product.unitCost === undefined
-            ? '—'
+            ? '-'
             : `R ${product.unitCost.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} />
         </dl>
       </Section>

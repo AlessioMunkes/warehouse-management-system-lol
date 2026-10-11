@@ -50,7 +50,7 @@ import { LogOut, Users } from 'lucide-react';
 
 // Minutes into something a person reads without doing arithmetic.
 const fmtDuration = (minutes) => {
-  if (minutes === null || minutes === undefined) return '—';
+  if (minutes === null || minutes === undefined) return '-';
   if (minutes < 60) return `${minutes} min`;
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
@@ -82,7 +82,7 @@ const COLUMNS = [
     cell: (v) => fmtDuration(v.minutesOnSite) },
   { key: 'source',    label: 'Source', weight: 1.8, minWidth: 'lg',
     sort: (v) => (v.source ?? '').toLowerCase(),
-    cell: (v) => v.source || '—' },
+    cell: (v) => v.source || '-' },
   { key: 'status',    label: '', sort: null, alwaysOn: true, weight: 1.8,
     cell: (v) => (v.signedOutAt ? null : <StatusBadge kind="visit" status="on_site">On site</StatusBadge>) },
 ];
@@ -110,7 +110,7 @@ const VisitDetail = ({ visit, busy, onSignOut, onClose }) => (
       <div><dt className="text-muted-foreground">Signed in</dt><dd>{fmtDateTime(visit.signedInAt)}</dd></div>
       <div><dt className="text-muted-foreground">Signed out</dt><dd>{fmtDateTime(visit.signedOutAt)}</dd></div>
       <div><dt className="text-muted-foreground">Time on site</dt><dd>{fmtDuration(visit.minutesOnSite)}</dd></div>
-      <div><dt className="text-muted-foreground">Source</dt><dd>{visit.source || '—'}</dd></div>
+      <div><dt className="text-muted-foreground">Source</dt><dd>{visit.source || '-'}</dd></div>
     </dl>
   </DetailPanel>
 );

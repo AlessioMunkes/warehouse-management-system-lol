@@ -21,7 +21,7 @@ const fmtDateTime = (value) =>
     ? new Date(value).toLocaleString('en-ZA', {
       year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
     })
-    : '—';
+    : '-';
 
 const Fact = ({ label, children }) => (
   <div>
@@ -100,7 +100,7 @@ export default function RequestDetailPanel({ request: r, onClose }) {
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{fmtQty(i.quantityApproved, i.unit)}</TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {confirmed ? fmtQty(i.quantityReleased, i.unit) : '—'}
+                      {confirmed ? fmtQty(i.quantityReleased, i.unit) : '-'}
                     </TableCell>
                   </TableRow>
                 ))}

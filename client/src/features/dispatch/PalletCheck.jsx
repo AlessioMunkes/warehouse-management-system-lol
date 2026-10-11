@@ -534,7 +534,7 @@ export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChan
                     {varied ? (
                       <Notice tone="warn">
                         That&rsquo;s different from what packing recorded. Saving still records the
-                        collection — a manager will see the difference.
+                        collection. A manager will see the difference.
                       </Notice>
                     ) : null}
                   </>

@@ -59,7 +59,7 @@ export function ReviewSummary({ draft }) {
             <span className="stf-row-meta">
               {draft.donorConsentGiven
                 ? [
-                  draft.donorName || "—",
+                  draft.donorName || "-",
                   draft.donorContact || draft.contactDetails || "No email",
                   "Section 18A requested",
                 ].join(" · ")
@@ -77,7 +77,7 @@ export function ReviewSummary({ draft }) {
             <div className="stf-row-main">
               <span className="stf-row-title">Section 18A donor details</span>
               <span className="stf-row-meta">
-                {draft.donorAddress || "No address"} · Tax ref: {draft.donorTaxReference || "—"} ·{" "}
+                {draft.donorAddress || "No address"} · Tax ref: {draft.donorTaxReference || "-"} ·{" "}
                 {draft.donorIdNumber || "No identification or registration number"}
               </span>
             </div>
@@ -87,7 +87,7 @@ export function ReviewSummary({ draft }) {
         <div className="stf-row is-static">
           <div className="stf-row-main">
             <span className="stf-row-title">Notes</span>
-            <span className="stf-row-meta">{draft.notes || "—"}</span>
+            <span className="stf-row-meta">{draft.notes || "-"}</span>
           </div>
         </div>
       </div>

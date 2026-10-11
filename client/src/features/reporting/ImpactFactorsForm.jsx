@@ -62,7 +62,7 @@ export default function ImpactFactorsForm() {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        The warehouse only ever weighs what left in kilograms — it never counts plates or
+        The warehouse only ever weighs what left in kilograms. It never counts plates or
         people directly. Every "meals," "adults" or "people served" number is that weight
         multiplied by the answer below. Change an answer and every report from today onward
         uses it; nothing already reported changes.

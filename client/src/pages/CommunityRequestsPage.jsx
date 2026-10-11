@@ -57,7 +57,7 @@ const fmtDateTime = (value) =>
         year: 'numeric', month: 'short', day: 'numeric',
         hour: '2-digit', minute: '2-digit',
       })
-    : '—';
+    : '-';
 
 const EMPTY = {
   pending:       'Nothing is waiting for approval.',
@@ -271,7 +271,7 @@ export default function CommunityRequestsPage() {
                       ) : null}
                     </TableCell>
                     <TableCell className="min-w-32 max-w-48 whitespace-pre-line text-muted-foreground">
-                      {r.quantityNote || '—'}
+                      {r.quantityNote || '-'}
                     </TableCell>
                     <TableCell className="min-w-36 whitespace-normal text-muted-foreground">
                       <button

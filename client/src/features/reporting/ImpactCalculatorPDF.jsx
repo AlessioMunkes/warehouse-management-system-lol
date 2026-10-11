@@ -102,7 +102,7 @@ const ImpactCalculatorPDF = ({ pdfStats, beneficiaryTypeStats, dateRange, onClos
                   <div className="pdf-poster-compare-head">
                     <span>{label}</span>
                     <span style={{ color: '#676767' }}>
-                      {!stat || stat.notReady || stat.error ? '—' : `${fmtNum(stat.value)} ${unit}`}
+                      {!stat || stat.notReady || stat.error ? '-' : `${fmtNum(stat.value)} ${unit}`}
                     </span>
                   </div>
                   <div className="pdf-poster-compare-track">

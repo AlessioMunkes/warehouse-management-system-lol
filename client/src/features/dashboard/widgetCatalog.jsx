@@ -236,13 +236,13 @@ export const WIDGETS = [
   }),
   report({
     id: 'compliance-trend', title: 'Collection compliance', roles: MANAGER_ONLY,
-    description: 'The share of scheduled collections that were actually collected — green at or above target, amber just under, red well under.',
+    description: 'The share of scheduled collections that were actually collected: green at or above target, amber just under, red well under.',
     spec: { metric: 'collection_compliance', dimension: 'month' }, hint: 'bar',
     rag: true,
   }),
   report({
     id: 'wastage-trend', title: 'Decanting wastage', roles: MANAGER_ONLY,
-    description: 'Wastage recorded while decanting — green within the limit, amber just over, red well over.',
+    description: 'Wastage recorded while decanting: green within the limit, amber just over, red well over.',
     spec: { metric: 'decanting_wastage', dimension: 'month' }, weekly: true, hint: 'bar',
     rag: true,
   }),
@@ -287,7 +287,7 @@ export const WIDGETS = [
     id: 'email-status', title: 'Email sending', roles: ADMIN_ONLY, needs: ['gmail'],
     description: 'Whether the account that sends certificates, reminders and Finance emails is connected.',
     render: ({ gmail }) => (
-      <StatTile image="email-sending-connected" label={gmail.connected ? 'Email sending connected' : 'Email sending is off — reconnect'}
+      <StatTile image="email-sending-connected" label={gmail.connected ? 'Email sending connected' : 'Email sending is off: reconnect'}
         value={gmail.connected ? 'On' : 'Off'} to={ADMIN.emailIntegration} alarm={!gmail.connected} />
     ),
   }),
@@ -400,7 +400,7 @@ export const WIDGETS = [
   }),
   report({
     id: 'spend-trend', title: 'Procurement spend', roles: ADMIN_ONLY, wide: true,
-    description: 'What was spent on purchase orders over time — the Finance view.',
+    description: 'What was spent on purchase orders over time, the Finance view.',
     spec: { metric: 'procurement_spend', dimension: 'month' }, hint: 'bar',
   }),
   {

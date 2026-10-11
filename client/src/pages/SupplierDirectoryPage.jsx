@@ -62,7 +62,7 @@ const TABS = [
 const fmtDate = (value) =>
   value
     ? new Date(value).toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' })
-    : '—';
+    : '-';
 
 // Same markup as the global fetch error banner in
 // InventoryManagementPage. One error style per app.
@@ -101,11 +101,11 @@ const SupplierDetail = ({ supplier, canManage, onEdit, onToggleActive, onRemove,
       ) : null}
     >
       <dl className="grid gap-4 text-sm sm:grid-cols-2">
-        <div><dt className="text-muted-foreground">Contact</dt><dd>{supplier.contactName || '—'}</dd></div>
-        <div><dt className="text-muted-foreground">Email</dt><dd className="break-words">{supplier.contactEmail || '—'}</dd></div>
-        <div><dt className="text-muted-foreground">Phone</dt><dd>{supplier.contactPhone || '—'}</dd></div>
+        <div><dt className="text-muted-foreground">Contact</dt><dd>{supplier.contactName || '-'}</dd></div>
+        <div><dt className="text-muted-foreground">Email</dt><dd className="break-words">{supplier.contactEmail || '-'}</dd></div>
+        <div><dt className="text-muted-foreground">Phone</dt><dd>{supplier.contactPhone || '-'}</dd></div>
         <div><dt className="text-muted-foreground">Agreement</dt><dd>{supplier.agreementRef || 'None on file'}</dd></div>
-        <div><dt className="text-muted-foreground">Payment terms</dt><dd>{supplier.paymentTerms || '—'}</dd></div>
+        <div><dt className="text-muted-foreground">Payment terms</dt><dd>{supplier.paymentTerms || '-'}</dd></div>
         <div>
           <dt className="text-muted-foreground">Expected lead time</dt>
           {/* null and 0 mean different things: "nobody recorded it"
@@ -234,23 +234,23 @@ const COLUMNS = [
     cell: (s) => s.name },
   { key: 'category', label: 'Category', weight: 2, minWidth: 'md',
     sort: (s) => (s.category ?? '').toLowerCase(),
-    cell: (s) => s.category || '—' },
+    cell: (s) => s.category || '-' },
   // The products a purchase order to this supplier may carry. A count
   // sorts; the names are what someone reads.
   { key: 'supplies', label: 'Products supplied', weight: 3, minWidth: 'md',
     sort: (s) => (s.suppliedProducts ?? []).length,
-    cell: (s) => suppliedText(s) || '—' },
+    cell: (s) => suppliedText(s) || '-' },
   { key: 'contact',  label: 'Contact', weight: 3, minWidth: 'sm',
     sort: (s) => (s.contactEmail ?? '').toLowerCase(),
-    cell: (s) => s.contactEmail || '—' },
+    cell: (s) => s.contactEmail || '-' },
   { key: 'phone',    label: 'Phone', weight: 2, minWidth: 'lg',
     sort: (s) => (s.contactPhone ?? '').toLowerCase(),
-    cell: (s) => s.contactPhone || '—' },
+    cell: (s) => s.contactPhone || '-' },
   // numeric, so 10 days sorts after 9 rather than before it, and a
   // supplier with no recorded lead time sorts last either way.
   { key: 'leadTime', label: 'Lead time', numeric: true, weight: 1.6, minWidth: 'lg',
     sort: (s) => (s.expectedLeadTimeDays ?? null),
-    cell: (s) => (s.expectedLeadTimeDays === null ? '—' : `${s.expectedLeadTimeDays} days`) },
+    cell: (s) => (s.expectedLeadTimeDays === null ? '-' : `${s.expectedLeadTimeDays} days`) },
   { key: 'status',   label: '', sort: null, alwaysOn: true, weight: 1.8,
     cell: (s) => (!s.isActive ? <StatusBadge kind="record" status="inactive">Inactive</StatusBadge> : null) },
 ];

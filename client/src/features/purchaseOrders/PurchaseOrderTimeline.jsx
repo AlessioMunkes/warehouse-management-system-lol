@@ -20,7 +20,7 @@ const fmtDateTime = (value) =>
     ? new Date(value).toLocaleString('en-ZA', {
         year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
       })
-    : '—';
+    : '-';
 
 const STATUS_ICON = {
   completed:          CheckCircle2,
@@ -74,7 +74,7 @@ export default function PurchaseOrderTimeline({ purchaseOrder: po }) {
       at: timeOf(d.recordedAt ?? d.deliveryDate),
       icon: Truck,
       tone: d.hasDiscrepancies ? 'text-brand border-brand' : 'text-ink border-ink',
-      title: d.hasDiscrepancies ? 'Delivery received — with a discrepancy' : 'Delivery received',
+      title: d.hasDiscrepancies ? 'Delivery received, with a discrepancy' : 'Delivery received',
       meta: `${d.receivedByName || 'Unknown'} · ${fmtDateTime(d.recordedAt ?? d.deliveryDate)}`,
     })),
   ];

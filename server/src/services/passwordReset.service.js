@@ -55,12 +55,12 @@ const composeResetEmail = (email, url) => {
     '',
     expiresLine,
     '',
-    "If you didn't ask for this, you can ignore this email — your password will not change.",
+    "If you didn't ask for this, you can ignore this email. Your password will not change.",
   ].join('\n');
   const html = `<p>Someone (hopefully you) asked to reset the password on this account.</p>`
     + `<p><a href="${url}">${url}</a></p>`
     + `<p>${expiresLine}</p>`
-    + `<p>If you didn't ask for this, you can ignore this email — your password will not change.</p>`;
+    + `<p>If you didn't ask for this, you can ignore this email. Your password will not change.</p>`;
   return {
     to: email,
     subject: "Reset your Ladles of Love Warehouse Management password",

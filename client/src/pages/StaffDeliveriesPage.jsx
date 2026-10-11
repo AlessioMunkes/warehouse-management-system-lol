@@ -50,7 +50,7 @@ const badgeFor = (delivery) => (
 );
 
 const formatDate = (value) =>
-  value ? new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+  value ? new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
 
 export default function StaffDeliveriesPage() {
   const navigate = useNavigate();

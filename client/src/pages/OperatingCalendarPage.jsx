@@ -289,7 +289,7 @@ export default function OperatingCalendarPage() {
                       <TableCell className="whitespace-nowrap tabular-nums">{fmtDay(c.date)}</TableCell>
                       <TableCell className="whitespace-normal font-medium">{c.label}</TableCell>
                       <TableCell><StatusBadge kind="closure" status={c.kind}>{KIND_LABEL[c.kind] ?? c.kind}</StatusBadge></TableCell>
-                      <TableCell className="text-muted-foreground">{cohort ? `${cohort.label} misses its collection` : '—'}</TableCell>
+                      <TableCell className="text-muted-foreground">{cohort ? `${cohort.label} misses its collection` : '-'}</TableCell>
                       <TableCell className="text-right">
                         <Button type="button" variant="ghost" size="icon-sm" aria-label={`Remove ${c.label} on ${fmtDay(c.date)}`}
                           onClick={() => setRemoving(c)}>

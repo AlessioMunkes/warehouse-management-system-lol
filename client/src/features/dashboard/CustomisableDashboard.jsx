@@ -194,7 +194,7 @@ function AddWidgetDialog({ open, onOpenChange, available, onAdd, size, replacing
   const blurb = replacing
     ? `Choose another ${SIZE_LABEL[size].toLowerCase()} widget to take its place.`
     : sized
-      ? `These fit the space you chose — ${SIZE_LABEL[size].toLowerCase()} widgets take ${SIZE_MEANS[size]}.`
+      ? `These fit the space you chose: ${SIZE_LABEL[size].toLowerCase()} widgets take ${SIZE_MEANS[size]}.`
       : 'Choose what to show on your dashboard. You can remove it again at any time.';
   const verb = replacing ? 'Use' : 'Add';
 

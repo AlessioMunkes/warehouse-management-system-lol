@@ -428,7 +428,7 @@ export const runCustom = async (spec, query) => {
   const { rows } = await query(sql, params);
   const ds = DATASETS[spec.custom.dataset];
   const m = ds.measures[spec.custom.measure];
-  const series = rows.map((r) => ({ label: r.label ?? '—', value: Number(r.value ?? 0) }));
+  const series = rows.map((r) => ({ label: r.label ?? '-', value: Number(r.value ?? 0) }));
   const total = series.reduce((s, r) => s + r.value, 0);
   const g0 = spec.custom.groupBy[0];
   return {

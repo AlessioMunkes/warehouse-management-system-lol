@@ -50,7 +50,7 @@ import PhotoStrip from '@/components/ui/photo-strip';
 const fmtDate = (value) =>
   value
     ? new Date(value).toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' })
-    : '—';
+    : '-';
 
 const fmtDateTime = (value) =>
   value
@@ -477,7 +477,7 @@ export default function PurchaseOrderDetail({
                       ) : null}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {line.unitPrice === null ? '—' : money(line.unitPrice)}
+                      {line.unitPrice === null ? '-' : money(line.unitPrice)}
                     </TableCell>
                   </TableRow>
                 );
@@ -513,7 +513,7 @@ export default function PurchaseOrderDetail({
           </AlertDialogHeader>
           <p className="text-sm text-muted-foreground">
             Nothing has been sent to the supplier or received against it yet.
-            This removes it for good — <span className="font-semibold text-foreground">cannot be undone.</span>
+            This removes it for good: <span className="font-semibold text-foreground">cannot be undone.</span>
           </p>
           <AlertDialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
             <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>

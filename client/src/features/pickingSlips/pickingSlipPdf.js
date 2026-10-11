@@ -147,9 +147,9 @@ const drawHeader = (pdf, slip, { origin, logo, warehouseName, continued }) => {
   // Pickup day · warehouse · week, in the paper slip's order.
   const week = weekNumberOf(slip);
   const facts = [
-    `Pickup Day: ${pickupDayOf(slip) || '—'}`,
+    `Pickup Day: ${pickupDayOf(slip) || '-'}`,
     `Warehouse: ${warehouseName}`,
-    `Week Number: ${week ? `Week ${week}` : '—'}`,
+    `Week Number: ${week ? `Week ${week}` : '-'}`,
   ];
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(10);

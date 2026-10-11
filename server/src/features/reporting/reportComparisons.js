@@ -99,7 +99,7 @@ export const COMPARISONS = {
     people: 'Packer',
     attention: { y: 'high' },
     actionTitle: 'Packers flagging more than average',
-    actionIntro: 'Check what these packers keep flagging — usually short or unsuitable stock on their slips, not their packing.',
+    actionIntro: 'Check what these packers keep flagging: usually short or unsuitable stock on their slips, not their packing.',
     lens: 'Pallets should be packed complete and on time; frequent flags point to stock problems reaching the packing floor, and a heavy workload on one person is a risk to getting pallets out.',
   },
 };

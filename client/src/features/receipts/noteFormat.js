@@ -30,10 +30,10 @@ export const calendarDay = (value) => {
 
 // A DATE column: 'YYYY-MM-DD', or a timestamp standing for one.
 export const formatDate = (value) => {
-  if (!value) return '—';
+  if (!value) return '-';
   const datePart = calendarDay(value);
   const [y, m, d] = datePart.split('-').map(Number);
-  if (!y || !m || !d) return '—';
+  if (!y || !m || !d) return '-';
   // Constructed as UTC and formatted as UTC — no shifting either way.
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-ZA', {
     year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC',
@@ -42,9 +42,9 @@ export const formatDate = (value) => {
 
 // A TIMESTAMPTZ column. Shown in warehouse time.
 export const formatDateTime = (value) => {
-  if (!value) return '—';
+  if (!value) return '-';
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '—';
+  if (Number.isNaN(d.getTime())) return '-';
   return d.toLocaleString('en-ZA', {
     year: 'numeric', month: 'short', day: 'numeric',
     hour: '2-digit', minute: '2-digit', timeZone: SAST,
@@ -53,10 +53,10 @@ export const formatDateTime = (value) => {
 
 // Short form for list rows.
 export const formatDateShort = (value) => {
-  if (!value) return '—';
+  if (!value) return '-';
   const datePart = calendarDay(value);
   const [y, m, d] = datePart.split('-').map(Number);
-  if (!y || !m || !d) return '—';
+  if (!y || !m || !d) return '-';
   return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-ZA', {
     year: '2-digit', month: 'short', day: 'numeric', timeZone: 'UTC',
   });

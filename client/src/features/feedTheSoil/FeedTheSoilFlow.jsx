@@ -50,16 +50,16 @@ import formatKitCode from './kitCode';
 import { todayISO } from '../packing/spareSlips';
 
 const fmtDate = (value) =>
-  value ? new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+  value ? new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
 
 const fmtDateTime = (value) =>
   value
     ? new Date(value).toLocaleString('en-ZA', {
         day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
       })
-    : '—';
+    : '-';
 
-const fmtKg = (value) => (value === null || value === undefined ? '—' : `${Number(value).toLocaleString('en-ZA')} kg`);
+const fmtKg = (value) => (value === null || value === undefined ? '-' : `${Number(value).toLocaleString('en-ZA')} kg`);
 
 const STATUS_LABEL = { assigned: 'Assigned', logged: 'Logged', dispatched: 'Dispatched' };
 
@@ -491,7 +491,7 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
             <KeyValues
               pairs={[
                 ['Name', selectedKit.owner_name],
-                ['Suburb', selectedKit.suburb || '—'],
+                ['Suburb', selectedKit.suburb || '-'],
                 ['Assigned', fmtDate(selectedKit.assigned_at)],
               ]}
             />
@@ -542,7 +542,7 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
               pairs={[
                 ['Kit', formatKitCode(selectedRecord.kit_id)],
                 ['Owner', selectedRecord.owner_name],
-                ['Suburb', selectedRecord.suburb || '—'],
+                ['Suburb', selectedRecord.suburb || '-'],
               ]}
             />
             <button
@@ -562,7 +562,7 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
           pairs={[
             ['Date collected', fmtDate(selectedRecord.logged_at)],
             ['Weight', fmtKg(selectedRecord.kg_compost)],
-            ['Notes', selectedRecord.notes || '—'],
+            ['Notes', selectedRecord.notes || '-'],
           ]}
         />
 
@@ -572,7 +572,7 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
             <KeyValues
               pairs={[
                 ['Dispatched', fmtDateTime(selectedRecord.dispatched_at)],
-                ['Sent to', selectedRecord.dispatched_to || '—'],
+                ['Sent to', selectedRecord.dispatched_to || '-'],
               ]}
             />
           </>

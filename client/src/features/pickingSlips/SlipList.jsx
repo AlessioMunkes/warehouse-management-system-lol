@@ -242,7 +242,7 @@ export default function SlipList({
                       </TableCell>
                     );
                     if (c.key === 'packer') return (
-                      <TableCell key={c.key} className="text-muted-foreground">{packers(slip) || '—'}</TableCell>
+                      <TableCell key={c.key} className="text-muted-foreground">{packers(slip) || '-'}</TableCell>
                     );
                     return (
                       <TableCell key={c.key} className="text-right tabular-nums">

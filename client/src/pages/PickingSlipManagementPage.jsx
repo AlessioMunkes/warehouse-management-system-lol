@@ -197,7 +197,7 @@ export default function PickingSlipManagementPage() {
     // as the browser is concerned, and gets blocked.
     const tab = reservePdfTab('Preparing picking slips…');
     if (!tab) {
-      setLabelError('Pop-up blocked — allow pop-ups for this site to open the slips.');
+      setLabelError('Pop-up blocked: allow pop-ups for this site to open the slips.');
       return;
     }
 
@@ -325,7 +325,7 @@ export default function PickingSlipManagementPage() {
               <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
               <span>
                 <strong>The QR codes on these slips will only work on this computer.</strong>{' '}
-                Please don’t print them for the warehouse — a volunteer scanning one
+                Please don’t print them for the warehouse: a volunteer scanning one
                 would not be able to open their pallet.
               </span>
             </p>

@@ -25,7 +25,7 @@ describe('noteFormat — a DATE column', () => {
   });
 
   it('shows a dash for nothing or nonsense', () => {
-    expect(formatDate(null)).toBe('—');
-    expect(formatDateShort('not a date')).toBe('—');
+    expect(formatDate(null)).toBe('-');
+    expect(formatDateShort('not a date')).toBe('-');
   });
 });

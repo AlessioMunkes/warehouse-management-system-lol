@@ -31,9 +31,9 @@ import { RotateCcw, ExternalLink, Archive } from 'lucide-react';
 
 const SAST = 'Africa/Johannesburg';
 const fmtDate = (value) => {
-  if (!value) return '—';
+  if (!value) return '-';
   const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric', timeZone: SAST });
+  return Number.isNaN(d.getTime()) ? '-' : d.toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric', timeZone: SAST });
 };
 
 // Amber: can be switched back on. Red: gone for good.
@@ -65,7 +65,7 @@ const COLUMNS = [
   { key: 'when', label: 'When', weight: 1.6, minWidth: 'md',
     sort: (x) => x.at ?? '', cell: (x) => fmtDate(x.at) },
   { key: 'by', label: 'By', weight: 1.8, minWidth: 'lg',
-    sort: (x) => (x.by ?? '').toLowerCase(), cell: (x) => x.by || '—' },
+    sort: (x) => (x.by ?? '').toLowerCase(), cell: (x) => x.by || '-' },
 ];
 
 function ItemDetail({ item, busy, onRestore, onClose }) {
@@ -92,7 +92,7 @@ function ItemDetail({ item, busy, onRestore, onClose }) {
     >
       <dl className="grid gap-4 text-sm sm:grid-cols-2">
         <div><dt className="text-muted-foreground">When</dt><dd>{fmtDate(item.at)}</dd></div>
-        <div><dt className="text-muted-foreground">By</dt><dd>{item.by || '—'}</dd></div>
+        <div><dt className="text-muted-foreground">By</dt><dd>{item.by || '-'}</dd></div>
       </dl>
       <p className="text-sm text-muted-foreground">
         {item.restorable

@@ -88,7 +88,7 @@ export const narrativeTool = {
 const SYSTEM_PROMPT = `You write short operational reports for the warehouse manager at Ladles of Love, a Cape Town food charity. You are given figures that have already been calculated from the warehouse database. Turn them into a clear, practical reading the manager can act on.
 
 WHAT THE OPERATION NEEDS (read the business view against these)
-- Every registered centre — ECD centres (creches), soup kitchens and dignity kitchens — gets its allocation on its
+- Every registered centre (ECD centres (creches), soup kitchens and dignity kitchens) gets its allocation on its
   collection day. A missed or short collection means children and families go without that week.
 - Stock goes out oldest and soonest-to-expire first, and nothing expires on the shelf. Low stock is reordered in time.
 - Deliveries match the purchase order; short or wrong deliveries are chased with the supplier.
@@ -416,7 +416,7 @@ export const writeComparisonNarrative = async (input) => {
   const back = (t) => (alias ? restore(t, alias.map) : t);
   const payload = {
     chart: {
-      type: 'scatter — one dot per item, two measures',
+      type: 'scatter: one dot per item, two measures',
       name: def.label,
       what_it_shows: def.about,
       x_axis: def.x, y_axis: def.y,

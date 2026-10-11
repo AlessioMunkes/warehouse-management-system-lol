@@ -51,7 +51,7 @@ const MAX_ATTEMPTS = 2;
 // mid-task, and each one still says whether waiting will help.
 const PROVIDER_MESSAGE = {
   rate_limit:    'I have answered a lot of questions this hour. Try the suggestions, or ask someone on the floor.',
-  busy:          'I am busy right now — this usually clears in a minute. Try again.',
+  busy:          'I am busy right now. This usually clears in a minute. Try again.',
   timeout:       'That took too long to come back. Try again.',
   unreachable:   'I cannot reach the help service right now. Check the connection.',
   model_missing: 'The help assistant is not set up correctly. Tell whoever looks after the system.',
@@ -104,7 +104,7 @@ export const ask = async ({ question, screen, userId, role }) => {
     throw fail(400, 'Type a few more words and I will have a better go at it.');
   }
   if (question.length > MAX_QUESTION) {
-    throw fail(400, 'That is a bit long for me — try asking it in a sentence.');
+    throw fail(400, 'That is a bit long for me. Try asking it in a sentence.');
   }
 
   const started = Date.now();

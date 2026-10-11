@@ -84,7 +84,7 @@ describe('the admin’s Needs attention', () => {
   it('lists what needs an admin, email first', () => {
     render(<MemoryRouter><NeedsAttention items={adminAttentionItems(data)} /></MemoryRouter>);
     expect(screen.getAllByRole('link').map((l) => l.textContent)).toEqual([
-      'Email sending is off — certificates, reminders and Finance emails are not going out',
+      'Email sending is off: certificates, reminders and Finance emails are not going out',
       '3 donations are waiting in the classification queue',
       '1 Section 18A certificate is ready to issue',
       '1 product has no cost or weight, so orders cannot estimate them',

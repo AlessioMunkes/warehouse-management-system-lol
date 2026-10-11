@@ -88,7 +88,7 @@ export const processDonationIntake = async ({
         [
           productId,
           quantityKg,
-          'Non-food donation received — requires manual review and storage placement.',
+          'Non-food donation received: requires manual review and storage placement.',
           resolvedStorageArea,
           receivedByUserId,
         ]

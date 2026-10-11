@@ -24,21 +24,21 @@ import useReconciliationQueue from './useReconciliation';
 import ErrorBanner from '@/components/ui/error-banner';
 
 const fmtValue = (value) => {
-  if (value === null || value === undefined || value === '') return '—';
+  if (value === null || value === undefined || value === '') return '-';
   return `R ${Number(value).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 const fmtDate = (value) =>
   value
     ? new Date(value).toLocaleString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-    : '—';
+    : '-';
 
 const STATUS_META = {
   commit_failed: { label: 'Commit failed' },
   commit_incomplete: { label: 'Commit incomplete' },
 };
 
-const statusMeta = (status) => STATUS_META[status] || { label: status || '—' };
+const statusMeta = (status) => STATUS_META[status] || { label: status || '-' };
 
 const failureTimestamp = (donation) =>
   donation.status === 'commit_failed' ? donation.commit_failed_at : donation.commit_incomplete_at;
@@ -66,7 +66,7 @@ const ReconciliationRow = ({ donation, busy, rowError, onRetry, actionLabel = 'R
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium text-ink">{donation.donor_name || '—'}</span>
+              <span className="text-sm font-medium text-ink">{donation.donor_name || '-'}</span>
               <Badge className="bg-warn-soft text-warn hover:bg-warn-soft">{meta.label}</Badge>
             </div>
             <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">

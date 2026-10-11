@@ -57,13 +57,13 @@ const fmtWhen = (iso) => (iso
   ? new Date(iso).toLocaleString('en-ZA', {
       timeZone: 'Africa/Johannesburg', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
     })
-  : '—');
+  : '-');
 
 // What the message was about. Not a link: the records messages are
 // about (purchase orders) live on manager screens, which an admin
 // cannot open.
 const About = ({ m }) => {
-  if (!m.relatedType || !m.relatedId) return <span className="text-muted-foreground">—</span>;
+  if (!m.relatedType || !m.relatedId) return <span className="text-muted-foreground">-</span>;
   const words = m.relatedType.replace(/_/g, ' ');
   return <span className="text-muted-foreground">{words.charAt(0).toUpperCase() + words.slice(1)} #{m.relatedId}</span>;
 };
@@ -91,8 +91,8 @@ function MessagePanel({ message: m, typeLabel, onClose }) {
         </div>
       ) : null}
       <dl className="grid gap-4 text-sm sm:grid-cols-2">
-        <div className="sm:col-span-2"><Fact label="Subject">{m.subject || '—'}</Fact></div>
-        <Fact label="To">{m.recipient || '—'}</Fact>
+        <div className="sm:col-span-2"><Fact label="Subject">{m.subject || '-'}</Fact></div>
+        <Fact label="To">{m.recipient || '-'}</Fact>
         <Fact label="Sent by">{m.sentByName || 'The system'}</Fact>
         <Fact label="About"><About m={m} /></Fact>
       </dl>
@@ -233,10 +233,10 @@ export default function MessageHistoryPage() {
                 <TableCell className="whitespace-nowrap pl-4 sm:pl-5 text-xs text-muted-foreground">{fmtWhen(m.attemptedAt)}</TableCell>
                 <TableCell className="max-w-[260px] whitespace-normal">
                   <span className="block font-medium">{typeLabel[m.type] ?? m.type}</span>
-                  <span className="block break-words text-xs text-muted-foreground">{m.subject || '—'}</span>
+                  <span className="block break-words text-xs text-muted-foreground">{m.subject || '-'}</span>
                 </TableCell>
                 {docked ? null : (
-                  <TableCell className="max-w-[200px] break-words whitespace-normal text-sm">{m.recipient || '—'}</TableCell>
+                  <TableCell className="max-w-[200px] break-words whitespace-normal text-sm">{m.recipient || '-'}</TableCell>
                 )}
                 <TableCell className="whitespace-normal">
                   <StatusBadge kind="message" status={m.status}>{STATUS_LABEL[m.status] ?? m.status}</StatusBadge>

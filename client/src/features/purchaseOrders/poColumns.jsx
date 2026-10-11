@@ -19,7 +19,7 @@ import { OPEN_PO_STATUSES, PO_STATUS_LABELS, needsFollowUp } from '@/services/pu
 const fmtDate = (value) =>
   value
     ? new Date(value).toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' })
-    : '—';
+    : '-';
 
 const money = (value) =>
   `R ${Number(value || 0).toLocaleString('en-ZA', {

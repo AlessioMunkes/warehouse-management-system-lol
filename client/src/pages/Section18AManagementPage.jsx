@@ -146,10 +146,10 @@ export default function Section18AManagementPage() {
     const v = String(emailType || '');
     if (v === 'THANK_YOU' || v === 'thank_you') return 'Thank you';
     if (v === 'SECTION_18A' || v === 'section18a_certificate') return 'Section 18A';
-    return v || '—';
+    return v || '-';
   };
-  const emailRecipientOf = (email) => email.recipient_email || email.recipientEmail || email.recipient || '—';
-  const emailDonationRefOf = (email) => email.donation_id ?? email.donationId ?? email.donationRef ?? email.donation_ref ?? '—';
+  const emailRecipientOf = (email) => email.recipient_email || email.recipientEmail || email.recipient || '-';
+  const emailDonationRefOf = (email) => email.donation_id ?? email.donationId ?? email.donationRef ?? email.donation_ref ?? '-';
   const emailSentAtOf = (email) => email.sent_at ?? email.sentAt ?? email.created_at ?? email.createdAt ?? null;
   const queueDonorOf = (item) => item.donorName || item.donor_name || '';
   const queueAmountOf = (item) => {
@@ -265,17 +265,17 @@ export default function Section18AManagementPage() {
                     ? new Date(item.received_at).toLocaleDateString()
                     : item.createdAt
                       ? new Date(item.createdAt).toLocaleDateString()
-                      : item.date || '—';
+                      : item.date || '-';
                   const formattedAmount = item.estimated_value_zar != null
                     ? `R${Number(item.estimated_value_zar).toFixed(2)}`
                     : item.amount != null
                       ? `R${item.amount}`
-                      : '—';
+                      : '-';
 
                   return (
                     <TableRow key={item.id}>
                       <TableCell className="font-medium">{item.reference || item.id}</TableCell>
-                      <TableCell>{item.donorName || item.donor_name || '—'}</TableCell>
+                      <TableCell>{item.donorName || item.donor_name || '-'}</TableCell>
                       <TableCell className="text-muted-foreground">{formattedDate}</TableCell>
                       <TableCell className="text-right tabular-nums">{formattedAmount}</TableCell>
                     </TableRow>
@@ -343,12 +343,12 @@ export default function Section18AManagementPage() {
                   return (
                     <TableRow key={email.id}>
                       <TableCell className="font-medium">{emailRecipientOf(email)}</TableCell>
-                      <TableCell>{email.donor_name || email.donorName || email.recipient_name || email.recipientName || '—'}</TableCell>
+                      <TableCell>{email.donor_name || email.donorName || email.recipient_name || email.recipientName || '-'}</TableCell>
                       <TableCell>{emailDonationRefOf(email)}</TableCell>
                       <TableCell><Badge variant="outline">{normaliseTypeLabel(email.email_type || email.emailType)}</Badge></TableCell>
-                      <TableCell className="max-w-[200px] truncate">{email.subject || '—'}</TableCell>
+                      <TableCell className="max-w-[200px] truncate">{email.subject || '-'}</TableCell>
                       <TableCell><StatusBadge tone={toneOf(statusConfig)} icon={statusConfig.icon}>{statusConfig.label}</StatusBadge></TableCell>
-                      <TableCell className="text-muted-foreground">{sentAt ? new Date(sentAt).toLocaleString() : '—'}</TableCell>
+                      <TableCell className="text-muted-foreground">{sentAt ? new Date(sentAt).toLocaleString() : '-'}</TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="sm" onClick={() => setConfirmResend(email)} disabled={actionLoading === `resend-${email.id}`}>
                           {actionLoading === `resend-${email.id}` ? <Loader2 className="animate-spin" /> : <Send />}Resend

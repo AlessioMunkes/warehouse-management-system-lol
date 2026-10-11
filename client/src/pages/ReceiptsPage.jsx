@@ -272,10 +272,10 @@ export default function ReceiptsPage() {
       // Its own column now, separate from the note ID. po_number is the
       // human reference (PO-2026-0007); purchase_order_id is the fallback for
       // any order raised before po_number was added.
-      render: (r) => r.po_number || (r.purchase_order_id ? `#${r.purchase_order_id}` : '—'),
+      render: (r) => r.po_number || (r.purchase_order_id ? `#${r.purchase_order_id}` : '-'),
     },
     { key: 'by',       header: 'Received by', sortKey: 'received_by_name',
-      render: (r) => r.received_by_name || '—' },
+      render: (r) => r.received_by_name || '-' },
     {
       key: 'status', header: 'Status', sortKey: 'status',
       render: (r) => (
@@ -312,7 +312,7 @@ export default function ReceiptsPage() {
     { key: 'cohort', header: 'Cohort',        sortKey: 'cohort',
       render: (r) => (r.cohort === 'thursday' ? 'Thursday' : 'Tuesday') },
     { key: 'driver', header: 'Driver',        sortKey: 'driver_name',
-      render: (r) => r.driver_name || '—' },
+      render: (r) => r.driver_name || '-' },
     {
       key: 'status', header: 'Outcome', sortKey: 'status',
       render: (r) => (

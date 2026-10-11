@@ -24,7 +24,7 @@ export const COHORT_FILTERS = [
 const fmtDate = (value) =>
   value
     ? new Date(value).toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' })
-    : '—';
+    : '-';
 
 export const BENEFICIARY_COLUMNS = [
   { key: 'name', label: 'Beneficiary', alwaysOn: true, weight: 3,
@@ -38,7 +38,7 @@ export const BENEFICIARY_COLUMNS = [
 
   { key: 'contact', label: 'Contact', weight: 2.4, minWidth: 'md',
     sort: (b) => (b.contactName ?? '').toLowerCase(),
-    cell: (b) => b.contactName || '—' },
+    cell: (b) => b.contactName || '-' },
 
   // Null is "nobody has recorded it", which is not zero — the
   // comparator in useTableView sorts nulls last in both directions
@@ -46,7 +46,7 @@ export const BENEFICIARY_COLUMNS = [
   { key: 'children', label: 'Children', weight: 1.6, minWidth: 'lg', numeric: true,
     sort: (b) => (b.childCount ?? null),
     cellClass: 'text-center',
-    cell: (b) => (b.childCount === null || b.childCount === undefined ? '—' : b.childCount) },
+    cell: (b) => (b.childCount === null || b.childCount === undefined ? '-' : b.childCount) },
 
   { key: 'lastCollected', label: 'Last collected', weight: 2.2, minWidth: 'lg', numeric: true,
     sort: (b) => (b.lastCollectedDate ? new Date(b.lastCollectedDate).getTime() : null),

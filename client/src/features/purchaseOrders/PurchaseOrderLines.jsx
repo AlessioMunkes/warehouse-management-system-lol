@@ -174,7 +174,7 @@ export default function PurchaseOrderLines({
                     <Input
                       type="number" min="0" step="0.001"
                       aria-label={`Expected weight for line ${index + 1}`}
-                      placeholder="—"
+                      placeholder="-"
                       value={line.expectedWeightKg}
                       onChange={(e) => relink(line.key, 'expectedWeightKg', e.target.value)}
                       disabled={disabled}
@@ -185,7 +185,7 @@ export default function PurchaseOrderLines({
                     <Input
                       type="number" min="0" step="0.01"
                       aria-label={`Line cost for line ${index + 1}`}
-                      placeholder="—"
+                      placeholder="-"
                       value={line.lineCost}
                       onChange={(e) => relink(line.key, 'lineCost', e.target.value)}
                       disabled={disabled}

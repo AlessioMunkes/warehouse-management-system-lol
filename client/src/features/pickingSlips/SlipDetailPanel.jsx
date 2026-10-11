@@ -94,16 +94,16 @@ export default function SlipDetailPanel({
     >
       <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Fact label="Packed" value={`${confirmed} of ${total}`} />
-        <Fact label="Flagged" value={flagged || '—'} />
-        <Fact label="Pallet ref" value={slip.pallet_ref || '—'} />
-        <Fact label="Children" value={slip.child_count ?? '—'} />
+        <Fact label="Flagged" value={flagged || '-'} />
+        <Fact label="Pallet ref" value={slip.pallet_ref || '-'} />
+        <Fact label="Children" value={slip.child_count ?? '-'} />
       </dl>
 
       <Section title="Who is packing it">
         <p className="mb-3 text-sm">
-          {slip.status === 'pending' ? 'Nobody yet — it is on the floor for anyone to claim, worker or guest. Assign it only to give it to one person.'
+          {slip.status === 'pending' ? 'Nobody yet: it is on the floor for anyone to claim, worker or guest. Assign it only to give it to one person.'
             : packers(slip) ? packers(slip)
-            : '—'}
+            : '-'}
         </p>
 
         {canAssign(slip) ? (

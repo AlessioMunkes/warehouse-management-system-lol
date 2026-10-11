@@ -37,7 +37,7 @@ const RANGES = [
 ];
 
 const formatDate = (value) =>
-  value ? new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+  value ? new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
 
 // One entry per terminal dispatch_events.status. `note` is whether a
 // dispatch note exists to open: nothing was loaded for the two that
@@ -165,7 +165,7 @@ export default function StaffDispatchHistoryPage() {
                 ) : (
                   /* No note exists for a pallet that never left — the
                      reason is what there is to show instead. */
-                  <span className="stf-row-meta">{row.override_reason || '—'}</span>
+                  <span className="stf-row-meta">{row.override_reason || '-'}</span>
                 )}
               </div>
             ))}

@@ -135,7 +135,7 @@ const DispatchNotePDF = ({ note, onClose }) => {
         </div>
         <div>
           <p className="pdf-meta-label">Beneficiary</p>
-          <p className="pdf-meta-value">{note.ecd_name || '—'}</p>
+          <p className="pdf-meta-value">{note.ecd_name || '-'}</p>
         </div>
         <div>
           <p className="pdf-meta-label">Type</p>
@@ -145,7 +145,7 @@ const DispatchNotePDF = ({ note, onClose }) => {
         </div>
         <div>
           <p className="pdf-meta-label">Children served</p>
-          <p className="pdf-meta-value">{note.child_count ?? '—'}</p>
+          <p className="pdf-meta-value">{note.child_count ?? '-'}</p>
         </div>
         <div>
           <p className="pdf-meta-label">Dispatch date</p>
@@ -157,19 +157,19 @@ const DispatchNotePDF = ({ note, onClose }) => {
         </div>
         <div>
           <p className="pdf-meta-label">Pallet</p>
-          <p className="pdf-meta-value">{note.pallet_ref || '—'}</p>
+          <p className="pdf-meta-value">{note.pallet_ref || '-'}</p>
         </div>
         <div>
           <p className="pdf-meta-label">Driver</p>
-          <p className="pdf-meta-value">{note.driver_name || '—'}</p>
+          <p className="pdf-meta-value">{note.driver_name || '-'}</p>
         </div>
         <div>
           <p className="pdf-meta-label">Vehicle</p>
-          <p className="pdf-meta-value">{note.vehicle_reg || '—'}</p>
+          <p className="pdf-meta-value">{note.vehicle_reg || '-'}</p>
         </div>
         <div>
           <p className="pdf-meta-label">Released by</p>
-          <p className="pdf-meta-value">{note.dispatched_by_name || '—'}</p>
+          <p className="pdf-meta-value">{note.dispatched_by_name || '-'}</p>
         </div>
       </div>
 
@@ -192,10 +192,10 @@ const DispatchNotePDF = ({ note, onClose }) => {
               return [
                 <tr key={line.id ?? i} className={v ? 'pdf-table-row--variance' : undefined}>
                   <td className="pdf-table-product">{line.product_name}</td>
-                  <td className="pdf-table-sku">{line.sku || '—'}</td>
+                  <td className="pdf-table-sku">{line.sku || '-'}</td>
                   <td className="pdf-table-center">{fmtQty(line.packed_quantity)}</td>
                   <td className="pdf-table-center">{fmtQty(line.loaded_quantity)}</td>
-                  <td className="pdf-table-center">{line.unit || '—'}</td>
+                  <td className="pdf-table-center">{line.unit || '-'}</td>
                   <td className={`pdf-table-center ${v ? v.className : 'pdf-variance-none'}`}>
                     {v ? v.label : '0'}
                   </td>
@@ -246,7 +246,7 @@ const DispatchNotePDF = ({ note, onClose }) => {
             <div className="pdf-signature-line" />
           )}
           <p className="pdf-signature-name">
-            {note.driver_name || '—'} · {formatDate(note.dispatch_date)}
+            {note.driver_name || '-'} · {formatDate(note.dispatch_date)}
           </p>
         </div>
         <div className="pdf-signature-block">
