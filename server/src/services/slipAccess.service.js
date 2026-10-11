@@ -292,7 +292,18 @@ const confirmItem = async (user, slipId, itemId, { packedQuantity: raw }) => {
   return result;
 };
 
-const flagItem = async (user, slipId, itemId, { reason, packedQuantity: raw }) => {
+// An optional word for staff on a flagged item. Saved to the same
+// packer_note column the worker's comment uses, under the same rule as
+// picking.service.js's cleanNote: trimmed, blank means none, 500 max.
+const cleanNote = (rawNote) => {
+  if (rawNote === undefined || rawNote === null) return undefined;
+  const note = String(rawNote).trim();
+  if (!note) return undefined;
+  if (note.length > 500) fail(400, 'That note is too long.');
+  return note;
+};
+
+const flagItem = async (user, slipId, itemId, { reason, packedQuantity: raw, note }) => {
   await requireOwnSlip(user, slipId);
   if (!reason || !String(reason).trim()) fail(400, 'Please say what the problem is.');
   // A flag may come with no count at all; one that is given is checked.
@@ -305,6 +316,7 @@ const flagItem = async (user, slipId, itemId, { reason, packedQuantity: raw }) =
     status: 'flagged',
     packedQuantity,
     flagReason: String(reason).trim(),
+    note: cleanNote(note),
     actor: volunteerActor(user),
     canOverride: false,
   });
