@@ -10,7 +10,7 @@
 // numbers a manager plans a week around, and both were only visible by
 // opening the row one at a time.
 // ─────────────────────────────────────────────────────────────
-import { Badge } from '@/components/ui/badge';
+import StatusBadge from '@/components/ui/status-badge';
 
 export const COHORT_LABELS = { tuesday: 'Tuesday', thursday: 'Thursday' };
 
@@ -57,8 +57,8 @@ export const BENEFICIARY_COLUMNS = [
   { key: 'status', label: '', sort: null, alwaysOn: true, weight: 2.4,
     cell: (b) => (
       <span className="flex flex-wrap justify-end gap-1">
-        {!b.approvedAt ? <Badge variant="outline">Unapproved</Badge> : null}
-        {!b.isActive ? <Badge variant="outline">Inactive</Badge> : null}
+        {!b.approvedAt ? <StatusBadge kind="record" status="unapproved">Unapproved</StatusBadge> : null}
+        {!b.isActive ? <StatusBadge kind="record" status="inactive">Inactive</StatusBadge> : null}
       </span>
     ) },
 ];

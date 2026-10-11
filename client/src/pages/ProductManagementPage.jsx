@@ -19,7 +19,6 @@ import useTableView        from '../features/masterdata/useTableView';
 import MasterDataTable     from '../features/masterdata/MasterDataTable';
 
 import { Button }    from '@/components/ui/button';
-import { Badge }     from '@/components/ui/badge';
 import { Skeleton }  from '@/components/ui/skeleton';
 import StatusBadge   from '@/components/ui/status-badge';
 import PageHeader, { PageShell } from '@/components/ui/page-header';
@@ -85,7 +84,7 @@ const COLUMNS = [
     sort: (p) => (p.isDecantable ? 'yes' : 'no'),
     cell: (p) => (p.isDecantable ? 'Yes' : 'No') },
   { key: 'status',   label: '', sort: null, alwaysOn: true, weight: 1.8,
-    cell: (p) => (!p.isActive ? <Badge variant="outline">Inactive</Badge> : null) },
+    cell: (p) => (!p.isActive ? <StatusBadge kind="record" status="inactive">Inactive</StatusBadge> : null) },
 ];
 
 // Same markup as the global fetch error banner in

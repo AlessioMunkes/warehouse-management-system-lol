@@ -17,7 +17,7 @@
 import { useState } from 'react';
 import { ChevronDown, Loader2, RefreshCw } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
+import StatusBadge from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -131,8 +131,8 @@ const IntakeFlagRow = ({ flag, busy, onResolve }) => {
       <CardHeader className="border-b border-line pb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge className="bg-chip text-ink hover:bg-chip">From a donation</Badge>
-            {isPlaceholder(flag) ? <Badge variant="outline">Placeholder</Badge> : null}
+            <StatusBadge kind="donationFlag" status="from_donation">From a donation</StatusBadge>
+            {isPlaceholder(flag) ? <StatusBadge kind="donationFlag" status="placeholder">Placeholder</StatusBadge> : null}
             <span className="text-sm font-medium text-ink">
               {flag.item_description || flag.name || 'Unnamed item'}
             </span>
@@ -175,9 +175,9 @@ const IntakeFlagRow = ({ flag, busy, onResolve }) => {
                     {fmtQty(item.quantity, item.unit)}
                   </span>
                   {item.status && item.status !== 'awaiting_resolution' ? (
-                    <Badge variant="outline" className="text-[10px]">
-                      {item.status}
-                    </Badge>
+                    <StatusBadge tone="neutral" className="text-[10px]">
+                      {String(item.status).replace(/_/g, ' ')}
+                    </StatusBadge>
                   ) : null}
                 </li>
               ))}
@@ -309,8 +309,8 @@ const LegacyFlagRow = ({ flag, busy, onResolve }) => {
       <CardHeader className="border-b border-line pb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge className="bg-warn-soft text-ink hover:bg-warn-soft">Standalone item</Badge>
-            {isPlaceholder(flag) ? <Badge variant="outline">Placeholder</Badge> : null}
+            <StatusBadge kind="donationFlag" status="standalone">Standalone item</StatusBadge>
+            {isPlaceholder(flag) ? <StatusBadge kind="donationFlag" status="placeholder">Placeholder</StatusBadge> : null}
             <span className="text-sm font-medium text-ink">
               {flag.name || 'Unnamed item'}
             </span>

@@ -11,7 +11,8 @@
 // The empty state is the point of this screen, so it is written as a
 // result rather than as an absence.
 // ─────────────────────────────────────────────────────────────
-import { Badge } from "@/components/ui/badge";
+import StatusBadge from '@/components/ui/status-badge';
+import { VARIANCE_STYLE } from '@/lib/statusStyles';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -82,9 +83,9 @@ export default function ReconciliationPanel({ data, isLoading }) {
                 <TableCell className="text-center font-mono text-sm">{fmt(r.balance)} {r.unit}</TableCell>
                 <TableCell className="text-center font-mono text-sm">{fmt(r.ledgerSum)}</TableCell>
                 <TableCell className="text-center">
-                  <Badge variant="outline" className="border-brand font-mono text-brand">
+                  <StatusBadge {...VARIANCE_STYLE} className="font-mono">
                     {r.variance > 0 ? "+" : ""}{fmt(r.variance)}
-                  </Badge>
+                  </StatusBadge>
                 </TableCell>
                 <TableCell className="text-center text-xs text-muted-foreground">
                   {r.movementCount}

@@ -6,7 +6,7 @@
 // out against what was approved. Older requests, logged before items
 // existed, show their free text and notes and no item list.
 // ─────────────────────────────────────────────────────────────
-import { Badge } from '@/components/ui/badge';
+import { SHORT_STYLE } from '@/lib/statusStyles';
 import StatusBadge from '@/components/ui/status-badge';
 import DetailPanel from '@/components/ui/detail-panel';
 import {
@@ -99,7 +99,7 @@ export default function RequestDetailPanel({ request: r, onClose }) {
                   <TableRow key={i.id}>
                     <TableCell className="whitespace-normal">
                       {i.productName}
-                      {i.shortAt ? <Badge variant="outline" className="ml-2">Short</Badge> : null}
+                      {i.shortAt ? <StatusBadge {...SHORT_STYLE} className="ml-2">Short</StatusBadge> : null}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{fmtQty(i.quantityApproved, i.unit)}</TableCell>
                     <TableCell className="text-right tabular-nums">

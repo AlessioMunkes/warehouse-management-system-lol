@@ -24,7 +24,7 @@
 // QuickBooks reference never carries over to the next order opened.
 // ─────────────────────────────────────────────────────────────
 import { useState } from 'react';
-import { Badge }  from '@/components/ui/badge';
+import { SHORT_STYLE } from '@/lib/statusStyles';
 import { Button } from '@/components/ui/button';
 import { Input }  from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -409,7 +409,7 @@ export default function PurchaseOrderDetail({
             <dd className="flex items-center gap-1">
               {/* Unlinked is the normal state until Finance has entered
                   the order, so it reads as neutral, not as a problem. */}
-              <StatusBadge tone="neutral" className="max-w-full whitespace-normal break-all">
+              <StatusBadge kind="accountsLink" status={po.quickbooksPoId ? 'linked' : 'unlinked'} className="max-w-full whitespace-normal break-all">
                 {po.quickbooksPoId ? `Linked to QuickBooks PO number ${po.quickbooksPoId}` : 'Not linked to QuickBooks yet'}
               </StatusBadge>
               {canManage ? (
@@ -473,7 +473,7 @@ export default function PurchaseOrderDetail({
                     <TableCell className="text-right tabular-nums">
                       {line.receivedToDate}
                       {outstanding > 0 && line.receivedToDate > 0 ? (
-                        <Badge variant="outline" className="ml-2">{outstanding} short</Badge>
+                        <StatusBadge {...SHORT_STYLE} className="ml-2">{outstanding} short</StatusBadge>
                       ) : null}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">

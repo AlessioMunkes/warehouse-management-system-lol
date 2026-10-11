@@ -18,10 +18,11 @@
 // share all three.
 // ─────────────────────────────────────────────────────────────
 import {
-  AlarmClock, Ban, Check, BadgeCheck, CalendarCheck, CalendarClock, CalendarX, CheckCheck, CircleDashed,
-  CircleOff, CircleX, ClipboardList, DoorOpen, Clock, FileCheck, Flag, Forward, Gift, History, House, Lock,
-  LogOut, Megaphone, PackageCheck, PackageOpen, PencilLine, Scale, SlidersHorizontal, Split, Trash2,
-  Send, TriangleAlert, Truck, Undo2,
+  AlarmClock, Ban, Check, BadgeCheck, Boxes, CalendarCheck, CalendarClock, CalendarX, CheckCheck, CircleDashed,
+  CircleOff, CircleX, ClipboardList, DoorOpen, Clock, FileCheck, Flag, Forward, Gift, HeartHandshake, History,
+  House, Link2, Lock, LogOut, Megaphone, PackageCheck, PackageOpen, PackagePlus, PencilLine, Scale, ShieldCheck,
+  ShoppingCart, SlidersHorizontal, Split, Sprout, Trash2, Send, TriangleAlert, Truck, Undo2, Unlink, UserCheck,
+  Users,
 } from 'lucide-react';
 
 const s = (tone, icon, strong = false) => ({ tone, icon, strong });
@@ -140,10 +141,78 @@ export const STATUS_STYLES = {
   // a product, a supplier. Active is the normal case, so it is quiet;
   // inactive is the one worth a glance.
   record: {
-    active:   s('neutral', Check),
-    inactive: s('warn', CircleOff),
+    active:     s('neutral', Check),
+    inactive:   s('warn', CircleOff),
+    unapproved: s('warn', Clock),                         // waiting on a sign-off
+  },
+  // Admin, Archive: amber can be switched back on, red is gone for good.
+  archive: {
+    deactivated: s('warn', CircleOff),
+    deleted:     s('bad', Trash2),
+  },
+  // Activity log: which part of the warehouse an entry belongs to,
+  // keyed by the name the server sends. Not a status, so the colour
+  // groups instead of judging: blue is goods coming in, amber is
+  // stock being handled, green is food and people going out, grey is
+  // the system itself.
+  activityArea: {
+    Purchasing:            s('info', ShoppingCart),
+    Receiving:             s('info', PackagePlus),
+    Donations:             s('info', Gift),
+    Stock:                 s('warn', Boxes),
+    Decanting:             s('warn', Split),
+    Packing:               s('good', ClipboardList),
+    Dispatch:              s('good', Truck),
+    'Benevolent requests': s('good', HeartHandshake),
+    'Feed the Soil':       s('good', Sprout),
+    Volunteers:            s('good', Users),
+    Admin:                 s('neutral', ShieldCheck),
+  },
+  // A supplier the buyer is still talking to (Suppliers, prospects).
+  prospect: {
+    open:      s('neutral', CircleDashed),
+    contacted: s('info', Send),
+    rejected:  s('bad', CircleX),
+    converted: s('good', CheckCheck, true),
+  },
+  // A volunteer's booking on an event, and whether they turned up.
+  booking: {
+    CONFIRMED:  s('good', Check),
+    CANCELLED:  s('neutral', Ban),
+    checked_in: s('good', UserCheck, true),
+  },
+  // The booking system's last sync for an event.
+  sync: {
+    SYNCED:  s('good', CheckCheck),
+    PENDING: s('neutral', Clock),
+    FAILED:  s('bad', CircleX, true),
+  },
+  timeslot: {
+    OPEN:      s('good', DoorOpen),
+    FULL:      s('warn', Users),
+    CLOSED:    s('neutral', Lock),
+    CANCELLED: s('neutral', Ban),
+  },
+  // A donation that did not finish saving (Donations, reconciliation).
+  donationCommit: {
+    commit_incomplete: s('warn', TriangleAlert),
+    commit_failed:     s('bad', CircleX, true),
+  },
+  // Where a flagged donated item came from.
+  donationFlag: {
+    from_donation: s('info', Gift),
+    standalone:    s('warn', PackageOpen),
+    placeholder:   s('neutral', CircleDashed),
+  },
+  // A purchase order's link to the accounts system.
+  accountsLink: {
+    linked:   s('good', Link2),
+    unlinked: s('neutral', Unlink),
   },
 };
+
+// "3 short" beside a line: less arrived, or is set aside, than was asked.
+export const SHORT_STYLE = s('warn', TriangleAlert);
 
 // A "N variances" tag beside a status, not a status itself.
 export const VARIANCE_STYLE = s('warn', Scale);

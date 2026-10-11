@@ -27,6 +27,14 @@ describe('status styles', () => {
     }
   });
 
+  // A list where some statuses have a picture and some do not reads as
+  // unfinished, and the picture is what carries a status without colour.
+  it('draws every status with an icon', () => {
+    for (const [kind, styles] of Object.entries(STATUS_STYLES)) {
+      for (const [status, st] of Object.entries(styles)) expect(st.icon, `${kind}.${status}`).toBeTruthy();
+    }
+  });
+
   it('gives each status in a list its own icon', () => {
     for (const [kind, styles] of Object.entries(STATUS_STYLES)) {
       const icons = Object.values(styles).map((st) => st.icon);

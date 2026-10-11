@@ -60,7 +60,7 @@ const BeneficiaryDetail = ({ beneficiary, canManage, onEdit, onToggleActive, onA
     eyebrow={`${COHORT_LABELS[beneficiary.cohort] ?? beneficiary.cohort} cohort`}
     title={beneficiary.name}
     badges={!beneficiary.approvedAt || beneficiary.isActive === false ? <>
-      {beneficiary.approvedAt ? null : <StatusBadge kind="record" status="inactive">Awaiting approval</StatusBadge>}
+      {beneficiary.approvedAt ? null : <StatusBadge kind="record" status="unapproved">Awaiting approval</StatusBadge>}
       {beneficiary.isActive === false ? <StatusBadge kind="record" status="inactive">Inactive</StatusBadge> : null}
     </> : null}
     actions={canManage ? (

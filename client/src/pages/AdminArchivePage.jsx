@@ -38,7 +38,7 @@ const fmtDate = (value) => {
 
 // Amber: can be switched back on. Red: gone for good.
 const StateBadge = ({ state }) => (
-  <StatusBadge tone={state === 'deleted' ? 'bad' : 'warn'}>{state === 'deleted' ? 'Deleted' : 'Deactivated'}</StatusBadge>
+  <StatusBadge kind="archive" status={state === 'deleted' ? 'deleted' : 'deactivated'}>{state === 'deleted' ? 'Deleted' : 'Deactivated'}</StatusBadge>
 );
 
 const RESTORE = {

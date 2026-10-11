@@ -33,7 +33,7 @@ import {
   CardHeader,
   CardTitle,
 } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
+import StatusBadge from '../components/ui/status-badge';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -240,8 +240,8 @@ export default function GmailSettingsPage({ embedded = false } = {}) {
             </CardDescription>
             <CardAction>
               {connected
-                ? <Badge className="bg-good-soft text-good hover:bg-good-soft">Connected</Badge>
-                : <Badge variant="outline" className="border-danger text-danger">Not connected</Badge>}
+                ? <StatusBadge kind="connection" status="ok">Connected</StatusBadge>
+                : <StatusBadge kind="connection" status="down">Not connected</StatusBadge>}
             </CardAction>
           </CardHeader>
           <CardContent className="space-y-4">

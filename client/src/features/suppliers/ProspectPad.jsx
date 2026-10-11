@@ -23,17 +23,17 @@ import {
 import { Field, FieldGroup } from '@/components/ui/field';
 import { Button }            from '@/components/ui/button';
 import { Input }             from '@/components/ui/input';
-import { Badge }             from '@/components/ui/badge';
+import StatusBadge       from '@/components/ui/status-badge';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Plus, ChevronDown, ChevronUp, UserPlus, PhoneCall, Ban, Trash2,
 } from 'lucide-react';
 
-const STATUS_VARIANT = {
-  open:      'secondary',
-  contacted: 'default',
-  rejected:  'outline',
-  converted: 'outline',
+const STATUS_LABEL = {
+  open:      'Open',
+  contacted: 'Contacted',
+  rejected:  'Rejected',
+  converted: 'Converted',
 };
 
 export default function ProspectPad({
@@ -136,7 +136,7 @@ export default function ProspectPad({
                     ) : null}
                     {p.notes ? <p className="mt-2 text-sm">{p.notes}</p> : null}
                   </div>
-                  <Badge variant={STATUS_VARIANT[p.status] ?? 'secondary'}>{p.status}</Badge>
+                  <StatusBadge kind="prospect" status={p.status}>{STATUS_LABEL[p.status] ?? p.status}</StatusBadge>
                 </div>
 
                 {p.status === 'converted' ? (

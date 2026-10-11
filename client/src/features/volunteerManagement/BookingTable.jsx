@@ -12,7 +12,10 @@
  */
 
 import { useState } from 'react';
-import { Badge } from '@/components/ui/badge';
+import StatusBadge from '@/components/ui/status-badge';
+
+// CONFIRMED → Confirmed.
+const sentence = (s) => String(s ?? '').replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -43,7 +46,7 @@ export default function BookingTable({ bookings, timeslots = [], spaces = [], at
           const checkedIn = Boolean(attendance?.checkedIn);
           const disabled = booking.status === 'CANCELLED' || busyBookingId === booking.id;
           const slot = timeslots.find((item) => item.id === booking.timeslotId);
-          return <TableRow key={booking.id}><TableCell className="font-medium">{`${booking.firstName} ${booking.lastName}`.trim()}</TableCell><TableCell className="text-xs">{formatTimeslot(slot, spaces)}</TableCell><TableCell><Badge variant="outline">{booking.source}</Badge></TableCell><TableCell><Badge variant="outline">{booking.status}</Badge></TableCell><TableCell>{checkedIn ? <Badge>Checked in</Badge> : <span className="text-sm text-muted-foreground">Not checked in</span>}</TableCell><TableCell className="text-right">{canRecordAttendance && <Button size="sm" variant={checkedIn ? 'outline' : 'default'} disabled={disabled} onClick={() => checkedIn ? onCheckOut(booking.id) : onCheckIn(booking.id)}>{checkedIn ? 'Undo check-in' : 'Check in'}</Button>}</TableCell></TableRow>;
+          return <TableRow key={booking.id}><TableCell className="font-medium">{`${booking.firstName} ${booking.lastName}`.trim()}</TableCell><TableCell className="text-xs">{formatTimeslot(slot, spaces)}</TableCell><TableCell><StatusBadge tone="neutral">{booking.source}</StatusBadge></TableCell><TableCell><StatusBadge kind="booking" status={booking.status}>{sentence(booking.status)}</StatusBadge></TableCell><TableCell>{checkedIn ? <StatusBadge kind="booking" status="checked_in">Checked in</StatusBadge> : <span className="text-sm text-muted-foreground">Not checked in</span>}</TableCell><TableCell className="text-right">{canRecordAttendance && <Button size="sm" variant={checkedIn ? 'outline' : 'default'} disabled={disabled} onClick={() => checkedIn ? onCheckOut(booking.id) : onCheckIn(booking.id)}>{checkedIn ? 'Undo check-in' : 'Check in'}</Button>}</TableCell></TableRow>;
         })}</TableBody>
       </Table></div>}
     </CardContent>

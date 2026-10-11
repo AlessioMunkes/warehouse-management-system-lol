@@ -11,12 +11,15 @@
  * Event booking publication to VMS happens automatically during booking management.
  */
 
-import { Badge } from '@/components/ui/badge';
+import StatusBadge from '@/components/ui/status-badge';
+
+// SYNCED → Synced.
+const sentence = (s) => String(s ?? '').replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function SyncStatusCard({ sync, busy, onRetry }) {
   return <Card><CardHeader><CardTitle>VMS sync</CardTitle><CardDescription>Bookings are published to the volunteer system automatically.</CardDescription></CardHeader><CardContent>
-    {!sync ? <p className="text-sm text-muted-foreground">Sync starts once the event’s bookings are set up.</p> : <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3"><div><Badge variant={sync.status === 'FAILED' ? 'destructive' : 'outline'}>{sync.status}</Badge>{sync.errorMessage && <p role="alert" className="mt-2 text-sm text-destructive">{sync.errorMessage}</p>}{sync.lastSuccessAt && <p className="mt-2 text-xs text-muted-foreground">Last synced {new Date(sync.lastSuccessAt).toLocaleString('en-ZA')}</p>}</div>{sync.status === 'FAILED' && <Button onClick={onRetry} disabled={busy} loading={busy}>{busy ? 'Retrying…' : 'Retry sync'}</Button>}</div>}
+    {!sync ? <p className="text-sm text-muted-foreground">Sync starts once the event’s bookings are set up.</p> : <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3"><div><StatusBadge kind="sync" status={sync.status}>{sentence(sync.status)}</StatusBadge>{sync.errorMessage && <p role="alert" className="mt-2 text-sm text-destructive">{sync.errorMessage}</p>}{sync.lastSuccessAt && <p className="mt-2 text-xs text-muted-foreground">Last synced {new Date(sync.lastSuccessAt).toLocaleString('en-ZA')}</p>}</div>{sync.status === 'FAILED' && <Button onClick={onRetry} disabled={busy} loading={busy}>{busy ? 'Retrying…' : 'Retry sync'}</Button>}</div>}
   </CardContent></Card>;
 }

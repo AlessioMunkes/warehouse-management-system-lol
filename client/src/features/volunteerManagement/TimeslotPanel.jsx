@@ -2,7 +2,10 @@
  * TimeslotPanel - read-only event schedule and capacity summary.
  */
 
-import { Badge } from '@/components/ui/badge';
+import StatusBadge from '@/components/ui/status-badge';
+
+// OPEN → Open.
+const sentence = (s) => String(s ?? '').replace(/_/g, ' ').toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { formatJohannesburgDateTime } from './dateTime';
@@ -39,7 +42,7 @@ export default function TimeslotPanel({
                       <p className="text-xs text-muted-foreground">to {readable(slot.endTime)}</p>
                       <p className="mt-1 text-sm">{space?.name ?? 'Unknown space'}{space?.location ? ` - ${space.location}` : ''}</p>
                     </div>
-                    <Badge variant="outline">{slot.status}</Badge>
+                    <StatusBadge kind="timeslot" status={slot.status}>{sentence(slot.status)}</StatusBadge>
                   </div>
                   {summary ? (
                     <div>

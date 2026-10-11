@@ -59,7 +59,7 @@ describe('VolunteerEventPage workspace', () => {
     expect(screen.getAllByText(/Community Hall - Cape Town/).length).toBeGreaterThan(0);
     expect(screen.queryByText('t1')).not.toBeInTheDocument();
     expect(screen.getByText('No-show')).toBeInTheDocument();
-    expect(screen.getByText('SYNCED')).toBeInTheDocument();
+    expect(screen.getByText('Synced')).toBeInTheDocument();
   });
 
   it('shows empty timeslot and booking states', async () => {
@@ -143,7 +143,7 @@ describe('VolunteerEventPage workspace', () => {
     expect(await screen.findByText('VMS unavailable')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Retry sync' }));
     await waitFor(() => expect(api.retrySync).toHaveBeenCalledWith('e1'));
-    expect(await screen.findByText('SYNCED')).toBeInTheDocument();
+    expect(await screen.findByText('Synced')).toBeInTheDocument();
   });
 
   it('keeps management actions hidden while leaving attendance reusable for warehouse staff', async () => {

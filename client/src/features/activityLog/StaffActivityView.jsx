@@ -15,7 +15,7 @@ import { defaultFrom, defaultTo } from './dateRange';
 import useTableView    from '../masterdata/useTableView';
 import MasterDataTable from '../masterdata/MasterDataTable';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { Badge }    from '@/components/ui/badge';
+import StatusBadge from '@/components/ui/status-badge';
 import { Input }    from '@/components/ui/input';
 import NativeSelect from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -53,7 +53,7 @@ const COLUMNS = [
     cell: (e) => e.text },
   { key: 'area', label: 'Area', weight: 1.6, minWidth: 'md',
     sort: (e) => e.area,
-    cell: (e) => <Badge variant="outline">{e.area}</Badge> },
+    cell: (e) => <StatusBadge kind="activityArea" status={e.area}>{e.area}</StatusBadge> },
   { key: 'role', label: 'Role', weight: 1.6, minWidth: 'lg',
     sort: (e) => e.actor?.role ?? '',
     cell: (e) => (e.actor?.role ? ROLE_LABELS[e.actor.role] ?? e.actor.role : '-') },

@@ -15,7 +15,7 @@
 import { useState } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
+import StatusBadge from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -67,7 +67,7 @@ const ReconciliationRow = ({ donation, busy, rowError, onRetry, actionLabel = 'R
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-medium text-ink">{donation.donor_name || '-'}</span>
-              <Badge className="bg-warn-soft text-warn hover:bg-warn-soft">{meta.label}</Badge>
+              <StatusBadge kind="donationCommit" status={donation.status}>{meta.label}</StatusBadge>
             </div>
             <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
               <span>{fmtValue(donation.estimated_value_zar)}</span>

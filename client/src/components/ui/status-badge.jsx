@@ -8,13 +8,16 @@
 //             neutral (grey)
 //   strong  — a solid fill instead of a soft tint, to tell apart two
 //             statuses with the same meaning
-//   icon    — the status's own picture
+//   icon    — the status's own picture. Every pill has one: a status
+//             nobody has drawn yet gets a plain dot, so no list shows
+//             some statuses with a picture and some without
 //
 // Pass `kind` and `status` to take all three from lib/statusStyles.js,
 // which is where every list's statuses are defined so none collide.
 // Built on the theme's status tokens, so it holds contrast in light
 // and dark; the label always says the status in words.
 // ─────────────────────────────────────────────────────────────
+import { Circle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { statusStyle } from '@/lib/statusStyles';
 
@@ -41,7 +44,7 @@ export default function StatusBadge({ kind, status, tone, strong, icon, classNam
   const fromKind = kind ? statusStyle(kind, status) : null;
   const t = tone ?? fromKind?.tone ?? 'neutral';
   const solid = strong ?? fromKind?.strong ?? false;
-  const Icon = icon ?? fromKind?.icon ?? null;
+  const Icon = icon ?? fromKind?.icon ?? Circle;
   const palette = solid ? STRONG : SOFT;
 
   return (
