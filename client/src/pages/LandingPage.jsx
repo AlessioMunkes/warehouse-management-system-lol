@@ -472,7 +472,7 @@ const LandingPage = () => {
         <section className={`lol-hero${ready ? ' is-ready' : ''}`}>
           <div
             className="lol-hero-bg"
-            style={{ backgroundImage: 'url(/images/dannyheartinghero.jpg)' }}
+            style={{ backgroundImage: 'url(/images/warehousehero.jpg)', backgroundPosition: 'center 80%' }}
             aria-hidden="true"
           />
           <div className="lol-hero-scrim" aria-hidden="true" />
