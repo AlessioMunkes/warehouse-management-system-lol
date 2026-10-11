@@ -169,13 +169,37 @@ describe('receiving: Guided\'s order list (cross-supplier)', () => {
   });
 });
 
-describe('receiving: Form\'s order list (scoped to the chosen supplier)', () => {
-  it('has no order to pick until a supplier is chosen', async () => {
-    setMode('full');
+describe('receiving: Guided and Form choose a delivery the same way', () => {
+  // The two views differ in how lines are counted, not in which
+  // delivery can be chosen. They used to list different suppliers and
+  // different orders, so the same order could be found in one view and
+  // not the other.
+  const optionsOf = (select) => within(select).getAllByRole('option').map((o) => o.textContent);
+
+  it('lists the same suppliers and the same orders in both views', async () => {
+    const seen = {};
+    for (const mode of ['guided', 'full']) {
+      setMode(mode);
+      const { unmount } = render(<ReceivingFlow />);
+      seen[mode] = {
+        suppliers: optionsOf(await screen.findByRole('combobox', { name: /Who it came from/i })),
+        orders:    optionsOf(await screen.findByRole('combobox', { name: /Which order/i })),
+      };
+      unmount();
+    }
+    expect(seen.full).toEqual(seen.guided);
+    expect(seen.guided.suppliers).toEqual(
+      expect.arrayContaining(['Bokomo Foods Distribution', 'Cape Cold Storage']));
+    expect(seen.guided.orders).toHaveLength(3); // the placeholder and both orders
+  });
+
+  it('only lists suppliers that have an order to receive', async () => {
+    receivingAPI.getPurchaseOrders.mockResolvedValue([ORDERS[1]]);
+    setMode('guided');
     render(<ReceivingFlow />);
-    await screen.findByRole('combobox', { name: /Who it came from/i });
-    expect(screen.queryByRole('combobox', { name: /Which order/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/Choose a supplier above/i)).toBeInTheDocument();
+    const select = await screen.findByRole('combobox', { name: /Who it came from/i });
+    expect(within(select).getByRole('option', { name: 'Cape Cold Storage' })).toBeInTheDocument();
+    expect(within(select).queryByRole('option', { name: 'Bokomo Foods Distribution' })).not.toBeInTheDocument();
   });
 
   it('only offers the chosen supplier\'s own orders', async () => {

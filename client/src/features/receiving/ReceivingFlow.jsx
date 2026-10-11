@@ -163,7 +163,6 @@ export default function ReceivingFlow({ onCrumbChange }) {
   } = useConfirmed();
   const acceptUndo = useUndo();
 
-  const [suppliers, setSuppliers] = useState([]);
   // Raised but not approved yet: named on step 1, never selectable.
   const [waitingOrders, setWaitingOrders] = useState([]);
   const [deliveryDate, setDeliveryDate] = useState(todayISO);
@@ -193,10 +192,11 @@ export default function ReceivingFlow({ onCrumbChange }) {
     ? openOrders.filter((o) => String(o.supplier_id) === String(supplierId))
     : openOrders;
 
-  // Form's supplier list: only those with an order to receive. Read off
-  // the orders themselves, so the two can never disagree. It used to be
-  // its own request, cached for a minute, and an order approved inside
-  // that minute had no supplier to find it under.
+  // The suppliers with an order to receive, read off the orders
+  // themselves so the two lists can never disagree. Guided and Form
+  // used to build this differently (every supplier in one, only those
+  // with an open order in the other, from a separate cached request);
+  // there is one list now and both views show it.
   const openSuppliers = useMemo(() => {
     const byId = new Map();
     for (const o of openOrders) {
@@ -215,16 +215,6 @@ export default function ReceivingFlow({ onCrumbChange }) {
   // while the wrong supplier is selected returns nothing, which reads
   // as "that order does not exist".
   const visibleOrders = orderSearch.searching ? orderSearch.filtered : orders;
-
-  // Form's own order list, unlike Guided's: a worker choosing "Form"
-  // already picked a supplier from the dropdown right above, so an
-  // order list still mixing every other supplier's orders in looks
-  // answerable and isn't — nothing stops the wrong one being picked.
-  // Empty until a supplier is chosen, rather than showing everything
-  // and hoping the label text is enough of a guardrail.
-  const formOrders = supplierId
-    ? visibleOrders.filter((o) => String(o.supplier_id) === String(supplierId))
-    : [];
 
   // Picking an order is also picking its supplier. The submit payload
   // carries both and the server rejects a mismatch between them
@@ -268,13 +258,12 @@ export default function ReceivingFlow({ onCrumbChange }) {
     } catch { /* leave what was there */ }
   }, []);
 
-  // ── Suppliers and orders, at mount ──────────────────────────
+  // ── At mount ────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [list] = await Promise.all([receivingAPI.getSuppliers(), loadOrders()]);
-        if (!cancelled) setSuppliers(list);
+        await loadOrders();
       } catch (err) {
         if (!cancelled) setError(err.message);
       } finally {
@@ -313,8 +302,8 @@ export default function ReceivingFlow({ onCrumbChange }) {
   }, [step.label, step.n, phase, onCrumbChange]);
 
   const supplierName = useMemo(
-    () => suppliers.find((s) => String(s.id) === String(supplierId))?.name ?? 'this supplier',
-    [suppliers, supplierId]
+    () => openSuppliers.find((s) => String(s.id) === String(supplierId))?.name ?? 'this supplier',
+    [openSuppliers, supplierId]
   );
   const shortLines = lines.filter((l) => l.counted !== '' && Number(l.counted) < l.expected);
   const receivedByName = user?.firstName ? `${user.firstName} ${user.lastName ?? ''}`.trim() : 'You';
@@ -579,35 +568,19 @@ export default function ReceivingFlow({ onCrumbChange }) {
             </Actions>
           }
         >
-          {/* A dropdown either way now — was a ChoiceList stack in
-              Guided (tap targets read fine for four rows, but the
-              supplier directory doesn't stay four rows, and a stacked
-              list of full-width buttons is a lot of scroll for one
-              choice). Both still write the same supplierId; Guided
-              keeps its own data source (every supplier, not just ones
-              with an open order right now) rather than Form's
-              openSuppliers, since Guided's own order search below
-              already looks across every supplier's orders at once. */}
-          {mode === 'guided' ? (
-            <SelectField
-              id="stf-guided-supplier"
-              label="Who it came from"
-              placeholder="Choose a supplier"
-              options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
-              value={supplierId}
-              onChange={(value) => { setSupplierId(value); setOrderId(''); }}
-            />
-          ) : (
-            <SelectField
-              id="stf-full-supplier"
-              label="Who it came from"
-              placeholder="Choose a supplier"
-              options={openSuppliers.map((s) => ({ value: s.id, label: s.name }))}
-              value={supplierId}
-              onChange={(value) => { setSupplierId(value); setOrderId(''); setLines([]); }}
-              hint={openSuppliers.length === 0 ? 'No supplier has an approved order right now.' : undefined}
-            />
-          )}
+          {/* ONE step for both views. Guided and Form differ in how the
+              lines are counted on the next screen, not in which
+              delivery can be chosen: the same suppliers, the same
+              orders and the same search. */}
+          <SelectField
+            id="stf-supplier"
+            label="Who it came from"
+            placeholder="Any supplier"
+            options={openSuppliers.map((s) => ({ value: s.id, label: s.name }))}
+            value={supplierId}
+            onChange={(value) => { setSupplierId(value); setOrderId(''); setLines([]); }}
+            hint={openSuppliers.length === 0 ? 'No supplier has an approved order right now.' : undefined}
+          />
 
           <div className="stf-field">
             <span className="stf-field-label">Received by</span>
@@ -624,50 +597,18 @@ export default function ReceivingFlow({ onCrumbChange }) {
             placeholder="Search by order number, supplier or date"
           />
 
-          {/* A dropdown either way now — not the tap-target stack this
-              used to fall back to — but not the same list. Guided
-              searches every supplier's orders at once, because a
-              driver's note has an order number on it and nothing else
-              (see visibleOrders' own note above). Form expects the
-              supplier chosen just above to mean something: its order
-              list is scoped to that supplier only, and empty until one
-              is picked, rather than an order list a worker could still
-              pick the wrong supplier's line out of. */}
-          {mode === 'guided' ? (
-            visibleOrders.length > 0 ? (
-              <SelectField
-                id="stf-guided-order"
-                label="Which order"
-                placeholder="Choose an order"
-                options={visibleOrders.map((o) => ({
-                  value: o.id,
-                  label: [orderCode(o), o.supplier_name].filter(Boolean).join(' · '),
-                }))}
-                value={orderId}
-                onChange={selectOrder}
-              />
-            ) : orderSearch.searching ? (
-              <NoMatches
-                query={orderSearch.query}
-                onClear={() => orderSearch.setQuery('')}
-                noun="orders"
-              />
-            ) : (
-              <Notice>
-                There are no open orders to receive against right now. Ask your manager to approve
-                the order before you sign anything in.
-              </Notice>
-            )
-          ) : !supplierId ? (
-            <Notice>Choose a supplier above to see its open orders.</Notice>
-          ) : formOrders.length > 0 ? (
+          {/* Every open order, narrowed to the supplier when one is
+              chosen. A search looks across all of them, because a
+              driver's note has an order number on it and nothing else,
+              and picking an order sets its supplier. */}
+          {visibleOrders.length > 0 ? (
             <SelectField
-              id="stf-full-order"
+              id="stf-order"
               label="Which order"
               placeholder="Choose an order"
-              options={formOrders.map((o) => ({
+              options={visibleOrders.map((o) => ({
                 value: o.id,
-                label: orderCode(o),
+                label: [orderCode(o), o.supplier_name].filter(Boolean).join(' · '),
               }))}
               value={orderId}
               onChange={selectOrder}
@@ -680,8 +621,8 @@ export default function ReceivingFlow({ onCrumbChange }) {
             />
           ) : (
             <Notice>
-              There is no open order for {supplierName} today. Ask your manager to check the order
-              before you sign anything in.
+              There are no open orders to receive against right now. Ask your manager to approve
+              the order before you sign anything in.
             </Notice>
           )}
 
