@@ -2288,6 +2288,20 @@ button.stf-panel-head:disabled { cursor: default; }
 }
 .stf-search-clear:hover { color: var(--stf-ink); }
 
+/* The tick on a success pop-up (SuccessDialog). */
+.stf-success-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 8px;
+  border-radius: 50%;
+  background: var(--good-soft, #e6f4ea);
+  color: var(--good-ink, #1d7a3a);
+  font-size: 24px;
+}
+
 /* A search that opens from an icon beside a field's label (SelectField's
    `search`). The label and the icon share one row; the box appears
    under them only once it is asked for. */

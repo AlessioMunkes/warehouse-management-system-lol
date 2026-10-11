@@ -13,7 +13,9 @@
 // API and the UI — the user was explicit that a mix of "logged" and
 // "recorded" was itself part of what made the previous version unclear.
 // ─────────────────────────────────────────────────────────────
+import pool from '../config/db.js';
 import kitRepo from '../repositories/collectionKit.repository.js';
+import { createNotification } from '../repositories/notification.repository.js';
 import { isPositiveInt, isValidDateString, toQuantity } from '../utils/validation.js';
 
 const fail = (status, message) => {
@@ -159,4 +161,50 @@ const listRecords = async (filters = {}) => {
     kitRepo.listRecords({ status, search: cleanText(filters.search), limit }));
 };
 
-export default { createKit, listKits, getKit, getRecord, logCompost, markDispatched, listRecords };
+// ── Follow up a kit nobody has logged compost for ────────────
+// A kit assigned this many months ago with nothing logged goes to the
+// managers' bell, once, so someone speaks to its owner. Run daily by
+// the housekeeping job (jobs/expiryWarning.job.js).
+export const IDLE_KIT_MONTHS = 3;
+
+const kitCode = (id) => `CK${String(id).padStart(4, '0')}`;
+const dayInWords = (value) =>
+  new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
+
+const runIdleKitCheck = async () => {
+  let idle;
+  try {
+    idle = await kitRepo.listIdleKits({ months: IDLE_KIT_MONTHS });
+  } catch (err) {
+    // A warehouse without the kit tables has no kits to chase.
+    if (err.code === '42P01') return { checked: 0, notified: 0 };
+    throw err;
+  }
+
+  let notified = 0;
+  for (const kit of idle) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      // avoidDuplicate: one notice per kit, not one a day.
+      await createNotification(client, {
+        type: 'collection_kit_idle',
+        title: `${kitCode(kit.id)} has no compost logged`,
+        body: `Given to ${kit.owner_name}${kit.suburb ? `, ${kit.suburb}` : ''} on ${dayInWords(kit.assigned_at)}. Follow up with the owner.`,
+        entityType: 'collection_kit',
+        entityId: kit.id,
+        avoidDuplicate: true,
+      });
+      await client.query('COMMIT');
+      notified += 1;
+    } catch (err) {
+      await client.query('ROLLBACK');
+      console.error('[collectionKit] idle kit notice failed:', err.message);
+    } finally {
+      client.release();
+    }
+  }
+  return { checked: idle.length, notified };
+};
+
+export default { createKit, listKits, getKit, getRecord, logCompost, markDispatched, listRecords, runIdleKitCheck };

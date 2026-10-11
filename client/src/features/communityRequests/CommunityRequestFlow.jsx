@@ -24,7 +24,8 @@
 import { useEffect, useState } from 'react';
 import communityRequestAPI from '../../services/communityRequestAPI';
 import { useAuth } from '../../context/AuthContext';
-import { Notice, TextField, Actions, Button } from '../staff/StepPrimitives';
+import { Notice, TextField, Actions, Button } from '../staff/StepPrimitives';
+import SuccessDialog from '../staff/SuccessDialog';
 import ListTools, { NoMatches } from '../staff/ListTools';
 import useListSearch from '../staff/useListSearch';
 import { fmtQty } from '@/lib/quantity';
@@ -251,6 +252,7 @@ export default function CommunityRequestFlow({ onCrumbChange }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
+  const [success, setSuccess] = useState(null);
   const [logBusy, setLogBusy] = useState(false);
   const [logError, setLogError] = useState(null);
   const [logKey, setLogKey] = useState(0);
@@ -293,9 +295,13 @@ export default function CommunityRequestFlow({ onCrumbChange }) {
     setLogError(null);
     try {
       const logged = await communityRequestAPI.logRequest(payload, { keepOffline: true });
-      setNotice(logged.queued
-        ? 'No signal, so this is saved on your phone. It sends itself when you are back in range. Do not log it again.'
-        : 'Request logged. A manager approves it before anyone packs.');
+      // Saved: a pop-up with a tick. Waiting on the phone is not the
+      // same thing, and stays a notice.
+      if (logged.queued) {
+        setNotice('No signal. It sends itself when you are back in range. Do not log it again.');
+      } else {
+        setSuccess({ title: 'Request logged', body: 'A manager approves it before anyone packs.' });
+      }
       setLogKey((k) => k + 1);   // a clean form for the next call
     } catch (err) {
       setLogError(err.message || 'Could not log the request.');
@@ -309,7 +315,7 @@ export default function CommunityRequestFlow({ onCrumbChange }) {
     setError(null);
     try {
       await communityRequestAPI.claimRequest(id);
-      setNotice('Request claimed. Open it when you are ready to pack.');
+      setSuccess({ title: 'Request claimed', body: 'Open it when you are ready to pack.' });
       setReloadToken((t) => t + 1);
     } catch (err) {
       // Someone else got there first, or a manager changed it: the
@@ -327,11 +333,14 @@ export default function CommunityRequestFlow({ onCrumbChange }) {
     try {
       const done = await communityRequestAPI.confirmRequest(packing.id, items);
       setPacking(null);
-      setNotice(done.queued
-        ? 'No signal, so this is saved on your phone. It sends itself when you are back in range. Do not confirm it again.'
-        : done.outcome === 'partially_fulfilled'
-          ? 'Done. Marked partly fulfilled, with what went out.'
-          : 'Done. Marked fulfilled.');
+      if (done.queued) {
+        setNotice('No signal. It sends itself when you are back in range. Do not confirm it again.');
+      } else {
+        setSuccess({
+          title: 'Request packed',
+          body: done.outcome === 'partially_fulfilled' ? 'Marked partly fulfilled, with what went out.' : 'Marked fulfilled.',
+        });
+      }
       setReloadToken((t) => t + 1);
     } catch (err) {
       setPackError(err.message || 'Could not confirm this request.');
@@ -358,6 +367,9 @@ export default function CommunityRequestFlow({ onCrumbChange }) {
       </div>
 
       {notice ? <Notice>{notice}</Notice> : null}
+      <SuccessDialog open={Boolean(success)} title={success?.title} onClose={() => setSuccess(null)}>
+        {success?.body}
+      </SuccessDialog>
 
       {tab === 'log' ? (
         <>

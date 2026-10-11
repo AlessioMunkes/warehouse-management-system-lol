@@ -10,9 +10,20 @@ import FeedTheSoilFlow from '../features/feedTheSoil/FeedTheSoilFlow';
 
 export default function StaffFeedTheSoilPage() {
   const [crumb, setCrumb] = useState('Kits');
+  // Kits are the screen; the compost records are its history, reached
+  // from the header like Receiving's and Dispatch's.
+  const [history, setHistory] = useState(false);
   return (
-    <StaffShell crumb={`Feed the Soil / ${crumb}`}>
-      <FeedTheSoilFlow onCrumbChange={setCrumb} />
+    <StaffShell
+      crumb={`Feed the Soil / ${crumb}`}
+      actions={history ? null : (
+        <button type="button" className="stf-crumb-link" onClick={() => setHistory(true)}>
+          <i className="ti ti-history" aria-hidden="true" />
+          <span>History</span>
+        </button>
+      )}
+    >
+      <FeedTheSoilFlow onCrumbChange={setCrumb} history={history} onHistoryChange={setHistory} />
     </StaffShell>
   );
 }

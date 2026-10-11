@@ -14,8 +14,8 @@
 //            which record, so this does not invent a batch concept —
 //            it only records where that one record's compost went)
 //
-// Two top-level views, switched with FilterSegments (the same control
-// the history screens use for date ranges):
+// The screen opens on Kits. The compost records are its History,
+// reached from the header (StaffFeedTheSoilPage), not a second tab:
 //   Records  the flat, cross-kit list — what needs attention. Sorted
 //            server-side: not-yet-dispatched first, dispatched at the
 //            bottom, newest first within each group. A row identifies
@@ -41,7 +41,7 @@ import {
   Actions, Button, TextField, DateField, NumberField, Notice, KeyValues,
 } from '../staff/StepPrimitives';
 import TaskPage from '../staff/TaskPage';
-import ListTools, { FilterSegments } from '../staff/ListTools';
+import { SearchHeading } from '../staff/ListTools';
 import usePaged from '../staff/usePaged';
 import Paged from '../staff/Paged';
 import { readDraft, writeDraft, clearDraft } from '../staff/useDraft';
@@ -73,11 +73,30 @@ const StatusBadge = ({ status }) => (
   </span>
 );
 
-export default function FeedTheSoilFlow({ onCrumbChange }) {
-  // 'browse' (tab: records | kits) | 'kitDetail' | 'recordDetail' |
-  // 'assign' | 'logPickKit' | 'log' | 'dispatch'
+// What last happened to a kit, and when: dispatched, logged, or only
+// assigned if nothing has been collected from it yet. This replaced a
+// status badge, which said "Logged" about the kit when it was really
+// the state of its last record.
+const lastAction = (kit) => {
+  if (kit.status === 'dispatched' && kit.last_dispatched_at) return `Last dispatched ${fmtDate(kit.last_dispatched_at)}`;
+  if (kit.last_logged_at) return `Last logged ${fmtDate(kit.last_logged_at)}`;
+  return `Assigned ${fmtDate(kit.assigned_at)}`;
+};
+
+// `history` and `onHistoryChange` belong to the page: its header carries
+// the History link, the same place Receiving and Dispatch keep theirs.
+// Kits are what this screen is for; the compost records are its history.
+export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHistoryChange }) {
+  // 'browse' (kits, or the records when `history`) | 'kitDetail' |
+  // 'recordDetail' | 'assign' | 'log' | 'dispatch'
   const [phase, setPhase] = useState('browse');
-  const [tab, setTab] = useState('records');
+  const tab = history ? 'records' : 'kits';
+  const setTab = (next) => onHistoryChange?.(next === 'records');
+
+  // The History link works from any step: it always lands on the list.
+  useEffect(() => {
+    if (history) setPhase('browse');
+  }, [history]);
 
   const [records, setRecords] = useState([]);
   const [recordsLoading, setRecordsLoading] = useState(true);
@@ -122,10 +141,9 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
     const crumb = phase === 'kitDetail' ? (selectedKit ? `Kit / ${selectedKit.owner_name}` : 'Kit')
       : phase === 'recordDetail' ? 'Record'
       : phase === 'dispatch' ? 'Mark dispatched'
-      : phase === 'assign' ? 'Assign a kit'
-      : phase === 'logPickKit' ? 'Log a collection'
+      : phase === 'assign' ? 'Assign a new kit'
       : phase === 'log' ? 'Log compost'
-      : tab === 'records' ? 'Compost records' : 'Kits';
+      : tab === 'records' ? 'History' : 'Kits';
     onCrumbChange?.(crumb);
   }, [phase, tab, selectedKit, onCrumbChange]);
 
@@ -332,20 +350,22 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
     </div>
   );
 
-  // ── Records tab ────────────────────────────────────────────
+  // ── History: the compost records ───────────────────────────
   if (phase === 'browse' && tab === 'records') {
     return (
-      <TaskPage title="Feed the Soil" sub="Compost logged, newest first.">
+      <TaskPage
+        title="History"
+        sub="Compost logged, newest first."
+        actions={<Actions><Button variant="secondary" onClick={() => setTab('kits')}>Back to kits</Button></Actions>}
+      >
         {browseError ? <Notice tone="warn">{browseError}</Notice> : null}
         {queuedNote ? <Notice>{queuedNote}</Notice> : null}
-        <FilterSegments label="View" value={tab} onChange={setTab} options={[{ key: 'records', label: 'Records' }, { key: 'kits', label: 'Kits' }]} />
 
-        <ListTools
+        <SearchHeading
+          title="Compost records"
           id="fts-record-search" query={recordSearch} onQuery={setRecordSearch}
-          placeholder="Search by owner or suburb"
-        >
-          <Button onClick={() => setPhase('logPickKit')}>Log a collection</Button>
-        </ListTools>
+          placeholder="Search by owner or suburb" buttonLabel="Search records"
+        />
 
         {recordsLoading ? (
           <div className="stf-skeleton" aria-label="Loading" />
@@ -355,7 +375,6 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
           </div>
         ) : (
           <>
-            <p className="stf-summary-title">Compost records</p>
             <div className="stf-list">
               {recordsPaged.slice.map((r) => (
                 <RecordRow key={r.id} record={r} onOpen={() => openRecord(r.id)} />
@@ -368,20 +387,22 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
     );
   }
 
-  // ── Kits tab ───────────────────────────────────────────────
-  if (phase === 'browse' && tab === 'kits') {
+  // ── Kits: what this screen opens on ─────────────────────────
+  if (phase === 'browse') {
     return (
       <TaskPage title="Feed the Soil" sub="Kits given out.">
         {browseError ? <Notice tone="warn">{browseError}</Notice> : null}
         {queuedNote ? <Notice>{queuedNote}</Notice> : null}
-        <FilterSegments label="View" value={tab} onChange={setTab} options={[{ key: 'records', label: 'Records' }, { key: 'kits', label: 'Kits' }]} />
 
-        <ListTools
+        <Actions>
+          <Button onClick={startAssign}>Assign a new kit</Button>
+        </Actions>
+
+        <SearchHeading
+          title="Collection kits"
           id="fts-kit-search" query={kitSearch} onQuery={setKitSearch}
-          placeholder="Search by owner or suburb"
-        >
-          <Button onClick={startAssign}>Assign a kit</Button>
-        </ListTools>
+          placeholder="Search by owner or suburb" buttonLabel="Search kits"
+        />
 
         {kitsLoading ? (
           <div className="stf-skeleton" aria-label="Loading" />
@@ -391,7 +412,6 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
           </div>
         ) : (
           <>
-            <p className="stf-summary-title">Collection kits</p>
             <div className="stf-list">
               {kitsPaged.slice.map((kit) => (
                 <div
@@ -401,11 +421,8 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
                 >
                   <span className="stf-row-main">
                     <span className="stf-row-title">{formatKitCode(kit.id)}</span>
-                    <span className="stf-row-meta">
-                      {kit.last_logged_at ? `Last collected ${fmtDate(kit.last_logged_at)}` : 'Not yet collected'}
-                    </span>
+                    <span className="stf-row-meta">{lastAction(kit)}</span>
                   </span>
-                  <StatusBadge status={kit.status} />
                   <button
                     type="button" className="stf-btn stf-btn-secondary"
                     onClick={(e) => { e.stopPropagation(); startLog(kit); }}
@@ -417,54 +434,6 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
             </div>
             <Paged {...kitsPaged} noun="kits" />
           </>
-        )}
-      </TaskPage>
-    );
-  }
-
-  // ── Log a collection — pick which kit first ────────────────
-  // Reached from the Records tab, where no kit is known yet. Reuses
-  // the same kit list/search the Kits tab already loads; picking a
-  // row goes straight into the existing log form instead of opening
-  // the kit.
-  if (phase === 'logPickKit') {
-    return (
-      <TaskPage
-        title="Log a collection"
-        sub="Choose which kit this collection belongs to."
-        actions={<Actions><Button variant="secondary" onClick={() => backToBrowse('records')}>Cancel</Button></Actions>}
-      >
-        {browseError ? <Notice tone="warn">{browseError}</Notice> : null}
-        {queuedNote ? <Notice>{queuedNote}</Notice> : null}
-        <ListTools
-          id="fts-log-pick-search" query={kitSearch} onQuery={setKitSearch}
-          placeholder="Search by owner or suburb"
-        />
-
-        {kitsLoading ? (
-          <div className="stf-skeleton" aria-label="Loading" />
-        ) : kits.length === 0 ? (
-          <div className="stf-empty">
-            {kitSearch ? `No kits match "${kitSearch}".` : 'No kits have been assigned yet.'}
-          </div>
-        ) : (
-          <div className="stf-list">
-            {kitsPaged.slice.map((kit) => (
-              <div
-                key={kit.id} className="stf-row" role="button" tabIndex={0}
-                onClick={() => startLog(kit)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); startLog(kit); } }}
-              >
-                <span className="stf-row-main">
-                  <span className="stf-row-title">{formatKitCode(kit.id)}</span>
-                  <span className="stf-row-meta">
-                    {kit.last_logged_at ? `Last collected ${fmtDate(kit.last_logged_at)}` : 'Not yet collected'}
-                  </span>
-                </span>
-                <StatusBadge status={kit.status} />
-              </div>
-            ))}
-          </div>
         )}
       </TaskPage>
     );
@@ -616,7 +585,7 @@ export default function FeedTheSoilFlow({ onCrumbChange }) {
   if (phase === 'assign') {
     return (
       <TaskPage
-        title="Assign a kit"
+        title="Assign a new kit"
         sub="Give a kit to a community member."
         note={ownerMissing ? 'Still needed: the owner\'s name.' : null}
         actions={

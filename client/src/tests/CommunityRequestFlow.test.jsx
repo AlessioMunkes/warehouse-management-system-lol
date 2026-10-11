@@ -42,7 +42,7 @@ describe('Log a request (worker)', () => {
     await waitFor(() => expect(api.logRequest).toHaveBeenCalledWith(
       expect.objectContaining({ itemsRequested: 'Samp and oil' }), { keepOffline: true },
     ));
-    expect(await screen.findByText('Request logged. A manager approves it before anyone packs.')).toBeTruthy();
+    expect(await screen.findByRole('dialog', { name: 'Request logged' })).toBeTruthy();
     expect(screen.getByLabelText('What was requested').value).toBe('');
   });
 
@@ -53,8 +53,8 @@ describe('Log a request (worker)', () => {
     await user.type(screen.getByLabelText('What was requested'), 'Samp and oil');
     await user.click(screen.getByRole('button', { name: 'Log request' }));
 
-    expect(await screen.findByText(/saved on your phone/)).toBeTruthy();
-    expect(screen.queryByText('Request logged. A manager approves it before anyone packs.')).toBeNull();
+    expect(await screen.findByText(/No signal. It sends itself/)).toBeTruthy();
+    expect(screen.queryByRole('dialog', { name: 'Request logged' })).toBeNull();
   });
 
   it('keeps the future-date block and the notes label', async () => {
@@ -201,8 +201,9 @@ describe('To pack', () => {
       await waitFor(() => expect(api.confirmRequest).toHaveBeenCalledWith(1, [
         { productId: 5, quantityReleased: 6 }, { productId: 6, quantityReleased: 3 },
       ]));
-      expect(await screen.findByText('Done. Marked fulfilled.')).toBeTruthy();
-      // Back on the list.
+      expect(await screen.findByText('Marked fulfilled.')).toBeTruthy();
+      // Back on the list, once the confirmation is closed.
+      await userEvent.click(screen.getByRole('button', { name: 'OK' }));
       expect(screen.getByRole('heading', { name: 'To pack' })).toBeTruthy();
     });
 
@@ -218,7 +219,7 @@ describe('To pack', () => {
       await waitFor(() => expect(api.confirmRequest).toHaveBeenCalledWith(1, [
         { productId: 5, quantityReleased: 4 }, { productId: 6, quantityReleased: 3 },
       ]));
-      expect(await screen.findByText('Done. Marked partly fulfilled, with what went out.')).toBeTruthy();
+      expect(await screen.findByText('Marked partly fulfilled, with what went out.')).toBeTruthy();
     });
 
     it('cannot go above what was approved', async () => {

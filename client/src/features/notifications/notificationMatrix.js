@@ -13,7 +13,7 @@
 // all read from here.
 // ─────────────────────────────────────────────────────────────
 import {
-  AlertTriangle, ClipboardList, Clock, Gift, Mail, Package, PhoneCall, ShoppingCart, Truck, Users, Bell,
+  AlertTriangle, ClipboardList, Clock, Gift, Mail, Package, PhoneCall, ShoppingCart, Truck, Users, Bell, Sprout,
 } from 'lucide-react';
 import { matchPath } from 'react-router-dom';
 import { STAFF, ADMIN, PACKING, VOLUNTEERS } from '../../routes/paths';
@@ -78,6 +78,10 @@ const NOTIFICATION_MATRIX = {
   stock_expiry_warning_1w: {
     severity: 'warning', icon: Clock,
     destination: () => '/noc/inventory',
+  },
+  collection_kit_idle: {
+    severity: 'action', icon: Sprout,
+    destination: () => STAFF.feedTheSoil,
   },
   donation_review: {
     severity: 'action', icon: Gift,

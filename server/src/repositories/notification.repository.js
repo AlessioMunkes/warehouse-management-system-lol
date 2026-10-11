@@ -40,6 +40,7 @@ const TARGET_ROLES_BY_TYPE = {
   // The names expiryWarning.service.js sends, and the older ones. Without
   // these the warnings were stored with no recipients, so nobody saw them.
   stock_expiry_warning_2w: MANAGER_ONLY,
+  collection_kit_idle: MANAGER_ONLY,
   stock_expiry_warning_1w: MANAGER_ONLY,
   stock_expiry_2_weeks: MANAGER_ONLY,
   stock_expiry_1_week: MANAGER_ONLY,

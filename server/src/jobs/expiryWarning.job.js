@@ -14,6 +14,7 @@
 // site is retried on the next tick without re-running the others.
 // ─────────────────────────────────────────────────────────────
 import expiryWarningService from '../services/expiryWarning.service.js';
+import collectionKitService from '../services/collectionKit.service.js';
 import { runInWarehouse } from '../config/warehouseContext.js';
 import { warehouseCodes } from '../config/warehouses.js';
 
@@ -47,6 +48,18 @@ const runIfDue = async () => {
         ? await runInWarehouse(code, () => expiryWarningService.runExpiryCheck())
         : await expiryWarningService.runExpiryCheck();
       console.log(`[expiryWarning]${where} checked ${summary.checked}, notified ${summary.notified}`);
+
+      // Same daily pass: collection kits given out months ago with no
+      // compost logged go to the managers' bell. Its own try, so a
+      // failure here never re-runs the expiry sweep above.
+      try {
+        const kits = code
+          ? await runInWarehouse(code, () => collectionKitService.runIdleKitCheck())
+          : await collectionKitService.runIdleKitCheck();
+        if (kits.checked > 0) console.log(`[idleKits]${where} ${kits.checked} idle, noticed ${kits.notified}`);
+      } catch (kitErr) {
+        console.error(`[idleKits]${where} check failed:`, kitErr.message);
+      }
     } catch (err) {
       // A failed sweep shouldn't crash the server or wedge future days —
       // reset so the next hourly tick retries today instead of waiting

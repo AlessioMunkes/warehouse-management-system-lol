@@ -16,6 +16,8 @@
 // is free; a debounce here would only add lag between the key and the
 // result.
 // ─────────────────────────────────────────────────────
+import { useState } from 'react';
+
 export default function ListTools({
   id, query, onQuery, placeholder = 'Search this list', children,
   // For a search that opens from an icon (SelectField's `search`):
@@ -90,5 +92,32 @@ export function NoMatches({ query, onClear, noun = 'items' }) {
         Show everything again
       </button>
     </div>
+  );
+}
+
+// A list's heading with a search icon beside it. The search box only
+// appears when the icon is tapped (or a search is already typed), so a
+// screen whose list is usually short enough to read does not spend a
+// row on it. The same idea as SelectField's `search`, for a list.
+export function SearchHeading({ title, id, query, onQuery, placeholder, buttonLabel = 'Search' }) {
+  const [open, setOpen] = useState(false);
+  const searching = open || Boolean(query);
+  return (
+    <>
+      <div className="stf-field-labelrow">
+        <p className="stf-summary-title">{title}</p>
+        {!searching ? (
+          <button type="button" className="stf-search-open" aria-label={buttonLabel} onClick={() => setOpen(true)}>
+            <i className="ti ti-search" aria-hidden="true" />
+          </button>
+        ) : null}
+      </div>
+      {searching ? (
+        <ListTools
+          id={id} query={query} onQuery={onQuery} placeholder={placeholder}
+          autoFocus={open} onClose={() => setOpen(false)}
+        />
+      ) : null}
+    </>
   );
 }

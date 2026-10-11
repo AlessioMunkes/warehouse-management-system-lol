@@ -94,10 +94,13 @@ const listKits = async ({ search = null } = {}) => {
     `SELECT ${KIT_COLUMNS},
             COALESCE(latest.status, 'assigned') AS status,
             latest.kg_compost AS last_kg_compost,
-            latest.logged_at  AS last_logged_at
+            latest.logged_at  AS last_logged_at,
+            -- When that latest record went to a farmer, if it has: the
+            -- list says the last thing that happened to a kit and when.
+            latest.dispatched_at AS last_dispatched_at
        FROM collection_kits k
        LEFT JOIN LATERAL (
-         SELECT r.status, r.kg_compost, r.logged_at
+         SELECT r.status, r.kg_compost, r.logged_at, r.dispatched_at
            FROM collection_kit_records r
           WHERE r.kit_id = k.id
           ORDER BY r.logged_at DESC, r.id DESC
@@ -290,6 +293,23 @@ const listRecords = async ({ status = null, search = null, limit = 200 } = {}) =
   return rows;
 };
 
+// ── Kits given out and never heard from ──────────────────────
+// Assigned at least `months` ago with no compost ever logged. A kit in
+// someone's kitchen that has produced nothing in that long is either
+// not being used or not being collected, and either way somebody needs
+// to speak to its owner.
+const listIdleKits = async ({ months }) => {
+  const { rows } = await pool.query(
+    `SELECT k.id, k.owner_name, k.suburb, k.assigned_at
+       FROM collection_kits k
+      WHERE k.assigned_at <= (now() AT TIME ZONE 'Africa/Johannesburg')::date - make_interval(months => $1::int)
+        AND NOT EXISTS (SELECT 1 FROM collection_kit_records r WHERE r.kit_id = k.id)
+      ORDER BY k.assigned_at ASC, k.id ASC`,
+    [months],
+  );
+  return rows;
+};
+
 export default {
-  createKit, listKits, getKitById, getRecordById, logCompost, markDispatched, listRecords,
+  createKit, listKits, listIdleKits, getKitById, getRecordById, logCompost, markDispatched, listRecords,
 };
