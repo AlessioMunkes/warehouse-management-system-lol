@@ -50,6 +50,7 @@ import { Link } from 'react-router-dom';
 import PageHeader, { PageShell } from '@/components/ui/page-header';
 import ErrorBanner from '@/components/ui/error-banner';
 import ReportChart    from '../features/reporting/ReportChart';
+import ChartNote      from '../features/reporting/ChartNote';
 import ImpactStatCard from '../features/reporting/ImpactStatCard';
 import BeneficiaryTypeChart from '../features/reporting/BeneficiaryTypeChart';
 import ImpactCalculatorPDF from '../features/reporting/ImpactCalculatorPDF';
@@ -266,13 +267,13 @@ const ImpactPanel = ({
           <ErrorBanner message={error} />
         ) : report ? (
           <>
-            <p className="mb-3 text-sm text-muted-foreground">{report.description}</p>
-            <div className="rounded-xl bg-surface-2 p-4">
-              <ReportChart report={report} dimensionLabel={DIMENSION_LABELS[dimension] ?? dimension} />
+            <div className="mb-3 flex items-center gap-1.5">
+              <p className="text-sm text-muted-foreground">{report.description}</p>
+              <ChartNote note={report.meta?.caveat} />
             </div>
-            {report.meta?.caveat ? (
-              <p className="mt-3 text-xs text-muted-foreground">{report.meta.caveat}</p>
-            ) : null}
+            <div className="rounded-xl bg-surface-2 p-4">
+              <ReportChart report={report} dimensionLabel={DIMENSION_LABELS[dimension] ?? dimension} note={report.meta?.caveat} />
+            </div>
           </>
         ) : (
           <p className="text-sm text-muted-foreground">No data for this range yet.</p>

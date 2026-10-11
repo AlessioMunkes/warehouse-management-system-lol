@@ -34,6 +34,7 @@ import { formatLabel, shapeOf, yearEarlier } from '../features/reporting/chartFo
 import { resolvePreset, DEFAULT_PRESET } from '../features/reporting/dateRanges';
 import { getCatalog, runReport, getComparisons, runComparison, saveTarget, drillDown, getSaved } from '../services/reportingAPI';
 import { SavedReportsBar, SaveReport } from '../features/reporting/SavedReports';
+import ChartNote from '../features/reporting/ChartNote';
 import { Truck, TrendingUp, CheckCircle2, AlertTriangle, ChevronDown } from 'lucide-react';
 
 const CHARCOAL = 'var(--ink)';
@@ -520,9 +521,12 @@ export default function ReportingPage() {
               ← Back to {drillStack[drillStack.length - 1].description}
             </button>
           )}
-          <p className="text-sm font-medium" style={{ color: CHARCOAL }}>
-            {report.description}
-          </p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-medium" style={{ color: CHARCOAL }}>
+              {report.description}
+            </p>
+            <ChartNote note={report.meta?.caveat} />
+          </div>
           {report.meta?.drillable && (
             <p className="mt-1 text-xs" style={{ color: MUTED }}>
               {highlight
@@ -571,10 +575,8 @@ export default function ReportingPage() {
               preset={preset === 'custom' ? 'last_3m' : preset} onSaved={loadSaved} />
           </div>
 
-          <footer className="mt-5 space-y-1 border-t pt-3 text-xs"
+          <footer className="mt-5 space-y-1 border-t pt-3 text-xs empty:hidden"
                   style={{ borderColor: BORDER, color: MUTED }}>
-            {report.meta?.caveat && <p>{report.meta.caveat}</p>}
-
             {/* A filter the chosen report cannot apply means the
                 answer is broader than the question. Say so. */}
             {report.meta?.droppedFilters && (

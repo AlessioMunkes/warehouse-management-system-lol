@@ -27,7 +27,7 @@ import {
 import { X } from 'lucide-react';
 import {
   SERIES, VIEW_LABELS, anomaliesOf, defaultView, downloadCsv, fmtTick, fmtValue, formatLabel,
-  isAdditive, pivot, ragColour, shapeOf, toCsv, unitWord, viewsFor,
+  fitLabel, isAdditive, pivot, ragColour, shapeOf, toCsv, unitWord, viewsFor,
 } from './chartFormat';
 import { Flow, Funnel, Waterfall } from './OperationalDiagrams';
 
@@ -43,6 +43,20 @@ const axisProps = {
   axisLine: { stroke: LINE },
   tickLine: false,
 };
+
+// A category name under a bar, on up to two lines and cut to the
+// width of its slot, so ten bars do not print over one another. The
+// tooltip gives the name in full.
+function FitTick({ x, y, payload, width, visibleTicksCount }) {
+  const slot = (Number(width) || 0) / Math.max(visibleTicksCount || 1, 1) - 6;
+  return (
+    <text x={x} y={y + 10} textAnchor="middle" fontSize={11} fill={MUTED}>
+      {fitLabel(formatLabel(payload?.value ?? ''), slot).map((line, i) => (
+        <tspan key={line + i} x={x} dy={i === 0 ? 0 : 13}>{line}</tspan>
+      ))}
+    </text>
+  );
+}
 
 // Values lead, labels follow; keyed with a short stroke, not a box.
 function ChartTooltip({ active, payload, label, unit, labelFor }) {
@@ -445,7 +459,7 @@ export default function OperationalChart({
             </>
           ) : (
             <>
-              <XAxis dataKey="name" tickFormatter={(v) => { const s = formatLabel(v); return s.length > 12 ? `${s.slice(0, 11)}…` : s; }} {...axisProps} interval={0} />
+              <XAxis dataKey="name" {...axisProps} tick={<FitTick />} height={40} interval={0} />
               <YAxis tickFormatter={(v) => fmtTick(v, unit)} {...axisProps} width={52} />
             </>
           )}

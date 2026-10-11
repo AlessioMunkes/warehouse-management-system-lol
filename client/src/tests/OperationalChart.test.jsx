@@ -7,7 +7,7 @@
 // ResponsiveContainer is given a fixed size here.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { cloneElement } from 'react';
 
 vi.mock('recharts', async (orig) => {
@@ -80,7 +80,9 @@ describe('OperationalChart', () => {
     const onHighlight = vi.fn();
     const { rerender } = render(<OperationalChart report={category} dimensionLabel="ECD centre" highlight={null} onHighlight={onHighlight} />);
     fireEvent.click(screen.getByRole('button', { name: 'Table' }));
-    fireEvent.click(screen.getByText('Ikhaya'));
+    // In the table: recharts keeps an off-screen span it measures axis
+    // names in, which holds the same word.
+    fireEvent.click(within(screen.getByRole('table')).getByText('Ikhaya'));
     expect(onHighlight).toHaveBeenCalledWith('Ikhaya');
 
     rerender(<OperationalChart report={category} dimensionLabel="ECD centre" highlight="Ikhaya" onHighlight={onHighlight} />);

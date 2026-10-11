@@ -32,6 +32,27 @@ export const formatLabel = (label) => {
   return humanise(s);
 };
 
+// An axis label that fits its slot: up to two lines, broken at a
+// space, each cut to what the slot holds. `slot` is in the chart's own
+// units; a character is about 0.6 of the font size wide. Ten bars
+// side by side used to print "Mitchells P." over "Bonteheuwel".
+export const fitLabel = (text, slot, fontSize = 11) => {
+  const max = Math.max(3, Math.floor(slot / (fontSize * 0.6)));
+  const s = String(text);
+  if (s.length <= max) return [s];
+  const cut = (t) => (t.length > max ? `${t.slice(0, max - 1)}…` : t);
+  const words = s.split(' ');
+  if (words.length === 1) return [cut(s)];
+  let first = words[0];
+  let i = 1;
+  while (i < words.length && `${first} ${words[i]}`.length <= max) { first += ` ${words[i]}`; i += 1; }
+  return [cut(first), cut(words.slice(i).join(' '))];
+};
+
+// A report's note as separate short points, one per sentence.
+export const noteLines = (note) =>
+  String(note ?? '').split(/(?<=[.!?])\s+/).map((line) => line.trim()).filter(Boolean);
+
 export const fmtValue = (value, unit) => {
   const n = Number(value ?? 0);
   if (unit === 'ZAR') return `R${n.toLocaleString('en-ZA', { maximumFractionDigits: 0 })}`;

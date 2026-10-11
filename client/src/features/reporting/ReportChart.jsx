@@ -19,8 +19,9 @@
 // metric report an absolute number, because "12 below" is the fact a
 // manager acts on.
 // ─────────────────────────────────────────────────────────────
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { fitLabel, isAdditive, noteLines } from './chartFormat';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -85,6 +86,21 @@ const formatLabel = (label) => {
 const GROUP_COLORS = { Children: RED, Adults: 'var(--chart-tan)', Households: CHARCOAL };
 const colorForGroup = (name, i) => GROUP_COLORS[name] ?? PALETTE[i % PALETTE.length];
 
+// An axis label on up to two lines, sized to the slot it sits in.
+const AxisLabel = ({ x, y, text, slot }) => (
+  <text x={x} y={y} textAnchor="middle" fontSize="11" fill={MUTED}>
+    {fitLabel(text, slot).map((line, i) => (
+      <tspan key={line + i} x={x} dy={i === 0 ? 0 : 13}>{line}</tspan>
+    ))}
+  </text>
+);
+
+// The whole slot answers the pointer, not only the bar: a short bar
+// is a small target.
+const Hit = ({ x, y, width, height }) => (
+  <rect x={x} y={y} width={width} height={height} fill="transparent" />
+);
+
 const NumberView = ({ series, unit }) => (
   <div className="py-10 text-center">
     <div className="text-5xl sm:text-6xl font-bold tracking-tight" style={{ color: CHARCOAL }}>
@@ -94,7 +110,7 @@ const NumberView = ({ series, unit }) => (
   </div>
 );
 
-const BarView = ({ series, unit }) => {
+const BarView = ({ series, unit, tipFor }) => {
   const max = Math.max(...series.map((r) => r.value), 0) || 1;
   const W = 640, H = 240, PAD_B = 44, PAD_T = 24;
   const slot = W / series.length;
@@ -108,17 +124,15 @@ const BarView = ({ series, unit }) => {
         const x = i * slot + (slot - barW) / 2;
         const y = H - PAD_B - h;
         return (
-          <g key={row.label}>
+          <g key={row.label} {...tipFor(row)}>
+            <Hit x={i * slot} y={0} width={slot} height={H} />
             <rect x={x} y={y} width={barW} height={h} rx="3" fill={PALETTE[i % PALETTE.length]} />
             {/* Printed value: ACC-03, height is never the only carrier. */}
             <text x={x + barW / 2} y={y - 6} textAnchor="middle"
                   fontSize="12" fontWeight="600" fill={CHARCOAL}>
               {fmt(row.value, unit)}
             </text>
-            <text x={x + barW / 2} y={H - PAD_B + 18} textAnchor="middle"
-                  fontSize="11" fill={MUTED}>
-              {truncate(formatLabel(row.label), 12)}
-            </text>
+            <AxisLabel x={x + barW / 2} y={H - PAD_B + 18} text={formatLabel(row.label)} slot={slot - 4} />
           </g>
         );
       })}
@@ -133,7 +147,7 @@ const BarView = ({ series, unit }) => {
 // server keeps returning the same flat [{label,value}] shape every
 // other chart type does rather than inventing a second response
 // shape for this one.
-const GroupedBarView = ({ series, unit }) => {
+const GroupedBarView = ({ series, unit, tipFor }) => {
   const parsed = series.map((row) => {
     const [month, group] = String(row.label).split('|');
     return { month, group: group ?? 'Total', value: row.value };
@@ -166,14 +180,14 @@ const GroupedBarView = ({ series, unit }) => {
                 const x = startX + gi * (barW + barGap);
                 const y = H - PAD_B - h;
                 return (
-                  <rect key={group} x={x} y={y} width={Math.max(barW, 2)} height={h} rx="2"
-                        fill={colorForGroup(group, gi)} />
+                  <g key={group} {...tipFor({ label: `${month}|${group}`, value })}>
+                    <Hit x={x} y={0} width={Math.max(barW, 2)} height={H - PAD_B} />
+                    <rect x={x} y={y} width={Math.max(barW, 2)} height={h} rx="2"
+                          fill={colorForGroup(group, gi)} />
+                  </g>
                 );
               })}
-              <text x={clusterX + clusterW / 2} y={H - PAD_B + 18} textAnchor="middle"
-                    fontSize="11" fill={MUTED}>
-                {truncate(formatLabel(month), 10)}
-              </text>
+              <AxisLabel x={clusterX + clusterW / 2} y={H - PAD_B + 18} text={formatLabel(month)} slot={clusterW - 4} />
             </g>
           );
         })}
@@ -191,7 +205,7 @@ const GroupedBarView = ({ series, unit }) => {
   );
 };
 
-const HBarView = ({ series, unit }) => {
+const HBarView = ({ series, unit, tipFor }) => {
   // Negative values (below reorder level) need a zero axis with bars
   // running left; all-positive series keep the full width.
   const values  = series.map((r) => r.value);
@@ -213,7 +227,8 @@ const HBarView = ({ series, unit }) => {
         const w = (Math.abs(row.value) / maxAbs) * trackW;
         const x = hasNeg ? zeroX - w : LABEL_W;
         return (
-          <g key={row.label}>
+          <g key={row.label} {...tipFor(row)}>
+            <Hit x={0} y={i * ROW} width={W} height={ROW} />
             <text x="0" y={y + 15} fontSize="12" fill={CHARCOAL}>
               {truncate(formatLabel(row.label), 22)}
             </text>
@@ -235,7 +250,7 @@ const HBarView = ({ series, unit }) => {
   );
 };
 
-const LineView = ({ series, unit }) => {
+const LineView = ({ series, unit, tipFor }) => {
   const max = Math.max(...series.map((r) => r.value), 0) || 1;
   const W = 640, H = 240, PAD_B = 44, PAD_T = 28, PAD_X = 24;
   const span = W - PAD_X * 2;
@@ -257,7 +272,8 @@ const LineView = ({ series, unit }) => {
                 fill="none" stroke={RED} strokeWidth="2.5"
                 strokeLinejoin="round" strokeLinecap="round" />
       {series.map((row, i) => (
-        <g key={row.label}>
+        <g key={row.label} {...tipFor(row)}>
+          <Hit x={points[i].x - (step || span) / 2} y={0} width={step || span} height={H} />
           <circle cx={points[i].x} cy={points[i].y} r="4" fill={RED} />
           {i % every === 0 && (
             <>
@@ -265,10 +281,7 @@ const LineView = ({ series, unit }) => {
                     fontSize="11" fontWeight="600" fill={CHARCOAL}>
                 {fmt(row.value, unit)}
               </text>
-              <text x={points[i].x} y={H - PAD_B + 18} textAnchor="middle"
-                    fontSize="11" fill={MUTED}>
-                {truncate(formatLabel(row.label), 10)}
-              </text>
+              <AxisLabel x={points[i].x} y={H - PAD_B + 18} text={formatLabel(row.label)} slot={(step || span) * every - 4} />
             </>
           )}
         </g>
@@ -358,9 +371,18 @@ const sortSeries = (series, sort) => {
 // small preview card (TrendCard.jsx) — the aria-label summary below
 // still carries every value to assistive tech regardless, so this is
 // a visual simplification, not an accessibility trade-off.
-export default function ReportChart({ report, dimensionLabel = 'Category', compact = false, initialSort = 'desc' }) {
+//
+// HOVER TIPS. Each bar, row or point answers the pointer with its own
+// tip: its full name (the axis may have cut it), its figure, its share
+// of the total where a total means something, and the report's note
+// (`note`), one short line per point. The note used to be a paragraph
+// under the chart. Pointer only: the table view and the summary carry
+// the same figures to a keyboard or a screen reader.
+export default function ReportChart({ report, dimensionLabel = 'Category', compact = false, initialSort = 'desc', note }) {
   const [asTable, setAsTable] = useState(false);
   const [sort, setSort] = useState(initialSort);
+  const [tip, setTip] = useState(null);
+  const frame = useRef(null);
   const { series: rawSeries, chartType, meta } = report;
   const unit = meta?.unit ?? '';
 
@@ -380,6 +402,25 @@ export default function ReportChart({ report, dimensionLabel = 'Category', compa
     number: NumberView, bar: BarView, hbar: HBarView, line: LineView, grouped_bar: GroupedBarView,
   }[chartType] ?? BarView;
 
+  const total = rawSeries.reduce((sum, r) => sum + Number(r.value || 0), 0);
+  const shares = isAdditive(unit, rawSeries) && chartType !== 'grouped_bar' && rawSeries.length > 1 && total > 0;
+  const notes = noteLines(note);
+
+  const place = (e, row) => {
+    const box = frame.current?.getBoundingClientRect();
+    if (!box) return;
+    // Kept inside the chart so a tip on the last bar is not cut off.
+    const x = Math.min(Math.max(e.clientX - box.left, 110), Math.max(box.width - 110, 110));
+    // Above the pointer, or below it when the top of the screen is
+    // too close for the tip to fit.
+    setTip({ row, x, y: e.clientY - box.top, below: e.clientY < 190 });
+  };
+  const tipFor = (row) => (compact ? {} : {
+    onMouseEnter: (e) => place(e, row),
+    onMouseMove:  (e) => place(e, row),
+    onMouseLeave: () => setTip(null),
+  });
+
   // One sentence summarising the chart, for screen readers. The
   // visual is marked presentational so it is not announced twice.
   const summary = `${report.description}. ` +
@@ -387,10 +428,30 @@ export default function ReportChart({ report, dimensionLabel = 'Category', compa
 
   return (
     <div>
-      <div role="img" aria-label={summary}>
+      <div ref={frame} className="relative" role="img" aria-label={summary}>
         {asTable
           ? <TableView series={series} unit={unit} dimensionLabel={dimensionLabel} />
-          : <Chart series={series} unit={unit} />}
+          : <Chart series={series} unit={unit} tipFor={tipFor} />}
+        {tip && !asTable ? (
+          <div
+            data-testid="chart-tip"
+            className={`pointer-events-none absolute z-10 w-52 -translate-x-1/2 rounded-lg border border-line bg-surface px-3 py-2 text-xs shadow-sm ${tip.below ? '' : '-translate-y-full'}`}
+            style={{ left: tip.x, top: tip.below ? tip.y + 18 : tip.y - 10 }}
+          >
+            <p style={{ color: MUTED }}>{formatLabel(tip.row.label)}</p>
+            <p className="font-bold" style={{ color: CHARCOAL }}>
+              {fmt(tip.row.value, unit)}{unit && unit !== '%' ? ` ${tip.row.meta?.unit ?? unit}` : ''}
+            </p>
+            {shares ? (
+              <p style={{ color: MUTED }}>{((Number(tip.row.value) / total) * 100).toFixed(0)}% of the total</p>
+            ) : null}
+            {notes.length ? (
+              <ul className="mt-1.5 space-y-1 border-t border-line pt-1.5" style={{ color: MUTED }}>
+                {notes.map((line) => <li key={line}>{line}</li>)}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {compact ? null : (
