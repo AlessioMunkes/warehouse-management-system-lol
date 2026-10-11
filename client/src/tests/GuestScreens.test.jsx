@@ -197,7 +197,7 @@ describe('(c) guest home', () => {
     renderAt('/guest-home', <GuestHomePage />, '/guest-home');
 
     // NFR-19: the whole name they signed in with, not the first word.
-    expect(await screen.findByRole('heading', { level: 1, name: 'Welcome, Thabo Mokoena' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Hi Thabo Mokoena, welcome!' })).toBeInTheDocument();
     expect(screen.getByText('Masibambane Day Care')).toBeInTheDocument();
     expect(screen.getByText('Rondebosch Soup Kitchen')).toBeInTheDocument();
   });
@@ -444,7 +444,7 @@ describe('the guest session bar', () => {
     api.fetchMySlip.mockResolvedValue(mySlip);
     renderAt('/guest/pack', <GuestPackPage />, '/guest/pack');
 
-    await screen.findByRole('navigation', { name: 'Your session' });
+    await screen.findByRole('group', { name: 'Your session' });
     screen.getByRole('button', { name: 'Sign out' });
     screen.getByRole('button', { name: 'Home' }).click();
     expect(await screen.findByText('Guest home')).toBeInTheDocument();

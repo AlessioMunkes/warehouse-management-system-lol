@@ -1,9 +1,9 @@
 {
   "admin.routes.js GET /activity": "admin",
   "admin.routes.js GET /archive": "admin",
-  "assistant.routes.js GET /catalog": "admin,manager,warehouse_worker",
-  "assistant.routes.js GET /topic/:id": "admin,manager,warehouse_worker",
-  "assistant.routes.js POST /ask": "admin,manager,warehouse_worker",
+  "assistant.routes.js GET /catalog": "admin,guest,manager,warehouse_worker",
+  "assistant.routes.js GET /topic/:id": "admin,guest,manager,warehouse_worker",
+  "assistant.routes.js POST /ask": "admin,guest,manager,warehouse_worker",
   "beneficiary.routes.js GET /": "admin,manager,warehouse_worker",
   "beneficiary.routes.js POST /": "admin,manager",
   "beneficiary.routes.js GET /:id": "admin,manager,warehouse_worker",

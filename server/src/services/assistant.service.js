@@ -51,6 +51,11 @@ const fail = (status, message) => {
 };
 
 const MAX_QUESTION = 300;
+// A guest is a volunteer for a shift, not a member of staff: shorter
+// questions, no sentence of the model's own, no memory of the turn
+// before. They get the topic, word for word, and nothing else.
+const GUEST = 'guest';
+const MAX_GUEST_QUESTION = 160;
 const MIN_QUESTION = 3;
 const MAX_ATTEMPTS = 2;
 
@@ -113,7 +118,8 @@ export const ask = async ({ question, screen, userId, role, previous }) => {
   if (typeof question !== 'string' || question.trim().length < MIN_QUESTION) {
     throw fail(400, 'Type a few more words and I will have a better go at it.');
   }
-  if (question.length > MAX_QUESTION) {
+  const isGuest = role === GUEST;
+  if (question.length > (isGuest ? MAX_GUEST_QUESTION : MAX_QUESTION)) {
     throw fail(400, 'That is a bit long for me. Try asking it in a sentence.');
   }
 
@@ -122,7 +128,8 @@ export const ask = async ({ question, screen, userId, role, previous }) => {
   const system  = buildSystemPrompt(role);
 
   const log = (outcome, extra = {}) => logRepo.record({
-    userId,
+    // The log's user is a staff account. A guest's id is a volunteer's.
+    userId: isGuest ? null : userId,
     role,
     screen: screen ?? null,
     question,
@@ -146,7 +153,7 @@ export const ask = async ({ question, screen, userId, role, previous }) => {
   // The topic id is checked against this role's catalogue, so a client
   // cannot use it to make the model read a topic it may not see.
   const before = [];
-  if (previous && typeof previous === 'object') {
+  if (!isGuest && previous && typeof previous === 'object') {
     if (typeof previous.question === 'string' && previous.question.trim()) {
       const said = redactText(previous.question.slice(0, MAX_QUESTION), names, keep).text;
       before.push(`Their previous message: ${said}`);
@@ -188,7 +195,7 @@ export const ask = async ({ question, screen, userId, role, previous }) => {
           topic: publicTopic(topic, role),
           // The model's own sentence or two, only if every word of it
           // is the topic's. null is the ordinary case, not a failure.
-          answer: checkAnswer(call.args?.direct_answer, topic, ORG_CONTEXT),
+          answer: isGuest ? null : checkAnswer(call.args?.direct_answer, topic, ORG_CONTEXT),
         };
       }
 

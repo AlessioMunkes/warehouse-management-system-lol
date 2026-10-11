@@ -17,7 +17,7 @@ import {
 } from '../src/features/assistant/helpCatalog.js';
 import { buildTools, buildSystemPrompt } from '../src/features/assistant/toolSchema.js';
 
-const ROLES = ['warehouse_worker', 'manager', 'admin'];
+const ROLES = ['warehouse_worker', 'manager', 'admin', 'guest'];
 
 describe('the help catalog', () => {
   it('has no duplicate topic ids', () => {

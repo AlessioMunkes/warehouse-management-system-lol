@@ -61,16 +61,15 @@ const ProtectedRoute = ({ roles, shell = false } = {}) => {
   // landing and login pages for free because they are outside any
   // ProtectedRoute.
   //
-  // Not for guests. A guest is a volunteer signed in with a first
-  // name for one event; they see a single screen, and the server
-  // refuses them the endpoint anyway (assistant.routes.js), so
-  // offering the button would be offering a dead end.
+  // Guests get it too: a volunteer on their first shift needs help the
+  // most. The server gives them a small set of topics of their own, no
+  // screens to open and a tighter limit (assistant.routes.js).
   const content = shell ? <ManagerLayout><Outlet /></ManagerLayout> : <Outlet />;
 
   return (
     <>
       {content}
-      {user.role !== 'guest' && <AssistantLauncher role={user.role} />}
+      <AssistantLauncher role={user.role} />
     </>
   );
 };

@@ -22,17 +22,27 @@ import { formatDay, foodForPhrase, RICH_MARK } from './guestFormat';
 import { useGuestSignOut } from './useGuestSignOut';
 import { useT } from '../../translations';
 import GuestLanguageSwitch from './GuestLanguageSwitch';
+import { BATCHES_LOGO } from '../assistant/brand';
 import '../../styles/guest.css';
 
 // ── Shell ─────────────────────────────────────────────────────
 // Owns the token scope. Every guest screen renders inside one.
-// The brand name is never translated.
-const Masthead = () => {
+//
+// ONE top bar, the app's own: the logo on the surface colour with a
+// hairline under it, and the session's controls at the end. It used to
+// be a dark band spelling the organisation's name in capitals with a
+// second bar under it, which matched nothing else in the app.
+const TopBar = ({ start = null, children = null }) => {
   const t = useT();
   return (
-    <header className="gst-masthead">
-      <span className="gst-masthead-brand" translate="no">Ladles<span>·</span>of<span>·</span>Love</span>
-      <span className="gst-masthead-brand gst-masthead-role">{t('guest.brand.role')}</span>
+    <header className="gst-topbar">
+      <div className="gst-topbar-inner">
+        <span className="gst-brand">
+          <img src={BATCHES_LOGO} alt="" className="gst-brand-logo" />
+          {start ?? <span className="gst-brand-role">{t('guest.brand.role')}</span>}
+        </span>
+        {children}
+      </div>
     </header>
   );
 };
@@ -44,7 +54,7 @@ const Masthead = () => {
 export const GuestShell = ({ children, nav = false }) => (
   nav ? <NavShell>{children}</NavShell> : (
     <div className="gst-shell">
-      <Masthead />
+      <TopBar />
       <main className="gst-page">{children}</main>
     </div>
   )
@@ -61,15 +71,14 @@ const NavShell = ({ children }) => {
 
   return (
     <div className="gst-shell">
-      <Masthead />
-      <nav className="gst-nav" aria-label={t('guest.nav.label')}>
-        <div className="gst-nav-inner">
-          {pathname !== '/guest-home' ? (
-            <button type="button" className="gst-nav-btn" onClick={() => navigate('/guest-home')} disabled={flow.busy}>
-              {t('guest.nav.home')}
-            </button>
-          ) : <span />}
-          <span className="gst-nav-end">
+      <TopBar
+        start={pathname !== '/guest-home' ? (
+          <button type="button" className="gst-nav-btn" onClick={() => navigate('/guest-home')} disabled={flow.busy}>
+            {t('guest.nav.home')}
+          </button>
+        ) : null}
+      >
+          <span className="gst-nav-end" role="group" aria-label={t('guest.nav.label')}>
             <GuestLanguageSwitch />
             <button
               type="button" className="gst-nav-btn"
@@ -81,8 +90,7 @@ const NavShell = ({ children }) => {
               {t('guest.nav.signOut')}
             </button>
           </span>
-        </div>
-      </nav>
+      </TopBar>
       <main className="gst-page">
         <SignOutConfirm flow={flow} />
         {children}

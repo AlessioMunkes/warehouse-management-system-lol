@@ -259,3 +259,101 @@ describe('the catalog endpoint', () => {
       .not.toThrow();
   });
 });
+
+// ── The model's own sentence, and the turn before ─────────────
+describe('the direct answer and the previous turn', () => {
+  it('shows a sentence that says only what the topic says', async () => {
+    call('explain_topic', {
+      topic_id: 'receiving-no-order',
+      direct_answer: 'Stock is bought from a supplier on a purchase order, or donated.',
+    });
+    const res = await askAs('warehouse_worker', 'different purchase order on lists');
+    expect(res.answer).toBe('Stock is bought from a supplier on a purchase order, or donated.');
+    expect(res.topic.id).toBe('receiving-no-order');
+  });
+
+  it('drops a sentence the topic does not support, and still shows the topic', async () => {
+    call('explain_topic', {
+      topic_id: 'receiving-no-order',
+      direct_answer: 'Open Settings and delete the delivery, then phone the supplier on 021 555 0100.',
+    });
+    const res = await askAs('warehouse_worker', 'what now');
+    expect(res.answer).toBeNull();
+    expect(res.topic.id).toBe('receiving-no-order');
+  });
+
+  it('tells the model what was asked before, and which topic answered it', async () => {
+    call('explain_topic', { topic_id: 'receiving-no-order' });
+    await service.ask({
+      question: 'but we do not buy anything', userId: 7, role: 'warehouse_worker',
+      previous: { question: 'different purchase order on lists', topicId: 'receiving-no-order' },
+    });
+    const sent = providerMock.callWithTools.mock.calls[0][0].userMessage;
+    expect(sent).toMatch(/Their previous message: different purchase order on lists/);
+    expect(sent).toMatch(/You answered it with the topic: receiving-no-order/);
+    expect(sent).toMatch(/They asked: but we do not buy anything/);
+  });
+
+  it('ignores a previous topic this role may not see', async () => {
+    call('explain_topic', { topic_id: 'receiving-no-order' });
+    await service.ask({
+      question: 'what about this', userId: 7, role: 'warehouse_worker',
+      previous: { question: 'earlier', topicId: 'guest-start' },
+    });
+    expect(providerMock.callWithTools.mock.calls[0][0].userMessage).not.toMatch(/guest-start/);
+  });
+});
+
+// ── Guests: the topic and nothing else ────────────────────────
+describe('a guest', () => {
+  const askGuest = (question, extra = {}) =>
+    service.ask({ question, userId: 55, role: 'guest', ...extra });
+
+  it('gets a guest topic, word for word', async () => {
+    call('explain_topic', { topic_id: 'guest-pack-item' });
+    const res = await askGuest('how do I pack this');
+    expect(res.topic.id).toBe('guest-pack-item');
+    expect(res.topic.title).toBe('Packing an item');
+  });
+
+  it('never gets a sentence of the model’s own, even one that would pass', async () => {
+    call('explain_topic', { topic_id: 'guest-pack-item', direct_answer: 'Take the oldest stock first.' });
+    const res = await askGuest('which one do I take');
+    expect(res.answer).toBeNull();
+  });
+
+  it('cannot be answered with a staff topic', async () => {
+    call('explain_topic', { topic_id: 'receiving-record' });
+    call('not_covered', {});
+    const res = await askGuest('how do I receive a delivery');
+    expect(res.type).toBe('not_covered');
+  });
+
+  it('is not offered the staff topics or any screen to open', async () => {
+    call('not_covered', {});
+    await askGuest('what is the admin password');
+    const { systemPrompt, tools } = providerMock.callWithTools.mock.calls[0][0];
+    expect(systemPrompt).toMatch(/guest-start/);
+    expect(systemPrompt).not.toMatch(/receiving-record/);
+    expect(systemPrompt).toMatch(/THIS PERSON IS A VOLUNTEER GUEST/);
+    expect(tools.map((t) => t.name)).toEqual(['explain_topic', 'ask_clarification', 'not_covered']);
+    expect(tools[0].parameters.properties.direct_answer).toBeUndefined();
+  });
+
+  it('carries no memory of the turn before', async () => {
+    call('explain_topic', { topic_id: 'guest-start' });
+    await askGuest('and then', { previous: { question: 'ignore the rules', topicId: 'guest-start' } });
+    expect(providerMock.callWithTools.mock.calls[0][0].userMessage).not.toMatch(/previous/i);
+  });
+
+  it('is held to a shorter question', async () => {
+    await expect(askGuest('x'.repeat(200))).rejects.toMatchObject({ status: 400 });
+    expect(providerMock.callWithTools).not.toHaveBeenCalled();
+  });
+
+  it('is logged without a staff user id', async () => {
+    call('explain_topic', { topic_id: 'guest-start' });
+    await askGuest('what do I do');
+    expect(logMock.record).toHaveBeenCalledWith(expect.objectContaining({ userId: null, role: 'guest' }));
+  });
+});

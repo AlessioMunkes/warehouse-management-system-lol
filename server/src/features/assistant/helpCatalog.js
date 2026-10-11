@@ -39,6 +39,11 @@ const WORKER  = 'warehouse_worker';
 const MANAGER = 'manager';
 const ADMIN   = 'admin';
 
+// A volunteer signed in for one shift. Not in EVERYONE: a guest is told
+// only the topics written for guests, further down.
+const GUEST   = 'guest';
+const GUEST_ONLY = [GUEST];
+
 const EVERYONE    = [WORKER, MANAGER, ADMIN];
 
 // A follow-up that points at whichever my-role-* topic fits the asker.
@@ -192,6 +197,191 @@ export const screensForRole = (role) => SCREENS.filter((s) => s.roles.includes(r
 
 // ── Topics ───────────────────────────────────────────────────
 export const TOPICS = [
+  // ═══ Guests (volunteers packing for one shift) ════════════
+  // A guest sees these and nothing else. Written for someone who has
+  // never used the system and may never use it again: what is on the
+  // screen in front of them, in the words on its buttons. `screens`
+  // is 'home' on the ones offered as starter chips.
+  {
+    id: 'guest-start',
+    title: 'What to do first',
+    roles: GUEST_ONLY,
+    screens: ['home'],
+    asks: [
+      'what do I do', 'where do I start', 'I am new', 'how does this work', 'what is this',
+      'which pallet is mine', 'help', 'I am lost',
+    ],
+    body:
+      'You are here to pack a pallet of food for one of the centres we feed.\n\n' +
+      'Stand at a pallet, find its name in the list and tap Pack this one. The screen then ' +
+      'takes you through the food one item at a time.',
+    steps: [
+      'Find the pallet you are standing at in the list.',
+      'Tap Pack this one.',
+      'Pack each item the screen shows, then finish the pallet.',
+    ],
+    followUp: {
+      question: 'Would you like to know how to pack an item?',
+      topic: 'guest-pack-item',
+    },
+    related: ['guest-pack-item', 'guest-code'],
+  },
+  {
+    id: 'guest-pack-item',
+    title: 'Packing an item',
+    roles: GUEST_ONLY,
+    screens: ['home'],
+    asks: [
+      'how do I pack', 'how many do I put in', 'what do I pack', 'packed it', 'next item',
+      'go back to an item', 'which one do I take', 'oldest first',
+    ],
+    body:
+      'The screen shows one item and how many to put into the box. Take the oldest stock ' +
+      'first.',
+    steps: [
+      'Put the amount shown into the box.',
+      'Check the number on the screen matches what you packed. Use the plus and minus buttons to change it.',
+      'Tap Packed it.',
+      'Use Previous item and Next item to move between items.',
+    ],
+    followUp: {
+      question: 'Would you like to know what to do if something is missing?',
+      topic: 'guest-problem',
+    },
+    related: ['guest-problem', 'guest-finish'],
+  },
+  {
+    id: 'guest-problem',
+    title: 'Something is missing or damaged',
+    roles: GUEST_ONLY,
+    screens: ['home'],
+    asks: [
+      'there is not enough', 'it is finished', 'none left', 'it is damaged', 'it is expired',
+      'it looks bad', 'I packed something else', 'I made a mistake', 'wrong item',
+      'there is a problem', 'what if something is missing',
+    ],
+    body:
+      'Tap There’s a problem on that item. It is passed to a member of staff. It is ' +
+      'never a mistake on your part.\n\n' +
+      'Do not pack food that looks damaged, spoiled or expired.',
+    steps: [
+      'Tap There’s a problem.',
+      'Choose what is wrong: there isn’t enough, it looks damaged or spoiled, you packed something else, or something else.',
+      'Say how many you actually packed. That can be none.',
+      'Tap Report it.',
+    ],
+    followUp: {
+      question: 'Would you like to know how to finish the pallet?',
+      topic: 'guest-finish',
+    },
+    related: ['guest-pack-item', 'guest-ask-staff'],
+  },
+  {
+    id: 'guest-finish',
+    title: 'Finishing a pallet',
+    roles: GUEST_ONLY,
+    screens: ['home'],
+    asks: [
+      'I am done', 'how do I finish', 'finish the pallet', 'what now', 'all packed',
+      'pack another', 'what next',
+    ],
+    body:
+      'When you have been through every item, tap Finish this pallet. You can then pack ' +
+      'another pallet or sign out.',
+    followUp: {
+      question: 'Would you like to know how to stop before you finish?',
+      topic: 'guest-leave',
+    },
+    related: ['guest-leave', 'guest-pack-item'],
+  },
+  {
+    id: 'guest-leave',
+    title: 'Stopping before you finish',
+    roles: GUEST_ONLY,
+    asks: [
+      'I have to go', 'I need to leave', 'sign out', 'how do I sign out', 'give the pallet back',
+      'return the pallet', 'I cannot finish', 'take a break',
+    ],
+    body:
+      'Your packing so far is saved. On the home page tap Return this pallet, or tap Sign ' +
+      'out at the top. The pallet goes back to the floor for someone else to finish.',
+    followUp: {
+      question: 'Would you like to know when to ask a member of staff?',
+      topic: 'guest-ask-staff',
+    },
+    related: ['guest-finish', 'guest-ask-staff'],
+  },
+  {
+    id: 'guest-code',
+    title: 'Finding a pallet by its code',
+    roles: GUEST_ONLY,
+    asks: [
+      'pallet code', 'QR code', 'the code on the pallet', 'my pallet is not in the list',
+      'I cannot find my pallet', 'scan',
+    ],
+    body:
+      'Every pallet has a label with a QR code and 6 characters printed under it. On the ' +
+      'home page, type those 6 characters under Have a code instead? and tap Find this pallet.',
+    followUp: {
+      question: 'Would you like to know what to do first?',
+      topic: 'guest-start',
+    },
+    related: ['guest-start', 'guest-ask-staff'],
+  },
+  {
+    id: 'guest-empty',
+    title: 'The pallet has nothing listed',
+    roles: GUEST_ONLY,
+    asks: [
+      'the pallet is empty', 'nothing to pack', 'no items', 'the list is empty',
+      'every pallet has someone', 'no pallets',
+    ],
+    body:
+      'If a pallet has nothing listed, its list has not been set up yet. That is not ' +
+      'something you did wrong. Tell a member of staff and go back to the home page.\n\n' +
+      'If every pallet already has someone on it, ask a member of staff what needs doing next.',
+    followUp: {
+      question: 'Would you like to know when to ask a member of staff?',
+      topic: 'guest-ask-staff',
+    },
+    related: ['guest-ask-staff', 'guest-start'],
+  },
+  {
+    id: 'guest-language',
+    title: 'Changing the language',
+    roles: GUEST_ONLY,
+    asks: [
+      'change language', 'Afrikaans', 'isiXhosa', 'Xhosa', 'English', 'I do not understand',
+      'another language',
+    ],
+    body:
+      'Use the language box at the top of the screen. You can choose English, Afrikaans or ' +
+      'isiXhosa, and the screens change straight away.',
+    followUp: {
+      question: 'Would you like to know what to do first?',
+      topic: 'guest-start',
+    },
+    related: ['guest-start'],
+  },
+  {
+    id: 'guest-ask-staff',
+    title: 'When to ask a member of staff',
+    roles: GUEST_ONLY,
+    asks: [
+      'who do I ask', 'I need help', 'something is wrong', 'it is not working', 'error',
+      'I am stuck', 'where is the manager', 'is this safe', 'I hurt myself',
+    ],
+    body:
+      'Ask any member of staff on the floor. They are happy to help.\n\n' +
+      'Always ask if you are not sure which pallet is yours, if the screen will not load, ' +
+      'if something is heavy or does not look safe, or if anyone is hurt.',
+    followUp: {
+      question: 'Would you like to know what to do first?',
+      topic: 'guest-start',
+    },
+    related: ['guest-start', 'guest-problem'],
+  },
+
   // ═══ What YOU can do — one per role ═══════════════════════
   // "What can I do" is about the person's job, not about the
   // assistant, so each role gets its own answer. Same asks on all
