@@ -79,7 +79,7 @@ const available = (over = {}) => ({
   productId: 5, productName: 'Rice', unit: 'kg', quantityOnHand: 10, committed: 0, available: 10, ...over,
 });
 
-const body = (over = {}) => ({
+const body = (over = {}) => ({ signedOff: true,
   itemsRequested: 'Samp, sugar beans, cooking oil',
   callerName: 'Sister Agnes',
   callerContact: '021 555 0777',
@@ -115,6 +115,24 @@ describe('createRequest', () => {
     expect(repoMock.createRequest).not.toHaveBeenCalled();
   });
 
+  // Whoever takes the request signs it off, and it is recorded against
+  // them: the signed-in user, never a name from the body.
+  it('refuses a request that has not been signed off', async () => {
+    await expect(service.createRequest(body({ signedOff: false }), ACTOR))
+      .rejects.toMatchObject({ status: 400, message: 'Sign off the request before logging it.' });
+    await expect(service.createRequest(body({ signedOff: 'yes' }), ACTOR))
+      .rejects.toMatchObject({ status: 400 });
+    expect(repoMock.createRequest).not.toHaveBeenCalled();
+  });
+
+  it('records the signed-in user as the one who logged it', async () => {
+    await service.createRequest(body({ loggedBy: 999 }), ACTOR);
+    expect(repoMock.createRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ loggedBy: ACTOR.id }),
+      expect.anything(),
+    );
+  });
+
   it('requires an authenticated actor (BR-01)', async () => {
     await expect(service.createRequest(body(), null)).rejects.toMatchObject({ status: 400 });
     await expect(service.createRequest(body(), {})).rejects.toMatchObject({ status: 400 });
@@ -130,7 +148,7 @@ describe('createRequest', () => {
 
   it('maps blank caller fields and a blank quantity note to null', async () => {
     await service.createRequest(
-      { itemsRequested: 'Blankets', callerName: '  ', callerContact: '', quantityNote: '' },
+      { itemsRequested: 'Blankets', callerName: '  ', callerContact: '', quantityNote: '', signedOff: true },
       ACTOR,
     );
     expect(repoMock.createRequest).toHaveBeenCalledWith(

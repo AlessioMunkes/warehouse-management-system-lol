@@ -36,14 +36,27 @@ describe('Log a request (worker)', () => {
     const user = userEvent.setup();
     render(<CommunityRequestFlow />);
     await user.type(screen.getByLabelText('What was requested'), 'Samp and oil');
-    await user.click(screen.getByRole('button', { name: 'Log request' }));
+    await user.click(screen.getByRole('checkbox', { name: /took this request/ }));
+    await user.click(screen.getByRole('button', { name: 'Sign off and log' }));
 
     // The floor asks for it to be kept on the phone if there is no signal.
     await waitFor(() => expect(api.logRequest).toHaveBeenCalledWith(
-      expect.objectContaining({ itemsRequested: 'Samp and oil' }), { keepOffline: true },
+      expect.objectContaining({ itemsRequested: 'Samp and oil', signedOff: true }), { keepOffline: true },
     ));
     expect(await screen.findByRole('dialog', { name: 'Request logged' })).toBeTruthy();
     expect(screen.getByLabelText('What was requested').value).toBe('');
+  });
+
+  // The person taking the request signs it off before it can be logged.
+  it('cannot be logged until it is signed off', async () => {
+    const user = userEvent.setup();
+    render(<CommunityRequestFlow />);
+    await user.type(screen.getByLabelText('What was requested'), 'Samp and oil');
+
+    const log = screen.getByRole('button', { name: 'Sign off and log' });
+    expect(log).toBeDisabled();
+    await user.click(screen.getByRole('checkbox', { name: /took this request/ }));
+    expect(log).toBeEnabled();
   });
 
   it('says the request is saved on the phone when there was no signal', async () => {
@@ -51,7 +64,8 @@ describe('Log a request (worker)', () => {
     const user = userEvent.setup();
     render(<CommunityRequestFlow />);
     await user.type(screen.getByLabelText('What was requested'), 'Samp and oil');
-    await user.click(screen.getByRole('button', { name: 'Log request' }));
+    await user.click(screen.getByRole('checkbox', { name: /took this request/ }));
+    await user.click(screen.getByRole('button', { name: 'Sign off and log' }));
 
     expect(await screen.findByText(/No signal. It sends itself/)).toBeTruthy();
     expect(screen.queryByRole('dialog', { name: 'Request logged' })).toBeNull();
@@ -64,7 +78,8 @@ describe('Log a request (worker)', () => {
     await user.type(screen.getByLabelText('What was requested'), 'x');
     await user.type(screen.getByLabelText(/Date & time of request/), '2099-01-01T10:00');
     expect(screen.getByText('Choose a date and time that is not in the future.')).toBeTruthy();
-    await user.click(screen.getByRole('button', { name: 'Log request' }));
+    await user.click(screen.getByRole('checkbox', { name: /took this request/ }));
+    await user.click(screen.getByRole('button', { name: 'Sign off and log' }));
     expect(api.logRequest).not.toHaveBeenCalled();
   });
 

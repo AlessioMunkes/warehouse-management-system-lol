@@ -2288,6 +2288,23 @@ button.stf-panel-head:disabled { cursor: default; }
 }
 .stf-search-clear:hover { color: var(--stf-ink); }
 
+/* The sign-off line on a form: a tick box and the sentence being
+   signed, as one tap target. */
+.stf-signoff {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: var(--stf-tap);
+  padding: 12px 14px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  font-size: 15px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.stf-signoff input { width: 22px; height: 22px; margin-top: 1px; flex-shrink: 0; accent-color: var(--brand); }
+
 /* The tick on a success pop-up (SuccessDialog). */
 .stf-success-mark {
   display: inline-flex;

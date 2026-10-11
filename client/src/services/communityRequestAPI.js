@@ -58,6 +58,8 @@ export const toRequest = (row = {}) => ({
   outcomeNote:    row.outcome_note ?? '',
   handledBy:      row.handled_by ?? null,
   handledByName:  fullName(row.handled_by_first_name, row.handled_by_last_name),
+  // Who took the request and signed it off.
+  loggedByName:   fullName(row.logged_by_first_name, row.logged_by_last_name),
   resolvedAt:     row.resolved_at ?? null,
   createdAt:      row.created_at ?? null,
   approvedAt:     row.approved_at ?? null,

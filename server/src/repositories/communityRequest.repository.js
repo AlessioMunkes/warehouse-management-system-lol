@@ -28,6 +28,7 @@
 // outcome_note are the who/when/why trail this table keeps.
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
+import { logAudit } from './auditLog.repository.js';
 
 // items: the approved lines, newest information first for the page.
 // A line with short_at set has stopped reserving stock.
@@ -36,6 +37,13 @@ export const SELECT_BASE = `
          cr.items_requested, cr.quantity_note, cr.outcome, cr.outcome_note,
          cr.handled_by, cr.resolved_at, cr.created_at,
          cr.approved_by, cr.approved_at, cr.assigned_to, cr.items_short_at,
+         -- Who logged and signed off the request (migration 046). Read
+         -- through to_jsonb so a database that has not had 046 yet
+         -- still lists its requests, with nobody named, rather than
+         -- failing every read on a missing column.
+         NULLIF(to_jsonb(cr)->>'logged_by', '')::int AS logged_by,
+         ul.first_name AS logged_by_first_name,
+         ul.last_name  AS logged_by_last_name,
          u.first_name  AS handled_by_first_name,
          u.last_name   AS handled_by_last_name,
          ua.first_name AS assigned_to_first_name,
@@ -60,6 +68,7 @@ export const SELECT_BASE = `
     LEFT JOIN public.users u  ON u.id  = cr.handled_by
     LEFT JOIN public.users ua ON ua.id = cr.assigned_to
     LEFT JOIN public.users ub ON ub.id = cr.approved_by
+    LEFT JOIN public.users ul ON ul.id = NULLIF(to_jsonb(cr)->>'logged_by', '')::int
 `;
 
 const getRequestById = async (id, client = pool) => {
@@ -99,6 +108,7 @@ const createRequest = async (payload, client = pool) => {
     itemsRequested,
     quantityNote = null,
     requestedAt = null,
+    loggedBy = null,
   } = payload;
 
   const { rows } = await client.query(
@@ -108,7 +118,32 @@ const createRequest = async (payload, client = pool) => {
      RETURNING id`,
     [callerName, callerContact, itemsRequested, quantityNote, requestedAt]
   );
-  return getRequestById(rows[0].id, client);
+  const id = rows[0].id;
+
+  // The sign-off. Two records of it: the audit log, which is the act
+  // (who, when, what they signed), and logged_by on the request, which
+  // is what the screens read. Both in the caller's transaction, so a
+  // request is never logged without its signature.
+  if (loggedBy) {
+    await logAudit(client, {
+      entityType: 'community_request',
+      entityId:   id,
+      action:     'logged',
+      actorId:    loggedBy,
+      after:      { caller_name: callerName, items_requested: itemsRequested, quantity_note: quantityNote },
+    });
+    // In a savepoint: before migration 046 the column is not there, and
+    // that must not cost the floor the request it just took down.
+    await client.query('SAVEPOINT request_logged_by');
+    try {
+      await client.query(`UPDATE public.community_requests SET logged_by = $2 WHERE id = $1`, [id, loggedBy]);
+      await client.query('RELEASE SAVEPOINT request_logged_by');
+    } catch (err) {
+      await client.query('ROLLBACK TO SAVEPOINT request_logged_by');
+      if (err.code !== '42703') throw err;
+    }
+  }
+  return getRequestById(id, client);
 };
 
 // ── Transitions ───────────────────────────────────────────────

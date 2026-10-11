@@ -474,7 +474,9 @@ CREATE TABLE public.community_requests (
   handled_by integer,
   resolved_at timestamp with time zone,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
+  logged_by integer,
   CONSTRAINT community_requests_pkey PRIMARY KEY (id),
+  CONSTRAINT community_requests_logged_by_fkey FOREIGN KEY (logged_by) REFERENCES public.users(id),
   CONSTRAINT community_requests_handled_by_fkey FOREIGN KEY (handled_by) REFERENCES public.users(id)
 );
 CREATE TABLE public.quickbooks_object_map (

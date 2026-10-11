@@ -73,10 +73,15 @@ const fmtDateTime = (value) =>
 // FeedTheSoilManagerView already make: one small form per audience,
 // not one straddling both.
 function LogRequestForm({ onSubmit, busy, error }) {
+  const { user } = useAuth();
   const [form, setForm] = useState({
     callerName: '', callerContact: '', itemsRequested: '', quantityNote: '', requestedAt: '',
   });
   const [touchedItems, setTouchedItems] = useState(false);
+  // The sign-off: whoever takes the request confirms it and is recorded
+  // against it. Not kept between requests: each one is signed on its own.
+  const [signedOff, setSignedOff] = useState(false);
+  const signerName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'You';
 
   const set = (key) => (value) => setForm((f) => ({ ...f, [key]: value }));
   const itemsMissing = !form.itemsRequested.trim();
@@ -86,8 +91,8 @@ function LogRequestForm({ onSubmit, busy, error }) {
 
   const submit = () => {
     setTouchedItems(true);
-    if (itemsMissing || requestedAtFuture) return;
-    onSubmit(withRequestedAtForServer(form));
+    if (itemsMissing || requestedAtFuture || !signedOff) return;
+    onSubmit({ ...withRequestedAtForServer(form), signedOff: true });
   };
 
   return (
@@ -144,8 +149,19 @@ function LogRequestForm({ onSubmit, busy, error }) {
         </p>
       </div>
 
+      <div className="stf-field">
+        <span className="stf-field-label">Sign off</span>
+        <label className="stf-signoff">
+          <input type="checkbox" checked={signedOff} onChange={(e) => setSignedOff(e.target.checked)} />
+          <span>
+            I, <strong translate="no">{signerName}</strong>, took this request and it is recorded as the caller gave it.
+          </span>
+        </label>
+        <p className="stf-field-hint">Your name is saved with the request.</p>
+      </div>
+
       <Actions>
-        <Button disabled={busy} onClick={submit}>{busy ? 'Saving' : 'Log request'}</Button>
+        <Button disabled={busy || !signedOff} onClick={submit}>{busy ? 'Saving' : 'Sign off and log'}</Button>
       </Actions>
     </>
   );

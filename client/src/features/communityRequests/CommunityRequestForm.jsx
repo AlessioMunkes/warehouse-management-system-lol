@@ -13,7 +13,8 @@
 // field; BR-28 makes the caller's name optional and the quantity is a
 // free-text note ("Enough for roughly 80 plates"), not a number.
 // ─────────────────────────────────────────────────────────────
-import { useState } from 'react';
+import { useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import {
   Field, FieldGroup, FieldLabel, FieldDescription, FieldError,
 } from '@/components/ui/field';
@@ -31,14 +32,19 @@ const BLANK = {
 };
 
 export default function CommunityRequestForm({
-  submitLabel = 'Log request',
+  submitLabel = 'Sign off and log',
   onSubmit,
   onCancel,
   busy = false,
   error = null,
 }) {
+  const { user } = useAuth();
   const [form, setForm] = useState({ ...BLANK });
   const [touchedItems, setTouchedItems] = useState(false);
+  // The sign-off: whoever logs the request confirms it and is recorded
+  // against it, the same as on the floor's form.
+  const [signedOff, setSignedOff] = useState(false);
+  const signerName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'You';
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
   const itemsMissing = !String(form.itemsRequested ?? '').trim();
@@ -48,10 +54,10 @@ export default function CommunityRequestForm({
 
   const submit = () => {
     setTouchedItems(true);
-    if (itemsMissing || requestedAtFuture) return;
+    if (itemsMissing || requestedAtFuture || !signedOff) return;
     // An ISO instant, or no requestedAt at all so the DB default now()
     // applies (see requestedAt.js).
-    onSubmit(withRequestedAtForServer(form));
+    onSubmit({ ...withRequestedAtForServer(form), signedOff: true });
   };
 
   return (
@@ -122,8 +128,23 @@ export default function CommunityRequestForm({
         </Field>
       </div>
 
+      <Field>
+        <FieldLabel htmlFor="cr-sign-off">Sign off</FieldLabel>
+        <label htmlFor="cr-sign-off" className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm">
+          <input
+            id="cr-sign-off"
+            type="checkbox"
+            className="mt-0.5 size-4 shrink-0 accent-[var(--brand)]"
+            checked={signedOff}
+            onChange={(e) => setSignedOff(e.target.checked)}
+          />
+          <span>I, <strong>{signerName}</strong>, took this request and it is recorded as the caller gave it.</span>
+        </label>
+        <FieldDescription>Your name is saved with the request.</FieldDescription>
+      </Field>
+
       <Field orientation="horizontal">
-        <Button type="button" onClick={submit} disabled={busy}>
+        <Button type="button" onClick={submit} disabled={busy || !signedOff}>
           {busy ? <Loader2 className="animate-spin" /> : null}
           {busy ? 'Saving' : submitLabel}
         </Button>

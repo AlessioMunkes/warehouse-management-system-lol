@@ -99,9 +99,16 @@ const createRequest = async (data = {}, actor) => {
 
   requireActor(actor, 'log a request');
 
+  // The person taking the request signs it off: they confirm it is
+  // what the caller asked for, and it is recorded against them. The
+  // name is the signed-in user's, never one sent in the body.
+  if ((data.signedOff ?? data.signed_off) !== true) {
+    fail(400, 'Sign off the request before logging it.');
+  }
+
   return withTransaction((client) =>
     requestRepo.createRequest(
-      { callerName, callerContact, itemsRequested, quantityNote, requestedAt },
+      { callerName, callerContact, itemsRequested, quantityNote, requestedAt, loggedBy: actor.id },
       client
     )
   );

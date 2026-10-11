@@ -68,6 +68,9 @@ export default function RequestDetailPanel({ request: r, onClose }) {
           {r.callerContact ? <span className="block text-muted-foreground">{r.callerContact}</span> : null}
         </Fact>
         <Fact label="Requested">{fmtDateTime(r.requestedAt)}</Fact>
+        {/* Who took the request and signed it off. Blank on requests
+            logged before sign-off existed. */}
+        {r.loggedByName ? <Fact label="Logged and signed off by">{r.loggedByName}</Fact> : null}
         {r.approvedAt ? (
           <Fact label="Approved">
             {fmtDateTime(r.approvedAt)}{r.approvedByName ? ` by ${r.approvedByName}` : ''}
