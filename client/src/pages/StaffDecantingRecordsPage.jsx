@@ -22,6 +22,8 @@ import { getDecantingRecords, getDecantingById } from '../services/decantingAPI'
 import { STAFF } from '../routes/paths';
 import Paged from '../features/staff/Paged';
 import usePaged from '../features/staff/usePaged';
+import StatusBadge from '@/components/ui/status-badge';
+import { Trash2 } from 'lucide-react';
 
 const RANGES = [
   { key: 'today', label: 'Today' },
@@ -121,9 +123,9 @@ export default function StaffDecantingRecordsPage() {
                   </span>
                 </span>
                 {Number(record.total_wastage_kg) > 0 ? (
-                  <span className="stf-badge is-warn">
+                  <StatusBadge tone="warn" icon={Trash2}>
                     {record.total_wastage_kg} kg wastage
-                  </span>
+                  </StatusBadge>
                 ) : null}
                 <button
                   type="button"

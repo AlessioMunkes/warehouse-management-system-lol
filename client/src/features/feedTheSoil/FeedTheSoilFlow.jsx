@@ -50,6 +50,7 @@ import formatKitCode from './kitCode';
 import SuccessDialog from '../staff/SuccessDialog';
 import { OFFLINE_TITLE, offlineLine } from '../staff/successText';
 import { todayISO } from '../packing/spareSlips';
+import StatusBadge from '@/components/ui/status-badge';
 
 const fmtDate = (value) =>
   value ? new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
@@ -65,14 +66,10 @@ const fmtKg = (value) => (value === null || value === undefined ? '-' : `${Numbe
 
 const STATUS_LABEL = { assigned: 'Assigned', logged: 'Logged', dispatched: 'Dispatched' };
 
-// Same red / amber / green as the manager's view: amber with the
+// The manager's badge and the manager's kit styles: amber with the
 // household, blue waiting to go to a farm, green gone.
-const STATUS_BADGE_CLASS = { assigned: ' is-rag-warn', logged: ' is-rag-info', dispatched: ' is-rag-good' };
-
-const StatusBadge = ({ status }) => (
-  <span className={`stf-badge${STATUS_BADGE_CLASS[status] ?? ''}`}>
-    {STATUS_LABEL[status] ?? status}
-  </span>
+const KitStatusBadge = ({ status }) => (
+  <StatusBadge kind="kit" status={status}>{STATUS_LABEL[status] ?? status}</StatusBadge>
 );
 
 // What last happened to a kit, and when: dispatched, logged, or only
@@ -358,7 +355,7 @@ export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHist
           {showKit ? formatKitCode(record.kit_id) : fmtDate(record.logged_at)}
         </span>
       </span>
-      <StatusBadge status={record.status} />
+      <KitStatusBadge status={record.status} />
     </div>
   );
 

@@ -28,6 +28,7 @@ import dispatchAPI from '../services/dispatchAPI';
 import { STAFF } from '../routes/paths';
 import Paged from '../features/staff/Paged';
 import usePaged from '../features/staff/usePaged';
+import StatusBadge from '@/components/ui/status-badge';
 
 const RANGES = [
   { key: 'today', label: 'Today' },
@@ -43,10 +44,10 @@ const formatDate = (value) =>
 // dispatch note exists to open: nothing was loaded for the two that
 // never left, so offering "View note" on them would be a dead button.
 const STATUS_META = {
-  collected:      { label: 'Collected',     tone: 'is-done',   note: true  },
-  late_collected: { label: 'Late',          tone: 'is-warn',   note: true  },
-  not_collected:  { label: 'Not collected', tone: 'is-warn',   note: false },
-  cancelled:      { label: 'Cancelled',     tone: 'is-active', note: false },
+  collected:      { label: 'Collected',     note: true  },
+  late_collected: { label: 'Late',          note: true  },
+  not_collected:  { label: 'Not collected', note: false },
+  cancelled:      { label: 'Cancelled',     note: false },
 };
 
 export default function StaffDispatchHistoryPage() {
@@ -150,9 +151,9 @@ export default function StaffDispatchHistoryPage() {
                       : ''}
                   </span>
                 </span>
-                <span className={`stf-badge ${STATUS_META[row.status]?.tone ?? 'is-active'}`}>
+                <StatusBadge kind="dispatch" status={row.status}>
                   {STATUS_META[row.status]?.label ?? row.status}
-                </span>
+                </StatusBadge>
                 {STATUS_META[row.status]?.note ? (
                   <button
                     type="button"

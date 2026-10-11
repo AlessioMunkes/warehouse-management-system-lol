@@ -32,6 +32,7 @@ import usePaged from '../staff/usePaged';
 import { floorWindow, isSpareSlip, isPackedSlip, isCollectedSlip, linesDone } from './spareSlips';
 import { volunteerHolder, dayLabel } from '../pickingSlips/slipViews';
 import { useT } from '../../translations';
+import StatusBadge from '@/components/ui/status-badge';
 
 const cohortLabel = (cohort, t) => (cohort === 'tuesday' || cohort === 'thursday' ? t(`day.${cohort}`) : cohort);
 
@@ -59,12 +60,15 @@ const claimedAt = (slip) => {
   return Number.isNaN(at) ? 0 : at;
 };
 
+// Drawn with the manager's badge and the manager's picking-slip
+// styles (lib/statusStyles.js), so a status looks the same on the
+// floor as it does in the office.
 function badgeFor(slip, t) {
-  if (isCollectedSlip(slip)) return { className: 'stf-badge is-done', label: t('status.collected') };
-  if (slip.status === 'complete') return { className: 'stf-badge is-done', label: t('status.complete') };
-  if (slip.status === 'in_progress') return { className: 'stf-badge is-active', label: t('status.inProgress') };
-  if (slip.status === 'cancelled') return { className: 'stf-badge', label: t('status.cancelled') };
-  return { className: 'stf-badge', label: t('status.pending') };
+  if (isCollectedSlip(slip)) return { status: 'collected', label: t('status.collected') };
+  if (slip.status === 'complete') return { status: 'complete', label: t('status.complete') };
+  if (slip.status === 'in_progress') return { status: 'in_progress', label: t('status.inProgress') };
+  if (slip.status === 'cancelled') return { status: 'cancelled', label: t('status.cancelled') };
+  return { status: 'pending', label: t('status.pending') };
 }
 
 // Floor, then claimed, then done — the three states a pallet actually
@@ -240,7 +244,7 @@ export default function StaffSlipList({ onOpenSlip }) {
                     {volunteerHolder(slip) ? ` · ${volunteerHolder(slip)}` : ''}
                   </span>
                 </span>
-                <span className={badge.className}>{badge.label}</span>
+                <StatusBadge kind="pickingSlip" status={badge.status}>{badge.label}</StatusBadge>
               </div>
             );
           })}
