@@ -78,11 +78,20 @@ const getBoard = async ({ dispatchDate, cohort, status, gateToday }) => {
     // specific status: no event row yet, or an event that is not one
     // of the two terminal collected states. not_collected is
     // deliberately outstanding — it is written off, not gone.
+    //
+    // A pallet that HAS gone stays on the board for the day it went.
+    // That used to be "booked for today" only, so a pallet booked for
+    // another day (Tuesday's, collected on Sunday) or a late one from
+    // last week vanished the moment it was dispatched: it was no longer
+    // outstanding and was not today's. The person who had just handed
+    // it over saw Dispatched (0). It is the day it was collected that
+    // puts it on today's board, in the warehouse's timezone.
     where.push(`(
          de.id IS NULL
       OR de.status IS NULL
       OR de.status NOT IN ('collected', 'late_collected')
       OR ps.dispatch_date = $${params.length}::date
+      OR (de.collected_at AT TIME ZONE 'Africa/Johannesburg')::date = $${params.length}::date
     )`);
   }
   if (cohort)       { params.push(cohort);       where.push(`ps.cohort = $${params.length}`); }

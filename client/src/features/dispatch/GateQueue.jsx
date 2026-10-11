@@ -115,7 +115,7 @@ const metaOf = (row) => {
 const EMPTY = {
   awaiting:   'No pallets awaiting dispatch.',
   late:       'No late pallets.',
-  dispatched: 'Nothing dispatched yet.',
+  dispatched: 'Nothing dispatched today.',
 };
 
 export default function GateQueue({ onOpenPallet }) {

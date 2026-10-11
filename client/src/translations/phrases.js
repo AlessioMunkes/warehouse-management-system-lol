@@ -458,7 +458,7 @@ export const PHRASES = [
   ["Awaiting dispatch", "Wag op versending", "Ilinde ukuthunyelwa"],
   ["No pallets awaiting dispatch.", "Geen palette wag op versending nie.", "Akukho palethi zilinde ukuthunyelwa."],
   ["No late pallets.", "Geen laat palette nie.", "Akukho palethi zilibazisekileyo."],
-  ["Nothing dispatched yet.", "Nog niks versend nie.", "Akukho nto ithunyelweyo okwangoku."],
+  ["Nothing dispatched today.", "Niks vandag versend nie.", "Akukho nto ithunyelweyo namhlanje."],
   ["Weigh it, bag it, then record what you made.", "Weeg dit, pak dit in sakke, en teken dan aan wat jy gemaak het.", "Yilinganise, yipakishe ezingxoweni, uze ubhale oko ukwenzileyo."],
   ["No signal. It sends itself when you are back in range. Do not record it again.", "Geen sein nie. Dit stuur vanself wanneer jy weer sein het. Moenie dit weer aanteken nie.", "Akukho signali. Izithumela xa ubuyela kwisignali. Sukuyibhala kwakhona."],
   ["Bags and waste recorded.", "Sakke en vermorsing aangeteken.", "Iingxowa nenkunkuma zibhaliwe."],
