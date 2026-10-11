@@ -35,6 +35,7 @@ const TARGET_ROLES_BY_TYPE = {
   low_stock: MANAGER_ONLY,
   picking_slips_generated: MANAGER_ONLY,
   non_collections_flagged: MANAGER_ONLY,
+  dispatch_day_complete: MANAGER_ONLY,
   purchase_order_needs_attention: MANAGER_ONLY,
   vms_sync_failed: MANAGER_ONLY,
   // The names expiryWarning.service.js sends, and the older ones. Without

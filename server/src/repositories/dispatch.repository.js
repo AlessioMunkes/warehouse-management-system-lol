@@ -26,6 +26,7 @@
 import pool       from '../config/db.js';
 import stockModel from './stock.repository.js';
 import { DISPATCH_SORTS, buildOrderBy } from '../constants/receiptSort.js';
+import { dispatchDayComplete } from '../features/communications/notices.js';
 
 // ── Audit helper ──────────────────────────────────────────────
 // Dispatch writes into picking_events, not a separate log. The slip
@@ -526,6 +527,36 @@ const collect = async ({
         booked_for: bookedFor,
         at:         'dispatch',
       });
+    }
+
+    // ── The day's dispatch is complete ─────────────────────────
+    // When this was the last pallet booked for its day, the managers
+    // are told, once: every pallet for that date has gone. Counted
+    // inside this transaction, so it sees this collection. In a
+    // savepoint: a notice that cannot be written must never cost the
+    // gate the collection it has just recorded.
+    await client.query('SAVEPOINT dispatch_day_notice');
+    try {
+      const day = await client.query(
+        `SELECT ps.dispatch_date::text AS dispatch_date,
+                COUNT(*)::int AS pallets,
+                COUNT(*) FILTER (WHERE de.status IN ('collected', 'late_collected'))::int AS gone,
+                COUNT(*) FILTER (WHERE de.status = 'late_collected')::int AS late
+           FROM picking_slips ps
+           LEFT JOIN dispatch_events de ON de.picking_slip_id = ps.id
+          WHERE ps.dispatch_date = (SELECT dispatch_date FROM picking_slips WHERE id = $1)
+            AND ps.status <> 'cancelled'
+          GROUP BY ps.dispatch_date`,
+        [slipId]
+      );
+      const tally = day.rows[0];
+      if (tally && tally.pallets > 0 && tally.gone === tally.pallets) {
+        await dispatchDayComplete(client, { dispatchDate: tally.dispatch_date, pallets: tally.pallets, late: tally.late });
+      }
+      await client.query('RELEASE SAVEPOINT dispatch_day_notice');
+    } catch (noticeError) {
+      await client.query('ROLLBACK TO SAVEPOINT dispatch_day_notice');
+      console.error('[dispatch] day-complete notice not sent:', noticeError.message);
     }
 
     await client.query('COMMIT');

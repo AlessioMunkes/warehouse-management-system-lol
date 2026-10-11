@@ -70,6 +70,27 @@ export const nonCollectionsFlagged = async (client, { flagged, dispatchDate, cut
   });
 };
 
+// dispatch.repository.js collect: the last pallet booked for a day
+// has gone. One notice per day, not one per pallet: twenty-seven
+// "collected" notices would bury the ones that need somebody. The
+// date is the notice's id (20261013), which is what makes it once.
+const dayInWords = (isoDay) =>
+  new Date(`${isoDay}T00:00:00Z`).toLocaleDateString('en-ZA', {
+    timeZone: 'UTC', weekday: 'long', day: 'numeric', month: 'long',
+  }).replace(/(^|\D)0(\d)(?!\d)/, '$1$2');   // "5 January", not "05 January"
+
+export const dispatchDayComplete = async (client, { dispatchDate, pallets, late = 0 }) => {
+  if (!dispatchDate || pallets <= 0) return;
+  await createNotification(client, {
+    type:  'dispatch_day_complete',
+    title: `Dispatch complete for ${dayInWords(dispatchDate)}`,
+    body:  `All ${plural(pallets, 'pallet')} collected${late > 0 ? `, ${late} of them late` : ''}.`,
+    entityType: 'dispatch_day',
+    entityId:   Number(String(dispatchDate).replace(/-/g, '')),
+    avoidDuplicate: true,
+  });
+};
+
 // purchaseOrder.repository.js updatePurchaseOrderStatus — only the two
 // statuses that need someone.
 export const purchaseOrderNeedsAttention = async (client, { purchaseOrder, status, reason }) => {
@@ -117,7 +138,7 @@ export const communityRequestItemsShort = async (client, { requestId, cause }) =
 };
 
 export default {
-  slipsGenerated, slipCreated, slipReleased, nonCollectionsFlagged, purchaseOrderNeedsAttention,
+  slipsGenerated, slipCreated, slipReleased, nonCollectionsFlagged, dispatchDayComplete, purchaseOrderNeedsAttention,
   purchaseOrderDeliveredShort,
   communityRequestItemsShort,
 };

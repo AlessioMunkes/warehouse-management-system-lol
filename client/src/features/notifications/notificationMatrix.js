@@ -53,6 +53,11 @@ const NOTIFICATION_MATRIX = {
       ? (n.entityId ? PACKING.detail(n.entityId) : PACKING.board)
       : withOpen(STAFF.pickingSlips, n.entityId)),
   },
+  // Good news, not a task: every pallet booked for a day has gone.
+  dispatch_day_complete: {
+    severity: 'info', icon: Truck,
+    destination: () => STAFF.receipts,
+  },
   non_collections_flagged: {
     severity: 'action', icon: Truck,
     destination: (n, role) => (isWorker(role)
