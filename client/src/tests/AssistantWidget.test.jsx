@@ -120,7 +120,7 @@ describe('knowing which screen you are on', () => {
     await userEvent.type(within(panel).getByRole('textbox', { name: /ask/i }), 'the truck is here');
     await userEvent.click(within(panel).getByRole('button', { name: /send/i }));
     await waitFor(() =>
-      expect(api.askAssistant).toHaveBeenCalledWith('the truck is here', 'receiving'));
+      expect(api.askAssistant).toHaveBeenCalledWith('the truck is here', 'receiving', null));
   });
 
   // A deep route is still the screen it belongs to — someone inside
@@ -131,7 +131,7 @@ describe('knowing which screen you are on', () => {
     await userEvent.type(within(panel).getByRole('textbox', { name: /ask/i }), 'what goes on this');
     await userEvent.click(within(panel).getByRole('button', { name: /send/i }));
     await waitFor(() =>
-      expect(api.askAssistant).toHaveBeenCalledWith('what goes on this', 'packing'));
+      expect(api.askAssistant).toHaveBeenCalledWith('what goes on this', 'packing', null));
   });
 
   it('falls back to the general suggestions on a screen it does not know', async () => {
@@ -233,7 +233,7 @@ describe('the four things an answer can be', () => {
     await userEvent.click(within(panel).getByRole('button', { name: /send/i }));
 
     await userEvent.click(await within(panel).findByRole('button', { name: 'Receiving' }));
-    await waitFor(() => expect(api.askAssistant).toHaveBeenLastCalledWith('Receiving', 'receiving'));
+    await waitFor(() => expect(api.askAssistant).toHaveBeenLastCalledWith('Receiving', 'receiving', expect.objectContaining({ question: expect.any(String) })));
   });
 
   it('says it does not know, and says who will', async () => {
