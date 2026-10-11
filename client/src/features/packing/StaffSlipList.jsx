@@ -33,6 +33,7 @@ import { floorWindow, isSpareSlip, isPackedSlip, isCollectedSlip, linesDone } fr
 import { volunteerHolder, dayLabel } from '../pickingSlips/slipViews';
 import { useT } from '../../translations';
 import StatusBadge from '@/components/ui/status-badge';
+import { workerStatus } from '../staff/workerStatus';
 
 const cohortLabel = (cohort, t) => (cohort === 'tuesday' || cohort === 'thursday' ? t(`day.${cohort}`) : cohort);
 
@@ -60,9 +61,8 @@ const claimedAt = (slip) => {
   return Number.isNaN(at) ? 0 : at;
 };
 
-// Drawn with the manager's badge and the manager's picking-slip
-// styles (lib/statusStyles.js), so a status looks the same on the
-// floor as it does in the office.
+// Drawn with the manager's badge, in the floor's own colours
+// (staff/workerStatus.js): a packed pallet is finished work here.
 function badgeFor(slip, t) {
   if (isCollectedSlip(slip)) return { status: 'collected', label: t('status.collected') };
   if (slip.status === 'complete') return { status: 'complete', label: t('status.complete') };
@@ -244,7 +244,7 @@ export default function StaffSlipList({ onOpenSlip }) {
                     {volunteerHolder(slip) ? ` · ${volunteerHolder(slip)}` : ''}
                   </span>
                 </span>
-                <StatusBadge kind="pickingSlip" status={badge.status}>{badge.label}</StatusBadge>
+                <StatusBadge {...workerStatus('slip', badge.status)}>{badge.label}</StatusBadge>
               </div>
             );
           })}

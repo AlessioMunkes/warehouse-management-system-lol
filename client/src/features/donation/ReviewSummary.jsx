@@ -14,7 +14,7 @@ import { ValueField } from "./ValueField";
 import { DonorConsentSection, DonorInfoFields } from "./DonationSection";
 import { NotesField } from "./NotesField";
 import StatusBadge from '@/components/ui/status-badge';
-import { Check, TriangleAlert } from "lucide-react";
+import { workerStatus } from '../staff/workerStatus';
 
 const SECTION_LABELS = {
   items: "Items",
@@ -36,7 +36,7 @@ export function ReviewSummary({ draft }) {
               <span className="stf-row-title">{item.description || "Untitled item"}</span>
               <span className="stf-row-meta">{item.quantity} {item.unit}</span>
             </div>
-            <StatusBadge tone={item.productId ? "good" : "warn"} icon={item.productId ? Check : TriangleAlert} className="max-w-[60%] truncate">
+            <StatusBadge {...workerStatus("match", item.productId ? "matched" : "unmatched")} className="max-w-[60%] truncate">
               {item.productId ? `Matched: ${item.productLabel}` : "Unmatched"}
             </StatusBadge>
           </div>

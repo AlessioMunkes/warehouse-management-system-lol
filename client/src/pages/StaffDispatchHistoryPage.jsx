@@ -29,6 +29,7 @@ import { STAFF } from '../routes/paths';
 import Paged from '../features/staff/Paged';
 import usePaged from '../features/staff/usePaged';
 import StatusBadge from '@/components/ui/status-badge';
+import { workerStatus } from '../features/staff/workerStatus';
 
 const RANGES = [
   { key: 'today', label: 'Today' },
@@ -151,7 +152,7 @@ export default function StaffDispatchHistoryPage() {
                       : ''}
                   </span>
                 </span>
-                <StatusBadge kind="dispatch" status={row.status}>
+                <StatusBadge {...workerStatus('dispatch', row.status)}>
                   {STATUS_META[row.status]?.label ?? row.status}
                 </StatusBadge>
                 {STATUS_META[row.status]?.note ? (

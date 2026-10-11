@@ -51,6 +51,7 @@ import SuccessDialog from '../staff/SuccessDialog';
 import { OFFLINE_TITLE, offlineLine } from '../staff/successText';
 import { todayISO } from '../packing/spareSlips';
 import StatusBadge from '@/components/ui/status-badge';
+import { workerStatus } from '../staff/workerStatus';
 
 const fmtDate = (value) =>
   value ? new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
@@ -66,10 +67,10 @@ const fmtKg = (value) => (value === null || value === undefined ? '-' : `${Numbe
 
 const STATUS_LABEL = { assigned: 'Assigned', logged: 'Logged', dispatched: 'Dispatched' };
 
-// The manager's badge and the manager's kit styles: amber with the
-// household, blue waiting to go to a farm, green gone.
+// The manager's badge: amber with the household, blue waiting to go
+// to a farm, green gone.
 const KitStatusBadge = ({ status }) => (
-  <StatusBadge kind="kit" status={status}>{STATUS_LABEL[status] ?? status}</StatusBadge>
+  <StatusBadge {...workerStatus('kit', status)}>{STATUS_LABEL[status] ?? status}</StatusBadge>
 );
 
 // What last happened to a kit, and when: dispatched, logged, or only

@@ -39,17 +39,7 @@ import { OFFLINE_TITLE, offlineLine } from '../staff/successText';
 import PhotoButton from '../staff/PhotoButton';
 import { useT } from '../../translations';
 import StatusBadge from '@/components/ui/status-badge';
-import { Check, CircleDashed, Flag } from 'lucide-react';
-import { VARIANCE_STYLE } from '@/lib/statusStyles';
-
-// A line's state, in the manager's badge: green packed, amber packed
-// with a different quantity, red flagged, grey still to do.
-const LINE_BADGE = {
-  confirmed: { tone: 'good', icon: Check },
-  differs:   { tone: VARIANCE_STYLE.tone, icon: VARIANCE_STYLE.icon },
-  flagged:   { tone: 'bad', icon: Flag },
-  pending:   { tone: 'neutral', icon: CircleDashed },
-};
+import { workerStatus } from '../staff/workerStatus';
 
 const MODE_KEY = 'stf_packing_view_mode';
 // label and hint are keys in translations/messages.js.
@@ -432,10 +422,10 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
               const variance = hasQuantityVariance(item);
               const showPanel = canEdit && !locked && item.status === 'pending';
               const badge =
-                item.status === 'confirmed' && variance ? { ...LINE_BADGE.differs, label: t('slip.badge.differs') } :
-                item.status === 'confirmed' ? { ...LINE_BADGE.confirmed, label: t('slip.badge.confirmed') } :
-                item.status === 'flagged'   ? { ...LINE_BADGE.flagged, label: t('slip.badge.flagged') } :
-                { ...LINE_BADGE.pending, label: t('slip.badge.pending') };
+                item.status === 'confirmed' && variance ? { status: 'differs', label: t('slip.badge.differs') } :
+                item.status === 'confirmed' ? { status: 'confirmed', label: t('slip.badge.confirmed') } :
+                item.status === 'flagged'   ? { status: 'flagged', label: t('slip.badge.flagged') } :
+                { status: 'pending', label: t('slip.badge.pending') };
 
               return (
                 <div key={item.id} className="stf-row is-static stf-row--check">
@@ -473,7 +463,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
                         <span className="stf-row-meta stf-use-first">{takeFirstText(item)}.</span>
                       ) : null}
                     </span>
-                    <StatusBadge tone={badge.tone} icon={badge.icon}>{badge.label}</StatusBadge>
+                    <StatusBadge {...workerStatus('line', badge.status)}>{badge.label}</StatusBadge>
                   </span>
                   {showPanel ? (
                     <ItemDecisionPanel

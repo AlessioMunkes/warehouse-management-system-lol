@@ -27,6 +27,7 @@ import { STAFF } from '../routes/paths';
 import Paged from '../features/staff/Paged';
 import usePaged from '../features/staff/usePaged';
 import StatusBadge from '@/components/ui/status-badge';
+import { workerStatus } from '../features/staff/workerStatus';
 
 const RANGES = [
   { key: 'today', label: 'Today' },
@@ -47,7 +48,7 @@ const isPoComplete = (poStatus) => poStatus === 'completed';
 const badgeFor = (delivery) => (
   isPoComplete(delivery.po_status)
     ? { status: 'completed', label: 'Completed' }
-    : { status: 'partially_received', label: 'Partially delivered' }
+    : { status: 'partial', label: 'Partially delivered' }
 );
 
 const formatDate = (value) =>
@@ -141,13 +142,13 @@ export default function StaffDeliveriesPage() {
                       {delivery.received_by_name ? ` · Received by ${delivery.received_by_name}` : ''}
                     </span>
                   </span>
-                  <StatusBadge kind="purchaseOrder" status={badge.status}>{badge.label}</StatusBadge>
+                  <StatusBadge {...workerStatus('delivery', badge.status)}>{badge.label}</StatusBadge>
                   {/* A count discrepancy is a separate, orthogonal fact
                       from whether the order is complete — an over-count
                       can still fully satisfy the order, so this shows
                       alongside the completion badge, not instead of it. */}
                   {delivery.status === 'flagged' ? (
-                    <StatusBadge kind="delivery" status="flagged">Discrepancy</StatusBadge>
+                    <StatusBadge {...workerStatus('delivery', 'discrepancy')}>Discrepancy</StatusBadge>
                   ) : null}
                   <button
                     type="button"
