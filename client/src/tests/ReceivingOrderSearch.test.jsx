@@ -275,11 +275,13 @@ describe('receiving: what Form used to leave out', () => {
       expect(screen.queryByText(/a use-by date on/)).not.toBeInTheDocument());
   });
 
-  it('opens a line when it is tapped', async () => {
+  it('shows where each line is going without a tap', async () => {
     const user = userEvent.setup();
     await openOrder86Form(user);
 
-    await user.click(screen.getByRole('button', { name: /Canned Baked Beans 410g/, expanded: false }));
+    // Form is every line at once: the storage place is on screen for
+    // both lines, not behind a row that has to be opened first.
+    expect(screen.getByText(/Where the Apples \(Bulk Bag\) is going/)).toBeInTheDocument();
     expect(screen.getByText(/Where the Canned Baked Beans 410g is going/)).toBeInTheDocument();
   });
 

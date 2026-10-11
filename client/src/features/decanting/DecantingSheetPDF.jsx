@@ -1,5 +1,5 @@
-import usePdfDocument from '../staff/usePdfDocument';
-import '../../styles/deliveryNotePDF.css';
+import NoteSheet from '../receipts/NoteSheet';
+import { noteNumber } from '../receipts/noteFormat';
 
 // ─────────────────────────────────────────────────────────────
 // client/src/features/decanting/DecantingSheetPDF.jsx
@@ -17,16 +17,6 @@ import '../../styles/deliveryNotePDF.css';
 // which both already call, so the shape here matches that query's
 // columns exactly rather than a route-specific one.
 // ─────────────────────────────────────────────────────────────
-
-const PDF_LOGO_URL = '/images/pdf_logo.png';
-
-// Same warehouse block DeliveryNotePDF.jsx uses — see that file's own
-// comment for why this is hardcoded rather than looked up.
-const WAREHOUSE = {
-  name: 'Ladles of Love, Cape Town Warehouse',
-  addressLines: ['Unit 4, Hewett Park', '17 Hewett Ave, Epping', 'Cape Town, 7460'],
-  phone: '',
-};
 
 const formatDate = (d) => {
   if (!d) return '-';
@@ -49,8 +39,6 @@ const bagSummaryOf = (bags) =>
 const WASTAGE_WARN_RATIO = 0.05;
 
 const DecantingSheetPDF = ({ record, onClose }) => {
-  const { documentRef, isGenerating, error: genError, openPdf: handleViewPdf } = usePdfDocument();
-
   if (!record) return null;
 
   const lines = record.lines || [];
@@ -73,123 +61,59 @@ const DecantingSheetPDF = ({ record, onClose }) => {
       : 'Every line on this sheet packed within the usual bagging margin, with no unusual wastage recorded.';
 
   return (
-    <div className="pdfnote-modal">
-
-      {/* Toolbar */}
-      <div className="pdfnote-toolbar">
-        <span className="pdfnote-toolbar-title">
-          DECANTING SHEET #{record.id} - Week of {formatDate(record.week_of)}
-        </span>
-        <div className="pdfnote-toolbar-actions">
-          {genError && <span className="pdfnote-toolbar-error">{genError}</span>}
-          <button
-            onClick={() => handleViewPdf(`decanting-sheet-${record.id}`)}
-            disabled={isGenerating}
-            className="btn-primary btn-sm"
-          >
-            {isGenerating ? 'GENERATING...' : '⤢ VIEW PDF'}
-          </button>
-          <button onClick={onClose} className="btn-ghost">✕ CLOSE</button>
-        </div>
-      </div>
-
-      {/* Scrollable document */}
-      <div className="pdfnote-scroll-area">
-        <div className="pdfnote-document" ref={documentRef}>
-
-          <div className="pdfnote-doc-header">
-            <div>
-              <div className="pdfnote-doc-title-tick" />
-              <h1 className="pdfnote-doc-title">Decanting Sheet</h1>
-            </div>
-            <img src={PDF_LOGO_URL} alt="" className="pdfnote-doc-logo" aria-hidden="true" />
-          </div>
-          <div className="pdfnote-doc-rule" />
-
-          {/* No second party column — a decanting sheet has no
-              external supplier or driver, just the warehouse and the
-              record's own identifying details, so the meta box is the
-              only thing on the right. */}
-          <div className="pdfnote-doc-parties">
-            <div className="pdfnote-doc-party-col">
-              <div className="pdfnote-doc-party">
-                <p className="pdfnote-doc-party-heading">{WAREHOUSE.name}</p>
-                {WAREHOUSE.addressLines.map((line) => (
-                  <p key={line} className="pdfnote-doc-party-line">{line}</p>
-                ))}
-                {WAREHOUSE.phone ? <p className="pdfnote-doc-party-line">{WAREHOUSE.phone}</p> : null}
-              </div>
-            </div>
-
-            <div className="pdfnote-doc-meta-box">
-              <p className="pdfnote-doc-meta-line">
-                <span>Sheet no.</span>
-                <strong>#{String(record.id).padStart(4, '0')}</strong>
-              </p>
-              <p className="pdfnote-doc-meta-line">
-                <span>Week of</span>
-                <strong>{formatDate(record.week_of)}</strong>
-              </p>
-              <p className="pdfnote-doc-meta-line">
-                <span>Recorded</span>
-                <strong>{formatDate(record.created_at)}</strong>
-              </p>
-              <p className="pdfnote-doc-meta-line">
-                <span>Recorded by</span>
-                <strong>{record.recorded_by_name || 'Warehouse Worker'}</strong>
-              </p>
-              <p className="pdfnote-doc-meta-line">
-                <span>Status</span>
-                <strong className={status.className}>{status.label}</strong>
-              </p>
-            </div>
-          </div>
-
-          <div className="pdfnote-doc-additional">
-            <p className="pdfnote-doc-section-heading">Additional information</p>
-            <p className="pdfnote-doc-additional-text">{additionalInfo}</p>
-          </div>
-
-          <table className="pdfnote-table">
-            <thead>
-              <tr>
-                <th>Product</th>
-                <th className="pdfnote-table-center">Weighed</th>
-                <th className="pdfnote-table-center">Packed</th>
-                <th>Bags</th>
-                <th className="pdfnote-table-center">Wastage</th>
+    <NoteSheet
+      title="Decanting Sheet"
+      toolbarTitle={`DECANTING SHEET #${record.id} - Week of ${formatDate(record.week_of)}`}
+      filename={`decanting-sheet-${record.id}`}
+      onClose={onClose}
+      meta={[
+        { label: 'Sheet no.', value: noteNumber(record.id) },
+        { label: 'Week of', value: formatDate(record.week_of) },
+        { label: 'Recorded', value: formatDate(record.created_at) },
+        { label: 'Recorded by', value: record.recorded_by_name || 'Warehouse Worker' },
+        {
+          label: 'Status',
+          value: status.label,
+          tone: status.className === 'pdfnote-status-complete' ? 'complete' : 'partial',
+        },
+      ]}
+      info={additionalInfo}
+    >
+      <table className="pdfnote-table">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th className="pdfnote-table-center">Weighed</th>
+            <th className="pdfnote-table-center">Packed</th>
+            <th>Bags</th>
+            <th className="pdfnote-table-center">Wastage</th>
+          </tr>
+        </thead>
+        <tbody>
+          {lines.length ? (
+            lines.map((line, i) => (
+              <tr key={line.id ?? i}>
+                <td className="pdfnote-table-product">{line.product_name || '-'}</td>
+                <td className="pdfnote-table-center">
+                  {line.actual_bulk_kg != null ? `${line.actual_bulk_kg} kg` : '-'}
+                </td>
+                <td className="pdfnote-table-center">
+                  {line.packed_kg != null ? `${line.packed_kg} kg` : '-'}
+                </td>
+                <td className="pdfnote-table-sku">{bagSummaryOf(line.bags)}</td>
+                <td className="pdfnote-table-center">
+                  {Number(line.wastage_kg || 0) > 0 ? `${line.wastage_kg} kg` : '-'}
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {lines.length ? (
-                lines.map((line, i) => (
-                  <tr key={line.id ?? i}>
-                    <td className="pdfnote-table-product">{line.product_name || '-'}</td>
-                    <td className="pdfnote-table-center">
-                      {line.actual_bulk_kg != null ? `${line.actual_bulk_kg} kg` : '-'}
-                    </td>
-                    <td className="pdfnote-table-center">
-                      {line.packed_kg != null ? `${line.packed_kg} kg` : '-'}
-                    </td>
-                    <td className="pdfnote-table-sku">{bagSummaryOf(line.bags)}</td>
-                    <td className="pdfnote-table-center">
-                      {Number(line.wastage_kg || 0) > 0 ? `${line.wastage_kg} kg` : '-'}
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={5} className="pdfnote-table-empty">
-                    No lines on record
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-
-        </div>
-      </div>
-    </div>
+            ))
+          ) : (
+            <tr>
+              <td colSpan={5} className="pdfnote-table-empty">No lines on record</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </NoteSheet>
   );
 };
 

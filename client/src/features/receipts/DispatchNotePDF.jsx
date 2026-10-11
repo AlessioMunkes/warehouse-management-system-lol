@@ -1,212 +1,116 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/features/receipts/DispatchNotePDF.jsx
 //
-// A recorded collection, as a printable note. The goods-out mirror
-// of DeliveryNotePDF, per warehouse visit 4.3 — "the same pattern
-// should be applied to dispatch".
+// The dispatch note: proof that a pallet left for a centre, signed by
+// the driver who took it. Shown the moment a collection is recorded at
+// the gate (PalletCheck), from the worker's dispatch history, and from
+// the manager's Receipts page. One component for all three.
 //
-// Reads a dispatch_events id, NOT a picking_slip_id. Two different id
-// spaces meet in the dispatch module and mixing them fetches the
-// wrong record or 404s.
+// Laid out by NoteSheet, the layout every note shares. This file only
+// says what a dispatch note contains.
 //
-// The lines come from dispatch_event_lines, which is a frozen record
-// of what was counted into the vehicle on the day — not a live join
-// onto picking_slip_items. A note reprinted six months later still
-// shows the day's numbers even if the slip or the product master has
-// changed since.
-//
-// SCOPE NOTE — this is NOT BR-24. BR-24 asks for a Proof of Dispatch
-// generated at the close of each dispatch RUN, covering every
-// beneficiary on that date and cohort in one document. This is the
-// per-collection receipt. The run-level document is a separate
-// endpoint (/api/dispatch/runs/:date) and is not built yet.
-//
-// The letterhead (logo + warehouse address) DeliveryNotePDF used to
-// carry over from deliveryNotePDF.css's older template was never
-// added here when this note moved to PdfShell — restored below, same
-// asset and address DeliveryNotePDF.jsx uses.
+// Fed by GET /api/dispatch/notes/:eventId. Its lines come from
+// dispatch_event_lines, so a note reprinted months later still shows
+// what was counted into the vehicle on the day.
 // ─────────────────────────────────────────────────────────────
-import PdfShell from './PdfShell';
-import {
-  formatDate, formatDateTime, fmtQty, variance, qty,
-  DISPATCH_STATUS_LABEL, BENEFICIARY_LABEL,
-} from './noteFormat';
+import NoteSheet, { NoteSignatures } from './NoteSheet';
+import { formatDate, fmtQty, variance, noteNumber } from './noteFormat';
 
-const PDF_LOGO_URL = '/images/pdf_logo.png';
-const WAREHOUSE_ADDRESS = ['Unit 4, Hewett Park', '17 Hewett Ave, Epping', 'Cape Town, 7460'];
+const COHORT = { tuesday: 'Tuesday', thursday: 'Thursday' };
 
-const COLLECTED = ['collected', 'late_collected'];
+const STATUS = {
+  collected:      { label: 'Collected',        tone: 'complete' },
+  late_collected: { label: 'Collected (late)', tone: 'partial' },
+  not_collected:  { label: 'Not collected',    tone: 'partial' },
+  awaiting:       { label: 'Awaiting collection' },
+  cancelled:      { label: 'Cancelled' },
+};
+
+const infoFor = (note, variedCount) => {
+  if (note.status === 'not_collected') {
+    return 'Nobody collected this pallet on its day. Nothing was deducted from stock, and it can still be collected late.';
+  }
+  const parts = [];
+  if (note.override_reason) {
+    parts.push(`Released on a manager's authorisation${note.override_by_name ? ` (${note.override_by_name})` : ''}: ${note.override_reason}`);
+  }
+  if (note.status === 'late_collected') {
+    parts.push('This pallet was written off at the cut-off before the driver arrived. It was collected afterwards and recorded as a late collection.');
+  }
+  if (variedCount > 0) {
+    parts.push(`${variedCount} ${variedCount === 1 ? 'line differs' : 'lines differ'} from what packing recorded, marked * below. The loaded quantity is what left the building.`);
+  }
+  if (parts.length === 0) {
+    parts.push('This pallet was collected on time and in full, matched against what packing recorded.');
+  }
+  return parts.join(' ');
+};
 
 const DispatchNotePDF = ({ note, onClose }) => {
   if (!note) return null;
 
-  const lines       = note.lines || [];
-  const wasCollected = COLLECTED.includes(note.status);
-  const wasLate      = note.status === 'late_collected';
-  const notCollected = note.status === 'not_collected';
-
+  const lines = note.lines || [];
+  const status = STATUS[note.status] || STATUS.collected;
+  const wasCollected = note.status === 'collected' || note.status === 'late_collected';
   const variedCount = lines.filter(
     (l) => variance(l.loaded_quantity, l.packed_quantity) !== null
   ).length;
 
-  const totalPacked = lines.reduce((s, l) => s + (qty(l.packed_quantity) ?? 0), 0);
-  const totalLoaded = lines.reduce((s, l) => s + (qty(l.loaded_quantity) ?? 0), 0);
-
   return (
-    <PdfShell
-      title={`DISPATCH NOTE #${note.id} - ${note.ecd_name || 'Unknown beneficiary'}`}
+    <NoteSheet
+      title="Dispatch Note"
+      toolbarTitle={`DISPATCH NOTE #${note.id} - ${note.ecd_name || 'Unknown beneficiary'}`}
       filename={`dispatch-note-${note.id}`}
       onClose={onClose}
+      party={{
+        heading: 'To',
+        name: note.ecd_name,
+        lines: [
+          note.contact_name ? `Contact: ${note.contact_name}` : null,
+          note.child_count ? `${note.child_count} children served` : null,
+        ],
+      }}
+      meta={[
+        { label: 'Dispatch note no.', value: noteNumber(note.id) },
+        wasCollected
+          ? { label: 'Collected', value: formatDate(note.collected_at) }
+          : { label: 'Booked for', value: formatDate(note.dispatch_date) },
+        { label: 'Pallet ref', value: note.pallet_ref || '-' },
+        { label: 'Cohort', value: COHORT[note.cohort] || '-' },
+        { label: 'Status', value: status.label, tone: status.tone },
+      ]}
+      info={infoFor(note, variedCount)}
     >
-      <div className="pdf-doc-header">
-        <div>
-          <h1 className="pdf-doc-title">DISPATCH NOTE</h1>
-          <p className="pdf-doc-subtitle">Ladles of Love · Nourish Our Children</p>
-          <p className="pdf-doc-subtitle">Proof of collection</p>
-          {WAREHOUSE_ADDRESS.map((line) => (
-            <p key={line} className="pdf-doc-address">{line}</p>
-          ))}
-        </div>
-        <img src={PDF_LOGO_URL} alt="" className="pdf-doc-logo" aria-hidden="true" />
-      </div>
-
-      {/* ── Outcome ────────────────────────────────────────── */}
-      <div className={`pdf-status-banner ${wasCollected && !wasLate ? 'pdf-status-banner--complete' : 'pdf-status-banner--warning'}`}>
-        <p className={`pdf-status-title ${wasCollected && !wasLate ? 'pdf-status-title--complete' : 'pdf-status-title--pending'}`}>
-          {DISPATCH_STATUS_LABEL[note.status] || note.status}
-        </p>
-        <p className="pdf-status-body">
-          {notCollected && (
-            <>
-              Nobody collected this pallet. It was written off by the 15:00 sweep (BR-14).
-              No stock was deducted: the goods stopped counting as committed and read as
-              available again. It remains collectable as a late collection.
-            </>
-          )}
-          {wasLate && (
-            <>
-              This pallet was written off at 15:00 and collected afterwards. The collection
-              proceeded normally; nothing had been deducted, so nothing needed unwinding.
-            </>
-          )}
-          {wasCollected && !wasLate && (
-            <>Collected at the gate and counted into the vehicle. Stock was deducted against
-              the loaded quantities below.</>
-          )}
-        </p>
-      </div>
-
-      {/* ── Override trail ─────────────────────────────────── */}
-      {note.override_reason && (
-        <div className="pdf-status-banner pdf-status-banner--warning">
-          <p className="pdf-status-title pdf-status-title--pending">
-            Released on a manager override
-          </p>
-          <p className="pdf-status-body">
-            {note.override_reason}
-            {note.override_by_name ? ` (authorised by ${note.override_by_name})` : ''}
-          </p>
-        </div>
-      )}
-
-      {/* ── Variance summary ───────────────────────────────── */}
-      {variedCount > 0 && (
-        <div className="pdf-status-banner pdf-status-banner--warning">
-          <p className="pdf-status-title pdf-status-title--pending">
-            {variedCount} line{variedCount === 1 ? '' : 's'} differed from the pallet
-          </p>
-          <p className="pdf-status-body">
-            The loaded quantity is what left the building and what was deducted from stock.
-            The packed quantity is what the packer recorded.
-          </p>
-        </div>
-      )}
-
-      <div className="pdf-meta-grid">
-        <div>
-          <p className="pdf-meta-label">Record number</p>
-          <p className="pdf-meta-value">#{String(note.id).padStart(4, '0')}</p>
-        </div>
-        <div>
-          <p className="pdf-meta-label">{wasCollected ? 'Collected' : 'Flagged'}</p>
-          <p className="pdf-meta-value">
-            {formatDateTime(wasCollected ? note.collected_at : note.flagged_at)}
-          </p>
-        </div>
-        <div>
-          <p className="pdf-meta-label">Beneficiary</p>
-          <p className="pdf-meta-value">{note.ecd_name || '-'}</p>
-        </div>
-        <div>
-          <p className="pdf-meta-label">Type</p>
-          <p className="pdf-meta-value">
-            {BENEFICIARY_LABEL[note.beneficiary_kind] || 'ECD centre'}
-          </p>
-        </div>
-        <div>
-          <p className="pdf-meta-label">Children served</p>
-          <p className="pdf-meta-value">{note.child_count ?? '-'}</p>
-        </div>
-        <div>
-          <p className="pdf-meta-label">Dispatch date</p>
-          <p className="pdf-meta-value">{formatDate(note.dispatch_date)}</p>
-        </div>
-        <div>
-          <p className="pdf-meta-label">Cohort</p>
-          <p className="pdf-meta-value">{note.cohort === 'thursday' ? 'Thursday' : 'Tuesday'}</p>
-        </div>
-        <div>
-          <p className="pdf-meta-label">Pallet</p>
-          <p className="pdf-meta-value">{note.pallet_ref || '-'}</p>
-        </div>
-        <div>
-          <p className="pdf-meta-label">Driver</p>
-          <p className="pdf-meta-value">{note.driver_name || '-'}</p>
-        </div>
-        <div>
-          <p className="pdf-meta-label">Vehicle</p>
-          <p className="pdf-meta-value">{note.vehicle_reg || '-'}</p>
-        </div>
-        <div>
-          <p className="pdf-meta-label">Released by</p>
-          <p className="pdf-meta-value">{note.dispatched_by_name || '-'}</p>
-        </div>
-      </div>
-
-      <p className="pdf-items-title">Items loaded</p>
-      <table className="pdf-table">
+      <table className="pdfnote-table">
         <thead>
           <tr>
-            <th>Product</th>
+            <th>Description</th>
             <th>SKU</th>
-            <th className="pdf-table-center">Packed</th>
-            <th className="pdf-table-center">Loaded</th>
-            <th className="pdf-table-center">Unit</th>
-            <th className="pdf-table-center">Variance</th>
+            <th className="pdfnote-table-center">Packed</th>
+            <th className="pdfnote-table-center">Loaded</th>
           </tr>
         </thead>
         <tbody>
           {lines.length ? (
             lines.map((line, i) => {
-              const v = variance(line.loaded_quantity, line.packed_quantity);
+              const key = line.id ?? i;
+              const varied = variance(line.loaded_quantity, line.packed_quantity) !== null;
+              // A line packing flagged with none packed loads nothing,
+              // but the centre still needs to read why it is not there.
+              const notPacked = Number(line.packed_quantity) === 0;
               return [
-                <tr key={line.id ?? i} className={v ? 'pdf-table-row--variance' : undefined}>
-                  <td className="pdf-table-product">{line.product_name}</td>
-                  <td className="pdf-table-sku">{line.sku || '-'}</td>
-                  <td className="pdf-table-center">{fmtQty(line.packed_quantity)}</td>
-                  <td className="pdf-table-center">{fmtQty(line.loaded_quantity)}</td>
-                  <td className="pdf-table-center">{line.unit || '-'}</td>
-                  <td className={`pdf-table-center ${v ? v.className : 'pdf-variance-none'}`}>
-                    {v ? v.label : '0'}
+                <tr key={key}>
+                  <td className="pdfnote-table-product">{line.product_name || '-'}</td>
+                  <td className="pdfnote-table-sku">{line.sku || '-'}</td>
+                  <td className="pdfnote-table-center">{fmtQty(line.packed_quantity, line.unit)}</td>
+                  <td className="pdfnote-table-center">
+                    {fmtQty(line.loaded_quantity, line.unit)}{varied ? ' *' : ''}
                   </td>
                 </tr>,
-                // A line packing flagged with none packed: no variance at
-                // the gate, but the centre still needs the reason.
-                (v || Number(line.packed_quantity) === 0) && line.variance_reason ? (
-                  <tr key={`${line.id ?? i}-reason`} className="pdf-reason-row">
-                    <td colSpan={6}>
-                      <span className="pdf-reason-label">Reason </span>
-                      {line.variance_reason}
+                (varied || notPacked) && line.variance_reason ? (
+                  <tr key={`${key}-reason`} className="pdf-reason-row">
+                    <td colSpan={4}>
+                      <strong>{notPacked ? 'Not packed: ' : 'Reason: '}</strong>{line.variance_reason}
                     </td>
                   </tr>
                 ) : null,
@@ -214,59 +118,26 @@ const DispatchNotePDF = ({ note, onClose }) => {
             })
           ) : (
             <tr>
-              <td colSpan={6} className="pdf-table-empty">
-                {notCollected
-                  ? 'Nothing was loaded. This pallet was not collected.'
-                  : 'No lines on record'}
-              </td>
+              <td colSpan={4} className="pdfnote-table-empty">No items on record</td>
             </tr>
           )}
         </tbody>
-        {/* Totals in the table's own columns — see the same fix and
-            reasoning in DeliveryNotePDF.jsx. */}
-        {lines.length > 0 && (
-          <tfoot>
-            <tr className="pdf-table-foot">
-              <td colSpan={2} className="pdf-table-foot-label">Total</td>
-              <td className="pdf-table-center pdf-table-foot-value">{fmtQty(totalPacked)}</td>
-              <td className="pdf-table-center pdf-table-foot-value">{fmtQty(totalLoaded)}</td>
-              <td colSpan={2} />
-            </tr>
-          </tfoot>
-        )}
       </table>
 
-
-      <div className="pdf-signature-section">
-        <div className="pdf-signature-block">
-          <p className="pdf-signature-label">Driver signature</p>
-          {note.signature ? (
-            <img src={note.signature} alt="Driver signature" className="pdf-signature-img" />
-          ) : (
-            <div className="pdf-signature-line" />
-          )}
-          <p className="pdf-signature-name">
-            {note.driver_name || '-'} · {formatDate(note.dispatch_date)}
-          </p>
-        </div>
-        <div className="pdf-signature-block">
-          {/* No line here on purpose — same reasoning as
-              DeliveryNotePDF's "Received by": the warehouse side has
-              no signature to collect, only who released the pallet. */}
-          <p className="pdf-signature-label">Released by (warehouse)</p>
-          <p className="pdf-signature-name">
-            {note.dispatched_by_name || 'Dispatch staff'} · {formatDate(note.dispatch_date)}
-          </p>
-        </div>
-      </div>
-
-      <div className="pdf-footer-stamp">
-        <p>Ladles of Love NGO · Warehouse Management System</p>
-        <p className="pdf-footer-stamp--spaced">
-          Generated {formatDateTime(new Date().toISOString())} · Record #{note.id}
-        </p>
-      </div>
-    </PdfShell>
+      {wasCollected ? (
+        <NoteSignatures
+          signed={{
+            label: 'Driver’s signature',
+            image: note.signature,
+            name: [note.driver_name || 'Driver', note.vehicle_reg].filter(Boolean).join(' · '),
+          }}
+          by={{
+            label: 'Dispatched by',
+            name: `${note.dispatched_by_name || 'Warehouse Worker'} · ${formatDate(note.collected_at)}`,
+          }}
+        />
+      ) : null}
+    </NoteSheet>
   );
 };
 

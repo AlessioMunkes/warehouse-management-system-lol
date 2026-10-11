@@ -3,17 +3,13 @@
 //
 // The Operations report as a printable document: letterhead, title and
 // period, then the same report body as the screen, charts included. It
-// uses PdfShell (Print / View PDF), like the delivery and dispatch notes.
+// is laid out by NoteSheet, like the delivery and dispatch notes.
 // The colours are fixed to the light theme (.op-pdf) so a report made in
 // dark mode still prints dark text on white paper.
 // ─────────────────────────────────────────────────────────────
 import { useState } from 'react';
-import PdfShell from '../receipts/PdfShell';
+import NoteSheet from '../receipts/NoteSheet';
 import { useAuth } from '../../context/AuthContext';
-
-// Same letterhead as the delivery and dispatch notes.
-const PDF_LOGO_URL = '/images/pdf_logo.png';
-const WAREHOUSE_ADDRESS = ['Unit 4, Hewett Park', '17 Hewett Ave, Epping', 'Cape Town, 7460'];
 
 const fmtDate = (iso) => (iso
   ? new Date(`${String(iso).slice(0, 10)}T00:00:00`).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -42,34 +38,18 @@ export default function OperationsReportPDF({ data, narrative, onClose, renderBo
     site && ['Warehouse', site],
   ].filter(Boolean);
 
+  // Laid out by NoteSheet, the layout every note and report shares:
+  // the same title, letterhead and details box as the dispatch note.
   return (
-    <PdfShell
-      title={`Operations report – ${title}`}
+    <NoteSheet
+      title="Operations Report"
+      toolbarTitle={`OPERATIONS REPORT - ${title}`}
       filename={`operations-report-${slug(title)}-${generated.toISOString().slice(0, 10)}`}
       onClose={onClose}
+      meta={meta.map(([label, value]) => ({ label, value }))}
     >
       <div className="op-pdf">
-        <div className="pdf-doc-header">
-          <div>
-            <h1 className="pdf-doc-title">Operations Report</h1>
-            <p className="pdf-doc-subtitle">Ladles of Love · Warehouse operations</p>
-            {WAREHOUSE_ADDRESS.map((line) => (
-              <p key={line} className="pdf-doc-address">{line}</p>
-            ))}
-          </div>
-          <img src={PDF_LOGO_URL} alt="" className="pdf-doc-logo" aria-hidden="true" />
-        </div>
-
         <h2 className="op-pdf-report-title">{title}</h2>
-
-        <dl className="op-pdf-meta">
-          {meta.map(([k, v]) => (
-            <div key={k}>
-              <dt>{k}</dt>
-              <dd>{v}</dd>
-            </div>
-          ))}
-        </dl>
 
         <div className="op-pdf-body">
           {renderBody({ data, narrative })}
@@ -84,6 +64,6 @@ export default function OperationsReportPDF({ data, narrative, onClose, renderBo
           <span>Produced from the warehouse management system. Figures as at {generated.toLocaleDateString('en-ZA')}.</span>
         </footer>
       </div>
-    </PdfShell>
+    </NoteSheet>
   );
 }

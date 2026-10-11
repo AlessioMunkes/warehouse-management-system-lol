@@ -117,3 +117,13 @@ export const BENEFICIARY_LABEL = {
   soup_kitchen:    'Soup kitchen',
   community:       'Community',
 };
+
+// ── Shared by every note ──────────────────────────────────────
+// Hardcoded to the one warehouse this app currently prints for.
+export const WAREHOUSE = {
+  name: 'Ladles of Love, Cape Town Warehouse',
+  addressLines: ['Unit 4, Hewett Park', '17 Hewett Ave, Epping', 'Cape Town, 7460'],
+};
+
+// "#0087": every note numbers itself the same way.
+export const noteNumber = (id) => `#${String(id).padStart(4, '0')}`;

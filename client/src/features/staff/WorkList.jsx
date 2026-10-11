@@ -166,6 +166,11 @@ export default function WorkList({
   lines, focusId, onFocus, onChange, renderDetail, guided = false,
   expectedLabel = 'Expected', onAcceptAll, acceptAllLabel = 'Everything as expected',
   confirmed, onConfirm, undo,
+  // Form only: every line's panel open at once. For a screen whose
+  // panel holds something that has to be answered (receiving's storage
+  // place and use-by date), a row that must be tapped to reveal it is a
+  // question nobody knows they were asked.
+  expandAll = false,
 }) {
   const total = lines.length;
   const confirmable = Boolean(onConfirm);
@@ -242,7 +247,7 @@ export default function WorkList({
           <WorkRow
             key={line.id}
             line={line}
-            focused={guided || String(focusId) === String(line.id)}
+            focused={guided || expandAll || String(focusId) === String(line.id)}
             onFocus={onFocus}
             onChange={onChange}
             expectedLabel={expectedLabel}

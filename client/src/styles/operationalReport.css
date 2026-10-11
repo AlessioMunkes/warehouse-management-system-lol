@@ -42,7 +42,8 @@
    reads var(--ink) etc., and in dark mode those are light colours —
    white text on a white sheet. Paper has one theme.
    ───────────────────────────────────────────────────────────── */
-.pdf-document .op-pdf {
+.pdf-document .op-pdf,
+.pdfnote-document .op-pdf {
   --canvas: #faf8f5; --surface: #ffffff; --ink: #2b3336; --ink-soft: #676767;
   --line: #e9e3dd; --brand: #ef3a40; --good-ink: #1d7a3a;
   --viz-1: #2a78d6; --viz-2: #eb6834; --viz-3: #1baf7a; --viz-4: #eda100;

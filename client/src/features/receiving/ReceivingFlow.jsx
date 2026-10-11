@@ -463,8 +463,8 @@ export default function ReceivingFlow({ onCrumbChange }) {
   // line's own panel, so "which line" is the whole question.
   if (missingUseBy.length) {
     blockers.push(missingUseBy.length <= 2
-      ? `a use-by date on ${missingUseBy.map((l) => l.name).join(' and ')} (tap the line)`
-      : `a use-by date on ${missingUseBy.length} fresh lines (tap each line)`);
+      ? `a use-by date on ${missingUseBy.map((l) => l.name).join(' and ')}`
+      : `a use-by date on ${missingUseBy.length} fresh lines`);
   }
   if (!signature) blockers.push("the driver's signature");
   const blockedNote = blockers.length ? `Still needed: ${blockers.join(', ')}.` : null;
@@ -701,6 +701,11 @@ export default function ReceivingFlow({ onCrumbChange }) {
               // no way to take a date the finish button asks for.
               focusId={focusId}
               onFocus={setFocusId}
+              // Form shows every line's storage place and use-by date
+              // without a tap: "every line at once" has to mean all of
+              // each line, or the date the finish button asks for has
+              // nowhere visible to go.
+              expandAll={mode !== 'guided'}
               onChange={(id, value) => patchLine(id, { counted: value })}
               onAcceptAll={acceptAllAsOrdered}
               acceptAllLabel="Everything as ordered"
