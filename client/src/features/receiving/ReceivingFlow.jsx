@@ -208,6 +208,13 @@ export default function ReceivingFlow({ onCrumbChange }) {
   }, [openOrders]);
 
   const orderSearch = useListSearch(openOrders, orderText);
+  const orderSearchProps = {
+    id: 'stf-order-search',
+    query: orderSearch.query,
+    onQuery: orderSearch.setQuery,
+    placeholder: 'Search by order number, supplier or date',
+    buttonLabel: 'Search orders',
+  };
 
   // A search by order number has to find the order whoever it came
   // from, so a live query overrides the supplier filter rather than
@@ -587,16 +594,6 @@ export default function ReceivingFlow({ onCrumbChange }) {
             <div className="stf-static-value">{receivedByName}</div>
           </div>
 
-          {/* The one search on this screen, and it is over the orders
-              rather than the suppliers: a driver's note has a number
-              on it, and the supplier list is four rows long. */}
-          <ListTools
-            id="stf-order-search"
-            query={orderSearch.query}
-            onQuery={orderSearch.setQuery}
-            placeholder="Search by order number, supplier or date"
-          />
-
           {/* Every open order, narrowed to the supplier when one is
               chosen. A search looks across all of them, because a
               driver's note has an order number on it and nothing else,
@@ -612,13 +609,20 @@ export default function ReceivingFlow({ onCrumbChange }) {
               }))}
               value={orderId}
               onChange={selectOrder}
+              // The one search on this screen, and it is over the orders:
+              // a driver's note has a number on it. Behind an icon by
+              // the label, so it is not a row of the form until wanted.
+              search={orderSearchProps}
             />
           ) : orderSearch.searching ? (
-            <NoMatches
+            <>
+              <ListTools {...orderSearchProps} />
+              <NoMatches
               query={orderSearch.query}
               onClear={() => orderSearch.setQuery('')}
               noun="orders"
             />
+            </>
           ) : (
             <Notice>
               There are no open orders to receive against right now. Ask your manager to approve

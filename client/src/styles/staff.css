@@ -2287,6 +2287,34 @@ button.stf-panel-head:disabled { cursor: default; }
   cursor: pointer;
 }
 .stf-search-clear:hover { color: var(--stf-ink); }
+
+/* A search that opens from an icon beside a field's label (SelectField's
+   `search`). The label and the icon share one row; the box appears
+   under them only once it is asked for. */
+.stf-field-labelrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.stf-search-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin: -8px 0;
+  border: 0;
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-field-bg);
+  color: var(--stf-ink);
+  font-size: 18px;
+  cursor: pointer;
+}
+.stf-search-open:focus-visible {
+  outline: 2px solid var(--stf-accent);
+  outline-offset: 1px;
+}
 .stf-tools-extra { display: flex; flex-direction: column; gap: 8px; }
 
 .stf-empty-line { margin: 0 0 12px; }
@@ -2846,6 +2874,23 @@ button.stf-panel-head:disabled { cursor: default; }
 /* The active filter segment gets a red underline, not a red fill —
    filters are not the action. */
 .stf-shell .stf-segment.is-active { box-shadow: inset 0 -2px 0 var(--brand), 0 1px 2px color-mix(in srgb, var(--ink) 14%, transparent); }
+
+/* Not the Guided / Form toggle. Its chosen side is already drawn by the
+   sliding pill behind it (.stf-segment-thumb); the rule above put a
+   second, squarer box with a red line on top of that pill, so the
+   choice read as a framed rectangle with a red bar. The toggle is the
+   pill alone. */
+.stf-shell .stf-toggle .stf-segment,
+.stf-shell .stf-toggle .stf-segment.is-active {
+  border-radius: var(--stf-radius-pill);
+  background: transparent;
+  box-shadow: none;
+}
+.stf-shell .stf-toggle .stf-segment-thumb { border-radius: var(--stf-radius-pill); }
+/* A track for the pill to slide in, so the two choices read as one
+   switch and the chosen one does not rely on a shadow alone. */
+.stf-shell .stf-toggle { padding: 3px; background: var(--surface-2); }
+.stf-shell .stf-toggle .stf-segment { padding: 8px 16px; }
 
 /* ── Header ─────────────────────────────────────────────────────── */
 .stf-shell .stf-crumb-link:hover { border-color: var(--brand); color: var(--brand); background: var(--surface); }

@@ -18,6 +18,9 @@
 // ─────────────────────────────────────────────────────
 export default function ListTools({
   id, query, onQuery, placeholder = 'Search this list', children,
+  // For a search that opens from an icon (SelectField's `search`):
+  // focus goes into it as it appears, and its cross closes it again.
+  autoFocus = false, onClose,
 }) {
   return (
     <div className="stf-tools">
@@ -28,17 +31,18 @@ export default function ListTools({
           className="stf-search-input"
           type="search"
           autoComplete="off"
+          autoFocus={autoFocus}
           placeholder={placeholder}
           aria-label={placeholder}
           value={query}
           onChange={(e) => onQuery(e.target.value)}
         />
-        {query ? (
+        {query || onClose ? (
           <button
             type="button"
             className="stf-search-clear"
-            onClick={() => onQuery('')}
-            aria-label="Clear the search"
+            onClick={() => { onQuery(''); onClose?.(); }}
+            aria-label={onClose && !query ? 'Close the search' : 'Clear the search'}
           >
             <span aria-hidden="true">&times;</span>
           </button>

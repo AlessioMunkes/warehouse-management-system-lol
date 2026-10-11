@@ -284,7 +284,8 @@ describe.skip('DecantingFlow', () => {
     const user = userEvent.setup();
     render(<DecantingFlow products={PRODUCTS} />);
 
-    await user.type(screen.getByLabelText('Search products'), 'sugar');
+    await user.click(screen.getByRole('button', { name: 'Search products' }));
+    await user.type(screen.getByRole('searchbox', { name: 'Search products' }), 'sugar');
     expect(screen.getByRole('radio', { name: /Sugar Beans/ })).toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: /Maize Meal/ })).not.toBeInTheDocument();
   });
@@ -293,7 +294,8 @@ describe.skip('DecantingFlow', () => {
     const user = userEvent.setup();
     render(<DecantingFlow products={PRODUCTS} />);
 
-    await user.type(screen.getByLabelText('Search products'), 'zzz');
+    await user.click(screen.getByRole('button', { name: 'Search products' }));
+    await user.type(screen.getByRole('searchbox', { name: 'Search products' }), 'zzz');
     expect(screen.getByText(/No products match/)).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Show everything again' }));

@@ -237,6 +237,13 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
   // long enough that two sacks can look identical until you read to
   // the end of them.
   const productSearch = useListSearch(products, productText);
+  const productSearchProps = {
+    id: 'stf-product-search',
+    query: productSearch.query,
+    onQuery: productSearch.setQuery,
+    placeholder: 'Search products',
+    buttonLabel: 'Search products',
+  };
 
   const { show: showCoachmark, dismiss: dismissCoachmark } = useCoachmark('decanting-view-toggle');
   // The sheet just saved, fetched in full by recordDecanting itself —
@@ -688,13 +695,6 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
             </Actions>
           }
         >
-          <ListTools
-            id="stf-product-search"
-            query={productSearch.query}
-            onQuery={productSearch.setQuery}
-            placeholder="Search products"
-          />
-
           {/* A dropdown, not the tap-target stack this used to be —
               same reasoning as ReceivingFlow's order picker: the
               catalogue runs to dozens of products with names long
@@ -724,13 +724,17 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
                 setShowCustomChooser(false);
                 setValidationTriggered(false);
               }}
+              search={productSearchProps}
             />
           ) : productSearch.searching ? (
-            <NoMatches
+            <>
+              <ListTools {...productSearchProps} />
+              <NoMatches
               query={productSearch.query}
               onClear={() => productSearch.setQuery('')}
               noun="products"
             />
+            </>
           ) : (
             <Notice>Nothing is marked as decantable yet. An admin sets that on the Products screen.</Notice>
           )}

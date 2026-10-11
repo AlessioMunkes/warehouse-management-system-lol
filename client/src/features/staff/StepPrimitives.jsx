@@ -11,6 +11,7 @@
 // numbers are 56px and every tap target is at least 44px.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import ListTools from './ListTools';
 
 // ── Step screen ───────────────────────────────────────────────
 // Moving between steps replaces the whole screen, so focus has to
@@ -108,11 +109,45 @@ export const TextField = ({ id, label, hint, value, onChange, ...rest }) => {
 // targets (every supplier, every one of a supplier's open orders) —
 // ChoiceList is the right control for two or three options, this is
 // the right one for a dropdown that can hold dozens.
-export const SelectField = ({ id, label, hint, value, onChange, options, placeholder, disabled = false }) => {
+//
+// `search` ({ id, query, onQuery, placeholder, buttonLabel }) puts a
+// search icon beside the label. The box itself only appears when the
+// icon is tapped or a search is already typed: a permanent search bar
+// above every dropdown was a full row of the screen for something most
+// visits never use.
+export const SelectField = ({ id, label, hint, value, onChange, options, placeholder, disabled = false, search }) => {
   const fieldId = id || 'stf-select';
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searching = search && (searchOpen || Boolean(search.query));
   return (
     <div className="stf-field">
-      <label className="stf-field-label" htmlFor={fieldId}>{label}</label>
+      {search ? (
+        <div className="stf-field-labelrow">
+          <label className="stf-field-label" htmlFor={fieldId}>{label}</label>
+          {!searching ? (
+            <button
+              type="button"
+              className="stf-search-open"
+              aria-label={search.buttonLabel || 'Search'}
+              onClick={() => setSearchOpen(true)}
+            >
+              <i className="ti ti-search" aria-hidden="true" />
+            </button>
+          ) : null}
+        </div>
+      ) : (
+        <label className="stf-field-label" htmlFor={fieldId}>{label}</label>
+      )}
+      {searching ? (
+        <ListTools
+          id={search.id}
+          query={search.query}
+          onQuery={search.onQuery}
+          placeholder={search.placeholder}
+          autoFocus={searchOpen}
+          onClose={() => setSearchOpen(false)}
+        />
+      ) : null}
       <select
         id={fieldId}
         className="stf-select"
