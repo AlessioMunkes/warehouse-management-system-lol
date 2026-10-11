@@ -93,3 +93,63 @@ describe('StaffSlipList — spare slips', () => {
     expect(screen.getByText(/Nothing on the floor right now/i)).toBeInTheDocument();
   });
 });
+
+// A pallet that has left the gate has status 'dispatched'. The list used
+// to look for a status called 'collected', which a slip never has, so
+// every collected pallet sat under "Claimed by me" labelled Pending.
+describe('StaffSlipList: what counts as mine, and as done', () => {
+  const slip = (over) => ({
+    id: 10, ecd_name: 'Creative Kids', cohort: 'tuesday', child_count: 37,
+    dispatch_date_iso: '2026-10-13', confirmed_items: 20, flagged_items: 1, total_items: 21,
+    status: 'in_progress', assigned_to: 7, ...over,
+  });
+  const showMine = (mine) => {
+    pickingAPI.fetchPickingSlips.mockImplementation(async ({ mine: asked } = {}) => (asked ? mine : []));
+  };
+  const openTab = async (user, name) => user.click(await screen.findByRole('tab', { name }));
+
+  it('puts a collected pallet under Done, not under Claimed by me', async () => {
+    const user = userEvent.setup();
+    showMine([
+      slip({ id: 1, ecd_name: 'Still packing', status: 'in_progress' }),
+      slip({ id: 2, ecd_name: 'Gone last week', status: 'dispatched', dispatch_status: 'collected' }),
+      slip({ id: 3, ecd_name: 'At the gate', status: 'complete' }),
+    ]);
+    render(<StaffSlipList onOpenSlip={vi.fn()} />);
+
+    await openTab(user, /Claimed by me \(1\)/);
+    expect(screen.getByText('Still packing')).toBeInTheDocument();
+    expect(screen.queryByText('Gone last week')).not.toBeInTheDocument();
+
+    await openTab(user, /Done \(2\)/);
+    expect(screen.getByText('Gone last week')).toBeInTheDocument();
+    expect(screen.getByText('Collected')).toBeInTheDocument();
+    expect(screen.getByText('At the gate')).toBeInTheDocument();
+  });
+
+  it('lists the pallet claimed most recently first', async () => {
+    const user = userEvent.setup();
+    showMine([
+      slip({ id: 1, ecd_name: 'Amaphiko', claimed_at: '2026-10-11T06:00:00Z' }),
+      slip({ id: 2, ecd_name: 'Zebra Kids', claimed_at: '2026-10-11T09:00:00Z' }),
+      slip({ id: 3, ecd_name: 'No claim on record' }),
+    ]);
+    render(<StaffSlipList onOpenSlip={vi.fn()} />);
+    await openTab(user, /Claimed by me/);
+
+    const titles = [...document.querySelectorAll('.stf-row-title')].map((n) => n.textContent);
+    expect(titles).toEqual(['Zebra Kids', 'Amaphiko', 'No claim on record']);
+  });
+
+  it('says the day and how many lines are done, and nothing else', async () => {
+    const user = userEvent.setup();
+    showMine([slip()]);
+    render(<StaffSlipList onOpenSlip={vi.fn()} />);
+    await openTab(user, /Claimed by me/);
+
+    // 20 confirmed and 1 flagged short: all 21 lines have been dealt with.
+    const meta = document.querySelector('.stf-row-meta').textContent;
+    expect(meta).toBe('Tue, 13 Oct · 21 of 21 packed');
+    expect(meta).not.toMatch(/children/);
+  });
+});

@@ -165,7 +165,11 @@ const getSlips = async ({ dispatchDate, from, to, cohort, status, assignedTo, st
        -- dispatch event exists. dispatch_events is where the
        -- not-collected cut-off writes; picking_slips.collection_status
        -- is never written and must not be read.
-       de.status                                              AS dispatch_status
+       de.status                                              AS dispatch_status,
+       -- When it was last claimed or assigned, so a packer's own list
+       -- can put the pallet they just took at the top.
+       (SELECT MAX(pe.created_at) FROM picking_events pe
+         WHERE pe.picking_slip_id = ps.id AND pe.event_type = 'assigned') AS claimed_at
      FROM picking_slips ps
      JOIN ecd_centres e ON e.id = ps.ecd_id
      LEFT JOIN users u  ON u.id = ps.assigned_to

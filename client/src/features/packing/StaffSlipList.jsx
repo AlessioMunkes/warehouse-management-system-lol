@@ -29,7 +29,7 @@ import { fetchPickingSlips, assignSlip } from '../../services/pickingAPI';
 import { Notice } from '../staff/StepPrimitives';
 import Paged from '../staff/Paged';
 import usePaged from '../staff/usePaged';
-import { floorWindow, isSpareSlip } from './spareSlips';
+import { floorWindow, isSpareSlip, isPackedSlip, isCollectedSlip, linesDone } from './spareSlips';
 import { volunteerHolder, dayLabel } from '../pickingSlips/slipViews';
 import { useT } from '../../translations';
 
@@ -37,8 +37,6 @@ const cohortLabel = (cohort, t) => (cohort === 'tuesday' || cohort === 'thursday
 
 // Soup kitchens and test centres have no child count; say nothing rather
 // than "· children" with the number missing.
-const childCountNote = (count, t) => (count == null || count === '' ? '' : ` · ${t('common.children', { n: count })}`);
-
 // The day a floor pallet goes out. The floor shows the whole week now,
 // so the row has to say which day each one is for.
 const goingOut = (slip, t) => {
@@ -48,19 +46,21 @@ const goingOut = (slip, t) => {
 
 // Centre and packer. Module level so its identity is stable.
 const slipText = (slip) => [slip.ecd_name, slip.packer_name, volunteerHolder(slip)].filter(Boolean).join(' ');
-const DONE_STATUSES = ['complete', 'collected'];
-const MISSED_COLLECTION_DAYS = 21; // same threshold as the manager board
+// The day a pallet goes out, short: "Tue 13 Oct".
+const slipDay = (slip, t) => {
+  const day = slip.dispatch_date_iso ?? String(slip.dispatch_date ?? '').slice(0, 10);
+  return day ? dayLabel(day) : cohortLabel(slip.cohort, t);
+};
 
-function daysSinceCollection(lastCollectedDate, dispatchDate) {
-  if (!lastCollectedDate || !dispatchDate) return null;
-  const last = new Date(lastCollectedDate);
-  const due = new Date(dispatchDate);
-  if (Number.isNaN(last.getTime()) || Number.isNaN(due.getTime())) return null;
-  return Math.round((due - last) / (24 * 60 * 60 * 1000));
-}
+// When the pallet was last claimed, as a number to sort on. A pallet
+// with no claim on record sorts last.
+const claimedAt = (slip) => {
+  const at = slip.claimed_at ? new Date(slip.claimed_at).getTime() : NaN;
+  return Number.isNaN(at) ? 0 : at;
+};
 
 function badgeFor(slip, t) {
-  if (slip.status === 'collected') return { className: 'stf-badge is-done', label: t('status.collected') };
+  if (isCollectedSlip(slip)) return { className: 'stf-badge is-done', label: t('status.collected') };
   if (slip.status === 'complete') return { className: 'stf-badge is-done', label: t('status.complete') };
   if (slip.status === 'in_progress') return { className: 'stf-badge is-active', label: t('status.inProgress') };
   if (slip.status === 'cancelled') return { className: 'stf-badge', label: t('status.cancelled') };
@@ -109,8 +109,12 @@ export default function StaffSlipList({ onOpenSlip }) {
     return () => { cancelled = true; };
   }, [reloadToken]);
 
-  const active = mineSlips.filter((s) => !DONE_STATUSES.includes(s.status) && s.status !== 'cancelled');
-  const done = mineSlips.filter((s) => DONE_STATUSES.includes(s.status));
+  // Newest claim first: the pallet just claimed is the one about to be
+  // packed, and it used to land at the bottom of a long list.
+  const active = mineSlips
+    .filter((s) => !isPackedSlip(s) && s.status !== 'cancelled')
+    .sort((a, b) => claimedAt(b) - claimedAt(a));
+  const done = mineSlips.filter(isPackedSlip);
   const spare = allSlips.filter(isSpareSlip);
 
   const rows = tab === 'mine' ? active : tab === 'spare' ? spare : done;
@@ -197,9 +201,7 @@ export default function StaffSlipList({ onOpenSlip }) {
                 <div key={slip.id} className="stf-row is-static">
                   <span className="stf-row-main">
                     <span className="stf-row-title">{slip.ecd_name}</span>
-                    <span className="stf-row-meta">
-                      {goingOut(slip, t)}{childCountNote(slip.child_count, t)}
-                    </span>
+                    <span className="stf-row-meta">{goingOut(slip, t)}</span>
                   </span>
                   <button
                     type="button"
@@ -214,14 +216,12 @@ export default function StaffSlipList({ onOpenSlip }) {
             }
 
             const badge = badgeFor(slip, t);
-            const gap = daysSinceCollection(slip.last_collected_date, slip.dispatch_date);
-            const missed = !slip.last_collected_date || (gap !== null && gap >= MISSED_COLLECTION_DAYS);
             const isDone = tab === 'done';
 
             return (
               <div
                 key={slip.id}
-                className={`stf-row${missed && !isDone ? ' is-warn' : ''}${isDone ? ' is-static' : ''}`}
+                className={`stf-row${isDone ? ' is-static' : ''}`}
                 role={isDone ? undefined : 'button'}
                 tabIndex={isDone ? undefined : 0}
                 onClick={isDone ? undefined : () => onOpenSlip(slip.id)}
@@ -233,11 +233,11 @@ export default function StaffSlipList({ onOpenSlip }) {
               >
                 <span className="stf-row-main">
                   <span className="stf-row-title">{slip.ecd_name}</span>
+                  {/* The day and how far along it is. The children, the
+                      cohort and the rest are on the pallet's own screen. */}
                   <span className="stf-row-meta">
-                    {cohortLabel(slip.cohort, t)}{childCountNote(slip.child_count, t)} ·{' '}
-                    {t('packing.itemsPacked', { done: slip.confirmed_items, all: slip.total_items })}
+                    {slipDay(slip, t)} · {t('packing.itemsPacked', { done: linesDone(slip), all: slip.total_items })}
                     {volunteerHolder(slip) ? ` · ${volunteerHolder(slip)}` : ''}
-                    {missed && !isDone ? ` · ${t('packing.notCollected')}` : ''}
                   </span>
                 </span>
                 <span className={badge.className}>{badge.label}</span>

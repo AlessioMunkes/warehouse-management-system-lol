@@ -18,6 +18,21 @@ export const todayISO = () => {
 
 export const isSpareSlip = (slip) => !slip.assigned_to && slip.status === 'pending';
 
+// Packing is finished with a pallet once it is closed off ('complete')
+// and stays finished after it leaves the gate ('dispatched'). The list
+// and the pallet screen each had their own copy of this, and both
+// looked for a status called 'collected', which a slip never has. So
+// every pallet that had been collected fell out of Done, back into
+// "Claimed by me" labelled Pending, and opened with a Log pallet packed
+// button the server could only refuse.
+export const isCollectedSlip = (slip) =>
+  slip.status === 'dispatched'
+  || slip.dispatch_status === 'collected' || slip.dispatch_status === 'late_collected';
+export const isPackedSlip = (slip) => slip.status === 'complete' || isCollectedSlip(slip);
+
+// Lines packing has dealt with: confirmed, or flagged as short.
+export const linesDone = (slip) => Number(slip.confirmed_items ?? 0) + Number(slip.flagged_items ?? 0);
+
 // The dispatch dates the floor shows: this week from Monday, through the
 // next seven days. It used to be today only, so a slip made on Monday
 // for Tuesday could not be seen or claimed until Tuesday — unless a

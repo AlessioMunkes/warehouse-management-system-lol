@@ -64,7 +64,7 @@ describe('the translation table', () => {
 describe('translator', () => {
   it('fills in values and picks the wording for one or many', () => {
     const t = translator('en');
-    expect(t('packing.itemsPacked', { done: 3, all: 8 })).toBe('3/8 items packed');
+    expect(t('packing.itemsPacked', { done: 3, all: 8 })).toBe('3 of 8 packed');
     expect(t.n('slip.stillNeeded', 1)).toBe('1 item still needs to be confirmed or flagged.');
     expect(t.n('slip.stillNeeded', 4)).toBe('4 items still need to be confirmed or flagged.');
     expect(translator('af')('packing.claim')).toBe('Eis op');

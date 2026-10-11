@@ -33,6 +33,7 @@ import {
 } from '../staff/StepPrimitives';
 import useCoachmark from '../staff/useCoachmark';
 import { volunteerHolder } from '../pickingSlips/slipViews';
+import { isPackedSlip, isCollectedSlip } from './spareSlips';
 import PhotoButton from '../staff/PhotoButton';
 import { useT } from '../../translations';
 
@@ -245,7 +246,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
   }
   if (!slip) return null;
 
-  const locked = slip.status === 'complete' || slip.status === 'collected';
+  const locked = isPackedSlip(slip);
   // A pallet a guest volunteer is packing is taken, though assigned_to is empty.
   const volunteerLabel = volunteerHolder(slip);
   const unassigned = !slip.assigned_to && !volunteerLabel;
@@ -512,7 +513,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
 
       {locked ? (
         <Notice>
-          {slip.status === 'collected' ? t('slip.palletCollected') : t('slip.palletPacked')}{slip.pallet_ref ? ` · ${t('slip.ref', { ref: slip.pallet_ref })}` : ''}.
+          {isCollectedSlip(slip) ? t('slip.palletCollected') : t('slip.palletPacked')}{slip.pallet_ref ? ` · ${t('slip.ref', { ref: slip.pallet_ref })}` : ''}.
         </Notice>
       ) : null}
 
