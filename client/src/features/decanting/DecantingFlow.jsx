@@ -74,7 +74,9 @@ import { calculateDecantingPlan, recordDecanting } from '../../services/decantin
 // appears in both, or in neither.
 import { STANDARD_SIZES, sizesToKg } from './BagSizes';
 import BagSizeToggle from './BagSizeToggle';
-import DecantingSheetPDF from './DecantingSheetPDF';
+import DecantingSheetPDF from './DecantingSheetPDF';
+import SuccessDialog from '../staff/SuccessDialog';
+import { OFFLINE_TITLE, offlineLine } from '../staff/successText';
 
 // Name and SKU: two sacks of maize meal are told apart by the code on
 // the bag as often as by the name on it. Module level for a stable
@@ -249,6 +251,7 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
   // The sheet just saved, fetched in full by recordDecanting itself —
   // null hides the pop-up; set once by save() on success.
   const [pdfRecord, setPdfRecord] = useState(null);
+  const [doneRecord, setDoneRecord] = useState(null);
   // True when the last sheet could not be sent and is on the phone.
   const [queued, setQueued] = useState(false);
 
@@ -542,10 +545,10 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
       // record to show yet.
       setQueued(Boolean(result?.queued));
       if (result?.queued) return;
-      // recordDecanting already returns the full joined record (see
-      // decanting.repository.js's own getDecantingById-after-insert
-      // pattern) — no second fetch needed for the pop-up.
-      setPdfRecord(result);
+      // recordDecanting already returns the full joined record. Kept
+      // for the "View decanting sheet" button on the confirmation, not
+      // opened over it.
+      setDoneRecord(result);
     } catch (err) {
       setError(
         /cannot exceed/.test(err.message)
@@ -558,6 +561,7 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
   };
 
   const restart = () => {
+    setDoneRecord(null);
     setPhase('which');
     setProductId('');
     setWeighedKg('');
@@ -740,7 +744,7 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
       )}
 
       {/* ── 2 · The work, on one page ──────────────────────── */}
-      {phase === 'work' && (
+      {(phase === 'work' || phase === 'done') && (
         <TaskPage
           title={product ? product.name : 'Decanting'}
           sub="Weigh it, bag it, then record what you made."
@@ -935,20 +939,16 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
         </TaskPage>
       )}
 
-      {/* ── Done ───────────────────────────────────────────── */}
-      {phase === 'done' && (
-        <StepScreen
-          title={queued ? 'Saved on this phone' : 'Saved'}
-          sub={queued
-            ? 'No signal. It sends itself when you are back in range. Do not record it again.'
-            : 'Bags and waste recorded.'}
-          actions={
-            <Actions>
-              <Button onClick={restart}>Decant another bulk amount</Button>
-            </Actions>
-          }
-        />
-      )}
+      {/* ── Done: the one confirmation every flow uses ─────── */}
+      <SuccessDialog
+        open={phase === 'done'}
+        tone={queued ? 'offline' : 'success'}
+        title={queued ? OFFLINE_TITLE : 'Decanting saved'}
+        onClose={restart}
+        action={doneRecord && !queued ? { label: 'View decanting sheet', onClick: () => setPdfRecord(doneRecord) } : null}
+      >
+        {queued ? offlineLine('Do not record it again.') : 'Bags and waste recorded.'}
+      </SuccessDialog>
 
       {pdfRecord ? (
         <DecantingSheetPDF record={pdfRecord} onClose={() => setPdfRecord(null)} />

@@ -46,7 +46,9 @@ import usePaged from '../staff/usePaged';
 import Paged from '../staff/Paged';
 import { readDraft, writeDraft, clearDraft } from '../staff/useDraft';
 import collectionKitAPI from '../../services/collectionKitAPI';
-import formatKitCode from './kitCode';
+import formatKitCode from './kitCode';
+import SuccessDialog from '../staff/SuccessDialog';
+import { OFFLINE_TITLE, offlineLine } from '../staff/successText';
 import { todayISO } from '../packing/spareSlips';
 
 const fmtDate = (value) =>
@@ -123,6 +125,13 @@ export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHist
   // Said on the list after a weigh-in that could not be sent and is
   // waiting on the phone.
   const [queuedNote, setQueuedNote] = useState(null);
+  // The confirmation after assigning, logging or dispatching.
+  const [success, setSuccess] = useState(null);
+  const successDialog = (
+    <SuccessDialog open={Boolean(success)} tone={success?.tone} title={success?.title} onClose={() => setSuccess(null)}>
+      {success?.body}
+    </SuccessDialog>
+  );
 
   // ── Assign form state ─────────────────────────────────────
   const [ownerName, setOwnerName] = useState('');
@@ -252,6 +261,7 @@ export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHist
       const kit = res?.data ?? res;
       await loadKits(kitSearch);
       await openKit(kit.id);
+      setSuccess({ title: 'Kit assigned', body: `${formatKitCode(kit.id)} is with ${ownerName.trim()}.` });
     } catch (err) {
       setFormError(err.message || 'Could not assign the kit.');
     } finally {
@@ -291,11 +301,12 @@ export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHist
         // No signal: it is on the phone, not yet on the kit's history.
         // Back to the list, with the reason on screen.
         backToBrowse();
-        setQueuedNote('No signal, so that weigh-in is saved on your phone. It sends itself when you are back in range. Do not log it again.');
+        setSuccess({ tone: 'offline', title: OFFLINE_TITLE, body: offlineLine('Do not log it again.') });
         return;
       }
       await loadRecords(recordSearch);
       await openKit(selectedKit.id);
+      setSuccess({ title: 'Compost logged', body: `${fmtKg(Number(kgCompost))} from ${formatKitCode(selectedKit.id)}.` });
     } catch (err) {
       setFormError(err.message || 'Could not log the compost collected.');
     } finally {
@@ -320,6 +331,7 @@ export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHist
     try {
       await collectionKitAPI.markDispatched(selectedRecord.id, dispatchedTo.trim());
       await openRecord(selectedRecord.id, { fromKit: recordOrigin === 'kit' });
+      setSuccess({ title: 'Compost dispatched', body: `Sent to ${dispatchedTo.trim()}.` });
     } catch (err) {
       setFormError(err.message || 'Could not mark this record dispatched.');
     } finally {
@@ -353,6 +365,8 @@ export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHist
   // ── History: the compost records ───────────────────────────
   if (phase === 'browse' && tab === 'records') {
     return (
+      <>
+        {successDialog}
       <TaskPage
         title="History"
         sub="Compost logged, newest first."
@@ -384,12 +398,15 @@ export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHist
           </>
         )}
       </TaskPage>
+      </>
     );
   }
 
   // ── Kits: what this screen opens on ─────────────────────────
   if (phase === 'browse') {
     return (
+      <>
+        {successDialog}
       <TaskPage title="Feed the Soil" sub="Kits given out.">
         {browseError ? <Notice tone="warn">{browseError}</Notice> : null}
         {queuedNote ? <Notice>{queuedNote}</Notice> : null}
@@ -436,6 +453,7 @@ export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHist
           </>
         )}
       </TaskPage>
+      </>
     );
   }
 
@@ -445,6 +463,8 @@ export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHist
       return <TaskPage title="Kit" sub="Loading…"><div className="stf-skeleton" aria-label="Loading" /></TaskPage>;
     }
     return (
+      <>
+        {successDialog}
       <TaskPage
         title="Collection kit details"
         sub={`${formatKitCode(selectedKit.id)} · ${STATUS_LABEL[selectedKit.status] ?? selectedKit.status}`}
@@ -481,6 +501,7 @@ export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHist
           </div>
         )}
       </TaskPage>
+      </>
     );
   }
 
@@ -491,6 +512,8 @@ export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHist
     }
     const backAction = () => (recordOrigin === 'kit' ? openKit(selectedRecord.kit_id) : backToBrowse('records'));
     return (
+      <>
+        {successDialog}
       <TaskPage
         title="Compost record details"
         sub={`${formatKitCode(selectedRecord.kit_id)} · ${STATUS_LABEL[selectedRecord.status] ?? selectedRecord.status}`}
@@ -547,12 +570,15 @@ export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHist
           </>
         ) : null}
       </TaskPage>
+      </>
     );
   }
 
   // ── Mark dispatched ────────────────────────────────────────
   if (phase === 'dispatch' && selectedRecord) {
     return (
+      <>
+        {successDialog}
       <TaskPage
         title="Mark dispatched"
         sub={`${formatKitCode(selectedRecord.kit_id)} · ${fmtKg(selectedRecord.kg_compost)} collected ${fmtDate(selectedRecord.logged_at)}`}
@@ -578,12 +604,15 @@ export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHist
           value={dispatchedTo} onChange={setDispatchedTo} placeholder="e.g. Voorbrug Farm"
         />
       </TaskPage>
+      </>
     );
   }
 
   // ── Assign a kit ───────────────────────────────────────────
   if (phase === 'assign') {
     return (
+      <>
+        {successDialog}
       <TaskPage
         title="Assign a new kit"
         sub="Give a kit to a community member."
@@ -603,12 +632,15 @@ export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHist
 
         <Notice>Only the owner's name and suburb are kept. No address or contact details.</Notice>
       </TaskPage>
+      </>
     );
   }
 
   // ── Log compost ────────────────────────────────────────────
   if (phase === 'log' && selectedKit) {
     return (
+      <>
+        {successDialog}
       <TaskPage
         title={`Log compost · ${selectedKit.owner_name}`}
         sub={`${formatKitCode(selectedKit.id)}${selectedKit.suburb ? ` · ${selectedKit.suburb}` : ''}`}
@@ -633,6 +665,7 @@ export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHist
         <DateField id="fts-logged" label="Date collected" value={loggedAt} onChange={setLoggedAt} />
         <TextField id="fts-notes" label="Notes (optional)" value={notes} onChange={setNotes} />
       </TaskPage>
+      </>
     );
   }
 

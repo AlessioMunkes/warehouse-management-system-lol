@@ -55,7 +55,9 @@ import { newIdempotencyKey } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import SignaturePad from './SignaturePad';
 import DeliveryNotePDF from './DeliveryNotePDF';
-import formatPoCode from './poCode';
+import formatPoCode from './poCode';
+import SuccessDialog from '../staff/SuccessDialog';
+import { OFFLINE_TITLE, offlineLine } from '../staff/successText';
 
 // Shared by both modes, right before the submit button. SignaturePad
 // is the manager side's own component — canvasClassName /
@@ -168,6 +170,8 @@ export default function ReceivingFlow({ onCrumbChange }) {
   const [deliveryDate, setDeliveryDate] = useState(todayISO);
   const [signature, setSignature] = useState(null);
   const [pdfDelivery, setPdfDelivery] = useState(null);
+  // The note for the delivery just recorded, offered on the confirmation.
+  const [doneNote, setDoneNote] = useState(null);
   // True when the submit went to the device queue instead of the
   // server. The done screen has to say so.
   const [queued, setQueued] = useState(false);
@@ -517,8 +521,9 @@ export default function ReceivingFlow({ onCrumbChange }) {
 
       setQueued(false);
       // recordDelivery's response already carries the full joined
-      // record (supplier name, items, po_status).
-      setPdfDelivery(result);
+      // record (supplier name, items, po_status). Kept for the "View
+      // delivery note" button on the confirmation, not opened over it.
+      setDoneNote(result);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -534,6 +539,7 @@ export default function ReceivingFlow({ onCrumbChange }) {
     setDeliveryDate(todayISO());
     setSignature(null);
     setPdfDelivery(null);
+    setDoneNote(null);
     setFollowUp(null);
     // A new delivery is a new attempt. Keeping the old key would make
     // the server treat the next genuine delivery as a replay of the
@@ -646,7 +652,8 @@ export default function ReceivingFlow({ onCrumbChange }) {
       )}
 
       {/* ── 2 · Count and put away ─────────────────────────── */}
-      {phase === 'work' && (
+      {/* The work stays on screen behind the confirmation. */}
+      {(phase === 'work' || phase === 'done') && (
         <TaskPage
           title={`${supplierName}${orderId ? ` · ${orderCode(openOrders.find((o) => String(o.id) === String(orderId)) ?? { id: orderId })}` : ''}`}
           sub="Count each line, then sign it in."
@@ -787,34 +794,30 @@ export default function ReceivingFlow({ onCrumbChange }) {
         </TaskPage>
       )}
 
-      {/* ── Done ───────────────────────────────────────────── */}
-      {phase === 'done' && (
-        <StepScreen
-          title={queued ? 'Saved on this phone' : 'Delivery received'}
-          sub={queued
-            ? 'No signal. It sends itself when you are back in range. Do not count it again.'
-            : 'Stock updated.'}
-          actions={
-            <Actions>
-              <Button onClick={restart}>Receive another delivery</Button>
-            </Actions>
-          }
-        >
-          {/* The follow-up flag: the order is part received, and the
-              manager sees the same flag on it. */}
-          {followUp && !queued ? (
-            <Notice tone="warn">
-              <p style={{ margin: 0, fontWeight: 600 }}>Follow-up required</p>
-              <p style={{ margin: '4px 0 0' }}>{followUp}</p>
-              <p style={{ margin: '4px 0 0' }}>The order is marked Partially received. Your manager has been flagged to follow up on the rest.</p>
-            </Notice>
-          ) : null}
-        </StepScreen>
-      )}
+      {/* ── Done: the one confirmation every flow uses ─────── */}
+      <SuccessDialog
+        open={phase === 'done'}
+        tone={queued ? 'offline' : 'success'}
+        title={queued ? OFFLINE_TITLE : 'Delivery received'}
+        onClose={restart}
+        action={doneNote && !queued ? { label: 'View delivery note', onClick: () => setPdfDelivery(doneNote) } : null}
+      >
+        <p className="stf-step-sub">
+          {queued ? offlineLine('Do not count it again.') : 'Stock updated.'}
+        </p>
+        {/* The follow-up flag: the order is part received, and the
+            manager sees the same flag on it. */}
+        {followUp && !queued ? (
+          <Notice tone="warn">
+            <p style={{ margin: 0, fontWeight: 600 }}>Follow-up required</p>
+            <p style={{ margin: '4px 0 0' }}>{followUp}</p>
+            <p style={{ margin: '4px 0 0' }}>The order is marked Partially received. Your manager has been flagged to follow up on the rest.</p>
+          </Notice>
+        ) : null}
+      </SuccessDialog>
 
-      {/* The note pops up the moment it can be fetched back in full;
-          closing it just clears the state above — the delivery itself
-          is already saved. */}
+      {/* Opened from the confirmation. Closing it goes back there; the
+          delivery itself is already saved. */}
       {pdfDelivery ? (
         <DeliveryNotePDF delivery={pdfDelivery} onClose={() => setPdfDelivery(null)} />
       ) : null}

@@ -2318,6 +2318,11 @@ button.stf-panel-head:disabled { cursor: default; }
   color: var(--good-ink, #1d7a3a);
   font-size: 24px;
 }
+/* Saved on the phone, or waiting on someone: not finished, so not green. */
+.stf-success-mark.is-waiting {
+  background: var(--stf-field-bg);
+  color: var(--stf-ink);
+}
 
 /* A search that opens from an icon beside a field's label (SelectField's
    `search`). The label and the icon share one row; the box appears

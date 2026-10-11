@@ -218,7 +218,7 @@ describe('To pack', () => {
       ]));
       expect(await screen.findByText('Marked fulfilled.')).toBeTruthy();
       // Back on the list, once the confirmation is closed.
-      await userEvent.click(screen.getByRole('button', { name: 'OK' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Done' }));
       expect(screen.getByRole('heading', { name: 'To pack' })).toBeTruthy();
     });
 

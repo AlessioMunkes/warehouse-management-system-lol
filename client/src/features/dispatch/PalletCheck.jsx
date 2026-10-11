@@ -44,7 +44,9 @@ import useUndo from '../staff/useUndo';
 import { useAuth } from '../../context/AuthContext';
 import dispatchAPI, { newIdempotencyKey } from '../../services/dispatchAPI';
 import SignaturePad from '../receiving/SignaturePad';
-import DispatchNotePDF from '../receipts/DispatchNotePDF';
+import DispatchNotePDF from '../receipts/DispatchNotePDF';
+import SuccessDialog from '../staff/SuccessDialog';
+import { OFFLINE_TITLE, offlineLine } from '../staff/successText';
 
 const isManager = (user) => user?.role === 'manager' || user?.role === 'admin';
 
@@ -124,6 +126,7 @@ export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChan
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [pdfNote, setPdfNote] = useState(null);
+  const [doneNote, setDoneNote] = useState(null);
   // See the same flag in ReceivingFlow.jsx.
   const [queued, setQueued] = useState(false);
 
@@ -342,8 +345,9 @@ export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChan
       }
       setQueued(false);
       // recordCollection's response already carries the full joined
-      // note — no second fetch needed for the pop-up.
-      setPdfNote(result.note);
+      // note. Kept for the "View dispatch note" button on the
+      // confirmation, not opened over it.
+      setDoneNote(result.note);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -353,6 +357,7 @@ export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChan
 
   const backToQueue = () => {
     setPdfNote(null);
+    setDoneNote(null);
     onCollected?.();
   };
 
@@ -454,7 +459,7 @@ export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChan
       )}
 
       {/* ── 2 · Load and release ───────────────────────────── */}
-      {phase === 'work' && (
+      {(phase === 'work' || phase === 'done') && (
         <TaskPage
           title={gateView.ecd_name}
           sub="Check every line, then take the driver's name and signature."
@@ -547,20 +552,16 @@ export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChan
         </TaskPage>
       )}
 
-      {/* ── Done ───────────────────────────────────────────── */}
-      {phase === 'done' && (
-        <StepScreen
-          title={queued ? 'Saved on this phone' : 'Collection confirmed'}
-          sub={queued
-            ? 'No signal. It sends itself when you are back in range. Let the driver go.'
-            : 'Stock updated. The pallet can go.'}
-          actions={
-            <Actions>
-              <Button onClick={backToQueue}>Back to the gate queue</Button>
-            </Actions>
-          }
-        />
-      )}
+      {/* ── Done: the one confirmation every flow uses ─────── */}
+      <SuccessDialog
+        open={phase === 'done'}
+        tone={queued ? 'offline' : 'success'}
+        title={queued ? OFFLINE_TITLE : 'Pallet dispatched'}
+        onClose={backToQueue}
+        action={doneNote && !queued ? { label: 'View dispatch note', onClick: () => setPdfNote(doneNote) } : null}
+      >
+        {queued ? offlineLine('Let the driver go.') : 'Stock updated. The pallet can go.'}
+      </SuccessDialog>
 
       {pdfNote ? (
         <DispatchNotePDF note={pdfNote} onClose={() => setPdfNote(null)} />

@@ -33,7 +33,9 @@ import {
 } from '../staff/StepPrimitives';
 import useCoachmark from '../staff/useCoachmark';
 import { volunteerHolder } from '../pickingSlips/slipViews';
-import { isPackedSlip, isCollectedSlip } from './spareSlips';
+import { isPackedSlip, isCollectedSlip } from './spareSlips';
+import SuccessDialog from '../staff/SuccessDialog';
+import { OFFLINE_TITLE, offlineLine } from '../staff/successText';
 import PhotoButton from '../staff/PhotoButton';
 import { useT } from '../../translations';
 
@@ -193,6 +195,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
   const [palletRef, setPalletRef] = useState('');
   const [completing, setCompleting] = useState(false);
   const [completeError, setCompleteError] = useState(null);
+  const [packedDone, setPackedDone] = useState(null);
   const [reloadToken, setReloadToken] = useState(0);
 
   const [mode, setMode] = useState(readStoredMode);
@@ -332,8 +335,9 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
     setCompleting(true);
     setCompleteError(null);
     try {
-      await completeSlip(slipId, palletRef || undefined);
-      onFinished?.();
+      const done = await completeSlip(slipId, palletRef || undefined);
+      // The confirmation first; closing it goes back to the list.
+      setPackedDone({ queued: Boolean(done?.queued) });
     } catch (err) {
       setCompleteError(err.message || t('slip.logFailed'));
     } finally {
@@ -343,6 +347,14 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
 
   return (
     <section className="stf-step">
+      <SuccessDialog
+        open={Boolean(packedDone)}
+        tone={packedDone?.queued ? 'offline' : 'success'}
+        title={packedDone?.queued ? OFFLINE_TITLE : 'Pallet packed'}
+        onClose={() => { setPackedDone(null); onFinished?.(); }}
+      >
+        {packedDone?.queued ? offlineLine('Do not pack it again.') : 'It is ready for dispatch.'}
+      </SuccessDialog>
       <div className="stf-step-head">
         {/* Same .stf-card-toggle treatment StepScreen/TaskPage give the
             toggle now — this flow hand-rolls its own card instead of

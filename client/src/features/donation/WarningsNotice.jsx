@@ -9,8 +9,9 @@
 // CompletionDialog: the one deliberate exception — this IS a modal,
 // because it's a real decision point (stay vs go home), not an error.
 // ─────────────────────────────────────────────────────────────
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { fmtQty } from "@/lib/quantity";
+import { fmtQty } from "@/lib/quantity";
+import SuccessDialog from "../staff/SuccessDialog";
+import { OFFLINE_TITLE, offlineLine } from "../staff/successText";
 
 export function WarningsNotice({ warnings, onDismiss }) {
   if (!warnings || warnings.length === 0) return null;
@@ -40,27 +41,21 @@ export function CompletionDialog({ open, result, onRecordAnother, onGoHome }) {
 
   const pendingReview = (result.awaitingCount || 0) > 0;
 
+  // The same confirmation every other flow ends on (SuccessDialog). A
+  // donation waiting on a manager is not finished, so it is not green.
   return (
-    <Dialog open={open}>
-      <DialogContent className="stf-shell" showCloseButton={false}>
-        <DialogHeader>
-          <DialogTitle>
-            {result.queued
-              ? "Saved on this phone"
-              : pendingReview ? "Donation received, pending manager review" : "Donation recorded"}
-          </DialogTitle>
-        </DialogHeader>
-
+    <SuccessDialog
+      open={open}
+      tone={result.queued ? 'offline' : pendingReview ? 'pending' : 'success'}
+      title={result.queued
+        ? OFFLINE_TITLE
+        : pendingReview ? 'Donation received, pending manager review' : 'Donation recorded'}
+      onClose={onRecordAnother}
+      closeLabel="Record another"
+      action={{ label: 'Go to home', onClick: onGoHome }}
+    >
         {result.queued && (
-          <div className="stf-notice">
-            <div className="stf-notice-body">
-              <p style={{ margin: 0 }}>
-                There was no signal, so this donation is waiting on your phone. It sends itself as
-                soon as you are back in range; the bar at the top says when it has gone. Do not
-                record it again.
-              </p>
-            </div>
-          </div>
+          <p className="stf-step-sub">{offlineLine('Do not record it again.')}</p>
         )}
 
         {pendingReview && (
@@ -103,19 +98,6 @@ export function CompletionDialog({ open, result, onRecordAnother, onGoHome }) {
           </div>
         )}
 
-        <p className="stf-step-sub">
-          Would you like to record another donation, or go to another task?
-        </p>
-
-        <DialogFooter>
-          <button className="stf-btn stf-btn-secondary" onClick={onGoHome}>
-            Go to home
-          </button>
-          <button className="stf-btn stf-btn-primary" onClick={onRecordAnother}>
-            Record another
-          </button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    </SuccessDialog>
   );
 }
