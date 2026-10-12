@@ -201,7 +201,7 @@ export const WIDGETS = [
   },
   {
     id: 'stock-cover', kind: 'panel', title: 'Weeks of stock left', roles: MANAGER_ONLY, needs: ['insights'],
-    description: 'How long the stock on hand lasts at what the recipe in use takes each week. Fewest weeks first.',
+    description: 'What is likely to run short or expire in the coming weeks: stock available and due in, against what a week takes.',
     render: ({ insights }) => <StockCoverPanel insights={insights} />,
   },
   {

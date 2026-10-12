@@ -125,6 +125,12 @@ export const STATUS_STYLES = {
     urgent:  s('bad', AlarmClock),                        // 14 days or less
     expired: s('bad', CalendarX, true),
   },
+  // The dashboard's stock outlook: when a product runs out at the rate
+  // it is used, and when its next use-by date comes first.
+  outlook: {
+    runs_short: s('bad', CalendarX),
+    may_expire: s('warn', AlarmClock),
+  },
   // A closed day on the operating calendar.
   closure: {
     public_holiday: s('info', Flag),
