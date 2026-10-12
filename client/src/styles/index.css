@@ -1918,3 +1918,12 @@ color:white;
 }
 .fx-dock      { overflow: hidden; animation: fx-dock-open 220ms cubic-bezier(0.2, 0, 0, 1) both; }
 .fx-dock-body { animation: fx-slide-in 220ms cubic-bezier(0.2, 0, 0, 1) both; }
+
+/* The app-wide loading screen (components/ui/loading-screen.jsx).
+   -delayed is the one a page's own file waits behind: nothing shows
+   for the first 300ms, so a file that arrives at once never flashes. */
+@keyframes loading-screen-in {
+  from { opacity: 0; }
+}
+.loading-screen-in      { animation: loading-screen-in 160ms ease-out both; }
+.loading-screen-delayed { animation: loading-screen-in 160ms ease-out 300ms both; }

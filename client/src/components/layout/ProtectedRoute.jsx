@@ -15,6 +15,7 @@ import { useAuth } from '../../context/AuthContext';
 import { homeForRole } from './navSections';
 import ManagerLayout from './ManagerLayout';
 import AssistantLauncher from '../../features/assistant/AssistantLauncher';
+import LoadingScreen from '../ui/loading-screen';
 
 // `shell` wraps the whole group in the app shell — sidebar on desktop,
 // hamburger drawer on a phone — so a route group opts in with one word
@@ -31,11 +32,7 @@ const ProtectedRoute = ({ roles, shell = false } = {}) => {
 
   // Still checking with the server — decide nothing yet.
   if (isLoading) {
-    return (
-      <div className="page-light" role="status" aria-live="polite">
-        <p className="pdf-table-empty">Checking your session…</p>
-      </div>
-    );
+    return <LoadingScreen solid label="Checking your session" />;
   }
 
   // Not logged in — send to login
