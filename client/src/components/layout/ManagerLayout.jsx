@@ -275,7 +275,13 @@ function ManagerLayoutShell({ children }) {
         {/* The list, and beside it the record opened from it. The dock
             is empty, and so takes no width, until a panel portals in. */}
         <div className="flex min-h-0 flex-1">
-          <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+          {/* `relative`: this is the scrolling area, and it has to be the
+              thing hidden screen-reader text (sr-only) is positioned
+              against. Otherwise that text is laid out against the page
+              at its unscrolled place, far below the window on a long
+              screen, and the page grows a blank area and a second
+              scrollbar. */}
+          <main className="relative min-h-0 min-w-0 flex-1 overflow-y-auto">
             <DetailDockContext.Provider value={detailDock}>{children}</DetailDockContext.Provider>
           </main>
           <div ref={setDetailDock} className="min-h-0 shrink-0" />
