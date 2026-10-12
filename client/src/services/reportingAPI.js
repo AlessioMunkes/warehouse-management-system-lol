@@ -40,6 +40,17 @@ export const getFilterOptions = () => apiGet('/api/reporting/filter-options');
 // dispatch note, as steps and the typical time between them.
 export const getProcessMap = (dateRange, filters = {}) => apiPost('/api/reporting/process', { dateRange, filters });
 
+// GET /api/reporting/reorder — when each product runs out, and what to
+// order by when, for a planning horizon of 4, 8 or 12 weeks.
+export const getReorderPlan = (weeks = 8) => apiGet(`/api/reporting/reorder?weeks=${encodeURIComponent(weeks)}`);
+
+// GET /api/reporting/alerts — weekly measures against their control
+// limits, over a baseline of 8, 12 or 26 weeks.
+export const getExceptionAlerts = (weeks = 12) => apiGet(`/api/reporting/alerts?weeks=${encodeURIComponent(weeks)}`);
+
+// POST /api/reporting/workload — recorded work by weekday and hour.
+export const getWorkload = (dateRange) => apiPost('/api/reporting/workload', { dateRange });
+
 // POST /api/reporting/ask
 // Returns either a report payload or { type: 'clarify', question, options }.
 export const askQuestion = (question) => apiPost('/api/reporting/ask', { question });

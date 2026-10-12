@@ -13,7 +13,7 @@ import { MemoryRouter } from 'react-router-dom';
 
 const METRIC = {
   id: 'dispatch_volume', label: 'Food dispatched', description: '', unit: 'kg', temporal: true,
-  defaultChart: 'line', dimensions: [{ id: 'month', label: 'Month' }], filters: [],
+  defaultChart: 'line', dimensions: [{ id: 'month', label: 'Month' }, { id: 'week', label: 'Week' }], filters: [],
 };
 const api = vi.hoisted(() => ({
   getCatalog: vi.fn(), runReport: vi.fn(), getComparisons: vi.fn(), runComparison: vi.fn(),
@@ -32,6 +32,11 @@ vi.mock('../features/reporting/OperationalChart', () => stub('the chart'));
 vi.mock('../features/reporting/OperationalInsight', () => stub('the insight'));
 vi.mock('../features/reporting/ProcessMap', () => stub('the process map'));
 vi.mock('../features/reporting/DataUpload', () => stub('the spreadsheet chart'));
+vi.mock('../features/reporting/ReorderPlanner', () => stub('the reorder planner'));
+vi.mock('../features/reporting/WorkloadHeatmap', () => stub('the workload heatmap'));
+vi.mock('../features/reporting/ExceptionAlerts', () => ({
+  default: ({ onOpenReport }) => <button type="button" onClick={() => onOpenReport('dispatch_volume')}>open flagged report</button>,
+}));
 vi.mock('../features/reporting/SavedReports', () => ({ SavedReportsBar: () => <div>saved reports</div>, SaveReport: () => null }));
 
 const { default: ReportingPage } = await import('../pages/ReportingPage');
@@ -54,6 +59,24 @@ beforeEach(() => {
 });
 
 describe('the tabs on Operations reports', () => {
+  it('has a tab for each planning tool, drawn only when opened', async () => {
+    await show();
+    expect(screen.queryByText('the reorder planner')).not.toBeInTheDocument();
+    await userEvent.click(tab('Reorder planner'));
+    expect(screen.getByText('the reorder planner')).toBeVisible();
+    await userEvent.click(tab('Workload'));
+    expect(screen.getByText('the workload heatmap')).toBeVisible();
+    expect(screen.getByText('the reorder planner')).not.toBeVisible();
+  });
+
+  it('opens a flagged measure as its weekly report on the Reports tab', async () => {
+    await show();
+    await userEvent.click(tab('Exception alerts'));
+    await userEvent.click(screen.getByRole('button', { name: 'open flagged report' }));
+    await waitFor(() => expect(tab('Reports')).toHaveAttribute('aria-selected', 'true'));
+    expect(api.runReport).toHaveBeenCalledWith(expect.objectContaining({ metric: 'dispatch_volume', dimension: 'week' }));
+  });
+
   it('opens on the overview, with only the overview', async () => {
     await show();
     expect(tab('Overview')).toHaveAttribute('aria-selected', 'true');

@@ -35,6 +35,9 @@ import { resolvePreset, DEFAULT_PRESET, todaySAST } from '../features/reporting/
 import { getCatalog, runReport, getComparisons, runComparison, saveTarget, drillDown, getSaved, getFilterOptions } from '../services/reportingAPI';
 import RecordsPanel from '../features/reporting/RecordsPanel';
 import ProcessMap from '../features/reporting/ProcessMap';
+import ReorderPlanner from '../features/reporting/ReorderPlanner';
+import ExceptionAlerts from '../features/reporting/ExceptionAlerts';
+import WorkloadHeatmap from '../features/reporting/WorkloadHeatmap';
 import { SavedReportsBar, SaveReport } from '../features/reporting/SavedReports';
 import ChartNote from '../features/reporting/ChartNote';
 import { Truck, TrendingUp, CheckCircle2, AlertTriangle } from 'lucide-react';
@@ -56,13 +59,16 @@ const TRENDS = [
   { metricId: 'low_stock_items',   label: 'Items below reorder level', icon: AlertTriangle, dimension: 'product' },
 ];
 
-// The page in four parts, switched with the tabs under the title the
+// The page in seven parts, switched with the tabs under the title the
 // way Receipts switches goods in and goods out. Anything that produces
 // a report (a card's Explore, a saved report) lands on Reports.
 const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'reports',  label: 'Reports' },
   { id: 'process',  label: 'Process map' },
+  { id: 'reorder',  label: 'Reorder planner' },
+  { id: 'alerts',   label: 'Exception alerts' },
+  { id: 'workload', label: 'Workload' },
   { id: 'upload',   label: 'Chart a spreadsheet' },
 ];
 
@@ -711,6 +717,25 @@ export default function ReportingPage() {
       {opened.process && (
         <div hidden={tab !== 'process'}>
           <ProcessMap suppliers={filterOptions.supplier_id ?? []} />
+        </div>
+      )}
+
+      {opened.reorder && (
+        <div hidden={tab !== 'reorder'}>
+          <ReorderPlanner />
+        </div>
+      )}
+
+      {/* A flagged measure opens as its weekly report on the Reports tab. */}
+      {opened.alerts && (
+        <div hidden={tab !== 'alerts'}>
+          <ExceptionAlerts onOpenReport={(id) => runMetric(id, 'week')} />
+        </div>
+      )}
+
+      {opened.workload && (
+        <div hidden={tab !== 'workload'}>
+          <WorkloadHeatmap />
         </div>
       )}
 

@@ -20,6 +20,11 @@ import recordsRepo from '../repositories/reportingRecords.repository.js';
 import processRepo from '../repositories/reportingProcess.repository.js';
 import { buildProcess } from '../features/reporting/processMining.js';
 import { buildFlow } from '../features/reporting/processFlow.js';
+import planningRepo from '../repositories/reportingPlanning.repository.js';
+import { buildReorderPlan, HORIZONS, HISTORY_WEEKS } from '../features/reporting/reorderPlan.js';
+import { assess, alignWeeks, completeWeeks, rankAlerts } from '../features/reporting/controlLimits.js';
+import { buildWorkload } from '../features/reporting/workload.js';
+import { OPERATIONAL_INSIGHTS } from '../features/reporting/operationalInsights.js';
 import {
   METRICS, DIMENSIONS, FILTERS, CACHE_TTL, getMetric, isSnapshot, describeSpec, COHORTS, BENEFICIARY_KINDS,
 } from '../features/reporting/reportCatalog.js';
@@ -348,4 +353,75 @@ const drillDown = async ({ spec: parentInput, label, target }) => {
   return { ...report, description, meta: { ...report.meta, drill: { from: label, title: plan.title } } };
 };
 
-export default { getCatalog, runReport, drillDown, records, filterOptions, processMap, todayISO, setFactor, getFactorHistory };
+// REORDER PLANNER: when each product runs out and what to order by
+// when (features/reporting/reorderPlan.js).
+const reorderPlan = async ({ horizonWeeks } = {}) => {
+  const weeks = Number(horizonWeeks ?? 8);
+  if (!HORIZONS.includes(weeks)) throw fail(400, `Choose a planning horizon of ${HORIZONS.join(', ')} weeks.`);
+  const rows = await planningRepo.listReorderInputs({ historyDays: HISTORY_WEEKS * 7 });
+  return buildReorderPlan(rows, { today: todayISO(), horizonWeeks: weeks });
+};
+
+// EXCEPTION ALERTS: the weekly measures judged against their own
+// control limits (features/reporting/controlLimits.js). Each one is the
+// ordinary weekly report, run through runReport like any other, so an
+// alert and the chart it opens can never disagree.
+const ALERT_METRICS = [
+  'dispatch_volume', 'collection_compliance', 'late_collection_rate', 'gate_load_variance',
+  'goods_received', 'receiving_discrepancy_rate', 'po_on_time_rate', 'supplier_lead_time', 'procurement_spend',
+  'picking_flag_rate', 'picking_turnaround', 'decanting_wastage', 'decanting_margin_rate', 'community_response_time',
+];
+const ALERT_WEEKS = [8, 12, 26];
+// A week with nothing recorded is a real zero for these, and no reading for a rate.
+const VOLUME_UNITS = new Set(['kg', 'ZAR', 'orders', 'units']);
+
+const exceptionAlerts = async ({ weeks } = {}) => {
+  const baseline = Number(weeks ?? 12);
+  if (!ALERT_WEEKS.includes(baseline)) throw fail(400, `Choose a baseline of ${ALERT_WEEKS.join(', ')} weeks.`);
+  // The baseline, and the latest complete week judged against it.
+  const window = completeWeeks(todayISO(), baseline + 1);
+  const items = await Promise.all(ALERT_METRICS.map(async (id) => {
+    const metric = METRICS[id];
+    const better = OPERATIONAL_INSIGHTS[id]?.better ?? null;
+    const base = { metric: id, label: metric.label, unit: metric.unit, better };
+    try {
+      const report = await runReport({ metric: id, dimension: 'week', filters: {}, dateRange: { from: window.from, to: window.to } });
+      const points = alignWeeks(report.series, window.labels, { fillZero: VOLUME_UNITS.has(metric.unit) });
+      return { ...base, points, ...assess(points, better) };
+    } catch (err) {
+      // One report that cannot run (a table not migrated yet) must not
+      // take the other thirteen down with it.
+      if ((err.status ?? 500) >= 500 && err.status !== 503) console.error('[alerts]', id, err.message);
+      return { ...base, points: [], status: 'unavailable', signal: null, deviation: null };
+    }
+  }));
+  const ranked = rankAlerts(items);
+  return {
+    range: { from: window.from, to: window.to },
+    baselineWeeks: baseline,
+    latestWeek: window.labels[window.labels.length - 1],
+    items: ranked,
+    summary: {
+      adverse: ranked.filter((i) => i.signal === 'adverse').length,
+      trend: ranked.filter((i) => i.signal === 'trend').length,
+      unusual: ranked.filter((i) => i.signal === 'unusual').length,
+      favourable: ranked.filter((i) => i.signal === 'favourable').length,
+      inControl: ranked.filter((i) => i.status === 'in_control' && !i.signal).length,
+      insufficient: ranked.filter((i) => i.status === 'insufficient' || i.status === 'unavailable').length,
+    },
+  };
+};
+
+// WORKLOAD HEATMAP: recorded work by weekday and hour, per area
+// (features/reporting/workload.js).
+const workload = async ({ dateRange } = {}) => {
+  const from = dateRange?.from;
+  const to = dateRange?.to;
+  const real = (d) => typeof d === 'string' && ISO_DAY.test(d) && !Number.isNaN(Date.parse(`${d}T00:00:00Z`));
+  if (!real(from) || !real(to)) throw fail(400, 'Choose a start and an end date.');
+  if (from > to) throw fail(400, 'The start date is after the end date.');
+  if ((Date.parse(to) - Date.parse(from)) / 86400000 > MAX_PROCESS_DAYS) throw fail(400, 'Choose a period of about a year or less.');
+  return buildWorkload(await planningRepo.listWorkload({ from, to }), { from, to });
+};
+
+export default { getCatalog, runReport, drillDown, records, filterOptions, processMap, reorderPlan, exceptionAlerts, workload, todayISO, setFactor, getFactorHistory };
