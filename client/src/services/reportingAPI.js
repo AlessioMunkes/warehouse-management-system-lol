@@ -36,6 +36,10 @@ export const listRecords = (spec, label) => apiPost('/api/reporting/records', { 
 // list: suppliers, products, centres, and statuses as recorded.
 export const getFilterOptions = () => apiGet('/api/reporting/filter-options');
 
+// POST /api/reporting/process — the process map: purchase order to
+// dispatch note, as steps and the typical time between them.
+export const getProcessMap = (dateRange, filters = {}) => apiPost('/api/reporting/process', { dateRange, filters });
+
 // POST /api/reporting/ask
 // Returns either a report payload or { type: 'clarify', question, options }.
 export const askQuestion = (question) => apiPost('/api/reporting/ask', { question });

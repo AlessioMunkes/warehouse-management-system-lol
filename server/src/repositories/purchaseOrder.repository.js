@@ -330,7 +330,12 @@ const getPurchaseOrderById = async (id) => {
 // The reason is kept for both of those statuses: it is what the order
 // shows as needing attention. Every other status clears it, so a
 // reopened order does not keep an old complaint.
-const updatePurchaseOrderStatus = async (id, status, reason, { beforeCommit } = {}) => {
+//
+// Each change is written to the audit trail with the status it left and
+// the one it reached. That is the only record of WHEN an order was
+// approved (status_changed_at is overwritten by the next change), and
+// the process report reads its approval times from it.
+const updatePurchaseOrderStatus = async (id, status, reason, { beforeCommit, actorId = null, from = null } = {}) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -345,6 +350,18 @@ const updatePurchaseOrderStatus = async (id, status, reason, { beforeCommit } = 
       [id, status, (status === 'returned' || status === 'follow_up_required') ? reason : null]
     );
     const po = rows[0] ?? null;
+
+    if (po) {
+      await logAudit(client, {
+        entityType: 'purchase_order',
+        entityId:   id,
+        action:     'status_changed',
+        actorId,
+        reason:     reason ?? null,
+        before:     from ? { status: from } : null,
+        after:      { status },
+      });
+    }
 
     if (beforeCommit) await beforeCommit(client, { purchaseOrder: po, status, reason });
 

@@ -34,6 +34,7 @@ import { formatLabel, shapeOf, yearEarlier } from '../features/reporting/chartFo
 import { resolvePreset, DEFAULT_PRESET, todaySAST } from '../features/reporting/dateRanges';
 import { getCatalog, runReport, getComparisons, runComparison, saveTarget, drillDown, getSaved, getFilterOptions } from '../services/reportingAPI';
 import RecordsPanel from '../features/reporting/RecordsPanel';
+import ProcessMap from '../features/reporting/ProcessMap';
 import { SavedReportsBar, SaveReport } from '../features/reporting/SavedReports';
 import ChartNote from '../features/reporting/ChartNote';
 import { Truck, TrendingUp, CheckCircle2, AlertTriangle, ChevronDown } from 'lucide-react';
@@ -481,6 +482,8 @@ export default function ReportingPage() {
           />
         </div>
       )}
+
+      {catalog && <ProcessMap suppliers={filterOptions.supplier_id ?? []} />}
 
       <div ref={builderRef} className="mt-6 scroll-mt-4">
         {catalog?.datasets?.length > 0 && (

@@ -17,8 +17,10 @@ import pool             from '../config/db.js';
 import { validateCustom, runCustom, describeDatasets } from '../features/reporting/customQuery.js';
 import { drillOptions, planDrill } from '../features/reporting/drillDown.js';
 import recordsRepo from '../repositories/reportingRecords.repository.js';
+import processRepo from '../repositories/reportingProcess.repository.js';
+import { buildProcess } from '../features/reporting/processMining.js';
 import {
-  METRICS, DIMENSIONS, FILTERS, CACHE_TTL, getMetric, isSnapshot, describeSpec,
+  METRICS, DIMENSIONS, FILTERS, CACHE_TTL, getMetric, isSnapshot, describeSpec, COHORTS, BENEFICIARY_KINDS,
 } from '../features/reporting/reportCatalog.js';
 
 const fail = (status, message) => {
@@ -279,6 +281,43 @@ const records = async ({ spec: input, label }) => {
 
 const filterOptions = () => recordsRepo.listFilterOptions();
 
+// PROCESS MINING: the main process, purchase order to dispatch note,
+// read off recorded timestamps (features/reporting/processMining.js).
+// Not a catalog metric: it is a map with its own shape, so it has its
+// own small validator here instead of a spec.
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_PROCESS_DAYS = 400;
+
+const processMap = async ({ dateRange, filters = {} } = {}) => {
+  const from = dateRange?.from;
+  const to = dateRange?.to;
+  const real = (d) => typeof d === 'string' && ISO_DAY.test(d) && !Number.isNaN(Date.parse(`${d}T00:00:00Z`));
+  if (!real(from) || !real(to)) throw fail(400, 'Choose a start and an end date.');
+  if (from > to) throw fail(400, 'The start date is after the end date.');
+  if ((Date.parse(to) - Date.parse(from)) / 86400000 > MAX_PROCESS_DAYS) {
+    throw fail(400, 'Choose a period of about a year or less.');
+  }
+
+  const f = filters ?? {};
+  const supplierId = f.supplierId === undefined || f.supplierId === null || f.supplierId === '' ? null : Number(f.supplierId);
+  if (supplierId !== null && !(Number.isInteger(supplierId) && supplierId > 0)) throw fail(400, 'That supplier is not valid.');
+  const cohort = f.cohort ? String(f.cohort).toLowerCase() : null;
+  if (cohort && !COHORTS.includes(cohort)) throw fail(400, 'That cohort is not valid.');
+  const beneficiaryKind = f.beneficiaryKind ? String(f.beneficiaryKind) : null;
+  if (beneficiaryKind && !BENEFICIARY_KINDS.includes(beneficiaryKind)) throw fail(400, 'That kind of beneficiary is not valid.');
+
+  const [orders, slips, movements] = await Promise.all([
+    processRepo.listOrders({ from, to, supplierId }),
+    processRepo.listSlips({ from, to, cohort, beneficiaryKind }),
+    processRepo.listMovements({ to }),
+  ]);
+  const events = await processRepo.listSlipEvents(slips.map((s) => s.id));
+  return {
+    ...buildProcess({ orders, slips, events, movements, range: { from, to } }),
+    filters: { supplierId, cohort, beneficiaryKind },
+  };
+};
+
 // Click a bar → the report behind it (features/reporting/drillDown.js).
 // A name from the chart is turned into its id here; the table name
 // comes from a fixed map, never from the request.
@@ -296,4 +335,4 @@ const drillDown = async ({ spec: parentInput, label, target }) => {
   return { ...report, description, meta: { ...report.meta, drill: { from: label, title: plan.title } } };
 };
 
-export default { getCatalog, runReport, drillDown, records, filterOptions, todayISO, setFactor, getFactorHistory };
+export default { getCatalog, runReport, drillDown, records, filterOptions, processMap, todayISO, setFactor, getFactorHistory };

@@ -71,6 +71,7 @@ router.post('/report',  auth, requireRole(...MANAGERS_UP), reportingController.r
 router.post('/drill',   auth, requireRole(...MANAGERS_UP), reportingController.drill);
 router.post('/records', auth, requireRole(...MANAGERS_UP), reportingController.records);
 router.get('/filter-options', auth, requireRole(...MANAGERS_UP), reportingController.filterOptions);
+router.post('/process', auth, requireRole(...MANAGERS_UP), reportingController.processMap);
 // Saved and scheduled reports: each manager's own (req.user.id).
 router.get   ('/saved',          auth, requireRole(...MANAGERS_UP), reportingController.listSaved);
 router.post  ('/saved',          auth, requireRole(...MANAGERS_UP), reportingController.createSaved);

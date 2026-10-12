@@ -96,6 +96,18 @@ const filterOptions = async (_req, res) => {
   }
 };
 
+// POST /api/reporting/process  { dateRange, filters? } — the main
+// process from purchase order to dispatch note, as a map of steps.
+const processMap = async (req, res) => {
+  try {
+    const data = await reportingService.processMap(req.body ?? {});
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    console.error('[process]', err.message);
+    send(res, err, 'Failed to work out the process map.');
+  }
+};
+
 const drill = async (req, res) => {
   try {
     const report = await reportingService.drillDown(req.body ?? {});
@@ -215,7 +227,7 @@ const getFactorHistory = async (req, res) => {
 };
 
 export default {
-  drill, records, filterOptions, listSaved, createSaved, updateSaved, removeSaved, sendSaved,
+  drill, records, filterOptions, processMap, listSaved, createSaved, updateSaved, removeSaved, sendSaved,
   getCatalog, runReport, ask, insight, getComparisons, runComparison, getTargets, setTarget,
   setFactor, getFactorHistory,
 };

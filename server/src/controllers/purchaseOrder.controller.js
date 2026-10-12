@@ -56,7 +56,7 @@ const getOne = async (req, res) => {
 // ── PATCH /api/purchase-orders/:id/status ──────────────────────
 const setStatus = async (req, res) => {
   try {
-    const data = await purchaseOrderService.setPurchaseOrderStatus(req.params.id, req.body);
+    const data = await purchaseOrderService.setPurchaseOrderStatus(req.params.id, req.body, req.user?.id ?? null);
     res.status(200).json({ success: true, data });
   } catch (err) {
     respondError(res, err, 'setPurchaseOrderStatus', 'Failed to change the purchase order status.');

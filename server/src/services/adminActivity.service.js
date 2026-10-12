@@ -88,7 +88,7 @@ const auditSentence = (verb, entityType) => {
     close: `closed a ${thing}`, 'check in': 'checked a volunteer in', 'check out': 'checked a volunteer out',
     'walk in': 'booked a walk-in volunteer', 'book space': 'booked an event space',
     'create product': 'created a product from a donation review', created: `created a ${thing}`,
-    dispatched: `dispatched a ${thing}`, 'section18a certificate issued': 'issued a Section 18A certificate',
+    dispatched: `dispatched a ${thing}`, 'status changed': `changed the status of a ${thing}`, 'section18a certificate issued': 'issued a Section 18A certificate',
   };
   return map[v] ?? `${v} (${thing})`;
 };

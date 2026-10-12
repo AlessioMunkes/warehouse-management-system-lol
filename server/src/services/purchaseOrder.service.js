@@ -442,7 +442,7 @@ const PO_STATUS_WORDS = {
   returned: 'Returned', follow_up_required: 'Follow-up required',
 };
 
-const setPurchaseOrderStatus = async (rawId, body = {}) => {
+const setPurchaseOrderStatus = async (rawId, body = {}, userId = null) => {
   if (!isPositiveInt(rawId)) throw fail(400, 'A valid purchase order ID is required.');
 
   // PO_STATUSES is the CHECK constraint verbatim, so anything this
@@ -493,6 +493,8 @@ const setPurchaseOrderStatus = async (rawId, body = {}) => {
 
   const updated = await repo.updatePurchaseOrderStatus(Number(rawId), status, reason, {
     beforeCommit: notices.purchaseOrderNeedsAttention,
+    actorId: userId,
+    from: existing.status,
   });
 
   // An approved order goes to QuickBooks, where one is connected. After

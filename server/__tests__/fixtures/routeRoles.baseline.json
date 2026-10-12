@@ -208,6 +208,7 @@
   "reporting.routes.js POST /saved/:id/send": "admin,manager",
   "reporting.routes.js POST /ask": "admin,manager",
   "reporting.routes.js POST /insight": "admin,manager",
+  "reporting.routes.js POST /process": "admin,manager",
   "reporting.routes.js GET /comparisons": "admin,manager",
   "reporting.routes.js POST /comparison": "admin,manager",
   "reporting.routes.js GET /targets": "admin,manager",
