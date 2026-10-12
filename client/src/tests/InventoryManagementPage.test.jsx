@@ -25,10 +25,7 @@ vi.mock('../services/stockAPI', () => ({
   adjustStock:  vi.fn(),
 }));
 
-vi.mock('@/features/reporting/chartFormat', () => ({
-  toCsv: vi.fn(() => 'csv'),
-  downloadCsv: vi.fn(),
-}));
+vi.mock('@/lib/excelExport', () => ({ exportExcel: vi.fn() }));
 
 const mockUser = { value: { id: 1, firstName: 'Grizel', lastName: 'M', role: 'manager' } };
 vi.mock('../context/AuthContext', () => ({
@@ -42,7 +39,7 @@ vi.mock('react-router-dom', () => ({
 }));
 
 const { getManifest, getMovements, getBatches, adjustStock } = await import('../services/stockAPI');
-const { toCsv, downloadCsv } = await import('@/features/reporting/chartFormat');
+const { exportExcel } = await import('@/lib/excelExport');
 const { default: InventoryManagementPage } = await import('../pages/InventoryManagementPage');
 
 const RICE = {
@@ -257,9 +254,10 @@ describe('InventoryManagementPage — bulk actions', () => {
     await user.click(await screen.findByRole('checkbox', { name: 'Select Sugar beans' }));
     await user.click(screen.getByRole('button', { name: /Export selected/ }));
 
-    const [rows] = toCsv.mock.calls[0];
-    expect(rows.map((r) => r.name)).toEqual(['Sugar beans']);
-    expect(downloadCsv).toHaveBeenCalledWith(expect.stringMatching(/^inventory-selected-/), 'csv');
+    const [sheet] = exportExcel.mock.calls[0];
+    expect(sheet.rows.map((r) => r.name)).toEqual(['Sugar beans']);
+    expect(sheet.filename).toMatch(/^inventory-selected-/);
+    expect(sheet.columns.map((c) => c.label)).toContain('On hand');
   });
 
   it('walks through each ticked product in turn, one reason per product', async () => {

@@ -22,6 +22,7 @@
 import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { fitLabel, isAdditive, noteLines } from './chartFormat';
+import { exportExcel } from '../../lib/excelExport';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -318,32 +319,24 @@ const TableView = ({ series, unit, dimensionLabel }) => (
 // (bar/hbar only, see SORT_OPTIONS below) carries into the file — the
 // same "table is the CSV source, so the two cannot disagree" reasoning
 // this file's header already applies to the table toggle.
-const downloadCSV = (report, dimensionLabel, series) => {
-  // Uploaded data gets a provenance line inside the file. Without it
-  // an exported CSV is indistinguishable from a warehouse report the
-  // moment it leaves this screen.
-  const header = report.meta?.uploaded
-    ? [[`# Source: ${report.description} (uploaded file, not warehouse data)`]]
-    : [];
-
-  const rows = [
-    ...header,
-    [dimensionLabel, report.meta?.unit ?? 'Value'],
-    ...series.map((r) => [r.label, r.value]),
-  ];
-  const csv = rows
-    .map((cols) => cols.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))
-    .join('\n');
-
-  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
-  const a = document.createElement('a');
-  a.href = url;
-  const range = report.spec.dateRange
-    ? `${report.spec.dateRange.from}_${report.spec.dateRange.to}`
-    : 'current';
-  a.download = `${report.spec.metric}_${range}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+const downloadSheet = (report, dimensionLabel, series) => {
+  const range = report.spec.dateRange;
+  const period = range ? `${range.from} to ${range.to}` : 'As it stands now';
+  const unit = report.meta?.unit ?? '';
+  return exportExcel({
+    filename: `${report.spec.metric}-${range ? `${range.from}-to-${range.to}` : 'current'}`,
+    sheetName: 'Report',
+    title: report.description ?? 'Report',
+    // Uploaded data says so inside the file. Without it an exported
+    // sheet is indistinguishable from a warehouse report the moment it
+    // leaves this screen.
+    subtitle: report.meta?.uploaded ? `${period}  ·  uploaded file, not warehouse data` : period,
+    columns: [
+      { key: 'label', label: dimensionLabel, kind: 'text' },
+      { key: 'value', label: unit === '%' ? 'Percentage' : (unit || 'Value'), kind: unit === 'ZAR' ? 'money' : 'number' },
+    ],
+    rows: series.map((r) => ({ label: formatLabel(r.label), value: r.value })),
+  });
 };
 
 // Sorting only makes sense for a categorical comparison (bar/hbar) —
@@ -461,8 +454,8 @@ export default function ReportChart({ report, dimensionLabel = 'Category', compa
           {asTable ? 'View as chart' : 'View as table'}
         </Button>
         <Button type="button" variant="outline" size="sm"
-                onClick={() => downloadCSV(report, dimensionLabel, series)}>
-          Export CSV
+                onClick={() => downloadSheet(report, dimensionLabel, series)}>
+          Export to Excel
         </Button>
         {sortable ? (
           <Select value={sort} onValueChange={setSort}>

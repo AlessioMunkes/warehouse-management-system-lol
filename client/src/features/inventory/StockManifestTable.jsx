@@ -36,7 +36,7 @@ import BulkActionBar from '@/components/ui/bulk-action-bar';
 import ListCard from '@/components/ui/list-card';
 import useTableView from '@/features/masterdata/useTableView';
 import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/usePaged';
-import { downloadCsv, toCsv } from '@/features/reporting/chartFormat';
+import { exportExcel } from '@/lib/excelExport';
 import { fmtQty } from '@/lib/quantity';
 import {
   FILTERS, EXPORT_COLUMNS, STOCK_STATUS_LABEL, STOCK_STATUS_RANK,
@@ -79,7 +79,15 @@ const fmtDay = (day) => (day
     })
   : '-');
 
-const exportFile = (label) => `inventory-${label}-${todaySast()}.csv`;
+// The rows on screen (or the ticked ones) as a formatted Excel sheet.
+const exportInventory = (label, rows) => exportExcel({
+  filename: `inventory-${label}-${todaySast()}`,
+  sheetName: 'Inventory',
+  title: label === 'selected' ? 'Inventory: selected products' : `Inventory: ${String(label).replace(/_/g, ' ')}`,
+  subtitle: `Stock as at ${todaySast()}`,
+  columns: EXPORT_COLUMNS,
+  rows,
+});
 
 export default function StockManifestTable({
   products = [],
@@ -163,7 +171,7 @@ export default function StockManifestTable({
       ) : null}
       <Button
         type="button" variant="outline" size="sm"
-        onClick={() => downloadCsv(exportFile('selected'), toCsv(exportRows(selectedProducts), EXPORT_COLUMNS))}
+        onClick={() => exportInventory('selected', exportRows(selectedProducts))}
       >
         <Download />
         Export selected
@@ -184,7 +192,7 @@ export default function StockManifestTable({
         onToggle: tableView.toggleColumn,
         onReset: tableView.resetColumns,
       }}
-      onExport={rows.length ? () => downloadCsv(exportFile(view), toCsv(exportRows(rows), EXPORT_COLUMNS)) : undefined}
+      onExport={rows.length ? () => exportInventory(view, exportRows(rows)) : undefined}
     />
   );
 

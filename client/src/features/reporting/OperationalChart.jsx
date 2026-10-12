@@ -9,7 +9,7 @@
 //   two-way          -> stacked or grouped columns, or a heatmap
 //   pipelines        -> a funnel; stock flow -> a waterfall;
 //   category → where -> a flow (Sankey) diagram
-//   any              -> a table with the same numbers (and CSV)
+//   any              -> a table with the same numbers (and an Excel export)
 //
 // Click a bar, point or cell to highlight it. The toolbar has top N,
 // sorting, an average line and the manager's own target line (saved to
@@ -26,9 +26,10 @@ import {
 } from 'recharts';
 import { X } from 'lucide-react';
 import {
-  SERIES, VIEW_LABELS, anomaliesOf, defaultView, downloadCsv, fmtTick, fmtValue, formatLabel,
-  fitLabel, isAdditive, pivot, ragColour, shapeOf, toCsv, unitWord, viewsFor,
+  SERIES, VIEW_LABELS, anomaliesOf, defaultView, fmtTick, fmtValue, formatLabel,
+  fitLabel, isAdditive, pivot, ragColour, shapeOf, unitWord, viewsFor,
 } from './chartFormat';
+import { exportExcel } from '../../lib/excelExport';
 import { Flow, Funnel, Waterfall } from './OperationalDiagrams';
 
 const INK    = 'var(--ink)';
@@ -298,14 +299,32 @@ export default function OperationalChart({
     </>
   );
 
-  const exportCsv = () => {
+  // The chart's own figures as a formatted sheet: one row per bar, or
+  // one row per month with a column per category for a two-way chart.
+  const exportSheet = () => {
+    const range = report?.spec?.dateRange;
+    const base = {
+      filename: `${report?.spec?.metric ?? 'report'}-${range ? `${range.from}-to-${range.to}` : 'now'}`,
+      sheetName: 'Report',
+      title: report?.description ?? 'Report',
+      subtitle: range ? `${range.from} to ${range.to}` : 'As it stands now',
+    };
     if (twoAxis) {
-      const cols = [{ key: 'name', label: 'Month' }, ...twoAxis.keys.map((k) => ({ key: k, label: formatLabel(k) }))];
-      downloadCsv('report.csv', toCsv(twoAxis.rows, cols));
-    } else {
-      downloadCsv('report.csv', toCsv(series.map((r) => ({ name: r.label, value: r.value, unit: r.meta?.unit ?? unit })),
-        [{ key: 'name', label: dimensionLabel }, { key: 'value', label: 'Value' }, { key: 'unit', label: 'Unit' }]));
+      return exportExcel({
+        ...base,
+        columns: [{ key: 'name', label: 'Month', kind: 'text' }, ...twoAxis.keys.map((k) => ({ key: k, label: formatLabel(k), kind: 'number' }))],
+        rows: twoAxis.rows.map((r) => ({ ...r, name: formatLabel(r.name) })),
+      });
     }
+    return exportExcel({
+      ...base,
+      columns: [
+        { key: 'name', label: dimensionLabel ?? 'Item', kind: 'text' },
+        { key: 'value', label: 'Value', kind: unit === 'ZAR' ? 'money' : 'number' },
+        { key: 'unit', label: 'Unit', kind: 'text' },
+      ],
+      rows: series.map((r) => ({ name: formatLabel(r.label), value: r.value, unit: r.meta?.unit ?? unit })),
+    });
   };
 
   if (!series.length) {
@@ -563,7 +582,7 @@ export default function OperationalChart({
             </label>
           )}
 
-          <button type="button" onClick={exportCsv} className="ml-auto underline underline-offset-2">Export CSV</button>
+          <button type="button" onClick={exportSheet} className="ml-auto underline underline-offset-2">Export to Excel</button>
         </div>
       )}
 

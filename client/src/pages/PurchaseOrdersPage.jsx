@@ -51,7 +51,7 @@ import QuickbooksImportDialog from '../features/purchaseOrders/QuickbooksImportD
 import useTableView from '../features/masterdata/useTableView';
 import useOpenFromQuery from '../features/masterdata/useOpenFromQuery';
 import { PO_COLUMNS } from '../features/purchaseOrders/poColumns';
-import { downloadCsv, toCsv } from '../features/reporting/chartFormat';
+import { exportExcel } from '../lib/excelExport';
 import { useRecordCache } from '@/lib/recordCache';
 
 const CAN_MANAGE = ['manager', 'admin'];
@@ -76,10 +76,10 @@ const EXPORT_COLUMNS = [
   { key: 'poNumber', label: 'PO number' },
   { key: 'supplierName', label: 'Supplier' },
   { key: 'statusLabel', label: 'Status' },
-  { key: 'expectedDeliveryDate', label: 'Expected' },
+  { key: 'expectedDeliveryDate', label: 'Expected', kind: 'date' },
   { key: 'receivedLineCount', label: 'Lines received' },
   { key: 'lineCount', label: 'Lines' },
-  { key: 'estimatedValue', label: 'Estimated (R)' },
+  { key: 'estimatedValue', label: 'Estimated value', kind: 'money' },
 ];
 
 export default function PurchaseOrdersPage() {
@@ -303,10 +303,13 @@ export default function PurchaseOrdersPage() {
     return sortRows(inView);
   }, [purchaseOrders, view, search, sortRows]);
 
-  const exportRows = () => downloadCsv(
-    `purchase-orders-${view}.csv`,
-    toCsv(rows.map((po) => ({ ...po, statusLabel: PO_STATUS_LABELS[po.status] ?? po.status })), EXPORT_COLUMNS),
-  );
+  const exportRows = () => exportExcel({
+    filename: `purchase-orders-${view}`,
+    sheetName: 'Purchase orders',
+    title: `Purchase orders: ${String(view).replace(/_/g, ' ')}`,
+    columns: EXPORT_COLUMNS,
+    rows: rows.map((po) => ({ ...po, statusLabel: PO_STATUS_LABELS[po.status] ?? po.status })),
+  });
 
   return (
     <PageShell>

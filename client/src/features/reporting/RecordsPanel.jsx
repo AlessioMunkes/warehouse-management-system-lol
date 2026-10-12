@@ -7,13 +7,15 @@
 //
 // The server decides the columns (reportingRecords.repository.js), so
 // a new kind of record needs nothing here. Numbers are right-aligned
-// and money is written in rand; the CSV carries the raw values.
+// and money is written in rand; the Excel export (lib/excelExport.js)
+// writes the same columns as real dates, numbers and amounts.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorBanner from '@/components/ui/error-banner';
 import { listRecords } from '../../services/reportingAPI';
-import { downloadCsv, formatLabel, toCsv } from './chartFormat';
+import { formatLabel } from './chartFormat';
+import { exportExcel } from '../../lib/excelExport';
 
 const NUMERIC = new Set(['number', 'money']);
 
@@ -45,9 +47,24 @@ export default function RecordsPanel({ spec, label = null, onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
-  const exportCsv = () => {
-    if (!data) return;
-    downloadCsv(`${data.metric}_records_${data.period.replace(/ /g, '_')}.csv`, toCsv(data.rows, data.columns));
+  const [exporting, setExporting] = useState(false);
+  const exportSheet = async () => {
+    if (!data || exporting) return;
+    setExporting(true);
+    try {
+      await exportExcel({
+        filename: `${data.metric}-records-${data.period.replace(/ /g, '-')}`,
+        sheetName: data.noun,
+        title: data.title,
+        subtitle: data.truncated ? `${data.period}  ·  first ${data.shown} of ${data.total}` : `${data.period}  ·  ${data.total} in all`,
+        columns: data.columns,
+        rows: data.rows,
+      });
+    } catch (err) {
+      setError(err.message || 'Could not make the Excel file. Try again.');
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -68,7 +85,9 @@ export default function RecordsPanel({ spec, label = null, onClose }) {
         </div>
         <div className="flex shrink-0 items-center gap-3 text-xs">
           {data?.rows.length ? (
-            <button type="button" onClick={exportCsv} className="font-semibold text-ink underline underline-offset-2">Export CSV</button>
+            <button type="button" onClick={exportSheet} disabled={exporting} className="font-semibold text-ink underline underline-offset-2 disabled:opacity-60">
+              {exporting ? 'Preparing' : 'Export to Excel'}
+            </button>
           ) : null}
           <button type="button" onClick={onClose} className="font-semibold text-muted-foreground hover:text-ink">Close</button>
         </div>

@@ -16,7 +16,8 @@ import {
   CartesianGrid, Cell, LabelList, ReferenceLine, ResponsiveContainer, Scatter, ScatterChart,
   Tooltip, XAxis, YAxis, ZAxis,
 } from 'recharts';
-import { downloadCsv, fmtTick, fmtValue, toCsv, unitWord } from './chartFormat';
+import { fmtTick, fmtValue, unitWord } from './chartFormat';
+import { exportExcel } from '../../lib/excelExport';
 
 const MUTED = 'var(--ink-soft)';
 const LINE  = 'var(--line)';
@@ -37,7 +38,7 @@ function Tip({ active, payload, data }) {
   );
 }
 
-// `compact`: no table / CSV controls — for the printed report, where
+// `compact`: no table / export controls — for the printed report, where
 // buttons mean nothing.
 export default function ComparisonChart({ data, compact = false }) {
   const [highlight, setHighlight] = useState(null);
@@ -58,9 +59,17 @@ export default function ComparisonChart({ data, compact = false }) {
         <button type="button" onClick={() => setShowTable((v) => !v)} className="underline underline-offset-2">
           {showTable ? 'Show chart' : 'Show table'}
         </button>
-        <button type="button" onClick={() => downloadCsv(`${data.id}.csv`, toCsv(pts, [
-          { key: 'label', label: 'Item' }, { key: 'x', label: data.x.label }, { key: 'y', label: data.y.label }, { key: 'detail', label: 'Detail' },
-        ]))} className="underline underline-offset-2">Export CSV</button>
+        <button type="button" onClick={() => exportExcel({
+          filename: data.id,
+          sheetName: 'Comparison',
+          title: data.description ?? `${data.y.label} against ${data.x.label}`,
+          subtitle: data.dateRange ? `${data.dateRange.from} to ${data.dateRange.to}` : '',
+          columns: [
+            { key: 'label', label: 'Item', kind: 'text' }, { key: 'x', label: data.x.label, kind: 'number' },
+            { key: 'y', label: data.y.label, kind: 'number' }, { key: 'detail', label: 'Detail', kind: 'text' },
+          ],
+          rows: pts,
+        })} className="underline underline-offset-2">Export to Excel</button>
         {highlight && (
           <button type="button" onClick={() => setHighlight(null)} className="rounded-full border px-2 py-0.5 font-medium" style={{ borderColor: INK }}>
             Highlighting: {highlight} ✕

@@ -143,11 +143,11 @@ export const EXPORT_COLUMNS = [
   { key: 'sku',            label: 'SKU' },
   { key: 'category',       label: 'Category' },
   { key: 'unit',           label: 'Unit' },
-  { key: 'onHand',         label: 'On hand' },
-  { key: 'committed',      label: 'Committed' },
-  { key: 'available',      label: 'Available' },
-  { key: 'reorderAt',      label: 'Reorder at' },
-  { key: 'earliestExpiry', label: 'Earliest expiry' },
+  { key: 'onHand',         label: 'On hand',         kind: 'number' },
+  { key: 'committed',      label: 'Committed',       kind: 'number' },
+  { key: 'available',      label: 'Available',       kind: 'number' },
+  { key: 'reorderAt',      label: 'Reorder at',      kind: 'number' },
+  { key: 'earliestExpiry', label: 'Earliest expiry', kind: 'date' },
   { key: 'status',         label: 'Status' },
 ];
 
