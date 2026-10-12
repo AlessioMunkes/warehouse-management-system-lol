@@ -22,6 +22,8 @@ import { OPEN_PO_STATUSES } from '../constants/purchaseOrderStatus.js';
 
 const sastDate = (col) => `((${col} AT TIME ZONE '${SAST}')::date)`;
 const TODAY = `((NOW() AT TIME ZONE '${SAST}')::date)`;
+// The day a pallet left: see reporting.repository.js LEFT_DAY.
+const LEFT_DAY = `COALESCE(${sastDate('de.collected_at')}, ps.dispatch_date)`;
 const bucketMonth = (d) => `to_char(${d}, 'YYYY-MM')`;
 const bucketWeek  = (d) => `to_char(${d}, 'IYYY-"W"IW')`;
 const num = (v) => (v === null || v === undefined ? 0 : Number(v));
@@ -166,9 +168,9 @@ const slipPipeline = async ({ dimension, filters }) => {
 
 // ══ Dispatch ═══════════════════════════════════════════════════
 const gateLoadVariance = async ({ dimension, filters, dateRange }) => {
-  const expr = pick({ none: `'Total'`, month: bucketMonth('ps.dispatch_date'), product: 'p.name' }, dimension);
+  const expr = pick({ none: `'Total'`, month: bucketMonth(LEFT_DAY), product: 'p.name' }, dimension);
   const params = [dateRange.from, dateRange.to];
-  const where = [`ps.dispatch_date BETWEEN $1::date AND $2::date`];
+  const where = [`${LEFT_DAY} BETWEEN $1::date AND $2::date`];
   if (filters.product_id) { params.push(filters.product_id); where.push(`del.product_id = $${params.length}`); }
   const { rows } = await pool.query(
     `SELECT ${expr} AS label,
@@ -258,13 +260,29 @@ const stockValue = async ({ dimension, filters }) => {
 // Receiving lines whose expiry falls in the next 30 days, by week or
 // product. Same source and the same "recorded, not per-batch" limit
 // as expiryWarning.repository.js.
+// Products on the shelf that Stock value cannot price. Said beside the
+// figure: with no unit costs captured the report reads R0, which looks
+// like an empty warehouse.
+const countUnpricedStock = async ({ filters = {} }) => {
+  const params = [];
+  const where = [`p.is_active = true`, `p.unit_cost IS NULL`, `sl.quantity_on_hand > 0`];
+  if (filters.programme_id) { params.push(filters.programme_id); where.push(`p.programme_id = $${params.length}`); }
+  const { rows } = await pool.query(
+    `SELECT COUNT(*)::int AS n FROM stock_levels sl JOIN products p ON p.id = sl.product_id WHERE ${where.join(' AND ')}`,
+    params
+  );
+  return rows[0]?.n ?? 0;
+};
+
 const expiringStock = async ({ dimension }) => {
   const expr = pick({ week: bucketWeek('dni.expiry_date'), product: 'p.name' }, dimension);
   const { rows } = await pool.query(
     `SELECT ${expr} AS label, COUNT(*)::numeric AS value
        FROM delivery_note_items dni
        JOIN products p ON p.id = dni.product_id
+       JOIN stock_levels sl ON sl.product_id = dni.product_id
       WHERE dni.expiry_date BETWEEN ${TODAY} AND ${TODAY} + 30
+        AND sl.quantity_on_hand > 0
       GROUP BY ${expr} ORDER BY ${dimension === 'week' ? '1' : '2 DESC, 1'}`
   );
   return rows2series(rows);
@@ -455,6 +473,6 @@ export default {
   stockFlow, daysOfCover,
   poOnTimeRate, supplierLeadTime, overduePurchaseOrders, purchaseOrderPipeline,
   pickingTurnaround, slipPipeline, gateLoadVariance, lateCollectionRate,
-  standingOrderDemand, stockValue, expiringStock, adjustmentReasons,
+  standingOrderDemand, stockValue, countUnpricedStock, expiringStock, adjustmentReasons,
   decantingMarginRate, communityResponseTime, donationRouting, volunteerEventAttendance,
 };

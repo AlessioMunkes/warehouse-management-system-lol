@@ -116,12 +116,12 @@ export default function ReportingPage() {
     if (!keepDrill) setDrillStack([]);
   };
 
-  const drillInto = async (label) => {
+  const drillInto = async (label, target) => {
     if (!report || !label) return;
     setDrillBusy(true);
     setError(null);
     try {
-      const res = await drillDown(report.spec, label);
+      const res = await drillDown(report.spec, label, target);
       setDrillStack((s) => [...s, report]);
       showReport(res.data ?? res, { keepDrill: true });
     } catch (err) {
@@ -531,10 +531,17 @@ export default function ReportingPage() {
             <p className="mt-1 text-xs" style={{ color: MUTED }}>
               {highlight
                 ? (
-                  <button type="button" disabled={drillBusy} onClick={() => drillInto(highlight)}
-                    className="rounded-lg bg-ink px-2 py-1 font-bold text-on-ink disabled:opacity-50">
-                    {drillBusy ? 'Opening…' : `Drill into ${formatLabel(highlight)} →`}
-                  </button>
+                  // One button per way this bar can be opened: over
+                  // time, or split by another breakdown the report has.
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    <span>{drillBusy ? 'Opening…' : `Drill into ${formatLabel(highlight)}:`}</span>
+                    {(report.meta.drillOptions ?? [{ id: undefined, label: 'Open' }]).map((o, i) => (
+                      <button key={o.id ?? 'open'} type="button" disabled={drillBusy} onClick={() => drillInto(highlight, o.id)}
+                        className={`rounded-lg px-2 py-1 font-bold disabled:opacity-50 ${i === 0 ? 'bg-ink text-on-ink' : 'border border-line text-ink hover:bg-muted/60'}`}>
+                        {o.label}
+                      </button>
+                    ))}
+                  </span>
                 )
                 : 'Click a bar or point to pick it, then drill into the report behind it.'}
             </p>
@@ -588,8 +595,8 @@ export default function ReportingPage() {
 
             {report.meta?.excludedLines > 0 && (
               <p>
-                {report.meta.excludedLines} dispatch line
-                {report.meta.excludedLines === 1 ? '' : 's'} excluded, not measured in kilograms.
+                {report.meta.excludedLines} {report.meta.excludedKind === 'delivery' ? 'delivery' : 'dispatch'} line
+                {report.meta.excludedLines === 1 ? '' : 's'} left out, not measured in kilograms.
               </p>
             )}
 

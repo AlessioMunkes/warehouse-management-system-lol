@@ -34,6 +34,12 @@ const fail = (status, message) => {
 const month = (col) => `to_char(date_trunc('month', ${col}), 'YYYY-MM')`;
 const week = (col) => `to_char(${col}, 'IYYY-"W"IW')`;
 
+// A moment recorded with a time zone, read as the warehouse's clock.
+// Without this a delivery booked in at 00:30 on the 12th is the 11th
+// to the database, which keeps time in UTC, and "today" loses it.
+const local = (col) => `(${col} AT TIME ZONE 'Africa/Johannesburg')`;
+const weekdayOf = (col) => `trim(to_char(${col}, 'Day'))`;
+
 // `values` — the only values a filter accepts (statuses); `id: true` —
 // a whole-number id. Anything else is refused before pg is touched.
 export const DATASETS = {
@@ -44,13 +50,13 @@ export const DATASETS = {
            LEFT JOIN suppliers s ON s.id = po.supplier_id
            LEFT JOIN LATERAL (SELECT SUM(poi.expected_quantity * COALESCE(poi.unit_price, 0)) AS value
                                 FROM purchase_order_items poi WHERE poi.purchase_order_id = po.id) v ON TRUE`,
-    date: 'po.created_at',
+    date: local('po.created_at'),
     dateLabel: 'raised',
     groups: {
       status:   { label: 'Status', sql: 'po.status' },
       supplier: { label: 'Supplier', sql: "COALESCE(s.name, 'No supplier')" },
       finance_email: { label: 'Finance email', sql: "COALESCE(po.finance_email_status, 'not sent')" },
-      month:    { label: 'Month raised', sql: month('po.created_at'), time: true },
+      month:    { label: 'Month raised', sql: month(local('po.created_at')), time: true },
     },
     filters: {
       status: { label: 'Status', sql: 'po.status', values: ['pending', 'approved', 'in_transit', 'partially_received', 'completed', 'returned', 'follow_up_required'] },
@@ -169,7 +175,7 @@ export const DATASETS = {
     },
     measures: {
       count: { label: 'Number of lines', sql: 'COUNT(*)', unit: 'lines' },
-      kg:    { label: 'Weight received', sql: 'COALESCE(SUM(dni.received_weight_kg), 0)', unit: 'kg' },
+      kg:    { label: 'Weight received', sql: "COALESCE(SUM(CASE WHEN dni.received_weight_kg IS NOT NULL THEN dni.received_weight_kg WHEN dni.unit = 'kg' THEN dni.received_quantity END), 0)", unit: 'kg' },
     },
   },
 
@@ -177,14 +183,14 @@ export const DATASETS = {
     label: 'Donations',
     description: 'Donations recorded at intake. Counted in aggregate; donors are never listed.',
     from: `donations d`,
-    date: 'd.received_at',
+    date: local('d.received_at'),
     dateLabel: 'received',
     groups: {
       status:        { label: 'Record status', sql: "COALESCE(d.status, 'unknown')" },
       s18a_status:   { label: 'Section 18A status', sql: "COALESCE(d.section_18a_status, 'not_evaluated')" },
       category:      { label: 'Category', sql: "COALESCE(d.donation_category, 'uncategorised')" },
       donor_type:    { label: 'Donor type', sql: "COALESCE(d.donor_registration_type, 'not recorded')" },
-      month:         { label: 'Month', sql: month('d.received_at'), time: true },
+      month:         { label: 'Month', sql: month(local('d.received_at')), time: true },
     },
     filters: {
       status: { label: 'Record status', sql: 'd.status', values: ['committed', 'draft'] },
@@ -200,11 +206,11 @@ export const DATASETS = {
     label: 'Benevolent requests',
     description: 'Phoned-in and walk-in requests for food parcels. Callers are never listed.',
     from: `community_requests cr`,
-    date: 'cr.requested_at',
+    date: local('cr.requested_at'),
     dateLabel: 'requested',
     groups: {
       outcome: { label: 'Outcome', sql: 'cr.outcome::text' },
-      month:   { label: 'Month', sql: month('cr.requested_at'), time: true },
+      month:   { label: 'Month', sql: month(local('cr.requested_at')), time: true },
     },
     filters: {
       outcome: { label: 'Outcome', sql: 'cr.outcome::text', values: ['pending', 'fulfilled', 'partially_fulfilled', 'declined', 'referred'] },
@@ -252,12 +258,12 @@ export const DATASETS = {
     label: 'Stock movements',
     description: 'Every movement in the stock ledger.',
     from: `stock_movements sm LEFT JOIN products p ON p.id = sm.product_id`,
-    date: 'sm.created_at',
+    date: local('sm.created_at'),
     dateLabel: 'recorded',
     groups: {
       type:    { label: 'Movement type', sql: 'sm.movement_type' },
       product: { label: 'Product', sql: "COALESCE(p.name, 'Unknown')" },
-      month:   { label: 'Month', sql: month('sm.created_at'), time: true },
+      month:   { label: 'Month', sql: month(local('sm.created_at')), time: true },
     },
     filters: {
       type: { label: 'Movement type', sql: 'sm.movement_type', values: ['received', 'donated', 'dispatched', 'picked', 'wastage', 'adjustment', 'decanted'] },
@@ -305,6 +311,168 @@ export const DATASETS = {
       active: { label: 'Active or inactive', sql: "CASE WHEN p.is_active THEN 'active' ELSE 'inactive' END", values: ['active', 'inactive'] },
     },
     measures: { count: { label: 'Number of products', sql: 'COUNT(*)', unit: 'products' } },
+  },
+
+  // ── Areas the prepared reports do not reach ──────────────────
+  // Each is one table, or one table and its parent, counted the same
+  // way as the datasets above. None lists a person.
+
+  decanting: {
+    label: 'Decanting lines',
+    description: 'Each product line on a decanting sheet: what was packed, how many bags, what was wasted, and whether the bags were within the weight margin.',
+    from: `decanting_lines dl
+           JOIN decanting_records dr ON dr.id = dl.decanting_id
+           LEFT JOIN products p ON p.id = dl.product_id`,
+    date: 'dr.week_of',
+    dateLabel: 'decanted',
+    groups: {
+      product: { label: 'Product', sql: "COALESCE(p.name, 'Unknown')" },
+      margin:  { label: 'Within margin?', sql: "CASE WHEN dl.within_margin THEN 'within margin' ELSE 'outside margin' END" },
+      month:   { label: 'Month', sql: month('dr.week_of'), time: true },
+      week:    { label: 'Week', sql: week('dr.week_of'), time: true },
+    },
+    filters: {
+      margin: { label: 'Within margin?', sql: "CASE WHEN dl.within_margin THEN 'within margin' ELSE 'outside margin' END", values: ['within margin', 'outside margin'] },
+      product_id: { label: 'Product', sql: 'dl.product_id', id: true },
+    },
+    measures: {
+      count:   { label: 'Number of lines', sql: 'COUNT(*)', unit: 'lines' },
+      packed:  { label: 'Packed', sql: 'COALESCE(SUM(dl.packed_kg), 0)', unit: 'kg' },
+      wastage: { label: 'Wastage', sql: 'COALESCE(SUM(dl.wastage_kg), 0)', unit: 'kg' },
+      bags:    { label: 'Bags packed', sql: 'COALESCE(SUM(dl.total_bags), 0)', unit: 'bags' },
+    },
+  },
+
+  stock_counts: {
+    label: 'Stock count lines',
+    description: 'Each product counted in a stock count, and whether the count matched what the system held.',
+    from: `stock_count_lines scl
+           JOIN stock_counts sc ON sc.id = scl.stock_count_id
+           LEFT JOIN products p ON p.id = scl.product_id`,
+    date: 'sc.count_date',
+    dateLabel: 'counted',
+    groups: {
+      result:  { label: 'Count result', sql: "CASE WHEN scl.variance IS NULL THEN 'not counted' WHEN scl.variance = 0 THEN 'matched' WHEN scl.variance > 0 THEN 'more than expected' ELSE 'less than expected' END" },
+      product: { label: 'Product', sql: "COALESCE(p.name, 'Unknown')" },
+      reason:  { label: 'Reason given', sql: "COALESCE(NULLIF(scl.reason_code, ''), 'no reason given')" },
+      status:  { label: 'Count status', sql: 'sc.status::text' },
+      month:   { label: 'Month', sql: month('sc.count_date'), time: true },
+    },
+    filters: {
+      result: { label: 'Count result', sql: "CASE WHEN scl.variance IS NULL THEN 'not counted' WHEN scl.variance = 0 THEN 'matched' WHEN scl.variance > 0 THEN 'more than expected' ELSE 'less than expected' END", values: ['matched', 'more than expected', 'less than expected', 'not counted'] },
+      product_id: { label: 'Product', sql: 'scl.product_id', id: true },
+    },
+    measures: {
+      count:    { label: 'Number of lines', sql: 'COUNT(*)', unit: 'lines' },
+      variance: { label: 'Units out', sql: 'COALESCE(SUM(ABS(scl.variance)), 0)', unit: 'units' },
+    },
+  },
+
+  kits: {
+    label: 'Feed the Soil kits',
+    description: 'Every compost collection kit given to a household, as it stands now: by suburb, by when it was assigned, and whether it has ever logged compost. Owners are never listed.',
+    from: `collection_kits k
+           LEFT JOIN (SELECT kit_id, COUNT(*) AS logs FROM collection_kit_records GROUP BY kit_id) r ON r.kit_id = k.id`,
+    date: null,
+    groups: {
+      suburb: { label: 'Suburb', sql: "COALESCE(NULLIF(k.suburb, ''), 'Unspecified')" },
+      used:   { label: 'Compost logged?', sql: "CASE WHEN COALESCE(r.logs, 0) > 0 THEN 'has logged compost' ELSE 'nothing logged yet' END" },
+      month:  { label: 'Month assigned', sql: month('k.assigned_at'), time: true },
+    },
+    filters: {
+      used: { label: 'Compost logged?', sql: "CASE WHEN COALESCE(r.logs, 0) > 0 THEN 'has logged compost' ELSE 'nothing logged yet' END", values: ['has logged compost', 'nothing logged yet'] },
+    },
+    measures: { count: { label: 'Number of kits', sql: 'COUNT(*)', unit: 'kits' } },
+  },
+
+  reminders: {
+    label: 'Collection reminders',
+    description: 'Reminders sent to centres before their collection day, by email or WhatsApp, and whether they went.',
+    from: `ecd_collection_reminders rm LEFT JOIN ecd_centres e ON e.id = rm.ecd_id`,
+    date: 'rm.collection_date',
+    dateLabel: 'for collection',
+    groups: {
+      status:  { label: 'Status', sql: 'LOWER(rm.status)' },
+      channel: { label: 'Channel', sql: 'LOWER(rm.channel)' },
+      centre:  { label: 'Centre', sql: "COALESCE(e.name, 'Unknown')" },
+      month:   { label: 'Month', sql: month('rm.collection_date'), time: true },
+    },
+    filters: {
+      status:  { label: 'Status', sql: 'LOWER(rm.status)', values: ['pending', 'sending', 'sent', 'failed', 'cancelled'] },
+      channel: { label: 'Channel', sql: 'LOWER(rm.channel)', values: ['email', 'whatsapp'] },
+    },
+    measures: { count: { label: 'Number of reminders', sql: 'COUNT(*)', unit: 'reminders' } },
+  },
+
+  messages: {
+    label: 'Emails and messages sent',
+    description: 'Every email or message the system tried to send, by what it was and whether it went. Recipients are never listed.',
+    from: `outbound_messages om`,
+    date: local('om.attempted_at'),
+    dateLabel: 'sent',
+    groups: {
+      status:  { label: 'Status', sql: 'om.status' },
+      type:    { label: 'Kind of message', sql: "COALESCE(NULLIF(om.type, ''), 'other')" },
+      channel: { label: 'Channel', sql: "COALESCE(NULLIF(om.channel, ''), 'other')" },
+      month:   { label: 'Month', sql: month(local('om.attempted_at')), time: true },
+    },
+    filters: {
+      status: { label: 'Status', sql: 'om.status', values: ['sent', 'stubbed', 'failed'] },
+    },
+    measures: { count: { label: 'Number of messages', sql: 'COUNT(*)', unit: 'messages' } },
+  },
+
+  activity: {
+    label: 'Recorded actions',
+    description: 'Actions written to the audit trail, by what was changed and what was done to it. Counted, never listed by person: the Activity log shows who did what.',
+    from: `audit_log al`,
+    date: local('al.created_at'),
+    dateLabel: 'recorded',
+    groups: {
+      record: { label: 'Kind of record', sql: "REPLACE(al.entity_type, '_', ' ')" },
+      action: { label: 'Action', sql: "REPLACE(al.action, '_', ' ')" },
+      month:  { label: 'Month', sql: month(local('al.created_at')), time: true },
+      weekday: { label: 'Day of the week', sql: weekdayOf(local('al.created_at')) },
+    },
+    filters: {},
+    measures: { count: { label: 'Number of actions', sql: 'COUNT(*)', unit: 'actions' } },
+  },
+
+  visits: {
+    label: 'Visitor sign-ins',
+    description: 'People who signed in at the door as guests or volunteers, and the hours they were on site. Counted, never listed by name.',
+    from: `volunteers v`,
+    date: local('v.signed_in_at'),
+    dateLabel: 'signed in',
+    groups: {
+      source:  { label: 'How they signed in', sql: "COALESCE(NULLIF(v.source, ''), 'not recorded')" },
+      state:   { label: 'Signed out?', sql: "CASE WHEN v.signed_out_at IS NULL THEN 'still signed in' ELSE 'signed out' END" },
+      month:   { label: 'Month', sql: month(local('v.signed_in_at')), time: true },
+      weekday: { label: 'Day of the week', sql: weekdayOf(local('v.signed_in_at')) },
+    },
+    filters: {
+      state: { label: 'Signed out?', sql: "CASE WHEN v.signed_out_at IS NULL THEN 'still signed in' ELSE 'signed out' END", values: ['still signed in', 'signed out'] },
+    },
+    measures: {
+      count: { label: 'Number of sign-ins', sql: 'COUNT(*)', unit: 'sign-ins' },
+      hours: { label: 'Hours on site', sql: 'COALESCE(ROUND(SUM(EXTRACT(EPOCH FROM (v.signed_out_at - v.signed_in_at)) / 3600.0) FILTER (WHERE v.signed_out_at > v.signed_in_at), 1), 0)', unit: 'hours' },
+    },
+  },
+
+  suppliers: {
+    label: 'Suppliers',
+    description: 'The supplier list as it stands now: how many are active, and by category.',
+    from: `suppliers s`,
+    date: null,
+    groups: {
+      active:   { label: 'Active or inactive', sql: "CASE WHEN s.is_active THEN 'active' ELSE 'inactive' END" },
+      category: { label: 'Category', sql: "COALESCE(NULLIF(s.category, ''), 'uncategorised')" },
+      terms:    { label: 'Payment terms', sql: "COALESCE(NULLIF(s.payment_terms, ''), 'not set')" },
+    },
+    filters: {
+      active: { label: 'Active or inactive', sql: "CASE WHEN s.is_active THEN 'active' ELSE 'inactive' END", values: ['active', 'inactive'] },
+    },
+    measures: { count: { label: 'Number of suppliers', sql: 'COUNT(*)', unit: 'suppliers' } },
   },
 };
 

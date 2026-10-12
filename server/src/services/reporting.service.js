@@ -15,7 +15,7 @@ import { validateSpec } from '../features/reporting/specValidator.js';
 import aiProvider       from '../features/reporting/provider.js';
 import pool             from '../config/db.js';
 import { validateCustom, runCustom, describeDatasets } from '../features/reporting/customQuery.js';
-import { canDrill, planDrill } from '../features/reporting/drillDown.js';
+import { drillOptions, planDrill } from '../features/reporting/drillDown.js';
 import {
   METRICS, DIMENSIONS, CACHE_TTL, getMetric, isSnapshot, describeSpec,
 } from '../features/reporting/reportCatalog.js';
@@ -65,6 +65,11 @@ const getCatalog = () => ({
 
 // A custom report ("how many X by Y") goes through its own validator
 // and query builder, and comes back in the same shape.
+// Reports that measure food leaving in kilograms, off the gate's lines.
+const DISPATCH_KG_REPORTS = new Set([
+  'dispatchVolume', 'mealsEnabled', 'mealsServedByGroup', 'adultsReached', 'dignityKitchenServed', 'communityServed',
+]);
+
 const runCustomReport = async (input) => {
   const spec = validateCustom(input);
   // Its own key: a custom spec has no metric/filters in the catalog sense.
@@ -124,7 +129,10 @@ const runReport = async (input) => {
   if (spec.dimension === 'weekday') { meta.ordered = true; meta.preferView = 'bar'; }
   if (spec.dimension === 'week_weekday') meta.preferView = 'heatmap';
   // Its bars can be clicked through to the report behind them.
-  if (canDrill(metric, spec.dimension)) meta.drillable = true;
+  // Every way a bar of this report can be opened, for the page's
+  // drill buttons. See features/reporting/drillDown.js.
+  const drills = drillOptions(metric, spec);
+  if (drills.length) { meta.drillable = true; meta.drillOptions = drills; }
 
   // Factor metrics convert here rather than in SQL, so the raw
   // measurement stays inspectable and one bad factor cannot corrupt
@@ -140,22 +148,46 @@ const runReport = async (input) => {
 
   // Weight metrics state what they excluded, so a total shrunk by
   // unit mismatches is visible rather than silently wrong.
-  if (spec.dateRange && !metric.waterfall && (metric.unit === 'kg' || metric.factorKey)) {
+  // Lines a kilogram figure cannot count, said beside it. Each kind of
+  // report counts its own: dispatch lines for food going out, delivery
+  // lines for goods coming in. (This used to count dispatch lines for
+  // every kilogram report, so Goods received carried a note about
+  // dispatch.)
+  if (spec.dateRange && DISPATCH_KG_REPORTS.has(metric.repoFn)) {
     const skipped = await repo.countNonKgLines(spec);
-    if (skipped > 0) meta.excludedLines = skipped;
+    if (skipped > 0) { meta.excludedLines = skipped; meta.excludedKind = 'dispatch'; }
+  } else if (spec.dateRange && metric.repoFn === 'goodsReceived') {
+    const skipped = await repo.countNonKgReceivedLines(spec);
+    if (skipped > 0) { meta.excludedLines = skipped; meta.excludedKind = 'delivery'; }
+  }
+  if (metric.repoFn === 'stockValue') {
+    const unpriced = await repo.countUnpricedStock(spec);
+    if (unpriced > 0) {
+      meta.caveat = `${unpriced} product${unpriced === 1 ? '' : 's'} in stock ${unpriced === 1 ? 'has' : 'have'} no unit cost and ${unpriced === 1 ? 'is' : 'are'} left out. Add unit costs on the Products screen to value them.`;
+    }
   }
 
   // Percentages average; everything else sums. A summed compliance
   // percentage would be nonsense, and the client should not have to
   // know which is which.
   // A waterfall's total is where it ends; days of cover average too.
-  const total = series.length === 0
-    ? 0
-    : metric.waterfall
-      ? series[series.length - 1].value
-      : metric.unit === '%' || metric.unit === 'days'
-        ? Number((series.reduce((s, r) => s + r.value, 0) / series.length).toFixed(1))
-        : series.reduce((s, r) => s + r.value, 0);
+  // THE TOTAL OF A RATE IS THE RATE OVERALL, NOT THE AVERAGE OF THE BARS
+  // Three suppliers at 0%, 86% and 86% on-time do not make 57% if the
+  // first sent one order and the others seven each. A rate or an
+  // average broken down is totalled by running the same report with no
+  // breakdown, which weighs every order, line or collection once. Only
+  // a report with no overall form (days of cover) falls back to the
+  // mean of its rows.
+  const isRate = metric.unit === '%' || metric.unit === 'days' || metric.unit === 'hours' || metric.unit === 'ZAR/unit';
+  let total;
+  if (series.length === 0) total = 0;
+  else if (metric.waterfall) total = series[series.length - 1].value;
+  else if (isRate && spec.dimension !== 'none' && metric.dimensions.includes('none')) {
+    const overall = await fn({ ...spec, dimension: 'none' });
+    total = overall[0]?.value ?? 0;
+  } else if (isRate) {
+    total = series.length === 1 ? series[0].value : Number((series.reduce((s, r) => s + r.value, 0) / series.length).toFixed(1));
+  } else total = series.reduce((s, r) => s + r.value, 0);
 
   const payload = {
     spec,
@@ -197,14 +229,16 @@ const getFactorHistory = (factorKey) => factorRepo.listFactorHistory(factorKey);
 // Click a bar → the report behind it (features/reporting/drillDown.js).
 // A name from the chart is turned into its id here; the table name
 // comes from a fixed map, never from the request.
-const drillDown = async ({ spec: parentInput, label }) => {
+const drillDown = async ({ spec: parentInput, label, target }) => {
   const parent = validateSpec(parentInput);
   const metric = getMetric(parent.metric);
-  const plan = planDrill(metric, parent, label);
+  const plan = planDrill(metric, parent, label, typeof target === 'string' ? target : null, todayISO());
   if (!plan) throw fail(400, 'This chart cannot be drilled into.');
   if (plan.lookup) {
     const { rows } = await pool.query(`SELECT id FROM ${plan.lookup.table} WHERE name = $1 ORDER BY id LIMIT 1`, [plan.lookup.name]);
-    if (!rows.length) throw fail(404, `Could not find "${label}" to drill into.`);
+    // "Unassigned", "Unknown": the bar for records with nothing set.
+    // There is no id to filter by, so there is no report behind it.
+    if (!rows.length) throw fail(404, `"${label}" is not a single record, so there is nothing more to open behind this bar.`);
     plan.spec.filters[plan.filter] = rows[0].id;
   }
   const report = await runReport(plan.spec);

@@ -25,7 +25,8 @@ export const deleteSaved = (id) => apiDelete(`/api/reporting/saved/${id}`);
 export const sendSavedNow = (id) => apiPost(`/api/reporting/saved/${id}/send`, {});
 
 // POST /api/reporting/drill — the report behind one clicked bar.
-export const drillDown = (spec, label) => apiPost('/api/reporting/drill', { spec, label });
+// `target` is one of the report's meta.drillOptions ids: which way to open the bar.
+export const drillDown = (spec, label, target) => apiPost('/api/reporting/drill', { spec, label, target });
 
 // POST /api/reporting/ask
 // Returns either a report payload or { type: 'clarify', question, options }.

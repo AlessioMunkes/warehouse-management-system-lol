@@ -27,6 +27,7 @@
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
 import opsRepo from './reportingOps.repository.js';
+import { committedStockSql } from './committedStock.sql.js';
 import {
   COLLECTED_STATUSES, NOT_COLLECTED_STATUSES, IMPACT_BENEFICIARY_KINDS, SAST,
 } from '../features/reporting/reportCatalog.js';
@@ -57,22 +58,33 @@ function sortWeekdays(series) {
 // Closed map. An unrecognised key throws rather than defaulting: a
 // silent fallback to "total" would answer a different question than
 // the one asked and nobody would notice.
-const slipDimension = (dimension) => {
+// THE DAY IT LEFT, NOT THE DAY IT WAS BOOKED FOR
+// A pallet booked for Tuesday and collected on Sunday left the
+// warehouse on Sunday. Anything that measures food going out is dated
+// by the gate (dispatch_events.collected_at, in SAST), falling back to
+// the booked day only for an old row with no collection time. Dating
+// it by the booked day hid food that had already gone: asked what
+// left today, the report said nothing until the booked day arrived.
+// Reports about the planned cycle (compliance, missed and late
+// collections, packing) still go by the booked day: `ps.dispatch_date`.
+const LEFT_DAY = `COALESCE(${sastDate('de.collected_at')}, ps.dispatch_date)`;
+
+const slipDimension = (dimension, day = 'ps.dispatch_date') => {
   switch (dimension) {
     case 'none':        return { expr: `'Total'`,                               group: null };
-    case 'month':       return { expr: bucketMonth('ps.dispatch_date'),         group: bucketMonth('ps.dispatch_date') };
-    case 'week':        return { expr: bucketWeek('ps.dispatch_date'),          group: bucketWeek('ps.dispatch_date') };
+    case 'month':       return { expr: bucketMonth(day),         group: bucketMonth(day) };
+    case 'week':        return { expr: bucketWeek(day),          group: bucketWeek(day) };
     case 'cohort':      return { expr: `ps.cohort::text`,                       group: `ps.cohort` };
     case 'ecd_centre':  return { expr: `COALESCE(e.name, ps.beneficiary_name)`, group: `COALESCE(e.name, ps.beneficiary_name)` };
     case 'beneficiary': return { expr: `ps.beneficiary_kind::text`,             group: `ps.beneficiary_kind` };
     case 'product':     return { expr: `p.name`,                                group: `p.name` };
     case 'programme':   return { expr: `COALESCE(pr.name, 'Unassigned')`,       group: `pr.name` };
     case 'month_beneficiary': {
-      const e = `${bucketMonth('ps.dispatch_date')} || '|' || ps.beneficiary_kind::text`;
+      const e = `${bucketMonth(day)} || '|' || ps.beneficiary_kind::text`;
       return { expr: e, group: e };
     }
-    case 'weekday':      return { expr: weekday('ps.dispatch_date'), group: weekday('ps.dispatch_date') };
-    case 'week_weekday': { const e = weekWeekday('ps.dispatch_date'); return { expr: e, group: e }; }
+    case 'weekday':      return { expr: weekday(day), group: weekday(day) };
+    case 'week_weekday': { const e = weekWeekday(day); return { expr: e, group: e }; }
     default: throw new Error(`Unsupported dimension: ${dimension}`);
   }
 };
@@ -104,10 +116,10 @@ const orderFor = (dimension) => (TIME_ORDERED.has(dimension) ? '1' : '2 DESC, 1'
 // centre id, count), so each centre contributes once per bucket and
 // centres sharing a headcount both count.
 const childrenReached = async ({ dimension, filters, dateRange }) => {
-  const dim = slipDimension(dimension);
+  const dim = slipDimension(dimension, LEFT_DAY);
   const params = [dateRange.from, dateRange.to];
   const where = [
-    `ps.dispatch_date BETWEEN $1::date AND $2::date`,
+    `${LEFT_DAY} BETWEEN $1::date AND $2::date`,
     `de.status = ANY($${params.push(COLLECTED_STATUSES)}::text[])`,
     `e.child_count IS NOT NULL`, `e.child_count > 0`,
     impactClause(params), ...slipFilters(filters, params),
@@ -130,10 +142,10 @@ const childrenReached = async ({ dimension, filters, dateRange }) => {
 // unit = 'kg' only — summing kilograms and crates is meaningless,
 // and the service reports how many lines were skipped.
 const dispatchedKgQuery = async ({ dimension, filters, dateRange, impactOnly }) => {
-  const dim = slipDimension(dimension);
+  const dim = slipDimension(dimension, LEFT_DAY);
   const params = [dateRange.from, dateRange.to];
   const where = [
-    `ps.dispatch_date BETWEEN $1::date AND $2::date`,
+    `${LEFT_DAY} BETWEEN $1::date AND $2::date`,
     `de.status = ANY($${params.push(COLLECTED_STATUSES)}::text[])`,
     `del.unit = 'kg'`,
   ];
@@ -216,16 +228,16 @@ const mealsServedByGroup = async ({ dimension, filters, dateRange }) => {
     // pivots this into month clusters and needs the months in
     // calendar order, not ranked by size.
     dim = {
-      expr: `${bucketMonth('ps.dispatch_date')} || '|' || ${MEALS_GROUP_CASE}`,
-      group: `${bucketMonth('ps.dispatch_date')}, ps.beneficiary_kind`,
+      expr: `${bucketMonth(LEFT_DAY)} || '|' || ${MEALS_GROUP_CASE}`,
+      group: `${bucketMonth(LEFT_DAY)}, ps.beneficiary_kind`,
     };
   } else {
-    dim = slipDimension(dimension);
+    dim = slipDimension(dimension, LEFT_DAY);
   }
 
   const params = [dateRange.from, dateRange.to];
   const where = [
-    `ps.dispatch_date BETWEEN $1::date AND $2::date`,
+    `${LEFT_DAY} BETWEEN $1::date AND $2::date`,
     `de.status = ANY($${params.push(COLLECTED_STATUSES)}::text[])`,
     `del.unit = 'kg'`,
     `ps.beneficiary_kind = ANY($${params.push(MEALS_GROUP_KINDS)}::beneficiary_type[])`,
@@ -418,7 +430,7 @@ const countNonKgLines = async ({ dateRange }) => {
        FROM picking_slips ps
        JOIN dispatch_events de ON de.picking_slip_id = ps.id
        JOIN dispatch_event_lines del ON del.dispatch_event_id = de.id
-      WHERE ps.dispatch_date BETWEEN $1::date AND $2::date
+      WHERE ${LEFT_DAY} BETWEEN $1::date AND $2::date
         AND de.status = ANY($3::text[]) AND del.unit <> 'kg'`,
     [dateRange.from, dateRange.to, COLLECTED_STATUSES]
   );
@@ -427,6 +439,27 @@ const countNonKgLines = async ({ dateRange }) => {
 
 // ══ Receiving ══════════════════════════════════════════════════
 // delivery_notes.delivery_date is a DATE, so no zone conversion.
+// Delivery lines Goods received leaves out: counted in bags, boxes or
+// punnets with no weight recorded. Said beside the figure, or a
+// delivery of sixty bags reads as nothing having arrived.
+const countNonKgReceivedLines = async ({ dateRange, filters = {} }) => {
+  const params = [dateRange.from, dateRange.to];
+  const where = [
+    `dn.delivery_date BETWEEN $1::date AND $2::date`,
+    `dni.received_weight_kg IS NULL`, `dni.unit <> 'kg'`,
+  ];
+  if (filters.supplier_id) { params.push(filters.supplier_id); where.push(`dn.supplier_id = $${params.length}`); }
+  if (filters.product_id)  { params.push(filters.product_id);  where.push(`dni.product_id = $${params.length}`); }
+  const { rows } = await pool.query(
+    `SELECT COUNT(*)::int AS n
+       FROM delivery_note_items dni
+       JOIN delivery_notes dn ON dn.id = dni.delivery_note_id
+      WHERE ${where.join(' AND ')}`,
+    params
+  );
+  return rows[0]?.n ?? 0;
+};
+
 const receivingDimension = (dimension) => {
   switch (dimension) {
     case 'none':     return { expr: `'Total'`,                       group: null };
@@ -599,19 +632,16 @@ const donationValue = async ({ dimension, filters, dateRange }) => {
     none:      `'Total'`,
     month:     bucketMonth(d),
     category:  `dn.donation_category::text`,
-    programme: `COALESCE(pr.name, 'Unassigned')`,
   }[dimension];
   if (!expr) throw new Error(`Unsupported dimension: ${dimension}`);
 
   const params = [dateRange.from, dateRange.to];
   const where = [`${d} BETWEEN $1::date AND $2::date`];
   if (filters.donation_category) { params.push(filters.donation_category); where.push(`dn.donation_category = $${params.length}`); }
-  if (filters.programme_id)      { params.push(filters.programme_id);      where.push(`dn.programme_id = $${params.length}`); }
 
   const { rows } = await pool.query(
     `SELECT ${expr} AS label, ROUND(SUM(dn.estimated_value_zar)::numeric, 2) AS value
        FROM donations dn
-  LEFT JOIN programmes pr ON pr.id = dn.programme_id
       WHERE ${where.join(' AND ')}
       ${dimension === 'none' ? '' : `GROUP BY ${expr}`}
       ORDER BY ${dimension === 'none' || dimension === 'month' ? '1' : '2 DESC, 1'}`,
@@ -675,25 +705,28 @@ const stockOnHand = async ({ dimension, filters, limit }) => {
 const lowStockItems = async ({ filters, limit }) => {
   const params = [];
   const where = [
-    `p.is_active = true`, `sl.reorder_threshold > 0`,
-    `sl.quantity_on_hand <= sl.reorder_threshold`,
+    `p.is_active = true`,
+    `(COALESCE(sl.quantity_on_hand, 0) - COALESCE(c.committed, 0)) <= COALESCE(sl.reorder_threshold, 0)`,
   ];
   if (filters.programme_id) { params.push(filters.programme_id); where.push(`p.programme_id = $${params.length}`); }
   params.push(limit ?? 10);
 
   const { rows } = await pool.query(
     `SELECT p.name AS label,
-            (sl.quantity_on_hand - sl.reorder_threshold)::numeric AS value,
-            sl.quantity_on_hand::numeric AS on_hand,
-            sl.reorder_threshold::numeric AS threshold, sl.unit
-       FROM stock_levels sl JOIN products p ON p.id = sl.product_id
+            (COALESCE(sl.quantity_on_hand, 0) - COALESCE(c.committed, 0) - COALESCE(sl.reorder_threshold, 0))::numeric AS value,
+            COALESCE(sl.quantity_on_hand, 0)::numeric AS on_hand,
+            COALESCE(c.committed, 0)::numeric AS committed,
+            COALESCE(sl.reorder_threshold, 0)::numeric AS threshold, COALESCE(sl.unit, p.default_unit, '') AS unit
+       FROM products p
+       JOIN stock_levels sl ON sl.product_id = p.id
+  LEFT JOIN (${committedStockSql()}) c ON c.product_id = p.id
       WHERE ${where.join(' AND ')}
-      ORDER BY (sl.quantity_on_hand - sl.reorder_threshold) ASC LIMIT $${params.length}`,
+      ORDER BY 2 ASC, p.name LIMIT $${params.length}`,
     params
   );
   return rows.map((r) => ({
     label: r.label, value: num(r.value),
-    meta: { onHand: num(r.on_hand), threshold: num(r.threshold), unit: r.unit },
+    meta: { onHand: num(r.on_hand), committed: num(r.committed), threshold: num(r.threshold), unit: r.unit },
   }));
 };
 
@@ -864,7 +897,7 @@ export default {
   donationValue, section18aPipeline,
   stockOnHand, lowStockItems, stockMovementVolume, stockCountVariance,
   pickingFlagRate, communityRequestOutcomes, volunteerHours,
-  countNonKgLines, getFactor,
+  countNonKgLines, countNonKgReceivedLines, getFactor,
   // Second-wave operational metrics, kept in their own file.
   ...opsRepo,
 };

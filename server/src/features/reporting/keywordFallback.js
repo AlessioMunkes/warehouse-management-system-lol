@@ -170,7 +170,8 @@ export const matchQuestion = (question, todayISO) => {
   // "X by status" / "how many X are inactive": a custom report grouped
   // by that dataset's status, when one clearly fits and no prepared
   // report was named more strongly.
-  const custom = STATUS_WORDS.test(q) ? bestCustom(q) : null;
+  const namedData = bestCustom(q);
+  const custom = STATUS_WORDS.test(q) ? namedData : null;
 
   // A scatter request goes to a comparison when one fits.
   if (/ (scatter|vs|versus|against|compared? to) /.test(q)) {
@@ -204,6 +205,16 @@ export const matchQuestion = (question, todayISO) => {
     const terms = [...(KEYWORDS[m.id] ?? []), m.label, m.id.replace(/_/g, ' ')];
     const s = scoreTerms(q, terms);
     if (s > 0 && (!best || s > best.score)) best = { metric: m, score: s };
+  }
+  // A question that names a kind of record outright ("collection
+  // reminders", "emails sent", "stock counts") and no prepared report
+  // more strongly is a count of those records, even with no status
+  // word in it. It has to be a whole-phrase hit, and it has to beat
+  // the best report: "did the collection reminders go out" used to
+  // come back as food dispatched, on the strength of "go out".
+  if (!custom && namedData && namedData.score - 1 >= 3 && (!best || namedData.score - 1 > best.score)) {
+    const ds = DATASETS[namedData.id];
+    return { kind: 'custom', id: namedData.id, spec: { custom: namedData.custom, dateRange: ds.date ? resolveDates(question, todayISO) : undefined }, score: namedData.score };
   }
   if (!best && custom) {
     const ds = DATASETS[custom.id];
@@ -281,9 +292,20 @@ const DATASET_WORDS = {
   stock_movements: ['stock movements', 'movements'],
   beneficiaries: ['beneficiaries', 'centres', 'centre', 'ecds'],
   products: ['products', 'catalogue'],
+  decanting: ['decanting lines', 'decanted', 'bags packed'],
+  stock_counts: ['stock count lines', 'stock counts', 'count results'],
+  kits: ['kits', 'compost kits', 'collection kits'],
+  reminders: ['reminders', 'collection reminders', 'whatsapp'],
+  messages: ['emails', 'messages', 'emails sent'],
+  activity: ['actions', 'audit', 'activity'],
+  visits: ['sign-ins', 'visitors', 'signed in'],
+  suppliers: ['suppliers', 'supplier list'],
 };
 
-const statusKeyOf = (d) => Object.keys(d.groups).find((k) => /status|outcome|^type$|active/.test(k));
+// The grouping that answers "how many, by what": a dataset's status
+// where it has one, else its first breakdown that is not a date.
+const statusKeyOf = (d) => Object.keys(d.groups).find((k) => /status|outcome|^type$|active/.test(k))
+  ?? Object.keys(d.groups).find((k) => !d.groups[k].time);
 
 function bestCustom(q) {
   let best = null;

@@ -305,7 +305,7 @@ export const METRICS = {
     dimensions: ['none', 'month', 'week', 'cohort', 'product', 'programme', 'ecd_centre', 'beneficiary', 'month_beneficiary', 'weekday', 'week_weekday'],
     filters: ['cohort', 'beneficiary_kind', 'programme_id', 'product_id', 'ecd_id'],
     defaultChart: 'line',
-    caveat: 'Gate-loaded quantities, kilogram lines only.',
+    caveat: 'Gate-loaded quantities, kilogram lines only. Counted on the day the pallet left, not the day it was booked for.',
   },
 
   collection_compliance: {
@@ -426,8 +426,8 @@ export const METRICS = {
       'The estimated rand value of donations received. Aggregate only; this report ' +
       'cannot be broken down by donor.',
     repoFn: 'donationValue', unit: 'ZAR',
-    dimensions: ['none', 'month', 'category', 'programme'],
-    filters: ['donation_category', 'programme_id'],
+    dimensions: ['none', 'month', 'category'],
+    filters: ['donation_category'],
     defaultChart: 'line',
     caveat: 'Values are as estimated at intake.',
   },
@@ -463,13 +463,14 @@ export const METRICS = {
   low_stock_items: {
     id: 'low_stock_items', label: 'Items at or below reorder level', temporal: 'snapshot',
     description:
-      'Products that have hit their reorder threshold and need ordering. A live ' +
-      'figure with no date range. Run this when asked what is running low or what ' +
-      'needs reordering.',
+      'Products at or below their reorder level, or out of stock, after taking off what ' +
+      'is already promised to pallets and food parcels. The same rule as the Low stock ' +
+      'tab on the Inventory screen. A live figure with no date range. Run this when ' +
+      'asked what is running low, what is out of stock or what needs reordering.',
     repoFn: 'lowStockItems', unit: 'units below threshold',
     dimensions: ['product'], filters: ['programme_id'],
     defaultChart: 'hbar', ranked: true, threshold: 0,
-    caveat: 'Shows how far below the reorder threshold each product is.',
+    caveat: 'How far each product is below its reorder level, counting stock already promised. A product with no reorder level set shows once it runs out.',
   },
 
   stock_movement_volume: {
@@ -648,12 +649,12 @@ export const METRICS = {
   expiring_stock: {
     id: 'expiring_stock', label: 'Stock expiring soon', temporal: 'snapshot',
     description:
-      'Received stock with an expiry date in the next 30 days, counted by delivery line, by week of ' +
+      'Stock still on the shelf with an expiry date in the next 30 days, counted by delivery line, by week of ' +
       'expiry or by product. A live figure. Run this when asked what is about to expire.',
     repoFn: 'expiringStock', unit: 'delivery lines',
     dimensions: ['week', 'product'], filters: [],
     defaultChart: 'bar',
-    caveat: 'Based on the expiry date recorded at receiving, not on how much of that delivery is still on the shelf.',
+    caveat: 'Based on the expiry date recorded at receiving. A product with nothing left on the shelf is left out, but a part-used delivery still counts as one line.',
   },
 
   adjustment_reasons: {

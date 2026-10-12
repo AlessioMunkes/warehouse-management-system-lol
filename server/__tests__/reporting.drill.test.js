@@ -7,7 +7,8 @@
 // Also: the new diagram reports are wired to their diagrams.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect } from 'vitest';
-import { canDrill, planDrill } from '../src/features/reporting/drillDown.js';
+import { canDrill, drillOptions, planDrill } from '../src/features/reporting/drillDown.js';
+import { validateSpec } from '../src/features/reporting/specValidator.js';
 import { getMetric, METRICS, DIMENSIONS } from '../src/features/reporting/reportCatalog.js';
 
 const RANGE = { from: '2026-06-01', to: '2026-09-27' };
@@ -16,20 +17,55 @@ describe('what can be drilled', () => {
   it('offers a drill only where the report can filter to the bar and show it over time', () => {
     expect(canDrill(getMetric('receiving_discrepancy_rate'), 'supplier')).toBe(true);
     expect(canDrill(getMetric('dispatch_volume'), 'month')).toBe(true);
-    expect(canDrill(getMetric('stock_on_hand'), 'supplier')).toBe(false);   // a snapshot has no "over time"
+    expect(canDrill(getMetric('stock_on_hand'), 'supplier')).toBe(false);   // not a breakdown it has
     expect(canDrill(getMetric('dispatch_volume'), 'weekday')).toBe(false);
+    expect(canDrill(getMetric('purchase_order_pipeline'), 'po_status')).toBe(false); // no filter for a status
   });
 
-  it('every drill it offers names a filter and a breakdown the report really has', () => {
+  it('opens a bar every way the report can: over time, and by each other breakdown', () => {
+    const ids = (metric, dimension, dateRange = RANGE) => drillOptions(getMetric(metric), { dimension, dateRange }).map((o) => o.id);
+    expect(ids('goods_received', 'supplier')).toEqual(['month', 'product']);
+    expect(ids('goods_received', 'month')).toEqual(['week', 'supplier', 'product']);
+    expect(ids('goods_received', 'week')).toEqual(['supplier', 'product']);
+    expect(ids('dispatch_volume', 'ecd_centre')).toEqual(['month', 'cohort', 'product', 'programme', 'beneficiary']);
+    // A short period goes week by week.
+    expect(ids('goods_received', 'supplier', { from: '2026-09-01', to: '2026-09-27' })[0]).toBe('week');
+  });
+
+  it('opens a product on a live report in the report that has its history', () => {
+    for (const id of ['stock_on_hand', 'low_stock_items', 'days_of_cover', 'expiring_stock']) {
+      expect(drillOptions(getMetric(id), { dimension: 'product' }).map((o) => o.id), id).toContain('across:stock_movement_volume');
+    }
+    const plan = planDrill(getMetric('low_stock_items'), { metric: 'low_stock_items', dimension: 'product', filters: {} }, 'Rice 2 kg', null, '2026-10-12');
+    expect(plan.spec).toEqual({ metric: 'stock_movement_volume', dimension: 'movement_type', filters: {}, dateRange: { from: '2026-07-14', to: '2026-10-12' } });
+    expect(plan.lookup).toEqual({ table: 'products', name: 'Rice 2 kg' });
+    expect(plan.filter).toBe('product_id');
+  });
+
+  // The guard for the whole feature: every button the page can show,
+  // on every report and breakdown, plans a report the validator accepts.
+  it('every drill it offers is a report that would really run', () => {
+    let checked = 0;
     for (const m of Object.values(METRICS)) {
       for (const dim of m.dimensions) {
-        if (!canDrill(m, dim)) continue;
-        const plan = planDrill(m, { metric: m.id, dimension: dim, filters: {}, dateRange: RANGE }, dim === 'month' ? '2026-07' : 'X');
-        expect(plan, `${m.id}/${dim}`).toBeTruthy();
-        expect(m.dimensions, `${m.id}/${dim}`).toContain(plan.spec.dimension);
-        if (plan.filter) expect(m.filters).toContain(plan.filter);
+        const parent = { metric: m.id, dimension: dim, filters: {}, ...(m.temporal === 'range' ? { dateRange: RANGE } : {}) };
+        const label = dim === 'month' ? '2026-07' : dim === 'week' ? '2026-W30' : dim === 'cohort' ? 'tuesday'
+          : dim === 'beneficiary' ? 'ecd' : dim === 'movement_type' ? 'received' : dim === 'category' ? 'recipe_food' : 'X';
+        for (const option of drillOptions(m, parent)) {
+          const where = `${m.id}/${dim} -> ${option.id}`;
+          const plan = planDrill(m, parent, label, option.id, '2026-10-12');
+          expect(plan, where).toBeTruthy();
+          const target = getMetric(plan.spec.metric);
+          expect(target.dimensions, where).toContain(plan.spec.dimension);
+          if (plan.filter) expect(target.filters, where).toContain(plan.filter);
+          // A looked-up id stands in for the name the service resolves.
+          const spec = plan.lookup ? { ...plan.spec, filters: { ...plan.spec.filters, [plan.filter]: 1 } } : plan.spec;
+          expect(() => validateSpec(spec), where).not.toThrow();
+          checked += 1;
+        }
       }
     }
+    expect(checked).toBeGreaterThan(100);
   });
 });
 
@@ -55,6 +91,27 @@ describe('the plan', () => {
       { metric: 'dispatch_volume', dimension: 'cohort', filters: { beneficiary_kind: 'ecd' }, dateRange: RANGE }, 'tuesday');
     expect(plan.lookup).toBeUndefined();
     expect(plan.spec.filters).toEqual({ beneficiary_kind: 'ecd', cohort: 'tuesday' });
+  });
+
+  it('a month bar → any other breakdown, inside that month', () => {
+    const plan = planDrill(getMetric('goods_received'), { metric: 'goods_received', dimension: 'month', filters: { product_id: 4 }, dateRange: RANGE }, '2026-07', 'supplier');
+    expect(plan.spec).toEqual({ metric: 'goods_received', dimension: 'supplier', filters: { product_id: 4 }, dateRange: { from: '2026-07-01', to: '2026-07-31' } });
+  });
+
+  it('a week bar → a breakdown inside that Monday to Sunday', () => {
+    const plan = planDrill(getMetric('goods_received'), { metric: 'goods_received', dimension: 'week', filters: {}, dateRange: { from: '2026-09-01', to: '2026-10-12' } }, '2026-W41', 'product');
+    expect(plan.spec.dateRange).toEqual({ from: '2026-10-05', to: '2026-10-11' });
+    expect(plan.spec.dimension).toBe('product');
+  });
+
+  it('a supplier bar → that supplier split by product, keeping the period', () => {
+    const plan = planDrill(getMetric('procurement_spend'), { metric: 'procurement_spend', dimension: 'supplier', filters: {}, dateRange: RANGE }, 'Cape Dry Goods', 'product');
+    expect(plan.spec).toMatchObject({ dimension: 'product', dateRange: RANGE });
+    expect(plan.lookup).toEqual({ table: 'suppliers', name: 'Cape Dry Goods' });
+  });
+
+  it('refuses a way of opening the bar that the report does not offer', () => {
+    expect(planDrill(getMetric('goods_received'), { metric: 'goods_received', dimension: 'supplier', filters: {}, dateRange: RANGE }, 'X', 'cohort')).toBeNull();
   });
 
   it('refuses a label that is not a month on a month chart', () => {
