@@ -28,6 +28,14 @@ export const sendSavedNow = (id) => apiPost(`/api/reporting/saved/${id}/send`, {
 // `target` is one of the report's meta.drillOptions ids: which way to open the bar.
 export const drillDown = (spec, label, target) => apiPost('/api/reporting/drill', { spec, label, target });
 
+// POST /api/reporting/records — the rows behind a report, or behind one
+// bar of it when `label` is given: the last level of a drill.
+export const listRecords = (spec, label) => apiPost('/api/reporting/records', { spec, label: label ?? undefined });
+
+// GET /api/reporting/filter-options — choices for filters with no fixed
+// list: suppliers, products, centres, and statuses as recorded.
+export const getFilterOptions = () => apiGet('/api/reporting/filter-options');
+
 // POST /api/reporting/ask
 // Returns either a report payload or { type: 'clarify', question, options }.
 export const askQuestion = (question) => apiPost('/api/reporting/ask', { question });

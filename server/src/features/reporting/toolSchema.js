@@ -77,6 +77,13 @@ export const buildTools = () => ([
         beneficiary_kind:  { type: STRING, enum: BENEFICIARY_KINDS,  description: 'Optional. One kind of beneficiary.' },
         movement_type:     { type: STRING, enum: MOVEMENT_TYPES,     description: 'Optional. One kind of stock movement.' },
         donation_category: { type: STRING, enum: DONATION_CATEGORIES,description: 'Optional. One donation category.' },
+        po_status: { type: STRING, description: 'Optional. One exact order status, written as that breakdown shows it. Only for reports that list it under Filters.' },
+        slip_status: { type: STRING, description: 'Optional. One exact slip status, written as that breakdown shows it. Only for reports that list it under Filters.' },
+        outcome: { type: STRING, description: 'Optional. One exact request outcome, written as that breakdown shows it. Only for reports that list it under Filters.' },
+        s18a_status: { type: STRING, description: 'Optional. One exact certificate status, written as that breakdown shows it. Only for reports that list it under Filters.' },
+        routing_status: { type: STRING, description: 'Optional. One exact routing status, written as that breakdown shows it. Only for reports that list it under Filters.' },
+        product_category: { type: STRING, description: 'Optional. One exact product category, written as that breakdown shows it. Only for reports that list it under Filters.' },
+        storage_type: { type: STRING, description: 'Optional. One exact storage type, written as that breakdown shows it. Only for reports that list it under Filters.' },
         limit: { type: INTEGER, description: `Optional. Rows for ranked reports. Max ${MAX_RANK_LIMIT}.` },
         chart_type: {
           type: STRING, enum: CHART_VIEWS,
@@ -181,7 +188,9 @@ export const buildSystemPrompt = (todayISO) => {
 
   for (const m of OPERATIONAL_METRICS) {
     const dims = m.dimensions.map((d) => `${d} (${DIMENSIONS[d].label})`).join(', ');
-    const entry = `- ${m.id}\n  What it is: ${m.description}\n  Measured in: ${m.unit}\n  Valid breakdowns: ${dims}`;
+    const filters = m.filters.length ? `
+  Filters: ${m.filters.join(', ')}` : '';
+    const entry = `- ${m.id}\n  What it is: ${m.description}\n  Measured in: ${m.unit}\n  Valid breakdowns: ${dims}${filters}`;
     (m.temporal === 'snapshot' ? live : timed).push(entry);
   }
 
@@ -261,7 +270,8 @@ You can show one report, so choose the one that covers the most of the question.
 - Otherwise answer the first part with the best report. The page offers the others underneath.
 
 CHOOSING A BREAKDOWN
-- A trend or change over time takes month or week.
+- A trend or change over time takes month or week. For a period of two weeks or less, use day where the report offers it.
+- Product reports also break down by product_category and storage_type; use those for "by category" or "dry versus cold".
 - A question naming or ranking centres, suppliers or products takes that dimension.
 - A single overall figure takes none.
 - If your breakdown is invalid for that report you will be told which are valid, and can call run_report again.

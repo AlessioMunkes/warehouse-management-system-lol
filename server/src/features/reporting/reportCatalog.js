@@ -62,6 +62,7 @@ export const DIMENSIONS = {
   none:           { id: 'none',           label: 'Total',             chart: 'number' },
   month:          { id: 'month',          label: 'Month',             chart: 'line'   },
   week:           { id: 'week',           label: 'Week',              chart: 'line'   },
+  day:            { id: 'day',            label: 'Day',               chart: 'bar'    },
   cohort:         { id: 'cohort',         label: 'Cohort',            chart: 'bar'    },
   ecd_centre:     { id: 'ecd_centre',     label: 'ECD centre',        chart: 'hbar'   },
   product:        { id: 'product',        label: 'Product',           chart: 'hbar'   },
@@ -110,6 +111,16 @@ export const FILTERS = {
   ecd_id:            { label: 'ECD centre',       values: null },
   supplier_id:       { label: 'Supplier',         values: null },
   location_id:       { label: 'Storage location', values: null },
+  // Free-text filters: one exact value of a status or a category, always
+  // sent to the database as a parameter. The value is whatever the
+  // breakdown of the same name shows, so a bar can be clicked into.
+  po_status:         { label: 'Order status',     text: true },
+  slip_status:       { label: 'Slip status',      text: true },
+  outcome:           { label: 'Outcome',          text: true },
+  s18a_status:       { label: 'Certificate status', text: true },
+  routing_status:    { label: 'Routing status',   text: true },
+  product_category:  { label: 'Product category', text: true },
+  storage_type:      { label: 'Storage type',     text: true },
 };
 
 // grouped_bar: several series clustered per time bucket (e.g.
@@ -302,8 +313,8 @@ export const METRICS = {
       'staff loaded onto the vehicle, not what was packed onto the pallet earlier ' +
       'in the week.',
     repoFn: 'dispatchVolume', unit: 'kg',
-    dimensions: ['none', 'month', 'week', 'cohort', 'product', 'programme', 'ecd_centre', 'beneficiary', 'month_beneficiary', 'weekday', 'week_weekday'],
-    filters: ['cohort', 'beneficiary_kind', 'programme_id', 'product_id', 'ecd_id'],
+    dimensions: ['none', 'month', 'week', 'cohort', 'product', 'programme', 'ecd_centre', 'beneficiary', 'month_beneficiary', 'weekday', 'week_weekday', 'day', 'product_category', 'storage_type'],
+    filters: ['cohort', 'beneficiary_kind', 'programme_id', 'product_id', 'ecd_id', 'product_category', 'storage_type'],
     defaultChart: 'line',
     caveat: 'Gate-loaded quantities, kilogram lines only. Counted on the day the pallet left, not the day it was booked for.',
   },
@@ -315,7 +326,7 @@ export const METRICS = {
       'collections count as collected: the food reached children, it just arrived ' +
       'after three in the afternoon.',
     repoFn: 'collectionCompliance', unit: '%',
-    dimensions: ['none', 'month', 'cohort', 'ecd_centre'],
+    dimensions: ['none', 'month', 'cohort', 'ecd_centre', 'week', 'day', 'beneficiary', 'weekday'],
     filters: ['cohort', 'beneficiary_kind', 'ecd_id'],
     defaultChart: 'bar',
     caveat: 'Late collections count as collected. Cancelled slips excluded.',
@@ -354,8 +365,8 @@ export const METRICS = {
       'actually received and signed for at the door, not what the purchase order ' +
       'said was coming.',
     repoFn: 'goodsReceived', unit: 'kg',
-    dimensions: ['none', 'month', 'week', 'supplier', 'product', 'month_supplier', 'weekday', 'week_weekday'],
-    filters: ['supplier_id', 'product_id'],
+    dimensions: ['none', 'month', 'week', 'supplier', 'product', 'month_supplier', 'weekday', 'week_weekday', 'day', 'product_category', 'storage_type'],
+    filters: ['supplier_id', 'product_id', 'product_category', 'storage_type'],
     defaultChart: 'line',
     caveat: 'Received weights where recorded in kilograms.',
   },
@@ -369,8 +380,8 @@ export const METRICS = {
     repoFn: 'receivingDiscrepancyRate', unit: '%',
     // supplier first: this is the supplier-reliability report, and a
     // single overall discrepancy rate is not something anyone acts on.
-    dimensions: ['supplier', 'none', 'month', 'product'],
-    filters: ['supplier_id', 'product_id'],
+    dimensions: ['supplier', 'none', 'month', 'product', 'week', 'day', 'product_category'],
+    filters: ['supplier_id', 'product_id', 'product_category', 'storage_type'],
     defaultChart: 'hbar',
     caveat: 'A line counts as discrepant if received differs from expected in either direction.',
   },
@@ -392,8 +403,8 @@ export const METRICS = {
       'What was spent on bought-in stock, in rands. Calculated from the quantity ' +
       'actually received multiplied by the price on the purchase order line.',
     repoFn: 'procurementSpend', unit: 'ZAR',
-    dimensions: ['none', 'month', 'supplier', 'product', 'month_supplier'],
-    filters: ['supplier_id', 'product_id'],
+    dimensions: ['none', 'month', 'supplier', 'product', 'month_supplier', 'week', 'day', 'product_category', 'storage_type'],
+    filters: ['supplier_id', 'product_id', 'product_category', 'storage_type'],
     defaultChart: 'line',
     // Lines received without a linked PO item have no price, so they
     // contribute nothing. Stated rather than hidden — an incomplete
@@ -413,8 +424,8 @@ export const METRICS = {
       'The average price paid per unit received, weighted by quantity so one large ' +
       'cheap delivery cannot be outvoted by several small expensive ones.',
     repoFn: 'unitPriceTrend', unit: 'ZAR/unit',
-    dimensions: ['product', 'none', 'month', 'supplier'],
-    filters: ['supplier_id', 'product_id'],
+    dimensions: ['product', 'none', 'month', 'supplier', 'week', 'product_category'],
+    filters: ['supplier_id', 'product_id', 'product_category', 'storage_type'],
     defaultChart: 'hbar',
     caveat: 'Excludes received lines with no purchase order price on record.',
   },
@@ -426,7 +437,7 @@ export const METRICS = {
       'The estimated rand value of donations received. Aggregate only; this report ' +
       'cannot be broken down by donor.',
     repoFn: 'donationValue', unit: 'ZAR',
-    dimensions: ['none', 'month', 'category'],
+    dimensions: ['none', 'month', 'category', 'week', 'day'],
     filters: ['donation_category'],
     defaultChart: 'line',
     caveat: 'Values are as estimated at intake.',
@@ -439,7 +450,7 @@ export const METRICS = {
       'issued, queued, waiting on donor details, or failed. This is the compliance ' +
       'view. Aggregate only, no donor names.',
     repoFn: 'section18aPipeline', unit: 'donations',
-    dimensions: ['s18a_status', 'month'], filters: [],
+    dimensions: ['s18a_status', 'month', 'week'], filters: ['s18a_status', 'donation_category'],
     defaultChart: 'bar',
     funnel: { dimension: 's18a_status', stages: ['not_evaluated', 'qualifying_pending_donor', 'queued', 'issued'], exits: ['not_qualifying', 'failed'] },
     caveat: 'Counts donations by certificate status, not certificate value.',
@@ -480,8 +491,8 @@ export const METRICS = {
       'donated, written off as wastage, or manually adjusted. Use this to see ' +
       'warehouse throughput or to check how much was adjusted by hand.',
     repoFn: 'stockMovementVolume', unit: 'units',
-    dimensions: ['movement_type', 'month', 'week', 'product', 'programme', 'month_movement', 'weekday', 'week_weekday'],
-    filters: ['movement_type', 'product_id', 'programme_id'],
+    dimensions: ['movement_type', 'month', 'week', 'product', 'programme', 'month_movement', 'weekday', 'week_weekday', 'day', 'product_category', 'storage_type'],
+    filters: ['movement_type', 'product_id', 'programme_id', 'product_category', 'storage_type'],
     defaultChart: 'bar',
     caveat: 'Mixed units across products; compare within a product rather than across.',
   },
@@ -508,8 +519,8 @@ export const METRICS = {
     repoFn: 'pickingFlagRate', unit: '%',
     // product first: a flag rate is only useful once you know which
     // product is causing it.
-    dimensions: ['product', 'none', 'month', 'cohort'],
-    filters: ['product_id', 'cohort'],
+    dimensions: ['product', 'none', 'month', 'cohort', 'week', 'day', 'product_category'],
+    filters: ['product_id', 'cohort', 'product_category', 'storage_type'],
     defaultChart: 'hbar',
     caveat: 'Flagged lines as a share of all lines that were worked.',
   },
@@ -522,7 +533,7 @@ export const METRICS = {
       'them: pending, fulfilled, partially fulfilled, or declined. ' +
       'Aggregate only, no caller details.',
     repoFn: 'communityRequestOutcomes', unit: 'requests',
-    dimensions: ['outcome', 'month'], filters: [],
+    dimensions: ['outcome', 'month', 'week', 'day', 'weekday'], filters: ['outcome'],
     defaultChart: 'bar',
     caveat: 'Counts requests logged in the period.',
   },
@@ -535,7 +546,7 @@ export const METRICS = {
       'the supplier promised. Run this when asked which suppliers deliver late or how reliable ' +
       'delivery dates are.',
     repoFn: 'poOnTimeRate', unit: '%',
-    dimensions: ['supplier', 'none', 'month'], filters: ['supplier_id'],
+    dimensions: ['supplier', 'none', 'month', 'week'], filters: ['supplier_id'],
     defaultChart: 'hbar',
     caveat: 'Judged on the first delivery against each order. Orders past their date with nothing delivered count as late; returned orders are left out.',
   },
@@ -546,7 +557,7 @@ export const METRICS = {
       'Average days from raising a purchase order to the first delivery arriving. Use this to ' +
       'plan how far ahead to order from each supplier.',
     repoFn: 'supplierLeadTime', unit: 'days',
-    dimensions: ['supplier', 'none', 'month'], filters: ['supplier_id'],
+    dimensions: ['supplier', 'none', 'month', 'week'], filters: ['supplier_id'],
     defaultChart: 'hbar',
     caveat: 'Orders with no delivery yet are left out.',
   },
@@ -569,7 +580,7 @@ export const METRICS = {
       'approved, in transit, partially received, completed, returned or needing follow-up. Run ' +
       'this for "how many orders did we raise / place this month".',
     repoFn: 'purchaseOrderPipeline', unit: 'orders',
-    dimensions: ['po_status', 'supplier', 'month'], filters: ['supplier_id'],
+    dimensions: ['po_status', 'supplier', 'month', 'week', 'day'], filters: ['supplier_id', 'po_status'],
     defaultChart: 'bar',
     funnel: { dimension: 'po_status', stages: ['pending', 'approved', 'in_transit', 'partially_received', 'completed'], exits: ['returned', 'follow_up_required', 'cancelled'] },
     caveat: 'Counted by the date the order was raised.',
@@ -582,7 +593,7 @@ export const METRICS = {
       'Average hours from a packer starting a picking slip to completing it. Rising turnaround ' +
       'means pallets are taking longer to pack.',
     repoFn: 'pickingTurnaround', unit: 'hours',
-    dimensions: ['month', 'week', 'cohort', 'none'], filters: ['cohort'],
+    dimensions: ['month', 'week', 'cohort', 'none', 'day'], filters: ['cohort'],
     defaultChart: 'line',
     caveat: 'Slips completed without being started first have no duration and are left out.',
   },
@@ -594,7 +605,7 @@ export const METRICS = {
       'complete, dispatched or cancelled. A live figure. Run this when asked how packing is ' +
       'going this week or what is still to be packed.',
     repoFn: 'slipPipeline', unit: 'slips',
-    dimensions: ['slip_status', 'cohort'], filters: ['cohort'],
+    dimensions: ['slip_status', 'cohort', 'beneficiary', 'day'], filters: ['cohort', 'slip_status', 'beneficiary_kind'],
     defaultChart: 'bar',
     funnel: { dimension: 'slip_status', stages: ['pending', 'in_progress', 'complete', 'dispatched'], exits: ['cancelled'] },
     caveat: 'Covers dispatch dates from seven days ago to fourteen days ahead.',
@@ -607,7 +618,7 @@ export const METRICS = {
       'on the pallet, as a percentage of dispatch lines. A high rate on one product means pallets ' +
       'are being packed wrong or changed at the gate.',
     repoFn: 'gateLoadVariance', unit: '%',
-    dimensions: ['product', 'none', 'month'], filters: ['product_id'],
+    dimensions: ['product', 'none', 'month', 'week', 'day', 'ecd_centre'], filters: ['product_id', 'ecd_id'],
     defaultChart: 'hbar',
     caveat: 'A line counts if loaded differs from packed in either direction.',
   },
@@ -618,7 +629,7 @@ export const METRICS = {
       'Of the pallets that were collected, the percentage collected late (after three in the ' +
       'afternoon). Run this when asked which centres collect late.',
     repoFn: 'lateCollectionRate', unit: '%',
-    dimensions: ['ecd_centre', 'month', 'cohort', 'none'], filters: ['cohort', 'ecd_id'],
+    dimensions: ['ecd_centre', 'month', 'cohort', 'none', 'week', 'day'], filters: ['cohort', 'ecd_id'],
     defaultChart: 'hbar',
     caveat: 'Only collected pallets count; missed collections are in collection compliance.',
   },
@@ -630,7 +641,7 @@ export const METRICS = {
       'Kilograms the active ECD centres are set up to receive on their standing orders, by product ' +
       'or centre. A live figure. Compare it with stock on hand to see what the next cycle needs.',
     repoFn: 'standingOrderDemand', unit: 'kg',
-    dimensions: ['product', 'ecd_centre', 'none'], filters: ['product_id', 'cohort'],
+    dimensions: ['product', 'ecd_centre', 'none', 'cohort', 'product_category'], filters: ['product_id', 'cohort', 'ecd_id'],
     defaultChart: 'hbar', ranked: true,
     caveat: 'Active centres and current order lines only, kilogram lines only. Per collection, not per month.',
   },
@@ -641,7 +652,7 @@ export const METRICS = {
       'The rand value of what is in the warehouse right now: quantity on hand times each product\u2019s ' +
       'unit cost, by product category, storage type (dry or cold) or product. A live figure.',
     repoFn: 'stockValue', unit: 'ZAR',
-    dimensions: ['product_category', 'storage_type', 'product', 'none'], filters: ['programme_id'],
+    dimensions: ['product_category', 'storage_type', 'product', 'none'], filters: ['programme_id', 'product_category', 'storage_type'],
     defaultChart: 'bar',
     caveat: 'Products with no unit cost on record are left out.',
   },
@@ -652,7 +663,7 @@ export const METRICS = {
       'Stock still on the shelf with an expiry date in the next 30 days, counted by delivery line, by week of ' +
       'expiry or by product. A live figure. Run this when asked what is about to expire.',
     repoFn: 'expiringStock', unit: 'delivery lines',
-    dimensions: ['week', 'product'], filters: [],
+    dimensions: ['week', 'product', 'day', 'product_category'], filters: [],
     defaultChart: 'bar',
     caveat: 'Based on the expiry date recorded at receiving. A product with nothing left on the shelf is left out, but a part-used delivery still counts as one line.',
   },
@@ -663,7 +674,7 @@ export const METRICS = {
       'Why stock was adjusted by hand, by the reason staff recorded. Frequent reasons point at a ' +
       'step in receiving or picking that is not being captured.',
     repoFn: 'adjustmentReasons', unit: 'adjustments',
-    dimensions: ['reason', 'month'], filters: ['product_id'],
+    dimensions: ['reason', 'month', 'week', 'day', 'product'], filters: ['product_id'],
     defaultChart: 'hbar',
     caveat: 'Reasons are grouped as typed, ignoring case. The top fifteen are shown.',
   },
@@ -687,7 +698,7 @@ export const METRICS = {
       'Average hours from a walk-in or phone-in request being logged to it being resolved. ' +
       'Aggregate only, no caller details.',
     repoFn: 'communityResponseTime', unit: 'hours',
-    dimensions: ['month', 'outcome', 'none'], filters: [],
+    dimensions: ['month', 'outcome', 'none', 'week'], filters: ['outcome'],
     defaultChart: 'line',
     caveat: 'Requests not yet resolved are left out.',
   },
@@ -698,7 +709,7 @@ export const METRICS = {
       'Donated items and where they sit in intake: allocated to stock, still pending, unmatched to a ' +
       'product, not stock-bearing, or waiting on programme stock. Aggregate only, no donor details.',
     repoFn: 'donationRouting', unit: 'items',
-    dimensions: ['routing_status', 'month', 'category_flow'], filters: [],
+    dimensions: ['routing_status', 'month', 'category_flow', 'week', 'category'], filters: ['routing_status', 'donation_category'],
     flows: 'category_flow',
     defaultChart: 'bar',
     caveat: 'Counts donation lines, not their value or weight.',
@@ -737,7 +748,7 @@ export const METRICS = {
       'Of confirmed bookings for past Love Activism event timeslots, the percentage where the ' +
       'volunteer checked in, by event or month. Aggregate only, never by individual volunteer.',
     repoFn: 'volunteerEventAttendance', unit: '%',
-    dimensions: ['event', 'month', 'none'], filters: [],
+    dimensions: ['event', 'month', 'none', 'week'], filters: [],
     defaultChart: 'hbar',
     caveat: 'Confirmed bookings for timeslots that have already started.',
   },
@@ -749,7 +760,7 @@ export const METRICS = {
       'Hours contributed by volunteers on site. Aggregate only; this report cannot ' +
       'be broken down by individual volunteer.',
     repoFn: 'volunteerHours', unit: 'hours',
-    dimensions: ['month', 'week', 'none'], filters: [],
+    dimensions: ['month', 'week', 'none', 'day'], filters: [],
     defaultChart: 'line',
     // Sessions with no sign-out have no duration. Counting them as
     // zero would understate; excluding them and saying so is honest.

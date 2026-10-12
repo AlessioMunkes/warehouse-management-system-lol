@@ -72,6 +72,30 @@ const removeSaved = wrap((req) => savedReportService.remove(req.user.id, req.par
 const sendSaved   = wrap((req) => savedReportService.sendNow(req.user.id, req.params.id), 'Failed to send the report.');
 
 // POST /api/reporting/drill  { spec, label } — the report behind one bar.
+// POST /api/reporting/records  { spec, label? } — the rows behind a
+// report or one bar of it: the last level of a drill.
+const records = async (req, res) => {
+  try {
+    const data = await reportingService.records(req.body ?? {});
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    console.error('[records]', err.message);
+    send(res, err, 'Failed to list the records behind the report.');
+  }
+};
+
+// GET /api/reporting/filter-options — the choices for filters with no
+// fixed list (suppliers, products, centres, statuses as recorded).
+const filterOptions = async (_req, res) => {
+  try {
+    const data = await reportingService.filterOptions();
+    res.status(200).json({ success: true, data });
+  } catch (err) {
+    console.error('[filter-options]', err.message);
+    send(res, err, 'Failed to load the filter choices.');
+  }
+};
+
 const drill = async (req, res) => {
   try {
     const report = await reportingService.drillDown(req.body ?? {});
@@ -191,7 +215,7 @@ const getFactorHistory = async (req, res) => {
 };
 
 export default {
-  drill, listSaved, createSaved, updateSaved, removeSaved, sendSaved,
+  drill, records, filterOptions, listSaved, createSaved, updateSaved, removeSaved, sendSaved,
   getCatalog, runReport, ask, insight, getComparisons, runComparison, getTargets, setTarget,
   setFactor, getFactorHistory,
 };

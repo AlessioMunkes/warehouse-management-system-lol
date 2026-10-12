@@ -33,7 +33,8 @@ const fail = (status, message) => {
 // argument the model invents is dropped rather than passed along.
 const argsToSpec = (args) => {
   const filters = {};
-  for (const k of ['cohort', 'beneficiary_kind', 'movement_type', 'donation_category']) {
+  for (const k of ['cohort', 'beneficiary_kind', 'movement_type', 'donation_category',
+    'po_status', 'slip_status', 'outcome', 's18a_status', 'routing_status', 'product_category', 'storage_type']) {
     if (args[k]) filters[k] = args[k];
   }
   return {

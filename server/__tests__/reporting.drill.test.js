@@ -19,15 +19,19 @@ describe('what can be drilled', () => {
     expect(canDrill(getMetric('dispatch_volume'), 'month')).toBe(true);
     expect(canDrill(getMetric('stock_on_hand'), 'supplier')).toBe(false);   // not a breakdown it has
     expect(canDrill(getMetric('dispatch_volume'), 'weekday')).toBe(false);
-    expect(canDrill(getMetric('purchase_order_pipeline'), 'po_status')).toBe(false); // no filter for a status
+    expect(canDrill(getMetric('purchase_order_pipeline'), 'po_status')).toBe(true);  // a status filters by its own text
+    expect(canDrill(getMetric('adjustment_reasons'), 'reason')).toBe(false);          // free text does not
   });
 
   it('opens a bar every way the report can: over time, and by each other breakdown', () => {
     const ids = (metric, dimension, dateRange = RANGE) => drillOptions(getMetric(metric), { dimension, dateRange }).map((o) => o.id);
-    expect(ids('goods_received', 'supplier')).toEqual(['month', 'product']);
-    expect(ids('goods_received', 'month')).toEqual(['week', 'supplier', 'product']);
-    expect(ids('goods_received', 'week')).toEqual(['supplier', 'product']);
-    expect(ids('dispatch_volume', 'ecd_centre')).toEqual(['month', 'cohort', 'product', 'programme', 'beneficiary']);
+    expect(ids('goods_received', 'supplier')).toEqual(['month', 'product', 'product_category', 'storage_type']);
+    expect(ids('goods_received', 'month')).toEqual(['week', 'day', 'supplier', 'product', 'product_category', 'storage_type']);
+    expect(ids('goods_received', 'week')).toEqual(['day', 'supplier', 'product', 'product_category', 'storage_type']);
+    expect(ids('goods_received', 'day')).toEqual(['supplier', 'product', 'product_category', 'storage_type']);
+    expect(ids('dispatch_volume', 'ecd_centre')).toEqual(['month', 'cohort', 'product', 'programme', 'beneficiary', 'product_category', 'storage_type']);
+    // A fortnight or less goes day by day.
+    expect(ids('goods_received', 'supplier', { from: '2026-10-01', to: '2026-10-12' })[0]).toBe('day');
     // A short period goes week by week.
     expect(ids('goods_received', 'supplier', { from: '2026-09-01', to: '2026-09-27' })[0]).toBe('week');
   });
@@ -49,7 +53,7 @@ describe('what can be drilled', () => {
     for (const m of Object.values(METRICS)) {
       for (const dim of m.dimensions) {
         const parent = { metric: m.id, dimension: dim, filters: {}, ...(m.temporal === 'range' ? { dateRange: RANGE } : {}) };
-        const label = dim === 'month' ? '2026-07' : dim === 'week' ? '2026-W30' : dim === 'cohort' ? 'tuesday'
+        const label = dim === 'month' ? '2026-07' : dim === 'week' ? '2026-W30' : dim === 'day' ? '2026-07-15' : dim === 'cohort' ? 'tuesday'
           : dim === 'beneficiary' ? 'ecd' : dim === 'movement_type' ? 'received' : dim === 'category' ? 'recipe_food' : 'X';
         for (const option of drillOptions(m, parent)) {
           const where = `${m.id}/${dim} -> ${option.id}`;
@@ -65,7 +69,7 @@ describe('what can be drilled', () => {
         }
       }
     }
-    expect(checked).toBeGreaterThan(100);
+    expect(checked).toBeGreaterThan(300);
   });
 });
 
@@ -108,6 +112,20 @@ describe('the plan', () => {
     const plan = planDrill(getMetric('procurement_spend'), { metric: 'procurement_spend', dimension: 'supplier', filters: {}, dateRange: RANGE }, 'Cape Dry Goods', 'product');
     expect(plan.spec).toMatchObject({ dimension: 'product', dateRange: RANGE });
     expect(plan.lookup).toEqual({ table: 'suppliers', name: 'Cape Dry Goods' });
+  });
+
+  it('a week bar → its days; a day bar → what happened that day', () => {
+    const week = planDrill(getMetric('goods_received'), { metric: 'goods_received', dimension: 'week', filters: {}, dateRange: { from: '2026-09-01', to: '2026-10-12' } }, '2026-W41');
+    expect(week.spec).toMatchObject({ dimension: 'day', dateRange: { from: '2026-10-05', to: '2026-10-11' } });
+    const day = planDrill(getMetric('goods_received'), { metric: 'goods_received', dimension: 'day', filters: {}, dateRange: { from: '2026-10-05', to: '2026-10-11' } }, '2026-10-10', 'supplier');
+    expect(day.spec).toMatchObject({ dimension: 'supplier', dateRange: { from: '2026-10-10', to: '2026-10-10' } });
+  });
+
+  it('a status bar → that status, by its own text', () => {
+    const plan = planDrill(getMetric('purchase_order_pipeline'), { metric: 'purchase_order_pipeline', dimension: 'po_status', filters: {}, dateRange: RANGE }, 'partially_received', 'supplier');
+    expect(plan.spec.filters).toEqual({ po_status: 'partially_received' });
+    expect(plan.spec.dimension).toBe('supplier');
+    expect(plan.lookup).toBeUndefined();
   });
 
   it('refuses a way of opening the bar that the report does not offer', () => {

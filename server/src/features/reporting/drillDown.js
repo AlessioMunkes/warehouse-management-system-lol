@@ -7,9 +7,10 @@
 // one is an ordinary report spec that goes through validateSpec and the
 // same queries as any other. Nothing here runs SQL.
 //
-//   a month            → that month week by week, or by any category
+//   a month            → that month week by week or day by day, or by any category
 //                        the report breaks down by, inside that month
-//   a week             → by any category, inside that week
+//   a week             → day by day, or by any category, inside that week
+//   a day              → by any category, on that day
 //   a supplier, product, centre, programme, cohort…
 //                      → that one item over time, or split by any other
 //                        category the report has (a supplier's products,
@@ -24,8 +25,11 @@
 // keep going: supplier → its products → one product by month → by week.
 //
 // A category can only be opened where the report can FILTER by it
-// (the catalog's `filters`). A status breakdown (order status, slip
-// status, outcome, reason) has no filter, so it does not drill.
+// (the catalog's `filters`). Statuses and product groupings filter by
+// their own text; a free-text reason does not drill.
+//
+// The last level is not a chart at all: the records behind the figure
+// (features/reporting/records.js), offered on every report.
 // ─────────────────────────────────────────────────────────────
 import { DIMENSIONS } from './reportCatalog.js';
 
@@ -41,6 +45,14 @@ export const DRILL_FILTERS = {
   beneficiary:   { filter: 'beneficiary_kind' },
   movement_type: { filter: 'movement_type' },
   category:      { filter: 'donation_category' },
+  // Statuses and product groupings: the bar's own text is the filter.
+  po_status:        { filter: 'po_status' },
+  slip_status:      { filter: 'slip_status' },
+  outcome:          { filter: 'outcome' },
+  s18a_status:      { filter: 's18a_status' },
+  routing_status:   { filter: 'routing_status' },
+  product_category: { filter: 'product_category' },
+  storage_type:     { filter: 'storage_type' },
 };
 
 // A live report's bar, opened in a report that has history.
@@ -60,7 +72,8 @@ const ACROSS = {
 
 const MONTH = /^(\d{4})-(\d{2})$/;
 const WEEK = /^(\d{4})-W(\d{2})$/;
-const TIME = new Set(['month', 'week']);
+const DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
+const TIME = new Set(['month', 'week', 'day']);
 const iso = (d) => d.toISOString().slice(0, 10);
 const daysBetween = (a, b) => (new Date(`${b}T00:00:00Z`) - new Date(`${a}T00:00:00Z`)) / 86400000;
 
@@ -70,7 +83,10 @@ const isCategory = (d) => !TIME.has(d) && d !== 'none' && d !== 'weekday'
   && !/^(month_|week_|group_month|flow$|category_flow$)/.test(d);
 
 const timeDimensionFor = (metric, dateRange) => {
-  const short = dateRange && daysBetween(dateRange.from, dateRange.to) <= 62;
+  const span = dateRange ? daysBetween(dateRange.from, dateRange.to) : null;
+  // A fortnight or less reads best day by day.
+  if (span !== null && span <= 14 && metric.dimensions.includes('day')) return 'day';
+  const short = span !== null && span <= 62;
   if (short && metric.dimensions.includes('week')) return 'week';
   if (metric.dimensions.includes('month')) return 'month';
   if (metric.dimensions.includes('week')) return 'week';
@@ -93,6 +109,8 @@ const bucketRange = (dimension, label, dateRange) => {
     range = { from: iso(new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, 1))), to: iso(new Date(Date.UTC(Number(m[1]), Number(m[2]), 0))) };
   } else if (dimension === 'week' && w) {
     range = weekRange(Number(w[1]), Number(w[2]));
+  } else if (dimension === 'day' && DAY.test(label)) {
+    range = { from: label, to: label };
   }
   if (!range) return null;
   return {
@@ -116,6 +134,7 @@ export const drillOptions = (metric, spec) => {
 
   if (metric.temporal === 'range' && TIME.has(dimension)) {
     if (dimension === 'month' && metric.dimensions.includes('week')) out.push({ id: 'week', label: 'Week by week' });
+    if (dimension !== 'day' && metric.dimensions.includes('day')) out.push({ id: 'day', label: 'Day by day' });
     for (const d of others) out.push({ id: d, label: by(d) });
   }
 
@@ -169,7 +188,7 @@ export const planDrill = (metric, spec, label, target = null, todayISO = null) =
     if (!dateRange) return null;
     return {
       spec: { ...base, dimension: option.id, dateRange },
-      title: option.id === 'week' ? `${label}, week by week` : `${label}, ${option.label.toLowerCase()}`,
+      title: `${label}, ${option.label.toLowerCase()}`,
     };
   }
 

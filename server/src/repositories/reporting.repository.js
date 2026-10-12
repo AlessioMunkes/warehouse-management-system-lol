@@ -38,6 +38,19 @@ const sastDate = (col) => `((${col} AT TIME ZONE '${SAST}')::date)`;
 // Month/week buckets over an already-converted date.
 const bucketMonth = (dateExpr) => `to_char(${dateExpr}, 'YYYY-MM')`;
 const bucketWeek  = (dateExpr) => `to_char(${dateExpr}, 'IYYY-"W"IW')`;
+const bucketDay   = (dateExpr) => `to_char(${dateExpr}, 'YYYY-MM-DD')`;
+
+// A product's category and storage type, as a breakdown and as a
+// filter. Blank is a bucket of its own, so every product lands
+// somewhere and the bars still add up to the total.
+const PRODUCT_CATEGORY = `COALESCE(NULLIF(TRIM(p.category), ''), 'Uncategorised')`;
+const STORAGE_TYPE     = `COALESCE(NULLIF(TRIM(p.storage_type), ''), 'Not set')`;
+const productFilters = (filters, params) => {
+  const clauses = [];
+  if (filters.product_category) { params.push(filters.product_category); clauses.push(`${PRODUCT_CATEGORY} = $${params.length}`); }
+  if (filters.storage_type)     { params.push(filters.storage_type);     clauses.push(`${STORAGE_TYPE} = $${params.length}`); }
+  return clauses;
+};
 
 const num = (v) => (v === null || v === undefined ? 0 : Number(v));
 const rows2series = (rows) => sortWeekdays(rows.map((r) => ({ label: r.label, value: num(r.value) })));
@@ -85,6 +98,9 @@ const slipDimension = (dimension, day = 'ps.dispatch_date') => {
     }
     case 'weekday':      return { expr: weekday(day), group: weekday(day) };
     case 'week_weekday': { const e = weekWeekday(day); return { expr: e, group: e }; }
+    case 'day':              return { expr: bucketDay(day), group: bucketDay(day) };
+    case 'product_category': return { expr: PRODUCT_CATEGORY, group: PRODUCT_CATEGORY };
+    case 'storage_type':     return { expr: STORAGE_TYPE,     group: STORAGE_TYPE };
     default: throw new Error(`Unsupported dimension: ${dimension}`);
   }
 };
@@ -96,6 +112,7 @@ const slipFilters = (filters, params) => {
   if (filters.ecd_id)           { params.push(filters.ecd_id);           clauses.push(`ps.ecd_id = $${params.length}`); }
   if (filters.product_id)       { params.push(filters.product_id);       clauses.push(`del.product_id = $${params.length}`); }
   if (filters.programme_id)     { params.push(filters.programme_id);     clauses.push(`p.programme_id = $${params.length}`); }
+  clauses.push(...productFilters(filters, params));
   return clauses;
 };
 
@@ -107,7 +124,7 @@ const impactClause = (params) => {
 };
 
 // Two-axis "month|category" buckets sort by label, so months stay in order.
-const TIME_ORDERED = new Set(['none', 'month', 'week', 'month_beneficiary', 'month_supplier', 'month_movement', 'week_weekday']);
+const TIME_ORDERED = new Set(['none', 'month', 'week', 'day', 'weekday', 'month_beneficiary', 'month_supplier', 'month_movement', 'week_weekday']);
 const orderFor = (dimension) => (TIME_ORDERED.has(dimension) ? '1' : '2 DESC, 1');
 
 // ══ Impact ═════════════════════════════════════════════════════
@@ -358,7 +375,7 @@ const collectionCompliance = async ({ dimension, filters, dateRange }) => {
   LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
       WHERE ${where.join(' AND ')}
       ${dim.group ? `GROUP BY ${dim.group}` : ''}
-      ORDER BY ${dimension === 'none' || dimension === 'month' ? '1' : '2 ASC, 1'}`,
+      ORDER BY ${TIME_ORDERED.has(dimension) ? '1' : '2 ASC, 1'}`,
     params
   );
   // Ascending on ranked views: worst performers first, because those
@@ -473,6 +490,9 @@ const receivingDimension = (dimension) => {
     }
     case 'weekday':      return { expr: weekday('dn.delivery_date'), group: weekday('dn.delivery_date') };
     case 'week_weekday': { const e = weekWeekday('dn.delivery_date'); return { expr: e, group: e }; }
+    case 'day':              return { expr: bucketDay('dn.delivery_date'), group: bucketDay('dn.delivery_date') };
+    case 'product_category': return { expr: PRODUCT_CATEGORY, group: PRODUCT_CATEGORY };
+    case 'storage_type':     return { expr: STORAGE_TYPE,     group: STORAGE_TYPE };
     default: throw new Error(`Unsupported dimension: ${dimension}`);
   }
 };
@@ -481,6 +501,7 @@ const receivingFilters = (filters, params) => {
   const clauses = [];
   if (filters.supplier_id) { params.push(filters.supplier_id); clauses.push(`dn.supplier_id = $${params.length}`); }
   if (filters.product_id)  { params.push(filters.product_id);  clauses.push(`dni.product_id = $${params.length}`); }
+  clauses.push(...productFilters(filters, params));
   return clauses;
 };
 
@@ -534,7 +555,7 @@ const receivingDiscrepancyRate = async ({ dimension, filters, dateRange }) => {
        JOIN products p ON p.id = dni.product_id
       WHERE ${where.join(' AND ')}
       ${dim.group ? `GROUP BY ${dim.group}` : ''}
-      ORDER BY ${dimension === 'none' || dimension === 'month' ? '1' : '2 DESC, 1'}`,
+      ORDER BY ${TIME_ORDERED.has(dimension) ? '1' : '2 DESC, 1'}`,
     params
   );
   return rows.map((r) => ({ label: r.label, value: num(r.value), meta: { lines: r.total_lines } }));
@@ -631,6 +652,8 @@ const donationValue = async ({ dimension, filters, dateRange }) => {
   const expr = {
     none:      `'Total'`,
     month:     bucketMonth(d),
+    week:      bucketWeek(d),
+    day:       bucketDay(d),
     category:  `dn.donation_category::text`,
   }[dimension];
   if (!expr) throw new Error(`Unsupported dimension: ${dimension}`);
@@ -644,21 +667,26 @@ const donationValue = async ({ dimension, filters, dateRange }) => {
        FROM donations dn
       WHERE ${where.join(' AND ')}
       ${dimension === 'none' ? '' : `GROUP BY ${expr}`}
-      ORDER BY ${dimension === 'none' || dimension === 'month' ? '1' : '2 DESC, 1'}`,
+      ORDER BY ${TIME_ORDERED.has(dimension) ? '1' : '2 DESC, 1'}`,
     params
   );
   return rows2series(rows);
 };
 
-const section18aPipeline = async ({ dimension, dateRange }) => {
+const section18aPipeline = async ({ dimension, filters = {}, dateRange }) => {
   const d = sastDate('dn.received_at');
-  const expr = dimension === 'month' ? bucketMonth(d) : `dn.section_18a_status`;
+  const expr = { s18a_status: `dn.section_18a_status`, month: bucketMonth(d), week: bucketWeek(d) }[dimension];
+  if (!expr) throw new Error(`Unsupported dimension: ${dimension}`);
+  const params = [dateRange.from, dateRange.to];
+  const where = [`${d} BETWEEN $1::date AND $2::date`];
+  if (filters.s18a_status)       { params.push(filters.s18a_status);       where.push(`dn.section_18a_status = $${params.length}`); }
+  if (filters.donation_category) { params.push(filters.donation_category); where.push(`dn.donation_category = $${params.length}`); }
   const { rows } = await pool.query(
     `SELECT ${expr} AS label, COUNT(*)::numeric AS value
        FROM donations dn
-      WHERE ${d} BETWEEN $1::date AND $2::date
-      GROUP BY ${expr} ORDER BY ${dimension === 'month' ? '1' : '2 DESC, 1'}`,
-    [dateRange.from, dateRange.to]
+      WHERE ${where.join(' AND ')}
+      GROUP BY ${expr} ORDER BY ${TIME_ORDERED.has(dimension) ? '1' : '2 DESC, 1'}`,
+    params
   );
   return rows2series(rows);
 };
@@ -737,6 +765,9 @@ const stockMovementVolume = async ({ dimension, filters, dateRange }) => {
     movement_type: `sm.movement_type`,
     month:         bucketMonth(d),
     week:          bucketWeek(d),
+    day:           bucketDay(d),
+    product_category: PRODUCT_CATEGORY,
+    storage_type:  STORAGE_TYPE,
     product:       `p.name`,
     programme:     `COALESCE(pr.name, 'Unassigned')`,
     month_movement: `${bucketMonth(d)} || '|' || sm.movement_type`,
@@ -750,6 +781,7 @@ const stockMovementVolume = async ({ dimension, filters, dateRange }) => {
   if (filters.movement_type) { params.push(filters.movement_type); where.push(`sm.movement_type = $${params.length}`); }
   if (filters.product_id)    { params.push(filters.product_id);    where.push(`sm.product_id = $${params.length}`); }
   if (filters.programme_id)  { params.push(filters.programme_id);  where.push(`p.programme_id = $${params.length}`); }
+  where.push(...productFilters(filters, params));
 
   // ABS: movements are signed (a pick is negative), and this reports
   // throughput, so a busy day of picks and receipts must not net to
@@ -800,6 +832,9 @@ const pickingFlagRate = async ({ dimension, filters, dateRange }) => {
   const expr = {
     none:    `'Total'`,
     month:   bucketMonth('ps.dispatch_date'),
+    week:    bucketWeek('ps.dispatch_date'),
+    day:     bucketDay('ps.dispatch_date'),
+    product_category: PRODUCT_CATEGORY,
     product: `p.name`,
     cohort:  `ps.cohort::text`,
   }[dimension];
@@ -812,6 +847,7 @@ const pickingFlagRate = async ({ dimension, filters, dateRange }) => {
   ];
   if (filters.product_id) { params.push(filters.product_id); where.push(`psi.product_id = $${params.length}`); }
   if (filters.cohort)     { params.push(filters.cohort);     where.push(`ps.cohort = $${params.length}::cohort_group`); }
+  where.push(...productFilters(filters, params));
 
   const { rows } = await pool.query(
     `SELECT ${expr} AS label,
@@ -823,7 +859,7 @@ const pickingFlagRate = async ({ dimension, filters, dateRange }) => {
        JOIN products p ON p.id = psi.product_id
       WHERE ${where.join(' AND ')}
       ${dimension === 'none' ? '' : `GROUP BY ${expr}`}
-      ORDER BY ${dimension === 'none' || dimension === 'month' ? '1' : '2 DESC, 1'}`,
+      ORDER BY ${TIME_ORDERED.has(dimension) ? '1' : '2 DESC, 1'}`,
     params
   );
   return rows.map((r) => ({ label: r.label, value: num(r.value), meta: { lines: r.worked } }));
@@ -832,15 +868,21 @@ const pickingFlagRate = async ({ dimension, filters, dateRange }) => {
 // ══ Community requests ═════════════════════════════════════════
 // requested_at is timestamptz. No caller_name or caller_contact
 // reachable here — same rule as donations.
-const communityRequestOutcomes = async ({ dimension, dateRange }) => {
+const communityRequestOutcomes = async ({ dimension, filters = {}, dateRange }) => {
   const d = sastDate('cr.requested_at');
-  const expr = dimension === 'month' ? bucketMonth(d) : `cr.outcome::text`;
+  const expr = {
+    outcome: `cr.outcome::text`, month: bucketMonth(d), week: bucketWeek(d), day: bucketDay(d), weekday: weekday(d),
+  }[dimension];
+  if (!expr) throw new Error(`Unsupported dimension: ${dimension}`);
+  const params = [dateRange.from, dateRange.to];
+  const where = [`${d} BETWEEN $1::date AND $2::date`];
+  if (filters.outcome) { params.push(filters.outcome); where.push(`cr.outcome::text = $${params.length}`); }
   const { rows } = await pool.query(
     `SELECT ${expr} AS label, COUNT(*)::numeric AS value
        FROM community_requests cr
-      WHERE ${d} BETWEEN $1::date AND $2::date
-      GROUP BY ${expr} ORDER BY ${dimension === 'month' ? '1' : '2 DESC, 1'}`,
-    [dateRange.from, dateRange.to]
+      WHERE ${where.join(' AND ')}
+      GROUP BY ${expr} ORDER BY ${TIME_ORDERED.has(dimension) ? '1' : '2 DESC, 1'}`,
+    params
   );
   return rows2series(rows);
 };
@@ -857,6 +899,7 @@ const volunteerHours = async ({ dimension, dateRange }) => {
     none:  `'Total'`,
     month: bucketMonth(d),
     week:  bucketWeek(d),
+    day:   bucketDay(d),
   }[dimension];
   if (!expr) throw new Error(`Unsupported dimension: ${dimension}`);
 

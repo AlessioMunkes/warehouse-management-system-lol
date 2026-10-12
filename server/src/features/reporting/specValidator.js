@@ -26,6 +26,7 @@ const fail = (status, message) => {
 };
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const TEXT_FILTER = /^[\p{L}\p{N} _&.,'()\/+-]{1,80}$/u;
 
 // Date-only parsing. Range filters compare against either a DATE
 // column or a timestamptz already converted to SAST in SQL, so the
@@ -110,6 +111,15 @@ export const validateSpec = (input) => {
         throw fail(400, `${def.label} must be one of: ${def.values.join(', ')}.`);
       }
       filters[key] = raw;
+    } else if (def.text) {
+      // One exact value of a status or category. It only ever reaches
+      // the database as a parameter; the shape check keeps a pasted
+      // paragraph or a control character out of the cache key and the
+      // report's title.
+      if (typeof raw !== 'string' || !TEXT_FILTER.test(raw)) {
+        throw fail(400, `${def.label} is not a value this report can filter by.`);
+      }
+      filters[key] = raw.trim();
     } else {
       filters[key] = asPositiveInt(raw, def.label);
     }

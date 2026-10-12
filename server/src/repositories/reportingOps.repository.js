@@ -26,6 +26,9 @@ const TODAY = `((NOW() AT TIME ZONE '${SAST}')::date)`;
 const LEFT_DAY = `COALESCE(${sastDate('de.collected_at')}, ps.dispatch_date)`;
 const bucketMonth = (d) => `to_char(${d}, 'YYYY-MM')`;
 const bucketWeek  = (d) => `to_char(${d}, 'IYYY-"W"IW')`;
+const bucketDay   = (d) => `to_char(${d}, 'YYYY-MM-DD')`;
+const PRODUCT_CATEGORY = `COALESCE(NULLIF(TRIM(p.category), ''), 'Uncategorised')`;
+const STORAGE_TYPE     = `COALESCE(NULLIF(TRIM(p.storage_type), ''), 'Not set')`;
 const num = (v) => (v === null || v === undefined ? 0 : Number(v));
 const rows2series = (rows) => rows.map((r) => ({ label: r.label, value: num(r.value) }));
 
@@ -34,7 +37,7 @@ const pick = (map, dimension) => {
   if (!expr) throw new Error(`Unsupported dimension: ${dimension}`);
   return expr;
 };
-const isTime = (d) => d === 'month' || d === 'week' || d === 'none';
+const isTime = (d) => d === 'month' || d === 'week' || d === 'day' || d === 'none';
 const groupBy = (dimension, expr) => (dimension === 'none' ? '' : `GROUP BY ${expr}`);
 const orderBy = (dimension, dir = 'DESC') => (isTime(dimension) ? '1' : `2 ${dir} NULLS LAST, 1`);
 
@@ -52,7 +55,7 @@ const PO_FIRST_DELIVERY = `
 // expected date has passed with nothing delivered counts as late; one
 // still in the future with nothing delivered is not judged yet.
 const poOnTimeRate = async ({ dimension, filters, dateRange }) => {
-  const expr = pick({ none: `'Total'`, month: bucketMonth('p.expected'), supplier: 's.name' }, dimension);
+  const expr = pick({ none: `'Total'`, month: bucketMonth('p.expected'), week: bucketWeek('p.expected'), supplier: 's.name' }, dimension);
   const params = [dateRange.from, dateRange.to];
   const where = [`p.expected BETWEEN $1::date AND $2::date`, `(p.first_delivery IS NOT NULL OR p.expected < ${TODAY})`];
   if (filters.supplier_id) { params.push(filters.supplier_id); where.push(`p.supplier_id = $${params.length}`); }
@@ -70,7 +73,7 @@ const poOnTimeRate = async ({ dimension, filters, dateRange }) => {
 };
 
 const supplierLeadTime = async ({ dimension, filters, dateRange }) => {
-  const expr = pick({ none: `'Total'`, month: bucketMonth('p.raised'), supplier: 's.name' }, dimension);
+  const expr = pick({ none: `'Total'`, month: bucketMonth('p.raised'), week: bucketWeek('p.raised'), supplier: 's.name' }, dimension);
   const params = [dateRange.from, dateRange.to];
   const where = [`p.raised BETWEEN $1::date AND $2::date`, `p.first_delivery IS NOT NULL`, `p.first_delivery >= p.raised`];
   if (filters.supplier_id) { params.push(filters.supplier_id); where.push(`p.supplier_id = $${params.length}`); }
@@ -109,10 +112,11 @@ const overduePurchaseOrders = async ({ dimension, filters, limit }) => {
 
 const purchaseOrderPipeline = async ({ dimension, filters, dateRange }) => {
   const d = sastDate('po.created_at');
-  const expr = pick({ po_status: 'po.status', supplier: 's.name', month: bucketMonth(d) }, dimension);
+  const expr = pick({ po_status: 'po.status', supplier: 's.name', month: bucketMonth(d), week: bucketWeek(d), day: bucketDay(d) }, dimension);
   const params = [dateRange.from, dateRange.to];
   const where = [`${d} BETWEEN $1::date AND $2::date`];
   if (filters.supplier_id) { params.push(filters.supplier_id); where.push(`po.supplier_id = $${params.length}`); }
+  if (filters.po_status)   { params.push(filters.po_status);   where.push(`po.status = $${params.length}`); }
   const { rows } = await pool.query(
     `SELECT ${expr} AS label, COUNT(*)::numeric AS value
        FROM purchase_orders po
@@ -129,7 +133,7 @@ const purchaseOrderPipeline = async ({ dimension, filters, dateRange }) => {
 // start (completed in one step) have no duration and are left out.
 const pickingTurnaround = async ({ dimension, filters, dateRange }) => {
   const expr = pick({
-    none: `'Total'`, month: bucketMonth('ps.dispatch_date'), week: bucketWeek('ps.dispatch_date'), cohort: 'ps.cohort::text',
+    none: `'Total'`, month: bucketMonth('ps.dispatch_date'), week: bucketWeek('ps.dispatch_date'), day: bucketDay('ps.dispatch_date'), cohort: 'ps.cohort::text',
   }, dimension);
   const params = [dateRange.from, dateRange.to];
   const where = [
@@ -152,15 +156,20 @@ const pickingTurnaround = async ({ dimension, filters, dateRange }) => {
 // Live: slips due from a week ago to two weeks ahead, so late pallets
 // from last week show alongside the next two weeks.
 const slipPipeline = async ({ dimension, filters }) => {
-  const expr = pick({ slip_status: 'ps.status', cohort: 'ps.cohort::text' }, dimension);
+  const expr = pick({
+    slip_status: 'ps.status', cohort: 'ps.cohort::text',
+    beneficiary: 'ps.beneficiary_kind::text', day: bucketDay('ps.dispatch_date'),
+  }, dimension);
   const params = [];
   const where = [`ps.dispatch_date BETWEEN ${TODAY} - 7 AND ${TODAY} + 14`];
-  if (filters.cohort) { params.push(filters.cohort); where.push(`ps.cohort = $${params.length}::cohort_group`); }
+  if (filters.cohort)      { params.push(filters.cohort);      where.push(`ps.cohort = $${params.length}::cohort_group`); }
+  if (filters.slip_status) { params.push(filters.slip_status); where.push(`ps.status::text = $${params.length}`); }
+  if (filters.beneficiary_kind) { params.push(filters.beneficiary_kind); where.push(`ps.beneficiary_kind = $${params.length}::beneficiary_type`); }
   const { rows } = await pool.query(
     `SELECT ${expr} AS label, COUNT(*)::numeric AS value
        FROM picking_slips ps
       WHERE ${where.join(' AND ')}
-      GROUP BY ${expr} ORDER BY 2 DESC, 1`,
+      GROUP BY ${expr} ORDER BY ${dimension === 'day' ? '1' : '2 DESC, 1'}`,
     params
   );
   return rows2series(rows);
@@ -168,10 +177,11 @@ const slipPipeline = async ({ dimension, filters }) => {
 
 // ══ Dispatch ═══════════════════════════════════════════════════
 const gateLoadVariance = async ({ dimension, filters, dateRange }) => {
-  const expr = pick({ none: `'Total'`, month: bucketMonth(LEFT_DAY), product: 'p.name' }, dimension);
+  const expr = pick({ none: `'Total'`, month: bucketMonth(LEFT_DAY), week: bucketWeek(LEFT_DAY), day: bucketDay(LEFT_DAY), product: 'p.name', ecd_centre: `COALESCE(e.name, ps.beneficiary_name)` }, dimension);
   const params = [dateRange.from, dateRange.to];
   const where = [`${LEFT_DAY} BETWEEN $1::date AND $2::date`];
   if (filters.product_id) { params.push(filters.product_id); where.push(`del.product_id = $${params.length}`); }
+  if (filters.ecd_id)     { params.push(filters.ecd_id);     where.push(`ps.ecd_id = $${params.length}`); }
   const { rows } = await pool.query(
     `SELECT ${expr} AS label,
             ROUND(100.0 * COUNT(*) FILTER (WHERE del.loaded_quantity <> del.packed_quantity) / NULLIF(COUNT(*), 0), 1)::numeric AS value,
@@ -180,6 +190,7 @@ const gateLoadVariance = async ({ dimension, filters, dateRange }) => {
        JOIN dispatch_events de ON de.id = del.dispatch_event_id
        JOIN picking_slips ps ON ps.id = de.picking_slip_id
        JOIN products p ON p.id = del.product_id
+  LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
       WHERE ${where.join(' AND ')}
       ${groupBy(dimension, expr)} ORDER BY ${orderBy(dimension)}`,
     params
@@ -189,7 +200,7 @@ const gateLoadVariance = async ({ dimension, filters, dateRange }) => {
 
 const lateCollectionRate = async ({ dimension, filters, dateRange }) => {
   const expr = pick({
-    none: `'Total'`, month: bucketMonth('ps.dispatch_date'), cohort: 'ps.cohort::text',
+    none: `'Total'`, month: bucketMonth('ps.dispatch_date'), week: bucketWeek('ps.dispatch_date'), day: bucketDay('ps.dispatch_date'), cohort: 'ps.cohort::text',
     ecd_centre: `COALESCE(e.name, ps.beneficiary_name)`,
   }, dimension);
   const params = [dateRange.from, dateRange.to, COLLECTED_STATUSES];
@@ -214,7 +225,7 @@ const lateCollectionRate = async ({ dimension, filters, dateRange }) => {
 // Active standing orders, kilogram lines only — mixing kg and crates
 // would be a meaningless total.
 const standingOrderDemand = async ({ dimension, filters, limit }) => {
-  const expr = pick({ product: 'p.name', ecd_centre: 'e.name', none: `'Total'` }, dimension);
+  const expr = pick({ product: 'p.name', ecd_centre: 'e.name', cohort: 'e.cohort::text', product_category: PRODUCT_CATEGORY, none: `'Total'` }, dimension);
   const params = [];
   const where = [
     `e.is_active = true`, `ol.unit = 'kg'`,
@@ -222,6 +233,7 @@ const standingOrderDemand = async ({ dimension, filters, limit }) => {
   ];
   if (filters.product_id) { params.push(filters.product_id); where.push(`ol.product_id = $${params.length}`); }
   if (filters.cohort)     { params.push(filters.cohort);     where.push(`e.cohort = $${params.length}::cohort_group`); }
+  if (filters.ecd_id)     { params.push(filters.ecd_id);     where.push(`ol.ecd_id = $${params.length}`); }
   params.push(limit ?? 10);
   const { rows } = await pool.query(
     `SELECT ${expr} AS label, SUM(ol.quantity)::numeric AS value
@@ -239,12 +251,14 @@ const standingOrderDemand = async ({ dimension, filters, limit }) => {
 const stockValue = async ({ dimension, filters }) => {
   const expr = pick({
     none: `'Total'`, product: 'p.name',
-    product_category: `COALESCE(NULLIF(TRIM(p.category), ''), 'Uncategorised')`,
-    storage_type: `COALESCE(p.storage_type, 'unknown')`,
+    product_category: PRODUCT_CATEGORY,
+    storage_type: STORAGE_TYPE,
   }, dimension);
   const params = [];
   const where = [`p.is_active = true`, `p.unit_cost IS NOT NULL`, `sl.quantity_on_hand > 0`];
   if (filters.programme_id) { params.push(filters.programme_id); where.push(`p.programme_id = $${params.length}`); }
+  if (filters.product_category) { params.push(filters.product_category); where.push(`${PRODUCT_CATEGORY} = $${params.length}`); }
+  if (filters.storage_type)     { params.push(filters.storage_type);     where.push(`${STORAGE_TYPE} = $${params.length}`); }
   const { rows } = await pool.query(
     `SELECT ${expr} AS label, ROUND(SUM(sl.quantity_on_hand * p.unit_cost)::numeric, 2) AS value
        FROM stock_levels sl
@@ -275,7 +289,7 @@ const countUnpricedStock = async ({ filters = {} }) => {
 };
 
 const expiringStock = async ({ dimension }) => {
-  const expr = pick({ week: bucketWeek('dni.expiry_date'), product: 'p.name' }, dimension);
+  const expr = pick({ week: bucketWeek('dni.expiry_date'), day: bucketDay('dni.expiry_date'), product: 'p.name', product_category: PRODUCT_CATEGORY }, dimension);
   const { rows } = await pool.query(
     `SELECT ${expr} AS label, COUNT(*)::numeric AS value
        FROM delivery_note_items dni
@@ -283,7 +297,7 @@ const expiringStock = async ({ dimension }) => {
        JOIN stock_levels sl ON sl.product_id = dni.product_id
       WHERE dni.expiry_date BETWEEN ${TODAY} AND ${TODAY} + 30
         AND sl.quantity_on_hand > 0
-      GROUP BY ${expr} ORDER BY ${dimension === 'week' ? '1' : '2 DESC, 1'}`
+      GROUP BY ${expr} ORDER BY ${dimension === 'week' || dimension === 'day' ? '1' : '2 DESC, 1'}`
   );
   return rows2series(rows);
 };
@@ -292,7 +306,8 @@ const adjustmentReasons = async ({ dimension, filters, dateRange }) => {
   const d = sastDate('sm.created_at');
   const expr = pick({
     reason: `COALESCE(NULLIF(LOWER(TRIM(sm.reason)), ''), 'no reason recorded')`,
-    month: bucketMonth(d),
+    month: bucketMonth(d), week: bucketWeek(d), day: bucketDay(d),
+    product: `COALESCE(p.name, 'Unknown product')`,
   }, dimension);
   const params = [dateRange.from, dateRange.to];
   const where = [`${d} BETWEEN $1::date AND $2::date`, `sm.movement_type = 'adjustment'`];
@@ -300,9 +315,10 @@ const adjustmentReasons = async ({ dimension, filters, dateRange }) => {
   const { rows } = await pool.query(
     `SELECT ${expr} AS label, COUNT(*)::numeric AS value
        FROM stock_movements sm
+  LEFT JOIN products p ON p.id = sm.product_id
       WHERE ${where.join(' AND ')}
-      GROUP BY ${expr} ORDER BY ${dimension === 'month' ? '1' : '2 DESC, 1'}
-      ${dimension === 'reason' ? 'LIMIT 15' : ''}`,
+      GROUP BY ${expr} ORDER BY ${isTime(dimension) ? '1' : '2 DESC, 1'}
+      ${dimension === 'reason' || dimension === 'product' ? 'LIMIT 25' : ''}`,
     params
   );
   return rows2series(rows);
@@ -332,38 +348,42 @@ const decantingMarginRate = async ({ dimension, filters, dateRange }) => {
 };
 
 // ══ Community, donations, volunteers (aggregate only) ═════════
-const communityResponseTime = async ({ dimension, dateRange }) => {
+const communityResponseTime = async ({ dimension, filters = {}, dateRange }) => {
   const d = sastDate('cr.requested_at');
-  const expr = pick({ none: `'Total'`, month: bucketMonth(d), outcome: 'cr.outcome::text' }, dimension);
+  const expr = pick({ none: `'Total'`, month: bucketMonth(d), week: bucketWeek(d), outcome: 'cr.outcome::text' }, dimension);
+  const params = [dateRange.from, dateRange.to];
+  const where = [`${d} BETWEEN $1::date AND $2::date`, `cr.resolved_at IS NOT NULL`, `cr.resolved_at >= cr.requested_at`];
+  if (filters.outcome) { params.push(filters.outcome); where.push(`cr.outcome::text = $${params.length}`); }
   const { rows } = await pool.query(
     `SELECT ${expr} AS label,
             ROUND(AVG(EXTRACT(EPOCH FROM (cr.resolved_at - cr.requested_at)) / 3600.0)::numeric, 1) AS value,
             COUNT(*)::int AS requests
        FROM community_requests cr
-      WHERE ${d} BETWEEN $1::date AND $2::date
-        AND cr.resolved_at IS NOT NULL AND cr.resolved_at >= cr.requested_at
+      WHERE ${where.join(' AND ')}
       ${groupBy(dimension, expr)} ORDER BY ${orderBy(dimension)}`,
-    [dateRange.from, dateRange.to]
+    params
   );
   return rows.map((r) => ({ label: r.label, value: num(r.value), meta: { requests: r.requests } }));
 };
 
-const donationRouting = async ({ dimension, dateRange }) => {
+const donationRouting = async ({ dimension, filters = {}, dateRange }) => {
   const d = sastDate('di.created_at');
-  // category_flow: "recipe_food|allocated", drawn as a flow diagram
-  // (donation category on the left, where the items ended up on the
-  // right).
   const expr = pick({
-    routing_status: 'di.routing_status', month: bucketMonth(d),
+    routing_status: 'di.routing_status', month: bucketMonth(d), week: bucketWeek(d),
+    category: `COALESCE(dn.donation_category, 'uncategorised')`,
     category_flow: `COALESCE(dn.donation_category, 'uncategorised') || '|' || di.routing_status`,
   }, dimension);
+  const params = [dateRange.from, dateRange.to];
+  const where = [`${d} BETWEEN $1::date AND $2::date`];
+  if (filters.routing_status)    { params.push(filters.routing_status);    where.push(`di.routing_status = $${params.length}`); }
+  if (filters.donation_category) { params.push(filters.donation_category); where.push(`dn.donation_category = $${params.length}`); }
   const { rows } = await pool.query(
     `SELECT ${expr} AS label, COUNT(*)::numeric AS value
        FROM donation_items di
        JOIN donations dn ON dn.id = di.donation_id
-      WHERE ${d} BETWEEN $1::date AND $2::date
-      GROUP BY ${expr} ORDER BY ${dimension === 'month' ? '1' : '2 DESC, 1'}`,
-    [dateRange.from, dateRange.to]
+      WHERE ${where.join(' AND ')}
+      GROUP BY ${expr} ORDER BY ${isTime(dimension) ? '1' : '2 DESC, 1'}`,
+    params
   );
   return rows2series(rows);
 };
@@ -372,7 +392,7 @@ const donationRouting = async ({ dimension, dateRange }) => {
 // booking's volunteer names are never selected.
 const volunteerEventAttendance = async ({ dimension, dateRange }) => {
   const d = sastDate('ts.start_time');
-  const expr = pick({ none: `'Total'`, month: bucketMonth(d), event: 'ev.event_name' }, dimension);
+  const expr = pick({ none: `'Total'`, month: bucketMonth(d), week: bucketWeek(d), event: 'ev.event_name' }, dimension);
   const { rows } = await pool.query(
     `SELECT ${expr} AS label,
             ROUND(100.0 * COUNT(*) FILTER (WHERE a.checked_in) / NULLIF(COUNT(*), 0), 1)::numeric AS value,

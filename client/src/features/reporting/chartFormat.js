@@ -16,6 +16,7 @@ export const MAX_SERIES = 7; // plus "Other" = 8
 
 const MONTH = /^\d{4}-\d{2}$/;
 const WEEK  = /^\d{4}-W\d{2}$/;
+const DAY   = /^\d{4}-\d{2}-\d{2}$/;
 export const TWO_AXIS = /^(.+?)\|(.+)$/;
 
 export const humanise = (s) =>
@@ -29,6 +30,12 @@ export const formatLabel = (label) => {
       .toLocaleDateString('en-ZA', { month: 'short', year: 'numeric', timeZone: 'UTC' });
   }
   if (WEEK.test(s)) return s.replace('-W', ' wk ');
+  // "2026-10-12" → "Mon 12 Oct": the weekday is what a manager looks for.
+  if (DAY.test(s)) {
+    const [y, m, d] = s.split('-').map(Number);
+    return new Date(Date.UTC(y, m - 1, d))
+      .toLocaleDateString('en-ZA', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+  }
   return humanise(s);
 };
 
@@ -79,7 +86,7 @@ export const unitWord = (unit) =>
 export const isAdditive = (unit, series) =>
   unit !== '%' && unit !== 'ZAR/unit' && !(series ?? []).some((r) => r.meta?.unit);
 
-const TIME_DIMS = new Set(['month', 'week']);
+const TIME_DIMS = new Set(['month', 'week', 'day']);
 
 // 'number' | 'time' | 'category' | 'twoAxis'
 export const shapeOf = (report) => {
@@ -87,7 +94,7 @@ export const shapeOf = (report) => {
   const dim = report?.spec?.dimension;
   if (series.length && series.every((r) => TWO_AXIS.test(r.label))) return 'twoAxis';
   if (dim === 'none') return 'number';
-  if (TIME_DIMS.has(dim) || (series.length && series.every((r) => MONTH.test(r.label) || WEEK.test(r.label)))) return 'time';
+  if (TIME_DIMS.has(dim) || (series.length && series.every((r) => MONTH.test(r.label) || WEEK.test(r.label) || DAY.test(r.label)))) return 'time';
   return 'category';
 };
 

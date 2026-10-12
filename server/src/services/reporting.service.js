@@ -16,8 +16,9 @@ import aiProvider       from '../features/reporting/provider.js';
 import pool             from '../config/db.js';
 import { validateCustom, runCustom, describeDatasets } from '../features/reporting/customQuery.js';
 import { drillOptions, planDrill } from '../features/reporting/drillDown.js';
+import recordsRepo from '../repositories/reportingRecords.repository.js';
 import {
-  METRICS, DIMENSIONS, CACHE_TTL, getMetric, isSnapshot, describeSpec,
+  METRICS, DIMENSIONS, FILTERS, CACHE_TTL, getMetric, isSnapshot, describeSpec,
 } from '../features/reporting/reportCatalog.js';
 
 const fail = (status, message) => {
@@ -51,6 +52,8 @@ const getCatalog = () => ({
     caveat: m.caveat,
     dimensions: m.dimensions.map((d) => ({ id: d, label: DIMENSIONS[d].label })),
     filters: m.filters,
+    // Whether the rows behind this report can be listed (the last drill).
+    records: recordsRepo.hasRecords(m.id),
     // The Operations Analytics page filters this out of its own
     // builder/dropdown; the Impact Calculator page never reads the
     // catalog at all, it hard-codes its five metric ids. Exposed here
@@ -61,6 +64,12 @@ const getCatalog = () => ({
   // Custom reports: what can be counted, grouped and filtered, for the
   // builder's Custom mode. Names only — the SQL stays in customQuery.js.
   datasets: describeDatasets(),
+  // Every filter a report can carry: its label, and its fixed choices
+  // where it has them. The rest (suppliers, products, statuses as the
+  // data holds them) come from /api/reporting/filter-options.
+  filterDefs: Object.fromEntries(Object.entries(FILTERS).map(([key, f]) => [key, {
+    label: f.label, values: f.values ?? null, kind: f.values ? 'list' : f.text ? 'text' : 'id',
+  }])),
 });
 
 // A custom report ("how many X by Y") goes through its own validator
@@ -133,6 +142,7 @@ const runReport = async (input) => {
   // drill buttons. See features/reporting/drillDown.js.
   const drills = drillOptions(metric, spec);
   if (drills.length) { meta.drillable = true; meta.drillOptions = drills; }
+  if (recordsRepo.hasRecords(metric.id)) meta.records = true;
 
   // Factor metrics convert here rather than in SQL, so the raw
   // measurement stays inspectable and one bad factor cannot corrupt
@@ -226,6 +236,49 @@ const setFactor = async ({ factorKey, value, unit, sourceNote, actorId }) => {
 
 const getFactorHistory = (factorKey) => factorRepo.listFactorHistory(factorKey);
 
+// A bar named after a supplier, product, centre or programme filters by
+// that record's id. The table name comes from drillDown.js's fixed
+// list, never from the request.
+const resolveLookup = async (plan, label) => {
+  if (plan.lookup) {
+    const { rows } = await pool.query(`SELECT id FROM ${plan.lookup.table} WHERE name = $1 ORDER BY id LIMIT 1`, [plan.lookup.name]);
+    // "Unassigned", "Unknown": the bar for records with nothing set.
+    // There is no id to filter by, so there is no report behind it.
+    if (!rows.length) throw fail(404, `"${label}" is not a single record, so there is nothing more to open behind this bar.`);
+    plan.spec.filters[plan.filter] = rows[0].id;
+  }
+};
+
+// THE LAST DRILL: the records a report, or one bar of it, is made of.
+// With a `label` the list is narrowed to that bar the same way a drill
+// would narrow it (its supplier, its month, its day); without one it is
+// everything the report counted. See reportingRecords.repository.js.
+const records = async ({ spec: input, label }) => {
+  let spec = validateSpec(input);
+  let from = null;
+  if (typeof label === 'string' && label) {
+    const plan = planDrill(getMetric(spec.metric), spec, label, null, todayISO());
+    if (plan) {
+      await resolveLookup(plan, label);
+      spec = validateSpec(plan.spec);
+      from = label;
+    }
+  }
+  const out = await recordsRepo.listRecords(spec);
+  if (!out) throw fail(404, 'This report has no list of records behind it.');
+  const metric = getMetric(spec.metric);
+  return {
+    ...out,
+    title: `${metric.label}: the ${out.noun} behind ${from ? `"${from}"` : 'this report'}`,
+    period: spec.dateRange ? `${spec.dateRange.from} to ${spec.dateRange.to}` : 'as it stands now',
+    metric: spec.metric,
+    shown: out.rows.length,
+    truncated: out.total > out.rows.length,
+  };
+};
+
+const filterOptions = () => recordsRepo.listFilterOptions();
+
 // Click a bar → the report behind it (features/reporting/drillDown.js).
 // A name from the chart is turned into its id here; the table name
 // comes from a fixed map, never from the request.
@@ -234,13 +287,7 @@ const drillDown = async ({ spec: parentInput, label, target }) => {
   const metric = getMetric(parent.metric);
   const plan = planDrill(metric, parent, label, typeof target === 'string' ? target : null, todayISO());
   if (!plan) throw fail(400, 'This chart cannot be drilled into.');
-  if (plan.lookup) {
-    const { rows } = await pool.query(`SELECT id FROM ${plan.lookup.table} WHERE name = $1 ORDER BY id LIMIT 1`, [plan.lookup.name]);
-    // "Unassigned", "Unknown": the bar for records with nothing set.
-    // There is no id to filter by, so there is no report behind it.
-    if (!rows.length) throw fail(404, `"${label}" is not a single record, so there is nothing more to open behind this bar.`);
-    plan.spec.filters[plan.filter] = rows[0].id;
-  }
+  await resolveLookup(plan, label);
   const report = await runReport(plan.spec);
   // "(supplier: 2)" means nothing to a reader; the name it came from does.
   const description = plan.lookup
@@ -249,4 +296,4 @@ const drillDown = async ({ spec: parentInput, label, target }) => {
   return { ...report, description, meta: { ...report.meta, drill: { from: label, title: plan.title } } };
 };
 
-export default { getCatalog, runReport, drillDown, todayISO, setFactor, getFactorHistory };
+export default { getCatalog, runReport, drillDown, records, filterOptions, todayISO, setFactor, getFactorHistory };

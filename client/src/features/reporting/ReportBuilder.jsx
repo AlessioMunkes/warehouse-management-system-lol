@@ -59,9 +59,13 @@ const FILTER_LABELS = {
   donation_category: 'Donation category',
 };
 
+// Enum values and statuses arrive as stored ("partially_received").
+const tidy = (s) => String(s).replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
+
 export default function ReportBuilder({
   catalog, metricId, dimension, preset, filters,
   onMetricChange, onDimensionChange, onPresetChange, onFilterChange, onRun, busy,
+  filterOptions = {}, customRange = null, onCustomRangeChange = () => {}, today = '',
 }) {
   const metric = catalog?.metrics.find((m) => m.id === metricId);
 
@@ -70,9 +74,20 @@ export default function ReportBuilder({
   // showing one the server ignores.
   const isSnapshot = metric?.temporal === 'snapshot';
 
-  // Only render a filter the selected metric declares, so the
-  // controls cannot offer a combination the server would reject.
-  const selectable = (metric?.filters ?? []).filter((f) => FILTER_OPTIONS[f]);
+  // EVERY filter the selected report declares, so the controls can
+  // narrow a report as far as a drill can, and never offer a
+  // combination the server would reject. The choices come from, in
+  // order: the hand-labelled lists above, the catalog's fixed values,
+  // then the live lists (suppliers, products, centres, statuses as
+  // recorded). A filter with nothing to choose from is left out.
+  const defs = catalog?.filterDefs ?? {};
+  const optionsFor = (key) => FILTER_OPTIONS[key]
+    ?? (defs[key]?.values ? defs[key].values.map((v) => ({ value: v, label: tidy(v) })) : null)
+    ?? (filterOptions[key] ?? []).map((o) => ({ value: String(o.value), label: defs[key]?.kind === 'text' ? tidy(o.label) : o.label }));
+  const selectable = (metric?.filters ?? [])
+    .map((key) => ({ key, label: FILTER_LABELS[key] ?? defs[key]?.label ?? tidy(key), options: optionsFor(key) }))
+    .filter((f) => f.options.length > 0);
+  const range = customRange ?? { from: '', to: '' };
 
   const field = 'flex flex-col gap-1.5 min-w-0';
 
@@ -110,7 +125,7 @@ export default function ReportBuilder({
             <Select value={preset} onValueChange={onPresetChange}>
               <SelectTrigger id="period"><SelectValue /></SelectTrigger>
               <SelectContent>
-                {RANGE_PRESETS.filter((p) => p.id !== 'custom').map((p) => (
+                {RANGE_PRESETS.map((p) => (
                   <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
                 ))}
               </SelectContent>
@@ -118,17 +133,35 @@ export default function ReportBuilder({
           </div>
         )}
 
-        {selectable.map((key) => (
+        {/* Any two dates, for a period the list above does not have. */}
+        {!isSnapshot && preset === 'custom' && (
+          <>
+            <div className={field}>
+              <Label htmlFor="range-from">From</Label>
+              <input id="range-from" type="date" value={range.from} max={range.to || today || undefined}
+                onChange={(e) => onCustomRangeChange({ ...range, from: e.target.value })}
+                className="h-9 rounded-lg border border-line bg-surface px-3 text-sm" />
+            </div>
+            <div className={field}>
+              <Label htmlFor="range-to">To</Label>
+              <input id="range-to" type="date" value={range.to} min={range.from || undefined} max={today || undefined}
+                onChange={(e) => onCustomRangeChange({ ...range, to: e.target.value })}
+                className="h-9 rounded-lg border border-line bg-surface px-3 text-sm" />
+            </div>
+          </>
+        )}
+
+        {selectable.map(({ key, label, options }) => (
           <div className={field} key={key}>
-            <Label htmlFor={key}>{FILTER_LABELS[key]}</Label>
+            <Label htmlFor={key}>{label}</Label>
             <Select
-              value={filters[key] ?? ALL}
+              value={filters[key] !== undefined && filters[key] !== null ? String(filters[key]) : ALL}
               onValueChange={(v) => onFilterChange(key, v === ALL ? null : v)}
             >
               <SelectTrigger id={key}><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>All</SelectItem>
-                {FILTER_OPTIONS[key].map((o) => (
+                {options.map((o) => (
                   <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
                 ))}
               </SelectContent>
@@ -154,7 +187,7 @@ export default function ReportBuilder({
 
       <div className="mt-4">
         <Button
-          type="button" onClick={onRun} disabled={busy || !metricId}
+          type="button" onClick={onRun} disabled={busy || !metricId || (!isSnapshot && preset === 'custom' && !(range.from && range.to))}
           className="bg-ink hover:bg-ink/90 text-on-ink font-bold text-xs tracking-wider rounded-lg px-6" loading={busy}>
           {busy ? 'RUNNING…' : 'RUN REPORT'}
         </Button>

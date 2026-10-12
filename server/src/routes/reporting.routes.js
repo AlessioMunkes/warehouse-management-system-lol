@@ -69,6 +69,8 @@ const writeUpLimiter = rateLimit({
 router.get ('/catalog', auth, requireRole(...MANAGERS_UP), reportingController.getCatalog);
 router.post('/report',  auth, requireRole(...MANAGERS_UP), reportingController.runReport);
 router.post('/drill',   auth, requireRole(...MANAGERS_UP), reportingController.drill);
+router.post('/records', auth, requireRole(...MANAGERS_UP), reportingController.records);
+router.get('/filter-options', auth, requireRole(...MANAGERS_UP), reportingController.filterOptions);
 // Saved and scheduled reports: each manager's own (req.user.id).
 router.get   ('/saved',          auth, requireRole(...MANAGERS_UP), reportingController.listSaved);
 router.post  ('/saved',          auth, requireRole(...MANAGERS_UP), reportingController.createSaved);

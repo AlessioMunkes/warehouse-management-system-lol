@@ -193,6 +193,8 @@
   "reporting.routes.js GET /catalog": "admin,manager",
   "reporting.routes.js POST /report": "admin,manager",
   "reporting.routes.js POST /drill": "admin,manager",
+  "reporting.routes.js POST /records": "admin,manager",
+  "reporting.routes.js GET /filter-options": "admin,manager",
   "reporting.routes.js GET /saved": "admin,manager",
   "reporting.routes.js POST /saved": "admin,manager",
   "reporting.routes.js PATCH /saved/:id": "admin,manager",

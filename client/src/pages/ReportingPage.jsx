@@ -31,8 +31,9 @@ import OperationalInsight from '../features/reporting/OperationalInsight';
 import CustomReportBuilder from '../features/reporting/CustomReportBuilder';
 import { defaultCustom } from '../features/reporting/customSpec';
 import { formatLabel, shapeOf, yearEarlier } from '../features/reporting/chartFormat';
-import { resolvePreset, DEFAULT_PRESET } from '../features/reporting/dateRanges';
-import { getCatalog, runReport, getComparisons, runComparison, saveTarget, drillDown, getSaved } from '../services/reportingAPI';
+import { resolvePreset, DEFAULT_PRESET, todaySAST } from '../features/reporting/dateRanges';
+import { getCatalog, runReport, getComparisons, runComparison, saveTarget, drillDown, getSaved, getFilterOptions } from '../services/reportingAPI';
+import RecordsPanel from '../features/reporting/RecordsPanel';
 import { SavedReportsBar, SaveReport } from '../features/reporting/SavedReports';
 import ChartNote from '../features/reporting/ChartNote';
 import { Truck, TrendingUp, CheckCircle2, AlertTriangle, ChevronDown } from 'lucide-react';
@@ -82,6 +83,13 @@ export default function ReportingPage() {
   const [dimension, setDimension] = useState('none');
   const [preset, setPreset]       = useState(DEFAULT_PRESET);
   const [filters, setFilters]     = useState({});
+  // "Custom range" in the period menu: any two dates.
+  const [customRange, setCustomRange] = useState(null);
+  const rangeFor = () => (preset === 'custom' && customRange?.from && customRange?.to ? customRange : resolvePreset(preset));
+  // Suppliers, products, centres and recorded statuses, for the filters.
+  const [filterOptions, setFilterOptions] = useState({});
+  // The records behind the report on screen, or one bar of it.
+  const [recordsFor, setRecordsFor] = useState(null);
   // Prepared report or custom "how many X by Y" — see CustomReportBuilder.
   const [mode, setMode]           = useState('prepared');
   const [custom, setCustom]       = useState(null);
@@ -109,6 +117,7 @@ export default function ReportingPage() {
   // view, the old highlight and the old report's target line.
   const showReport = (next, { keepDrill = false } = {}) => {
     setReport(next);
+    setRecordsFor(null);
     setComparison(null);
     setHighlight(null);
     setTarget(null);
@@ -174,7 +183,7 @@ export default function ReportingPage() {
     setError(null);
     focusResult();
     try {
-      const res = await runComparison(id, range ?? resolvePreset(preset));
+      const res = await runComparison(id, range ?? rangeFor());
       showComparison(res.data ?? res);
     } catch (err) {
       setError(err.message);
@@ -216,7 +225,7 @@ export default function ReportingPage() {
     setError(null);
     focusResult();
     try {
-      const res = await runReport({ custom: spec, dateRange: range ?? resolvePreset(preset) });
+      const res = await runReport({ custom: spec, dateRange: range ?? rangeFor() });
       showReport(res.data ?? res);
     } catch (err) {
       setError(err.message);
@@ -267,6 +276,16 @@ export default function ReportingPage() {
       return !open;
     });
   };
+
+  // The filter choices load on their own: a slow or failed list leaves
+  // those filters out, it does not hold up the page.
+  useEffect(() => {
+    let cancelled = false;
+    getFilterOptions()
+      .then((res) => { if (!cancelled) setFilterOptions(res.data ?? res ?? {}); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -340,12 +359,12 @@ export default function ReportingPage() {
     setError(null);
     try {
       const res = await runReport(mode === 'custom'
-        ? { custom: custom ?? defaultCustom(catalog.datasets[0]), dateRange: resolvePreset(preset) }
+        ? { custom: custom ?? defaultCustom(catalog.datasets[0]), dateRange: rangeFor() }
         : {
             metric: metricId,
             dimension,
             filters,
-            dateRange: resolvePreset(preset),
+            dateRange: rangeFor(),
           });
       showReport(res.data ?? res);
     } catch (err) {
@@ -354,7 +373,7 @@ export default function ReportingPage() {
     } finally {
       setBusy(false);
     }
-  }, [mode, custom, catalog, metricId, dimension, filters, preset]);
+  }, [mode, custom, catalog, metricId, dimension, filters, preset, customRange]);
 
   // Browse all reports, and the ask box's "closest report" button:
   // pick a metric and run it straight away with its first breakdown
@@ -373,7 +392,7 @@ export default function ReportingPage() {
     showReport(null);
     focusResult();
     try {
-      const res = await runReport({ metric: id, dimension: dim, filters: {}, dateRange: range ?? resolvePreset(preset) });
+      const res = await runReport({ metric: id, dimension: dim, filters: {}, dateRange: range ?? rangeFor() });
       showReport(res.data ?? res);
     } catch (err) {
       setError(err.message);
@@ -499,6 +518,10 @@ export default function ReportingPage() {
             onFilterChange={handleFilterChange}
             onRun={run}
             busy={busy}
+            filterOptions={filterOptions}
+            customRange={customRange}
+            onCustomRangeChange={setCustomRange}
+            today={todaySAST()}
           />
         )}
       </div>
@@ -545,6 +568,26 @@ export default function ReportingPage() {
                 )
                 : 'Click a bar or point to pick it, then drill into the report behind it.'}
             </p>
+          )}
+
+          {/* The last level: the rows that were counted. */}
+          {report.meta?.records && (
+            <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs" style={{ color: MUTED }}>
+              <span>See what this is made of:</span>
+              <button type="button" onClick={() => setRecordsFor({ spec: report.spec, label: null })}
+                className="rounded-lg border border-line px-2 py-1 font-bold text-ink hover:bg-muted/60">
+                All the records
+              </button>
+              {highlight && report.meta?.drillable && (
+                <button type="button" onClick={() => setRecordsFor({ spec: report.spec, label: highlight })}
+                  className="rounded-lg border border-line px-2 py-1 font-bold text-ink hover:bg-muted/60">
+                  Records behind {formatLabel(highlight)}
+                </button>
+              )}
+            </p>
+          )}
+          {recordsFor && (
+            <RecordsPanel spec={recordsFor.spec} label={recordsFor.label} onClose={() => setRecordsFor(null)} />
           )}
 
           {shapeOf(report) === 'time' && report.spec?.dateRange && (
