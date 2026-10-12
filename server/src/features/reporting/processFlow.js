@@ -76,8 +76,17 @@ const PALLET_EVENT = {
   late_collected: 'collected_late', not_collected: 'not_collected',
 };
 
+// The weekday of a moment, in South African time.
+const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const weekdayOf = (at) => (at === null || at === undefined ? null : WEEKDAY_NAMES[new Date(at + 2 * HOUR).getUTCDay()]);
+const titled = (s) => (s ? `${String(s)[0].toUpperCase()}${String(s).slice(1).replace(/_/g, ' ')}` : null);
+// Only what is known: an attribute with no value is left off the case.
+const known = (attrs) => Object.fromEntries(Object.entries(attrs).filter(([, v]) => v !== null && v !== undefined && v !== ''));
+
 // [{ a, at }] in order → one case, repeats back to back folded.
-const toCase = (id, label, steps, index) => {
+// `attrs` says what kind of case it is (its supplier, its cohort), for
+// the root cause analysis on the flow map: which kinds deviate most.
+const toCase = (id, label, steps, index, attrs = {}) => {
   const path = [];
   const times = [];
   for (const s of steps) {
@@ -88,12 +97,12 @@ const toCase = (id, label, steps, index) => {
     times.push(s.at);
   }
   const start = times.find((x) => x !== null) ?? null;
-  return { id, label, path, t: times.map((x) => (x === null || start === null ? null : round((x - start) / HOUR))) };
+  return { id, label, path, t: times.map((x) => (x === null || start === null ? null : round((x - start) / HOUR))), attrs: known(attrs) };
 };
 
 const pack = (id, label, caseNoun, activities, expected, cases, extra = {}) => {
   const index = new Map(activities.map(([key], i) => [key, i]));
-  const built = cases.map((c) => toCase(c.id, c.label, c.steps, index)).filter((c) => c.path.length > 0);
+  const built = cases.map((c) => toCase(c.id, c.label, c.steps, index, c.attrs)).filter((c) => c.path.length > 0);
   // The most recent cases when there are more than the browser should hold.
   const kept = built.length > MAX_CASES ? built.slice(built.length - MAX_CASES) : built;
   return {
@@ -161,10 +170,15 @@ export const orderFlow = ({ orders, changes = [], deliveries = [], followUps = [
     }
     if (o.status === 'returned' && !timed.some((s) => s.a === 'returned')) steps.push({ a: 'returned', at: ms(o.status_changed_at) ?? last });
 
-    return { id: o.id, label: `${o.po_number ?? `Order ${o.id}`} · ${o.supplier_name ?? 'No supplier'}`, steps };
+    return {
+      id: o.id, label: `${o.po_number ?? `Order ${o.id}`} · ${o.supplier_name ?? 'No supplier'}`, steps,
+      attrs: { Supplier: o.supplier_name, 'Weekday raised': weekdayOf(raised) },
+    };
   });
   return pack('orders', 'Purchase orders', 'purchase orders', ORDER_ACTIVITIES, ORDER_EXPECTED, cases);
 };
+
+const BENEFICIARY_LABEL = { ecd: 'ECD centre', soup_kitchen: 'Soup kitchen', dignity_kitchen: 'Dignity Kitchen', community: 'Community' };
 
 /** slips: listSlips() rows · events: listSlipEvents() rows, oldest first */
 export const palletFlow = ({ slips, events = [] }) => {
@@ -192,7 +206,15 @@ export const palletFlow = ({ slips, events = [] }) => {
     }
     steps.sort(inOrder);
     const day = s.dispatch_date ? ` · booked for ${String(s.dispatch_date).slice(0, 10)}` : '';
-    return { id: s.id, label: `${s.name ?? `Pallet ${s.id}`}${day}`, steps };
+    return {
+      id: s.id, label: `${s.name ?? `Pallet ${s.id}`}${day}`, steps,
+      attrs: {
+        Cohort: titled(s.cohort),
+        'Beneficiary type': BENEFICIARY_LABEL[s.beneficiary_kind] ?? titled(s.beneficiary_kind),
+        Beneficiary: s.name,
+        'Scheduled weekday': s.dispatch_date ? weekdayOf(Date.parse(`${String(s.dispatch_date).slice(0, 10)}T10:00:00Z`)) : null,
+      },
+    };
   });
   return pack('pallets', 'Packing', 'pallets', PALLET_ACTIVITIES, PALLET_EXPECTED, cases);
 };
@@ -272,7 +294,10 @@ export const lotFlow = ({ orders, deliveries = [], movements = [] }) => {
     steps.push({ a: due !== null && lot.at > due ? 'delivered_late' : 'delivered', at: lot.at });
     steps.push(...lot.steps);
     steps.push(lot.usedUpAt !== null ? { a: 'used_up', at: lot.usedUpAt } : { a: 'in_stock', at: null });
-    return { id: i + 1, label: `${o.po_number ?? `Order ${o.id}`} · ${lot.product ?? 'Unknown product'}`, steps };
+    return {
+      id: i + 1, label: `${o.po_number ?? `Order ${o.id}`} · ${lot.product ?? 'Unknown product'}`, steps,
+      attrs: { Supplier: o.supplier_name, Product: lot.product, 'Weekday received': weekdayOf(lot.at) },
+    };
   });
   return pack('order_to_dispatch', 'Order to dispatch', 'receipt lines', LOT_ACTIVITIES, LOT_EXPECTED, cases, {
     estimate: true,
@@ -314,7 +339,10 @@ export const donationFlow = ({ donations = [], items = [] }) => {
     if (d.status === 'committed') steps.push({ a: 'committed', at: null });
     if (S18A_STEP[d.section_18a_status]) steps.push({ a: S18A_STEP[d.section_18a_status], at: null });
     if (d.section_18a_issued_at) steps.push({ a: 'certificate', at: ms(d.section_18a_issued_at) });
-    return { id: d.id, label: `${d.donor_name || 'Unnamed donor'} · ${String(d.received_day ?? '').slice(0, 10)}`, steps };
+    return {
+      id: d.id, label: `${d.donor_name || 'Unnamed donor'} · ${String(d.received_day ?? '').slice(0, 10)}`, steps,
+      attrs: { Donor: d.donor_name, 'Weekday received': weekdayOf(ms(d.received_at)) },
+    };
   });
   return pack('donations', 'Donations', 'donations', DONATION_ACTIVITIES, DONATION_EXPECTED, cases);
 };
@@ -343,7 +371,7 @@ export const requestFlow = ({ requests = [], reversals = [] }) => {
     for (const at of reversedAt.get(r.id) ?? []) steps.push({ a: 'reversed', at });
     if (r.outcome && r.outcome !== 'pending') steps.push({ a: r.outcome, at: ms(r.resolved_at) });
     const what = String(r.items_requested ?? '').replace(/\s+/g, ' ').slice(0, 40);
-    return { id: r.id, label: `${r.caller_name || 'Unnamed caller'} · ${what}`, steps };
+    return { id: r.id, label: `${r.caller_name || 'Unnamed caller'} · ${what}`, steps, attrs: { 'Weekday logged': weekdayOf(ms(r.requested_at)) } };
   });
   return pack('requests', 'Benevolent requests', 'requests', REQUEST_ACTIVITIES, REQUEST_EXPECTED, cases);
 };

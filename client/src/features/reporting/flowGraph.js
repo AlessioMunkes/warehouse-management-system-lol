@@ -11,6 +11,8 @@
 //                connection
 //   graphOf      steps and connections with how many and how long
 //   layoutOf     where each step sits, and the curve of each connection
+//   rootCauses   which kinds of case (a supplier, a cohort, a weekday)
+//                are over-represented among the ones that went wrong
 //
 // A step is an index into process.activities. The two ends of the map
 // are the ids 'start' and 'end'.
@@ -72,7 +74,8 @@ const hasEdge = (path, from, to) => {
 };
 
 /**
- * filters: [{ kind: 'through' | 'avoid', step }  |  { kind: 'with' | 'without', from, to }]
+ * filters: [{ kind: 'through' | 'avoid', step }  |  { kind: 'with' | 'without', from, to }
+ *            |  { kind: 'attr', key, value }]
  * Every filter must hold.
  */
 export const applyFilters = (cases, filters = []) => cases.filter((c) => filters.every((f) => {
@@ -80,11 +83,13 @@ export const applyFilters = (cases, filters = []) => cases.filter((c) => filters
   if (f.kind === 'avoid') return !c.path.includes(f.step);
   if (f.kind === 'with') return hasEdge(c.path, f.from, f.to);
   if (f.kind === 'without') return !hasEdge(c.path, f.from, f.to);
+  if (f.kind === 'attr') return c.attrs?.[f.key] === f.value;
   return true;
 }));
 
 export const filterLabel = (process, f) => {
   const name = (id) => (id === START ? 'Start' : id === END ? 'End' : process.activities[id]?.label ?? 'Activity');
+  if (f.kind === 'attr') return `${f.key}: ${f.value}`;
   if (f.kind === 'through') return `Through: ${name(f.step)}`;
   if (f.kind === 'avoid') return `Bypasses: ${name(f.step)}`;
   if (f.kind === 'with') return `Transition: ${name(f.from)} to ${name(f.to)}`;
@@ -245,6 +250,61 @@ export const edgePath = (layout, from, to, at = 0.5) => {
 export const thickness = (value, max) => {
   if (!max || value === null || value === undefined) return 1.5;
   return 1.5 + Math.sqrt(Math.max(0, value) / max) * 8.5;
+};
+
+// ── Root cause analysis ─────────────────────────────────────
+// Which kinds of case are over-represented among the ones with a
+// problem. For each value of each attribute (a supplier, a cohort, a
+// weekday) it compares that value's own problem rate with the rate
+// across all cases, and ranks by EXCESS: how many more problem cases
+// that value has than it would at the overall rate. Excess weighs how
+// far out of line a value is by how many cases it carries, so one bad
+// case out of one does not top the list.
+export const ROOT_CAUSE_TARGETS = [
+  { id: 'deviation', label: 'Deviation from the reference path' },
+  { id: 'rework', label: 'Rework (a repeated activity)' },
+  { id: 'slow', label: 'Long cycle time (slowest 25%)' },
+];
+
+/** The test for each target: (case) => true when it has the problem. */
+export const targetTest = (process, cases, target) => {
+  if (target === 'rework') return (c) => new Set(c.path).size < c.path.length;
+  if (target === 'slow') {
+    const hours = cases.map(caseHours).filter((h) => h !== null);
+    const cut = quantile(hours, 0.75);
+    return (c) => { const h = caseHours(c); return cut !== null && h !== null && h > cut; };
+  }
+  return (c) => !sameRoute(c.path, process.expected);
+};
+
+/**
+ * → { total, affected, rate, rows: [{ key, value, cases, affected, rate, excess }] }
+ * Only values carried by at least `minCases` cases, with more problem
+ * cases than the overall rate predicts, most excess first.
+ */
+export const rootCauses = (cases, isAffected, { minCases = 3, limit = 10 } = {}) => {
+  const total = cases.length;
+  const affected = cases.filter(isAffected).length;
+  const rate = total ? affected / total : 0;
+  const groups = new Map();
+  for (const c of cases) {
+    const hit = isAffected(c);
+    for (const [key, value] of Object.entries(c.attrs ?? {})) {
+      const id = `${key}\u0000${value}`;
+      if (!groups.has(id)) groups.set(id, { key, value, cases: 0, affected: 0 });
+      const g = groups.get(id);
+      g.cases += 1;
+      if (hit) g.affected += 1;
+    }
+  }
+  const rows = [...groups.values()]
+    .map((g) => ({ ...g, rate: g.affected / g.cases, excess: g.affected - g.cases * rate }))
+    // A value every case shares explains nothing.
+    .filter((g) => g.cases >= minCases && g.cases < total && g.excess > 0.5)
+    .sort((a, b) => b.excess - a.excess || b.rate - a.rate)
+    .slice(0, limit)
+    .map((g) => ({ ...g, rate: Math.round(g.rate * 1000) / 10, excess: Math.round(g.excess * 10) / 10 }));
+  return { total, affected, rate: Math.round(rate * 1000) / 10, rows };
 };
 
 /** How many of the commonest routes it takes to cover `share` percent of cases. */

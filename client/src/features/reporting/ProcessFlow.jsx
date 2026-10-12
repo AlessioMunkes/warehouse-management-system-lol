@@ -20,6 +20,10 @@
 //   a connection  choose one for its times and its slowest cases, and
 //                 to keep only the cases that took it or never did
 //   play          dots run along each connection, more on busier ones
+//   root cause    under the map: which supplier, cohort, product or
+//                 weekday is over-represented among the cases that
+//                 deviated, repeated work or ran long, each one a
+//                 filter to narrow the map to
 //
 // All of it is worked out in the browser (flowGraph.js) from the case
 // paths the server sent with the process map, so every change redraws
@@ -32,7 +36,7 @@ import { duration } from './processFormat';
 import { exportExcel } from '../../lib/excelExport';
 import {
   START, END, NODE_W, NODE_H, variantsOf, applyFilters, filterLabel, graphOf, neighbours,
-  layoutOf, edgePath, thickness, routesToCover, caseHours,
+  layoutOf, edgePath, thickness, routesToCover, caseHours, rootCauses, targetTest, ROOT_CAUSE_TARGETS,
 } from './flowGraph';
 
 const count = (n) => Number(n ?? 0).toLocaleString('en-ZA');
@@ -85,6 +89,7 @@ export default function ProcessFlow({ flow, range }) {
   const [hover, setHover] = useState(null);
   const [playing, setPlaying] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [target, setTarget] = useState('deviation');
 
   const process = flow.processes.find((p) => p.id === processId) ?? flow.processes[0];
   const noun = process.caseNoun;
@@ -101,6 +106,9 @@ export default function ProcessFlow({ flow, range }) {
   // The expected route is the centre column whatever is shown, so a
   // step keeps its place as routes are switched on and off.
   const layout = useMemo(() => layoutOf(graph, process.expected), [graph, process]);
+  // Over every case in scope, not only the variants drawn: hiding a
+  // rare variant must not hide what causes it.
+  const causes = useMemo(() => rootCauses(inScope, targetTest(process, inScope, target)), [process, inScope, target]);
 
   const reset = (next = {}) => { setChosen(null); setSelected(null); setHover(null); if (next.filters) setFilters(next.filters); };
   const changeProcess = (id) => { setProcessId(id); setFilters([]); reset(); };
@@ -449,6 +457,69 @@ export default function ProcessFlow({ flow, range }) {
               </section>
             </div>
           </div>
+
+          {/* ── Root cause analysis ──────────────────────────── */}
+          <section aria-label="Root cause analysis" className="mt-3 rounded-2xl border border-line bg-card p-3">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-ink">Root cause analysis</h3>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {count(causes.affected)} of {count(causes.total)} {noun} affected ({causes.rate}%). Attributes ranked by excess cases over that rate.
+                </p>
+              </div>
+              <label className="flex flex-col gap-1 text-xs font-semibold text-ink">
+                Analyse
+                <NativeSelect className="w-80 max-w-full" value={target} onChange={(e) => setTarget(e.target.value)}>
+                  {ROOT_CAUSE_TARGETS.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+                </NativeSelect>
+              </label>
+            </div>
+            {causes.rows.length === 0 ? (
+              <p className="mt-3 text-xs text-muted-foreground">
+                {causes.affected === 0
+                  ? 'No affected cases in scope.'
+                  : 'No attribute is over-represented: affected cases are spread in line with the overall rate.'}
+              </p>
+            ) : (
+              <div className="mt-2 overflow-x-auto">
+                <table className="w-full min-w-[34rem] border-collapse text-xs">
+                  <thead>
+                    <tr className="text-left text-muted-foreground">
+                      <th scope="col" className="py-1.5 pr-3 font-semibold">Attribute</th>
+                      <th scope="col" className="py-1.5 pr-3 font-semibold">Value</th>
+                      <th scope="col" className="py-1.5 pr-3 text-right font-semibold">Affected</th>
+                      <th scope="col" className="py-1.5 pr-3 font-semibold">Rate against {causes.rate}% overall</th>
+                      <th scope="col" className="py-1.5 pr-3 text-right font-semibold">Excess cases</th>
+                      <th scope="col" className="py-1.5"><span className="sr-only">Filter</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {causes.rows.map((r) => (
+                      <tr key={`${r.key}:${r.value}`} className="border-t border-line">
+                        <td className="py-1.5 pr-3 text-muted-foreground">{r.key}</td>
+                        <th scope="row" className="py-1.5 pr-3 text-left font-semibold text-ink">{r.value}</th>
+                        <td className="whitespace-nowrap py-1.5 pr-3 text-right tabular-nums">{count(r.affected)} of {count(r.cases)}</td>
+                        <td className="py-1.5 pr-3">
+                          <div className="flex items-center gap-2">
+                            <div className="relative h-1.5 w-28 shrink-0 rounded-full bg-surface-2">
+                              <div className="h-1.5 rounded-full bg-warn" style={{ width: `${Math.min(100, r.rate)}%` }} />
+                              <span aria-hidden="true" className="absolute -top-0.5 h-2.5 w-px bg-ink" style={{ left: `${Math.min(100, causes.rate)}%` }} />
+                            </div>
+                            <span className="tabular-nums text-ink">{r.rate}%</span>
+                          </div>
+                        </td>
+                        <td className="py-1.5 pr-3 text-right font-bold tabular-nums text-ink">+{r.excess}</td>
+                        <td className="py-1.5 text-right">
+                          <button type="button" className={pill} onClick={() => addFilter({ kind: 'attr', key: r.key, value: r.value })}
+                            aria-label={`Filter to ${r.key}: ${r.value}`}>Filter</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
 
           {process.truncated ? (
             <p className="mt-2 text-xs text-muted-foreground">
