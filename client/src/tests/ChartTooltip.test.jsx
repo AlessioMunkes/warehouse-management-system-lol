@@ -8,7 +8,8 @@
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { render, screen } from '@testing-library/react';
 import ChartTooltip, { ChartTip } from '../features/reporting/ChartTooltip';
 import { entityColours, SERIES, OTHER_COLOUR } from '../features/reporting/chartFormat';
@@ -71,7 +72,7 @@ const walk = (dir) => readdirSync(dir).flatMap((f) => {
 });
 
 describe('chart files', () => {
-  const root = join(__dirname, '..');
+  const root = join(dirname(fileURLToPath(import.meta.url)), '..');
   const charts = walk(join(root, 'features')).filter((f) => /\.jsx$/.test(f))
     .filter((f) => readFileSync(f, 'utf8').includes("from 'recharts'"));
 
