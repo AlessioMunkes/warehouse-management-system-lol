@@ -96,7 +96,9 @@ export default function SlipDetailPanel({
         <Fact label="Packed" value={`${confirmed} of ${total}`} />
         <Fact label="Flagged" value={flagged || '-'} />
         <Fact label="Pallet ref" value={slip.pallet_ref || '-'} />
-        <Fact label="Children" value={slip.child_count ?? '-'} />
+        {slip.beneficiary_kind && slip.beneficiary_kind !== 'ecd'
+          ? <Fact label="For" value={slip.beneficiary_kind === 'soup_kitchen' ? 'Soup kitchen' : slip.beneficiary_kind === 'dignity_kitchen' ? 'Dignity Kitchen' : 'Community'} />
+          : <Fact label="Children" value={slip.child_count ?? '-'} />}
       </dl>
 
       <Section title="Who is packing it">

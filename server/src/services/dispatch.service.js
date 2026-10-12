@@ -157,7 +157,12 @@ export const evaluateEligibility = (gateView, cutoff = NON_COLLECTION_CUTOFF_HOU
   const dispatchDay = pgDateToString(gateView.dispatch_date);
 
   return {
-    ecdInactive:      gateView.ecd_is_active === false || gateView.ecd_approved_at === null,
+    // Only an ECD centre has to be active and approved. A soup kitchen
+    // or the Dignity Kitchen has no centre record at all (its name is
+    // on the slip), and "no record" used to read here as "not
+    // approved", which refused every pallet for one at the gate.
+    ecdInactive:      (gateView.beneficiary_kind ?? 'ecd') === 'ecd'
+                        && (gateView.ecd_is_active === false || gateView.ecd_approved_at === null),
     slipNotPacked:    !['complete', 'dispatched'].includes(gateView.slip_status),
     wrongDay:         dispatchDay !== null && dispatchDay !== todayString(),
     afterCutoff:      currentHour() >= cutoff,

@@ -56,6 +56,8 @@ const readStoredMode = () => {
 };
 
 const cohortLabel = (cohort, t) => (cohort === 'tuesday' || cohort === 'thursday' ? t(`day.${cohort}`) : cohort);
+// A kitchen's pallet is not on a cohort: say what it is for instead.
+const KITCHEN_KIND = { soup_kitchen: 'Soup kitchen', dignity_kitchen: 'Dignity Kitchen', community: 'Community' };
 
 // Soup kitchens and test centres have no child count; say nothing rather
 // than "· children" with the number missing.
@@ -371,7 +373,7 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
         ) : null}
         <h1 className="stf-step-title" tabIndex={-1}>{slip.ecd_name}</h1>
         <p className="stf-step-sub">
-          {cohortLabel(slip.cohort, t)}{childCountNote(slip.child_count, t)} · {t('slip.oldestFirst')}
+          {KITCHEN_KIND[slip.beneficiary_kind] ?? `${cohortLabel(slip.cohort, t)}${childCountNote(slip.child_count, t)}`} · {t('slip.oldestFirst')}
         </p>
       </div>
 

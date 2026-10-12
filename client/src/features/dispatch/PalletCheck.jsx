@@ -403,7 +403,9 @@ export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChan
         >
           <KeyValues
             pairs={[
-              ['Cohort', gateView.cohort],
+              gateView.beneficiary_kind && gateView.beneficiary_kind !== 'ecd'
+                ? ['For', { soup_kitchen: 'Soup kitchen', dignity_kitchen: 'Dignity Kitchen', community: 'Community' }[gateView.beneficiary_kind] ?? gateView.beneficiary_kind]
+                : ['Cohort', gateView.cohort],
               ['Items', `${packedLines.length}`],
             ]}
           />

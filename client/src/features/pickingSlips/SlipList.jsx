@@ -229,7 +229,9 @@ export default function SlipList({
                           {slip.ecd_name}
                         </button>
                         <span className="block text-xs text-muted-foreground">
-                          {slip.cohort === 'thursday' ? 'Thursday' : 'Tuesday'} cohort
+                          {slip.beneficiary_kind === 'soup_kitchen' ? 'Soup kitchen'
+                            : slip.beneficiary_kind === 'dignity_kitchen' ? 'Dignity Kitchen'
+                              : `${slip.cohort === 'thursday' ? 'Thursday' : 'Tuesday'} cohort`}
                         </span>
                       </TableCell>
                     );

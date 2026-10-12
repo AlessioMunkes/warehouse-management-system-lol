@@ -148,7 +148,10 @@ const getSlips = async ({ dispatchDate, from, to, cohort, status, assignedTo, st
        -- who has it instead of reading as unassigned.
        ps.assigned_volunteer_id,
        NULLIF(split_part(trim(v.full_name), ' ', 1), '') AS volunteer_name,
-       e.name       AS ecd_name,
+       -- A soup or dignity kitchen's slip has no centre row; its name is
+       -- on the slip itself. Every screen reads the one column.
+       COALESCE(e.name, ps.beneficiary_name) AS ecd_name,
+       ps.beneficiary_kind::text AS beneficiary_kind,
        e.child_count,
        e.last_collected_date,
        u.first_name  AS packer_name,
@@ -171,7 +174,7 @@ const getSlips = async ({ dispatchDate, from, to, cohort, status, assignedTo, st
        (SELECT MAX(pe.created_at) FROM picking_events pe
          WHERE pe.picking_slip_id = ps.id AND pe.event_type = 'assigned') AS claimed_at
      FROM picking_slips ps
-     JOIN ecd_centres e ON e.id = ps.ecd_id
+     LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
      LEFT JOIN users u  ON u.id = ps.assigned_to
      LEFT JOIN users u2 ON u2.id = ps.assigned_to_2
      LEFT JOIN volunteers v ON v.id = ps.assigned_volunteer_id
@@ -179,7 +182,7 @@ const getSlips = async ({ dispatchDate, from, to, cohort, status, assignedTo, st
      LEFT JOIN picking_slip_items psi ON psi.picking_slip_id = ps.id
      ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
      GROUP BY ps.id, e.name, e.child_count, e.last_collected_date, u.first_name, u2.first_name, v.full_name, de.status
-     ORDER BY ps.dispatch_date ASC, e.name ASC`,
+     ORDER BY ps.dispatch_date ASC, COALESCE(e.name, ps.beneficiary_name) ASC`,
     params
   );
 
@@ -198,7 +201,7 @@ const getSlipById = async (id) => {
        ps.dispatch_date::text AS dispatch_date_iso,
        -- The gate's outcome, as getSlips reports it.
        (SELECT de.status FROM dispatch_events de WHERE de.picking_slip_id = ps.id) AS dispatch_status,
-       e.name                AS ecd_name,
+       COALESCE(e.name, ps.beneficiary_name) AS ecd_name,
        e.child_count,
        e.contact_name,
        e.last_collected_date,
@@ -206,7 +209,7 @@ const getSlipById = async (id) => {
        u2.first_name          AS packer_name_2,
        NULLIF(split_part(trim(v.full_name), ' ', 1), '') AS volunteer_name
      FROM picking_slips ps
-     JOIN ecd_centres e ON e.id = ps.ecd_id
+     LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
      LEFT JOIN users u  ON u.id = ps.assigned_to
      LEFT JOIN users u2 ON u2.id = ps.assigned_to_2
      LEFT JOIN volunteers v ON v.id = ps.assigned_volunteer_id
@@ -420,24 +423,59 @@ const generateSlips = async ({ dispatchDate, cohort, generatedBy, beforeCommit }
 // `beforeCommit(client, facts)`, when given, runs inside this
 // transaction just before COMMIT — the service's notification goes in
 // with the change or not at all (features/communications/notices.js).
-const createSlip = async ({ ecdId, dispatchDate, cohort, generatedBy, items, beforeCommit }) => {
+//
+// A SOUP KITCHEN OR DIGNITY KITCHEN (`beneficiaryKind` other than
+// 'ecd') has no row in ecd_centres and no standing order: the slip
+// carries the kitchen's name itself (ps_beneficiary_consistency) and
+// its lines are always the ones the manager typed. Everything after
+// this insert is the same pallet as any other: claimed, packed,
+// collected at the gate.
+const createSlip = async ({ ecdId, beneficiaryKind = 'ecd', beneficiaryName = null, dispatchDate, cohort, generatedBy, items, beforeCommit }) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    const ecdCheck = await client.query(
-      `SELECT id, name FROM ecd_centres WHERE id = $1 AND is_active = TRUE AND approved_at IS NOT NULL`,
-      [ecdId]
-    );
-    if (!ecdCheck.rows[0]) { await client.query('ROLLBACK'); return { ecdNotFound: true }; }
+    const forCentre = beneficiaryKind === 'ecd';
+    let ecdCheck = { rows: [{ name: beneficiaryName }] };
+    let slipResult;
 
-    const slipResult = await client.query(
-      `INSERT INTO picking_slips (ecd_id, dispatch_date, cohort, generated_by)
-       VALUES ($1, $2, $3::cohort_group, $4)
-       ON CONFLICT (ecd_id, dispatch_date) DO NOTHING
-       RETURNING id`,
-      [ecdId, dispatchDate, cohort, generatedBy]
-    );
+    if (forCentre) {
+      ecdCheck = await client.query(
+        `SELECT id, name FROM ecd_centres WHERE id = $1 AND is_active = TRUE AND approved_at IS NOT NULL`,
+        [ecdId]
+      );
+      if (!ecdCheck.rows[0]) { await client.query('ROLLBACK'); return { ecdNotFound: true }; }
+
+      slipResult = await client.query(
+        `INSERT INTO picking_slips (ecd_id, dispatch_date, cohort, generated_by)
+         VALUES ($1, $2, $3::cohort_group, $4)
+         ON CONFLICT (ecd_id, dispatch_date) DO NOTHING
+         RETURNING id`,
+        [ecdId, dispatchDate, cohort, generatedBy]
+      );
+    } else {
+      // The unique (ecd_id, dispatch_date) rule cannot see a slip with no
+      // centre, so the same kitchen on the same day is checked by name.
+      // The advisory lock makes two managers pressing Create at once
+      // take turns, so both cannot pass the check.
+      await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [`slip:${beneficiaryKind}:${beneficiaryName.toLowerCase()}:${dispatchDate}`]);
+      const clash = await client.query(
+        `SELECT 1 FROM picking_slips
+          WHERE ecd_id IS NULL AND beneficiary_kind = $1::beneficiary_type
+            AND LOWER(beneficiary_name) = LOWER($2) AND dispatch_date = $3::date
+            AND status <> 'cancelled'
+          LIMIT 1`,
+        [beneficiaryKind, beneficiaryName, dispatchDate]
+      );
+      if (clash.rows[0]) { await client.query('ROLLBACK'); return { alreadyExists: true }; }
+
+      slipResult = await client.query(
+        `INSERT INTO picking_slips (ecd_id, beneficiary_kind, beneficiary_name, dispatch_date, cohort, generated_by)
+         VALUES (NULL, $1::beneficiary_type, $2, $3, $4::cohort_group, $5)
+         RETURNING id`,
+        [beneficiaryKind, beneficiaryName, dispatchDate, cohort, generatedBy]
+      );
+    }
 
     if (!slipResult.rows[0]) { await client.query('ROLLBACK'); return { alreadyExists: true }; }
 
@@ -730,7 +768,7 @@ const releaseSlip = async ({ slipId, actorId, beforeCommit, ownOnly = false }) =
     // The centre's name, for the floor's "back on the floor" notice
     // and the caller's push message.
     const ecd = await client.query('SELECT name FROM ecd_centres WHERE id = $1', [result.rows[0].ecd_id]);
-    const ecdName = ecd.rows[0]?.name ?? 'a centre';
+    const ecdName = ecd.rows[0]?.name ?? result.rows[0].beneficiary_name ?? 'a centre';
     if (beforeCommit) await beforeCommit(client, { slipId, ecdName });
 
     await client.query('COMMIT');

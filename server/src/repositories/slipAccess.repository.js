@@ -76,7 +76,7 @@ const getPreviewByToken = async (token) => {
   const { rows } = await pool.query(
     `SELECT ${PREVIEW_COLUMNS}
        FROM picking_slips ps
-       JOIN ecd_centres e ON e.id = ps.ecd_id
+       LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
       WHERE ps.public_token = $1::uuid`,
     [token],
   );
@@ -97,7 +97,7 @@ const findPreviewsByShortCode = async (code) => {
   const { rows } = await pool.query(
     `SELECT ${PREVIEW_COLUMNS}
        FROM picking_slips ps
-       JOIN ecd_centres e ON e.id = ps.ecd_id
+       LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
       WHERE RIGHT(ps.public_token::text, 6) = LOWER($1)
       ORDER BY ps.dispatch_date DESC, ps.id DESC`,
     [code],
@@ -112,7 +112,7 @@ const listUnclaimedForDate = async (dispatchDate) => {
   const { rows } = await pool.query(
     `SELECT ${PREVIEW_COLUMNS}
        FROM picking_slips ps
-       JOIN ecd_centres e ON e.id = ps.ecd_id
+       LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
       WHERE ps.dispatch_date = $1::date
         AND ps.status = ANY($2)
         AND ps.assigned_volunteer_id IS NULL
@@ -130,7 +130,7 @@ const listUnclaimedBetween = async (from, to) => {
   const { rows } = await pool.query(
     `SELECT ${PREVIEW_COLUMNS}
        FROM picking_slips ps
-       JOIN ecd_centres e ON e.id = ps.ecd_id
+       LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
       WHERE ps.dispatch_date BETWEEN $1::date AND $2::date
         AND ps.status = ANY($3)
         AND ps.assigned_volunteer_id IS NULL
@@ -304,7 +304,7 @@ const getPreviewById = async (slipId) => {
   const { rows } = await pool.query(
     `SELECT ${PREVIEW_COLUMNS}
        FROM picking_slips ps
-       JOIN ecd_centres e ON e.id = ps.ecd_id
+       LEFT JOIN ecd_centres e ON e.id = ps.ecd_id
       WHERE ps.id = $1`,
     [slipId],
   );

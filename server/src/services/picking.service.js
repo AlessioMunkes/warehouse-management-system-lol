@@ -105,7 +105,7 @@ const getSlipById = async (id) => {
 // the two paths can't drift apart on what counts as a valid slip.
 // allowOverride lets a manager create an ad-hoc slip outside the
 // normal rotation (e.g. a make-up delivery) without lying about it.
-const validateDispatchDate = async (dispatchDate, cohort, { allowOverride = false } = {}) => {
+const validateDispatchDate = async (dispatchDate, cohort, { allowOverride = false, anyWorkingDay = false } = {}) => {
   if (!dispatchDate)             fail(400, 'Dispatch date is required.');
   if (!COHORTS.includes(cohort)) fail(400, 'Cohort must be tuesday or thursday.');
 
@@ -121,6 +121,10 @@ const validateDispatchDate = async (dispatchDate, cohort, { allowOverride = fals
     fail(400,
       `The warehouse is closed on ${isoDate} (${closed.label}). Choose another date, or check the operating calendar.`);
   }
+
+  // A kitchen's pallet is not on the weekly rotation, so it is not held
+  // to a cohort's pickup day.
+  if (anyWorkingDay) return date;
 
   const scheduled = await cohortForDate(isoDate);
   if (scheduled !== cohort && !allowOverride) {
@@ -168,24 +172,59 @@ const generateSlips = async ({ dispatchDate, cohort }, user) => {
 // standing order (ecd_order_lines) — a manager typed or adjusted the
 // lines by hand, including via the client's meals-to-serve
 // calculation. Omit it to keep pulling from the standing order.
-const createSlip = async ({ ecdId, dispatchDate, cohort, force, items }, user) => {
+//
+// A SOUP KITCHEN OR DIGNITY KITCHEN gets its pallets this way and no
+// other: they are not on the weekly run, so a manager raises a slip
+// when one is needed, names the kitchen and types the lines. It is not
+// tied to a cohort's pickup day. From here it is an ordinary pallet.
+const KITCHEN_KINDS = ['soup_kitchen', 'dignity_kitchen'];
+const KITCHEN_LABEL = { soup_kitchen: 'soup kitchen', dignity_kitchen: 'Dignity Kitchen' };
+
+const createSlip = async ({ ecdId, beneficiaryKind, beneficiaryName, dispatchDate, cohort, force, items }, user) => {
   if (!isManager(user)) fail(403, 'Only managers can create picking slips.');
-  if (!ecdId)           fail(400, 'ECD is required.');
-  await validateDispatchDate(dispatchDate, cohort, { allowOverride: force === true });
+
+  const kind = beneficiaryKind === undefined || beneficiaryKind === null || beneficiaryKind === '' ? 'ecd' : beneficiaryKind;
+  const forKitchen = KITCHEN_KINDS.includes(kind);
+  if (kind !== 'ecd' && !forKitchen) fail(400, 'Choose an ECD centre, a soup kitchen or the Dignity Kitchen.');
+
+  let name = null;
+  let slipCohort = cohort;
+  if (forKitchen) {
+    name = typeof beneficiaryName === 'string' ? beneficiaryName.trim().replace(/\s+/g, ' ') : '';
+    if (!name)             fail(400, `Name the ${KITCHEN_LABEL[kind]} this pallet is for.`);
+    if (name.length > 120) fail(400, 'That name is too long. Keep it under 120 characters.');
+    if (items === undefined) fail(400, 'Add the products for this pallet. A kitchen has no standing order to copy.');
+    // The slip table needs a cohort. A kitchen has none, so it takes
+    // the day's own cohort where the day has one; the screens show the
+    // kind of beneficiary for these, never the cohort.
+    const isoDate = String(dispatchDate ?? '').slice(0, 10);
+    slipCohort = (await cohortForDate(isoDate).catch(() => null)) ?? (COHORTS.includes(cohort) ? cohort : COHORTS[0]);
+    // Any working day: only a closed day needs the override.
+    await validateDispatchDate(dispatchDate, slipCohort, { allowOverride: force === true, anyWorkingDay: true });
+  } else {
+    if (!ecdId) fail(400, 'ECD is required.');
+    await validateDispatchDate(dispatchDate, cohort, { allowOverride: force === true });
+  }
 
   const cleanItems = items !== undefined ? cleanItemLines(items) : undefined;
 
   const result = await pickingRepository.createSlip({
-    ecdId,
+    ecdId: forKitchen ? null : ecdId,
+    beneficiaryKind: kind,
+    beneficiaryName: name,
     dispatchDate,
-    cohort,
+    cohort: slipCohort,
     generatedBy: user.id,
     items: cleanItems,
     beforeCommit: notices.slipCreated,
   });
 
   if (result.ecdNotFound)   fail(404, 'ECD not found, inactive, or not yet approved for dispatch.');
-  if (result.alreadyExists) fail(409, 'A picking slip already exists for this ECD on this date.');
+  if (result.alreadyExists) {
+    fail(409, forKitchen
+      ? `A picking slip already exists for ${name} on this date.`
+      : 'A picking slip already exists for this ECD on this date.');
+  }
 
   if (pushService.isForToday(dispatchDate)) {
     pushService.notifyFloor({

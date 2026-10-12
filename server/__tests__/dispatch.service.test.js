@@ -587,3 +587,26 @@ describe('the not-collected cut-off from Settings', () => {
     vi.useRealTimers();
   });
 });
+
+// ── A pallet for a soup kitchen or the Dignity Kitchen ─────────
+// It has no centre record: its name is on the slip. "No record" used
+// to read as "not an approved centre", and every such pallet was
+// refused at the gate.
+describe('evaluateEligibility: a kitchen has no centre to be inactive', () => {
+  const base = { slip_status: 'complete', dispatch_date: null, dispatch_status: null, items: [] };
+
+  it.each(['soup_kitchen', 'dignity_kitchen', 'community'])('%s is not held to the centre check', async (kind) => {
+    const { evaluateEligibility } = await import('../src/services/dispatch.service.js');
+    const e = evaluateEligibility({ ...base, beneficiary_kind: kind, ecd_is_active: true, ecd_approved_at: null }, 16);
+    expect(e.ecdInactive).toBe(false);
+  });
+
+  it('an ECD centre still has to be active and approved', async () => {
+    const { evaluateEligibility } = await import('../src/services/dispatch.service.js');
+    expect(evaluateEligibility({ ...base, beneficiary_kind: 'ecd', ecd_is_active: true, ecd_approved_at: null }, 16).ecdInactive).toBe(true);
+    expect(evaluateEligibility({ ...base, beneficiary_kind: 'ecd', ecd_is_active: false, ecd_approved_at: '2026-01-01' }, 16).ecdInactive).toBe(true);
+    expect(evaluateEligibility({ ...base, beneficiary_kind: 'ecd', ecd_is_active: true, ecd_approved_at: '2026-01-01' }, 16).ecdInactive).toBe(false);
+    // A row read before the kind was selected is treated as a centre.
+    expect(evaluateEligibility({ ...base, ecd_is_active: true, ecd_approved_at: null }, 16).ecdInactive).toBe(true);
+  });
+});

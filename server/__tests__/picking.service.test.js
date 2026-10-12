@@ -907,3 +907,58 @@ describe('getAssignableWorkers', () => {
     await expect(pickingService.getAssignableWorkers(ADMIN)).resolves.toEqual([]);
   });
 });
+// ── createSlip for a soup kitchen or the Dignity Kitchen ───────
+// They are not on the weekly run: a manager raises a slip when one is
+// needed, names the kitchen and types the lines. After that it is an
+// ordinary pallet.
+describe('createSlip — a kitchen, raised ad hoc', () => {
+  const lines = [{ productId: 4, quantity: 10, unit: 'kg' }];
+  const body = { beneficiaryKind: 'soup_kitchen', beneficiaryName: '  Hope   Soup Kitchen ', dispatchDate: NON_PICKUP_DATE, items: lines };
+
+  it('creates it on any working day, with no centre and no cohort asked for', async () => {
+    await expect(pickingService.createSlip(body, MANAGER)).resolves.toBeDefined();
+    expect(repoMock.createSlip).toHaveBeenCalledWith(expect.objectContaining({
+      ecdId: null,
+      beneficiaryKind: 'soup_kitchen',
+      beneficiaryName: 'Hope Soup Kitchen',
+      dispatchDate: NON_PICKUP_DATE,
+      items: lines,
+    }));
+    // The table needs a cohort; it is always a real one.
+    expect(['tuesday', 'thursday']).toContain(repoMock.createSlip.mock.calls[0][0].cohort);
+  });
+
+  it('works the same for the Dignity Kitchen', async () => {
+    await pickingService.createSlip({ ...body, beneficiaryKind: 'dignity_kitchen', beneficiaryName: 'Dignity Kitchen' }, MANAGER);
+    expect(repoMock.createSlip.mock.calls[0][0]).toMatchObject({ beneficiaryKind: 'dignity_kitchen', beneficiaryName: 'Dignity Kitchen', ecdId: null });
+  });
+
+  it('needs the kitchen named', async () => {
+    await expectStatus(pickingService.createSlip({ ...body, beneficiaryName: '   ' }, MANAGER), 400);
+    expect(repoMock.createSlip).not.toHaveBeenCalled();
+  });
+
+  it('needs its products, because a kitchen has no standing order', async () => {
+    await expectStatus(pickingService.createSlip({ ...body, items: undefined }, MANAGER), 400);
+    await expectStatus(pickingService.createSlip({ ...body, items: [] }, MANAGER), 400);
+  });
+
+  it('refuses a kind it does not know', async () => {
+    await expectStatus(pickingService.createSlip({ ...body, beneficiaryKind: 'warehouse' }, MANAGER), 400);
+  });
+
+  it('still refuses a past date, and anyone who is not a manager', async () => {
+    await expectStatus(pickingService.createSlip({ ...body, dispatchDate: PAST_DATE }, MANAGER), 400);
+    await expectStatus(pickingService.createSlip(body, WORKER), 403);
+  });
+
+  it('says so when that kitchen already has a slip that day', async () => {
+    repoMock.createSlip.mockResolvedValue({ alreadyExists: true });
+    await expect(pickingService.createSlip(body, MANAGER)).rejects.toMatchObject({ status: 409, message: expect.stringContaining('Hope Soup Kitchen') });
+  });
+
+  it('leaves an ECD slip exactly as it was', async () => {
+    await pickingService.createSlip({ ecdId: 3, dispatchDate: TUESDAY_DATE, cohort: 'tuesday' }, MANAGER);
+    expect(repoMock.createSlip.mock.calls[0][0]).toMatchObject({ ecdId: 3, beneficiaryKind: 'ecd', beneficiaryName: null, cohort: 'tuesday' });
+  });
+});

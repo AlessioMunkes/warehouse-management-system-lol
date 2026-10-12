@@ -156,8 +156,20 @@ export function GenerateSlipsForm({ onGenerated, onDone }) {
 // ── Create a new slip ──────────────────────────────────────────
 // For a late registration, a correction, or a make-up delivery.
 // `onCreated(dispatchDate)` — the list moves to that date's week.
+// WHO THE PALLET IS FOR. An ECD centre is on the weekly run and has a
+// standing order. A soup kitchen or the Dignity Kitchen is not: its
+// pallets are raised here when one is needed, named and with the
+// products typed in. After that it is packed and dispatched like any
+// other pallet.
+const KINDS = [
+  { id: 'ecd',             label: 'ECD centre' },
+  { id: 'soup_kitchen',    label: 'Soup kitchen' },
+  { id: 'dignity_kitchen', label: 'Dignity Kitchen' },
+];
+
 export function CreateSlipForm({ beneficiaries, products, onCreated, onCancel }) {
   const [form, setForm] = useState({
+    kind: 'ecd', beneficiaryName: '',
     ecdId: '', dispatchDate: todaySast(), cohort: '', force: false,
     // manualItems off by default keeps the original behaviour: the
     // server pulls this ECD's standing order. Switching it on lets a
@@ -166,6 +178,21 @@ export function CreateSlipForm({ beneficiaries, products, onCreated, onCancel })
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+
+  const forKitchen = form.kind !== 'ecd';
+
+  // A kitchen has no standing order, so its lines are always typed.
+  // Switching to one opens the product lines straight away.
+  const setKind = (kind) => setForm((f) => {
+    if (kind === 'ecd') return { ...f, kind, beneficiaryName: '' };
+    const seeded = products.filter((p) => p.quantityPerMeal != null).map((p) => ({ productId: String(p.id), quantity: '' }));
+    return {
+      ...f, kind, ecdId: '', force: false,
+      beneficiaryName: kind === 'dignity_kitchen' ? 'Dignity Kitchen' : '',
+      manualItems: true,
+      items: f.items.length ? f.items : (seeded.length ? seeded : [{ productId: '', quantity: '' }]),
+    };
+  });
 
   // Turning manual lines on seeds every product that has a meals-to-
   // serve ratio, and defaults meals-to-serve to this beneficiary's own
@@ -202,10 +229,14 @@ export function CreateSlipForm({ beneficiaries, products, onCreated, onCancel })
   const run = async () => {
     setBusy(true); setError(null);
     try {
-      const items = form.manualItems
+      const items = form.manualItems || forKitchen
         ? toPayloadLines(form.items.filter((l) => l.productId && l.quantity && Number(l.quantity) > 0), products)
         : undefined;
-      await createSlip({ ...form, ecdId: Number(form.ecdId), items });
+      if (forKitchen) {
+        await createSlip({ beneficiaryKind: form.kind, beneficiaryName: form.beneficiaryName.trim(), dispatchDate: form.dispatchDate, items });
+      } else {
+        await createSlip({ ecdId: Number(form.ecdId), dispatchDate: form.dispatchDate, cohort: form.cohort, force: form.force, items });
+      }
       await onCreated(form.dispatchDate);
     } catch (err) { setError(err.message); } finally { setBusy(false); }
   };
@@ -215,10 +246,31 @@ export function CreateSlipForm({ beneficiaries, products, onCreated, onCancel })
       <CardHeader><CardTitle>Create a new slip</CardTitle></CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Use for a late registration, a correction or a make-up delivery.
+          Use for a soup kitchen or the Dignity Kitchen, a late registration, a correction or a make-up delivery.
         </p>
         {error ? <ErrorBanner message={error} /> : null}
 
+        <Field>
+          <FieldLabel htmlFor="adhoc-kind">Who it is for</FieldLabel>
+          <Select value={form.kind} onValueChange={setKind}>
+            <SelectTrigger id="adhoc-kind"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {KINDS.map((k) => <SelectItem key={k.id} value={k.id}>{k.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </Field>
+
+        {forKitchen ? (
+          <Field>
+            <FieldLabel htmlFor="adhoc-name">{form.kind === 'soup_kitchen' ? 'Soup kitchen name' : 'Name'}</FieldLabel>
+            <Input
+              id="adhoc-name" value={form.beneficiaryName} maxLength={120}
+              onChange={(e) => setForm((f) => ({ ...f, beneficiaryName: e.target.value }))}
+              placeholder={form.kind === 'soup_kitchen' ? 'e.g. Hope Soup Kitchen' : 'Dignity Kitchen'}
+            />
+            <FieldDescription>Shown on the pallet, at the gate and on the dispatch note.</FieldDescription>
+          </Field>
+        ) : (
         <Field>
           <FieldLabel htmlFor="adhoc-ecd">Beneficiary</FieldLabel>
           <Select value={form.ecdId || undefined} onValueChange={(v) => setForm((f) => ({ ...f, ecdId: v }))}>
@@ -234,6 +286,7 @@ export function CreateSlipForm({ beneficiaries, products, onCreated, onCancel })
           </Select>
           <FieldDescription>Only approved, active beneficiaries can actually receive a slip.</FieldDescription>
         </Field>
+        )}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="adhoc-date">Dispatch date</FieldLabel>
@@ -242,11 +295,16 @@ export function CreateSlipForm({ beneficiaries, products, onCreated, onCancel })
               onChange={(e) => setForm((f) => ({ ...f, dispatchDate: e.target.value }))}
             />
           </Field>
+          {/* A kitchen is not on a cohort's rotation: any working day. */}
+          {forKitchen ? null : (
           <Field>
             <FieldLabel htmlFor="adhoc-cohort">Cohort</FieldLabel>
             <CohortSelect id="adhoc-cohort" value={form.cohort} onChange={(v) => setForm((f) => ({ ...f, cohort: v }))} />
           </Field>
+          )}
         </div>
+        {forKitchen ? null : (
+        <>
         <Field orientation="horizontal">
           <Checkbox
             id="adhoc-force" checked={form.force}
@@ -266,8 +324,10 @@ export function CreateSlipForm({ beneficiaries, products, onCreated, onCancel })
         <FieldDescription>
           Leave unticked to use the centre’s standing order.
         </FieldDescription>
+        </>
+        )}
 
-        {form.manualItems ? (
+        {form.manualItems || forKitchen ? (
           <>
             <Field>
               <FieldLabel htmlFor="adhoc-meals">Meals to serve</FieldLabel>
@@ -276,7 +336,7 @@ export function CreateSlipForm({ beneficiaries, products, onCreated, onCancel })
                 value={form.mealsToServe} onChange={(e) => applyMealsToServe(e.target.value)}
               />
               <FieldDescription>
-                Fills each quantity from the centre’s per-meal ratio. Adjust any line before creating the slip.
+                Fills each quantity from the per-meal ratio of each product. Adjust any line before creating the slip.
               </FieldDescription>
             </Field>
             <ItemLinesEditor items={form.items} products={products} onChange={(items) => setForm((f) => ({ ...f, items }))} />
@@ -286,7 +346,10 @@ export function CreateSlipForm({ beneficiaries, products, onCreated, onCancel })
         <Field orientation="horizontal">
           <Button
             type="button" onClick={run}
-            disabled={busy || !form.ecdId || !form.dispatchDate || !form.cohort || (form.manualItems && linesInvalid(form.items))} loading={busy}>
+            disabled={busy || !form.dispatchDate
+              || (forKitchen
+                ? !form.beneficiaryName.trim() || linesInvalid(form.items)
+                : !form.ecdId || !form.cohort || (form.manualItems && linesInvalid(form.items)))} loading={busy}>
             {busy ? 'Creating' : 'Create slip'}
           </Button>
           <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
