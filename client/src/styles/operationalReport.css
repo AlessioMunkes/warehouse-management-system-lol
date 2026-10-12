@@ -14,8 +14,8 @@
 .pdfnote-document .op-pdf {
   --canvas: #faf8f5; --surface: #ffffff; --ink: #2b3336; --ink-soft: #676767;
   --line: #e9e3dd; --brand: #ef3a40; --good-ink: #1d7a3a;
-  --viz-1: #2a78d6; --viz-2: #eb6834; --viz-3: #1baf7a; --viz-4: #eda100;
-  --viz-5: #e87ba4; --viz-6: #008300; --viz-7: #4a3aa7; --viz-8: #e34948;
+  --viz-1: #2d5563; --viz-2: #cf6f36; --viz-3: #6f9f79; --viz-4: #d6a437;
+  --viz-5: #c47a97; --viz-6: #86aab8; --viz-7: #5c4a8c; --viz-8: #c0392f;
   color: #2b3336;
 }
 

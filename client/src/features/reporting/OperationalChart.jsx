@@ -391,7 +391,7 @@ export default function OperationalChart({
               key={k} dataKey={k} name={k} stackId={stacked ? 'a' : undefined}
               fill={SERIES[i]} hide={hidden.has(k)} fillOpacity={opacityFor(k)}
               stroke={SURF} strokeWidth={stacked ? 2 : 0}
-              radius={stacked ? 0 : [4, 4, 0, 0]} maxBarSize={48} isAnimationActive={animate}
+              radius={stacked ? 0 : [6, 6, 0, 0]} maxBarSize={48} isAnimationActive={animate}
               onClick={() => setHighlight(k)} cursor="pointer"
             />
           ))}
@@ -483,9 +483,9 @@ export default function OperationalChart({
           )}
           {withPrev && (
             <Bar dataKey="previous" name="Same period last year" fill={MUTED} fillOpacity={0.35}
-              radius={[4, 4, 0, 0]} maxBarSize={48} isAnimationActive={false} />
+              radius={[6, 6, 0, 0]} maxBarSize={48} isAnimationActive={false} />
           )}
-          <Bar dataKey="value" name="This period" radius={horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]} maxBarSize={horizontal ? 22 : 48} isAnimationActive={animate}
+          <Bar dataKey="value" name="This period" radius={horizontal ? [0, 6, 6, 0] : [6, 6, 0, 0]} maxBarSize={horizontal ? 22 : 48} isAnimationActive={animate}
             label={!compact && rows.length <= 15 ? {
               position: horizontal ? 'right' : 'top', fill: MUTED, fontSize: 11,
               formatter: (v) => fmtTick(v, unit),
