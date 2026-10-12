@@ -22,7 +22,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 
-export default function TrendCard({ metricId, label, icon: Icon, dimension = 'month', preset = 'last_3m', onExplore }) {
+export default function TrendCard({ metricId, label, icon: Icon, dimension = 'month', preset = 'last_3m', caption = null, onExplore }) {
   const [report, setReport] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -57,6 +57,8 @@ export default function TrendCard({ metricId, label, icon: Icon, dimension = 'mo
         </Button>
       </CardHeader>
       <CardContent>
+        {/* What the card covers: its breakdown and period. */}
+        {caption ? <p className="-mt-1 mb-2 text-xs text-muted-foreground">{caption}</p> : null}
         {loading ? (
           <Skeleton className="h-28 w-full" />
         ) : error ? (

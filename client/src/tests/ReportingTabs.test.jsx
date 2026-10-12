@@ -23,8 +23,9 @@ vi.mock('../services/reportingAPI', () => api);
 
 const stub = (name) => ({ default: () => <div>{name}</div> });
 vi.mock('../features/reporting/TrendCard', () => ({
-  default: ({ label, metricId, onExplore }) => <button type="button" onClick={() => onExplore(metricId)}>Explore {label}</button>,
+  default: ({ label, onExplore }) => <button type="button" onClick={() => onExplore()}>Explore {label}</button>,
 }));
+vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: { id: 7, role: 'manager', warehouse: 'main' } }) }));
 vi.mock('../features/reporting/AskBox', () => stub('ask box'));
 vi.mock('../features/reporting/ReportBrowser', () => stub('report browser'));
 vi.mock('../features/reporting/ReportBuilder', () => stub('report builder'));

@@ -24,7 +24,8 @@ import ReportBuilder from '../features/reporting/ReportBuilder';
 import OperationalChart from '../features/reporting/OperationalChart';
 import ComparisonChart  from '../features/reporting/ComparisonChart';
 import ComparisonInsight from '../features/reporting/ComparisonInsight';
-import TrendCard     from '../features/reporting/TrendCard';
+import OverviewCards from '../features/reporting/OverviewCards';
+import { useAuth } from '../context/AuthContext';
 import DataUpload   from '../features/reporting/DataUpload';
 import ReportBrowser from '../features/reporting/ReportBrowser';
 import OperationalInsight from '../features/reporting/OperationalInsight';
@@ -40,24 +41,10 @@ import ExceptionAlerts from '../features/reporting/ExceptionAlerts';
 import WorkloadHeatmap from '../features/reporting/WorkloadHeatmap';
 import { SavedReportsBar, SaveReport } from '../features/reporting/SavedReports';
 import ChartNote from '../features/reporting/ChartNote';
-import { Truck, TrendingUp, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 const CHARCOAL = 'var(--ink)';
 const MUTED    = 'var(--ink-soft)';
 const BORDER   = 'var(--line)';
-
-// Four pre-picked, genuinely useful signals — not an exhaustive list
-// (the builder below has all eighteen), just the ones worth seeing
-// without asking. unit_price_trend covers "prices"; there is no
-// substitute-goods metric here because nothing in the schema tracks
-// product substitution — inventing one would be a chart with no real
-// data behind it, which is worse than not showing it.
-const TRENDS = [
-  { metricId: 'dispatch_volume',   label: 'Food dispatched',       icon: Truck,         dimension: 'month' },
-  { metricId: 'unit_price_trend',  label: 'Unit price trend',      icon: TrendingUp,    dimension: 'product' },
-  { metricId: 'collection_compliance', label: 'Collection compliance', icon: CheckCircle2, dimension: 'month' },
-  { metricId: 'low_stock_items',   label: 'Items below reorder level', icon: AlertTriangle, dimension: 'product' },
-];
 
 // The page in seven parts, switched with the tabs under the title the
 // way Receipts switches goods in and goods out. Anything that produces
@@ -95,6 +82,7 @@ function Alternatives({ items, onPick, closest }) {
 }
 
 export default function ReportingPage() {
+  const { user } = useAuth();
   const [catalog, setCatalog]     = useState(null);
   const [tab, setTab]             = useState('overview');
   // The process map and the spreadsheet chart are drawn once their tab
@@ -352,9 +340,11 @@ export default function ReportingPage() {
   // A trend card's "Explore" runs its report straight away, with the
   // card's own breakdown, and brings the full result into focus — the
   // same path as Browse all reports, so the builder is synced too.
-  const handleExplore = (id) => {
-    const card = TRENDS.find((t) => t.metricId === id);
-    runMetric(id, card?.dimension);
+  // A card on the overview opens as the same report, breakdown and
+  // period, in full on the Reports tab.
+  const handleExplore = (card) => {
+    setPreset(card.preset);
+    runMetric(card.metric, card.dimension, resolvePreset(card.preset));
   };
 
   const handleFilterChange = (key, value) =>
@@ -455,16 +445,7 @@ export default function ReportingPage() {
         </div>
       )}
 
-      {catalog && (
-        <section aria-labelledby="op-trends-heading">
-          <h2 id="op-trends-heading" className="mb-2 text-sm font-bold">At a glance</h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {TRENDS.map((t) => (
-              <TrendCard key={t.metricId} {...t} onExplore={handleExplore} />
-            ))}
-          </div>
-        </section>
-      )}
+      {catalog && <OverviewCards user={user} metrics={catalog.metrics} onExplore={handleExplore} />}
 
       <SavedReportsBar items={saved} onOpen={openSaved} onChanged={loadSaved} />
       <ErrorBanner className="mt-5" message={error} />
