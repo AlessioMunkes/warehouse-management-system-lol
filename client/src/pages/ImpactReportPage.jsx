@@ -92,9 +92,9 @@ const COHORT_OPTIONS = [
 
 const MISSING_FACTOR_STATUS = 503;
 
-// One fixed palette entry per headline card — a card's colour never
-// changes meaning between renders, the same reasoning
-// ManagerDashboardPage.jsx's DONUT_COLORS follows.
+// One fixed colour per headline card, so a card's colour never
+// changes meaning between renders. The cards print their figure in
+// it, so these stay text-safe colours rather than chart slots.
 //
 // Order and captions match the poster-style layout: children/adults
 // on top, compost/paper below. Three of the four captions are static

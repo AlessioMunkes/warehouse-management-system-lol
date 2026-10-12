@@ -30,6 +30,7 @@ import {
   fitLabel, isAdditive, pivot, ragColour, shapeOf, unitWord, viewsFor,
 } from './chartFormat';
 import ChartTooltip from './ChartTooltip';
+import { useChartMotion } from './useChartMotion';
 import { exportExcel } from '../../lib/excelExport';
 import { Flow, Funnel, Waterfall } from './OperationalDiagrams';
 
@@ -214,6 +215,9 @@ export default function OperationalChart({
   const [showTarget, setShowTarget] = useState(true);
   const [hidden, setHidden]   = useState(() => new Set());
   const [localHl, setLocalHl] = useState(null);
+  // Grows in unless movement is reduced; never on paper, which is
+  // captured at once.
+  const animate = useChartMotion() && !print;
 
   const highlight = controlledHl !== undefined ? controlledHl : localHl;
   const setHighlight = (name) => {
@@ -387,7 +391,7 @@ export default function OperationalChart({
               key={k} dataKey={k} name={k} stackId={stacked ? 'a' : undefined}
               fill={SERIES[i]} hide={hidden.has(k)} fillOpacity={opacityFor(k)}
               stroke={SURF} strokeWidth={stacked ? 2 : 0}
-              radius={stacked ? 0 : [4, 4, 0, 0]} maxBarSize={48} isAnimationActive={!print}
+              radius={stacked ? 0 : [4, 4, 0, 0]} maxBarSize={48} isAnimationActive={animate}
               onClick={() => setHighlight(k)} cursor="pointer"
             />
           ))}
@@ -411,8 +415,8 @@ export default function OperationalChart({
               strokeDasharray="5 4" dot={false} connectNulls isAnimationActive={false} />
           )}
           {activeView === 'line'
-            ? <Line type="monotone" dataKey="value" name="This period" stroke={SINGLE} strokeWidth={2} dot={{ r: 4, fill: SINGLE, stroke: SURF, strokeWidth: 2 }} activeDot={{ r: 6 }} isAnimationActive={!print} />
-            : <Area type="monotone" dataKey="value" name="This period" stroke={SINGLE} strokeWidth={2} fill={SINGLE} fillOpacity={0.15} isAnimationActive={!print} />}
+            ? <Line type="monotone" dataKey="value" name="This period" stroke={SINGLE} strokeWidth={2} dot={{ r: 4, fill: SINGLE, stroke: SURF, strokeWidth: 2 }} activeDot={{ r: 6 }} isAnimationActive={animate} />
+            : <Area type="monotone" dataKey="value" name="This period" stroke={SINGLE} strokeWidth={2} fill={SINGLE} fillOpacity={0.15} isAnimationActive={animate} />}
           {!compact && anomalies.map((a) => (
             <ReferenceDot key={`anomaly-${a.name}`} x={a.name} y={a.value} r={8} fill="none" stroke="var(--rag-bad)" strokeWidth={2.5} />
           ))}
@@ -481,7 +485,7 @@ export default function OperationalChart({
             <Bar dataKey="previous" name="Same period last year" fill={MUTED} fillOpacity={0.35}
               radius={[4, 4, 0, 0]} maxBarSize={48} isAnimationActive={false} />
           )}
-          <Bar dataKey="value" name="This period" radius={horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]} maxBarSize={horizontal ? 22 : 48} isAnimationActive={!print}
+          <Bar dataKey="value" name="This period" radius={horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]} maxBarSize={horizontal ? 22 : 48} isAnimationActive={animate}
             label={!compact && rows.length <= 15 ? {
               position: horizontal ? 'right' : 'top', fill: MUTED, fontSize: 11,
               formatter: (v) => fmtTick(v, unit),

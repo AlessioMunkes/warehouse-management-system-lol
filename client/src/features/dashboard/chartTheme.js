@@ -9,11 +9,6 @@ export const BENEFICIARY_LABELS = {
   dignity_kitchen: 'Dignity kitchens', community: 'Community',
 };
 
-// Tokens, so every slice inverts with the theme.
-export const DONUT_COLORS = [
-  'var(--ink)', 'var(--brand)', 'var(--chart-tan)', 'var(--chart-sage)', 'var(--chart-grey)',
-];
-
 /**
  * The report payload out of whatever envelope the API wrapped it in.
  * Reads `series` — the reporting rework renamed `data` to `series`,

@@ -28,6 +28,7 @@ import {
 } from 'recharts';
 import { Button } from '@/components/ui/button';
 import ChartTooltip from './ChartTooltip';
+import { useChartMotion } from './useChartMotion';
 import {
   BAR_CURSOR, BENEFICIARY_COLOURS, LINE_CURSOR, SERIES, entityColours, fitLabel,
   formatLabel as baseLabel, isAdditive,
@@ -100,14 +101,14 @@ const NumberView = ({ series, unit }) => (
   </div>
 );
 
-const BarView = ({ rows, unit, tip, colourOf }) => (
+const BarView = ({ rows, unit, tip, colourOf, animate }) => (
   <ResponsiveContainer width="100%" height={260}>
     <BarChart data={rows} margin={{ top: 22, right: 8, left: 8, bottom: 0 }} barCategoryGap="20%">
       <CartesianGrid vertical={false} stroke={LINE} strokeOpacity={0.6} />
       <XAxis dataKey="name" {...axisProps} tick={<FitTick />} height={40} interval={0} />
       <YAxis hide />
       {tip(BAR_CURSOR)}
-      <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={64}>
+      <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={64} isAnimationActive={animate}>
         {rows.map((r) => <Cell key={r.name} fill={colourOf(r.name)} />)}
         {/* Printed value: ACC-03, height is never the only carrier. */}
         <LabelList dataKey="value" position="top" fontSize={12} fontWeight={600} fill={INK}
@@ -117,7 +118,7 @@ const BarView = ({ rows, unit, tip, colourOf }) => (
   </ResponsiveContainer>
 );
 
-const HBarView = ({ rows, unit, tip, colourOf }) => {
+const HBarView = ({ rows, unit, tip, colourOf, animate }) => {
   // Negative values (below reorder level) run left from a zero line.
   const hasNeg = rows.some((r) => r.value < 0);
   const values = rows.map((r) => r.value);
@@ -131,7 +132,7 @@ const HBarView = ({ rows, unit, tip, colourOf }) => {
           tick={{ fill: INK, fontSize: 12 }} tickFormatter={(v) => truncate(formatLabel(v), 22)} />
         {hasNeg ? <ReferenceLine x={0} stroke={LINE} strokeWidth={1.5} /> : null}
         {tip(BAR_CURSOR)}
-        <Bar dataKey="value" radius={hasNeg ? [4, 0, 0, 4] : [0, 4, 4, 0]} maxBarSize={18}>
+        <Bar dataKey="value" radius={hasNeg ? [4, 0, 0, 4] : [0, 4, 4, 0]} maxBarSize={18} isAnimationActive={animate}>
           {rows.map((r) => <Cell key={r.name} fill={hasNeg ? UNDER : colourOf(r.name)} />)}
           <LabelList position={hasNeg ? 'left' : 'right'} fontSize={12} fontWeight={600} fill={INK}
             content={({ x, y, width, height, index }) => {
@@ -151,7 +152,7 @@ const HBarView = ({ rows, unit, tip, colourOf }) => {
   );
 };
 
-const LineView = ({ rows, unit, tip }) => {
+const LineView = ({ rows, unit, tip, animate }) => {
   // Every point's value on a short series, every other on a long one,
   // so the figures stay readable without running into each other.
   const every = rows.length > 8 ? 2 : 1;
@@ -162,7 +163,7 @@ const LineView = ({ rows, unit, tip }) => {
         <XAxis dataKey="name" {...axisProps} tick={<FitTick />} height={40} interval={every - 1} />
         <YAxis hide domain={[0, 'auto']} />
         {tip(LINE_CURSOR)}
-        <Line type="monotone" dataKey="value" stroke={TREND} strokeWidth={2}
+        <Line type="monotone" dataKey="value" stroke={TREND} strokeWidth={2} isAnimationActive={animate}
           dot={{ r: 4, fill: TREND, stroke: SURF, strokeWidth: 2 }} activeDot={{ r: 6 }}>
           <LabelList dataKey="value" position="top" fontSize={11} fontWeight={600} fill={INK}
             content={({ x, y, value, index }) => (index % every === 0
@@ -176,7 +177,7 @@ const LineView = ({ rows, unit, tip }) => {
 
 // One cluster per month, one bar per group within it: "compared over
 // time" rather than BarView's single snapshot.
-const GroupedBarView = ({ series, unit, tip }) => {
+const GroupedBarView = ({ series, unit, tip, animate }) => {
   const parsed = series.map((row) => {
     const [month, group] = String(row.label).split('|');
     return { month, group: group ?? 'Total', value: row.value };
@@ -197,7 +198,7 @@ const GroupedBarView = ({ series, unit, tip }) => {
           <YAxis hide />
           {tip(BAR_CURSOR)}
           {groups.map((g, gi) => (
-            <Bar key={g} dataKey={g} name={g} fill={colourForGroup(g, gi)} radius={[3, 3, 0, 0]} maxBarSize={28} />
+            <Bar key={g} dataKey={g} name={g} fill={colourForGroup(g, gi)} radius={[3, 3, 0, 0]} maxBarSize={28} isAnimationActive={animate} />
           ))}
         </BarChart>
       </ResponsiveContainer>
@@ -290,6 +291,7 @@ const sortSeries = (series, sort) => {
 export default function ReportChart({ report, dimensionLabel = 'Category', compact = false, initialSort = 'desc', note }) {
   const [asTable, setAsTable] = useState(false);
   const [sort, setSort] = useState(initialSort);
+  const animate = useChartMotion();
   const { series: rawSeries, chartType, meta } = report;
   const unit = meta?.unit ?? '';
 
@@ -327,10 +329,10 @@ export default function ReportChart({ report, dimensionLabel = 'Category', compa
 
   const views = {
     number: <NumberView series={series} unit={unit} />,
-    bar: <BarView rows={rows} unit={unit} tip={tip} colourOf={colourOf} />,
-    hbar: <HBarView rows={rows} unit={unit} tip={tip} colourOf={colourOf} />,
-    line: <LineView rows={rows} unit={unit} tip={tip} />,
-    grouped_bar: <GroupedBarView series={series} unit={unit} tip={tip} />,
+    bar: <BarView rows={rows} unit={unit} tip={tip} colourOf={colourOf} animate={animate} />,
+    hbar: <HBarView rows={rows} unit={unit} tip={tip} colourOf={colourOf} animate={animate} />,
+    line: <LineView rows={rows} unit={unit} tip={tip} animate={animate} />,
+    grouped_bar: <GroupedBarView series={series} unit={unit} tip={tip} animate={animate} />,
   };
 
   return (

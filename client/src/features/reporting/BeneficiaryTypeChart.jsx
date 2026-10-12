@@ -23,6 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChartTip } from './ChartTooltip';
 import { BAR_CURSOR } from './chartFormat';
+import { useChartMotion } from './useChartMotion';
 
 const INK = 'var(--ink)';
 const fmtNum = (n) => Math.round(Number(n) || 0).toLocaleString('en-ZA');
@@ -41,6 +42,7 @@ function BeneficiaryTip({ active, payload }) {
 }
 
 export default function BeneficiaryTypeChart({ items }) {
+  const animate = useChartMotion();
   const rows = items.filter(({ stat }) => ready(stat)).map(({ metric, label, unit, color, stat }) => ({
     metric, label, unit, color, value: stat.value, estimated: metric !== 'children_reached',
   }));
@@ -65,7 +67,7 @@ export default function BeneficiaryTypeChart({ items }) {
                 <YAxis type="category" dataKey="label" width={170} axisLine={false} tickLine={false}
                   tick={{ fill: INK, fontSize: 13, fontWeight: 500 }} />
                 <Tooltip cursor={BAR_CURSOR} content={<BeneficiaryTip />} />
-                <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={14} minPointSize={3}>
+                <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={14} minPointSize={3} isAnimationActive={animate}>
                   {rows.map((r) => <Cell key={r.metric} fill={r.color} />)}
                   <LabelList content={({ x, y, width, height, index }) => {
                     const r = rows[index];

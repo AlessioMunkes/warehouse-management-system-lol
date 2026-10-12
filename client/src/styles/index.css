@@ -318,8 +318,8 @@
     --violet-soft: #f3ecfb;
     --chip:        #eef2f4;   /* the neutral badge on the donation screens */
 
-    /* The third, fourth and fifth slices of a donut. Light values are
-       ManagerDashboardPage's DONUT_COLORS verbatim. */
+    /* Accent colours for the Impact report's headline cards, and the
+       grey every chart uses for categories past its eighth colour. */
     --chart-tan:   #c9a86a;
     --chart-sage:  #6b8f71;
     --chart-grey:  #8a8a8a;

@@ -27,6 +27,7 @@ import {
 } from 'recharts';
 import ChartTooltip from '@/features/reporting/ChartTooltip';
 import { BAR_CURSOR, SERIES } from '@/features/reporting/chartFormat';
+import { useChartMotion } from '@/features/reporting/useChartMotion';
 import TablePager from '@/components/ui/table-pager';
 import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/usePaged';
 
@@ -559,6 +560,7 @@ const exportReportPdf = async ({ dateFrom, dateTo, type, chartData, purchaseOrde
 };
 
 export default function FinanceWarehouseReportView({ loadReport, showReset = true }) {
+  const animate = useChartMotion();
   const [type, setType] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -753,9 +755,9 @@ export default function FinanceWarehouseReportView({ loadReport, showReset = tru
                       <XAxis dataKey="label" tickMargin={8} {...axisProps} />
                       <YAxis allowDecimals={false} {...axisProps} />
                       <Tooltip content={<ChartTooltip unit="records" labelFor={(l) => l} />} cursor={BAR_CURSOR} />
-                      <Bar dataKey="donations" name="Donations" fill={CHART_COLORS.donations} radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="po" name="Purchase Orders" fill={CHART_COLORS.po} radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="dispatches" name="Dispatch" fill={CHART_COLORS.dispatches} radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="donations" name="Donations" fill={CHART_COLORS.donations} radius={[4, 4, 0, 0]} isAnimationActive={animate} />
+                      <Bar dataKey="po" name="Purchase Orders" fill={CHART_COLORS.po} radius={[4, 4, 0, 0]} isAnimationActive={animate} />
+                      <Bar dataKey="dispatches" name="Dispatch" fill={CHART_COLORS.dispatches} radius={[4, 4, 0, 0]} isAnimationActive={animate} />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (

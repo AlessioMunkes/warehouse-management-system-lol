@@ -28,6 +28,7 @@ import {
 import { buildSeries } from './balanceSeries';
 import { ChartTip } from '../reporting/ChartTooltip';
 import { LINE_CURSOR, SERIES } from '../reporting/chartFormat';
+import { useChartMotion } from '../reporting/useChartMotion';
 
 const TREND = SERIES[0];
 const GRID  = 'var(--line)';
@@ -54,6 +55,7 @@ function BalanceTip({ active, payload, unit }) {
 
 export default function BalanceChart({ movements, onHand, reorderAt = 0, unit = '' }) {
   const points = useMemo(() => buildSeries(movements, onHand), [movements, onHand]);
+  const animate = useChartMotion();
 
   if (points.length === 0) {
     return (
@@ -84,7 +86,7 @@ export default function BalanceChart({ movements, onHand, reorderAt = 0, unit = 
               comes near it should still show how far away it is. */}
           <YAxis hide domain={[(min) => Math.min(min, 0), (max) => Math.max(max, threshold, 1)]} />
           <Tooltip cursor={LINE_CURSOR} content={<BalanceTip unit={unit} />} />
-          <Area type="linear" dataKey="v" stroke={TREND} strokeWidth={2} fill={TREND} fillOpacity={0.08}
+          <Area type="linear" dataKey="v" isAnimationActive={animate} stroke={TREND} strokeWidth={2} fill={TREND} fillOpacity={0.08}
             dot={false} activeDot={{ r: 4, fill: TREND, stroke: 'var(--surface)', strokeWidth: 2 }} />
           {threshold > 0 ? (
             <ReferenceLine y={threshold} stroke={MUTED} strokeDasharray="4 4"
