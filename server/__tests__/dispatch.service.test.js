@@ -418,7 +418,7 @@ describe('a pallet written off at 15:00 can still be collected', () => {
     });
 
     expect(repoMock.collect).toHaveBeenCalledWith(
-      expect.objectContaining({ overrideReason: null, actorId: WORKER.id })
+      expect.objectContaining({ actorId: WORKER.id })
     );
   });
 
@@ -437,8 +437,8 @@ describe('a pallet written off at 15:00 can still be collected', () => {
 
   // Being written off must not smuggle a pallet past the checks that
   // ARE gates. A written-off pallet at an inactive centre is still
-  // blocked, and one that packing never closed off still needs a
-  // manager.
+  // blocked, and one that packing never closed off is refused for
+  // everyone: the agreed process is to finish packing first.
   it('still blocks an inactive centre (BR-11)', async () => {
     repoMock.getGateView.mockResolvedValue(
       gateView({ dispatch_status: 'not_collected', ecd_is_active: false })
@@ -455,6 +455,26 @@ describe('a pallet written off at 15:00 can still be collected', () => {
       status: 409, message: expect.stringContaining('Finish packing it first'),
     });
     expect(repoMock.collect).not.toHaveBeenCalled();
+  });
+
+  // The manager override that used to sit here could never run: the
+  // collect route is worker-only and the repository refuses an
+  // unpacked pallet anyway. It was removed, so a reason no longer
+  // lets anyone past.
+  it('refuses an unpacked pallet even with a reason, for a manager too', async () => {
+    repoMock.getGateView.mockResolvedValue(gateView({ slip_status: 'in_progress' }));
+    await expect(
+      dispatchService.collect(1, { ...body, overrideReason: 'Driver is here' }, MANAGER)
+    ).rejects.toMatchObject({ status: 409, message: expect.stringContaining('Finish packing it first') });
+    expect(repoMock.collect).not.toHaveBeenCalled();
+  });
+
+  it('never passes an override reason down to be recorded', async () => {
+    repoMock.getGateView.mockResolvedValue(gateView());
+    repoMock.collect.mockResolvedValue({ event: { id: 9 } });
+    repoMock.getDispatchNote?.mockResolvedValue?.({});
+    await dispatchService.collect(1, { ...body, overrideReason: 'ignored' }, WORKER);
+    expect(repoMock.collect.mock.calls[0][0]).not.toHaveProperty('overrideReason');
   });
 });
 
@@ -489,7 +509,7 @@ describe('a pallet booked for another day can still be collected', () => {
 
     await expect(dispatchService.collect(1, body, WORKER)).resolves.toBeTruthy();
     expect(repoMock.collect).toHaveBeenCalledWith(
-      expect.objectContaining({ overrideReason: null, actorId: WORKER.id })
+      expect.objectContaining({ actorId: WORKER.id })
     );
   });
 

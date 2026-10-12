@@ -304,7 +304,7 @@ const getGateView = async (slipId) => {
 // there is nothing to unwind first.
 const collect = async ({
   slipId, driverName, vehicleReg, signature,
-  lines = [], idempotencyKey = null, overrideReason = null,
+  lines = [], idempotencyKey = null,
   actorId,
   // Advisory flags from the service. These do not change what is
   // written to stock or to dispatch_events; they are recorded in the
@@ -339,8 +339,8 @@ const collect = async ({
     const slip = slipResult.rows[0];
     if (!slip) { await client.query('ROLLBACK'); return { notFound: true }; }
 
-    // The slip must be packed. The service decides whether a manager
-    // may override this; the repository only reports the state.
+    // The slip must be packed. The service refuses this first with
+    // the worker's wording; this is the backstop.
     if (slip.status !== 'complete' && slip.status !== 'dispatched') {
       await client.query('ROLLBACK');
       return { notPacked: true, slipStatus: slip.status };
@@ -390,33 +390,20 @@ const collect = async ({
                driver_name     = $3,
                vehicle_reg     = $4,
                signature       = $5,
-               override_reason = COALESCE($6, override_reason),
-               override_by     = CASE WHEN $6::text IS NOT NULL THEN $2::integer ELSE override_by END,
-               idempotency_key = COALESCE($7, idempotency_key)
-           WHERE id = $8
+               idempotency_key = COALESCE($6, idempotency_key)
+           WHERE id = $7
            RETURNING *`,
           ['late_collected', actorId, driverName, vehicleReg ?? null,
-           signature ?? null, overrideReason, idempotencyKey, existing.id]
+           signature ?? null, idempotencyKey, existing.id]
         )
       : await client.query(
           `INSERT INTO dispatch_events
              (picking_slip_id, status, collected_at, dispatched_by, driver_name,
-              vehicle_reg, signature, override_reason, override_by, idempotency_key)
-           VALUES ($1, 'collected', NOW(), $2::integer, $3, $4, $5, $6,
-                   -- $2 is deduced as integer from dispatched_by above, then
-                   -- deduced again inside this CASE against an untyped NULL.
-                   -- The two deductions conflict and Postgres raises 42P08
-                   -- ("inconsistent types deduced for parameter $2") — on
-                   -- FIRST-TIME collection only, since the UPDATE branch
-                   -- below has an ELSE override_by, a column with a known
-                   -- type. Casting both arms pins it. Reproduced and fixed
-                   -- against real Postgres 16; the pg mock in the tests
-                   -- cannot see this class of error at all.
-                   CASE WHEN $6::text IS NOT NULL THEN $2::integer
-                        ELSE NULL::integer END, $7)
+              vehicle_reg, signature, idempotency_key)
+           VALUES ($1, 'collected', NOW(), $2::integer, $3, $4, $5, $6)
            RETURNING *`,
           [slipId, actorId, driverName, vehicleReg ?? null,
-           signature ?? null, overrideReason, idempotencyKey]
+           signature ?? null, idempotencyKey]
         );
 
     const event = eventResult.rows[0];
@@ -510,7 +497,6 @@ const collect = async ({
       dispatch_event_id: event.id,
       driver_name:       driverName,
       vehicle_reg:       vehicleReg ?? null,
-      override_reason:   overrideReason,
       line_count:        packedResult.rowCount,
     });
     if (shortfalls.length > 0) {
