@@ -15,16 +15,17 @@
 // QuickBooks, Send again finishes the job.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
-import { CircleX, Clock, Send, TriangleAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import StatusBadge from '@/components/ui/status-badge';
 import { getOrderState, sendOrder } from '../../services/quickbooksAPI';
 
-const LOOK = {
-  none:        { tone: 'neutral', icon: Clock,         label: 'Not sent to QuickBooks yet' },
-  sending:     { tone: 'info',    icon: Send,          label: 'Sending to QuickBooks' },
-  needs_match: { tone: 'warn',    icon: TriangleAlert, label: 'Needs a match in QuickBooks' },
-  failed:      { tone: 'bad',     icon: CircleX,       label: 'Could not be sent to QuickBooks' },
+// The colour and icon for each state are in lib/statusStyles.js
+// (kind 'quickbooks'), with every other status in the app.
+const LABEL = {
+  none:        'Not sent to QuickBooks yet',
+  sending:     'Sending to QuickBooks',
+  needs_match: 'Needs a match in QuickBooks',
+  failed:      'Could not be sent to QuickBooks',
 };
 
 export default function QuickbooksSync({ purchaseOrder: po, canManage, onSynced }) {
@@ -49,7 +50,7 @@ export default function QuickbooksSync({ purchaseOrder: po, canManage, onSynced 
   // Nothing to send until a manager has approved it.
   if (po.status === 'pending' || po.status === 'returned') return null;
 
-  const look = LOOK[busy ? 'sending' : state.state] ?? LOOK.none;
+  const look = busy ? 'sending' : (LABEL[state.state] ? state.state : 'none');
 
   const send = async () => {
     setBusy(true);
@@ -68,7 +69,7 @@ export default function QuickbooksSync({ purchaseOrder: po, canManage, onSynced 
   return (
     <div className="mt-2 space-y-1.5">
       <div className="flex flex-wrap items-center gap-2">
-        <StatusBadge tone={look.tone} icon={look.icon}>{look.label}</StatusBadge>
+        <StatusBadge kind="quickbooks" status={look}>{LABEL[look]}</StatusBadge>
         {canManage ? (
           <Button type="button" size="sm" variant="outline" onClick={send} disabled={busy} loading={busy}>
             {state.state === 'none' ? 'Send to QuickBooks' : 'Send again'}

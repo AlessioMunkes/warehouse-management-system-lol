@@ -8,7 +8,11 @@
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// This file's own folder. __dirname is not defined in an ES module.
+const here = dirname(fileURLToPath(import.meta.url));
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { MESSAGES } from '../translations/messages';
@@ -98,9 +102,9 @@ describe('guest translation keys', () => {
 
   it('every guest key the guest files ask for exists in English', () => {
     const files = [
-      ...readdirSync(join(__dirname, '../pages')).filter((f) => f.startsWith('Guest')).map((f) => join(__dirname, '../pages', f)),
-      ...readdirSync(join(__dirname, '../features/guest')).map((f) => join(__dirname, '../features/guest', f)),
-      join(__dirname, '../services/guestSlipAPI.js'),
+      ...readdirSync(join(here, '../pages')).filter((f) => f.startsWith('Guest')).map((f) => join(here, '../pages', f)),
+      ...readdirSync(join(here, '../features/guest')).map((f) => join(here, '../features/guest', f)),
+      join(here, '../services/guestSlipAPI.js'),
     ];
     const used = new Set();
     for (const f of files) {

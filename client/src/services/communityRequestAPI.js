@@ -69,6 +69,9 @@ export const toRequest = (row = {}) => ({
   assignedToName: fullName(row.assigned_to_first_name, row.assigned_to_last_name),
   // Set while any approved line ran short of stock.
   itemsShortAt:   row.items_short_at ?? null,
+  // Approved a week ago or more and still not gone out (the server's
+  // rule, communityRequest.repository.js).
+  isOverdue:      Boolean(row.is_overdue),
   items:          (row.items ?? []).map(toItem),
 });
 
@@ -115,6 +118,14 @@ export const declineRequest = async (id, reason) => {
   return toRequest(body.data ?? {});
 };
 
+// ── POST /:id/reverse ────────────────────────────────────────
+// Managers only. Puts what went out back into stock and ends the
+// request as declined, with the reason.
+export const reverseRequest = async (id, reason) => {
+  const body = await apiPost(`/api/community-requests/${id}/reverse`, { reason });
+  return toRequest(body.data ?? {});
+};
+
 // ── PATCH /:id/assign ────────────────────────────────────────
 // userId null clears the packer.
 export const assignRequest = async (id, userId) => {
@@ -148,6 +159,6 @@ export const confirmRequest = async (id, items) => {
 
 export default {
   getRequests, getRequest, logRequest,
-  approveRequest, declineRequest, assignRequest, rechooseItems, claimRequest, confirmRequest,
+  approveRequest, declineRequest, assignRequest, rechooseItems, claimRequest, confirmRequest, reverseRequest,
   OUTCOMES, OUTCOME_LABELS,
 };

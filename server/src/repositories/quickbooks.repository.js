@@ -17,6 +17,9 @@ import pool from '../config/db.js';
 const ENTITY = 'purchase_order';
 const OBJECT = 'PurchaseOrder';
 const keyFor = (poId) => `purchase_order:${poId}:create`;
+// The same key in SQL, for a query that joins orders to their send
+// (the purchase order list, the dashboard's Needs attention count).
+export const poSyncKeySql = (poIdExpr) => `'purchase_order:' || ${poIdExpr} || ':create'`;
 
 // ── The connection ──────────────────────────────────────────
 // One company at a time: the newest row is the connection.

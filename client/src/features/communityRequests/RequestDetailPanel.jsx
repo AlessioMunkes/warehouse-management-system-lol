@@ -9,6 +9,7 @@
 import { SHORT_STYLE } from '@/lib/statusStyles';
 import StatusBadge from '@/components/ui/status-badge';
 import DetailPanel from '@/components/ui/detail-panel';
+import { Button } from '@/components/ui/button';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -30,7 +31,9 @@ const Fact = ({ label, children }) => (
   </div>
 );
 
-export default function RequestDetailPanel({ request: r, onClose }) {
+// `onReverse`: the manager's screen passes it, and a confirmed request
+// then offers Reverse. The floor's screen does not.
+export default function RequestDetailPanel({ request: r, onClose, onReverse }) {
   const confirmed = r.outcome === 'fulfilled' || r.outcome === 'partially_fulfilled';
   const status = displayStatus(r);
   const packer = packerLabel(r);
@@ -40,6 +43,9 @@ export default function RequestDetailPanel({ request: r, onClose }) {
       open
       onClose={onClose}
       eyebrow={`Benevolent request #${r.id}`}
+      actions={confirmed && onReverse ? (
+        <Button type="button" variant="outline" onClick={onReverse}>Reverse</Button>
+      ) : null}
       title={r.callerName || 'An unnamed caller'}
       badges={(
         <StatusBadge kind="communityRequest" status={status}>

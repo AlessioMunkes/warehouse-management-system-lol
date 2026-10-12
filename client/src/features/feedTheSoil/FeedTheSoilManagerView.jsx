@@ -17,6 +17,7 @@
 // row, not repeated in the list.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import collectionKitAPI from '../../services/collectionKitAPI';
 import formatKitCode from './kitCode';
 import { todayISO } from '../packing/spareSlips';
@@ -85,8 +86,12 @@ const KitStatus = ({ status }) => (
   <StatusBadge kind="kit" status={status}>{STATUS_LABELS[status] ?? status}</StatusBadge>
 );
 
+// `idle`: kits assigned three months ago or more with no compost ever
+// logged (is_idle, the server's rule). The dashboard's Needs attention
+// line links here with ?status=idle. Shown only while there are any.
 const TABS = [
   { id: 'kits',    label: 'Kits' },
+  { id: 'idle',    label: 'Idle kits', alert: true },
   { id: 'records', label: 'Records' },
 ];
 
@@ -390,7 +395,9 @@ const RecordDetail = ({ record, onDispatch, onOpenKit, onClose, backLabel }) => 
 );
 
 export default function FeedTheSoilManagerView() {
-  const [tab, setTab] = useState('kits');
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState(() => (searchParams.get('status') === 'idle' ? 'idle' : 'kits'));
+  const kitsTab = tab !== 'records';
   // 'list' | 'assign' | 'log' | 'logPickKit' | 'dispatch'
   const [view, setView] = useState('list');
   const [selectedKit, setSelectedKit] = useState(null);
@@ -434,10 +441,10 @@ export default function FeedTheSoilManagerView() {
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
-    const load = tab === 'kits' ? loadKits() : loadRecords();
+    const load = kitsTab ? loadKits() : loadRecords();
     load.finally(() => { if (!cancelled) setIsLoading(false); });
     return () => { cancelled = true; };
-  }, [tab, loadKits, loadRecords]);
+  }, [kitsTab, loadKits, loadRecords]);
 
   const openKit = async (id) => {
     setError(null);
@@ -521,14 +528,16 @@ export default function FeedTheSoilManagerView() {
   };
 
   // Kits, fifteen to a page.
-  const kitSort = useSortable(kits, KIT_SORT);
-  const kitPage = usePaged(kitSort.rows, TABLE_PAGE_SIZE, `${kitSearch}|${kits.length}|${kitSort.sort?.key}|${kitSort.sort?.dir}`);
+  const idleKits = kits.filter((k) => k.is_idle);
+  const shownKits = tab === 'idle' ? idleKits : kits;
+  const kitSort = useSortable(shownKits, KIT_SORT);
+  const kitPage = usePaged(kitSort.rows, TABLE_PAGE_SIZE, `${tab}|${kitSearch}|${shownKits.length}|${kitSort.sort?.key}|${kitSort.sort?.dir}`);
   // Records, fifteen to a page.
   const recordSort = useSortable(records, RECORD_SORT);
   const recordPage = usePaged(recordSort.rows, TABLE_PAGE_SIZE, `${recordSearch}|${records.length}|${recordSort.sort?.key}|${recordSort.sort?.dir}`);
   // The page's main action follows the tab, and only on the list itself.
   const onList = view === 'list' && !selectedKit && !selectedRecord;
-  const headerAction = !onList ? null : tab === 'kits' ? (
+  const headerAction = !onList ? null : kitsTab ? (
     <Button type="button" onClick={() => go('assign')}>
       <Plus /> Assign a kit
     </Button>
@@ -546,14 +555,15 @@ export default function FeedTheSoilManagerView() {
         actions={headerAction}
       />
 
-      <ErrorBanner className="mt-4" message={error} onRetry={tab === 'kits' ? loadKits : loadRecords} />
+      <ErrorBanner className="mt-4" message={error} onRetry={kitsTab ? loadKits : loadRecords} />
 
       <ViewTabs
         className="mt-5"
         label="Feed the Soil views"
         value={tab}
         onChange={(id) => { setTab(id); setView('list'); setSelectedKit(null); setSelectedRecord(null); }}
-        tabs={TABS}
+        tabs={TABS.filter((t) => t.id !== 'idle' || idleKits.length > 0 || tab === 'idle')
+          .map((t) => (t.id === 'idle' ? { ...t, count: idleKits.length } : t))}
       />
 
       <div ref={detailRef} tabIndex={-1} className="mt-6 space-y-6 scroll-mt-6 outline-none">
@@ -588,20 +598,22 @@ export default function FeedTheSoilManagerView() {
             onOpenRecord={(id) => openRecord(id, { fromKit: true })}
             onClose={() => { setSelectedKit(null); loadKits(); }}
           />
-        ) : tab === 'kits' ? (
+        ) : kitsTab ? (
           <ListCard
             header={<ListToolbar search={{ value: kitSearch, onChange: setKitSearch, placeholder: 'Search by owner or suburb' }} />}
-            footer={!isLoading && kits.length ? <TablePager {...kitPage} noun="kits" alwaysShow /> : null}
+            footer={!isLoading && shownKits.length ? <TablePager {...kitPage} noun="kits" alwaysShow /> : null}
           >
             {isLoading ? (
               <div className="space-y-2 p-4" aria-busy="true">
                 {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
               </div>
-            ) : kits.length === 0 ? (
+            ) : shownKits.length === 0 ? (
               <EmptyState
                 icon={Sprout}
-                title={kitSearch ? 'No kits match' : 'No kits assigned yet'}
-                description={kitSearch ? 'Nothing matches the search.' : 'Assign a kit to a community member to start.'}
+                title={kitSearch ? 'No kits match' : tab === 'idle' ? 'No idle kits' : 'No kits assigned yet'}
+                description={kitSearch ? 'Nothing matches the search.' : tab === 'idle'
+                  ? 'Every kit has had compost logged, or was given out less than three months ago.'
+                  : 'Assign a kit to a community member to start.'}
               />
             ) : (
           <Table>

@@ -68,6 +68,12 @@ const PO_VIEWS = [
   { id: 'follow_up_required', label: 'Follow-up required', alert: true, test: needsFollowUp },
   { id: 'partially_received', label: 'Partially received', test: (po) => po.status === 'partially_received' },
   { id: 'closed',             label: 'Closed', test: (po) => po.status === 'completed' || po.status === 'returned' },
+  // Flags a person has to act on, whatever the order's status. Shown
+  // only while there are any (or the tab is open from a link).
+  { id: 'email_failed',       label: 'Finance email failed', alert: true, onlyWhenAny: true,
+    test: (po) => po.financeEmailStatus === 'failed' },
+  { id: 'needs_match',        label: 'Needs a QuickBooks match', alert: true, onlyWhenAny: true,
+    test: (po) => po.quickbooksState === 'needs_match' },
   { id: 'all',                label: 'All',                test: () => true },
 ];
 const viewById = (id) => PO_VIEWS.find((v) => v.id === id) ?? PO_VIEWS[0];
@@ -365,7 +371,8 @@ export default function PurchaseOrdersPage() {
             label="Purchase order views"
             value={view}
             onChange={changeView}
-            tabs={PO_VIEWS.map((v) => ({ id: v.id, label: v.label, alert: v.alert, count: isLoading ? null : counts[v.id] }))}
+            tabs={PO_VIEWS.filter((v) => !v.onlyWhenAny || counts[v.id] > 0 || v.id === view)
+              .map((v) => ({ id: v.id, label: v.label, alert: v.alert, count: isLoading ? null : counts[v.id] }))}
           />
 
           <ListCard

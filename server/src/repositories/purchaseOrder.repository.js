@@ -20,6 +20,7 @@ import pool           from '../config/db.js';
 import { logAudit }   from './auditLog.repository.js';
 import { safeFinanceEmailError } from '../utils/financeEmailError.js';
 import { buildState, classifyPair } from '../utils/quickbooksImport.js';
+import { poSyncKeySql } from './quickbooks.repository.js';
 
 const QBO_UNIQUE_CONSTRAINT = 'qbo_map_unique_remote';
 
@@ -222,10 +223,15 @@ const listPurchaseOrders = async ({ status = null, supplierId = null, limit = 50
             -- with none is flagged "follow-up required".
             (SELECT COUNT(*) FROM purchase_orders child
               WHERE child.follow_up_of = po.id
-                AND child.status NOT IN ('completed', 'returned'))::int AS open_follow_up_count
+                AND child.status NOT IN ('completed', 'returned'))::int AS open_follow_up_count,
+            -- What the "Finance email failed" and "Needs a match in
+            -- QuickBooks" tabs filter on, and the dashboard counts.
+            po.finance_email_status,
+            qsq.payload->>'state' AS quickbooks_state
        FROM purchase_orders po
        JOIN suppliers s ON s.id = po.supplier_id
        LEFT JOIN users u ON u.id = po.created_by
+       LEFT JOIN quickbooks_sync_queue qsq ON qsq.idempotency_key = ${poSyncKeySql('po.id')}
       WHERE ($1::text IS NULL OR po.status = $1)
         AND ($2::int  IS NULL OR po.supplier_id = $2)
       ORDER BY po.created_at DESC

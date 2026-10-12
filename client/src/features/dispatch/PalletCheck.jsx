@@ -8,8 +8,7 @@
 // second, near-duplicate render tree for Form mode. It is now two
 // screens on the page itself:
 //
-//   1  Which pallet   the beneficiary, the eligibility flags, and a
-//                     manager's override reason where one is needed
+//   1  Which pallet   the beneficiary and the eligibility flags
 //   2  Load and release   every line at once, the driver, the signature
 //
 // Guided and Form are no longer different trees. They are the same
@@ -20,13 +19,13 @@
 //
 // The one HARD block is an inactive beneficiary centre (BR-11) —
 // nothing here gets past that, for anyone. A pallet packing has not
-// closed off needs a manager's typed reason; a warehouse worker is
-// told to find one. This screen is not the source of truth for any of
+// closed off can't start either: the worker is told to finish packing
+// it first. This screen is not the source of truth for any of
 // that — evaluateEligibility() on the server is — but disagreeing
 // with it here would mean filling in a whole form only to be refused
 // at the last tap.
 //
-// wrongDay is deliberately NOT an override condition, matching
+// wrongDay deliberately does not stop a collection, matching
 // dispatch.service.js's collect(): a pallet booked for another day is
 // recorded rather than gated, same as a written-off one.
 // ─────────────────────────────────────────────────────────────
@@ -41,14 +40,11 @@ import { readDraft, writeDraft, clearDraft } from '../staff/useDraft';
 import useCoachmark from '../staff/useCoachmark';
 import useConfirmed from '../staff/useConfirmed';
 import useUndo from '../staff/useUndo';
-import { useAuth } from '../../context/AuthContext';
 import dispatchAPI, { newIdempotencyKey } from '../../services/dispatchAPI';
 import SignaturePad from '../receiving/SignaturePad';
 import DispatchNotePDF from '../receipts/DispatchNotePDF';
 import SuccessDialog from '../staff/SuccessDialog';
 import { OFFLINE_TITLE, offlineLine } from '../staff/successText';
-
-const isManager = (user) => user?.role === 'manager' || user?.role === 'admin';
 
 // Postgres NUMERIC arrives from node-postgres as a string, so
 // packed_quantity is "1.000" and "35.000". String() kept that
@@ -97,7 +93,6 @@ const varianceReasonFor = (variance) =>
   variance === 0 ? null : variance < 0 ? 'Short count at dispatch' : 'Over count at dispatch';
 
 export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChange }) {
-  const { user } = useAuth();
 
   const [gateView, setGateView] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -109,7 +104,6 @@ export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChan
   // Which pallet `lines` belongs to — see the draft effect below.
   const [linesKey, setLinesKey] = useState(null);
 
-  const [overrideReason, setOverrideReason] = useState('');
   const [driverName, setDriverName] = useState('');
   const [vehicleReg, setVehicleReg] = useState('');
   const [signature, setSignature] = useState(null);
@@ -146,7 +140,6 @@ export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChan
       setLoadError(null);
       setPhase('which');
       setFocusId(null);
-      setOverrideReason('');
       setDriverName('');
       setVehicleReg('');
       setSignature(null);
@@ -226,11 +219,7 @@ export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChan
   );
   const hasLines = packedLines.length > 0;
 
-  const needsOverride = eligibility.slipNotPacked;
-  const overrideReasonText = eligibility.slipNotPacked
-    ? 'packing has not closed this pallet off yet'
-    : '';
-  const canStart = !eligibility.ecdInactive && (!needsOverride || (isManager(user) && overrideReason.trim()));
+  const canStart = !eligibility.ecdInactive && !eligibility.slipNotPacked;
 
   // Save the draft whenever the numbers or the driver change. Guarded
   // on phase so an untouched pallet does not leave a draft behind.
@@ -330,7 +319,6 @@ export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChan
         signature,
         lines: overrides,
         idempotencyKey: attemptKey,
-        overrideReason: needsOverride ? overrideReason : null,
       });
 
       // Sent, or safely in the outbox — either way the draft's job is done.
@@ -417,26 +405,10 @@ export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChan
             </Notice>
           ) : null}
 
-          {!eligibility.ecdInactive && needsOverride ? (
-            isManager(user) ? (
-              <div className="stf-field">
-                <label className="stf-field-label" htmlFor="stf-override-reason">
-                  Reason for authorising this collection
-                </label>
-                <textarea
-                  id="stf-override-reason"
-                  className="stf-input is-text"
-                  rows={2}
-                  value={overrideReason}
-                  onChange={(e) => setOverrideReason(e.target.value)}
-                  placeholder={`${overrideReasonText}. Say why this can still go out today.`}
-                />
-              </div>
-            ) : (
-              <Notice tone="warn">
-                Packing has not closed this pallet off yet. Finish packing it first.
-              </Notice>
-            )
+          {!eligibility.ecdInactive && eligibility.slipNotPacked ? (
+            <Notice tone="warn">
+              Packing has not closed this pallet off yet. Finish packing it first.
+            </Notice>
           ) : null}
 
           {eligibility.hasFlaggedLines ? (
@@ -487,22 +459,6 @@ export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChan
             </div>
           }
         >
-          {needsOverride && isManager(user) ? (
-            <div className="stf-field">
-              <label className="stf-field-label" htmlFor="stf-work-override-reason">
-                Reason for authorising this collection
-              </label>
-              <textarea
-                id="stf-work-override-reason"
-                className="stf-input is-text"
-                rows={2}
-                value={overrideReason}
-                onChange={(e) => setOverrideReason(e.target.value)}
-                placeholder={`${overrideReasonText}. Say why this can still go out today.`}
-              />
-            </div>
-          ) : null}
-
           {hasLines ? (
             <WorkList
               lines={packedLines.map((line) => ({

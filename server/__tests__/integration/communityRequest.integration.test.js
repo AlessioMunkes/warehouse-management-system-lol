@@ -34,7 +34,7 @@ if (LOCAL) {
 }
 
 const TABLES = [
-  'community_request_items', 'community_requests', 'dispatch_event_lines', 'dispatch_events',
+  'audit_log', 'community_request_items', 'community_requests', 'dispatch_event_lines', 'dispatch_events',
   'picking_slip_items', 'picking_slips', 'picking_events', 'stock_movements', 'stock_levels',
   'notifications', 'ecd_centres', 'products', 'users',
 ];
@@ -76,7 +76,8 @@ const manifest = async (productId) => {
 };
 
 const log = (over = {}) =>
-  service.createRequest({ itemsRequested: 'Rice and beans', callerName: 'Sister Agnes', ...over }, worker);
+  // signedOff: whoever logs a request signs it off (commit 89da081).
+  service.createRequest({ signedOff: true, itemsRequested: 'Rice and beans', callerName: 'Sister Agnes', ...over }, worker);
 
 const approved = async (items, who = manager) => {
   const r = await log();
@@ -379,25 +380,27 @@ describe.skipIf(!LOCAL)('benevolent requests against a real database', () => {
   describe('Needs attention counts', () => {
     const counts = async () => (await dashboardRepo.getAttention()).communityRequests;
 
-    it('counts awaiting approval, approved-but-unclaimed, and needs-new-items separately', async () => {
+    // Each count is the size of the tab it links to: Approved holds every
+    // approved request waiting to go out, claimed or not.
+    it('counts awaiting approval, approved, and needs-new-items separately', async () => {
       await log();                                                   // awaiting approval
       await approved([{ productId: beans, quantity: 1 }]);           // approved, unclaimed
       const claimed = await approved([{ productId: beans, quantity: 1 }]);
-      await service.claim(claimed, worker);                          // approved, claimed: not counted as unclaimed
+      await service.claim(claimed, worker);                          // approved, claimed: still waiting to go out
       const assigned = await approved([{ productId: beans, quantity: 1 }]);
       await service.assign(assigned, { userId: worker2.id }, manager); // approved, assigned: has an owner
-      expect(await counts()).toEqual({ pending: 1, unclaimed: 1, needsItems: 0 });
+      expect(await counts()).toEqual({ pending: 1, approved: 3, overdue: 0, needsItems: 0 });
     });
 
-    it('a flagged request moves from unclaimed to needs new items, and back when items are re-chosen', async () => {
+    it('a flagged request moves from approved to needs new items, and back when items are re-chosen', async () => {
       const id = await approved([{ productId: rice, quantity: 8 }]);
-      expect(await counts()).toEqual({ pending: 0, unclaimed: 1, needsItems: 0 });
+      expect(await counts()).toEqual({ pending: 0, approved: 1, overdue: 0, needsItems: 0 });
 
       await packPallet(rice, 6);
-      expect(await counts()).toEqual({ pending: 0, unclaimed: 0, needsItems: 1 });
+      expect(await counts()).toEqual({ pending: 0, approved: 0, overdue: 0, needsItems: 1 });
 
       await service.rechooseItems(id, { items: [{ productId: beans, quantity: 2 }] }, manager);
-      expect(await counts()).toEqual({ pending: 0, unclaimed: 1, needsItems: 0 });
+      expect(await counts()).toEqual({ pending: 0, approved: 1, overdue: 0, needsItems: 0 });
     });
 
     it('closed requests are not counted', async () => {
@@ -405,7 +408,90 @@ describe.skipIf(!LOCAL)('benevolent requests against a real database', () => {
       await service.decline(a, { reason: 'No' }, manager);
       const b = await approved([{ productId: beans, quantity: 1 }]);
       await service.confirm(b, {}, manager);
-      expect(await counts()).toEqual({ pending: 0, unclaimed: 0, needsItems: 0 });
+      expect(await counts()).toEqual({ pending: 0, approved: 0, overdue: 0, needsItems: 0 });
+    });
+
+    it('counts a request approved over a week ago and not gone out, and the list flags the same one', async () => {
+      const old = await approved([{ productId: beans, quantity: 1 }]);
+      await approved([{ productId: beans, quantity: 1 }]);
+      await q(`UPDATE community_requests SET approved_at = now() - interval '8 days' WHERE id = $1`, [old]);
+      expect(await counts()).toEqual({ pending: 0, approved: 2, overdue: 1, needsItems: 0 });
+      const flagged = (await service.listRequests({})).filter((r) => r.is_overdue).map((r) => r.id);
+      expect(flagged).toEqual([old]);
+
+      // Gone out: no longer overdue.
+      await service.confirm(old, {}, manager);
+      expect((await counts()).overdue).toBe(0);
+    });
+  });
+
+  // ── Reversing a confirmed request ───────────────────────────
+  describe('reversing a confirmed request', () => {
+    const net = async (productId) => Number((await q(
+      `SELECT COALESCE(SUM(quantity), 0) AS n FROM stock_movements
+        WHERE reference_type = 'community_request' AND product_id = $1`, [productId])).rows[0].n);
+
+    it('puts the stock back through the ledger, ends the request as declined, and records it', async () => {
+      const id = await approved([{ productId: rice, quantity: 6 }, { productId: beans, quantity: 3 }]);
+      await service.confirm(id, {}, manager);
+      expect(await onHand(rice)).toBe(4);
+
+      const r = await service.reverse(id, { reason: 'Caller never came' }, manager);
+
+      expect(r.outcome).toBe('declined');
+      expect(r.outcome_note).toBe('Reversed: Caller never came');
+      expect(r.items.map((i) => Number(i.quantityReleased))).toEqual([0, 0]);
+      expect(await onHand(rice)).toBe(10);
+      expect(await onHand(beans)).toBe(10);
+      // Nothing held for it any more, and its own movements add up to nothing.
+      expect(await manifest(rice)).toEqual({ onHand: 10, committed: 0, available: 10 });
+      expect(await net(rice)).toBe(0);
+      expect(await net(beans)).toBe(0);
+
+      const back = (await q(`SELECT movement_type, reference_id, performed_by, reason FROM stock_movements
+                               WHERE quantity > 0 AND reference_type = 'community_request'`)).rows;
+      expect(back).toHaveLength(2);
+      for (const m of back) {
+        expect(m).toMatchObject({ movement_type: 'adjustment', reference_id: id, performed_by: manager.id });
+        expect(m.reason).toMatch(/reversed: Caller never came/);
+      }
+
+      const audit = (await q(`SELECT action, actor_id, reason, before_data, after_data FROM audit_log
+                                WHERE entity_type = 'community_request' AND entity_id = $1 AND action = 'reversed'`, [String(id)])).rows;
+      expect(audit).toHaveLength(1);
+      expect(audit[0]).toMatchObject({ actor_id: manager.id, reason: 'Caller never came' });
+      expect(audit[0].before_data.outcome).toBe('fulfilled');
+    });
+
+    it('after a partial confirmation, puts back only what went out', async () => {
+      const id = await approved([{ productId: rice, quantity: 6 }]);
+      await service.confirm(id, { items: [{ productId: rice, quantityReleased: 4 }] }, manager);
+      expect(await onHand(rice)).toBe(6);
+      await service.reverse(id, { reason: 'Recorded by mistake' }, manager);
+      expect(await onHand(rice)).toBe(10);
+      expect(await net(rice)).toBe(0);
+    });
+
+    it('cannot be done twice, and two at once put the stock back only once', async () => {
+      const id = await approved([{ productId: rice, quantity: 6 }]);
+      await service.confirm(id, {}, manager);
+      const results = await Promise.allSettled([
+        service.reverse(id, { reason: 'one' }, manager),
+        service.reverse(id, { reason: 'two' }, admin),
+      ]);
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+      expect(await onHand(rice)).toBe(10);
+      await rejects(service.reverse(id, { reason: 'again' }, manager), 409);
+      expect(await onHand(rice)).toBe(10);
+    });
+
+    it('only a manager or admin, only a confirmed request, and only with a reason', async () => {
+      const id = await approved([{ productId: rice, quantity: 6 }]);
+      await rejects(service.reverse(id, { reason: 'x' }, manager), 409, /confirmed/);
+      await service.confirm(id, {}, manager);
+      await rejects(service.reverse(id, { reason: 'x' }, worker), 403);
+      await rejects(service.reverse(id, { reason: ' ' }, manager), 400);
+      expect(await onHand(rice)).toBe(4);
     });
   });
 

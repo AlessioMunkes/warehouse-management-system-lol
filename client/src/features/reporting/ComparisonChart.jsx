@@ -16,7 +16,8 @@ import {
   CartesianGrid, Cell, LabelList, ReferenceLine, ResponsiveContainer, Scatter, ScatterChart,
   Tooltip, XAxis, YAxis, ZAxis,
 } from 'recharts';
-import { fmtTick, fmtValue, unitWord } from './chartFormat';
+import { figure, fmtTick, fmtValue } from './chartFormat';
+import { ChartTip } from './ChartTooltip';
 import { exportExcel } from '../../lib/excelExport';
 
 const MUTED = 'var(--ink-soft)';
@@ -25,16 +26,20 @@ const INK   = 'var(--ink)';
 const DOT   = 'var(--viz-1)';
 const axis = { tick: { fill: MUTED, fontSize: 11 }, axisLine: { stroke: LINE }, tickLine: false };
 
-function Tip({ active, payload, data }) {
+// The shared tip (ChartTooltip.jsx): the point's name, then its two
+// figures, each named.
+function ScatterTip({ active, payload, data }) {
   if (!active || !payload?.length) return null;
   const p = payload[0].payload;
   return (
-    <div className="rounded-lg border bg-surface px-3 py-2 text-xs" style={{ borderColor: LINE }}>
-      <p className="font-bold" style={{ color: INK }}>{p.label}</p>
-      <p>{data.x.label}: <strong>{fmtValue(p.x, data.x.unit)}</strong> {unitWord(data.x.unit)}</p>
-      <p>{data.y.label}: <strong>{fmtValue(p.y, data.y.unit)}</strong> {unitWord(data.y.unit)}</p>
-      {p.detail && <p style={{ color: MUTED }}>{p.detail}</p>}
-    </div>
+    <ChartTip
+      title={p.label}
+      rows={[
+        { color: DOT, value: figure(p.x, data.x.unit), name: data.x.label },
+        { color: DOT, value: figure(p.y, data.y.unit), name: data.y.label },
+      ]}
+      extra={[p.detail]}
+    />
   );
 }
 
@@ -114,7 +119,7 @@ export default function ComparisonChart({ data, compact = false }) {
             <ReferenceLine x={avgX} stroke={MUTED} strokeDasharray="4 4" />
             <ReferenceLine y={avgY} stroke={MUTED} strokeDasharray="4 4"
               label={{ value: 'averages', position: 'insideTopRight', fill: MUTED, fontSize: 11 }} />
-            <Tooltip content={<Tip data={data} />} cursor={{ strokeDasharray: '3 3' }} />
+            <Tooltip content={<ScatterTip data={data} />} cursor={{ strokeDasharray: '3 3' }} />
             <Scatter data={pts} onClick={(p) => toggle(p.label ?? p.payload?.label)} cursor="pointer" isAnimationActive={false}>
               {pts.map((p) => (
                 <Cell key={p.label} fill={DOT}

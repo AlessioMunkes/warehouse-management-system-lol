@@ -40,7 +40,7 @@ import {
   AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
 import {
-  BadgeCheck, CircleCheck, Mail, MailCheck, MailX, Pencil, RotateCcw, CopyPlus, Trash2, TriangleAlert, Truck, Undo2,
+  BadgeCheck, CircleCheck, Pencil, RotateCcw, CopyPlus, Trash2, TriangleAlert, Truck, Undo2,
 } from 'lucide-react';
 import {
   RECEIVABLE_PO_STATUSES, canMovePurchaseOrder, needsFollowUp,
@@ -431,13 +431,13 @@ export default function PurchaseOrderDetail({
           <dt className="text-xs text-muted-foreground">Finance email</dt>
           <dd className="flex flex-wrap items-center gap-2">
             {emailSent ? (
-              <StatusBadge tone="neutral" icon={MailCheck}>
+              <StatusBadge kind="message" status="sent">
                 Sent to Finance{po.financeEmailAttemptedAt ? ` · ${fmtDateTime(po.financeEmailAttemptedAt)}` : ''}
               </StatusBadge>
             ) : emailFailed ? (
-              <StatusBadge tone="warn" icon={MailX}>Send failed</StatusBadge>
+              <StatusBadge kind="message" status="failed">Send failed</StatusBadge>
             ) : (
-              <StatusBadge tone="neutral" icon={Mail}>Not sent</StatusBadge>
+              <StatusBadge kind="message" status="unsent">Not sent</StatusBadge>
             )}
             {emailFailed && po.financeEmailError ? (
               <span className="text-xs text-muted-foreground">{po.financeEmailError}</span>

@@ -140,6 +140,6 @@ describe('sidebars built from the table', () => {
 
   it('keeps the attention counts on the manager items that had them', () => {
     const counted = NAV_SECTIONS('manager').flatMap((s) => s.items).filter((i) => i.count).map((i) => i.label);
-    expect(counted).toEqual(['Purchase orders', 'Inventory', 'Picking slips', 'Benevolent requests']);
+    expect(counted).toEqual(['Purchase orders', 'Inventory', 'Picking slips', 'Benevolent requests', 'Feed the Soil']);
   });
 });

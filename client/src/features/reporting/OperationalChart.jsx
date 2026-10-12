@@ -26,9 +26,11 @@ import {
 } from 'recharts';
 import { X } from 'lucide-react';
 import {
-  SERIES, VIEW_LABELS, anomaliesOf, defaultView, fmtTick, fmtValue, formatLabel,
+  SERIES, VIEW_LABELS, anomaliesOf, defaultView, entityColours, fmtTick, BAR_CURSOR, LINE_CURSOR, fmtValue, formatLabel,
   fitLabel, isAdditive, pivot, ragColour, shapeOf, unitWord, viewsFor,
 } from './chartFormat';
+import ChartTooltip from './ChartTooltip';
+import { useChartMotion } from './useChartMotion';
 import { exportExcel } from '../../lib/excelExport';
 import { Flow, Funnel, Waterfall } from './OperationalDiagrams';
 
@@ -56,29 +58,6 @@ function FitTick({ x, y, payload, width, visibleTicksCount }) {
         <tspan key={line + i} x={x} dy={i === 0 ? 0 : 13}>{line}</tspan>
       ))}
     </text>
-  );
-}
-
-// Values lead, labels follow; keyed with a short stroke, not a box.
-function ChartTooltip({ active, payload, label, unit, labelFor }) {
-  if (!active || !payload?.length) return null;
-  const title = labelFor ? labelFor(label, payload) : formatLabel(label);
-  return (
-    <div className="rounded-lg border bg-surface px-3 py-2 text-xs shadow-sm" style={{ borderColor: LINE }}>
-      <p className="mb-1" style={{ color: MUTED }}>{title}</p>
-      {payload.filter((p) => p.value !== undefined && p.value !== null).map((p) => (
-        <p key={p.dataKey ?? p.name} className="flex items-center gap-2">
-          <span aria-hidden="true" className="inline-block h-0.5 w-3" style={{ background: p.color ?? p.payload?.fill ?? SINGLE }} />
-          <span className="font-bold" style={{ color: INK }}>
-            {fmtValue(p.value, unit)} {p.payload?.unit ?? unitWord(unit)}
-          </span>
-          {payload.length > 1 && <span style={{ color: MUTED }}>{formatLabel(p.name)}</span>}
-          {p.payload?.cumulative !== undefined && (
-            <span style={{ color: MUTED }}>· {p.payload.cumulative}% of total so far</span>
-          )}
-        </p>
-      ))}
-    </div>
   );
 }
 
@@ -236,6 +215,9 @@ export default function OperationalChart({
   const [showTarget, setShowTarget] = useState(true);
   const [hidden, setHidden]   = useState(() => new Set());
   const [localHl, setLocalHl] = useState(null);
+  // Grows in unless movement is reduced; never on paper, which is
+  // captured at once.
+  const animate = useChartMotion() && !print;
 
   const highlight = controlledHl !== undefined ? controlledHl : localHl;
   const setHighlight = (name) => {
@@ -271,6 +253,10 @@ export default function OperationalChart({
 
   const opacityFor = (name) => (highlight && highlight !== name ? DIM : 1);
   const colourOf = (r, fallback) => colorFor?.(r.name, r.value) ?? ragColour(meta?.rag, r.value) ?? fallback;
+  // Categories each get their own colour from the theme; a trend over
+  // time is one thing moving, so it keeps one.
+  const entityColour = useMemo(() => entityColours(series), [series]);
+  const barFill = (r) => colourOf(r, shape === 'category' ? entityColour(r.name) : SINGLE);
 
   // Time charts: points far off the usual level, and last year's
   // figures lined up by position (month 1 against month 1).
@@ -331,7 +317,14 @@ export default function OperationalChart({
     return <p className="py-8 text-center text-sm" style={{ color: MUTED }}>Nothing recorded for this selection.</p>;
   }
 
-  const tip = <Tooltip active={print ? false : undefined} content={<ChartTooltip unit={unit} />} cursor={print ? false : { fill: 'var(--line)', fillOpacity: 0.4 }} />;
+  // One tip format for every chart (ChartTooltip.jsx). A share of the
+  // total only where the figures add up; a Pareto bar also says how
+  // much of the total is covered by here.
+  const tipTotal = shape === 'category' && additive && series.length > 1
+    ? series.reduce((s, r) => s + Number(r.value || 0), 0) : null;
+  const runningShare = (shown) => (shown[0]?.payload?.cumulative !== undefined
+    ? [`${shown[0].payload.cumulative}% of the total so far`] : []);
+  const tip = <Tooltip active={print ? false : undefined} content={<ChartTooltip unit={unit} total={tipTotal} extraFor={runningShare} />} cursor={print ? false : BAR_CURSOR} />;
 
   let body;
   if (activeView === 'number') {
@@ -387,7 +380,7 @@ export default function OperationalChart({
           <CartesianGrid vertical={false} stroke={LINE} strokeOpacity={0.6} />
           <XAxis dataKey="name" tickFormatter={formatLabel} {...axisProps} />
           <YAxis tickFormatter={(v) => fmtTick(v, unit)} {...axisProps} width={52} />
-          <Tooltip active={print ? false : undefined} content={<ChartTooltip unit={unit} />} cursor={print ? false : { fill: 'var(--line)', fillOpacity: 0.4 }} />
+          <Tooltip active={print ? false : undefined} content={<ChartTooltip unit={unit} />} cursor={print ? false : BAR_CURSOR} />
           <Legend
             iconType="rect"
             onClick={(e) => setHidden((h) => { const n = new Set(h); if (n.has(e.dataKey)) n.delete(e.dataKey); else n.add(e.dataKey); return n; })}
@@ -398,7 +391,7 @@ export default function OperationalChart({
               key={k} dataKey={k} name={k} stackId={stacked ? 'a' : undefined}
               fill={SERIES[i]} hide={hidden.has(k)} fillOpacity={opacityFor(k)}
               stroke={SURF} strokeWidth={stacked ? 2 : 0}
-              radius={stacked ? 0 : [4, 4, 0, 0]} maxBarSize={48} isAnimationActive={!print}
+              radius={stacked ? 0 : [4, 4, 0, 0]} maxBarSize={48} isAnimationActive={animate}
               onClick={() => setHighlight(k)} cursor="pointer"
             />
           ))}
@@ -415,15 +408,15 @@ export default function OperationalChart({
           <CartesianGrid vertical={false} stroke={LINE} strokeOpacity={0.6} />
           <XAxis dataKey="name" tickFormatter={formatLabel} {...axisProps} />
           <YAxis tickFormatter={(v) => fmtTick(v, unit)} {...axisProps} width={52} />
-          <Tooltip active={print ? false : undefined} content={<ChartTooltip unit={unit} />} cursor={print ? false : { stroke: MUTED, strokeWidth: 1 }} />
+          <Tooltip active={print ? false : undefined} content={<ChartTooltip unit={unit} />} cursor={print ? false : LINE_CURSOR} />
           {refLines('y')}
           {prevSeries && (
             <Line type="monotone" dataKey="previous" name="Same period last year" stroke={MUTED} strokeWidth={2}
               strokeDasharray="5 4" dot={false} connectNulls isAnimationActive={false} />
           )}
           {activeView === 'line'
-            ? <Line type="monotone" dataKey="value" name="This period" stroke={SINGLE} strokeWidth={2} dot={{ r: 4, fill: SINGLE, stroke: SURF, strokeWidth: 2 }} activeDot={{ r: 6 }} isAnimationActive={!print} />
-            : <Area type="monotone" dataKey="value" name="This period" stroke={SINGLE} strokeWidth={2} fill={SINGLE} fillOpacity={0.15} isAnimationActive={!print} />}
+            ? <Line type="monotone" dataKey="value" name="This period" stroke={SINGLE} strokeWidth={2} dot={{ r: 4, fill: SINGLE, stroke: SURF, strokeWidth: 2 }} activeDot={{ r: 6 }} isAnimationActive={animate} />
+            : <Area type="monotone" dataKey="value" name="This period" stroke={SINGLE} strokeWidth={2} fill={SINGLE} fillOpacity={0.15} isAnimationActive={animate} />}
           {!compact && anomalies.map((a) => (
             <ReferenceDot key={`anomaly-${a.name}`} x={a.name} y={a.value} r={8} fill="none" stroke="var(--rag-bad)" strokeWidth={2.5} />
           ))}
@@ -441,16 +434,16 @@ export default function OperationalChart({
             {tip}
             <Pie data={rows} dataKey="value" nameKey="name" innerRadius="55%" outerRadius="85%" stroke={SURF} strokeWidth={2}
               onClick={(d) => setHighlight(d.name)} cursor="pointer" isAnimationActive={false}>
-              {rows.map((r, i) => <Cell key={r.name} fill={colourOf(r, SERIES[i % SERIES.length])} fillOpacity={opacityFor(r.name)} />)}
+              {rows.map((r) => <Cell key={r.name} fill={colourOf(r, entityColour(r.name))} fillOpacity={opacityFor(r.name)} />)}
             </Pie>
           </PieChart>
         </ResponsiveContainer>
         <ul className="w-full space-y-1 text-xs sm:max-w-56">
-          {rows.map((r, i) => (
+          {rows.map((r) => (
             <li key={r.name}>
               <button type="button" onClick={() => setHighlight(r.name)} className="flex w-full items-center gap-2 text-left"
                 style={{ opacity: opacityFor(r.name) === 1 ? 1 : 0.5, fontWeight: highlight === r.name ? 700 : 400 }}>
-                <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: colourOf(r, SERIES[i % SERIES.length]) }} />
+                <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: colourOf(r, entityColour(r.name)) }} />
                 <span className="min-w-0 flex-1 truncate">{formatLabel(r.name)}</span>
                 <span className="tabular-nums" style={{ color: MUTED }}>{Math.round((r.value / total) * 100)}%</span>
               </button>
@@ -492,7 +485,7 @@ export default function OperationalChart({
             <Bar dataKey="previous" name="Same period last year" fill={MUTED} fillOpacity={0.35}
               radius={[4, 4, 0, 0]} maxBarSize={48} isAnimationActive={false} />
           )}
-          <Bar dataKey="value" name="This period" radius={horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]} maxBarSize={horizontal ? 22 : 48} isAnimationActive={!print}
+          <Bar dataKey="value" name="This period" radius={horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]} maxBarSize={horizontal ? 22 : 48} isAnimationActive={animate}
             label={!compact && rows.length <= 15 ? {
               position: horizontal ? 'right' : 'top', fill: MUTED, fontSize: 11,
               formatter: (v) => fmtTick(v, unit),
@@ -500,7 +493,7 @@ export default function OperationalChart({
             {rows.map((r) => (
               <Cell
                 key={r.name}
-                fill={colourOf(r, SINGLE)}
+                fill={barFill(r)}
                 fillOpacity={opacityFor(r.name)}
                 stroke={highlight === r.name ? INK : odd.has(r.name) && !compact ? 'var(--rag-bad)' : 'none'}
                 strokeWidth={highlight === r.name || (odd.has(r.name) && !compact) ? 2 : 0}

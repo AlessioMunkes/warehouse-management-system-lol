@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const kitRepo = vi.hoisted(() => ({ listIdleKits: vi.fn() }));
 const notify = vi.hoisted(() => ({ createNotification: vi.fn() }));
-vi.mock('../src/repositories/collectionKit.repository.js', () => ({ default: kitRepo }));
+vi.mock('../src/repositories/collectionKit.repository.js', () => ({ default: kitRepo, IDLE_KIT_MONTHS: 3 }));
 vi.mock('../src/repositories/notification.repository.js', () => notify);
 
 const { default: pool } = await import('../src/config/db.js');

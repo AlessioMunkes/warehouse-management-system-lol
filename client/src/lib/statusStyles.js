@@ -20,7 +20,7 @@
 import {
   AlarmClock, Ban, Check, BadgeCheck, Boxes, CalendarCheck, CalendarClock, CalendarX, CheckCheck, CircleDashed,
   CircleOff, CircleX, ClipboardList, DoorOpen, Clock, FileCheck, Flag, Forward, Gift, HeartHandshake, History,
-  House, Link2, Lock, LogOut, Megaphone, PackageCheck, PackageOpen, PackagePlus, PencilLine, Scale, ShieldCheck,
+  House, Link2, Lock, LogOut, Mail, Megaphone, PackageCheck, PackageOpen, PackagePlus, PencilLine, Scale, ShieldCheck,
   ShoppingCart, SlidersHorizontal, Split, Sprout, Trash2, Send, TriangleAlert, Truck, Undo2, Unlink, UserCheck,
   Users,
 } from 'lucide-react';
@@ -91,11 +91,24 @@ export const STATUS_STYLES = {
     not_collected: s('bad', CircleX, true),
     cancelled:     s('neutral', Ban, true),
   },
-  // An outbound email's outcome (features/communications on the server).
+  // An outbound email's outcome (features/communications on the server),
+  // and the same outcome where a screen shows one email: Section 18A's
+  // certificate emails and a purchase order's Finance email.
   message: {
-    sent:    s('good', CheckCheck, true),
-    stubbed: s('neutral', CircleDashed),                  // sending switched off; nothing left
-    failed:  s('bad', CircleX, true),
+    sent:      s('good', CheckCheck, true),
+    delivered: s('good', BadgeCheck),
+    pending:   s('warn', Clock),                          // queued, not tried yet
+    stubbed:   s('neutral', CircleDashed),                // sending switched off; nothing left
+    unsent:    s('neutral', Mail),                        // never tried
+    failed:    s('bad', CircleX, true),
+    bounced:   s('bad', Undo2),                           // sent, then refused by the inbox
+  },
+  // A purchase order's send to QuickBooks (features/purchaseOrders/QuickbooksSync.jsx).
+  quickbooks: {
+    none:        s('neutral', Clock),
+    sending:     s('info', Send),
+    needs_match: s('warn', TriangleAlert),                // a name not found there; a person has to act
+    failed:      s('bad', CircleX, true),
   },
   // Derived from AVAILABLE server-side (stock.repository.js getManifest).
   // All soft: on a list of sixty products a solid red pill per row
@@ -111,6 +124,12 @@ export const STATUS_STYLES = {
     soon:    s('warn', Clock),                            // 15 to 30 days
     urgent:  s('bad', AlarmClock),                        // 14 days or less
     expired: s('bad', CalendarX, true),
+  },
+  // The dashboard's stock outlook: when a product runs out at the rate
+  // it is used, and when its next use-by date comes first.
+  outlook: {
+    runs_short: s('bad', CalendarX),
+    may_expire: s('warn', AlarmClock),
   },
   // A closed day on the operating calendar.
   closure: {

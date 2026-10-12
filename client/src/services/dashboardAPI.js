@@ -55,11 +55,17 @@ export const toAttention = (row = {}) => {
     purchaseOrders: {
       awaitingApproval: n(row.purchaseOrders?.awaitingApproval),
       followUp:         n(row.purchaseOrders?.followUp),
+      financeEmailFailed:   n(row.purchaseOrders?.financeEmailFailed),
+      needsQuickbooksMatch: n(row.purchaseOrders?.needsQuickbooksMatch),
     },
     communityRequests: {
       pending:    n(row.communityRequests?.pending),
-      unclaimed:  n(row.communityRequests?.unclaimed),
+      approved:   n(row.communityRequests?.approved),
+      overdue:    n(row.communityRequests?.overdue),
       needsItems: n(row.communityRequests?.needsItems),
+    },
+    feedTheSoil: {
+      idleKits: n(row.feedTheSoil?.idleKits),
     },
   };
 };
@@ -70,17 +76,24 @@ export const getAttention = async () => {
 };
 
 // ── GET /api/dashboard/insights ───────────────────────────────
-// Three figures for the manager's board: weeks of stock left on the
-// recipe in use, this week's packing, and centres missing collections.
+// Three figures for the manager's board: the stock outlook (weeks of
+// stock left), this week's packing, and centres missing collections.
 export const toInsights = (row = {}) => {
   const n = (v) => Number(v ?? 0);
   return {
     recipeName: row.recipeName ?? null,
     stockCover: (row.stockCover ?? []).map((p) => ({
       productId: p.productId, name: p.name, unit: p.unit,
-      onHand: n(p.onHand), weeklyUse: n(p.weeklyUse), weeklyUnit: p.weeklyUnit ?? p.unit,
+      available: n(p.available), dueIn: n(p.dueIn), nextDue: p.nextDue ?? null,
+      weeklyUse: n(p.weeklyUse), weeklyUnit: p.weeklyUnit ?? p.unit,
+      // 'recipe': a week of slips on the recipe in use; 'history': the
+      // average sent out a week lately.
+      usage: p.usage === 'history' ? 'history' : 'recipe',
       weeks: p.weeks == null ? null : Number(p.weeks),
+      runsShortOn: p.runsShortOn ?? null,
+      mayExpireOn: p.mayExpireOn ?? null,
     })),
+    outlook: { usageWeeks: n(row.outlook?.usageWeeks) || 8, dueInWeeks: n(row.outlook?.dueInWeeks) || 4 },
     packing: { total: n(row.packing?.total), packed: n(row.packing?.packed), inProgress: n(row.packing?.inProgress) },
     missedWeeks: n(row.missedWeeks),
     missedCollections: (row.missedCollections ?? []).map((c) => ({

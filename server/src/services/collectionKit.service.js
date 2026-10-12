@@ -14,7 +14,7 @@
 // "recorded" was itself part of what made the previous version unclear.
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
-import kitRepo from '../repositories/collectionKit.repository.js';
+import kitRepo, { IDLE_KIT_MONTHS } from '../repositories/collectionKit.repository.js';
 import { createNotification } from '../repositories/notification.repository.js';
 import { isPositiveInt, isValidDateString, toQuantity } from '../utils/validation.js';
 
@@ -165,7 +165,8 @@ const listRecords = async (filters = {}) => {
 // A kit assigned this many months ago with nothing logged goes to the
 // managers' bell, once, so someone speaks to its owner. Run daily by
 // the housekeeping job (jobs/expiryWarning.job.js).
-export const IDLE_KIT_MONTHS = 3;
+// The rule lives with the query (collectionKit.repository.js).
+export { IDLE_KIT_MONTHS };
 
 const kitCode = (id) => `CK${String(id).padStart(4, '0')}`;
 const dayInWords = (value) =>
