@@ -13,15 +13,17 @@
 // upstream by the programme team, not a discrepancy between a number
 // in a database and a number on a shelf.
 //
-// Two things (a pallet booked for another day, and a slip packing has
-// not closed off) proceed on a manager override with a recorded
-// reason, which is what the paper process already does when Grizel
-// signs off an exception at the gate.
+// A pallet packing has not closed off is refused, and the worker is
+// told to finish packing it first. There used to be a manager
+// override for it, but the gate is a worker-only route and the
+// repository refuses an unpacked pallet anyway, so it could never run.
+// The agreed process is "finish packing first".
 //
-// A collection after the 16:00 write-off is NOT one of them. It is
-// recorded — the event becomes 'late_collected' and the day shows it
-// as late — and otherwise proceeds exactly as an on-time collection
-// does, with no override, no manager and no extra taps. The sweep
+// A pallet booked for another day, and a collection after the 16:00
+// write-off, are recorded rather than refused — the event becomes
+// 'late_collected' and the day shows it as late — and otherwise
+// proceed exactly as an on-time collection does, with no manager and
+// no extra taps. The sweep
 // exists to keep the non-collection history honest at the end of a
 // day, not to close the gate at 16:00.
 // ─────────────────────────────────────────────────────────────
@@ -297,10 +299,7 @@ const validateCollectBody = (body) => {
     fail(400, 'Invalid request key.');
   }
 
-  const overrideReason = (body.overrideReason || '').trim() || null;
-  if (overrideReason && overrideReason.length > 500) fail(400, 'Override reason is too long.');
-
-  return { driverName, vehicleReg, signature, lines, idempotencyKey, overrideReason };
+  return { driverName, vehicleReg, signature, lines, idempotencyKey };
 };
 
 // ── Record a collection ───────────────────────────────────────
@@ -326,17 +325,17 @@ const collect = async (slipId, body, user) => {
     fail(409, 'This pallet has already been collected.');
   }
 
-  // ── Override-gated exceptions ──────────────────────────────
-  // Each one names what is wrong and what to do about it, in the
-  // words the person at the gate would use (ACC-09). "Requires
-  // authorisation" tells a warehouse worker nothing actionable; "ask
-  // a manager to authorise it" does.
-  const needsOverride = [];
+  // ── Not packed yet ─────────────────────────────────────────
+  // The gate and Packing are both the worker's screens, so the way
+  // out is theirs: close the pallet off, then release it. Said before
+  // the repository is reached so the worker reads what to do, not
+  // "not packed". The repository refuses it too.
   if (eligibility.slipNotPacked) {
-    needsOverride.push('this pallet has not been closed off by the packing team yet');
+    fail(409, 'This pallet has not been closed off by packing yet. Finish packing it first.');
   }
-  // wrongDay is DELIBERATELY not in this list, for the same reason
-  // writtenOff is not (see below).
+
+  // ── Recorded, not refused ──────────────────────────────────
+  // A pallet booked for another day (wrongDay):
   //
   // BR-12 says a pallet is booked for a cohort day. It does not say
   // food may not leave the building on any other day, and a driver
@@ -358,7 +357,8 @@ const collect = async (slipId, body, user) => {
   // reporting and any manager review still see it. Same principle as
   // shortfall and unit mismatch: the system records what happened
   // rather than refusing to let it happen.
-  // writtenOff is DELIBERATELY not in this list.
+  //
+  // A pallet the 16:00 sweep wrote off (writtenOff):
   //
   // BR-14's 16:00 sweep is a bookkeeping act, not a gate closure. It
   // writes a 'not_collected' event so the non-collection history
@@ -377,20 +377,6 @@ const collect = async (slipId, body, user) => {
   // leaving the building over a data disagreement — and the data
   // disagreement here is with a clock.
 
-  if (needsOverride.length > 0) {
-    // The gate is the worker's screen and so is Packing, so the way out
-    // is theirs: close the pallet off, then release it. This used to
-    // say "ask a manager to authorise", which no manager's screen can do.
-    if (!isManager(user)) {
-      fail(409, 'This pallet has not been closed off by packing yet. Finish packing it first.');
-    }
-    if (!payload.overrideReason) {
-      fail(400,
-        `${needsOverride.join(', and ')}. Record a short reason for authorising it.`
-      );
-    }
-  }
-
   const result = await dispatchRepository.collect({
     slipId,
     driverName:     payload.driverName,
@@ -398,7 +384,6 @@ const collect = async (slipId, body, user) => {
     signature:      payload.signature,
     lines:          payload.lines,
     idempotencyKey: payload.idempotencyKey,
-    overrideReason: payload.overrideReason,
     actorId:        user.id,
     // Advisory, not a gate. Recorded against the collection so a
     // manager reviewing BR-26 can see it went out off-schedule.

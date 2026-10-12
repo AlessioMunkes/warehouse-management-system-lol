@@ -10,14 +10,24 @@ const req = (over = {}) => ({
 const line = (over = {}) => ({ id: 1, productId: 5, productName: 'Rice', unit: 'kg', quantityApproved: 6, quantityReleased: 0, shortAt: null, ...over });
 
 describe('tabs', () => {
-  it('are, in order: Awaiting approval, Approved, Needs new items, Fulfilled, Declined, All', () => {
+  it('are, in order: Awaiting approval, Approved, Needs new items, Waiting over a week, Fulfilled, Declined, All', () => {
     expect(VIEWS.map((v) => v.label)).toEqual([
-      'Awaiting approval', 'Approved', 'Needs new items', 'Fulfilled', 'Declined', 'All',
+      'Awaiting approval', 'Approved', 'Needs new items', 'Waiting over a week', 'Fulfilled', 'Declined', 'All',
     ]);
   });
 
-  it('use the ids the dashboard links to: pending, approved, needs-items', () => {
-    expect(VIEWS.map((v) => v.id)).toEqual(['pending', 'approved', 'needs-items', 'fulfilled', 'declined', 'all']);
+  // The server decides what is overdue (communityRequest.repository.js),
+  // with the same rule the dashboard counts by.
+  it('puts a request in Waiting over a week when the server flags it', () => {
+    const rows = [
+      { id: 1, outcome: 'approved', isOverdue: true },
+      { id: 2, outcome: 'approved', isOverdue: false },
+    ];
+    expect(rowsForView(rows, viewById('overdue')).map((r) => r.id)).toEqual([1]);
+  });
+
+  it('use the ids the dashboard links to: pending, approved, needs-items, overdue', () => {
+    expect(VIEWS.map((v) => v.id)).toEqual(['pending', 'approved', 'needs-items', 'overdue', 'fulfilled', 'declined', 'all']);
   });
 
   it('start on Awaiting approval, and fall back to it for an unknown id', () => {

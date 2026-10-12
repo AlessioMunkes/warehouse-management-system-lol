@@ -82,6 +82,17 @@ const createKit = async ({ ownerName, suburb, assignedAt, actorId }) => {
 // still needs dispatching (or that have no records at all yet) sort
 // first, fully settled ('dispatched') kits sink to the bottom, most
 // recent activity first within each group.
+// ── Kits given out and never heard from ──────────────────────
+// Assigned at least IDLE_KIT_MONTHS ago with no compost ever logged. A
+// kit in someone's kitchen that has produced nothing in that long is
+// either not being used or not being collected, and either way
+// somebody needs to speak to its owner. The daily follow-up notice,
+// the manager's Idle tab and the dashboard count all use this rule.
+export const IDLE_KIT_MONTHS = 3;
+export const idleKitSql = (alias = 'k', months = String(IDLE_KIT_MONTHS)) =>
+  `(${alias}.assigned_at <= (now() AT TIME ZONE 'Africa/Johannesburg')::date - make_interval(months => ${months})
+     AND NOT EXISTS (SELECT 1 FROM collection_kit_records r WHERE r.kit_id = ${alias}.id))`;
+
 const listKits = async ({ search = null } = {}) => {
   const params = [];
   const where = [];
@@ -97,7 +108,8 @@ const listKits = async ({ search = null } = {}) => {
             latest.logged_at  AS last_logged_at,
             -- When that latest record went to a farmer, if it has: the
             -- list says the last thing that happened to a kit and when.
-            latest.dispatched_at AS last_dispatched_at
+            latest.dispatched_at AS last_dispatched_at,
+            ${idleKitSql('k')} AS is_idle
        FROM collection_kits k
        LEFT JOIN LATERAL (
          SELECT r.status, r.kg_compost, r.logged_at, r.dispatched_at
@@ -293,17 +305,11 @@ const listRecords = async ({ status = null, search = null, limit = 200 } = {}) =
   return rows;
 };
 
-// ── Kits given out and never heard from ──────────────────────
-// Assigned at least `months` ago with no compost ever logged. A kit in
-// someone's kitchen that has produced nothing in that long is either
-// not being used or not being collected, and either way somebody needs
-// to speak to its owner.
-const listIdleKits = async ({ months }) => {
+const listIdleKits = async ({ months = IDLE_KIT_MONTHS } = {}) => {
   const { rows } = await pool.query(
     `SELECT k.id, k.owner_name, k.suburb, k.assigned_at
        FROM collection_kits k
-      WHERE k.assigned_at <= (now() AT TIME ZONE 'Africa/Johannesburg')::date - make_interval(months => $1::int)
-        AND NOT EXISTS (SELECT 1 FROM collection_kit_records r WHERE r.kit_id = k.id)
+      WHERE ${idleKitSql('k', '$1::int')}
       ORDER BY k.assigned_at ASC, k.id ASC`,
     [months],
   );

@@ -141,8 +141,12 @@ export const toPurchaseOrder = (row) => ({
   expectedDeliveryDate: row.expected_delivery_date ?? null,
   notes:                row.notes ?? "",
   quickbooksPoId:       row.quickbooks_po_id ?? "",
-  // Detail only. financeEmailError is already a short safe message
-  // from the server (never raw provider text).
+  // Where the send to QuickBooks stands (list only): synced,
+  // needs_match, failed, sending, or null when never sent.
+  quickbooksState:      row.quickbooks_state ?? null,
+  // The status is on the list too (its "Finance email failed" tab);
+  // the error and time are detail only. financeEmailError is already a
+  // short safe message from the server (never raw provider text).
   financeEmailStatus:      row.finance_email_status ?? null,
   financeEmailError:       row.finance_email_error ?? "",
   financeEmailAttemptedAt: row.finance_email_attempted_at ?? null,

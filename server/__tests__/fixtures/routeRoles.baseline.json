@@ -37,6 +37,7 @@
   "communityRequest.routes.js PATCH /:id/assign": "admin,manager",
   "communityRequest.routes.js PUT /:id/items": "admin,manager",
   "communityRequest.routes.js POST /:id/confirm": "admin,manager,warehouse_worker",
+  "communityRequest.routes.js POST /:id/reverse": "admin,manager",
   "communityRequest.routes.js PATCH /:id/resolve": "admin,manager",
   "dashboard.routes.js GET /summary": "admin,manager",
   "dashboard.routes.js GET /my-work": "admin,manager,warehouse_worker",

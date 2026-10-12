@@ -294,12 +294,12 @@ describe('dispatch controller — responses', () => {
     expect(res.status).toBe(409);
   });
 
-  it('passes a 403 override-required error straight through', async () => {
+  it('passes a not-packed refusal straight through', async () => {
     serviceMock.collect.mockRejectedValue(
-      withStatus(403, 'This pallet has not been closed off by the packing team yet. Ask a manager to authorise this collection at the gate.')
+      withStatus(409, 'This pallet has not been closed off by packing yet. Finish packing it first.')
     );
     const res = await request(app).post(`${BASE}/1/collect`)
       .set('Cookie', cookieFor(ROLES.WORKER)).send(COLLECT_BODY);
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(409);
   });
 });

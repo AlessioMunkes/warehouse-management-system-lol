@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   FileText, Mail, Send,
-  CheckCircle2, XCircle, Clock, AlertTriangle, Loader2,
+  Loader2,
 } from 'lucide-react';
 //import { TopNavbar } from '../components/layout/TopNavBar';
 import { Badge } from '../components/ui/badge';
@@ -38,17 +38,10 @@ const TABS = [
   { id: 'emails', label: 'Email history', icon: Mail, description: 'Track and resend Section 18A certificate emails.' },
 ];
 
-const EMAIL_STATUS_CONFIG = {
-  sent: { icon: CheckCircle2, color: 'text-good', bg: 'bg-good-soft', label: 'Sent' },
-  delivered: { icon: CheckCircle2, color: 'text-good', bg: 'bg-good-soft', label: 'Delivered' },
-  failed: { icon: XCircle, color: 'text-danger', bg: 'bg-danger-soft', label: 'Failed' },
-  pending: { icon: Clock, color: 'text-warn', bg: 'bg-warn-soft', label: 'Pending' },
-  bounced: { icon: AlertTriangle, color: 'text-danger', bg: 'bg-danger-soft', label: 'Bounced' },
-  SENT: { icon: CheckCircle2, color: 'text-good', bg: 'bg-good-soft', label: 'Sent' },
-  DELIVERED: { icon: CheckCircle2, color: 'text-good', bg: 'bg-good-soft', label: 'Delivered' },
-  FAILED: { icon: XCircle, color: 'text-danger', bg: 'bg-danger-soft', label: 'Failed' },
-  PENDING: { icon: Clock, color: 'text-warn', bg: 'bg-warn-soft', label: 'Pending' },
-  BOUNCED: { icon: AlertTriangle, color: 'text-danger', bg: 'bg-danger-soft', label: 'Bounced' },
+// How each email status reads. The colour and icon come from
+// lib/statusStyles.js (kind 'message'), as on every other list.
+const EMAIL_STATUS_LABEL = {
+  sent: 'Sent', delivered: 'Delivered', pending: 'Pending', failed: 'Failed', bounced: 'Bounced',
 };
 
 
@@ -141,7 +134,9 @@ export default function Section18AManagementPage() {
 
   const activeTab = TABS.find((item) => item.id === tab) || TABS[0];
   const normaliseStatusKey = (status) => String(status || '').toLowerCase();
-  const getEmailStatusConfig = (status) => EMAIL_STATUS_CONFIG[status] || EMAIL_STATUS_CONFIG[normaliseStatusKey(status)] || EMAIL_STATUS_CONFIG.pending;
+  // The server has sent these in upper case at times; an unknown one
+  // reads as Pending, as it always has.
+  const emailStatusKey = (status) => (EMAIL_STATUS_LABEL[normaliseStatusKey(status)] ? normaliseStatusKey(status) : 'pending');
   const normaliseTypeLabel = (emailType) => {
     const v = String(emailType || '');
     if (v === 'THANK_YOU' || v === 'thank_you') return 'Thank you';
@@ -197,7 +192,6 @@ export default function Section18AManagementPage() {
     failed: emailHistory.filter((e) => ['failed', 'bounced', 'FAILED', 'BOUNCED'].includes(e.status)).length,
     pending: emailHistory.filter((e) => ['pending', 'PENDING'].includes(e.status)).length,
   };
-  const toneOf = (config) => ({ 'text-good': 'good', 'text-danger': 'bad', 'text-warn': 'warn' }[config.color] ?? 'neutral');
 
   return (
     <PageShell>
@@ -338,7 +332,7 @@ export default function Section18AManagementPage() {
               </TableHeader>
               <TableBody>
                 {emailPage.slice.map((email) => {
-                  const statusConfig = getEmailStatusConfig(email.status);
+                  const statusKey = emailStatusKey(email.status);
                   const sentAt = emailSentAtOf(email);
                   return (
                     <TableRow key={email.id}>
@@ -347,7 +341,7 @@ export default function Section18AManagementPage() {
                       <TableCell>{emailDonationRefOf(email)}</TableCell>
                       <TableCell><Badge variant="outline">{normaliseTypeLabel(email.email_type || email.emailType)}</Badge></TableCell>
                       <TableCell className="max-w-[200px] truncate">{email.subject || '-'}</TableCell>
-                      <TableCell><StatusBadge tone={toneOf(statusConfig)} icon={statusConfig.icon}>{statusConfig.label}</StatusBadge></TableCell>
+                      <TableCell><StatusBadge kind="message" status={statusKey}>{EMAIL_STATUS_LABEL[statusKey]}</StatusBadge></TableCell>
                       <TableCell className="text-muted-foreground">{sentAt ? new Date(sentAt).toLocaleString() : '-'}</TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="sm" onClick={() => setConfirmResend(email)} disabled={actionLoading === `resend-${email.id}`}>

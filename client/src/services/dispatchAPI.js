@@ -162,7 +162,7 @@ export const getGateQueue = (dispatchDate) =>
 //
 // Read those eligibility flags rather than re-deriving them here.
 // They exist precisely so the screen and the collect endpoint cannot
-// disagree about whether a pallet needs a manager's authorisation.
+// disagree about whether a pallet can go out.
 export const getGateView = (slipId) => request(`/${slipId}`);
 
 // ── POST /api/dispatch/:id/collect ───────────────────
@@ -179,7 +179,7 @@ export const getGateView = (slipId) => request(`/${slipId}`);
 // server can be reached again.
 export const recordCollection = async (
   slipId,
-  { driverName, signature, vehicleReg, lines, idempotencyKey, overrideReason } = {}
+  { driverName, signature, vehicleReg, lines, idempotencyKey } = {}
 ) => {
   const body = {
     driverName,
@@ -187,7 +187,6 @@ export const recordCollection = async (
     vehicleReg:     vehicleReg || null,
     lines:          lines || [],
     idempotencyKey: idempotencyKey || null,
-    overrideReason: overrideReason || null,
   };
 
   try {

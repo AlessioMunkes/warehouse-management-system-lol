@@ -9,10 +9,37 @@
 // ─────────────────────────────────────────────────────────────
 
 // Categorical slots, in fixed order, defined as --viz-N tokens in
-// operationalReport.css (light and dark each validated as a set).
+// styles/index.css (light and dark each validated as a set). Every
+// chart in the app draws from these.
 // A ninth category is never a new colour: it folds into "Other".
 export const SERIES = Array.from({ length: 8 }, (_, i) => `var(--viz-${i + 1})`);
 export const MAX_SERIES = 7; // plus "Other" = 8
+
+// A colour per category that follows the category, not its place on
+// screen: the slot is the category's position in the report as it
+// came back, so sorting, "Show top 10" or hiding one never repaints
+// the rest. Past the eighth, categories are grey; their names and
+// figures are on the axis and in the table.
+export const OTHER_COLOUR = 'var(--chart-grey)';
+
+// Who the warehouse reached, one colour each wherever they are drawn
+// together (BeneficiaryTypeChart, the grouped "Meals served" bars).
+// All four are side by side, so every pair has to be told apart, not
+// only neighbours: slots 1, 4, 5 and 6 are the set of four that passes
+// the palette checker's all-pairs test in both themes.
+export const BENEFICIARY_COLOURS = {
+  children:   'var(--viz-1)',
+  adults:     'var(--viz-4)',
+  households: 'var(--viz-5)',
+  dignity:    'var(--viz-6)',
+};
+export const entityColours = (series) => {
+  const slot = new Map((series ?? []).map((r, i) => [r.label ?? r.name, i]));
+  return (name) => {
+    const i = slot.get(name);
+    return i !== undefined && i < SERIES.length ? SERIES[i] : OTHER_COLOUR;
+  };
+};
 
 const MONTH = /^\d{4}-\d{2}$/;
 const WEEK  = /^\d{4}-W\d{2}$/;
@@ -276,3 +303,19 @@ export const downloadCsv = (filename, csv) => {
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
+
+// ── Hover tips (ChartTooltip.jsx) ─────────────────────────────
+// "30 kg", "R1 200", "94.7%": a figure with its unit, as every tip prints it.
+export const figure = (value, unit, unitOverride) => {
+  const word = unitOverride ?? unitWord(unit);
+  return `${fmtValue(value, unit)}${word ? ` ${word}` : ''}`;
+};
+
+// The share of a total, or null where a total does not mean anything.
+export const shareLine = (value, total) =>
+  (total > 0 ? `${((Number(value) / total) * 100).toFixed(0)}% of the total` : null);
+
+// What the pointer lights up behind the mark: a wash behind a bar, a
+// hairline on a line or area.
+export const BAR_CURSOR  = { fill: 'var(--line)', fillOpacity: 0.4 };
+export const LINE_CURSOR = { stroke: 'var(--line-strong)', strokeWidth: 1 };

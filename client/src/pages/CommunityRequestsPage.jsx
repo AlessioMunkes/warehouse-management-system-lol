@@ -17,6 +17,8 @@
 //                        (a pallet used the stock that was set aside;
 //                         pallets always come first)
 //   Fulfilled · Declined · All
+//                        (a fulfilled request's detail offers Reverse:
+//                         the stock goes back and it ends as declined)
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -27,6 +29,7 @@ import { fetchAssignableWorkers } from '../services/pickingAPI';
 import CommunityRequestForm from '../features/communityRequests/CommunityRequestForm';
 import ApproveItemsPanel from '../features/communityRequests/ApproveItemsPanel';
 import DeclinePanel from '../features/communityRequests/DeclinePanel';
+import ReversePanel from '../features/communityRequests/ReversePanel';
 import AssignPanel from '../features/communityRequests/AssignPanel';
 import RequestDetailPanel from '../features/communityRequests/RequestDetailPanel';
 import {
@@ -173,6 +176,11 @@ export default function CommunityRequestsPage() {
     'Could not decline the request.',
   );
 
+  const reverse = (reason) => act(
+    () => communityRequestAPI.reverseRequest(panel.request.id, reason),
+    'Could not reverse the request.',
+  );
+
   const assign = (userId) => act(
     () => communityRequestAPI.assignRequest(panel.request.id, userId),
     'Could not assign the packer.',
@@ -206,7 +214,8 @@ export default function CommunityRequestsPage() {
         label="Request views"
         value={view.id}
         onChange={changeView}
-        tabs={VIEWS.map((v) => ({ id: v.id, label: v.label, alert: v.alert, count: isLoading ? null : counts[v.id] }))}
+        tabs={VIEWS.filter((v) => !v.onlyWhenAny || counts[v.id] > 0 || v.id === view.id)
+          .map((v) => ({ id: v.id, label: v.label, alert: v.alert, count: isLoading ? null : counts[v.id] }))}
       />
 
       <div className="mt-6">
@@ -383,6 +392,17 @@ export default function CommunityRequestsPage() {
         />
       ) : null}
 
+      {panel?.type === 'reverse' ? (
+        <ReversePanel
+          key={panel.request.id}
+          request={panel.request}
+          busy={busy}
+          error={formError}
+          onSubmit={reverse}
+          onCancel={closePanel}
+        />
+      ) : null}
+
       {panel?.type === 'assign' ? (
         <AssignPanel
           key={panel.request.id}
@@ -396,7 +416,11 @@ export default function CommunityRequestsPage() {
       ) : null}
 
       {panel?.type === 'detail' ? (
-        <RequestDetailPanel request={panel.request} onClose={closePanel} />
+        <RequestDetailPanel
+          request={panel.request}
+          onClose={closePanel}
+          onReverse={() => { setFormError(null); setPanel({ type: 'reverse', request: panel.request }); }}
+        />
       ) : null}
     </PageShell>
   );

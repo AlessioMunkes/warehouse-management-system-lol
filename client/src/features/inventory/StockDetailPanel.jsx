@@ -196,7 +196,6 @@ export default function StockDetailPanel({
             onHand={product.onHand}
             reorderAt={product.reorderAt}
             unit={unit}
-            width={520}
           />
         )}
       </Section>

@@ -22,6 +22,7 @@ import requestRepo from '../repositories/communityRequest.repository.js';
 import stockModel from '../repositories/stock.repository.js';
 import { getAvailability } from '../repositories/communityRequestStock.repository.js';
 import { withTransaction } from '../utils/transaction.js';
+import { logAudit } from '../repositories/auditLog.repository.js';
 import { isManagerUp } from '../constants/permissions.js';
 
 const fail = (status, message) => {
@@ -343,6 +344,74 @@ const confirm = async (id, data = {}, actor) => {
   });
 };
 
+// ── Reverse a confirmed request ───────────────────────────────
+// A manager undoes a confirmation: recorded by mistake, or the caller
+// never took it away. In one transaction, with the row locked so two
+// people cannot both reverse it:
+//   - the request ends as declined, with "Reversed: <reason>" as its
+//     note, and its released quantities go back to zero
+//   - everything the ledger shows went out for it goes back on the
+//     shelf, as an adjustment linked to the request and carrying the
+//     reason
+//   - the audit log records who did it, why, and what it was before
+// So stock, the request and the ledger always agree: after a reversal
+// the request's own movements add up to nothing.
+const reverse = async (id, data = {}, actor) => {
+  requireActor(actor, 'reverse a request');
+  requireManager(actor, 'reverse a request');
+  const reason = cleanText(data.reason);
+  if (!reason) fail(400, 'Say why the request is being reversed.');
+  if (reason.length > 500) fail(400, 'The reason must be 500 characters or fewer.');
+
+  return withTransaction(async (client) => {
+    const row = await requestRepo.lockRequest(id, client);
+    if (!row) fail(404, 'Community request not found.');
+    if (row.outcome !== 'fulfilled' && row.outcome !== 'partially_fulfilled') {
+      fail(409, 'Only a request that has been confirmed can be reversed.');
+    }
+
+    const lines = await requestRepo.getItems(id, client);
+    const putBack = await requestRepo.netStockOut(Number(id), client);
+
+    if (!(await requestRepo.markReversed(id, `Reversed: ${reason}`, client))) {
+      fail(409, 'This request has already been reversed.');
+    }
+    await requestRepo.resetReleased(id, client);
+
+    // Product order, like every other adjustStock caller.
+    for (const out of putBack) {
+      await stockModel.adjustStock(client, {
+        productId:     out.product_id,
+        quantityDelta: num(out.quantity),
+        unit:          out.unit,
+        movementType:  'adjustment',
+        referenceType: 'community_request',
+        referenceId:   Number(id),
+        reason:        `Benevolent request #${id} reversed: ${reason}`,
+        performedBy:   Number(actor.id),
+      });
+    }
+
+    await logAudit(client, {
+      entityType: 'community_request',
+      entityId:   Number(id),
+      action:     'reversed',
+      actorId:    Number(actor.id),
+      reason,
+      before: {
+        outcome: row.outcome,
+        released: lines.map((l) => ({ product_id: l.product_id, quantity: num(l.quantity_released), unit: l.unit })),
+      },
+      after: {
+        outcome: 'declined',
+        returned: putBack.map((o) => ({ product_id: o.product_id, quantity: num(o.quantity), unit: o.unit })),
+      },
+    });
+
+    return requestRepo.getRequestById(id, client);
+  });
+};
+
 // ── The old resolve call ──────────────────────────────────────
 // Kept so a client that has not been updated yet does not break, but
 // narrowed: it can only decline, and only for a manager or admin. A
@@ -367,6 +436,7 @@ export default {
   assign,
   claim,
   confirm,
+  reverse,
   resolve,
   countPending,
 };
