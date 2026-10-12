@@ -37,7 +37,7 @@ import RecordsPanel from '../features/reporting/RecordsPanel';
 import ProcessMap from '../features/reporting/ProcessMap';
 import { SavedReportsBar, SaveReport } from '../features/reporting/SavedReports';
 import ChartNote from '../features/reporting/ChartNote';
-import { Truck, TrendingUp, CheckCircle2, AlertTriangle, ChevronDown } from 'lucide-react';
+import { Truck, TrendingUp, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 const CHARCOAL = 'var(--ink)';
 const MUTED    = 'var(--ink-soft)';
@@ -54,6 +54,16 @@ const TRENDS = [
   { metricId: 'unit_price_trend',  label: 'Unit price trend',      icon: TrendingUp,    dimension: 'product' },
   { metricId: 'collection_compliance', label: 'Collection compliance', icon: CheckCircle2, dimension: 'month' },
   { metricId: 'low_stock_items',   label: 'Items below reorder level', icon: AlertTriangle, dimension: 'product' },
+];
+
+// The page in four parts, switched with the tabs under the title the
+// way Receipts switches goods in and goods out. Anything that produces
+// a report (a card's Explore, a saved report) lands on Reports.
+const TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'reports',  label: 'Reports' },
+  { id: 'process',  label: 'Process map' },
+  { id: 'upload',   label: 'Chart a spreadsheet' },
 ];
 
 // "Not what you meant? Try:" — the next closest answers the server
@@ -80,6 +90,12 @@ function Alternatives({ items, onPick, closest }) {
 
 export default function ReportingPage() {
   const [catalog, setCatalog]     = useState(null);
+  const [tab, setTab]             = useState('overview');
+  // The process map and the spreadsheet chart are drawn once their tab
+  // has been opened and kept after that, so coming back to one finds
+  // the filters, the chosen step or the dropped file as it was left.
+  const [opened, setOpened]       = useState({});
+  const changeTab = (id) => { setTab(id); setOpened((o) => (o[id] ? o : { ...o, [id]: true })); };
   const [metricId, setMetricId]   = useState(null);
   const [dimension, setDimension] = useState('none');
   const [preset, setPreset]       = useState(DEFAULT_PRESET);
@@ -254,6 +270,7 @@ export default function ReportingPage() {
   const resultRef = useRef(null);
   const pendingFocus = useRef(false);
   const focusResult = () => {
+    setTab('reports');
     pendingFocus.current = true;
     resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
@@ -265,18 +282,6 @@ export default function ReportingPage() {
     el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     el.focus({ preventScroll: true });
   }, [report, comparison, error]);
-
-  // The trend cards can be folded away; remembered per browser.
-  // Storage can be blocked (private windows), so it is best effort.
-  const [trendsOpen, setTrendsOpen] = useState(() => {
-    try { return localStorage.getItem('op-trends-collapsed') !== '1'; } catch { return true; }
-  });
-  const toggleTrends = () => {
-    setTrendsOpen((open) => {
-      try { localStorage.setItem('op-trends-collapsed', open ? '1' : '0'); } catch { /* not kept */ }
-      return !open;
-    });
-  };
 
   // The filter choices load on their own: a slow or failed list leaves
   // those filters out, it does not hold up the page.
@@ -430,11 +435,14 @@ export default function ReportingPage() {
   return (
     <PageShell>
       <PageHeader
-        className="mb-5"
+        className="mb-4"
         title="Operations reports"
         description="Ask a question or browse the warehouse’s reports."
       />
 
+      <ViewTabs className="mb-5" label="Operations reports" value={tab} onChange={changeTab} tabs={TABS} />
+
+      {tab === 'overview' && (<>
       {!catalog && !error && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-40 w-full rounded-lg" />)}
@@ -443,32 +451,22 @@ export default function ReportingPage() {
 
       {catalog && (
         <section aria-labelledby="op-trends-heading">
-          <h2 id="op-trends-heading" className="mb-2">
-            <button
-              type="button"
-              onClick={toggleTrends}
-              aria-expanded={trendsOpen}
-              aria-controls="op-trends"
-              className="flex items-center gap-2 text-sm font-bold"
-            >
-              <ChevronDown aria-hidden="true" className={`h-4 w-4 transition-transform ${trendsOpen ? '' : '-rotate-90'}`} />
-              At a glance
-            </button>
-          </h2>
-          {trendsOpen && (
-            <div id="op-trends" className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {TRENDS.map((t) => (
-                <TrendCard key={t.metricId} {...t} onExplore={handleExplore} />
-              ))}
-            </div>
-          )}
+          <h2 id="op-trends-heading" className="mb-2 text-sm font-bold">At a glance</h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {TRENDS.map((t) => (
+              <TrendCard key={t.metricId} {...t} onExplore={handleExplore} />
+            ))}
+          </div>
         </section>
       )}
 
       <SavedReportsBar items={saved} onOpen={openSaved} onChanged={loadSaved} />
+      <ErrorBanner className="mt-5" message={error} />
+      </>)}
 
+      {tab === 'reports' && (<>
       {catalog?.aiEnabled && (
-        <div className="mt-6">
+        <div>
           <AskBox onReport={handleAIReport} onPickMetric={runMetric} />
         </div>
       )}
@@ -482,8 +480,6 @@ export default function ReportingPage() {
           />
         </div>
       )}
-
-      {catalog && <ProcessMap suppliers={filterOptions.supplier_id ?? []} />}
 
       <div ref={builderRef} className="mt-6 scroll-mt-4">
         {catalog?.datasets?.length > 0 && (
@@ -710,9 +706,19 @@ export default function ReportingPage() {
         <Alternatives items={comparison.alternatives} onPick={pickAlternative} closest={comparison.matchedBy === 'keyword'} />
       )}
       {comparison && <ComparisonInsight key={comparison.description} comparison={comparison} />}
-      <div className="mt-6">
-        <DataUpload />
-      </div>
+      </>)}
+
+      {opened.process && (
+        <div hidden={tab !== 'process'}>
+          <ProcessMap suppliers={filterOptions.supplier_id ?? []} />
+        </div>
+      )}
+
+      {opened.upload && (
+        <div hidden={tab !== 'upload'}>
+          <DataUpload />
+        </div>
+      )}
 
     </PageShell>
   );

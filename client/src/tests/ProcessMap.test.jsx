@@ -55,7 +55,6 @@ const DATA = {
 
 const openMap = async () => {
   render(<ProcessMap suppliers={[{ value: '3', label: 'Cape Dry Goods' }]} />);
-  await userEvent.click(screen.getByRole('button', { name: 'Process map' }));
 };
 
 beforeEach(() => {
@@ -74,10 +73,8 @@ describe('duration', () => {
 });
 
 describe('the process map', () => {
-  it('asks for nothing until it is opened', async () => {
+  it('asks for the map once, with no filters, when its tab is opened', async () => {
     render(<ProcessMap />);
-    expect(api.getProcessMap).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole('button', { name: 'Process map' }));
     await waitFor(() => expect(api.getProcessMap).toHaveBeenCalledTimes(1));
     expect(api.getProcessMap.mock.calls[0][1]).toEqual({ supplierId: null, cohort: null, beneficiaryKind: null });
   });

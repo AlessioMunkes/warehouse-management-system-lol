@@ -16,11 +16,12 @@
 //   routes taken    every way a case went through the lane
 //   break-downs     by supplier, by cohort, by product
 //
-// It loads only when opened. The shelf lane replays the whole stock
-// ledger, and nobody who came for a chart should wait on that.
+// It has a tab of its own on the page, and loads when that tab is
+// first opened. The shelf lane replays the whole stock ledger, and
+// nobody who came for a chart should wait on that.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ArrowRight, ArrowDown, Timer } from 'lucide-react';
+import { ArrowRight, ArrowDown, Timer } from 'lucide-react';
 import NativeSelect from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorBanner from '@/components/ui/error-banner';
@@ -182,7 +183,6 @@ function Lane({ lane, picked, bottleneck, onPick }) {
 }
 
 export default function ProcessMap({ suppliers = [] }) {
-  const [open, setOpen] = useState(false);
   const [preset, setPreset] = useState('last_3m');
   const [supplierId, setSupplierId] = useState('');
   const [cohort, setCohort] = useState('');
@@ -194,7 +194,6 @@ export default function ProcessMap({ suppliers = [] }) {
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
-    if (!open) return undefined;
     let cancelled = false;
     setBusy(true);
     setError(null);
@@ -203,7 +202,7 @@ export default function ProcessMap({ suppliers = [] }) {
       .catch((err) => { if (!cancelled) { setError(err.message); setData(null); } })
       .finally(() => { if (!cancelled) setBusy(false); });
     return () => { cancelled = true; };
-  }, [open, preset, supplierId, cohort, kind]);
+  }, [preset, supplierId, cohort, kind]);
 
   const pickedLane = useMemo(() => data?.lanes.find((l) => l.id === picked?.lane) ?? null, [data, picked]);
   const pickedTransition = pickedLane?.transitions.find((t) => t.id === picked?.id) ?? null;
@@ -229,106 +228,95 @@ export default function ProcessMap({ suppliers = [] }) {
   };
 
   return (
-    <section aria-labelledby="process-map-heading" className="mt-6">
-      <h2 id="process-map-heading" className="mb-2">
-        <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} aria-controls="process-map"
-          className="flex items-center gap-2 text-sm font-bold">
-          <ChevronDown aria-hidden="true" className={`h-4 w-4 transition-transform ${open ? '' : '-rotate-90'}`} />
-          Process map
-        </button>
-      </h2>
+    <section id="process-map" aria-labelledby="process-map-heading" className="rounded-4xl bg-card p-4 shadow-md ring-1 ring-foreground/5 sm:p-5">
+      <h2 id="process-map-heading" className="text-sm font-bold tracking-tight">Process map</h2>
+      <p className="mt-1 text-sm text-ink">From purchase order to dispatch note. Choose a time between two steps to see what is behind it.</p>
 
-      {open && (
-        <div id="process-map" className="rounded-4xl bg-card p-4 shadow-md ring-1 ring-foreground/5 sm:p-5">
-          <p className="text-sm text-ink">From purchase order to dispatch note. Choose a time between two steps to see what is behind it.</p>
+      <div className="mt-3 flex flex-wrap items-end gap-3">
+        <label className="flex flex-col gap-1 text-xs font-semibold text-ink">
+          Period
+          <NativeSelect className="w-40" value={preset} onChange={(e) => setPreset(e.target.value)}>
+            {PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+          </NativeSelect>
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-semibold text-ink">
+          Supplier
+          <NativeSelect className="w-48" value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
+            <option value="">All suppliers</option>
+            {suppliers.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </NativeSelect>
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-semibold text-ink">
+          Cohort
+          <NativeSelect className="w-36" value={cohort} onChange={(e) => setCohort(e.target.value)}>
+            <option value="">All cohorts</option>
+            {COHORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </NativeSelect>
+        </label>
+        <label className="flex flex-col gap-1 text-xs font-semibold text-ink">
+          Who it was for
+          <NativeSelect className="w-44" value={kind} onChange={(e) => setKind(e.target.value)}>
+            <option value="">Everyone</option>
+            {KINDS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </NativeSelect>
+        </label>
+        {data && !data.empty ? (
+          <button type="button" onClick={exportSheet} disabled={exporting}
+            className="ml-auto text-xs font-semibold text-ink underline underline-offset-2 disabled:opacity-60">
+            {exporting ? 'Preparing' : 'Export to Excel'}
+          </button>
+        ) : null}
+      </div>
 
-          <div className="mt-3 flex flex-wrap items-end gap-3">
-            <label className="flex flex-col gap-1 text-xs font-semibold text-ink">
-              Period
-              <NativeSelect className="w-40" value={preset} onChange={(e) => setPreset(e.target.value)}>
-                {PRESETS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
-              </NativeSelect>
-            </label>
-            <label className="flex flex-col gap-1 text-xs font-semibold text-ink">
-              Supplier
-              <NativeSelect className="w-48" value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
-                <option value="">All suppliers</option>
-                {suppliers.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </NativeSelect>
-            </label>
-            <label className="flex flex-col gap-1 text-xs font-semibold text-ink">
-              Cohort
-              <NativeSelect className="w-36" value={cohort} onChange={(e) => setCohort(e.target.value)}>
-                <option value="">All cohorts</option>
-                {COHORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-              </NativeSelect>
-            </label>
-            <label className="flex flex-col gap-1 text-xs font-semibold text-ink">
-              Who it was for
-              <NativeSelect className="w-44" value={kind} onChange={(e) => setKind(e.target.value)}>
-                <option value="">Everyone</option>
-                {KINDS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-              </NativeSelect>
-            </label>
-            {data && !data.empty ? (
-              <button type="button" onClick={exportSheet} disabled={exporting}
-                className="ml-auto text-xs font-semibold text-ink underline underline-offset-2 disabled:opacity-60">
-                {exporting ? 'Preparing' : 'Export to Excel'}
-              </button>
-            ) : null}
+      <ErrorBanner className="mt-3" message={error} />
+      {busy && !data ? <Skeleton className="mt-4 h-64 w-full rounded-2xl" /> : null}
+
+      {data?.empty ? (
+        <p className="mt-4 text-sm text-muted-foreground">Nothing was ordered, packed or dispatched in this period. Choose a longer period.</p>
+      ) : null}
+
+      {data && !data.empty ? (
+        <div className={busy ? 'opacity-60' : ''}>
+          <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <Figure
+              label="Typical time, order raised to food collected"
+              value={data.endToEnd.medianHours === null ? 'Not enough yet' : duration(data.endToEnd.medianHours)}
+              hint={data.endToEnd.medianHours === null
+                ? 'One part of the process has no measured time in this period.'
+                : 'The three parts added together. Stock is not followed batch by batch.'}
+            />
+            <div className="rounded-2xl border border-line bg-warn-soft px-3 py-2.5">
+              <p className="flex items-center gap-1.5 text-xs text-warn"><Timer aria-hidden="true" className="size-3.5" /> Slowest step</p>
+              {data.bottleneck ? (
+                <>
+                  <p className="mt-0.5 text-base font-bold text-ink">{data.bottleneck.label}: {duration(data.bottleneck.medianHours)}</p>
+                  <button type="button" onClick={() => setPicked({ lane: data.bottleneck.lane, id: data.bottleneck.id })}
+                    className="mt-0.5 text-xs font-semibold text-ink underline underline-offset-2">
+                    See what is behind it
+                  </button>
+                </>
+              ) : (
+                <p className="mt-0.5 text-sm text-ink">Too few cases in this period to name one.</p>
+              )}
+            </div>
           </div>
 
-          <ErrorBanner className="mt-3" message={error} />
-          {busy && !data ? <Skeleton className="mt-4 h-64 w-full rounded-2xl" /> : null}
+          <div className="mt-4 space-y-3">
+            {data.lanes.map((lane) => (
+              <Lane key={lane.id} lane={lane} bottleneck={data.bottleneck}
+                picked={picked?.lane === lane.id ? picked.id : null} onPick={pick} />
+            ))}
+          </div>
 
-          {data?.empty ? (
-            <p className="mt-4 text-sm text-muted-foreground">Nothing was ordered, packed or dispatched in this period. Choose a longer period.</p>
+          {pickedLane && pickedTransition ? (
+            <Detail lane={pickedLane} transition={pickedTransition} onClose={() => setPicked(null)} />
           ) : null}
 
-          {data && !data.empty ? (
-            <div className={busy ? 'opacity-60' : ''}>
-              <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                <Figure
-                  label="Typical time, order raised to food collected"
-                  value={data.endToEnd.medianHours === null ? 'Not enough yet' : duration(data.endToEnd.medianHours)}
-                  hint={data.endToEnd.medianHours === null
-                    ? 'One part of the process has no measured time in this period.'
-                    : 'The three parts added together. Stock is not followed batch by batch.'}
-                />
-                <div className="rounded-2xl border border-line bg-warn-soft px-3 py-2.5">
-                  <p className="flex items-center gap-1.5 text-xs text-warn"><Timer aria-hidden="true" className="size-3.5" /> Slowest step</p>
-                  {data.bottleneck ? (
-                    <>
-                      <p className="mt-0.5 text-base font-bold text-ink">{data.bottleneck.label}: {duration(data.bottleneck.medianHours)}</p>
-                      <button type="button" onClick={() => setPicked({ lane: data.bottleneck.lane, id: data.bottleneck.id })}
-                        className="mt-0.5 text-xs font-semibold text-ink underline underline-offset-2">
-                        See what is behind it
-                      </button>
-                    </>
-                  ) : (
-                    <p className="mt-0.5 text-sm text-ink">Too few cases in this period to name one.</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-3">
-                {data.lanes.map((lane) => (
-                  <Lane key={lane.id} lane={lane} bottleneck={data.bottleneck}
-                    picked={picked?.lane === lane.id ? picked.id : null} onPick={pick} />
-                ))}
-              </div>
-
-              {pickedLane && pickedTransition ? (
-                <Detail lane={pickedLane} transition={pickedTransition} onClose={() => setPicked(null)} />
-              ) : null}
-
-              <p className="mt-3 text-xs text-muted-foreground">
-                Purchase orders raised in the period, pallets booked for it, and stock that left in it. Times are between recorded moments, with no one named.
-              </p>
-            </div>
-          ) : null}
+          <p className="mt-3 text-xs text-muted-foreground">
+            Purchase orders raised in the period, pallets booked for it, and stock that left in it. Times are between recorded moments, with no one named.
+          </p>
         </div>
-      )}
+      ) : null}
     </section>
   );
 }
