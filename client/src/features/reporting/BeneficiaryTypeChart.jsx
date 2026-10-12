@@ -63,9 +63,11 @@ export default function BeneficiaryTypeChart({ items }) {
           <div role="img" aria-label={rows.map((r) => `${r.label}: ${fmtNum(r.value)} ${r.unit}`).join('. ')}>
             <ResponsiveContainer width="100%" height={rows.length * 40 + 8}>
               <BarChart data={rows} layout="vertical" margin={{ top: 4, right: 96, left: 0, bottom: 4 }} barCategoryGap="30%">
-                <XAxis type="number" hide domain={[0, 'dataMax']} />
-                <YAxis type="category" dataKey="label" width={170} axisLine={false} tickLine={false}
-                  tick={{ fill: INK, fontSize: 13, fontWeight: 500 }} />
+                {/* At least 1, so a period where nobody was reached still has a
+                    scale to place each row's "0 children" against. */}
+                <XAxis type="number" hide domain={[0, (max) => Math.max(max, 1)]} />
+                <YAxis type="category" dataKey="label" width={132} axisLine={false} tickLine={false}
+                  tick={{ fill: INK, fontSize: 12, fontWeight: 500 }} />
                 <Tooltip cursor={BAR_CURSOR} content={<BeneficiaryTip />} />
                 <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={14} minPointSize={3} isAnimationActive={animate}>
                   {rows.map((r) => <Cell key={r.metric} fill={r.color} />)}

@@ -35,7 +35,7 @@ function Explained({ tip, children, className = '' }) {
     <Tooltip>
       <TooltipTrigger
         render={<span tabIndex={0} />}
-        className={`cursor-help underline decoration-dotted decoration-1 underline-offset-2 ${className}`}
+        className={`cursor-help rounded-sm underline decoration-dotted decoration-1 underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${className}`}
       >
         {children}
       </TooltipTrigger>
@@ -106,7 +106,9 @@ export function StockCoverPanel({ insights }) {
               <p className="mt-1 flex flex-wrap gap-1.5">
                 {p.runsShortOn ? (
                   <Explained tip="When it runs out at this rate, counting what is due in." className="no-underline">
-                    <StatusBadge kind="outlook" status="runs_short">Runs short around {fmtDay(p.runsShortOn)}</StatusBadge>
+                    <StatusBadge kind="outlook" status="runs_short">
+                      {p.weeks === 0 ? 'None available' : `Runs short around ${fmtDay(p.runsShortOn)}`}
+                    </StatusBadge>
                   </Explained>
                 ) : null}
                 {p.mayExpireOn ? (

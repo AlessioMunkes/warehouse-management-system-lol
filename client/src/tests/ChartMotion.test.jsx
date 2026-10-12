@@ -21,6 +21,7 @@ vi.mock('recharts', async (orig) => {
 
 const { useChartMotion } = await import('../features/reporting/useChartMotion');
 const { default: ReportChart } = await import('../features/reporting/ReportChart');
+const { default: BeneficiaryTypeChart } = await import('../features/reporting/BeneficiaryTypeChart');
 
 const reduced = (on) => ({ children }) => (
   <ReducedMotionContext.Provider value={{ reducedMotion: on, setReducedMotion: () => {} }}>
@@ -59,5 +60,16 @@ describe('chart motion', () => {
     render(<ReportChart report={report} />, { wrapper: reduced(true) });
     expect(screen.getAllByText('60').length).toBeGreaterThan(0);
     expect(screen.getAllByText('10').length).toBeGreaterThan(0);
+  });
+
+  // A period where nobody was reached still says so on every row.
+  it('prints a zero on each row when every figure is zero', () => {
+    const items = [
+      { metric: 'children_reached', label: 'Children (ECD)', unit: 'children', color: 'var(--viz-1)', stat: { value: 0 } },
+      { metric: 'adults_reached', label: 'Adults', unit: 'adults', color: 'var(--viz-4)', stat: { value: 0 } },
+    ];
+    render(<BeneficiaryTypeChart items={items} />, { wrapper: reduced(true) });
+    expect(screen.getByText('0 children')).toBeInTheDocument();
+    expect(screen.getByText('0 adults')).toBeInTheDocument();
   });
 });

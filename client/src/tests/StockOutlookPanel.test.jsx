@@ -32,6 +32,15 @@ describe('stock outlook panel', () => {
     expect(screen.getByText(/^Runs short around 0?2 Nov$/)).toBeInTheDocument();
   });
 
+  it('says none is available, not a date, when nothing is left', () => {
+    renderPanel(insights([{
+      productId: 3, name: 'Onions', unit: 'kg', available: 0, dueIn: 0, weeklyUse: 40, weeklyUnit: 'kg',
+      usage: 'recipe', weeks: 0, runsShortOn: '2026-10-12', mayExpireOn: null,
+    }]));
+    expect(screen.getByText('None available')).toBeInTheDocument();
+    expect(screen.queryByText(/Runs short around/)).toBeNull();
+  });
+
   it('says when the next use-by date comes first', () => {
     renderPanel(insights([{
       productId: 2, name: 'Pilchards', unit: 'cans', available: 40, dueIn: 0, weeklyUse: 10, weeklyUnit: 'cans',

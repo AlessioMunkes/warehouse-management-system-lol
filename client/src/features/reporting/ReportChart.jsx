@@ -43,6 +43,9 @@ import {
 
 const INK = 'var(--ink)', LINE = 'var(--line)', MUTED = 'var(--ink-soft)', SURF = 'var(--surface)';
 const UNDER = 'var(--rag-bad)';
+// A value axis of at least 0 to 1, so a report whose figures are all
+// zero still has a scale to print its "0" labels against.
+const ATLEAST_ONE = [0, (max) => Math.max(max, 1)];
 const TREND = SERIES[0];
 
 const axisProps = { tick: { fill: MUTED, fontSize: 11 }, axisLine: { stroke: LINE }, tickLine: false };
@@ -106,7 +109,7 @@ const BarView = ({ rows, unit, tip, colourOf, animate }) => (
     <BarChart data={rows} margin={{ top: 22, right: 8, left: 8, bottom: 0 }} barCategoryGap="20%">
       <CartesianGrid vertical={false} stroke={LINE} strokeOpacity={0.6} />
       <XAxis dataKey="name" {...axisProps} tick={<FitTick />} height={40} interval={0} />
-      <YAxis hide />
+      <YAxis hide domain={ATLEAST_ONE} />
       {tip(BAR_CURSOR)}
       <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={64} isAnimationActive={animate}>
         {rows.map((r) => <Cell key={r.name} fill={colourOf(r.name)} />)}
@@ -122,7 +125,7 @@ const HBarView = ({ rows, unit, tip, colourOf, animate }) => {
   // Negative values (below reorder level) run left from a zero line.
   const hasNeg = rows.some((r) => r.value < 0);
   const values = rows.map((r) => r.value);
-  const domain = [Math.min(0, ...values), Math.max(0, ...values)];
+  const domain = [Math.min(0, ...values), Math.max(hasNeg ? 0 : 1, ...values)];
   const label = (r) => `${fmt(r.value, unit)}${r.unit ? ` ${r.unit}` : ''}`;
   return (
     <ResponsiveContainer width="100%" height={rows.length * 30 + 16}>
@@ -161,7 +164,7 @@ const LineView = ({ rows, unit, tip, animate }) => {
       <LineChart data={rows} margin={{ top: 24, right: 24, left: 24, bottom: 0 }}>
         <CartesianGrid vertical={false} stroke={LINE} strokeOpacity={0.6} />
         <XAxis dataKey="name" {...axisProps} tick={<FitTick />} height={40} interval={every - 1} />
-        <YAxis hide domain={[0, 'auto']} />
+        <YAxis hide domain={ATLEAST_ONE} />
         {tip(LINE_CURSOR)}
         <Line type="monotone" dataKey="value" stroke={TREND} strokeWidth={2} isAnimationActive={animate}
           dot={{ r: 4, fill: TREND, stroke: SURF, strokeWidth: 2 }} activeDot={{ r: 6 }}>
@@ -195,7 +198,7 @@ const GroupedBarView = ({ series, unit, tip, animate }) => {
         <BarChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 0 }} barCategoryGap="20%" barGap={2}>
           <CartesianGrid vertical={false} stroke={LINE} strokeOpacity={0.6} />
           <XAxis dataKey="name" {...axisProps} tick={<FitTick />} height={40} interval={0} />
-          <YAxis hide />
+          <YAxis hide domain={ATLEAST_ONE} />
           {tip(BAR_CURSOR)}
           {groups.map((g, gi) => (
             <Bar key={g} dataKey={g} name={g} fill={colourForGroup(g, gi)} radius={[3, 3, 0, 0]} maxBarSize={28} isAnimationActive={animate} />
