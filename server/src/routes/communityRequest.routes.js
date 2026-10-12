@@ -46,6 +46,8 @@ router.post('/:id/confirm',  auth, requireRole(...ALL_STAFF), validateIntId, ide
 
 // The old resolve call. Narrowed to "decline" for managers and admins;
 // a request can no longer be fulfilled without being approved first.
+// A manager undoes a confirmation, putting the stock back (communityRequest.service.js reverse).
+router.post('/:id/reverse',  auth, requireRole(...MANAGERS_UP), validateIntId, idempotent('communityRequest.reverse'), communityRequestController.reverseRequest);
 router.patch('/:id/resolve', auth, requireRole(...MANAGERS_UP), communityRequestController.resolveRequest);
 
 export default router;

@@ -80,6 +80,16 @@ const declineRequest = async (req, res, next) => {
   }
 };
 
+// POST /api/community-requests/:id/reverse   body: { reason }
+const reverseRequest = async (req, res, next) => {
+  try {
+    const result = await communityRequestService.reverse(req.params.id, req.body, req.user);
+    res.status(200).json({ success: true, data: result });
+  } catch (err) {
+    next(err);
+  }
+};
+
 const assignRequest = async (req, res, next) => {
   try {
     const result = await communityRequestService.assign(req.params.id, req.body, req.user);
@@ -118,4 +128,5 @@ export default {
   assignRequest,
   rechooseItems,
   confirmRequest,
+  reverseRequest,
 };

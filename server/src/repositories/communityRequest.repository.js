@@ -304,6 +304,52 @@ const setReleased = async (lineId, quantity, client) => {
   await client.query(SET_RELEASED_SQL, [lineId, quantity]);
 };
 
+// ── Reverse a confirmed request ───────────────────────────────
+// For a request confirmed by mistake, or one the caller never took
+// away. It ends as declined, which already means "nothing went out":
+// no stock is held for it and nothing is counted as given. The reason
+// goes in the note, and the audit log keeps the confirmation it undid.
+export const REVERSE_SQL = `
+  UPDATE public.community_requests
+     SET outcome = 'declined'::request_outcome,
+         outcome_note = $2,
+         resolved_at = NOW()
+   WHERE id = $1
+     AND outcome IN ('fulfilled'::request_outcome, 'partially_fulfilled'::request_outcome)
+   RETURNING id`;
+
+const markReversed = async (id, note, client) => {
+  const { rowCount } = await client.query(REVERSE_SQL, [id, note]);
+  return rowCount > 0;
+};
+
+export const RESET_RELEASED_SQL = `
+  UPDATE community_request_items
+     SET quantity_released = 0, updated_at = NOW()
+   WHERE request_id = $1`;
+
+const resetReleased = async (requestId, client) => {
+  await client.query(RESET_RELEASED_SQL, [requestId]);
+};
+
+// What the ledger says went out for this request, per product, net of
+// anything already put back. Read from stock_movements rather than the
+// released quantities, so putting it back undoes exactly what was
+// taken off, in the unit it was taken off in, and a second reversal
+// finds nothing left to undo.
+export const NET_OUT_SQL = `
+  SELECT product_id, unit, (-SUM(quantity))::numeric AS quantity
+    FROM stock_movements
+   WHERE reference_type = 'community_request' AND reference_id = $1
+   GROUP BY product_id, unit
+  HAVING SUM(quantity) < 0
+   ORDER BY product_id`;
+
+const netStockOut = async (requestId, client) => {
+  const { rows } = await client.query(NET_OUT_SQL, [requestId]);
+  return rows;
+};
+
 const countPending = async (client = pool) => {
   const { rows } = await client.query(
     `SELECT COUNT(*)::int AS count
@@ -328,5 +374,8 @@ export default {
   claimApproved,
   markConfirmed,
   setReleased,
+  markReversed,
+  resetReleased,
+  netStockOut,
   countPending,
 };

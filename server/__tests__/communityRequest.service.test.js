@@ -27,6 +27,9 @@ const repoMock = {
   claimApproved:      vi.fn(),
   markConfirmed:      vi.fn(),
   setReleased:        vi.fn(),
+  markReversed:       vi.fn(),
+  resetReleased:      vi.fn(),
+  netStockOut:        vi.fn(),
   countPending:       vi.fn(),
 };
 vi.mock('../src/repositories/communityRequest.repository.js', () => ({ default: repoMock }));
@@ -104,6 +107,9 @@ beforeEach(() => {
   repoMock.claimApproved.mockResolvedValue(true);
   repoMock.markConfirmed.mockResolvedValue(true);
   repoMock.setReleased.mockResolvedValue(undefined);
+  repoMock.markReversed.mockResolvedValue(true);
+  repoMock.resetReleased.mockResolvedValue(undefined);
+  repoMock.netStockOut.mockResolvedValue([]);
   stockMock.adjustStock.mockResolvedValue({ before: 10, after: 4, isShortfall: false });
   availabilityMock.mockResolvedValue([available()]);
 });
@@ -486,5 +492,96 @@ describe('getRequest', () => {
 describe('countPending', () => {
   it('returns the repository count as a number', async () => {
     await expect(service.countPending()).resolves.toBe(2);
+  });
+});
+
+// ── Reverse ───────────────────────────────────────────────────
+// A manager undoes a confirmation. The stock that went out comes back
+// through the ledger, linked to the request; the request ends as
+// declined with the reason; the audit log keeps what it undid.
+describe('reverse', () => {
+  const confirmed = () => {
+    repoMock.lockRequest.mockResolvedValue(lockRow({ outcome: 'fulfilled', handled_by: 7 }));
+    repoMock.getItems.mockResolvedValue([
+      line({ product_id: 5, quantity_released: '6' }),
+      line({ id: 11, product_id: 8, unit: 'each', quantity_approved: '4', quantity_released: '4' }),
+    ]);
+    repoMock.netStockOut.mockResolvedValue([
+      { product_id: 5, unit: 'kg', quantity: '6' },
+      { product_id: 8, unit: 'each', quantity: '4' },
+    ]);
+  };
+
+  it('puts back exactly what the ledger shows went out, linked to the request', async () => {
+    confirmed();
+    await service.reverse(1, { reason: 'Caller never came' }, MANAGER);
+    expect(stockMock.adjustStock).toHaveBeenCalledTimes(2);
+    expect(stockMock.adjustStock).toHaveBeenNthCalledWith(1, expect.anything(), expect.objectContaining({
+      productId: 5, quantityDelta: 6, unit: 'kg', movementType: 'adjustment',
+      referenceType: 'community_request', referenceId: 1, performedBy: MANAGER.id,
+      reason: 'Benevolent request #1 reversed: Caller never came',
+    }));
+    expect(stockMock.adjustStock).toHaveBeenNthCalledWith(2, expect.anything(), expect.objectContaining({
+      productId: 8, quantityDelta: 4, unit: 'each',
+    }));
+  });
+
+  it('ends the request as declined with the reason, and clears what was released', async () => {
+    confirmed();
+    await service.reverse(1, { reason: 'Recorded by mistake' }, MANAGER);
+    expect(repoMock.markReversed).toHaveBeenCalledWith(1, 'Reversed: Recorded by mistake', expect.anything());
+    expect(repoMock.resetReleased).toHaveBeenCalledWith(1, expect.anything());
+  });
+
+  it('records who reversed it, why, and what it was before, in the audit log', async () => {
+    confirmed();
+    const client = makeClient();
+    poolMock.connect.mockResolvedValue(client);
+    await service.reverse(1, { reason: 'Caller never came' }, MANAGER);
+    const audit = client.query.mock.calls.find(([sql]) => /INSERT INTO audit_log/.test(sql));
+    expect(audit).toBeTruthy();
+    const [, [entityType, entityId, action, actorId, reason, , before, after]] = audit;
+    expect([entityType, entityId, action, actorId, reason]).toEqual(['community_request', 1, 'reversed', MANAGER.id, 'Caller never came']);
+    expect(before.outcome).toBe('fulfilled');
+    expect(before.released).toEqual([
+      { product_id: 5, quantity: 6, unit: 'kg' },
+      { product_id: 8, quantity: 4, unit: 'each' },
+    ]);
+    expect(after.returned).toEqual([
+      { product_id: 5, quantity: 6, unit: 'kg' },
+      { product_id: 8, quantity: 4, unit: 'each' },
+    ]);
+  });
+
+  it('needs a reason', async () => {
+    confirmed();
+    await expect(service.reverse(1, { reason: '  ' }, MANAGER)).rejects.toMatchObject({ status: 400 });
+    expect(stockMock.adjustStock).not.toHaveBeenCalled();
+  });
+
+  it('is for managers and admins only', async () => {
+    confirmed();
+    await expect(service.reverse(1, { reason: 'x' }, ACTOR)).rejects.toMatchObject({ status: 403 });
+    await expect(service.reverse(1, { reason: 'x' }, ADMIN)).resolves.toBeTruthy();
+  });
+
+  it('only reverses a confirmed request, and leaves stock alone otherwise', async () => {
+    repoMock.lockRequest.mockResolvedValue(lockRow({ outcome: 'approved' }));
+    await expect(service.reverse(1, { reason: 'x' }, MANAGER)).rejects.toMatchObject({ status: 409 });
+    repoMock.lockRequest.mockResolvedValue(lockRow({ outcome: 'declined' }));
+    await expect(service.reverse(1, { reason: 'x' }, MANAGER)).rejects.toMatchObject({ status: 409 });
+    expect(stockMock.adjustStock).not.toHaveBeenCalled();
+    expect(repoMock.markReversed).not.toHaveBeenCalled();
+  });
+
+  it('rolls everything back when putting stock back fails', async () => {
+    confirmed();
+    const client = makeClient();
+    poolMock.connect.mockResolvedValue(client);
+    stockMock.adjustStock.mockRejectedValueOnce(new Error('disk full'));
+    await expect(service.reverse(1, { reason: 'x' }, MANAGER)).rejects.toThrow('disk full');
+    const sql = client.query.mock.calls.map(([q]) => q);
+    expect(sql).toContain('ROLLBACK');
+    expect(sql).not.toContain('COMMIT');
   });
 });

@@ -17,6 +17,8 @@
 //                        (a pallet used the stock that was set aside;
 //                         pallets always come first)
 //   Fulfilled · Declined · All
+//                        (a fulfilled request's detail offers Reverse:
+//                         the stock goes back and it ends as declined)
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -27,6 +29,7 @@ import { fetchAssignableWorkers } from '../services/pickingAPI';
 import CommunityRequestForm from '../features/communityRequests/CommunityRequestForm';
 import ApproveItemsPanel from '../features/communityRequests/ApproveItemsPanel';
 import DeclinePanel from '../features/communityRequests/DeclinePanel';
+import ReversePanel from '../features/communityRequests/ReversePanel';
 import AssignPanel from '../features/communityRequests/AssignPanel';
 import RequestDetailPanel from '../features/communityRequests/RequestDetailPanel';
 import {
@@ -171,6 +174,11 @@ export default function CommunityRequestsPage() {
   const decline = (reason) => act(
     () => communityRequestAPI.declineRequest(panel.request.id, reason),
     'Could not decline the request.',
+  );
+
+  const reverse = (reason) => act(
+    () => communityRequestAPI.reverseRequest(panel.request.id, reason),
+    'Could not reverse the request.',
   );
 
   const assign = (userId) => act(
@@ -384,6 +392,17 @@ export default function CommunityRequestsPage() {
         />
       ) : null}
 
+      {panel?.type === 'reverse' ? (
+        <ReversePanel
+          key={panel.request.id}
+          request={panel.request}
+          busy={busy}
+          error={formError}
+          onSubmit={reverse}
+          onCancel={closePanel}
+        />
+      ) : null}
+
       {panel?.type === 'assign' ? (
         <AssignPanel
           key={panel.request.id}
@@ -397,7 +416,11 @@ export default function CommunityRequestsPage() {
       ) : null}
 
       {panel?.type === 'detail' ? (
-        <RequestDetailPanel request={panel.request} onClose={closePanel} />
+        <RequestDetailPanel
+          request={panel.request}
+          onClose={closePanel}
+          onReverse={() => { setFormError(null); setPanel({ type: 'reverse', request: panel.request }); }}
+        />
       ) : null}
     </PageShell>
   );

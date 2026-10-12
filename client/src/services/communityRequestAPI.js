@@ -118,6 +118,14 @@ export const declineRequest = async (id, reason) => {
   return toRequest(body.data ?? {});
 };
 
+// ── POST /:id/reverse ────────────────────────────────────────
+// Managers only. Puts what went out back into stock and ends the
+// request as declined, with the reason.
+export const reverseRequest = async (id, reason) => {
+  const body = await apiPost(`/api/community-requests/${id}/reverse`, { reason });
+  return toRequest(body.data ?? {});
+};
+
 // ── PATCH /:id/assign ────────────────────────────────────────
 // userId null clears the packer.
 export const assignRequest = async (id, userId) => {
@@ -151,6 +159,6 @@ export const confirmRequest = async (id, items) => {
 
 export default {
   getRequests, getRequest, logRequest,
-  approveRequest, declineRequest, assignRequest, rechooseItems, claimRequest, confirmRequest,
+  approveRequest, declineRequest, assignRequest, rechooseItems, claimRequest, confirmRequest, reverseRequest,
   OUTCOMES, OUTCOME_LABELS,
 };
