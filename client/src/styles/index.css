@@ -1919,7 +1919,118 @@ color:white;
 .fx-dock      { overflow: hidden; animation: fx-dock-open 220ms cubic-bezier(0.2, 0, 0, 1) both; }
 .fx-dock-body { animation: fx-slide-in 220ms cubic-bezier(0.2, 0, 0, 1) both; }
 
-/* The app-wide loading screen (components/ui/loading-screen.jsx).
+/* ── The loading mark ────────────────────────────────────────────
+   See components/ui/loading-screen.jsx. Every loading placeholder in
+   the app (the Skeleton component, .stf-skeleton on the floor,
+   .gst-skeleton for volunteers) already takes up the space of the
+   thing it stands in for. The Batches mark in a turning ring is drawn
+   in the middle of each one, so loading looks the same everywhere and
+   covers only the part that is loading.
+
+   The placeholder is its own size container, and the mark asks how big
+   it is: full size in a card or a table, small in a single row, and
+   not at all in a line of text or a button, which stay plain bars.
+
+   In the base layer so a utility on a particular skeleton (hidden,
+   absolute, inline-block) still wins. */
+@layer base {
+  [data-slot="skeleton"],
+  .stf-skeleton,
+  .gst-skeleton {
+    display: grid;
+    place-items: center;
+    container-type: size;
+  }
+  [data-slot="skeleton"]::before,
+  .stf-skeleton::before,
+  .gst-skeleton::before,
+  [data-slot="skeleton"]::after,
+  .stf-skeleton::after,
+  .gst-skeleton::after {
+    content: "";
+    display: none;
+    grid-area: 1 / 1;
+  }
+  /* The ring. */
+  [data-slot="skeleton"]::before,
+  .stf-skeleton::before,
+  .gst-skeleton::before {
+    width: var(--loading-ring, 1.75rem);
+    height: var(--loading-ring, 1.75rem);
+    border-radius: 9999px;
+    border: 2px solid var(--line-strong, rgb(0 0 0 / 0.18));
+    border-top-color: var(--ink, #222);
+    animation: loading-ring-turn 0.9s linear infinite;
+  }
+  /* The Batches mark inside it. */
+  [data-slot="skeleton"]::after,
+  .stf-skeleton::after,
+  .gst-skeleton::after {
+    width: calc(var(--loading-ring, 1.75rem) * 0.58);
+    height: calc(var(--loading-ring, 1.75rem) * 0.58);
+    border-radius: 22%;
+    background: url('../assets/Batches_Logo.jpeg') center / cover no-repeat;
+  }
+  /* Room for a small one: a single row. */
+  @container (min-height: 3rem) and (min-width: 8rem) {
+    [data-slot="skeleton"]::before, .stf-skeleton::before, .gst-skeleton::before,
+    [data-slot="skeleton"]::after, .stf-skeleton::after, .gst-skeleton::after { display: block; }
+  }
+  /* Room for the full one: a card, a chart, a table. */
+  @container (min-height: 7rem) and (min-width: 10rem) {
+    [data-slot="skeleton"]::before, .stf-skeleton::before, .gst-skeleton::before,
+    [data-slot="skeleton"]::after, .stf-skeleton::after, .gst-skeleton::after { --loading-ring: 4rem; }
+    [data-slot="skeleton"]::before, .stf-skeleton::before, .gst-skeleton::before { border-width: 3px; }
+  }
+  /* SEVERAL PLACEHOLDERS SIDE BY SIDE ARE ONE THING LOADING: the rows
+     of a table, a row of cards. They get one mark between them, in the
+     middle of the group, instead of one each (or none, where each row
+     is too short to hold its own). The group is whatever directly
+     holds two placeholders in a row. */
+  :has(> :is([data-slot="skeleton"], .stf-skeleton, .gst-skeleton) + :is([data-slot="skeleton"], .stf-skeleton, .gst-skeleton)) {
+    position: relative;
+  }
+  :has(> :is([data-slot="skeleton"], .stf-skeleton, .gst-skeleton) + :is([data-slot="skeleton"], .stf-skeleton, .gst-skeleton)) > :is([data-slot="skeleton"], .stf-skeleton, .gst-skeleton)::before,
+  :has(> :is([data-slot="skeleton"], .stf-skeleton, .gst-skeleton) + :is([data-slot="skeleton"], .stf-skeleton, .gst-skeleton)) > :is([data-slot="skeleton"], .stf-skeleton, .gst-skeleton)::after {
+    display: none;
+  }
+  :has(> :is([data-slot="skeleton"], .stf-skeleton, .gst-skeleton) + :is([data-slot="skeleton"], .stf-skeleton, .gst-skeleton))::before,
+  :has(> :is([data-slot="skeleton"], .stf-skeleton, .gst-skeleton) + :is([data-slot="skeleton"], .stf-skeleton, .gst-skeleton))::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    z-index: 1;
+    pointer-events: none;
+  }
+  :has(> :is([data-slot="skeleton"], .stf-skeleton, .gst-skeleton) + :is([data-slot="skeleton"], .stf-skeleton, .gst-skeleton))::before {
+    width: 3.5rem;
+    height: 3.5rem;
+    margin: -1.75rem 0 0 -1.75rem;
+    border-radius: 9999px;
+    border: 3px solid var(--line-strong, rgb(0 0 0 / 0.18));
+    border-top-color: var(--ink, #222);
+    background: var(--card, #fff);
+    animation: loading-ring-turn 0.9s linear infinite;
+  }
+  :has(> :is([data-slot="skeleton"], .stf-skeleton, .gst-skeleton) + :is([data-slot="skeleton"], .stf-skeleton, .gst-skeleton))::after {
+    width: 2rem;
+    height: 2rem;
+    margin: -1rem 0 0 -1rem;
+    border-radius: 22%;
+    background: url('../assets/Batches_Logo.jpeg') center / cover no-repeat;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-slot="skeleton"]::before, .stf-skeleton::before, .gst-skeleton::before,
+    :has(> :is([data-slot="skeleton"], .stf-skeleton, .gst-skeleton) + :is([data-slot="skeleton"], .stf-skeleton, .gst-skeleton))::before { animation: none; }
+  }
+}
+@keyframes loading-ring-turn {
+  to { transform: rotate(360deg); }
+}
+
+/* The same mark for a whole page (the LoadingScreen component).
    -delayed is the one a page's own file waits behind: nothing shows
    for the first 300ms, so a file that arrives at once never flashes. */
 @keyframes loading-screen-in {

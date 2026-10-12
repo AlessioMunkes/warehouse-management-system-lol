@@ -32,7 +32,7 @@ const ProtectedRoute = ({ roles, shell = false } = {}) => {
 
   // Still checking with the server — decide nothing yet.
   if (isLoading) {
-    return <LoadingScreen solid label="Checking your session" />;
+    return <LoadingScreen page label="Checking your session" />;
   }
 
   // Not logged in — send to login

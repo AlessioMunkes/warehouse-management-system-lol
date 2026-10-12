@@ -1,46 +1,45 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/components/ui/loading-screen.jsx
 //
-// THE LOADING SCREEN, one for the whole app. The Batches mark inside a
-// turning ring with a word under it, over whatever is on screen.
+// THE LOADING MARK, one for the whole app: the Batches mark inside a
+// turning ring. It sits IN the thing that is loading, and only that.
+// A list that is loading shows it where the list will be, and the rest
+// of the screen stays as it is and stays usable.
 //
-// It is used in three places and looks the same in each:
-//   GlobalLoading   (mounted once in App.jsx) while a request someone
-//                   caused is taking long enough to notice. See
-//                   services/loading.js for which requests count.
-//   a page's file   the first time a screen is opened and its code is
-//                   still arriving (the Suspense fallback in App.jsx)
-//   the session     while the app is asking the server who is signed in
-//                   (ProtectedRoute.jsx). `solid`, because there is
-//                   nothing behind it yet to show through.
+// WHERE IT COMES FROM
+//   a part of a screen   every loading placeholder in the app already
+//                        marks out the space of the thing it stands in
+//                        for: <Skeleton> on manager and admin screens,
+//                        .stf-skeleton on the floor, .gst-skeleton for
+//                        volunteers. The mark is drawn inside those by
+//                        styles/index.css, so every one of them has it
+//                        with nothing changed where they are used. A
+//                        placeholder too small to hold it (a line of
+//                        text, a button) stays a plain pulsing bar.
+//   a whole page         this component. The first time a screen is
+//                        opened its code has to arrive (the Suspense
+//                        fallback in App.jsx): the mark fills the page
+//                        area, inside the sidebar and top bar.
+//   the app itself       this component with `page`. While the app is
+//                        asking the server who is signed in there is
+//                        nothing to show yet, so it takes the window
+//                        (ProtectedRoute.jsx).
 //
-// It never takes a tap. A request that hangs must not leave someone
-// locked out of a screen they could otherwise leave, so the veil is
-// see-through to the pointer and the page under it still works.
-//
-// Quick loads show nothing: the screen waits a moment before it
-// appears, and once it has appeared it stays long enough to be read
-// instead of flickering.
+// `delayed` holds it back a moment, so a page that arrives at once
+// shows nothing instead of a flash.
 // ─────────────────────────────────────────────────────────────
-import { useEffect, useState, useSyncExternalStore } from 'react';
-import { useLocation } from 'react-router-dom';
 import batchesLogo from '../../assets/Batches_Logo.jpeg';
 import { useT } from '../../translations';
-import { isWaiting, subscribeLoading, markIntent } from '../../services/loading';
 
-// Shorter than this and a load is not worth a screen.
-const SHOW_AFTER_MS = 400;
-// Once shown, it stays at least this long.
-const STAY_AT_LEAST_MS = 450;
-
-export default function LoadingScreen({ label, solid = false, delayed = false }) {
+export default function LoadingScreen({ label, page = false, delayed = false, className = '' }) {
   const t = useT();
   return (
     <div
       role="status"
       aria-live="polite"
-      className={`pointer-events-none fixed inset-0 z-[200] flex flex-col items-center justify-center gap-4
-        ${solid ? 'bg-background' : 'bg-background/75 backdrop-blur-[2px]'} ${delayed ? 'loading-screen-delayed' : 'loading-screen-in'}`}
+      className={`flex flex-col items-center justify-center gap-4
+        ${page ? 'fixed inset-0 z-[200] bg-background' : 'min-h-[60vh] w-full'}
+        ${delayed ? 'loading-screen-delayed' : 'loading-screen-in'} ${className}`}
     >
       <div className="relative flex size-20 items-center justify-center">
         <span aria-hidden="true" className="absolute inset-0 rounded-full border-[3px] border-line" />
@@ -50,31 +49,4 @@ export default function LoadingScreen({ label, solid = false, delayed = false })
       <p className="text-sm font-semibold text-ink">{label ?? t('common.loading')}</p>
     </div>
   );
-}
-
-/**
- * The screen for requests. Mounted once, inside the router: changing
- * screen is an action, so the requests the new screen makes count.
- */
-export function GlobalLoading() {
-  const waiting = useSyncExternalStore(subscribeLoading, isWaiting, () => false);
-  const [shown, setShown] = useState(false);
-  const [since, setSince] = useState(0);
-  const location = useLocation();
-
-  useEffect(() => { markIntent(); }, [location.pathname, location.search]);
-
-  useEffect(() => {
-    if (waiting && !shown) {
-      const timer = setTimeout(() => { setShown(true); setSince(Date.now()); }, SHOW_AFTER_MS);
-      return () => clearTimeout(timer);
-    }
-    if (!waiting && shown) {
-      const timer = setTimeout(() => setShown(false), Math.max(0, STAY_AT_LEAST_MS - (Date.now() - since)));
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-  }, [waiting, shown, since]);
-
-  return shown ? <LoadingScreen /> : null;
 }

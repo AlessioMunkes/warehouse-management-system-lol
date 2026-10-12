@@ -16,7 +16,6 @@
 // in at BUILD time, so an unset variable in a production build would
 // otherwise leave every request pointing at the developer's localhost.
 import { reportReach, reportUnreachable } from './connection';
-import { tracked } from './loading';
 
 export const API_BASE =
   import.meta.env.VITE_API_URL ??
@@ -169,12 +168,8 @@ const networkError = () => {
   return error;
 };
 
-// Each verb below runs inside tracked() (services/loading.js), which is
-// how the app-wide loading screen knows someone is waiting. A caller
-// that shows its own progress passes { quiet: true } to stay out of it.
-
 // ── GET ───────────────────────────────────────────────────────
-export const apiGet = (endpoint, options = {}) => tracked(async () => {
+export const apiGet = async (endpoint, options = {}) => {
   let res;
   try {
     res = await fetchWaking(`${API_BASE}${endpoint}`, {
@@ -188,11 +183,11 @@ export const apiGet = (endpoint, options = {}) => tracked(async () => {
     throw networkError();
   }
   return handleResponse(res);
-}, options);
+};
 
 // ── POST ──────────────────────────────────────────────────────
 // options.signal lets a caller abort (section18aSettingsAPI's timeout).
-export const apiPost = (endpoint, body, options = {}) => tracked(async () => {
+export const apiPost = async (endpoint, body, options = {}) => {
   // Never log `body` here: on /api/login it holds the password.
   const send = WAKE_RETRY_POSTS.has(endpoint) ? fetchWaking : fetch;
   let res;
@@ -210,10 +205,10 @@ export const apiPost = (endpoint, body, options = {}) => tracked(async () => {
     throw networkError();
   }
   return handleResponse(res);
-}, options);
+};
 
 // ── PATCH ─────────────────────────────────────────────────────
-export const apiPatch = (endpoint, body = {}) => tracked(async () => {
+export const apiPatch = async (endpoint, body = {}) => {
   let res;
   try {
     res = await fetch(`${API_BASE}${endpoint}`, {
@@ -226,12 +221,12 @@ export const apiPatch = (endpoint, body = {}) => tracked(async () => {
     throw networkError();
   }
   return handleResponse(res);
-});
+};
 
 // Deletion on this system is never a SQL DELETE — see migration 019 —
 // but DELETE is still the honest verb for what the admin is asking
 // for, and routing it through apiPatch with a flag would hide that.
-export const apiDelete = (endpoint) => tracked(async () => {
+export const apiDelete = async (endpoint) => {
   let res;
   try {
     res = await fetch(`${API_BASE}${endpoint}`, {
@@ -242,7 +237,7 @@ export const apiDelete = (endpoint) => tracked(async () => {
     throw networkError();
   }
   return handleResponse(res);
-});
+};
 
 // ── Short-lived cache for rarely-changing dropdown data ────────
 // Suppliers, open-order suppliers, decantable products — all barely
@@ -280,7 +275,7 @@ export const clearApiCache = () => cache.clear();
 // PUT is used by the attendance contract. It lives in the shared helper so
 // that future attendance components keep the same cookie, network-error and
 // session-expiry behaviour as every other API call.
-export const apiPut = (endpoint, body = {}, options = {}) => tracked(async () => {
+export const apiPut = async (endpoint, body = {}, options = {}) => {
   let res;
   try {
     res = await fetch(`${API_BASE}${endpoint}`, {
@@ -295,4 +290,4 @@ export const apiPut = (endpoint, body = {}, options = {}) => tracked(async () =>
     throw networkError();
   }
   return handleResponse(res);
-}, options);
+};
