@@ -30,7 +30,12 @@ import pool from '../config/db.js';
 const KEY = /^[A-Za-z0-9_-]{8,100}$/;
 const KEEP_DAYS = 7;
 
-const refuse = (res, status, message) => res.status(status).json({ success: false, message });
+const refuse = (res, status, message, extra = {}) => res.status(status).json({ success: false, message, ...extra });
+
+// How long a submission may be "still being saved" before the first
+// attempt is taken to have died (a restart, a dropped connection) and a
+// repeat is allowed to do the work. Far longer than any save takes.
+const ABANDONED_AFTER_SECONDS = 120;
 
 export const idempotent = (scope) => async (req, res, next) => {
   const key = req.body?.idempotencyKey;
@@ -50,7 +55,9 @@ export const idempotent = (scope) => async (req, res, next) => {
 
     if (claim.rows.length === 0) {
       const { rows } = await pool.query(
-        `SELECT scope, user_id, status_code, response FROM idempotency_keys WHERE key = $1`,
+        `SELECT scope, user_id, status_code, response,
+                (created_at < NOW() - INTERVAL '${ABANDONED_AFTER_SECONDS} seconds') AS abandoned
+           FROM idempotency_keys WHERE key = $1`,
         [key]
       );
       const prior = rows[0];
@@ -61,12 +68,32 @@ export const idempotent = (scope) => async (req, res, next) => {
         return refuse(res, 409, 'This was already submitted as something else. Refresh and try again.');
       }
       if (prior.status_code === null) {
-        return refuse(res, 409, 'This is already being saved. Check that it is recorded before trying again.');
-      }
+        if (!prior.abandoned) {
+          // Told apart from a real conflict, so a phone holding this in
+          // its outbox waits and tries again instead of giving up on it.
+          return refuse(res, 409, 'This is already being saved. Check that it is recorded before trying again.', { retryable: true });
+        }
+        // The first attempt never finished and never will: the server
+        // went down with the key claimed and no answer stored. Without
+        // this the key answered "already being saved" for a week and
+        // the work could never be sent. This attempt takes the key
+        // over; the routes that use it check their own records too.
+        const taken = await pool.query(
+          `UPDATE idempotency_keys SET created_at = NOW()
+            WHERE key = $1 AND status_code IS NULL
+              AND created_at < NOW() - INTERVAL '${ABANDONED_AFTER_SECONDS} seconds'
+          RETURNING key`,
+          [key]
+        );
+        if (taken.rows.length === 0) {
+          return refuse(res, 409, 'This is already being saved. Check that it is recorded before trying again.', { retryable: true });
+        }
+      } else {
       const body = prior.response && typeof prior.response === 'object' && !Array.isArray(prior.response)
         ? { ...prior.response, duplicate: true }
         : prior.response;
       return res.status(prior.status_code).json(body);
+      }
     }
   } catch (err) {
     console.error(`[idempotency] ${scope}: not checked, carrying on:`, err.message);

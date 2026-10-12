@@ -141,6 +141,9 @@ const handleResponse = async (res) => {
     // accept/resolve 410s: 'expired' | 'revoked' | 'accepted') — lets a
     // caller show distinct copy per cause instead of one generic message.
     if (data.reason) error.reason = data.reason;
+    // The server could not take this just now but will (the same
+    // submission is still being saved): the outbox tries again.
+    if (data.retryable) error.retryable = true;
     // Multi-warehouse: 'WAREHOUSE_REQUIRED' | 'WAREHOUSE_FORBIDDEN' |
     // 'WAREHOUSE_INVALID', with the allowed codes when the server
     // sends them. AuthContext uses these to pick or reset the site.

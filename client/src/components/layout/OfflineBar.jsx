@@ -26,7 +26,9 @@
 // the sentence it is on. This is not an emergency, it is a fact about
 // the building.
 // ─────────────────────────────────────────────────────────────
+import { useState } from 'react';
 import useOutbox from '../../lib/useOutbox';
+import OutboxPanel from './OutboxPanel';
 import { useServedFromCache } from '../../services/readCache';
 import { useT } from '../../translations';
 
@@ -39,47 +41,89 @@ const savedWords = (at, t) => {
 };
 
 export default function OfflineBar() {
-  const { online, waiting, stuck, sending, send } = useOutbox();
+  const { online, pending, waiting, stuck, others, sending, send, retry, discard, isOther } = useOutbox();
   const savedAt = useServedFromCache();
   const t = useT();
+  const [open, setOpen] = useState(false);
   const savedNote = savedAt ? ` ${t('offline.showingSaved', { when: savedWords(savedAt, t) })}` : '';
 
-  // Everything is fine and nothing is waiting: say nothing.
-  if (online && waiting === 0) return null;
+  // Everything is fine and nothing is on this phone: say nothing.
+  if (online && pending.length === 0) return null;
+
+  // The list behind the bar: what each thing is and what to do with it.
+  // Only offered when there is something in it, so with nothing queued
+  // the bar is still a plain notice with nothing to press.
+  const view = pending.length > 0 ? (
+    <button type="button" className="stf-netbar-btn" onClick={() => setOpen(true)}>
+      {t('offline.view')}
+    </button>
+  ) : null;
+  const panel = (
+    <OutboxPanel
+      open={open} onOpenChange={setOpen} items={pending} online={online}
+      isOther={isOther} onRetry={retry} onDiscard={discard}
+    />
+  );
 
   if (stuck.length > 0) {
     return (
-      <div className="stf-netbar is-stuck" role="status">
-        <span className="stf-netbar-text">
-          {t.n('offline.stuck', stuck.length)}{' '}
-          {stuck[0].label ? `${stuck[0].label}: ` : ''}{stuck[0].error} {t('offline.tellManager')}
-        </span>
-      </div>
+      <>
+        <div className="stf-netbar is-stuck" role="status">
+          <span className="stf-netbar-text">
+            {t.n('offline.stuck', stuck.length)} {t('offline.stuckWhat')}
+          </span>
+          {view}
+        </div>
+        {panel}
+      </>
     );
   }
 
   if (!online) {
     return (
-      <div className="stf-netbar" role="status">
-        <span className="stf-netbar-text">
-          {waiting > 0 ? t.n('offline.noSignalWaiting', waiting) : t('offline.noSignal')}
-          {savedNote}
-        </span>
-      </div>
+      <>
+        <div className="stf-netbar" role="status">
+          <span className="stf-netbar-text">
+            {waiting > 0 ? t.n('offline.noSignalWaiting', waiting) : t('offline.noSignal')}
+            {savedNote}
+          </span>
+          {view}
+        </div>
+        {panel}
+      </>
+    );
+  }
+
+  // Only somebody else's work is on this phone: nothing of ours to send.
+  if (waiting === 0) {
+    return (
+      <>
+        <div className="stf-netbar" role="status">
+          <span className="stf-netbar-text">
+            {t.n('offline.othersWaiting', others.length, { name: others[0]?.userName || t('offline.someoneElse') })}
+          </span>
+          {view}
+        </div>
+        {panel}
+      </>
     );
   }
 
   // Back in range with a queue behind us.
   return (
-    <div className="stf-netbar is-sending" role="status">
-      <span className="stf-netbar-text">
-        {sending ? t.n('offline.sending', waiting) : t.n('offline.waiting', waiting)}
-      </span>
-      {!sending ? (
-        <button type="button" className="stf-netbar-btn" onClick={send}>
-          {t('offline.sendNow')}
-        </button>
-      ) : null}
-    </div>
+    <>
+      <div className="stf-netbar is-sending" role="status">
+        <span className="stf-netbar-text">
+          {sending ? t.n('offline.sending', waiting) : t.n('offline.waiting', waiting)}
+        </span>
+        {!sending ? (
+          <button type="button" className="stf-netbar-btn" onClick={send}>
+            {t('offline.sendNow')}
+          </button>
+        ) : null}
+        {view}
+      </div>
+      {panel}
+    </>
   );
 }

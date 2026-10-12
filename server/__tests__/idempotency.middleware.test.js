@@ -21,6 +21,13 @@ const poolMock = {
       return { rows: [{ key: params[0] }] };
     }
     if (/^SELECT scope/.test(sql)) return { rows: table.has(params[0]) ? [table.get(params[0])] : [] };
+    // A repeat taking over a key whose first attempt died.
+    if (/^UPDATE idempotency_keys SET created_at/.test(sql)) {
+      const row = table.get(params[0]);
+      if (!row || row.status_code !== null || !row.abandoned) return { rows: [] };
+      row.abandoned = false;
+      return { rows: [{ key: params[0] }] };
+    }
     if (/^UPDATE idempotency_keys/.test(sql)) {
       Object.assign(table.get(params[0]), { status_code: params[1], response: JSON.parse(params[2]) });
       return { rows: [] };
@@ -99,6 +106,25 @@ describe('idempotent()', () => {
     expect(res.status).toBe(409);
     expect(res.body.message).toMatch(/already being saved/);
     expect(work).not.toHaveBeenCalled();
+  });
+
+  it('marks that answer as worth retrying, so a phone holding it does not give up', async () => {
+    table.set(KEY, { scope: 'decanting', user_id: 7, status_code: null, response: null });
+    const res = await request(build()).post('/sheets').send({ idempotencyKey: KEY });
+    expect(res.status).toBe(409);
+    expect(res.body.retryable).toBe(true);
+    expect(work).not.toHaveBeenCalled();
+  });
+
+  // The server went down mid-save: the key is claimed and no answer
+  // will ever be stored. It used to answer "already being saved" for a
+  // week, so the work could never be sent.
+  it('lets a repeat do the work when the first attempt died long ago', async () => {
+    table.set(KEY, { scope: 'decanting', user_id: 7, status_code: null, response: null, abandoned: true });
+    const res = await request(build()).post('/sheets').send({ idempotencyKey: KEY });
+    expect(res.status).toBe(201);
+    expect(work).toHaveBeenCalledOnce();
+    expect(table.get(KEY).status_code).toBe(201);
   });
 
   it('refuses a key that is not shaped like one', async () => {

@@ -17,6 +17,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 
+// The bar reads who is signed in, to send each item as the person who
+// recorded it.
+vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: { id: 1, firstName: 'Wendy' } }) }));
+
 const connection = await import('../services/connection');
 const outbox = await import('../services/outbox');
 const { default: OfflineBar } = await import('../components/layout/OfflineBar');

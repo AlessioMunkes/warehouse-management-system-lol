@@ -17,12 +17,19 @@
 import { useCallback, useEffect, useState } from 'react';
 import { apiGet, apiPost } from '../services/api';
 import { isReachable, subscribe as subscribeConnection } from '../services/connection';
-import { flush, list, subscribe as subscribeOutbox } from '../services/outbox';
+import { flush, list, remove, retry as retryItem, setOwner, subscribe as subscribeOutbox } from '../services/outbox';
+import { useAuth } from '../context/AuthContext';
 
 export default function useOutbox() {
   const [online, setOnline] = useState(isReachable);
   const [pending, setPending] = useState([]);
   const [sending, setSending] = useState(false);
+
+  // The queue sends each item as the person who recorded it, so it has
+  // to know who is signed in. Told before the first flush below.
+  const { user } = useAuth() ?? {};
+  const userId = user?.id ?? null;
+  useEffect(() => { setOwner(user ?? null); }, [user]);
 
   useEffect(() => subscribeConnection(setOnline), []);
   useEffect(() => subscribeOutbox(setPending), []);
@@ -48,8 +55,17 @@ export default function useOutbox() {
   // on a slow drum-beat while anything is waiting. The interval is
   // the one that matters: warehouse wifi comes and goes without ever
   // firing an `online` event, because the interface never dropped.
+  // Somebody else's work on this phone waits for them; it is not ours
+  // to send, so it does not keep the timer running.
+  const isOther = useCallback(
+    (item) => item.userId != null && userId != null && String(item.userId) !== String(userId),
+    [userId],
+  );
+  const mine = pending.filter((item) => !isOther(item));
+  const sendable = mine.filter((item) => !item.permanent).length;
+
   useEffect(() => {
-    if (pending.length === 0) return undefined;
+    if (sendable === 0) return undefined;
 
     const attempt = () => { send(); };
     const timer = setInterval(attempt, 30000);
@@ -64,7 +80,7 @@ export default function useOutbox() {
     };
     // `online` is in here on purpose: coming back online should
     // re-run this and fire the immediate attempt above.
-  }, [pending.length, online, send]);
+  }, [sendable, online, send, userId]);
 
   // With nothing queued, nothing above ever asks the server again, so
   // a worker who walked back into range would keep seeing "No signal"
@@ -76,14 +92,28 @@ export default function useOutbox() {
     return () => clearInterval(timer);
   }, [online]);
 
-  const stuck = pending.filter((item) => item.error);
+  // Stuck means out of the retry rotation: refused, or too old. An
+  // item that merely failed once and will be tried again is waiting,
+  // not stuck, and neither is one waiting for a sign-in.
+  const stuck = mine.filter((item) => item.permanent);
+  const others = pending.filter(isOther);
+
+  // Put a stuck item back and send straight away, so the worker sees
+  // whether it went.
+  const retry = useCallback(async (id) => { await retryItem(id); return send(); }, [send]);
+  const discard = useCallback((id) => remove(id), []);
 
   return {
     online,
     pending,
+    mine,
+    others,
     stuck,
     sending,
-    waiting: pending.length,
+    waiting: sendable,
     send,
+    retry,
+    discard,
+    isOther,
   };
 }
