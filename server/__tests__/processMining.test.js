@@ -54,7 +54,7 @@ describe('order to shelf', () => {
     expect(step(inbound, 'approved_delivered').medianHours).toBe(48);
     expect(step(inbound, 'raised_delivered').medianHours).toBe(72);
     expect(inbound.steps.map((s) => s.cases)).toEqual([1, 1, 1, 1]);
-    expect(inbound.variants).toEqual([{ label: 'Delivered in full, on time', cases: 1, share: 100 }]);
+    expect(inbound.variants).toEqual([{ label: 'Received in full, on time', cases: 1, share: 100 }]);
     expect(inbound.note).toBeNull();
   });
 
@@ -64,7 +64,7 @@ describe('order to shelf', () => {
     // Still counted as approved: it was delivered. Only the time is missing.
     expect(inbound.steps.find((s) => s.id === 'approved')).toMatchObject({ cases: 1, timed: 0 });
     expect(step(inbound, 'raised_delivered').medianHours).toBe(72);
-    expect(inbound.note).toMatch(/recorded from now on/);
+    expect(inbound.note).toMatch(/recorded from this release/);
   });
 
   it('names the route each order took', () => {
@@ -79,13 +79,13 @@ describe('order to shelf', () => {
     ] }), 'inbound');
     const routes = Object.fromEntries(inbound.variants.map((v) => [v.label, v.cases]));
     expect(routes).toEqual({
-      'Delivered in full, on time': 1,
-      'Delivered in full, late': 1,
-      'Part delivered, the rest outstanding': 1,
-      'Delivered in parts': 1,
-      'Waiting for approval': 1,
-      'Not delivered, overdue': 1,
-      'Sent back': 1,
+      'Received in full, on time': 1,
+      'Received in full, late': 1,
+      'Partially received, balance outstanding': 1,
+      'Multiple deliveries': 1,
+      'Pending approval': 1,
+      'Outstanding, overdue': 1,
+      'Returned to supplier': 1,
     });
   });
 
@@ -117,7 +117,7 @@ describe('slip to dispatch note', () => {
     expect(step(outbound, 'packed_collected').medianHours).toBe(22);
     expect(step(outbound, 'generated_collected').medianHours).toBe(26);
     expect(outbound.steps.map((s) => s.cases)).toEqual([1, 1, 1, 1, 1]);
-    expect(outbound.variants[0].label).toBe('Collected');
+    expect(outbound.variants[0].label).toBe('Dispatched');
   });
 
   it('names the detours: re-claimed, flagged, short, late, not collected', () => {
@@ -136,10 +136,10 @@ describe('slip to dispatch note', () => {
       ],
     }), 'outbound');
     expect(outbound.variants.map((v) => v.label).sort()).toEqual([
-      'Collected late, stock short',
-      'Collected, re-claimed, a line flagged',
-      'Not claimed yet',
-      'Packed, not collected',
+      'Dispatched, reassigned, line exception',
+      'Late collection, stock shortfall',
+      'Packed, uncollected',
+      'Unassigned',
     ]);
     // The written-off pallet is not counted as collected.
     expect(outbound.steps.find((s) => s.id === 'collected').cases).toBe(2);

@@ -20,7 +20,7 @@
 //   Flow map     every route cases really took, as a graph to explore
 //                (ProcessFlow.jsx). The one to open on: it is where a
 //                detour or a repeat shows up.
-//   Step times   the lanes described above, for how long each wait is.
+//   Cycle times  the lanes described above, for how long each wait is.
 //
 // It has a tab of its own on the page, and loads when that tab is
 // first opened. The shelf lane replays the whole stock ledger, and
@@ -60,14 +60,17 @@ function Arrow({ transition, active, slowest, onPick }) {
       type="button"
       onClick={onPick}
       aria-pressed={active}
-      title={`${transition.label}. Open what is behind it.`}
-      className={`flex shrink-0 items-center justify-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-bold transition-colors lg:flex-col lg:gap-0.5
+      title={`${transition.label}. View details.`}
+      // `relative` holds the hidden screen-reader text below. Without a
+      // positioned parent it is laid out against the page, not this
+      // button, and stretches the page past the bottom of the window.
+      className={`relative flex shrink-0 items-center justify-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-bold transition-colors lg:flex-col lg:gap-0.5
         ${active ? 'bg-ink text-on-ink' : slowest ? 'bg-warn-soft text-warn hover:brightness-95' : 'text-ink hover:bg-muted/60'}`}
     >
       <ArrowDown aria-hidden="true" className="size-4 lg:hidden" />
-      <span className="whitespace-nowrap lg:max-w-[5.5rem] lg:whitespace-normal lg:text-center lg:leading-tight">{none ? 'No time yet' : duration(transition.medianHours)}</span>
+      <span className="whitespace-nowrap lg:max-w-[5.5rem] lg:whitespace-normal lg:text-center lg:leading-tight">{none ? 'No data' : duration(transition.medianHours)}</span>
       <ArrowRight aria-hidden="true" className="hidden size-4 lg:block" />
-      <span className="sr-only">{transition.label}{slowest ? ', the slowest step' : ''}</span>
+      <span className="sr-only">{transition.label}{slowest ? ', bottleneck' : ''}</span>
     </button>
   );
 }
@@ -104,9 +107,9 @@ function Figure({ label, value, hint }) {
 // What is behind one arrow: its figures, its slowest cases, and the
 // lane it belongs to broken down.
 function Detail({ lane, transition, onClose }) {
-  const slowestHeading = lane.id === 'shelf' ? 'Products that sat longest' : `Slowest ${lane.caseNoun}`;
+  const slowestHeading = lane.id === 'shelf' ? 'Longest dwell time by product' : `Longest durations, ${lane.caseNoun}`;
   return (
-    <section aria-label={`${transition.label}: what is behind it`} className="mt-4 rounded-2xl border border-line bg-card p-4">
+    <section aria-label={`${transition.label}: details`} className="mt-4 rounded-2xl border border-line bg-card p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs text-muted-foreground">{lane.label}</p>
@@ -116,14 +119,14 @@ function Detail({ lane, transition, onClose }) {
       </div>
 
       {transition.cases === 0 ? (
-        <p className="mt-3 text-sm text-muted-foreground">Nothing has been through this step in the period, so there is no time to show.</p>
+        <p className="mt-3 text-sm text-muted-foreground">No cases completed this step in the period, so no duration is available.</p>
       ) : (
         <>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Figure label="Typical" value={duration(transition.medianHours)} hint="Half were quicker" />
-            <Figure label="Average" value={duration(transition.averageHours)} />
-            <Figure label="Slow end" value={duration(transition.p90Hours)} hint="9 in 10 were quicker" />
-            <Figure label="Measured" value={count(transition.cases)} hint={lane.caseNoun} />
+            <Figure label="Median" value={duration(transition.medianHours)} hint="50% of cases were faster" />
+            <Figure label="Mean" value={duration(transition.averageHours)} />
+            <Figure label="90th percentile" value={duration(transition.p90Hours)} hint="90% of cases were faster" />
+            <Figure label="Sample size" value={count(transition.cases)} hint={lane.caseNoun} />
           </div>
           {transition.slowest?.length > 0 && (
             <div className="mt-4">
@@ -137,7 +140,7 @@ function Detail({ lane, transition, onClose }) {
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         {lane.variants?.length > 0 && (
           <div>
-            <h4 className="text-xs font-bold text-ink">Routes taken</h4>
+            <h4 className="text-xs font-bold text-ink">Variants</h4>
             <Bars rows={lane.variants} valueOf={(r) => r.cases} textOf={(r) => `${count(r.cases)} · ${r.share}%`} />
           </div>
         )}
@@ -165,7 +168,7 @@ function Lane({ lane, picked, bottleneck, onPick }) {
         {whole && lane.path.length > 1 ? (
           <button type="button" onClick={() => onPick(lane.id, whole.id)} aria-pressed={picked === whole.id}
             className={`rounded-lg px-2 py-1 text-xs font-bold ${picked === whole.id ? 'bg-ink text-on-ink' : 'border border-line text-ink hover:bg-muted/60'}`}>
-            Whole lane: {whole.cases ? duration(whole.medianHours) : 'no time yet'}
+            Lane total: {whole.cases ? duration(whole.medianHours) : 'no data'}
           </button>
         ) : null}
       </div>
@@ -224,7 +227,7 @@ export default function ProcessMap({ suppliers = [] }) {
       await exportExcel({
         filename: `process-map-${data.range.from}-to-${data.range.to}`,
         sheetName: 'Process map',
-        title: 'Process map: purchase order to dispatch note',
+        title: 'Process cycle times: purchase order to dispatch',
         subtitle: `${data.range.from} to ${data.range.to}`,
         columns: SHEET_COLUMNS,
         rows: sheetRows(data),
@@ -241,8 +244,8 @@ export default function ProcessMap({ suppliers = [] }) {
       <h2 id="process-map-heading" className="text-sm font-bold tracking-tight">Process map</h2>
       <p className="mt-1 text-sm text-ink">
         {view === 'flow'
-          ? 'From purchase order to dispatch note. Choose a step or a connection to see what is behind it.'
-          : 'From purchase order to dispatch note. Choose a time between two steps to see what is behind it.'}
+          ? 'Purchase order to dispatch. Select an activity or a transition to view its details.'
+          : 'Purchase order to dispatch. Select a duration between two steps to view its details.'}
       </p>
 
       <div className="mt-3 flex flex-wrap items-end gap-3">
@@ -267,9 +270,9 @@ export default function ProcessMap({ suppliers = [] }) {
           </NativeSelect>
         </label>
         <label className="flex flex-col gap-1 text-xs font-semibold text-ink">
-          Who it was for
+          Beneficiary type
           <NativeSelect className="w-44" value={kind} onChange={(e) => setKind(e.target.value)}>
-            <option value="">Everyone</option>
+            <option value="">All types</option>
             {KINDS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </NativeSelect>
         </label>
@@ -285,12 +288,12 @@ export default function ProcessMap({ suppliers = [] }) {
       {busy && !data ? <Skeleton className="mt-4 h-64 w-full rounded-2xl" /> : null}
 
       {data?.empty ? (
-        <p className="mt-4 text-sm text-muted-foreground">Nothing was ordered, packed or dispatched in this period. Choose a longer period.</p>
+        <p className="mt-4 text-sm text-muted-foreground">No orders, packing or dispatch activity in this period. Select a longer period.</p>
       ) : null}
 
       {data && !data.empty ? (
         <ViewTabs className="mt-4" label="View of the process" value={view} onChange={setView}
-          tabs={[{ id: 'flow', label: 'Flow map' }, { id: 'steps', label: 'Step times' }]} />
+          tabs={[{ id: 'flow', label: 'Flow map' }, { id: 'steps', label: 'Cycle times' }]} />
       ) : null}
 
       {/* Keyed by what was asked for: a new period or filter is a new
@@ -305,24 +308,24 @@ export default function ProcessMap({ suppliers = [] }) {
         <div className={busy ? 'opacity-60' : ''}>
           <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
             <Figure
-              label="Typical time, order raised to food collected"
-              value={data.endToEnd.medianHours === null ? 'Not enough yet' : duration(data.endToEnd.medianHours)}
+              label="End-to-end lead time (median)"
+              value={data.endToEnd.medianHours === null ? 'Insufficient data' : duration(data.endToEnd.medianHours)}
               hint={data.endToEnd.medianHours === null
-                ? 'One part of the process has no measured time in this period.'
-                : 'The three parts added together. Stock is not followed batch by batch.'}
+                ? 'One stage has no measured duration in this period.'
+                : 'Sum of the three stage medians. Stock is not batch-tracked.'}
             />
             <div className="rounded-2xl border border-line bg-warn-soft px-3 py-2.5">
-              <p className="flex items-center gap-1.5 text-xs text-warn"><Timer aria-hidden="true" className="size-3.5" /> Slowest step</p>
+              <p className="flex items-center gap-1.5 text-xs text-warn"><Timer aria-hidden="true" className="size-3.5" /> Bottleneck</p>
               {data.bottleneck ? (
                 <>
                   <p className="mt-0.5 text-base font-bold text-ink">{data.bottleneck.label}: {duration(data.bottleneck.medianHours)}</p>
                   <button type="button" onClick={() => setPicked({ lane: data.bottleneck.lane, id: data.bottleneck.id })}
                     className="mt-0.5 text-xs font-semibold text-ink underline underline-offset-2">
-                    See what is behind it
+                    View details
                   </button>
                 </>
               ) : (
-                <p className="mt-0.5 text-sm text-ink">Too few cases in this period to name one.</p>
+                <p className="mt-0.5 text-sm text-ink">Insufficient cases in this period to identify one.</p>
               )}
             </div>
           </div>
@@ -339,7 +342,7 @@ export default function ProcessMap({ suppliers = [] }) {
           ) : null}
 
           <p className="mt-3 text-xs text-muted-foreground">
-            Purchase orders raised in the period, pallets booked for it, and stock that left in it. Times are between recorded moments, with no one named.
+            Scope: purchase orders raised in the period, pallets scheduled for dispatch in it, and stock dispatched in it. Durations are measured between recorded timestamps and are not attributed to individuals.
           </p>
         </div>
       ) : null}

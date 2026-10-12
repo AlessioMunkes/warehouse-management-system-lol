@@ -56,7 +56,7 @@ const DATA = {
 const openMap = async () => {
   render(<ProcessMap suppliers={[{ value: '3', label: 'Cape Dry Goods' }]} />);
   // The lanes and their waits are the Step times view.
-  await userEvent.click(await screen.findByRole('tab', { name: 'Step times' }));
+  await userEvent.click(await screen.findByRole('tab', { name: 'Cycle times' }));
 };
 
 beforeEach(() => {
@@ -70,7 +70,7 @@ describe('duration', () => {
     expect(duration(1)).toBe('1 hour');
     expect(duration(3.5)).toBe('3.5 hours');
     expect(duration(72)).toBe('3 days');
-    expect(duration(null)).toBe('No time yet');
+    expect(duration(null)).toBe('No data');
   });
 });
 
@@ -88,28 +88,28 @@ describe('the process map', () => {
     expect(screen.getByRole('heading', { name: 'Slip to dispatch note' })).toBeInTheDocument();
     expect(screen.getByText('8.3 days')).toBeInTheDocument();
     expect(screen.getByText('Approved to first delivery: 3 days')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Approved to first delivery, the slowest step/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Approved to first delivery, bottleneck/ })).toBeInTheDocument();
   });
 
   it('opens what is behind a wait, and closes it again', async () => {
     await openMap();
     const arrow = await screen.findByRole('button', { name: /Waiting for approval/ });
     await userEvent.click(arrow);
-    const detail = screen.getByRole('region', { name: 'Waiting for approval: what is behind it' });
-    expect(within(detail).getByText('Slowest purchase orders')).toBeInTheDocument();
+    const detail = screen.getByRole('region', { name: 'Waiting for approval: details' });
+    expect(within(detail).getByText('Longest durations, purchase orders')).toBeInTheDocument();
     expect(within(detail).getByText('Slow one at Waiting for approval')).toBeInTheDocument();
-    expect(within(detail).getByText('Routes taken')).toBeInTheDocument();
+    expect(within(detail).getByText('Variants')).toBeInTheDocument();
     expect(within(detail).getByText('3 · 75%')).toBeInTheDocument();
     expect(within(detail).getByText('Cape Dry Goods')).toBeInTheDocument();
 
     await userEvent.click(arrow);
-    expect(screen.queryByRole('region', { name: /what is behind it/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: /: details$/ })).not.toBeInTheDocument();
   });
 
   it('says so when nothing has been through a step', async () => {
     await openMap();
     await userEvent.click(await screen.findByRole('button', { name: /Waiting to be claimed/ }));
-    expect(screen.getByText(/Nothing has been through this step/)).toBeInTheDocument();
+    expect(screen.getByText(/No cases completed this step/)).toBeInTheDocument();
   });
 
   it('loads again when a filter changes', async () => {
@@ -123,13 +123,13 @@ describe('the process map', () => {
   it('says a period with nothing in it is empty', async () => {
     api.getProcessMap.mockResolvedValue({ data: { ...DATA, empty: true } });
     render(<ProcessMap />);
-    expect(await screen.findByText(/Nothing was ordered, packed or dispatched/)).toBeInTheDocument();
+    expect(await screen.findByText(/No orders, packing or dispatch activity/)).toBeInTheDocument();
   });
 
   it('writes every step of every part to the sheet', () => {
     const rows = sheetRows(DATA);
     expect(rows).toHaveLength(6);
-    expect(rows.find((r) => r.step === 'On the shelf').basis).toBe('Estimate, oldest stock first');
+    expect(rows.find((r) => r.step === 'On the shelf').basis).toBe('Estimate (FIFO allocation)');
   });
 
   it('uses no em dashes in what people read', async () => {

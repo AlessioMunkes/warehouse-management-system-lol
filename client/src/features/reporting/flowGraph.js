@@ -84,11 +84,11 @@ export const applyFilters = (cases, filters = []) => cases.filter((c) => filters
 }));
 
 export const filterLabel = (process, f) => {
-  const name = (id) => (id === START ? 'the start' : id === END ? 'the end' : process.activities[id]?.label ?? 'a step');
-  if (f.kind === 'through') return `Passes through ${name(f.step)}`;
-  if (f.kind === 'avoid') return `Skips ${name(f.step)}`;
-  if (f.kind === 'with') return `Goes from ${name(f.from)} to ${name(f.to)}`;
-  return `Never goes from ${name(f.from)} to ${name(f.to)}`;
+  const name = (id) => (id === START ? 'Start' : id === END ? 'End' : process.activities[id]?.label ?? 'Activity');
+  if (f.kind === 'through') return `Through: ${name(f.step)}`;
+  if (f.kind === 'avoid') return `Bypasses: ${name(f.step)}`;
+  if (f.kind === 'with') return `Transition: ${name(f.from)} to ${name(f.to)}`;
+  return `No transition: ${name(f.from)} to ${name(f.to)}`;
 };
 
 const edgeKey = (from, to) => `${from}>${to}`;
@@ -168,7 +168,7 @@ export const neighbours = (graph, process, id, direction) => {
   return list
     .map((e) => {
       const other = direction === 'next' ? e.to : e.from;
-      const label = other === START ? 'Started here' : other === END ? 'Ended here' : process.activities[other].label;
+      const label = other === START ? 'Process start' : other === END ? 'Process end' : process.activities[other].label;
       return { id: other, label, count: e.count, share: Math.round((e.count / total) * 100) };
     })
     .sort((a, b) => b.count - a.count);

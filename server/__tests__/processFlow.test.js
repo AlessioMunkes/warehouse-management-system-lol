@@ -29,7 +29,7 @@ describe('a purchase order as a path', () => {
       changes: [{ purchase_order_id: 1, from_status: 'pending', to_status: 'approved', created_at: at(2) }],
       deliveries: [{ purchase_order_id: 1, status: 'recorded', created_at: at(4) }],
     });
-    expect(names(p, p.cases[0])).toEqual(['Order raised', 'Approved', 'Delivery received', 'Received in full']);
+    expect(names(p, p.cases[0])).toEqual(['PO raised', 'PO approved', 'Goods received', 'Fully received']);
     expect(p.cases[0].t).toEqual([0, 24, 72, 72]);
     expect(p.cases[0].path).toEqual(p.expected);
     expect(p.cases[0].label).toBe('PO-2026-0001 · Cape Dry Goods');
@@ -37,13 +37,13 @@ describe('a purchase order as a path', () => {
 
   it('keeps an unlogged approval on the route, with no time', () => {
     const p = orderFlow({ orders: [order()], deliveries: [{ purchase_order_id: 1, status: 'recorded', created_at: at(4) }] });
-    expect(names(p, p.cases[0])).toEqual(['Order raised', 'Approved', 'Delivery received', 'Received in full']);
+    expect(names(p, p.cases[0])).toEqual(['PO raised', 'PO approved', 'Goods received', 'Fully received']);
     expect(p.cases[0].t).toEqual([0, null, 72, 72]);
   });
 
   it('does not put approval on an order still waiting for it', () => {
     const p = orderFlow({ orders: [order({ status: 'pending' })] });
-    expect(names(p, p.cases[0])).toEqual(['Order raised']);
+    expect(names(p, p.cases[0])).toEqual(['PO raised']);
   });
 
   it('shows a short delivery, the follow-up order, and the second delivery', () => {
@@ -57,7 +57,7 @@ describe('a purchase order as a path', () => {
       followUps: [{ follow_up_of: 1, created_at: at(5) }],
     });
     expect(names(p, p.cases[0])).toEqual([
-      'Order raised', 'Approved', 'Delivery received', 'Follow-up order raised', 'Delivery flagged', 'Received in full',
+      'PO raised', 'PO approved', 'Goods received', 'Back order raised', 'Receipt discrepancy', 'Fully received',
     ]);
   });
 
@@ -66,7 +66,7 @@ describe('a purchase order as a path', () => {
       orders: [order({ status: 'partially_received' })],
       deliveries: [{ purchase_order_id: 1, status: 'recorded', created_at: at(4) }],
     });
-    expect(names(p, p.cases[0])).toEqual(['Order raised', 'Approved', 'Delivery received', 'Delivered short']);
+    expect(names(p, p.cases[0])).toEqual(['PO raised', 'PO approved', 'Goods received', 'Short delivery']);
   });
 
   it('tells a reopening apart from the first approval, and shows an order sent back', () => {
@@ -78,8 +78,8 @@ describe('a purchase order as a path', () => {
         { purchase_order_id: 1, from_status: 'follow_up_required', to_status: 'approved', created_at: at(5) },
       ],
     });
-    expect(names(p, p.cases[0])).toEqual(['Order raised', 'Approved', 'Follow-up needed', 'Reopened']);
-    expect(names(p, p.cases[1])).toEqual(['Order raised', 'Sent back']);
+    expect(names(p, p.cases[0])).toEqual(['PO raised', 'PO approved', 'Follow-up required', 'Reopened']);
+    expect(names(p, p.cases[1])).toEqual(['PO raised', 'Returned to supplier']);
   });
 });
 
@@ -93,7 +93,7 @@ describe('a pallet as a path', () => {
         ['dispatched', at(8, '10:00')],
       ]),
     });
-    expect(names(p, p.cases[0])).toEqual(['Slip raised', 'Claimed', 'Lines packed', 'Packed', 'Collected']);
+    expect(names(p, p.cases[0])).toEqual(['Slip generated', 'Assigned', 'Lines picked', 'Packing complete', 'Dispatched']);
     expect(p.cases[0].t).toEqual([0, 1, 1.5, 4, 26]);
     expect(p.cases[0].path).toEqual(p.expected);
   });
@@ -108,13 +108,13 @@ describe('a pallet as a path', () => {
       ]),
     });
     expect(names(p, p.cases[0])).toEqual([
-      'Slip raised', 'Claimed', 'Lines packed', 'Line flagged', 'Claimed', 'Lines packed', 'Stock short', 'Packed', 'Collected late',
+      'Slip generated', 'Assigned', 'Lines picked', 'Line exception', 'Assigned', 'Lines picked', 'Stock shortfall', 'Packing complete', 'Late collection',
     ]);
   });
 
   it('falls back on the slip and gate timestamps where there are no events', () => {
     const p = palletFlow({ slips: [slip({ completed_at: at(7, '12:00'), collected_at: at(8, '10:00'), gate_status: 'collected' })] });
-    expect(names(p, p.cases[0])).toEqual(['Slip raised', 'Packed', 'Collected']);
+    expect(names(p, p.cases[0])).toEqual(['Slip generated', 'Packing complete', 'Dispatched']);
   });
 
   it('does not call a written-off pallet collected', () => {
@@ -122,7 +122,7 @@ describe('a pallet as a path', () => {
       slips: [slip({ collected_at: at(9), gate_status: 'not_collected' })],
       events: ev(10, [['generated', at(7)], ['completed', at(7, '12:00')], ['not_collected', at(9)]]),
     });
-    expect(names(p, p.cases[0])).toEqual(['Slip raised', 'Packed', 'Not collected']);
+    expect(names(p, p.cases[0])).toEqual(['Slip generated', 'Packing complete', 'Uncollected']);
   });
 
   it('puts a finding before the result when both were logged in the same moment', () => {
@@ -133,12 +133,12 @@ describe('a pallet as a path', () => {
         ['dispatched', at(9)], ['stock_shortfall', at(9)], ['wrong_day_collection', at(9)],
       ]),
     });
-    expect(names(p, p.cases[0])).toEqual(['Slip raised', 'Stock short', 'Packed', 'Stock short', 'Came on another day', 'Collected']);
+    expect(names(p, p.cases[0])).toEqual(['Slip generated', 'Stock shortfall', 'Packing complete', 'Stock shortfall', 'Off-schedule collection', 'Dispatched']);
   });
 
   it('ignores events that are not a step of the pallet', () => {
     const p = palletFlow({ slips: [slip()], events: ev(10, [['generated', at(7)], ['no_order_lines', at(7, '08:01')], ['something_new', at(7, '08:02')]]) });
-    expect(names(p, p.cases[0])).toEqual(['Slip raised']);
+    expect(names(p, p.cases[0])).toEqual(['Slip generated']);
   });
 });
 
@@ -157,7 +157,7 @@ describe('a delivered item, from its order to the pallets it left on', () => {
 
   it('follows the order onto a pallet and out, oldest stock first', () => {
     const p = lots([received(10, at(4), 50), move(1, -4, 'dispatched', at(8)), move(1, -6, 'dispatched', at(10))]);
-    expect(names(p, p.cases[0])).toEqual(['Order raised', 'Approved', 'Delivered', 'Dispatched on a pallet', 'All of it gone']);
+    expect(names(p, p.cases[0])).toEqual(['PO raised', 'PO approved', 'Goods received', 'Dispatched', 'Fully depleted']);
     expect(p.cases[0].t).toEqual([0, 24, 72, 168, 216]);
     expect(p.cases[0].path).toEqual(p.expected);
     expect(p.cases[0].label).toBe('PO-2026-0001 · Rice 2 kg');
@@ -166,22 +166,22 @@ describe('a delivered item, from its order to the pallets it left on', () => {
 
   it('gives what leaves to the older delivery first', () => {
     const p = lots([received(10, at(4), 50), received(10, at(12), 51), move(1, -12, 'dispatched', at(15))]);
-    expect(names(p, p.cases[0]).slice(-2)).toEqual(['Dispatched on a pallet', 'All of it gone']);
+    expect(names(p, p.cases[0]).slice(-2)).toEqual(['Dispatched', 'Fully depleted']);
     // Delivered a week after it was due, and two of its ten left.
-    expect(names(p, p.cases[1])).toEqual(['Order raised', 'Approved', 'Delivered late', 'Dispatched on a pallet', 'Some still in stock']);
+    expect(names(p, p.cases[1])).toEqual(['PO raised', 'PO approved', 'Late delivery', 'Dispatched', 'Balance on hand']);
   });
 
   it('shows stock that was written off or never moved', () => {
     const p = lots([received(10, at(4), 50), move(1, -3, 'wastage', at(6)), move(1, -2, 'adjustment', at(7))]);
-    expect(names(p, p.cases[0])).toEqual(['Order raised', 'Approved', 'Delivered', 'Written off', 'Count corrected', 'Some still in stock']);
+    expect(names(p, p.cases[0])).toEqual(['PO raised', 'PO approved', 'Goods received', 'Written off', 'Stock adjustment', 'Balance on hand']);
     const idle = lots([received(10, at(4), 50)]);
-    expect(names(idle, idle.cases[0])).toEqual(['Order raised', 'Approved', 'Delivered', 'Some still in stock']);
+    expect(names(idle, idle.cases[0])).toEqual(['PO raised', 'PO approved', 'Goods received', 'Balance on hand']);
   });
 
   it('lets stock from elsewhere take its turn without being a case', () => {
     const p = lots([move(1, 5, 'donated', at(3)), received(10, at(4), 50), move(1, -5, 'dispatched', at(8))]);
     expect(p.cases).toHaveLength(1);
-    expect(names(p, p.cases[0]).slice(-1)).toEqual(['Some still in stock']);
+    expect(names(p, p.cases[0]).slice(-1)).toEqual(['Balance on hand']);
   });
 
   it('keeps an unlogged approval on the route with no time', () => {
@@ -204,7 +204,7 @@ describe('a donation as a path', () => {
         { donation_id: 5, routing_status: 'allocated', resolved_at: at(4, '09:00') },
       ],
     });
-    expect(names(p, p.cases[0])).toEqual(['Donation received', 'Items classified', 'Added to stock', 'Certificate issued']);
+    expect(names(p, p.cases[0])).toEqual(['Donation received', 'Items classified', 'Committed to stock', 'Section 18A issued']);
     expect(p.cases[0].path).toEqual(p.expected);
     expect(p.cases[0].label).toBe('Hope Foods · 2026-09-03');
   });
@@ -214,8 +214,8 @@ describe('a donation as a path', () => {
       donations: [donation({ status: 'under_review', section_18a_status: 'qualifying_pending_donor', section_18a_issued_at: null, donor_name: null })],
       items: [{ donation_id: 5, routing_status: 'unmatched', resolved_at: null }],
     });
-    expect(names(p, p.cases[0])).toEqual(['Donation received', 'Items still to classify', 'Waiting for donor details']);
-    expect(p.cases[0].label).toBe('Donor not named · 2026-09-03');
+    expect(names(p, p.cases[0])).toEqual(['Donation received', 'Classification pending', 'Awaiting donor details']);
+    expect(p.cases[0].label).toBe('Unnamed donor · 2026-09-03');
   });
 });
 

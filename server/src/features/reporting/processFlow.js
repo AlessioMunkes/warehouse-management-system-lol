@@ -38,34 +38,34 @@ const round = (n) => Math.round(n * 100) / 100;
 export const MAX_CASES = 4000;
 
 const ORDER_ACTIVITIES = [
-  ['raised', 'Order raised'],
-  ['approved', 'Approved'],
+  ['raised', 'PO raised'],
+  ['approved', 'PO approved'],
   ['in_transit', 'In transit'],
-  ['delivery', 'Delivery received'],
-  ['delivery_problem', 'Delivery flagged'],
-  ['short', 'Delivered short'],
-  ['follow_up_needed', 'Follow-up needed'],
-  ['follow_up_order', 'Follow-up order raised'],
+  ['delivery', 'Goods received'],
+  ['delivery_problem', 'Receipt discrepancy'],
+  ['short', 'Short delivery'],
+  ['follow_up_needed', 'Follow-up required'],
+  ['follow_up_order', 'Back order raised'],
   ['reopened', 'Reopened'],
-  ['closed', 'Closed by a manager'],
-  ['complete', 'Received in full'],
-  ['returned', 'Sent back'],
+  ['closed', 'Manually closed'],
+  ['complete', 'Fully received'],
+  ['returned', 'Returned to supplier'],
 ];
 const ORDER_EXPECTED = ['raised', 'approved', 'delivery', 'complete'];
 
 const PALLET_ACTIVITIES = [
-  ['generated', 'Slip raised'],
-  ['claimed', 'Claimed'],
-  ['packing', 'Lines packed'],
-  ['flagged', 'Line flagged'],
-  ['variance', 'Quantity changed'],
-  ['shortfall', 'Stock short'],
-  ['unit_mismatch', 'Unit did not match'],
-  ['packed', 'Packed'],
-  ['wrong_day', 'Came on another day'],
-  ['collected', 'Collected'],
-  ['collected_late', 'Collected late'],
-  ['not_collected', 'Not collected'],
+  ['generated', 'Slip generated'],
+  ['claimed', 'Assigned'],
+  ['packing', 'Lines picked'],
+  ['flagged', 'Line exception'],
+  ['variance', 'Quantity variance'],
+  ['shortfall', 'Stock shortfall'],
+  ['unit_mismatch', 'Unit mismatch'],
+  ['packed', 'Packing complete'],
+  ['wrong_day', 'Off-schedule collection'],
+  ['collected', 'Dispatched'],
+  ['collected_late', 'Late collection'],
+  ['not_collected', 'Uncollected'],
 ];
 const PALLET_EXPECTED = ['generated', 'claimed', 'packing', 'packed', 'collected'];
 
@@ -208,16 +208,16 @@ export const palletFlow = ({ slips, events = [] }) => {
 // meant to rotate. Stock that came in another way (a donation, a count
 // correction) takes its turn in the queue but is not a case.
 const LOT_ACTIVITIES = [
-  ['raised', 'Order raised'],
-  ['approved', 'Approved'],
-  ['delivered', 'Delivered'],
-  ['delivered_late', 'Delivered late'],
+  ['raised', 'PO raised'],
+  ['approved', 'PO approved'],
+  ['delivered', 'Goods received'],
+  ['delivered_late', 'Late delivery'],
   ['decanted', 'Decanted'],
-  ['dispatched', 'Dispatched on a pallet'],
+  ['dispatched', 'Dispatched'],
   ['wasted', 'Written off'],
-  ['adjusted', 'Count corrected'],
-  ['used_up', 'All of it gone'],
-  ['in_stock', 'Some still in stock'],
+  ['adjusted', 'Stock adjustment'],
+  ['used_up', 'Fully depleted'],
+  ['in_stock', 'Balance on hand'],
 ];
 const LOT_EXPECTED = ['raised', 'approved', 'delivered', 'dispatched', 'used_up'];
 const LEAVES_AS = { dispatched: 'dispatched', wastage: 'wasted', decanted: 'decanted' };
@@ -274,9 +274,9 @@ export const lotFlow = ({ orders, deliveries = [], movements = [] }) => {
     steps.push(lot.usedUpAt !== null ? { a: 'used_up', at: lot.usedUpAt } : { a: 'in_stock', at: null });
     return { id: i + 1, label: `${o.po_number ?? `Order ${o.id}`} · ${lot.product ?? 'Unknown product'}`, steps };
   });
-  return pack('order_to_dispatch', 'Order to dispatch', 'delivered items', LOT_ACTIVITIES, LOT_EXPECTED, cases, {
+  return pack('order_to_dispatch', 'Order to dispatch', 'receipt lines', LOT_ACTIVITIES, LOT_EXPECTED, cases, {
     estimate: true,
-    note: 'An estimate. Stock is not tracked by batch, so each delivered item is followed by matching what left to the oldest stock of that product.',
+    note: 'An estimate. Stock is not batch-tracked, so each receipt line is traced by FIFO allocation: outbound quantities are matched to the oldest stock of that product.',
   });
 };
 
@@ -284,12 +284,12 @@ export const lotFlow = ({ orders, deliveries = [], movements = [] }) => {
 const DONATION_ACTIVITIES = [
   ['received', 'Donation received'],
   ['classified', 'Items classified'],
-  ['unclassified', 'Items still to classify'],
-  ['committed', 'Added to stock'],
-  ['awaiting_donor', 'Waiting for donor details'],
-  ['certificate_queued', 'Certificate queued'],
-  ['certificate', 'Certificate issued'],
-  ['certificate_failed', 'Certificate failed'],
+  ['unclassified', 'Classification pending'],
+  ['committed', 'Committed to stock'],
+  ['awaiting_donor', 'Awaiting donor details'],
+  ['certificate_queued', 'Section 18A queued'],
+  ['certificate', 'Section 18A issued'],
+  ['certificate_failed', 'Section 18A failed'],
   ['cancelled', 'Cancelled'],
 ];
 const DONATION_EXPECTED = ['received', 'classified', 'committed', 'certificate'];
@@ -314,7 +314,7 @@ export const donationFlow = ({ donations = [], items = [] }) => {
     if (d.status === 'committed') steps.push({ a: 'committed', at: null });
     if (S18A_STEP[d.section_18a_status]) steps.push({ a: S18A_STEP[d.section_18a_status], at: null });
     if (d.section_18a_issued_at) steps.push({ a: 'certificate', at: ms(d.section_18a_issued_at) });
-    return { id: d.id, label: `${d.donor_name || 'Donor not named'} · ${String(d.received_day ?? '').slice(0, 10)}`, steps };
+    return { id: d.id, label: `${d.donor_name || 'Unnamed donor'} · ${String(d.received_day ?? '').slice(0, 10)}`, steps };
   });
   return pack('donations', 'Donations', 'donations', DONATION_ACTIVITIES, DONATION_EXPECTED, cases);
 };
@@ -325,8 +325,8 @@ const REQUEST_ACTIVITIES = [
   ['reversed', 'Decision reversed'],
   ['approved', 'Approved'],
   ['fulfilled', 'Fulfilled'],
-  ['partially_fulfilled', 'Part fulfilled'],
-  ['referred', 'Referred elsewhere'],
+  ['partially_fulfilled', 'Partially fulfilled'],
+  ['referred', 'Referred'],
   ['declined', 'Declined'],
 ];
 const REQUEST_EXPECTED = ['requested', 'fulfilled'];
@@ -343,7 +343,7 @@ export const requestFlow = ({ requests = [], reversals = [] }) => {
     for (const at of reversedAt.get(r.id) ?? []) steps.push({ a: 'reversed', at });
     if (r.outcome && r.outcome !== 'pending') steps.push({ a: r.outcome, at: ms(r.resolved_at) });
     const what = String(r.items_requested ?? '').replace(/\s+/g, ' ').slice(0, 40);
-    return { id: r.id, label: `${r.caller_name || 'Caller not named'} · ${what}`, steps };
+    return { id: r.id, label: `${r.caller_name || 'Unnamed caller'} · ${what}`, steps };
   });
   return pack('requests', 'Benevolent requests', 'requests', REQUEST_ACTIVITIES, REQUEST_EXPECTED, cases);
 };

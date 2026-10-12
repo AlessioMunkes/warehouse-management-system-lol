@@ -143,20 +143,20 @@ export default function ProcessFlow({ flow, range }) {
     try {
       await exportExcel({
         filename: `process-routes-${process.id}-${range.from}-to-${range.to}`,
-        sheetName: 'Routes',
-        title: `${process.label}: the routes taken`,
+        sheetName: 'Variants',
+        title: `${process.label}: process variants`,
         subtitle: `${range.from} to ${range.to}  ·  ${count(inScope.length)} ${noun}`,
         columns: [
-          { key: 'route', label: 'Route', kind: 'text' },
+          { key: 'route', label: 'Variant', kind: 'text' },
           { key: 'cases', label: 'Cases', kind: 'number' },
           { key: 'share', label: 'Share (%)', kind: 'number' },
-          { key: 'hours', label: 'Typical time, start to end (hours)', kind: 'number' },
-          { key: 'kind', label: 'Kind', kind: 'text' },
+          { key: 'hours', label: 'Median cycle time (hours)', kind: 'number' },
+          { key: 'kind', label: 'Classification', kind: 'text' },
         ],
         rows: variants.map((v) => ({
           route: routeText(v), cases: v.cases.length, share: v.share,
           hours: v.medianHours === null ? null : Math.round(v.medianHours * 100) / 100,
-          kind: v.expected ? 'Expected route' : v.repeats ? 'Has a repeated step' : 'Different route',
+          kind: v.expected ? 'Reference path' : v.repeats ? 'Contains rework' : 'Deviation',
         })),
       });
     } finally {
@@ -171,25 +171,25 @@ export default function ProcessFlow({ flow, range }) {
       {/* ── Controls ─────────────────────────────────────────── */}
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1 text-xs font-semibold text-ink">
-          Follow
+          Process
           <NativeSelect className="w-44" value={process.id} onChange={(e) => changeProcess(e.target.value)}>
             {flow.processes.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
           </NativeSelect>
         </label>
         <div role="group" aria-label="What the map measures" className="flex rounded-3xl bg-input/50 p-0.5 text-xs font-bold">
-          {[['count', 'How many'], ['time', 'How long']].map(([id, label]) => (
+          {[['count', 'Frequency'], ['time', 'Duration']].map(([id, label]) => (
             <button key={id} type="button" aria-pressed={metric === id} onClick={() => setMetric(id)}
               className={`rounded-3xl px-3 py-1.5 ${metric === id ? 'bg-ink text-on-ink' : 'text-ink'}`}>{label}</button>
           ))}
         </div>
         <button type="button" onClick={() => setPlaying((v) => !v)} aria-pressed={playing} className={`${pill} inline-flex items-center gap-1.5`}>
           {playing ? <Pause aria-hidden="true" className="size-3.5" /> : <Play aria-hidden="true" className="size-3.5" />}
-          {playing ? 'Stop' : 'Play the flow'}
+          {playing ? 'Stop animation' : 'Animate flow'}
         </button>
         {variants.length > 0 ? (
           <button type="button" onClick={exportRoutes} disabled={exporting}
             className="ml-auto text-xs font-semibold text-ink underline underline-offset-2 disabled:opacity-60">
-            {exporting ? 'Preparing' : 'Export routes to Excel'}
+            {exporting ? 'Preparing' : 'Export variants to Excel'}
           </button>
         ) : null}
       </div>
@@ -204,10 +204,10 @@ export default function ProcessFlow({ flow, range }) {
 
       {filters.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
-          <span className="text-muted-foreground">Only {noun} where:</span>
+          <span className="text-muted-foreground">Case filters:</span>
           {filters.map((f, i) => (
             <button key={`${f.kind}-${i}`} type="button" onClick={() => removeFilter(i)}
-              className="inline-flex items-center gap-1 rounded-full bg-ink px-2.5 py-1 font-semibold text-on-ink">
+              className="relative inline-flex items-center gap-1 rounded-full bg-ink px-2.5 py-1 font-semibold text-on-ink">
               {filterLabel(process, f)} <X aria-hidden="true" className="size-3" /><span className="sr-only">Remove</span>
             </button>
           ))}
@@ -218,14 +218,14 @@ export default function ProcessFlow({ flow, range }) {
       {process.cases.length === 0 ? (
         <p className="mt-4 text-sm text-muted-foreground">No {noun} in this period.</p>
       ) : inScope.length === 0 ? (
-        <p className="mt-4 text-sm text-muted-foreground">No {noun} match all of those. Remove one to see the map again.</p>
+        <p className="mt-4 text-sm text-muted-foreground">No {noun} match these filters. Remove a filter to restore the map.</p>
       ) : (
         <>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Fact label={`${noun[0].toUpperCase()}${noun.slice(1)}`} value={count(inScope.length)} />
-            <Fact label="Different routes" value={count(variants.length)} />
-            <Fact label="On the expected route" value={pct(onExpected)} />
-            <Fact label="With a repeated step" value={pct(withRepeats)} />
+            <Fact label="Variants" value={count(variants.length)} />
+            <Fact label="Conformance rate" value={pct(onExpected)} />
+            <Fact label="Rework rate" value={pct(withRepeats)} />
           </div>
 
           <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -252,7 +252,7 @@ export default function ProcessFlow({ flow, range }) {
                   const text = metric === 'count' ? count(e.count) : (e.medianHours === null ? '' : duration(e.medianHours));
                   const ends = e.from === START || e.to === END;
                   const picked = selectedEdge?.key === e.key;
-                  const label = `${nameOf(e.from)} to ${nameOf(e.to)}: ${count(e.count)} ${noun}${e.medianHours === null ? '' : `, typically ${duration(e.medianHours)}`}${e.expected ? '' : ', off the expected route'}`;
+                  const label = `${nameOf(e.from)} to ${nameOf(e.to)}: ${count(e.count)} ${noun}${e.medianHours === null ? '' : `, median ${duration(e.medianHours)}`}${e.expected ? '' : ', deviation'}`;
                   return (
                     <g key={e.key} role="button" tabIndex={0} aria-label={label} aria-pressed={picked} className="cursor-pointer outline-none"
                       onClick={() => setSelected(picked ? null : { type: 'edge', key: e.key })}
@@ -295,7 +295,7 @@ export default function ProcessFlow({ flow, range }) {
                   const p = layout.at.get(n.id);
                   const picked = selectedNode?.id === n.id;
                   const dim = selectedEdge ? !(selectedEdge.from === n.id || selectedEdge.to === n.id) : false;
-                  const label = `${n.label}: ${count(n.cases)} ${noun}${n.repeated ? `, repeated in ${count(n.repeated)}` : ''}${n.expected ? '' : ', not on the expected route'}`;
+                  const label = `${n.label}: ${count(n.cases)} ${noun}${n.repeated ? `, repeated in ${count(n.repeated)}` : ''}${n.expected ? '' : ', deviation'}`;
                   const choose = () => setSelected(picked ? null : { type: 'node', id: n.id });
                   return (
                     <g key={n.id} role="button" tabIndex={0} aria-label={label} aria-pressed={picked} className="cursor-pointer outline-none"
@@ -310,17 +310,17 @@ export default function ProcessFlow({ flow, range }) {
                       <circle cx={p.x - NODE_W / 2 + 22} cy={p.y} r={6 + (n.cases / nodeMax) * 8} fill={picked ? 'var(--on-ink)' : n.expected ? INK : OFF_ROUTE} opacity={picked ? 0.9 : 0.85} />
                       <text x={p.x - NODE_W / 2 + 44} y={p.y - 2} fontSize="12.5" fontWeight="700" fill={picked ? 'var(--on-ink)' : INK}>{n.label}</text>
                       <text x={p.x - NODE_W / 2 + 44} y={p.y + 13} fontSize="10.5" fill={picked ? 'var(--on-ink)' : 'var(--ink-soft)'}>
-                        {count(n.cases)}{n.repeated ? ` · repeated in ${count(n.repeated)}` : ''}
+                        {count(n.cases)}{n.repeated ? ` · rework in ${count(n.repeated)}` : ''}
                       </text>
                     </g>
                   );
                 })}
               </svg>
               <p className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-line px-3 py-2 text-[11px] text-muted-foreground">
-                <span className="inline-flex items-center gap-1.5"><span className="inline-block h-0.5 w-5 bg-ink" /> Expected route</span>
-                <span className="inline-flex items-center gap-1.5"><span className="inline-block h-0.5 w-5 bg-warn" /> Off the expected route</span>
-                <span className="inline-flex items-center gap-1.5"><RotateCw aria-hidden="true" className="size-3" /> Dashed: a step done again</span>
-                <span>Thicker: {metric === 'count' ? 'more cases' : 'a longer wait'}</span>
+                <span className="inline-flex items-center gap-1.5"><span className="inline-block h-0.5 w-5 bg-ink" /> Reference path</span>
+                <span className="inline-flex items-center gap-1.5"><span className="inline-block h-0.5 w-5 bg-warn" /> Deviation</span>
+                <span className="inline-flex items-center gap-1.5"><RotateCw aria-hidden="true" className="size-3" /> Dashed: rework loop</span>
+                <span>Thicker: {metric === 'count' ? 'higher frequency' : 'longer duration'}</span>
               </p>
             </div>
 
@@ -333,18 +333,18 @@ export default function ProcessFlow({ flow, range }) {
                     <button type="button" onClick={() => setSelected(null)} className="text-xs font-semibold text-muted-foreground hover:text-ink">Close</button>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    In {count(selectedNode.cases)} of the {count(graph.cases)} {noun} shown.
-                    {selectedNode.repeated ? ` Done more than once in ${count(selectedNode.repeated)}.` : ''}
-                    {selectedNode.expected ? '' : ' Not a step of the expected route.'}
+                    Present in {count(selectedNode.cases)} of {count(graph.cases)} {noun} in view.
+                    {selectedNode.repeated ? ` Repeated in ${count(selectedNode.repeated)} (rework).` : ''}
+                    {selectedNode.expected ? '' : ' Not part of the reference path.'}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    <button type="button" className={pill} onClick={() => addFilter({ kind: 'through', step: selectedNode.id })}>Only those that pass through it</button>
-                    <button type="button" className={pill} onClick={() => addFilter({ kind: 'avoid', step: selectedNode.id })}>Only those that skip it</button>
+                    <button type="button" className={pill} onClick={() => addFilter({ kind: 'through', step: selectedNode.id })}>Filter: cases through this activity</button>
+                    <button type="button" className={pill} onClick={() => addFilter({ kind: 'avoid', step: selectedNode.id })}>Filter: cases bypassing this activity</button>
                   </div>
-                  <h4 className="mt-3 text-xs font-bold text-ink">What came before</h4>
+                  <h4 className="mt-3 text-xs font-bold text-ink">Predecessors</h4>
                   <Bars rows={neighbours(graph, process, selectedNode.id, 'before')} valueOf={(r) => r.count} textOf={(r) => `${count(r.count)} · ${r.share}%`}
                     onPick={(r) => setSelected({ type: 'edge', key: `${r.id}>${selectedNode.id}` })} />
-                  <h4 className="mt-3 text-xs font-bold text-ink">What came next</h4>
+                  <h4 className="mt-3 text-xs font-bold text-ink">Successors</h4>
                   <Bars rows={neighbours(graph, process, selectedNode.id, 'next')} valueOf={(r) => r.count} textOf={(r) => `${count(r.count)} · ${r.share}%`}
                     onPick={(r) => setSelected({ type: 'edge', key: `${selectedNode.id}>${r.id}` })} />
                 </section>
@@ -357,32 +357,32 @@ export default function ProcessFlow({ flow, range }) {
                     <button type="button" onClick={() => setSelected(null)} className="text-xs font-semibold text-muted-foreground hover:text-ink">Close</button>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {count(selectedEdge.cases)} {noun} went this way{selectedEdge.count > selectedEdge.cases ? `, ${count(selectedEdge.count)} times in all` : ''}.
-                    {selectedEdge.expected ? '' : ' This is off the expected route.'}
-                    {selectedEdge.back ? ' It goes back to an earlier step.' : ''}
+                    {count(selectedEdge.cases)} {noun} followed this transition{selectedEdge.count > selectedEdge.cases ? `, ${count(selectedEdge.count)} occurrences in total` : ''}.
+                    {selectedEdge.expected ? '' : ' Deviates from the reference path.'}
+                    {selectedEdge.back ? ' Rework loop: returns to an earlier activity.' : ''}
                   </p>
                   {selectedEdge.measured > 0 ? (
                     <div className="mt-2 grid grid-cols-3 gap-1.5">
-                      <Fact label="Typical" value={duration(selectedEdge.medianHours)} />
-                      <Fact label="Average" value={duration(selectedEdge.averageHours)} />
-                      <Fact label="Slow end" value={duration(selectedEdge.p90Hours)} />
+                      <Fact label="Median" value={duration(selectedEdge.medianHours)} />
+                      <Fact label="Mean" value={duration(selectedEdge.averageHours)} />
+                      <Fact label="90th percentile" value={duration(selectedEdge.p90Hours)} />
                     </div>
                   ) : selectedEdge.from !== START && selectedEdge.to !== END ? (
-                    <p className="mt-2 text-xs text-muted-foreground">No time was recorded for this step.</p>
+                    <p className="mt-2 text-xs text-muted-foreground">No duration recorded for this transition.</p>
                   ) : null}
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    <button type="button" className={pill} onClick={() => addFilter({ kind: 'with', from: selectedEdge.from, to: selectedEdge.to })}>Only those that went this way</button>
-                    <button type="button" className={pill} onClick={() => addFilter({ kind: 'without', from: selectedEdge.from, to: selectedEdge.to })}>Only those that never did</button>
+                    <button type="button" className={pill} onClick={() => addFilter({ kind: 'with', from: selectedEdge.from, to: selectedEdge.to })}>Filter: cases with this transition</button>
+                    <button type="button" className={pill} onClick={() => addFilter({ kind: 'without', from: selectedEdge.from, to: selectedEdge.to })}>Filter: cases without this transition</button>
                   </div>
                   {selectedEdge.timed.length > 0 ? (
                     <>
-                      <h4 className="mt-3 text-xs font-bold text-ink">Slowest here</h4>
+                      <h4 className="mt-3 text-xs font-bold text-ink">Longest durations</h4>
                       <Bars rows={[...selectedEdge.timed].sort((a, b) => b.hours - a.hours).slice(0, 8).map((x) => ({ label: x.c.label, hours: x.hours }))}
                         valueOf={(r) => r.hours} textOf={(r) => duration(r.hours)} />
                     </>
                   ) : (
                     <>
-                      <h4 className="mt-3 text-xs font-bold text-ink">Which ones</h4>
+                      <h4 className="mt-3 text-xs font-bold text-ink">Cases</h4>
                       <ul className="mt-1.5 space-y-1 text-xs text-ink">
                         {selectedEdge.caseList.slice(0, 8).map((c) => <li key={c.id} className="truncate">{c.label}</li>)}
                       </ul>
@@ -392,29 +392,29 @@ export default function ProcessFlow({ flow, range }) {
               ) : null}
 
               {selectedRoute ? (
-                <section aria-label="Route: details" className="rounded-2xl border border-line bg-card p-3">
+                <section aria-label="Variant: details" className="rounded-2xl border border-line bg-card p-3">
                   <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-sm font-bold text-ink">{count(selectedRoute.cases.length)} {noun} on this route</h3>
+                    <h3 className="text-sm font-bold text-ink">{count(selectedRoute.cases.length)} {noun} in this variant</h3>
                     <button type="button" onClick={() => setSelected(null)} className="text-xs font-semibold text-muted-foreground hover:text-ink">Close</button>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">{routeText(selectedRoute)}</p>
-                  <h4 className="mt-3 text-xs font-bold text-ink">Longest first</h4>
+                  <h4 className="mt-3 text-xs font-bold text-ink">Longest cycle times</h4>
                   <Bars rows={selectedRoute.cases.map((c) => ({ label: c.label, hours: caseHours(c) ?? 0 })).sort((a, b) => b.hours - a.hours).slice(0, 10)}
                     valueOf={(r) => r.hours} textOf={(r) => duration(r.hours)} />
                 </section>
               ) : null}
 
-              <section aria-label="Routes" className="rounded-2xl border border-line bg-card p-3">
+              <section aria-label="Variants" className="rounded-2xl border border-line bg-card p-3">
                 <div className="flex items-baseline justify-between gap-2">
-                  <h3 className="text-sm font-bold text-ink">Routes</h3>
+                  <h3 className="text-sm font-bold text-ink">Variants</h3>
                   <span className="text-xs text-muted-foreground">
                     {count(shown.length)} of {count(variants.length)} shown · {inScope.length ? Math.round((shownCases.length / inScope.length) * 100) : 0}% of {noun}
                   </span>
                 </div>
                 {variants.length > 1 ? (
                   <label className="mt-2 block text-xs font-semibold text-ink">
-                    <span className="flex justify-between"><span>Commonest only</span><span>Every route</span></span>
-                    <input type="range" min={1} max={variants.length} value={Math.min(shown.length, variants.length)} aria-label="How many routes to show"
+                    <span className="flex justify-between"><span>Most frequent</span><span>All variants</span></span>
+                    <input type="range" min={1} max={variants.length} value={Math.min(shown.length, variants.length)} aria-label="Number of variants shown"
                       onChange={(e) => setRouteCount(Number(e.target.value))} className="mt-1 w-full accent-[var(--ink)]" />
                   </label>
                 ) : null}
@@ -425,10 +425,10 @@ export default function ProcessFlow({ flow, range }) {
                       <li key={v.key} className={`rounded-xl border p-2 text-xs ${on ? 'border-line-strong bg-surface' : 'border-line opacity-70'}`}>
                         <div className="flex items-start gap-2">
                           <input type="checkbox" checked={on} onChange={() => toggleRoute(v.key)} className="mt-0.5 accent-[var(--ink)]"
-                            aria-label={`Show route ${i + 1}: ${routeText(v)}`} />
+                            aria-label={`Show variant ${i + 1}: ${routeText(v)}`} />
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-baseline justify-between gap-x-2">
-                              <span className="font-bold text-ink">Route {i + 1}</span>
+                              <span className="font-bold text-ink">Variant {i + 1}</span>
                               <span className="tabular-nums text-muted-foreground">{count(v.cases.length)} · {v.share}%</span>
                             </div>
                             <div className="mt-1 h-1.5 rounded-full bg-surface-2">
@@ -436,9 +436,9 @@ export default function ProcessFlow({ flow, range }) {
                             </div>
                             <p className="mt-1 text-ink">{routeText(v)}</p>
                             <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-muted-foreground">
-                              <span>{v.expected ? 'Expected route' : v.repeats ? 'Has a repeated step' : 'Different route'}</span>
-                              {v.medianHours !== null ? <span>Typically {duration(v.medianHours)}</span> : null}
-                              <button type="button" onClick={() => onlyRoute(v.key)} className="font-semibold text-ink underline underline-offset-2">Show only this</button>
+                              <span>{v.expected ? 'Reference path' : v.repeats ? 'Contains rework' : 'Deviation'}</span>
+                              {v.medianHours !== null ? <span>Median {duration(v.medianHours)}</span> : null}
+                              <button type="button" onClick={() => onlyRoute(v.key)} className="font-semibold text-ink underline underline-offset-2">Isolate</button>
                             </p>
                           </div>
                         </div>
@@ -452,7 +452,7 @@ export default function ProcessFlow({ flow, range }) {
 
           {process.truncated ? (
             <p className="mt-2 text-xs text-muted-foreground">
-              Showing the most recent {count(process.cases.length)} of {count(process.total)} {noun}. Choose a shorter period to see all of them.
+              Limited to the most recent {count(process.cases.length)} of {count(process.total)} {noun}. Select a shorter period to include all.
             </p>
           ) : null}
         </>

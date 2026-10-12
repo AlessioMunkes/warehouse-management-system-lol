@@ -65,8 +65,8 @@ describe('narrowing the cases', () => {
   });
 
   it('says a filter in words', () => {
-    expect(filterLabel(PALLETS, { kind: 'avoid', step: 1 })).toBe('Skips Claimed');
-    expect(filterLabel(PALLETS, { kind: 'with', from: 3, to: 1 })).toBe('Goes from Line flagged to Claimed');
+    expect(filterLabel(PALLETS, { kind: 'avoid', step: 1 })).toBe('Bypasses: Claimed');
+    expect(filterLabel(PALLETS, { kind: 'with', from: 3, to: 1 })).toBe('Transition: Line flagged to Claimed');
   });
 });
 
@@ -102,7 +102,7 @@ describe('the graph', () => {
       { id: 5, label: 'Collected', count: 9, share: 90 },
       { id: 6, label: 'Not collected', count: 1, share: 10 },
     ]);
-    expect(neighbours(graph, PALLETS, 0, 'before')[0]).toMatchObject({ label: 'Started here', count: 10 });
+    expect(neighbours(graph, PALLETS, 0, 'before')[0]).toMatchObject({ label: 'Process start', count: 10 });
   });
 
   it('lays the steps out top to bottom, the common route in one column', () => {
@@ -129,7 +129,7 @@ describe('the flow map on screen', () => {
 
   it('opens on the process that has cases, with its common routes', () => {
     show();
-    expect(screen.getByLabelText('Follow')).toHaveValue('pallets');
+    expect(screen.getByLabelText('Process')).toHaveValue('pallets');
     expect(screen.getByText('2 of 4 shown · 80% of pallets')).toBeInTheDocument();
     expect(step('Line flagged')).toBeInTheDocument();
     // The rare routes are not on the map until asked for.
@@ -139,7 +139,7 @@ describe('the flow map on screen', () => {
 
   it('shows every route when the slider is pulled across', async () => {
     show();
-    const slider = screen.getByRole('slider', { name: 'How many routes to show' });
+    const slider = screen.getByRole('slider', { name: 'Number of variants shown' });
     fireEvent.change(slider, { target: { value: '4' } });
     expect(screen.getByText('4 of 4 shown · 100% of pallets')).toBeInTheDocument();
     expect(step('Not collected')).toBeInTheDocument();
@@ -147,12 +147,12 @@ describe('the flow map on screen', () => {
 
   it('switches a route on and off by itself, and shows one alone with its cases', async () => {
     show();
-    await userEvent.click(screen.getByRole('checkbox', { name: /^Show route 3: / }));
+    await userEvent.click(screen.getByRole('checkbox', { name: /^Show variant 3: / }));
     expect(step('Not collected')).toBeInTheDocument();
 
-    await userEvent.click(within(screen.getByRole('region', { name: 'Routes' })).getAllByRole('button', { name: 'Show only this' })[1]);
+    await userEvent.click(within(screen.getByRole('region', { name: 'Variants' })).getAllByRole('button', { name: 'Isolate' })[1]);
     expect(screen.getByText('1 of 4 shown · 20% of pallets')).toBeInTheDocument();
-    const detail = screen.getByRole('region', { name: 'Route: details' });
+    const detail = screen.getByRole('region', { name: 'Variant: details' });
     expect(within(detail).getByText('Centre 7')).toBeInTheDocument();
   });
 
@@ -160,7 +160,7 @@ describe('the flow map on screen', () => {
     show();
     await userEvent.click(step('Claimed'));
     const detail = screen.getByRole('region', { name: 'Claimed: details' });
-    expect(detail).toHaveTextContent('In 8 of the 8 pallets shown. Done more than once in 2.');
+    expect(detail).toHaveTextContent('Present in 8 of 8 pallets in view. Repeated in 2 (rework).');
     expect(within(detail).getByRole('button', { name: 'Line flagged' })).toBeInTheDocument();
     expect(within(detail).getByRole('button', { name: 'Lines packed' })).toBeInTheDocument();
   });
@@ -168,11 +168,11 @@ describe('the flow map on screen', () => {
   it('keeps only the cases through a step, and puts them back when the filter is removed', async () => {
     show();
     await userEvent.click(step('Line flagged'));
-    await userEvent.click(screen.getByRole('button', { name: 'Only those that pass through it' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Filter: cases through this activity' }));
     expect(screen.getByText('1 of 1 shown · 100% of pallets')).toBeInTheDocument();
-    expect(screen.getByText('Only pallets where:')).toBeInTheDocument();
+    expect(screen.getByText('Case filters:')).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: /Passes through Line flagged/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Through: Line flagged/ }));
     expect(screen.getByText('2 of 4 shown · 80% of pallets')).toBeInTheDocument();
   });
 
@@ -180,23 +180,23 @@ describe('the flow map on screen', () => {
     show();
     await userEvent.click(screen.getByRole('button', { name: /^Packed to Collected: 8 pallets/ }));
     const detail = screen.getByRole('region', { name: 'Packed to Collected: details' });
-    expect(within(detail).getByText('Slowest here')).toBeInTheDocument();
+    expect(within(detail).getByText('Longest durations')).toBeInTheDocument();
     expect(within(detail).getByText('Centre 6')).toBeInTheDocument();
-    await userEvent.click(within(detail).getByRole('button', { name: 'Only those that never did' }));
-    expect(screen.getByText('Never goes from Packed to Collected', { exact: false })).toBeInTheDocument();
+    await userEvent.click(within(detail).getByRole('button', { name: 'Filter: cases without this transition' }));
+    expect(screen.getByText('No transition: Packed to Collected', { exact: false })).toBeInTheDocument();
   });
 
   it('says a connection that goes back is work done again', async () => {
     show();
     await userEvent.click(screen.getByRole('button', { name: /^Line flagged to Claimed: / }));
-    expect(screen.getByRole('region', { name: 'Line flagged to Claimed: details' })).toHaveTextContent('It goes back to an earlier step.');
+    expect(screen.getByRole('region', { name: 'Line flagged to Claimed: details' })).toHaveTextContent('Rework loop: returns to an earlier activity.');
   });
 
   it('switches to how long, and to the other process', async () => {
     show();
-    await userEvent.click(screen.getByRole('button', { name: 'How long' }));
-    expect(screen.getByText(/Thicker: a longer wait/)).toBeInTheDocument();
-    await userEvent.selectOptions(screen.getByLabelText('Follow'), 'orders');
+    await userEvent.click(screen.getByRole('button', { name: 'Duration' }));
+    expect(screen.getByText(/Thicker: longer duration/)).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByLabelText('Process'), 'orders');
     expect(screen.getByText('No purchase orders in this period.')).toBeInTheDocument();
   });
 

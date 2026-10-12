@@ -115,13 +115,13 @@ const groupMedians = (cases, keyOf, from, to, limit = 8) => {
 const dayEnd = (isoDay) => (isoDay ? new Date(`${String(isoDay).slice(0, 10)}T23:59:59+02:00`).getTime() : null);
 
 const orderVariant = (o) => {
-  if (o.status === 'returned') return 'Sent back';
-  if (o.status === 'pending') return 'Waiting for approval';
-  if (o.firstDelivery === null) return o.expectedBy !== null && o.expectedBy < o.now ? 'Not delivered, overdue' : 'Not delivered yet';
+  if (o.status === 'returned') return 'Returned to supplier';
+  if (o.status === 'pending') return 'Pending approval';
+  if (o.firstDelivery === null) return o.expectedBy !== null && o.expectedBy < o.now ? 'Outstanding, overdue' : 'Outstanding';
   const late = o.expectedBy !== null && o.firstDelivery > o.expectedBy;
-  if (o.status !== 'completed') return late ? 'Part delivered, late' : 'Part delivered, the rest outstanding';
-  if (o.deliveries > 1) return late ? 'Delivered in parts, late' : 'Delivered in parts';
-  return late ? 'Delivered in full, late' : 'Delivered in full, on time';
+  if (o.status !== 'completed') return late ? 'Partially received, late' : 'Partially received, balance outstanding';
+  if (o.deliveries > 1) return late ? 'Multiple deliveries, late' : 'Multiple deliveries';
+  return late ? 'Received in full, late' : 'Received in full, on time';
 };
 
 const inboundLane = (rows, now) => {
@@ -144,21 +144,21 @@ const inboundLane = (rows, now) => {
   const name = (o) => `${o.number ?? `Order ${o.id}`} · ${o.supplier ?? 'No supplier'}`;
   const reached = (key) => orders.filter((o) => o[key] !== null).length;
   const transitions = [
-    transition('raised_approved', 'raised', 'approved', 'Waiting for approval', between(orders, 'raised', 'approved', name)),
-    transition('approved_delivered', 'approved', 'firstDelivery', 'Approved to first delivery', between(orders, 'approved', 'firstDelivery', name)),
-    transition('raised_delivered', 'raised', 'firstDelivery', 'Raised to first delivery', between(orders, 'raised', 'firstDelivery', name)),
-    transition('delivered_complete', 'firstDelivery', 'complete', 'First delivery to received in full', between(orders.filter((o) => o.deliveries > 1), 'firstDelivery', 'complete', name)),
+    transition('raised_approved', 'raised', 'approved', 'Approval lead time', between(orders, 'raised', 'approved', name)),
+    transition('approved_delivered', 'approved', 'firstDelivery', 'Supplier lead time', between(orders, 'approved', 'firstDelivery', name)),
+    transition('raised_delivered', 'raised', 'firstDelivery', 'Order lead time', between(orders, 'raised', 'firstDelivery', name)),
+    transition('delivered_complete', 'firstDelivery', 'complete', 'Completion lead time', between(orders.filter((o) => o.deliveries > 1), 'firstDelivery', 'complete', name)),
   ];
   return {
     id: 'inbound',
-    label: 'Order to shelf',
+    label: 'Inbound: order to receipt',
     caseNoun: 'purchase orders',
     cases: orders.length,
     steps: [
-      { id: 'raised', label: 'Order raised', cases: reached('raised') },
-      { id: 'approved', label: 'Approved', cases: orders.filter((o) => o.status !== 'pending' && o.status !== 'returned').length, timed: reached('approved') },
-      { id: 'firstDelivery', label: 'First delivery', cases: reached('firstDelivery') },
-      { id: 'complete', label: 'Received in full', cases: reached('complete') },
+      { id: 'raised', label: 'PO raised', cases: reached('raised') },
+      { id: 'approved', label: 'PO approved', cases: orders.filter((o) => o.status !== 'pending' && o.status !== 'returned').length, timed: reached('approved') },
+      { id: 'firstDelivery', label: 'First receipt', cases: reached('firstDelivery') },
+      { id: 'complete', label: 'Fully received', cases: reached('complete') },
     ],
     // The arrows drawn on the map: one per step, falling back to the
     // whole raised-to-delivered wait where approval times are missing.
@@ -166,9 +166,9 @@ const inboundLane = (rows, now) => {
     headline: 'raised_delivered',
     transitions,
     variants: tally(orders, orderVariant),
-    groups: [{ id: 'supplier', label: 'By supplier, raised to first delivery', rows: groupMedians(orders, (o) => o.supplier, 'raised', 'firstDelivery') }],
+    groups: [{ id: 'supplier', label: 'Order lead time by supplier', rows: groupMedians(orders, (o) => o.supplier, 'raised', 'firstDelivery') }],
     note: reached('approved') < orders.filter((o) => o.status !== 'pending').length
-      ? 'Approval times are recorded from now on. Orders approved before that show the whole wait from raised to first delivery.'
+      ? 'Approval timestamps are recorded from this release. Earlier orders report order lead time only.'
       : null,
   };
 };
@@ -178,16 +178,16 @@ const KIND = { ecd: 'ECD centres', soup_kitchen: 'Soup kitchens', dignity_kitche
 
 const palletVariant = (p) => {
   const extras = [];
-  if (p.claims > 1) extras.push('re-claimed');
-  if (p.flagged) extras.push('a line flagged');
-  if (p.shortfall) extras.push('stock short');
+  if (p.claims > 1) extras.push('reassigned');
+  if (p.flagged) extras.push('line exception');
+  if (p.shortfall) extras.push('stock shortfall');
   const tail = extras.length ? `, ${extras.join(', ')}` : '';
   if (p.status === 'cancelled') return 'Cancelled';
-  if (p.outcome === 'not_collected') return `Packed, not collected${tail}`;
-  if (p.collected !== null) return `${p.outcome === 'late_collected' ? 'Collected late' : 'Collected'}${p.wrongDay ? ' on another day' : ''}${tail}`;
-  if (p.packed !== null) return `Packed, waiting at the gate${tail}`;
-  if (p.claimed !== null) return `Being packed${tail}`;
-  return 'Not claimed yet';
+  if (p.outcome === 'not_collected') return `Packed, uncollected${tail}`;
+  if (p.collected !== null) return `${p.outcome === 'late_collected' ? 'Late collection' : 'Dispatched'}${p.wrongDay ? ', off schedule' : ''}${tail}`;
+  if (p.packed !== null) return `Packed, awaiting collection${tail}`;
+  if (p.claimed !== null) return `Picking in progress${tail}`;
+  return 'Unassigned';
 };
 
 const outboundLane = (slips, events) => {
@@ -220,31 +220,31 @@ const outboundLane = (slips, events) => {
   const name = (p) => `${p.name ?? `Pallet ${p.id}`}${p.bookedFor ? ` · booked for ${String(p.bookedFor).slice(0, 10)}` : ''}`;
   const reached = (key) => pallets.filter((p) => p[key] !== null).length;
   const transitions = [
-    transition('generated_claimed', 'generated', 'claimed', 'Waiting to be claimed', between(pallets, 'generated', 'claimed', name)),
-    transition('claimed_started', 'claimed', 'started', 'Claimed to first line packed', between(pallets, 'claimed', 'started', name)),
-    transition('started_packed', 'started', 'packed', 'Packing', between(pallets, 'started', 'packed', name)),
-    transition('packed_collected', 'packed', 'collected', 'Waiting at the gate', between(pallets, 'packed', 'collected', name)),
-    transition('generated_collected', 'generated', 'collected', 'Slip raised to collected', between(pallets, 'generated', 'collected', name)),
+    transition('generated_claimed', 'generated', 'claimed', 'Queue time before assignment', between(pallets, 'generated', 'claimed', name)),
+    transition('claimed_started', 'claimed', 'started', 'Assignment to first pick', between(pallets, 'claimed', 'started', name)),
+    transition('started_packed', 'started', 'packed', 'Pick and pack time', between(pallets, 'started', 'packed', name)),
+    transition('packed_collected', 'packed', 'collected', 'Staging dwell time', between(pallets, 'packed', 'collected', name)),
+    transition('generated_collected', 'generated', 'collected', 'Outbound cycle time', between(pallets, 'generated', 'collected', name)),
   ];
   return {
     id: 'outbound',
-    label: 'Slip to dispatch note',
+    label: 'Outbound: slip to dispatch',
     caseNoun: 'pallets',
     cases: pallets.length,
     steps: [
-      { id: 'generated', label: 'Slip raised', cases: reached('generated') },
-      { id: 'claimed', label: 'Claimed', cases: reached('claimed') },
-      { id: 'started', label: 'Packing started', cases: reached('started') },
-      { id: 'packed', label: 'Packed', cases: reached('packed') },
-      { id: 'collected', label: 'Collected', cases: reached('collected') },
+      { id: 'generated', label: 'Slip generated', cases: reached('generated') },
+      { id: 'claimed', label: 'Assigned', cases: reached('claimed') },
+      { id: 'started', label: 'Picking started', cases: reached('started') },
+      { id: 'packed', label: 'Packing complete', cases: reached('packed') },
+      { id: 'collected', label: 'Dispatched', cases: reached('collected') },
     ],
     path: ['generated_claimed', 'claimed_started', 'started_packed', 'packed_collected'],
     headline: 'generated_collected',
     transitions,
     variants: tally(pallets, palletVariant),
     groups: [
-      { id: 'cohort', label: 'By cohort, slip raised to collected', rows: groupMedians(pallets.filter((p) => p.kind === 'ecd' || !p.kind), (p) => (p.cohort ? `${p.cohort[0].toUpperCase()}${p.cohort.slice(1)}` : null), 'generated', 'collected') },
-      { id: 'kind', label: 'By who it was for, slip raised to collected', rows: groupMedians(pallets, (p) => KIND[p.kind] ?? p.kind, 'generated', 'collected') },
+      { id: 'cohort', label: 'Outbound cycle time by cohort', rows: groupMedians(pallets.filter((p) => p.kind === 'ecd' || !p.kind), (p) => (p.cohort ? `${p.cohort[0].toUpperCase()}${p.cohort.slice(1)}` : null), 'generated', 'collected') },
+      { id: 'kind', label: 'Outbound cycle time by beneficiary type', rows: groupMedians(pallets, (p) => KIND[p.kind] ?? p.kind, 'generated', 'collected') },
     ],
     note: null,
   };
@@ -298,7 +298,7 @@ const shelfLane = (movements, range) => {
     .sort((a, b) => b.medianHours - a.medianHours);
   const median = weightedMedian(samples);
   const dwell = {
-    id: 'received_dispatched', from: 'received', to: 'dispatched', label: 'On the shelf',
+    id: 'received_dispatched', from: 'received', to: 'dispatched', label: 'Storage dwell time',
     cases: samples.length,
     medianHours: round(median),
     averageHours: round(weight ? samples.reduce((s, x) => s + x.value * x.weight, 0) / weight : null),
@@ -307,19 +307,19 @@ const shelfLane = (movements, range) => {
   };
   return {
     id: 'shelf',
-    label: 'On the shelf',
-    caseNoun: 'dispatched quantities',
+    label: 'Storage: receipt to dispatch',
+    caseNoun: 'outbound quantities',
     cases: samples.length,
     steps: [
-      { id: 'received', label: 'Received into stock', cases: samples.length },
-      { id: 'dispatched', label: 'Left on a pallet', cases: samples.length },
+      { id: 'received', label: 'Goods received', cases: samples.length },
+      { id: 'dispatched', label: 'Dispatched', cases: samples.length },
     ],
     path: ['received_dispatched'],
     headline: 'received_dispatched',
     transitions: [dwell],
     variants: [],
-    groups: [{ id: 'product', label: 'By product, longest on the shelf first', rows: products.slice(0, 8) }],
-    note: 'An estimate. Stock is not tracked by batch, so each quantity that left is matched to the oldest of that product still on the shelf.',
+    groups: [{ id: 'product', label: 'Storage dwell time by product', rows: products.slice(0, 8) }],
+    note: 'An estimate. Stock is not batch-tracked, so dwell time is derived by FIFO allocation of outbound quantities to the oldest receipts.',
     estimate: true,
   };
 };
