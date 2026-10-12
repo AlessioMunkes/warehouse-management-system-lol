@@ -307,22 +307,26 @@ const processMap = async ({ dateRange, filters = {} } = {}) => {
   const beneficiaryKind = f.beneficiaryKind ? String(f.beneficiaryKind) : null;
   if (beneficiaryKind && !BENEFICIARY_KINDS.includes(beneficiaryKind)) throw fail(400, 'That kind of beneficiary is not valid.');
 
-  const [orders, slips, movements] = await Promise.all([
+  const [orders, slips, movements, donations, requests] = await Promise.all([
     processRepo.listOrders({ from, to, supplierId }),
     processRepo.listSlips({ from, to, cohort, beneficiaryKind }),
     processRepo.listMovements({ to }),
+    processRepo.listDonations({ from, to }),
+    processRepo.listRequests({ from, to }),
   ]);
   const orderIds = orders.map((o) => o.id);
-  const [events, changes, deliveries, followUps] = await Promise.all([
+  const [events, changes, deliveries, followUps, donationItems, reversals] = await Promise.all([
     processRepo.listSlipEvents(slips.map((s) => s.id)),
     processRepo.listOrderChanges(orderIds),
     processRepo.listOrderDeliveries(orderIds),
     processRepo.listFollowUps(orderIds),
+    processRepo.listDonationItems(donations.map((d) => d.id)),
+    processRepo.listRequestReversals(requests.map((r) => r.id)),
   ]);
   return {
     ...buildProcess({ orders, slips, events, movements, range: { from, to } }),
     // Every case's own path, for the flow map (features/reporting/processFlow.js).
-    flow: buildFlow({ orders, changes, deliveries, followUps, slips, events }),
+    flow: buildFlow({ orders, changes, deliveries, followUps, slips, events, movements, donations, donationItems, requests, reversals }),
     filters: { supplierId, cohort, beneficiaryKind },
   };
 };

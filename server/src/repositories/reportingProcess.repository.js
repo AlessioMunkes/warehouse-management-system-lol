@@ -79,7 +79,8 @@ export const listSlipEvents = async (slipIds) => {
 /** Every stock movement up to the end of `to`, oldest first. */
 export const listMovements = async ({ to }) => {
   const { rows } = await pool.query(
-    `SELECT sm.product_id, p.name AS product_name, sm.quantity, sm.movement_type, sm.created_at
+    `SELECT sm.id, sm.product_id, p.name AS product_name, sm.quantity, sm.movement_type,
+            sm.reference_type, sm.reference_id, sm.created_at
        FROM stock_movements sm
        JOIN products p ON p.id = sm.product_id
       WHERE ${SAST_DAY('sm.created_at')} <= $1::date
@@ -110,7 +111,7 @@ export const listOrderChanges = async (orderIds) => {
 export const listOrderDeliveries = async (orderIds) => {
   if (!orderIds.length) return [];
   const { rows } = await pool.query(
-    `SELECT dn.purchase_order_id, dn.status, dn.created_at
+    `SELECT dn.id, dn.purchase_order_id, dn.status, dn.created_at
        FROM delivery_notes dn
       WHERE dn.purchase_order_id = ANY($1::int[])
       ORDER BY dn.created_at ASC, dn.id ASC`,
@@ -139,4 +140,55 @@ export const listFollowUps = async (orderIds) => {
   }
 };
 
-export default { listOrders, listSlips, listSlipEvents, listMovements, listOrderChanges, listOrderDeliveries, listFollowUps };
+// A deployment that has not had a feature's migration yet has no such
+// table or column. That process is simply empty; the rest still draw.
+const orNone = async (run) => {
+  try {
+    return (await run()).rows;
+  } catch (err) {
+    if (err.code === '42P01' || err.code === '42703') return [];
+    throw err;
+  }
+};
+
+/** Donations received in [from, to]. */
+export const listDonations = ({ from, to }) => orNone(() => pool.query(
+  `SELECT d.id, d.donor_name, d.status, d.section_18a_status, d.section_18a_issued_at, d.received_at,
+          ${SAST_DAY('d.received_at')}::text AS received_day
+     FROM donations d
+    WHERE ${SAST_DAY('d.received_at')} BETWEEN $1::date AND $2::date
+    ORDER BY d.received_at ASC`,
+  [from, to],
+));
+
+/** The lines of those donations, with when each was classified. */
+export const listDonationItems = (donationIds) => (donationIds.length ? orNone(() => pool.query(
+  `SELECT di.donation_id, di.routing_status, di.resolved_at
+     FROM donation_items di
+    WHERE di.donation_id = ANY($1::int[])`,
+  [donationIds],
+)) : Promise.resolve([]));
+
+/** Benevolent requests logged in [from, to]. */
+export const listRequests = ({ from, to }) => orNone(() => pool.query(
+  `SELECT cr.id, cr.caller_name, cr.items_requested, cr.outcome::text AS outcome, cr.requested_at, cr.resolved_at
+     FROM community_requests cr
+    WHERE ${SAST_DAY('cr.requested_at')} BETWEEN $1::date AND $2::date
+    ORDER BY cr.requested_at ASC`,
+  [from, to],
+));
+
+/** Each time a decision on one of those requests was reversed. */
+export const listRequestReversals = (requestIds) => (requestIds.length ? orNone(() => pool.query(
+  `SELECT al.entity_id::int AS request_id, al.created_at
+     FROM audit_log al
+    WHERE al.entity_type = 'community_request' AND al.action = 'reversed'
+      AND al.entity_id = ANY($1::text[])
+    ORDER BY al.created_at ASC`,
+  [requestIds.map(String)],
+)) : Promise.resolve([]));
+
+export default {
+  listOrders, listSlips, listSlipEvents, listMovements, listOrderChanges, listOrderDeliveries, listFollowUps,
+  listDonations, listDonationItems, listRequests, listRequestReversals,
+};

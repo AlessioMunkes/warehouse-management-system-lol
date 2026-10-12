@@ -7,6 +7,8 @@
 // up is work done again. It is the picture process-mining tools open
 // on, and it works the way they do:
 //
+//   follow        which process: an order through to dispatch, a
+//                 purchase order, packing, a donation, a request
 //   routes        the list on the right is every route, commonest
 //                 first. The slider shows more or fewer of them, and
 //                 each can be switched on or off by itself.
@@ -191,6 +193,14 @@ export default function ProcessFlow({ flow, range }) {
           </button>
         ) : null}
       </div>
+
+      {/* A process worked out, not recorded step by step, says so. */}
+      {process.note ? (
+        <p className="mt-3 text-xs text-muted-foreground">
+          {process.estimate ? <span className="mr-2 rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold">Estimate</span> : null}
+          {process.note.replace(/^An estimate\. /, '')}
+        </p>
+      ) : null}
 
       {filters.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
