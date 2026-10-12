@@ -51,10 +51,11 @@ describe('toPurchaseOrder — finance email fields', () => {
 });
 
 describe('PurchaseOrderDetail — finance email', () => {
-  it('shows "Sent to Finance · <time>" in a neutral badge with no Resend', () => {
+  it('shows "Sent to Finance · <time>" in the shared sent style with no Resend', () => {
     renderDetail({ finance_email_status: 'sent', finance_email_attempted_at: '2026-10-02T08:30:00.000Z' });
     const badge = screen.getByText(/Sent to Finance ·/);
-    expect(badge.closest('[data-tone]').dataset.tone).toBe('neutral');
+    // Drawn as every sent email is (lib/statusStyles.js, message.sent).
+    expect(badge.closest('[data-tone]').dataset.tone).toBe('good');
     expect(screen.queryByRole('button', { name: 'Resend to Finance' })).toBeNull();
   });
 
@@ -64,12 +65,12 @@ describe('PurchaseOrderDetail — finance email', () => {
     expect(screen.getByRole('button', { name: 'Resend to Finance' })).toBeTruthy();
   });
 
-  it('shows "Send failed" in the warning tone, the safe reason, and Resend', async () => {
+  it('shows "Send failed" in the shared failed style, the safe reason, and Resend', async () => {
     const user = userEvent.setup();
     const { onResendFinanceEmail } = renderDetail({
       finance_email_status: 'failed', finance_email_error: 'Gmail not connected',
     });
-    expect(screen.getByText('Send failed').closest('[data-tone]').dataset.tone).toBe('warn');
+    expect(screen.getByText('Send failed').closest('[data-tone]').dataset.tone).toBe('bad');
     expect(screen.getByText('Gmail not connected')).toBeTruthy();
 
     await user.click(screen.getByRole('button', { name: 'Resend to Finance' }));
