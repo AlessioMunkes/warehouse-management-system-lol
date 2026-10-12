@@ -53,6 +53,7 @@ import ReportChart    from '../features/reporting/ReportChart';
 import ChartNote      from '../features/reporting/ChartNote';
 import ImpactStatCard from '../features/reporting/ImpactStatCard';
 import BeneficiaryTypeChart from '../features/reporting/BeneficiaryTypeChart';
+import { BENEFICIARY_COLOURS } from '../features/reporting/chartFormat';
 import ImpactCalculatorPDF from '../features/reporting/ImpactCalculatorPDF';
 import { runReport }  from '../services/reportingAPI';
 import ImpactFactorsForm from '../features/reporting/ImpactFactorsForm';
@@ -130,12 +131,14 @@ const STAT_DEFS = [
 // fetching for themselves (see EXTRA_METRIC_DEFS below) — all four
 // end up in the same `stats` object regardless of which array loaded
 // them, so this list only needs to say how to LABEL and colour each
-// one, not how to fetch it.
+// one, not how to fetch it. The colours are the chart palette's
+// beneficiary set (chartFormat.js), the same as the grouped Meals
+// served bars.
 const BENEFICIARY_TYPE_DEFS = [
-  { metric: 'children_reached', label: 'Children (ECD)', unit: 'children', color: 'var(--brand)' },
-  { metric: 'adults_reached', label: 'Adults (soup kitchens)', unit: 'adults', color: 'var(--chart-tan)' },
-  { metric: 'dignity_kitchen_served', label: 'Dignity kitchens', unit: 'people', color: 'var(--chart-sage)' },
-  { metric: 'community_served', label: 'Households (community requests)', unit: 'people', color: 'var(--ink)' },
+  { metric: 'children_reached', label: 'Children (ECD)', unit: 'children', color: BENEFICIARY_COLOURS.children },
+  { metric: 'adults_reached', label: 'Adults (soup kitchens)', unit: 'adults', color: BENEFICIARY_COLOURS.adults },
+  { metric: 'dignity_kitchen_served', label: 'Dignity kitchens', unit: 'people', color: BENEFICIARY_COLOURS.dignity },
+  { metric: 'community_served', label: 'Households (community requests)', unit: 'people', color: BENEFICIARY_COLOURS.households },
 ];
 
 // Fetched the same way as STAT_DEFS but not rendered as a poster

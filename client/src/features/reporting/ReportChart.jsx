@@ -1,27 +1,37 @@
 // ─────────────────────────────────────────────────────────────
 // client/src/features/reporting/ReportChart.jsx
 //
-// Renders one { series, chartType } payload. Four shapes, plain SVG,
-// no charting dependency.
+// Renders one { series, chartType } payload: a number, bars, ranked
+// rows, a line, or bars grouped by month. Drawn with Recharts, like
+// every other chart in the app, with the shared hover tip
+// (ChartTooltip.jsx) and the theme's chart colours (--viz-N).
 //
-// ACCESSIBILITY IS THE REASON THIS IS HAND-ROLLED
+// ACCESSIBILITY
 // ACC-01 requires WCAG AA and ACC-03 forbids conveying status by
-// colour alone. An SVG chart is close to invisible to a screen
-// reader, so every shape prints a numeric label and the whole
-// component has a table view holding identical data. The toggle is
-// not a nicety — it is how a screen-reader user, or anyone who would
-// rather read figures, gets the same answer. The table is also the
-// CSV source, so the two cannot disagree.
+// colour alone. So every bar and point prints its figure, the whole
+// chart carries a one-sentence summary for a screen reader, and there
+// is a table view holding identical data. The toggle is not a nicety:
+// it is how a screen-reader user, or anyone who would rather read
+// figures, gets the same answer. The table is also the Excel source,
+// so the two cannot disagree. The hover tip only adds to what is
+// already printed.
 //
 // NEGATIVE VALUES: low_stock_items reports how far BELOW the reorder
 // threshold each product is, so bars run the other way and zero is
-// the line to beat. Handled in HBarView rather than by making the
-// metric report an absolute number, because "12 below" is the fact a
-// manager acts on.
+// the line to beat. Those rows are all drawn in the "gone wrong" red:
+// "this far under" is a warning, not a category.
 // ─────────────────────────────────────────────────────────────
-import { useRef, useState } from 'react';
+import { useState } from 'react';
+import {
+  Bar, BarChart, CartesianGrid, Cell, LabelList, Line, LineChart, ReferenceLine,
+  ResponsiveContainer, Tooltip, XAxis, YAxis,
+} from 'recharts';
 import { Button } from '@/components/ui/button';
-import { fitLabel, isAdditive, noteLines } from './chartFormat';
+import ChartTooltip from './ChartTooltip';
+import {
+  BAR_CURSOR, BENEFICIARY_COLOURS, LINE_CURSOR, SERIES, entityColours, fitLabel,
+  formatLabel as baseLabel, isAdditive,
+} from './chartFormat';
 import { exportExcel } from '../../lib/excelExport';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -30,15 +40,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 
-const RED = 'var(--brand)', CHARCOAL = 'var(--ink)', BORDER = 'var(--line)', MUTED = 'var(--ink-soft)';
+const INK = 'var(--ink)', LINE = 'var(--line)', MUTED = 'var(--ink-soft)', SURF = 'var(--surface)';
+const UNDER = 'var(--rag-bad)';
+const TREND = SERIES[0];
 
-// One rotation, reused everywhere a chart needs more than one colour —
-// same palette ManagerDashboardPage.jsx's DONUT_COLORS uses, so a bar
-// chart and a donut on the dashboard never disagree about what colour
-// means "third category." A single-series trend (LineView) stays on
-// plain RED: rotating hue along a time axis would read as categories
-// changing, not one thing moving.
-const PALETTE = [CHARCOAL, RED, 'var(--chart-tan)', 'var(--chart-sage)', 'var(--chart-grey)'];
+const axisProps = { tick: { fill: MUTED, fontSize: 11 }, axisLine: { stroke: LINE }, tickLine: false };
 
 // Percentages keep a decimal; counts and weights read better whole.
 // "94.7 children" would be nonsense on screen.
@@ -49,245 +55,162 @@ const fmt = (value, unit) =>
 
 const truncate = (s, n) => (String(s).length > n ? `${String(s).slice(0, n - 1)}…` : String(s));
 
-// Enum values arrive as stored. A manager should not have to read
-// 'qualifying_pending_donor'.
-const humanise = (s) =>
-  String(s).replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
-
-// Month-dimension labels arrive as raw "YYYY-MM" buckets
-// (reporting.repository.js's bucketMonth) — humanise() alone leaves
-// that as "2026-09", which is exactly the kind of number-soup a chart
-// is supposed to replace. Every other dimension (cohort, beneficiary,
-// product name...) still goes through humanise().
-const MONTH_BUCKET = /^\d{4}-\d{2}$/;
-
-// grouped_bar packs two axes into one label ("2026-07|Children" —
-// see reportCatalog.js's CHART_TYPES note) so it still fits the flat
+// grouped_bar packs two axes into one label ("2026-07|Children", see
+// reportCatalog.js's CHART_TYPES note) so it still fits the flat
 // [{label,value}] shape every chart type returns. GroupedBarView
-// below parses that itself for the chart; this handles it for the
-// table/CSV/screen-reader summary paths, which all just call
-// formatLabel() on whatever label they're given without knowing
-// which chart type produced it.
+// parses that itself for the chart; this handles it for the table,
+// the Excel sheet and the screen-reader summary. Months, weeks and
+// days read as dates (chartFormat.js), anything else is humanised.
 const GROUP_MONTH = /^(\d{4}-\d{2})\|(.+)$/;
-
 const formatLabel = (label) => {
   const groupMonth = GROUP_MONTH.exec(label);
-  if (groupMonth) return `${formatLabel(groupMonth[1])} – ${groupMonth[2]}`;
-  if (!MONTH_BUCKET.test(label)) return humanise(label);
-  const [y, m] = String(label).split('-').map(Number);
-  return new Date(Date.UTC(y, m - 1, 1))
-    .toLocaleDateString('en-ZA', { month: 'short', year: 'numeric', timeZone: 'UTC' });
+  if (groupMonth) return `${baseLabel(groupMonth[1])} – ${groupMonth[2]}`;
+  return baseLabel(label);
 };
 
-// Fixed colours for the one grouped_bar producer today
-// (meals_served_by_group) — matching BeneficiaryTypeChart.jsx's own
-// Children/Adults/Households colours exactly, so the two charts never
-// disagree about what a colour means. Any other group name (a future
-// grouped_bar metric) falls back to rotating the shared PALETTE.
-const GROUP_COLORS = { Children: RED, Adults: 'var(--chart-tan)', Households: CHARCOAL };
-const colorForGroup = (name, i) => GROUP_COLORS[name] ?? PALETTE[i % PALETTE.length];
+// The one grouped_bar producer today (meals_served_by_group) uses the
+// same colour per group as BeneficiaryTypeChart.jsx, so the two charts
+// never disagree about what a colour means. Any other group name (a
+// future grouped_bar metric) takes the theme's colours in order.
+const GROUP_COLOURS = {
+  Children: BENEFICIARY_COLOURS.children,
+  Adults: BENEFICIARY_COLOURS.adults,
+  Households: BENEFICIARY_COLOURS.households,
+};
+const colourForGroup = (name, i) => GROUP_COLOURS[name] ?? SERIES[i % SERIES.length];
 
 // An axis label on up to two lines, sized to the slot it sits in.
-const AxisLabel = ({ x, y, text, slot }) => (
-  <text x={x} y={y} textAnchor="middle" fontSize="11" fill={MUTED}>
-    {fitLabel(text, slot).map((line, i) => (
-      <tspan key={line + i} x={x} dy={i === 0 ? 0 : 13}>{line}</tspan>
-    ))}
-  </text>
-);
-
-// The whole slot answers the pointer, not only the bar: a short bar
-// is a small target.
-const Hit = ({ x, y, width, height }) => (
-  <rect x={x} y={y} width={width} height={height} fill="transparent" />
-);
+function FitTick({ x, y, payload, width, visibleTicksCount }) {
+  const slot = (Number(width) || 0) / Math.max(visibleTicksCount || 1, 1) - 6;
+  return (
+    <text x={x} y={y + 10} textAnchor="middle" fontSize={11} fill={MUTED}>
+      {fitLabel(formatLabel(payload?.value ?? ''), slot).map((line, i) => (
+        <tspan key={line + i} x={x} dy={i === 0 ? 0 : 13}>{line}</tspan>
+      ))}
+    </text>
+  );
+}
 
 const NumberView = ({ series, unit }) => (
   <div className="py-10 text-center">
-    <div className="text-5xl sm:text-6xl font-bold tracking-tight" style={{ color: CHARCOAL }}>
+    <div className="text-5xl sm:text-6xl font-bold tracking-tight" style={{ color: INK }}>
       {fmt(series[0]?.value ?? 0, unit)}
     </div>
     {unit !== '%' && <div className="mt-2 text-sm" style={{ color: MUTED }}>{unit}</div>}
   </div>
 );
 
-const BarView = ({ series, unit, tipFor }) => {
-  const max = Math.max(...series.map((r) => r.value), 0) || 1;
-  const W = 640, H = 240, PAD_B = 44, PAD_T = 24;
-  const slot = W / series.length;
-  const barW = Math.min(slot * 0.6, 64);
+const BarView = ({ rows, unit, tip, colourOf }) => (
+  <ResponsiveContainer width="100%" height={260}>
+    <BarChart data={rows} margin={{ top: 22, right: 8, left: 8, bottom: 0 }} barCategoryGap="20%">
+      <CartesianGrid vertical={false} stroke={LINE} strokeOpacity={0.6} />
+      <XAxis dataKey="name" {...axisProps} tick={<FitTick />} height={40} interval={0} />
+      <YAxis hide />
+      {tip(BAR_CURSOR)}
+      <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={64}>
+        {rows.map((r) => <Cell key={r.name} fill={colourOf(r.name)} />)}
+        {/* Printed value: ACC-03, height is never the only carrier. */}
+        <LabelList dataKey="value" position="top" fontSize={12} fontWeight={600} fill={INK}
+          formatter={(v) => fmt(v, unit)} />
+      </Bar>
+    </BarChart>
+  </ResponsiveContainer>
+);
 
+const HBarView = ({ rows, unit, tip, colourOf }) => {
+  // Negative values (below reorder level) run left from a zero line.
+  const hasNeg = rows.some((r) => r.value < 0);
+  const values = rows.map((r) => r.value);
+  const domain = [Math.min(0, ...values), Math.max(0, ...values)];
+  const label = (r) => `${fmt(r.value, unit)}${r.unit ? ` ${r.unit}` : ''}`;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="presentation">
-      <line x1="0" y1={H - PAD_B} x2={W} y2={H - PAD_B} stroke={BORDER} strokeWidth="1.5" />
-      {series.map((row, i) => {
-        const h = ((row.value / max) * (H - PAD_B - PAD_T)) || 0;
-        const x = i * slot + (slot - barW) / 2;
-        const y = H - PAD_B - h;
-        return (
-          <g key={row.label} {...tipFor(row)}>
-            <Hit x={i * slot} y={0} width={slot} height={H} />
-            <rect x={x} y={y} width={barW} height={h} rx="3" fill={PALETTE[i % PALETTE.length]} />
-            {/* Printed value: ACC-03, height is never the only carrier. */}
-            <text x={x + barW / 2} y={y - 6} textAnchor="middle"
-                  fontSize="12" fontWeight="600" fill={CHARCOAL}>
-              {fmt(row.value, unit)}
-            </text>
-            <AxisLabel x={x + barW / 2} y={H - PAD_B + 18} text={formatLabel(row.label)} slot={slot - 4} />
-          </g>
-        );
-      })}
-    </svg>
+    <ResponsiveContainer width="100%" height={rows.length * 30 + 16}>
+      <BarChart data={rows} layout="vertical" margin={{ top: 4, right: 64, left: 0, bottom: 4 }} barCategoryGap="20%">
+        <XAxis type="number" hide domain={domain} />
+        <YAxis type="category" dataKey="name" width={150} {...axisProps} axisLine={false}
+          tick={{ fill: INK, fontSize: 12 }} tickFormatter={(v) => truncate(formatLabel(v), 22)} />
+        {hasNeg ? <ReferenceLine x={0} stroke={LINE} strokeWidth={1.5} /> : null}
+        {tip(BAR_CURSOR)}
+        <Bar dataKey="value" radius={hasNeg ? [4, 0, 0, 4] : [0, 4, 4, 0]} maxBarSize={18}>
+          {rows.map((r) => <Cell key={r.name} fill={hasNeg ? UNDER : colourOf(r.name)} />)}
+          <LabelList position={hasNeg ? 'left' : 'right'} fontSize={12} fontWeight={600} fill={INK}
+            content={({ x, y, width, height, index }) => {
+              const r = rows[index];
+              if (!r) return null;
+              const end = hasNeg ? x + width - 6 : x + width + 6;
+              return (
+                <text x={end} y={y + height / 2 + 4} fontSize={12} fontWeight={600} fill={INK}
+                  textAnchor={hasNeg ? 'end' : 'start'}>
+                  {label(r)}
+                </text>
+              );
+            }} />
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
   );
 };
 
-// One cluster per month, one bar per group within it — "compared
-// over time" rather than BarView's single snapshot. Parses the
-// "YYYY-MM|Group" labels grouped_bar reports use (see this file's own
-// GROUP_MONTH note above) into a month x group matrix here, since the
-// server keeps returning the same flat [{label,value}] shape every
-// other chart type does rather than inventing a second response
-// shape for this one.
-const GroupedBarView = ({ series, unit, tipFor }) => {
+const LineView = ({ rows, unit, tip }) => {
+  // Every point's value on a short series, every other on a long one,
+  // so the figures stay readable without running into each other.
+  const every = rows.length > 8 ? 2 : 1;
+  return (
+    <ResponsiveContainer width="100%" height={260}>
+      <LineChart data={rows} margin={{ top: 24, right: 24, left: 24, bottom: 0 }}>
+        <CartesianGrid vertical={false} stroke={LINE} strokeOpacity={0.6} />
+        <XAxis dataKey="name" {...axisProps} tick={<FitTick />} height={40} interval={every - 1} />
+        <YAxis hide domain={[0, 'auto']} />
+        {tip(LINE_CURSOR)}
+        <Line type="monotone" dataKey="value" stroke={TREND} strokeWidth={2}
+          dot={{ r: 4, fill: TREND, stroke: SURF, strokeWidth: 2 }} activeDot={{ r: 6 }}>
+          <LabelList dataKey="value" position="top" fontSize={11} fontWeight={600} fill={INK}
+            content={({ x, y, value, index }) => (index % every === 0
+              ? <text x={x} y={y - 10} textAnchor="middle" fontSize={11} fontWeight={600} fill={INK}>{fmt(value, unit)}</text>
+              : null)} />
+        </Line>
+      </LineChart>
+    </ResponsiveContainer>
+  );
+};
+
+// One cluster per month, one bar per group within it: "compared over
+// time" rather than BarView's single snapshot.
+const GroupedBarView = ({ series, unit, tip }) => {
   const parsed = series.map((row) => {
     const [month, group] = String(row.label).split('|');
     return { month, group: group ?? 'Total', value: row.value };
   });
-
   const months = [...new Set(parsed.map((r) => r.month))].sort();
   const groups = [...new Set(parsed.map((r) => r.group))];
-  const valueAt = (month, group) =>
-    parsed.find((r) => r.month === month && r.group === group)?.value ?? 0;
-
-  const max = Math.max(...parsed.map((r) => r.value), 0) || 1;
-  const W = 640, H = 240, PAD_B = 44, PAD_T = 24;
-  const clusterW = W / Math.max(months.length, 1);
-  const barGap = 3;
-  const barW = Math.min((clusterW - barGap * (groups.length + 1)) / groups.length, 28);
-  const groupsWidth = groups.length * barW + (groups.length - 1) * barGap;
+  const data = months.map((month) => ({
+    name: month,
+    ...Object.fromEntries(groups.map((g) => [g, parsed.find((r) => r.month === month && r.group === g)?.value ?? 0])),
+  }));
 
   return (
     <div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="presentation">
-        <line x1="0" y1={H - PAD_B} x2={W} y2={H - PAD_B} stroke={BORDER} strokeWidth="1.5" />
-        {months.map((month) => {
-          const clusterX = month === months[0] ? 0 : months.indexOf(month) * clusterW;
-          const startX = clusterX + (clusterW - groupsWidth) / 2;
-          return (
-            <g key={month}>
-              {groups.map((group, gi) => {
-                const value = valueAt(month, group);
-                const h = ((value / max) * (H - PAD_B - PAD_T)) || 0;
-                const x = startX + gi * (barW + barGap);
-                const y = H - PAD_B - h;
-                return (
-                  <g key={group} {...tipFor({ label: `${month}|${group}`, value })}>
-                    <Hit x={x} y={0} width={Math.max(barW, 2)} height={H - PAD_B} />
-                    <rect x={x} y={y} width={Math.max(barW, 2)} height={h} rx="2"
-                          fill={colorForGroup(group, gi)} />
-                  </g>
-                );
-              })}
-              <AxisLabel x={clusterX + clusterW / 2} y={H - PAD_B + 18} text={formatLabel(month)} slot={clusterW - 4} />
-            </g>
-          );
-        })}
-      </svg>
+      <ResponsiveContainer width="100%" height={260}>
+        <BarChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 0 }} barCategoryGap="20%" barGap={2}>
+          <CartesianGrid vertical={false} stroke={LINE} strokeOpacity={0.6} />
+          <XAxis dataKey="name" {...axisProps} tick={<FitTick />} height={40} interval={0} />
+          <YAxis hide />
+          {tip(BAR_CURSOR)}
+          {groups.map((g, gi) => (
+            <Bar key={g} dataKey={g} name={g} fill={colourForGroup(g, gi)} radius={[3, 3, 0, 0]} maxBarSize={28} />
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
         {groups.map((group, gi) => (
           <span key={group} className="inline-flex items-center gap-1.5 text-xs" style={{ color: MUTED }}>
-            <span className="inline-block size-2.5 rounded-full" style={{ backgroundColor: colorForGroup(group, gi) }} />
+            <span className="inline-block size-2.5 rounded-sm" style={{ backgroundColor: colourForGroup(group, gi) }} />
             {group}
           </span>
         ))}
         {unit ? <span className="text-xs" style={{ color: MUTED }}>· in {unit}</span> : null}
       </div>
     </div>
-  );
-};
-
-const HBarView = ({ series, unit, tipFor }) => {
-  // Negative values (below reorder level) need a zero axis with bars
-  // running left; all-positive series keep the full width.
-  const values  = series.map((r) => r.value);
-  const hasNeg  = values.some((v) => v < 0);
-  const maxAbs  = Math.max(...values.map(Math.abs), 0) || 1;
-
-  const ROW = 30, LABEL_W = 150, VALUE_W = 62, W = 640;
-  const H = series.length * ROW + 8;
-  const trackW = W - LABEL_W - VALUE_W;
-  const zeroX  = hasNeg ? LABEL_W + trackW : LABEL_W;
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="presentation">
-      {hasNeg && (
-        <line x1={zeroX} y1="0" x2={zeroX} y2={H} stroke={BORDER} strokeWidth="1.5" />
-      )}
-      {series.map((row, i) => {
-        const y = i * ROW + 4;
-        const w = (Math.abs(row.value) / maxAbs) * trackW;
-        const x = hasNeg ? zeroX - w : LABEL_W;
-        return (
-          <g key={row.label} {...tipFor(row)}>
-            <Hit x={0} y={i * ROW} width={W} height={ROW} />
-            <text x="0" y={y + 15} fontSize="12" fill={CHARCOAL}>
-              {truncate(formatLabel(row.label), 22)}
-            </text>
-            {/* Negative values (below reorder level) stay RED regardless
-                of row — "this far under threshold" is a warning, not a
-                category, and rotating hue there would blunt the signal.
-                A normal all-positive ranked breakdown rotates the shared
-                palette instead, same as BarView. */}
-            <rect x={x} y={y + 4} width={Math.max(w, 2)} height="16" rx="3"
-                  fill={hasNeg ? RED : PALETTE[i % PALETTE.length]} />
-            <text x={W} y={y + 16} textAnchor="end"
-                  fontSize="12" fontWeight="600" fill={CHARCOAL}>
-              {fmt(row.value, unit)}{row.meta?.unit ? ` ${row.meta.unit}` : ''}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
-  );
-};
-
-const LineView = ({ series, unit, tipFor }) => {
-  const max = Math.max(...series.map((r) => r.value), 0) || 1;
-  const W = 640, H = 240, PAD_B = 44, PAD_T = 28, PAD_X = 24;
-  const span = W - PAD_X * 2;
-  const step = series.length > 1 ? span / (series.length - 1) : 0;
-
-  const points = series.map((row, i) => ({
-    x: PAD_X + i * step,
-    y: H - PAD_B - (row.value / max) * (H - PAD_B - PAD_T),
-  }));
-
-  // Label every point on a short series, every other on a long one,
-  // so values stay readable without overlapping.
-  const every = series.length > 8 ? 2 : 1;
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="presentation">
-      <line x1="0" y1={H - PAD_B} x2={W} y2={H - PAD_B} stroke={BORDER} strokeWidth="1.5" />
-      <polyline points={points.map((p) => `${p.x},${p.y}`).join(' ')}
-                fill="none" stroke={RED} strokeWidth="2.5"
-                strokeLinejoin="round" strokeLinecap="round" />
-      {series.map((row, i) => (
-        <g key={row.label} {...tipFor(row)}>
-          <Hit x={points[i].x - (step || span) / 2} y={0} width={step || span} height={H} />
-          <circle cx={points[i].x} cy={points[i].y} r="4" fill={RED} />
-          {i % every === 0 && (
-            <>
-              <text x={points[i].x} y={points[i].y - 10} textAnchor="middle"
-                    fontSize="11" fontWeight="600" fill={CHARCOAL}>
-                {fmt(row.value, unit)}
-              </text>
-              <AxisLabel x={points[i].x} y={H - PAD_B + 18} text={formatLabel(row.label)} slot={(step || span) * every - 4} />
-            </>
-          )}
-        </g>
-      ))}
-    </svg>
   );
 };
 
@@ -313,12 +236,9 @@ const TableView = ({ series, unit, dimensionLabel }) => (
 );
 
 // Built from the same series the table renders, so file and screen
-// cannot disagree. Quoted because ECD and product names contain
-// commas.
-// Takes `series` separately from `report.series` so an on-screen sort
-// (bar/hbar only, see SORT_OPTIONS below) carries into the file — the
-// same "table is the CSV source, so the two cannot disagree" reasoning
-// this file's header already applies to the table toggle.
+// cannot disagree. Takes `series` separately from `report.series` so
+// an on-screen sort (bar/hbar only, see SORT_OPTIONS below) carries
+// into the file.
 const downloadSheet = (report, dimensionLabel, series) => {
   const range = report.spec.dateRange;
   const period = range ? `${range.from} to ${range.to}` : 'As it stands now';
@@ -339,12 +259,10 @@ const downloadSheet = (report, dimensionLabel, series) => {
   });
 };
 
-// Sorting only makes sense for a categorical comparison (bar/hbar) —
-// a line's point order is time, and a number has nothing to sort.
-// 'desc' matches what the backend already returns for every
-// categorical dimension (orderFor()'s own default), so picking it as
-// the initial state changes nothing on first render; it only starts
-// mattering once someone picks a different one.
+// Sorting only makes sense for a categorical comparison (bar/hbar): a
+// line's point order is time, and a number has nothing to sort. 'desc'
+// matches what the backend already returns for every categorical
+// dimension, so the first render is the server's order.
 const SORT_OPTIONS = [
   { id: 'desc',  label: 'Highest first' },
   { id: 'asc',   label: 'Lowest first' },
@@ -352,7 +270,7 @@ const SORT_OPTIONS = [
 ];
 
 const sortSeries = (series, sort) => {
-  // 'none' keeps the server's order — a month-by-month trend has to
+  // 'none' keeps the server's order: a month-by-month trend has to
   // read left to right in time, not tallest first.
   if (sort === 'none') return series;
   if (sort === 'desc') return [...series].sort((a, b) => b.value - a.value);
@@ -360,22 +278,18 @@ const sortSeries = (series, sort) => {
   return [...series].sort((a, b) => formatLabel(a.label).localeCompare(formatLabel(b.label)));
 };
 
-// compact drops the "view as table" / "export CSV" / sort row for a
-// small preview card (TrendCard.jsx) — the aria-label summary below
-// still carries every value to assistive tech regardless, so this is
-// a visual simplification, not an accessibility trade-off.
+// compact drops the table, Excel and sort row and the hover tips for a
+// small preview card (TrendCard.jsx). The summary still carries every
+// value to assistive tech, so this is a visual simplification, not an
+// accessibility trade-off.
 //
-// HOVER TIPS. Each bar, row or point answers the pointer with its own
-// tip: its full name (the axis may have cut it), its figure, its share
-// of the total where a total means something, and the report's note
-// (`note`), one short line per point. The note used to be a paragraph
-// under the chart. Pointer only: the table view and the summary carry
-// the same figures to a keyboard or a screen reader.
+// HOVER TIPS. Each bar, row or point answers the pointer with the
+// shared tip: its full name (the axis may have cut it), its figure,
+// its share of the total where a total means something, and the
+// report's note (`note`), one short line per point.
 export default function ReportChart({ report, dimensionLabel = 'Category', compact = false, initialSort = 'desc', note }) {
   const [asTable, setAsTable] = useState(false);
   const [sort, setSort] = useState(initialSort);
-  const [tip, setTip] = useState(null);
-  const frame = useRef(null);
   const { series: rawSeries, chartType, meta } = report;
   const unit = meta?.unit ?? '';
 
@@ -390,61 +304,41 @@ export default function ReportChart({ report, dimensionLabel = 'Category', compa
 
   const sortable = chartType === 'bar' || chartType === 'hbar';
   const series = sortable ? sortSeries(rawSeries, sort) : rawSeries;
-
-  const Chart = {
-    number: NumberView, bar: BarView, hbar: HBarView, line: LineView, grouped_bar: GroupedBarView,
-  }[chartType] ?? BarView;
+  const rows = series.map((r) => ({ name: r.label, value: Number(r.value), unit: r.meta?.unit }));
+  // The colour follows the category in the server's order, so a sort
+  // never repaints a bar.
+  const colourOf = entityColours(rawSeries);
 
   const total = rawSeries.reduce((sum, r) => sum + Number(r.value || 0), 0);
   const shares = isAdditive(unit, rawSeries) && chartType !== 'grouped_bar' && rawSeries.length > 1 && total > 0;
-  const notes = noteLines(note);
 
-  const place = (e, row) => {
-    const box = frame.current?.getBoundingClientRect();
-    if (!box) return;
-    // Kept inside the chart so a tip on the last bar is not cut off.
-    const x = Math.min(Math.max(e.clientX - box.left, 110), Math.max(box.width - 110, 110));
-    // Above the pointer, or below it when the top of the screen is
-    // too close for the tip to fit.
-    setTip({ row, x, y: e.clientY - box.top, below: e.clientY < 190 });
-  };
-  const tipFor = (row) => (compact ? {} : {
-    onMouseEnter: (e) => place(e, row),
-    onMouseMove:  (e) => place(e, row),
-    onMouseLeave: () => setTip(null),
-  });
+  // Recharts draws the tip; compact charts have none.
+  const tip = (cursor) => (compact ? null : (
+    <Tooltip
+      cursor={cursor}
+      content={<ChartTooltip unit={unit} labelFor={(l) => formatLabel(l)} total={shares ? total : null} note={note} />}
+    />
+  ));
 
   // One sentence summarising the chart, for screen readers. The
-  // visual is marked presentational so it is not announced twice.
+  // drawing inside is not announced on its own.
   const summary = `${report.description}. ` +
     series.map((r) => `${formatLabel(r.label)}: ${fmt(r.value, unit)}`).join('. ');
 
+  const views = {
+    number: <NumberView series={series} unit={unit} />,
+    bar: <BarView rows={rows} unit={unit} tip={tip} colourOf={colourOf} />,
+    hbar: <HBarView rows={rows} unit={unit} tip={tip} colourOf={colourOf} />,
+    line: <LineView rows={rows} unit={unit} tip={tip} />,
+    grouped_bar: <GroupedBarView series={series} unit={unit} tip={tip} />,
+  };
+
   return (
     <div>
-      <div ref={frame} className="relative" role="img" aria-label={summary}>
+      <div className="relative" role="img" aria-label={summary}>
         {asTable
           ? <TableView series={series} unit={unit} dimensionLabel={dimensionLabel} />
-          : <Chart series={series} unit={unit} tipFor={tipFor} />}
-        {tip && !asTable ? (
-          <div
-            data-testid="chart-tip"
-            className={`pointer-events-none absolute z-10 w-52 -translate-x-1/2 rounded-lg border border-line bg-surface px-3 py-2 text-xs shadow-sm ${tip.below ? '' : '-translate-y-full'}`}
-            style={{ left: tip.x, top: tip.below ? tip.y + 18 : tip.y - 10 }}
-          >
-            <p style={{ color: MUTED }}>{formatLabel(tip.row.label)}</p>
-            <p className="font-bold" style={{ color: CHARCOAL }}>
-              {fmt(tip.row.value, unit)}{unit && unit !== '%' ? ` ${tip.row.meta?.unit ?? unit}` : ''}
-            </p>
-            {shares ? (
-              <p style={{ color: MUTED }}>{((Number(tip.row.value) / total) * 100).toFixed(0)}% of the total</p>
-            ) : null}
-            {notes.length ? (
-              <ul className="mt-1.5 space-y-1 border-t border-line pt-1.5" style={{ color: MUTED }}>
-                {notes.map((line) => <li key={line}>{line}</li>)}
-              </ul>
-            ) : null}
-          </div>
-        ) : null}
+          : views[chartType] ?? views.bar}
       </div>
 
       {compact ? null : (

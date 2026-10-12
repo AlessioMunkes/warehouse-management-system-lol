@@ -21,6 +21,18 @@ export const MAX_SERIES = 7; // plus "Other" = 8
 // the rest. Past the eighth, categories are grey; their names and
 // figures are on the axis and in the table.
 export const OTHER_COLOUR = 'var(--chart-grey)';
+
+// Who the warehouse reached, one colour each wherever they are drawn
+// together (BeneficiaryTypeChart, the grouped "Meals served" bars).
+// All four are side by side, so every pair has to be told apart, not
+// only neighbours: slots 1, 4, 5 and 6 are the set of four that passes
+// the palette checker's all-pairs test in both themes.
+export const BENEFICIARY_COLOURS = {
+  children:   'var(--viz-1)',
+  adults:     'var(--viz-4)',
+  households: 'var(--viz-5)',
+  dignity:    'var(--viz-6)',
+};
 export const entityColours = (series) => {
   const slot = new Map((series ?? []).map((r, i) => [r.label ?? r.name, i]));
   return (name) => {

@@ -5,8 +5,19 @@
 // printing over one another, and each bar answers the pointer with
 // its own tip, which is where the report's note now lives.
 // ─────────────────────────────────────────────────────────────
-import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { cloneElement } from 'react';
+import { render, screen } from '@testing-library/react';
+
+const tooltips = [];
+vi.mock('recharts', async (orig) => {
+  const actual = await orig();
+  return {
+    ...actual,
+    ResponsiveContainer: ({ children }) => cloneElement(children, { width: 600, height: 300 }),
+    Tooltip: (props) => { tooltips.push(props); return null; },
+  };
+});
 import ReportChart from '../features/reporting/ReportChart';
 import { fitLabel, noteLines } from '../features/reporting/chartFormat';
 
@@ -53,36 +64,37 @@ describe('a report note', () => {
   });
 });
 
+// jsdom has no layout, so Recharts is given a fixed size and its
+// Tooltip is captured: the test renders the tip the chart configured,
+// for a bar it names, the way Recharts would on hover.
 describe('hover tips', () => {
-  const bar = (name) => {
-    const groups = [...document.querySelectorAll('svg g')];
-    return groups.find((g) => g.textContent.includes(name));
+  const tipFor = (name) => {
+    const props = tooltips.at(-1);
+    const row = report.series.find((r) => r.label === name);
+    return render(cloneElement(props.content, {
+      active: true, label: name, payload: [{ value: row.value, name: 'value', payload: { name } }],
+    }));
   };
 
   it('shows the full name, the figure, its share and the note', () => {
     render(<ReportChart report={report} note={NOTE} />);
-    expect(screen.queryByTestId('chart-tip')).toBeNull();
-
-    fireEvent.mouseEnter(bar('Mitchells'), { clientX: 200, clientY: 300 });
+    tipFor('Mitchells Plain');
     const tip = screen.getByTestId('chart-tip');
     expect(tip).toHaveTextContent('Mitchells Plain');
     expect(tip).toHaveTextContent('30 kg');
     expect(tip).toHaveTextContent('30% of the total');
     expect(tip).toHaveTextContent('Counts every logged weigh-in.');
-
-    fireEvent.mouseLeave(bar('Mitchells'));
-    expect(screen.queryByTestId('chart-tip')).toBeNull();
   });
 
   it('gives no share for a percentage, which does not add up', () => {
     render(<ReportChart report={{ ...report, meta: { unit: '%' } }} />);
-    fireEvent.mouseEnter(bar('Langa'), { clientX: 200, clientY: 300 });
+    tipFor('Langa');
     expect(screen.getByTestId('chart-tip')).not.toHaveTextContent('of the total');
   });
 
   it('stays quiet on a small preview card', () => {
+    tooltips.length = 0;
     render(<ReportChart report={report} compact />);
-    fireEvent.mouseEnter(bar('Langa'), { clientX: 200, clientY: 300 });
-    expect(screen.queryByTestId('chart-tip')).toBeNull();
+    expect(tooltips).toHaveLength(0);
   });
 });
