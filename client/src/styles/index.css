@@ -323,6 +323,24 @@
     --chart-tan:   #c9a86a;
     --chart-sage:  #6b8f71;
     --chart-grey:  #8a8a8a;
+
+    /* Categorical chart colours, in fixed order, for every chart in
+       the app (features/reporting/chartFormat.js SERIES). Validated
+       with the dataviz palette checker against --surface in each
+       theme: lightness band, chroma, colour-blind and normal-vision
+       separation all pass. Slots 3 to 5 sit under 3:1 on white, so
+       every chart that uses them also has labels or a table view. */
+    --viz-1: #2a78d6; --viz-2: #eb6834; --viz-3: #1baf7a; --viz-4: #eda100;
+    --viz-5: #e87ba4; --viz-6: #008300; --viz-7: #4a3aa7; --viz-8: #e34948;
+
+    /* Red / amber / green for charts where the colour MEANS something
+       (stock health, a figure against its target), taken from the
+       palette above. The label always says the status in words too. */
+    --rag-bad:   var(--viz-8);
+    --rag-warn:  var(--viz-4);
+    --rag-good:  var(--viz-3);
+    --rag-none:  var(--chart-grey);
+    --rag-muted: #d3d8da;   /* context, not action: recedes next to the rest */
 }
 
 .dark {
@@ -356,6 +374,11 @@
     --chart-tan:   #d8bd85;
     --chart-sage:  #8fbf97;
     --chart-grey:  #9aa3a5;
+
+    /* The same eight, stepped for the dark card and validated against it. */
+    --viz-1: #3987e5; --viz-2: #d95926; --viz-3: #199e70; --viz-4: #c98500;
+    --viz-5: #d55181; --viz-6: #008300; --viz-7: #9085e9; --viz-8: #e66767;
+    --rag-muted: #46535a;
 
     color-scheme: dark;   /* scrollbars, form controls, the browser's own chrome */
 }

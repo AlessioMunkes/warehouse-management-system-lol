@@ -1,35 +1,3 @@
-/* Categorical chart colours for the Operations page, in fixed order.
-   Validated with the dataviz palette checker against --surface in
-   each theme (light #ffffff, dark #1c2325): lightness band, chroma,
-   colour-blind separation and normal-vision separation all pass.
-   Slots 3–5 sit under 3:1 on white, so every chart that uses them
-   also has direct labels or its table view. Scatter plots use one
-   colour only. */
-:root {
-  --viz-1: #2a78d6; --viz-2: #eb6834; --viz-3: #1baf7a; --viz-4: #eda100;
-  --viz-5: #e87ba4; --viz-6: #008300; --viz-7: #4a3aa7; --viz-8: #e34948;
-}
-.dark {
-  --viz-1: #3987e5; --viz-2: #d95926; --viz-3: #199e70; --viz-4: #c98500;
-  --viz-5: #d55181; --viz-6: #008300; --viz-7: #9085e9; --viz-8: #e66767;
-}
-
-/* Status colours — red / amber / green — for charts where the colour
-   MEANS something (stock health, a figure against its target). Taken
-   from the validated palette above rather than new hexes, so they
-   keep its contrast and colour-blind separation in both themes; the
-   label or legend always says the status in words too. */
-:root, .dark {
-  --rag-bad:  var(--viz-8);
-  --rag-warn: var(--viz-4);
-  --rag-good: var(--viz-3);
-  --rag-none: var(--chart-grey, #8a8a8a);
-}
-/* A slice that is there for context, not action — it should recede
-   next to the statuses someone has to do something about. */
-:root { --rag-muted: #d3d8da; }
-.dark { --rag-muted: #46535a; }
-
 /* ─────────────────────────────────────────────────────────────
    client/src/styles/operationalReport.css
 

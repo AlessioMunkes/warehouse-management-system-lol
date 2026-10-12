@@ -20,12 +20,13 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
+import ChartTooltip from '@/features/reporting/ChartTooltip';
+import { BAR_CURSOR, SERIES } from '@/features/reporting/chartFormat';
 import TablePager from '@/components/ui/table-pager';
 import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/usePaged';
 
@@ -50,20 +51,24 @@ const TYPE_KEYS = {
 
 // Theme tokens, not hex, so the chart follows light and dark mode
 // (NoHardcodedColours.test.js). Same blue / red / green meaning.
+// The first three of the app's chart colours (--viz-1 to 3, styles/index.css),
+// as every other chart uses them.
 const CHART_COLORS = {
-  donations: 'var(--info-ink)',
-  po: 'var(--brand)',
-  dispatches: 'var(--good-ink)',
+  donations: SERIES[0],
+  po: SERIES[1],
+  dispatches: SERIES[2],
 };
+const axisProps = { tick: { fill: 'var(--ink-soft)', fontSize: 11 }, axisLine: { stroke: 'var(--line)' }, tickLine: false };
 
 const PDF_COLORS = {
   ink: [30, 41, 59],
   muted: [100, 116, 139],
   border: [226, 232, 240],
   soft: [248, 250, 252],
-  donations: [37, 99, 235],
-  po: [220, 38, 38],
-  dispatches: [22, 163, 74],
+  // --viz-1 to 3 in the light theme: paper has one theme.
+  donations: [42, 120, 214],
+  po: [235, 104, 52],
+  dispatches: [27, 175, 122],
 };
 
 const formatDate = (value) => {
@@ -744,11 +749,10 @@ export default function FinanceWarehouseReportView({ loadReport, showReset = tru
                 {hasChartData ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData} margin={{ top: 12, right: 16, left: 0, bottom: 8 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="label" tickMargin={8} />
-                      <YAxis allowDecimals={false} />
-                      <Tooltip />
-                      <Legend />
+                      <CartesianGrid vertical={false} stroke="var(--line)" strokeOpacity={0.6} />
+                      <XAxis dataKey="label" tickMargin={8} {...axisProps} />
+                      <YAxis allowDecimals={false} {...axisProps} />
+                      <Tooltip content={<ChartTooltip unit="records" labelFor={(l) => l} />} cursor={BAR_CURSOR} />
                       <Bar dataKey="donations" name="Donations" fill={CHART_COLORS.donations} radius={[4, 4, 0, 0]} />
                       <Bar dataKey="po" name="Purchase Orders" fill={CHART_COLORS.po} radius={[4, 4, 0, 0]} />
                       <Bar dataKey="dispatches" name="Dispatch" fill={CHART_COLORS.dispatches} radius={[4, 4, 0, 0]} />

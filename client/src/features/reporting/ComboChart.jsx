@@ -10,22 +10,12 @@
 import {
   Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
-import { fmtTick, fmtValue, formatLabel, unitWord } from './chartFormat';
+import { BAR_CURSOR, LINE_CURSOR, fmtTick, formatLabel } from './chartFormat';
+import ChartTooltip from './ChartTooltip';
 
 const MUTED = 'var(--ink-soft)';
 const LINE  = 'var(--line)';
-const INK   = 'var(--ink)';
 const axis = { tick: { fill: MUTED, fontSize: 11 }, axisLine: { stroke: LINE }, tickLine: false };
-
-function Tip({ active, payload, label, unit, name }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-lg border bg-surface px-3 py-2 text-xs" style={{ borderColor: LINE }}>
-      <p style={{ color: MUTED }}>{formatLabel(label)} · {name}</p>
-      <p className="font-bold" style={{ color: INK }}>{fmtValue(payload[0].value, unit)} {unitWord(unit)}</p>
-    </div>
-  );
-}
 
 // `print`: no animation, for the PDF report (captured as an image at once).
 export default function ComboChart({ combo, syncId = 'combo', print = false }) {
@@ -47,7 +37,7 @@ export default function ComboChart({ combo, syncId = 'combo', print = false }) {
           <CartesianGrid vertical={false} stroke={LINE} strokeOpacity={0.6} />
           <XAxis dataKey="name" hide />
           <YAxis tickFormatter={(v) => fmtTick(v, combo.bars.unit)} {...axis} width={52} />
-          <Tooltip active={print ? false : undefined} content={<Tip unit={combo.bars.unit} name={combo.bars.label} />} cursor={print ? false : { fill: LINE, fillOpacity: 0.4 }} />
+          <Tooltip active={print ? false : undefined} content={<ChartTooltip unit={combo.bars.unit} labelFor={(l) => `${formatLabel(l)} · ${combo.bars.label}`} />} cursor={print ? false : BAR_CURSOR} />
           <Bar dataKey="bars" fill="var(--viz-1)" radius={[4, 4, 0, 0]} maxBarSize={40} isAnimationActive={!print} />
         </BarChart>
       </ResponsiveContainer>
@@ -57,7 +47,7 @@ export default function ComboChart({ combo, syncId = 'combo', print = false }) {
           <CartesianGrid vertical={false} stroke={LINE} strokeOpacity={0.6} />
           <XAxis dataKey="name" tickFormatter={formatLabel} {...axis} />
           <YAxis tickFormatter={(v) => fmtTick(v, combo.line.unit)} {...axis} width={52} />
-          <Tooltip active={print ? false : undefined} content={<Tip unit={combo.line.unit} name={combo.line.label} />} cursor={print ? false : { stroke: MUTED }} />
+          <Tooltip active={print ? false : undefined} content={<ChartTooltip unit={combo.line.unit} labelFor={(l) => `${formatLabel(l)} · ${combo.line.label}`} />} cursor={print ? false : LINE_CURSOR} />
           <Line type="monotone" dataKey="line" stroke="var(--viz-2)" strokeWidth={2} connectNulls isAnimationActive={!print}
             dot={{ r: 4, fill: 'var(--viz-2)', stroke: 'var(--surface)', strokeWidth: 2 }} />
         </LineChart>
