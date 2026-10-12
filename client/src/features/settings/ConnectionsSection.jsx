@@ -12,13 +12,14 @@
 // and offers the fix where there is one.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import StatusBadge from '@/components/ui/status-badge';
 import ErrorBanner from '@/components/ui/error-banner';
 import { checkConnections } from '../../services/settingsAPI';
+import quickbooksAPI from '../../services/quickbooksAPI';
 import { ADMIN } from '../../routes/paths';
 
 const STATUS_LABEL = { ok: 'Working', warning: 'Needs a look', down: 'Not working', off: 'Not set up' };
@@ -30,8 +31,18 @@ const fmtTime = (iso) => new Date(iso).toLocaleTimeString('en-ZA', {
   hour: '2-digit', minute: '2-digit', timeZone: 'Africa/Johannesburg',
 });
 
-function Fix({ fix, onSection }) {
+// Things a connection's button does that are not a place to go to.
+// Connecting is a trip to Intuit and back, so it leaves the page.
+const ACTIONS = {
+  'quickbooks-connect': () => { window.location.assign(quickbooksAPI.getConnectUrl()); },
+  'quickbooks-disconnect': async (recheck) => { await quickbooksAPI.disconnect(); await recheck(); },
+};
+
+function Fix({ fix, onSection, onAction }) {
   if (!fix) return null;
+  if (fix.action) {
+    return <Button type="button" size="sm" variant="outline" onClick={() => onAction(fix.action)}>{fix.label}</Button>;
+  }
   if (fix.section) {
     return <Button type="button" size="sm" variant="outline" onClick={() => onSection(fix.section)}>{fix.label}</Button>;
   }
@@ -65,6 +76,36 @@ export default function ConnectionsSection({ onSection }) {
     return () => { cancelled = true; };
   }, []);
 
+  // Back from signing in to QuickBooks: say how it went, once.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const quickbooksReturn = searchParams.get('quickbooks');
+  const [notice, setNotice] = useState(null);
+  useEffect(() => {
+    if (!quickbooksReturn) return;
+    setNotice(quickbooksReturn === 'connected'
+      ? { ok: true, text: 'QuickBooks is connected. Approved purchase orders will now be sent across.' }
+      : { ok: false, text: 'QuickBooks was not connected. Try again, and if it keeps failing ask whoever set up the QuickBooks keys.' });
+    const next = new URLSearchParams(searchParams);
+    next.delete('quickbooks');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quickbooksReturn]);
+
+  const [acting, setActing] = useState(false);
+  const runAction = async (action) => {
+    if (action === 'quickbooks-disconnect'
+      && !window.confirm('Disconnect QuickBooks? Approved orders will go back to being emailed to Finance to capture by hand.')) return;
+    setActing(true);
+    setError(null);
+    try {
+      await ACTIONS[action]?.(check);
+    } catch (err) {
+      setError(err.message || 'That did not work. Try again.');
+    } finally {
+      setActing(false);
+    }
+  };
+
   const connections = [...(result?.connections ?? [])].sort((a, b) => ORDER[a.status] - ORDER[b.status]);
   const problems = connections.filter((c) => c.status === 'down' || c.status === 'warning').length;
 
@@ -82,6 +123,11 @@ export default function ConnectionsSection({ onSection }) {
       </div>
 
       <ErrorBanner message={error} onRetry={check} />
+      {notice ? (
+        <p role="status" className={`rounded-xl px-4 py-3 text-sm ${notice.ok ? 'bg-good-soft text-good' : 'bg-danger-soft text-danger'}`}>
+          {notice.text}
+        </p>
+      ) : null}
 
       {!result && checking ? (
         <div className="space-y-3" aria-busy="true">
@@ -99,7 +145,7 @@ export default function ConnectionsSection({ onSection }) {
                 <p className="text-sm">{c.summary}</p>
                 {c.detail ? <p className="break-words text-xs text-muted-foreground">{c.detail}</p> : null}
               </div>
-              <div className="shrink-0"><Fix fix={c.fix} onSection={onSection} /></div>
+              <div className="shrink-0"><Fix fix={acting ? null : c.fix} onSection={onSection} onAction={runAction} /></div>
             </li>
           ))}
         </ul>

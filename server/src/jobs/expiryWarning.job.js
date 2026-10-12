@@ -15,6 +15,7 @@
 // ─────────────────────────────────────────────────────────────
 import expiryWarningService from '../services/expiryWarning.service.js';
 import collectionKitService from '../services/collectionKit.service.js';
+import quickbooksService from '../services/quickbooks.service.js';
 import { runInWarehouse } from '../config/warehouseContext.js';
 import { warehouseCodes } from '../config/warehouses.js';
 
@@ -59,6 +60,18 @@ const runIfDue = async () => {
         if (kits.checked > 0) console.log(`[idleKits]${where} ${kits.checked} idle, noticed ${kits.notified}`);
       } catch (kitErr) {
         console.error(`[idleKits]${where} check failed:`, kitErr.message);
+      }
+
+      // And approved orders QuickBooks could not take at the time (it
+      // was down, or not yet connected). Does nothing unless QuickBooks
+      // is set up and connected.
+      try {
+        const qb = code
+          ? await runInWarehouse(code, () => quickbooksService.pushUnsent())
+          : await quickbooksService.pushUnsent();
+        if (qb.tried > 0) console.log(`[quickbooks]${where} retried ${qb.tried}, sent ${qb.synced}`);
+      } catch (qbErr) {
+        console.error(`[quickbooks]${where} retry failed:`, qbErr.message);
       }
     } catch (err) {
       // A failed sweep shouldn't crash the server or wedge future days —

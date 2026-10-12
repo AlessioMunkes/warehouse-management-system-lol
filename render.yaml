@@ -79,3 +79,20 @@ services:
         sync: false
       - key: VAPID_SUBJECT
         sync: false            # e.g. mailto:ops@ladlesoflove.org.za
+      # QuickBooks Online: sends each approved purchase order across so
+      # Finance does not capture it by hand. From an Intuit developer
+      # app (developer.intuit.com). The redirect URI must be registered
+      # on that app exactly as written here:
+      #   https://<this service>/api/quickbooks/callback
+      # Unset = the feature is off and Finance is emailed each order.
+      # Then an admin connects the company in Settings, Connections.
+      - key: QUICKBOOKS_CLIENT_ID
+        sync: false
+      - key: QUICKBOOKS_CLIENT_SECRET
+        sync: false
+      - key: QUICKBOOKS_REDIRECT_URI
+        sync: false
+      - key: QUICKBOOKS_ENVIRONMENT
+        sync: false            # sandbox (default) or production
+      - key: QUICKBOOKS_TOKEN_ENCRYPTION_KEY
+        sync: false            # base64 of 32 random bytes; falls back to GMAIL_TOKEN_ENCRYPTION_KEY

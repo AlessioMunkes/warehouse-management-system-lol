@@ -66,6 +66,7 @@ import ecdCollectionReminderRouter from './src/routes/ecdCollectionReminder.rout
 import loveActivismRouter   from './src/routes/loveActivism.routes.js';
 import communityRequestRouter from './src/routes/communityRequest.routes.js';
 import gmailRouter from './src/routes/gmail.routes.js';
+import quickbooksRouter from './src/routes/quickbooks.routes.js';
 import certificateSettingsRouter from './src/routes/certificateSettings.routes.js';
 import collectionKitRouter from './src/routes/collectionKit.routes.js';
 import communicationsRouter from './src/routes/communications.routes.js';
@@ -243,6 +244,7 @@ app.use('/api/collection-reminders', ecdCollectionReminderRouter);
 app.use('/api/love-activism', loveActivismRouter);
 app.use('/api/community-requests', communityRequestRouter);
 app.use('/api/gmail', gmailRouter);
+app.use('/api/quickbooks', quickbooksRouter);
 app.use('/api/certificate-settings', certificateSettingsRouter);
 app.use('/api/collection-kits', collectionKitRouter);
 app.use('/api/communications', communicationsRouter);

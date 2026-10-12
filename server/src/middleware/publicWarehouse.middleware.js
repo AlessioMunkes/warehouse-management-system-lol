@@ -32,6 +32,7 @@ import pool from '../config/db.js';
 import { runInWarehouse, isValidWarehouseCode } from '../config/warehouseContext.js';
 import { isMultiWarehouse, warehouseCodes } from '../config/warehouses.js';
 import gmailService from '../services/gmail.service.js';
+import quickbooksService from '../services/quickbooks.service.js';
 
 const sha256 = (value) => crypto.createHash('sha256').update(String(value)).digest('hex');
 // A malformed %-escape is just a bad link, not a server fault.
@@ -81,6 +82,12 @@ export const RULES = [
     methods: ['GET'],
     path: /^\/api\/gmail\/callback\/?$/,
     resolve: (req) => gmailService.warehouseForState(req.query?.state),
+  },
+  {
+    name: 'quickbooks callback',
+    methods: ['GET'],
+    path: /^\/api\/quickbooks\/callback\/?$/,
+    resolve: (req) => quickbooksService.warehouseForState(req.query?.state),
   },
 ];
 

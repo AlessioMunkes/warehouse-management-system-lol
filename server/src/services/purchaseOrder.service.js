@@ -28,6 +28,7 @@ import { emailStyles, escapeHtml, renderLadlesEmail } from '../utils/emailTempla
 // feature/notification-fix brought this service onto staging.
 import financeService from './finance.service.js';
 import { FINANCE_EMAIL_ERRORS, safeFinanceEmailError } from '../utils/financeEmailError.js';
+import quickbooksService from './quickbooks.service.js';
 import {
   MAX_IMPORT_ROWS, tooManyRowsMessage, normalizePair, findDuplicateIndexes,
 } from '../utils/quickbooksImport.js';
@@ -490,9 +491,16 @@ const setPurchaseOrderStatus = async (rawId, body = {}) => {
       : `An order that is ${label(existing.status)} cannot be changed to ${label(status)}. It can become: ${next.map(label).join(', ')}.`);
   }
 
-  return repo.updatePurchaseOrderStatus(Number(rawId), status, reason, {
+  const updated = await repo.updatePurchaseOrderStatus(Number(rawId), status, reason, {
     beforeCommit: notices.purchaseOrderNeedsAttention,
   });
+
+  // An approved order goes to QuickBooks, where one is connected. After
+  // the approval is saved and never awaited: the manager is not kept
+  // waiting on Intuit, and a failure is recorded on the order to retry.
+  if (status === 'approved' && existing.status === 'pending') quickbooksService.pushInBackground(Number(rawId));
+
+  return updated;
 };
 
 // ── Follow-up order ───────────────────────────────────────────

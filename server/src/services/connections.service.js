@@ -19,6 +19,7 @@
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
 import gmailService from './gmail.service.js';
+import quickbooksService from './quickbooks.service.js';
 import pushService from './push.service.js';
 import { getAdapter } from './vmsIntegration.service.js';
 import mockVMSAdapter from '../integrations/mockVMS.adapter.js';
@@ -185,10 +186,48 @@ const scheduledJobs = async () => {
     };
 };
 
+// QuickBooks: off until the keys are on the server, then waiting to be
+// connected, then live. `action` is a button the Connections screen
+// knows how to run (it is not a place in the app to go to).
+const quickbooks = async () => {
+  const s = await quickbooksService.status({ check: true });
+  if (!s.configured) {
+    return {
+      status: 'off',
+      summary: 'Not set up: Finance is emailed each order to capture by hand',
+      detail: 'To send approved purchase orders to QuickBooks automatically, add the QuickBooks keys to the server (QUICKBOOKS_CLIENT_ID, QUICKBOOKS_CLIENT_SECRET, QUICKBOOKS_REDIRECT_URI).',
+    };
+  }
+  const where = s.environment === 'production' ? '' : ' (sandbox)';
+  if (!s.connected) {
+    return {
+      status: 'off',
+      summary: `Ready to connect${where}`,
+      detail: 'Sign in to QuickBooks to send approved purchase orders across. Until then Finance is emailed each order.',
+      fix: { label: 'Connect QuickBooks', action: 'quickbooks-connect' },
+    };
+  }
+  if (!s.working) {
+    return {
+      status: 'down',
+      summary: `Connected${where}, but QuickBooks is not accepting it`,
+      detail: s.error || 'Reconnect QuickBooks.',
+      fix: { label: 'Reconnect QuickBooks', action: 'quickbooks-connect' },
+    };
+  }
+  return {
+    status: 'ok',
+    summary: `Connected to ${s.company || `company ${s.realmId}`}${where}`,
+    detail: 'Approved purchase orders are sent to QuickBooks. An order whose supplier or products are not found there by name is held, never guessed.',
+    fix: { label: 'Disconnect', action: 'quickbooks-disconnect' },
+  };
+};
+
 const CHECKS = [
   { id: 'database',  name: 'Database',              run: database },
   { id: 'email',     name: 'Email (Gmail)',         run: email },
   ...Object.entries(LINK_KINDS).map(([kind, { label }]) => ({ id: `link-${kind}`, name: label, run: linkCheck(kind) })),
+  { id: 'quickbooks', name: 'QuickBooks',           run: quickbooks },
   { id: 'jobs',      name: 'Scheduled jobs',        run: scheduledJobs },
   { id: 'assistant', name: 'AI assistant',          run: assistant },
   { id: 'push',      name: 'Phone notifications',   run: push },

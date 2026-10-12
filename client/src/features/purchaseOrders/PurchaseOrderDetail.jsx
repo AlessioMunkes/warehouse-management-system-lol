@@ -33,6 +33,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import StatusBadge from '@/components/ui/status-badge';
+import QuickbooksSync from './QuickbooksSync';
 import DetailPanel from '@/components/ui/detail-panel';
 import {
   AlertDialog, AlertDialogContent, AlertDialogDescription,
@@ -422,6 +423,9 @@ export default function PurchaseOrderDetail({
               ) : null}
             </dd>
           )}
+          {/* Where it stands with a connected QuickBooks, and a button
+              to send it. Shows nothing when QuickBooks is not connected. */}
+          <QuickbooksSync purchaseOrder={po} canManage={canManage} onSynced={() => onOpenOrder?.(po.id)} />
         </div>
         <div>
           <dt className="text-xs text-muted-foreground">Finance email</dt>

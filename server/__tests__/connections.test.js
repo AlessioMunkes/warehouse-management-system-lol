@@ -46,7 +46,7 @@ describe('Settings → Connections', () => {
     expect(result.connections.map((c) => c.id)).toEqual([
       'database', 'email',
       'link-invite', 'link-passwordReset', 'link-section18a', 'link-financeReport', 'link-gmailReturn', 'link-savedReport',
-      'jobs', 'assistant', 'push', 'vms',
+      'quickbooks', 'jobs', 'assistant', 'push', 'vms',
     ]);
   });
 
