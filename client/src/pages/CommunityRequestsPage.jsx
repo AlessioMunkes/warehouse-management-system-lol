@@ -206,7 +206,8 @@ export default function CommunityRequestsPage() {
         label="Request views"
         value={view.id}
         onChange={changeView}
-        tabs={VIEWS.map((v) => ({ id: v.id, label: v.label, alert: v.alert, count: isLoading ? null : counts[v.id] }))}
+        tabs={VIEWS.filter((v) => !v.onlyWhenAny || counts[v.id] > 0 || v.id === view.id)
+          .map((v) => ({ id: v.id, label: v.label, alert: v.alert, count: isLoading ? null : counts[v.id] }))}
       />
 
       <div className="mt-6">

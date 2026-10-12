@@ -91,3 +91,19 @@ describe('the admin’s Needs attention', () => {
     ]);
   });
 });
+
+describe('NeedsAttention: things a manager would otherwise only find by opening each one', () => {
+  it('links failed Finance emails and QuickBooks matches to their purchase order tabs', () => {
+    renderList({ ...zero, purchaseOrders: { awaitingApproval: 0, followUp: 0, financeEmailFailed: 2, needsQuickbooksMatch: 1 } });
+    expect(screen.getByRole('link', { name: '2 purchase orders did not reach Finance by email' }))
+      .toHaveAttribute('href', '/noc/purchase-orders?status=email_failed');
+    expect(screen.getByRole('link', { name: '1 purchase order needs a match in QuickBooks' }))
+      .toHaveAttribute('href', '/noc/purchase-orders?status=needs_match');
+  });
+
+  it('links idle Feed the Soil kits to the Idle kits tab', () => {
+    renderList({ ...zero, feedTheSoil: { idleKits: 3 } });
+    expect(screen.getByRole('link', { name: '3 Feed the Soil kits have had no compost logged in three months' }))
+      .toHaveAttribute('href', '/noc/feed-the-soil?status=idle');
+  });
+});

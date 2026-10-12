@@ -79,6 +79,34 @@ describe('PurchaseOrdersPage', () => {
     expect(screen.queryByText('PO-1')).not.toBeInTheDocument();
   });
 
+  // The dashboard's "did not reach Finance" and "needs a match in
+  // QuickBooks" lines link here; each tab holds exactly what it counts.
+  it('shows the two flag tabs only while there is something in them', async () => {
+    render(<PurchaseOrdersPage />);
+    await screen.findByRole('tab', { name: 'Open 3' });
+    expect(screen.queryByRole('tab', { name: /Finance email failed/ })).toBeNull();
+    expect(screen.queryByRole('tab', { name: /Needs a QuickBooks match/ })).toBeNull();
+  });
+
+  it('opens the Finance email failed and QuickBooks match tabs from a link', async () => {
+    api.getPurchaseOrders.mockResolvedValue([
+      ...ORDERS,
+      po({ id: 5, poNumber: 'PO-5', financeEmailStatus: 'failed' }),
+      po({ id: 6, poNumber: 'PO-6', status: 'completed', quickbooksState: 'needs_match' }),
+    ]);
+    router.params = new URLSearchParams('status=email_failed');
+    const { unmount } = render(<PurchaseOrdersPage />);
+    expect(await screen.findByText('PO-5')).toBeInTheDocument();
+    expect(screen.queryByText('PO-1')).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Needs a QuickBooks match 1' })).toBeInTheDocument();
+    unmount();
+
+    router.params = new URLSearchParams('status=needs_match');
+    render(<PurchaseOrdersPage />);
+    expect(await screen.findByText('PO-6')).toBeInTheDocument();
+    expect(screen.queryByText('PO-5')).not.toBeInTheDocument();
+  });
+
   it('shows how many lines have arrived', async () => {
     render(<PurchaseOrdersPage />);
     expect(await screen.findByText('1 of 4')).toBeInTheDocument();

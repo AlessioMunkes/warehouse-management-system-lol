@@ -24,6 +24,9 @@ import { OPEN_PO_STATUSES, CLOSED_PO_STATUSES } from '../constants/purchaseOrder
 import stockRepo from './stock.repository.js';
 import { COUNTED_UNITS } from '../features/recipes/recipeSeason.js';
 import { toStockUnitSql, unitRatioSql } from '../features/units/unitConversion.js';
+import { poSyncKeySql } from './quickbooks.repository.js';
+import { overdueSql } from './communityRequest.repository.js';
+import { idleKitSql } from './collectionKit.repository.js';
 
 const num = (v) => (v === null || v === undefined ? 0 : Number(v));
 
@@ -170,17 +173,22 @@ const getSummary = async () => {
 //                    delivery line due within 30 days, today included)
 //   pickingSlips   — this week (Monday to Sunday, SAST), the Picking
 //                    Slips page's default range
-//   purchaseOrders — awaiting approval, and those flagged for follow-up
-//   communityRequests — awaiting approval; approved but nobody has
-//                    claimed or been assigned them; and approved ones that
-//                    need new items because a pallet used their stock
+//   purchaseOrders — awaiting approval; flagged for follow-up; the
+//                    Finance email failed; needs a match in QuickBooks
+//   communityRequests — awaiting approval; approved and waiting to go
+//                    out; approved and still not gone out after
+//                    OVERDUE_AFTER_DAYS (communityRequest.repository.js);
+//                    and approved ones that need new items because a
+//                    pallet used their stock
+//   feedTheSoil    — kits nobody has logged compost for (IDLE_KIT_MONTHS,
+//                    collectionKit.repository.js)
 const EXPIRY_WINDOW_DAYS = 30;
 
 const sastDay = (date) =>
   new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Johannesburg' }).format(date);
 
 const getAttention = async ({ now = new Date() } = {}) => {
-  const [manifest, slips, pos, requests] = await Promise.all([
+  const [manifest, slips, pos, requests, kits] = await Promise.all([
     stockRepo.getManifest(),
     pool.query(
       `SELECT
@@ -198,20 +206,31 @@ const getAttention = async ({ now = new Date() } = {}) => {
          -- its way, or marked by a manager.
          COUNT(*) FILTER (WHERE (status = 'follow_up_required' OR (status = 'partially_received' AND NOT EXISTS (
                    SELECT 1 FROM purchase_orders c
-                    WHERE c.follow_up_of = purchase_orders.id AND c.status NOT IN ('completed', 'returned')))))::int AS follow_up
+                    WHERE c.follow_up_of = purchase_orders.id AND c.status NOT IN ('completed', 'returned')))))::int AS follow_up,
+         -- Finance was never told about the order; Resend is on the order.
+         COUNT(*) FILTER (WHERE finance_email_status = 'failed')::int AS finance_email_failed,
+         -- A supplier or product not found in QuickBooks by name: a
+         -- person has to add it there, then Send again.
+         COUNT(*) FILTER (WHERE EXISTS (
+                   SELECT 1 FROM quickbooks_sync_queue q
+                    WHERE q.idempotency_key = ${poSyncKeySql('purchase_orders.id')}
+                      AND q.payload->>'state' = 'needs_match'))::int AS needs_quickbooks_match
        FROM purchase_orders`
     ),
     pool.query(
       `SELECT
          COUNT(*) FILTER (WHERE outcome = 'pending')::int AS pending,
+         -- The Approved tab: set aside and waiting to go out.
          COUNT(*) FILTER (WHERE outcome = 'approved'
-                            AND items_short_at IS NULL
-                            AND handled_by IS NULL
-                            AND assigned_to IS NULL)::int AS unclaimed,
+                            AND items_short_at IS NULL)::int AS approved,
+         COUNT(*) FILTER (WHERE ${overdueSql('community_requests')})::int AS overdue,
          COUNT(*) FILTER (WHERE outcome = 'approved'
                             AND items_short_at IS NOT NULL)::int AS needs_items
        FROM community_requests`
     ),
+    // A warehouse without the kit tables has no kits to chase.
+    pool.query(`SELECT COUNT(*)::int AS idle FROM collection_kits k WHERE ${idleKitSql('k')}`)
+      .catch((err) => { if (err.code === '42P01') return { rows: [{ idle: 0 }] }; throw err; }),
   ]);
 
   const today = sastDay(now);
@@ -227,12 +246,19 @@ const getAttention = async ({ now = new Date() } = {}) => {
   return {
     inventory:         { shortfall, lowStock, expiring },
     pickingSlips:      { unassigned: num(slips.rows[0]?.unassigned), notCollected: num(slips.rows[0]?.not_collected) },
-    purchaseOrders:    { awaitingApproval: num(pos.rows[0]?.awaiting_approval), followUp: num(pos.rows[0]?.follow_up) },
+    purchaseOrders:    {
+      awaitingApproval:     num(pos.rows[0]?.awaiting_approval),
+      followUp:             num(pos.rows[0]?.follow_up),
+      financeEmailFailed:   num(pos.rows[0]?.finance_email_failed),
+      needsQuickbooksMatch: num(pos.rows[0]?.needs_quickbooks_match),
+    },
     communityRequests: {
       pending:    num(requests.rows[0]?.pending),
-      unclaimed:  num(requests.rows[0]?.unclaimed),
+      approved:   num(requests.rows[0]?.approved),
+      overdue:    num(requests.rows[0]?.overdue),
       needsItems: num(requests.rows[0]?.needs_items),
     },
+    feedTheSoil: { idleKits: num(kits.rows[0]?.idle) },
   };
 };
 

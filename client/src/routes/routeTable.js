@@ -80,7 +80,8 @@ export const ROUTES = [
   // ── Inbound ────────────────────────────────────────────────
   { id: 'purchaseOrders', path: STAFF.purchaseOrders, roles: MANAGER_ONLY, shell: true,
     nav: [nav('manager', 'Inbound', 'Purchase orders', ShoppingCart,
-      (a) => a.purchaseOrders.awaitingApproval + a.purchaseOrders.followUp)] },
+      (a) => a.purchaseOrders.awaitingApproval + a.purchaseOrders.followUp
+        + (a.purchaseOrders.financeEmailFailed ?? 0) + (a.purchaseOrders.needsQuickbooksMatch ?? 0))] },
   { id: 'receipts', path: STAFF.receipts, roles: MANAGER_ONLY, shell: true,
     nav: [nav('manager', 'Inbound', 'Receipts', ReceiptText)] },
 
@@ -126,9 +127,9 @@ export const ROUTES = [
 
   // ── The manager's side of those two programmes ─────────────
   { id: 'communityRequests', path: STAFF.communityRequests, roles: MANAGER_ONLY, shell: true,
-    nav: [nav('manager', 'Outbound', 'Benevolent requests', PhoneCall, (a) => (a.communityRequests.pending ?? 0) + (a.communityRequests.needsItems ?? 0))] },
+    nav: [nav('manager', 'Outbound', 'Benevolent requests', PhoneCall, (a) => (a.communityRequests.pending ?? 0) + (a.communityRequests.needsItems ?? 0) + (a.communityRequests.overdue ?? 0))] },
   { id: 'feedTheSoil', path: STAFF.feedTheSoil, roles: MANAGER_ONLY, shell: true,
-    nav: [nav('manager', 'Programmes', 'Feed the Soil', Sprout)] },
+    nav: [nav('manager', 'Programmes', 'Feed the Soil', Sprout, (a) => a.feedTheSoil?.idleKits ?? 0)] },
 
   // ── Programmes ─────────────────────────────────────────────
   { id: 'volunteerEvents', path: VOLUNTEERS.events, roles: MANAGER_ONLY, shell: true,

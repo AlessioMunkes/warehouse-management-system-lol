@@ -30,6 +30,18 @@
 import pool from '../config/db.js';
 import { logAudit } from './auditLog.repository.js';
 
+// ── Approved, and still not gone out ─────────────────────────
+// An approved request holds its stock aside until it is confirmed or
+// declined. One that has not gone out a week after approval most
+// likely never will: the caller has not come, and the stock it holds
+// is kept from everyone else. The manager's list flags it and the
+// dashboard counts it, from this one rule, so the two always agree.
+// A request flagged for new items is left out: it has its own line.
+export const OVERDUE_AFTER_DAYS = 7;
+export const overdueSql = (alias = 'cr') =>
+  `(${alias}.outcome = 'approved' AND ${alias}.items_short_at IS NULL
+     AND ${alias}.approved_at < now() - make_interval(days => ${OVERDUE_AFTER_DAYS}))`;
+
 // items: the approved lines, newest information first for the page.
 // A line with short_at set has stopped reserving stock.
 export const SELECT_BASE = `
@@ -37,6 +49,7 @@ export const SELECT_BASE = `
          cr.items_requested, cr.quantity_note, cr.outcome, cr.outcome_note,
          cr.handled_by, cr.resolved_at, cr.created_at,
          cr.approved_by, cr.approved_at, cr.assigned_to, cr.items_short_at,
+         ${overdueSql('cr')} AS is_overdue,
          -- Who logged and signed off the request (migration 046). Read
          -- through to_jsonb so a database that has not had 046 yet
          -- still lists its requests, with nobody named, rather than

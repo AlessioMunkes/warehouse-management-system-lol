@@ -24,7 +24,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ChevronDown, ChevronRight, CircleCheck, CircleX, Hourglass, TrendingDown, TriangleAlert,
+  ChevronDown, ChevronRight, CircleCheck, CircleX, Hourglass, MailX, Sprout, TrendingDown, TriangleAlert, Unlink,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -45,26 +45,40 @@ const lines = (a) => [
   { key: 'followUp', tone: 'bad', icon: TriangleAlert, count: a.purchaseOrders.followUp,
     text: (n) => `${plural(n, 'purchase order needs', 'purchase orders need')} following up with the supplier`,
     to: `${STAFF.purchaseOrders}?status=follow_up_required` },
+  { key: 'financeEmailFailed', tone: 'bad', icon: MailX, count: a.purchaseOrders.financeEmailFailed ?? 0,
+    text: (n) => `${plural(n, 'purchase order', 'purchase orders')} did not reach Finance by email`,
+    to: `${STAFF.purchaseOrders}?status=email_failed` },
   { key: 'expiring', tone: 'warn', icon: Hourglass, count: a.inventory.expiring,
     text: (n) => `${plural(n, 'product has', 'products have')} a delivery expiring within 30 days`,
     to: `${INVENTORY}?status=expiring` },
   { key: 'awaitingApproval', tone: 'warn', image: 'po-awaiting-approval', count: a.purchaseOrders.awaitingApproval,
     text: (n) => `${plural(n, 'purchase order is', 'purchase orders are')} waiting for approval`,
     to: `${STAFF.purchaseOrders}?status=pending` },
+  { key: 'needsQuickbooksMatch', tone: 'warn', icon: Unlink, count: a.purchaseOrders.needsQuickbooksMatch ?? 0,
+    text: (n) => `${plural(n, 'purchase order needs', 'purchase orders need')} a match in QuickBooks`,
+    to: `${STAFF.purchaseOrders}?status=needs_match` },
   { key: 'lowStock', tone: 'warn', icon: TrendingDown, count: a.inventory.lowStock,
     text: (n) => `${plural(n, 'product is', 'products are')} at or below the reorder level`,
     to: `${INVENTORY}?status=lowstock` },
   { key: 'requestsNeedItems', tone: 'warn', image: 'pending-benevolent-requests', count: a.communityRequests.needsItems,
     text: (n) => `${plural(n, 'benevolent request needs', 'benevolent requests need')} new items`,
     to: `${STAFF.communityRequests}?status=needs-items` },
+  { key: 'overdueRequests', tone: 'warn', icon: Hourglass, count: a.communityRequests.overdue ?? 0,
+    text: (n) => `${plural(n, 'approved request has', 'approved requests have')} not gone out after a week`,
+    to: `${STAFF.communityRequests}?status=overdue` },
   { key: 'pendingRequests', tone: 'warn', image: 'pending-benevolent-requests', count: a.communityRequests.pending,
     text: (n) => `${plural(n, 'benevolent request is', 'benevolent requests are')} waiting for approval`,
     to: `${STAFF.communityRequests}?status=pending` },
   { key: 'unassigned', tone: 'info', image: 'unclaimed-slips', count: a.pickingSlips.unassigned,
     text: (n) => `${plural(n, 'slip', 'slips')} this week nobody has claimed yet`,
     to: `${STAFF.pickingSlips}?status=unassigned` },
-  { key: 'unclaimedRequests', tone: 'info', image: 'pending-benevolent-requests', count: a.communityRequests.unclaimed,
-    text: (n) => `${plural(n, 'approved request has', 'approved requests have')} not been claimed yet`,
+  { key: 'idleKits', tone: 'info', icon: Sprout, count: a.feedTheSoil?.idleKits ?? 0,
+    text: (n) => `${plural(n, 'Feed the Soil kit has', 'Feed the Soil kits have')} had no compost logged in three months`,
+    to: `${STAFF.feedTheSoil}?status=idle` },
+  // The Approved tab's own rule (approved, not short of stock), so the
+  // number is the rows the link opens.
+  { key: 'approvedRequests', tone: 'info', image: 'pending-benevolent-requests', count: a.communityRequests.approved ?? 0,
+    text: (n) => `${plural(n, 'approved request is', 'approved requests are')} waiting to go out`,
     to: `${STAFF.communityRequests}?status=approved` },
 ];
 

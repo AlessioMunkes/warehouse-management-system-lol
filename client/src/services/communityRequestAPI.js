@@ -69,6 +69,9 @@ export const toRequest = (row = {}) => ({
   assignedToName: fullName(row.assigned_to_first_name, row.assigned_to_last_name),
   // Set while any approved line ran short of stock.
   itemsShortAt:   row.items_short_at ?? null,
+  // Approved a week ago or more and still not gone out (the server's
+  // rule, communityRequest.repository.js).
+  isOverdue:      Boolean(row.is_overdue),
   items:          (row.items ?? []).map(toItem),
 });
 

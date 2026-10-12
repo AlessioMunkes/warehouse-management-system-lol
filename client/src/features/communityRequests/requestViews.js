@@ -7,12 +7,13 @@
 //   pending      Awaiting approval   waiting for a manager to choose items
 //   approved     Approved            items chosen, stock set aside
 //   needs-items  Needs new items     approved, but a pallet used the stock
+//   overdue      Waiting over a week approved a week ago or more, not gone out
 //   fulfilled    Fulfilled           fulfilled or partially fulfilled
 //   declined     Declined
 //   all          All
 //
 // `id` is what goes in ?status=. The dashboard's Needs attention lines
-// link to pending, approved and needs-items.
+// link to pending, approved, needs-items and overdue.
 // ─────────────────────────────────────────────────────────────
 
 export const isFlagged = (r) => r.outcome === 'approved' && Boolean(r.itemsShortAt);
@@ -41,6 +42,9 @@ export const VIEWS = [
     test: (r) => r.outcome === 'approved' && !r.itemsShortAt },
   { id: 'needs-items', label: 'Needs new items', alert: true,
     test: isFlagged, sort: byFlaggedOldestFirst },
+  // Shown only while there are any (or the tab is open from a link).
+  { id: 'overdue',     label: 'Waiting over a week', alert: true, onlyWhenAny: true,
+    test: (r) => r.isOverdue },
   { id: 'fulfilled',   label: 'Fulfilled',
     test: (r) => r.outcome === 'fulfilled' || r.outcome === 'partially_fulfilled' },
   { id: 'declined',    label: 'Declined',

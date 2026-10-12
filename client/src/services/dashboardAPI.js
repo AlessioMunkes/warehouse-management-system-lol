@@ -55,11 +55,17 @@ export const toAttention = (row = {}) => {
     purchaseOrders: {
       awaitingApproval: n(row.purchaseOrders?.awaitingApproval),
       followUp:         n(row.purchaseOrders?.followUp),
+      financeEmailFailed:   n(row.purchaseOrders?.financeEmailFailed),
+      needsQuickbooksMatch: n(row.purchaseOrders?.needsQuickbooksMatch),
     },
     communityRequests: {
       pending:    n(row.communityRequests?.pending),
-      unclaimed:  n(row.communityRequests?.unclaimed),
+      approved:   n(row.communityRequests?.approved),
+      overdue:    n(row.communityRequests?.overdue),
       needsItems: n(row.communityRequests?.needsItems),
+    },
+    feedTheSoil: {
+      idleKits: n(row.feedTheSoil?.idleKits),
     },
   };
 };
