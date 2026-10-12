@@ -19,6 +19,7 @@ import { drillOptions, planDrill } from '../features/reporting/drillDown.js';
 import recordsRepo from '../repositories/reportingRecords.repository.js';
 import processRepo from '../repositories/reportingProcess.repository.js';
 import { buildProcess } from '../features/reporting/processMining.js';
+import { buildFlow } from '../features/reporting/processFlow.js';
 import {
   METRICS, DIMENSIONS, FILTERS, CACHE_TTL, getMetric, isSnapshot, describeSpec, COHORTS, BENEFICIARY_KINDS,
 } from '../features/reporting/reportCatalog.js';
@@ -311,9 +312,17 @@ const processMap = async ({ dateRange, filters = {} } = {}) => {
     processRepo.listSlips({ from, to, cohort, beneficiaryKind }),
     processRepo.listMovements({ to }),
   ]);
-  const events = await processRepo.listSlipEvents(slips.map((s) => s.id));
+  const orderIds = orders.map((o) => o.id);
+  const [events, changes, deliveries, followUps] = await Promise.all([
+    processRepo.listSlipEvents(slips.map((s) => s.id)),
+    processRepo.listOrderChanges(orderIds),
+    processRepo.listOrderDeliveries(orderIds),
+    processRepo.listFollowUps(orderIds),
+  ]);
   return {
     ...buildProcess({ orders, slips, events, movements, range: { from, to } }),
+    // Every case's own path, for the flow map (features/reporting/processFlow.js).
+    flow: buildFlow({ orders, changes, deliveries, followUps, slips, events }),
     filters: { supplierId, cohort, beneficiaryKind },
   };
 };

@@ -55,6 +55,8 @@ const DATA = {
 
 const openMap = async () => {
   render(<ProcessMap suppliers={[{ value: '3', label: 'Cape Dry Goods' }]} />);
+  // The lanes and their waits are the Step times view.
+  await userEvent.click(await screen.findByRole('tab', { name: 'Step times' }));
 };
 
 beforeEach(() => {
@@ -120,7 +122,7 @@ describe('the process map', () => {
 
   it('says a period with nothing in it is empty', async () => {
     api.getProcessMap.mockResolvedValue({ data: { ...DATA, empty: true } });
-    await openMap();
+    render(<ProcessMap />);
     expect(await screen.findByText(/Nothing was ordered, packed or dispatched/)).toBeInTheDocument();
   });
 

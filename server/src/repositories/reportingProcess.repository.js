@@ -89,4 +89,54 @@ export const listMovements = async ({ to }) => {
   return rows;
 };
 
-export default { listOrders, listSlips, listSlipEvents, listMovements };
+// ── The flow map: every step of each order, not only the measured ones ──
+
+/** Each logged status change on those orders, oldest first. */
+export const listOrderChanges = async (orderIds) => {
+  if (!orderIds.length) return [];
+  const { rows } = await pool.query(
+    `SELECT al.entity_id::int AS purchase_order_id, al.before_data->>'status' AS from_status,
+            al.after_data->>'status' AS to_status, al.created_at
+       FROM audit_log al
+      WHERE al.entity_type = 'purchase_order' AND al.action = 'status_changed'
+        AND al.entity_id = ANY($1::text[])
+      ORDER BY al.created_at ASC`,
+    [orderIds.map(String)],
+  );
+  return rows;
+};
+
+/** Each delivery against those orders, oldest first. */
+export const listOrderDeliveries = async (orderIds) => {
+  if (!orderIds.length) return [];
+  const { rows } = await pool.query(
+    `SELECT dn.purchase_order_id, dn.status, dn.created_at
+       FROM delivery_notes dn
+      WHERE dn.purchase_order_id = ANY($1::int[])
+      ORDER BY dn.created_at ASC, dn.id ASC`,
+    [orderIds],
+  );
+  return rows;
+};
+
+/** Follow-up orders raised for what those orders were short. */
+export const listFollowUps = async (orderIds) => {
+  if (!orderIds.length) return [];
+  try {
+    const { rows } = await pool.query(
+      `SELECT po.follow_up_of, po.created_at
+         FROM purchase_orders po
+        WHERE po.follow_up_of = ANY($1::int[])
+        ORDER BY po.created_at ASC`,
+      [orderIds],
+    );
+    return rows;
+  } catch (err) {
+    // A database that has not had migration 043 yet has no follow-up
+    // orders to show. The rest of the map still stands.
+    if (err.code === '42703') return [];
+    throw err;
+  }
+};
+
+export default { listOrders, listSlips, listSlipEvents, listMovements, listOrderChanges, listOrderDeliveries, listFollowUps };

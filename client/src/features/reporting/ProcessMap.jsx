@@ -16,6 +16,12 @@
 //   routes taken    every way a case went through the lane
 //   break-downs     by supplier, by cohort, by product
 //
+// TWO VIEWS of the same period and filters:
+//   Flow map     every route cases really took, as a graph to explore
+//                (ProcessFlow.jsx). The one to open on: it is where a
+//                detour or a repeat shows up.
+//   Step times   the lanes described above, for how long each wait is.
+//
 // It has a tab of its own on the page, and loads when that tab is
 // first opened. The shelf lane replays the whole stock ledger, and
 // nobody who came for a chart should wait on that.
@@ -23,6 +29,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, ArrowDown, Timer } from 'lucide-react';
 import NativeSelect from '@/components/ui/native-select';
+import ViewTabs from '@/components/ui/view-tabs';
+import ProcessFlow from './ProcessFlow';
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorBanner from '@/components/ui/error-banner';
 import { getProcessMap } from '../../services/reportingAPI';
@@ -191,6 +199,7 @@ export default function ProcessMap({ suppliers = [] }) {
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [picked, setPicked] = useState(null);       // { lane, id }
+  const [view, setView] = useState('flow');         // 'flow' | 'steps'
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
@@ -230,7 +239,11 @@ export default function ProcessMap({ suppliers = [] }) {
   return (
     <section id="process-map" aria-labelledby="process-map-heading" className="rounded-4xl bg-card p-4 shadow-md ring-1 ring-foreground/5 sm:p-5">
       <h2 id="process-map-heading" className="text-sm font-bold tracking-tight">Process map</h2>
-      <p className="mt-1 text-sm text-ink">From purchase order to dispatch note. Choose a time between two steps to see what is behind it.</p>
+      <p className="mt-1 text-sm text-ink">
+        {view === 'flow'
+          ? 'From purchase order to dispatch note. Choose a step or a connection to see what is behind it.'
+          : 'From purchase order to dispatch note. Choose a time between two steps to see what is behind it.'}
+      </p>
 
       <div className="mt-3 flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1 text-xs font-semibold text-ink">
@@ -260,7 +273,7 @@ export default function ProcessMap({ suppliers = [] }) {
             {KINDS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </NativeSelect>
         </label>
-        {data && !data.empty ? (
+        {data && !data.empty && view === 'steps' ? (
           <button type="button" onClick={exportSheet} disabled={exporting}
             className="ml-auto text-xs font-semibold text-ink underline underline-offset-2 disabled:opacity-60">
             {exporting ? 'Preparing' : 'Export to Excel'}
@@ -276,6 +289,19 @@ export default function ProcessMap({ suppliers = [] }) {
       ) : null}
 
       {data && !data.empty ? (
+        <ViewTabs className="mt-4" label="View of the process" value={view} onChange={setView}
+          tabs={[{ id: 'flow', label: 'Flow map' }, { id: 'steps', label: 'Step times' }]} />
+      ) : null}
+
+      {/* Keyed by what was asked for: a new period or filter is a new
+          set of cases, so the map starts again from its own defaults. */}
+      {data && !data.empty && view === 'flow' && data.flow ? (
+        <div className={busy ? 'opacity-60' : ''}>
+          <ProcessFlow key={JSON.stringify([data.range, data.filters])} flow={data.flow} range={data.range} />
+        </div>
+      ) : null}
+
+      {data && !data.empty && view === 'steps' ? (
         <div className={busy ? 'opacity-60' : ''}>
           <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
             <Figure
