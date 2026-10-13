@@ -38,10 +38,10 @@ import {
 import passwordResetAPI from '@/services/passwordResetAPI';
 
 // The Montserrat stack and 26px radius are the worker-UI retone's
-// current tokens (staff.css's --stf-font-sans / --stf-radius) — this
+// current tokens (the floor screens section's --stf-font-sans / --stf-radius) — this
 // page isn't inside .stf-shell so it can't read those as CSS
 // variables, but the literal values are copied here rather than
-// invented, same as guest.css's own header explains doing for its
+// invented, same as the volunteer screens section's own header explains doing for its
 // borrowed tokens.
 const PAGE_FONT = '"Montserrat", "Open Sans", Helvetica, sans-serif';
 const CURRENT_RADIUS = 'rounded-[26px]';

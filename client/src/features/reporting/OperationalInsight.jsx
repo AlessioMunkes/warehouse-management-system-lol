@@ -27,7 +27,6 @@ import ComboChart from './ComboChart';
 import OperationsReportPDF from './OperationsReportPDF';
 import { getInsight } from '../../services/reportingAPI';
 import { STAFF } from '../../routes/paths';
-import '../../styles/operationalReport.css';
 
 const MUTED  = 'var(--ink-soft)';
 const BORDER = 'var(--line)';

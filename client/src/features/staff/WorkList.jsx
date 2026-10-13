@@ -97,7 +97,7 @@ export function WorkRow({
               {line.sku ? `${line.sku} · ` : ''}{expectedLabel}{' '}
               {/* The number the worker is checking against, picked out
                   of the meta line. Asked for directly. Worth knowing
-                  it spends the accent that staff.css otherwise
+                  it spends the accent that the floor screens section of index.css otherwise
                   reserves for things you can click — so this is the
                   one static red on the screen, and nothing else in
                   the row may take it. */}

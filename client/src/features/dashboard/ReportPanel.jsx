@@ -28,7 +28,6 @@ import { resolvePreset } from '../reporting/dateRanges';
 import { STAFF } from '../../routes/paths';
 import { periodById, unwrapReport, ragAgainst } from './chartTheme';
 // The --viz-1…8 palette the Operations charts are drawn in.
-import '../../styles/operationalReport.css';
 
 const RETRY_STATUSES = new Set([502, 503, 504]);
 const MAX_RETRIES = 4;

@@ -65,7 +65,7 @@ const fmtDateTime = (value) =>
 // manager's own vocabulary, same as every other manager form. Reused
 // as-is here, it put a shadcn button (Tailwind's font, index.css's
 // --primary) next to every other worker screen's .stf-btn-primary CTA
-// (staff.css's own --stf-ink, Montserrat) — close enough to read as
+// (the floor screens section's own --stf-ink, Montserrat) — close enough to read as
 // the same button and different enough that "Log request" and Feed
 // the Soil's "Log a collection" looked like two different systems
 // side by side, which is exactly what was reported. Same trade-off

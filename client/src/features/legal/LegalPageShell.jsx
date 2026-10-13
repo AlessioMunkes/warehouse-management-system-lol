@@ -3,7 +3,7 @@
 //
 // The frame around the Privacy Policy and Terms of Service: the
 // landing page's header and footer styling, a readable column of text
-// between them. Public, so it brings its own colours (landingpage.css)
+// between them. Public, so it brings its own colours (the landing page section of index.css)
 // and does not follow the signed-in theme, like the landing page.
 // ─────────────────────────────────────────────────────────────
 import { useEffect } from 'react';

@@ -19,6 +19,7 @@ import { ToastProvider }                           from './components/ui/toast';
 import { PAGES }                                   from './routes/pages';
 import PageNotFound                                from './pages/PageNotFound';
 import LoadingScreen                               from './components/ui/loading-screen';
+import ErrorBoundary                               from './components/ui/error-boundary';
 
 // A screen's own file is fetched the first time it is opened
 // (routes/pages.jsx). The wait is around the page only, so the sidebar
@@ -26,7 +27,15 @@ import LoadingScreen                               from './components/ui/loading
 //
 // The loading mark fills the page area, held back a moment so a file
 // that arrives at once shows nothing at all.
-const page = (id) => <Suspense fallback={<LoadingScreen delayed />}>{PAGES[id]}</Suspense>;
+//
+// Each screen has its own error boundary: if it throws, or its file
+// fails to arrive, it says so in place and the rest of the app stays
+// up. Keyed by screen, so moving to another one clears the message.
+const page = (id) => (
+  <ErrorBoundary key={id}>
+    <Suspense fallback={<LoadingScreen delayed />}>{PAGES[id]}</Suspense>
+  </ErrorBoundary>
+);
 
 // Guarded routes, grouped by who may open them and whether they sit in
 // the shell, in the order each group first appears in the table.

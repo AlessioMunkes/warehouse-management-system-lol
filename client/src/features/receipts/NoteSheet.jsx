@@ -29,7 +29,6 @@ import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import usePdfDocument from '../staff/usePdfDocument';
 import { WAREHOUSE } from './noteFormat';
-import '../../styles/deliveryNotePDF.css';
 
 const PDF_LOGO_URL = '/images/pdf_logo.png';
 
@@ -72,7 +71,7 @@ export default function NoteSheet({
           {/* The browser's own printing, straight from this page. It does
               not go through the PDF, so it works when the PDF cannot be
               made, and on a phone it opens the print sheet. The print
-              rules are in deliveryNotePDF.css. */}
+              rules are in the note sheet section of index.css. */}
           <button type="button" onClick={() => window.print()} className="btn-ghost">PRINT</button>
           <button type="button" onClick={onClose} className="btn-ghost">✕ CLOSE</button>
         </div>

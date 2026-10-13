@@ -124,7 +124,7 @@ function LocationsMap({ locations }) {
 //
 // The motion itself lives entirely in CSS, behind
 // @media (prefers-reduced-motion: no-preference) — see .lol-reveal in
-// landingpage.css. That means a reduced-motion visitor's .lol-reveal
+// the landing page section of index.css. That means a reduced-motion visitor's .lol-reveal
 // elements have no opacity/transform rules at all and render exactly
 // as if this hook were never called; nothing here needs its own
 // reduced-motion branch.

@@ -7,7 +7,7 @@
 //
 // Bottom-right on desktop. On the worker flow the tab bar is fixed at
 // the bottom, so the stack sits above it — --stf-tabbar-h is defined
-// on .stf-shell in staff.css, and the fallback covers every screen
+// on .stf-shell in the floor screens section of index.css, and the fallback covers every screen
 // that has no tab bar.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';

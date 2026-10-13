@@ -2,7 +2,7 @@
 // client/src/features/dashboard/TaskNode.jsx
 //
 // One task on the worker dashboard — was TaskPathNode.jsx, renamed
-// alongside dropping the connecting line between nodes (see staff.css's
+// alongside dropping the connecting line between nodes (see the floor screens section's
 // own note on .stf-tasks): "path" implied a route between them that
 // no longer exists, and a name that used to be accurate but now isn't
 // is worse than no comment at all.
@@ -15,7 +15,7 @@
 // the floor doesn't actually follow.
 //
 // Row on a phone, circle on wider screens — CSS only (.stf-tasks'
-// media query in staff.css), same markup either way.
+// media query in the floor screens section of index.css), same markup either way.
 // ─────────────────────────────────────────────────────────────
 import { Link } from 'react-router-dom';
 

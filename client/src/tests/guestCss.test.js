@@ -18,7 +18,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const css = readFileSync(fileURLToPath(new URL('../styles/guest.css', import.meta.url)), 'utf8');
+const css = readFileSync(fileURLToPath(new URL('../styles/index.css', import.meta.url)), 'utf8');
 
 describe('guest.css', () => {
   it('has no decorative pseudo-element on the hero', () => {

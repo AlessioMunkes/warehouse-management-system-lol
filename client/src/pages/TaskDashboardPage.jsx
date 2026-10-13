@@ -12,7 +12,7 @@
 //
 // Task section is a stacked list of rows on a phone, a row of
 // free-standing circles from tablet width up — no connecting line
-// between them either way. See staff.css's .stf-tasks for why the
+// between them either way. See the floor screens section's .stf-tasks for why the
 // line from the original storyboard reference was tried and then
 // explicitly dropped: it reads as a fixed order for the day
 // (Receiving, then Packing, then Decanting, then Dispatch), which
