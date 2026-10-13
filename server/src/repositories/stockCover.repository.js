@@ -25,6 +25,7 @@ import { committedStockSql } from './committedStock.sql.js';
 import { recipeForDate, COUNTED_UNITS } from '../features/recipes/recipeSeason.js';
 import { SETTINGS } from '../features/settings/settingsDefinitions.js';
 import { unitRatioSql } from '../features/units/unitConversion.js';
+import { loadShelfLots, todayInSAST } from './shelfLots.repository.js';
 import {
   coverFor, byUrgency, HISTORY_WEEKS, DEFAULT_LEAD_DAYS, DEFAULT_HORIZON_WEEKS,
 } from '../features/stock/stockCover.js';
@@ -163,12 +164,6 @@ export const listCoverInputs = async ({ recipeId = null, childBand = 1, historyD
               AND d.first_delivery >= ${SAST('po.created_at')}::date
          ) x
         GROUP BY x.product_id
-     ),
-     expiry AS (
-       SELECT product_id, MIN(expiry_date) AS earliest
-         FROM delivery_note_items
-        WHERE expiry_date >= ${SAST_TODAY}
-        GROUP BY product_id
      )
      SELECT p.id AS product_id, p.name, pu.unit, p.programme_id,
             (pu.unit = ANY($3::text[]) OR NOT COALESCE(p.is_decantable, true)) AS whole_units,
@@ -184,8 +179,7 @@ export const listCoverInputs = async ({ recipeId = null, childBand = 1, historyD
             ls.expected_lead_time_days        AS supplier_agreed_days,
             li.suppliers                      AS linked_suppliers,
             al.days                           AS median_lead_days,
-            COALESCE(al.orders, 0)            AS lead_orders,
-            ex.earliest::text                 AS earliest_expiry
+            COALESCE(al.orders, 0)            AS lead_orders
        FROM products p
        JOIN pu ON pu.id = p.id
        LEFT JOIN stock_levels sl       ON sl.product_id = p.id
@@ -197,7 +191,6 @@ export const listCoverInputs = async ({ recipeId = null, childBand = 1, historyD
        LEFT JOIN latest_supplier ls    ON ls.product_id = p.id
        LEFT JOIN linked li             ON li.product_id = p.id
        LEFT JOIN actual_lead al        ON al.product_id = p.id
-       LEFT JOIN expiry ex             ON ex.product_id = p.id
       WHERE p.is_active = true AND p.archived_at IS NULL
         AND ($6::int IS NULL OR p.programme_id = $6::int)
       ORDER BY p.name ASC`,
@@ -227,17 +220,20 @@ export const recipeInUse = async (today) => {
   }
 };
 
-export const todayInSAST = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Johannesburg' });
+export { todayInSAST };
 
 /** Every active product's cover, most urgent first. */
 export const loadStockCover = async ({
   today = todayInSAST(), horizonWeeks = DEFAULT_HORIZON_WEEKS, programmeId = null,
 } = {}) => {
   const recipe = await recipeInUse(today);
-  const rows = await listCoverInputs({
-    recipeId: recipe?.id ?? null, childBand: recipe?.childBand ?? 1,
-    historyDays: HISTORY_WEEKS * 7, programmeId,
-  });
+  const [rows, shelf] = await Promise.all([
+    listCoverInputs({
+      recipeId: recipe?.id ?? null, childBand: recipe?.childBand ?? 1,
+      historyDays: HISTORY_WEEKS * 7, programmeId,
+    }),
+    loadShelfLots(),
+  ]);
   const recipeName = recipe?.name ?? null;
   return {
     today,
@@ -245,7 +241,11 @@ export const loadStockCover = async ({
     historyWeeks: HISTORY_WEEKS,
     defaultLeadDays: DEFAULT_LEAD_DAYS,
     recipeName,
-    items: rows.map((row) => coverFor(row, { today, horizonWeeks, recipeName })).sort(byUrgency),
+    // Each product's estimated lots go in beside its inputs, for the
+    // use-by dates (stockCover.js).
+    items: rows
+      .map((row) => coverFor({ ...row, lots: shelf.get(row.product_id)?.lots ?? [] }, { today, horizonWeeks, recipeName }))
+      .sort(byUrgency),
   };
 };
 

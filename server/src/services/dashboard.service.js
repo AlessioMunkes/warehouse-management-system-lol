@@ -20,11 +20,13 @@ const getAttention = async () => repo.getAttention();
 // "Days of stock left" report and the reorder planner. The outlook
 // adds one thing of its own:
 //
-//   may expire   the soonest use-by date on the shelf comes before the
-//                available stock would be used up. Use-by dates are kept
-//                per delivery, not per unit left, so this assumes the
-//                oldest stock goes first: an estimate. A batch-based
-//                stock cover would replace it (see stockCover.js).
+//   may expire   a delivery estimated to be still on the shelf will not
+//                all be used by its use-by date at the weekly rate (the
+//                lots in features/stock/shelfLots.js). Use-by dates are
+//                kept per delivery, not per unit left, so this assumes
+//                the oldest stock goes first: an estimate. A manager can
+//                dismiss a delivery's warning, and it is then left out.
+//                Batch tracking would make it exact.
 //
 // Products that run short within SHORT_WITHIN_WEEKS or may expire come
 // first, soonest first; then the rest, fewest weeks first. A product
@@ -53,7 +55,8 @@ export const stockOutlook = (items) => {
       limits: i.limits,
       weeks: i.weeksOfCover,
       runsShortOn: i.weeksOfCover < SHORT_WITHIN_WEEKS ? i.runsOutOn : null,
-      mayExpireOn: i.available > 0 && i.earliestExpiry && i.earliestExpiry < i.shelfRunsOutOn ? i.earliestExpiry : null,
+      mayExpireOn: i.mayExpireOn,
+      mayExpireQuantity: i.mayExpireQuantity,
     }));
 
   // Something to act on first, soonest first; then fewest weeks.

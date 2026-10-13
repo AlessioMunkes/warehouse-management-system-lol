@@ -61,14 +61,23 @@
 //   suggested          a horizon's demand, less available, incoming and
 //                      overdue. Whole units for anything not decantable.
 //
+// USE-BY DATES  come from the estimated lots (shelfLots.js), passed in
+// as row.lots: the deliveries probably still on the shelf, oldest
+// received first. earliestExpiry is the soonest of the lots not
+// dismissed by a manager. mayExpireOn is the soonest use-by date of a lot
+// that will not all be used by then at the weekly rate, and
+// mayExpireQuantity how much will be left across all such lots. The lots
+// are an estimate (oldest stock goes out first); the cover figures above
+// do not use them.
+//
 // BATCHES: available is one number because stock_levels holds one
-// balance a product. Once the stock left from each delivery is known,
-// pass lots ({ quantity, expiresOn }) instead and draw them down oldest
-// first in drawDown(), leaving out what expires before it is used. That
-// gives usable stock, expected waste and a truer runs-out date with no
-// change to the three screens.
+// balance a product. Once batches are tracked, shelfLots.repository.js
+// returns the real ones as lots, and drawing them down in drawDown()
+// would give usable stock, expected waste and a truer runs-out date with
+// no change to the three screens.
 // ─────────────────────────────────────────────────────────────
 import { UNIT_SIZE_SETTINGS } from '../units/unitConversion.js';
+import { earliestLive, expiringBeforeUse } from './shelfLots.js';
 
 export const HISTORY_WEEKS = 8;
 export const DEFAULT_LEAD_DAYS = 7;
@@ -223,7 +232,9 @@ export const coverFor = (row, {
     leadLabel: lead.label,
     supplier: lead.supplier,
     reorderLevel: round(num(row.reorder_threshold)),
-    earliestExpiry: row.earliest_expiry ?? null,
+    earliestExpiry: earliestLive(row.lots ?? [], today)?.expiryDate ?? null,
+    mayExpireOn: null,
+    mayExpireQuantity: 0,
     limits,
   };
 
@@ -235,6 +246,7 @@ export const coverFor = (row, {
   }
 
   const perDay = demand.weekly / 7;
+  const mayExpire = available > 0 ? expiringBeforeUse(row.lots ?? [], perDay, today) : null;
   const days = drawDown(available, perDay, arrivals);
   const runsOutOn = addDays(today, Math.floor(days));
   const shelfRunsOutOn = addDays(today, Math.floor(Math.max(available, 0) / perDay));
@@ -272,6 +284,8 @@ export const coverFor = (row, {
 
   return {
     ...base,
+    mayExpireOn: mayExpire?.expiresOn ?? null,
+    mayExpireQuantity: mayExpire?.quantity ?? 0,
     status,
     daysOfCover: round(days, 1),
     weeksOfCover: round(days / 7, 1),
