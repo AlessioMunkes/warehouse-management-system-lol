@@ -27,6 +27,8 @@ import { committedStockSql } from './committedStock.sql.js';
 import { toStockUnitSql, unitRatioSql } from '../features/units/unitConversion.js';
 import { recheckProducts } from './communityRequestStock.repository.js';
 import recipeRepository   from './recipe.repository.js';
+import { loadShelfLots, todayInSAST } from './shelfLots.repository.js';
+import { earliestLive } from '../features/stock/shelfLots.js';
 
 // ── Audit helper (used inside existing transactions) ──────────
 const logEvent = async (client, slipId, eventType, actorId, detail = null) => {
@@ -228,18 +230,7 @@ const getSlipById = async (id) => {
        psi.packer_note,
        psi.confirmed_at,
        p.name               AS product_name,
-       p.stock_keeping_unit AS sku,
-       -- FEFO: the soonest use-by date on record for this product that
-       -- has not passed, for the packer to take first. It is the date on
-       -- a delivery line, not a count of what is left of it — stock is
-       -- one balance per product — so it says which date to look for on
-       -- the shelf, and nothing about how much of it remains. NULL for a
-       -- product nobody has recorded a date for (dry goods).
-       (SELECT MIN(dni.expiry_date)::text
-          FROM delivery_note_items dni
-         WHERE dni.product_id = psi.product_id
-           AND dni.expiry_date >= (now() AT TIME ZONE 'Africa/Johannesburg')::date
-       ) AS use_first_date
+       p.stock_keeping_unit AS sku
      FROM picking_slip_items psi
      JOIN products p ON p.id = psi.product_id
      WHERE psi.picking_slip_id = $1
@@ -250,7 +241,20 @@ const getSlipById = async (id) => {
 
   if (!slipResult.rows[0]) return null;
 
-  return { ...slipResult.rows[0], items: itemsResult.rows };
+  // FEFO: the soonest use-by date among the deliveries probably still on
+  // the shelf (not ones a manager has dismissed), for the packer to look
+  // for first. An estimate, like the lots it comes from: it says which
+  // date to look for, not how much of it remains. NULL for a product
+  // nobody has recorded a date for (dry goods).
+  const productIds = [...new Set(itemsResult.rows.map((i) => i.product_id))];
+  const shelf = productIds.length > 0 ? await loadShelfLots({ productIds }) : new Map();
+  const today = todayInSAST();
+  const items = itemsResult.rows.map((item) => ({
+    ...item,
+    use_first_date: earliestLive(shelf.get(item.product_id)?.lots ?? [], today)?.expiryDate ?? null,
+  }));
+
+  return { ...slipResult.rows[0], items };
 };
 
 // ── One slip's lines ──────────────────────────────────────────
