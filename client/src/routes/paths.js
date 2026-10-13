@@ -14,6 +14,13 @@ const DONATIONS_NEW = '/donations/new';
 
 export const LANDING = '/';
 
+// Public pages anyone can read without signing in. The Google sign-in
+// consent screen links to both.
+export const LEGAL = {
+  privacy: '/privacy',
+  terms: '/terms',
+};
+
 export const PACKING = {
   // Warehouse staff only (managers follow packing on Picking Slips).
   board: '/noc/packing',

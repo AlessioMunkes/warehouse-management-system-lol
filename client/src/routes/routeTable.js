@@ -40,7 +40,7 @@ import {
   PackageOpen, PackageCheck, FlaskConical, ClipboardCheck, HandCoins, PhoneCall,
   ScrollText, Sprout, MessageCircle, Settings, Landmark, CalendarDays,
 } from 'lucide-react';
-import { STAFF, ADMIN, VOLUNTEERS, PACKING, DONATIONS } from './paths';
+import { STAFF, ADMIN, VOLUNTEERS, PACKING, DONATIONS, LEGAL } from './paths';
 import {
   MANAGERS_UP, MANAGER_ONLY, ADMIN_ONLY, GUEST_ONLY, WORKERS_ONLY,
 } from './permissions';
@@ -68,6 +68,10 @@ export const ROUTES = [
   // The page behind each pallet's QR code (BR-22): only what is
   // already printed on the label.
   { id: 'slipPreview',    path: '/slip/:token',           roles: null },
+  // What the system keeps and the terms of using it. Linked from the
+  // landing page, the sign-in page and Google's consent screen.
+  { id: 'privacy',        path: LEGAL.privacy,            roles: null },
+  { id: 'terms',          path: LEGAL.terms,              roles: null },
 
   // ── Dashboards ─────────────────────────────────────────────
   { id: 'managerDashboard', path: '/manager', roles: MANAGER_ONLY, shell: true,

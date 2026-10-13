@@ -19,6 +19,7 @@
 import pool from '../config/db.js';
 import { COLLECTED_STATUSES, SAST } from '../features/reporting/reportCatalog.js';
 import { OPEN_PO_STATUSES } from '../constants/purchaseOrderStatus.js';
+import stockCoverRepo from './stockCover.repository.js';
 
 const sastDate = (col) => `((${col} AT TIME ZONE '${SAST}')::date)`;
 const TODAY = `((NOW() AT TIME ZONE '${SAST}')::date)`;
@@ -457,36 +458,27 @@ const stockFlow = async ({ filters, dateRange }) => {
 };
 
 // ══ Days of cover ═════════════════════════════════════════════
-// On hand ÷ the average daily dispatch over the last 90 days. A
-// product not dispatched in that window never runs out at this rate
-// and is left out. Most urgent first.
-const COVER_WINDOW_DAYS = 90;
+// The shared stock cover (features/stock/stockCover.js): the same
+// figures as the dashboard's stock outlook and the reorder planner.
+// A product with no demand never runs out and is left out. Most
+// urgent first. Each row's note says where its demand and lead time
+// came from and what missing data held it back.
+const fmtDay = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 const daysOfCover = async ({ filters, limit }) => {
-  const params = [COVER_WINDOW_DAYS];
-  const where = [`p.is_active = true`];
-  if (filters.programme_id) { params.push(filters.programme_id); where.push(`p.programme_id = $${params.length}`); }
-  params.push(limit ?? 10);
-  const { rows } = await pool.query(
-    `WITH out AS (
-       SELECT sm.product_id, SUM(-sm.quantity) / $1::numeric AS per_day
-         FROM stock_movements sm
-        WHERE sm.movement_type = 'dispatched' AND sm.quantity < 0
-          AND ${sastDate('sm.created_at')} > ${TODAY} - $1::int
-        GROUP BY sm.product_id
-     )
-     SELECT p.name AS label, GREATEST(sl.quantity_on_hand, 0)::numeric AS on_hand, sl.unit, out.per_day,
-            ROUND(GREATEST(sl.quantity_on_hand, 0) / out.per_day, 1)::numeric AS value,
-            to_char(${TODAY} + FLOOR(GREATEST(sl.quantity_on_hand, 0) / out.per_day)::int, 'YYYY-MM-DD') AS run_out
-       FROM out JOIN products p ON p.id = out.product_id
-       JOIN stock_levels sl ON sl.product_id = p.id
-      WHERE out.per_day > 0 AND ${where.join(' AND ')}
-      ORDER BY value ASC, p.name LIMIT $${params.length}`,
-    params
-  );
-  return rows.map((x) => ({
-    label: x.label, value: num(x.value),
-    meta: { onHand: num(x.on_hand), perDay: Number(num(x.per_day).toFixed(2)), stockUnit: x.unit, runOut: x.run_out },
-  }));
+  const { items } = await stockCoverRepo.loadStockCover({ programmeId: filters.programme_id ?? null });
+  return items
+    .filter((i) => i.daysOfCover !== null)
+    .sort((a, b) => a.daysOfCover - b.daysOfCover || a.name.localeCompare(b.name))
+    .slice(0, limit ?? 10)
+    .map((i) => ({
+      label: i.name, value: i.daysOfCover,
+      meta: {
+        onHand: i.onHand, available: i.available, stockUnit: i.unit,
+        perDay: Number((i.weeklyDemand / 7).toFixed(2)), runOut: i.runsOutOn, orderBy: i.orderBy,
+        demand: i.demandLabel, leadTime: i.leadLabel, limits: i.limits,
+        note: [`Demand: ${i.demandLabel}`, `Order by ${fmtDay(i.orderBy)} (lead time: ${i.leadLabel})`, ...i.limits].join('. '),
+      },
+    }));
 };
 
 export default {

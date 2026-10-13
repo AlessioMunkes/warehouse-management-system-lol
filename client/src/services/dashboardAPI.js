@@ -82,18 +82,21 @@ export const toInsights = (row = {}) => {
   const n = (v) => Number(v ?? 0);
   return {
     recipeName: row.recipeName ?? null,
+    // The shared stock cover (server features/stock/stockCover.js), the
+    // same figures as the reorder planner and the Days of stock left
+    // report, with where demand and lead time came from.
     stockCover: (row.stockCover ?? []).map((p) => ({
       productId: p.productId, name: p.name, unit: p.unit,
       available: n(p.available), dueIn: n(p.dueIn), nextDue: p.nextDue ?? null,
-      weeklyUse: n(p.weeklyUse), weeklyUnit: p.weeklyUnit ?? p.unit,
-      // 'recipe': a week of slips on the recipe in use; 'history': the
-      // average sent out a week lately.
-      usage: p.usage === 'history' ? 'history' : 'recipe',
-      weeks: p.weeks == null ? null : Number(p.weeks),
+      overdue: n(p.overdue), ifOverdueArrived: p.ifOverdueArrived ?? null,
+      weeklyUse: n(p.weeklyUse),
+      demandLabel: p.demandLabel ?? '', leadLabel: p.leadLabel ?? '', orderBy: p.orderBy ?? null,
+      limits: p.limits ?? [],
+      weeks: n(p.weeks),
       runsShortOn: p.runsShortOn ?? null,
       mayExpireOn: p.mayExpireOn ?? null,
     })),
-    outlook: { usageWeeks: n(row.outlook?.usageWeeks) || 8, dueInWeeks: n(row.outlook?.dueInWeeks) || 4 },
+    outlook: { usageWeeks: n(row.outlook?.usageWeeks) || 8, unmeasured: n(row.outlook?.unmeasured) },
     packing: { total: n(row.packing?.total), packed: n(row.packing?.packed), inProgress: n(row.packing?.inProgress) },
     missedWeeks: n(row.missedWeeks),
     missedCollections: (row.missedCollections ?? []).map((c) => ({

@@ -1,9 +1,10 @@
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate }                 from 'react-router-dom';
+import { Link, useNavigate }           from 'react-router-dom';
 import L                               from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { getPublicImpactSummary }      from '../services/publicImpactAPI';
+import { LEGAL }                       from '../routes/paths';
 
 // ── Image fallback ───────────────────────────────────────────
 function ImgWithFallback({ src, alt, fallbackText, fallbackPath, className }) {
@@ -742,6 +743,10 @@ const LandingPage = () => {
           <div className="lol-footer-bottom">
             <span>Ladles of Love is a registered South African non-profit organisation.</span>
             <span>© Ladles of Love · Warehouse Management System</span>
+            <span className="lol-footer-legal">
+              <Link to={LEGAL.privacy}>Privacy Policy</Link>
+              <Link to={LEGAL.terms}>Terms of Service</Link>
+            </span>
           </div>
         </div>
       </footer>

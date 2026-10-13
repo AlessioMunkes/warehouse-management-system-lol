@@ -22,7 +22,15 @@
     <title>Ladles of Love: Warehouse Management</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Plain links for anything that reads this page without running
+           the app (a crawler, Google's consent-screen review, a very slow
+           first load). React replaces everything inside #root the moment
+           it starts, so signed-in users never see these. -->
+      <p style="font:14px system-ui,sans-serif;text-align:center;margin:24px">
+        <a href="/privacy">Privacy Policy</a> &middot; <a href="/terms">Terms of Service</a>
+      </p>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

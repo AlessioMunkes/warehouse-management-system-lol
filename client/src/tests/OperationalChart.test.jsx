@@ -91,6 +91,27 @@ describe('OperationalChart', () => {
     expect(onHighlight).toHaveBeenLastCalledWith(null);
   });
 
+  it('shows where each row was worked out from, when the report says', () => {
+    const cover = {
+      spec: { metric: 'days_of_cover', dimension: 'product' },
+      chartType: 'hbar',
+      meta: { unit: 'days' },
+      series: [
+        { label: 'Maize meal', value: 12, meta: { note: 'Demand: Summer recipe. Order by 20 Oct (lead time: Assumed 7 days)' } },
+        { label: 'Onions', value: 30, meta: { note: 'Demand: Sent out, last 8 weeks. Planned demand not used: 1 line in kg, no bag weight set' } },
+      ],
+    };
+    render(<OperationalChart report={cover} dimensionLabel="Product" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Table' }));
+    const table = screen.getByRole('table');
+    expect(within(table).getByText('Worked out from')).toBeInTheDocument();
+    expect(within(table).getByText(/Planned demand not used: 1 line in kg, no bag weight set/)).toBeInTheDocument();
+    // A report without notes keeps two columns.
+    render(<OperationalChart report={category} dimensionLabel="ECD centre" />);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Table' })[1]);
+    expect(within(screen.getAllByRole('table')[1]).queryByText('Worked out from')).not.toBeInTheDocument();
+  });
+
   it('opens on the view the AI was asked for', () => {
     render(<OperationalChart report={category} hint="donut" />);
     expect(screen.getByRole('button', { name: 'Donut' })).toHaveAttribute('aria-pressed', 'true');
