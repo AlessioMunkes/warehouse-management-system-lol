@@ -15,19 +15,26 @@
 // then scanned a pallet — the name step is skipped: the server binds
 // the existing volunteer rather than creating a second one, so asking
 // again would be asking someone to introduce themselves twice.
+//
+// STAFF ARE NOT VOLUNTEERS. A worker, manager or admin who opens a pallet
+// link is already signed in, and the guest flow would swap their staff
+// session for a volunteer's. They are sent to their own screen for that
+// pallet instead (StaffSlipRedirect below) and nothing is claimed here.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useGuestSignOut } from '../features/guest/useGuestSignOut';
 import { useT } from '../translations';
+import { staffDestination } from '../features/scan/slipCode';
+import { homeForRole } from '../components/layout/navSections';
 import { fetchSlipPreview, claimSlipByToken } from '../services/guestSlipAPI';
 import {
   GuestShell, GuestScreen, PlaceBar, Button, Notice,
   PalletCard, HelpNote, Loading, SignOutConfirm,
 } from '../features/guest/GuestPrimitives';
 
-const SlipPreviewPage = () => {
+const GuestSlipPreview = () => {
   const { token } = useParams();
   const navigate = useNavigate();
   const { user, refreshFromClaim } = useAuth();
@@ -99,7 +106,7 @@ const SlipPreviewPage = () => {
     return (
       <GuestShell>
         <GuestScreen
-          title="We could not find that pallet"
+          title={t('guest.slip.notFoundTitle')}
           lede="The code may be mistyped, or the pallet may be finished."
         >
           <Notice tone="warn">{error || 'That code did not match a pallet.'}</Notice>
@@ -219,6 +226,62 @@ const SlipPreviewPage = () => {
       </GuestScreen>
     </GuestShell>
   );
+};
+
+// ── A signed-in staff member opening a pallet link ────────────
+// The preview is public and already carries the slip id, so no new
+// endpoint is needed: look the token up, then go to the screen that
+// person uses for a pallet. The worker screen shows who holds it, and
+// says so itself when the pallet is finished or cancelled.
+const StaffSlipRedirect = () => {
+  const { token } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const t = useT();
+  const [error, setError] = useState(null);
+  const [adminStop, setAdminStop] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchSlipPreview(token)
+      .then((slip) => {
+        if (cancelled) return;
+        const to = staffDestination(user.role, slip.id);
+        if (to) navigate(to, { replace: true });
+        else setAdminStop(true);
+      })
+      .catch((err) => { if (!cancelled) setError(err.message); });
+    return () => { cancelled = true; };
+  }, [token, user.role, navigate]);
+
+  if (!error && !adminStop) {
+    return <GuestShell><Loading label={t('guest.slip.staffOpening')} /></GuestShell>;
+  }
+
+  return (
+    <GuestShell>
+      <GuestScreen title={t('guest.slip.notFoundTitle')}>
+        <Notice tone="warn">{adminStop ? t('guest.slip.staffAdmin') : error}</Notice>
+        <Button onClick={() => navigate(homeForRole(user.role), { replace: true })}>
+          {t('guest.slip.staffHome')}
+        </Button>
+      </GuestScreen>
+    </GuestShell>
+  );
+};
+
+const SlipPreviewPage = () => {
+  const { user, isLoading } = useAuth();
+  const t = useT();
+
+  // The session check is a round trip: until it answers we cannot tell a
+  // volunteer from a worker, and showing the guest page first would flash
+  // it at someone about to be redirected.
+  if (isLoading) {
+    return <GuestShell><Loading label={t('guest.slip.staffOpening')} /></GuestShell>;
+  }
+  if (user && user.role !== 'guest') return <StaffSlipRedirect />;
+  return <GuestSlipPreview />;
 };
 
 export default SlipPreviewPage;
