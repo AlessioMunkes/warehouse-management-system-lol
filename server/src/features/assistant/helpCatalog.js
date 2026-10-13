@@ -1319,7 +1319,7 @@ export const TOPICS = [
       'Committed: already promised to picking slips that haven’t gone out.',
       'Available: on hand minus committed, in bold. This is the number to trust; red means more is promised than we have.',
       'Reorder at: the level below which the product counts as low.',
-      'Earliest expiry: a countdown when it is within the month, otherwise the date.',
+      'Earliest expiry: the soonest use-by date of a delivery that is probably still on the shelf, as a countdown when it is within the month, otherwise the date. It is an estimate: it assumes the oldest stock goes out first.',
     ],
     followUp: {
       question: 'Would you like to know how to see one product in detail?',
@@ -1339,8 +1339,10 @@ export const TOPICS = [
     body:
       'Click a product in Inventory and it opens beside the list, which stays in use; ' +
       'click another product to switch. It shows the four figures, the balance over time with ' +
-      'the reorder line on it, expiry by delivery (soonest first), recent movements, ' +
-      'and the catalogue details. Adjust stock is at the foot of the panel.',
+      'the reorder line on it, expiry by delivery (soonest first, with about how much of each ' +
+      'is left), recent movements, and the catalogue details. Adjust stock is at the foot of ' +
+      'the panel. If an expiry warning is wrong, for example the stock was used or checked and ' +
+      'is fine, a manager can dismiss it from there with a reason.',
     followUp: {
       question: 'Would you like to know how to see every stock movement across the warehouse?',
       topic: 'stock-ledger',
@@ -1431,7 +1433,8 @@ export const TOPICS = [
       'Expired. It has to come off the figures, otherwise the next picking slip ' +
       'promises food that can’t be sent.\n\n' +
       'The Expiring in 30 days tab in Inventory shows what is close, so it can go out ' +
-      'first instead.',
+      'first instead. It works from an estimate of which deliveries are still on the shelf, ' +
+      'so a manager can dismiss a warning that is wrong.',
     followUp: {
       question: 'Would you like to know how to make a stock adjustment?',
       topic: 'stock-adjustment',

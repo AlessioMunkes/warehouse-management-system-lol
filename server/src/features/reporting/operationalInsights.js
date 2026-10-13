@@ -124,7 +124,7 @@ export const ACTION_LISTS = {
     entry: (r) => ({
       name: r.name,
       detail: `Expires ${fmtDate(r.expiry_date)} (${r.days_left === 0 ? 'today' : `in ${plural(r.days_left, 'day')}`})`
-        + ` · ${fmtNum(r.quantity, 2)} ${r.unit ?? ''} received on that line`,
+        + ` · about ${fmtNum(r.quantity, 2)} of ${fmtNum(r.received, 2)} ${r.unit ?? ''} left (estimated)`,
     }),
   },
 

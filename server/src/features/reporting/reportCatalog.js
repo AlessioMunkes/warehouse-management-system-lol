@@ -660,12 +660,12 @@ export const METRICS = {
   expiring_stock: {
     id: 'expiring_stock', label: 'Stock expiring soon', temporal: 'snapshot',
     description:
-      'Stock still on the shelf with an expiry date in the next 30 days, counted by delivery line, by week of ' +
-      'expiry or by product. A live figure. Run this when asked what is about to expire.',
+      'Deliveries estimated to still have stock on the shelf, with an expiry date in the next 30 days, counted by ' +
+      'delivery line, by week of expiry or by product. A live figure. Run this when asked what is about to expire.',
     repoFn: 'expiringStock', unit: 'delivery lines',
     dimensions: ['week', 'product', 'day', 'product_category'], filters: [],
     defaultChart: 'bar',
-    caveat: 'Based on the expiry date recorded at receiving. A product with nothing left on the shelf is left out, but a part-used delivery still counts as one line.',
+    caveat: 'An estimate. Stock is not batch-tracked, so it assumes the oldest stock goes out first and works out which deliveries are probably still on the shelf. A part-used delivery counts as one line. Warnings a manager has dismissed are left out.',
   },
 
   adjustment_reasons: {
