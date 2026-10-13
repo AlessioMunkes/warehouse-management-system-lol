@@ -55,7 +55,9 @@
 //                      weekly rate, each incoming order added on its
 //                      day: the first day there is nothing left. An
 //                      order that comes after a gap does not hide it.
-//   days / weeks       days until then, and the same in weeks.
+//   days / weeks       days until then, and the same in weeks (one
+//                      decimal). coverDays is the same in whole days,
+//                      rounded down: what the screens say.
 //   runs out on shelf  the same with nothing incoming.
 //   order by           runs out on, less the lead time.
 //   suggested          a horizon's demand, less available, incoming and
@@ -90,6 +92,10 @@ const num = (v) => (v === null || v === undefined || v === '' ? 0 : Number(v));
 const round = (n, dp = 2) => Math.round(n * 10 ** dp) / 10 ** dp;
 export const addDays = (iso, days) => new Date(Date.parse(`${iso}T00:00:00Z`) + days * DAY).toISOString().slice(0, 10);
 const daysBetween = (from, to) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY);
+// Whole days of cover, always rounded down. The tiny rounding first keeps
+// a cover that is exactly 14 days from reading 13 for want of a float's
+// last digit.
+const wholeDays = (days) => Math.floor(round(days, 6));
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 // Why a quantity in `from` cannot be turned into `to`: a size nobody
@@ -240,7 +246,7 @@ export const coverFor = (row, {
 
   if (demand.weekly <= 0) {
     return {
-      ...base, status: 'no_demand', daysOfCover: null, weeksOfCover: null, runsOutOn: null, shelfRunsOutOn: null,
+      ...base, status: 'no_demand', daysOfCover: null, weeksOfCover: null, coverDays: null, runsOutOn: null, shelfRunsOutOn: null,
       orderBy: null, suggestedQuantity: 0, ifOverdueArrived: null, projection: [],
     };
   }
@@ -256,7 +262,7 @@ export const coverFor = (row, {
   let ifOverdueArrived = null;
   if (overdue > 0) {
     const late = drawDown(available, perDay, [...arrivals, { day: 0, quantity: overdue }]);
-    ifOverdueArrived = { weeksOfCover: round(late / 7, 1), runsOutOn: addDays(today, Math.floor(late)) };
+    ifOverdueArrived = { weeksOfCover: round(late / 7, 1), coverDays: wholeDays(late), runsOutOn: addDays(today, Math.floor(late)) };
   }
 
   const needed = demand.weekly * horizonWeeks - available - incoming - overdue;
@@ -289,6 +295,7 @@ export const coverFor = (row, {
     status,
     daysOfCover: round(days, 1),
     weeksOfCover: round(days / 7, 1),
+    coverDays: wholeDays(days),
     runsOutOn,
     shelfRunsOutOn,
     orderBy,

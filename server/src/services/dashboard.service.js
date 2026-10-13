@@ -54,6 +54,7 @@ export const stockOutlook = (items) => {
       orderBy: i.orderBy,
       limits: i.limits,
       weeks: i.weeksOfCover,
+      days: i.coverDays,
       runsShortOn: i.weeksOfCover < SHORT_WITHIN_WEEKS ? i.runsOutOn : null,
       mayExpireOn: i.mayExpireOn,
       mayExpireQuantity: i.mayExpireQuantity,

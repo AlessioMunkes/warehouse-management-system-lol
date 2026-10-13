@@ -19,6 +19,7 @@ import pool from '../config/db.js';
 import expiryWarningRepository from '../repositories/expiryWarning.repository.js';
 import { createNotification } from '../repositories/notification.repository.js';
 import settings from './settings.service.js';
+import { pluralUnit } from '../features/units/pluralUnit.js';
 
 // The two windows come from Settings (stock.expiryWarningFirstDays /
 // SecondDays), defaulting to 14 and 7. The notification TYPES stay
@@ -42,12 +43,15 @@ const tiers = async () => {
 const formatDate = (value) =>
   new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
 
-// "12 of 40 kg": what is probably left of the delivery, and what came in.
+// "12 of 40 kg", "1 of 10 crates": what is probably left of the delivery,
+// and what came in.
 const stockLeft = (item) => {
-  const unit = item.unit ? ` ${item.unit}` : '';
-  return item.quantity_left === undefined || item.quantity_left === null
-    ? `${item.received_quantity}${unit}`
-    : `${item.quantity_left} of ${item.received_quantity}${unit}`;
+  const left = item.quantity_left;
+  const hasLeft = left !== undefined && left !== null;
+  const unit = (n) => (item.unit ? ` ${pluralUnit(item.unit, n)}` : '');
+  return hasLeft
+    ? `${left} of ${item.received_quantity}${unit(item.received_quantity)}`
+    : `${item.received_quantity}${unit(item.received_quantity)}`;
 };
 
 // One notification, in its own transaction — a failure notifying

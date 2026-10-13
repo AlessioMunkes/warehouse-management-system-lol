@@ -60,6 +60,25 @@ describe('stock cover', () => {
     });
   });
 
+  it('gives whole days of cover, always rounded down', () => {
+    // 100 available at 5 a day is 20 days exactly.
+    expect(cover().coverDays).toBe(20);
+    // 99 at 5 a day is 19.8 days: 19, not 20, though daysOfCover shows 19.8.
+    expect(cover({ on_hand: 119 })).toMatchObject({ daysOfCover: 19.8, coverDays: 19 });
+    // 100 at 50 a week (7.142857 a day) is exactly 14 days; a float must not make it 13.
+    expect(cover({ recipe_weekly: 50 })).toMatchObject({ coverDays: 14 });
+    // Nothing available: none.
+    expect(cover({ on_hand: 20 }).coverDays).toBe(0);
+    // No demand, nothing to measure.
+    expect(cover({ recipe_weekly: 0 }).coverDays).toBeNull();
+  });
+
+  it('gives the whole days of cover there would be if the overdue orders arrived today', () => {
+    // 100 available + 50 overdue at 5 a day = 30 days.
+    const c = cover({ incoming: [{ quantity: 50, expectedOn: '2026-10-05' }] });
+    expect(c.ifOverdueArrived).toMatchObject({ coverDays: 30 });
+  });
+
   it('adds an order on the day it is due', () => {
     // 70 kg on day 14: 30 left then, 100 after, 20 more days.
     const c = cover({ incoming: [{ quantity: 70, expectedOn: '2026-10-26' }] });

@@ -96,6 +96,20 @@ describe('runExpiryCheck', () => {
     expect(secondArgs.title).toMatch(/Tinned beans expires in 1 week/);
   });
 
+  it('says crates in the plural, and crate for one', async () => {
+    repoMock.findApproachingExpiry.mockResolvedValueOnce([
+      { ...ITEM_A, unit: 'crate', received_quantity: 10, quantity_left: 1 },
+      { ...ITEM_B, delivery_note_item_id: 3, unit: 'crate', received_quantity: 1, quantity_left: 1 },
+    ]);
+    repoMock.findApproachingExpiry.mockResolvedValueOnce([]);
+    repoMock.warningAlreadySent.mockResolvedValue(false);
+
+    await expiryWarningService.runExpiryCheck();
+
+    expect(createNotificationMock.mock.calls[0][1].body).toMatch(/^About 1 of 10 crates left/);
+    expect(createNotificationMock.mock.calls[1][1].body).toMatch(/^About 1 of 1 crate left/);
+  });
+
   it('skips a line that has already been warned at that tier', async () => {
     repoMock.findApproachingExpiry.mockResolvedValueOnce([ITEM_A]);
     repoMock.findApproachingExpiry.mockResolvedValueOnce([]);
