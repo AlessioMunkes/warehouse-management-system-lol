@@ -95,6 +95,7 @@ export const toInsights = (row = {}) => {
       weeks: n(p.weeks),
       runsShortOn: p.runsShortOn ?? null,
       mayExpireOn: p.mayExpireOn ?? null,
+      mayExpireQuantity: n(p.mayExpireQuantity),
     })),
     outlook: { usageWeeks: n(row.outlook?.usageWeeks) || 8, unmeasured: n(row.outlook?.unmeasured) },
     packing: { total: n(row.packing?.total), packed: n(row.packing?.packed), inProgress: n(row.packing?.inProgress) },

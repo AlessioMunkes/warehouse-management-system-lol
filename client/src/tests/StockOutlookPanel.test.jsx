@@ -74,6 +74,14 @@ describe('stock outlook panel', () => {
     expect(screen.queryByText(/due in/)).toBeNull();
   });
 
+  it('says how much would be left on the day, and that it is an estimate, on focus', async () => {
+    renderPanel(insights([product({
+      name: 'Pilchards', unit: 'cans', runsShortOn: null, mayExpireOn: '2026-10-20', mayExpireQuantity: 12,
+    })]));
+    fireEvent.focus(screen.getByText(/^May expire first/).closest('[tabindex]'));
+    expect(await screen.findByText(/About 12 cans would still be on the shelf at its use-by date at this rate\. Estimated: assumes oldest stock goes out first\./)).toBeInTheDocument();
+  });
+
   it('can be read with the keyboard: every explained figure takes focus', () => {
     renderPanel(insights([product({ dueIn: 0, weeks: 2, runsShortOn: null })]));
     expect(screen.getByText('2 weeks')).toHaveAttribute('tabindex', '0');

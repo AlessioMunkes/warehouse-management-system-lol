@@ -34,6 +34,7 @@ import {
   ScrollText, Truck, Users2, Warehouse,
 } from 'lucide-react';
 import StatTile from './StatTile';
+import { EXPIRY_ESTIMATE_HINT } from '../inventory/inventoryViews';
 import ActionCard from './ActionCard';
 import ReportPanel from './ReportPanel';
 import StaticChart from './StaticChart';
@@ -123,10 +124,10 @@ export const WIDGETS = [
   // tab it opens.
   tile({
     id: 'expiring-stock', title: 'Stock expiring soon', roles: MANAGER_ONLY, needs: ['attention'],
-    description: 'Products with a delivery that expires within 30 days.',
+    description: 'Products with stock estimated to expire within 30 days. Which deliveries are left is an estimate: it assumes the oldest stock goes out first.',
     render: ({ attention }) => (
       <StatTile icon={Hourglass} label="Products expiring within 30 days" value={attention.inventory.expiring}
-        to={`${INVENTORY}?status=expiring`} warn />
+        to={`${INVENTORY}?status=expiring`} warn hint={EXPIRY_ESTIMATE_HINT} />
     ),
   }),
   tile({

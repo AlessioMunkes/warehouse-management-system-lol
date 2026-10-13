@@ -29,6 +29,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { STAFF } from '../../routes/paths';
+import { EXPIRY_ESTIMATE_HINT } from '../inventory/inventoryViews';
 
 const INVENTORY = '/noc/inventory';
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
@@ -49,7 +50,8 @@ const lines = (a) => [
     text: (n) => `${plural(n, 'purchase order', 'purchase orders')} did not reach Finance by email`,
     to: `${STAFF.purchaseOrders}?status=email_failed` },
   { key: 'expiring', tone: 'warn', icon: Hourglass, count: a.inventory.expiring,
-    text: (n) => `${plural(n, 'product has', 'products have')} a delivery expiring within 30 days`,
+    text: (n) => `${plural(n, 'product has', 'products have')} stock estimated to expire within 30 days`,
+    hint: EXPIRY_ESTIMATE_HINT,
     to: `${INVENTORY}?status=expiring` },
   { key: 'awaitingApproval', tone: 'warn', image: 'po-awaiting-approval', count: a.purchaseOrders.awaitingApproval,
     text: (n) => `${plural(n, 'purchase order is', 'purchase orders are')} waiting for approval`,
@@ -148,9 +150,9 @@ export default function NeedsAttention({ attention, items, storageKey = 'wms.das
           </p>
         ) : (
           <ul className="divide-y">
-            {due.map(({ key, tone, icon: Icon, image, count, text, to }) => (
+            {due.map(({ key, tone, icon: Icon, image, count, text, to, hint }) => (
               <li key={key}>
-                <Link to={to} className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-muted/50">
+                <Link to={to} title={hint} className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-muted/50">
                   {image ? (
                     <span className="shrink-0 rounded-full border border-line bg-white p-1">
                       <img src={`/icons/dashboard/${image}.png`} alt="" aria-hidden="true" className="size-5 object-contain" />

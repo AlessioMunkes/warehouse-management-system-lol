@@ -23,6 +23,15 @@ const renderList = (attention) =>
 beforeEach(() => window.localStorage.clear());
 
 describe('NeedsAttention', () => {
+  it('words the expiring line as an estimate, with a tooltip saying so', () => {
+    renderList({ ...zero, inventory: { shortfall: 0, lowStock: 0, expiring: 3 } });
+
+    const link = screen.getByRole('link');
+    expect(link).toHaveTextContent('3 products have stock estimated to expire within 30 days');
+    expect(link).toHaveAttribute('title', 'Estimated: assumes oldest stock goes out first');
+    expect(link).toHaveAttribute('href', '/noc/inventory?status=expiring');
+  });
+
   it('lists only what is non-zero, worst first, each linking to its tab', () => {
     renderList({
       ...zero,

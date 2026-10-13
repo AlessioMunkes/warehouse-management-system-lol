@@ -97,7 +97,7 @@ const TONE = {
   bad:  { card: 'border-danger/40', icon: 'bg-danger-soft text-danger' },
 };
 
-export default function StatTile({ icon: Icon, image, label, value, to, warn, alarm, tone }) {
+export default function StatTile({ icon: Icon, image, label, value, to, warn, alarm, tone, hint }) {
   const alarming = !tone && (alarm ?? (warn && Number(value) > 0));
   const toned = TONE[tone];
   const display = useCountUp(value);
@@ -122,5 +122,7 @@ export default function StatTile({ icon: Icon, image, label, value, to, warn, al
     </Card>
   );
 
-  return to ? <Link to={to} className="block h-full">{content}</Link> : content;
+  // `hint` is a short tooltip, for a figure that is an estimate.
+  if (to) return <Link to={to} title={hint} className="block h-full">{content}</Link>;
+  return hint ? <div title={hint} className="h-full">{content}</div> : content;
 }

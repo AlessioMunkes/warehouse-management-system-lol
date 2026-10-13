@@ -18,6 +18,7 @@ import { fmtQty } from '../../lib/quantity';
 import StatusBadge from '@/components/ui/status-badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import ChartNote from '../reporting/ChartNote';
+import { EXPIRY_ESTIMATE_HINT } from '../inventory/inventoryViews';
 
 // Under two weeks is the one to act on; under four is worth watching.
 const coverTone = (weeks) => (weeks < 2 ? 'text-danger' : weeks < 4 ? 'text-warn' : 'text-good');
@@ -54,8 +55,11 @@ const outlookNote = (insights) => [
     ? `A week is what a week of slips takes: the ${insights.recipeName} recipe for centres on it, standing orders for the rest. Where that cannot be worked out, the average sent out a week over the last ${insights.outlook.usageWeeks} weeks.`
     : `A week is what a week of slips takes on standing orders, or where that cannot be worked out, the average sent out a week over the last ${insights.outlook.usageWeeks} weeks.`,
   'Weeks is how long available stock lasts at that rate, with orders added on the day they are due.',
-  'May expire first means the next use-by date comes before the stock would be used up. Use-by dates are kept per delivery, so this assumes the oldest stock goes first.',
+  'May expire first means a delivery on the shelf will not all be used by its use-by date at that rate. Use-by dates are kept per delivery, so which deliveries are left is an estimate that assumes the oldest stock goes first. A manager can dismiss a warning in the stock detail on the Inventory page.',
 ].join(' ');
+
+// What is expected to be left on the day, and that it is an estimate.
+const mayExpireTip = (p) => `${p.mayExpireQuantity > 0 ? `About ${fmtQty(p.mayExpireQuantity, p.unit)} would still be on the shelf at its use-by date at this rate. ` : ''}${EXPIRY_ESTIMATE_HINT}.`;
 
 // Missing data that changed a product's figures. Lead time only moves
 // the order-by date, which is in the runs-short tip, so it is said there.
@@ -132,7 +136,7 @@ export function StockCoverPanel({ insights }) {
                   </Explained>
                 ) : null}
                 {p.mayExpireOn ? (
-                  <Explained tip="The next use-by date comes before this stock would be used up. This assumes the oldest stock goes first." className="no-underline">
+                  <Explained tip={mayExpireTip(p)} className="no-underline">
                     <StatusBadge kind="outlook" status="may_expire">May expire first: use-by {fmtDay(p.mayExpireOn)}</StatusBadge>
                   </Explained>
                 ) : null}
