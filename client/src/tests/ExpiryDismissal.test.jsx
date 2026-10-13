@@ -152,6 +152,21 @@ describe('dismissing an expiry warning', () => {
   });
 });
 
+describe('units in the delivery list', () => {
+  it('say crates for several and crate for one', async () => {
+    getBatches.mockResolvedValue([
+      { ...LIVE, id: 1, unit: 'crate', receivedQuantity: 10, quantityLeft: 5 },
+      { ...LIVE, id: 2, expiryDate: '2099-02-10', unit: 'crate', receivedQuantity: 10, quantityLeft: 1 },
+    ]);
+    const user = userEvent.setup();
+    render(<InventoryManagementPage />);
+    const panel = await openPanel(user);
+
+    expect(await panel.findByText(/about 5 crates left of 10/)).toBeInTheDocument();
+    expect(panel.getByText(/about 1 crate left of 10/)).toBeInTheDocument();
+  });
+});
+
 describe('the estimate is said to be one', () => {
   it('gives the Earliest expiry column a tooltip, with about how much of that delivery is left', async () => {
     render(<InventoryManagementPage />);

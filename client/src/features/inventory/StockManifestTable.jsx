@@ -38,6 +38,7 @@ import useTableView from '@/features/masterdata/useTableView';
 import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/usePaged';
 import { exportExcel } from '@/lib/excelExport';
 import { fmtQty } from '@/lib/quantity';
+import { fmtQtyUnit } from '@/lib/stockWording';
 import {
   FILTERS, EXPORT_COLUMNS, STOCK_STATUS_LABEL, STOCK_STATUS_RANK,
   EXPIRY_ESTIMATE_HINT, countdownLabel, expiryState, exportRows, filterProducts, isExpiringSoon, rowTone, stockStatus, todaySast,
@@ -323,7 +324,7 @@ function Cell({ column, product: p, onOpen, today }) {
       // Close: a countdown badge, red inside two weeks, amber inside the
       // month. Further out: the date.
       const state = expiryState(p.earliestExpiry, today);
-      const left = p.earliestExpiryLeft > 0 ? `. About ${fmtQty(p.earliestExpiryLeft, p.unit)} of that delivery left` : '';
+      const left = p.earliestExpiryLeft > 0 ? `. About ${fmtQtyUnit(p.earliestExpiryLeft, p.unit)} of that delivery left` : '';
       return (
         <TableCell className="tabular-nums" title={p.earliestExpiry ? `${EXPIRY_ESTIMATE_HINT}${left}` : undefined}>
           {isExpiringSoon(state) ? (

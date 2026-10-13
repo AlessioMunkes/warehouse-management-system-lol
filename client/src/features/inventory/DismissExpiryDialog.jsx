@@ -14,7 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { fmtQty } from '@/lib/quantity';
+import { fmtQtyUnit } from '@/lib/stockWording';
 
 export const MAX_REASON = 500;
 
@@ -38,7 +38,7 @@ export default function DismissExpiryDialog({ product, batch, expiresOn, onConfi
             <DialogTitle>Dismiss expiry warning · {product.name}</DialogTitle>
             <DialogDescription>
               The delivery with use-by {expiresOn}
-              {batch.quantityLeft !== null ? `, about ${fmtQty(batch.quantityLeft, batch.unit)} left` : ''}.
+              {batch.quantityLeft !== null ? `, about ${fmtQtyUnit(batch.quantityLeft, batch.unit)} left` : ''}.
               The warning stops showing on every screen and is not sent again. You can bring it back later.
             </DialogDescription>
           </DialogHeader>

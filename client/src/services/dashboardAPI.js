@@ -93,6 +93,8 @@ export const toInsights = (row = {}) => {
       demandLabel: p.demandLabel ?? '', leadLabel: p.leadLabel ?? '', orderBy: p.orderBy ?? null,
       limits: p.limits ?? [],
       weeks: n(p.weeks),
+      // Whole days of cover, rounded down (the screen words it).
+      days: n(p.days),
       runsShortOn: p.runsShortOn ?? null,
       mayExpireOn: p.mayExpireOn ?? null,
       mayExpireQuantity: n(p.mayExpireQuantity),

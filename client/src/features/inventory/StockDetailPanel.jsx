@@ -37,6 +37,7 @@ import StatusBadge from '@/components/ui/status-badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fmtQty } from '@/lib/quantity';
+import { fmtQtyUnit } from '@/lib/stockWording';
 import BalanceChart from './BalanceChart';
 import { dismissExpiryWarning, getBatches, getMovements, restoreExpiryWarning } from '../../services/stockAPI';
 import DismissExpiryDialog from './DismissExpiryDialog';
@@ -270,8 +271,8 @@ export default function StockDetailPanel({
                         {' · '}
                         <span className="tabular-nums">
                           {b.quantityLeft === null
-                            ? fmtQty(b.receivedQuantity, b.unit)
-                            : `about ${fmtQty(b.quantityLeft, b.unit)} left of ${fmtQty(b.receivedQuantity)}`}
+                            ? fmtQtyUnit(b.receivedQuantity, b.unit)
+                            : `about ${fmtQtyUnit(b.quantityLeft, b.unit)} left of ${fmtQty(b.receivedQuantity)}`}
                         </span>
                       </p>
                       {b.dismissal ? (

@@ -20,6 +20,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import ErrorBanner from '@/components/ui/error-banner';
 import { getReorderPlan } from '../../services/reportingAPI';
 import { exportExcel } from '../../lib/excelExport';
+import { fmtQtyUnit, weeklyUseText } from '../../lib/stockWording';
 
 const STATUS = {
   out_of_stock: { label: 'Out of stock', tone: 'bg-danger-soft text-danger' },
@@ -64,7 +65,7 @@ function Projection({ item }) {
 }
 
 function Detail({ item, horizonWeeks, historyWeeks }) {
-  const per = (n) => `${qty(n)} ${item.unit} per week`;
+  const per = (n) => weeklyUseText(n, item.unit) || 'None';
   const planned = item.recipeWeekly + item.standingWeekly;
   const facts = [
     ['Demand used', item.demandLabel],
@@ -72,14 +73,14 @@ function Detail({ item, horizonWeeks, historyWeeks }) {
       ? `${per(planned)} (recipe ${qty(item.recipeWeekly)}, standing orders ${qty(item.standingWeekly)})`
       : 'None'],
     [`Sent out, ${historyWeeks}-week average`, per(item.historyWeekly)],
-    ['On hand, committed', `${qty(item.onHand)} ${item.unit}, ${qty(item.committed)} ${item.unit} committed`],
+    ['On hand, committed', `${fmtQtyUnit(item.onHand, item.unit)}, ${fmtQtyUnit(item.committed, item.unit)} committed`],
     ['Supplier', item.supplier ?? 'None on record'],
     ['Lead time used', item.leadLabel],
-    ['On order', item.incoming > 0 ? `${qty(item.incoming)} ${item.unit}${item.nextDelivery ? `, next due ${day(item.nextDelivery)}` : ''}` : 'None'],
+    ['On order', item.incoming > 0 ? `${fmtQtyUnit(item.incoming, item.unit)}${item.nextDelivery ? `, next due ${day(item.nextDelivery)}` : ''}` : 'None'],
     ['Runs out on the shelf, nothing arriving', day(item.shelfRunsOutOn)],
   ];
   if (item.overdue > 0) {
-    facts.push(['Overdue, chase supplier', `${qty(item.overdue)} ${item.unit} on ${plural(item.overdueOrders, 'order')}`
+    facts.push(['Overdue, chase supplier', `${fmtQtyUnit(item.overdue, item.unit)} on ${plural(item.overdueOrders, 'order')}`
       + (item.ifOverdueArrived ? `. If it arrived today, runs out ${day(item.ifOverdueArrived.runsOutOn)}` : '')]);
   }
   return (
@@ -252,12 +253,12 @@ export default function ReorderPlanner() {
                           <td className="px-3 py-2">
                             <span className={`whitespace-nowrap rounded-full px-2 py-0.5 font-semibold ${STATUS[i.status].tone}`}>{STATUS[i.status].label}</span>
                           </td>
-                          <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">{qty(i.available)} {i.unit}</td>
+                          <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">{fmtQtyUnit(i.available, i.unit)}</td>
                           <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                            {i.weeklyDemand > 0 ? qty(i.weeklyDemand) : '-'}
+                            {i.weeklyDemand > 0 ? weeklyUseText(i.weeklyDemand, i.unit) : '-'}
                             <span className="block text-[11px] text-muted-foreground">{i.demandLabel}</span>
                           </td>
-                          <td className="px-3 py-2 text-right tabular-nums">{i.daysOfCover === null ? '-' : qty(i.daysOfCover)}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{i.coverDays === null || i.coverDays === undefined ? '-' : i.coverDays}</td>
                           <td className="whitespace-nowrap px-3 py-2">{day(i.runsOutOn)}</td>
                           <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
                             {i.incoming > 0 ? qty(i.incoming) : '-'}
@@ -272,7 +273,7 @@ export default function ReorderPlanner() {
                             )}
                           </td>
                           <td className="whitespace-nowrap px-3 py-2 font-semibold">{day(i.orderBy)}</td>
-                          <td className="whitespace-nowrap px-3 py-2 text-right font-bold tabular-nums">{i.suggestedQuantity > 0 ? `${qty(i.suggestedQuantity)} ${i.unit}` : '-'}</td>
+                          <td className="whitespace-nowrap px-3 py-2 text-right font-bold tabular-nums">{i.suggestedQuantity > 0 ? fmtQtyUnit(i.suggestedQuantity, i.unit) : '-'}</td>
                         </tr>
                         {isOpen ? (
                           <tr className="border-t border-line bg-surface">

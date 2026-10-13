@@ -28,7 +28,7 @@ const item = (over = {}) => ({
   onHand: 25, committed: 10, available: 15, incoming: 0, nextDelivery: null, overdue: 0, overdueOrders: 0, ifOverdueArrived: null,
   weeklyDemand: 35, demandSource: 'planned', demandLabel: 'Summer recipe', recipeWeekly: 35, standingWeekly: 0, historyWeekly: 20,
   leadDays: 4, leadSource: 'median', leadLabel: 'Median of 3 orders: 4 days', reorderLevel: 20, limits: ['No agreed lead time for Cape Dry Goods'],
-  status: 'order_now', daysOfCover: 3, weeksOfCover: 0.4,
+  status: 'order_now', daysOfCover: 3.6, weeksOfCover: 0.5, coverDays: 3,
   runsOutOn: '2026-10-15', shelfRunsOutOn: '2026-10-15', orderBy: '2026-10-11', suggestedQuantity: 265,
   projection: [{ week: 1, weekEnding: '2026-10-19', balance: 0 }, { week: 2, weekEnding: '2026-10-26', balance: 0 }],
   ...over,
@@ -42,7 +42,7 @@ const PLAN = {
     item({
       productId: 2, name: 'Beans 5 kg', status: 'planned', available: 200, orderBy: '2026-11-20', runsOutOn: '2026-11-21',
       leadSource: 'assumed', leadLabel: 'Assumed 7 days', leadDays: 7, overdue: 40, overdueOrders: 1,
-      ifOverdueArrived: { weeksOfCover: 6, runsOutOn: '2026-11-23' },
+      ifOverdueArrived: { weeksOfCover: 6, coverDays: 42, runsOutOn: '2026-11-23' },
       limits: ['No agreed lead time or delivery history', 'Overdue, chase supplier'],
     }),
     item({ productId: 3, name: 'Oil 750 ml', status: 'covered', suggestedQuantity: 0, available: 900, limits: [] }),
@@ -59,7 +59,7 @@ describe('the reorder planner', () => {
     const row = screen.getByRole('row', { name: /Rice 2 kg/ });
     expect(within(row).getByText('Order now')).toBeInTheDocument();
     expect(within(row).getByText('11 Oct 2026')).toBeInTheDocument();
-    expect(within(row).getByText('265 bag')).toBeInTheDocument();
+    expect(within(row).getByText('265 bags')).toBeInTheDocument();
     // Where the figures came from, and what is missing.
     expect(within(row).getByText('Summer recipe')).toBeInTheDocument();
     expect(within(row).getByText('Median')).toBeInTheDocument();
@@ -82,8 +82,8 @@ describe('the reorder planner', () => {
     render(<ReorderPlanner />);
     await userEvent.click(await screen.findByRole('button', { name: 'Rice 2 kg' }));
     expect(screen.getByText('Median of 3 orders: 4 days')).toBeInTheDocument();
-    expect(screen.getByText('35 bag per week (recipe 35, standing orders 0)')).toBeInTheDocument();
-    expect(screen.getByText('25 bag, 10 bag committed')).toBeInTheDocument();
+    expect(screen.getByText('35 bags a week (recipe 35, standing orders 0)')).toBeInTheDocument();
+    expect(screen.getByText('25 bags, 10 bags committed')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: /Projected balance: week 1 0, week 2 0/ })).toBeInTheDocument();
   });
 
@@ -98,7 +98,7 @@ describe('the reorder planner', () => {
     expect(screen.getByText(/Lead time assumed at 7 days for 1 product with no agreed time or delivery history/)).toBeInTheDocument();
     expect(screen.getByText(/No supplier has an agreed lead time yet/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Beans 5 kg' }));
-    expect(screen.getByText('40 bag on 1 order. If it arrived today, runs out 23 Nov 2026')).toBeInTheDocument();
+    expect(screen.getByText('40 bags on 1 order. If it arrived today, runs out 23 Nov 2026')).toBeInTheDocument();
     expect(within(screen.getByRole('list', { name: 'Missing data' })).getByText('Overdue, chase supplier')).toBeInTheDocument();
   });
 
