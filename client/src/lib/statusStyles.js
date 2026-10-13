@@ -126,10 +126,12 @@ export const STATUS_STYLES = {
     expired: s('bad', CalendarX, true),
   },
   // The dashboard's stock outlook: when a product runs out at the rate
-  // it is used, and when its next use-by date comes first.
+  // it is used, when its next use-by date comes first, and an order
+  // that should have arrived.
   outlook: {
     runs_short: s('bad', CalendarX),
     may_expire: s('warn', AlarmClock),
+    overdue:    s('warn', Truck),
   },
   // A closed day on the operating calendar.
   closure: {

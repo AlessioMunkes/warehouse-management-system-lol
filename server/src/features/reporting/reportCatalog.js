@@ -732,14 +732,17 @@ export const METRICS = {
   days_of_cover: {
     id: 'days_of_cover', label: 'Days of stock left', temporal: 'snapshot',
     description:
-      'For each product, how many days the stock on hand will last at the rate it was dispatched ' +
-      'over the last 90 days, and the date it runs out. Most urgent first. Run this when asked what ' +
-      'will run out, when stock runs out, or how long stock will last. A live figure.',
+      'For each product, how many days the available stock will last (on hand less packed pallets and ' +
+      'approved benevolent requests, plus open orders on the day they are due) at the weekly demand ' +
+      'planned for slips, or the average sent out over the last 8 weeks where that cannot be worked out, ' +
+      'and the date it runs out. Most urgent first. Run this when asked what will run out, when stock ' +
+      'runs out, or how long stock will last. A live figure.',
     repoFn: 'daysOfCover', unit: 'days',
     dimensions: ['product'], filters: ['programme_id'],
     defaultChart: 'hbar', ranked: true,
     rag: { red: 14, amber: 30 },
-    caveat: 'Products not dispatched in the last 90 days are left out: at that rate they never run out.',
+    caveat: 'The same figures as the reorder planner and the dashboard stock outlook. Overdue orders are not ' +
+      'counted. Products with no demand are left out. Each product notes where its demand and lead time came from.',
   },
 
   volunteer_event_attendance: {

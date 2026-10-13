@@ -218,26 +218,33 @@ const GroupedBarView = ({ series, unit, tip, animate }) => {
   );
 };
 
-const TableView = ({ series, unit, dimensionLabel }) => (
-  <Table>
-    <TableHeader>
-      <TableRow>
-        <TableHead>{dimensionLabel}</TableHead>
-        <TableHead className="text-right">{unit === '%' ? 'Percentage' : unit}</TableHead>
-      </TableRow>
-    </TableHeader>
-    <TableBody>
-      {series.map((row) => (
-        <TableRow key={row.label}>
-          <TableCell>{formatLabel(row.label)}</TableCell>
-          <TableCell className="text-right font-medium">
-            {fmt(row.value, unit)}{row.meta?.unit ? ` ${row.meta.unit}` : ''}
-          </TableCell>
+// A row's own note (where a product's days of stock came from) gets a
+// column of its own when any row has one.
+const TableView = ({ series, unit, dimensionLabel }) => {
+  const notes = series.some((row) => row.meta?.note);
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>{dimensionLabel}</TableHead>
+          <TableHead className="text-right">{unit === '%' ? 'Percentage' : unit}</TableHead>
+          {notes ? <TableHead>Worked out from</TableHead> : null}
         </TableRow>
-      ))}
-    </TableBody>
-  </Table>
-);
+      </TableHeader>
+      <TableBody>
+        {series.map((row) => (
+          <TableRow key={row.label}>
+            <TableCell>{formatLabel(row.label)}</TableCell>
+            <TableCell className="text-right font-medium">
+              {fmt(row.value, unit)}{row.meta?.unit ? ` ${row.meta.unit}` : ''}
+            </TableCell>
+            {notes ? <TableCell className="whitespace-normal text-xs" style={{ color: MUTED }}>{row.meta?.note ?? ''}</TableCell> : null}
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+};
 
 // Built from the same series the table renders, so file and screen
 // cannot disagree. Takes `series` separately from `report.series` so
@@ -247,6 +254,9 @@ const downloadSheet = (report, dimensionLabel, series) => {
   const range = report.spec.dateRange;
   const period = range ? `${range.from} to ${range.to}` : 'As it stands now';
   const unit = report.meta?.unit ?? '';
+  // A row's own note (Days of stock left) gets a column; a report
+  // without notes exports exactly as it always has.
+  const notes = series.some((r) => r.meta?.note);
   return exportExcel({
     filename: `${report.spec.metric}-${range ? `${range.from}-to-${range.to}` : 'current'}`,
     sheetName: 'Report',
@@ -258,8 +268,12 @@ const downloadSheet = (report, dimensionLabel, series) => {
     columns: [
       { key: 'label', label: dimensionLabel, kind: 'text' },
       { key: 'value', label: unit === '%' ? 'Percentage' : (unit || 'Value'), kind: unit === 'ZAR' ? 'money' : 'number' },
+      ...(notes ? [{ key: 'note', label: 'Worked out from', kind: 'text' }] : []),
     ],
-    rows: series.map((r) => ({ label: formatLabel(r.label), value: r.value })),
+    rows: series.map((r) => ({
+      label: formatLabel(r.label), value: r.value,
+      ...(notes ? { note: r.meta?.note ?? '' } : {}),
+    })),
   });
 };
 
@@ -309,7 +323,7 @@ export default function ReportChart({ report, dimensionLabel = 'Category', compa
 
   const sortable = chartType === 'bar' || chartType === 'hbar';
   const series = sortable ? sortSeries(rawSeries, sort) : rawSeries;
-  const rows = series.map((r) => ({ name: r.label, value: Number(r.value), unit: r.meta?.unit }));
+  const rows = series.map((r) => ({ name: r.label, value: Number(r.value), unit: r.meta?.unit, note: r.meta?.note }));
   // The colour follows the category in the server's order, so a sort
   // never repaints a bar.
   const colourOf = entityColours(rawSeries);
@@ -321,7 +335,8 @@ export default function ReportChart({ report, dimensionLabel = 'Category', compa
   const tip = (cursor) => (compact ? null : (
     <Tooltip
       cursor={cursor}
-      content={<ChartTooltip unit={unit} labelFor={(l) => formatLabel(l)} total={shares ? total : null} note={note} />}
+      content={<ChartTooltip unit={unit} labelFor={(l) => formatLabel(l)} total={shares ? total : null} note={note}
+        extraFor={(shown) => (shown[0]?.payload?.note ? shown[0].payload.note.split('. ') : [])} />}
     />
   ));
 

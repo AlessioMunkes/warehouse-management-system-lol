@@ -230,7 +230,7 @@ export default function OperationalChart({
 
   // Category rows after sort and top-N. Time rows keep their order.
   const rows = useMemo(() => {
-    const base = series.map((r) => ({ name: r.label, value: r.value, unit: r.meta?.unit }));
+    const base = series.map((r) => ({ name: r.label, value: r.value, unit: r.meta?.unit, note: r.meta?.note }));
     if (shape !== 'category' || keepOrder) return base;
     const sorted = [...base].sort((a, b) =>
       sortBy === 'name' ? String(a.name).localeCompare(String(b.name)) : Math.abs(b.value) - Math.abs(a.value));
@@ -287,6 +287,9 @@ export default function OperationalChart({
 
   // The chart's own figures as a formatted sheet: one row per bar, or
   // one row per month with a column per category for a two-way chart.
+  // Rows with their own note (where a product's days of stock came
+  // from): the table and the Excel file give the note a column.
+  const rowNotes = series.some((r) => r.meta?.note);
   const exportSheet = () => {
     const range = report?.spec?.dateRange;
     const base = {
@@ -308,8 +311,14 @@ export default function OperationalChart({
         { key: 'name', label: dimensionLabel ?? 'Item', kind: 'text' },
         { key: 'value', label: 'Value', kind: unit === 'ZAR' ? 'money' : 'number' },
         { key: 'unit', label: 'Unit', kind: 'text' },
+        // A row's own note (Days of stock left) gets a column; a report
+        // without notes exports exactly as it always has.
+        ...(rowNotes ? [{ key: 'note', label: 'Worked out from', kind: 'text' }] : []),
       ],
-      rows: series.map((r) => ({ name: formatLabel(r.label), value: r.value, unit: r.meta?.unit ?? unit })),
+      rows: series.map((r) => ({
+        name: formatLabel(r.label), value: r.value, unit: r.meta?.unit ?? unit,
+        ...(rowNotes ? { note: r.meta?.note ?? '' } : {}),
+      })),
     });
   };
 
@@ -322,8 +331,12 @@ export default function OperationalChart({
   // much of the total is covered by here.
   const tipTotal = shape === 'category' && additive && series.length > 1
     ? series.reduce((s, r) => s + Number(r.value || 0), 0) : null;
-  const runningShare = (shown) => (shown[0]?.payload?.cumulative !== undefined
-    ? [`${shown[0].payload.cumulative}% of the total so far`] : []);
+  // A row's own note (where a product's days of stock came from) goes
+  // under its figure.
+  const runningShare = (shown) => [
+    ...(shown[0]?.payload?.cumulative !== undefined ? [`${shown[0].payload.cumulative}% of the total so far`] : []),
+    ...(shown[0]?.payload?.note ? shown[0].payload.note.split('. ') : []),
+  ];
   const tip = <Tooltip active={print ? false : undefined} content={<ChartTooltip unit={unit} total={tipTotal} extraFor={runningShare} />} cursor={print ? false : BAR_CURSOR} />;
 
   let body;
@@ -344,10 +357,11 @@ export default function OperationalChart({
               {twoAxis
                 ? twoAxis.keys.map((k) => <th key={k} className="py-1.5 pr-3 text-right font-medium">{formatLabel(k)}</th>)
                 : <th className="py-1.5 text-right font-medium">Value</th>}
+              {rowNotes && !twoAxis ? <th className="py-1.5 pl-3 font-medium">Worked out from</th> : null}
             </tr>
           </thead>
           <tbody>
-            {(twoAxis ? twoAxis.rows : series.map((r) => ({ name: r.label, value: r.value, unit: r.meta?.unit }))).map((r) => (
+            {(twoAxis ? twoAxis.rows : series.map((r) => ({ name: r.label, value: r.value, unit: r.meta?.unit, note: r.meta?.note }))).map((r) => (
               <tr
                 key={r.name}
                 onClick={() => setHighlight(r.name)}
@@ -358,6 +372,7 @@ export default function OperationalChart({
                 {twoAxis
                   ? twoAxis.keys.map((k) => <td key={k} className="py-1.5 pr-3 text-right tabular-nums">{fmtValue(r[k] ?? 0, unit)}</td>)
                   : <td className="py-1.5 text-right tabular-nums">{fmtValue(r.value, unit)} {r.unit ?? ''}</td>}
+                {rowNotes && !twoAxis ? <td className="py-1.5 pl-3 text-xs" style={{ color: MUTED }}>{r.note ?? ''}</td> : null}
               </tr>
             ))}
           </tbody>
