@@ -30,11 +30,25 @@ const fail = (status, message, extra = {}) => {
 // anyway — either way, the paper in their hand did not work.
 const NOT_FOUND = 'That code did not match a pallet. Check the code, or ask a staff member.';
 
+// Why a pallet cannot be taken or worked any more, by what became of it.
+// "Already finished" for all of them was wrong for a cancelled pallet,
+// which was never packed, and for one that has left the gate. Same three
+// outcomes the worker screen tells apart (picking.service.js).
+const gone = (status) => {
+  if (status === 'cancelled')  return 'was cancelled';
+  if (status === 'dispatched') return 'has already been collected';
+  return 'is already packed';
+};
+// A volunteer who scanned or typed a code is told where to go next.
+const takenMessage = (status) => `That pallet ${gone(status)}. Ask a staff member for another one.`;
+// A volunteer already packing it is just told how it stands.
+const workingMessage = (status) => `This pallet ${gone(status)}.`;
+
 // Every way the repository can refuse a claim, as the volunteer should
 // hear it. Shared by the claim by token or code and the claim by id.
 const refuseUnlessClaimed = (result) => {
   if (result.notFound)         fail(404, NOT_FOUND);
-  if (result.locked)           fail(409, 'That pallet is already finished. Ask a staff member for another one.');
+  if (result.locked)           fail(409, takenMessage(result.status));
   if (result.takenByStaff)     fail(409, 'A staff member is already packing that pallet. Ask them for another one.');
   if (result.takenByVolunteer) fail(409, 'Someone else is already packing that pallet. Ask a staff member for another one.');
   if (result.alreadyHolding) {
@@ -122,7 +136,7 @@ const claim = async ({ token, code, name, existingVolunteerId = null }) => {
   const preview = await resolveSlip({ token, code });
 
   if (!slipAccessRepo.CLAIMABLE_STATUSES.includes(preview.status)) {
-    fail(409, 'That pallet is already finished. Ask a staff member for another one.');
+    fail(409, takenMessage(preview.status));
   }
 
   let existing = null;
@@ -172,7 +186,7 @@ const claimById = async (user, slipId) => {
   if (!preview) fail(404, NOT_FOUND);
 
   if (!slipAccessRepo.CLAIMABLE_STATUSES.includes(preview.status)) {
-    fail(409, 'That pallet is already finished. Ask a staff member for another one.');
+    fail(409, takenMessage(preview.status));
   }
 
   const volunteer = await slipAccessRepo.getVolunteerById(user.id);
@@ -279,7 +293,7 @@ const confirmItem = async (user, slipId, itemId, { packedQuantity: raw }) => {
   });
 
   if (result.notFound)  fail(404, 'That item is not on this pallet.');
-  if (result.locked)    fail(409, 'This pallet is already finished.');
+  if (result.locked)    fail(409, workingMessage(result.status));
   if (result.forbidden) fail(403, 'That pallet is not yours to pack.');
   return result;
 };
@@ -314,7 +328,7 @@ const flagItem = async (user, slipId, itemId, { reason, packedQuantity: raw, not
   });
 
   if (result.notFound)  fail(404, 'That item is not on this pallet.');
-  if (result.locked)    fail(409, 'This pallet is already finished.');
+  if (result.locked)    fail(409, workingMessage(result.status));
   if (result.forbidden) fail(403, 'That pallet is not yours to pack.');
   return result;
 };
@@ -330,7 +344,7 @@ const completeSlip = async (user, slipId, { palletRef } = {}) => {
   });
 
   if (result.notFound)       fail(404, 'That pallet no longer exists.');
-  if (result.alreadyComplete) fail(409, 'This pallet is already finished.');
+  if (result.alreadyComplete) fail(409, workingMessage('complete'));
   if (result.forbidden)      fail(403, 'That pallet is not yours to pack.');
   if (result.pendingItems) {
     fail(409, `There ${result.pendingItems === 1 ? 'is' : 'are'} still ` +

@@ -278,6 +278,29 @@ describe('POST /api/slip/:token/claim', () => {
 
     expect(res.status).toBe(409);
     expect(poolQuery).not.toHaveBeenCalled();   // no volunteer row for a dead pallet
+    expect(slipAccessRepo.claimForVolunteer).not.toHaveBeenCalled();
+  });
+
+  // Each outcome says what became of the pallet. A cancelled one was never
+  // packed, so "already finished" was wrong for it.
+  it.each([
+    ['cancelled',  /was cancelled/i],
+    ['dispatched', /already been collected/i],
+    ['complete',   /already packed/i],
+  ])('says what happened to a %s pallet', async (status, wording) => {
+    slipAccessRepo.getPreviewByToken.mockResolvedValue({ ...previewRow, status });
+    const res = await request(app).post(`/api/slip/${TOKEN}/claim`).send({ name: 'Thabo' });
+
+    expect(res.status).toBe(409);
+    expect(res.body.message).toMatch(wording);
+    expect(res.body.message).not.toMatch(/finished/i);
+  });
+
+  it('says the same when the pallet changed between the look-up and the lock', async () => {
+    slipAccessRepo.claimForVolunteer.mockResolvedValue({ locked: true, status: 'cancelled' });
+    const res = await request(app).post(`/api/slip/${TOKEN}/claim`).send({ name: 'Thabo' });
+    expect(res.status).toBe(409);
+    expect(res.body.message).toMatch(/was cancelled/i);
   });
 
   it('claims by short code too', async () => {
@@ -420,6 +443,21 @@ describe('guest writes', () => {
   beforeEach(() => {
     pickingRepo.setItemStatus.mockResolvedValue({ item: { id: 1 }, variance: null });
     pickingRepo.completeSlip.mockResolvedValue({ slip: { id: 132, status: 'complete' } });
+  });
+
+  it.each([
+    ['cancelled',  /was cancelled/i],
+    ['dispatched', /already been collected/i],
+    ['complete',   /already packed/i],
+  ])('says what happened when the pallet is %s under a guest mid-pack', async (status, wording) => {
+    pickingRepo.setItemStatus.mockResolvedValue({ locked: true, status });
+    const res = await request(app)
+      .post('/api/slip/132/items/1/confirm')
+      .set('Cookie', authCookie(GUEST))
+      .send({ packedQuantity: 5 });
+
+    expect(res.status).toBe(409);
+    expect(res.body.message).toMatch(wording);
   });
 
   it('confirms an item on the guest’s own slip', async () => {

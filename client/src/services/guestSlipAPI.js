@@ -41,6 +41,8 @@ const request = async (path, options = {}) => {
     // The short-code screen needs to tell "no such code" from "that code
     // matches more than one pallet" — they need different wording.
     err.ambiguous = Boolean(json.ambiguous);
+    // A guest who already holds a pallet and tries to take another.
+    err.alreadyHolding = Boolean(json.alreadyHolding);
     throw err;
   }
   return json.data;

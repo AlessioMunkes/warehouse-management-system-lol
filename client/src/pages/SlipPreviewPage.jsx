@@ -20,6 +20,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useGuestSignOut } from '../features/guest/useGuestSignOut';
+import { useT } from '../translations';
 import { fetchSlipPreview, claimSlipByToken } from '../services/guestSlipAPI';
 import {
   GuestShell, GuestScreen, PlaceBar, Button, Notice,
@@ -30,6 +31,7 @@ const SlipPreviewPage = () => {
   const { token } = useParams();
   const navigate = useNavigate();
   const { user, refreshFromClaim } = useAuth();
+  const t = useT();
 
   const [slip, setSlip]       = useState(null);
   const [loading, setLoading] = useState(true);
@@ -81,7 +83,9 @@ const SlipPreviewPage = () => {
       navigate('/guest-home', { replace: true });
       navigate('/guest/pack');
     } catch (err) {
-      setError(err.message);
+      // A guest already packing a pallet is told to finish or hand it
+      // back, in their own language, rather than the server's English.
+      setError(err.alreadyHolding ? t('guest.slip.holding') : err.message);
       setBusy(false);
     }
   };
@@ -109,6 +113,11 @@ const SlipPreviewPage = () => {
 
   const taken = slip.isClaimed;
   const finished = !['pending', 'in_progress'].includes(slip.status);
+  // What became of it: a cancelled pallet was never packed, so it must not
+  // say "finished".
+  const finishedKey = slip.status === 'cancelled' ? 'guest.slip.cancelled'
+    : slip.status === 'dispatched' ? 'guest.slip.collected'
+    : 'guest.slip.packed';
 
   // ── (b) Name entry ──────────────────────────────────────────
   // Framed as "so we can thank you", never as a login form. There is no
@@ -182,7 +191,7 @@ const SlipPreviewPage = () => {
         </div>
 
         {finished ? (
-          <Notice tone="info">This pallet is already finished. Ask a staff member for another one.</Notice>
+          <Notice tone="info">{t(finishedKey)}</Notice>
         ) : taken ? (
           <Notice tone="info">Someone is already packing this pallet. Ask a staff member for another one.</Notice>
         ) : null}

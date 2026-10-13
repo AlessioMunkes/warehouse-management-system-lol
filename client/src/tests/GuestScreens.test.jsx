@@ -749,3 +749,33 @@ describe('the packing screen (guided look)', () => {
     expect(screen.getByRole('progressbar', { name: '3 of 6 items done' })).toBeInTheDocument();
   });
 });
+
+// ── What a pallet's state says ────────────────────────────────
+// "Already finished" was wrong for a cancelled pallet, which was never
+// packed, and vague for one that has left the gate.
+describe('(a3) /slip/:token: a pallet that cannot be taken says why', () => {
+  it.each([
+    ['cancelled',  /was cancelled/i],
+    ['dispatched', /already been collected/i],
+    ['complete',   /already packed/i],
+  ])('says what happened to a %s pallet', async (status, wording) => {
+    useAuth.mockReturnValue({ user: null, logout: vi.fn(), refreshFromClaim: vi.fn() });
+    api.fetchSlipPreview.mockResolvedValue({ ...preview135, status });
+    renderAt('/slip/abc', <SlipPreviewPage />, '/slip/:token');
+
+    expect(await screen.findByText(wording)).toBeInTheDocument();
+    expect(screen.queryByText(/already finished/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /pack this one/i })).not.toBeInTheDocument();
+  });
+
+  it('tells a guest who already holds a pallet to finish or hand it back', async () => {
+    api.fetchSlipPreview.mockResolvedValue(preview135);
+    api.claimSlipByToken.mockRejectedValue(
+      Object.assign(new Error('You are already packing a pallet.'), { status: 409, alreadyHolding: true }));
+    renderAt('/slip/abc', <SlipPreviewPage />, '/slip/:token');
+
+    (await screen.findByRole('button', { name: /Pack this one/i })).click();
+
+    expect(await screen.findByText(/finish it or hand it back/i)).toBeInTheDocument();
+  });
+});
