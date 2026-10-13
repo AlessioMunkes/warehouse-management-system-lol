@@ -25,7 +25,7 @@
 // (onHand, reorderAt). Mapping happens here rather than in the page
 // so every future screen reading the manifest gets the same shape.
 // ─────────────────────────────────────────────────────────────
-import { apiGet, apiPost } from "./api";
+import { apiDelete, apiGet, apiPost } from "./api";
 
 // ── Row mappers ───────────────────────────────────────────────
 // Three quantities, and they mean different things:
@@ -56,9 +56,13 @@ const toProduct = (row) => ({
   // The newest ledger row, for "No movement 60+ days". Not updatedAt,
   // which a reorder-threshold edit also bumps.
   lastMovementAt: row.last_movement_at ?? null,
-  // Soonest expiry still today or later, as 'YYYY-MM-DD'. Per receipt
-  // line, not per unit on the shelf — see getManifest.
+  // Soonest expiry still today or later among the deliveries estimated
+  // to be on the shelf, as 'YYYY-MM-DD' — see getManifest.
   earliestExpiry: toDay(row.earliest_expiry),
+  // About how much of that delivery is left (an estimate), in `unit`.
+  earliestExpiryLeft: row.earliest_expiry_left === null || row.earliest_expiry_left === undefined
+    ? null
+    : Number(row.earliest_expiry_left),
 
   // Catalogue fields, for the summary panel. Not rendered as columns —
   // the table is already full — but they are why the panel can stand
@@ -98,10 +102,18 @@ const toBatch = (row) => ({
   id:               row.id,
   expiryDate:       toDay(row.expiry_date),
   receivedQuantity: Number(row.received_quantity ?? 0),
+  // About how much of the delivery is left: an estimate (the server
+  // assumes the oldest stock goes out first). Null from a server that
+  // does not say.
+  quantityLeft:     row.quantity_left === null || row.quantity_left === undefined ? null : Number(row.quantity_left),
   unit:             row.unit || "",
   receivedOn:       toDay(row.received_on),
   supplierName:     row.supplier_name || null,
   daysLeft:         row.days_left === null || row.days_left === undefined ? null : Number(row.days_left),
+  // A manager's dismissal of this delivery's warning: who, when, why.
+  dismissal:        row.dismissal
+    ? { id: row.dismissal.id, byName: row.dismissal.by_name || "Unknown", at: row.dismissal.at ?? null, reason: row.dismissal.reason ?? "" }
+    : null,
 });
 
 const toMovement = (row) => ({
@@ -129,11 +141,24 @@ export const getMovements = async (productId) => {
 };
 
 // ── GET /api/stock/:id/batches ────────────────────────────────
-// Receipt lines that recorded an expiry, soonest first. Quantity is
-// what was RECEIVED on that line, not what is left of it.
+// The deliveries estimated to be still on the shelf, soonest expiry
+// first: what came in, about how much is left, and any dismissed warning.
 export const getBatches = async (productId) => {
   const body = await apiGet(`/api/stock/${productId}/batches`);
   return (body.data ?? []).map(toBatch);
+};
+
+// ── POST / DELETE /api/stock/:id/batches/:lineId/dismissal ─────
+// A manager says the estimate has this delivery wrong: its expiry
+// warning stops everywhere, with a reason on record. Restore undoes it.
+export const dismissExpiryWarning = async (productId, lineId, reason) => {
+  const body = await apiPost(`/api/stock/${productId}/batches/${lineId}/dismissal`, { reason });
+  return body.data;
+};
+
+export const restoreExpiryWarning = async (productId, lineId) => {
+  const body = await apiDelete(`/api/stock/${productId}/batches/${lineId}/dismissal`);
+  return body.data;
 };
 
 // ── POST /api/stock/adjust ────────────────────────────────────
@@ -239,6 +264,6 @@ export const getLedgerActors = async () => {
 };
 
 export default {
-  getManifest, getMovements, getBatches, adjustStock,
+  getManifest, getMovements, getBatches, adjustStock, dismissExpiryWarning, restoreExpiryWarning,
   getLedger, getReconciliation, getLedgerActors,
 };
