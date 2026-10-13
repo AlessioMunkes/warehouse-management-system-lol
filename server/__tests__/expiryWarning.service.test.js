@@ -34,6 +34,7 @@ const ITEM_A = {
   delivery_note_item_id: 1,
   expiry_date: '2026-09-27',
   received_quantity: 10,
+  quantity_left: 4,
   unit: 'kg',
   product_id: 5,
   product_name: 'Maize meal',
@@ -83,6 +84,8 @@ describe('runExpiryCheck', () => {
       entityId: 1,
     });
     expect(firstArgs.title).toMatch(/Maize meal expires in 2 weeks/);
+    // What is probably left of the delivery, said to be an estimate.
+    expect(firstArgs.body).toBe('About 4 of 10 kg left, estimated · Expires 27 Sept 2026 · MM-01');
 
     const [, secondArgs] = createNotificationMock.mock.calls[1];
     expect(secondArgs).toMatchObject({

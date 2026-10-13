@@ -2,13 +2,17 @@
 // server/__tests__/expiryWarning.repository.test.js
 //
 // Repository-level tests for expiryWarning.repository. No database —
-// pool.query is mocked and each test checks the SQL shape and the
-// bound parameters.
+// the shared lots loader and pool.query are mocked. Which lines the
+// warnings cover (stock left, not dismissed) is the loader's business:
+// shelfLots.test.js works it by hand, expiryWarning.dismissed.test.js
+// runs it through the sweep.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const poolMock = { query: vi.fn() };
 vi.mock('../src/config/db.js', () => ({ default: poolMock }));
+const listExpiringLots = vi.fn();
+vi.mock('../src/repositories/shelfLots.repository.js', () => ({ listExpiringLots }));
 
 const { default: expiryWarningRepository } =
   await import('../src/repositories/expiryWarning.repository.js');
@@ -18,28 +22,23 @@ const { findApproachingExpiry, warningAlreadySent } = expiryWarningRepository;
 beforeEach(() => vi.clearAllMocks());
 
 describe('findApproachingExpiry', () => {
-  it('selects delivery lines expiring within the window, ordered soonest first', async () => {
-    const rows = [
-      { delivery_note_item_id: 1, expiry_date: '2026-09-25', received_quantity: 10, unit: 'kg', product_id: 5, product_name: 'Maize meal', sku: 'MM-01' },
-    ];
-    poolMock.query.mockResolvedValueOnce({ rows });
+  it('lists the live lots expiring within the window as warning rows, with what is left of each', async () => {
+    listExpiringLots.mockResolvedValueOnce([
+      { lineId: 1, expiryDate: '2026-09-25', received: 40, left: 12, unit: 'kg', productId: 5, productName: 'Maize meal', sku: 'MM-01' },
+    ]);
 
     const result = await findApproachingExpiry(14);
 
-    expect(result).toEqual(rows);
-    expect(poolMock.query).toHaveBeenCalledTimes(1);
-    const [sql, params] = poolMock.query.mock.calls[0];
-    expect(sql).toMatch(/FROM delivery_note_items dni/i);
-    expect(sql).toMatch(/JOIN products p ON p\.id = dni\.product_id/i);
-    expect(sql).toMatch(/dni\.expiry_date IS NOT NULL/i);
-    expect(sql).toMatch(/dni\.expiry_date >= CURRENT_DATE/i);
-    expect(sql).toMatch(/dni\.expiry_date <= \(CURRENT_DATE \+ \$1::int\)/i);
-    expect(sql).toMatch(/ORDER BY dni\.expiry_date ASC/i);
-    expect(params).toEqual([14]);
+    expect(result).toEqual([
+      { delivery_note_item_id: 1, expiry_date: '2026-09-25', received_quantity: 40, quantity_left: 12, unit: 'kg', product_id: 5, product_name: 'Maize meal', sku: 'MM-01' },
+    ]);
+    expect(listExpiringLots).toHaveBeenCalledWith({ withinDays: 14 });
+    // The estimate does the work now; nothing is read straight off delivery_note_items.
+    expect(poolMock.query).not.toHaveBeenCalled();
   });
 
   it('returns an empty array when nothing is approaching expiry', async () => {
-    poolMock.query.mockResolvedValueOnce({ rows: [] });
+    listExpiringLots.mockResolvedValueOnce([]);
 
     const result = await findApproachingExpiry(7);
 

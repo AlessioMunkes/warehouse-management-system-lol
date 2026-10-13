@@ -2,8 +2,9 @@
 // server/src/services/expiryWarning.service.js
 //
 // Orchestrates the expiry-warning sweep: pull delivery lines entering
-// each warning window, skip anything already warned about at that
-// tier, write one manager notification per line that's new. See
+// each warning window that are estimated to still have stock and have
+// not been dismissed by a manager, skip anything already warned about at
+// that tier, write one manager notification per line that's new. See
 // expiryWarning.repository.js for what "approaching expiry" means
 // here and its limits.
 //
@@ -41,6 +42,14 @@ const tiers = async () => {
 const formatDate = (value) =>
   new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' });
 
+// "12 of 40 kg": what is probably left of the delivery, and what came in.
+const stockLeft = (item) => {
+  const unit = item.unit ? ` ${item.unit}` : '';
+  return item.quantity_left === undefined || item.quantity_left === null
+    ? `${item.received_quantity}${unit}`
+    : `${item.quantity_left} of ${item.received_quantity}${unit}`;
+};
+
 // One notification, in its own transaction — a failure notifying
 // about line B should never roll back the one already written for
 // line A, and createNotification requires a client of its own either
@@ -52,7 +61,7 @@ const notifyOne = async (item, tier) => {
     await createNotification(client, {
       type: tier.type,
       title: `${item.product_name} expires in ${tier.label}`,
-      body: `${item.received_quantity} ${item.unit || ''} · Expires ${formatDate(item.expiry_date)}` +
+      body: `About ${stockLeft(item)} left, estimated · Expires ${formatDate(item.expiry_date)}` +
         (item.sku ? ` · ${item.sku}` : ''),
       entityType: 'delivery_note_item_expiry',
       entityId: item.delivery_note_item_id,
