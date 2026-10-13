@@ -13,8 +13,7 @@
 //
 // Nothing in this file reads or writes the Love Activism / VMS tables.
 // ─────────────────────────────────────────────────────────────
-import pool              from '../config/db.js';
-import slipAccessRepo    from '../repositories/slipAccess.repository.js';
+import slipAccessRepo   from '../repositories/slipAccess.repository.js';
 import pickingRepository from '../repositories/picking.repository.js';
 import { assertWholeBySlipItem } from '../features/units/wholeItems.js';
 
@@ -30,6 +29,19 @@ const fail = (status, message, extra = {}) => {
 // which codes exist, and a volunteer cannot act on the difference
 // anyway — either way, the paper in their hand did not work.
 const NOT_FOUND = 'That code did not match a pallet. Check the code, or ask a staff member.';
+
+// Every way the repository can refuse a claim, as the volunteer should
+// hear it. Shared by the claim by token or code and the claim by id.
+const refuseUnlessClaimed = (result) => {
+  if (result.notFound)         fail(404, NOT_FOUND);
+  if (result.locked)           fail(409, 'That pallet is already finished. Ask a staff member for another one.');
+  if (result.takenByStaff)     fail(409, 'A staff member is already packing that pallet. Ask them for another one.');
+  if (result.takenByVolunteer) fail(409, 'Someone else is already packing that pallet. Ask a staff member for another one.');
+  if (result.alreadyHolding) {
+    fail(409, 'You are already packing a pallet. Finish it or hand it back before you take another one.',
+      { alreadyHolding: true });
+  }
+};
 
 // SAST, not UTC. Render runs in UTC and Cape Town is UTC+2, so for two
 // hours either side of midnight the server's idea of "today" is a day
@@ -82,14 +94,12 @@ const resolveSlip = async ({ token, code }) => {
 };
 
 // ── 1.3 Claim ─────────────────────────────────────────────────
-// Creates the volunteer via the same INSERT the gate sign-in uses, then
-// binds the slip to them. The caller issues the JWT — this returns the
-// volunteer so the route can sign it, keeping token-minting in one place.
+// Binds the slip to the volunteer, creating the volunteer in the same
+// transaction when the caller has no session (see claimForVolunteer), so
+// a refused claim leaves no volunteer row. The caller issues the JWT:
+// this returns the volunteer so the route can sign it, keeping
+// token-minting in one place.
 //
-// Not wrapped in a single transaction across both writes on purpose. If
-// the claim fails, the volunteer row still stands: they ARE in the
-// building and the arrival record should say so, whether or not they
-// ended up packing anything.
 // existingVolunteerId is set when the caller ALREADY has a guest session
 // — the volunteer who signed in at the gate, landed on the guest home
 // and picked a pallet off the list (entry path 3).
@@ -115,34 +125,20 @@ const claim = async ({ token, code, name, existingVolunteerId = null }) => {
     fail(409, 'That pallet is already finished. Ask a staff member for another one.');
   }
 
-  let volunteer;
+  let existing = null;
   if (existingVolunteerId) {
-    volunteer = await slipAccessRepo.getVolunteerById(existingVolunteerId);
+    existing = await slipAccessRepo.getVolunteerById(existingVolunteerId);
     // The token verified but the row is gone — treat it as no session
     // rather than claiming against an id that no longer exists.
-    if (!volunteer) fail(401, 'Your visit has ended. Please sign in again.');
-  } else {
-    // source is always 'guest_login'. It is the only seam that will later
-    // distinguish a walk-in from a VMS-booked volunteer — see the
-    // integration boundary in the brief.
-    const inserted = await pool.query(
-      `INSERT INTO volunteers (full_name, source)
-       VALUES ($1, 'guest_login')
-       RETURNING id, full_name, signed_in_at`,
-      [trimmed],
-    );
-    volunteer = inserted.rows[0];
+    if (!existing) fail(401, 'Your visit has ended. Please sign in again.');
   }
 
-  const result = await slipAccessRepo.claimForVolunteer({
-    slipId: preview.id,
-    volunteerId: volunteer.id,
-  });
-
-  if (result.notFound)        fail(404, NOT_FOUND);
-  if (result.locked)          fail(409, 'That pallet is already finished. Ask a staff member for another one.');
-  if (result.takenByStaff)    fail(409, 'A staff member is already packing that pallet. Ask them for another one.');
-  if (result.takenByVolunteer) fail(409, 'Someone else is already packing that pallet. Ask a staff member for another one.');
+  const result = await slipAccessRepo.claimForVolunteer(
+    existing
+      ? { slipId: preview.id, volunteerId: existing.id }
+      : { slipId: preview.id, newVolunteerName: trimmed },
+  );
+  refuseUnlessClaimed(result);
 
   // `preview` is ALREADY a toPreview() result — camelCase, with
   // beneficiary_name COALESCEd to the ECD name and dispatch_date cast to
@@ -156,7 +152,7 @@ const claim = async ({ token, code, name, existingVolunteerId = null }) => {
   // altogether. Take the preview as built and override only what the
   // claim actually changed.
   return {
-    volunteer,
+    volunteer: existing ?? result.volunteer,
     slip: { ...preview, status: result.slip.status, isClaimed: true },
   };
 };
@@ -183,11 +179,7 @@ const claimById = async (user, slipId) => {
   if (!volunteer) fail(401, 'Your visit has ended. Please sign in again.');
 
   const result = await slipAccessRepo.claimForVolunteer({ slipId, volunteerId: user.id });
-
-  if (result.notFound)         fail(404, NOT_FOUND);
-  if (result.locked)           fail(409, 'That pallet is already finished. Ask a staff member for another one.');
-  if (result.takenByStaff)     fail(409, 'A staff member is already packing that pallet. Ask them for another one.');
-  if (result.takenByVolunteer) fail(409, 'Someone else is already packing that pallet. Ask a staff member for another one.');
+  refuseUnlessClaimed(result);
 
   return { slip: { ...toPreview(preview), status: result.slip.status, isClaimed: true } };
 };

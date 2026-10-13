@@ -105,11 +105,16 @@ describe('preview SQL', () => {
 });
 
 describe('claimForVolunteer', () => {
-  const setup = (slip) => {
+  // `otherHeld` is the row the one-pallet check finds, if any.
+  const setup = (slip, { otherHeld = null } = {}) => {
     client.query.mockReset();
     client.query.mockImplementation(async (sql) => {
       const text = String(sql);
       if (/SELECT id, status, assigned_to/i.test(text)) return { rows: slip ? [slip] : [] };
+      if (/assigned_volunteer_id = \$1 AND id <> \$2/i.test(text)) return { rows: otherHeld ? [otherHeld] : [] };
+      if (/INSERT INTO volunteers/i.test(text)) {
+        return { rows: [{ id: '41', full_name: 'Thabo', signed_in_at: 't' }] };
+      }
       if (/UPDATE picking_slips/i.test(text)) {
         return { rows: [{ ...slip, status: 'in_progress', assigned_volunteer_id: '7' }] };
       }
@@ -188,6 +193,88 @@ describe('claimForVolunteer', () => {
 
     const select = client.query.mock.calls.find(([sql]) => /SELECT id, status/i.test(String(sql)));
     expect(String(select[0])).toMatch(/FOR UPDATE/);
+  });
+
+  // ── One transaction for the volunteer and the claim ──────────
+  const insertCall = () => client.query.mock.calls
+    .find(([sql]) => /INSERT INTO volunteers/i.test(String(sql)));
+  const free = { id: 132, status: 'pending', assigned_to: null, assigned_volunteer_id: null };
+
+  it('creates the volunteer inside the claim, as a guest_login, and binds the slip to them', async () => {
+    setup(free);
+    const result = await repo.claimForVolunteer({ slipId: 132, newVolunteerName: 'Thabo' });
+
+    const [sql, params] = insertCall();
+    expect(String(sql)).toMatch(/guest_login/);
+    expect(params).toEqual(['Thabo']);
+    expect(result.volunteer).toMatchObject({ id: '41', full_name: 'Thabo' });
+    expect(updateCall()[1][0]).toBe('41');            // the slip is bound to the new row
+    expect(client.query.mock.calls[0][0]).toBe('BEGIN');
+    expect(client.query).toHaveBeenCalledWith('COMMIT');
+  });
+
+  it('never touches the VMS tables', async () => {
+    setup(free);
+    await repo.claimForVolunteer({ slipId: 132, newVolunteerName: 'Thabo' });
+    const sql = client.query.mock.calls.map(([q]) => String(q)).join(' ');
+    for (const vms of ['volunteer_bookings', 'attendance', 'vms_sync', 'love_activism_events']) {
+      expect(sql).not.toContain(vms);
+    }
+  });
+
+  it.each([
+    ['a finished pallet',            { id: 132, status: 'complete',    assigned_to: null, assigned_volunteer_id: null }],
+    ['a cancelled pallet',           { id: 132, status: 'cancelled',   assigned_to: null, assigned_volunteer_id: null }],
+    ['a pallet a worker holds',      { id: 132, status: 'in_progress', assigned_to: 3,    assigned_volunteer_id: null }],
+    ['a pallet another guest holds', { id: 132, status: 'in_progress', assigned_to: null, assigned_volunteer_id: '9' }],
+  ])('inserts no volunteer when the claim is refused: %s', async (_label, slip) => {
+    setup(slip);
+    await repo.claimForVolunteer({ slipId: 132, newVolunteerName: 'Thabo' });
+
+    expect(insertCall()).toBeUndefined();
+    expect(client.query).toHaveBeenCalledWith('ROLLBACK');
+  });
+
+  it('rolls the volunteer back with the claim when the slip update fails', async () => {
+    setup(free);
+    const base = client.query.getMockImplementation();
+    client.query.mockImplementation(async (sql, params) => {
+      if (/UPDATE picking_slips/i.test(String(sql))) throw new Error('connection lost');
+      return base(sql, params);
+    });
+
+    await expect(repo.claimForVolunteer({ slipId: 132, newVolunteerName: 'Thabo' }))
+      .rejects.toThrow('connection lost');
+    expect(client.query).toHaveBeenCalledWith('ROLLBACK');
+    expect(client.query).not.toHaveBeenCalledWith('COMMIT');
+    expect(client.release).toHaveBeenCalled();
+  });
+
+  // ── One pallet per guest ─────────────────────────────────────
+  it('refuses a second pallet for a guest who already holds one', async () => {
+    setup(free, { otherHeld: { id: 99 } });
+    const result = await repo.claimForVolunteer({ slipId: 132, volunteerId: '7' });
+
+    expect(result).toEqual({ alreadyHolding: true, heldSlipId: 99 });
+    expect(updateCall()).toBeUndefined();
+    expect(client.query).toHaveBeenCalledWith('ROLLBACK');
+  });
+
+  it('locks the volunteer row before checking, so two scans at once cannot both pass', async () => {
+    setup(free);
+    await repo.claimForVolunteer({ slipId: 132, volunteerId: '7' });
+    const sqls = client.query.mock.calls.map(([q]) => String(q));
+    const lock = sqls.findIndex((q) => /FROM volunteers WHERE id = \$1 FOR UPDATE/i.test(q));
+    const check = sqls.findIndex((q) => /id <> \$2/i.test(q));
+    expect(lock).toBeGreaterThan(-1);
+    expect(lock).toBeLessThan(check);
+  });
+
+  it('lets a guest re-scan the pallet they already hold', async () => {
+    setup({ ...free, status: 'in_progress', assigned_volunteer_id: '7' });
+    const result = await repo.claimForVolunteer({ slipId: 132, volunteerId: '7' });
+    expect(result.alreadyHolding).toBeUndefined();
+    expect(result.alreadyMine).toBe(true);
   });
 
   it('rolls back and releases the client when the slip is gone', async () => {

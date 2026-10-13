@@ -103,10 +103,11 @@ beforeEach(() => {
       dispatch_date: new Date('2026-09-15T22:00:00.000Z'),
     },
     alreadyMine: false,
+    // Set when the claim created the volunteer (no session): the insert
+    // happens inside the claim's own transaction now.
+    volunteer: { id: '7', full_name: 'Thabo Mokoena', signed_in_at: '2026-09-16T07:00:00Z' },
   });
-  poolQuery.mockResolvedValue({
-    rows: [{ id: '7', full_name: 'Thabo Mokoena', signed_in_at: '2026-09-16T07:00:00Z' }],
-  });
+  poolQuery.mockResolvedValue({ rows: [] });
 });
 
 // ── 1.1 public preview ────────────────────────────────────────
@@ -203,7 +204,9 @@ describe('POST /api/slip/:token/claim', () => {
     expect(res.status).toBe(201);
     expect(res.body.data.user).toMatchObject({ id: '7', firstName: 'Thabo Mokoena', role: 'guest' });
     expect(String(res.headers['set-cookie'])).toContain('wms_token=');
-    expect(slipAccessRepo.claimForVolunteer).toHaveBeenCalledWith({ slipId: 132, volunteerId: '7' });
+    // The volunteer is created by the claim itself, in one transaction.
+    expect(slipAccessRepo.claimForVolunteer)
+      .toHaveBeenCalledWith({ slipId: 132, newVolunteerName: 'Thabo Mokoena' });
   });
 
   // The claim response is what the guest screen renders straight after
@@ -228,17 +231,12 @@ describe('POST /api/slip/:token/claim', () => {
     });
   });
 
-  // The integration boundary: guests live in `volunteers`, always with
-  // source 'guest_login', and never in the VMS tables.
-  it("inserts into volunteers with source 'guest_login' only", async () => {
+  // The service no longer writes a volunteer on its own: that INSERT
+  // lives inside the claim's transaction (see the repository tests), so a
+  // refused claim cannot leave a row behind.
+  it('never inserts a volunteer outside the claim transaction', async () => {
     await request(app).post(`/api/slip/${TOKEN}/claim`).send({ name: 'Thabo' });
-
-    const sql = poolQuery.mock.calls.map(([q]) => String(q)).join('\n');
-    expect(sql).toMatch(/INSERT INTO volunteers/i);
-    expect(sql).toMatch(/guest_login/);
-    for (const vms of ['volunteer_bookings', 'attendance', 'vms_sync', 'love_activism_events']) {
-      expect(sql).not.toContain(vms);
-    }
+    expect(poolQuery).not.toHaveBeenCalled();
   });
 
   it('requires a name', async () => {
@@ -253,6 +251,19 @@ describe('POST /api/slip/:token/claim', () => {
 
     expect(res.status).toBe(409);
     expect(res.body.message).toMatch(/someone else/i);
+  });
+
+  it('refuses a second pallet for a guest who already holds one', async () => {
+    slipAccessRepo.getVolunteerById.mockResolvedValue({ id: '7', full_name: 'Thabo' });
+    slipAccessRepo.claimForVolunteer.mockResolvedValue({ alreadyHolding: true, heldSlipId: 99 });
+    const res = await request(app)
+      .post(`/api/slip/${TOKEN}/claim`)
+      .set('Cookie', authCookie(GUEST))
+      .send({});
+
+    expect(res.status).toBe(409);
+    expect(res.body.alreadyHolding).toBe(true);
+    expect(res.body.message).toMatch(/finish it or hand it back/i);
   });
 
   it('refuses a pallet a staff member is packing', async () => {
@@ -290,9 +301,7 @@ describe('POST /api/slip/:token/claim', () => {
     expect(res.status).toBe(201);
     expect(res.body.data.user.id).toBe('7');
 
-    // No INSERT, and the claim bound to the session's volunteer.
-    const sql = poolQuery.mock.calls.map(([q]) => String(q)).join('\n');
-    expect(sql).not.toMatch(/INSERT INTO volunteers/i);
+    // No new volunteer, and the claim bound to the session's volunteer.
     expect(slipAccessRepo.claimForVolunteer).toHaveBeenCalledWith({ slipId: 132, volunteerId: '7' });
   });
 
@@ -315,7 +324,8 @@ describe('POST /api/slip/:token/claim', () => {
 
     expect(res.status).toBe(201);
     expect(slipAccessRepo.getVolunteerById).not.toHaveBeenCalled();
-    expect(poolQuery.mock.calls.map(([q]) => String(q)).join('\n')).toMatch(/INSERT INTO volunteers/i);
+    expect(slipAccessRepo.claimForVolunteer)
+      .toHaveBeenCalledWith({ slipId: 132, newVolunteerName: 'Thabo' });
   });
 
   it('treats a signed-out session as no session', async () => {
