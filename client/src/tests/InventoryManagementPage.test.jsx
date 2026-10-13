@@ -40,9 +40,7 @@ vi.mock('react-router-dom', () => ({
   useSearchParams: () => [router.params, router.setParams],
 }));
 
-const {
-  getManifest, getMovements, getBatches, adjustStock, dismissExpiryWarning, restoreExpiryWarning,
-} = await import('../services/stockAPI');
+const { getManifest, getMovements, getBatches, adjustStock } = await import('../services/stockAPI');
 const { exportExcel } = await import('@/lib/excelExport');
 const { default: InventoryManagementPage } = await import('../pages/InventoryManagementPage');
 

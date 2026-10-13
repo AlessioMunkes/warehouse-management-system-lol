@@ -254,6 +254,8 @@
   "stock.routes.js GET /ledger": "admin,manager",
   "stock.routes.js GET /:id/history": "admin,manager,warehouse_worker",
   "stock.routes.js GET /:id/batches": "admin,manager,warehouse_worker",
+  "stock.routes.js POST /:id/batches/:lineId/dismissal": "admin,manager",
+  "stock.routes.js DELETE /:id/batches/:lineId/dismissal": "admin,manager",
   "supplier.routes.js GET /prospects": "admin,manager",
   "supplier.routes.js POST /prospects": "admin,manager",
   "supplier.routes.js PATCH /prospects/:id": "admin,manager",
