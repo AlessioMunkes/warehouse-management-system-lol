@@ -75,7 +75,7 @@ export const stockOutlook = (items) => {
 };
 
 const getInsights = async () => {
-  const [cover, rest] = await Promise.all([stockCoverRepo.loadStockCover(), repo.getInsights()]);
+  const [cover, rest] = await Promise.all([stockCoverRepo.loadStockCover({ shelfLots: true }), repo.getInsights()]);
   const { stockCover, unmeasured } = stockOutlook(cover.items);
   return {
     ...rest,

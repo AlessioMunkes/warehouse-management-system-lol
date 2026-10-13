@@ -62,7 +62,7 @@
 //                      overdue. Whole units for anything not decantable.
 //
 // USE-BY DATES  come from the estimated lots (shelfLots.js), passed in
-// as row.lots: the deliveries probably still on the shelf, oldest
+// as row.lots when the caller asks for them (loadStockCover's shelfLots): the deliveries probably still on the shelf, oldest
 // received first. earliestExpiry is the soonest of the lots not
 // dismissed by a manager. mayExpireOn is the soonest use-by date of a lot
 // that will not all be used by then at the weekly rate, and
@@ -170,7 +170,7 @@ export const demandFor = (row, { recipeName = null, historyWeeks = HISTORY_WEEKS
   return { weekly: 0, source: null, label: 'No demand', limit, ...parts };
 };
 
-/** One product's cover. `row` is a stockCover.repository listCoverInputs() row. */
+/** One product's cover. `row` is a stockCover.repository listCoverInputs() row, with its estimated `lots` when use-by dates are wanted. */
 export const coverFor = (row, {
   today, horizonWeeks = DEFAULT_HORIZON_WEEKS, historyWeeks = HISTORY_WEEKS,
   defaultLeadDays = DEFAULT_LEAD_DAYS, recipeName = null,

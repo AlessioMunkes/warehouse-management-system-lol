@@ -222,9 +222,15 @@ export const recipeInUse = async (today) => {
 
 export { todayInSAST };
 
-/** Every active product's cover, most urgent first. */
+/**
+ * Every active product's cover, most urgent first. `shelfLots` also loads
+ * the deliveries estimated to be on the shelf, for the use-by figures
+ * (earliestExpiry, mayExpireOn): only the dashboard's outlook reads those,
+ * so the planner and the days-of-stock report leave it off. The cover
+ * figures are the same either way.
+ */
 export const loadStockCover = async ({
-  today = todayInSAST(), horizonWeeks = DEFAULT_HORIZON_WEEKS, programmeId = null,
+  today = todayInSAST(), horizonWeeks = DEFAULT_HORIZON_WEEKS, programmeId = null, shelfLots = false,
 } = {}) => {
   const recipe = await recipeInUse(today);
   const [rows, shelf] = await Promise.all([
@@ -232,7 +238,7 @@ export const loadStockCover = async ({
       recipeId: recipe?.id ?? null, childBand: recipe?.childBand ?? 1,
       historyDays: HISTORY_WEEKS * 7, programmeId,
     }),
-    loadShelfLots(),
+    shelfLots ? loadShelfLots() : new Map(),
   ]);
   const recipeName = recipe?.name ?? null;
   return {

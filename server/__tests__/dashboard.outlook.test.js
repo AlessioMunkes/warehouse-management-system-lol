@@ -68,6 +68,8 @@ describe('dashboard insights', () => {
     coverMock.loadStockCover.mockResolvedValue({ recipeName: 'Summer', items: [item()] });
     repoMock.getInsights.mockResolvedValue({ packing: { total: 4, packed: 1 }, missedWeeks: 8, missedCollections: [] });
     const out = await service.getInsights();
+    // Only the outlook reads use-by dates, so only it asks for the estimated lots.
+    expect(coverMock.loadStockCover).toHaveBeenCalledWith({ shelfLots: true });
     expect(out).toMatchObject({
       recipeName: 'Summer', packing: { total: 4, packed: 1 }, outlook: { usageWeeks: 8, unmeasured: 0 },
     });

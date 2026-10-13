@@ -149,10 +149,14 @@ describe.skipIf(!LOCAL)('the shelf estimate against a real database', () => {
     ]);
   });
 
-  it('still runs the stock cover over the same data', async () => {
-    const cover = await loadStockCover();
-    const maize = cover.items.find((i) => i.name === 'Maize meal');
-    expect(maize).toMatchObject({ earliestExpiry: inDays(20) });
+  it('gives the stock cover its use-by dates only when asked', async () => {
+    const withLots = (await loadStockCover({ shelfLots: true })).items.find((i) => i.name === 'Maize meal');
+    expect(withLots).toMatchObject({ earliestExpiry: inDays(20) });
+
+    const without = (await loadStockCover()).items.find((i) => i.name === 'Maize meal');
+    expect(without).toMatchObject({ earliestExpiry: null, mayExpireOn: null });
+    // The cover figures themselves do not depend on it.
+    expect(without.available).toBe(withLots.available);
   });
 
   describe('dismissing a warning', () => {
