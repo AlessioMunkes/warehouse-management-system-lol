@@ -11,9 +11,9 @@ export const LEGAL_DETAILS = Object.freeze({
   systemName: 'Batches, the Ladles of Love warehouse system',
 
   // TO FILL IN before the pages are submitted to Google.
-  contactName: '[CONTACT NAME]',
-  contactEmail: '[CONTACT EMAIL]',
-  informationOfficer: '[NAME/ROLE]',
+  contactName: 'Barry van Biljon',
+  contactEmail: 'Barry@ladlesoflove.org.za',
+  informationOfficer: 'Barry van Biljon, External IT Consultant',
 
   // Shown on both pages. Change it whenever either page changes.
   lastUpdated: '13 October 2026',
