@@ -26,7 +26,13 @@ export const DEFAULT_WAREHOUSE_NAME = 'LoL Cape Town';
 const PAGE_H = 297;
 const LEFT = 15;
 const RIGHT = 195;
-const QR_SIZE = 30;
+// The code's side, in mm. Exported so a test can hold it at or above 30.
+export const QR_SIZE = 30;
+const QR_TOP = 12;
+// What the QR does, under it. Two lines so the type can be large without
+// running wider than the code.
+const SCAN_WORDS = ['SCAN TO OPEN', 'THIS PALLET'];
+const SCAN_WORDS_PT = 10.5;
 const LOGO_W = 19;
 const LOGO_H = 24;   // pdf_logo.png is 2136 x 2695
 const ROW_H = 7.6;
@@ -108,20 +114,28 @@ const drawHeader = (pdf, slip, { origin, logo, warehouseName, continued }) => {
     textX = LEFT + LOGO_W + 6;
   }
 
-  // The QR, top right, with the typed code under it for anyone who
-  // cannot scan.
+  // The QR, top right, with what scanning it does in plain words under
+  // it, and the typed code under that for anyone who cannot scan.
+  //
+  // The words are bold, black and 10.5 pt on two lines, centred on the
+  // code, so they can be read across a pallet. They were 7.5 pt grey, and
+  // the partner VMS prints a different QR (volunteer attendance) that the
+  // same people scan: a volunteer has to be able to see which one this is.
+  // They say "open this pallet" and nothing that sounds like checking in.
   const qrX = RIGHT - QR_SIZE;
   const hasCode = Boolean(slip.public_token);
   if (hasCode) {
-    drawQr(pdf, slipUrlFor(slip.public_token, origin), qrX, 12, QR_SIZE);
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(7.5);
-    pdf.setTextColor(60, 60, 60);
-    pdf.text('Scan to open this pallet', qrX + QR_SIZE / 2, 12 + QR_SIZE + 3.6, { align: 'center' });
-    pdf.setFont('courier', 'bold');
-    pdf.setFontSize(11);
+    const centre = qrX + QR_SIZE / 2;
+    drawQr(pdf, slipUrlFor(slip.public_token, origin), qrX, QR_TOP, QR_SIZE);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(SCAN_WORDS_PT);
     pdf.setTextColor(0, 0, 0);
-    pdf.text(shortCodeOf(slip.public_token), qrX + QR_SIZE / 2, 12 + QR_SIZE + 8.2, { align: 'center' });
+    SCAN_WORDS.forEach((line, i) => {
+      pdf.text(line, centre, QR_TOP + QR_SIZE + 4.8 + i * 4.6, { align: 'center' });
+    });
+    pdf.setFont('courier', 'bold');
+    pdf.setFontSize(12);
+    pdf.text(shortCodeOf(slip.public_token), centre, QR_TOP + QR_SIZE + 4.8 + SCAN_WORDS.length * 4.6 + 2.2, { align: 'center' });
   }
 
   // The centre's name, shrunk before it is ever cut: the sheet is
@@ -154,7 +168,8 @@ const drawHeader = (pdf, slip, { origin, logo, warehouseName, continued }) => {
   pdf.setFont('helvetica', 'bold');
   pdf.setFontSize(10);
   pdf.setTextColor(0, 0, 0);
-  const factsY = 12 + QR_SIZE + 16;
+  // Clear of the code and its words: the table starts below them.
+  const factsY = QR_TOP + QR_SIZE + 22;
   pdf.text(facts[0], LEFT, factsY);
   pdf.text(facts[1], 78, factsY);
   pdf.text(facts[2], RIGHT, factsY, { align: 'right' });
