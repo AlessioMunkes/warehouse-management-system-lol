@@ -287,6 +287,9 @@ export default function OperationalChart({
 
   // The chart's own figures as a formatted sheet: one row per bar, or
   // one row per month with a column per category for a two-way chart.
+  // Rows with their own note (where a product's days of stock came
+  // from): the table and the Excel file give the note a column.
+  const rowNotes = series.some((r) => r.meta?.note);
   const exportSheet = () => {
     const range = report?.spec?.dateRange;
     const base = {
@@ -308,8 +311,14 @@ export default function OperationalChart({
         { key: 'name', label: dimensionLabel ?? 'Item', kind: 'text' },
         { key: 'value', label: 'Value', kind: unit === 'ZAR' ? 'money' : 'number' },
         { key: 'unit', label: 'Unit', kind: 'text' },
+        // A row's own note (Days of stock left) gets a column; a report
+        // without notes exports exactly as it always has.
+        ...(rowNotes ? [{ key: 'note', label: 'Worked out from', kind: 'text' }] : []),
       ],
-      rows: series.map((r) => ({ name: formatLabel(r.label), value: r.value, unit: r.meta?.unit ?? unit })),
+      rows: series.map((r) => ({
+        name: formatLabel(r.label), value: r.value, unit: r.meta?.unit ?? unit,
+        ...(rowNotes ? { note: r.meta?.note ?? '' } : {}),
+      })),
     });
   };
 
@@ -328,7 +337,6 @@ export default function OperationalChart({
     ...(shown[0]?.payload?.cumulative !== undefined ? [`${shown[0].payload.cumulative}% of the total so far`] : []),
     ...(shown[0]?.payload?.note ? shown[0].payload.note.split('. ') : []),
   ];
-  const rowNotes = series.some((r) => r.meta?.note);
   const tip = <Tooltip active={print ? false : undefined} content={<ChartTooltip unit={unit} total={tipTotal} extraFor={runningShare} />} cursor={print ? false : BAR_CURSOR} />;
 
   let body;

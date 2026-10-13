@@ -254,6 +254,9 @@ const downloadSheet = (report, dimensionLabel, series) => {
   const range = report.spec.dateRange;
   const period = range ? `${range.from} to ${range.to}` : 'As it stands now';
   const unit = report.meta?.unit ?? '';
+  // A row's own note (Days of stock left) gets a column; a report
+  // without notes exports exactly as it always has.
+  const notes = series.some((r) => r.meta?.note);
   return exportExcel({
     filename: `${report.spec.metric}-${range ? `${range.from}-to-${range.to}` : 'current'}`,
     sheetName: 'Report',
@@ -265,8 +268,12 @@ const downloadSheet = (report, dimensionLabel, series) => {
     columns: [
       { key: 'label', label: dimensionLabel, kind: 'text' },
       { key: 'value', label: unit === '%' ? 'Percentage' : (unit || 'Value'), kind: unit === 'ZAR' ? 'money' : 'number' },
+      ...(notes ? [{ key: 'note', label: 'Worked out from', kind: 'text' }] : []),
     ],
-    rows: series.map((r) => ({ label: formatLabel(r.label), value: r.value })),
+    rows: series.map((r) => ({
+      label: formatLabel(r.label), value: r.value,
+      ...(notes ? { note: r.meta?.note ?? '' } : {}),
+    })),
   });
 };
 
