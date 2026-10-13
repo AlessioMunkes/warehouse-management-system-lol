@@ -12,6 +12,8 @@ import { committedStockSql } from './committedStock.sql.js';
 import { recheckProducts } from './communityRequestStock.repository.js';
 import { createNotification } from './notification.repository.js';
 import { convertQuantity, readUnitSizes } from '../features/units/unitConversion.js';
+import { loadShelfLots, todayInSAST } from './shelfLots.repository.js';
+import { earliestLive, daysBetween } from '../features/stock/shelfLots.js';
 
 // ── Adjust stock — the single write path for every stock change ──
 // Must be called with a client already inside BEGIN/COMMIT — either
@@ -258,17 +260,23 @@ const manualAdjust = async ({ productId, quantityDelta, unit, reason, performedB
 //                      bumps when someone edits a reorder threshold, so a
 //                      product nobody has touched in months would read as
 //                      "moved today".
-//   earliest_expiry  — the soonest expiry_date still today or later, off
-//                      delivery_note_items. That column is the only place
-//                      an expiry is recorded (PO receiving, migration 018;
-//                      donations record none), and it is per receipt line,
-//                      not per unit left on the shelf — see the note at the
-//                      top of expiryWarning.repository.js. Past dates are
-//                      left out: a delivery used up months ago would
-//                      otherwise read "Expired" for ever.
-// Both are grouped once and joined, not correlated per product row.
+//   earliest_expiry  — the soonest expiry date still today or later among
+//                      the deliveries ESTIMATED to have stock left that a
+//                      manager has not dismissed (shelfLots.repository.js).
+//                      An expiry is recorded per delivery line
+//                      (delivery_note_items), the only place one is kept
+//                      (PO receiving, migration 018; donations record
+//                      none), while stock is one balance a product, so
+//                      which deliveries are still on the shelf is worked
+//                      out by assuming the oldest received goes out
+//                      first. Past dates are left out: a delivery used up
+//                      months ago would otherwise read "Expired" for ever.
+//   earliest_expiry_left — the estimate of how much of that delivery is
+//                      left, in the stock unit.
+// last_movement_at is grouped once and joined, not correlated per
+// product row.
 const getManifest = async () => {
-  const result = await pool.query(
+  const [result, shelf] = await Promise.all([pool.query(
     `SELECT
        p.id, p.name, p.stock_keeping_unit AS sku,
        p.category, p.storage_type, p.is_perishable,
@@ -284,12 +292,7 @@ const getManifest = async () => {
          <= COALESCE(sl.reorder_threshold, 0)
          AS is_low_stock,
        sl.updated_at,
-       lm.last_movement_at,
-       -- ::text, not the DATE: node-postgres turns a DATE into a JS
-       -- Date at local midnight, which serialises as the day before
-       -- anywhere east of UTC. Same reason getSlips selects
-       -- dispatch_date::text.
-       ex.earliest_expiry::text AS earliest_expiry
+       lm.last_movement_at
      FROM products p
      LEFT JOIN stock_levels sl ON sl.product_id = p.id
      LEFT JOIN (${committedStockSql()}) c ON c.product_id = p.id
@@ -298,54 +301,51 @@ const getManifest = async () => {
        FROM stock_movements
        GROUP BY product_id
      ) lm ON lm.product_id = p.id
-     LEFT JOIN (
-       SELECT product_id, MIN(expiry_date) AS earliest_expiry
-       FROM delivery_note_items
-       WHERE expiry_date >= (now() AT TIME ZONE 'Africa/Johannesburg')::date
-       GROUP BY product_id
-     ) ex ON ex.product_id = p.id
      WHERE p.is_active = true
      ORDER BY p.name ASC`
-  );
-  return result.rows;
+  ), loadShelfLots()]);
+  const today = todayInSAST();
+  return result.rows.map((row) => {
+    const lot = earliestLive(shelf.get(row.id)?.lots ?? [], today);
+    return { ...row, earliest_expiry: lot?.expiryDate ?? null, earliest_expiry_left: lot?.left ?? null };
+  });
 };
 
-// ── Expiry by receipt line, for one product's detail panel ─────
-// The closest thing to batches the schema has: every receiving line
-// for this product that recorded an expiry date, soonest first.
+// ── Expiry by delivery, for one product's detail panel ─────────
+// The deliveries ESTIMATED to be still on the shelf (shelfLots.js),
+// soonest expiry first, each with how much of it is probably left beside
+// what came in. A delivery a manager has dismissed the warning for is
+// included, with who dismissed it and why, so it can be restored.
+// Deliveries estimated to be used up are not listed.
 //
-// RECEIVED, NOT REMAINING. received_quantity is what came in on that
-// delivery; stock_levels holds one balance per product, so how much of
-// a given line is still on the shelf is not known (per-
-// batch stock — is not tracked). The panel labels it that way.
-//
-// Lines that expired more than EXPIRED_GRACE_DAYS ago are dropped for
-// the same reason getManifest drops past dates: after a month the
-// stock is almost certainly gone, and listing it is noise. Inside the
-// window they stay, because "this expired last week" is exactly what
-// a manager checking the shelf needs to see.
+// Lots that expired more than EXPIRED_GRACE_DAYS ago are dropped:
+// after a month the stock is almost certainly gone (written off without
+// a ledger entry) and listing it is noise. Inside the window they stay,
+// because "this expired last week" is exactly what a manager checking
+// the shelf needs to see.
 const EXPIRED_GRACE_DAYS = 30;
 
 const getExpiryBatches = async (productId) => {
-  const result = await pool.query(
-    `SELECT dni.id,
-            dni.expiry_date::text          AS expiry_date,
-            dni.received_quantity::numeric AS received_quantity,
-            dni.unit,
-            dn.delivery_date::text         AS received_on,
-            s.name                         AS supplier_name,
-            (dni.expiry_date - (now() AT TIME ZONE 'Africa/Johannesburg')::date)::int AS days_left
-     FROM delivery_note_items dni
-     JOIN delivery_notes dn ON dn.id = dni.delivery_note_id
-     LEFT JOIN suppliers s  ON s.id  = dn.supplier_id
-     WHERE dni.product_id = $1
-       AND dni.expiry_date IS NOT NULL
-       AND dni.received_quantity > 0
-       AND dni.expiry_date >= (now() AT TIME ZONE 'Africa/Johannesburg')::date - $2::int
-     ORDER BY dni.expiry_date ASC, dni.id ASC`,
-    [productId, EXPIRED_GRACE_DAYS],
-  );
-  return result.rows;
+  const shelf = await loadShelfLots({ productIds: [Number(productId)] });
+  const today = todayInSAST();
+  return (shelf.get(Number(productId))?.lots ?? [])
+    .map((lot) => ({ lot, daysLeft: daysBetween(today, lot.expiryDate) }))
+    .filter(({ daysLeft }) => daysLeft >= -EXPIRED_GRACE_DAYS)
+    .sort((a, b) => a.lot.expiryDate.localeCompare(b.lot.expiryDate) || a.lot.lineId - b.lot.lineId)
+    .map(({ lot, daysLeft }) => ({
+      id: lot.lineId,
+      expiry_date: lot.expiryDate,
+      received_quantity: lot.received,
+      quantity_left: lot.left,
+      unit: lot.unit,
+      received_on: lot.receivedOn,
+      supplier_name: lot.supplierName,
+      days_left: daysLeft,
+      estimated: true,
+      dismissal: lot.dismissal && {
+        id: lot.dismissal.id, by_name: lot.dismissal.byName, at: lot.dismissal.at, reason: lot.dismissal.reason,
+      },
+    }));
 };
 
 // ── Movement history for one product ───────────────────────────

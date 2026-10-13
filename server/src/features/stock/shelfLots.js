@@ -46,7 +46,7 @@ const DAY = 86400000;
 const num = (v) => (v === null || v === undefined || v === '' ? 0 : Number(v));
 const round = (n, dp = 2) => Math.round(n * 10 ** dp) / 10 ** dp;
 const day = (value) => String(value).slice(0, 10);
-const daysBetween = (from, to) => Math.round((Date.parse(`${day(to)}T00:00:00Z`) - Date.parse(`${day(from)}T00:00:00Z`)) / DAY);
+export const daysBetween = (from, to) => Math.round((Date.parse(`${day(to)}T00:00:00Z`) - Date.parse(`${day(from)}T00:00:00Z`)) / DAY);
 
 /**
  * One product's lots.
