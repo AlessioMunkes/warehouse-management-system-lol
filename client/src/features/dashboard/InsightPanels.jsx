@@ -7,8 +7,8 @@
 //   StockCoverPanel        the stock outlook: available and due in
 //                          against what a week takes, the date each
 //                          runs short and whether its next use-by
-//                          date comes first (dashboard.repository.js
-//                          stockOutlook)
+//                          date comes first (dashboard.service.js
+//                          stockOutlook, on the shared stock cover)
 //   MissedCollectionsPanel centres that have not collected two or more
 //                          pallets in the last few weeks
 // ─────────────────────────────────────────────────────────────
@@ -47,26 +47,41 @@ function Explained({ tip, children, className = '' }) {
 // How the panel's figures are worked out, behind the info button for
 // touch screens, where nothing hovers.
 const outlookNote = (insights) => [
+  'The same figures as the reorder planner and the Days of stock left report.',
   'Available is what is on hand, less packed pallets and approved benevolent requests.',
-  `Due in is what approved orders due in the next ${insights.outlook.dueInWeeks} weeks still have to bring.`,
+  'Due in is what open orders still have to bring, each counted from the day it is due. An overdue order is not counted until it arrives.',
   insights.recipeName
-    ? `A week is what a week of slips takes on the ${insights.recipeName} recipe, or for anything not on it, the average sent out a week over the last ${insights.outlook.usageWeeks} weeks.`
-    : `A week is the average sent out a week over the last ${insights.outlook.usageWeeks} weeks.`,
-  'Weeks is available plus due in, divided by a week.',
+    ? `A week is what a week of slips takes: the ${insights.recipeName} recipe for centres on it, standing orders for the rest. Where that cannot be worked out, the average sent out a week over the last ${insights.outlook.usageWeeks} weeks.`
+    : `A week is what a week of slips takes on standing orders, or where that cannot be worked out, the average sent out a week over the last ${insights.outlook.usageWeeks} weeks.`,
+  'Weeks is how long available stock lasts at that rate, with orders added on the day they are due.',
   'May expire first means the next use-by date comes before the stock would be used up. Use-by dates are kept per delivery, so this assumes the oldest stock goes first.',
 ].join(' ');
 
+// Missing data that changed a product's figures. Lead time only moves
+// the order-by date, which is in the runs-short tip, so it is said there.
+const isLeadLimit = (l) => l.startsWith('No agreed lead time');
+
 export function StockCoverPanel({ insights }) {
+  const unmeasured = insights.outlook.unmeasured > 0 ? (
+    <p className="mt-2 text-xs text-warn">
+      {insights.outlook.unmeasured === 1 ? '1 product is' : `${insights.outlook.unmeasured} products are`} left out: demand could not be worked out because a unit weight is not set.
+    </p>
+  ) : null;
   if (insights.stockCover.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">
-        Nothing to measure yet: no product is on the recipe in use or has been sent out in the last {insights.outlook.usageWeeks} weeks.
-      </p>
+      <>
+        <p className="text-sm text-muted-foreground">
+          Nothing to measure yet: no product has demand planned for slips or has been sent out in the last {insights.outlook.usageWeeks} weeks.
+        </p>
+        {unmeasured}
+      </>
     );
   }
-  const weekTip = (p) => (p.usage === 'recipe'
-    ? `What a week of slips takes on the ${insights.recipeName} recipe.`
-    : `The average sent out a week over the last ${insights.outlook.usageWeeks} weeks.`);
+  const weekTip = (p) => `Worked out from: ${p.demandLabel}.`;
+  const shortTip = (p) => {
+    const lead = p.limits.find(isLeadLimit);
+    return `When it runs out at this rate, counting orders on the day they are due.${p.orderBy ? ` Order by ${fmtDay(p.orderBy)}, lead time: ${p.leadLabel}.` : ''}${lead ? ` ${lead}.` : ''}`;
+  };
 
   return (
     <TooltipProvider>
@@ -75,15 +90,9 @@ export function StockCoverPanel({ insights }) {
           <li key={p.productId} className="py-2 text-sm">
             <div className="flex items-baseline justify-between gap-3">
               <span className="min-w-0 truncate font-medium">{p.name}</span>
-              {/* Stock in crates, the recipe in kilograms, and no crate
-                  weight set (admin Settings): nothing to work out. */}
-              {p.weeks === null ? (
-                <span className="shrink-0 text-xs text-muted-foreground">No {p.unit} weight set</span>
-              ) : (
-                <Explained tip="Available plus due in, divided by a week." className={`shrink-0 font-semibold tabular-nums ${coverTone(p.weeks)}`}>
-                  {weeksText(p.weeks)}
-                </Explained>
-              )}
+              <Explained tip="How long available stock lasts at a week's rate, with orders added on the day they are due." className={`shrink-0 font-semibold tabular-nums ${coverTone(p.weeks)}`}>
+                {weeksText(p.weeks)}
+              </Explained>
             </div>
             <p className="mt-0.5 flex flex-wrap gap-x-1.5 text-xs text-muted-foreground">
               <Explained tip="On hand, less packed pallets and approved benevolent requests.">
@@ -92,20 +101,31 @@ export function StockCoverPanel({ insights }) {
               {p.dueIn > 0 ? (
                 <>
                   <span aria-hidden="true">·</span>
-                  <Explained tip={`Still to arrive on approved orders${p.nextDue ? `, the next due ${fmtDay(p.nextDue)}` : ''}.`}>
+                  <Explained tip={`Still to arrive on open orders${p.nextDue ? `, the next due ${fmtDay(p.nextDue)}` : ''}.`}>
                     {fmtQty(p.dueIn, p.unit)} due in
                   </Explained>
                 </>
               ) : null}
               <span aria-hidden="true">·</span>
               <Explained tip={weekTip(p)}>
-                {fmtQty(p.weeklyUse, p.weeks === null ? p.weeklyUnit : p.unit)} a week
+                {fmtQty(p.weeklyUse, p.unit)} a week
               </Explained>
             </p>
-            {p.runsShortOn || p.mayExpireOn ? (
+            {p.limits.filter((l) => !isLeadLimit(l) && l !== 'Overdue, chase supplier').map((l) => (
+              <p key={l} className="mt-0.5 text-xs text-warn">{l}</p>
+            ))}
+            {p.runsShortOn || p.mayExpireOn || p.overdue > 0 ? (
               <p className="mt-1 flex flex-wrap gap-1.5">
+                {p.overdue > 0 ? (
+                  <Explained
+                    tip={`Not counted in the weeks until it arrives.${p.ifOverdueArrived ? ` If it arrived today: ${weeksText(p.ifOverdueArrived.weeksOfCover)}.` : ''}`}
+                    className="no-underline"
+                  >
+                    <StatusBadge kind="outlook" status="overdue">{fmtQty(p.overdue, p.unit)} overdue, chase supplier</StatusBadge>
+                  </Explained>
+                ) : null}
                 {p.runsShortOn ? (
-                  <Explained tip="When it runs out at this rate, counting what is due in." className="no-underline">
+                  <Explained tip={shortTip(p)} className="no-underline">
                     <StatusBadge kind="outlook" status="runs_short">
                       {p.weeks === 0 ? 'None available' : `Runs short around ${fmtDay(p.runsShortOn)}`}
                     </StatusBadge>
@@ -125,6 +145,7 @@ export function StockCoverPanel({ insights }) {
         <ChartNote note={outlookNote(insights)} label="How this is worked out" />
         <span>Shortest first. <Link to={STAFF.inventory} className="underline underline-offset-2">Open inventory</Link></span>
       </div>
+      {unmeasured}
     </TooltipProvider>
   );
 }
