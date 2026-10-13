@@ -35,6 +35,8 @@ export const PAGE_LOADERS = {
   inviteAccept:     () => import('../pages/InviteAcceptPage'),
   resetPassword:    () => import('../pages/ResetPasswordPage'),
   slipPreview:      () => import('../pages/SlipPreviewPage'),
+  privacy:          () => import('../pages/PrivacyPolicyPage'),
+  terms:            () => import('../pages/TermsOfServicePage'),
 
   managerDashboard: () => import('../pages/ManagerDashboardPage'),
   adminDashboard:   () => import('../pages/AdminDashboardPage'),
@@ -104,6 +106,8 @@ export const PAGES = {
   inviteAccept:     <L.inviteAccept />,
   resetPassword:    <L.resetPassword />,
   slipPreview:      <L.slipPreview />,
+  privacy:          <L.privacy />,
+  terms:            <L.terms />,
 
   managerDashboard: <L.managerDashboard />,
   adminDashboard:   <L.adminDashboard />,

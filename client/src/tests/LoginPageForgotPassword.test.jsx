@@ -21,6 +21,7 @@ vi.mock('../context/AuthContext', () => ({
 
 const mockSearchParams = new URLSearchParams();
 vi.mock('react-router-dom', () => ({
+  Link: ({ to, children, ...rest }) => <a href={to} {...rest}>{children}</a>,
   useNavigate: () => vi.fn(),
   useLocation: () => ({ state: null }),
   useSearchParams: () => [mockSearchParams],
