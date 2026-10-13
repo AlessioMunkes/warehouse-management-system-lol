@@ -26,6 +26,7 @@
     "date-fns": "^4.4.0",
     "exceljs": "^4.4.0",
     "html2canvas-pro": "^2.4.0",
+    "html5-qrcode": "2.3.8",
     "jspdf": "^4.2.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.31.0",
