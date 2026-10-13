@@ -13,6 +13,9 @@ import { resolve } from 'node:path';
 import LoadingScreen from '../components/ui/loading-screen';
 import { Skeleton } from '../components/ui/skeleton';
 
+// This test runs in node, where `process` exists; the lint config only knows
+// the browser's globals, and CI lints the tests.
+/* global process */
 const css = readFileSync(resolve(process.cwd(), 'src/styles/index.css'), 'utf8');
 
 describe('a whole page loading', () => {
