@@ -136,7 +136,7 @@ export const leadTimeFor = (row, defaultLeadDays = DEFAULT_LEAD_DAYS) => {
     const days = Math.max(0, Math.round(num(row.median_lead_days)));
     return { days, source: 'median', supplier: supplier.name, label: `Median of ${plural(num(row.lead_orders), 'order')}: ${days} days`, limit: missing };
   }
-  return { days: defaultLeadDays, source: 'assumed', supplier: supplier.name, label: `Assumed ${defaultLeadDays} days`, limit: `${missing} or delivery history` };
+  return { days: defaultLeadDays, source: 'assumed', supplier: supplier.name, label: `Assumed ${defaultLeadDays} days`, limit: `No agreed lead time or delivery history${supplier.name ? ` for ${supplier.name}` : ''}` };
 };
 
 export const demandFor = (row, { recipeName = null, historyWeeks = HISTORY_WEEKS } = {}) => {

@@ -205,6 +205,15 @@ describe.skipIf(!LOCAL)('stock cover against a real database', () => {
     });
   });
 
+  it('gives the Days of stock left report the same figures, with where they came from', async () => {
+    const { default: ops } = await import('../../src/repositories/reportingOps.repository.js');
+    const rows = await ops.daysOfCover({ filters: {}, limit: 10 });
+    const maize = rows.find((r) => r.label === 'Maize meal');
+    expect(maize.value).toBe(item('Maize meal').daysOfCover);
+    expect(maize.meta.note).toMatch(/^Demand: Summer recipe and standing orders\. Order by .+ \(lead time: Assumed 7 days\)\. No agreed lead time or delivery history for Cape Mills\. Overdue, chase supplier$/);
+    expect(rows.map((r) => r.value)).toEqual([...rows.map((r) => r.value)].sort((a, b) => a - b));
+  });
+
   it('narrows to one programme', async () => {
     const none = await loadStockCover({ programmeId: 999999 });
     expect(none.items).toEqual([]);
