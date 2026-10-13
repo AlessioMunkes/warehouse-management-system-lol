@@ -11,6 +11,7 @@ import { render, screen, within } from '@testing-library/react';
 import { ROUTES } from '../routes/routeTable';
 import { LEGAL } from '../routes/paths';
 import { LEGAL_DETAILS } from '../features/legal/legalDetails';
+import indexHtml from '../../index.html?raw';
 
 // jsdom has no IntersectionObserver, which the landing page uses to reveal
 // sections as they scroll in.
@@ -98,6 +99,20 @@ describe('links to the legal pages', () => {
     openApp('/login');
     expect(await screen.findByRole('link', { name: 'Privacy Policy' })).toHaveAttribute('href', '/privacy');
     expect(screen.getByRole('link', { name: 'Terms of Service' })).toHaveAttribute('href', '/terms');
+  });
+});
+
+describe('links to the legal pages from the guest sign-in and the bare HTML', () => {
+  it('are on the guest sign-in page', async () => {
+    openApp('/guest');
+    expect(await screen.findByRole('link', { name: 'Privacy Policy' })).toHaveAttribute('href', '/privacy');
+    expect(screen.getByRole('link', { name: 'Terms of Service' })).toHaveAttribute('href', '/terms');
+  });
+
+  // For a reader that does not run the app (a crawler, Google's review).
+  it('are plain links in index.html', () => {
+    expect(indexHtml).toContain('<a href="/privacy">Privacy Policy</a>');
+    expect(indexHtml).toContain('<a href="/terms">Terms of Service</a>');
   });
 });
 
