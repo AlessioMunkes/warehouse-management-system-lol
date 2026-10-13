@@ -55,7 +55,7 @@
 //                      weekly rate, each incoming order added on its
 //                      day: the first day there is nothing left. An
 //                      order that comes after a gap does not hide it.
-//   weeks of cover     days until then, in weeks.
+//   days / weeks       days until then, and the same in weeks.
 //   runs out on shelf  the same with nothing incoming.
 //   order by           runs out on, less the lead time.
 //   suggested          a horizon's demand, less available, incoming and
@@ -229,7 +229,7 @@ export const coverFor = (row, {
 
   if (demand.weekly <= 0) {
     return {
-      ...base, status: 'no_demand', weeksOfCover: null, runsOutOn: null, shelfRunsOutOn: null,
+      ...base, status: 'no_demand', daysOfCover: null, weeksOfCover: null, runsOutOn: null, shelfRunsOutOn: null,
       orderBy: null, suggestedQuantity: 0, ifOverdueArrived: null, projection: [],
     };
   }
@@ -273,6 +273,7 @@ export const coverFor = (row, {
   return {
     ...base,
     status,
+    daysOfCover: round(days, 1),
     weeksOfCover: round(days / 7, 1),
     runsOutOn,
     shelfRunsOutOn,
@@ -286,6 +287,6 @@ export const coverFor = (row, {
 // Most urgent first: by status, then the soonest order-by date.
 export const byUrgency = (a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status)
   || String(a.orderBy ?? '9999').localeCompare(String(b.orderBy ?? '9999'))
-  || a.name.localeCompare(b.name);
+  || String(a.name).localeCompare(String(b.name));
 
 export default { coverFor, demandFor, leadTimeFor, drawDown, byUrgency, HISTORY_WEEKS, DEFAULT_LEAD_DAYS };

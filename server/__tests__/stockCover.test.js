@@ -25,7 +25,7 @@ const cover = (over, opts) => coverFor(row(over), { today: TODAY, horizonWeeks: 
 describe('stock cover', () => {
   it('works out available, cover, the runs-out date, the order-by date and what to order', () => {
     expect(cover()).toMatchObject({
-      available: 100, weeklyDemand: 35, demandSource: 'planned', demandLabel: 'Summer recipe',
+      available: 100, weeklyDemand: 35, demandSource: 'planned', demandLabel: 'Summer recipe', daysOfCover: 20,
       weeksOfCover: 2.9,                 // 20 days
       runsOutOn: '2026-11-01', shelfRunsOutOn: '2026-11-01',
       leadDays: 4, leadSource: 'agreed', leadLabel: 'Agreed with Cape Mills: 4 days',
