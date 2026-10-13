@@ -2,12 +2,12 @@
 // src/pages/GuestLoginPage.jsx
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiGet } from '../services/api';
 import logo from '../assets/Batches_Logo.jpeg';
 import Log_In_Background from '../assets/Log_In_Background.jpg';
-import { LANDING } from '../routes/paths';
+import { LANDING, LEGAL } from '../routes/paths';
 import { useT } from '../translations';
 import GuestLanguageSwitch from '../features/guest/GuestLanguageSwitch';
 
@@ -212,6 +212,13 @@ const GuestLoginPage = () => {
                 {t('guest.login.staff')}
               </Button>
             </form>
+
+            {/* English only: the policy pages are not translated yet. */}
+            <p className="login-legal-links">
+              <Link to={LEGAL.privacy}>Privacy Policy</Link>
+              <span aria-hidden="true">·</span>
+              <Link to={LEGAL.terms}>Terms of Service</Link>
+            </p>
           </CardContent>
         </Card>
       </div>

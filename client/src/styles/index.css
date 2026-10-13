@@ -643,6 +643,26 @@
   margin-top: 20px;
 }
 
+.login-legal-links {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  color: #9ca3af;
+  margin-top: 6px;
+}
+
+.login-legal-links a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.login-legal-links a:hover {
+  color: #4b5563;
+}
+
 /* ── Forgot password modal ─────────────────────────────────── */
 
 .forgot-modal-content {
@@ -1838,7 +1858,9 @@ color:white;
 .dark .login-forgot-link     { color: var(--ink-soft); }
 .dark .login-section-title,
 .dark .login-footer-meta,
+.dark .login-legal-links,
 .dark .login-toggle-visibility { color: var(--ink-faint); }
+.dark .login-legal-links a:hover { color: var(--ink); }
 .dark .login-input,
 .dark .login-input-password  { background: var(--surface-2); color: var(--ink); }
 .dark .login-input::placeholder { color: var(--ink-faint); }

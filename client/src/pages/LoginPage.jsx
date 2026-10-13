@@ -2,12 +2,12 @@
 // src/pages/LoginPage.jsx
 // ─────────────────────────────────────────────────────────────
 import { useState } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import logo from '../assets/Batches_Logo.jpeg';
 import { HugeiconsIcon } from '@hugeicons/react';
 import Log_In_Background from '../assets/Log_In_Background.jpg';
-import { STAFF, ADMIN, LANDING } from '../routes/paths';
+import { STAFF, ADMIN, LANDING, LEGAL } from '../routes/paths';
 import { requestReset } from '../services/passwordResetAPI';
 
 // shadcn/ui components
@@ -304,6 +304,11 @@ const LoginPage = () => {
             </form>
 
             <p className="login-footer-meta">AUTHORISED PERSONNEL ONLY</p>
+            <p className="login-legal-links">
+              <Link to={LEGAL.privacy}>Privacy Policy</Link>
+              <span aria-hidden="true">·</span>
+              <Link to={LEGAL.terms}>Terms of Service</Link>
+            </p>
           </CardContent>
         </Card>
       </div>
