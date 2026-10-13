@@ -339,13 +339,13 @@ const completeSlip = async (user, slipId, { palletRef } = {}) => {
   return result;
 };
 
-// Hand the pallet this guest holds back to the floor, progress kept.
+// Hand every pallet this guest holds back to the floor, progress kept.
 // Idempotent: holding nothing is not an error, because sign-out calls
 // this whenever it is unsure and must not fail on an empty hand.
 const releaseMySlip = async (user) => {
   const result = await slipAccessRepo.releaseForVolunteer({ volunteerId: user.id });
   if (result.nothingHeld) return { released: false };
-  return { released: true, slipId: result.slip.id };
+  return { released: true, slipId: result.slip.id, slipIds: result.slips.map((slip) => slip.id) };
 };
 
 export default {

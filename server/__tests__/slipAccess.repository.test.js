@@ -310,13 +310,15 @@ describe('volunteerHoldsSlip', () => {
 });
 
 describe('releaseForVolunteer', () => {
-  const run = async (heldRow) => {
+  // `heldRows` are the slips the SELECT finds; each is released in turn.
+  const run = async (heldRows) => {
+    const rows = Array.isArray(heldRows) ? heldRows : (heldRows ? [heldRows] : []);
     const calls = [];
     client.query.mockImplementation(async (sql, params) => {
       const text = String(sql).replace(/\s+/g, ' ').trim();
       calls.push({ text, params });
-      if (/^SELECT id FROM picking_slips/i.test(text)) return { rows: heldRow ? [heldRow] : [] };
-      if (/^UPDATE picking_slips/i.test(text)) return { rows: heldRow ? [{ id: heldRow.id, status: 'pending', assigned_volunteer_id: null }] : [] };
+      if (/^SELECT id FROM picking_slips/i.test(text)) return { rows };
+      if (/^UPDATE picking_slips/i.test(text)) return { rows: [{ id: params[0], status: 'pending', assigned_volunteer_id: null }] };
       return { rows: [] };
     });
     const result = await repo.releaseForVolunteer({ volunteerId: '7' });
@@ -336,12 +338,24 @@ describe('releaseForVolunteer', () => {
     expect(result.slip.id).toBe(132);
   });
 
-  it('only ever looks for unfinished slips held by the caller, under a row lock', async () => {
+  // A pallet left behind stays locked to a person who has gone home.
+  it('frees every pallet the volunteer holds, one event each, in one transaction', async () => {
+    const { result, calls } = await run([{ id: 21 }, { id: 20 }]);
+
+    const updates = calls.filter((c) => /^UPDATE picking_slips/i.test(c.text));
+    expect(updates.map((c) => c.params[0])).toEqual([21, 20]);
+    expect(calls.filter((c) => /INSERT INTO picking_events/i.test(c.text))).toHaveLength(2);
+    expect(result.slips.map((slip) => slip.id)).toEqual([21, 20]);
+    expect(calls.filter((c) => c.text === 'COMMIT')).toHaveLength(1);
+  });
+
+  it('only ever looks for unfinished slips held by the caller, under a row lock, with no LIMIT', async () => {
     const { calls } = await run({ id: 132 });
     const sel = calls.find((c) => /^SELECT id FROM picking_slips/i.test(c.text));
     expect(sel.text).toMatch(/assigned_volunteer_id = \$1/);
     expect(sel.text).toMatch(/status = ANY\(\$2\)/);
     expect(sel.text).toMatch(/FOR UPDATE/);
+    expect(sel.text).not.toMatch(/LIMIT/i);
   });
 
   it('holding nothing is a quiet no-op, not a write', async () => {

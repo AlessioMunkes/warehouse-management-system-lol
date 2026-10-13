@@ -565,11 +565,11 @@ describe('role separation', () => {
 // ── Release on sign-out ───────────────────────────────────────
 describe('POST /api/slip/release', () => {
   it('releases the pallet the caller holds, naming only the caller', async () => {
-    slipAccessRepo.releaseForVolunteer.mockResolvedValue({ slip: { id: 132 } });
+    slipAccessRepo.releaseForVolunteer.mockResolvedValue({ slip: { id: 132 }, slips: [{ id: 132 }, { id: 140 }] });
     const res = await request(app).post('/api/slip/release').set('Cookie', authCookie(GUEST));
 
     expect(res.status).toBe(200);
-    expect(res.body.data).toEqual({ released: true, slipId: 132 });
+    expect(res.body.data).toEqual({ released: true, slipId: 132, slipIds: [132, 140] });
     expect(slipAccessRepo.releaseForVolunteer).toHaveBeenCalledWith({ volunteerId: '7' });
   });
 
