@@ -21,7 +21,8 @@ import processRepo from '../repositories/reportingProcess.repository.js';
 import { buildProcess } from '../features/reporting/processMining.js';
 import { buildFlow } from '../features/reporting/processFlow.js';
 import planningRepo from '../repositories/reportingPlanning.repository.js';
-import { buildReorderPlan, HORIZONS, HISTORY_WEEKS } from '../features/reporting/reorderPlan.js';
+import { buildReorderPlan, HORIZONS } from '../features/reporting/reorderPlan.js';
+import stockCoverRepo from '../repositories/stockCover.repository.js';
 import { assess, alignWeeks, completeWeeks, rankAlerts } from '../features/reporting/controlLimits.js';
 import { buildWorkload } from '../features/reporting/workload.js';
 import { OPERATIONAL_INSIGHTS } from '../features/reporting/operationalInsights.js';
@@ -354,12 +355,11 @@ const drillDown = async ({ spec: parentInput, label, target }) => {
 };
 
 // REORDER PLANNER: when each product runs out and what to order by
-// when (features/reporting/reorderPlan.js).
+// when, from the shared stock cover (features/stock/stockCover.js).
 const reorderPlan = async ({ horizonWeeks } = {}) => {
   const weeks = Number(horizonWeeks ?? 8);
   if (!HORIZONS.includes(weeks)) throw fail(400, `Choose a planning horizon of ${HORIZONS.join(', ')} weeks.`);
-  const rows = await planningRepo.listReorderInputs({ historyDays: HISTORY_WEEKS * 7 });
-  return buildReorderPlan(rows, { today: todayISO(), horizonWeeks: weeks });
+  return buildReorderPlan(await stockCoverRepo.loadStockCover({ today: todayISO(), horizonWeeks: weeks }));
 };
 
 // EXCEPTION ALERTS: the weekly measures judged against their own

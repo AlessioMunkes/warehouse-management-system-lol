@@ -6,80 +6,34 @@
 // is tested as arithmetic: known rows in, known answer out.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect } from 'vitest';
-import { planProduct, buildReorderPlan } from '../src/features/reporting/reorderPlan.js';
+import { buildReorderPlan } from '../src/features/reporting/reorderPlan.js';
 import { assess, alignWeeks, completeWeeks, rankAlerts } from '../src/features/reporting/controlLimits.js';
 import { buildWorkload, weekdayCounts } from '../src/features/reporting/workload.js';
 
 const TODAY = '2026-10-12';   // a Monday
 
 describe('the reorder planner', () => {
-  const row = (over = {}) => ({
-    product_id: 1, name: 'Rice 2 kg', unit: 'bag', on_hand: 70, reorder_threshold: 20,
-    standing_weekly: 35, other_unit_lines: 0, dispatched_recent: 160, on_order: 0, next_delivery: null,
-    lead_days: 4, supplier_name: 'Cape Dry Goods', ...over,
-  });
-  const plan = (over, options) => planProduct(row(over), { today: TODAY, horizonWeeks: 8, ...options });
+  // Every figure is the shared stock cover (stockCover.test.js works
+  // them by hand); the planner only counts what it shows.
+  const item = (name, status, leadSource, limits = []) => ({ name, status, leadSource, limits });
 
-  it('works out cover, the stock-out date, the order-by date and what to order', () => {
-    const p = plan();
-    expect(p).toMatchObject({
-      weeklyDemand: 35, demandBasis: 'standing_orders', daysOfCover: 14,
-      stockOut: '2026-10-26', orderBy: '2026-10-22', leadDays: 4, leadAssumed: false,
-      suggestedQuantity: 210, status: 'planned',
+  it('counts each status, and the lead times that were agreed or assumed', () => {
+    const plan = buildReorderPlan({
+      today: TODAY, horizonWeeks: 8,
+      items: [
+        item('Oil', 'out_of_stock', 'assumed'),
+        item('Rice', 'order_now', 'median', ['No agreed lead time for Cape Dry Goods']),
+        item('Samp', 'order_soon', 'agreed'),
+        item('Beans', 'covered', 'assumed'),
+        item('Salt', 'no_demand', 'assumed'),
+      ],
     });
-  });
-
-  it('plans on standing orders when there are any, and on dispatch history when there are none', () => {
-    expect(plan().actualWeekly).toBe(20);
-    const adHoc = plan({ standing_weekly: 0 });
-    expect(adHoc).toMatchObject({ weeklyDemand: 20, demandBasis: 'dispatch_history' });
-  });
-
-  it('says when to order: now, soon, later, or not at all', () => {
-    expect(plan({ on_hand: 15 }).status).toBe('order_now');            // 3 days of cover, 4 days lead
-    expect(plan({ on_hand: 50 }).status).toBe('order_soon');           // order by the 18th
-    expect(plan({ on_hand: 200 }).status).toBe('planned');
-    expect(plan({ on_hand: 400 })).toMatchObject({ status: 'covered', suggestedQuantity: 0 });
-    expect(plan({ on_hand: 0 }).status).toBe('out_of_stock');
-    expect(plan({ standing_weekly: 0, dispatched_recent: 0 })).toMatchObject({ status: 'no_demand', stockOut: null, suggestedQuantity: 0 });
-  });
-
-  it('counts what is already on order towards the plan', () => {
-    const p = plan({ on_hand: 15, on_order: 140, next_delivery: '2026-10-15' });
-    expect(p.stockOut).toBe('2026-10-15');                 // what is on hand alone
-    expect(p.stockOutWithOrders).toBe('2026-11-12');       // 155 at 5 a day
-    expect(p.orderBy).toBe('2026-11-08');
-    expect(p.suggestedQuantity).toBe(125);                 // 280 needed, 155 on hand or coming
-    expect(p.status).toBe('planned');
-  });
-
-  it('assumes a lead time when there is no history, and says so', () => {
-    const p = plan({ lead_days: null });
-    expect(p).toMatchObject({ leadDays: 7, leadAssumed: true, orderBy: '2026-10-19' });
-  });
-
-  it('projects the closing balance week by week, never below nothing', () => {
-    const p = plan({ on_hand: 80, on_order: 100, next_delivery: '2026-10-28' }, { horizonWeeks: 4 });
-    expect(p.projection.map((w) => w.balance)).toEqual([45, 10, 75, 40]);
-    expect(plan({ on_hand: 40 }, { horizonWeeks: 4 }).projection.map((w) => w.balance)).toEqual([5, 0, 0, 0]);
-  });
-
-  it('reports order lines in another unit instead of converting them', () => {
-    expect(plan({ other_unit_lines: 3 }).excludedOrderLines).toBe(3);
-  });
-
-  it('lists the most urgent first and counts each status', () => {
-    const out = buildReorderPlan([
-      row({ product_id: 1, name: 'Beans', on_hand: 400 }),
-      row({ product_id: 2, name: 'Rice', on_hand: 15 }),
-      row({ product_id: 3, name: 'Oil', on_hand: 0 }),
-      row({ product_id: 4, name: 'Salt', standing_weekly: 0, dispatched_recent: 0, lead_days: null }),
-      row({ product_id: 5, name: 'Samp', on_hand: 50, lead_days: null }),
-    ], { today: TODAY, horizonWeeks: 8 });
-    expect(out.items.map((i) => i.product)).toEqual(['Oil', 'Rice', 'Samp', 'Beans', 'Salt']);
-    expect(out.summary).toMatchObject({ out_of_stock: 1, order_now: 1, order_soon: 1, covered: 1, no_demand: 1 });
+    expect(plan.summary).toMatchObject({ out_of_stock: 1, order_now: 1, order_soon: 1, planned: 0, covered: 1, no_demand: 1 });
     // Salt has no demand, so its missing lead time is nobody's problem.
-    expect(out.assumedLeadTimes).toBe(1);
+    expect(plan.assumedLeadTimes).toBe(2);
+    expect(plan.agreedLeadTimes).toBe(1);
+    expect(plan.limited).toBe(1);
+    expect(plan.items.map((i) => i.name)).toEqual(['Oil', 'Rice', 'Samp', 'Beans', 'Salt']);
   });
 });
 
