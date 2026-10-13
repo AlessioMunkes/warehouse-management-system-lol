@@ -7,7 +7,6 @@
 // so every chart on the board looks like one family.
 // ─────────────────────────────────────────────────────────────
 import OperationalChart from '../reporting/OperationalChart';
-import '../../styles/operationalReport.css';
 
 export default function StaticChart({ series, unit, hint, description, colorFor }) {
   const report = {

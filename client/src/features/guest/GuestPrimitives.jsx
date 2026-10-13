@@ -8,7 +8,7 @@
 //
 // These are deliberately NOT the .stf-* primitives re-skinned. They are
 // the same design language in a different register: bigger targets
-// (56px, ACC-06), more air, plainer words. See the header of guest.css.
+// (56px, ACC-06), more air, plainer words. See the header of the volunteer screens section of index.css.
 //
 // Rules every primitive here keeps:
 //   ACC-03  status is a mark AND a word, never colour alone
@@ -23,7 +23,6 @@ import { useGuestSignOut } from './useGuestSignOut';
 import { useT } from '../../translations';
 import GuestLanguageSwitch from './GuestLanguageSwitch';
 import { BATCHES_LOGO } from '../assistant/brand';
-import '../../styles/guest.css';
 
 // ── Shell ─────────────────────────────────────────────────────
 // Owns the token scope. Every guest screen renders inside one.

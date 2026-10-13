@@ -24,7 +24,7 @@
 // selector, and inside the React tree this component has no useful
 // siblings. Rendering into document.body makes
 // `body > *:not(.pdf-modal) { display: none }` work — see the print
-// block in receipts.css. A portal is also simply correct for a
+// block in the printable notes section of index.css. A portal is also simply correct for a
 // modal: it escapes any ancestor stacking or overflow context.
 //
 // ── LONGER TERM ──────────────────────────────────────────────
@@ -40,7 +40,7 @@ import jsPDF from 'jspdf';
 // html2canvas-pro, matching usePdfDocument.js — see the long note at the
 // top of that file. Plain html2canvas is not a declared dependency any
 // more (PR #51 replaced it in package.json) and it throws on the oklch()
-// colours receipts.css and Tailwind v4 both emit, which this shell walks
+// colours the printable notes section of index.css and Tailwind v4 both emit, which this shell walks
 // on every generation.
 import html2canvas from 'html2canvas-pro';
 import { reservePdfTab, showPdf, releasePdfTab, A4_WIDTH_PX, EXPORT_WINDOW_WIDTH } from '../../lib/pdfTab';
@@ -161,7 +161,7 @@ export default function PdfShell({ title, filename, onClose, children }) {
         useCORS: true,
         backgroundColor: '#FFFFFF',
         logging: false,
-        // The phone-layout rules in receipts.css are for reading the
+        // The phone-layout rules in the printable notes section of index.css are for reading the
         // preview on a phone. The PDF is laid out as the A4 page.
         windowWidth: EXPORT_WINDOW_WIDTH,
         // Runs against html2canvas's internal clone, before it rasterises.
@@ -206,7 +206,7 @@ export default function PdfShell({ title, filename, onClose, children }) {
   };
 
   // The browser's own renderer, so it cannot fail the way html2canvas can.
-  // receipts.css hides everything except this modal while printing.
+  // the printable notes section of index.css hides everything except this modal while printing.
   const handlePrint = () => window.print();
 
   const modal = (

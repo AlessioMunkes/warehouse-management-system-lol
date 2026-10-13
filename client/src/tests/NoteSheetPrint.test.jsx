@@ -20,8 +20,8 @@ const { default: NoteSheet } = await import('../features/receipts/NoteSheet');
 // Read from disk: Vitest does not process stylesheets, so importing one
 // gives an empty string.
 const css = (name) => readFileSync(resolve(process.cwd(), 'src/styles', name), 'utf8');
-const receiptsCss = css('receipts.css');
-const noteCss = css('deliveryNotePDF.css');
+const receiptsCss = css('index.css');
+const noteCss = css('index.css');
 
 afterEach(() => vi.restoreAllMocks());
 

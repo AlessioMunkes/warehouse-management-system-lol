@@ -5,7 +5,7 @@ import { noteNumber } from '../receipts/noteFormat';
 // client/src/features/decanting/DecantingSheetPDF.jsx
 //
 // The decanting equivalent of DeliveryNotePDF.jsx — same document
-// shell (.pdfnote-* classes, deliveryNotePDF.css), same html2canvas+jsPDF
+// shell (.pdfnote-* classes, the note sheet section of index.css), same html2canvas+jsPDF
 // pipeline (usePdfDocument), adapted to what a decanting record
 // actually has instead of a delivery: no supplier, no signature (this
 // is an internal record with no external party to sign it), one or

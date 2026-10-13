@@ -11,7 +11,7 @@
 // One listener for the whole floor shell rather than a prop on every
 // button: the flows use several kinds of button (StepPrimitives, the
 // shared ui Button, plain .stf-btn), and a press on any of them should
-// feel the same. The look is .is-pressed in staff.css, which also
+// feel the same. The look is .is-pressed in the floor screens section of index.css, which also
 // switches it off for anyone who has asked for less movement.
 //
 // Disabled buttons do not flash: nothing happened.

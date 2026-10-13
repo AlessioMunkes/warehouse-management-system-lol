@@ -262,7 +262,7 @@ export default function AssistantPanel({ open, onOpenChange, screen, role }) {
             //
             // --wms-launcher-bottom and --wms-assistant-h are set by
             // AssistantLauncher from a measurement of the tab bar.
-            // NOT --stf-tabbar-h, which staff.css declares on the
+            // NOT --stf-tabbar-h, which the floor screens section of index.css declares on the
             // staff shell's own element and which is therefore
             // invisible to anything rendered above it — including
             // this panel and the toast stack.

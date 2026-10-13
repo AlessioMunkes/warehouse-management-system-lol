@@ -29,7 +29,7 @@ export const StepScreen = ({ title, sub, toggle, children, actions }) => {
     <section className="stf-step">
       <div className="stf-step-head">
         {/* The mode toggle (Guided/Form), when this screen has one — see
-            .stf-card-toggle's own note in staff.css for why it lives
+            .stf-card-toggle's own note in the floor screens section of index.css for why it lives
             here now instead of floating above the card. */}
         {toggle ? <div className="stf-card-toggle">{toggle}</div> : null}
         {/* tabIndex={-1} makes the heading focusable programmatically
@@ -303,7 +303,7 @@ export const KeyValues = ({ pairs }) => (
 // Two ways to work the same task, not a filter between subsets of
 // data (that's Segments, used on the packing board) — so it gets its
 // own name even though it borrows .stf-segments' look, overridden to
-// a full pill (see staff.css's .stf-toggle rule) rather than the
+// a full pill (see the floor screens section's .stf-toggle rule) rather than the
 // filter tabs' softer corners.
 //
 // Sized to its labels, not stretched to fill the row — the same
@@ -395,7 +395,7 @@ export const ViewToggle = ({ options, value, onChange, className = '' }) => {
 // permanent label. Pair with useCoachmark, which decides whether it
 // should be showing at all — this component only draws it. Dismissed
 // by tapping it, and the arrow's bounce is switched off under ACC-08
-// (see staff.css's [data-stf-motion] rule) since it is the only
+// (see the floor screens section's [data-stf-motion] rule) since it is the only
 // animated part.
 export const Coachmark = ({ show, onDismiss, children }) => {
   if (!show) return null;

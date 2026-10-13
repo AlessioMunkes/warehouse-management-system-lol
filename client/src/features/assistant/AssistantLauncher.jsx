@@ -13,7 +13,7 @@
 // Three things want it: the staff tab bar, the toast stack, and now
 // this. They have to agree, and until now they did not.
 //
-// --stf-tabbar-h looks like the answer and is not: staff.css
+// --stf-tabbar-h looks like the answer and is not: the floor screens section of index.css
 // declares it on the staff shell's own element, so only descendants
 // of that shell can read it. This button and the toast stack are
 // both rendered ABOVE the shell, so for them it has always resolved

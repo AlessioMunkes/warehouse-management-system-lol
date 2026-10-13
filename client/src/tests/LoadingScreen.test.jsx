@@ -9,11 +9,11 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import LoadingScreen from '../components/ui/loading-screen';
 import { Skeleton } from '../components/ui/skeleton';
 
-const css = readFileSync(resolve(process.cwd(), 'src/styles/index.css'), 'utf8');
+// Relative to where the tests run from (client/), as Theme.test.jsx reads it.
+const css = readFileSync('src/styles/index.css', 'utf8');
 
 describe('a whole page loading', () => {
   it('fills the page area, not the window', () => {

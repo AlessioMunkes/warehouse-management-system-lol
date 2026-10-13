@@ -20,7 +20,6 @@
 import { useId } from 'react';
 import { LANGUAGES, setLanguage, useLanguage } from '../../translations';
 import { MESSAGES } from '../../translations/messages';
-import '../../styles/guest.css';
 
 // "Language · Taal · Ulwimi", from each language's own entry.
 const LABEL = LANGUAGES.map((l) => MESSAGES[l.code]?.['language.label'] ?? MESSAGES.en['language.label']).join(' · ');

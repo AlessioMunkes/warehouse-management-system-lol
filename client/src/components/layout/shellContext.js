@@ -34,7 +34,7 @@ export const MOTION_KEY = 'stf_reduced_motion';
 
 // prefers-reduced-motion is the honest default: someone who set it at
 // the OS level has already said what they want.
-// staff.css keys off <html data-stf-motion="reduced">, so plain CSS can
+// the floor screens section of index.css keys off <html data-stf-motion="reduced">, so plain CSS can
 // honour the setting without every animated component reading a hook.
 // Whoever changes the value keeps that attribute in step.
 export const applyMotionAttribute = (reduced) => {

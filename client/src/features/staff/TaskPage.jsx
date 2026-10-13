@@ -35,7 +35,7 @@ export default function TaskPage({ title, sub, toggle, children, side, actions, 
     <section className="stf-task">
       <header className="stf-task-head">
         {/* Same mode toggle as StepScreen's — see .stf-card-toggle in
-            staff.css. Part of the sticky head here, so it stays with
+            the floor screens section of index.css. Part of the sticky head here, so it stays with
             the title rather than needing its own sticky coordination. */}
         {toggle ? <div className="stf-card-toggle">{toggle}</div> : null}
         <h1 className="stf-task-title" ref={headingRef} tabIndex={-1}>{title}</h1>
@@ -43,7 +43,7 @@ export default function TaskPage({ title, sub, toggle, children, side, actions, 
       </header>
 
       {/* has-side is what actually turns the two-column grid on above
-          1024px (see staff.css) — without it .stf-task-cols was still
+          1024px (see the floor screens section of index.css) — without it .stf-task-cols was still
           display:grid, grid-template-columns: 1fr 320px regardless of
           whether an aside existed to put in that second column, so a
           TaskPage with no side prop (Feed the Soil's browse/kits

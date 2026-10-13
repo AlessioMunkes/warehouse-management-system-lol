@@ -1,19 +1,337 @@
-﻿@import "tailwindcss";
-/* Printable note documents + the receipts archive. Plain CSS with literal
-   brand hex, because html2canvas cannot parse the oklch() colours Tailwind v4
-   and shadcn emit. See the header of receipts.css. */
-@import './receipts.css';
+/* ───────────────────────────────────────────────────────────────────
+   client/src/styles/index.css
+
+   THE ONE STYLESHEET. Everything the app styles by hand is in this
+   file, in sections, in the order the rules have to apply:
+
+     1. Imports           Tailwind, shadcn, animation utilities, fonts
+     2. Printable notes   delivery and dispatch note documents, the
+                          receipts archive, and the print rules
+     3. Tokens and base   colours, radii, light and dark, the chart
+                          palette, effects, the loading mark
+     4. Floor screens     the phone-first worker flows (.stf-*)
+     5. Landing page      the public front page (.lol-*)
+     6. Operations report the report as a printed document (.op-pdf*)
+     7. Volunteer screens the guest flows (.gst-*)
+     8. Note sheet        the on-screen delivery and dispatch note
+
+   The order is not cosmetic. Where two sections style the same thing,
+   the later one wins, and each section is where it is because that is
+   the order the browser was already applying them in when they were
+   separate files.
+
+   Sections 2, 6 and 8 use literal hex colours, not the tokens: they
+   are turned into PDFs by html2canvas, which cannot read the oklch()
+   colours Tailwind and shadcn emit.
+   ─────────────────────────────────────────────────────────────────── */
+@import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/inter";
-/* Was @import url(fonts.googleapis.com/...Montserrat...). That sat after
-   receipts.css had already been inlined, so it followed real rules and
-   the browser dropped it — the font never loaded. The package is already
-   a dependency, needs no ordering care, and keeps working offline. */
+/* Fonts come from packages, not a web address: they need no ordering
+   care and keep working offline. Every @import stays above the first
+   rule in this file; one placed lower is dropped by the browser. */
 @import "@fontsource/montserrat/400.css";
 @import "@fontsource/montserrat/500.css";
 @import "@fontsource/montserrat/600.css";
 @import "@fontsource/montserrat/700.css";
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   2. PRINTABLE NOTES
+   (was receipts.css)
+
+   Ahead of the tokens and base rules below, as it always was.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ─────────────────────────────────────────────────────────────
+   client/src/styles/receipts.css
+
+   Styling for the printable note documents (DeliveryNotePDF,
+   DispatchNotePDF) and the receipts archive list.
+
+   WHY PLAIN CSS AND LITERAL HEX
+   These nodes are handed to html2canvas 1.4.1, which cannot parse
+   oklch() and throws mid-render when it meets one. index.css defines
+   62 oklch colours through shadcn/Tailwind v4, so every Tailwind
+   semantic token (bg-muted, text-foreground, border-border) is a
+   landmine inside a node destined for a PDF. Literal hex only.
+
+   The class names are the ones DeliveryNotePDF.jsx has always used.
+   They were never defined — this file is the missing half of that
+   component, not a new convention.
+
+   Brand tokens, matching index.css:
+     #2b3336 dark   #ef3a40 accent   #e9e3dd cream   #676767 muted
+   ───────────────────────────────────────────────────────────── */
+
+/* ─────────────────────────────────────────────────────────────
+   THE oklch RESET — do not remove without reading this
+
+   index.css carries, in the shadcn base layer:
+
+       @layer base { * { @apply border-border outline-ring/50; } }
+
+   which sets border-color: var(--border) and outline-color:
+   color-mix(in oklab, var(--ring) 50%, transparent) on EVERY
+   element in the document. --border is oklch.
+
+   html2canvas 1.4.1 reads the computed border and outline colour
+   of every node it renders and throws on both oklch() and
+   color-mix(). Neither existed when it was last released. Without
+   this reset the PDF fails on every record, which is exactly what
+   happened.
+
+   TWO THINGS MAKE THIS WORK:
+
+   :where() gives the selector ZERO specificity, so every real rule
+   in this file still wins. Without it, `.pdf-document *` (0,1,1)
+   would beat `.pdf-doc-header` (0,1,0) and flatten the header rule.
+
+   These rules are UNLAYERED. Unlayered styles outrank every cascade
+   layer regardless of source order, so this beats @layer base even
+   though index.css imports it near the top.
+
+   The custom properties below are a second line of defence: if a
+   var() reference leaks into the document from somewhere we have
+   not anticipated, it resolves to hex instead of oklch.
+   ───────────────────────────────────────────────────────────── */
+:where(.pdf-document, .pdf-document *) {
+  border-color: #e9e3dd;
+  outline-color: transparent;
+  text-decoration-color: currentColor;
+  --tw-ring-color: transparent;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-shadow: 0 0 #0000;
+}
+
+.pdf-document {
+  --background: #ffffff;
+  --foreground: #2b3336;
+  --card: #ffffff;
+  --card-foreground: #2b3336;
+  --popover: #ffffff;
+  --popover-foreground: #2b3336;
+  --primary: #2b3336;
+  --primary-foreground: #ffffff;
+  --secondary: #e9e3dd;
+  --secondary-foreground: #2b3336;
+  --muted: #f6f4f1;
+  --muted-foreground: #676767;
+  --accent: #e9e3dd;
+  --accent-foreground: #2b3336;
+  --destructive: #ef3a40;
+  --destructive-foreground: #ffffff;
+  --border: #e9e3dd;
+  --input: #e9e3dd;
+  --ring: #2b3336;
+}
+
+/* ── The modal shell ──────────────────────────────────────── */
+.pdf-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background: rgba(43, 51, 54, 0.55);
+}
+
+.pdf-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  background: #2b3336;
+  color: #ffffff;
+}
+
+.pdf-toolbar-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pdf-toolbar-actions { display: flex; align-items: center; gap: 8px; }
+
+.pdf-toolbar-error {
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffd7d8;
+  max-width: 320px;
+}
+
+.pdf-scroll-area {
+  flex: 1;
+  overflow: auto;
+  padding: 20px 12px 48px;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── The document itself ──────────────────────────────────── */
+/* 794px = A4 at 96dpi. The visible preview can shrink to the phone
+   viewport so it is not clipped; PdfShell forces the cloned export
+   document back to 794px immediately before html2canvas rasterises it. */
+.pdf-document {
+  width: min(794px, calc(100vw - 24px));
+  max-width: 794px;
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 40px 44px;
+  background: #ffffff;
+  color: #2b3336;
+  font-family: 'Montserrat', 'Open Sans', Helvetica, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+}
+
+/* ── Status banner ────────────────────────────────────────── */
+
+/* ── Meta grid ────────────────────────────────────────────── */
+
+/* ── Items table ──────────────────────────────────────────── */
+
+/* A line that did not match. Not colour alone — the variance cell also
+   carries text, because a printed PDF may be photocopied in mono. */
+
+.pdf-variance-short { color: #ef3a40; font-weight: 700; }
+.pdf-variance-over  { color: #8a6d00; font-weight: 700; }
+
+/* REVISED — was tinted the same pink as the variance row it sits
+   under, so the two read as one continuous block with no visible
+   boundary, and its label (letter-spacing 0.06em, colour #2b3336) was
+   a third, one-off style next to .pdf-meta-label's 0.1em/#676767 and
+   the table header's own uppercase treatment. Plain background now
+   (the row above it already carries the pink), an indent so it reads
+   as an annotation attached to that row rather than a new one of its
+   own, and pdf-reason-label now matches .pdf-meta-label exactly. */
+.pdf-reason-row td {
+  padding: 4px 10px 10px 26px;
+  font-size: 11px;
+  color: #676767;
+  background: none;
+  border-bottom: 1px solid #e9e3dd;
+}
+
+/* ── Totals ───────────────────────────────────────────────── */
+
+/* ── Signatures ───────────────────────────────────────────── */
+
+/* ── Footer ───────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .pdf-scroll-area {
+    padding: 16px 8px 32px;
+  }
+
+  .pdf-document {
+    width: calc(100vw - 16px);
+    padding: 32px 18px;
+  }
+}
+
+/* The narrowest phones (320 to 380px): six columns still have to fit. */
+@media (max-width: 380px) {
+  .pdf-document {
+    padding: 28px 12px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   POSTER PAGES (Impact Calculator PDF only)
+
+   PdfShell's "View PDF" button rasterises the whole .pdf-document as
+   ONE tall canvas, then slices it into PDF pages purely by pixel
+   height (yPos += pageHeight in a loop) — it has no idea where one
+   section ends and the next begins. The only way to make each
+   section land on its own PDF page is to make every .pdf-poster-page
+   EXACTLY one A4 page tall in the same units .pdf-document's own
+   fixed 794px width already commits to (A4 at 96dpi: 794 x 1123).
+   Off by even a few pixels and a page bleeds into the next one.
+
+   :has() rather than touching .pdf-document's own padding directly —
+   that class is shared with the delivery/dispatch note PDFs, which
+   still want their normal single flowing page.
+   ───────────────────────────────────────────────────────────── */
+.pdf-document:has(.pdf-poster) {
+  padding: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   PRINT
+
+   The previous version of this block only set .pdf-modal to
+   position: static. That drops the modal out of its fixed overlay
+   and into normal document flow BELOW the page it was covering —
+   which was never hidden — so printing produced several pages of
+   filter bar and results table with the note somewhere underneath.
+
+   Hiding the page needs a sibling selector, which is why PdfShell
+   renders through a portal into document.body. The modal is a direct
+   child of body, so everything else can be switched off by name.
+
+   display: none, not visibility: hidden — a hidden element still
+   occupies its box and would print as blank leading pages.
+   ───────────────────────────────────────────────────────────── */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 12mm;
+  }
+
+  /* Everything except the note. #root holds the whole app. Both note
+     shells are named: this file is loaded everywhere, so naming only
+     .pdf-modal hid the other shell's note as well and printed a blank
+     page. */
+  body > *:not(.pdf-modal):not(.pdfnote-modal) { display: none !important; }
+
+  .pdf-modal {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    background: none !important;
+  }
+
+  /* Screen furniture: the toolbar is the buttons, and it has no
+     meaning on paper. */
+  .pdf-toolbar { display: none !important; }
+
+  .pdf-scroll-area {
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
+  /* The 794px fixed width exists so html2canvas rasterises at a
+     predictable size. On paper the page box decides the width. */
+  .pdf-document {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    /* Without this, browsers drop the dark table header and the
+       banner tints to save ink, and a variance row stops reading as
+       one. The colour is carrying meaning here, not decoration. */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Page-break behaviour. A note that runs past one page should
+     break between rows, not through them, and the signature block
+     should not be orphaned from what it signs off. */
+  .pdf-reason-row  { page-break-before: avoid; }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   3. TOKENS AND BASE
+   (was the body of index.css)
+
+   Colours, radii, light and dark, the chart palette, effects.
+   ═══════════════════════════════════════════════════════════════════ */
 
 @layer base {
   :root {
@@ -130,7 +448,7 @@
     /* Manager UI tokens — the .page-header/.programme-select/.modal/
        .btn-* rules below (restored after PR #41, see commit 45571de)
        reference these names. Pointed at the CURRENT palette, the same
-       values .lol-landing uses in landingpage.css, not the pre-redesign
+       values .lol-landing uses in the landing page section of index.css, not the pre-redesign
        red/maroon those selectors used to pull from. */
     --color-maroon: var(--nectar-dark);          /* #2b3336, same as .lol-landing --maroon */
     --color-maroon-deep: #171b1c;                /* .lol-landing --maroon-deep — no global token exists yet, promoted from there */
@@ -503,14 +821,6 @@
   box-sizing: border-box;
 }
 
-.login-section-title {
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  color: #999;
-  margin: 0 0 16px;
-}
-
 /* ── Floating decorative icons ─────────────────────────────── */
 
 .login-floating-icon {
@@ -720,13 +1030,6 @@
   flex: 1;
 }
 
-.top-navbar__back-button {
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-  flex-shrink: 0;
-}
-
 .top-navbar__brand {
   display: flex;
   align-items: center;
@@ -804,13 +1107,6 @@ color:white;
 
 /* ── Main Layout Container ──────────────────────────────── */
 
-.home-main {
-  padding: 1.25rem 1rem;
-  width: 100%;
-  box-sizing: border-box;
-  background-color: var(--color-bg);
-}
-
 /* ── Strict Mobile Vertical Task List ────────────────────── */
 
 .task-grid {
@@ -819,52 +1115,6 @@ color:white;
   width: 100% !important;
   gap: 0.875rem !important;
   margin-top: 1rem !important;
-}
-
-.task-card {
-  display: flex !important;
-  flex-direction: row !important;
-  align-items: center !important;
-  justify-content: flex-start !important;
-  width: 100% !important;
-  box-sizing: border-box !important;
-  padding: 1.125rem 1.25rem !important;
-  gap: 1rem !important;
-  background-color: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.75rem;
-  text-decoration: none;
-  cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-
-  transition: transform 0.15s ease,
-              box-shadow 0.15s ease,
-              background-color 0.15s ease;
-}
-
-.task-card__icon {
-  width: 2.5rem !important;
-  height: 2.5rem !important;
-  flex-shrink: 0 !important;
-  margin-bottom: 0 !important;
-}
-
-.task-card__title {
-  font-size: 1.05rem !important;
-  font-weight: 600;
-  color: #1f2937;
-  text-align: left !important;
-  font-family: var(--font-base);
-}
-
-.task-card:active {
-  transform: scale(0.98);
-  background-color: #f1f5f9;
-}
-
-.task-card:focus-visible {
-  outline: 2px solid #2563eb;
-  outline-offset: 2px;
 }
 /* ==========================================================================
    Task Dashboard Grid & Card Responsiveness
@@ -883,98 +1133,6 @@ color:white;
   .task-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-}
-
-/* --------------------------------------------------------------------------
-   Task Card Base Styling
-   -------------------------------------------------------------------------- */
-.task-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
-  background-color: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.75rem;
-  text-decoration: none;
-  text-align: center;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-
-  /* Smooth transitions for all state changes */
-  transition: transform 0.2s ease-out,
-              box-shadow 0.2s ease-out,
-              border-color 0.2s ease-out,
-              background-color 0.2s ease-out;
-}
-
-.task-card__icon {
-  width: 3rem;
-  height: 3rem;
-  margin-bottom: 0.75rem;
-  
-  /* Smooth scale transition on hover/active */
-  transition: transform 0.2s ease-out;
-}
-
-.task-card__title {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #1f2937;
-  transition: color 0.2s ease-out;
-}
-
-/* --------------------------------------------------------------------------
-   Hover State (Mouse cursor over card)
-   -------------------------------------------------------------------------- */
-.task-card:hover {
-  /* Lift card up by 4px */
-  transform: translateY(-4px);
-
-  /* Enhance shadow for depth */
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 
-              0 4px 6px -2px rgba(0, 0, 0, 0.05);
-
-  /* Subtle border & background tint */
-  border-color: #cbd5e1;
-  background-color: #f8fafc;
-}
-
-/* Slightly enlarge the icon when card is hovered */
-.task-card:hover .task-card__icon {
-  transform: scale(1.08);
-}
-
-/* Highlight text color on hover */
-.task-card:hover .task-card__title {
-  color: #0f172a;
-}
-
-/* --------------------------------------------------------------------------
-   Active State (Mouse clicked or pressed down)
-   -------------------------------------------------------------------------- */
-.task-card:active {
-  /* Push card back down and scale down slightly for tactile press feedback */
-  transform: translateY(0) scale(0.98);
-
-  /* Compress shadow */
-  box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.06);
-
-  /* Darken background slightly on press */
-  background-color: #f1f5f9;
-}
-
-/* Slightly compress icon when pressed */
-.task-card:active .task-card__icon {
-  transform: scale(0.95);
-}
-
-/* --------------------------------------------------------------------------
-   Focus State (Keyboard navigation for accessibility)
-   -------------------------------------------------------------------------- */
-.task-card:focus-visible {
-  outline: 2px solid #2563eb;
-  outline-offset: 2px;
 }
 /* ==========================================================================
    TopNavbar Styling & Accessibility Button
@@ -1028,103 +1186,9 @@ color:white;
 .top-navbar__toggle:hover svg {
   color: #111827; /* Darken icon on hover */
 }
-/* --------------------------------------------------------------------------
-   Tooltip Styling (for low visual strain hint)
-   -------------------------------------------------------------------------- */
-.top-navbar__tooltip {
-  background-color: #1e293b;
-  color: #f8fafc;
-  font-size: 0.75rem;
-  padding: 0.375rem 0.75rem;
-  border-radius: 0.375rem;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  pointer-events: none;
-}
 /* ─────────────────────────────────────────────────────────────
    Inventory Management Module Stylesheet
    ───────────────────────────────────────────────────────────── */
-
-/* --- Stock Health Segment Progress Bar --- */
-.health-bar-container {
-  position: relative;
-  display: flex;
-  height: 1rem; /* 16px */
-  width: 100%;
-  overflow: hidden;
-  border-radius: 9999px;
-  background-color: hsl(var(--secondary));
-}
-
-.health-bar-segment {
-  height: 100%;
-  transition: all 0.2s ease-in-out;
-  cursor: pointer;
-}
-
-/* Status-specific bar fill classes */
-.health-bar-segment--instock {
-  background-color: #10b981; /* Emerald-500 */
-}
-.health-bar-segment--instock:hover {
-  background-color: #059669; /* Emerald-600 */
-}
-
-.health-bar-segment--lowstock {
-  background-color: #f59e0b; /* Amber-500 */
-}
-.health-bar-segment--lowstock:hover {
-  background-color: #d97706; /* Amber-600 */
-}
-
-.health-bar-segment--shortfall {
-  background-color: #ef4444; /* Rose-500 */
-}
-.health-bar-segment--shortfall:hover {
-  background-color: #dc2626; /* Rose-600 */
-}
-
-/* Status color indicator dots */
-.status-dot {
-  height: 0.75rem; /* 12px */
-  width: 0.75rem;
-  border-radius: 9999px;
-}
-.status-dot--instock {
-  background-color: #10b981;
-}
-.status-dot--lowstock {
-  background-color: #f59e0b;
-}
-.status-dot--shortfall {
-  background-color: #ef4444;
-}
-
-/* --- Metric Cards Borders --- */
-.metric-card--instock {
-  border-left-width: 4px;
-  border-left-color: #10b981;
-}
-
-.metric-card--lowstock {
-  border-left-width: 4px;
-  border-left-color: #f59e0b;
-}
-
-.metric-card--shortfall {
-  border-left-width: 4px;
-  border-left-color: #ef4444;
-}
-
-/* Text status accents */
-.text-status-instock {
-  color: #059669;
-}
-.text-status-lowstock {
-  color: #d97706;
-}
-.text-status-shortfall {
-  color: #dc2626;
-}
 
 /* --- Table Status Badges --- */
 
@@ -1140,14 +1204,6 @@ color:white;
    restored for (ManagerActivityScreen) has since been removed as
    unused; what remains here is still used by the floor pages.
    ───────────────────────────────────────────────────────────── */
-
-.page-light {
-  min-height: 100vh;
-  min-height: 100dvh;
-  background-color: var(--color-lol-bg);
-  display: flex;
-  flex-direction: column;
-}
 
 /* ── Page header (top bar — logo, status) ───────────────────── */
 .page-header {
@@ -1167,133 +1223,6 @@ color:white;
 
 @media (max-width: 360px) {
   .page-header { padding: 10px 12px; }
-}
-
-.page-header-left,
-.page-header-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-@media (max-width: 480px) {
-  .page-header-left,
-  .page-header-right { gap: 8px; }
-}
-
-@media (max-width: 360px) {
-  .page-header-left,
-  .page-header-right { gap: 6px; }
-}
-
-.page-header-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.page-header-avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background-color: var(--color-maroon);
-  color: var(--color-lol-white);
-  font-size: 13px;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-
-.page-header-name {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--color-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 40vw;
-}
-
-.page-header-status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--color-text-sub);
-}
-
-@media (max-width: 480px) {
-  .page-header-status span:last-child { display: none; }
-}
-
-.page-header-status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: #22a55a;
-  flex-shrink: 0;
-}
-
-.page-header-icon-btn {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  min-width: 44px;
-  min-height: 44px;
-  border-radius: 50%;
-  background: transparent;
-  border: 1px solid var(--color-border);
-  color: var(--color-text-sub);
-  font-size: 18px;
-  cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease;
-}
-
-@media (max-width: 480px) {
-  .page-header-icon-btn {
-    width: 36px;
-    height: 36px;
-    min-width: 36px;
-    min-height: 36px;
-  }
-}
-
-.page-header-icon-btn:hover {
-  background-color: var(--color-lol-bg);
-  color: var(--color-text);
-}
-
-.page-header-icon-btn::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  background-color: var(--color-text);
-  color: var(--color-lol-white);
-  font-size: 12px;
-  font-weight: 500;
-  padding: 4px 10px;
-  border-radius: 6px;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s ease;
-  z-index: 10;
-}
-
-@media (hover: hover) {
-  .page-header-icon-btn:hover::after { opacity: 1; }
-}
-
-@media (max-width: 640px) {
-  .page-header-icon-btn::after { display: none; }
 }
 
 /* ── Buttons ────────────────────────────────────────────────── */
@@ -1340,74 +1269,9 @@ color:white;
 .btn-secondary:hover:not(:disabled) { background-color: var(--color-lol-bg); }
 .btn-secondary:disabled { color: var(--color-text-meta); cursor: not-allowed; }
 
-/* Decanting's week planner, and only it (features/decanting/
-   Button.jsx is its sole consumer — see that file's own note) — reported
-   as taking up too much room on a screen that is already a dense form of
-   many product rows. Everything but size still comes from .btn-primary/
-   .btn-secondary above; this only overrides height/padding/font-size, so
-   colour, hover and disabled states stay identical to every other button
-   in the app. */
-.decanting-btn {
-  height: 36px;
-  padding: 0 14px;
-  font-size: 13px;
-}
-
 /* ── Programme / activity select ─────────────────────────────── */
 
-.programme-select-heading {
-  font-family: var(--font-family-display);
-  font-size: 32px;
-  font-weight: 700;
-  color: black;
-  margin-bottom: 8px;
-}
-
-@media (max-width: 640px) {
-  .programme-select-heading { font-size: 24px; }
-}
-
-.programme-select-subtitle {
-  font-size: 15px;
-  color: rgba(10, 1, 1, 0.85);
-  margin-bottom: 32px;
-}
-
 /* ── Modal ──────────────────────────────────────────────────── */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background-color: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  z-index: 50;
-}
-
-@media (max-width: 640px) {
-  .modal-overlay { padding: 0; align-items: flex-end; }
-}
-
-.modal-card {
-  background-color: var(--color-lol-white);
-  border: 1px solid var(--color-border);
-  border-top: 4px solid var(--color-accent);
-  border-radius: 16px;
-  padding: 28px;
-  max-width: 440px;
-  width: 100%;
-}
-
-@media (max-width: 640px) {
-  .modal-card {
-    max-width: 100%;
-    max-height: 90vh;
-    overflow-y: auto;
-    border-radius: 16px 16px 0 0;
-    padding: 20px;
-  }
-}
 
 .modal-title {
   font-size: 16px;
@@ -1421,18 +1285,6 @@ color:white;
   color: var(--color-text);
   line-height: 1.6;
   margin-bottom: 24px;
-}
-
-.modal-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-}
-
-@media (max-width: 480px) {
-  .modal-actions { flex-direction: column-reverse; }
-  .modal-actions .btn-primary,
-  .modal-actions .btn-secondary { width: 100%; }
 }
 .adjust-modal-container {
   max-width: 28rem; /* Equivalent to sm:max-w-md */
@@ -1586,11 +1438,6 @@ color:white;
    task-nav-card.css
    The task navigation icon, used by the floor pages' TaskNavGrid.
    ───────────────────────────────────────────────────────────── */
-
-.task-nav-icon {
-  height: 1rem;
-  width: 1rem;
-}
 
 /* ─────────────────────────────────────────────────────────────
    top-navbar.css
@@ -1810,7 +1657,7 @@ color:white;
    followed the theme at the top of this file.
 
    Not here on purpose: .lol-landing (the public page, whose visitors
-   have no toggle) and everything in receipts.css / deliveryNotePDF.css
+   have no toggle) and everything in the printable notes section of index.css / the note sheet section of index.css
    (printed on paper, and rasterised by html2canvas-pro, which is the
    reason those files hold literal hex at all).
    ══════════════════════════════════════════════════════════════════ */
@@ -1836,7 +1683,6 @@ color:white;
 .dark .login-logo            { background: var(--surface); border-color: var(--line); }
 .dark .login-subtitle,
 .dark .login-forgot-link     { color: var(--ink-soft); }
-.dark .login-section-title,
 .dark .login-footer-meta,
 .dark .login-toggle-visibility { color: var(--ink-faint); }
 .dark .login-input,
@@ -1871,10 +1717,8 @@ color:white;
 .dark .page-header           { background-color: var(--surface); border-color: var(--line); }
 .dark .page-header h1,
 .dark .page-header h2        { color: var(--ink); }
-.dark .programme-select,
 .dark .modal,
 .dark .modal-content         { background-color: var(--surface); border-color: var(--line); color: var(--ink); }
-.dark .modal-overlay         { background-color: rgb(0 0 0 / 60%); }
 
 .dark .btn-secondary         { background-color: var(--surface-2); border-color: var(--line-strong); color: var(--ink); }
 .dark .btn-secondary:hover   { background-color: var(--line); }
@@ -1882,21 +1726,13 @@ color:white;
 .dark .btn-ghost:hover       { background-color: var(--surface-2); color: var(--ink); }
 
 /* ── Tables and cards written in plain CSS ─────────────────────── */
-.dark .data-table            { background-color: var(--surface); color: var(--ink); }
-.dark .data-table th         { background-color: var(--surface-2); color: var(--ink-soft); border-color: var(--line); }
-.dark .data-table td         { border-color: var(--line); }
-.dark .data-table tr:hover td { background-color: var(--surface-2); }
-
-/* ── Status blocks (the blue/red notes around line 310 above) ──── */
-.dark .info-box              { background: var(--info-soft); border-color: var(--info-ink); color: var(--info-ink); }
-.dark .error-box             { background: var(--danger-soft); border-color: var(--danger-ink); color: var(--danger-ink); }
 
 /* ── Inventory stock health, which names its own colours ───────── */
 
 
 /* ── Small motion on the office screens ──────────────────────────
    Short and quiet: content settling in, not decoration. Nothing here
-   needs its own reduced-motion rule — staff.css zeroes every animation
+   needs its own reduced-motion rule — the floor screens section of index.css zeroes every animation
    and transition when <html data-stf-motion="reduced"> (the eye button
    in the top bar, seeded from the device's own setting). */
 @keyframes fx-fade {
@@ -2046,3 +1882,4398 @@ color:white;
 }
 .loading-screen-in      { animation: loading-screen-in 160ms ease-out both; }
 .loading-screen-delayed { animation: loading-screen-in 160ms ease-out 300ms both; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   4. FLOOR SCREENS
+   (was staff.css)
+
+   The phone-first worker flows. Loaded on every screen, after the base.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ==========================================================================
+   client/src/styles/staff.css
+
+   Chrome for the four warehouse-staff task pages: receiving, packing,
+   decanting, dispatch.
+
+   Everything is namespaced .stf-* so it cannot collide with index.css,
+   which every existing screen depends on. Import it AFTER index.css.
+
+   ── Tokens ────────────────────────────────────────────────────────────
+   Taken from the landing page section of index.css, not invented, so a staff page and the
+   front door read as one product. The landing page's own rule is
+   followed here too:
+
+       charcoal  structure, headings, surfaces
+       red       anything clickable
+       gold      small editorial accents
+
+   REVISED — --stf-attention used to be a separate deep-brick colour
+   (#8a3227), kept apart from --stf-accent specifically because staff's
+   primary buttons used to BE --stf-accent (red) — a warning sharing
+   its colour with every button is a warning nobody reads. That
+   justification is gone: staff's primary buttons are --stf-ink
+   (near-black) now, matching the manager side, so red is free for
+   warnings again. --stf-attention now equals --stf-accent outright,
+   and --stf-attention-bg/-border/-ink are the exact values every
+   manager page's own error banner uses (ErrorBanner in
+   CommunityRequestsPage.jsx and a dozen others: border #ef3a40,
+   background #fff4f2, body text #2b3336) — not a separately-invented
+   khaki family with no manager equivalent at all. Per ACC-03 the mark
+   and the sentence still carry the meaning regardless, so colour was
+   never the only signal either way.
+
+   ── Two rules the layouts are built on ────────────────────────────────
+   ACC-05  a multi-step task is sequential screens, one decision each.
+           .stf-crumb-progress is the indicator for Receiving/Decanting/
+           Dispatch (kept deliberately quiet, in the crumb row rather
+           than its own block — see that class's own note); Donation
+           Intake's own rail (DonationRail.jsx) still uses .stf-rail
+           directly.
+   ACC-06  this is a PWA used on a phone in a warehouse, often with
+           gloves. Tap targets 44px minimum; numbers typed on the floor
+           are 56px.
+
+   ── Retoned to match the manager screens ────────────────────────────
+   User feedback: the staff module read as a visually different
+   product from the manager/admin screens, and that was correct — this
+   file applied the shared brand palette far more literally (warm
+   khaki backgrounds, a bold display face, a solid dark app bar, sharp
+   4px corners) than the manager side does. Colour, radius, typeface
+   and the app bar are now matched directly against what the manager
+   screens actually render: ManagerLayout.jsx's page background and
+   border colour; Montserrat, index.css's own body rule, not the Inter
+   token it also defines but never applies; and — corrected after an
+   early guess sized everything off ErrorBanner's one-off rounded-[4px]
+   — the real radius of the components that build every manager
+   screen (Card, Button, Input, Select, Badge, all under
+   components/ui): rounded-4xl and rounded-3xl, genuinely round, not
+   sharp corners. See each changed block's own note for what moved and
+   why.
+
+   WHAT DID NOT CHANGE, ON PURPOSE: tap target sizes (--stf-tap,
+   --stf-field), the guided/form toggle, the bottom tab bar,
+   StepPrimitives' behaviour, useDraft, reduced motion. None of that
+   is a style choice — it is the accessibility contract (ACC-05/
+   ACC-06) this file exists to keep, and colour/typeface are a
+   separate axis from it: WCAG contrast and tap-target size do not
+   care which hex value a background is, only how much it contrasts
+   with the text on it and how big the target is. The tokens below
+   were already tuned to 4.5:1 (ACC-02); the new ones are close enough
+   in lightness that the ratios hold.
+   ========================================================================== */
+
+.stf-shell {
+  /* Brand, from the landing page section of index.css */
+  --stf-ink:        #2b3336;   /* --maroon      structure and headings */
+  --stf-ink-deep:   #171b1c;   /* --maroon-deep */
+  --stf-accent:     #ef3a40;   /* --accent      clickable */
+  --stf-accent-deep:#d42d33;   /* --accent-deep hover */
+  --stf-gold:       #979168;   /* --khaki       editorial accents */
+  --stf-gold-deep:  #8a8058;   /* --khaki-deep */
+  /* REVISED — these two used to be the landing page's own, more
+     saturated khaki tones (#e9e3dd / #ddd4c8). Same brand family, but
+     the manager screens (built later, on shadcn) lean on a much
+     quieter version of it: ManagerLayout.jsx's actual page background
+     is #faf8f5 and #e9e3dd is what IT uses for borders, not ground —
+     these two values are pulled from there directly, not re-guessed,
+     so a staff page and a manager page finally read as one product
+     instead of two that happen to share a logo. */
+  --stf-sand:       #faf8f5;   /* --bg          page ground */
+  --stf-border:     #e9e3dd;   /* --border */
+  --stf-text:       #5c5c5c;   /* --text */
+  --stf-text-sub:   #6f6a5e;   /* --text-sub, darkened for 4.5:1 (ACC-02) */
+  --stf-text-meta:  #8b8578;   /* --text-meta, darkened for the same reason */
+  --stf-white:      #ffffff;
+  /* NEW — every text field, select and search box on the manager side
+     (components/ui/input.jsx, select.jsx) is a FILLED bg-input/50 box
+     with border-transparent — a light grey fill, no visible line,
+     until it's focused. staff fields were still solid white with a
+     visible border always on, which is why they read as a different
+     kind of control even after colour/radius/font matched. This is
+     that same fill: --input (oklch(0.922 0 0)) at 50% over white,
+     computed rather than eyeballed. */
+  --stf-field-bg:   #f2f2f2;
+
+  /* Staff-only — see the REVISED note above the token block for why
+     these now equal the manager side's actual error-banner colours
+     rather than a separately-invented khaki family. */
+  --stf-attention:  #ef3a40;
+  --stf-attention-ink: #2b3336;
+  --stf-attention-bg:  #fff4f2;
+  --stf-attention-border: #ef3a40;
+
+  /* REVISED (correction) — the previous version of this comment claimed
+     manager screens render in Inter and switched both tokens to it. That
+     was wrong: index.css sets `body { font-family: var(--font-montserrat) }`
+     globally, --font-family-display also points at Montserrat, and no
+     manager page applies Tailwind's font-sans utility to override that
+     default (checked every .jsx under pages/ and features/ — none do).
+     Inter is defined as a token in index.css but never actually reaches
+     the screen anywhere a manager or admin looks. Montserrat IS the
+     product's real display/body font, so that's what staff now matches —
+     same stack index.css uses, so no separate font files to load.
+     Numbers stay the same size either way (ACC-06 is about size, not
+     typeface), so nothing about legibility on the floor changes here. */
+  --stf-font-display: "Montserrat", "Open Sans", Helvetica, sans-serif;
+  --stf-font-sans:    "Montserrat", "Open Sans", Helvetica, sans-serif;
+
+  /* REVISED (correction) — the previous version of this comment sized
+     these off ErrorBanner's hand-rolled rounded-[4px], on the claim
+     that it was what "every card" on the manager side does. It isn't:
+     ErrorBanner is a one-off raw div, but the components that actually
+     build every manager screen — Card, Button, Input, Select, Badge,
+     all from client/src/components/ui — round themselves far more,
+     via Tailwind's rounded-3xl/rounded-4xl utilities (checked each
+     one's own source). Against index.css's --radius: 0.625rem base,
+     rounded-4xl is 26px (Card, Button) and rounded-3xl is 22px (Input,
+     Select, Badge). That's the actual, dominant shape language a
+     manager or admin sees — search boxes, filter dropdowns, the
+     primary button, the card around every table — and it is
+     genuinely round, close to a pill, not a sharp 4px corner. These
+     two tokens now carry those two real values directly. */
+  --stf-radius:   26px;
+  --stf-radius-sm: 22px;
+  --stf-radius-pill: 999px;
+  --stf-tap:   44px;
+  --stf-field: 56px;
+
+  /* 100dvh, not 100vh: on iOS Safari the address bar makes 100vh taller
+     than the visible viewport, which pushed the tab bar below the fold
+     on exactly the device this is built for. */
+  /* The tab bar's height, used twice: once to size the bar, once to
+     pad the shell so content is never hidden behind it. */
+  --stf-tabbar-h: 60px;
+
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  padding-bottom: calc(var(--stf-tabbar-h) + env(safe-area-inset-bottom));
+  background: var(--stf-sand);
+  font-family: var(--stf-font-sans);
+  color: var(--stf-text);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.stf-shell img { max-width: 100%; display: block; }
+.stf-shell a { color: var(--stf-accent); text-decoration: none; }
+.stf-shell a:hover { color: var(--stf-accent-deep); text-decoration: underline; }
+.stf-shell a:focus-visible,
+.stf-shell button:focus-visible {
+  outline: 3px solid var(--stf-accent);
+  outline-offset: 2px;
+}
+
+/* ── App bar ─────────────────────────────────────────────────────── */
+
+/* ── Breadcrumb row ──────────────────────────────────────────────── */
+/* flex-wrap added for .stf-crumb-progress: a third group (breadcrumb,
+   progress, actions) still lays out fine with space-between on a
+   normal-width screen, but wraps rather than crushing on a narrow one
+   instead of the row simply not fitting. */
+.stf-crumb {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--stf-border);
+  background: var(--stf-white);
+  font-size: 12px;
+  color: var(--stf-text-sub);
+}
+.stf-crumb-meta { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* An action link in the crumb row (e.g. Receiving's "History") — in
+   the persistent header rather than inline page content, so it stays
+   reachable and visible regardless of scroll position or which
+   screen/dialog is currently showing. */
+.stf-crumb-link {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  font: 700 12px/1.4 var(--stf-font-sans);
+  color: var(--stf-accent);
+  white-space: nowrap;
+}
+.stf-crumb-link:hover { color: var(--stf-accent-deep); }
+.stf-crumb-link i { font-size: 14px; }
+
+/* Step progress, now living in the crumb row instead of its own
+   StepRail block inside the card — "above it, a slim step strip
+   carries breadcrumb, progress and History on one 56px row." Replaces
+   StepRail's stacked bars-then-label layout: the label is redundant
+   here (the crumb text already names the step — "Receiving / Which
+   delivery"), so only the bars and the "Step X of Y" count remain. */
+.stf-crumb-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.stf-crumb-progress-bars { display: flex; gap: 4px; }
+.stf-crumb-progress-bar {
+  width: 20px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--stf-border);
+}
+.stf-crumb-progress-bar.is-done { background: var(--stf-accent); }
+.stf-crumb-progress-label { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* The single column every task page lays out in. Same column on a phone
+   and on a bench tablet — the tablet gets more air, not a denser layout
+   to relearn. */
+.stf-main {
+  flex: 1;
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 18px 18px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* The week planner inside Decanting is a two-column form, not a task
+   flow. It keeps the same chrome and takes the room it needs. */
+.stf-main.is-wide { max-width: 1200px; }
+
+/* ── New-activity toast ──────────────────────────────────────────── */
+/* Sits between the app bar and the page content on every staff screen
+   (StaffShell), so a worker on Receiving or Decanting still hears
+   about new pallets on the floor without leaving what they're doing.
+   Same width as .stf-main so it lines up with the column beneath it
+   rather than running edge to edge. Gold border, same reasoning as
+   .stf-wl-undo: red is this app's click colour, and "something just
+   happened" is an editorial note, not a call to action in itself. */
+.stf-activity-toast {
+  width: 100%;
+  max-width: 520px;
+  margin: 12px auto 0;
+  padding: 10px 12px 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--stf-gold);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+}
+.stf-activity-toast-text {
+  flex: 1;
+  font: 500 13px/1.4 var(--stf-font-sans);
+  color: var(--stf-text-sub);
+}
+.stf-activity-toast-btn {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--stf-accent);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  font: 700 13px/1 var(--stf-font-sans);
+  color: var(--stf-accent);
+  cursor: pointer;
+}
+.stf-activity-toast-btn:hover { background: var(--stf-accent); color: var(--stf-white); }
+.stf-activity-toast-dismiss {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  background: none;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--stf-text-sub);
+  cursor: pointer;
+}
+.stf-activity-toast-dismiss:hover { color: var(--stf-ink); }
+
+/* Dashboard only (.stf-tasks is TaskDashboardPage's own direct child,
+   nothing else renders one) — reported as "weird spacing", which is
+   .stf-main's own flex:1 doing exactly what it should for every task
+   flow (top-anchor the content, leave any extra height as trailing
+   space so a long form or list has somewhere to scroll into) but
+   reading as an oversized, unexplained gap below a greeting and a row
+   of circles, the shortest thing any staff page renders. Centering is
+   scoped to this one page on purpose: a Receiving or Decanting screen
+   that centred itself would visibly re-center every time a field
+   error added or removed a line, which is a worse kind of movement
+   than a blank margin ever was. */
+.stf-main:has(> .stf-tasks) {
+  justify-content: center;
+}
+
+/* ── Bottom tab bar ──────────────────────────────────────────────── */
+/* How staff move between the four tasks. A sidebar collapses behind a
+   hamburger at this width, hiding all four destinations behind a tap;
+   on a phone held one-handed the thumb is already at the bottom. */
+.stf-tabbar {
+  /* Fixed, not sticky. Sticky pins to the bottom of the scroll box, and
+     the doodle footer sits inside that box after the bar — so the bar
+     stopped 52px short of the window with a white gap beneath it. */
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  min-height: var(--stf-tabbar-h);
+  display: flex;
+  align-items: stretch;
+  border-top: 1px solid var(--stf-border);
+  background: var(--stf-white);
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 20;
+}
+
+.stf-tab {
+  flex: 1;
+  min-height: var(--stf-tap);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 2px;
+  border: 0;
+  border-top: 2px solid transparent;
+  background: none;
+  color: var(--stf-text-sub);
+  font: 600 10px/1.2 var(--stf-font-sans);
+  cursor: pointer;
+}
+.stf-tab-icon-wrap { position: relative; display: inline-flex; }
+.stf-tab-icon  { width: 24px; height: 24px; object-fit: contain; opacity: 0.55; transition: opacity 150ms ease, transform 150ms ease; }
+.stf-tab-glyph { font-size: 18px; line-height: 24px; opacity: 0.55; transition: opacity 150ms ease, transform 150ms ease; }
+.stf-tab.is-current { border-top-color: var(--stf-accent); color: var(--stf-ink); }
+/* New spare work on the floor — spareCount from useSpareSlipAlert,
+   only ever shown on Packing (see StaffTabBar). Pulses so it reads as
+   "something changed" rather than a static count a worker has to
+   notice on their own; ACC-08 turns the pulse off along with every
+   other animation on the shared tablet. */
+.stf-tab-badge {
+  position: absolute;
+  top: -2px;
+  right: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--stf-accent);
+  box-shadow: 0 0 0 2px var(--stf-white);
+  animation: stf-tab-badge-pulse 1.8s ease-in-out infinite;
+}
+[data-stf-motion="reduced"] .stf-tab-badge { animation: none; }
+@keyframes stf-tab-badge-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--stf-white), 0 0 0 2px rgba(239, 58, 64, 0.5); }
+  50%      { box-shadow: 0 0 0 2px var(--stf-white), 0 0 0 7px rgba(239, 58, 64, 0); }
+}
+.stf-tab.is-current .stf-tab-icon,
+.stf-tab.is-current .stf-tab-glyph { opacity: 1; }
+/* Every tab, current or not, on a mouse — the bar had no hover
+   feedback at all before this, only the permanent .is-current state.
+   Full opacity plus a small pop rather than opacity alone: a tab
+   sitting at opacity 1 already (the current one) still needs
+   something to show for a hover, and "lights up AND grows slightly"
+   is the ask. Icon and glyph only, not the tab's own border/colour —
+   those still belong to .is-current alone, so hovering a tab never
+   reads as though it were already selected. */
+.stf-tab:hover .stf-tab-icon,
+.stf-tab:hover .stf-tab-glyph { opacity: 1; transform: scale(1.1); }
+
+/* ── Doodle footer ───────────────────────────────────────────────── */
+
+/* ── Step rail (ACC-05) ──────────────────────────────────────────── */
+/* Four thin bars and a quiet line of text. Not a numbered wizard
+   header: staff need to know roughly where they are, not to navigate a
+   diagram. Red, because the filled bars are the one thing on the rail
+   that changes. */
+.stf-rail { display: flex; flex-direction: column; gap: 9px; }
+.stf-rail-bars { display: flex; gap: 5px; }
+.stf-rail-bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--stf-border);
+  transition: background 180ms ease;
+}
+.stf-rail-bar.is-done { background: var(--stf-accent); }
+.stf-rail-meta {
+  display: flex; justify-content: space-between; gap: 12px;
+  font-size: 12px; color: var(--stf-text-sub);
+}
+
+/* ── Step screen ─────────────────────────────────────────────────── */
+.stf-step      { display: flex; flex-direction: column; gap: 20px; }
+.stf-step-head { display: flex; flex-direction: column; gap: 6px; }
+.stf-step-title {
+  margin: 0;
+  font-family: var(--stf-font-display);
+  font-size: clamp(1.3rem, 4.5vw, 1.5rem);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--stf-ink);
+  text-wrap: pretty;
+}
+.stf-step-sub  { margin: 0; font-size: 14px; line-height: 1.5; color: var(--stf-text-sub); text-wrap: pretty; }
+.stf-step-body { display: flex; flex-direction: column; gap: 16px; }
+
+/* ── Actions ─────────────────────────────────────────────────────── */
+/* One action per screen commits the step; anything else is outlined and
+   sits under it. Both the same height, so a pair never reads as two
+   different kinds of control. Pill and 44px+, matching the landing
+   page's buttons. */
+.stf-actions { display: flex; flex-direction: column; gap: 10px; }
+.stf-actions.is-row { flex-direction: row; }
+.stf-actions.is-row > * { flex: 1; }
+
+.stf-btn {
+  min-height: 48px;
+  padding: 0 24px;
+  border: 1.5px solid transparent;
+  border-radius: var(--stf-radius-pill);
+  font: 600 15px/1 var(--stf-font-sans);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+.stf-btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+.stf-btn {
+  transition: background 150ms ease, border-color 150ms ease,
+              box-shadow 150ms ease, transform 100ms ease;
+}
+/* NEW — the primary CTA on the manager side ("Log a request",
+   "Assign a kit", "Resolve") is components/ui/button.jsx's default
+   variant, bg-primary: oklch(0.205 0 0), a near-black, not the brand
+   accent red. Red is still very much in the app (43 hits across
+   manager pages) but for alerts, borders and small marks — never as
+   a solid CTA fill. --stf-ink is close enough to that near-black
+   (#171717) to reuse rather than add a third dark token, and it is
+   already what the rest of this file calls "structure," which a
+   primary button is. */
+.stf-btn-primary { background: var(--stf-ink); color: var(--stf-white); }
+.stf-btn-primary:hover:not([disabled]) { background: var(--stf-ink-deep); }
+.stf-btn:hover:not([disabled]) {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18); /* blue-500 @ 18% */
+}
+.stf-btn:active:not([disabled]) {
+  transform: scale(0.97);
+}
+
+.stf-btn:focus-visible {
+  outline: 3px solid rgba(59, 130, 246, 0.6);
+  outline-offset: 2px;
+}
+.stf-btn-secondary {
+  background: var(--stf-white);
+  border-color: var(--stf-border);
+  color: var(--stf-ink);
+}
+.stf-btn-secondary:hover:not([disabled]) { background: var(--stf-sand); border-color: var(--stf-gold); }
+
+/* Used where the action is the way out of a problem — "flag shortage",
+   "something is wrong with this one". */
+.stf-btn-warn {
+  background: var(--stf-white);
+  border-color: var(--stf-attention);
+  color: var(--stf-attention-ink);
+}
+.stf-btn-warn:hover:not([disabled]) { background: var(--stf-attention-bg); }
+
+/* Donation intake uses the same staff task primitives as Dispatch,
+   with only layout glue scoped to the donation page. */
+
+.donation-intake-card {
+  padding: 18px;
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+}
+
+.donation-intake-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.donation-intake-choice {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.donation-intake-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.donation-intake-option {
+  min-height: var(--stf-field);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  color: var(--stf-ink);
+  font: 700 15px/1 var(--stf-font-display);
+  cursor: pointer;
+}
+
+.donation-intake-option:hover {
+  border-color: var(--stf-gold);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.14);
+}
+
+.donation-intake-option.is-chosen {
+  border-color: var(--stf-accent);
+  box-shadow: inset 0 0 0 1px var(--stf-accent);
+}
+
+.donation-intake-option input {
+  accent-color: var(--stf-accent);
+}
+
+.donation-intake-items {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.donation-intake-actions {
+  padding-top: 18px;
+  border-top: 1px solid var(--stf-border);
+}
+
+.donation-intake-error {
+  color: var(--stf-attention);
+}
+
+.donation-intake-error-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+@media (min-width: 720px) {
+  .donation-intake-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ── Fields ──────────────────────────────────────────────────────── */
+.stf-field { display: flex; flex-direction: column; gap: 7px; }
+.stf-field-label {
+  font-family: var(--stf-font-display);
+  font-size: 12px; font-weight: 700;
+  color: var(--stf-ink);
+}
+.stf-field-hint { font-size: 12px; line-height: 1.5; color: var(--stf-text-sub); }
+
+.stf-input {
+  min-height: var(--stf-field);
+  width: 100%;
+  padding: 0 16px;
+  border: 1.5px solid transparent;
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-field-bg);
+  color: var(--stf-ink);
+  font: 700 26px/1 var(--stf-font-display);
+  font-variant-numeric: tabular-nums;
+}
+.stf-input:focus { border-color: var(--stf-accent); }
+.stf-input.is-flagged { border-color: var(--stf-attention); }
+.stf-input.is-text { font: 400 16px/1 var(--stf-font-sans); }
+
+/* iOS zooms the page in when a focused input is under 16px. Nothing
+   here is, but the rule is explicit so a future edit cannot bring it
+   back. */
+.stf-input, .stf-select { font-size: max(16px, 1em); }
+
+.stf-select {
+  min-height: var(--stf-field);
+  width: 100%;
+  padding: 0 14px;
+  border: 1.5px solid transparent;
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-field-bg);
+  color: var(--stf-ink);
+  font: 400 16px/1 var(--stf-font-sans);
+}
+.stf-select:focus { border-color: var(--stf-accent); }
+.stf-select.is-flagged { border-color: var(--stf-attention); }
+
+/* ── Choice list ─────────────────────────────────────────────────── */
+/* Tap targets instead of a dropdown: on the floor, picking "cold room"
+   from two visible options beats opening a menu. */
+.stf-choices { display: flex; flex-direction: column; gap: 10px; }
+.stf-choice {
+  width: 100%;
+  min-height: var(--stf-tap);
+  padding: 16px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+.stf-choice:hover { border-color: var(--stf-gold) ; 
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.14);
+
+}
+.stf-choice.is-chosen { border-color: var(--stf-accent); background: var(--stf-white); box-shadow: inset 0 0 0 1px var(--stf-accent); }
+.stf-choice-label { font-family: var(--stf-font-display); font-size: 16px; font-weight: 700; color: var(--stf-ink); }
+.stf-choice-meta  { font-size: 13px; color: var(--stf-text-sub); }
+
+/* ── Notices (ACC-03: a mark and a sentence, never colour alone) ─── */
+/* REVISED — was a 4px coloured LEFT-BORDER accent (gold default,
+   red warn), asymmetric corner radius to match. No manager equivalent
+   anywhere in the app — its own real callout (ErrorBanner, used on a
+   dozen pages) is a plain border on all four sides, same radius as
+   everything else. Matched to that: a symmetric border, no accent
+   stripe. The icon mark (.stf-notice-mark) still carries the "this is
+   a warning" signal on its own, same as it always did. */
+.stf-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--stf-text);
+}
+.stf-notice.is-warn {
+  border-color: var(--stf-attention-border);
+  background: var(--stf-attention-bg);
+}
+.stf-notice-mark {
+  flex-shrink: 0;
+  width: 18px; height: 18px;
+  border: 1.5px solid var(--stf-gold-deep);
+  border-radius: 50%;
+  color: var(--stf-gold-deep);
+  font: 700 12px/15px var(--stf-font-display);
+  text-align: center;
+}
+.stf-notice.is-warn .stf-notice-mark,
+.stf-row.is-warn .stf-notice-mark {
+  border-color: var(--stf-attention);
+  /* --stf-attention-ink, not --stf-attention: the "!" glyph is text-
+     sized (12px bold), and #ef3a40 is only 3.64:1 on this mark's
+     --stf-attention-bg background — passes the 3:1 a border needs,
+     fails the 4.5:1 text needs. The border itself stays the brand red
+     since a border only needs that 3:1. */
+  color: var(--stf-attention-ink);
+}
+.stf-notice-body { flex: 1; min-width: 0; }
+.stf-notice-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+
+/* ── List and rows ───────────────────────────────────────────────── */
+.stf-list {
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  overflow: hidden;
+  background: var(--stf-white);
+}
+.stf-row {
+  width: 100%;
+  min-height: var(--stf-tap);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--stf-border);
+  background: none;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.stf-row:last-child { border-bottom: 0; }
+.stf-row:hover { background: var(--stf-sand); }
+.stf-row.is-warn { background: var(--stf-attention-bg); }
+.stf-row.is-static { cursor: default; }
+.stf-row.is-static:hover { background: none; }
+.stf-row.is-warn.is-static:hover { background: var(--stf-attention-bg); }
+.stf-row-main  { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.stf-row-title { font-family: var(--stf-font-display); font-size: 15px; font-weight: 700; color: var(--stf-ink); }
+.stf-row-meta  { font-size: 12px; line-height: 1.45; color: var(--stf-text-sub); }
+/* The use-by date to take first: an instruction, so it reads as the
+   line's own text rather than as its small print. */
+.stf-use-first { display: block; font-weight: 700; color: var(--stf-ink); }
+
+/* .stf-row is otherwise a single-line horizontal button (see
+   ReceivingFlow, GateQueue). The dispatch gate check row packs a
+   3-column grid plus a conditional variance-reason field and hint
+   text into the same row, so it needs to stack vertically instead of
+   squeezing those extra lines onto the item's own line. */
+.stf-row--check {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  cursor: default;
+}
+.stf-row--check:hover { background: none; }
+.stf-row--check.is-warn:hover { background: var(--stf-attention-bg); }
+.stf-row--check .stf-row-main { width: 100%; }
+
+/* The main line of a .stf-row--check row, when it also needs a badge
+   next to it (StaffSlipFlow.jsx's packing checklist) — restates
+   .stf-row's own default row layout (align-items: center, gap: 12px)
+   on this inner wrapper, since the outer .stf-row--check is in column
+   mode to make room for whatever stacks below (a Confirm/Flag panel,
+   here). */
+.stf-row-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; }
+
+/* ── key: value captions ─────────────────────────────────────────── */
+.stf-kv     { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; font-size: 12px; color: var(--stf-text-sub); }
+.stf-kv-key { color: var(--stf-text-meta); }
+.stf-kv-val { color: var(--stf-ink); font-weight: 600; }
+
+/* ── Instruction numbers (decanting step 3) ──────────────────────── */
+/* Nothing to type on that screen, which is why these can be this big
+   and read from a metre away with both hands full. */
+.stf-instruction {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 20px;
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+}
+.stf-instruction-n {
+  min-width: 56px;
+  font-family: var(--stf-font-display);
+  font-size: 2.4rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--stf-ink);
+}
+.stf-instruction-l { font-size: 16px; color: var(--stf-text); }
+
+/* ── Signature ───────────────────────────────────────────────────── */
+.stf-sign-canvas {
+  width: 100%;
+  height: 170px;
+  border: 2px dashed var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+  /* Without this the browser treats the first drag as a page pan and
+     the driver's signature scrolls the screen instead. */
+  touch-action: none;
+  display: block;
+}
+/* ── Live field validity ──────────────────────────────────────────── */
+/* .is-flagged already exists for invalid state (red). Adding the
+   green counterpart for valid state, shown live as the worker types
+   or moves to the next field — not just after a submit attempt. */
+.stf-input.is-valid {
+  border-color: #22a55a; /* matches --color-header... green already used
+                             for the "online" status dot in index.css */
+}
+
+.stf-input.is-valid:focus {
+  border-color: #22a55a;
+}
+/* ── Valid-state hint text ────────────────────────────────────────── */
+.stf-field-hint.is-valid-msg {
+  color: #1a7d42; /* darker than the border green, for 4.5:1 text contrast */
+}
+
+
+/* ── Counter ─────────────────────────────────────────────────────── */
+.stf-counter { display: flex; align-items: center; gap: 12px; }
+.stf-counter-btn {
+  width: 48px; height: 48px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: 50%;
+  background: var(--stf-white);
+  font: 400 22px/1 var(--stf-font-sans);
+  color: var(--stf-ink);
+  cursor: pointer;
+}
+.stf-counter-btn:hover { border-color: var(--stf-accent); color: var(--stf-accent); }
+.stf-counter-val {
+  min-width: 44px; text-align: center;
+  font-family: var(--stf-font-display);
+  font-size: 22px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--stf-ink);
+}
+
+/* ── Progress bar (packing) ──────────────────────────────────────── */
+.stf-progress { display: flex; align-items: center; gap: 14px; }
+.stf-progress-track { flex: 1; height: 10px; border-radius: 5px; background: var(--stf-border); overflow: hidden; }
+.stf-progress-fill  { height: 100%; background: var(--stf-accent); transition: width 240ms ease; }
+.stf-progress-count {
+  font-family: var(--stf-font-display);
+  font-size: 13px; font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--stf-ink);
+}
+
+/* ── Quiet states ────────────────────────────────────────────────── */
+.stf-empty {
+  padding: 24px 20px;
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+  font-size: 14px; line-height: 1.6;
+  color: var(--stf-text-sub);
+}
+/* REVISED — was a flat, static block. The manager side's own loading
+   state (@/components/ui/skeleton.jsx) has carried Tailwind's
+   animate-pulse the whole time; this is the one place the floor screens section of index.css never
+   matched it, on a class used in 16 places across every worker flow
+   (Receiving, Decanting, Dispatch, Packing, Feed the Soil, Community
+   Requests). Same keyframe and timing as Tailwind's own animate-pulse
+   (2s cubic-bezier(0.4,0,0.6,1) infinite, 50% opacity at the midpoint)
+   rather than inventing a different one, so a loading state looks the
+   same whichever side of the app it's on. Frozen for reduced-motion
+   the same way every other animation in this file already is — the
+   blanket [data-stf-motion='reduced'] rule zeroes animation-duration
+   app-wide, nothing extra needed here. */
+.stf-skeleton {
+  height: 56px;
+  border-radius: var(--stf-radius);
+  background: var(--stf-border);
+  animation: stf-skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+@keyframes stf-skeleton-pulse {
+  50% { opacity: 0.5; }
+}
+
+/* ── Segmented tabs ──────────────────────────────────────────────── */
+/* For a board with a few named subsets (packing's "assigned to me /
+   spare / done") — not the bottom .stf-tab task bar, which is
+   navigation between the four tasks, not filters within one of them.
+
+   REVISED — the track used to be --stf-border, the same warm khaki
+   the rest of the brand palette leans on. Fine as a hairline, too
+   present as a fill: next to the manager/admin side's neutral pill
+   surfaces it read as a yellow-tinted track behind a white pill,
+   not one clean control. --stf-field-bg is the same neutral fill
+   already used for every input/select/search box, so this now
+   matches those rather than introducing a third kind of "light"
+   background. */
+.stf-segments {
+  display: flex; gap: 4px;
+  padding: 3px;
+  background: var(--stf-field-bg);
+  border-radius: var(--stf-radius-sm);
+}
+.stf-segment {
+  flex: 1;
+  min-height: var(--stf-tap);
+  padding: 8px 10px;
+  border: none;
+  border-radius: calc(var(--stf-radius-sm) - 3px);
+  background: transparent;
+  font: 600 13px/1.3 var(--stf-font-sans);
+  color: var(--stf-text-sub);
+  cursor: pointer;
+}
+.stf-segment.is-active { background: var(--stf-white); color: var(--stf-ink); }
+
+/* ── View toggle (Guided / Form) ───────────────────────────────────
+   Same .stf-segments shell as the filter tabs above, but a full pill
+   rather than their softer corners, and sized to its labels rather
+   than stretched to fill the row — this is the one place in the app
+   asking to look like booking.com's compact List/Grid switch, not the
+   full-width filter-tab language used everywhere else (nor the
+   full-width block this looked like before: a fixed 50/50 split only
+   works for two equal-width segments, which forced the whole control
+   to stretch to make that true). The thumb's width and position come
+   from JS measuring the real button (see ViewToggle in
+   StepPrimitives.jsx) — CSS here only draws it.
+
+   REVISED — pill and hint used to stack (hint below, left-aligned
+   under the pill). Now that ViewToggle only ever renders inside
+   .stf-card-toggle (see below), the hint IS that control's own
+   description sitting right beside it, same row — "The mode toggle
+   is a property of the form... the caption becomes that control's
+   description instead of a floating line of text." A stacked layout
+   read fine floating alone above the card; inline is what reads as
+   one control with a caption once it's a row inside the card's own
+   header. */
+.stf-toggle-block {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.stf-toggle {
+  position: relative;
+  display: inline-flex;
+  width: auto;
+  border-radius: var(--stf-radius-pill);
+}
+.stf-toggle .stf-segment {
+  flex: none;
+  padding: 10px 18px;
+  position: relative;
+  z-index: 1;
+  border-radius: var(--stf-radius-pill);
+  background: transparent; /* the thumb draws the active background now */
+}
+.stf-segment-thumb {
+  position: absolute;
+  top: 3px; bottom: 3px; left: 0;
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-white);
+  box-shadow: 0 1px 2px rgba(43, 51, 54, 0.14);
+  transition: transform 220ms cubic-bezier(0.4, 0, 0.2, 1), width 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 0;
+}
+
+/* One line naming whichever option is currently active, beside the
+   (content-sized) pill rather than under it — see .stf-toggle-block's
+   own note above. Not a title-attribute tooltip: this is read with a
+   thumb, not a mouse, and title never shows on a tap. */
+.stf-toggle-hint { margin: 0; font-size: 12px; color: var(--stf-text-sub); }
+
+/* ── Card toggle row ───────────────────────────────────────────────
+   The mode toggle's own header strip inside a step card (StepScreen's
+   .stf-step-head, TaskPage's .stf-task-head) — was a lone floating
+   block (.stf-toggle-anchor) sitting above the card in .stf-main's own
+   flex column, right-aligned, with a StepRail progress bar rendered
+   BELOW it: three separate chrome rows before any actual content.
+   "the mode toggle is a property of the form, not of the app, so it
+   moves onto the card's own top edge where it has an obvious owner" —
+   the toggle is now the first thing inside whichever card is showing,
+   and the breadcrumb row carries the step progress instead (see
+   StaffShell's own .stf-crumb-progress).
+
+   position: relative is still what anchors the Coachmark — same job
+   .stf-toggle-anchor did, just on the row that now actually owns the
+   toggle. */
+.stf-card-toggle {
+  position: relative;
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--stf-border);
+}
+/* In the row's own flow, under the toggle, not floated over what
+   follows: as an absolute box it sat on top of the step's heading
+   ("Which delivery is this?") for as long as it showed, which is the
+   first thing a new worker sees. It now pushes the heading down for
+   those few seconds instead. The home screen's arrow is the one hint
+   that floats (.stf-coachmark-fixed, further down). */
+.stf-coachmark {
+  position: static;
+  margin-top: 8px;
+  /* left, not right — .stf-card-toggle is its own standalone row
+     holding only the toggle (StepScreen, TaskPage, this file all
+     render it that way, nothing else sharing the row to push it
+     right), and .stf-toggle-block is inline-flex, so the pill always
+     sits at the row's own left/start edge. right: 0 anchored this to
+     the far right of the WHOLE card header instead — visibly
+     disconnected from the toggle it's meant to be pointing at on any
+     card wider than the toggle pill itself, which is every card. */
+  left: 0;
+  z-index: 30;
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  max-width: 190px;
+}
+.stf-coachmark-arrow {
+  flex-shrink: 0;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--stf-ink);
+  animation: stf-coachmark-bounce 1.2s ease-in-out infinite;
+}
+.stf-coachmark-body {
+  border: 0;
+  border-radius: var(--stf-radius-sm);
+  padding: 8px 10px;
+  background: var(--stf-ink);
+  color: var(--stf-white);
+  font: 600 12px/1.4 var(--stf-font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+@keyframes stf-coachmark-bounce {
+  0%, 100% { transform: translateY(-2px); }
+  50%      { transform: translateY(2px); }
+}
+
+/* ── Full-form line row (Receiving's "Form" mode) ──────────────────
+   One card per order line holding everything the guided flow spreads
+   across two screens (count, then put-away) — the point of this mode
+   is that none of it is hidden behind a Next button. */
+
+/* ── Status badge ────────────────────────────────────────────────── */
+
+/* ── Select field ─────────────────────────────────────────────────── */
+/* .stf-select itself already exists (donation forms use it) — this
+   file only adds the wrapper spacing to match .stf-field's rhythm,
+   which SelectField in StepPrimitives.jsx already relies on. */
+
+/* ── Date field ───────────────────────────────────────────────────── */
+/* The real <input type="date"> is kept in the document (so
+   showPicker() and native validation still work) but visually
+   collapsed — the button is what a worker actually sees and taps. */
+.stf-date-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: var(--stf-field);
+  padding: 0 16px;
+  border: 1.5px solid transparent;
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-field-bg);
+  color: var(--stf-ink);
+  font: 400 16px/1 var(--stf-font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+.stf-date-trigger:hover { border-color: var(--stf-gold); }
+.stf-date-trigger i { font-size: 18px; color: var(--stf-text-sub); }
+.stf-date-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* ── Quantity readout + edit (Form mode) ─────────────────────────── */
+/* Pre-filled from the order, shown as a plain value rather than an
+   open input — most deliveries match the order exactly, so an
+   always-editable field on every one of a dozen lines is a dozen
+   chances to bump a number by accident. Edit is one deliberate tap
+   away instead. */
+.stf-qty-readout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: var(--stf-field);
+  padding: 0 16px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-sand);
+}
+.stf-qty-readout-val {
+  font: 700 22px/1 var(--stf-font-display);
+  color: var(--stf-ink);
+  font-variant-numeric: tabular-nums;
+}
+.stf-qty-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--stf-tap);
+  padding: 0 14px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-white);
+  color: var(--stf-ink);
+  font: 600 13px/1 var(--stf-font-sans);
+}
+.stf-qty-edit-btn:hover { border-color: var(--stf-accent); color: var(--stf-accent); }
+.stf-qty-edit-btn i { font-size: 15px; }
+
+/* ── Signature field ──────────────────────────────────────────────── */
+/* Wraps SignaturePad, which is shared with the manager side and takes
+   its class names as props precisely so it can look native here
+   instead of borrowing the manager page's plain-link styling. */
+.stf-signature-field { display: flex; flex-direction: column; gap: 8px; }
+.stf-signature-clear {
+  min-height: var(--stf-tap);
+  padding: 0 4px;
+  border: none;
+  background: none;
+  color: var(--stf-accent);
+  font: 600 13px/1 var(--stf-font-sans);
+}
+.stf-signature-clear:hover { color: var(--stf-accent-deep); text-decoration: underline; }
+
+/* ── Form-mode dialog (the "one scrolling form") ─────────────────── */
+
+/* ── Static (read-only) field value ──────────────────────────────── */
+/* Looks like an input's box without inviting a tap — for a value the
+   screen already knows (who's signed in) rather than one someone
+   needs to choose. */
+.stf-static-value {
+  display: flex;
+  align-items: center;
+  min-height: var(--stf-field);
+  padding: 0 16px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-sand);
+  color: var(--stf-ink);
+  font: 600 16px/1 var(--stf-font-sans);
+}
+
+/* History's own link now lives in the crumb bar (.stf-crumb-link,
+   above StaffShell.jsx's block) instead of here — inline page content
+   scrolls out of view and, worse, sits behind the Form dialog once
+   that's open, so it isn't reachable from both modes at all times. */
+
+.stf-sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+/* ── Section divider ──────────────────────────────────────────────── */
+
+/* ── Donation intake: item rows & stock search ──────────────────── */
+/* Classes for the search-first item-entry row used on the donation
+   intake form. Visual language mirrors the existing .stf-field /
+   .stf-input / .stf-btn / .stf-row patterns above — same tokens,
+   radius steps, tap targets, and font stack — so a staff member
+   can't tell these rules came from a different .jsx file. */
+
+.stf-search-input {
+  position: relative;
+}
+.stf-search-input input {
+  min-height: var(--stf-tap);
+  width: 100%;
+  padding: 0 14px;
+  border: 1.5px solid transparent;
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-field-bg);
+  color: var(--stf-ink);
+  font: 400 16px/1 var(--stf-font-sans);
+  font-size: max(16px, 1em);
+}
+.stf-search-input input:focus {
+  border-color: var(--stf-accent);
+  outline: none;
+}
+
+/* Same colour correction as .stf-btn-primary above — this is that
+   button's small size, not a different kind of action. */
+.stf-btn-small {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1.5px solid transparent;
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-ink);
+  color: var(--stf-white);
+  font: 600 13px/1 var(--stf-font-sans);
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+.stf-btn-small:hover {
+  background: var(--stf-ink-deep);
+}
+.stf-btn-small:active {
+  transform: scale(0.97);
+}
+.stf-btn-small:focus-visible {
+  outline: 2px solid rgba(59, 130, 246, 0.6);
+  outline-offset: 2px;
+}
+
+/* Manager's own "outline" button (components/ui/button.jsx's outline
+   variant, used for e.g. Benevolent Requests' "Claim") is neutral —
+   border-border, bg-background, text-foreground — never accent-
+   coloured. This used to be a red-bordered/red-text button, which had
+   no real equivalent on the manager side; now it matches
+   .stf-btn-secondary's already-correct neutral treatment. */
+.stf-btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 24px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-white);
+  color: var(--stf-ink);
+  font: 600 15px/1 var(--stf-font-sans);
+  gap: 8px;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.stf-btn-outline:hover {
+  background: var(--stf-sand);
+  border-color: var(--stf-gold);
+}
+.stf-btn-outline:active {
+  transform: scale(0.97);
+}
+.stf-btn-outline:focus-visible {
+  outline: 3px solid rgba(59, 130, 246, 0.6);
+  outline-offset: 2px;
+}
+/* REVISED — used to be a bordered, padded badge (1px border, 4px
+   radius) with no manager equivalent. Manager's own inline field
+   error (components/ui/field.jsx's FieldError) is plain coloured
+   text, no box — matched to that exactly.
+
+   NOT var(--stf-attention): #ef3a40 is 3.93:1 on white, which clears
+   the 3:1 a border or background needs but fails 4.5:1 for text.
+   Manager's FieldError doesn't use the brand red for this either —
+   its text-destructive resolves to #e7000b (4.77:1), a darker red
+   picked for exactly this reason. Matched to that value, not the
+   brand accent, for the same reason manager itself doesn't use one
+   red for everything. */
+.stf-error {
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: #e7000b;
+  margin-top: 4px;
+}
+
+/* ── Less Movement / Reduced Motion Accessibility Mode ── */
+
+body.reduced-movement *,
+body.reduced-movement *::before,
+body.reduced-movement *::after {
+  /* Disable all smooth animations & transforms */
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+  transform: none !important;
+}
+/* ── ACC-08 · reduced motion ─────────────────────────────────────── */
+/* Honoured from the OS setting, and from the in-app "Less movement"
+   toggle (components/layout/shellContext.js), which sets data-stf-motion="reduced"
+   on <html> so it also covers a shared tablet whose OS setting nobody
+   can change.
+
+   REVISED — this used to be five named selectors plus the coachmark
+   arrow, which is what let the coachmark "just freeze on screen"
+   instead of disappearing: the arrow's own bounce stopped (line
+   below still zeroes it out) but nothing here was ever the reason it
+   stayed visible — that was a separate bug, a missing auto-dismiss
+   timer, fixed in TaskDashboardPage.jsx. This blanket rule is a
+   genuine second thing worth having anyway: an enumerated list always
+   drifts behind whatever's actually animated in the file, the same
+   problem a completely separate, DEAD version of this same idea had
+   (body.reduced-movement, still in this file below, toggled only by
+   TopNavBar.jsx — a component nothing in App.jsx routes to any more).
+   `*` catches every current and future transition/animation without
+   needing its own entry. transform is deliberately left alone: it's
+   also how static things are centred here (translateY(-50%) etc.),
+   and a blanket transform: none would un-centre them, not just stop
+   motion. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+[data-stf-motion='reduced'] *,
+[data-stf-motion='reduced'] *::before,
+[data-stf-motion='reduced'] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* ── Bench tablet ────────────────────────────────────────────────── */
+/* Same column, more air. Deliberately not a wider table: the staff who
+   use the tablet are the staff who use the phone. */
+@media (min-width: 720px) {
+  .stf-main { max-width: 620px; padding: 28px 24px 40px; }
+  .stf-tab { font-size: 11px; }
+  .stf-tab-icon { width: 28px; height: 28px; }
+  .stf-instruction-n { font-size: 2.8rem; }
+}
+
+
+/* ── Task page (TaskPage.jsx) ──────────────────────────────────
+   The container that replaced the dialog both staff flows used to
+   render into. Full width of the shell rather than a 560px box, with
+   the head and the commit bar pinned so neither scrolls away from a
+   worker halfway down a nine-line delivery. */
+.stf-task {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+}
+.stf-task-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--stf-sand);
+  padding: 16px 0 12px;
+  border-bottom: 1px solid var(--stf-border);
+}
+.stf-task-title {
+  font-family: var(--stf-font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--stf-ink);
+  margin: 0;
+}
+.stf-task-title:focus-visible { outline: 2px solid var(--stf-accent); outline-offset: 3px; }
+.stf-task-sub { margin: 4px 0 0; font-size: 14px; color: var(--stf-text-sub); }
+
+.stf-task-cols { display: block; padding: 12px 0 16px; }
+.stf-task-main { min-width: 0; }
+.stf-task-side { margin-top: 16px; }
+
+/* Two panes only where there is width for two panes, AND only where a
+   TaskPage actually has a side pane to put there — .has-side, set by
+   TaskPage.jsx only when its `side` prop is passed. REVISED: this used
+   to apply to bare .stf-task-cols regardless, so a TaskPage with no
+   side (Feed the Soil's browse/kits screens use TaskPage for its
+   sticky head with no side content) still got grid-template-columns:
+   1fr 320px — a real second column reserved on screen with nothing
+   in it, showing as unexplained empty space beside a narrower-than-
+   expected card. Below 1024px the side pane (when there is one) is
+   simply the next thing down the page either way. */
+@media (min-width: 1024px) {
+  .stf-task-cols.has-side {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 24px;
+    align-items: start;
+  }
+  .stf-task-side {
+    margin-top: 0;
+    position: sticky;
+    top: 92px;
+  }
+}
+
+.stf-task-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: var(--stf-sand);
+  border-top: 1px solid var(--stf-border);
+  padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
+}
+.stf-task-note {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--stf-attention-ink);
+}
+
+/* On a wide screen the commit lives in the side pane, so the sticky
+   footer would be a second copy of it taking up the bottom of the
+   page for nothing. */
+
+/* ── Work list (WorkList.jsx) ──────────────────────────────────
+   One row per line: what it is on the left, the number on the right,
+   about 56px tall. The card-per-line shape this replaced was ~135px,
+   which is what made nine lines a scroll instead of a screen. */
+.stf-wl { display: flex; flex-direction: column; gap: 8px; }
+
+.stf-wl-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.stf-wl-count { font-size: 13px; color: var(--stf-text-sub); }
+.stf-wl-accept {
+  min-height: var(--stf-tap);
+  padding: 0 16px;
+  border: 1px solid var(--stf-ink);
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-white);
+  font-family: var(--stf-font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--stf-ink);
+  cursor: pointer;
+}
+.stf-wl-accept:hover { background: var(--stf-ink); color: var(--stf-white); }
+
+.stf-wl-rows {
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+  overflow: hidden;
+}
+.stf-wl-row { border-bottom: 1px solid var(--stf-border); }
+.stf-wl-row:last-child { border-bottom: 0; }
+.stf-wl-row.is-warn { background: var(--stf-attention-bg); }
+/* The focused row in Guided. A left bar rather than a colour swap,
+   so it never collides with the warn state a varied line already
+   carries — ACC-03, never colour alone. */
+.stf-wl-row.is-focus { box-shadow: inset 3px 0 0 var(--stf-accent); }
+
+.stf-wl-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 56px;
+  padding: 6px 10px;
+}
+.stf-wl-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  padding: 4px 0;
+  font-family: inherit;
+}
+.stf-wl-text { min-width: 0; display: flex; flex-direction: column; }
+.stf-wl-title {
+  font-family: var(--stf-font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--stf-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stf-wl-meta {
+  font-size: 12px;
+  color: var(--stf-text-meta);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stf-wl-mark {
+  flex: 0 0 auto;
+  width: 20px; height: 20px;
+  border-radius: 50%;
+  /* NOT var(--stf-attention): white text at 13px bold on #ef3a40 is
+     3.93:1, under the 4.5:1 normal text needs. #e7000b is the same
+     darker red shadcn's own --destructive resolves to for exactly
+     this reason (see .stf-error's note) — white on it is 4.77:1. */
+  background: #e7000b;
+  color: var(--stf-white);
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stf-wl-qty { flex: 0 0 auto; display: flex; align-items: center; gap: 4px; }
+.stf-wl-step {
+  width: var(--stf-tap);
+  height: var(--stf-tap);
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  font-size: 20px;
+  line-height: 1;
+  color: var(--stf-ink);
+  cursor: pointer;
+}
+.stf-wl-step:hover { background: var(--stf-sand); }
+.stf-wl-input {
+  width: 84px;
+  min-height: var(--stf-tap);
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  text-align: center;
+  font-family: var(--stf-font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--stf-ink);
+}
+.stf-wl-input.is-flagged { border-color: var(--stf-attention); }
+
+/* The accordion. Only the focused line opens, so put-away location,
+   use-by date and the variance notice are present when they matter
+   and invisible when they do not. */
+.stf-wl-detail {
+  padding: 4px 10px 14px;
+  border-top: 1px dashed var(--stf-border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Summary card, for the side pane ──────────────────────── */
+.stf-summary {
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.stf-summary-title {
+  font-family: var(--stf-font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--stf-ink);
+  margin: 0;
+}
+
+
+/* ── Script 21 ─────────────────────────────────────────────────
+   Appended rather than edited into the blocks above, so this script
+   and 17/19/20 never fight over the same anchor.
+
+   ── 1 · THE WIDTH ──────────────────────────────────────────────
+   .stf-main caps every staff page at 520px, 620px above 720px wide.
+   `.stf-main.is-wide` has existed since Decanting's week planner
+   needed the room — and NOTHING in the codebase ever passed the
+   `wide` flag that turns it on. That is the whole of the reported
+   "you didn't use all the white space": on a 1315px laptop the work
+   sat in a 570px strip with product names truncated to "A..", and
+   TaskPage's two-pane layout at 1024px could never fire because its
+   own container was 620px.
+
+   Keyed on :has() rather than a new prop: the page that needs the
+   width is the page that renders a TaskPage, so there is nothing for
+   a caller to remember and no way to add a fifth flow and forget.
+   :has() carries the specificity of its argument (0,2,0), so this
+   beats the bare .stf-main rules wherever they are, media query or
+   not — no !important and no source-order dependency.
+
+   The 1200px is the manager dashboard's own max-w-6xl (1152px)
+   rounded to the number .stf-main.is-wide already used, so a staff
+   page and a dashboard measure the same on the same screen. */
+.stf-main:has(.stf-task),
+.stf-main:has(> .stf-step) {
+  max-width: 1200px;
+}
+
+/* ── 2 · THE DASHBOARD SURFACE ──────────────────────────────────
+   "Apply the style from the dashboard to these pages."
+
+   REVISED (correction) — this had gone through two guesses already:
+   24px as a guess at rounded-4xl, then a "+2px" on top of a wrongly
+   shrunk --stf-radius after mistaking ErrorBanner's one-off 4px for
+   the card standard. --stf-radius now IS rounded-4xl's real value
+   (26px, see the token block), so this reads it directly with no
+   fudge added on top.
+
+   What is copied is the SURFACE, not the type system. The stf-*
+   scale exists because these screens are used on a phone with gloves
+   (ACC-06): 44px tap targets, 56px number fields. Swapping that for
+   the dashboard's 14px body text would undo the accessibility work
+   to win a family resemblance. So: the dashboard's card, the staff
+   pages' contents. */
+.stf-main > .stf-task,
+.stf-main > .stf-step {
+  background: var(--stf-white);
+  border: 1px solid rgb(43 51 54 / 0.06);
+  border-radius: var(--stf-radius);
+  box-shadow: 0 4px 6px -1px rgb(43 51 54 / 0.08), 0 2px 4px -2px rgb(43 51 54 / 0.06);
+  padding: 20px;
+}
+
+@media (min-width: 720px) {
+  .stf-main > .stf-task,
+  .stf-main > .stf-step {
+    padding: 24px;
+  }
+}
+
+/* The head and the foot are sticky, so they cannot simply inherit
+   the card's padding — they have to span the card's full width and
+   paint over what scrolls under them. Negative margins pull them out
+   to the card edge; the background changes from sand to white
+   because they are now ON the card.
+
+   The radius is repeated on both so that when neither is stuck they
+   sit flush in the card's corners, and when the head IS stuck it
+   reads as a floating header rather than a square patch. */
+.stf-main > .stf-task > .stf-task-head {
+  background: var(--stf-white);
+  margin: -20px -20px 0;
+  padding: 20px 20px 14px;
+  border-radius: var(--stf-radius) var(--stf-radius) 0 0;
+}
+.stf-main > .stf-task > .stf-task-foot {
+  background: var(--stf-white);
+  margin: 0 -20px -20px;
+  padding: 14px 20px calc(14px + env(safe-area-inset-bottom));
+  border-radius: 0 0 var(--stf-radius) var(--stf-radius);
+}
+
+@media (min-width: 720px) {
+  .stf-main > .stf-task > .stf-task-head {
+    margin: -24px -24px 0;
+    padding: 24px 24px 16px;
+  }
+  .stf-main > .stf-task > .stf-task-foot {
+    margin: 0 -24px -24px;
+    padding: 16px 24px calc(16px + env(safe-area-inset-bottom));
+  }
+}
+
+/* The side pane sticks under the sticky head. On the card that head
+   is taller than the 92px the original rule guessed at. */
+@media (min-width: 1024px) {
+  .stf-main > .stf-task .stf-task-side { top: 110px; }
+}
+
+/* Width is for the work, not for the prose. A list, a table and a
+   two-pane task all get better at 1200px; a heading, a paragraph and
+   a stack of fields get worse — 1200px of running text is unreadable
+   and a 1200px-wide input looks like a mistake. So the card takes the
+   room and the type inside it keeps a measure.
+
+   .stf-step-body is StepScreen's own wrapper for whatever the step
+   asks for, which is always fields or choices. The lists on the
+   history screens are NOT inside it — they are direct children of
+   .stf-step — so they still span the card. */
+.stf-main > .stf-step > .stf-step-head,
+.stf-main > .stf-step > .stf-step-body {
+  max-width: 760px;
+}
+
+/* ── 3 · GUIDED IS NOW A MODE YOU CAN SEE ───────────────────────
+   Reported as "there's no difference between guided and form view on
+   dispatch", and that was accurate: script 20 made Guided a focus
+   state over one shared list, which fixed the code duplication but
+   left the two modes rendering an identical screen with one extra
+   button. A left bar and an accordion is not a mode.
+
+   Guided now says where you are and what you are on. Everything
+   except the focused line is muted and compact; the focused line is
+   full contrast, bigger, and carries "Item 3 of 9".
+
+   Muted, not hidden and not disabled — the point of the rework was
+   that a worker can see the whole job and jump to the line they
+   actually want. Every row stays tappable, and tapping one moves the
+   focus to it. */
+.stf-wl.is-guided .stf-wl-row {
+  opacity: 0.5;
+  transition: opacity 0.15s ease;
+}
+.stf-wl.is-guided .stf-wl-row.is-focus {
+  opacity: 1;
+  border-color: var(--stf-accent);
+  box-shadow: 0 0 0 1px var(--stf-accent);
+}
+/* A line that is short or over keeps its contrast even when it is not
+   the line you are on. ACC-03 says the mark and the sentence carry
+   the meaning rather than colour — dimming both to 50% to make Guided
+   look like a mode would take the exception off the screen, which is
+   the one thing this list exists to surface. */
+.stf-wl.is-guided .stf-wl-row.is-warn { opacity: 0.85; }
+.stf-wl.is-guided .stf-wl-row.is-focus .stf-wl-title {
+  font-size: 17px;
+}
+/* 56px and 20px: the same "typed on the floor" sizing NumberField
+   uses (ACC-06). The collapsed rows keep the compact 44px field. */
+.stf-wl.is-guided .stf-wl-row.is-focus .stf-wl-input {
+  min-height: 56px;
+  font-size: 20px;
+}
+.stf-wl-pos {
+  display: block;
+  font: 700 11px/1.4 var(--stf-font-sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--stf-accent);
+  margin-bottom: 2px;
+}
+
+/* The old [data-stf-motion='reduced'] .stf-wl-row rule that used to
+   live here is now covered by the blanket reduced-motion rule near
+   the top of this file — every transition, this row's included. */
+
+/* ── 3b · THE ROW ON A PHONE ────────────────────────────────────
+   Found by rendering it rather than by reading it. Two 44px steppers
+   and the number take about 176px of a 390px row, and .stf-wl-title
+   is `white-space: nowrap` with an ellipsis — so on a real phone the
+   product names came out as "Maize Me..." and "Tinned...", which is
+   the one thing on the row a worker has to be able to read. The
+   truncation was there from script 20; the wider card just made it
+   visible on the laptop instead.
+
+   Below 480px the number moves to its own line under the name. The
+   row gets taller, which is the correct trade: a 56px row that does
+   not say what it is saves nothing. */
+@media (max-width: 479px) {
+  .stf-wl-line { flex-wrap: wrap; row-gap: 6px; }
+  .stf-wl-main { flex: 1 0 100%; }
+  .stf-wl-qty  { margin-left: auto; }
+}
+
+/* ── 4 · PAGER (Paged.jsx) ──────────────────────────────────────
+   Under a list, not over it: the control belongs where the list
+   runs out. Hidden entirely at one page, so short lists are
+   unchanged. */
+.stf-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 2px 2px;
+}
+.stf-pager-btn {
+  min-height: var(--stf-tap);
+  padding: 0 16px;
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  font: 600 14px/1 var(--stf-font-sans);
+  color: var(--stf-ink);
+  cursor: pointer;
+}
+.stf-pager-btn:hover:not(:disabled) { border-color: var(--stf-accent); color: var(--stf-accent); }
+.stf-pager-btn:disabled { opacity: 0.4; cursor: default; }
+.stf-pager-count {
+  font: 500 13px/1.4 var(--stf-font-sans);
+  color: var(--stf-text-sub);
+  text-align: center;
+}
+
+/* ── 5 · PANELS (DecantingFlow) ─────────────────────────────────
+   Decanting's three parts on one page. Guided opens one at a time
+   and shows the others as a summary line; Form opens all three at
+   once. Same markup, same handlers, one code path — which is what
+   the dialog version was not. */
+.stf-panel {
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+  overflow: hidden;
+}
+.stf-panel + .stf-panel { margin-top: 12px; }
+.stf-panel.is-open { border-color: var(--stf-ink); }
+.stf-panel.is-locked { opacity: 0.55; }
+
+.stf-panel-head {
+  width: 100%;
+  min-height: var(--stf-tap);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: none;
+  border: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+button.stf-panel-head { cursor: pointer; }
+button.stf-panel-head:disabled { cursor: default; }
+
+.stf-panel-n {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--stf-sand);
+  color: var(--stf-ink);
+  font: 700 13px/1 var(--stf-font-sans);
+}
+.stf-panel.is-open .stf-panel-n { background: var(--stf-ink); color: var(--stf-white); }
+/* REVISED — was var(--stf-gold): a 26px, border-radius:999px pill
+   filled with khaki. That's exactly the "yellow accent and fill
+   colour in pills" the manager side doesn't have (its own done/closed
+   state is .stf-badge.is-done, filled --stf-ink, not gold). Matched
+   to that same convention rather than inventing a third "done"
+   colour. */
+.stf-panel.is-done .stf-panel-n { background: var(--stf-ink); color: var(--stf-white); }
+
+.stf-panel-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.stf-panel-title {
+  font-family: var(--stf-font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--stf-ink);
+}
+.stf-panel-sum { font-size: 13px; color: var(--stf-text-sub); }
+
+.stf-panel-body {
+  padding: 4px 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+
+/* ── Script 22 ─────────────────────────────────────────────────
+   Appended after 21's block for the same reason 21 was appended
+   after everything else: no two scripts share an anchor.
+
+   ── 1 · CENTRE THE SELECTION SCREENS ───────────────────────────
+   Script 21 gave every staff page the full 1200px card and then
+   capped the type at 760px so a paragraph would not run the width of
+   a laptop. What it did not do was centre that 760px, so "Which
+   delivery is this?" and "What are you decanting?" sat hard left in
+   a wide card with a third of it empty.
+
+   Scoped with :has(> .stf-step-body) so it only catches a StepScreen
+   — a screen of questions. The history screens render their list as
+   a direct child of .stf-step with no body, and they want the whole
+   card. */
+.stf-main > .stf-step:has(> .stf-step-body) > .stf-step-head,
+.stf-main > .stf-step:has(> .stf-step-body) > .stf-step-body,
+.stf-main > .stf-step:has(> .stf-step-body) > .stf-actions {
+  width: 100%;
+  max-width: 760px;
+  margin-inline: auto;
+}
+
+/* ── 2 · THE NUMBER BEING CHECKED AGAINST ───────────────────────
+   Asked for directly. Worth stating the tension: the floor screens section's own rule
+   is charcoal for structure, red for anything clickable, gold for
+   accents — and this is a static number wearing the click colour. It
+   works because it is the ONLY static red on the row, so it still
+   reads as "this one number", not as "this is a button". If a second
+   static red ever appears next to it, both stop meaning anything. */
+.stf-wl-expected {
+  color: var(--stf-accent);
+  font-weight: 700;
+}
+
+/* ── 3 · GUIDED IS ONE ITEM NOW ─────────────────────────────────
+   Script 21 made Guided "focus one, dim the rest". This replaces
+   that with one line on screen at a time, which is what was asked
+   for. The dimming rules from 21 still apply to whatever is
+   rendered, so the single line — which is always the focused one —
+   is put back to full contrast here, including when it is also a
+   short or over line. */
+.stf-wl.is-guided .stf-wl-row,
+.stf-wl.is-guided .stf-wl-row.is-warn,
+.stf-wl.is-guided .stf-wl-row.is-focus {
+  opacity: 1;
+}
+
+/* One line has the whole card, so it can afford to be read at arm's
+   length on a bench. */
+.stf-wl.is-guided .stf-wl-line { min-height: 76px; padding: 12px 14px; }
+.stf-wl.is-guided .stf-wl-title { font-size: 19px; }
+.stf-wl.is-guided .stf-wl-meta  { font-size: 14px; }
+
+/* The pager. This is the part that stops one-at-a-time being the
+   trap the old Guided was: that version could only go forwards, one
+   StepScreen at a time, so a line you fumbled was gone. */
+.stf-wl-steps {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+}
+.stf-wl-step-btn {
+  min-height: var(--stf-tap);
+  padding: 0 16px;
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  font: 600 14px/1 var(--stf-font-sans);
+  color: var(--stf-ink);
+  cursor: pointer;
+}
+.stf-wl-step-btn:hover:not(:disabled) { border-color: var(--stf-accent); color: var(--stf-accent); }
+.stf-wl-step-btn:disabled { opacity: 0.4; cursor: default; }
+.stf-wl-steps-count {
+  font: 700 14px/1 var(--stf-font-display);
+  color: var(--stf-text-sub);
+  white-space: nowrap;
+}
+
+/* ── 4 · THE CONFIRM TICK ───────────────────────────────────────
+   Off (outline) and on (filled) differ by more than colour — the
+   border weight and the tick's own contrast change too, ACC-03. */
+.stf-wl-tick {
+  width: var(--stf-tap);
+  height: var(--stf-tap);
+  flex: 0 0 auto;
+  margin-left: 4px;
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  font-size: 18px;
+  line-height: 1;
+  color: var(--stf-text-meta);
+  cursor: pointer;
+}
+.stf-wl-tick:hover { border-color: var(--stf-ink); color: var(--stf-ink); }
+.stf-wl-tick.is-on {
+  border-color: var(--stf-ink);
+  background: var(--stf-ink);
+  color: var(--stf-white);
+}
+/* A hairline down the left edge, so a confirmed line is legible as
+   confirmed while scanning the column rather than only at the tick. */
+.stf-wl-row.is-confirmed { box-shadow: inset 3px 0 0 var(--stf-gold); }
+/* Focus still wins where both apply: in Guided the one line on screen
+   is always focused, and it may also be confirmed. */
+.stf-wl-row.is-confirmed.is-focus { box-shadow: inset 3px 0 0 var(--stf-accent); }
+
+/* ── 5 · SEARCH AND FILTERS (ListTools.jsx) ─────────────────────
+   Above the list, inside the same measure as the list itself. */
+.stf-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.stf-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.stf-search-icon {
+  position: absolute;
+  left: 12px;
+  font-size: 18px;
+  color: var(--stf-text-meta);
+  pointer-events: none;
+}
+.stf-search-input {
+  width: 100%;
+  min-height: var(--stf-tap);
+  padding: 10px 44px 10px 38px;
+  border: 1px solid transparent;
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-field-bg);
+  font: 500 15px/1.3 var(--stf-font-sans);
+  color: var(--stf-ink);
+}
+/* text-sub, not text-meta: text-meta was tuned against the old
+   --stf-sand/--stf-border fill this input no longer has — on the new
+   --stf-field-bg it only clears 3.28:1, under this file's own 4.5:1
+   goal (ACC-02). text-sub clears 4.81:1 on the same background. */
+.stf-search-input::placeholder { color: var(--stf-text-sub); }
+.stf-search-input:focus-visible {
+  outline: 2px solid var(--stf-accent);
+  outline-offset: 1px;
+}
+/* The browser's own clear affordance is inconsistent across the
+   devices this runs on, so it is hidden and one is drawn instead. */
+.stf-search-input::-webkit-search-cancel-button { display: none; }
+.stf-search-clear {
+  position: absolute;
+  right: 4px;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: var(--stf-radius-sm);
+  background: none;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--stf-text-sub);
+  cursor: pointer;
+}
+.stf-search-clear:hover { color: var(--stf-ink); }
+
+/* The sign-off line on a form: a tick box and the sentence being
+   signed, as one tap target. */
+.stf-signoff {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: var(--stf-tap);
+  padding: 12px 14px;
+  border: 1.5px solid var(--stf-border);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  font-size: 15px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.stf-signoff input { width: 22px; height: 22px; margin-top: 1px; flex-shrink: 0; accent-color: var(--brand); }
+
+/* The tick on a success pop-up (SuccessDialog). */
+.stf-success-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 8px;
+  border-radius: 50%;
+  background: var(--good-soft, #e6f4ea);
+  color: var(--good-ink, #1d7a3a);
+  font-size: 24px;
+}
+/* Saved on the phone, or waiting on someone: not finished, so not green. */
+.stf-success-mark.is-waiting {
+  background: var(--stf-field-bg);
+  color: var(--stf-ink);
+}
+
+/* A search that opens from an icon beside a field's label (SelectField's
+   `search`). The label and the icon share one row; the box appears
+   under them only once it is asked for. */
+.stf-field-labelrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.stf-search-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin: -8px 0;
+  border: 0;
+  border-radius: var(--stf-radius-pill);
+  background: var(--stf-field-bg);
+  color: var(--stf-ink);
+  font-size: 18px;
+  cursor: pointer;
+}
+.stf-search-open:focus-visible {
+  outline: 2px solid var(--stf-accent);
+  outline-offset: 1px;
+}
+.stf-tools-extra { display: flex; flex-direction: column; gap: 8px; }
+
+.stf-empty-line { margin: 0 0 12px; }
+
+
+
+/* ── Script 24 ─────────────────────────────────────────────────
+   The offline bar. Appended after 22's block, same rule as always:
+   no two scripts share an anchor.
+
+   Charcoal rather than red for the normal "offline" state. Red in
+   this design system means "you can click this", and a red strip
+   across the top of the screen reads as an emergency — losing signal
+   in a warehouse is a Tuesday, not a disaster, and the whole point of
+   the bar is to say "carry on". Red is kept for the one state that
+   does need a person: something the server refused. */
+.stf-netbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 18px;
+  background: var(--stf-ink);
+  color: var(--stf-white);
+  font: 500 13px/1.4 var(--stf-font-sans);
+}
+.stf-netbar.is-sending { background: var(--stf-gold-deep); }
+/* #e7000b, not var(--stf-attention): white text at 13px on #ef3a40
+   is 3.93:1, under the 4.5:1 this bar's own text needs — same fix as
+   .stf-wl-mark. */
+.stf-netbar.is-stuck   { background: #e7000b; }
+
+.stf-netbar-text { text-wrap: pretty; }
+
+.stf-netbar-btn {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid rgb(255 255 255 / 0.5);
+  border-radius: var(--stf-radius-sm);
+  background: none;
+  font: 600 13px/1 var(--stf-font-sans);
+  color: var(--stf-white);
+  cursor: pointer;
+}
+.stf-netbar-btn:hover { background: rgb(255 255 255 / 0.12); }
+
+@media (min-width: 720px) {
+  .stf-netbar { padding: 10px 24px; font-size: 14px; }
+}
+
+
+/* ── Script 25 ─────────────────────────────────────────────────
+   Appended after 24's block. Same rule: no two scripts share an
+   anchor.
+
+   ── The undo strip ─────────────────────────────────────────────
+   Gold, not red. Red is the click colour in this design system and
+   the undo button is the only thing in the strip worth clicking, so
+   a red strip would put the emphasis on the wrong half. Gold is the
+   editorial accent, which is what "something just happened" is. */
+.stf-wl-undo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--stf-gold);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+}
+.stf-wl-undo-text {
+  font: 500 13px/1.4 var(--stf-font-sans);
+  color: var(--stf-text-sub);
+}
+.stf-wl-undo-btn {
+  flex: 0 0 auto;
+  min-height: var(--stf-tap);
+  padding: 0 16px;
+  border: 1px solid var(--stf-accent);
+  border-radius: var(--stf-radius-sm);
+  background: var(--stf-white);
+  font: 700 14px/1 var(--stf-font-sans);
+  color: var(--stf-accent);
+  cursor: pointer;
+}
+.stf-wl-undo-btn:hover { background: var(--stf-accent); color: var(--stf-white); }
+
+/* ── Unfinished work ───────────────────────────────────────────
+   Now on the worker dashboard inside StaffShell (see
+   TaskDashboardPage.jsx's own note on that move) — this still
+   borrows the plain white card look rather than the sand ground:
+   same white, same radius, same hairline. The gold left-border accent
+   this used to have is gone — same fix as .stf-notice and
+   .pdf-status-banner, no manager equivalent for a coloured accent
+   stripe on a card. */
+.stf-resume {
+  margin-top: 24px;
+  padding: 16px;
+  border: 1px solid rgb(43 51 54 / 0.06);
+  border-radius: 26px;
+  background: #ffffff;
+  box-shadow: 0 4px 6px -1px rgb(43 51 54 / 0.08), 0 2px 4px -2px rgb(43 51 54 / 0.06);
+}
+.stf-resume-title {
+  margin: 0 0 10px;
+  font: 700 13px/1.3 "Montserrat", "Open Sans", Helvetica, sans-serif;
+  color: #2b3336;
+}
+.stf-resume-list { list-style: none; margin: 0; padding: 0; }
+
+.stf-resume-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 0;
+}
+.stf-resume-row + .stf-resume-row { border-top: 1px dashed #e9e3dd; }
+
+.stf-resume-text { flex: 1 1 12rem; min-width: 0; display: flex; flex-direction: column; }
+.stf-resume-name { font: 600 15px/1.3 "Montserrat", "Open Sans", Helvetica, sans-serif; color: #2b3336; }
+.stf-resume-meta { font: 400 13px/1.4 "Montserrat", "Open Sans", Helvetica, sans-serif; color: #6f6a5e; }
+
+/* Scoped through the parent rather than the bare class: the floor screens section of index.css
+   line 85 is `.stf-shell a { color: var(--stf-accent) }`, which is
+   (0,1,1) and outranks a lone class. On a screen inside the staff
+   shell that painted this button red text on a red background —
+   invisible. Caught by rendering it, not by reading it. */
+.stf-resume .stf-resume-go {
+  flex: 0 0 auto;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: #2b3336;
+  font: 700 14px/1 "Montserrat", "Open Sans", Helvetica, sans-serif;
+  color: #ffffff;
+  text-decoration: none;
+}
+.stf-resume .stf-resume-go:hover { background: #171b1c; color: #ffffff; }
+
+.stf-resume .stf-resume-drop {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  font: 500 13px/1 "Montserrat", "Open Sans", Helvetica, sans-serif;
+  color: #6f6a5e;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.stf-resume .stf-resume-drop:hover { color: #8a3227; }
+
+/* @sentinel script-45-staff-dark */
+/* ══════════════════════════════════════════════════════════════════
+   DARK (script 45)
+
+   the floor screens section of index.css funnels almost everything through the --stf-* block at the
+   top, so the whole floor-staff shell turns over in one override.
+   The dozen rules below it are the stragglers that hardcode a hex.
+
+   The floor shell has no toggle of its own — the control lives in the
+   manager top bar, by the same argument the header of this file makes
+   about a 390px screen. This is here so that a manager or admin who
+   has chosen dark and then opens a task flow gets one app, not two.
+   ══════════════════════════════════════════════════════════════════ */
+.dark {
+  --stf-ink:        #eceeee;
+  --stf-ink-deep:   #ffffff;
+  --stf-accent:     #ff5257;
+  --stf-accent-deep:#ff7377;
+  --stf-gold:       #b5ae82;
+  --stf-gold-deep:  #c6bf92;
+  --stf-sand:       #14191a;
+  --stf-border:     #384447;
+  --stf-text:       #c9cfd0;
+  --stf-text-sub:   #a8b0b2;
+  --stf-text-meta:  #8d9698;
+  --stf-white:      #1c2325;
+
+  --stf-attention:      #ff9b8a;
+  --stf-attention-ink:  #ffb3a4;
+  --stf-attention-bg:   #2e211c;
+  --stf-attention-border: #4a352c;
+}
+
+.dark .stf-resume            { background: var(--stf-white); }
+.dark .stf-resume-name       { color: var(--stf-ink); }
+.dark .stf-resume-meta,
+.dark .stf-resume .stf-resume-drop { color: var(--stf-text-sub); }
+.dark .stf-resume-row + .stf-resume-row { border-top-color: var(--stf-border); }
+.dark .stf-resume .stf-resume-go { background: var(--stf-accent); color: #1a0d0e; }
+.dark .stf-resume .stf-resume-go:hover { background: var(--stf-accent-deep); color: #1a0d0e; }
+.dark .stf-resume .stf-resume-drop:hover { color: var(--stf-attention); }
+
+/* @sentinel script-49-worker-view-app-style */
+/* ══════════════════════════════════════════════════════════════════
+   SCRIPT 49 — THE FLOOR FLOWS IN THE APP'S OWN STYLE
+
+   StaffShell now renders inside ManagerLayout, the same shell as the
+   dashboard, manager and admin screens. This block makes what is
+   inside it read as the same app:
+
+     · every --stf-* token points at the app tokens in index.css
+       (--canvas, --surface, --ink, --line, --brand …). Those flip in
+       .dark on their own, so the script-45 .dark block above no
+       longer decides anything inside .stf-shell — these win by being
+       set on the nearer element.
+     · Inter everywhere, medium/semibold headings, like the dashboard.
+     · ink is the action colour (the shadcn default button and the
+       sidebar's active item); red now means "look at this" — short
+       counts, flags, failed requests — like StatTile and the
+       dashboard's error banner.
+     · no blue hover glows; hover is a stronger line, like ActionCard.
+
+   What is NOT changed: sizes. 44px tap targets, 48px buttons and
+   56px number fields stay (ACC-06, gloves on the floor). Only the
+   paint and the type family move.
+   ══════════════════════════════════════════════════════════════════ */
+.stf-shell {
+  --stf-ink:        var(--ink);
+  --stf-ink-deep:   var(--ink);
+  --stf-accent:     var(--ink);
+  --stf-accent-deep: color-mix(in srgb, var(--ink) 80%, transparent);
+  --stf-gold:       var(--line-strong);
+  --stf-gold-deep:  var(--ink-soft);
+  --stf-sand:       var(--canvas);
+  --stf-border:     var(--line);
+  --stf-text:       var(--ink);
+  --stf-text-sub:   var(--ink-soft);
+  --stf-text-meta:  var(--ink-faint);
+  --stf-white:      var(--surface);
+  /* Was a fixed light grey, so in dark mode every field stayed white
+     with the theme's light text on it. */
+  --stf-field-bg:   var(--surface-2);
+
+  --stf-attention:        var(--brand);
+  --stf-attention-ink:    var(--danger-ink);
+  --stf-attention-bg:     var(--danger-soft);
+  --stf-attention-border: color-mix(in srgb, var(--brand) 35%, transparent);
+
+  --stf-font-display: "Inter Variable", "Inter", system-ui, -apple-system, sans-serif;
+  --stf-font-sans:    "Inter Variable", "Inter", system-ui, -apple-system, sans-serif;
+
+  color: var(--ink);
+}
+
+/* ── Inside the app shell ───────────────────────────────────────── */
+/* ManagerLayout already fills the viewport and scrolls its own
+   <main>; a second 100dvh here would add a screen of empty scroll. */
+.stf-shell.is-in-app {
+  min-height: 0;
+  background: transparent;
+}
+
+/* The tab bar is the phone's navigation. From sm up the sidebar is on
+   screen with the same destinations, so the bar and the space kept
+   for it both go. --stf-tabbar-h drops to 0 too, which is what the
+   toast stack offsets itself by. */
+@media (min-width: 640px) {
+  .stf-shell.is-in-app {
+    --stf-tabbar-h: 0px;
+    padding-bottom: 0;
+  }
+  .stf-shell.is-in-app .stf-tabbar { display: none; }
+}
+
+/* Same outer rhythm as the dashboard pages: px-4 py-6, sm:px-6. */
+.stf-shell.is-in-app .stf-main {
+  padding: 24px 16px 32px;
+}
+@media (min-width: 640px) {
+  .stf-shell.is-in-app .stf-main { padding: 24px 24px 32px; }
+}
+
+/* ── Page header (replaces the crumb strip) ─────────────────────── */
+.stf-page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.stf-page-head-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+.stf-page-head-left > button { margin-top: 1px; margin-left: -8px; }
+.stf-page-head-text { min-width: 0; display: flex; flex-direction: column; }
+.stf-page-title {
+  margin: 0;
+  font-size: 1.5rem;          /* text-2xl */
+  line-height: 2rem;
+  font-weight: 500;           /* font-medium */
+  color: var(--ink);
+}
+.stf-page-sub {
+  margin: 4px 0 0;
+  font-size: 0.875rem;        /* text-sm */
+  line-height: 1.25rem;
+  color: var(--ink-soft);     /* text-muted-foreground */
+}
+.stf-page-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  align-self: flex-start;
+  min-height: 32px;
+  margin: -4px 0 2px -4px;
+  padding: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: 500 13px/1.2 var(--stf-font-sans);
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.stf-page-back:hover { color: var(--ink); background: var(--surface-2); }
+.stf-page-head-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 36px;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+.stf-shell .stf-crumb-link {
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  font: 500 14px/1 var(--stf-font-sans);
+  color: var(--ink);
+  text-decoration: none;
+}
+.stf-shell .stf-crumb-link:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+/* ── Bottom tab bar, in shell paint ─────────────────────────────── */
+.stf-shell .stf-tabbar {
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  gap: 4px;
+  padding: 6px 6px calc(6px + env(safe-area-inset-bottom));
+}
+.stf-shell .stf-tab {
+  border-top: 0;
+  border-radius: 8px;
+  color: var(--ink-soft);
+  font: 500 11px/1.2 var(--stf-font-sans);
+}
+.stf-shell .stf-tab-glyph { opacity: 1; line-height: 0; }
+.stf-shell .stf-tab:hover { background: var(--surface-2); color: var(--ink); }
+.stf-shell .stf-tab.is-current { background: var(--ink); color: var(--on-ink); }
+
+/* ── Type: the dashboard's weights ──────────────────────────────── */
+.stf-shell .stf-step-title,
+.stf-shell .stf-task-title  { font-weight: 600; letter-spacing: -0.01em; }
+.stf-shell .stf-field-label,
+.stf-shell .stf-choice-label,
+.stf-shell .stf-row-title,
+.stf-shell .stf-counter-val,
+.stf-shell .stf-progress-count,
+.stf-shell .stf-qty-readout-val,
+.stf-shell .stf-input         { font-weight: 600; }
+.stf-shell .stf-input.is-text { font-weight: 400; }
+.stf-shell .stf-instruction-n { font-weight: 700; }
+.stf-shell .stf-field-label   { font-size: 13px; }
+
+/* ── Buttons: shadcn's default and outline ──────────────────────── */
+.stf-shell .stf-btn { font-weight: 500; }
+.stf-shell .stf-btn-primary { background: var(--ink); color: var(--on-ink); }
+.stf-shell .stf-btn-primary:hover:not([disabled]) {
+  background: color-mix(in srgb, var(--ink) 80%, transparent);
+}
+.stf-shell .stf-btn-secondary { background: var(--surface); border-width: 1px; }
+.stf-shell .stf-btn-secondary:hover:not([disabled]) {
+  background: var(--surface-2);
+  border-color: var(--line-strong);
+}
+.stf-shell .stf-btn-warn { border-width: 1px; }
+
+.stf-shell .stf-btn:hover:not([disabled]),
+.stf-shell .stf-choice:hover,
+.stf-shell .donation-intake-option:hover { box-shadow: none; }
+.stf-shell .stf-choice:hover,
+.stf-shell .donation-intake-option:hover { border-color: var(--line-strong); }
+.stf-shell .stf-choice.is-chosen,
+.stf-shell .donation-intake-option.is-chosen {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+
+/* One focus ring for everything, the shadcn one (ring-3 ring/30). */
+.stf-shell :is(button, a, input, select, textarea):focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--ring) 45%, transparent);
+  outline-offset: 2px;
+}
+.stf-shell .stf-input:focus,
+.stf-shell .stf-select:focus { border-color: var(--line-strong); }
+
+/* ── Inputs: shadcn's softer box ────────────────────────────────── */
+.stf-shell .stf-input,
+.stf-shell .stf-select,
+.stf-shell .stf-date-trigger,
+.stf-shell .stf-qty-readout,
+.stf-shell .stf-static-value { border-width: 1px; border-radius: 12px; }
+.stf-shell .stf-qty-readout,
+.stf-shell .stf-static-value { background: var(--surface-2); }
+
+/* Valid state: the theme's green, which flips in dark. */
+.stf-shell .stf-input.is-valid,
+.stf-shell .stf-input.is-valid:focus { border-color: var(--good-ink); }
+.stf-shell .stf-field-hint.is-valid-msg { color: var(--good-ink); }
+
+/* ── Surfaces: the dashboard Card, in tokens ────────────────────── */
+/* Script 21 copied the Card with literal rgb(43 51 54 / …), which is
+   a light-mode shadow on a dark page. */
+.stf-shell .stf-main > .stf-task,
+.stf-shell .stf-main > .stf-step {
+  border: 1px solid color-mix(in srgb, var(--ink) 6%, transparent);
+  box-shadow:
+    0 4px 6px -1px color-mix(in srgb, var(--ink) 8%, transparent),
+    0 2px 4px -2px color-mix(in srgb, var(--ink) 6%, transparent);
+}
+.stf-shell .stf-list,
+.stf-shell .stf-empty,
+.stf-shell .stf-instruction { border-radius: 16px; }
+.stf-shell .stf-notice { border-radius: 0 12px 12px 0; }
+
+/* Segmented filters: shadcn tabs-ish, muted track, surface thumb. */
+.stf-shell .stf-segments { background: var(--surface-2); border-radius: 12px; }
+.stf-shell .stf-segment { font-weight: 500; border-radius: 9px; }
+.stf-shell .stf-segment.is-active {
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 14%, transparent);
+}
+.stf-shell .stf-segment-thumb {
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 14%, transparent);
+}
+
+/* Progress and step rail: ink fill, like the dashboard's bars. */
+.stf-shell .stf-rail-bar:not(.is-done) { background: var(--surface-2); }
+.stf-shell .stf-progress-track { background: var(--surface-2); }
+
+/* Coachmark: ink bubble, on-ink text (surface would be dark-on-light
+   in dark mode). */
+.stf-shell .stf-coachmark-body { color: var(--on-ink); }
+
+/* ── Resume card on the worker dashboard ────────────────────────── */
+/* It lives on /noc, outside .stf-shell, and holds literal hex; the
+   "Resume" button was the last red action on that page. */
+.stf-resume .stf-resume-go,
+.dark .stf-resume .stf-resume-go { background: var(--ink); color: var(--on-ink); }
+.stf-resume .stf-resume-go:hover,
+.dark .stf-resume .stf-resume-go:hover {
+  background: color-mix(in srgb, var(--ink) 80%, transparent);
+  color: var(--on-ink);
+}
+
+/* @sentinel script-50-worker-view-red-accents */
+/* ══════════════════════════════════════════════════════════════════
+   SCRIPT 50 — BRAND RED BACK ON THE ACTIONS
+
+   Script 49 made ink the action colour everywhere, which left the
+   floor flows black and white. The brand rule from the landing page section of index.css
+   comes back: red is what you tap, and what shows progress.
+
+     · --stf-accent is --brand again, so every rule that already used
+       it (rail, progress fill, focused work-list line, counter/pager/
+       qty hovers, undo, signature clear) is red with no further edit.
+     · primary buttons, the chosen option, the current tab and the
+       resume button are red (script 49 had pinned those to ink).
+     · warnings move to --danger-ink, the darker red, so a flagged
+       line never reads as one more button (the original reason for
+       --stf-attention).
+
+   Text on red uses --on-brand, which is white in light and near-black
+   in dark (white on the dark theme's #ff5257 fails contrast).
+   ══════════════════════════════════════════════════════════════════ */
+.stf-shell {
+  --stf-accent:      var(--brand);
+  --stf-accent-deep: var(--brand-deep);
+
+  --stf-attention:        var(--danger-ink);
+  --stf-attention-border: color-mix(in srgb, var(--danger-ink) 30%, transparent);
+}
+
+/* Links stay ink — History and the in-flow back are navigation, not
+   the action on the screen. */
+.stf-shell a { color: var(--ink); }
+.stf-shell a:hover { color: var(--brand); }
+
+/* ── Primary action ─────────────────────────────────────────────── */
+/* The fill is --brand-deep, not --brand: white on #ef3a40 is 3.9:1,
+   on #d42d33 it is 5:1 (ACC-02). */
+.stf-shell .stf-btn-primary { background: var(--brand-deep); color: var(--on-brand); }
+.stf-shell .stf-btn-primary:hover:not([disabled]) {
+  background: color-mix(in srgb, var(--brand-deep) 88%, var(--ink));
+}
+
+/* ── Step action ────────────────────────────────────────────────── */
+/* Red is the one button that finishes the screen. An action repeated
+   down a list ("Confirm" on every line of a pallet) is ink instead, so
+   a screen never shows a column of red with the real finish lost at
+   the bottom of it. */
+.stf-shell .stf-btn-step { background: var(--ink); color: var(--on-ink); }
+.stf-shell .stf-btn-step:hover:not([disabled]) {
+  background: color-mix(in srgb, var(--ink) 85%, transparent);
+}
+
+/* A filled button that cannot be pressed yet goes grey. Faded red read
+   as a pink alert with text nobody could read. */
+.stf-shell .stf-btn-primary[disabled],
+.stf-shell .stf-btn-step[disabled] {
+  background: var(--surface-2);
+  color: var(--ink-soft);
+  border-color: var(--line);
+  opacity: 1;
+}
+.stf-shell .stf-btn-secondary:hover:not([disabled]) { border-color: var(--brand); }
+
+/* ── Choices ────────────────────────────────────────────────────── */
+.stf-shell .stf-choice.is-chosen,
+.stf-shell .donation-intake-option.is-chosen {
+  border-color: var(--brand);
+  box-shadow: inset 0 0 0 1px var(--brand);
+  background: color-mix(in srgb, var(--brand) 5%, var(--surface));
+}
+.stf-shell .donation-intake-option input { accent-color: var(--brand); }
+.stf-shell .stf-input:focus,
+.stf-shell .stf-select:focus { border-color: var(--brand); }
+.stf-shell .stf-input.is-flagged,
+.stf-shell .stf-select.is-flagged { border-color: var(--danger-ink); }
+
+/* The active filter segment gets a red underline, not a red fill —
+   filters are not the action. */
+.stf-shell .stf-segment.is-active { box-shadow: inset 0 -2px 0 var(--brand), 0 1px 2px color-mix(in srgb, var(--ink) 14%, transparent); }
+
+/* Not the Guided / Form toggle. Its chosen side is already drawn by the
+   sliding pill behind it (.stf-segment-thumb); the rule above put a
+   second, squarer box with a red line on top of that pill, so the
+   choice read as a framed rectangle with a red bar. The toggle is the
+   pill alone. */
+.stf-shell .stf-toggle .stf-segment,
+.stf-shell .stf-toggle .stf-segment.is-active {
+  border-radius: var(--stf-radius-pill);
+  background: transparent;
+  box-shadow: none;
+}
+.stf-shell .stf-toggle .stf-segment-thumb { border-radius: var(--stf-radius-pill); }
+/* A track for the pill to slide in, so the two choices read as one
+   switch and the chosen one does not rely on a shadow alone. */
+.stf-shell .stf-toggle { padding: 3px; background: var(--surface-2); }
+.stf-shell .stf-toggle .stf-segment { padding: 8px 16px; }
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.stf-shell .stf-crumb-link:hover { border-color: var(--brand); color: var(--brand); background: var(--surface); }
+.stf-page-back:hover { color: var(--brand); }
+
+/* ── Tab bar ────────────────────────────────────────────────────── */
+.stf-shell .stf-tab.is-current {
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
+  color: var(--brand);
+}
+
+/* ── Badges ─────────────────────────────────────────────────────── */
+
+/* ── Resume card on the worker dashboard (outside .stf-shell) ───── */
+.stf-resume .stf-resume-go,
+.dark .stf-resume .stf-resume-go { background: var(--brand); color: var(--on-brand); }
+.stf-resume .stf-resume-go:hover,
+.dark .stf-resume .stf-resume-go:hover { background: var(--brand-deep); color: var(--on-brand); }
+.stf-resume,
+.dark .stf-resume { border-left-color: var(--brand); }
+
+/* @sentinel script-51-tabbar-all-widths */
+/* ══════════════════════════════════════════════════════════════════
+   SCRIPT 51 — THE TAB BAR IS BACK ON EVERY WIDTH
+
+   Script 49 hid the bottom bar from sm up, on the reasoning that the
+   sidebar says the same thing. On the floor the bar is the thing
+   people actually hit, so it comes back at every width, alongside
+   the sidebar.
+
+   It is sticky inside the shell's own scroll box rather than fixed to
+   the window, so on a desk it spans the content and leaves the
+   sidebar alone; on a phone, where there is no sidebar, that is the
+   full width — which is where it always was.
+   ══════════════════════════════════════════════════════════════════ */
+.stf-shell.is-in-app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  padding-bottom: 0;
+}
+.stf-shell.is-in-app .stf-main { flex: 1 1 auto; }
+
+@media (min-width: 640px) {
+  .stf-shell.is-in-app {
+    /* script 49 zeroed this to reclaim the space the bar left */
+    --stf-tabbar-h: 60px;
+    padding-bottom: 0;
+  }
+  .stf-shell.is-in-app .stf-tabbar { display: flex; }
+}
+
+.stf-shell.is-in-app .stf-tabbar {
+  position: sticky;
+  left: auto;
+  right: auto;
+  bottom: 0;
+  margin-top: auto;
+}
+
+/* @sentinel script-52-illustrated-icons-dark */
+/* ══════════════════════════════════════════════════════════════════
+   SCRIPT 52 — THE ILLUSTRATED ICONS IN DARK MODE
+
+   The task drawings are line art with near-black outlines, so on the
+   dark theme they all but vanish. They keep their own colours and sit
+   on a light plate instead, which is what the packaging on a shelf
+   does anyway — no filter tricks, so the red van stays a red van.
+   ══════════════════════════════════════════════════════════════════ */
+.stf-tab-icon { width: 28px; height: 28px; opacity: 1; }
+.stf-tab:not(.is-current) .stf-tab-icon { opacity: 0.75; }
+
+.dark .stf-tab-icon {
+  background: #f4f1ec;
+  border-radius: 8px;
+  padding: 2px;
+}
+
+/* ── Worker dashboard tasks ───────────────────────────────────────
+   REVISED — was a single-row "path" with a connecting line between
+   circles, from the old storyboard reference. Dropped on request: a
+   line between the tasks reads as a route through them, in order —
+   Receiving, then Packing, then Decanting, then Dispatch — which
+   isn't true. A shift can be packing-only or dispatch-only, so
+   nothing here should look like it's claiming a sequence.
+
+   Two shapes off one breakpoint, no JS: a stacked list of icon-left
+   rows on a phone (matches every other list in this file), a row of
+   free-standing circles — no line, just circles with air between them
+   — from tablet width up, where TaskDashboardPage.jsx's `wide` prop
+   (same one Decanting's week planner uses) gives them the room to
+   read as filling the page rather than a small clump adrift in it.
+   flex-wrap on the row rather than horizontal scroll: with no line to
+   route across a wrap, wrapping to a second row is simply the better
+   fallback now if all seven don't fit one row. Every module gets the
+   same tile and the same target size here, including Feed the Soil
+   and Benevolent Requests — they used to be smaller text links below
+   this grid, which claimed a hierarchy ("less important than the
+   other five") the product doesn't actually have. */
+.stf-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.stf-task-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--stf-border);
+  text-decoration: none;
+}
+.stf-task-item:last-child { border-bottom: 0; }
+.stf-task-icon {
+  position: relative;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 2px solid var(--stf-border);
+  background: var(--stf-white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+.stf-task-item:hover .stf-task-icon { border-color: var(--stf-gold); background: var(--stf-sand); }
+.stf-task-icon img {
+  display: block;
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  image-rendering: -webkit-optimize-contrast;
+}
+.stf-task-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.stf-task-title {
+  font-family: var(--stf-font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--stf-ink);
+}
+.stf-task-meta { font-size: 12px; line-height: 1.4; color: var(--stf-text-sub); }
+
+@media (min-width: 640px) {
+  .stf-tasks {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 12px 4px;
+  }
+  .stf-task-item {
+    flex: 1 1 0;
+    min-width: 108px;
+    flex-direction: column;
+    text-align: center;
+    gap: 10px;
+    padding: 4px;
+    border-bottom: 0;
+  }
+  .stf-task-icon { width: 80px; height: 80px; }
+  .stf-task-icon img { width: 42px; height: 42px; }
+  .stf-task-text { align-items: center; }
+  .stf-task-title { white-space: nowrap; }
+  .stf-task-meta { max-width: 130px; }
+}
+
+/* First-visit hint pointing at StaffShell's own hamburger trigger
+   (AppNavDrawer, first item in .stf-appbar-left). A fixed position
+   near where that button always sits, rather than a measured ref —
+   same rough-anchor approach StepPrimitives' Coachmark takes. */
+.stf-coachmark-fixed {
+  position: fixed;
+  left: 14px;
+  right: auto;
+  top: 60px;
+  z-index: 50;
+}
+/* No text bubble here — an actual industry app's "look, the menu is
+   there" hint is just the animated arrow, not a callout you have to
+   read. Rendered as a plain button (not the usual div) so it stays
+   tappable to dismiss without needing its own label reading like a
+   sentence of UI copy. */
+.stf-coachmark-arrow-only {
+  border: 0;
+  background: none;
+  padding: 4px;
+  cursor: pointer;
+}
+
+/* No tab bar for managers and admins (StaffShell adds .no-tabbar):
+   hide it and give back the space reserved for it. */
+.stf-shell.no-tabbar { --stf-tabbar-h: 0px; }
+.stf-shell.is-in-app.no-tabbar .stf-tabbar { display: none; }
+
+/* ── The pressed button flashes (usePressFlash.js) ─────────────────
+   One ring, on the one control that was pressed, for 400ms: "that
+   press landed", on a phone with no click to hear. Nothing else on the
+   screen moves.
+
+   Two parts on purpose. The outline is not an animation: it is simply
+   there while the class is, so it still shows for someone who has asked
+   for less movement (the blanket rule above stops the pulse, not the
+   outline). The pulse on top is the animated part.
+
+   currentColor, so the ring matches whichever button it is on without
+   a colour of its own to keep in step with the theme. */
+@keyframes stf-press-flash {
+  from { box-shadow: 0 0 0 0 currentColor; filter: brightness(1.18); }
+  to   { box-shadow: 0 0 0 12px transparent; filter: none; }
+}
+.stf-shell .is-pressed {
+  outline: 3px solid currentColor;
+  outline-offset: 2px;
+  animation: stf-press-flash 400ms ease-out;
+}
+
+/* ── Add a photo (PhotoButton.jsx) ─────────────────────────────────
+   The file input is the real control and stays in the page for the
+   camera to answer to, but is never seen: the button beside it opens
+   it. */
+.stf-photo { display: flex; flex-direction: column; gap: 6px; }
+.stf-photo-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.stf-photo-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.stf-photo-error { color: var(--stf-attention, #b3261e); }
+
+/* ── Language (LanguagePicker.jsx) ─────────────────────────────── */
+.stf-language { margin: 16px 0 4px; max-width: 22rem; display: flex; flex-direction: column; gap: 6px; }
+.stf-language-label { font: 600 14px/1.3 var(--stf-font-sans); color: var(--stf-ink); }
+.stf-language-select { cursor: pointer; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   5. LANDING PAGE
+   (was landingpage.css)
+
+   The public front page. Loaded on every screen, after the floor styles.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ==========================================================================
+   Ladles of Love Landing Page — Stylesheet
+   Brand tokens verified against ladlesoflove.org.za's own theme config.
+   Rule of thumb applied throughout this pass: charcoal (--maroon) is for
+   structure and headings, red (--accent) is for anything clickable, gold
+   (--khaki) is for small editorial accents. That's what fixes the "blue"
+   read without inventing an unverified colour.
+   ========================================================================== */
+
+.lol-landing {
+  --maroon: #2b3336;
+  --maroon-deep: #171b1c;
+  --accent: #ef3a40;
+  --accent-deep: #d42d33;
+  --khaki: #979168;
+  --khaki-deep: #8a8058;
+  --bg: #e9e3dd;
+  --white: #ffffff;
+  --border: #ddd4c8;
+  --text: #5c5c5c;
+  --text-sub: #7d786a;
+  --text-meta: #a39d8f;
+
+  --font-display: "Montserrat", "Inter", system-ui, -apple-system, sans-serif;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+
+  --max-width: 1200px;
+  --radius: 16px;
+  --radius-pill: 999px;
+
+  font-family: var(--font-sans);
+  color: var(--text);
+  background: var(--white);
+  line-height: 1.6;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.lol-landing img { max-width: 100%; display: block; }
+.lol-landing a { text-decoration: none; color: inherit; }
+.lol-landing a:focus-visible,
+.lol-landing button:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.lol-icon { display: block; flex-shrink: 0; }
+.lol-section-inner { max-width: var(--max-width); margin: 0 auto; padding: 0 1.5rem; }
+
+/* Skip link */
+.lol-skip-link {
+  position: absolute; top: -100px; left: 0;
+  background: var(--maroon); color: #fff;
+  padding: 0.6rem 1.2rem; z-index: 1000; font-weight: 700;
+}
+.lol-skip-link:focus { top: 0; }
+
+/* Eyebrow — small label above a section heading */
+.lol-eyebrow {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 900; color: var(--khaki);
+  margin-bottom: 0.5rem;
+}
+.lol-eyebrow--on-dark { color: rgba(255, 255, 255, 0.9); }
+
+/* Section titles */
+.lol-section-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 3vw, 2.1rem);
+  font-weight: 700;
+  color: var(--maroon);
+  margin-bottom: 1rem;
+  line-height: 1.2;
+}
+.lol-section-title-light { color: #fff; }
+
+/* Buttons — primary is now red by default, not charcoal */
+.lol-btn-primary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 44px; padding: 0 22px;
+  background: var(--accent); color: #fff; border: none;
+  border-radius: var(--radius-pill);
+  font-weight: 600; font-size: 14px; cursor: pointer;
+  /* transform added alongside background — same tactile press
+     feedback the floor screens section's own .stf-btn:active already gives every
+     button on the worker side, and the one pair of real CTA buttons
+     on the landing page was still missing it. */
+  transition: background 0.15s ease, transform 0.15s ease;
+  white-space: nowrap;
+}
+.lol-btn-primary:hover { background: var(--accent-deep); }
+.lol-btn-primary:active, .lol-btn-secondary:active { transform: scale(0.97); }
+
+/* The arrow on the hero's "Log in" button nudges right on hover — a
+   small, standard affordance-of-direction cue, not a new visual
+   language: same icon, same stroke, already there. */
+.lol-hero-actions .lol-btn-primary .lol-icon { transition: transform 0.2s ease; }
+.lol-hero-actions .lol-btn-primary:hover .lol-icon { transform: translateX(3px); }
+
+/* Secondary (hero) — red-bordered so it reads red even sitting on a photo */
+.lol-btn-secondary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 44px; padding: 0 22px;
+  background: rgba(239, 58, 64, 0.14);
+  border: 1.5px solid var(--accent);
+  color: #fff;
+  border-radius: var(--radius-pill);
+  font-weight: 600; font-size: 14px; cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  white-space: nowrap;
+}
+.lol-btn-secondary:hover { background: var(--accent); border-color: var(--accent); }
+.lol-btn-large { height: 50px; padding: 0 26px; font-size: 15px; }
+
+/* ── Navigation ───────────────────────────────────────────── */
+.lol-nav { background: #fff; position: sticky; top: 0; z-index: 100; }
+.lol-nav-inner {
+  max-width: var(--max-width); margin: 0 auto;
+  display: flex; align-items: center; gap: 1.5rem;
+  padding: 0.85rem 1.5rem;
+}
+.lol-menu-trigger {
+  width: 40px; height: 40px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: none; border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--maroon); cursor: pointer;
+}
+@media (min-width: 861px) { .lol-menu-trigger { display: none; } }
+
+.lol-nav-brand { display: flex; align-items: center; gap: 0.7rem; margin-right: auto; min-width: 0; }
+.lol-nav-logo { width: 52px; height: 52px; object-fit: contain; flex-shrink: 0; }
+
+/* Nav links now red, matching the login button next to them */
+.lol-nav-links { display: flex; align-items: center; gap: 1.85rem; }
+.lol-nav-link {
+  position: relative;
+  font-size: 0.92rem; font-weight: 700; color: var(--accent); transition: color 0.15s ease;
+}
+.lol-nav-link:hover { color: var(--accent-deep); }
+/* An underline that sweeps in from the left on hover, rather than
+   appearing all at once — the same "arriving" quality as the reveal
+   and hero motion above, just fast (0.2s) and local to one link
+   instead of a whole section. right:100% (fully clipped) to right:0
+   (fully drawn) — the whole thing lives in one property, so it's a
+   single transition, not two things timed against each other. */
+.lol-nav-link::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 100%; bottom: -4px;
+  height: 2px;
+  background: var(--accent-deep);
+  transition: right 0.2s ease;
+}
+.lol-nav-link:hover::after { right: 0; }
+@media (max-width: 860px) { .lol-nav-links { display: none; } }
+
+/* ── Drawer (mobile only) ─────────────────────────────────── */
+.lol-drawer-backdrop {
+  position: fixed; inset: 0; background: rgba(20, 15, 12, 0.5);
+  opacity: 0; pointer-events: none; transition: opacity 0.2s; z-index: 190;
+}
+.lol-drawer-backdrop.is-open { opacity: 1; pointer-events: auto; }
+.lol-drawer {
+  position: fixed; top: 0; left: 0; height: 100dvh;
+  width: min(320px, 85vw);
+  background: #fff; z-index: 200;
+  transform: translateX(-100%);
+  transition: transform 0.2s;
+  display: flex; flex-direction: column;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.12);
+}
+.lol-drawer.is-open { transform: translateX(0); }
+.lol-drawer-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1.25rem; border-bottom: 1px solid var(--border);
+}
+.lol-drawer-title { font-family: var(--font-display); font-weight: 700; color: var(--maroon); }
+.lol-drawer-close { background: none; border: none; cursor: pointer; color: var(--text-sub); }
+.lol-drawer-links { padding: 0.75rem; display: flex; flex-direction: column; gap: 0.25rem; }
+.lol-drawer-link {
+  display: flex; align-items: center; gap: 0.85rem;
+  padding: 0.9rem 1rem; border-radius: 12px;
+  font-weight: 700; color: var(--accent);
+  transition: background 0.15s, color 0.15s;
+}
+.lol-drawer-link:hover { background: var(--bg); color: var(--accent-deep); }
+.lol-drawer-link img { width: 20px; height: 20px; object-fit: contain; flex-shrink: 0; }
+.lol-drawer-link svg:last-child { color: var(--text-meta); margin-left: auto; }
+
+/* ── Hero ─────────────────────────────────────────────────── */
+.lol-hero {
+  position: relative; min-height: 82vh;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  overflow: hidden; background: var(--maroon);
+}
+.lol-hero-bg { position: absolute; inset: 0; background-size: cover; background-position: center; z-index: 0; }
+.lol-hero-scrim {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(20, 15, 12, 0.22) 0%, rgba(20, 15, 12, 0.22) 30%, rgba(20, 15, 12, 0.5) 62%, rgba(20, 15, 12, 0.72) 100%);
+  z-index: 1;
+}
+.lol-hero-content {
+  position: relative; z-index: 2;
+  max-width: var(--max-width); margin: 0 auto; width: 100%;
+  padding: 0 1.5rem 2rem; color: #fff;
+}
+.lol-hero-title {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  font-weight: 700; line-height: 1.1;
+  margin-bottom: 1rem;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.4);
+}
+.lol-hero-lede {
+  font-size: 1.05rem; max-width: 560px; margin-bottom: 1.5rem;
+  color: rgba(255, 255, 255, 0.95);
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.35);
+}
+.lol-hero-actions { display: flex; gap: 1rem; flex-wrap: wrap; }
+
+/* REVISED — LandingPage.jsx has set a `ready` state and added
+   .is-ready to the hero on a 60ms delay since this section was
+   written, with no CSS rule anywhere ever reading it — a fade-in that
+   was wired up in JS and never finished in CSS. Finished here: the
+   hero's own content starts a beat below and faded, settling into
+   place once .is-ready lands, the same "arrived, not popped in" motion
+   the reveal sections below use. Gated behind prefers-reduced-motion
+   the same way .lol-reveal is — see that rule's own note. */
+@media (prefers-reduced-motion: no-preference) {
+  .lol-hero-content {
+    opacity: 0;
+    transform: translateY(18px);
+    transition: opacity 0.7s ease 0.1s, transform 0.7s ease 0.1s;
+  }
+  .lol-hero.is-ready .lol-hero-content {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.lol-proof-line {
+  position: relative; z-index: 2; text-align: center;
+  color: #ffffff; font-size: 1.05rem; font-weight: 500; letter-spacing: 0.02em;
+  padding: 1.25rem 1.5rem;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.5);
+}
+
+/* ── Scroll reveal ────────────────────────────────────────────
+   Applied to every section below the hero (useReveal() in
+   LandingPage.jsx) — each fades and settles up into place the first
+   time it's scrolled into view, then stays put; it does not replay on
+   a second pass, same reasoning CountUpStat's own count-up only fires
+   once.
+
+   Wrapped in prefers-reduced-motion: no-preference rather than an
+   explicit :where(reduce) override — for a visitor who has that
+   preference set, .lol-reveal picks up NO rule here at all, so the
+   section is opacity:1 the way it would be with no JS involved. That
+   also means a real failure (the observer never firing, a ref that
+   missed its node) fails safe: the fallback state for every visitor,
+   reduced-motion or not, is fully visible. */
+@media (prefers-reduced-motion: no-preference) {
+  .lol-reveal {
+    opacity: 0;
+    transform: translateY(28px);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+  }
+  .lol-reveal.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Organic divider — forced to true black regardless of the
+   source SVG's own fill, since brightness(0) maps every colour
+   in the image to black while keeping its transparency intact */
+.lol-divider {
+  display: block;
+  width: 150px; max-width: 30vw;
+  margin: 0 0 1.25rem 0;
+  filter: brightness(0);
+  opacity: 1;
+}
+
+/* ── Accent illustrations — hand-drawn Canva pieces used the way
+   runnapatosonoma.com places its mascot: large, beside a heading,
+   filling what would otherwise be empty margin. Light backgrounds
+   only, so the black outlines keep their contrast. ──────────────── */
+.lol-accent-illustration {
+  width: 150px;
+  height: auto;
+  flex-shrink: 0;
+  align-self: flex-start;
+}
+@media (max-width: 900px) { .lol-accent-illustration { width: 110px; } }
+@media (max-width: 640px) { .lol-accent-illustration { display: none; } }
+
+/* ── Image fallback ───────────────────────────────────────── */
+.img-slot { position: relative; width: 100%; height: 100%; overflow: hidden; background: var(--bg); border-radius: inherit; }
+.img-slot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.img-slot__fallback {
+  position: absolute; inset: 0; display: none;
+  flex-direction: column; align-items: center; justify-content: center;
+  background: var(--bg); color: var(--text-meta);
+  font-size: 0.85rem; text-align: center; padding: 1rem;
+}
+
+/* ── Team section ─────────────────────────────────────────── */
+.lol-team { background: #fff; padding: 4.5rem 0; }
+.lol-team-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2.75rem; align-items: center; }
+.lol-team-photo { min-width: 0; }
+.lol-team p { color: var(--text-sub); line-height: 1.7; }
+.lol-team-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; }
+.lol-team-heading .lol-section-title { margin-bottom: 1rem; }
+
+/* Slideshow */
+.lol-slideshow { position: relative; height: 320px; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); background: var(--bg); }
+.lol-slideshow-track { display: flex; height: 100%; transition: transform 0.4s ease; }
+.lol-slideshow-slide { flex: 0 0 100%; height: 100%; }
+.lol-slideshow-slide .img-slot { height: 100%; }
+.lol-slideshow-arrow {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.92); border: none; border-radius: 50%;
+  cursor: pointer; z-index: 3; color: var(--accent);
+}
+.lol-slideshow-arrow-left { left: 12px; }
+.lol-slideshow-arrow-right { right: 12px; }
+.lol-slideshow-dots { position: absolute; bottom: 14px; left: 0; right: 0; display: flex; gap: 8px; justify-content: center; z-index: 3; }
+.lol-slideshow-dot { width: 8px; height: 8px; border-radius: 50%; border: none; background: rgba(255, 255, 255, 0.55); cursor: pointer; padding: 0; }
+.lol-slideshow-dot.is-active { background: var(--accent); width: 22px; border-radius: 999px; }
+
+/* ── Programmes ───────────────────────────────────────────── */
+.lol-programmes { background: var(--bg); padding: 4.5rem 0; }
+.lol-programmes-intro { display: flex; align-items: center; justify-content: space-between; gap: 2rem; }
+.lol-programmes-intro > div { min-width: 0; }
+.lol-programme-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.75rem; margin-top: 2rem; }
+.lol-programme-card { background: #fff; border-radius: var(--radius); overflow: hidden; box-shadow: 0 4px 16px rgba(43, 51, 54, 0.06); }
+.lol-programme-card .img-slot { height: 180px; }
+.lol-programme-card__body { padding: 1.5rem; }
+.lol-programme-icon-img { width: 56px; height: 56px; object-fit: contain; margin-bottom: 0.75rem; }
+.lol-programme-card h3 { font-family: var(--font-display); font-size: 1.15rem; font-weight: 700; color: var(--maroon); margin-bottom: 0.5rem; }
+.lol-programme-card p { font-size: 0.9rem; color: var(--text-sub); line-height: 1.5; }
+
+/* ── Our Why — text + photo, so it no longer trails off into
+   empty space on wide screens ─────────────────────────────── */
+.lol-story { background: #fff; padding: 5rem 0; }
+.lol-story-grid { display: grid; grid-template-columns: 1.3fr 1fr; gap: 3rem; align-items: start; }
+.lol-story-text { min-width: 0; }
+.lol-story p { color: var(--text-sub); line-height: 1.85; margin-bottom: 1.5rem; font-size: 1.05rem; }
+.lol-story-photo .img-slot { aspect-ratio: 3 / 4; border-radius: var(--radius); }
+@media (max-width: 900px) { .lol-story-grid { grid-template-columns: 1fr; } }
+
+/* Stat panel — anchors the two context numbers to a lead-in
+   line and a bordered panel instead of floating in whitespace */
+.lol-context-panel {
+  margin-top: 1.5rem;
+  background: var(--bg);
+  border-left: 4px solid var(--accent);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 1.5rem 2rem;
+}
+.lol-context-lead { font-family: var(--font-display); font-weight: 900; color: var(--maroon); margin-bottom: 1rem; font-size: 1rem; }
+.lol-context-stats { display: grid; grid-template-columns: repeat(2, minmax(160px, 1fr)); gap: 1.75rem 2.5rem; }
+.lol-context-stat { max-width: 220px; }
+.lol-context-value { display: block; font-family: var(--font-display); font-size: 2rem; font-weight: 700; color: var(--khaki-deep); }
+.lol-context-label { font-size: 0.85rem; color: var(--text-sub); line-height: 1.4; }
+.lol-context-stat-icon { display: flex; align-items: center; justify-content: flex-end; }
+.lol-context-stat-icon img { width: 80px; height: auto; opacity: 0.9; }
+@media (max-width: 640px) {
+  .lol-context-stats { grid-template-columns: 1fr; }
+  .lol-context-stat-icon { display: none; }
+}
+.lol-context-source { margin-top: 1.25rem; font-size: 0.78rem; color: var(--text-meta); }
+.lol-context-source a { color: var(--text-meta); text-decoration: underline; }
+.lol-context-source a:hover { color: var(--accent); }
+
+/* ── Impact counters — dark band between Programmes and Our Why.
+   Placeholder/estimated numbers until real reporting data lands. */
+.lol-impact { background: var(--maroon); padding: 4rem 0; }
+.lol-impact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 2rem;
+  margin-top: 2rem;
+}
+.lol-impact-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  color: #fff;
+}
+.lol-impact-stat .lol-icon { color: var(--accent); }
+.lol-impact-value { font-family: var(--font-display); font-size: 2.4rem; font-weight: 700; }
+.lol-impact-label { font-size: 0.88rem; color: rgba(255, 255, 255, 0.75); line-height: 1.4; max-width: 32ch; }
+
+/* ── Map — real, interactive multi-pin map (Leaflet + OpenStreetMap).
+   Every location is a real pin with its own popup, so the separate
+   text list this used to sit next to is gone. ────────────────────── */
+.lol-map-section { background: var(--bg); padding: 4.5rem 0; }
+.lol-map-lede { color: var(--text-sub); max-width: 60ch; margin-bottom: 1.5rem; }
+.lol-map-canvas {
+  height: 460px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(43, 51, 54, 0.06);
+  border: 1px solid var(--border);
+  background: var(--border);
+}
+.leaflet-marker-icon.lol-map-pin { background: transparent; border: none; }
+.leaflet-popup-content-wrapper { border-radius: 10px; }
+.leaflet-popup-content { font-family: var(--font-sans); font-size: 0.85rem; color: var(--text); margin: 0.65rem 0.9rem; }
+.leaflet-popup-content strong { display: block; font-family: var(--font-display); color: var(--maroon); font-size: 0.92rem; margin-bottom: 0.15rem; }
+@media (max-width: 860px) { .lol-map-canvas { height: 340px; } }
+
+/* ── Get involved ─────────────────────────────────────────── */
+.lol-getinvolved { background: var(--maroon); padding: 4.5rem 0; }
+.lol-getinvolved-lede { color: rgba(255, 255, 255, 0.85); max-width: 60ch; margin-bottom: 2rem; }
+.lol-cta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; }
+.lol-cta-tile {
+  background: #fff; border-radius: var(--radius); padding: 1.75rem;
+  display: flex; flex-direction: column; gap: 0.5rem; color: var(--text);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.lol-cta-tile:hover { transform: translateY(-4px); box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16); }
+.lol-cta-tile img { width: 48px; height: 48px; object-fit: contain; flex-shrink: 0; margin-bottom: 0.25rem; }
+.lol-cta-tile-title { font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; color: var(--maroon); }
+.lol-cta-tile-text { font-size: 0.85rem; color: var(--text-sub); }
+.lol-cta-tile-link { font-weight: 700; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.4px; color: var(--accent); }
+
+/* ── Footer — rebuilt tight and dense, the old intro paragraph
+   is gone since Get Involved above already says the same thing */
+.lol-footer { background: var(--maroon); color: rgba(255, 255, 255, 0.82); padding: 3rem 0 1.75rem; }
+.lol-footer-top {
+  display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr; gap: 2rem;
+  padding-bottom: 2rem; border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+.lol-footer-brand-title { font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; color: #fff; margin-bottom: 0.4rem; }
+.lol-footer-tagline { font-size: 0.85rem; color: rgba(255, 255, 255, 0.6); line-height: 1.5; }
+.lol-footer-col-title { font-family: var(--font-display); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--khaki); margin-bottom: 0.75rem; }
+.lol-footer-meta { font-size: 0.85rem; margin-bottom: 0.35rem; color: rgba(255, 255, 255, 0.65); line-height: 1.5; }
+.lol-footer-links { display: flex; flex-direction: column; gap: 0.5rem; }
+.lol-footer-links a { font-size: 0.85rem; color: var(--accent); font-weight: 700; }
+.lol-footer-links a:hover { color: #fff; }
+.lol-footer-links--social { flex-direction: row; flex-wrap: wrap; gap: 0.9rem; }
+.lol-footer-links--social a { color: rgba(255, 255, 255, 0.85); font-weight: 500; }
+.lol-footer-links--social a:hover { color: var(--accent); }
+.lol-footer-bottom {
+  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;
+  padding-top: 1.5rem; font-size: 0.76rem; color: rgba(255, 255, 255, 0.5);
+}
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 900px) { .lol-team-grid { grid-template-columns: 1fr; } }
+@media (max-width: 768px) {
+  .lol-hero { min-height: 70vh; }
+  .lol-hero-actions { flex-direction: column; align-items: stretch; }
+  .lol-team, .lol-programmes, .lol-story, .lol-map-section, .lol-getinvolved { padding: 3rem 0; }
+}
+@media (max-width: 760px) { .lol-footer-top { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 480px) {
+  .lol-section-inner { padding: 0 1rem; }
+  .lol-nav-inner { padding: 0.65rem 1rem; }
+  .lol-footer-top { grid-template-columns: 1fr; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   6. OPERATIONS REPORT AS A DOCUMENT
+   (was operationalReport.css)
+
+   Used to arrive only with the screens that print a report.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ─────────────────────────────────────────────────────────────
+   client/src/styles/operationalReport.css
+
+   The operations report as a document (OperationsReportPDF.jsx),
+   inside PdfShell's .pdf-document. the printable notes section of index.css already owns the
+   modal, the letterhead (.pdf-doc-header) and the print rules; this
+   file only adds what is particular to this report.
+
+   The tokens are PINNED to their light values here. The report body
+   reads var(--ink) etc., and in dark mode those are light colours —
+   white text on a white sheet. Paper has one theme.
+   ───────────────────────────────────────────────────────────── */
+.pdf-document .op-pdf,
+.pdfnote-document .op-pdf {
+  --canvas: #faf8f5; --surface: #ffffff; --ink: #2b3336; --ink-soft: #676767;
+  --line: #e9e3dd; --brand: #ef3a40; --good-ink: #1d7a3a;
+  --viz-1: #2d5563; --viz-2: #cf6f36; --viz-3: #6f9f79; --viz-4: #d6a437;
+  --viz-5: #c47a97; --viz-6: #86aab8; --viz-7: #5c4a8c; --viz-8: #c0392f;
+  color: #2b3336;
+}
+
+.op-pdf-report-title {
+  margin: 18px 0 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #2b3336;
+}
+
+/* Section headings in the body read as document headings, with the
+   brand rule the notes use, not as screen toggles. */
+.op-pdf-body h3 {
+  margin: 0 0 8px;
+  padding-left: 8px;
+  border-left: 3px solid #ef3a40;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.op-pdf-body section { background: #ffffff; }
+/* Edge labels ("Sept 2026") sit half outside the plot; let them show. */
+.op-pdf-body svg { overflow: visible; }
+
+.op-pdf-caveat {
+  margin: 20px 0 0;
+  padding: 8px 0 0;
+  border-top: 1px solid #e9e3dd;
+  font-size: 10px;
+  color: #676767;
+}
+
+.op-pdf-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 28px;
+  padding-top: 8px;
+  border-top: 2px solid #2b3336;
+  font-size: 9px;
+  color: #676767;
+}
+
+@media print {
+  .op-avoid-break { break-inside: avoid; page-break-inside: avoid; }
+  .op-pdf-footer  { page-break-before: avoid; }
+  /* A heading never ends a page on its own. */
+  .op-pdf-body h3 { break-after: avoid; page-break-after: avoid; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   7. VOLUNTEER SCREENS
+   (was guest.css)
+
+   Used to arrive only with the guest screens.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ==========================================================================
+   client/src/styles/guest.css
+
+   The Love Activist screens: the only part of this system most
+   volunteers will ever see.
+
+   Namespaced .gst-* so it cannot collide with .stf-* or index.css.
+   Import AFTER index.css.
+
+   ── Tokens ────────────────────────────────────────────────────────────
+   Aliases, not copies. Every --gst-* colour, the typeface and the
+   radii point at the same app tokens the worker screens resolve to
+   (--ink, --canvas, --surface, --line, --brand ... in index.css, which
+   are what the floor screens section's --stf-* tokens themselves end up pointing at).
+   They are the app tokens rather than --stf-* because --stf-* is only
+   defined inside .stf-shell, and guest screens are not inside one.
+   Two things follow: a change to the worker palette reaches guests
+   with no edit here, and dark mode needs no block of its own, because
+   the app tokens already flip under .dark.
+
+   The worker's rule is followed too:
+       ink       structure, headings, surfaces
+       red       the primary action, and the thing to look at
+       gold      small editorial accents
+
+   ── What is deliberately DIFFERENT from .stf-* ────────────────────────
+   Not a different design language. A different register of the same one:
+
+   1. LARGER. --gst-tap is 56px, not 44px. Staff use this daily with
+      gloves; a Love Activist may be using it for the first time, in
+      their sixties, standing up, one-handed. The floor for a staff
+      control is the ceiling for ours.
+
+   2. MORE AIR. Generous vertical rhythm and one card per decision.
+      StaffSlipFlow shows a whole pallet at once on purpose — an
+      experienced packer needs it. A first-timer needs one thing.
+
+   3. WARMER. Cream rather than sand, and the warmth NFR-06 asks for
+      carried by the copy, the palette and the type.
+      There is deliberately NO abstract decorative shape: see .gst-hero.
+
+   ── Accessibility, ACC-01 to ACC-10 ───────────────────────────────────
+   ACC-01/02  WCAG 2.1 AA. The pairings are the app's own: body text
+              is --ink on --canvas, secondary text is --ink-soft,
+              text on red is --on-brand (white in light, near-black in
+              dark, because white on the dark theme's red fails), and
+              warnings are --danger-ink. index.css documents and
+              maintains those ratios in both themes.
+   ACC-03     Status is never colour alone. Every state pairs a mark
+              (✓ !) with a word. See .gst-state.
+   ACC-04     200% zoom: everything is rem/ch based and single column,
+              no fixed heights on text containers, no overflow hidden
+              on anything that holds words.
+   ACC-06     56px minimum on every interactive element.
+   ACC-09     Plain language — enforced in the copy, not the CSS.
+   Motion     Every animation is decorative and removed wholesale under
+              prefers-reduced-motion. Nothing is the only signal of a
+              state change.
+   ========================================================================== */
+
+.gst-shell {
+  --gst-ink:        var(--ink);
+  --gst-ink-deep:   var(--ink);
+  --gst-on-ink:     var(--on-ink);
+  --gst-accent:     var(--brand);
+  --gst-accent-deep:var(--brand-deep);
+  --gst-on-accent:  var(--on-brand);
+  --gst-gold:       var(--gold);
+  --gst-cream:      var(--canvas);
+  --gst-sand:       var(--surface-2);
+  --gst-border:     var(--line);
+  --gst-text:       var(--ink);
+  --gst-text-sub:   var(--ink-soft);
+  --gst-white:      var(--surface);
+
+  --gst-good:       var(--good-ink);   /* packed */
+  --gst-good-bg:    var(--good-soft);
+  --gst-attention:  var(--danger-ink); /* a problem */
+  --gst-attention-bg: var(--danger-soft);
+
+  /* The worker screens' own stack (the floor screens section of index.css, script 49). */
+  --gst-font-display: "Inter Variable", "Inter", system-ui, -apple-system, sans-serif;
+  --gst-font-sans:    "Inter Variable", "Inter", system-ui, -apple-system, sans-serif;
+
+  --gst-radius:    16px;       /* the worker's list and card radius */
+  --gst-radius-sm: 12px;       /* the worker's field and notice radius */
+  --gst-radius-pill: 999px;
+  --gst-tap: 56px;            /* ACC-06, raised from the staff 44px */
+
+  min-height: 100dvh;         /* not 100vh — iOS Safari's address bar */
+  background: var(--gst-cream);
+  font-family: var(--gst-font-sans);
+  color: var(--gst-text);
+  font-size: 17px;            /* one step up from staff: read at arm's length */
+  line-height: 1.6;
+}
+
+.gst-shell *, .gst-shell *::before, .gst-shell *::after { box-sizing: border-box; }
+.gst-shell img { max-width: 100%; display: block; }
+
+.gst-shell a { color: var(--gst-accent); }
+.gst-shell a:hover { color: var(--gst-accent-deep); }
+
+/* A visible focus ring that survives on cream and on red. */
+.gst-shell a:focus-visible,
+.gst-shell button:focus-visible,
+.gst-shell input:focus-visible,
+.gst-shell [tabindex]:focus-visible {
+  outline: 3px solid var(--gst-ink);
+  outline-offset: 3px;
+  border-radius: var(--gst-radius-sm);
+}
+
+/* ── Layout ───────────────────────────────────────────────────── */
+.gst-page {
+  width: 100%;
+  max-width: 34rem;           /* ch-based reading width, not a device width */
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 3rem;
+}
+
+.gst-stack      { display: flex; flex-direction: column; gap: 1.25rem; }
+.gst-stack-tight{ display: flex; flex-direction: column; gap: 0.75rem; }
+
+/* ── Masthead ─────────────────────────────────────────────────── */
+.gst-topbar {
+  background: var(--gst-white);
+  border-bottom: 1px solid var(--gst-border);
+}
+.gst-topbar-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: 0.375rem 0.75rem;   /* room round the 56px language switch */
+}
+.gst-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.gst-brand-logo {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  object-fit: contain;
+}
+.gst-brand-role {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--gst-text-sub);
+  font: 600 0.9375rem/1.2 var(--gst-font-display);
+}
+
+/* ── Session controls in the top bar: Home, language, Sign out ──── */
+.gst-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: var(--gst-tap);
+  padding: 0 0.75rem;
+  border: 0;
+  background: transparent;
+  color: var(--gst-ink);
+  font: 700 1rem/1.2 var(--gst-font-display);
+  cursor: pointer;
+}
+.gst-nav-btn:hover:not(:disabled) { color: var(--gst-accent); }
+.gst-nav-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.gst-nav-end { display: inline-flex; align-items: center; gap: 0.25rem; }
+
+/* The bar has to hold the logo, Home, the language box and Sign out
+   on a 320px phone. Buttons keep their words on one line; the role
+   label and the width of the language box are what give way. */
+.gst-topbar .gst-nav-btn { flex-shrink: 0; white-space: nowrap; padding: 0 0.5rem; }
+.gst-topbar .gst-nav-end { flex-shrink: 0; }
+@media (max-width: 30rem) {
+  .gst-brand-role { display: none; }
+  .gst-topbar-inner { padding: 0.375rem 0.5rem; gap: 0.25rem; }
+  .gst-topbar .gst-lang-select { max-width: 8.75rem; padding-right: 0.25rem; }
+}
+@media (max-width: 22rem) {
+  .gst-brand-logo { width: 32px; height: 32px; }
+  .gst-topbar .gst-lang-select { max-width: 7.5rem; }
+}
+
+/* ── Language switch (GuestLanguageSwitch.jsx) ────────────────────
+   App tokens directly, not --gst-*, because it also sits on the
+   sign-in page, which is outside .gst-shell. 56px tall (ACC-06). */
+.gst-lang {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.gst-lang-icon {
+  position: absolute;
+  left: 0.75rem;
+  font-size: 1.125rem;
+  line-height: 1;
+  pointer-events: none;
+}
+.gst-lang-select {
+  min-height: 56px;
+  padding: 0 0.75rem 0 2.5rem;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font: 700 1rem/1.2 "Inter Variable", "Inter", system-ui, -apple-system, sans-serif;
+  cursor: pointer;
+}
+.gst-lang-select:focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; }
+
+.gst-confirm { border-color: var(--gst-ink); }
+
+/* ── Sense of place: where am I, who is it for ────────────────── */
+.gst-place {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.75rem;
+  padding: 0.75rem 0;
+  border-bottom: 2px solid var(--gst-border);
+  font-size: 0.9375rem;
+  color: var(--gst-text-sub);
+}
+.gst-place > * { min-width: 0; }
+.gst-place-strong { font-weight: 700; color: var(--gst-ink); }
+
+/* ── Hero ─────────────────────────────────────────────────────── */
+.gst-hero { padding: 0.5rem 0 0.25rem; }
+
+/* A decorative blob used to sit behind every heading here: an
+   absolutely positioned pseudo-element, 12rem across, offset off the
+   left edge of the page.
+   REMOVED OUTRIGHT — not resized, not repositioned, not replaced.
+   It marked nothing, grouped nothing and separated nothing: the same
+   shape on every guest screen, carrying no meaning. It also painted
+   UNDER the heading and the "For <beneficiary>" line, tinting their
+   background and pulling those pairings off the contrast ratios this
+   file documents at the top. It cost ACC-02 and bought nothing.
+   NFR-06's warmth is carried by the copy, the palette and the type,
+   which are already doing that job. Do not reintroduce a decorative
+   shape here. */
+
+/* Long words wrap rather than push the page wide. Names are now shown
+   in full ("Corporate group (Old Mutual)"), and a product name or a
+   beneficiary can be longer than 360px of heading. */
+.gst-title {
+  margin: 0;
+  font: 700 clamp(1.75rem, 6vw, 2.25rem)/1.15 var(--gst-font-display);
+  color: var(--gst-ink);
+  letter-spacing: -0.01em;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+.gst-title-sm { font-size: clamp(1.375rem, 5vw, 1.625rem); }
+
+.gst-lede {
+  overflow-wrap: break-word;
+  margin: 0.625rem 0 0;
+  font-size: 1.0625rem;
+  color: var(--gst-text);
+}
+
+/* ── Cards ────────────────────────────────────────────────────── */
+.gst-card {
+  background: var(--gst-white);
+  border: 1px solid var(--gst-border);
+  border-radius: var(--gst-radius);
+  padding: 1.25rem;
+}
+.gst-card-quiet { background: var(--gst-sand); border-color: transparent; }
+
+.gst-card-title {
+  margin: 0 0 0.25rem;
+  overflow-wrap: break-word;
+  font: 700 1.125rem/1.25 var(--gst-font-display);
+  color: var(--gst-ink);
+}
+.gst-card-meta { margin: 0; font-size: 0.9375rem; color: var(--gst-text-sub); overflow-wrap: break-word; }
+.gst-card-action { margin-top: 0.75rem; font-weight: 700; color: var(--gst-accent); }
+.gst-choice-label { font-size: 1rem; }
+.gst-fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.gst-summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--gst-tap);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+/* A whole card that is a tap target (choose-a-pallet list). */
+.gst-card-button {
+  display: block;
+  width: 100%;
+  min-height: var(--gst-tap);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.gst-card-button:hover:not(:disabled) { border-color: var(--gst-accent); }
+.gst-card-button:active:not(:disabled) { transform: scale(0.995); }
+/* Saving a claim: same card, just not tappable. */
+.gst-card-button:disabled { cursor: progress; color: inherit; }
+
+/* ── Buttons ──────────────────────────────────────────────────── */
+.gst-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: var(--gst-tap);
+  padding: 0.875rem 1.25rem;
+  border: 2px solid transparent;
+  border-radius: var(--gst-radius-pill);
+  font: 700 1.0625rem/1.2 var(--gst-font-display);
+  cursor: pointer;
+  min-width: 0;
+  overflow-wrap: break-word;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+.gst-btn:active { transform: scale(0.98); }
+.gst-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+.gst-btn[aria-busy="true"] { cursor: progress; }
+
+/* Small spinner for a button whose action is running. */
+.gst-spinner {
+  flex: none;
+  width: 1.125rem;
+  height: 1.125rem;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: gst-spin 0.7s linear infinite;
+}
+@keyframes gst-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .gst-spinner { animation-duration: 2s; }
+}
+
+.gst-btn-primary { background: var(--gst-accent); color: var(--gst-on-accent); }
+.gst-btn-primary:hover:not(:disabled) { background: var(--gst-accent-deep); }
+
+.gst-btn-secondary {
+  background: transparent;
+  color: var(--gst-ink);
+  border-color: var(--gst-ink);
+}
+.gst-btn-secondary:hover:not(:disabled) { background: var(--gst-ink); color: var(--gst-on-ink); }
+
+.gst-btn-ghost {
+  background: transparent;
+  color: var(--gst-ink);
+  border-color: var(--gst-border);
+}
+.gst-btn-ghost:hover:not(:disabled) { border-color: var(--gst-ink); }
+
+/* minmax(0, 1fr), not 1fr. A grid track sized 1fr still has an automatic
+   MINIMUM of its content, so "There's a problem" widened its column past
+   half the row and pushed the whole grid off the screen. minmax(0, 1fr)
+   lets the track shrink and the label wrap inside its 56px button. */
+.gst-btn-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
+@media (max-width: 24rem) { .gst-btn-row { grid-template-columns: 1fr; } }
+
+/* ── Fields ───────────────────────────────────────────────────── */
+.gst-field { display: flex; flex-direction: column; gap: 0.5rem; }
+.gst-label { font-weight: 700; color: var(--gst-ink); font-size: 1rem; }
+.gst-hint  { margin: 0; font-size: 0.9375rem; color: var(--gst-text-sub); }
+
+.gst-input {
+  width: 100%;
+  min-height: var(--gst-tap);
+  padding: 0.75rem 1rem;
+  background: var(--gst-white);
+  border: 2px solid var(--gst-border);
+  border-radius: var(--gst-radius-sm);
+  font: 400 1.125rem/1.4 var(--gst-font-sans);
+  color: var(--gst-ink);
+}
+.gst-input:focus { border-color: var(--gst-ink); }
+.gst-textarea { resize: vertical; }
+.gst-input-code {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 1.5rem;
+  letter-spacing: 0.3em;
+  text-transform: lowercase;
+  text-align: center;
+}
+
+/* ── Counter (quantity) ───────────────────────────────────────── */
+.gst-counter { display: flex; align-items: center; gap: 0.75rem; }
+.gst-counter-btn {
+  flex: 0 0 auto;
+  width: var(--gst-tap);
+  height: var(--gst-tap);
+  border: 2px solid var(--gst-ink);
+  border-radius: 50%;
+  background: var(--gst-white);
+  color: var(--gst-ink);
+  font: 700 1.5rem/1 var(--gst-font-display);
+  cursor: pointer;
+}
+.gst-counter-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.gst-counter-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--gst-tap);
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--gst-border);
+  border-radius: var(--gst-radius-sm);
+  background: var(--gst-white);
+  font: 700 1.75rem/1 var(--gst-font-display);
+  color: var(--gst-ink);
+}
+
+/* ── Status (ACC-03: mark + word, never colour alone) ─────────── */
+.gst-state {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: var(--gst-radius-pill);
+  font-size: 0.875rem;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+.gst-state-mark { font-size: 1rem; line-height: 1; }
+.gst-state-done    { background: var(--gst-good-bg); color: var(--gst-good); border-color: color-mix(in srgb, var(--gst-good) 30%, transparent); }
+.gst-state-problem { background: var(--gst-attention-bg); color: var(--gst-attention); border-color: color-mix(in srgb, var(--gst-attention) 30%, transparent); }
+
+/* ── "What you've done so far" list ───────────────────────────── */
+/* Was inline flex styles on the <li>. A long product name beside a
+   status pill overflowed the row at 200% zoom (clipped by 73px),
+   because both flex children default to min-width:auto. The name is
+   allowed to shrink and wrap; the pill never shrinks, because a
+   half-width "Packed" is worse than a wrapped product name. */
+.gst-done-list { list-style: none; margin: 0.75rem 0 0; padding: 0; }
+.gst-done-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+}
+.gst-done-row > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+/* The pill may yield as a last resort. flex:0 0 auto kept it rigid, and
+   at 320px with 200% zoom the card's own padding left less room than
+   the pill wanted, overflowing the row by 18px. It shrinks only after
+   the product name has already given up everything it can. */
+.gst-done-row .gst-state { flex: 0 1 auto; min-width: 0; }
+
+/* ── Notices ──────────────────────────────────────────────────── */
+.gst-notice {
+  display: flex;
+  gap: 0.625rem;
+  padding: 0.875rem 1rem;
+  border-radius: var(--gst-radius-sm);
+  border: 1px solid;
+  font-size: 0.9375rem;
+}
+.gst-notice-info  { background: var(--gst-sand); border-color: var(--gst-border); color: var(--gst-ink); }
+.gst-notice-warn  { background: var(--gst-attention-bg); border-color: color-mix(in srgb, var(--gst-attention) 30%, transparent); color: var(--gst-attention); }
+.gst-notice-good  { background: var(--gst-good-bg); border-color: color-mix(in srgb, var(--gst-good) 30%, transparent); color: var(--gst-good); }
+
+/* ── Progress ─────────────────────────────────────────────────── */
+/* The worker's .stf-progress: track, red fill, "n / n" beside it. */
+.gst-progress { display: flex; align-items: center; gap: 0.875rem; }
+.gst-progress-track {
+  flex: 1;
+  height: 0.625rem;
+  background: var(--surface-2);
+  border-radius: var(--gst-radius-pill);
+  overflow: hidden;
+}
+.gst-progress-fill {
+  height: 100%;
+  background: var(--gst-accent);
+  border-radius: var(--gst-radius-pill);
+  transition: width 240ms ease;
+}
+.gst-progress-count {
+  font: 600 1rem/1 var(--gst-font-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--gst-ink);
+}
+
+/* ── Item list and row (the worker's .stf-list / .stf-row) ─────── */
+.gst-list {
+  border: 1px solid var(--gst-border);
+  border-radius: var(--gst-radius);
+  overflow: hidden;
+  background: var(--gst-white);
+}
+.gst-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-bottom: 1px solid var(--gst-border);
+}
+.gst-row:last-child { border-bottom: 0; }
+.gst-row-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.gst-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.gst-row-pos {
+  display: block;
+  margin: 0;
+  font: 700 0.75rem/1.4 var(--gst-font-sans);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gst-accent);
+}
+.gst-row-title {
+  margin: 0;
+  font: 600 1.25rem/1.25 var(--gst-font-display);
+  color: var(--gst-ink);
+  overflow-wrap: anywhere;
+}
+.gst-row-meta { font-size: 0.9375rem; line-height: 1.45; color: var(--gst-text-sub); overflow-wrap: break-word; }
+
+/* ── Previous / next item (the worker's .stf-wl-steps) ────────── */
+.gst-steps {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.625rem;
+}
+.gst-step-btn {
+  min-height: var(--gst-tap);
+  padding: 0 1rem;
+  border: 1px solid var(--gst-border);
+  border-radius: var(--gst-radius-sm);
+  background: var(--gst-white);
+  font: 600 0.9375rem/1 var(--gst-font-sans);
+  color: var(--gst-ink);
+  cursor: pointer;
+}
+.gst-step-btn:hover:not(:disabled) { border-color: var(--gst-accent); color: var(--gst-accent); }
+.gst-step-btn:disabled { opacity: 0.4; cursor: default; }
+.gst-steps-count {
+  font: 700 0.9375rem/1 var(--gst-font-display);
+  color: var(--gst-text-sub);
+  white-space: nowrap;
+}
+
+/* ── Contribution summary ─────────────────────────────────────── */
+.gst-figure {
+  display: block;
+  /* vw-based floor, not a rem floor. A rem floor scales WITH browser
+     zoom, so at 200% two of these no longer fit side by side; a vw
+     floor stays tied to the screen, which is what must be fitted. */
+  font: 700 clamp(2rem, 12vw, 4.5rem)/1 var(--gst-font-display);
+  color: var(--gst-accent);
+  overflow-wrap: anywhere;
+}
+.gst-figure-label {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 1rem;
+  color: var(--gst-text-sub);
+}
+/* auto-fit + minmax(min(100%, 8rem), 1fr): two side by side when there
+   is room, one per row when there is not — which is what 200% zoom on a
+   320px screen is. The min() stops the track demanding 8rem on a screen
+   narrower than that. */
+.gst-figure-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
+  gap: 1rem;
+  text-align: center;
+}
+
+/* ── Thank-you screen ─────────────────────────────────────────────
+   Guest-only, so it may have a personality; built from the same
+   tokens as everything else. The warmth is a brand-tinted card, a
+   round seal with a tick and the volunteer's own number in red -
+   no confetti and no decorative shapes (see .gst-hero above), and
+   nothing here is the only carrier of meaning: the words say it. */
+.gst-celebrate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  gap: 0.25rem;
+  padding: 1.5rem 1.25rem;
+  text-align: center;
+  background: color-mix(in srgb, var(--gst-accent) 7%, var(--gst-white));
+  border: 1px solid color-mix(in srgb, var(--gst-accent) 25%, var(--gst-border));
+  border-radius: var(--gst-radius);
+}
+.gst-seal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  margin-bottom: 0.5rem;
+  border-radius: 50%;
+  background: var(--gst-accent);
+  color: var(--gst-on-accent);
+  font: 700 1.5rem/1 var(--gst-font-display);
+}
+.gst-stat { text-align: center; }
+.gst-figure-sm { font-size: clamp(1.75rem, 9vw, 2.5rem); color: var(--gst-ink); }
+.gst-figure-sm.is-packed { color: var(--gst-good); }
+.gst-text-ink { color: var(--gst-ink); }
+.gst-thanks {
+  text-align: center;
+  border-top: 3px solid var(--gst-gold);
+  border-radius: 0 0 var(--gst-radius) var(--gst-radius);
+}
+
+/* ── Help: no dead ends, on every screen ──────────────────────── */
+.gst-help {
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 2px solid var(--gst-border);
+  text-align: center;
+}
+.gst-help-text { margin: 0 0 0.75rem; font-size: 0.9375rem; color: var(--gst-text-sub); }
+.gst-help-strong { margin: 0; font-weight: 700; color: var(--gst-ink); }
+
+/* ── Skeleton ─────────────────────────────────────────────────── */
+.gst-skeleton {
+  height: 8rem;
+  border-radius: var(--gst-radius);
+  background: var(--gst-sand);
+  animation: gst-pulse 1.4s ease-in-out infinite;
+}
+
+/* Screen-reader-only, for the live region that announces saves. */
+.gst-sr {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Motion ───────────────────────────────────────────────────── */
+@keyframes gst-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+@keyframes gst-pop   { from { transform: scale(0.8); } to { transform: scale(1); } }
+.gst-animate-pop  { animation: gst-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+/* NFR-06 wants animation; ACC does not want it imposed. Every
+   animation here is decorative — the words and marks carry every
+   meaning — so under reduced motion they are simply removed. */
+@media (prefers-reduced-motion: reduce) {
+  .gst-shell *,
+  .gst-shell *::before,
+  .gst-shell *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   8. NOTE SHEET
+   (was deliveryNotePDF.css)
+
+   Used to arrive only with a note. It comes last because it overrides the
+   printable-note header from section 2 where the two disagree.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ─────────────────────────────────────────────────────────────
+   client/src/styles/deliveryNotePDF.css
+
+   Styles for the two staff-facing document popups that never moved
+   onto PdfShell/the printable notes section of index.css: DispatchNotePDF.jsx (the dispatch-
+   history one, features/dispatch) and DecantingSheetPDF.jsx.
+   DeliveryNotePDF.jsx itself moved off this file when PdfShell.jsx was
+   built — see that component's own header comment — but this one was
+   never deleted, so it kept shaping two other documents' names.
+
+   RENAMED .pdf-* → .pdfnote-* (every selector in this file, and the
+   matching classNames in the two components above) after that turned
+   out to be a real bug, not just a stale comment: the printable notes section of index.css is
+   `@import`ed globally from index.css and defines its OWN .pdf-doc-
+   header/.pdf-doc-title/.pdf-table/etc. for a completely different
+   design (DeliveryNotePDF, the receipts-archive DispatchNotePDF,
+   ImpactCalculatorPDF). Two same-named, equal-specificity rules for
+   the same classes, both loaded on every page regardless of which
+   document is actually open — whichever file's JS module Vite happened
+   to bundle later won each colliding property, so a receiving delivery
+   note could render with (say) this file's 40px title instead of
+   the printable notes section's 26px one, and nobody could tell from the source which
+   would win. The prefix makes that structurally impossible instead of
+   coincidentally avoided.
+
+   The .pdfnote-* classes here were never delivery-specific in name
+   (.pdfnote-document, .pdfnote-doc-header, .pdfnote-table, ...), so a
+   second document type reuses this file rather than duplicating ~180
+   lines of near-identical rules under a new name.
+
+   Imported directly by each component (not added to the floor screens section of index.css or
+   the landing page section of index.css) because these components are shared between the
+   manager dashboard (plain page, no .lol-landing/.stf-shell ancestor)
+   and the staff flows (.stf-shell) — neither wrapper's CSS custom
+   properties can be relied on here, so the brand colours are written
+   out directly instead of through the --stf- or --maroon-style
+   variables.
+   ───────────────────────────────────────────────────────────── */
+
+.pdfnote-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  background: rgba(23, 27, 28, 0.55);
+}
+
+.pdfnote-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #2b3336;
+  color: #ffffff;
+}
+.pdfnote-toolbar-title {
+  font: 700 13px/1.3 "Montserrat", "Inter", system-ui, sans-serif;
+  letter-spacing: 0.02em;
+}
+.pdfnote-toolbar-actions { display: flex; align-items: center; gap: 10px; }
+.pdfnote-toolbar-error { font-size: 12px; color: #f5b5b7; }
+
+.pdfnote-scroll-area {
+  flex: 1;
+  overflow: auto;
+  padding: 24px 16px 40px;
+}
+
+/* Sparse and quiet rather than boxed — redesigned against a plain
+   delivery-note template (large title, generous whitespace, a single
+   light table, a script-style signature at the bottom) instead of the
+   denser, heavily-bordered layout this replaces. */
+.pdfnote-document {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 56px 48px;
+  background: #ffffff;
+  border-radius: 4px;
+  color: #2b3336;
+  font: 400 14px/1.6 "Inter", system-ui, sans-serif;
+}
+
+.pdfnote-doc-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 18px;
+}
+.pdfnote-doc-title-tick {
+  width: 34px;
+  height: 5px;
+  margin-bottom: 10px;
+  background: #ef3a40;
+  border-radius: 2px;
+}
+.pdfnote-doc-title {
+  margin: 0;
+  font: 700 40px/1.1 "Montserrat", "Inter", system-ui, sans-serif;
+  letter-spacing: 0.01em;
+  color: #1f2628;
+}
+.pdfnote-doc-logo {
+  /* Sized by a bounding box, not a fixed width+height, so whatever
+     the real logo's own proportions turn out to be, it's never
+     stretched or distorted to fill a shape it wasn't drawn for. */
+  max-height: 120px;
+  max-width: 180px;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.pdfnote-doc-rule {
+  height: 3px;
+  background: #ef3a40;
+  margin-bottom: 40px;
+}
+
+.pdfnote-doc-parties {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 32px;
+  margin-bottom: 36px;
+}
+.pdfnote-doc-party-col { display: flex; flex-direction: column; gap: 24px; }
+.pdfnote-doc-party { display: flex; flex-direction: column; gap: 4px; }
+.pdfnote-doc-party-heading {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #2b3336;
+}
+.pdfnote-doc-party-line { margin: 0; font-size: 13px; font-style: normal; color: #6f6a5e; }
+.pdfnote-doc-party-line--primary { font-size: 15px; font-style: normal; font-weight: 700; color: #1f2628; }
+
+.pdfnote-doc-meta-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 240px;
+  padding: 20px 22px;
+  border-radius: 8px;
+  background: #f4f2ee;
+}
+.pdfnote-doc-meta-line {
+  margin: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  font-size: 13px;
+  color: #2b3336;
+}
+.pdfnote-doc-meta-line span { color: #8b8578; }
+.pdfnote-doc-meta-line span::after { content: ':'; }
+.pdfnote-doc-meta-line strong { font-weight: 700; }
+.pdfnote-status-complete { color: #1a7d42; }
+.pdfnote-status-partial  { color: #8a5a27; }
+
+.pdfnote-doc-additional { margin-bottom: 40px; }
+.pdfnote-doc-section-heading {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #2b3336;
+}
+.pdfnote-doc-additional-text { margin: 0; font-size: 13px; line-height: 1.7; color: #6f6a5e; }
+
+.pdfnote-table { width: 100%; border-collapse: collapse; margin-bottom: 40px; }
+.pdfnote-table thead { border-top: 2px solid #ef3a40; }
+.pdfnote-table th {
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #2b3336;
+}
+.pdfnote-table td {
+  padding: 12px 12px;
+  border-bottom: 1px solid #ece7df;
+  font-size: 13px;
+}
+.pdfnote-table-center { text-align: center; }
+.pdfnote-table-product { font-weight: 500; }
+.pdfnote-table-sku { color: #8b8578; font-variant-numeric: tabular-nums; }
+.pdfnote-table-empty { text-align: center; color: #8b8578; padding: 24px 10px; }
+
+.pdfnote-signature-section {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 32px;
+  margin-bottom: 36px;
+}
+.pdfnote-signature-block { display: flex; flex-direction: column; gap: 8px; }
+.pdfnote-signature-label { margin: 0; font-size: 12px; font-weight: 700; color: #2b3336; }
+.pdfnote-signature-img { max-height: 60px; max-width: 100%; object-fit: contain; align-self: flex-start; }
+.pdfnote-signature-line { height: 44px; border-bottom: 1.5px solid #2b3336; }
+.pdfnote-signature-name { margin: 0; font-size: 12px; color: #6f6a5e; }
+/* No signature line above it (Received By isn't a second physical
+   signature) — needs more visual weight than a small caption so it
+   doesn't read as an orphaned line under nothing. */
+.pdfnote-signature-name--standalone {
+  padding-top: 4px;
+  font-size: 14px;
+  color: #2b3336;
+}
+
+@media (max-width: 640px) {
+  /* Three buttons and a title do not fit one row on a phone: Close was
+     pushed off the right edge. The title takes the first row and the
+     buttons the second, each on one line. */
+  .pdfnote-toolbar { flex-wrap: wrap; gap: 8px; }
+  .pdfnote-toolbar-title { flex: 1 1 100%; }
+  .pdfnote-toolbar-actions { flex: 1 1 100%; flex-wrap: wrap; gap: 8px; }
+  .pdfnote-toolbar-actions button { white-space: nowrap; }
+  .pdfnote-document { padding: 32px 24px; }
+  .pdfnote-doc-parties { flex-direction: column; }
+  .pdfnote-doc-meta-box { width: 100%; }
+  .pdfnote-signature-section { grid-template-columns: 1fr; }
+  /* The title and logo together were wider than a phone, which pushed
+     the logo off the page. */
+  .pdfnote-doc-header { gap: 12px; }
+  .pdfnote-doc-title { font-size: 28px; }
+  .pdfnote-doc-logo { max-width: 72px; max-height: 72px; }
+  /* The table ran a few pixels past the page at phone width. */
+  .pdfnote-table th { padding: 8px 6px; font-size: 10px; }
+  .pdfnote-table td { padding: 10px 6px; font-size: 12px; }
+}
+
+/* -- Variance on the items table ----------------------------------
+   Added alongside the restore of this document. The note is what the
+   driver signs, so it has to state what actually arrived, not only
+   what was ordered - a short delivery must not be signable as
+   complete. These five classes were referenced by the previous note
+   but never existed in any stylesheet, so variance rendered unstyled. */
+.pdf-variance-over  { color: #8a5a27; font-weight: 600; }
+.pdf-variance-short { color: #ef3a40; font-weight: 600; }
+.pdf-reason-row td {
+  padding-top: 0;
+  border-bottom: 1px solid #ece7df;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #6f6a5e;
+}
+.pdf-reason-row strong { color: #2b3336; font-weight: 600; }
+
+/* -- Printing ------------------------------------------------------
+   The Print button calls window.print(). On paper the note is the
+   page: no dimmed backdrop, no toolbar, no scrolling box, and the
+   sheet takes the width the page gives it. (Everything else on the
+   screen is hidden by the print rule in the printable notes section of index.css, which names
+   this shell.) */
+@media print {
+  @page { size: A4 portrait; margin: 12mm; }
+
+  .pdfnote-modal {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    background: none !important;
+  }
+  .pdfnote-toolbar { display: none !important; }
+  .pdfnote-scroll-area {
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+  .pdfnote-document {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    /* Keep the red rule, the grey details box and the status colour:
+       they carry meaning, and browsers drop backgrounds to save ink. */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Break between rows, never through one, and keep a reason with its
+     line and the signatures with what they sign. */
+  .pdfnote-table       { page-break-inside: auto; }
+  .pdfnote-table tr    { page-break-inside: avoid; break-inside: avoid; }
+  .pdfnote-table thead { display: table-header-group; }
+  .pdf-reason-row      { page-break-before: avoid; }
+  .pdfnote-signature-section,
+  .pdfnote-doc-meta-box,
+  .pdfnote-doc-additional { page-break-inside: avoid; break-inside: avoid; }
+}
