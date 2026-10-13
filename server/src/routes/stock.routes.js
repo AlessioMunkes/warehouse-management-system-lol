@@ -4,7 +4,7 @@
 import express                      from 'express';
 import auth, { requireRole } from '../middleware/auth.middleware.js';
 import { ALL_STAFF, MANAGERS_UP } from '../constants/permissions.js';
-import { validateIntId }            from '../middleware/validate.middleware.js';
+import { validateIntId, validateIntParam } from '../middleware/validate.middleware.js';
 import stockController              from '../controllers/stock.controller.js';
 
 const router = express.Router();
@@ -47,5 +47,9 @@ router.get('/trends', auth, requireRole(...ALL_STAFF), stockController.getStockT
 router.get('/:id/history', auth, requireRole(...ALL_STAFF), validateIntId, stockController.getMovements);
 // Gated like history: the same product's receiving record, read-only.
 router.get('/:id/batches', auth, requireRole(...ALL_STAFF), validateIntId, stockController.getExpiryBatches);
+// A manager says the estimate has this delivery wrong: its expiry warning
+// stops everywhere, with a reason on record. DELETE brings it back.
+router.post('/:id/batches/:lineId/dismissal', auth, requireRole(...MANAGERS_UP), validateIntId, validateIntParam('lineId'), stockController.dismissExpiryWarning);
+router.delete('/:id/batches/:lineId/dismissal', auth, requireRole(...MANAGERS_UP), validateIntId, validateIntParam('lineId'), stockController.restoreExpiryWarning);
 
 export default router;
