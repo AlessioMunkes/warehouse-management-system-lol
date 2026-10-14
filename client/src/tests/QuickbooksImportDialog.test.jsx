@@ -23,6 +23,11 @@ vi.mock('../services/purchaseOrderAPI', async () => {
   };
   return { ...actual, ...api, default: api };
 });
+// Only the connection status is stubbed; the order panel's own calls stay as they were.
+vi.mock('../services/quickbooksAPI', async () => {
+  const actual = await vi.importActual('../services/quickbooksAPI');
+  return { ...actual, getStatus: vi.fn(async () => ({ connected: false })) };
+});
 vi.mock('../services/supplierAPI', () => ({ default: { getSuppliers: vi.fn(async () => []) } }));
 vi.mock('../services/stockAPI', () => ({ default: { getManifest: vi.fn(async () => []) } }));
 vi.mock('@/components/ui/toastContext', () => ({ useToast: () => vi.fn() }));
@@ -33,6 +38,7 @@ vi.mock('react-router-dom', () => ({
 }));
 
 const { default: api } = await import('../services/purchaseOrderAPI');
+const { getStatus: quickbooksStatus } = await import('../services/quickbooksAPI');
 const { default: QuickbooksImportDialog } = await import('../features/purchaseOrders/QuickbooksImportDialog');
 const { default: PurchaseOrdersPage } = await import('../pages/PurchaseOrdersPage');
 
@@ -300,6 +306,51 @@ describe('the Purchase orders header', () => {
   it('offers the import to a manager', async () => {
     render(<PurchaseOrdersPage />);
     expect(await screen.findByRole('button', { name: 'Import QuickBooks links' })).toBeInTheDocument();
+  });
+
+  describe('and the QuickBooks connection', () => {
+    const NOTE = /new purchase orders are sent to it automatically/;
+
+    it('keeps the import as the main way to link orders while QuickBooks is not connected', async () => {
+      quickbooksStatus.mockResolvedValue({ connected: false });
+      render(<PurchaseOrdersPage />);
+      expect(await screen.findByRole('button', { name: 'Import QuickBooks links' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Link existing QuickBooks POs' })).not.toBeInTheDocument();
+      expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+    });
+
+    it('makes it secondary once connected, with a note that new orders sync by themselves', async () => {
+      quickbooksStatus.mockResolvedValue({ connected: true, working: true });
+      render(<PurchaseOrdersPage />);
+      const secondary = await screen.findByRole('button', { name: 'Link existing QuickBooks POs' });
+      expect(screen.queryByRole('button', { name: 'Import QuickBooks links' })).not.toBeInTheDocument();
+      expect(screen.getByText(NOTE)).toBeInTheDocument();
+      // Quieter than the New purchase order button beside it, and still opens the same dialog.
+      expect(secondary.className).not.toBe(screen.getByRole('button', { name: 'New purchase order' }).className);
+      await userEvent.click(secondary);
+      expect(await screen.findByLabelText('QuickBooks PO export file')).toBeInTheDocument();
+    });
+
+    it('goes back to the main import when the connection has lapsed, since nothing syncs by itself', async () => {
+      quickbooksStatus.mockResolvedValue({ connected: true, working: false, error: 'The QuickBooks sign-in has expired. Reconnect it.' });
+      render(<PurchaseOrdersPage />);
+      expect(await screen.findByRole('button', { name: 'Import QuickBooks links' })).toBeInTheDocument();
+      expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+    });
+
+    it('never hides the import because the status could not be read', async () => {
+      quickbooksStatus.mockRejectedValue(new Error('network'));
+      render(<PurchaseOrdersPage />);
+      expect(await screen.findByRole('button', { name: 'Import QuickBooks links' })).toBeInTheDocument();
+    });
+
+    it('does not ask a warehouse worker, who sees neither button', async () => {
+      auth.role = 'warehouse_worker';
+      quickbooksStatus.mockClear();
+      render(<PurchaseOrdersPage />);
+      await screen.findByRole('heading', { name: 'Purchase orders' });
+      expect(quickbooksStatus).not.toHaveBeenCalled();
+    });
   });
 
   it('does not offer it to anyone else', async () => {

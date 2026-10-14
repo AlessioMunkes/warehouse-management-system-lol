@@ -23,6 +23,11 @@ vi.mock('../services/purchaseOrderAPI', async () => {
   };
   return { ...actual, ...api, default: api };
 });
+// Only the connection status is stubbed; the order panel's own calls stay as they were.
+vi.mock('../services/quickbooksAPI', async () => {
+  const actual = await vi.importActual('../services/quickbooksAPI');
+  return { ...actual, getStatus: vi.fn(async () => ({ connected: false })) };
+});
 vi.mock('../services/supplierAPI', () => ({ default: { getSuppliers: vi.fn(async () => []) } }));
 vi.mock('../services/stockAPI', () => ({ default: { getManifest: vi.fn(async () => []) } }));
 vi.mock('../components/layout/ManagerLayout', () => ({ default: ({ children }) => children }));
