@@ -200,13 +200,35 @@ const lineTotal = (item) => lineAmount(item.expected_quantity, item.unit_price);
 const poTotal = (items) => orderTotal(items.map((i) => ({ quantity: i.expected_quantity, unitPrice: i.unit_price })));
 
 // ── Finance email ─────────────────────────────────────────────
-// Interim design while API-based QuickBooks PO creation is blocked
-// (see README): Finance is emailed the PO and captures it manually.
-const buildFinanceEmail = (purchaseOrder) => {
+// Sent when a manager approves the order (afterApproval), in one of two
+// voices:
+//   QuickBooks connected   the order is sent across by the system, so the
+//                          email says so, gives the QuickBooks number once
+//                          the order is linked, and asks for nothing.
+//   not connected          the original ask: capture it in QuickBooks and
+//                          type our number into the Memo, which the file
+//                          import then links.
+const buildFinanceEmail = (purchaseOrder, { connected = false, quickbooksNumber = null } = {}) => {
   const total = poTotal(purchaseOrder.items);
   const createdBy = purchaseOrder.created_by_name || 'a warehouse manager';
+  const po = purchaseOrder.po_number;
 
-  const subject = `${purchaseOrder.po_number} · ${purchaseOrder.supplier_name} · ${money(total)} · capture in QuickBooks`;
+  const subject = connected
+    ? `${po} · ${purchaseOrder.supplier_name} · ${money(total)} · sent to QuickBooks automatically`
+    : `${po} · ${purchaseOrder.supplier_name} · ${money(total)} · capture in QuickBooks`;
+
+  let intro;
+  let closing;
+  if (!connected) {
+    intro = `Purchase order ${po} has been approved and needs to be captured in QuickBooks.`;
+    closing = `Capture this order in QuickBooks and type ${po} into the QuickBooks PO's Memo field. The system links the two automatically from your QuickBooks export.`;
+  } else if (quickbooksNumber) {
+    intro = `Purchase order ${po} has been approved and sent to QuickBooks automatically, as QuickBooks PO ${quickbooksNumber}. There is nothing for you to capture.`;
+    closing = 'No need to capture this order: the system has already put it in QuickBooks. If you have already captured it by hand, tell a manager so the two can be matched.';
+  } else {
+    intro = `Purchase order ${po} has been approved. It is being sent to QuickBooks automatically and has not reached it yet; if QuickBooks cannot take it, a manager is told and will sort it out. There is nothing for you to capture.`;
+    closing = 'No need to capture this order: the system sends it to QuickBooks. If you have already captured it by hand, tell a manager so the two can be matched.';
+  }
 
   const textLines = purchaseOrder.items.map((item) => {
     const unit = item.default_unit ? ` ${item.default_unit}` : '';
@@ -214,7 +236,7 @@ const buildFinanceEmail = (purchaseOrder) => {
     return `  - ${item.product_name}: ${item.expected_quantity}${unit} x ${unitPrice} = ${money(lineTotal(item))}`;
   }).join('\n');
 
-  const text = `Purchase order ${purchaseOrder.po_number} has been created and needs to be captured in QuickBooks.
+  const text = `${intro}
 
 Supplier: ${purchaseOrder.supplier_name}
 Created: ${formatDate(purchaseOrder.created_at)} by ${createdBy}
@@ -224,7 +246,7 @@ ${textLines}
 
 Total: ${money(total)}
 
-Capture this order in QuickBooks and type ${purchaseOrder.po_number} into the QuickBooks PO's Memo field. The system links the two automatically from your QuickBooks export.`;
+${closing}`;
 
   const rows = purchaseOrder.items.map((item) => `
     <tr>
@@ -235,10 +257,12 @@ Capture this order in QuickBooks and type ${purchaseOrder.po_number} into the Qu
     </tr>`).join('');
 
   const html = renderLadlesEmail({
-    title: 'Purchase order created',
-    preheader: `Purchase order ${purchaseOrder.po_number} needs to be captured in QuickBooks.`,
+    title: 'Purchase order approved',
+    preheader: connected
+      ? `Purchase order ${po} was sent to QuickBooks automatically. Nothing to capture.`
+      : `Purchase order ${po} needs to be captured in QuickBooks.`,
     bodyHtml: `
-      <p style="${emailStyles.paragraph}">Purchase order <strong>${escapeHtml(purchaseOrder.po_number)}</strong> has been created and needs to be captured in QuickBooks.</p>
+      <p style="${emailStyles.paragraph}">${escapeHtml(intro)}</p>
       <p style="${emailStyles.paragraph}"><strong>Supplier:</strong> ${escapeHtml(purchaseOrder.supplier_name)}<br>
          <strong>Created:</strong> ${escapeHtml(formatDate(purchaseOrder.created_at))} by ${escapeHtml(createdBy)}</p>
       <table style="${emailStyles.table}">
@@ -254,7 +278,7 @@ Capture this order in QuickBooks and type ${purchaseOrder.po_number} into the Qu
           <td style="${emailStyles.td}text-align:right;font-weight:700;">${escapeHtml(money(total))}</td>
         </tr></tfoot>
       </table>
-      <p style="${emailStyles.note}">Capture this order in QuickBooks and type <strong>${escapeHtml(purchaseOrder.po_number)}</strong> into the QuickBooks PO's Memo field. The system links the two automatically from your QuickBooks export.</p>
+      <p style="${emailStyles.note}">${escapeHtml(closing)}</p>
     `,
   });
   return { subject, text, html };
@@ -288,7 +312,12 @@ const notifyFinance = async (purchaseOrder, sentBy = null) => {
     const { recipientEmail } = await financeService.getEmailSettings();
     if (!recipientEmail) return 'no_recipient'; // nothing configured — status left as is, no attempt logged
 
-    const { subject, text, html } = buildFinanceEmail(purchaseOrder);
+    // With QuickBooks connected the order goes across by itself, so Finance
+    // is told that, and not asked to capture it. Without it, the manual ask.
+    const { subject, text, html } = buildFinanceEmail(purchaseOrder, {
+      connected: await quickbooksService.isConnected(),
+      quickbooksNumber: purchaseOrder.quickbooks_po_id ?? null,
+    });
 
     let result;
     try {
@@ -383,19 +412,10 @@ const createPurchaseOrder = async (body, userId) => {
     throw fail(500, 'Failed to create the purchase order.');
   }
 
-  // Fire-and-forget, after commit. setImmediate runs it after the
-  // controller has sent the response, so Gmail's latency (or an outage)
-  // never delays or fails the create. The send writes its own status
-  // once the attempt resolves; the catch keeps any error from becoming
-  // an unhandled rejection.
-  const created = result.purchaseOrder;
-  setImmediate(() => {
-    notifyFinance(created, userId).catch((err) => {
-      console.error('[purchaseOrder:financeEmail]', err.message);
-    });
-  });
-
-  return created;
+  // Finance is not told yet. A new order is only a request until a manager
+  // approves it, and one that is returned or deleted first should never
+  // reach Finance: the email goes out on approval (afterApproval).
+  return result.purchaseOrder;
 };
 
 // ── Read ──────────────────────────────────────────────────────
@@ -443,6 +463,28 @@ const PO_STATUS_WORDS = {
   pending: 'Pending approval', approved: 'Approved', in_transit: 'In transit',
   partially_received: 'Partially received', completed: 'Completed',
   returned: 'Returned', follow_up_required: 'Follow-up required',
+};
+
+// What happens once an order is approved, in this order: where QuickBooks
+// is connected the order is sent across first, then Finance is emailed, so
+// the email can say where it ended up (and give the QuickBooks number).
+// Without QuickBooks the email is the ask to capture it. Never throws.
+const afterApproval = (poId, userId = null) => {
+  setImmediate(() => {
+    (async () => {
+      if (await quickbooksService.isConnected()) {
+        // Finance is told whatever happens to the send: a failure here must
+        // not leave them hearing nothing.
+        try { await quickbooksService.pushInBackground(poId); } catch (err) {
+          console.error('[purchaseOrder:financeEmail]', err.message);
+        }
+      }
+      const po = await repo.getPurchaseOrderById(poId);   // fresh: the link may have just been made
+      if (po) await notifyFinance(po, userId);
+    })().catch((err) => {
+      console.error('[purchaseOrder:financeEmail]', err.message);
+    });
+  });
 };
 
 const setPurchaseOrderStatus = async (rawId, body = {}, userId = null) => {
@@ -500,10 +542,11 @@ const setPurchaseOrderStatus = async (rawId, body = {}, userId = null) => {
     from: existing.status,
   });
 
-  // An approved order goes to QuickBooks, where one is connected. After
-  // the approval is saved and never awaited: the manager is not kept
-  // waiting on Intuit, and a failure is recorded on the order to retry.
-  if (status === 'approved' && existing.status === 'pending') quickbooksService.pushInBackground(Number(rawId));
+  // The approval is saved. Everything that follows (QuickBooks, then
+  // Finance) happens in the background and is never awaited here: the
+  // manager is not kept waiting on Intuit or Gmail, and a failure is
+  // recorded on the order to retry.
+  if (status === 'approved' && existing.status === 'pending') afterApproval(Number(rawId), userId);
 
   return updated;
 };
@@ -645,6 +688,10 @@ const resendFinanceEmail = async (rawId, userId = null) => {
 
   const purchaseOrder = await repo.getPurchaseOrderById(id);
   if (!purchaseOrder) throw fail(404, 'Purchase order not found.');
+  // Finance hears about an order when it is approved, so there is nothing to
+  // resend before that, and nothing to say about one that was sent back.
+  if (purchaseOrder.status === 'pending') throw fail(409, 'Approve this order before sending it to Finance.');
+  if (purchaseOrder.status === 'returned') throw fail(409, 'This order was returned, so Finance is not told about it.');
 
   const outcome = await notifyFinance(purchaseOrder, userId);
   if (outcome === 'in_progress') {

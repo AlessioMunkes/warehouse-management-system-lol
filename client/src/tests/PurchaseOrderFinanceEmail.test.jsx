@@ -77,6 +77,18 @@ describe('PurchaseOrderDetail — finance email', () => {
     expect(onResendFinanceEmail).toHaveBeenCalledTimes(1);
   });
 
+  it('says it is sent when approved, with no Resend, while the order awaits approval', () => {
+    renderDetail({ status: 'pending' });
+    expect(screen.getByText('Sent when approved')).toBeTruthy();
+    expect(screen.queryByText('Not sent')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Resend to Finance' })).toBeNull();
+  });
+
+  it('offers no Resend for a returned order, which Finance is never told about', () => {
+    renderDetail({ status: 'returned', status_reason: 'Wrong supplier' });
+    expect(screen.queryByRole('button', { name: 'Resend to Finance' })).toBeNull();
+  });
+
   it('hides Resend from someone who cannot manage orders', () => {
     renderDetail({ finance_email_status: 'failed' }, { canManage: false });
     expect(screen.getByText('Send failed')).toBeTruthy();

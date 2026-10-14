@@ -236,8 +236,8 @@ wording. One flat folder per area, with no folders inside.
   announce (`features/communications/notices.js`).
 - **Repeat requests** from a phone that lost signal are recognised by
   `middleware/idempotency.middleware.js` and answered without doing the work twice.
-- **Raising a purchase order emails Finance.** Tests that create one through the API send a
-  real email if Gmail is connected.
+- **Approving a purchase order emails Finance.** Tests that approve one through the API send a
+  real email if Gmail is connected. (Creating one sends nothing.)
 
 ### Database
 

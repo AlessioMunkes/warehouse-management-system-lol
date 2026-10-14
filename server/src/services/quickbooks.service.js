@@ -371,11 +371,23 @@ const link = async (poId, remote) => {
 
 // After an approval: sent in the background, never awaited by the
 // request that approved the order, and never allowed to throw into it.
+// Resolves with what happened (see pushPurchaseOrder) so the Finance email
+// that follows can say so, and never rejects. The approval itself does not
+// wait for it.
 const pushInBackground = (poId) => {
-  if (!isConfigured()) return;
-  Promise.resolve()
+  if (!isConfigured()) return Promise.resolve(null);
+  return Promise.resolve()
     .then(() => pushPurchaseOrder(poId))
-    .catch((err) => console.error('[quickbooks] background send failed:', err.message));
+    .catch((err) => {
+      console.error('[quickbooks] background send failed:', err.message);
+      return null;
+    });
+};
+
+/** Set up on this server AND a company connected: orders go across by themselves. */
+const isConnected = async () => {
+  if (!isConfigured()) return false;
+  try { return Boolean(await repo.getConnection()); } catch { return false; }
 };
 
 // Orders whose automatic send failed, to try again (see listUnsent): only
@@ -414,5 +426,5 @@ const syncState = async (rawId) => {
 
 export default {
   startConnect, handleCallback, disconnect, status, warehouseForState,
-  pushPurchaseOrder, pushInBackground, pushUnsent, syncState, buildPurchaseOrder,
+  pushPurchaseOrder, pushInBackground, pushUnsent, syncState, buildPurchaseOrder, isConnected,
 };

@@ -99,7 +99,7 @@ const MANAGER = [
     ] },
   { title: 'Purchase orders',
     steps: [
-      'Raise an order with New purchase order: choose the supplier, the expected date and the lines. Finance is emailed when it is raised.',
+      'Raise an order with New purchase order: choose the supplier, the expected date and the lines. Finance is emailed when it is approved.',
       'An order starts as Pending approval. Approve it before it can be received on the floor.',
       'Mark as in transit when the supplier confirms it is on its way.',
       'A delivery in full completes the order. A short delivery leaves it Partially received, flagged Follow-up required with what was short.',

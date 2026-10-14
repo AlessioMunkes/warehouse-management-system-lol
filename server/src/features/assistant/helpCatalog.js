@@ -126,7 +126,7 @@ export const SCREENS = [
     about: 'Every stock movement in and out, warehouse-wide, with who did it.',
     aka: ['stock movements', 'audit trail', 'ledger'] },
   { id: 'purchaseOrders', label: 'Purchase orders', roles: MANAGERS_UP,
-    about: 'Raise and track orders to suppliers. New orders are emailed to Finance.',
+    about: 'Raise and track orders to suppliers. Finance is emailed when an order is approved.',
     aka: ['POs', 'orders', 'buying', 'procurement orders'] },
   { id: 'pickingSlips', label: 'Picking slips', roles: MANAGERS_UP,
     about: 'Create, generate and assign the slips that say what each centre gets.',
@@ -427,7 +427,7 @@ export const TOPICS = [
       'deliveries.',
     steps: [
       'Stock: inventory levels, the stock ledger and stock adjustments.',
-      'Buying: raise purchase orders; each one is emailed to Finance.',
+      'Buying: raise purchase orders; Finance is emailed when each one is approved.',
       'Centres: beneficiaries, this week’s picking slips and collection reminders.',
       'Donations: the classification queue, and Section 18A certificates for donors.',
       'Insight: operations reports and impact reports.',
@@ -1519,9 +1519,10 @@ export const TOPICS = [
       'finance email', 'did finance get it', 'accounts need the order', 'capture in quickbooks',
     ],
     body:
-      'Every new purchase order is emailed to Finance automatically, with its lines ' +
-      'and total, so they can capture it in QuickBooks. You don’t need to send it ' +
-      'yourself.\n\n' +
+      'Finance is emailed automatically when a purchase order is approved, with its ' +
+      'lines and total. Where QuickBooks is connected the email says the order was ' +
+      'sent to QuickBooks for them; otherwise it asks them to capture it there. You ' +
+      'don’t need to send it yourself.\n\n' +
       'If Finance says it never arrived, ask an admin to check the Finance recipient ' +
       'in Email settings.',
     followUp: {
