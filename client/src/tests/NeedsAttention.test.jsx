@@ -97,7 +97,7 @@ describe('NeedsAttention: things a manager would otherwise only find by opening 
     renderList({ ...zero, purchaseOrders: { awaitingApproval: 0, followUp: 0, financeEmailFailed: 2, needsQuickbooksMatch: 1 } });
     expect(screen.getByRole('link', { name: '2 purchase orders did not reach Finance by email' }))
       .toHaveAttribute('href', '/noc/purchase-orders?status=email_failed');
-    expect(screen.getByRole('link', { name: '1 purchase order needs a match in QuickBooks' }))
+    expect(screen.getByRole('link', { name: '1 purchase order needs attention in QuickBooks' }))
       .toHaveAttribute('href', '/noc/purchase-orders?status=needs_match');
   });
 

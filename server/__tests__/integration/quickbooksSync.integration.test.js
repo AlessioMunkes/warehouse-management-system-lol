@@ -16,11 +16,12 @@ import { resetTables } from '../helpers/resetTables.js';
 
 const LOCAL = /@(localhost|127\.0\.0\.1)[:/]/.test(process.env.DATABASE_URL || '');
 
-let pool, poRepo, qbRepo;
+let pool, poRepo, qbRepo, dashRepo;
 if (LOCAL) {
   ({ default: pool } = await import('../../src/config/db.js'));
   ({ default: poRepo } = await import('../../src/repositories/purchaseOrder.repository.js'));
   ({ default: qbRepo } = await import('../../src/repositories/quickbooks.repository.js'));
+  ({ default: dashRepo } = await import('../../src/repositories/dashboard.repository.js'));
 }
 
 const q = (sql, params) => pool.query(sql, params);
@@ -59,6 +60,22 @@ describe.skipIf(!LOCAL)('QuickBooks and purchase orders (real SQL)', () => {
   };
   const hoursAgo = (h) => new Date(Date.now() - h * 3600 * 1000);
   const unsent = async () => (await qbRepo.listUnsent(50)).sort((a, b) => a - b);
+
+  describe('the Needs attention count', () => {
+    it('counts an order waiting for a match and one QuickBooks refused, not one that failed or was sent', async () => {
+      const ids = [];
+      for (const [i, state] of ['needs_match', 'refused', 'failed', 'synced', 'sending'].entries()) {
+        const id = await addPo(`PO-2026-04${String(i).padStart(2, '0')}`);
+        await qbRepo.recordSync(id, { state, error: 'x' });
+        ids.push(id);
+      }
+      const res = await dashRepo.getAttention({ now: new Date() });
+      expect(res.purchaseOrders.needsQuickbooksMatch).toBe(2);
+      // and the order list carries the state the attention tab filters on
+      const rows = await poRepo.listPurchaseOrders({ limit: 10 });
+      expect(rows.filter((r) => ['needs_match', 'refused'].includes(r.quickbooks_state)).map((r) => r.id).sort()).toEqual(ids.slice(0, 2).sort());
+    });
+  });
 
   describe('the daily retry', () => {
     it('takes up an order approved while connected whose send failed', async () => {

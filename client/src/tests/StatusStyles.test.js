@@ -51,7 +51,7 @@ describe('status styles', () => {
     ['ledger', LEDGER_TYPES],
     ['inventory', ['in_stock', 'low_stock', 'shortfall']],
     ['message', ['sent', 'delivered', 'pending', 'stubbed', 'unsent', 'failed', 'bounced']],
-    ['quickbooks', ['none', 'sending', 'needs_match', 'failed']],
+    ['quickbooks', ['none', 'sending', 'needs_match', 'refused', 'failed']],
     ['pickingSlip', ['pending', 'in_progress', 'complete', 'dispatched', 'collected', 'not_collected', 'cancelled']],
     ['expiry', ['ok', 'soon', 'urgent', 'expired']],
   ])('styles every %s status the app can show', (kind, statuses) => {

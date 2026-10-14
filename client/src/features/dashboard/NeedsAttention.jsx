@@ -55,7 +55,7 @@ const lines = (a) => [
     text: (n) => `${plural(n, 'purchase order is', 'purchase orders are')} waiting for approval`,
     to: `${STAFF.purchaseOrders}?status=pending` },
   { key: 'needsQuickbooksMatch', tone: 'warn', icon: Unlink, count: a.purchaseOrders.needsQuickbooksMatch ?? 0,
-    text: (n) => `${plural(n, 'purchase order needs', 'purchase orders need')} a match in QuickBooks`,
+    text: (n) => `${plural(n, 'purchase order needs', 'purchase orders need')} attention in QuickBooks`,
     to: `${STAFF.purchaseOrders}?status=needs_match` },
   { key: 'lowStock', tone: 'warn', icon: TrendingDown, count: a.inventory.lowStock,
     text: (n) => `${plural(n, 'product is', 'products are')} at or below the reorder level`,

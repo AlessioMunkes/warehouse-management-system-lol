@@ -108,6 +108,7 @@ export const STATUS_STYLES = {
     none:        s('neutral', Clock),
     sending:     s('info', Send),
     needs_match: s('warn', TriangleAlert),                // a name not found there; a person has to act
+    refused:     s('warn', Ban),                          // QuickBooks said no to the order; a person has to act
     failed:      s('bad', CircleX, true),
   },
   // Derived from AVAILABLE server-side (stock.repository.js getManifest).

@@ -72,8 +72,9 @@ const PO_VIEWS = [
   // only while there are any (or the tab is open from a link).
   { id: 'email_failed',       label: 'Finance email failed', alert: true, onlyWhenAny: true,
     test: (po) => po.financeEmailStatus === 'failed' },
-  { id: 'needs_match',        label: 'Needs a QuickBooks match', alert: true, onlyWhenAny: true,
-    test: (po) => po.quickbooksState === 'needs_match' },
+  { id: 'needs_match',        label: 'Needs QuickBooks attention', alert: true, onlyWhenAny: true,
+    // A name not found there, or an order QuickBooks refused: both wait for a person.
+    test: (po) => po.quickbooksState === 'needs_match' || po.quickbooksState === 'refused' },
   { id: 'all',                label: 'All',                test: () => true },
 ];
 const viewById = (id) => PO_VIEWS.find((v) => v.id === id) ?? PO_VIEWS[0];
