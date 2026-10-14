@@ -6,7 +6,10 @@
 // conflicts, confirm with totals, see the result. Also that the button
 // is on the Purchase orders header for managers only.
 // ─────────────────────────────────────────────────────────────
+/* global process */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -304,5 +307,46 @@ describe('the Purchase orders header', () => {
     render(<PurchaseOrdersPage />);
     await screen.findByRole('heading', { name: 'Purchase orders' });
     expect(screen.queryByRole('button', { name: 'Import QuickBooks links' })).not.toBeInTheDocument();
+  });
+});
+
+// The real "Open Purchase Order List by Vendor" export, through the dialog:
+// vendor headings, "Total for" rows, TOTAL and the footer are not rows with
+// no PO number; only #1099 and #1002 are.
+describe('a real QuickBooks report', () => {
+  const bytes = readFileSync(resolve(process.cwd(), 'src/tests/fixtures/qbo-open-purchase-order-list-by-vendor.xlsx'));
+
+  it('counts and lists only the real transactions that have no PO number', async () => {
+    api.previewQuickbooksImport.mockImplementation(async (pairs) => ({
+      rows: pairs.map((p) => ({ ...p, status: 'will_link' })), counts: {},
+    }));
+    const user = userEvent.setup();
+    openDialog();
+    const file = new File([bytes], 'Open Purchase Order List by Vendor.xlsx');
+    if (typeof file.arrayBuffer !== 'function') {
+      file.arrayBuffer = async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+    }
+    await user.upload(screen.getByLabelText('QuickBooks PO export file'), file);
+    expect(await screen.findByLabelText('Column with the QuickBooks PO number')).toHaveValue('Num');
+    await user.click(screen.getByRole('button', { name: 'Check the file' }));
+    await screen.findByRole('button', { name: 'Continue to confirm' });
+
+    const line = screen.getByText(/will link/, { selector: 'p' }).textContent;
+    expect(line).toMatch(/6 will link/);
+    expect(line).toMatch(/2 without a PO number/);
+    expect(screen.getByText(/8 heading, total and footer rows were ignored/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /2 rows have no PO number/ }));
+    expect(screen.getByText('QuickBooks PO number 1099')).toBeInTheDocument();
+    expect(screen.getByText('QuickBooks PO number 1002')).toBeInTheDocument();
+    expect(screen.queryByText(/Total for/)).toBeNull();
+    expect(api.previewQuickbooksImport).toHaveBeenCalledWith([
+      { poNumber: 'PO-2026-0069', quickbooksNumber: 'PO-2026-0069' },
+      { poNumber: 'PO-2026-0068', quickbooksNumber: 'PO-2026-0068' },
+      { poNumber: 'PO-2026-0070', quickbooksNumber: 'PO-2026-0070' },
+      { poNumber: 'PO-2026-0071', quickbooksNumber: 'PO-2026-0071' },
+      { poNumber: 'PO-2026-0072', quickbooksNumber: 'PO-2026-0072' },
+      { poNumber: 'PO-2026-0059', quickbooksNumber: 'PO-2026-0059' },
+    ]);
   });
 });
