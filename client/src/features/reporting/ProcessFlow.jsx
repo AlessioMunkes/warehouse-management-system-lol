@@ -30,9 +30,10 @@
 // at once.
 // ─────────────────────────────────────────────────────────────
 import { useMemo, useState } from 'react';
-import { Play, Pause, RotateCw, X } from 'lucide-react';
+import { Flag, Play, Pause, RotateCw, X } from 'lucide-react';
 import NativeSelect from '@/components/ui/native-select';
 import { duration } from './processFormat';
+import { activityLook } from './processActivityLook';
 import { exportExcel } from '../../lib/excelExport';
 import {
   START, END, NODE_W, NODE_H, variantsOf, applyFilters, filterLabel, graphOf, neighbours,
@@ -126,7 +127,6 @@ export default function ProcessFlow({ flow, range }) {
 
   const maxCount = Math.max(...graph.edges.map((e) => e.count), 1);
   const maxHours = Math.max(...graph.edges.map((e) => e.medianHours ?? 0), 0);
-  const nodeMax = Math.max(...graph.nodes.map((n) => n.cases), 1);
 
   const onExpected = variants.filter((v) => v.expected).reduce((s, v) => s + v.cases.length, 0);
   const withRepeats = variants.filter((v) => v.repeats).reduce((s, v) => s + v.cases.length, 0);
@@ -292,6 +292,11 @@ export default function ProcessFlow({ flow, range }) {
                   return (
                     <g key={id}>
                       <circle cx={p.x} cy={p.y} r={13} fill={INK} />
+                      {/* Start plays, End is the finish flag. */}
+                      {(() => {
+                        const Mark = id === START ? Play : Flag;
+                        return <Mark x={p.x - 7} y={p.y - 7} width={14} height={14} color="var(--on-ink)" strokeWidth={2.2} aria-hidden="true" />;
+                      })()}
                       <text x={p.x + 22} y={p.y + 4} fontSize="12" fontWeight="700" fill={INK}>
                         {id === START ? 'Start' : 'End'} · {count(graph.cases)}
                       </text>
@@ -314,8 +319,20 @@ export default function ProcessFlow({ flow, range }) {
                       <title>{label}</title>
                       <rect x={p.x - NODE_W / 2} y={p.y - NODE_H / 2} width={NODE_W} height={NODE_H} rx={NODE_H / 2}
                         fill={picked ? INK : 'var(--card)'} stroke={picked ? INK : n.expected ? 'var(--line-strong)' : OFF_ROUTE} strokeWidth={n.expected ? 1.2 : 1.8} />
-                      {/* How much of the traffic reaches this step. */}
-                      <circle cx={p.x - NODE_W / 2 + 22} cy={p.y} r={6 + (n.cases / nodeMax) * 8} fill={picked ? 'var(--on-ink)' : n.expected ? INK : OFF_ROUTE} opacity={picked ? 0.9 : 0.85} />
+                      {/* What the step is: its own icon, coloured by what it
+                          means (processActivityLook.js). The traffic through
+                          it is the count under the label. */}
+                      {(() => {
+                        const lookOf = activityLook(n.id, n.expected);
+                        const Icon = lookOf.icon;
+                        const cx = p.x - NODE_W / 2 + 22;
+                        return (
+                          <>
+                            <circle cx={cx} cy={p.y} r={15} fill={lookOf.fill} stroke={picked ? 'var(--on-ink)' : lookOf.ink} strokeWidth={1.5} />
+                            <Icon x={cx - 8} y={p.y - 8} width={16} height={16} color={lookOf.ink} strokeWidth={2} aria-hidden="true" />
+                          </>
+                        );
+                      })()}
                       <text x={p.x - NODE_W / 2 + 44} y={p.y - 2} fontSize="12.5" fontWeight="700" fill={picked ? 'var(--on-ink)' : INK}>{n.label}</text>
                       <text x={p.x - NODE_W / 2 + 44} y={p.y + 13} fontSize="10.5" fill={picked ? 'var(--on-ink)' : 'var(--ink-soft)'}>
                         {count(n.cases)}{n.repeated ? ` · rework in ${count(n.repeated)}` : ''}
