@@ -35,7 +35,9 @@ const getConnection = async () => {
 };
 
 // Connecting replaces whatever was there: a second company is a change
-// of company, not a second connection.
+// of company, not a second connection. created_at is when the CURRENT
+// connection was made, so a reconnect starts it afresh: the daily retry
+// only takes up orders that failed after it (listUnsent).
 const saveConnection = async ({ realmId, tokenType, scope, accessEncrypted, refreshEncrypted, accessExpiresAt, refreshExpiresAt, userId }) => {
   const client = await pool.connect();
   try {
@@ -53,6 +55,7 @@ const saveConnection = async ({ realmId, tokenType, scope, accessEncrypted, refr
              access_token_expires_at = EXCLUDED.access_token_expires_at,
              refresh_token_expires_at = EXCLUDED.refresh_token_expires_at,
              connected_by_user_id = EXCLUDED.connected_by_user_id,
+             created_at = NOW(),
              updated_at = NOW()
        RETURNING id, realm_id`,
       [realmId, tokenType, scope, accessEncrypted, refreshEncrypted, accessExpiresAt, refreshExpiresAt, userId ?? null],
@@ -84,9 +87,14 @@ const deleteConnection = async () => {
 
 // ── Where each order's send stands ──────────────────────────
 // `state` is this feature's own word, kept in payload:
-//   synced | needs_match | failed | sending
+//   synced | needs_match | refused | failed | sending
 // and mapped onto the table's status column so the two agree.
-const STATUS_OF = { synced: 'succeeded', needs_match: 'pending', failed: 'failed', sending: 'in_flight' };
+//
+// Only 'failed' (QuickBooks down, a timeout, a lapsed sign-in) is tried
+// again by the daily retry. 'needs_match' and 'refused' wait for a person
+// to fix something in QuickBooks and press Send again: trying them daily
+// would only be told no again.
+const STATUS_OF = { synced: 'succeeded', needs_match: 'pending', refused: 'abandoned', failed: 'failed', sending: 'in_flight' };
 
 const recordSync = async (poId, { state, error = null, detail = {} }) => {
   await pool.query(
@@ -140,17 +148,25 @@ const saveLink = async (poId, { qboId, syncToken = null }) => {
   }
 };
 
-// Orders approved while QuickBooks could not take them: still not
-// linked, and not waiting on a person to fix a match.
+// Orders to try again: approved while QuickBooks was connected, but the
+// send failed (it was down, it timed out, the sign-in had lapsed). Never
+// an order that was approved before this connection was made: those stay
+// on the manual path until a manager presses Send, so connecting does not
+// send a backlog of older orders Finance may already have captured by
+// hand. An order only has a send on record from the moment it was sent
+// automatically, and one from before the current connection is left alone.
+// An order waiting for a person (needs a match, refused) is not here.
 const listUnsent = async (limit = 20) => {
   const { rows } = await pool.query(
     `SELECT po.id
        FROM purchase_orders po
+       JOIN quickbooks_sync_queue q ON q.idempotency_key = 'purchase_order:' || po.id || ':create'
+       JOIN quickbooks_connections c ON c.created_at <= q.created_at
        LEFT JOIN quickbooks_object_map m ON m.entity_type = $1 AND m.entity_id = po.id
-       LEFT JOIN quickbooks_sync_queue q ON q.idempotency_key = 'purchase_order:' || po.id || ':create'
       WHERE po.status IN ('approved', 'in_transit', 'partially_received')
         AND m.entity_id IS NULL
-        AND (q.id IS NULL OR q.status = 'failed')
+        AND q.status = 'failed'
+      GROUP BY po.id
       ORDER BY po.id
       LIMIT $2`,
     [ENTITY, limit],

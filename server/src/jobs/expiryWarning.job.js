@@ -62,9 +62,10 @@ const runIfDue = async () => {
         console.error(`[idleKits]${where} check failed:`, kitErr.message);
       }
 
-      // And approved orders QuickBooks could not take at the time (it
-      // was down, or not yet connected). Does nothing unless QuickBooks
-      // is set up and connected.
+      // And orders whose automatic send to QuickBooks failed (it was down,
+      // or the sign-in had lapsed). Never orders approved before it was
+      // connected, and never ones waiting on a person. Does nothing unless
+      // QuickBooks is set up and connected.
       try {
         const qb = code
           ? await runInWarehouse(code, () => quickbooksService.pushUnsent())
