@@ -23,7 +23,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useMemo } from 'react';
 import {
-  Area, AreaChart, CartesianGrid, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Area, AreaChart, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import { buildSeries } from './balanceSeries';
 import { ChartTip } from '../reporting/ChartTooltip';
@@ -31,7 +31,6 @@ import { LINE_CURSOR, SERIES } from '../reporting/chartFormat';
 import { useChartMotion } from '../reporting/useChartMotion';
 
 const TREND = SERIES[0];
-const GRID  = 'var(--line)';
 const INK   = 'var(--ink)';
 const MUTED = 'var(--ink-soft)';
 
@@ -76,7 +75,6 @@ export default function BalanceChart({ movements, onHand, reorderAt = 0, unit = 
         <AreaChart data={points} margin={{ top: 12, right: 64, left: 8, bottom: 0 }}>
           {/* Hairline grid, solid: dashes here would read as a threshold,
               and there is a real one that needs to own that. */}
-          <CartesianGrid vertical={false} stroke={GRID} />
           <XAxis
             dataKey="t" type="number" scale="time" domain={[tMin, tMax]}
             ticks={tMin === tMax ? [tMin] : [tMin, tMax]} tickFormatter={fmtDate}
@@ -86,7 +84,7 @@ export default function BalanceChart({ movements, onHand, reorderAt = 0, unit = 
               comes near it should still show how far away it is. */}
           <YAxis hide domain={[(min) => Math.min(min, 0), (max) => Math.max(max, threshold, 1)]} />
           <Tooltip cursor={LINE_CURSOR} content={<BalanceTip unit={unit} />} />
-          <Area type="linear" dataKey="v" isAnimationActive={animate} stroke={TREND} strokeWidth={2} fill={TREND} fillOpacity={0.08}
+          <Area type="linear" dataKey="v" isAnimationActive={animate} stroke={TREND} strokeWidth={2} fill={TREND} fillOpacity={0.05}
             dot={false} activeDot={{ r: 4, fill: TREND, stroke: 'var(--surface)', strokeWidth: 2 }} />
           {threshold > 0 ? (
             <ReferenceLine y={threshold} stroke={MUTED} strokeDasharray="4 4"

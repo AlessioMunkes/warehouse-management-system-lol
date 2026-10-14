@@ -176,7 +176,7 @@ function ManagerLayoutShell({ children }) {
       {/* ── Sidebar ─────────────────────────────────────────── */}
       <aside
         className={`hidden shrink-0 flex-col border-r border-line bg-surface py-4 sm:flex ${
-          sidebarCollapsed ? 'w-16 px-2' : 'w-56 px-3'
+          sidebarCollapsed ? 'w-16 px-2' : 'w-60 px-3'
         } ${
           // The width animates, unless the person has asked the app to
           // stop moving — the same setting the eye button holds, two

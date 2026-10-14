@@ -13,6 +13,7 @@ import { timeGreeting } from '../features/dashboard/timeGreeting';
 import CustomisableDashboard from '../features/dashboard/CustomisableDashboard';
 import NeedsAttention from '../features/dashboard/NeedsAttention';
 import useAttention from '../features/dashboard/useAttention';
+import ImpactHeadline from '../features/dashboard/ImpactHeadline';
 
 // The greeting reads the summary even if no widget does.
 const ALWAYS = ['summary'];
@@ -36,6 +37,10 @@ export default function ManagerDashboardPage() {
         title={`${timeGreeting()}${user?.firstName ? `, ${user.firstName}` : ''}`}
         description={summary ? `Today: ${managerSummaryLine(summary)}.` : 'What would you like to work on today?'}
       />
+      {/* What the work did this month, first: the purpose before the queue. */}
+      <div className="mt-5">
+        <ImpactHeadline />
+      </div>
       {/* Above the widgets: what to act on before what to read. */}
       <div className="mb-6 mt-5">
         <NeedsAttention attention={attention} storageKey="wms.dashboard.attention.collapsed:manager" />

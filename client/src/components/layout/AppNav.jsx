@@ -26,11 +26,26 @@ import { NAV_SECTIONS, homeForRole } from './navSections';
 import useAttention from '../../features/dashboard/useAttention';
 import batchesLogo from '../../assets/Batches_Logo.jpeg';
 
+// Each section of the menu has its own colour, from the chart palette,
+// so a section reads as a place: inbound teal, outbound terracotta,
+// stock green. The icon sits on a faint tile of it. Anything not listed
+// is ink.
+const SECTION_TONE = {
+  Inbound: 'var(--viz-1)', Donations: 'var(--viz-5)', Stock: 'var(--viz-3)',
+  Outbound: 'var(--viz-2)', Programmes: 'var(--viz-4)', Insights: 'var(--viz-7)',
+  'Master data': 'var(--viz-6)', Logs: 'var(--viz-7)', Warehouse: 'var(--viz-2)',
+};
+const toneOf = (section) => SECTION_TONE[section] ?? 'var(--ink)';
+
 // `count` — how many things on this screen need dealing with, or
 // nothing. Expanded it is a number at the end of the row; collapsed, a
 // dot on the icon. Either way the accessible name says it in words, so
 // it never rests on the pill alone.
-const NavLink = ({ to, label, icon: Icon, active, collapsed, onNavigate, count }) => {
+//
+// The open item is marked by a red bar at its left edge, a bolder name
+// and its icon filled in, not by a filled block: the solid pill is what
+// every dashboard template does.
+const NavLink = ({ to, label, icon: Icon, active, collapsed, onNavigate, count, tone }) => {
   const flagged = count > 0;
   const name = flagged ? `${label}, ${count} need${count === 1 ? 's' : ''} attention` : label;
   const link = (
@@ -41,16 +56,23 @@ const NavLink = ({ to, label, icon: Icon, active, collapsed, onNavigate, count }
       // has to come from somewhere. Expanded, an aria-label is only
       // needed when there is a count to say.
       aria-label={collapsed || flagged ? name : undefined}
-      className={`flex items-center rounded-[4px] text-sm transition-colors ${
-        collapsed ? 'justify-center px-0 py-2.5' : 'gap-2.5 px-3 py-2'
+      aria-current={active ? 'page' : undefined}
+      className={`relative flex items-center rounded-lg text-sm transition-colors ${
+        collapsed ? 'justify-center px-0 py-1.5' : 'gap-2.5 py-1.5 pl-3 pr-2'
       } ${
         active
-          ? 'bg-ink text-on-ink font-medium'
-          : 'text-ink hover:bg-surface-2'
+          ? 'bg-surface-2 font-semibold text-ink'
+          : 'text-ink/85 hover:bg-surface-2/70 hover:text-ink'
       }`}
     >
-      <span className="relative shrink-0">
-        <Icon className="size-4" />
+      {active ? (
+        <span aria-hidden="true" className="absolute inset-y-1.5 left-0 w-[3px] rounded-full bg-brand" />
+      ) : null}
+      <span
+        className="relative grid size-7 shrink-0 place-items-center rounded-md"
+        style={{ background: `color-mix(in srgb, ${tone} ${active ? 22 : 13}%, transparent)`, color: tone }}
+      >
+        <Icon className="size-[18px]" weight={active ? 'fill' : 'duotone'} aria-hidden="true" />
         {collapsed && flagged ? (
           <span aria-hidden="true" className="absolute -right-1 -top-1 size-2 rounded-full bg-danger" />
         ) : null}
@@ -59,9 +81,7 @@ const NavLink = ({ to, label, icon: Icon, active, collapsed, onNavigate, count }
       {!collapsed && flagged ? (
         <span
           aria-hidden="true"
-          className={`ml-auto rounded-full px-1.5 text-[11px] font-medium tabular-nums ${
-            active ? 'bg-on-ink/20 text-on-ink' : 'bg-danger-soft text-danger'
-          }`}
+          className="ml-auto rounded-full bg-danger-soft px-1.5 text-[11px] font-medium tabular-nums text-danger"
         >
           {count > 99 ? '99+' : count}
         </span>
@@ -131,7 +151,11 @@ export const SidebarNav = ({ sections, pathname, homeTo, collapsed = false, onNa
                 ? null
                 : <div aria-hidden="true" className="mx-2 mb-3 border-t border-line" />
             ) : (
-              <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              // A plain word after a short red rule. Not grey capitals
+              // with wide letter spacing, which is the stock dashboard
+              // label.
+              <p className="mb-1.5 flex items-center gap-2 px-3 text-xs font-semibold text-ink">
+                <span aria-hidden="true" className="h-0.5 w-3 rounded-full bg-brand" />
                 {section.label}
               </p>
             )}
@@ -142,6 +166,7 @@ export const SidebarNav = ({ sections, pathname, homeTo, collapsed = false, onNa
                   {...item}
                   count={attention && item.count ? item.count(attention) : 0}
                   active={item.to === activeTo}
+                  tone={toneOf(section.label)}
                   collapsed={collapsed}
                   onNavigate={onNavigate}
                 />

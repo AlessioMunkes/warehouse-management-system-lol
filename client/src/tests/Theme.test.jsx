@@ -69,7 +69,8 @@ describe('light mode, which this script must not have changed', () => {
   // before script 45. The token is only safe because it resolves to the
   // same colour it replaced.
   const EXPECTED = {
-    '--canvas': '#faf8f5',
+    // Deepened on purpose (from #faf8f5) so borderless white cards stand off it.
+    '--canvas': '#f4efe8',
     '--surface': '#ffffff',
     '--surface-2': '#f3efe9',
     '--ink': '#2b3336',

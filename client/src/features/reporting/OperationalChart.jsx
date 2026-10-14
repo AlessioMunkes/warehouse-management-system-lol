@@ -21,7 +21,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useMemo, useState } from 'react';
 import {
-  Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line, LineChart,
+  Area, AreaChart, Bar, BarChart, Cell, ComposedChart, Legend, Line, LineChart,
   Pie, PieChart, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import { X } from 'lucide-react';
@@ -208,7 +208,14 @@ export default function OperationalChart({
   // Days of the week keep Monday to Sunday.
   const keepOrder = keepOrderProp || Boolean(meta?.ordered);
 
-  const [view, setView]       = useState(() => defaultView(views, report?.chartType, hint, meta));
+  // Something counted per period (kilograms out, deliveries, hours)
+  // opens as bars: one bar per period reads as "how much each time".
+  // A rate or an average over time stays a line.
+  const [view, setView]       = useState(() => {
+    const picked = defaultView(views, report?.chartType, hint, meta);
+    const counted = shape === 'time' && !hint && unit !== '%' && isAdditive(unit, series);
+    return counted && picked === 'line' && views.includes('bar') ? 'bar' : picked;
+  });
   const [topN, setTopN]       = useState(compact ? 8 : 10);
   const [sortBy, setSortBy]   = useState('value');
   const [showAvg, setShowAvg] = useState(false);
@@ -392,7 +399,6 @@ export default function OperationalChart({
     body = (
       <ResponsiveContainer width="100%" height={height + 30}>
         <BarChart data={twoAxis.rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} barCategoryGap="20%">
-          <CartesianGrid vertical={false} stroke={LINE} strokeOpacity={0.6} />
           <XAxis dataKey="name" tickFormatter={formatLabel} {...axisProps} />
           <YAxis tickFormatter={(v) => fmtTick(v, unit)} {...axisProps} width={52} />
           <Tooltip active={print ? false : undefined} content={<ChartTooltip unit={unit} />} cursor={print ? false : BAR_CURSOR} />
@@ -416,11 +422,22 @@ export default function OperationalChart({
   } else if (activeView === 'line' || activeView === 'area') {
     const Chart = prevSeries ? ComposedChart : activeView === 'line' ? LineChart : AreaChart;
     const hlRow = rows.find((r) => r.name === highlight);
+    // The end-of-line label, and the high and low where they are not
+    // also the last point. Not on the compact dashboard tiles, where
+    // there is no room beside the line for a label.
+    const lineMarks = [];
+    if (!compact && rows.length > 1) {
+      const last = rows[rows.length - 1];
+      const high = rows.reduce((a, b) => (b.value > a.value ? b : a));
+      const low = rows.reduce((a, b) => (b.value < a.value ? b : a));
+      if (high !== last) lineMarks.push({ kind: 'high', row: high, text: `High ${fmtTick(high.value, unit)}` });
+      if (low !== last && low !== high) lineMarks.push({ kind: 'low', row: low, text: `Low ${fmtTick(low.value, unit)}` });
+      lineMarks.push({ kind: 'last', row: last, text: fmtValue(last.value, unit) });
+    }
     body = (
       <ResponsiveContainer width="100%" height={height}>
-        <Chart data={timeRows} margin={{ top: 12, right: 12, left: 0, bottom: 0 }}
+        <Chart data={timeRows} margin={{ top: 20, right: compact ? 12 : 72, left: 0, bottom: 8 }}
           onClick={(e) => e?.activeLabel && setHighlight(e.activeLabel)}>
-          <CartesianGrid vertical={false} stroke={LINE} strokeOpacity={0.6} />
           <XAxis dataKey="name" tickFormatter={formatLabel} {...axisProps} />
           <YAxis tickFormatter={(v) => fmtTick(v, unit)} {...axisProps} width={52} />
           <Tooltip active={print ? false : undefined} content={<ChartTooltip unit={unit} />} cursor={print ? false : LINE_CURSOR} />
@@ -429,11 +446,25 @@ export default function OperationalChart({
             <Line type="monotone" dataKey="previous" name="Same period last year" stroke={MUTED} strokeWidth={2}
               strokeDasharray="5 4" dot={false} connectNulls isAnimationActive={false} />
           )}
+          {/* A plain line: no fill under it and no dot on every point.
+              The latest value is said at the end of the line, and the
+              high and low are marked where they happened, instead of a
+              row of figures above the chart. */}
           {activeView === 'line'
-            ? <Line type="monotone" dataKey="value" name="This period" stroke={SINGLE} strokeWidth={2} dot={{ r: 4, fill: SINGLE, stroke: SURF, strokeWidth: 2 }} activeDot={{ r: 6 }} isAnimationActive={animate} />
-            : <Area type="monotone" dataKey="value" name="This period" stroke={SINGLE} strokeWidth={2} fill={SINGLE} fillOpacity={0.15} isAnimationActive={animate} />}
+            ? <Line type="monotone" dataKey="value" name="This period" stroke={SINGLE} strokeWidth={2.5} strokeLinecap="round"
+                dot={false} activeDot={{ r: 5, fill: SINGLE, stroke: SURF, strokeWidth: 2 }} isAnimationActive={animate} />
+            : <Area type="monotone" dataKey="value" name="This period" stroke={SINGLE} strokeWidth={2.5} fill={SINGLE} fillOpacity={0.08} isAnimationActive={animate} />}
+          {lineMarks.map((m) => (
+            <ReferenceDot key={`mark-${m.kind}`} x={m.row.name} y={m.row.value} r={m.kind === 'last' ? 5 : 3.5}
+              fill={m.kind === 'last' ? SINGLE : SURF} stroke={SINGLE} strokeWidth={2}
+              label={{ value: m.text, position: m.kind === 'last' ? 'right' : m.kind === 'high' ? 'top' : 'bottom',
+                // On the first point it would sit on the axis figures: nudged right.
+                dx: m.kind !== 'last' && m.row === rows[0] ? 30 : 0,
+                fill: m.kind === 'last' ? INK : MUTED, fontSize: m.kind === 'last' ? 12 : 11, fontWeight: m.kind === 'last' ? 700 : 500 }} />
+          ))}
           {!compact && anomalies.map((a) => (
-            <ReferenceDot key={`anomaly-${a.name}`} x={a.name} y={a.value} r={8} fill="none" stroke="var(--rag-bad)" strokeWidth={2.5} />
+            <ReferenceDot key={`anomaly-${a.name}`} x={a.name} y={a.value} r={8} fill="none" stroke="var(--rag-bad)" strokeWidth={2.5}
+              label={{ value: 'Unusual', position: 'top', fill: 'var(--rag-bad)', fontSize: 11, fontWeight: 600 }} />
           ))}
           {hlRow && <ReferenceDot x={hlRow.name} y={hlRow.value} r={7} fill={SINGLE} stroke={INK} strokeWidth={2}
             label={{ value: fmtValue(hlRow.value, unit), position: 'top', fill: INK, fontSize: 12, fontWeight: 700 }} />}
@@ -476,7 +507,6 @@ export default function OperationalChart({
       <ResponsiveContainer width="100%" height={horizontal ? hbarHeight : height}>
         <BarChart data={withPrev ? timeRows : rows} layout={horizontal ? 'vertical' : 'horizontal'}
           margin={{ top: 12, right: horizontal ? 48 : 8, left: 0, bottom: 0 }} barCategoryGap="20%">
-          <CartesianGrid horizontal={!horizontal} vertical={horizontal} stroke={LINE} strokeOpacity={0.6} />
           {horizontal ? (
             <>
               <XAxis type="number" tickFormatter={(v) => fmtTick(v, unit)} {...axisProps} />
@@ -505,11 +535,13 @@ export default function OperationalChart({
               position: horizontal ? 'right' : 'top', fill: MUTED, fontSize: 11,
               formatter: (v) => fmtTick(v, unit),
             } : false}>
-            {rows.map((r) => (
+            {rows.map((r, i) => (
               <Cell
                 key={r.name}
                 fill={barFill(r)}
-                fillOpacity={opacityFor(r.name)}
+                // Over time, the latest period in full and the ones
+                // before it lighter: what is happening now stands out.
+                fillOpacity={highlight || !isTimeView || horizontal || i === rows.length - 1 ? opacityFor(r.name) : 0.5}
                 stroke={highlight === r.name ? INK : odd.has(r.name) && !compact ? 'var(--rag-bad)' : 'none'}
                 strokeWidth={highlight === r.name || (odd.has(r.name) && !compact) ? 2 : 0}
                 cursor="pointer"

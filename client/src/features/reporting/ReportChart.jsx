@@ -23,7 +23,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useState } from 'react';
 import {
-  Bar, BarChart, CartesianGrid, Cell, LabelList, Line, LineChart, ReferenceLine,
+  Bar, BarChart, Cell, LabelList, Line, LineChart, ReferenceLine,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import { Button } from '@/components/ui/button';
@@ -107,7 +107,6 @@ const NumberView = ({ series, unit }) => (
 const BarView = ({ rows, unit, tip, colourOf, animate }) => (
   <ResponsiveContainer width="100%" height={260}>
     <BarChart data={rows} margin={{ top: 22, right: 8, left: 8, bottom: 0 }} barCategoryGap="20%">
-      <CartesianGrid vertical={false} stroke={LINE} strokeOpacity={0.6} />
       <XAxis dataKey="name" {...axisProps} tick={<FitTick />} height={40} interval={0} />
       <YAxis hide domain={ATLEAST_ONE} />
       {tip(BAR_CURSOR)}
@@ -162,7 +161,6 @@ const LineView = ({ rows, unit, tip, animate }) => {
   return (
     <ResponsiveContainer width="100%" height={260}>
       <LineChart data={rows} margin={{ top: 24, right: 24, left: 24, bottom: 0 }}>
-        <CartesianGrid vertical={false} stroke={LINE} strokeOpacity={0.6} />
         <XAxis dataKey="name" {...axisProps} tick={<FitTick />} height={40} interval={every - 1} />
         <YAxis hide domain={ATLEAST_ONE} />
         {tip(LINE_CURSOR)}
@@ -196,7 +194,6 @@ const GroupedBarView = ({ series, unit, tip, animate }) => {
     <div>
       <ResponsiveContainer width="100%" height={260}>
         <BarChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 0 }} barCategoryGap="20%" barGap={2}>
-          <CartesianGrid vertical={false} stroke={LINE} strokeOpacity={0.6} />
           <XAxis dataKey="name" {...axisProps} tick={<FitTick />} height={40} interval={0} />
           <YAxis hide domain={ATLEAST_ONE} />
           {tip(BAR_CURSOR)}

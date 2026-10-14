@@ -19,7 +19,6 @@ import {
 import {
   Bar,
   BarChart,
-  CartesianGrid,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -751,7 +750,6 @@ export default function FinanceWarehouseReportView({ loadReport, showReset = tru
                 {hasChartData ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData} margin={{ top: 12, right: 16, left: 0, bottom: 8 }}>
-                      <CartesianGrid vertical={false} stroke="var(--line)" strokeOpacity={0.6} />
                       <XAxis dataKey="label" tickMargin={8} {...axisProps} />
                       <YAxis allowDecimals={false} {...axisProps} />
                       <Tooltip content={<ChartTooltip unit="records" labelFor={(l) => l} />} cursor={BAR_CURSOR} />

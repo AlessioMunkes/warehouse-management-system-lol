@@ -19,6 +19,7 @@
     "@fontsource/montserrat": "^5.3.0",
     "@hugeicons/core-free-icons": "^4.2.3",
     "@hugeicons/react": "^1.1.9",
+    "@phosphor-icons/react": "^2.1.10",
     "@shadcn/react": "^0.3.0",
     "@tabler/icons-webfont": "3.46.0",
     "class-variance-authority": "^0.7.1",

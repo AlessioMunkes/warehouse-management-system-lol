@@ -9,7 +9,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useMemo } from 'react';
 import {
-  Bar, BarChart, CartesianGrid, Cell, Layer, Rectangle, ResponsiveContainer, Sankey, Tooltip, XAxis, YAxis,
+  Bar, BarChart, Cell, Layer, Rectangle, ResponsiveContainer, Sankey, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import { ArrowDown } from 'lucide-react';
 import {
@@ -84,7 +84,6 @@ export function Waterfall({ series, unit, height = 300, compact = false }) {
   return (
     <ResponsiveContainer width="100%" height={height}>
       <BarChart data={rows} margin={{ top: 18, right: 8, left: 0, bottom: 0 }} barCategoryGap="18%">
-        <CartesianGrid vertical={false} stroke={LINE} strokeOpacity={0.6} />
         <XAxis dataKey="name" {...axisProps} interval={0} tickFormatter={(v) => (v.length > 14 ? `${v.slice(0, 13)}…` : v)} />
         <YAxis tickFormatter={(v) => fmtTick(v, unit)} {...axisProps} width={56} />
         <Tooltip

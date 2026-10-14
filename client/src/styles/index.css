@@ -611,7 +611,11 @@
 }
 
 :root {
-    --canvas:      #faf8f5;   /* was bg-[#faf8f5] / #f8f5f2 / #faf8f6 / #f7f3ee / #fdfcfa */
+    /* A shade deeper than it was (#faf8f5), so white cards stand off it
+       by the step in tone and a soft shadow, with no outline. */
+    --canvas:      #f4efe8;
+    /* Cards: a warm, wide, faint shadow instead of a grey ring. */
+    --card-shadow: 0 1px 2px rgb(43 51 54 / 0.04), 0 8px 24px rgb(43 51 54 / 0.06);
     --surface:     #ffffff;   /* was bg-white */
     --surface-2:   #f3efe9;   /* was bg-[#f3efe9] / #eef2f4 / #e9e3dd */
     --ink:         #2b3336;   /* was text-[#2b3336] — the brand ink, 82 sites */
@@ -671,6 +675,8 @@
 
 .dark {
     --canvas:      #14191a;
+    /* No shadow reads on a dark page; the card's lighter surface does the work. */
+    --card-shadow: none;
     --surface:     #1c2325;
     --surface-2:   #232b2e;
     --ink:         #eceeee;

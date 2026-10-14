@@ -34,12 +34,15 @@
 // may open a manager or admin screen. A screen two sides both work on
 // (Benevolent Requests, Feed the Soil) is two routes, one per side.
 // ─────────────────────────────────────────────────────────────
+// Phosphor, not lucide: the menu's icons are drawn duotone (fill when
+// the item is open) by AppNav.jsx, a look the stock shadcn set has no
+// weight for.
 import {
-  LayoutDashboard, Users2, ClipboardList, ShoppingCart, BarChart3, HeartHandshake,
-  Package, Truck, Gift, HandHeart, Boxes, ReceiptText, Activity, Archive, Inbox,
-  PackageOpen, PackageCheck, FlaskConical, ClipboardCheck, HandCoins, PhoneCall,
-  ScrollText, Sprout, MessageCircle, Settings, Landmark, CalendarDays,
-} from 'lucide-react';
+  Archive, Bank, Basket, BowlFood, CalendarDots, ChartBar, ChatCircleText,
+  ClipboardText, Flask, Gear, Gift, HandCoins, HandHeart, Package, PhoneCall, Plant,
+  Pulse, Receipt, Scroll, ShoppingCart, SquaresFour, Storefront, Tray, TrayArrowDown,
+  Truck, UsersThree, Warehouse,
+} from '@phosphor-icons/react';
 import { STAFF, ADMIN, VOLUNTEERS, PACKING, DONATIONS, LEGAL } from './paths';
 import {
   MANAGERS_UP, MANAGER_ONLY, ADMIN_ONLY, GUEST_ONLY, WORKERS_ONLY,
@@ -75,11 +78,11 @@ export const ROUTES = [
 
   // ── Dashboards ─────────────────────────────────────────────
   { id: 'managerDashboard', path: '/manager', roles: MANAGER_ONLY, shell: true,
-    nav: [nav('manager', 'Overview', 'Dashboard', LayoutDashboard)] },
+    nav: [nav('manager', 'Overview', 'Dashboard', SquaresFour)] },
   { id: 'adminDashboard', path: ADMIN.dashboard, roles: ADMIN_ONLY, shell: true,
-    nav: [nav('admin', 'Overview', 'Dashboard', LayoutDashboard)] },
+    nav: [nav('admin', 'Overview', 'Dashboard', SquaresFour)] },
   { id: 'staffHome', path: STAFF.home, roles: WORKERS_ONLY,
-    nav: [nav('worker', 'Overview', 'Dashboard', LayoutDashboard)] },
+    nav: [nav('worker', 'Overview', 'Dashboard', SquaresFour)] },
 
   // ── Inbound ────────────────────────────────────────────────
   { id: 'purchaseOrders', path: STAFF.purchaseOrders, roles: MANAGER_ONLY, shell: true,
@@ -87,39 +90,39 @@ export const ROUTES = [
       (a) => a.purchaseOrders.awaitingApproval + a.purchaseOrders.followUp
         + (a.purchaseOrders.financeEmailFailed ?? 0) + (a.purchaseOrders.needsQuickbooksMatch ?? 0))] },
   { id: 'receipts', path: STAFF.receipts, roles: MANAGER_ONLY, shell: true,
-    nav: [nav('manager', 'Inbound', 'Receipts', ReceiptText)] },
+    nav: [nav('manager', 'Inbound', 'Receipts', Receipt)] },
 
   // ── Stock ──────────────────────────────────────────────────
   { id: 'inventory', path: STAFF.inventory, roles: MANAGER_ONLY, shell: true,
-    nav: [nav('manager', 'Stock', 'Inventory', Boxes,
+    nav: [nav('manager', 'Stock', 'Inventory', Warehouse,
       (a) => a.inventory.shortfall + a.inventory.expiring)] },
   { id: 'stockLedger', path: STAFF.stockLedger, roles: MANAGER_ONLY, shell: true,
-    nav: [nav('manager', 'Stock', 'Stock ledger', ScrollText)] },
+    nav: [nav('manager', 'Stock', 'Stock ledger', Scroll)] },
 
   // ── Outbound ───────────────────────────────────────────────
   // Unclaimed slips are the queue's normal state, so only pallets not
   // collected are counted.
   { id: 'pickingSlips', path: STAFF.pickingSlips, roles: MANAGER_ONLY, shell: true,
-    nav: [nav('manager', 'Outbound', 'Picking slips', ClipboardList, (a) => a.pickingSlips.notCollected)] },
+    nav: [nav('manager', 'Outbound', 'Picking slips', ClipboardText, (a) => a.pickingSlips.notCollected)] },
   { id: 'beneficiaries', path: STAFF.beneficiaries, roles: MANAGER_ONLY, shell: true,
-    nav: [nav('manager', 'Outbound', 'Beneficiaries', Users2)] },
+    nav: [nav('manager', 'Outbound', 'Beneficiaries', UsersThree)] },
   { id: 'collectionReminders', path: STAFF.collectionReminders, roles: MANAGER_ONLY, shell: true,
-    nav: [nav('manager', 'Outbound', 'Collection reminders', MessageCircle)] },
+    nav: [nav('manager', 'Outbound', 'Collection reminders', ChatCircleText)] },
   { id: 'operatingCalendar', path: STAFF.operatingCalendar, roles: MANAGER_ONLY, shell: true,
-    nav: [nav('manager', 'Outbound', 'Operating calendar', CalendarDays)] },
+    nav: [nav('manager', 'Outbound', 'Operating calendar', CalendarDots)] },
 
   // ── The warehouse floor (warehouse staff only) ──────────────
   { id: 'receiving', path: STAFF.receiving, roles: WORKERS_ONLY,
-    nav: [nav('worker', 'Warehouse', 'Receiving', PackageOpen)] },
+    nav: [nav('worker', 'Warehouse', 'Receiving', TrayArrowDown)] },
   { id: 'deliveries', path: STAFF.deliveries, roles: WORKERS_ONLY },
   { id: 'packing', path: PACKING.board, roles: WORKERS_ONLY,
-    nav: [nav('worker', 'Warehouse', 'Packing', PackageCheck)] },
+    nav: [nav('worker', 'Warehouse', 'Packing', Package)] },
   { id: 'packingDetail', path: PACKING.detailPattern, roles: WORKERS_ONLY },
   { id: 'decanting', path: STAFF.decanting, roles: WORKERS_ONLY,
-    nav: [nav('worker', 'Warehouse', 'Decanting', FlaskConical)] },
+    nav: [nav('worker', 'Warehouse', 'Decanting', Flask)] },
   { id: 'decantingRecords', path: STAFF.decantingRecords, roles: WORKERS_ONLY },
   { id: 'dispatch', path: STAFF.dispatch, roles: WORKERS_ONLY,
-    nav: [nav('worker', 'Warehouse', 'Dispatch', ClipboardCheck)] },
+    nav: [nav('worker', 'Warehouse', 'Dispatch', Truck)] },
   { id: 'dispatchHistory', path: STAFF.dispatchHistory, roles: WORKERS_ONLY },
   { id: 'donationIntake', path: STAFF.donation, roles: WORKERS_ONLY,
     nav: [nav('worker', 'Warehouse', 'Donation intake', HandCoins)] },
@@ -128,13 +131,13 @@ export const ROUTES = [
   { id: 'floorRequests', path: STAFF.floorRequests, roles: WORKERS_ONLY,
     nav: [nav('worker', 'Warehouse', 'Benevolent requests', PhoneCall)] },
   { id: 'floorFeedTheSoil', path: STAFF.floorFeedTheSoil, roles: WORKERS_ONLY,
-    nav: [nav('worker', 'Warehouse', 'Feed the Soil', Sprout)] },
+    nav: [nav('worker', 'Warehouse', 'Feed the Soil', Plant)] },
 
   // ── The manager's side of those two programmes ─────────────
   { id: 'communityRequests', path: STAFF.communityRequests, roles: MANAGER_ONLY, shell: true,
     nav: [nav('manager', 'Outbound', 'Benevolent requests', PhoneCall, (a) => (a.communityRequests.pending ?? 0) + (a.communityRequests.needsItems ?? 0) + (a.communityRequests.overdue ?? 0))] },
   { id: 'feedTheSoil', path: STAFF.feedTheSoil, roles: MANAGER_ONLY, shell: true,
-    nav: [nav('manager', 'Programmes', 'Feed the Soil', Sprout, (a) => a.feedTheSoil?.idleKits ?? 0)] },
+    nav: [nav('manager', 'Programmes', 'Feed the Soil', Plant, (a) => a.feedTheSoil?.idleKits ?? 0)] },
 
   // ── Programmes ─────────────────────────────────────────────
   { id: 'volunteerEvents', path: VOLUNTEERS.events, roles: MANAGER_ONLY, shell: true,
@@ -143,25 +146,25 @@ export const ROUTES = [
 
   // ── Insights ───────────────────────────────────────────────
   { id: 'reporting', path: STAFF.reporting, roles: MANAGER_ONLY, shell: true,
-    nav: [nav('manager', 'Insights', 'Operations reports', BarChart3)] },
+    nav: [nav('manager', 'Insights', 'Operations reports', ChartBar)] },
   { id: 'impactReport', path: STAFF.impactReport, roles: MANAGER_ONLY, shell: true,
-    nav: [nav('manager', 'Insights', 'Impact report', HeartHandshake)] },
+    nav: [nav('manager', 'Insights', 'Impact report', BowlFood)] },
 
   // ── Admin ──────────────────────────────────────────────────
   { id: 'users', path: ADMIN.users, roles: ADMIN_ONLY, shell: true,
-    nav: [nav('admin', 'Master data', 'Users', Users2)] },
+    nav: [nav('admin', 'Master data', 'Users', UsersThree)] },
   { id: 'products', path: ADMIN.products, roles: ADMIN_ONLY, shell: true,
-    nav: [nav('admin', 'Master data', 'Products', Package)] },
+    nav: [nav('admin', 'Master data', 'Products', Basket)] },
   { id: 'suppliers', path: ADMIN.suppliers, roles: ADMIN_ONLY, shell: true,
-    nav: [nav('admin', 'Master data', 'Suppliers', Truck)] },
+    nav: [nav('admin', 'Master data', 'Suppliers', Storefront)] },
   // Staff activity and the door sign-in log. Managers use Volunteer
   // Events instead.
   { id: 'activityLog', path: ADMIN.activityLog, roles: ADMIN_ONLY, shell: true,
-    nav: [nav('admin', 'Logs', 'Activity log', Activity)] },
+    nav: [nav('admin', 'Logs', 'Activity log', Pulse)] },
   { id: 'archive', path: ADMIN.archive, roles: ADMIN_ONLY, shell: true,
     nav: [nav('admin', 'Logs', 'Archive', Archive)] },
   { id: 'messageHistory', path: ADMIN.messageHistory, roles: ADMIN_ONLY, shell: true,
-    nav: [nav('admin', 'Logs', 'Message history', Inbox)] },
+    nav: [nav('admin', 'Logs', 'Message history', Tray)] },
   // The queue is run by managers and admins together, so it is in both menus.
   { id: 'donationManagement', path: ADMIN.donationManagement, roles: MANAGERS_UP, shell: true,
     nav: [
@@ -170,8 +173,8 @@ export const ROUTES = [
     ] },
   { id: 'section18a', path: ADMIN.section18aManagement, roles: MANAGERS_UP, shell: true,
     nav: [
-      nav('admin', 'Donations', 'Section 18A', ScrollText),
-      nav('manager', 'Donations', 'Section 18A', ScrollText),
+      nav('admin', 'Donations', 'Section 18A', Scroll),
+      nav('manager', 'Donations', 'Section 18A', Scroll),
     ] },
   // Settings' Email section, at the address Google's sign-in returns to
   // and older links use. Listed in the menu as Settings.
@@ -179,10 +182,10 @@ export const ROUTES = [
   // The warehouse movement report finance works from. It was routed
   // but in no menu; listed beside the dashboard.
   { id: 'financeReport', path: ADMIN.financeReport, roles: ADMIN_ONLY, shell: true,
-    nav: [nav('admin', 'Overview', 'Finance report', Landmark)] },
+    nav: [nav('admin', 'Overview', 'Finance report', Bank)] },
 
   { id: 'settings', path: ADMIN.settings, roles: ADMIN_ONLY, shell: true,
-    nav: [nav('admin', 'Setup', 'Settings', Settings)] },
+    nav: [nav('admin', 'Setup', 'Settings', Gear)] },
 
   // ── Guests (Love Activist volunteers) ──────────────────────
   { id: 'guestHome', path: '/guest-home', roles: GUEST_ONLY },
