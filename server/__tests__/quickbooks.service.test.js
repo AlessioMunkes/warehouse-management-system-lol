@@ -54,6 +54,7 @@ const intuit = vi.fn(async (url, init = {}) => {
     if (/from Vendor/.test(q)) return reply(200, { QueryResponse: { Vendor: world.vendors.filter((v) => q.includes(`'${v.DisplayName}'`)) } });
     if (/from Item/.test(q)) return reply(200, { QueryResponse: { Item: world.items.filter((i) => q.includes(`'${i.Name}'`)) } });
     if (/from Account/.test(q)) return reply(200, { QueryResponse: { Account: world.accounts } });
+    if (/from PurchaseOrder where TxnDate/.test(q)) return reply(200, { QueryResponse: { PurchaseOrder: world.orders } });
     if (/from PurchaseOrder/.test(q)) return reply(200, { QueryResponse: { PurchaseOrder: world.orders.filter((o) => q.includes(`'${o.DocNumber}'`)) } });
   }
   if (u.pathname.endsWith('/purchaseorder') && init.method === 'POST') return world.create(JSON.parse(init.body));
@@ -91,7 +92,7 @@ beforeEach(() => {
   calls = [];
   world = {
     vendors: [{ Id: '56', DisplayName: 'Cape Dry Goods', Active: true }],
-    items: [{ Id: '11', Name: 'Rice 2 kg', Active: true }, { Id: '12', Name: 'Baked beans 410 g', Active: true }],
+    items: [{ Id: '11', Name: 'Rice 2 kg', Active: true, ExpenseAccountRef: { value: '60' } }, { Id: '12', Name: 'Baked beans 410 g', Active: true, ExpenseAccountRef: { value: '60' } }],
     accounts: [{ Id: '33', Name: 'Accounts Payable (A/P)' }],
     orders: [],
     token: () => reply(200, { access_token: 'access-1', refresh_token: 'refresh-1', token_type: 'bearer', expires_in: 3600, x_refresh_token_expires_in: 8640000 }),
@@ -246,6 +247,68 @@ describe('sending an approved order', () => {
     expect(repo.saveLink).toHaveBeenCalledWith(28, { qboId: 'PO-2026-0028', syncToken: '3' });
   });
 
+  describe('an order Finance already captured by hand', () => {
+    const captured = (note, over = {}) => ({ Id: '800', DocNumber: '1099', SyncToken: '1', PrivateNote: note, ...over });
+
+    it('is linked, not made twice, when our number is in its private memo', async () => {
+      world.orders = [captured('PO-2026-0028')];
+      expect(await service.pushPurchaseOrder(28)).toEqual({ state: 'synced', quickbooksPoId: '1099' });
+      expect(posts()).toHaveLength(0);
+      expect(repo.saveLink).toHaveBeenCalledWith(28, { qboId: '1099', syncToken: '1' });
+    });
+
+    it.each([
+      ['lower case', 'po-2026-0028'],
+      ['padded with spaces', '  PO-2026-0028  '],
+      ['spaces around the dashes', 'PO - 2026 - 0028'],
+      ['inside other words', 'Maize drive, PO-2026-0028, urgent'],
+    ])('reads the memo the way the file import does: %s', async (_label, note) => {
+      world.orders = [captured(note)];
+      expect(await service.pushPurchaseOrder(28)).toMatchObject({ state: 'synced', quickbooksPoId: '1099' });
+      expect(posts()).toHaveLength(0);
+    });
+
+    it.each([
+      ['glued to a letter', 'REPO-2026-0028'],
+      ["someone else's number", 'PO-2026-0029'],
+      ['a row naming two orders', 'PO-2026-0028 and PO-2026-0029'],
+      ['an empty memo', ''],
+      ['no memo at all', undefined],
+    ])('does not take %s for ours, and creates the order', async (_label, note) => {
+      world.orders = [captured(note)];
+      expect(await service.pushPurchaseOrder(28)).toMatchObject({ state: 'synced', quickbooksPoId: 'PO-2026-0028' });
+      expect(posts()).toHaveLength(1);
+    });
+
+    it('prefers a match on the number QuickBooks was given, without reading memos at all', async () => {
+      world.orders = [{ Id: '777', DocNumber: 'PO-2026-0028', SyncToken: '3' }];
+      await service.pushPurchaseOrder(28);
+      expect(calls.some((c) => /TxnDate/.test(c.url.searchParams.get('query') ?? ''))).toBe(false);
+    });
+
+    it('holds the order, creating nothing, when two QuickBooks orders carry our number', async () => {
+      world.orders = [captured('PO-2026-0028'), captured('po-2026-0028', { Id: '801', DocNumber: '1100' })];
+      const result = await service.pushPurchaseOrder(28);
+      expect(result.state).toBe('needs_match');
+      expect(result.message).toMatch(/More than one QuickBooks purchase order.*1099, 1100/);
+      expect(posts()).toHaveLength(0);
+      expect(repo.saveLink).not.toHaveBeenCalled();
+      expect(repo.recordSync).toHaveBeenCalledWith(28, expect.objectContaining({ state: 'needs_match', detail: { duplicates: ['1099', '1100'] } }));
+    });
+
+    it('does not move a number that already belongs to another order', async () => {
+      world.orders = [captured('PO-2026-0028')];
+      repo.saveLink.mockResolvedValue(false);
+      expect(await service.pushPurchaseOrder(28)).toMatchObject({ state: 'failed', message: expect.stringMatching(/already linked to another order/) });
+    });
+
+    it('only reads orders from a few days before ours was raised', async () => {
+      await service.pushPurchaseOrder(28);
+      const read = calls.map((c) => c.url.searchParams.get('query')).find((q) => /TxnDate/.test(q ?? ''));
+      expect(read).toMatch(/TxnDate >= '2026-10-07'/);   // PO.created_at is 10 Oct
+    });
+  });
+
   it('leaves an order that is already linked alone', async () => {
     poRepo.getPurchaseOrderById.mockResolvedValue({ ...PO, quickbooks_po_id: 'QB-555' });
     expect(await service.pushPurchaseOrder(28)).toMatchObject({ state: 'synced', quickbooksPoId: 'QB-555' });
@@ -260,13 +323,50 @@ describe('sending an approved order', () => {
     expect(calls).toHaveLength(0);   // nothing asked of Intuit since connecting
   });
 
-  it('records a refusal with what QuickBooks said, to try again', async () => {
+  it('holds a refusal for a person, with what QuickBooks said and the products it may be about', async () => {
     world.create = () => reply(400, { Fault: { Error: [{ Message: 'Object Not Found', Detail: 'Item 12 is inactive' }] } });
     const result = await service.pushPurchaseOrder(28);
-    expect(result.state).toBe('failed');
+    expect(result.state).toBe('refused');
     expect(result.message).toMatch(/Object Not Found: Item 12 is inactive/);
+    expect(result.message).toMatch(/"Rice 2 kg", "Baked beans 410 g"/);
+    expect(result.message).toMatch(/send this order again/);
     expect(repo.saveLink).not.toHaveBeenCalled();
-    expect(repo.recordSync).toHaveBeenCalledWith(28, expect.objectContaining({ state: 'failed' }));
+    // 'refused', not 'failed': the daily retry only takes up 'failed'
+    expect(repo.recordSync).toHaveBeenCalledWith(28, expect.objectContaining({ state: 'refused', detail: { items: ['Rice 2 kg', 'Baked beans 410 g'] } }));
+    expect(repo.recordSync).not.toHaveBeenCalledWith(28, expect.objectContaining({ state: 'failed' }));
+  });
+
+  it('names the product whose item has no expense account, and creates nothing', async () => {
+    // What QuickBooks answers with "Select an account for this transaction", not saying which.
+    delete world.items[1].ExpenseAccountRef;
+    const result = await service.pushPurchaseOrder(28);
+    expect(result.state).toBe('refused');
+    expect(result.items).toEqual(['Baked beans 410 g']);
+    expect(result.message).toMatch(/expense account on this item/);
+    expect(result.message).toMatch(/"Baked beans 410 g"/);
+    expect(result.message).not.toMatch(/Rice 2 kg/);
+    expect(posts()).toHaveLength(0);
+    expect(repo.recordSync).toHaveBeenCalledWith(28, expect.objectContaining({ state: 'refused', detail: { items: ['Baked beans 410 g'] } }));
+  });
+
+  it('names every product without an expense account', async () => {
+    delete world.items[0].ExpenseAccountRef; delete world.items[1].ExpenseAccountRef;
+    const result = await service.pushPurchaseOrder(28);
+    expect(result.items).toEqual(['Rice 2 kg', 'Baked beans 410 g']);
+    expect(result.message).toMatch(/these items/);
+  });
+
+  it('a manager pressing Send again after fixing it sends the order', async () => {
+    delete world.items[1].ExpenseAccountRef;
+    expect((await service.pushPurchaseOrder(28)).state).toBe('refused');
+    world.items[1].ExpenseAccountRef = { value: '60' };      // fixed in QuickBooks
+    expect((await service.pushPurchaseOrder(28)).state).toBe('synced');
+    expect(posts()).toHaveLength(1);
+  });
+
+  it('still tries a failure on the QuickBooks side again later: busy and sign-in problems stay "failed"', async () => {
+    world.create = () => reply(503, {});
+    expect((await service.pushPurchaseOrder(28)).state).toBe('failed');
   });
 
   it('says to reconnect when QuickBooks no longer accepts the connection', async () => {

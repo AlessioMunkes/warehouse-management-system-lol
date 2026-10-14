@@ -19,6 +19,23 @@ export const MAX_QUICKBOOKS_NUMBER_LENGTH = 50;
 // po_number column default).
 export const PO_NUMBER_RE = /^PO-\d{4}-\d{4,}$/;
 
+// Our PO number, wherever it is in a piece of text. The SAME pattern the
+// import dialog reads a QuickBooks export with (client/src/features/
+// purchaseOrders/quickbooksImport.js, pinned together by a test):
+// PO-YYYY-NNNN with 4 or more digits, any case, spaces allowed around the
+// dashes, and not glued to a letter or digit before it ("REPO-2026-0001")
+// or to more digits after it. Returned upper-cased, once each, in order.
+const PO_PATTERN = /(?<![A-Za-z0-9])PO\s*-\s*(\d{4})\s*-\s*(\d{4,})(?!\d)/gi;
+
+export const findPoNumbers = (text) => {
+  const found = [];
+  for (const m of String(text ?? '').matchAll(PO_PATTERN)) {
+    const po = `PO-${m[1]}-${m[2]}`;
+    if (!found.includes(po)) found.push(po);
+  }
+  return found;
+};
+
 export const tooManyRowsMessage = (count) =>
   `That file has ${count} rows to link. Import up to ${MAX_IMPORT_ROWS} at a time: split the file and import it in parts.`;
 

@@ -160,7 +160,8 @@ export const findVendor = async (session, name) => {
 
 /** The product or service in QuickBooks with exactly this name, or null. */
 export const findItem = async (session, name) => {
-  const rows = await query(session, `select Id, Name, Active from Item where Name = ${quote(name)}`, 'Item');
+  // select * so the item's accounts come back: a purchase order line needs the item to have an expense account.
+  const rows = await query(session, `select * from Item where Name = ${quote(name)}`, 'Item');
   return rows.find((i) => i.Active !== false) ?? null;
 };
 
@@ -174,6 +175,24 @@ export const findPayablesAccount = async (session) => {
 export const findPurchaseOrder = async (session, docNumber) => {
   const rows = await query(session, `select Id, DocNumber, SyncToken from PurchaseOrder where DocNumber = ${quote(docNumber)}`, 'PurchaseOrder');
   return rows[0] ?? null;
+};
+
+/**
+ * Purchase orders dated on or after a day, with their private memo (the
+ * field the report calls Memo, and where Finance types our number).
+ * PrivateNote cannot be searched in a query, so they are read and
+ * filtered by the caller. Pages of 1000, at most five.
+ */
+export const listPurchaseOrdersSince = async (session, day) => {
+  const out = [];
+  for (let page = 0; page < 5; page += 1) {
+    const rows = await query(session,
+      `select * from PurchaseOrder where TxnDate >= ${quote(day)} orderby TxnDate startposition ${1 + page * 1000} maxresults 1000`,
+      'PurchaseOrder');
+    out.push(...rows);
+    if (rows.length < 1000) break;
+  }
+  return out;
 };
 
 export const createPurchaseOrder = async (session, purchaseOrder) => {
@@ -191,5 +210,5 @@ export const companyName = async (session) => {
 
 export default {
   setFetch, authorizeUrl, exchangeCode, refreshTokens, revoke, quote,
-  findVendor, findItem, findPayablesAccount, findPurchaseOrder, createPurchaseOrder, companyName,
+  findVendor, findItem, findPayablesAccount, findPurchaseOrder, listPurchaseOrdersSince, createPurchaseOrder, companyName,
 };
