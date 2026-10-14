@@ -20,11 +20,9 @@ import recordsRepo from '../repositories/reportingRecords.repository.js';
 import processRepo from '../repositories/reportingProcess.repository.js';
 import { buildProcess } from '../features/reporting/processMining.js';
 import { buildFlow } from '../features/reporting/processFlow.js';
-import planningRepo from '../repositories/reportingPlanning.repository.js';
 import { buildReorderPlan, HORIZONS } from '../features/reporting/reorderPlan.js';
 import stockCoverRepo from '../repositories/stockCover.repository.js';
 import { assess, alignWeeks, completeWeeks, rankAlerts } from '../features/reporting/controlLimits.js';
-import { buildWorkload } from '../features/reporting/workload.js';
 import { OPERATIONAL_INSIGHTS } from '../features/reporting/operationalInsights.js';
 import {
   METRICS, DIMENSIONS, FILTERS, CACHE_TTL, getMetric, isSnapshot, describeSpec, COHORTS, BENEFICIARY_KINDS,
@@ -145,7 +143,7 @@ const runReport = async (input) => {
   if (metric.flows && metric.flows === spec.dimension) meta.flows = true;
   if (metric.rag) meta.rag = metric.rag;
   if (spec.dimension === 'weekday') { meta.ordered = true; meta.preferView = 'bar'; }
-  if (spec.dimension === 'week_weekday') meta.preferView = 'heatmap';
+  if (spec.dimension === 'week_weekday' || spec.dimension === 'hour_weekday') meta.preferView = 'heatmap';
   // Its bars can be clicked through to the report behind them.
   // Every way a bar of this report can be opened, for the page's
   // drill buttons. See features/reporting/drillDown.js.
@@ -412,16 +410,7 @@ const exceptionAlerts = async ({ weeks } = {}) => {
   };
 };
 
-// WORKLOAD HEATMAP: recorded work by weekday and hour, per area
-// (features/reporting/workload.js).
-const workload = async ({ dateRange } = {}) => {
-  const from = dateRange?.from;
-  const to = dateRange?.to;
-  const real = (d) => typeof d === 'string' && ISO_DAY.test(d) && !Number.isNaN(Date.parse(`${d}T00:00:00Z`));
-  if (!real(from) || !real(to)) throw fail(400, 'Choose a start and an end date.');
-  if (from > to) throw fail(400, 'The start date is after the end date.');
-  if ((Date.parse(to) - Date.parse(from)) / 86400000 > MAX_PROCESS_DAYS) throw fail(400, 'Choose a period of about a year or less.');
-  return buildWorkload(await planningRepo.listWorkload({ from, to }), { from, to });
-};
+// Workload is the `workload` report in reportCatalog.js now, run
+// through runReport like any other (features/reporting/workload.js).
 
-export default { getCatalog, runReport, drillDown, records, filterOptions, processMap, reorderPlan, exceptionAlerts, workload, todayISO, setFactor, getFactorHistory };
+export default { getCatalog, runReport, drillDown, records, filterOptions, processMap, reorderPlan, exceptionAlerts, todayISO, setFactor, getFactorHistory };

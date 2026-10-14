@@ -26,6 +26,8 @@
 // only ever touched DATE columns.
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
+import { listWorkload } from './reportingPlanning.repository.js';
+import { workloadSeries } from '../features/reporting/workload.js';
 import opsRepo from './reportingOps.repository.js';
 import { committedStockSql } from './committedStock.sql.js';
 import {
@@ -931,7 +933,17 @@ const getFactor = async (key) => {
   return rows[0] ? { ...rows[0], value: Number(rows[0].value) } : null;
 };
 
+// ══ Workload ═══════════════════════════════════════════════════
+// Recorded work by weekday and hour, averaged per weekday. The counting
+// is reportingPlanning.repository's; the shaping is workload.js's.
+const workload = async ({ dimension, filters, dateRange }) => {
+  const area = filters?.work_area ?? null;
+  const rows = await listWorkload({ from: dateRange.from, to: dateRange.to, area });
+  return workloadSeries(rows, { dimension, area, from: dateRange.from, to: dateRange.to });
+};
+
 export default {
+  workload,
   childrenReached, mealsEnabled, mealsServedByGroup, adultsReached, dignityKitchenServed, communityServed,
   paperSaved, compostProcessed,
   dispatchVolume, collectionCompliance,

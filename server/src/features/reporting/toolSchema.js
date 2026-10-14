@@ -230,6 +230,7 @@ A scatter plot is only available for the comparisons above. If the user asks for
 CHART TYPES
 If the user names a kind of chart (pie, donut, stacked, heatmap, pareto, funnel, waterfall, sankey, area, table), pass it as chart_type on run_report. Choose a breakdown that suits it: donut and pareto need a category breakdown, stacked and heatmap need a two-way breakdown such as month_supplier.
 
+Workload and staffing: workload breaks recorded work down by hour_weekday (an hour of the day by weekday heatmap) or weekday, filtered by work_area (receiving, packing, gate) or for the whole floor. Use it for workload, busiest hours, peak times and rostering, with chart_type heatmap.
 Busiest days: dispatch_volume, goods_received and stock_movement_volume break down by weekday (Monday to Sunday) and by week_weekday (a week by day heatmap). Use weekday for "which day is busiest", and week_weekday with chart_type heatmap for "a heatmap of days".
 Pipelines (purchase_order_pipeline by po_status, slip_pipeline by slip_status, section18a_pipeline by s18a_status) are drawn as a funnel by default.
 stock_flow is a waterfall from opening to closing stock. days_of_cover forecasts when each product runs out. donation_routing by category_flow is a flow diagram from donation category to where the items ended up.

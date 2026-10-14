@@ -113,8 +113,6 @@ const processMap = async (req, res) => {
 const reorderPlan = wrap((req) => reportingService.reorderPlan({ horizonWeeks: req.query.weeks }), 'Failed to work out the reorder plan.');
 // GET /api/reporting/alerts?weeks=12 — weekly measures outside their control limits.
 const exceptionAlerts = wrap((req) => reportingService.exceptionAlerts({ weeks: req.query.weeks }), 'Failed to work out the exception alerts.');
-// POST /api/reporting/workload  { dateRange } — recorded work by weekday and hour.
-const workload = wrap((req) => reportingService.workload(req.body ?? {}), 'Failed to work out the workload.');
 
 const drill = async (req, res) => {
   try {
@@ -235,7 +233,7 @@ const getFactorHistory = async (req, res) => {
 };
 
 export default {
-  drill, records, filterOptions, processMap, reorderPlan, exceptionAlerts, workload, listSaved, createSaved, updateSaved, removeSaved, sendSaved,
+  drill, records, filterOptions, processMap, reorderPlan, exceptionAlerts, listSaved, createSaved, updateSaved, removeSaved, sendSaved,
   getCatalog, runReport, ask, insight, getComparisons, runComparison, getTargets, setTarget,
   setFactor, getFactorHistory,
 };

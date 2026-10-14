@@ -60,6 +60,7 @@ const KEYWORDS = {
   community_response_time:    ['response time', 'respond', 'resolve requests', 'how quickly', 'answer requests'],
   volunteer_hours:            ['volunteer hours', 'volunteers', 'volunteer'],
   volunteer_event_attendance: ['attendance', 'event', 'events', 'checked in', 'no-shows'],
+  workload:                   ['workload', 'busiest hour', 'busiest hours', 'busiest time', 'busy hours', 'peak hour', 'peak hours', 'peak time', 'staffing', 'roster', 'rostering', 'how busy', 'time of day', 'when is', 'more staff', 'staff on', 'more people', 'the floor'],
 };
 
 // Scatter plots: a "vs / against / scatter" question naming the pair.
@@ -77,6 +78,7 @@ const DIMENSION_WORDS = [
   [/\bsuppliers?\b/, ['supplier', 'month_supplier']],
   [/\b(centres?|centers?|ecds?|schools?)\b/, ['ecd_centre']],
   [/\bproducts?|items?\b/, ['product']],
+  [/\b(hours?|hourly|time of day|times?|heat ?map|roster(ing)?|staffing)\b/, ['hour_weekday']],
   [/\b(day of (the )?week|week ?days?|busiest days?|busy days?|which days?|quiet days?)\b/, ['weekday']],
   [/\bcohorts?|tuesdays?|thursdays?|pickup days?\b/, ['cohort']],
   [/\bstatus\b/, ['po_status', 'slip_status', 's18a_status', 'routing_status', 'outcome']],
@@ -87,6 +89,13 @@ const DIMENSION_WORDS = [
   [/\bevents?\b/, ['event']],
   [/\bbeneficiar(y|ies)|soup kitchens?\b/, ['beneficiary', 'month_beneficiary']],
   [/\btotal|overall|how much|how many\b/, ['none']],
+];
+
+// Which area of the floor a workload question is about.
+const WORK_AREA_WORDS = [
+  [/\b(receiving|deliver(y|ies)|goods in|bay)\b/, 'receiving'],
+  [/\b(packing|picking|packers?|pickers?|pack|pick)\b/, 'packing'],
+  [/\b(gate|dispatch|collections?|released?)\b/, 'gate'],
 ];
 
 const CHART_WORDS = [
@@ -256,12 +265,19 @@ export const matchQuestion = (question, todayISO) => {
   if (chartHint === 'funnel' && metric.funnel) dimension = metric.funnel.dimension;
   if (chartHint === 'sankey' && metric.flows) dimension = metric.flows;
 
+  // Workload: the area of the floor, when the question names one.
+  const filters = {};
+  if (metric.id === 'workload') {
+    const area = WORK_AREA_WORDS.find(([re]) => re.test(q))?.[1];
+    if (area) filters.work_area = area;
+  }
+
   return {
     kind: 'report',
     spec: {
       metric: metric.id,
       dimension,
-      filters: {},
+      filters,
       dateRange: metric.temporal === 'snapshot' ? undefined : resolveDates(question, todayISO),
     },
     chartHint,

@@ -32,6 +32,7 @@ import { committedStockSql } from './committedStock.sql.js';
 import { COLLECTED_STATUSES, NOT_COLLECTED_STATUSES, SAST } from '../features/reporting/reportCatalog.js';
 import { OPEN_PO_STATUSES } from '../constants/purchaseOrderStatus.js';
 import { listExpiringLots } from './shelfLots.repository.js';
+import { WORK_SQL } from './reportingPlanning.repository.js';
 
 export const MAX_RECORDS = 500;
 
@@ -56,6 +57,24 @@ const PRODUCT_FILTERS = {
 const col = (key, label, kind, sql) => ({ key, label, kind, sql });
 
 const FAMILIES = {
+  // One piece of recorded work on the floor: a delivery received, a
+  // line picked or flagged, a pallet released. What the workload
+  // heatmap counts (reportingPlanning.repository.js WORK_SQL). No
+  // person is named.
+  work: {
+    noun: 'pieces of work',
+    from: `${WORK_SQL} w`,
+    date: `w.at::date`,
+    columns: [
+      col('at', 'When', 'datetime', `to_char(w.at, 'YYYY-MM-DD HH24:MI')`),
+      col('day', 'Day', 'text', `to_char(w.at, 'Dy')`),
+      col('area', 'Area', 'text', `CASE w.area WHEN 'receiving' THEN 'Receiving' WHEN 'packing' THEN 'Picking and packing' ELSE 'Dispatch gate' END`),
+      col('what', 'What', 'text', `w.what`),
+    ],
+    filters: { work_area: `w.area = $?` },
+    order: `1 DESC`,
+  },
+
   // One line of one pallet, as loaded at the gate.
   dispatch_lines: {
     noun: 'gate lines',
@@ -379,6 +398,7 @@ const FAMILIES = {
 // `date` overrides the family's date; `noDate` lists a live report's
 // rows whatever the period.
 export const REPORT_RECORDS = {
+  workload:                   { family: 'work' },
   dispatch_volume:            { family: 'dispatch_lines', where: [`de.status IN (${inList(COLLECTED_STATUSES)})`] },
   gate_load_variance:         { family: 'dispatch_lines' },
   collection_compliance:      { family: 'pallets', where: [`ps.status IN ('complete', 'dispatched')`] },

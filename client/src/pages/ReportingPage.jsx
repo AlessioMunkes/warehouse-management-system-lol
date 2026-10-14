@@ -38,7 +38,6 @@ import RecordsPanel from '../features/reporting/RecordsPanel';
 import ProcessMap from '../features/reporting/ProcessMap';
 import ReorderPlanner from '../features/reporting/ReorderPlanner';
 import ExceptionAlerts from '../features/reporting/ExceptionAlerts';
-import WorkloadHeatmap from '../features/reporting/WorkloadHeatmap';
 import { SavedReportsBar, SaveReport } from '../features/reporting/SavedReports';
 import ChartNote from '../features/reporting/ChartNote';
 
@@ -55,7 +54,6 @@ const TABS = [
   { id: 'process',  label: 'Process map' },
   { id: 'reorder',  label: 'Reorder planner' },
   { id: 'alerts',   label: 'Exception alerts' },
-  { id: 'workload', label: 'Workload' },
   { id: 'upload',   label: 'Chart a spreadsheet' },
 ];
 
@@ -711,12 +709,6 @@ export default function ReportingPage() {
       {opened.alerts && (
         <div hidden={tab !== 'alerts'}>
           <ExceptionAlerts onOpenReport={(id) => runMetric(id, 'week')} />
-        </div>
-      )}
-
-      {opened.workload && (
-        <div hidden={tab !== 'workload'}>
-          <WorkloadHeatmap />
         </div>
       )}
 

@@ -34,7 +34,6 @@ vi.mock('../features/reporting/OperationalInsight', () => stub('the insight'));
 vi.mock('../features/reporting/ProcessMap', () => stub('the process map'));
 vi.mock('../features/reporting/DataUpload', () => stub('the spreadsheet chart'));
 vi.mock('../features/reporting/ReorderPlanner', () => stub('the reorder planner'));
-vi.mock('../features/reporting/WorkloadHeatmap', () => stub('the workload heatmap'));
 vi.mock('../features/reporting/ExceptionAlerts', () => ({
   default: ({ onOpenReport }) => <button type="button" onClick={() => onOpenReport('dispatch_volume')}>open flagged report</button>,
 }));
@@ -65,9 +64,14 @@ describe('the tabs on Operations reports', () => {
     expect(screen.queryByText('the reorder planner')).not.toBeInTheDocument();
     await userEvent.click(tab('Reorder planner'));
     expect(screen.getByText('the reorder planner')).toBeVisible();
-    await userEvent.click(tab('Workload'));
-    expect(screen.getByText('the workload heatmap')).toBeVisible();
+    await userEvent.click(tab('Exception alerts'));
     expect(screen.getByText('the reorder planner')).not.toBeVisible();
+  });
+
+  // Workload is a report the AI draws as a heatmap now, not a tab.
+  it('has no Workload tab', async () => {
+    await show();
+    expect(screen.queryByRole('tab', { name: 'Workload' })).toBeNull();
   });
 
   it('opens a flagged measure as its weekly report on the Reports tab', async () => {

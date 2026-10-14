@@ -80,7 +80,7 @@ const daysBetween = (a, b) => (new Date(`${b}T00:00:00Z`) - new Date(`${a}T00:00
 // Breakdowns a drill can land on: one plain category. Not a total, not
 // a two-way grid, not a diagram.
 const isCategory = (d) => !TIME.has(d) && d !== 'none' && d !== 'weekday'
-  && !/^(month_|week_|group_month|flow$|category_flow$)/.test(d);
+  && !/^(month_|week_|hour_|group_month|flow$|category_flow$)/.test(d);
 
 const timeDimensionFor = (metric, dateRange) => {
   const span = dateRange ? daysBetween(dateRange.from, dateRange.to) : null;

@@ -28,6 +28,7 @@
 // constants/ and re-exported here to keep this catalog's flat shape.
 import { MOVEMENT_TYPES } from '../../constants/movementTypes.js';
 import { STORAGE_AREAS } from '../../constants/storageAreas.js';
+import { AREA_IDS as WORK_AREAS } from './workload.js';
 
 // ── Enum values ─────────────────────────────────────────────
 // Each centre's weekly pickup day. (Very old data used week1/week2;
@@ -93,6 +94,9 @@ export const DIMENSIONS = {
   // Busy days: seven bars Monday to Sunday, or a week × day heatmap.
   weekday:           { id: 'weekday',           label: 'Day of the week',     chart: 'bar'  },
   week_weekday:      { id: 'week_weekday',      label: 'Week and day',        chart: 'stacked_bar' },
+  // Workload only: "08|Mon", an hour of the day by weekday, drawn as a
+  // heatmap.
+  hour_weekday:      { id: 'hour_weekday',      label: 'Hour and day',        chart: 'stacked_bar' },
   // Diagram-only breakdowns, one metric each.
   flow:              { id: 'flow',              label: 'Opening to closing',  chart: 'bar'  },
   category_flow:     { id: 'category_flow',     label: 'Category to routing', chart: 'bar'  },
@@ -121,6 +125,8 @@ export const FILTERS = {
   routing_status:    { label: 'Routing status',   text: true },
   product_category:  { label: 'Product category', text: true },
   storage_type:      { label: 'Storage type',     text: true },
+  // Workload: which area of the floor (receiving, packing, the gate).
+  work_area:         { label: 'Area',             values: WORK_AREAS },
 };
 
 // grouped_bar: several series clustered per time bucket (e.g.
@@ -726,6 +732,23 @@ export const METRICS = {
     dimensions: ['flow'], filters: ['product_id', 'programme_id'],
     defaultChart: 'bar', waterfall: true,
     caveat: 'Kilogram products only: crates, bags and litres cannot be added to kilograms.',
+  },
+
+  // When the floor is busy, for rostering. Was its own Workload tab;
+  // now asked for like any report and drawn as a heatmap.
+  workload: {
+    id: 'workload', label: 'Workload by hour and day', temporal: 'range',
+    description:
+      'When the warehouse is busy: recorded work by hour of the day and day of the week, as the average ' +
+      'for that weekday, for receiving (deliveries received), picking and packing (lines picked) and the ' +
+      'dispatch gate (pallets released), or all of them together. Run this when asked about workload, the ' +
+      'busiest hours or times, peak times, when to roster or staff more people, or a heatmap of the day. ' +
+      'Counts work recorded, not people.',
+    repoFn: 'workload', unit: 'activities',
+    dimensions: ['hour_weekday', 'weekday'], filters: ['work_area'],
+    defaultChart: 'stacked_bar',
+    caveat: 'Average per weekday in the period, so a period with more Mondays does not make Monday look busier. ' +
+      'Counts work recorded (a delivery saved, a line picked, a pallet released), not people.',
   },
 
   // How long stock lasts at the current rate of dispatch.

@@ -207,7 +207,6 @@
   "reporting.routes.js GET /reorder": "admin,manager",
   "reporting.routes.js GET /saved": "admin,manager",
   "reporting.routes.js POST /saved": "admin,manager",
-  "reporting.routes.js POST /workload": "admin,manager",
   "reporting.routes.js PATCH /saved/:id": "admin,manager",
   "reporting.routes.js DELETE /saved/:id": "admin,manager",
   "reporting.routes.js POST /saved/:id/send": "admin,manager",

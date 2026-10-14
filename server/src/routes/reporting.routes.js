@@ -74,7 +74,6 @@ router.get('/filter-options', auth, requireRole(...MANAGERS_UP), reportingContro
 router.post('/process', auth, requireRole(...MANAGERS_UP), reportingController.processMap);
 router.get('/reorder',   auth, requireRole(...MANAGERS_UP), reportingController.reorderPlan);
 router.get('/alerts',    auth, requireRole(...MANAGERS_UP), reportingController.exceptionAlerts);
-router.post('/workload', auth, requireRole(...MANAGERS_UP), reportingController.workload);
 // Saved and scheduled reports: each manager's own (req.user.id).
 router.get   ('/saved',          auth, requireRole(...MANAGERS_UP), reportingController.listSaved);
 router.post  ('/saved',          auth, requireRole(...MANAGERS_UP), reportingController.createSaved);

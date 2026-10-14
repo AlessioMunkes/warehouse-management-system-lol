@@ -48,9 +48,6 @@ export const getReorderPlan = (weeks = 8) => apiGet(`/api/reporting/reorder?week
 // limits, over a baseline of 8, 12 or 26 weeks.
 export const getExceptionAlerts = (weeks = 12) => apiGet(`/api/reporting/alerts?weeks=${encodeURIComponent(weeks)}`);
 
-// POST /api/reporting/workload — recorded work by weekday and hour.
-export const getWorkload = (dateRange) => apiPost('/api/reporting/workload', { dateRange });
-
 // POST /api/reporting/ask
 // Returns either a report payload or { type: 'clarify', question, options }.
 export const askQuestion = (question) => apiPost('/api/reporting/ask', { question });

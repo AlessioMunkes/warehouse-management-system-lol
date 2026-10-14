@@ -32,6 +32,10 @@ export const PHRASINGS = [
   { q: 'how many pallets were not collected last month', expect: ['custom:collections', 'collection_compliance', 'repeat_non_collections'] },
 
   // ── Picking and decanting ───────────────────────────────────
+  { q: 'when is receiving busiest', expect: ['workload'] },
+  { q: 'workload heatmap for packing', expect: ['workload'] },
+  { q: 'what are the peak hours at the gate', expect: ['workload'] },
+  { q: 'when do we need more staff on the floor', expect: ['workload'] },
   { q: 'how many slips are still pending', expect: ['slip_pipeline', 'custom:picking_slips'] },
   { q: 'picking slips by status', expect: ['slip_pipeline', 'custom:picking_slips'] },
   { q: 'which products do packers flag most', expect: ['picking_flag_rate'] },

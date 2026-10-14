@@ -11,7 +11,7 @@
 
 export const AREAS = [
   { id: 'dispatch',    label: 'Dispatch and collections', metrics: ['dispatch_volume', 'collection_compliance', 'repeat_non_collections', 'late_collection_rate', 'gate_load_variance'] },
-  { id: 'floor',       label: 'Picking and decanting',    metrics: ['slip_pipeline', 'picking_turnaround', 'picking_flag_rate', 'decanting_wastage', 'decanting_margin_rate'] },
+  { id: 'floor',       label: 'Picking and decanting',    metrics: ['workload', 'slip_pipeline', 'picking_turnaround', 'picking_flag_rate', 'decanting_wastage', 'decanting_margin_rate'] },
   { id: 'receiving',   label: 'Receiving and suppliers',  metrics: ['goods_received', 'receiving_discrepancy_rate', 'unresolved_discrepancies', 'po_on_time_rate', 'supplier_lead_time'] },
   { id: 'procurement', label: 'Procurement',              metrics: ['overdue_purchase_orders', 'purchase_order_pipeline', 'procurement_spend', 'unit_price_trend'] },
   { id: 'stock',       label: 'Stock',                    metrics: ['low_stock_items', 'stock_on_hand', 'stock_value', 'expiring_stock', 'standing_order_demand', 'stock_movement_volume', 'stock_count_variance', 'adjustment_reasons'] },
@@ -41,6 +41,8 @@ export const FEATURED_QUESTIONS = [
   'Which products have gone up in price?',
   'Is decanting wastage getting worse?',
   'Which products do packers flag most?',
+  // The workload heatmap: it used to be its own tab.
+  'When is receiving busiest? Show a heatmap',
   'Scatter plot of centres: collections vs children',
   'Show spend by supplier per month as a stacked chart',
 ];

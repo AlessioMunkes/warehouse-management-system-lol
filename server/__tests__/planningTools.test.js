@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildReorderPlan } from '../src/features/reporting/reorderPlan.js';
 import { assess, alignWeeks, completeWeeks, rankAlerts } from '../src/features/reporting/controlLimits.js';
-import { buildWorkload, weekdayCounts } from '../src/features/reporting/workload.js';
+import { workloadSeries, weekdayCounts } from '../src/features/reporting/workload.js';
 
 const TODAY = '2026-10-12';   // a Monday
 
@@ -107,25 +107,37 @@ describe('the workload heatmap', () => {
     expect(weekdayCounts('2026-10-12', '2026-10-14')).toEqual([1, 1, 1, 0, 0, 0, 0]);
   });
 
-  it('lays work out by weekday and hour, with the average for that weekday', () => {
-    const out = buildWorkload(rows, RANGE);
-    const receiving = out.areas.find((a) => a.id === 'receiving');
-    expect(receiving.total).toBe(10);
-    expect(receiving.cells.find((c) => c.weekday === 0 && c.hour === 8)).toMatchObject({ total: 6, average: 3 });
-    expect(receiving.peak).toMatchObject({ weekday: 'Monday', hour: 8, average: 3 });
-    expect(receiving.busiestDay).toMatchObject({ label: 'Monday', total: 8, average: 4 });
-    expect(receiving.byHour.find((h) => h.hour === 8).total).toBe(8);
+  // The workload report's rows (reportCatalog.js `workload`), drawn as
+  // a heatmap: "08|Mon", the average for that weekday.
+  const cell = (series, label) => series.find((r) => r.label === label)?.value;
+
+  it('lays one area out by hour and weekday, as the average for that weekday', () => {
+    const series = workloadSeries(rows, { dimension: 'hour_weekday', area: 'receiving', ...RANGE });
+    expect(cell(series, '08|Mon')).toBe(3);   // 6 over two Mondays
+    expect(cell(series, '09|Mon')).toBe(1);
+    expect(cell(series, '08|Wed')).toBe(1);
+    expect(cell(series, '10|Tue')).toBe(0);   // the gate's, not receiving's
   });
 
-  it('always shows the working day, and stretches for work outside it', () => {
-    expect(buildWorkload(rows.slice(0, 3), RANGE).hours).toEqual([7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]);
-    expect(buildWorkload(rows, RANGE).hours[buildWorkload(rows, RANGE).hours.length - 1]).toBe(19);
+  it('adds the areas together when none is chosen', () => {
+    const series = workloadSeries(rows, { dimension: 'hour_weekday', ...RANGE });
+    expect(cell(series, '10|Tue')).toBe(15);
+    expect(cell(series, '08|Mon')).toBe(3);
   });
 
-  it('says an area with nothing recorded has no peak, and a period with nothing is empty', () => {
-    const out = buildWorkload(rows, RANGE);
-    expect(out.areas.find((a) => a.id === 'packing')).toMatchObject({ total: 0, peak: null });
-    expect(out.empty).toBe(false);
-    expect(buildWorkload([], RANGE).empty).toBe(true);
+  it('is a full grid: the working day always, stretched for work outside it', () => {
+    const quiet = workloadSeries(rows, { dimension: 'hour_weekday', area: 'receiving', ...RANGE });
+    expect(quiet).toHaveLength(11 * 7);       // 07 to 17, every weekday
+    expect(quiet[0].label).toBe('07|Mon');
+    const late = workloadSeries(rows, { dimension: 'hour_weekday', ...RANGE });
+    expect(late[late.length - 1].label).toBe('19|Sun');
+    expect(workloadSeries([], { dimension: 'hour_weekday', ...RANGE }).every((r) => r.value === 0)).toBe(true);
+  });
+
+  it('gives the average for each weekday, Monday to Sunday', () => {
+    const series = workloadSeries(rows, { dimension: 'weekday', area: 'receiving', ...RANGE });
+    expect(series.map((r) => r.label)).toEqual(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
+    expect(series[0].value).toBe(4);           // 8 over two Mondays
+    expect(series[2].value).toBe(1);
   });
 });

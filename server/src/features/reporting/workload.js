@@ -1,17 +1,22 @@
 // ─────────────────────────────────────────────────────────────
 // server/src/features/reporting/workload.js
 //
-// THE WORKLOAD HEATMAP: when the warehouse is busy, by weekday and hour
-// of the day, for each area of the floor. It is for rostering: which
-// mornings receiving needs two people, when the gate queue forms.
+// WORKLOAD: when the warehouse is busy, by weekday and hour of the
+// day, for each area of the floor. It is for rostering: which mornings
+// receiving needs two people, when the gate queue forms.
+//
+// It used to be its own tab on the Operations reports page. It is now
+// the `workload` report in reportCatalog.js, so it is asked for like
+// any other ("when is receiving busiest?") and drawn as a heatmap by
+// the same chart every report uses.
 //
 // The repository counts recorded activity per area, weekday and hour
-// (South African time). This shapes those counts into a grid and works
-// out the average for a weekday, because a period with five Mondays
-// and four Fridays would otherwise make Monday look busier than it is.
+// (South African time). This turns those counts into the report's
+// rows, as the AVERAGE for a weekday: a period with five Mondays and
+// four Fridays would otherwise make Monday look busier than it is.
 //
 // It counts WORK RECORDED, not people: a delivery note saved, a line
-// confirmed, a pallet released. Nobody is named or timed.
+// confirmed or flagged, a pallet released. Nobody is named or timed.
 // ─────────────────────────────────────────────────────────────
 
 export const AREAS = [
@@ -19,7 +24,9 @@ export const AREAS = [
   { id: 'packing', label: 'Picking and packing', unit: 'lines picked' },
   { id: 'gate', label: 'Dispatch gate', unit: 'pallets released' },
 ];
-export const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+export const AREA_IDS = AREAS.map((a) => a.id);
+// The short names the rest of reporting uses for days (to_char 'Dy').
+export const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 // The grid always shows the working day, and stretches to hold
 // anything recorded outside it.
@@ -27,6 +34,7 @@ const OPEN_HOUR = 7;
 const CLOSE_HOUR = 17;
 
 const round = (n, dp = 1) => Math.round(n * 10 ** dp) / 10 ** dp;
+const pad = (h) => String(h).padStart(2, '0');
 
 /** How many times each weekday (0 = Monday) falls in [from, to]. */
 export const weekdayCounts = (from, to) => {
@@ -36,45 +44,42 @@ export const weekdayCounts = (from, to) => {
   return counts;
 };
 
-/** rows: [{ area, weekday (1 = Monday .. 7), hour (0-23), events }] */
-export const buildWorkload = (rows, { from, to }) => {
+/**
+ * The report's rows from the repository's counts.
+ *
+ * rows:      [{ area, weekday (1 = Monday .. 7), hour (0-23), events }]
+ * dimension: 'hour_weekday'  "08|Mon" for every hour of the working day
+ *                            and every weekday, quiet ones as 0, so the
+ *                            heatmap is a full grid
+ *            'weekday'       Mon to Sun, the average for that day
+ * area:      one of AREA_IDS, or nothing for every area together
+ */
+export const workloadSeries = (rows, { dimension, area = null, from, to }) => {
   const occurrences = weekdayCounts(from, to);
-  const hoursSeen = rows.map((r) => Number(r.hour));
+  const mine = area ? rows.filter((r) => r.area === area) : rows;
+  const avg = (total, d) => (occurrences[d] ? round(total / occurrences[d]) : 0);
+
+  if (dimension === 'weekday') {
+    const byDay = Array(7).fill(0);
+    for (const r of mine) byDay[Number(r.weekday) - 1] += Number(r.events);
+    return WEEKDAYS.map((label, d) => ({ label, value: avg(byDay[d], d) }));
+  }
+
+  const hoursSeen = mine.map((r) => Number(r.hour));
   const firstHour = Math.min(OPEN_HOUR, ...hoursSeen);
   const lastHour = Math.max(CLOSE_HOUR, ...hoursSeen);
-  const hours = Array.from({ length: lastHour - firstHour + 1 }, (_, i) => firstHour + i);
-
-  const areas = AREAS.map((area) => {
-    const mine = rows.filter((r) => r.area === area.id);
-    const grid = WEEKDAYS.map(() => hours.map(() => 0));
-    for (const r of mine) grid[Number(r.weekday) - 1][Number(r.hour) - firstHour] += Number(r.events);
-
-    const cells = [];
-    grid.forEach((row, d) => row.forEach((total, h) => {
-      // The typical load of that hour on that weekday.
-      cells.push({ weekday: d, hour: hours[h], total, average: occurrences[d] ? round(total / occurrences[d]) : 0 });
-    }));
-    const total = cells.reduce((s, c) => s + c.total, 0);
-    const peak = cells.reduce((best, c) => (c.average > (best?.average ?? 0) ? c : best), null);
-    const byWeekday = WEEKDAYS.map((label, d) => {
-      const sum = grid[d].reduce((a, b) => a + b, 0);
-      return { label, total: sum, average: occurrences[d] ? round(sum / occurrences[d]) : 0 };
+  const cell = new Map();
+  for (const r of mine) {
+    const key = `${Number(r.weekday) - 1}|${Number(r.hour)}`;
+    cell.set(key, (cell.get(key) ?? 0) + Number(r.events));
+  }
+  const out = [];
+  for (let h = firstHour; h <= lastHour; h += 1) {
+    WEEKDAYS.forEach((day, d) => {
+      out.push({ label: `${pad(h)}|${day}`, value: avg(cell.get(`${d}|${h}`) ?? 0, d) });
     });
-    const byHour = hours.map((hour, h) => ({ hour, total: grid.reduce((s, row) => s + row[h], 0) }));
-    return {
-      ...area,
-      total,
-      cells,
-      max: Math.max(0, ...cells.map((c) => c.total)),
-      maxAverage: Math.max(0, ...cells.map((c) => c.average)),
-      peak: peak && peak.total > 0 ? { weekday: WEEKDAYS[peak.weekday], hour: peak.hour, average: peak.average, total: peak.total } : null,
-      busiestDay: byWeekday.reduce((best, d) => (d.average > (best?.average ?? 0) ? d : best), null),
-      byWeekday,
-      byHour,
-    };
-  });
-
-  return { range: { from, to }, hours, weekdays: WEEKDAYS, occurrences, areas, empty: areas.every((a) => a.total === 0) };
+  }
+  return out;
 };
 
-export default { buildWorkload, weekdayCounts, AREAS, WEEKDAYS };
+export default { workloadSeries, weekdayCounts, AREAS, AREA_IDS, WEEKDAYS };

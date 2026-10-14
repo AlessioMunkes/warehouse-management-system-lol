@@ -1,8 +1,9 @@
 // ─────────────────────────────────────────────────────────────
 // src/tests/PlanningTools.test.jsx
 //
-// Three tools on the Operations reports page: the reorder planner, the
-// exception alerts and the workload heatmap. Plus the root cause
+// Two tools on the Operations reports page: the reorder planner and the
+// exception alerts. (The workload heatmap is a report now, drawn by
+// OperationalChart: see OperationalChart.test.jsx.) Plus the root cause
 // analysis under the flow map. Each must show what the server worked
 // out in terms a manager can act on, and narrow or open as asked.
 // ─────────────────────────────────────────────────────────────
@@ -11,13 +12,12 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { rootCauses, targetTest, applyFilters, filterLabel } from '../features/reporting/flowGraph';
 
-const api = vi.hoisted(() => ({ getReorderPlan: vi.fn(), getExceptionAlerts: vi.fn(), getWorkload: vi.fn() }));
+const api = vi.hoisted(() => ({ getReorderPlan: vi.fn(), getExceptionAlerts: vi.fn() }));
 vi.mock('../services/reportingAPI', () => api);
 vi.mock('../lib/excelExport', () => ({ exportExcel: vi.fn() }));
 
 const { default: ReorderPlanner } = await import('../features/reporting/ReorderPlanner');
 const { default: ExceptionAlerts } = await import('../features/reporting/ExceptionAlerts');
-const { default: WorkloadHeatmap } = await import('../features/reporting/WorkloadHeatmap');
 const { default: ProcessFlow } = await import('../features/reporting/ProcessFlow');
 
 beforeEach(() => vi.clearAllMocks());
@@ -173,56 +173,6 @@ describe('exception alerts', () => {
     api.getExceptionAlerts.mockResolvedValue({ data: { ...ALERTS, items: ALERTS.items.slice(2) } });
     render(<ExceptionAlerts />);
     expect(await screen.findByRole('status')).toHaveTextContent('No exceptions in week 2026-W41.');
-  });
-});
-
-// ── Workload heatmap ────────────────────────────────────────
-const HOURS = [7, 8, 9];
-const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const area = (id, label, unit, busy) => {
-  const cells = WEEKDAYS.flatMap((_, d) => HOURS.map((hour) => {
-    const total = busy && d === 0 && hour === 8 ? 6 : busy && d === 2 && hour === 9 ? 2 : 0;
-    return { weekday: d, hour, total, average: total / 2 };
-  }));
-  const total = cells.reduce((s, c) => s + c.total, 0);
-  return {
-    id, label, unit, total, cells, max: busy ? 6 : 0, maxAverage: busy ? 3 : 0,
-    peak: busy ? { weekday: 'Monday', hour: 8, average: 3, total: 6 } : null,
-    busiestDay: busy ? { label: 'Monday', total: 6, average: 3 } : null,
-    byWeekday: WEEKDAYS.map((l, d) => ({ label: l, total: d === 0 && busy ? 6 : d === 2 && busy ? 2 : 0, average: d === 0 && busy ? 3 : d === 2 && busy ? 1 : 0 })),
-    byHour: HOURS.map((hour) => ({ hour, total: 0 })),
-  };
-};
-const WORKLOAD = {
-  range: { from: '2026-09-28', to: '2026-10-11' }, hours: HOURS, weekdays: WEEKDAYS, occurrences: [2, 2, 2, 2, 2, 2, 2], empty: false,
-  areas: [area('receiving', 'Receiving', 'deliveries received', true), area('gate', 'Dispatch gate', 'pallets released', false)],
-};
-
-describe('the workload heatmap', () => {
-  beforeEach(() => api.getWorkload.mockResolvedValue({ data: WORKLOAD }));
-
-  it('shows the peak hour, the busiest day and the grid', async () => {
-    render(<WorkloadHeatmap />);
-    expect(await screen.findByText('Monday 08:00')).toBeInTheDocument();
-    expect(screen.getByText('3 on an average Monday')).toBeInTheDocument();
-    const grid = screen.getByRole('table', { name: 'Receiving: deliveries received by weekday and hour' });
-    const monday = within(grid).getByRole('row', { name: /^Monday/ });
-    expect(within(monday).getAllByRole('cell')[1]).toHaveTextContent('3');
-  });
-
-  it('switches between the weekday average and the total', async () => {
-    render(<WorkloadHeatmap />);
-    await screen.findByText('Monday 08:00');
-    await userEvent.click(screen.getByRole('button', { name: 'Total' }));
-    const monday = screen.getByRole('row', { name: /^Monday/ });
-    expect(within(monday).getAllByRole('cell')[1]).toHaveTextContent('6');
-  });
-
-  it('says so for an area with nothing recorded', async () => {
-    render(<WorkloadHeatmap />);
-    await screen.findByText('Monday 08:00');
-    await userEvent.selectOptions(screen.getByLabelText('Area'), 'gate');
-    expect(screen.getByText('No pallets released recorded in this period. Select a longer period.')).toBeInTheDocument();
   });
 });
 

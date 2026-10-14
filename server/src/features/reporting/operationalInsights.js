@@ -439,6 +439,15 @@ export const OPERATIONAL_INSIGHTS = {
     related: [{ metric: 'stock_movement_volume', dimension: 'movement_type' }, { metric: 'adjustment_reasons', dimension: 'reason' }],
     actions: ['manual_adjustments'],
   },
+  workload: {
+    area: 'picking', better: null,
+    related: [
+      { metric: 'goods_received', dimension: 'weekday' },
+      { metric: 'dispatch_volume', dimension: 'weekday' },
+      { metric: 'picking_turnaround', dimension: 'month' },
+    ],
+    actions: [],
+  },
   days_of_cover: {
     area: 'stock', better: 'up', target: 30,
     related: [{ metric: 'low_stock_items', dimension: 'product' }, { metric: 'dispatch_volume', dimension: 'product' }],

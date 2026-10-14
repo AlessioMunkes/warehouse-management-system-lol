@@ -127,6 +127,22 @@ describe('OperationalChart', () => {
     expect(screen.getByLabelText('Target 90%')).toBeChecked();
   });
 
+  // The workload report (it used to be its own tab): hours across,
+  // weekdays down, opened straight on the heatmap.
+  it('opens a workload report on a heatmap of hours by weekday', () => {
+    const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const series = ['07', '08', '09'].flatMap((h) => DAYS.map((d) => ({ label: `${h}|${d}`, value: h === '08' && d === 'Mon' ? 3 : 0 })));
+    render(<OperationalChart report={{
+      description: 'Workload by hour and day', spec: { metric: 'workload', dimension: 'hour_weekday' },
+      chartType: 'stacked_bar', series, meta: { unit: 'activities', preferView: 'heatmap' },
+    }} />);
+    expect(screen.getByRole('button', { name: 'Heatmap' })).toHaveAttribute('aria-pressed', 'true');
+    const rows = screen.getAllByRole('rowheader').map((r) => r.textContent);
+    expect(rows).toEqual(DAYS);
+    const monday = screen.getByRole('rowheader', { name: 'Mon' }).closest('tr');
+    expect(within(monday).getAllByRole('cell')[1]).toHaveTextContent('3');
+  });
+
   it('draws two-way data as stacked, grouped or a heatmap', () => {
     render(<OperationalChart report={twoAxis} />);
     fireEvent.click(screen.getByRole('button', { name: 'Heatmap' }));
