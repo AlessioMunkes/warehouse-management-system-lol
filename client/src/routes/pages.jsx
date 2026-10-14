@@ -60,6 +60,7 @@ export const PAGE_LOADERS = {
   dispatchHistory:  () => import('../pages/StaffDispatchHistoryPage'),
   donationIntake:   () => import('../pages/DonationDetailsPage').then((m) => ({ default: m.DonationDetailsPage })),
   donationReview:   () => import('../pages/ReviewPage').then((m) => ({ default: m.ReviewPage })),
+  donationHistory:  () => import('../pages/StaffDonationHistoryPage'),
 
   floorRequests:    () => import('../pages/StaffCommunityRequestsPage'),
   floorFeedTheSoil: () => import('../pages/StaffFeedTheSoilPage'),
@@ -134,6 +135,7 @@ export const PAGES = {
   // only lives while you are on the intake pages.
   donationIntake:   <DonationDraftProvider><L.donationIntake /></DonationDraftProvider>,
   donationReview:   <DonationDraftProvider><L.donationReview /></DonationDraftProvider>,
+  donationHistory:  <L.donationHistory />,
 
   floorRequests:    <L.floorRequests />,
   floorFeedTheSoil: <L.floorFeedTheSoil />,

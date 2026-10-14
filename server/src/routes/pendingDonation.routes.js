@@ -46,6 +46,14 @@ router.post(
   pendingDonationController.retryPendingDonationCommit
 );
 
+// Declared before /pending/:id so 'mine' is never read as an id.
+router.get(
+  '/pending/mine',
+  auth,
+  requireRole(...WORKERS_ONLY),
+  pendingDonationController.listMyPendingDonations
+);
+
 router.get(
   '/pending/:id',
   auth,

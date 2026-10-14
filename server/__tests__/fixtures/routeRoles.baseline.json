@@ -162,6 +162,7 @@
   "pendingDonation.routes.js GET /pending": "admin,manager",
   "pendingDonation.routes.js GET /pending/reconciliation": "admin,manager",
   "pendingDonation.routes.js POST /pending/:pendingDonationId/retry-commit": "admin,manager",
+  "pendingDonation.routes.js GET /pending/mine": "warehouse_worker",
   "pendingDonation.routes.js GET /pending/:id": "admin,manager,warehouse_worker",
   "picking.routes.js POST /generate": "admin,manager",
   "picking.routes.js GET /workers": "admin,manager",

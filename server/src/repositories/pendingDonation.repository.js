@@ -480,7 +480,34 @@ const listPendingDonationsByStatus = async (statuses = [], client = pool) => {
   return result.rows;
 };
 
+// The donations one worker recorded, newest first, for their own
+// History on the floor: what they filled in and where it has got to.
+// `from` is a calendar date (YYYY-MM-DD) or null for everything. Only
+// the columns that screen shows, plus how many lines are still waiting
+// on a manager; the full record is getPendingDonationById.
+const listPendingDonationsByCreator = async (userId, { from = null } = {}, client = pool) => {
+  const result = await client.query(
+    `SELECT d.id, d.status, d.created_at, d.committed_at, d.cancelled_at,
+            d.donor_name, d.donor_first_name, d.donor_last_name,
+            d.estimated_value_zar, d.donation_category, d.section18a_requested,
+            d.committed_donation_id,
+            COUNT(i.id)::int AS item_count,
+            COUNT(i.id) FILTER (WHERE i.status = 'awaiting_resolution')::int AS awaiting_count,
+            COUNT(i.id) FILTER (WHERE i.status = 'rejected')::int AS rejected_count
+       FROM pending_donations d
+       LEFT JOIN pending_donation_items i ON i.pending_donation_id = d.id
+      WHERE d.created_by = $1
+        AND ($2::date IS NULL OR (d.created_at AT TIME ZONE 'Africa/Johannesburg')::date >= $2::date)
+      GROUP BY d.id
+      ORDER BY d.created_at DESC, d.id DESC
+      LIMIT 500;`,
+    [userId, from]
+  );
+  return result.rows;
+};
+
 export default {
+  listPendingDonationsByCreator,
   findPendingDonationIdByIdempotencyKey,
   createPendingDonation,
   createPendingDonationItems,

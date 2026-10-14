@@ -124,6 +124,7 @@ export const ROUTES = [
   { id: 'donationIntake', path: STAFF.donation, roles: WORKERS_ONLY,
     nav: [nav('worker', 'Warehouse', 'Donation intake', HandCoins)] },
   { id: 'donationReview', path: DONATIONS.review, roles: WORKERS_ONLY },
+  { id: 'donationHistory', path: DONATIONS.history, roles: WORKERS_ONLY },
   { id: 'floorRequests', path: STAFF.floorRequests, roles: WORKERS_ONLY,
     nav: [nav('worker', 'Warehouse', 'Benevolent requests', PhoneCall)] },
   { id: 'floorFeedTheSoil', path: STAFF.floorFeedTheSoil, roles: WORKERS_ONLY,

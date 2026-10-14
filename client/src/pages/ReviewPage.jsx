@@ -6,7 +6,7 @@
 // fix any section, then submits and shows a confirmation.
 // ─────────────────────────────────────────────────────────────
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import StaffShell from "../components/layout/StaffShell";
 
 import { useDonationDraft, validateDonationDraft } from "../features/donation/DonationDraftContext";
@@ -99,7 +99,17 @@ export function ReviewPage() {
   });
 
   return (
-    <StaffShell crumb="Donations / Review donation" meta={today}>
+    <StaffShell
+      crumb="Donations / Review donation"
+      meta={today}
+      // What this worker recorded before, and where it has got to.
+      actions={(
+        <Link to={DONATIONS.history} className="stf-crumb-link">
+          <i className="ti ti-history" aria-hidden="true" />
+          <span>History</span>
+        </Link>
+      )}
+    >
       <DonationRail currentStep={1} />
 
       <div className="stf-step">

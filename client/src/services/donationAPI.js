@@ -12,7 +12,7 @@
 // Shared fetch wrapper: same-origin /api path (Vite dev proxy forwards to
 // the Express backend) and credentials included so the httpOnly wms_token
 // cookie reaches the server. All donation endpoints go through this.
-import { newIdempotencyKey } from "./api";
+import { apiGet, newIdempotencyKey } from "./api";
 import { reportUnreachable } from "./connection";
 import { queueIfOffline } from "./outbox";
 
@@ -189,4 +189,18 @@ async function parseJsonResponse(response) {
   } catch {
     return {};
   }
+}
+
+// The signed-in worker's own donations, newest first: what they filled
+// in and where it has got to. GET /api/donations/pending/mine, scoped to
+// the session server-side. range: today | week | month | all.
+export async function getMyDonations(range = "all") {
+  const res = await apiGet(`/api/donations/pending/mine?range=${encodeURIComponent(range)}`);
+  return res?.data ?? [];
+}
+
+// One of them in full, with its items, as it was filled in.
+export async function getMyDonation(id) {
+  const res = await apiGet(`/api/donations/pending/${encodeURIComponent(id)}`);
+  return res?.data ?? null;
 }

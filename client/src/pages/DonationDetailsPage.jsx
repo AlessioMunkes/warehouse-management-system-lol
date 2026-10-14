@@ -7,7 +7,7 @@
 // to the review page. Used by warehouse workers and admins, inside
 // StaffShell so the tab bar is there.
 // ─────────────────────────────────────────────────────────────
-import { useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useRef, useState, useEffect } from "react";
 import StaffShell from "../components/layout/StaffShell";
 
@@ -76,7 +76,17 @@ export function DonationDetailsPage() {
   ].filter(Boolean);
 
   return (
-    <StaffShell crumb="Donations / Record a donation" meta={today}>
+    <StaffShell
+      crumb="Donations / Record a donation"
+      meta={today}
+      // What this worker recorded before, and where it has got to.
+      actions={(
+        <Link to={DONATIONS.history} className="stf-crumb-link">
+          <i className="ti ti-history" aria-hidden="true" />
+          <span>History</span>
+        </Link>
+      )}
+    >
       <DonationRail currentStep={0} />
 
       <section className="stf-step donation-intake-card">

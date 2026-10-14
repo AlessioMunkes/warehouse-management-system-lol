@@ -41,6 +41,7 @@ import PhotoButton from '../staff/PhotoButton';
 import { useT } from '../../translations';
 import StatusBadge from '@/components/ui/status-badge';
 import { workerStatus } from '../staff/workerStatus';
+import { subscribe as onOutboxChange } from '../../services/outbox';
 
 const MODE_KEY = 'stf_packing_view_mode';
 // label and hint are keys in translations/messages.js.
@@ -224,6 +225,20 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
   }, [slipId, reloadToken]);
 
   const reload = () => setReloadToken((t) => t + 1);
+
+  // Packing done with no signal shows "saved on this phone" until it is
+  // sent. That used to be worked out only when the pallet loaded, so the
+  // box stayed after the phone had sent it. Reload the moment this
+  // pallet's queued packing has gone from the outbox.
+  const waiting = Boolean(slip?.waitingToSend);
+  useEffect(() => {
+    if (!waiting) return undefined;
+    return onOutboxChange((items) => {
+      const mine = items.some((q) => q.kind === 'packing' && !q.permanent
+        && Number(q.meta?.slipId) === Number(slipId));
+      if (!mine) setReloadToken((t) => t + 1);
+    });
+  }, [waiting, slipId]);
 
   // Lifted above the loading/error/no-slip returns below, and reading
   // slip?.items rather than the slip.items used once it's guaranteed
@@ -430,6 +445,18 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
         <span className="stf-progress-count">{confirmed + flagged} / {items.length}</span>
       </div>
 
+      {/* Packed or collected: said once, at the top, as a status like
+          every other one. It used to be an information box under the
+          last item that never went away. */}
+      {locked ? (
+        <p className="stf-slip-state">
+          <StatusBadge {...workerStatus('slip', isCollectedSlip(slip) ? 'collected' : 'complete')}>
+            {isCollectedSlip(slip) ? t('slip.palletCollected') : t('slip.palletPacked')}
+          </StatusBadge>
+          {slip.pallet_ref ? <span className="stf-row-meta">{t('slip.ref', { ref: slip.pallet_ref })}</span> : null}
+        </p>
+      ) : null}
+
       {items.length === 0 ? (
         <Notice>{t('slip.noItems')}</Notice>
       ) : (
@@ -540,12 +567,6 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
             </Button>
           </Actions>
         </>
-      ) : null}
-
-      {locked ? (
-        <Notice>
-          {isCollectedSlip(slip) ? t('slip.palletCollected') : t('slip.palletPacked')}{slip.pallet_ref ? ` · ${t('slip.ref', { ref: slip.pallet_ref })}` : ''}.
-        </Notice>
       ) : null}
 
       {/* Packed with no signal: what shows above is the phone's own

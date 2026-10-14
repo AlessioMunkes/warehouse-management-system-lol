@@ -65,6 +65,16 @@ describe('Release this pallet', () => {
     expect(pickingAPI.releaseSlip).toHaveBeenCalledWith(12);
   });
 
+  // A packed pallet says so once, at the top, as a status: it used to be
+  // an information box under the last item that never went away.
+  it('shows a packed pallet as a status under the progress bar, not a box at the bottom', async () => {
+    await show(slip({ status: 'complete', pallet_ref: 'P-7', items: [item(1, 'confirmed'), item(2, 'confirmed')] }));
+    const state = document.querySelector('.stf-slip-state');
+    expect(state).toHaveTextContent('Pallet packed');
+    expect(state).toHaveTextContent('Ref P-7');
+    expect(document.querySelectorAll('.stf-notice')).toHaveLength(0);
+  });
+
   it('stays on the pallet and says why when the server refuses', async () => {
     const onBack = vi.fn();
     pickingAPI.releaseSlip.mockRejectedValue(new Error('You have started packing this pallet. Ask a manager to release it.'));

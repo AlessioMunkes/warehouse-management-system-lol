@@ -68,7 +68,7 @@ function DonationItemRow({ item, onChange, onRemove, canRemove, error = {}, isFo
               aria-label="Product"
               aria-invalid={fieldInvalid(error.description)}
             />
-            <span className="stf-field-hint">Saved as NON_FOOD.</span>
+            <span className="stf-field-hint">Routed to the appropriate destination.</span>
             {error.description && <span className="stf-field-hint" style={{ color: "var(--stf-attention)" }}>{error.description}</span>}
           </div>
         )}

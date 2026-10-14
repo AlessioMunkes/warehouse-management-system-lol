@@ -4163,6 +4163,14 @@ button.stf-panel-head:disabled { cursor: default; }
   font-weight: 700;
   color: var(--stf-ink);
 }
+/* A packed or collected pallet's state, under its progress bar. */
+.stf-slip-state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
 .stf-history-badges {
   display: inline-flex;
   flex-wrap: wrap;

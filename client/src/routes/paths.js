@@ -71,6 +71,8 @@ export const STAFF = {
 export const DONATIONS = {
   new:    DONATIONS_NEW,
   review: `${DONATIONS_NEW}/review`,
+  // A worker's own donations: what they filled in, and its status.
+  history: '/donations/history',
 };
 
 export const VOLUNTEERS = {

@@ -12,13 +12,19 @@
 // so it is green.
 //
 //   tone: good (green) · warn (amber) · bad (red) · info (blue) · neutral (grey)
+//
+// Every floor badge is the same soft pill: tint, border, icon. A few
+// finished states used to be solid, so one screen's "Completed" looked
+// nothing like the packing list's "Confirmed" beside it. Tone and icon
+// carry the meaning; the weight no longer varies (asked for from the
+// floor).
 // ─────────────────────────────────────────────────────────────
 import {
-  Ban, Check, CheckCheck, CircleDashed, CircleX, Flag, History, House, PackageCheck,
+  Ban, Check, CheckCheck, CircleDashed, CircleX, Flag, History, Hourglass, House, PackageCheck,
   PackageOpen, Scale, Trash2, TriangleAlert, Truck,
 } from 'lucide-react';
 
-const s = (tone, icon, strong = false) => ({ tone, icon, strong });
+const s = (tone, icon) => ({ tone, icon, strong: false });
 
 export const WORKER_STATUS = {
   // A pallet on the packing list.
@@ -26,7 +32,7 @@ export const WORKER_STATUS = {
     pending:     s('neutral', CircleDashed),
     in_progress: s('info', PackageOpen),
     complete:    s('good', PackageCheck),
-    collected:   s('good', CheckCheck, true),
+    collected:   s('good', CheckCheck),
     cancelled:   s('neutral', Ban),
   },
   // One line on a pallet.
@@ -38,13 +44,13 @@ export const WORKER_STATUS = {
   },
   // A delivery, by how far its order has come.
   delivery: {
-    completed:   s('good', CheckCheck, true),
+    completed:   s('good', CheckCheck),
     partial:     s('info', PackageOpen),
     discrepancy: s('bad', Flag),
   },
   // A pallet at the gate.
   dispatch: {
-    collected:      s('good', CheckCheck, true),
+    collected:      s('good', CheckCheck),
     late_collected: s('warn', History),
     not_collected:  s('bad', CircleX),
     cancelled:      s('neutral', Ban),
@@ -53,12 +59,30 @@ export const WORKER_STATUS = {
   kit: {
     assigned:   s('warn', House),
     logged:     s('info', Scale),
-    dispatched: s('good', Truck, true),
+    dispatched: s('good', Truck),
   },
   // A donated item against the product list.
   match: {
     matched:   s('good', Check),
     unmatched: s('warn', TriangleAlert),
+  },
+  // A donation a worker recorded (pending_donations.status), and each
+  // of its items (pending_donation_items.status).
+  donation: {
+    committed:          s('good', CheckCheck),
+    awaiting_resolution: s('warn', Hourglass),
+    draft:              s('info', CircleDashed),
+    committing:         s('info', CircleDashed),
+    commit_failed:      s('bad', TriangleAlert),
+    commit_incomplete:  s('bad', TriangleAlert),
+    cancelled:          s('neutral', Ban),
+  },
+  donationItem: {
+    awaiting_resolution: s('warn', Hourglass),
+    resolved:  s('good', Check),
+    committed: s('good', Check),
+    rejected:  s('bad', CircleX),
+    cancelled: s('neutral', Ban),
   },
   // A note beside a record, not a status of its own.
   note: {

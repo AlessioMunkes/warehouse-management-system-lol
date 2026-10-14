@@ -113,7 +113,29 @@ const getPendingDonationById = async (req, res) => {
   }
 };
 
+// GET /api/donations/pending/mine?range=today|week|month|all
+// The signed-in worker's own donations, for their History. Scoped by
+// req.user.id from the session, never by anything in the request.
+const MINE_RANGE_DAYS = { today: 0, week: 7, month: 30 };
+const SAST_OFFSET_MS = 2 * 60 * 60 * 1000;
+const listMyPendingDonations = async (req, res) => {
+  try {
+    const range = req.query.range ?? 'all';
+    if (range !== 'all' && !(range in MINE_RANGE_DAYS)) {
+      return res.status(400).json({ success: false, message: 'Range must be today, week, month or all.' });
+    }
+    const from = range === 'all'
+      ? null
+      : new Date(Date.now() + SAST_OFFSET_MS - MINE_RANGE_DAYS[range] * 86400000).toISOString().slice(0, 10);
+    const rows = await pendingDonationRepository.listPendingDonationsByCreator(req.user.id, { from });
+    return res.status(200).json({ success: true, data: rows });
+  } catch (err) {
+    return handleError(res, 'listMyPendingDonations', 'Failed to retrieve your donations.')(err);
+  }
+};
+
 export default {
+  listMyPendingDonations,
   createPendingDonation,
   resolvePendingDonationFlag,
   retryPendingDonationCommit,
