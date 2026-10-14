@@ -33,6 +33,7 @@ import {
   environment, isConfigured, OAUTH_STATE_TTL_MS, parseEncryptionKey, SCOPE,
 } from '../config/quickbooks.js';
 import { currentWarehouse } from '../config/warehouseContext.js';
+import { lineAmount } from '../utils/poMoney.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -176,7 +177,6 @@ const status = async ({ check = false } = {}) => {
 
 // ── Sending a purchase order ────────────────────────────────
 const sending = new Set();
-const money = (n) => Math.round(Number(n || 0) * 100) / 100;
 const dayOf = (value) => {
   if (!value) return undefined;
   const d = value instanceof Date ? value : new Date(value);
@@ -201,7 +201,7 @@ export const buildPurchaseOrder = (po, { vendor, items, payables }) => ({
     const price = line.unit_price === null || line.unit_price === undefined ? 0 : Number(line.unit_price);
     return {
       DetailType: 'ItemBasedExpenseLineDetail',
-      Amount: money(qty * price),
+      Amount: lineAmount(qty, price),
       Description: [line.product_name, line.default_unit ? `(${line.default_unit})` : null].filter(Boolean).join(' '),
       ItemBasedExpenseLineDetail: { ItemRef: { value: String(item.Id), name: item.Name }, Qty: qty, UnitPrice: price },
     };

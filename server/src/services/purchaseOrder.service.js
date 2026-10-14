@@ -28,6 +28,7 @@ import { emailStyles, escapeHtml, renderLadlesEmail } from '../utils/emailTempla
 // feature/notification-fix brought this service onto staging.
 import financeService from './finance.service.js';
 import { FINANCE_EMAIL_ERRORS, safeFinanceEmailError } from '../utils/financeEmailError.js';
+import { lineAmount, orderTotal } from '../utils/poMoney.js';
 import quickbooksService from './quickbooks.service.js';
 import {
   MAX_IMPORT_ROWS, tooManyRowsMessage, normalizePair, findDuplicateIndexes,
@@ -192,15 +193,17 @@ const formatDate = (value) =>
     ? new Date(value).toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' })
     : '-';
 
-// Matches the estimated_value convention in listPurchaseOrders: a
+// One rule for a line and an order's total (utils/poMoney.js), shared
+// with the order list's value and the order sent to QuickBooks. A
 // missing unit price counts as 0 rather than making the total unknown.
-const lineTotal = (item) => item.expected_quantity * (item.unit_price ?? 0);
+const lineTotal = (item) => lineAmount(item.expected_quantity, item.unit_price);
+const poTotal = (items) => orderTotal(items.map((i) => ({ quantity: i.expected_quantity, unitPrice: i.unit_price })));
 
 // ── Finance email ─────────────────────────────────────────────
 // Interim design while API-based QuickBooks PO creation is blocked
 // (see README): Finance is emailed the PO and captures it manually.
 const buildFinanceEmail = (purchaseOrder) => {
-  const total = purchaseOrder.items.reduce((sum, item) => sum + lineTotal(item), 0);
+  const total = poTotal(purchaseOrder.items);
   const createdBy = purchaseOrder.created_by_name || 'a warehouse manager';
 
   const subject = `${purchaseOrder.po_number} · ${purchaseOrder.supplier_name} · ${money(total)} · capture in QuickBooks`;

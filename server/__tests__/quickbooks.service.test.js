@@ -341,6 +341,24 @@ describe('the words sent', () => {
   });
 });
 
+describe('the money sent', () => {
+  it('rounds each line half up, so QuickBooks totals what the email and the list show', () => {
+    const po = { ...PO, items: [
+      { id: 1, product_name: 'Rocks', default_unit: 'kg', expected_quantity: '100.000', unit_price: '12.50' },
+      { id: 2, product_name: 'Soil', default_unit: 'kg', expected_quantity: '2.500', unit_price: '33.33' },
+    ] };
+    const body = buildPurchaseOrder(po, {
+      vendor: { Id: '1', DisplayName: 'V' },
+      items: new Map([[1, { Id: '1', Name: 'Rocks' }], [2, { Id: '2', Name: 'Soil' }]]),
+      payables: null,
+    });
+    expect(body.Line.map((l) => l.Amount)).toEqual([1250, 83.33]);
+    expect(body.Line[1].ItemBasedExpenseLineDetail).toMatchObject({ Qty: 2.5, UnitPrice: 33.33 });
+    // QuickBooks adds the lines up: 1 333.33
+    expect(body.Line.reduce((sum, l) => sum + Math.round(l.Amount * 100), 0) / 100).toBe(1333.33);
+  });
+});
+
 describe('orders that could not be sent at the time', () => {
   it('are tried again later, and it stops if the connection has gone', async () => {
     await connect();

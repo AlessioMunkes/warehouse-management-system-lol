@@ -60,6 +60,24 @@ beforeEach(() => {
   emailProviderMock.sendEmail.mockResolvedValue({ sent: true, messageId: 'abc123' });
 });
 
+describe('the amounts in the finance email', () => {
+  it('shows each line rounded half up and a total that is the sum of those lines', async () => {
+    repoMock.getPurchaseOrderById.mockResolvedValue(createdPO({ items: [
+      { id: 1, product_id: 1, product_name: 'Rocks', expected_quantity: '100.000', unit_price: '12.50', default_unit: 'kg' },
+      { id: 2, product_id: 2, product_name: 'Soil', expected_quantity: '2.500', unit_price: '33.33', default_unit: 'kg' },
+    ] }));
+    emailProviderMock.sendEmail.mockResolvedValue({ sent: true, messageId: 'x' });
+    await purchaseOrderService.resendFinanceEmail(42, 7);
+    const mail = emailProviderMock.sendEmail.mock.calls[0][0];
+    const num = (t) => Number(t.replace(/[^0-9,]/g, '').replace(',', '.'));
+    const lines = [...mail.text.matchAll(/= (R [^\n]+)/g)].map((m) => num(m[1]));
+    const total = num(mail.text.match(/Total: (R [^\n]+)/)[1]);
+    expect(lines).toEqual([1250, 83.33]);
+    expect(total).toBe(1333.33);
+    expect(Math.round(lines.reduce((a, b) => a + b, 0) * 100) / 100).toBe(total);
+  });
+});
+
 describe('createPurchaseOrder — finance email', () => {
   it('returns as soon as the PO is committed, without waiting for the send', async () => {
     let finishSend;

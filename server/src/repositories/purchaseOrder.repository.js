@@ -213,7 +213,7 @@ const listPurchaseOrders = async ({ status = null, supplierId = null, limit = 50
                                 FROM delivery_note_items dni
                                WHERE dni.purchase_order_item_id = poi.id), 0)
                     >= poi.expected_quantity)::int AS received_line_count,
-            (SELECT COALESCE(SUM(poi.expected_quantity * COALESCE(poi.unit_price, 0)), 0)
+            (SELECT COALESCE(SUM(ROUND(poi.expected_quantity * COALESCE(poi.unit_price, 0), 2)), 0)
                FROM purchase_order_items poi
               WHERE poi.purchase_order_id = po.id) AS estimated_value,
             -- BR-07A: instalments are delivery_notes against this PO.
