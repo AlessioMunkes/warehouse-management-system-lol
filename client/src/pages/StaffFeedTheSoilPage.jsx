@@ -16,6 +16,9 @@ export default function StaffFeedTheSoilPage() {
   return (
     <StaffShell
       crumb={`Feed the Soil / ${crumb}`}
+      // History goes back to the kits from the header, the way the
+      // other histories go back to their own task.
+      onBack={history ? () => setHistory(false) : undefined}
       actions={history ? null : (
         <button type="button" className="stf-crumb-link" onClick={() => setHistory(true)}>
           <i className="ti ti-history" aria-hidden="true" />

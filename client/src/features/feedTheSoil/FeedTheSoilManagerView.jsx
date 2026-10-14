@@ -386,7 +386,7 @@ const RecordDetail = ({ record, onDispatch, onOpenKit, onClose, backLabel }) => 
           <Button type="button" size="sm" onClick={() => onDispatch(record)}>Mark dispatched</Button>
         ) : null}
         <Button type="button" variant="outline" size="sm" onClick={() => onOpenKit(record.kit_id)}>
-          View kit details
+          View kit logs
         </Button>
         <Button type="button" variant="ghost" size="sm" onClick={onClose}>{backLabel}</Button>
       </div>

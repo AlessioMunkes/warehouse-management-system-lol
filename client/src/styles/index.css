@@ -4108,6 +4108,68 @@ button.stf-panel-head:disabled { cursor: default; }
 }
 .stf-tools-extra { display: flex; flex-direction: column; gap: 8px; }
 
+/* Worker histories (HistoryScreen.jsx): Sort and the filters under the
+   search, two to a row on a phone and four on a wide screen, then the
+   "Showing 4 of 31" line. */
+.stf-history-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+@media (min-width: 720px) {
+  .stf-history-filters { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.stf-history-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.stf-history-filter-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--stf-text-sub);
+}
+.stf-select.is-compact {
+  min-height: var(--stf-tap);
+  padding: 0 12px;
+  font-size: 16px;
+  text-overflow: ellipsis;
+}
+.stf-history-count {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+  color: var(--stf-text-sub);
+}
+.stf-history-clear {
+  min-height: var(--stf-tap);
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--stf-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+/* Feed the Soil: whose kit it is, at the top of kit and record detail. */
+.stf-fts-owner { margin-bottom: 4px; }
+.stf-fts-owner-name {
+  margin: 0 0 6px;
+  font-family: var(--stf-font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--stf-ink);
+}
+.stf-history-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
 .stf-empty-line { margin: 0 0 12px; }
 
 

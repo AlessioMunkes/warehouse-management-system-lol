@@ -16,12 +16,11 @@
 //
 // The screen opens on Kits. The compost records are its History,
 // reached from the header (StaffFeedTheSoilPage), not a second tab:
-//   Records  the flat, cross-kit list — what needs attention. Sorted
-//            server-side: not-yet-dispatched first, dispatched at the
-//            bottom, newest first within each group. A row identifies
-//            a record by its kit only — date, weight and dispatch
-//            details live on the record's own detail screen, opened
-//            by tapping the row, not repeated in the list.
+//   Records  the flat, cross-kit list, drawn by HistoryScreen like
+//            every other worker history: date range, search, sort and
+//            filters (status, owner, suburb, where it went). A row
+//            names the kit AND its owner, with the date and weight, so
+//            the list can be read without opening each one.
 //   Kits     search by owner or suburb, assign a new kit, or open one
 //            to see who owns it (name + suburb only — no address or
 //            contact details, by design) and its full log history.
@@ -30,8 +29,13 @@
 // shows who owns it and every record logged against it; tapping a
 // record — from either tab — shows that one collection's own detail
 // (date, weight, status, and where it went once dispatched), not the
-// kit's. Kit detail's own record rows are equally minimal (a date,
-// nothing else) and open the same record detail on tap.
+// kit's. Kit detail's own record rows are a date and a weight and open
+// the same record detail on tap.
+//
+// Whose kit it is comes first on both detail screens: the kit and its
+// owner are the title, and the owner card sits above the records, not
+// beside or under them. Asked for from the floor, where it read as
+// secondary information.
 //
 // Built from the same StepPrimitives/TaskPage/usePaged vocabulary as
 // Receiving, Packing and Decanting.
@@ -42,6 +46,8 @@ import {
 } from '../staff/StepPrimitives';
 import TaskPage from '../staff/TaskPage';
 import { SearchHeading } from '../staff/ListTools';
+import HistoryScreen, { HistoryRow } from '../staff/HistoryScreen';
+import { withinRange, byNewest, byOldest, byNumber, byText } from '../staff/historyView';
 import usePaged from '../staff/usePaged';
 import Paged from '../staff/Paged';
 import { readDraft, writeDraft, clearDraft } from '../staff/useDraft';
@@ -83,6 +89,26 @@ const lastAction = (kit) => {
   return `Assigned ${fmtDate(kit.assigned_at)}`;
 };
 
+// The History list's sorts and filters (HistoryScreen). Module level
+// so their identity is stable across renders.
+const RECORD_SORTS = [
+  { key: 'newest', label: 'Newest first', compare: byNewest((r) => r.logged_at) },
+  { key: 'oldest', label: 'Oldest first', compare: byOldest((r) => r.logged_at) },
+  { key: 'heaviest', label: 'Heaviest first', compare: byNumber((r) => r.kg_compost) },
+  { key: 'owner', label: 'Owner A to Z', compare: byText((r) => r.owner_name) },
+];
+const RECORD_FILTERS = [
+  { key: 'status', label: 'Status', valueOf: (r) => r.status, labelOf: (v) => STATUS_LABEL[v] ?? v },
+  { key: 'owner', label: 'Owner', valueOf: (r) => r.owner_name },
+  { key: 'suburb', label: 'Suburb', valueOf: (r) => r.suburb },
+  { key: 'sentTo', label: 'Went to', valueOf: (r) => r.dispatched_to },
+];
+const recordSearchText = (r) =>
+  [formatKitCode(r.kit_id), r.owner_name, r.suburb, r.dispatched_to].filter(Boolean).join(' ');
+
+// The kit and whose it is, the way both detail screens are titled.
+const kitTitle = (kitId, owner) => `${formatKitCode(kitId)} · ${owner}`;
+
 // `history` and `onHistoryChange` belong to the page: its header carries
 // the History link, the same place Receiving and Dispatch keep theirs.
 // Kits are what this screen is for; the compost records are its history.
@@ -100,7 +126,9 @@ export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHist
 
   const [records, setRecords] = useState([]);
   const [recordsLoading, setRecordsLoading] = useState(true);
-  const [recordSearch, setRecordSearch] = useState('');
+  // The records API has no date range of its own, so History narrows
+  // what is loaded, with the same four ranges as the other histories.
+  const [recordRange, setRecordRange] = useState('all');
 
   const [kits, setKits] = useState([]);
   const [kitsLoading, setKitsLoading] = useState(true);
@@ -154,10 +182,10 @@ export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHist
     onCrumbChange?.(crumb);
   }, [phase, tab, selectedKit, onCrumbChange]);
 
-  const loadRecords = useCallback(async (search) => {
+  const loadRecords = useCallback(async () => {
     setBrowseError(null);
     try {
-      const res = await collectionKitAPI.listRecords({ search });
+      const res = await collectionKitAPI.listRecords({});
       setRecords(res?.data ?? res ?? []);
     } catch (err) {
       setBrowseError(err.message || 'Could not load compost records.');
@@ -177,11 +205,9 @@ export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHist
   useEffect(() => {
     let cancelled = false;
     setRecordsLoading(true);
-    loadRecords(recordSearch).finally(() => { if (!cancelled) setRecordsLoading(false); });
+    loadRecords().finally(() => { if (!cancelled) setRecordsLoading(false); });
     return () => { cancelled = true; };
-    // Deliberately not debounced, same reasoning as ListTools' own
-    // comment: the list is already in memory server-side and small.
-  }, [loadRecords, recordSearch]);
+  }, [loadRecords]);
 
   useEffect(() => {
     let cancelled = false;
@@ -190,7 +216,6 @@ export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHist
     return () => { cancelled = true; };
   }, [loadKits, kitSearch]);
 
-  const recordsPaged = usePaged(records);
   const kitsPaged = usePaged(kits);
 
   const openKit = async (id) => {
@@ -229,7 +254,7 @@ export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHist
     setFormError(null);
     if (targetTab) setTab(targetTab);
     loadKits(kitSearch);
-    loadRecords(recordSearch);
+    loadRecords();
   };
 
   // ── Assign a kit ───────────────────────────────────────────
@@ -302,7 +327,7 @@ export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHist
         setSuccess({ tone: 'offline', title: OFFLINE_TITLE, body: offlineLine('Do not log it again.') });
         return;
       }
-      await loadRecords(recordSearch);
+      await loadRecords();
       await openKit(selectedKit.id);
       setSuccess({ title: 'Compost logged', body: `${fmtKg(Number(kgCompost))} from ${formatKitCode(selectedKit.id)}.` });
     } catch (err) {
@@ -337,65 +362,61 @@ export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHist
     }
   };
 
-  // ── Records row ────────────────────────────────────────────
-  // showKit=true is the cross-kit view (the Records tab), identified
-  // by kit code only — date, weight and dispatch details live on the
-  // record's own detail screen, not repeated here. showKit=false is a
-  // kit's OWN history inside its detail screen, where the kit is
-  // already known, so the date carries the row instead; weight still
-  // lives on the record's own detail. Both open the same record
-  // detail on tap.
-  const RecordRow = ({ record, showKit = true, onOpen }) => (
+  // ── A kit's own record row ─────────────────────────────────
+  // Inside kit detail, where the kit is already known: the date and
+  // the weight. Opens the record's own detail on tap. The cross-kit
+  // History list draws HistoryRow instead.
+  const RecordRow = ({ record, onOpen }) => (
     <div
       className="stf-row" role="button" tabIndex={0}
       onClick={onOpen}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } }}
     >
       <span className="stf-row-main">
-        <span className="stf-row-title">
-          {showKit ? formatKitCode(record.kit_id) : fmtDate(record.logged_at)}
-        </span>
+        <span className="stf-row-title">{fmtDate(record.logged_at)}</span>
+        <span className="stf-row-meta">{fmtKg(record.kg_compost)}</span>
       </span>
       <KitStatusBadge status={record.status} />
     </div>
   );
 
   // ── History: the compost records ───────────────────────────
+  // The same screen as every worker history (HistoryScreen). The
+  // page's header carries the way back to the kits.
   if (phase === 'browse' && tab === 'records') {
     return (
       <>
         {successDialog}
-      <TaskPage
-        title="History"
-        sub="Compost logged, newest first."
-        actions={<Actions><Button variant="secondary" onClick={() => setTab('kits')}>Back to kits</Button></Actions>}
-      >
-        {browseError ? <Notice tone="warn">{browseError}</Notice> : null}
-        {queuedNote ? <Notice>{queuedNote}</Notice> : null}
-
-        <SearchHeading
-          title="Compost records"
-          id="fts-record-search" query={recordSearch} onQuery={setRecordSearch}
-          placeholder="Search by owner or suburb" buttonLabel="Search records"
+        <HistoryScreen
+          title="History"
+          sub="Every compost record logged."
+          error={browseError}
+          notice={queuedNote}
+          range={recordRange}
+          onRangeChange={setRecordRange}
+          loading={recordsLoading}
+          rows={records.filter((r) => withinRange(r.logged_at, recordRange))}
+          search={recordSearchText}
+          searchPlaceholder="Search by kit, owner, suburb or farm"
+          searchId="fts-record-search"
+          sorts={RECORD_SORTS}
+          filters={RECORD_FILTERS}
+          empty={recordRange === 'all' ? 'No compost has been logged yet.' : 'No compost logged in this range.'}
+          noun="records"
+          renderRow={(r) => (
+            <HistoryRow
+              title={kitTitle(r.kit_id, r.owner_name)}
+              meta={[
+                fmtDate(r.logged_at),
+                fmtKg(r.kg_compost),
+                r.suburb,
+                r.dispatched_to ? `Sent to ${r.dispatched_to}` : null,
+              ].filter(Boolean).join(' · ')}
+              badges={<KitStatusBadge status={r.status} />}
+              action={{ label: 'View record', onClick: () => openRecord(r.id) }}
+            />
+          )}
         />
-
-        {recordsLoading ? (
-          <div className="stf-skeleton" aria-label="Loading" />
-        ) : records.length === 0 ? (
-          <div className="stf-empty">
-            {recordSearch ? `No records match "${recordSearch}".` : 'No compost has been logged yet.'}
-          </div>
-        ) : (
-          <>
-            <div className="stf-list">
-              {recordsPaged.slice.map((r) => (
-                <RecordRow key={r.id} record={r} onOpen={() => openRecord(r.id)} />
-              ))}
-            </div>
-            <Paged {...recordsPaged} noun="records" />
-          </>
-        )}
-      </TaskPage>
       </>
     );
   }
@@ -435,8 +456,8 @@ export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHist
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openKit(kit.id); } }}
                 >
                   <span className="stf-row-main">
-                    <span className="stf-row-title">{formatKitCode(kit.id)}</span>
-                    <span className="stf-row-meta">{lastAction(kit)}</span>
+                    <span className="stf-row-title">{kitTitle(kit.id, kit.owner_name)}</span>
+                    <span className="stf-row-meta">{[kit.suburb, lastAction(kit)].filter(Boolean).join(' · ')}</span>
                   </span>
                   <button
                     type="button" className="stf-btn stf-btn-secondary"
@@ -464,37 +485,39 @@ export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHist
       <>
         {successDialog}
       <TaskPage
-        title="Collection kit details"
-        sub={`${formatKitCode(selectedKit.id)} · ${STATUS_LABEL[selectedKit.status] ?? selectedKit.status}`}
+        title={kitTitle(selectedKit.id, selectedKit.owner_name)}
+        sub={[selectedKit.suburb, STATUS_LABEL[selectedKit.status] ?? selectedKit.status].filter(Boolean).join(' · ')}
         actions={
           <Actions>
             <Button onClick={() => startLog(selectedKit)}>Log compost</Button>
             <Button variant="secondary" onClick={() => backToBrowse('kits')}>Back to kits</Button>
           </Actions>
         }
-        side={
-          <div className="stf-summary">
-            <p className="stf-summary-title">Owner</p>
-            <KeyValues
-              pairs={[
-                ['Name', selectedKit.owner_name],
-                ['Suburb', selectedKit.suburb || '-'],
-                ['Assigned', fmtDate(selectedKit.assigned_at)],
-              ]}
-            />
-          </div>
-        }
       >
         {browseError ? <Notice tone="warn">{browseError}</Notice> : null}
         {queuedNote ? <Notice>{queuedNote}</Notice> : null}
 
-        <p className="stf-summary-title">Collection records</p>
+        <div className="stf-summary stf-fts-owner">
+          <p className="stf-summary-title">Owner</p>
+          <p className="stf-fts-owner-name">{selectedKit.owner_name}</p>
+          <KeyValues
+            pairs={[
+              ['Kit', formatKitCode(selectedKit.id)],
+              ['Suburb', selectedKit.suburb || '-'],
+              ['Assigned', fmtDate(selectedKit.assigned_at)],
+              ['Collections', selectedKit.records.length],
+              ['Total', fmtKg(selectedKit.records.reduce((sum, r) => sum + Number(r.kg_compost || 0), 0))],
+            ]}
+          />
+        </div>
+
+        <p className="stf-summary-title">Compost logs</p>
         {selectedKit.records.length === 0 ? (
           <div className="stf-empty">No compost logged yet for this kit.</div>
         ) : (
           <div className="stf-list">
             {selectedKit.records.map((r) => (
-              <RecordRow key={r.id} record={r} showKit={false} onOpen={() => openRecord(r.id, { fromKit: true })} />
+              <RecordRow key={r.id} record={r} onOpen={() => openRecord(r.id, { fromKit: true })} />
             ))}
           </div>
         )}
@@ -513,8 +536,8 @@ export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHist
       <>
         {successDialog}
       <TaskPage
-        title="Compost record details"
-        sub={`${formatKitCode(selectedRecord.kit_id)} · ${STATUS_LABEL[selectedRecord.status] ?? selectedRecord.status}`}
+        title={kitTitle(selectedRecord.kit_id, selectedRecord.owner_name)}
+        sub={`Compost record · ${STATUS_LABEL[selectedRecord.status] ?? selectedRecord.status}`}
         actions={
           <Actions>
             {selectedRecord.status === 'logged' ? (
@@ -525,27 +548,30 @@ export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHist
             </Button>
           </Actions>
         }
-        side={
-          <div className="stf-summary">
-            <p className="stf-summary-title">Kit</p>
-            <KeyValues
-              pairs={[
-                ['Kit', formatKitCode(selectedRecord.kit_id)],
-                ['Owner', selectedRecord.owner_name],
-                ['Suburb', selectedRecord.suburb || '-'],
-              ]}
-            />
+      >
+        {browseError ? <Notice tone="warn">{browseError}</Notice> : null}
+        {queuedNote ? <Notice>{queuedNote}</Notice> : null}
+
+        {/* Whose kit, first. The button opens the kit's list of
+            compost logs, so it says so. */}
+        <div className="stf-summary stf-fts-owner">
+          <p className="stf-summary-title">Owner</p>
+          <p className="stf-fts-owner-name">{selectedRecord.owner_name}</p>
+          <KeyValues
+            pairs={[
+              ['Kit', formatKitCode(selectedRecord.kit_id)],
+              ['Suburb', selectedRecord.suburb || '-'],
+            ]}
+          />
+          {recordOrigin !== 'kit' ? (
             <button
               type="button" className="stf-btn stf-btn-secondary"
               onClick={() => openKit(selectedRecord.kit_id)}
             >
-              View kit details
+              View kit logs
             </button>
-          </div>
-        }
-      >
-        {browseError ? <Notice tone="warn">{browseError}</Notice> : null}
-        {queuedNote ? <Notice>{queuedNote}</Notice> : null}
+          ) : null}
+        </div>
 
         <p className="stf-summary-title">Collection</p>
         <KeyValues
