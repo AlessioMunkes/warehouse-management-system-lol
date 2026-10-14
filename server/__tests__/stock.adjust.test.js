@@ -593,7 +593,8 @@ describe('regression — balances are summed in NUMERIC, not JS floats', () => {
 // ─────────────────────────────────────────────────────────────
 describe('getManifest — committed stock is part of the answer', () => {
   const runManifest = async () => {
-    poolMock.query.mockResolvedValueOnce({ rows: [] });
+    // The manifest query, then the shelf estimate's reads (nothing dated here).
+    poolMock.query.mockResolvedValue({ rows: [] });
     await stockRepository.getManifest();
     return poolMock.query.mock.calls[0][0].replace(/\s+/g, ' ');
   };

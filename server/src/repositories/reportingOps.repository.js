@@ -20,6 +20,7 @@ import pool from '../config/db.js';
 import { COLLECTED_STATUSES, SAST } from '../features/reporting/reportCatalog.js';
 import { OPEN_PO_STATUSES } from '../constants/purchaseOrderStatus.js';
 import stockCoverRepo from './stockCover.repository.js';
+import { listExpiringLots } from './shelfLots.repository.js';
 
 const sastDate = (col) => `((${col} AT TIME ZONE '${SAST}')::date)`;
 const TODAY = `((NOW() AT TIME ZONE '${SAST}')::date)`;
@@ -272,9 +273,10 @@ const stockValue = async ({ dimension, filters }) => {
   return rows2series(rows);
 };
 
-// Receiving lines whose expiry falls in the next 30 days, by week or
-// product. Same source and the same "recorded, not per-batch" limit
-// as expiryWarning.repository.js.
+// Deliveries whose expiry falls in the next 30 days, by week or product,
+// counting only those estimated to still have stock and not dismissed by
+// a manager (shelfLots.repository.js): the same lines the Inventory
+// expiring tab and the daily warning use.
 // Products on the shelf that Stock value cannot price. Said beside the
 // figure: with no unit costs captured the report reads R0, which looks
 // like an empty warehouse.
@@ -291,14 +293,15 @@ const countUnpricedStock = async ({ filters = {} }) => {
 
 const expiringStock = async ({ dimension }) => {
   const expr = pick({ week: bucketWeek('dni.expiry_date'), day: bucketDay('dni.expiry_date'), product: 'p.name', product_category: PRODUCT_CATEGORY }, dimension);
+  const lots = await listExpiringLots({ withinDays: 30 });
+  if (lots.length === 0) return [];
   const { rows } = await pool.query(
     `SELECT ${expr} AS label, COUNT(*)::numeric AS value
        FROM delivery_note_items dni
        JOIN products p ON p.id = dni.product_id
-       JOIN stock_levels sl ON sl.product_id = dni.product_id
-      WHERE dni.expiry_date BETWEEN ${TODAY} AND ${TODAY} + 30
-        AND sl.quantity_on_hand > 0
-      GROUP BY ${expr} ORDER BY ${dimension === 'week' || dimension === 'day' ? '1' : '2 DESC, 1'}`
+      WHERE dni.id = ANY($1::int[])
+      GROUP BY ${expr} ORDER BY ${dimension === 'week' || dimension === 'day' ? '1' : '2 DESC, 1'}`,
+    [lots.map((lot) => lot.lineId)]
   );
   return rows2series(rows);
 };

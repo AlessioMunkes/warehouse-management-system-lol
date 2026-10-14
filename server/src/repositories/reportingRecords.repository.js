@@ -31,6 +31,7 @@ import pool from '../config/db.js';
 import { committedStockSql } from './committedStock.sql.js';
 import { COLLECTED_STATUSES, NOT_COLLECTED_STATUSES, SAST } from '../features/reporting/reportCatalog.js';
 import { OPEN_PO_STATUSES } from '../constants/purchaseOrderStatus.js';
+import { listExpiringLots } from './shelfLots.repository.js';
 
 export const MAX_RECORDS = 500;
 
@@ -391,7 +392,9 @@ export const REPORT_RECORDS = {
   unresolved_discrepancies:   { family: 'delivery_lines', where: [`COALESCE(dni.discrepancy_quantity, 0) <> 0`, `dni.discrepancy_resolved = false`] },
   procurement_spend:          { family: 'delivery_lines', where: [`poi.unit_price IS NOT NULL`] },
   unit_price_trend:           { family: 'delivery_lines', where: [`poi.unit_price IS NOT NULL`, `dni.received_quantity > 0`] },
-  expiring_stock:             { family: 'delivery_lines', noDate: true, where: [`dni.expiry_date BETWEEN ${TODAY} AND ${TODAY} + 30`, `sl.quantity_on_hand > 0`] },
+  // The deliveries the estimate says still have stock and are not dismissed,
+  // expiring within the days given (shelfLots.repository.js).
+  expiring_stock:             { family: 'delivery_lines', noDate: true, liveExpiryDays: 30 },
   po_on_time_rate:            { family: 'purchase_orders', date: `po.expected_delivery_date`, where: [`po.status <> 'returned'`] },
   supplier_lead_time:         { family: 'purchase_orders', where: [`po.status <> 'returned'`, `d.first_delivery IS NOT NULL`] },
   overdue_purchase_orders:    { family: 'purchase_orders', noDate: true, where: [`po.status IN (${inList(OPEN_PO_STATUSES)})`, `po.expected_delivery_date < ${TODAY}`] },
@@ -419,7 +422,7 @@ export const REPORT_RECORDS = {
 export const hasRecords = (metricId) => Boolean(REPORT_RECORDS[metricId]);
 
 /** The query for a report's records. Exported for the tests. */
-export const buildRecordsSql = ({ metric, filters = {}, dateRange = null }) => {
+export const buildRecordsSql = ({ metric, filters = {}, dateRange = null, lineIds = null }) => {
   const plan = REPORT_RECORDS[metric];
   if (!plan) return null;
   const family = FAMILIES[plan.family];
@@ -429,6 +432,11 @@ export const buildRecordsSql = ({ metric, filters = {}, dateRange = null }) => {
   if (dateExpr && dateRange) {
     params.push(dateRange.from, dateRange.to);
     where.push(`${dateExpr} BETWEEN $1::date AND $2::date`);
+  }
+  // A report of the deliveries the shelf estimate keeps: just those lines.
+  if (plan.liveExpiryDays) {
+    params.push(lineIds ?? []);
+    where.push(`dni.id = ANY($${params.length}::int[])`);
   }
   const ignored = [];
   for (const [key, value] of Object.entries(filters)) {
@@ -454,7 +462,9 @@ const NUMERIC = new Set(['number', 'money']);
 
 /** The records behind a report: columns, up to MAX_RECORDS rows, and how many there are in all. */
 export const listRecords = async (spec) => {
-  const built = buildRecordsSql(spec);
+  const days = REPORT_RECORDS[spec.metric]?.liveExpiryDays;
+  const lineIds = days ? (await listExpiringLots({ withinDays: days })).map((lot) => lot.lineId) : null;
+  const built = buildRecordsSql({ ...spec, lineIds });
   if (!built) return null;
   const [{ rows }, count] = await Promise.all([
     pool.query(built.sql, built.params),

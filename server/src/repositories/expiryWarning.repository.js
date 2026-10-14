@@ -9,42 +9,36 @@
 //
 // WHAT THIS WARNS ON, AND WHAT IT DOESN'T
 // expiry_date lives on delivery_note_items — one row per receiving
-// line, not per unit of stock still on the shelf. Per-batch
-// stock is not tracked: stock_levels is one
-// balance per product, so there is no data yet on how much of a given
-// delivery is still on hand versus already dispatched or decanted.
-// This warns on the DELIVERY LINE'S own expiry date regardless of
-// remaining quantity, same as the receiving screen already records
-// it — recorded, not enforced, per that same note. Tightening this to
-// remaining-quantity-aware warnings is real future work that needs
-// per-batch stock first, not something this file can do with the
-// data that exists today.
+// line, not per unit of stock still on the shelf. Per-batch stock is not
+// tracked: stock_levels is one balance per product. So which deliveries
+// still have stock is ESTIMATED (features/stock/shelfLots.js, loaded by
+// shelfLots.repository.js): stock is assumed to leave oldest-received
+// first, and a delivery estimated to be used up is not warned about.
+// A manager can dismiss the warning for a delivery the estimate has
+// wrong; that delivery is left out here too, so it is never sent.
+// Batch tracking would make the estimate exact, and only the loader would
+// change.
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
+import { listExpiringLots } from './shelfLots.repository.js';
 
 // ── Delivery lines entering a warning window ────────────────────
 // withinDays: warn once expiry_date is this many days out or closer
 // — but not already past, which is a different problem (spoiled
 // stock still on the shelf) this job does not try to solve.
+// Days are South African, like every screen.
 const findApproachingExpiry = async (withinDays) => {
-  const { rows } = await pool.query(
-    `SELECT
-       dni.id             AS delivery_note_item_id,
-       dni.expiry_date,
-       dni.received_quantity,
-       dni.unit,
-       p.id               AS product_id,
-       p.name             AS product_name,
-       p.stock_keeping_unit AS sku
-     FROM delivery_note_items dni
-     JOIN products p ON p.id = dni.product_id
-     WHERE dni.expiry_date IS NOT NULL
-       AND dni.expiry_date >= CURRENT_DATE
-       AND dni.expiry_date <= (CURRENT_DATE + $1::int)
-     ORDER BY dni.expiry_date ASC`,
-    [withinDays]
-  );
-  return rows;
+  const lots = await listExpiringLots({ withinDays });
+  return lots.map((lot) => ({
+    delivery_note_item_id: lot.lineId,
+    expiry_date: lot.expiryDate,
+    received_quantity: lot.received,
+    quantity_left: lot.left,
+    unit: lot.unit,
+    product_id: lot.productId,
+    product_name: lot.productName,
+    sku: lot.sku,
+  }));
 };
 
 // ── Has this exact warning already fired? ───────────────────────

@@ -23,6 +23,8 @@ vi.mock('../services/stockAPI', () => ({
   getMovements: vi.fn(),
   getBatches:   vi.fn(),
   adjustStock:  vi.fn(),
+  dismissExpiryWarning: vi.fn(),
+  restoreExpiryWarning: vi.fn(),
 }));
 
 vi.mock('@/lib/excelExport', () => ({ exportExcel: vi.fn() }));
@@ -103,9 +105,9 @@ describe('InventoryManagementPage — detail panel', () => {
     expect(await screen.findByRole('dialog')).toHaveTextContent('RICE-10');
   });
 
-  it('lists expiry lines as received quantities, soonest first as the server sent them', async () => {
+  it('lists the deliveries on the shelf with about how much is left of each, and says it is an estimate', async () => {
     getBatches.mockResolvedValue([
-      { id: 1, expiryDate: '2099-01-10', receivedQuantity: 40, unit: 'kg', receivedOn: '2026-09-01', supplierName: 'Acme', daysLeft: 9000 },
+      { id: 1, expiryDate: '2099-01-10', receivedQuantity: 40, quantityLeft: 12, unit: 'kg', receivedOn: '2026-09-01', supplierName: 'Acme', daysLeft: 9000, dismissal: null },
     ]);
     const user = userEvent.setup();
     render(<InventoryManagementPage />);
@@ -114,7 +116,9 @@ describe('InventoryManagementPage — detail panel', () => {
     const panel = within(await screen.findByRole('dialog'));
 
     expect(await panel.findByText(/Acme/)).toBeInTheDocument();
-    expect(panel.getByText(/not what remains/)).toBeInTheDocument();
+    expect(panel.getByText(/about 12 kg left of 40/)).toBeInTheDocument();
+    expect(panel.getByText(/Estimated: assumes oldest stock goes out first/)).toBeInTheDocument();
+    expect(panel.getByText(/Deliveries estimated to be used up are not listed/)).toBeInTheDocument();
   });
 
   it('hides the adjust action from roles the server would refuse anyway', async () => {

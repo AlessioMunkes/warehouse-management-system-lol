@@ -34,6 +34,7 @@ const ITEM_A = {
   delivery_note_item_id: 1,
   expiry_date: '2026-09-27',
   received_quantity: 10,
+  quantity_left: 4,
   unit: 'kg',
   product_id: 5,
   product_name: 'Maize meal',
@@ -83,6 +84,8 @@ describe('runExpiryCheck', () => {
       entityId: 1,
     });
     expect(firstArgs.title).toMatch(/Maize meal expires in 2 weeks/);
+    // What is probably left of the delivery, said to be an estimate.
+    expect(firstArgs.body).toBe('About 4 of 10 kg left, estimated · Expires 27 Sept 2026 · MM-01');
 
     const [, secondArgs] = createNotificationMock.mock.calls[1];
     expect(secondArgs).toMatchObject({
@@ -91,6 +94,20 @@ describe('runExpiryCheck', () => {
       entityId: 2,
     });
     expect(secondArgs.title).toMatch(/Tinned beans expires in 1 week/);
+  });
+
+  it('says crates in the plural, and crate for one', async () => {
+    repoMock.findApproachingExpiry.mockResolvedValueOnce([
+      { ...ITEM_A, unit: 'crate', received_quantity: 10, quantity_left: 1 },
+      { ...ITEM_B, delivery_note_item_id: 3, unit: 'crate', received_quantity: 1, quantity_left: 1 },
+    ]);
+    repoMock.findApproachingExpiry.mockResolvedValueOnce([]);
+    repoMock.warningAlreadySent.mockResolvedValue(false);
+
+    await expiryWarningService.runExpiryCheck();
+
+    expect(createNotificationMock.mock.calls[0][1].body).toMatch(/^About 1 of 10 crates left/);
+    expect(createNotificationMock.mock.calls[1][1].body).toMatch(/^About 1 of 1 crate left/);
   });
 
   it('skips a line that has already been warned at that tier', async () => {

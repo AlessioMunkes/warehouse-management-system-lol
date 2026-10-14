@@ -17,12 +17,37 @@ const row = (over = {}) => ({
   on_hand: 120, committed: 20, reorder_threshold: 0,
   recipe_weekly: 35, standing_weekly: 0, unconverted: [], dispatched: 0,
   incoming: [], supplier_name: 'Cape Mills', supplier_agreed_days: 4, linked_suppliers: [],
-  median_lead_days: null, lead_orders: 0, earliest_expiry: null,
+  median_lead_days: null, lead_orders: 0, lots: [],
   ...over,
 });
 const cover = (over, opts) => coverFor(row(over), { today: TODAY, horizonWeeks: 8, recipeName: 'Summer', ...opts });
 
 describe('stock cover', () => {
+  describe('use-by dates, from the estimated lots', () => {
+    // 100 available at 5 kg a day. A: 60 left, 8 days to its date, 40 usable, so 20 left over.
+    // B: 80 left, 49 days, 245 usable with 140 ahead of it: all used in time.
+    const lot = (lineId, expiryDate, left, dismissal = null) => ({ lineId, expiryDate, left, dismissal });
+    const lots = [lot(1, '2026-10-20', 60), lot(2, '2026-11-30', 80)];
+
+    it('takes the earliest expiry from the lots and flags the one that will not be used in time', () => {
+      expect(cover({ lots })).toMatchObject({ earliestExpiry: '2026-10-20', mayExpireOn: '2026-10-20', mayExpireQuantity: 20 });
+    });
+
+    it('leaves a dismissed lot out of both', () => {
+      const c = cover({ lots: [lot(1, '2026-10-20', 60, { reason: 'checked' }), lot(2, '2026-11-30', 80)] });
+      expect(c).toMatchObject({ earliestExpiry: '2026-11-30', mayExpireOn: null, mayExpireQuantity: 0 });
+    });
+
+    it('flags nothing when everything is already committed, and nothing for a product with no demand', () => {
+      expect(cover({ lots, on_hand: 20, committed: 20 })).toMatchObject({ mayExpireOn: null });
+      expect(cover({ lots, recipe_weekly: 0 })).toMatchObject({ earliestExpiry: '2026-10-20', mayExpireOn: null, mayExpireQuantity: 0 });
+    });
+
+    it('has no use-by date for a product with no lots', () => {
+      expect(cover()).toMatchObject({ earliestExpiry: null, mayExpireOn: null });
+    });
+  });
+
   it('works out available, cover, the runs-out date, the order-by date and what to order', () => {
     expect(cover()).toMatchObject({
       available: 100, weeklyDemand: 35, demandSource: 'planned', demandLabel: 'Summer recipe', daysOfCover: 20,
@@ -33,6 +58,25 @@ describe('stock cover', () => {
       suggestedQuantity: 180,            // 8 weeks of 35 is 280, less 100 available
       status: 'planned', limits: [],
     });
+  });
+
+  it('gives whole days of cover, always rounded down', () => {
+    // 100 available at 5 a day is 20 days exactly.
+    expect(cover().coverDays).toBe(20);
+    // 99 at 5 a day is 19.8 days: 19, not 20, though daysOfCover shows 19.8.
+    expect(cover({ on_hand: 119 })).toMatchObject({ daysOfCover: 19.8, coverDays: 19 });
+    // 100 at 50 a week (7.142857 a day) is exactly 14 days; a float must not make it 13.
+    expect(cover({ recipe_weekly: 50 })).toMatchObject({ coverDays: 14 });
+    // Nothing available: none.
+    expect(cover({ on_hand: 20 }).coverDays).toBe(0);
+    // No demand, nothing to measure.
+    expect(cover({ recipe_weekly: 0 }).coverDays).toBeNull();
+  });
+
+  it('gives the whole days of cover there would be if the overdue orders arrived today', () => {
+    // 100 available + 50 overdue at 5 a day = 30 days.
+    const c = cover({ incoming: [{ quantity: 50, expectedOn: '2026-10-05' }] });
+    expect(c.ifOverdueArrived).toMatchObject({ coverDays: 30 });
   });
 
   it('adds an order on the day it is due', () => {

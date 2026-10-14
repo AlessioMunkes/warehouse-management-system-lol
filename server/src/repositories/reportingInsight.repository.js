@@ -27,6 +27,8 @@
 import pool from '../config/db.js';
 import { NOT_COLLECTED_STATUSES, SAST } from '../features/reporting/reportCatalog.js';
 import { OPEN_PO_STATUSES } from '../constants/purchaseOrderStatus.js';
+import { listExpiringLots, todayInSAST } from './shelfLots.repository.js';
+import { daysBetween } from '../features/stock/shelfLots.js';
 
 export const LIST_LIMIT = 15;
 
@@ -253,23 +255,24 @@ const lowStockToReorder = async ({ filters = {} }) => {
   })));
 };
 
-// Same source as expiryWarning.repository.js: the receiving line's
-// own expiry date, not per-batch stock (which does not exist yet).
+// Same lines as the daily expiry warning (expiryWarning.repository.js):
+// deliveries estimated to still have stock, not dismissed by a manager.
+// Stock is not batch-tracked, so what is left of each is an estimate
+// (features/stock/shelfLots.js).
 const stockNearExpiry = async ({ withinDays = 14 } = {}) => {
-  const { rows } = await pool.query(
-    `SELECT p.name, dni.expiry_date, dni.received_quantity::numeric AS quantity, dni.unit,
-            (dni.expiry_date - CURRENT_DATE)::int AS days_left,
-            COUNT(*) OVER () AS total
-       FROM delivery_note_items dni
-       JOIN products p ON p.id = dni.product_id
-      WHERE dni.expiry_date IS NOT NULL
-        AND dni.expiry_date >= CURRENT_DATE
-        AND dni.expiry_date <= CURRENT_DATE + $1::int
-      ORDER BY dni.expiry_date ASC
-      LIMIT $2`,
-    [withinDays, LIST_LIMIT]
-  );
-  return withTotal(rows.map((r) => ({ ...r, quantity: num(r.quantity) })));
+  const lots = await listExpiringLots({ withinDays });
+  const today = todayInSAST();
+  return {
+    rows: lots.slice(0, LIST_LIMIT).map((lot) => ({
+      name: lot.productName,
+      expiry_date: lot.expiryDate,
+      quantity: lot.left,
+      received: lot.received,
+      unit: lot.unit,
+      days_left: daysBetween(today, lot.expiryDate),
+    })),
+    total: lots.length,
+  };
 };
 
 const countVarianceByProduct = async ({ dateRange, filters = {} }) => {

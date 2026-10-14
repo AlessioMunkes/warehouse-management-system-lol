@@ -168,7 +168,8 @@ const getSummary = async () => {
 // Each count is the size of a tab a manager can open:
 //   inventory      — the Inventory tabs (same rules as inventoryViews.js:
 //                    low stock excludes shortfalls; expiring is a
-//                    delivery line due within 30 days, today included)
+//                    product with a delivery estimated still on the shelf,
+//                    not dismissed, due within 30 days, today included)
 //   pickingSlips   — this week (Monday to Sunday, SAST), the Picking
 //                    Slips page's default range
 //   purchaseOrders — awaiting approval; flagged for follow-up; the

@@ -11,6 +11,10 @@
 // ─────────────────────────────────────────────────────────────
 
 export const EXPIRY_WINDOW_DAYS = 30;
+// Which deliveries are still on the shelf is worked out, not counted
+// (stock is one balance a product; use-by dates are kept per delivery).
+// Every screen that shows an expiry says so in this tooltip.
+export const EXPIRY_ESTIMATE_HINT = 'Estimated: assumes oldest stock goes out first';
 // Inside this, an expiry is urgent (red) rather than soon (amber) —
 // the server's first expiry warning goes out at 14 days by default.
 export const URGENT_EXPIRY_DAYS = 14;

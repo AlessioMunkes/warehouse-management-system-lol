@@ -14,14 +14,19 @@
 // ─────────────────────────────────────────────────────────────
 import { Link } from 'react-router-dom';
 import { STAFF } from '../../routes/paths';
-import { fmtQty } from '../../lib/quantity';
+import { NONE_AVAILABLE, coverText, fmtQtyUnit, weeklyUseText } from '../../lib/stockWording';
 import StatusBadge from '@/components/ui/status-badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import ChartNote from '../reporting/ChartNote';
+import { EXPIRY_ESTIMATE_HINT } from '../inventory/inventoryViews';
 
 // Under two weeks is the one to act on; under four is worth watching.
 const coverTone = (weeks) => (weeks < 2 ? 'text-danger' : weeks < 4 ? 'text-warn' : 'text-good');
-const weeksText = (weeks) => (weeks === 1 ? '1 week' : `${weeks} weeks`);
+
+// How long stock lasts, from whole days rounded down. Nothing available
+// has its own words; under a day (some stock, but not a whole day's
+// worth) says so rather than claiming a day.
+const coverWords = (available, wholeDays) => (available <= 0 ? NONE_AVAILABLE : coverText(wholeDays) ?? 'Less than 1 day');
 
 const fmtDay = (day) => new Date(`${day}T00:00:00Z`).toLocaleDateString('en-ZA', {
   day: 'numeric', month: 'short', timeZone: 'UTC',
@@ -53,9 +58,12 @@ const outlookNote = (insights) => [
   insights.recipeName
     ? `A week is what a week of slips takes: the ${insights.recipeName} recipe for centres on it, standing orders for the rest. Where that cannot be worked out, the average sent out a week over the last ${insights.outlook.usageWeeks} weeks.`
     : `A week is what a week of slips takes on standing orders, or where that cannot be worked out, the average sent out a week over the last ${insights.outlook.usageWeeks} weeks.`,
-  'Weeks is how long available stock lasts at that rate, with orders added on the day they are due.',
-  'May expire first means the next use-by date comes before the stock would be used up. Use-by dates are kept per delivery, so this assumes the oldest stock goes first.',
+  'The time on the right is how long available stock lasts at that rate, with orders added on the day they are due, always rounded down: days under two weeks, weeks and days up to four weeks, whole weeks beyond. A rate under one a week is shown as about so many a month.',
+  'May expire first means a delivery on the shelf will not all be used by its use-by date at that rate. Use-by dates are kept per delivery, so which deliveries are left is an estimate that assumes the oldest stock goes first. A manager can dismiss a warning in the stock detail on the Inventory page.',
 ].join(' ');
+
+// What is expected to be left on the day, and that it is an estimate.
+const mayExpireTip = (p) => `${p.mayExpireQuantity > 0 ? `About ${fmtQtyUnit(p.mayExpireQuantity, p.unit)} would still be on the shelf at its use-by date at this rate. ` : ''}${EXPIRY_ESTIMATE_HINT}.`;
 
 // Missing data that changed a product's figures. Lead time only moves
 // the order-by date, which is in the runs-short tip, so it is said there.
@@ -90,49 +98,52 @@ export function StockCoverPanel({ insights }) {
           <li key={p.productId} className="py-2 text-sm">
             <div className="flex items-baseline justify-between gap-3">
               <span className="min-w-0 truncate font-medium">{p.name}</span>
-              <Explained tip="How long available stock lasts at a week's rate, with orders added on the day they are due." className={`shrink-0 font-semibold tabular-nums ${coverTone(p.weeks)}`}>
-                {weeksText(p.weeks)}
+              <Explained
+                tip={p.available <= 0 ? shortTip(p) : "How long available stock lasts at a week's rate, with orders added on the day they are due. Rounded down."}
+                className={`shrink-0 font-semibold tabular-nums ${coverTone(p.weeks)}`}
+              >
+                {coverWords(p.available, p.days)}
               </Explained>
             </div>
             <p className="mt-0.5 flex flex-wrap gap-x-1.5 text-xs text-muted-foreground">
               <Explained tip="On hand, less packed pallets and approved benevolent requests.">
-                {fmtQty(p.available, p.unit)} available
+                {fmtQtyUnit(p.available, p.unit)} available
               </Explained>
               {p.dueIn > 0 ? (
                 <>
                   <span aria-hidden="true">·</span>
                   <Explained tip={`Still to arrive on open orders${p.nextDue ? `, the next due ${fmtDay(p.nextDue)}` : ''}.`}>
-                    {fmtQty(p.dueIn, p.unit)} due in
+                    {fmtQtyUnit(p.dueIn, p.unit)} due in
                   </Explained>
                 </>
               ) : null}
               <span aria-hidden="true">·</span>
               <Explained tip={weekTip(p)}>
-                {fmtQty(p.weeklyUse, p.unit)} a week
+                {weeklyUseText(p.weeklyUse, p.unit)}
               </Explained>
             </p>
             {p.limits.filter((l) => !isLeadLimit(l) && l !== 'Overdue, chase supplier').map((l) => (
               <p key={l} className="mt-0.5 text-xs text-warn">{l}</p>
             ))}
-            {p.runsShortOn || p.mayExpireOn || p.overdue > 0 ? (
+            {(p.runsShortOn && p.available > 0) || p.mayExpireOn || p.overdue > 0 ? (
               <p className="mt-1 flex flex-wrap gap-1.5">
                 {p.overdue > 0 ? (
                   <Explained
-                    tip={`Not counted in the weeks until it arrives.${p.ifOverdueArrived ? ` If it arrived today: ${weeksText(p.ifOverdueArrived.weeksOfCover)}.` : ''}`}
+                    tip={`Not counted in the cover until it arrives.${p.ifOverdueArrived ? ` If it arrived today: ${(coverText(p.ifOverdueArrived.coverDays) ?? 'less than 1 day').toLowerCase()}.` : ''}`}
                     className="no-underline"
                   >
-                    <StatusBadge kind="outlook" status="overdue">{fmtQty(p.overdue, p.unit)} overdue, chase supplier</StatusBadge>
+                    <StatusBadge kind="outlook" status="overdue">{fmtQtyUnit(p.overdue, p.unit)} overdue, chase supplier</StatusBadge>
                   </Explained>
                 ) : null}
-                {p.runsShortOn ? (
+                {p.runsShortOn && p.available > 0 ? (
                   <Explained tip={shortTip(p)} className="no-underline">
                     <StatusBadge kind="outlook" status="runs_short">
-                      {p.weeks === 0 ? 'None available' : `Runs short around ${fmtDay(p.runsShortOn)}`}
+                      {`Runs short around ${fmtDay(p.runsShortOn)}`}
                     </StatusBadge>
                   </Explained>
                 ) : null}
                 {p.mayExpireOn ? (
-                  <Explained tip="The next use-by date comes before this stock would be used up. This assumes the oldest stock goes first." className="no-underline">
+                  <Explained tip={mayExpireTip(p)} className="no-underline">
                     <StatusBadge kind="outlook" status="may_expire">May expire first: use-by {fmtDay(p.mayExpireOn)}</StatusBadge>
                   </Explained>
                 ) : null}

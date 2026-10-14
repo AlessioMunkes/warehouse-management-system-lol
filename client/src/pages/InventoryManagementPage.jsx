@@ -213,6 +213,7 @@ export default function InventoryManagementPage() {
           canAdjust={canAdjust}
           canEditCatalogue={user?.role === "admin"}
           onAdjust={(p) => startAdjusting([p])}
+          onExpiryChanged={reloadManifest}
           onClose={() => setOpenId(null)}
         />
       ) : null}

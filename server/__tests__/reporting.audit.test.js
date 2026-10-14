@@ -61,12 +61,8 @@ describe('low stock is the Inventory screen\'s rule', () => {
   });
 });
 
-describe('expiring stock is stock that is still there', () => {
-  it('leaves out a product with nothing on the shelf', async () => {
-    await repo.expiringStock({ dimension: 'product' });
-    expect(lastSql()).toMatch(/sl\.quantity_on_hand > 0/);
-  });
-});
+// Expiring stock is the deliveries estimated to still be on the shelf:
+// see reporting.expiring.test.js.
 
 describe('the total of a rate', () => {
   it('is the overall rate, weighing every order once', async () => {
