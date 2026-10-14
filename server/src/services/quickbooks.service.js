@@ -83,27 +83,45 @@ const warehouseForState = (state) => {
   return meta && meta.expiresAt > Date.now() ? (meta.warehouse ?? null) : null;
 };
 
+// A callback can arrive twice for one sign-in (a browser that repeats the
+// request, a prefetch, a double click on Intuit's page). The first
+// finishes the connection; the second must not be told the sign-in has
+// "expired" and send the admin back to Settings with an error, after the
+// connection was in fact made. So the state is kept for its ten minutes
+// with the outcome of the first call, and a repeat with the SAME code and
+// company simply gets that outcome again. A different code on a used state
+// is still refused: the state only ever vouches for one sign-in.
 const handleCallback = async ({ code = null, state = null, realmId = null, oauthError = null } = {}) => {
   sweepStates();
   if (oauthError) throw fail(400, 'QuickBooks sign-in was cancelled or refused.');
   const meta = state ? states.get(String(state)) : null;
-  if (state) states.delete(String(state));
   if (!meta || meta.expiresAt <= Date.now()) throw fail(400, 'That QuickBooks sign-in has expired. Start again from Settings.');
   if (!code || !realmId) throw fail(400, 'QuickBooks did not send back what is needed to connect. Start again from Settings.');
   if (!/^[0-9]{1,32}$/.test(String(realmId))) throw fail(400, 'QuickBooks sent back a company this system cannot use.');
 
-  const tokens = await qbo.exchangeCode(String(code));
-  await repo.saveConnection({
-    realmId: String(realmId),
-    tokenType: tokens.tokenType,
-    scope: SCOPE,
-    accessEncrypted: encrypt(tokens.accessToken),
-    refreshEncrypted: encrypt(tokens.refreshToken),
-    accessExpiresAt: tokens.accessExpiresAt,
-    refreshExpiresAt: tokens.refreshExpiresAt,
-    userId: meta.userId,
-  });
-  return { realmId: String(realmId) };
+  if (meta.completion) {
+    if (meta.code !== String(code) || meta.realmId !== String(realmId)) {
+      throw fail(400, 'That QuickBooks sign-in has expired. Start again from Settings.');
+    }
+    return meta.completion;
+  }
+  meta.code = String(code);
+  meta.realmId = String(realmId);
+  meta.completion = (async () => {
+    const tokens = await qbo.exchangeCode(String(code));
+    await repo.saveConnection({
+      realmId: String(realmId),
+      tokenType: tokens.tokenType,
+      scope: SCOPE,
+      accessEncrypted: encrypt(tokens.accessToken),
+      refreshEncrypted: encrypt(tokens.refreshToken),
+      accessExpiresAt: tokens.accessExpiresAt,
+      refreshExpiresAt: tokens.refreshExpiresAt,
+      userId: meta.userId,
+    });
+    return { realmId: String(realmId) };
+  })();
+  return meta.completion;
 };
 
 const disconnect = async () => {

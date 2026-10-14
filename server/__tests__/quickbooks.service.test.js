@@ -160,10 +160,48 @@ describe('connecting', () => {
     expect(repo.saveConnection).not.toHaveBeenCalled();
   });
 
-  it('uses a state once', async () => {
-    const { state } = service.startConnect({ userId: 2 });
-    await service.handleCallback({ code: 'c', state, realmId: '1' });
-    await expect(service.handleCallback({ code: 'c', state, realmId: '1' })).rejects.toMatchObject({ status: 400 });
+  describe('a callback that arrives twice', () => {
+    const tokenCalls = () => calls.filter((c) => c.url.hostname === 'oauth.platform.intuit.com');
+
+    it('connects once and answers the repeat the same way, instead of saying it expired', async () => {
+      const { state } = service.startConnect({ userId: 2 });
+      const first = await service.handleCallback({ code: 'c', state, realmId: '1' });
+      const again = await service.handleCallback({ code: 'c', state, realmId: '1' });
+      expect(again).toEqual(first);
+      expect(repo.saveConnection).toHaveBeenCalledTimes(1);
+      expect(tokenCalls()).toHaveLength(1);
+    });
+
+    it('does the same when the two arrive at the same moment', async () => {
+      const { state } = service.startConnect({ userId: 2 });
+      const [a, b] = await Promise.all([
+        service.handleCallback({ code: 'c', state, realmId: '1' }),
+        service.handleCallback({ code: 'c', state, realmId: '1' }),
+      ]);
+      expect(a).toEqual(b);
+      expect(repo.saveConnection).toHaveBeenCalledTimes(1);
+      expect(tokenCalls()).toHaveLength(1);
+    });
+
+    it('still refuses a different code, or another company, on a used state', async () => {
+      const { state } = service.startConnect({ userId: 2 });
+      await service.handleCallback({ code: 'c', state, realmId: '1' });
+      await expect(service.handleCallback({ code: 'other', state, realmId: '1' })).rejects.toMatchObject({ status: 400 });
+      await expect(service.handleCallback({ code: 'c', state, realmId: '2' })).rejects.toMatchObject({ status: 400 });
+      expect(repo.saveConnection).toHaveBeenCalledTimes(1);
+    });
+
+    it('tells the repeat of a failed sign-in that it failed, not that it worked', async () => {
+      world.token = () => reply(400, { error: 'invalid_grant' });
+      const { state } = service.startConnect({ userId: 2 });
+      await expect(service.handleCallback({ code: 'c', state, realmId: '1' })).rejects.toBeTruthy();
+      await expect(service.handleCallback({ code: 'c', state, realmId: '1' })).rejects.toBeTruthy();
+      expect(repo.saveConnection).not.toHaveBeenCalled();
+    });
+
+    it('does not accept a state it never issued', async () => {
+      await expect(service.handleCallback({ code: 'c', state: 'made-up', realmId: '1' })).rejects.toMatchObject({ status: 400 });
+    });
   });
 
   it('refuses a company id that is not one', async () => {
