@@ -183,16 +183,29 @@ const dayOf = (value) => {
   return Number.isNaN(d.getTime()) ? undefined : d.toLocaleDateString('en-CA', { timeZone: 'Africa/Johannesburg' });
 };
 
+// "17 Oct 2026", for a person reading the order in QuickBooks.
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const readable = (value) => {
+  const iso = dayOf(value);
+  if (!iso) return null;
+  const [y, m, d] = iso.split('-').map(Number);
+  return `${d} ${MONTHS[m - 1]} ${y}`;
+};
+
 // QuickBooks' own shape for a purchase order. Exported for the tests.
 export const buildPurchaseOrder = (po, { vendor, items, payables }) => ({
   DocNumber: po.po_number,
   TxnDate: dayOf(po.created_at),
-  DueDate: dayOf(po.expected_delivery_date),
   // Finance was asked to type our order number into the Memo when
   // capturing by hand, and the file import links on it. Kept here so
   // an order sent this way is found by the same number.
   PrivateNote: po.po_number,
-  Memo: [po.po_number, po.notes].filter(Boolean).join(' · ').slice(0, 4000),
+  // QuickBooks keeps no delivery date on a purchase order: ShipDate is
+  // refused and DueDate is accepted and silently dropped (checked against
+  // a sandbox company). The Memo, the message to the supplier, is kept, so
+  // the date travels there, after the number the file import looks for.
+  Memo: [po.po_number, readable(po.expected_delivery_date) && `Expected delivery ${readable(po.expected_delivery_date)}`, po.notes]
+    .filter(Boolean).join(' · ').slice(0, 4000),
   VendorRef: { value: String(vendor.Id), name: vendor.DisplayName },
   ...(payables ? { APAccountRef: { value: String(payables.Id), name: payables.Name } } : {}),
   Line: po.items.map((line) => {

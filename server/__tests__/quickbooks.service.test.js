@@ -335,9 +335,27 @@ describe('the words sent', () => {
     });
     expect(body.DocNumber).toBe('PO-2026-0028');
     expect(body.PrivateNote).toBe('PO-2026-0028');
-    expect(body.Memo).toBe('PO-2026-0028 · Leave at gate 2');
-    expect(body.DueDate).toBe('2026-10-17');
+    expect(body.Memo).toBe('PO-2026-0028 · Expected delivery 17 Oct 2026 · Leave at gate 2');
+    expect(body.DueDate).toBeUndefined();   // QuickBooks drops it
+    expect(body.ShipDate).toBeUndefined();  // and refuses this one
     expect(body.APAccountRef).toBeUndefined();
+  });
+});
+
+describe('the delivery date sent', () => {
+  const build = (over) => buildPurchaseOrder({ ...PO, ...over }, {
+    vendor: { Id: '1', DisplayName: 'V' },
+    items: new Map([[1, { Id: '1', Name: 'Rice 2 kg' }], [2, { Id: '2', Name: 'Baked beans 410 g' }]]),
+    payables: null,
+  });
+  it('rides in the Memo, which QuickBooks keeps, after our number', () => {
+    expect(build({ notes: null }).Memo).toBe('PO-2026-0028 · Expected delivery 17 Oct 2026');
+  });
+  it('is left out when the order has none, and the number stays first', () => {
+    expect(build({ expected_delivery_date: null, notes: 'Gate 2' }).Memo).toBe('PO-2026-0028 · Gate 2');
+  });
+  it('reads a date object the way the database driver returns it', () => {
+    expect(build({ expected_delivery_date: new Date('2026-12-01T00:00:00+02:00'), notes: null }).Memo).toContain('Expected delivery 1 Dec 2026');
   });
 });
 
