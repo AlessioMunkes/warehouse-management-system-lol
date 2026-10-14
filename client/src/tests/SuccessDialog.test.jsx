@@ -44,6 +44,28 @@ describe('SuccessDialog', () => {
     expect(document.querySelector('.stf-success-mark')).toHaveClass('is-waiting');
   });
 
+  // "Says more than just done": a picture of the job and what it came to.
+  it('shows the job\'s picture and its numbers, flagging the one to look at', () => {
+    render(
+      <SuccessDialog
+        open title="Pallet packed" picture="ti-package" onClose={() => {}}
+        facts={[{ value: 12, label: 'items packed' }, null, { value: 1, label: 'item flagged', warn: true }]}
+      >
+        It is ready for dispatch to Green Pastures.
+      </SuccessDialog>,
+    );
+    expect(document.querySelector('.stf-success-picture .ti-package')).toBeTruthy();
+    expect(document.querySelectorAll('.stf-success-bit').length).toBe(8);
+    expect(screen.getByText('items packed').nextSibling).toHaveTextContent('12');
+    expect(screen.getByText('item flagged').closest('.stf-success-fact')).toHaveClass('is-warn');
+  });
+
+  it('does not celebrate work that is only on the phone', () => {
+    render(<SuccessDialog open tone="offline" picture="ti-package" title={OFFLINE_TITLE} onClose={() => {}}>x</SuccessDialog>);
+    expect(document.querySelector('.stf-success-bit')).toBeNull();
+    expect(document.querySelector('.stf-success-picture')).toHaveClass('is-waiting');
+  });
+
   it('shows nothing when closed', () => {
     render(<SuccessDialog open={false} title="Pallet packed" onClose={() => {}}>It is ready for dispatch.</SuccessDialog>);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

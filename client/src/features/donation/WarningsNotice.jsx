@@ -51,6 +51,7 @@ export function CompletionDialog({ open, result, onRecordAnother, onGoHome }) {
         ? OFFLINE_TITLE
         : pendingReview ? 'Donation received, pending manager review' : 'Donation recorded'}
       onClose={onRecordAnother}
+      picture="ti-heart-handshake"
       closeLabel="Record another"
       action={{ label: 'Go to home', onClick: onGoHome }}
     >

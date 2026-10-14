@@ -3938,6 +3938,147 @@ button.stf-panel-head:disabled { cursor: default; }
   color: var(--stf-ink);
 }
 
+/* The picture on a success pop-up: the job's own icon with the tick as
+   a badge, a small burst round it when the job is really done, then
+   the numbers and a thank you. Asked for so "done" says more than the
+   one word. Every colour is a token, so dark mode follows. */
+.stf-success-hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  width: 120px;
+  height: 104px;
+  margin: 0 auto 4px;
+}
+.stf-success-hero .stf-success-mark { margin-bottom: 0; }
+.stf-success-hero.is-done > .stf-success-picture,
+.stf-success-hero.is-done > .stf-success-mark {
+  animation: stf-success-pop 420ms cubic-bezier(.2, 1.4, .4, 1) both;
+}
+.stf-success-picture {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: var(--good-soft, #e6f4ea);
+  color: var(--good-ink, #1d7a3a);
+  font-size: 44px;
+}
+.stf-success-picture.is-waiting {
+  background: var(--stf-field-bg);
+  color: var(--stf-ink);
+}
+.stf-success-mark.is-badge {
+  position: absolute;
+  right: -4px;
+  bottom: -2px;
+  width: 32px;
+  height: 32px;
+  font-size: 18px;
+  border: 3px solid var(--stf-white);
+  background: var(--good-ink, #1d7a3a);
+  color: var(--stf-white);
+}
+.stf-success-hero.is-done .stf-success-mark.is-badge {
+  animation: stf-success-pop 360ms 260ms cubic-bezier(.2, 1.4, .4, 1) both;
+}
+.stf-success-mark.is-badge.is-waiting {
+  background: var(--stf-ink);
+  color: var(--stf-white);
+}
+
+/* The burst: eight pieces flung out from behind the picture once. */
+.stf-success-bit {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 2px;
+  background: var(--stf-accent);
+  opacity: 0;
+  animation: stf-success-burst 900ms 120ms ease-out both;
+}
+.stf-success-bit:nth-child(odd) { border-radius: 50%; background: var(--good-ink, #1d7a3a); }
+.stf-success-bit:nth-child(3n)  { background: var(--stf-gold); }
+.stf-success-bit.is-0 { --dx:   0px; --dy: -52px; }
+.stf-success-bit.is-1 { --dx:  40px; --dy: -38px; }
+.stf-success-bit.is-2 { --dx:  58px; --dy:   0px; }
+.stf-success-bit.is-3 { --dx:  40px; --dy:  36px; }
+.stf-success-bit.is-4 { --dx:   0px; --dy:  50px; }
+.stf-success-bit.is-5 { --dx: -40px; --dy:  36px; }
+.stf-success-bit.is-6 { --dx: -58px; --dy:   0px; }
+.stf-success-bit.is-7 { --dx: -40px; --dy: -38px; }
+@keyframes stf-success-burst {
+  0%   { opacity: 0; transform: translate(0, 0) scale(.4) rotate(0deg); }
+  25%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1) rotate(160deg); }
+}
+@keyframes stf-success-pop {
+  0%   { transform: scale(.5); opacity: 0; }
+  100% { transform: scale(1);  opacity: 1; }
+}
+
+/* What the job added up to: up to three numbers in a row. */
+.stf-success-facts {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin: 4px 0 0;
+}
+.stf-success-fact {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px;
+  border-radius: 16px;
+  background: var(--stf-sand);
+  border: 1px solid var(--stf-border);
+  text-align: center;
+  min-width: 0;
+}
+.stf-success-fact dd {
+  margin: 0;
+  font-family: var(--stf-font-display);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--stf-ink);
+  overflow-wrap: anywhere;
+}
+.stf-success-fact dt {
+  font-size: 13px;
+  line-height: 1.25;
+  color: var(--stf-text-sub);
+}
+.stf-success-fact.is-warn {
+  background: var(--warn-soft, #fff4e5);
+  border-color: var(--warn-soft, #fff4e5);
+}
+.stf-success-fact.is-warn dd { color: var(--warn-ink, #9a4d00); }
+
+.stf-success-thanks {
+  margin: 4px 0 0;
+  text-align: center;
+  font-weight: 600;
+  color: var(--stf-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stf-success-bit { display: none; }
+  .stf-success-hero.is-done > .stf-success-picture,
+  .stf-success-hero.is-done > .stf-success-mark,
+  .stf-success-hero.is-done .stf-success-mark.is-badge { animation: none; }
+}
+
 /* A search that opens from an icon beside a field's label (SelectField's
    `search`). The label and the icon share one row; the box appears
    under them only once it is asked for. */

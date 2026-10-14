@@ -298,6 +298,32 @@ describe('createDelivery — what counts as a count, and as a date', () => {
     expect(repoMock.createDelivery).not.toHaveBeenCalled();
   });
 
+  // BR-06. Perishables must have a use-by date; a dry line may send a
+  // best-before, which is kept so the expiry warnings can see it.
+  const dated = (expiryDate) => body({ lineItems: [{ purchaseOrderItemId: 100, receivedQuantity: 20,
+    overAction: 'accept', location: 'dry_store', expiryDate }] });
+
+  it('keeps the date sent on a dry line', async () => {
+    await deliveryService.createDelivery(dated('2027-03-01'), USER_ID);
+    expect(repoMock.createDelivery.mock.calls[0][0].lineItems[0].expiryDate).toBe('2027-03-01');
+  });
+
+  it('records a dry line with no date', async () => {
+    await deliveryService.createDelivery(dated(''), USER_ID);
+    expect(repoMock.createDelivery.mock.calls[0][0].lineItems[0].expiryDate).toBeNull();
+  });
+
+  it('refuses a date on a dry line that is not a calendar date', async () => {
+    await expect(deliveryService.createDelivery(dated('01/03/2027'), USER_ID))
+      .rejects.toMatchObject({ status: 400, message: expect.stringContaining('must be a calendar date') });
+  });
+
+  it('still refuses a perishable line with no date', async () => {
+    repoMock.getPurchaseOrderItems.mockResolvedValue([poItem({ product_name: 'Apples', is_perishable: true })]);
+    await expect(deliveryService.createDelivery(dated(''), USER_ID))
+      .rejects.toMatchObject({ status: 400, message: expect.stringContaining('use-by date is required for Apples') });
+  });
+
   // A reopened part-received order: the repository hands back what is
   // still owed as expected_quantity, so receiving exactly that is clean.
   it('receiving what is still owed on a reopened order is not a discrepancy', async () => {

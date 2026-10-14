@@ -944,6 +944,12 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
         open={phase === 'done'}
         tone={queued ? 'offline' : 'success'}
         title={queued ? OFFLINE_TITLE : 'Decanting saved'}
+        picture="ti-paper-bag"
+        facts={[
+          { value: madeTotal, label: madeTotal === 1 ? 'bag made' : 'bags made' },
+          weighedKg !== '' ? { value: `${weighedKg} kg`, label: 'bulk weighed' } : null,
+          Number(wastageKg) > 0 ? { value: `${wastageKg} kg`, label: 'wastage' } : null,
+        ]}
         onClose={restart}
         action={doneRecord && !queued ? { label: 'View decanting sheet', onClick: () => setPdfRecord(doneRecord) } : null}
       >

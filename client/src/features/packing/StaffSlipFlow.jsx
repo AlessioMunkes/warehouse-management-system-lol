@@ -33,7 +33,8 @@ import {
 } from '../staff/StepPrimitives';
 import useCoachmark from '../staff/useCoachmark';
 import { volunteerHolder } from '../pickingSlips/slipViews';
-import { isPackedSlip, isCollectedSlip } from './spareSlips';
+import { isPackedSlip, isCollectedSlip } from './spareSlips';
+
 import SuccessDialog from '../staff/SuccessDialog';
 import { OFFLINE_TITLE, offlineLine } from '../staff/successText';
 import PhotoButton from '../staff/PhotoButton';
@@ -94,6 +95,9 @@ function ItemDecisionPanel({ item, slipId, onDone }) {
   // The paper slip's "Comment" column — on every line, not only a
   // flagged one, so it lives here rather than folded into reason.
   const [note, setNote] = useState('');
+  // Photos saved against this item while the flag panel was open. A
+  // flag needs at least one: the manager sorts it out from the picture.
+  const [photos, setPhotos] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const t = useT();
@@ -152,8 +156,11 @@ function ItemDecisionPanel({ item, slipId, onDone }) {
       />
       <Counter label={t('slip.qtyPacked')} value={flagQty === '' ? 0 : Number(flagQty)} onChange={(v) => setFlagQty(String(v))} />
       <p className="stf-field-hint">{t('slip.comesOffStock')}</p>
-      {/* Optional, and saved the moment it is taken: see PhotoButton. */}
-      <PhotoButton entityType="picking_slip_item" entityId={item.id} hint={t('photo.hintFlag')} />
+      {/* Required for a flag, and saved the moment it is taken: see PhotoButton. */}
+      <PhotoButton
+        entityType="picking_slip_item" entityId={item.id} hint={t('photo.hintFlag')}
+        onSaved={() => setPhotos((n) => n + 1)}
+      />
       <TextField
         id={`stf-note-flag-${item.id}`}
         label={t('slip.comment')}
@@ -162,10 +169,11 @@ function ItemDecisionPanel({ item, slipId, onDone }) {
         onChange={setNote}
       />
       {error ? <Notice tone="warn">{error}</Notice> : null}
+      {reason && photos === 0 ? <p className="stf-field-hint">{t('slip.photoNeeded')}</p> : null}
       <Actions row>
         <Button
           variant="step"
-          disabled={!reason || submitting}
+          disabled={!reason || photos === 0 || submitting}
           onClick={async () => {
             setSubmitting(true);
             setError(null);
@@ -355,9 +363,16 @@ export default function StaffSlipFlow({ currentUser, slipId, onBack, onFinished 
         open={Boolean(packedDone)}
         tone={packedDone?.queued ? 'offline' : 'success'}
         title={packedDone?.queued ? OFFLINE_TITLE : 'Pallet packed'}
+        picture="ti-package"
+        facts={[
+          { value: confirmed, label: confirmed === 1 ? 'item packed' : 'items packed' },
+          flagged > 0 ? { value: flagged, label: flagged === 1 ? 'item flagged' : 'items flagged', warn: true } : null,
+        ]}
         onClose={() => { setPackedDone(null); onFinished?.(); }}
       >
-        {packedDone?.queued ? offlineLine('Do not pack it again.') : 'It is ready for dispatch.'}
+        {packedDone?.queued
+          ? offlineLine('Do not pack it again.')
+          : slip?.ecd_name ? `It is ready for dispatch to ${slip.ecd_name}.` : 'It is ready for dispatch.'}
       </SuccessDialog>
       <div className="stf-step-head">
         {/* Same .stf-card-toggle treatment StepScreen/TaskPage give the

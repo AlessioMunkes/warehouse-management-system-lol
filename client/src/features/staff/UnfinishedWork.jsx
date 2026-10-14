@@ -99,15 +99,16 @@ export default function UnfinishedWork() {
 
             <Link className="stf-resume-go" to={to}>{t('resume.carryOn')}</Link>
 
-            {/* Discarding is deliberately the quieter of the two and
-                says what it does. "Dismiss" would be a lie: the counts
-                go with it. */}
+            {/* Discarding is deliberately the quieter of the two.
+                "Release" was asked for by the floor in place of "Throw
+                away": it lets go of the job, and the saved counts go
+                with it. */}
             <button
               type="button"
               className="stf-resume-drop"
               onClick={() => discard(draft.key)}
             >
-              {t('resume.throwAway')}
+              {t('resume.release')}
             </button>
           </li>
         ))}

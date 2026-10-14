@@ -291,20 +291,21 @@ const createDelivery = async (data, userId) => {
     }
 
     // ── BR-06: FEFO needs a date to sort on ────────────────────
-    // Only perishables carry one — dry goods are picked oldest-first
-    // and have nothing to record. A date is stored as sent; no
-    // timezone conversion, because a use-by date is a calendar date
-    // rather than an instant.
+    // Required for perishables. Dry goods may send one too (the
+    // best-before on a tin), which the expiry warnings then pick up;
+    // without one they are picked oldest-first as before. A date is
+    // stored as sent; no timezone conversion, because a use-by date is
+    // a calendar date rather than an instant.
     let expiryDate = null;
-    if (po.is_perishable) {
-      const raw = String(line.expiryDate || '').trim();
-      if (!raw) {
-        fail(400, `A use-by date is required for ${po.product_name}, a perishable product.`);
-      }
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(raw) || Number.isNaN(Date.parse(raw))) {
+    const rawExpiry = String(line.expiryDate || '').trim();
+    if (po.is_perishable && !rawExpiry) {
+      fail(400, `A use-by date is required for ${po.product_name}, a perishable product.`);
+    }
+    if (rawExpiry) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(rawExpiry) || Number.isNaN(Date.parse(rawExpiry))) {
         fail(400, `Use-by date for ${po.product_name} must be a calendar date (YYYY-MM-DD).`);
       }
-      expiryDate = raw;
+      expiryDate = rawExpiry;
     }
 
     resolved.push({
@@ -317,7 +318,7 @@ const createDelivery = async (data, userId) => {
       unit:                po.default_unit,
       discrepancyReason:   variance === 0 ? null : String(line.discrepancyReason).trim(),
       storageArea,                     // BR-07
-      expiryDate,                      // BR-06 — null unless perishable
+      expiryDate,                      // BR-06 — required if perishable
     });
   }
 

@@ -126,7 +126,7 @@ export default function FeedTheSoilFlow({ onCrumbChange, history = false, onHist
   // The confirmation after assigning, logging or dispatching.
   const [success, setSuccess] = useState(null);
   const successDialog = (
-    <SuccessDialog open={Boolean(success)} tone={success?.tone} title={success?.title} onClose={() => setSuccess(null)}>
+    <SuccessDialog open={Boolean(success)} tone={success?.tone} title={success?.title} picture="ti-plant" onClose={() => setSuccess(null)}>
       {success?.body}
     </SuccessDialog>
   );

@@ -55,7 +55,7 @@ import { newIdempotencyKey } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import SignaturePad from './SignaturePad';
 import DeliveryNotePDF from './DeliveryNotePDF';
-import formatPoCode from './poCode';
+import formatPoCode from './poCode';
 import SuccessDialog from '../staff/SuccessDialog';
 import { OFFLINE_TITLE, offlineLine } from '../staff/successText';
 
@@ -104,8 +104,8 @@ const LOCATIONS = [
   { value: 'cold_room', label: 'Cold room', meta: 'For fresh food only' },
 ];
 
-// Fresh lines need a use-by date and are picked date-first; dry goods
-// are picked oldest-first and have no date to record (BR-06). Reads
+// Fresh lines need a use-by date (BR-06); dry goods may carry a
+// best-before and it is asked for, but never required. Reads
 // products.is_perishable; the name heuristic stays only as a fallback
 // for a database without that column, so a missing column degrades
 // this to a guess rather than breaking the screen.
@@ -317,6 +317,8 @@ export default function ReceivingFlow({ onCrumbChange }) {
     [openSuppliers, supplierId]
   );
   const shortLines = lines.filter((l) => l.counted !== '' && Number(l.counted) < l.expected);
+  // What came in, for the numbers on the confirmation.
+  const receivedUnits = lines.reduce((sum, l) => sum + Number(l.counted || 0), 0);
   const receivedByName = user?.firstName ? `${user.firstName} ${user.lastName ?? ''}`.trim() : 'You';
   const hasLines = lines.length > 0;
 
@@ -497,7 +499,7 @@ export default function ReceivingFlow({ onCrumbChange }) {
             receivedQuantity,
             overAction: 'accept', // no reject-the-extra UI on this screen yet
             location: line.location,
-            expiryDate: line.fresh ? (line.useBy || null) : null,
+            expiryDate: line.useBy || null,
             // Short and over counts are recorded structurally rather
             // than typed out by staff — the service still requires a
             // reason for any line that varies, so this is it.
@@ -746,31 +748,31 @@ export default function ReceivingFlow({ onCrumbChange }) {
                       onChange={(value) => patchLine(line.purchaseOrderItemId, { location: value })}
                     />
 
-                    {/* Fresh only. Dry goods get no date field rather
-                        than a disabled one: an empty box staff are told
-                        to skip is a box someone eventually fills in
-                        wrongly. */}
-                    {line.fresh ? (
-                      <div className="stf-field">
-                        <label
-                          className="stf-field-label"
-                          htmlFor={`stf-useby-${line.purchaseOrderItemId}`}
-                        >
-                          What is the date on the box?
-                        </label>
-                        <input
-                          id={`stf-useby-${line.purchaseOrderItemId}`}
-                          className="stf-input is-text"
-                          type="date"
-                          value={line.useBy}
-                          onChange={(e) => patchLine(line.purchaseOrderItemId, { useBy: e.target.value })}
-                        />
-                        <p className="stf-field-hint">
-                          Fresh food is packed by date, so this is what decides which box goes out
-                          first.
-                        </p>
-                      </div>
-                    ) : null}
+                    {/* Every line, in both views. Fresh food must have
+                        one; tins and packets usually carry a best-before
+                        too, and that date is what the expiry warnings
+                        run on, so it is asked for and may be left
+                        empty. */}
+                    <div className="stf-field">
+                      <label
+                        className="stf-field-label"
+                        htmlFor={`stf-useby-${line.purchaseOrderItemId}`}
+                      >
+                        What is the date on the box?
+                      </label>
+                      <input
+                        id={`stf-useby-${line.purchaseOrderItemId}`}
+                        className="stf-input is-text"
+                        type="date"
+                        value={line.useBy}
+                        onChange={(e) => patchLine(line.purchaseOrderItemId, { useBy: e.target.value })}
+                      />
+                      <p className="stf-field-hint">
+                        {line.fresh
+                          ? 'Fresh food is packed by date, so this is what decides which box goes out first.'
+                          : 'Leave it empty if there is no date.'}
+                      </p>
+                    </div>
 
                     {short ? (
                       <Notice tone="warn">
@@ -799,6 +801,14 @@ export default function ReceivingFlow({ onCrumbChange }) {
         open={phase === 'done'}
         tone={queued ? 'offline' : 'success'}
         title={queued ? OFFLINE_TITLE : 'Delivery received'}
+        picture="ti-truck-delivery"
+        facts={[
+          { value: lines.length, label: lines.length === 1 ? 'line counted' : 'lines counted' },
+          { value: receivedUnits, label: 'units in' },
+          shortLines.length > 0
+            ? { value: shortLines.length, label: shortLines.length === 1 ? 'line short' : 'lines short', warn: true }
+            : null,
+        ]}
         onClose={restart}
         action={doneNote && !queued ? { label: 'View delivery note', onClick: () => setPdfDelivery(doneNote) } : null}
       >

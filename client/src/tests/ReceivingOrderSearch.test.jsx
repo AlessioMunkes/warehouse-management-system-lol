@@ -268,11 +268,25 @@ describe('receiving: what Form used to leave out', () => {
     const user = userEvent.setup();
     await openOrder86Form(user);
 
-    // Apples is fresh and has no date yet, so Form opens on it.
-    const useBy = screen.getByLabelText(/What is the date on the box/i);
+    // Apples is fresh and has no date yet, so it is the one asked about.
+    expect(screen.getByText(/a use-by date on Apples/)).toBeInTheDocument();
+    const useBy = document.getElementById('stf-useby-501');
     await user.type(useBy, '2026-11-01');
     await waitFor(() =>
       expect(screen.queryByText(/a use-by date on/)).not.toBeInTheDocument());
+  });
+
+  // Asked for from the floor: Form showed no date on a dry line, so it
+  // looked as though Form did not collect expiry dates at all. Every
+  // line has the box now; on a dry line it may be left empty.
+  it('asks for the date on a dry line too, without requiring it', async () => {
+    const user = userEvent.setup();
+    await openOrder86Form(user);
+
+    expect(screen.getAllByLabelText(/What is the date on the box/i)).toHaveLength(2);
+    expect(document.getElementById('stf-useby-502')).toBeInTheDocument();
+    expect(screen.getByText('Leave it empty if there is no date.')).toBeInTheDocument();
+    expect(screen.queryByText(/a use-by date on Canned Baked Beans/)).not.toBeInTheDocument();
   });
 
   it('shows where each line is going without a tap', async () => {

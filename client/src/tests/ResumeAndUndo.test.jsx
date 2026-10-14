@@ -104,7 +104,7 @@ describe('UnfinishedWork', () => {
     writeDraft('receiving-86', { counted: {} });
     render(<UnfinishedWork />);
 
-    await user.click(screen.getByRole('button', { name: 'Throw away' }));
+    await user.click(screen.getByRole('button', { name: 'Release' }));
     expect(screen.queryByText(/Order 86/)).not.toBeInTheDocument();
     expect(listDrafts()).toEqual([]);
   });

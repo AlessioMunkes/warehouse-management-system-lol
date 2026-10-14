@@ -383,7 +383,7 @@ export default function CommunityRequestFlow({ onCrumbChange }) {
       </div>
 
       {notice ? <Notice>{notice}</Notice> : null}
-      <SuccessDialog open={Boolean(success)} title={success?.title} onClose={() => setSuccess(null)}>
+      <SuccessDialog open={Boolean(success)} title={success?.title} picture="ti-clipboard-check" onClose={() => setSuccess(null)}>
         {success?.body}
       </SuccessDialog>
 

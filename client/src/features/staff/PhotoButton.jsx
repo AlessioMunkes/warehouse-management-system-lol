@@ -4,10 +4,11 @@
 // "Add a photo": opens the phone's camera, shrinks the picture and saves
 // it against one record (a flagged slip item, a delivery's order).
 //
-// Optional everywhere it appears. Nothing waits on it: the photo is
-// saved the moment it is taken, on its own, so a worker who takes one
-// and then cancels the flag has still not lost anything, and one who
-// skips it is not held up.
+// The photo is saved the moment it is taken, on its own, so a worker
+// who takes one and then cancels the flag has still not lost anything.
+// Optional on a delivery. Flagging a packed item needs one: the caller
+// hears about each saved photo through `onSaved` and holds its own
+// button until there is one.
 //
 // It says what happened in words: how many are saved, that one is
 // waiting on the phone when there is no signal, or that it failed.
@@ -20,7 +21,7 @@ import { useT } from '../../translations';
 // `hint` is the line under the button before a photo is taken; `hintKey`
 // is the same as a key in translations/messages.js, for a screen that has no
 // translator of its own.
-export default function PhotoButton({ entityType, entityId, hint, hintKey }) {
+export default function PhotoButton({ entityType, entityId, hint, hintKey, onSaved }) {
   const t = useT();
   const input = useRef(null);
   const [saved, setSaved] = useState(0);
@@ -41,6 +42,7 @@ export default function PhotoButton({ entityType, entityId, hint, hintKey }) {
       const result = await uploadPhoto({ entityType, entityId, dataUrl });
       if (result?.queued) setOnPhone(true);
       setSaved((n) => n + 1);
+      onSaved?.();
     } catch (err) {
       setError(err?.message === 'not-a-photo' ? t('photo.notAPhoto') : (err?.status ? err.message : t('photo.failed')));
     } finally {

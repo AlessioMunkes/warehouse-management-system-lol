@@ -415,7 +415,7 @@ const createDelivery = async ({
           line.unit,
           line.discrepancyReason,
           line.storageArea,   // BR-07 — migration 018
-          line.expiryDate,    // BR-06 — null for anything not perishable
+          line.expiryDate,    // BR-06 — required if perishable, optional otherwise
         ],
       );
 

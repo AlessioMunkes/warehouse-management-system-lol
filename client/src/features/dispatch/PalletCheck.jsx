@@ -515,10 +515,14 @@ export default function PalletCheck({ palletId, onBack, onCollected, onCrumbChan
         open={phase === 'done'}
         tone={queued ? 'offline' : 'success'}
         title={queued ? OFFLINE_TITLE : 'Pallet dispatched'}
+        picture="ti-truck"
+        facts={[{ value: packedLines.length, label: packedLines.length === 1 ? 'line loaded' : 'lines loaded' }]}
         onClose={backToQueue}
         action={doneNote && !queued ? { label: 'View dispatch note', onClick: () => setPdfNote(doneNote) } : null}
       >
-        {queued ? offlineLine('Let the driver go.') : 'Stock updated. The pallet can go.'}
+        {queued
+          ? offlineLine('Let the driver go.')
+          : driverName.trim() ? `Stock updated. ${driverName.trim()} can go.` : 'Stock updated. The pallet can go.'}
       </SuccessDialog>
 
       {pdfNote ? (
