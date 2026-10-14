@@ -149,10 +149,16 @@ const listUnclaimedBetween = async (from, to) => {
 // their own pallet succeeds quietly rather than being told it is taken
 // by someone, that someone being themselves.
 //
+// Takes EITHER volunteerId (a guest who already has a session) OR
+// newVolunteerName (someone arriving by QR with no session). The new
+// volunteer is inserted inside this same transaction, after the slip has
+// been checked, so a claim that is refused or fails leaves no volunteer
+// row behind: nobody is recorded as arriving for a pallet they did not get.
+//
 // Does NOT set assigned_to. A guest holds a slip through
 // assigned_volunteer_id; writing a volunteer id into assigned_to would
 // point an FK at users and name a staff member.
-const claimForVolunteer = async ({ slipId, volunteerId }) => {
+const claimForVolunteer = async ({ slipId, volunteerId = null, newVolunteerName = null }) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -184,6 +190,37 @@ const claimForVolunteer = async ({ slipId, volunteerId }) => {
       return { takenByVolunteer: true };
     }
 
+    let volunteer = null;
+    if (volunteerId !== null && volunteerId !== undefined) {
+      // One pallet per volunteer. A second would stay locked to them but
+      // out of their sight: the guest screens show only the newest, and
+      // nothing else would ever free the first.
+      // The volunteer's own row is locked first, so two scans from one
+      // phone at once cannot both pass the check below.
+      await client.query('SELECT id FROM volunteers WHERE id = $1 FOR UPDATE', [volunteerId]);
+      const other = await client.query(
+        `SELECT id FROM picking_slips
+          WHERE assigned_volunteer_id = $1 AND id <> $2 AND status = ANY($3)
+          LIMIT 1`,
+        [volunteerId, slipId, CLAIMABLE_STATUSES],
+      );
+      if (other.rows[0]) {
+        await client.query('ROLLBACK');
+        return { alreadyHolding: true, heldSlipId: other.rows[0].id };
+      }
+    } else {
+      // source is always 'guest_login'. It is the only seam that will
+      // later distinguish a walk-in from a VMS-booked volunteer.
+      const inserted = await client.query(
+        `INSERT INTO volunteers (full_name, source)
+         VALUES ($1, 'guest_login')
+         RETURNING id, full_name, signed_in_at`,
+        [newVolunteerName],
+      );
+      volunteer = inserted.rows[0];
+      volunteerId = volunteer.id;
+    }
+
     const result = await client.query(
       `UPDATE picking_slips
           SET assigned_volunteer_id = $1,
@@ -204,7 +241,7 @@ const claimForVolunteer = async ({ slipId, volunteerId }) => {
     );
 
     await client.query('COMMIT');
-    return { slip: result.rows[0], alreadyMine: heldBy !== null };
+    return { slip: result.rows[0], alreadyMine: heldBy !== null, volunteer };
 
   } catch (err) {
     await client.query('ROLLBACK');
@@ -229,10 +266,15 @@ const findSlipIdForVolunteer = async (volunteerId) => {
 };
 
 // ── Release ───────────────────────────────────────────────────
-// A guest handing their pallet back to the floor (they are signing out
-// before it is finished). Frees ONLY the pallet this volunteer holds:
-// the WHERE names both the volunteer and a not-yet-finished status, so
-// the write itself is the guard, not a check made beforehand.
+// A guest handing their pallets back to the floor (they are signing out
+// before finishing, or pressing "return this pallet"). Frees ONLY the
+// pallets this volunteer holds: the WHERE names both the volunteer and a
+// not-yet-finished status, so the write itself is the guard, not a check
+// made beforehand.
+//
+// EVERY pallet they hold, not just the newest. The claim now refuses a
+// second pallet, but a volunteer could hold two from before that rule,
+// and one left behind stays locked to a person who has gone home.
 //
 // Item progress is not touched. The next person, guest or worker, picks
 // up from the first item still pending. started_at is kept for the same
@@ -248,34 +290,38 @@ const releaseForVolunteer = async ({ volunteerId }) => {
         WHERE assigned_volunteer_id = $1
           AND status = ANY($2)
         ORDER BY id DESC
-        LIMIT 1
         FOR UPDATE`,
       [volunteerId, CLAIMABLE_STATUSES],
     );
     if (!held.rows[0]) { await client.query('ROLLBACK'); return { nothingHeld: true }; }
 
-    const result = await client.query(
-      `UPDATE picking_slips
-          SET assigned_volunteer_id = NULL,
-              status = 'pending'
-        WHERE id = $1
-          AND assigned_volunteer_id = $2
-          AND status = ANY($3)
-        RETURNING *`,
-      [held.rows[0].id, volunteerId, CLAIMABLE_STATUSES],
-    );
-    if (!result.rows[0]) { await client.query('ROLLBACK'); return { nothingHeld: true }; }
+    const slips = [];
+    for (const { id } of held.rows) {
+      const result = await client.query(
+        `UPDATE picking_slips
+            SET assigned_volunteer_id = NULL,
+                status = 'pending'
+          WHERE id = $1
+            AND assigned_volunteer_id = $2
+            AND status = ANY($3)
+          RETURNING *`,
+        [id, volunteerId, CLAIMABLE_STATUSES],
+      );
+      if (!result.rows[0]) continue;
+      slips.push(result.rows[0]);
 
-    // Same event type the claim and the manager release use (the column
-    // is CHECK-constrained); the detail says what happened.
-    await client.query(
-      `INSERT INTO picking_events (picking_slip_id, event_type, actor_id, detail)
-       VALUES ($1, 'assigned', NULL, $2)`,
-      [result.rows[0].id, { actor_type: 'volunteer', volunteer_id: volunteerId, released: true }],
-    );
+      // Same event type the claim and the manager release use (the column
+      // is CHECK-constrained); the detail says what happened.
+      await client.query(
+        `INSERT INTO picking_events (picking_slip_id, event_type, actor_id, detail)
+         VALUES ($1, 'assigned', NULL, $2)`,
+        [result.rows[0].id, { actor_type: 'volunteer', volunteer_id: volunteerId, released: true }],
+      );
+    }
+    if (slips.length === 0) { await client.query('ROLLBACK'); return { nothingHeld: true }; }
 
     await client.query('COMMIT');
-    return { slip: result.rows[0] };
+    return { slip: slips[0], slips };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;

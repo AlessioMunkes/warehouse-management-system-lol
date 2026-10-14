@@ -17,6 +17,7 @@ import auth, { requireRole } from '../middleware/auth.middleware.js';
 import { MANAGERS_UP, GUEST_ONLY } from '../constants/permissions.js';
 import { validateIntId }            from '../middleware/validate.middleware.js';
 import volunteerRepo                from '../repositories/volunteer.repository.js';
+import slipAccessRepo               from '../repositories/slipAccess.repository.js';
 
 const router = express.Router();
 
@@ -142,6 +143,14 @@ router.post('/sign-out',
   async (req, res) => {
     try {
       const id = req.user.id;
+
+      // Every pallet they still hold goes back to the floor first, so a
+      // volunteer who signs out (or whose app skipped the hand-back)
+      // never leaves a pallet locked to someone who has gone home. Only
+      // the caller's own pallets, named by the token; nothing held is a
+      // no-op. Progress on the items is kept for the next person.
+      await slipAccessRepo.releaseForVolunteer({ volunteerId: id });
+
       const updated = await volunteerRepo.signOutVolunteer(id);
 
       res.clearCookie(AUTH_COOKIE, authCookieOptions());

@@ -89,7 +89,7 @@ suite('guest release (real SQL)', () => {
     });
 
     const result = await slipAccessService.releaseMySlip({ id: a });
-    expect(result).toEqual({ released: true, slipId });
+    expect(result).toEqual({ released: true, slipId, slipIds: [slipId] });
 
     expect(await row(slipId)).toMatchObject({ status: 'pending', assigned_volunteer_id: null, assigned_to: null });
     const items = (await pool.query(

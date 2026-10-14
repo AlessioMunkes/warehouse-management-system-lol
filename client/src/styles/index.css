@@ -6333,3 +6333,34 @@ button.stf-panel-head:disabled { cursor: default; }
   .pdfnote-doc-meta-box,
   .pdfnote-doc-additional { page-break-inside: avoid; break-inside: avoid; }
 }
+
+/* ── Pallet QR scanner (features/scan) ──────────────────────────
+   The camera view the scanner library draws into. Square so the code
+   box sits in the middle on a phone held upright; the library's own
+   inline styles size the video, so only the frame is set here.
+   Nothing in it moves, so Reduce motion needs no special case. */
+.scan-view {
+  width: 100%;
+  max-width: 22rem;
+  margin-inline: auto;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #000;
+}
+.scan-view video { width: 100% !important; height: 100% !important; object-fit: cover; }
+
+/* The worker's panel: the same room a pallet card takes on that screen. */
+.stf-scan {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--stf-border);
+  border-radius: var(--stf-radius);
+  background: var(--stf-white);
+}
+.stf-scan-title { margin: 0; font-size: 16px; font-weight: 600; color: var(--stf-ink); }
+.stf-scan-title:focus { outline: none; }
+.stf-scan-hint { margin: 0; font-size: 13px; line-height: 1.55; color: var(--stf-text); }
+.stf-scan-code { display: flex; flex-direction: column; gap: 10px; }

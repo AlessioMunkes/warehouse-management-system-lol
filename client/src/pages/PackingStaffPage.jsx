@@ -15,6 +15,7 @@ import { PACKING } from '../routes/paths';
 import StaffShell from '../components/layout/StaffShell';
 import StaffSlipList from '../features/packing/StaffSlipList';
 import StaffSlipFlow from '../features/packing/StaffSlipFlow';
+import StaffScanPanel from '../features/scan/StaffScanPanel';
 
 export default function PackingStaffPage() {
   const { slipId } = useParams();
@@ -39,10 +40,14 @@ export default function PackingStaffPage() {
           onFinished={backToList}
         />
       ) : (
-        <StaffSlipList
-          currentUser={user}
-          onOpenSlip={(id) => navigate(PACKING.detail(id))}
-        />
+        <>
+          {/* Scan the QR on the pallet sheet, or type the code under it. */}
+          <StaffScanPanel />
+          <StaffSlipList
+            currentUser={user}
+            onOpenSlip={(id) => navigate(PACKING.detail(id))}
+          />
+        </>
       )}
     </StaffShell>
   );

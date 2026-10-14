@@ -15,21 +15,30 @@
 // then scanned a pallet — the name step is skipped: the server binds
 // the existing volunteer rather than creating a second one, so asking
 // again would be asking someone to introduce themselves twice.
+//
+// STAFF ARE NOT VOLUNTEERS. A worker, manager or admin who opens a pallet
+// link is already signed in, and the guest flow would swap their staff
+// session for a volunteer's. They are sent to their own screen for that
+// pallet instead (StaffSlipRedirect below) and nothing is claimed here.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useGuestSignOut } from '../features/guest/useGuestSignOut';
+import { useT } from '../translations';
+import { staffDestination } from '../features/scan/slipCode';
+import { homeForRole } from '../components/layout/navSections';
 import { fetchSlipPreview, claimSlipByToken } from '../services/guestSlipAPI';
 import {
   GuestShell, GuestScreen, PlaceBar, Button, Notice,
   PalletCard, HelpNote, Loading, SignOutConfirm,
 } from '../features/guest/GuestPrimitives';
 
-const SlipPreviewPage = () => {
+const GuestSlipPreview = () => {
   const { token } = useParams();
   const navigate = useNavigate();
   const { user, refreshFromClaim } = useAuth();
+  const t = useT();
 
   const [slip, setSlip]       = useState(null);
   const [loading, setLoading] = useState(true);
@@ -81,7 +90,9 @@ const SlipPreviewPage = () => {
       navigate('/guest-home', { replace: true });
       navigate('/guest/pack');
     } catch (err) {
-      setError(err.message);
+      // A guest already packing a pallet is told to finish or hand it
+      // back, in their own language, rather than the server's English.
+      setError(err.alreadyHolding ? t('guest.slip.holding') : err.message);
       setBusy(false);
     }
   };
@@ -95,7 +106,7 @@ const SlipPreviewPage = () => {
     return (
       <GuestShell>
         <GuestScreen
-          title="We could not find that pallet"
+          title={t('guest.slip.notFoundTitle')}
           lede="The code may be mistyped, or the pallet may be finished."
         >
           <Notice tone="warn">{error || 'That code did not match a pallet.'}</Notice>
@@ -109,6 +120,11 @@ const SlipPreviewPage = () => {
 
   const taken = slip.isClaimed;
   const finished = !['pending', 'in_progress'].includes(slip.status);
+  // What became of it: a cancelled pallet was never packed, so it must not
+  // say "finished".
+  const finishedKey = slip.status === 'cancelled' ? 'guest.slip.cancelled'
+    : slip.status === 'dispatched' ? 'guest.slip.collected'
+    : 'guest.slip.packed';
 
   // ── (b) Name entry ──────────────────────────────────────────
   // Framed as "so we can thank you", never as a login form. There is no
@@ -182,7 +198,7 @@ const SlipPreviewPage = () => {
         </div>
 
         {finished ? (
-          <Notice tone="info">This pallet is already finished. Ask a staff member for another one.</Notice>
+          <Notice tone="info">{t(finishedKey)}</Notice>
         ) : taken ? (
           <Notice tone="info">Someone is already packing this pallet. Ask a staff member for another one.</Notice>
         ) : null}
@@ -210,6 +226,62 @@ const SlipPreviewPage = () => {
       </GuestScreen>
     </GuestShell>
   );
+};
+
+// ── A signed-in staff member opening a pallet link ────────────
+// The preview is public and already carries the slip id, so no new
+// endpoint is needed: look the token up, then go to the screen that
+// person uses for a pallet. The worker screen shows who holds it, and
+// says so itself when the pallet is finished or cancelled.
+const StaffSlipRedirect = () => {
+  const { token } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const t = useT();
+  const [error, setError] = useState(null);
+  const [adminStop, setAdminStop] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchSlipPreview(token)
+      .then((slip) => {
+        if (cancelled) return;
+        const to = staffDestination(user.role, slip.id);
+        if (to) navigate(to, { replace: true });
+        else setAdminStop(true);
+      })
+      .catch((err) => { if (!cancelled) setError(err.message); });
+    return () => { cancelled = true; };
+  }, [token, user.role, navigate]);
+
+  if (!error && !adminStop) {
+    return <GuestShell><Loading label={t('guest.slip.staffOpening')} /></GuestShell>;
+  }
+
+  return (
+    <GuestShell>
+      <GuestScreen title={t('guest.slip.notFoundTitle')}>
+        <Notice tone="warn">{adminStop ? t('guest.slip.staffAdmin') : error}</Notice>
+        <Button onClick={() => navigate(homeForRole(user.role), { replace: true })}>
+          {t('guest.slip.staffHome')}
+        </Button>
+      </GuestScreen>
+    </GuestShell>
+  );
+};
+
+const SlipPreviewPage = () => {
+  const { user, isLoading } = useAuth();
+  const t = useT();
+
+  // The session check is a round trip: until it answers we cannot tell a
+  // volunteer from a worker, and showing the guest page first would flash
+  // it at someone about to be redirected.
+  if (isLoading) {
+    return <GuestShell><Loading label={t('guest.slip.staffOpening')} /></GuestShell>;
+  }
+  if (user && user.role !== 'guest') return <StaffSlipRedirect />;
+  return <GuestSlipPreview />;
 };
 
 export default SlipPreviewPage;

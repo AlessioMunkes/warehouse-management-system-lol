@@ -29,6 +29,7 @@ import {
   GuestShell, GuestScreen, Button, Notice, PalletCard, HelpNote, Loading,
 } from '../features/guest/GuestPrimitives';
 import { displayName } from '../features/guest/guestFormat';
+import GuestScanPanel from '../features/scan/GuestScanPanel';
 import { useT } from '../translations';
 
 // Name and "<n> of <total> packed", from the /mine payload the page
@@ -81,6 +82,15 @@ const GuestHomePage = () => {
     return () => { cancelled = true; };
   }, []);
 
+  // Look it up first so a wrong code is a plain "we could not find
+  // that", not a failed claim the volunteer has to interpret. Shared by
+  // the typed box and the scanner, which read the same 6 characters.
+  const claimCode = async (code6) => {
+    await fetchSlipByCode(code6);
+    await claimSlipByCode(code6);
+    navigate('/guest/pack');
+  };
+
   const claimByCode = async (e) => {
     e.preventDefault();
     const trimmed = code.trim().toLowerCase();
@@ -92,13 +102,9 @@ const GuestHomePage = () => {
     setBusy(true);
     setCodeError(null);
     try {
-      // Look it up first so a wrong code is a plain "we could not find
-      // that", not a failed claim the volunteer has to interpret.
-      await fetchSlipByCode(trimmed);
-      await claimSlipByCode(trimmed);
-      navigate('/guest/pack');
+      await claimCode(trimmed);
     } catch (err) {
-      setCodeError(err.message);
+      setCodeError(err.alreadyHolding ? t('guest.slip.holding') : err.message);
       setBusy(false);
     }
   };
@@ -187,6 +193,17 @@ const GuestHomePage = () => {
             ) : null}
 
             {error ? <Notice tone="warn">{error}</Notice> : null}
+
+            {/* ── Scan the QR on the pallet sheet ────────────── */}
+            {!mySlip ? (
+              <GuestScanPanel
+                disabled={busy}
+                // A link goes to the pallet preview, as opening the QR does.
+                onToken={(token) => navigate(`/slip/${token}`)}
+                onCode={claimCode}
+                onTypeInstead={() => requestAnimationFrame(() => document.getElementById('gst-code')?.focus())}
+              />
+            ) : null}
 
             {/* ── 1. Pick from the list — no typing ──────────── */}
             {!mySlip ? (

@@ -27,6 +27,7 @@ const handle = (res, error, logLabel, fallback) => {
       success: false,
       message: error.message,
       ...(error.ambiguous ? { ambiguous: true } : {}),
+      ...(error.alreadyHolding ? { alreadyHolding: true } : {}),
     });
   }
   console.error(logLabel, error.message);
