@@ -36,6 +36,7 @@ import PurchaseOrderForm   from '../features/purchaseOrders/PurchaseOrderForm';
 import PurchaseOrderList   from '../features/purchaseOrders/PurchaseOrderList';
 import PurchaseOrderDetail from '../features/purchaseOrders/PurchaseOrderDetail';
 import purchaseOrderAPI, { PO_STATUS_LABELS, needsFollowUp } from '../services/purchaseOrderAPI';
+import { getStatus as getQuickbooksStatus } from '../services/quickbooksAPI';
 import supplierAPI from '../services/supplierAPI';
 import stockAPI    from '../services/stockAPI';
 import { Button }   from '@/components/ui/button';
@@ -72,8 +73,9 @@ const PO_VIEWS = [
   // only while there are any (or the tab is open from a link).
   { id: 'email_failed',       label: 'Finance email failed', alert: true, onlyWhenAny: true,
     test: (po) => po.financeEmailStatus === 'failed' },
-  { id: 'needs_match',        label: 'Needs a QuickBooks match', alert: true, onlyWhenAny: true,
-    test: (po) => po.quickbooksState === 'needs_match' },
+  { id: 'needs_match',        label: 'Needs QuickBooks attention', alert: true, onlyWhenAny: true,
+    // A name not found there, or an order QuickBooks refused: both wait for a person.
+    test: (po) => po.quickbooksState === 'needs_match' || po.quickbooksState === 'refused' },
   { id: 'all',                label: 'All',                test: () => true },
 ];
 const viewById = (id) => PO_VIEWS.find((v) => v.id === id) ?? PO_VIEWS[0];
@@ -107,6 +109,21 @@ export default function PurchaseOrdersPage() {
   const [invalidProductIds, setInvalidProductIds] = useState([]);
   const [search, setSearch]       = useState('');
   const [importOpen, setImportOpen] = useState(false);
+
+  // Is QuickBooks connected and working? Then new orders sync by
+  // themselves and the file import is only for orders captured by hand, so
+  // it is shown as the secondary thing it has become. Unknown (still
+  // loading, or the status could not be read) is treated as not connected:
+  // the import is the way to link orders, and it should never be hidden.
+  const [qbConnected, setQbConnected] = useState(false);
+  useEffect(() => {
+    if (!canManage) return undefined;
+    let cancelled = false;
+    getQuickbooksStatus()
+      .then((s) => { if (!cancelled) setQbConnected(Boolean(s?.connected && s?.working)); })
+      .catch(() => { if (!cancelled) setQbConnected(false); });
+    return () => { cancelled = true; };
+  }, [canManage]);
 
   // Sorting and column visibility, from the hook every other table in
   // the app reads.
@@ -324,9 +341,15 @@ export default function PurchaseOrdersPage() {
         description="Raise, approve and track orders to suppliers."
         actions={canManage && mode === 'list' ? (
           <>
-            <Button type="button" variant="outline" onClick={() => setImportOpen(true)}>
-              <Link2 /> Import QuickBooks links
-            </Button>
+            {qbConnected ? (
+              <Button type="button" variant="ghost" size="sm" onClick={() => setImportOpen(true)}>
+                <Link2 /> Link existing QuickBooks POs
+              </Button>
+            ) : (
+              <Button type="button" variant="outline" onClick={() => setImportOpen(true)}>
+                <Link2 /> Import QuickBooks links
+              </Button>
+            )}
             <Button
               type="button"
               onClick={() => { setMode('create'); setSeedProducts([]); setSelected(null); setFormError(null); }}
@@ -336,6 +359,13 @@ export default function PurchaseOrdersPage() {
           </>
         ) : null}
       />
+
+      {qbConnected && canManage && mode === 'list' ? (
+        <p className="mt-2 text-sm text-muted-foreground">
+          QuickBooks is connected: new purchase orders are sent to it automatically when they are approved.
+          Use “Link existing QuickBooks POs” only for orders Finance captured there by hand.
+        </p>
+      ) : null}
 
       {mode === 'create' || mode === 'edit' ? (
         <div className="mt-6">

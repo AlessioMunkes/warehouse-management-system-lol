@@ -100,14 +100,31 @@ export const findPoNumbers = (text) => {
   return found;
 };
 
+// ── Is this row a transaction at all? ────────────────────────
+// A QuickBooks report is not a flat table. Between the real purchase
+// orders it has a heading for each vendor, a "Total for <vendor>" row, a
+// grand TOTAL row, and a timestamp at the foot. None of those is a
+// purchase order, so none should be counted as "a row with no PO number".
+// What every real transaction row has, and those rows never do, is its own
+// QuickBooks number or a date.
+const DATE_LIKE = /^(\d{1,4}[/.-]\d{1,2}[/.-]\d{1,4}|[A-Za-z]{3,9}\.? \d{1,2},? \d{4}|\d{1,2} [A-Za-z]{3,9}\.? \d{4})(\b.*)?$/;
+export const looksLikeDate = (value) => DATE_LIKE.test(String(value ?? '').trim());
+
+const isTransactionRow = (cells, numberIndex, dateIndexes) => {
+  if (String(cells[numberIndex] ?? '').trim() !== '') return true;
+  return dateIndexes.some((i) => looksLikeDate(cells[i]));
+};
+
 // ── One entry per row ─────────────────────────────────────────
 export const extractRows = ({ columns, dataRows }, numberColumn) => {
   const numberIndex = columns.indexOf(numberColumn);
   if (numberIndex === -1) throw new Error('Choose the column with the QuickBooks PO number.');
+  const dateIndexes = columns.map((c, i) => (/date/i.test(c) ? i : -1)).filter((i) => i !== -1);
   return dataRows.map(({ rowNumber, cells }) => ({
     rowNumber,
     quickbooksNumber: String(cells[numberIndex] ?? '').trim(),
     poNumbers: [...new Set(cells.flatMap((c) => findPoNumbers(c)))],
+    isTransaction: isTransactionRow(cells, numberIndex, dateIndexes),
   }));
 };
 
@@ -120,12 +137,18 @@ export const REVIEW_REASONS = {
   no_qb:     'This row has no QuickBooks number in the chosen column.',
 };
 
-// → { noPo: row[], review: [{ ...row, reason }], candidates: row[] }
+// → { noPo: row[], ignored: row[], review: [{ ...row, reason }], candidates: row[] }
+// noPo is the real transactions that name no PO number of ours. ignored is
+// the report's own furniture (vendor headings, totals, the footer): not
+// counted and not listed as a row, only mentioned. A row that does not say
+// whether it is a transaction (isTransaction missing) is treated as one.
 // A candidate has exactly one PO number, one QuickBooks number, and
 // neither is repeated elsewhere, so it is safe to ask the server about.
 export const sortRows = (rows) => {
   const withPo = rows.filter((r) => r.poNumbers.length > 0);
-  const noPo = rows.filter((r) => r.poNumbers.length === 0);
+  const without = rows.filter((r) => r.poNumbers.length === 0);
+  const noPo = without.filter((r) => r.isTransaction !== false);
+  const ignored = without.filter((r) => r.isTransaction === false);
 
   const rowsPerPo = new Map();
   for (const r of withPo) {
@@ -151,7 +174,7 @@ export const sortRows = (rows) => {
     if (reason) review.push({ ...r, reason });
     else candidates.push({ ...r, poNumber: r.poNumbers[0] });
   }
-  return { noPo, review, candidates };
+  return { noPo, ignored, review, candidates };
 };
 
 // ── Merge the server's preview back onto the candidates ───────

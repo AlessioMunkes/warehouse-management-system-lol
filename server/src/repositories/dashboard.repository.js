@@ -208,12 +208,13 @@ const getAttention = async ({ now = new Date() } = {}) => {
                     WHERE c.follow_up_of = purchase_orders.id AND c.status NOT IN ('completed', 'returned')))))::int AS follow_up,
          -- Finance was never told about the order; Resend is on the order.
          COUNT(*) FILTER (WHERE finance_email_status = 'failed')::int AS finance_email_failed,
-         -- A supplier or product not found in QuickBooks by name: a
-         -- person has to add it there, then Send again.
+         -- A supplier or product not found in QuickBooks by name, or an order
+         -- QuickBooks refused (an item with no expense account): a person has
+         -- to fix it there, then Send again.
          COUNT(*) FILTER (WHERE EXISTS (
                    SELECT 1 FROM quickbooks_sync_queue q
                     WHERE q.idempotency_key = ${poSyncKeySql('purchase_orders.id')}
-                      AND q.payload->>'state' = 'needs_match'))::int AS needs_quickbooks_match
+                      AND q.payload->>'state' IN ('needs_match', 'refused')))::int AS needs_quickbooks_match
        FROM purchase_orders`
     ),
     pool.query(

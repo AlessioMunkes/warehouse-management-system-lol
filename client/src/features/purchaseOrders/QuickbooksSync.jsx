@@ -9,6 +9,11 @@
 // for an order that is already linked: the "Linked to QuickBooks PO
 // number" pill above it says that.
 //
+// "Needs attention" is the same kind of state: QuickBooks understood the
+// order and refused it, and the message names the product (an item with no
+// expense account is the usual cause). Nothing is retried by itself; once
+// it is fixed in QuickBooks, Send again finishes the job.
+//
 // "Needs a match" is the state that needs a person. The supplier or a
 // product on the order was not found in QuickBooks by name, so nothing
 // was created there. The names are listed; once they exist in
@@ -25,6 +30,7 @@ const LABEL = {
   none:        'Not sent to QuickBooks yet',
   sending:     'Sending to QuickBooks',
   needs_match: 'Needs a match in QuickBooks',
+  refused:     'Needs attention in QuickBooks',
   failed:      'Could not be sent to QuickBooks',
 };
 

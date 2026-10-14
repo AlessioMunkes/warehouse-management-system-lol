@@ -127,7 +127,7 @@ export default function QuickbooksImportDialog({ open, onOpenChange, onDone }) {
   const [fileName, setFileName] = useState('');
   const [table, setTable] = useState(null);
   const [numberColumn, setNumberColumn] = useState('');
-  const [sorted, setSorted] = useState(null);       // { noPo, review }
+  const [sorted, setSorted] = useState(null);       // { noPo, ignored, review }
   const [groups, setGroups] = useState(null);       // mergePreview output
   const [ticked, setTicked] = useState(() => new Set());
   const [showWhich, setShowWhich] = useState(false);
@@ -177,7 +177,7 @@ export default function QuickbooksImportDialog({ open, onOpenChange, onDone }) {
         ? await purchaseOrderAPI.previewQuickbooksImport(
             s.candidates.map((c) => ({ poNumber: c.poNumber, quickbooksNumber: c.quickbooksNumber })))
         : { rows: [] };
-      setSorted({ noPo: s.noPo, review: s.review });
+      setSorted({ noPo: s.noPo, ignored: s.ignored, review: s.review });
       setGroups(mergePreview(s.candidates, server.rows));
       setTicked(new Set());
       setStep('preview');
@@ -276,6 +276,11 @@ export default function QuickbooksImportDialog({ open, onOpenChange, onDone }) {
               {' · '}{groups.notFound.length} not found
               {' · '}{sorted.noPo.length} without a PO number
             </p>
+            {sorted.ignored.length > 0 && (
+              <p className="-mt-1 text-xs text-muted-foreground">
+                {plural(sorted.ignored.length, 'heading, total or footer row was', 'heading, total and footer rows were')} ignored.
+              </p>
+            )}
 
             <Section title={`${groups.willLink.length} will link`} defaultOpen={groups.willLink.length > 0 && groups.willLink.length <= 10}>
               {groups.willLink.length ? <Rows rows={groups.willLink} render={(r) => <li key={r.poNumber} className="py-1.5"><Pair row={r} /></li>} /> : <p className="text-sm text-muted-foreground">Nothing to link.</p>}

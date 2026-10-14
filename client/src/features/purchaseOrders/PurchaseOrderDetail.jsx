@@ -179,7 +179,10 @@ export default function PurchaseOrderDetail({
   const [resending, setResending] = useState(false);
   const emailFailed = po.financeEmailStatus === 'failed';
   const emailSent   = po.financeEmailStatus === 'sent';
-  const canResend   = canManage && !emailSent && Boolean(onResendFinanceEmail);
+  // Finance is told on approval, so there is nothing to resend before it,
+  // and nothing to say about an order that was sent back.
+  const awaitingApproval = po.status === 'pending';
+  const canResend   = canManage && !emailSent && !awaitingApproval && po.status !== 'returned' && Boolean(onResendFinanceEmail);
   const resend = async () => {
     setResending(true);
     try {
@@ -437,7 +440,7 @@ export default function PurchaseOrderDetail({
             ) : emailFailed ? (
               <StatusBadge kind="message" status="failed">Send failed</StatusBadge>
             ) : (
-              <StatusBadge kind="message" status="unsent">Not sent</StatusBadge>
+              <StatusBadge kind="message" status="unsent">{awaitingApproval ? 'Sent when approved' : 'Not sent'}</StatusBadge>
             )}
             {emailFailed && po.financeEmailError ? (
               <span className="text-xs text-muted-foreground">{po.financeEmailError}</span>

@@ -23,6 +23,11 @@ vi.mock('../services/purchaseOrderAPI', async () => {
   };
   return { ...actual, ...api, default: api };
 });
+// Only the connection status is stubbed; the order panel's own calls stay as they were.
+vi.mock('../services/quickbooksAPI', async () => {
+  const actual = await vi.importActual('../services/quickbooksAPI');
+  return { ...actual, getStatus: vi.fn(async () => ({ connected: false })) };
+});
 vi.mock('../services/supplierAPI', () => ({ default: { getSuppliers: vi.fn(async () => []) } }));
 vi.mock('../services/stockAPI', () => ({ default: { getManifest: vi.fn(async () => []) } }));
 vi.mock('../components/layout/ManagerLayout', () => ({ default: ({ children }) => children }));
@@ -85,7 +90,7 @@ describe('PurchaseOrdersPage', () => {
     render(<PurchaseOrdersPage />);
     await screen.findByRole('tab', { name: 'Open 3' });
     expect(screen.queryByRole('tab', { name: /Finance email failed/ })).toBeNull();
-    expect(screen.queryByRole('tab', { name: /Needs a QuickBooks match/ })).toBeNull();
+    expect(screen.queryByRole('tab', { name: /Needs QuickBooks attention/ })).toBeNull();
   });
 
   it('opens the Finance email failed and QuickBooks match tabs from a link', async () => {
@@ -98,13 +103,26 @@ describe('PurchaseOrdersPage', () => {
     const { unmount } = render(<PurchaseOrdersPage />);
     expect(await screen.findByText('PO-5')).toBeInTheDocument();
     expect(screen.queryByText('PO-1')).not.toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: 'Needs a QuickBooks match 1' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Needs QuickBooks attention 1' })).toBeInTheDocument();
     unmount();
 
     router.params = new URLSearchParams('status=needs_match');
     render(<PurchaseOrdersPage />);
     expect(await screen.findByText('PO-6')).toBeInTheDocument();
     expect(screen.queryByText('PO-5')).not.toBeInTheDocument();
+  });
+
+  it('puts an order QuickBooks refused on the same attention tab as one that needs a match', async () => {
+    api.getPurchaseOrders.mockResolvedValue([
+      ...ORDERS,
+      po({ id: 6, poNumber: 'PO-6', status: 'approved', quickbooksState: 'refused' }),
+      po({ id: 7, poNumber: 'PO-7', status: 'approved', quickbooksState: 'needs_match' }),
+    ]);
+    router.params = new URLSearchParams('status=needs_match');
+    render(<PurchaseOrdersPage />);
+    expect(await screen.findByText('PO-6')).toBeInTheDocument();
+    expect(screen.getByText('PO-7')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Needs QuickBooks attention 2' })).toBeInTheDocument();
   });
 
   it('shows how many lines have arrived', async () => {

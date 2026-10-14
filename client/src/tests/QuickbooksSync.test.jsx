@@ -72,6 +72,21 @@ describe('the QuickBooks line on an order', () => {
     expect(api.sendOrder).toHaveBeenCalledWith(28);
   });
 
+  it('names the product QuickBooks refused, and sends again once it is fixed there', async () => {
+    api.getOrderState.mockResolvedValue({
+      available: true, state: 'refused',
+      message: 'QuickBooks needs an expense account on this item before it can go on a purchase order: "Rocks". In QuickBooks, open it under Products and services and set its Expense account, then send this order again.',
+    });
+    api.sendOrder.mockResolvedValue({ available: true, state: 'synced', quickbooksPoId: 'PO-2026-0028' });
+    const onSynced = vi.fn();
+    show(PO, { onSynced });
+
+    expect(await screen.findByText('Needs attention in QuickBooks')).toBeInTheDocument();
+    expect(screen.getByText(/"Rocks"/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Send again' }));
+    await waitFor(() => expect(onSynced).toHaveBeenCalledWith('PO-2026-0028'));
+  });
+
   it('keeps saying why when a second try still does not match', async () => {
     api.getOrderState.mockResolvedValue({ available: true, state: 'needs_match', message: 'first' });
     api.sendOrder.mockResolvedValue({ available: true, state: 'needs_match', message: 'Not found in QuickBooks by name: product "Rice 2 kg".' });

@@ -33,6 +33,8 @@ import {
   environment, isConfigured, OAUTH_STATE_TTL_MS, parseEncryptionKey, SCOPE,
 } from '../config/quickbooks.js';
 import { currentWarehouse } from '../config/warehouseContext.js';
+import { lineAmount } from '../utils/poMoney.js';
+import { findPoNumbers } from '../utils/quickbooksImport.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -81,27 +83,45 @@ const warehouseForState = (state) => {
   return meta && meta.expiresAt > Date.now() ? (meta.warehouse ?? null) : null;
 };
 
+// A callback can arrive twice for one sign-in (a browser that repeats the
+// request, a prefetch, a double click on Intuit's page). The first
+// finishes the connection; the second must not be told the sign-in has
+// "expired" and send the admin back to Settings with an error, after the
+// connection was in fact made. So the state is kept for its ten minutes
+// with the outcome of the first call, and a repeat with the SAME code and
+// company simply gets that outcome again. A different code on a used state
+// is still refused: the state only ever vouches for one sign-in.
 const handleCallback = async ({ code = null, state = null, realmId = null, oauthError = null } = {}) => {
   sweepStates();
   if (oauthError) throw fail(400, 'QuickBooks sign-in was cancelled or refused.');
   const meta = state ? states.get(String(state)) : null;
-  if (state) states.delete(String(state));
   if (!meta || meta.expiresAt <= Date.now()) throw fail(400, 'That QuickBooks sign-in has expired. Start again from Settings.');
   if (!code || !realmId) throw fail(400, 'QuickBooks did not send back what is needed to connect. Start again from Settings.');
   if (!/^[0-9]{1,32}$/.test(String(realmId))) throw fail(400, 'QuickBooks sent back a company this system cannot use.');
 
-  const tokens = await qbo.exchangeCode(String(code));
-  await repo.saveConnection({
-    realmId: String(realmId),
-    tokenType: tokens.tokenType,
-    scope: SCOPE,
-    accessEncrypted: encrypt(tokens.accessToken),
-    refreshEncrypted: encrypt(tokens.refreshToken),
-    accessExpiresAt: tokens.accessExpiresAt,
-    refreshExpiresAt: tokens.refreshExpiresAt,
-    userId: meta.userId,
-  });
-  return { realmId: String(realmId) };
+  if (meta.completion) {
+    if (meta.code !== String(code) || meta.realmId !== String(realmId)) {
+      throw fail(400, 'That QuickBooks sign-in has expired. Start again from Settings.');
+    }
+    return meta.completion;
+  }
+  meta.code = String(code);
+  meta.realmId = String(realmId);
+  meta.completion = (async () => {
+    const tokens = await qbo.exchangeCode(String(code));
+    await repo.saveConnection({
+      realmId: String(realmId),
+      tokenType: tokens.tokenType,
+      scope: SCOPE,
+      accessEncrypted: encrypt(tokens.accessToken),
+      refreshEncrypted: encrypt(tokens.refreshToken),
+      accessExpiresAt: tokens.accessExpiresAt,
+      refreshExpiresAt: tokens.refreshExpiresAt,
+      userId: meta.userId,
+    });
+    return { realmId: String(realmId) };
+  })();
+  return meta.completion;
 };
 
 const disconnect = async () => {
@@ -176,23 +196,35 @@ const status = async ({ check = false } = {}) => {
 
 // ── Sending a purchase order ────────────────────────────────
 const sending = new Set();
-const money = (n) => Math.round(Number(n || 0) * 100) / 100;
 const dayOf = (value) => {
   if (!value) return undefined;
   const d = value instanceof Date ? value : new Date(value);
   return Number.isNaN(d.getTime()) ? undefined : d.toLocaleDateString('en-CA', { timeZone: 'Africa/Johannesburg' });
 };
 
+// "17 Oct 2026", for a person reading the order in QuickBooks.
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const readable = (value) => {
+  const iso = dayOf(value);
+  if (!iso) return null;
+  const [y, m, d] = iso.split('-').map(Number);
+  return `${d} ${MONTHS[m - 1]} ${y}`;
+};
+
 // QuickBooks' own shape for a purchase order. Exported for the tests.
 export const buildPurchaseOrder = (po, { vendor, items, payables }) => ({
   DocNumber: po.po_number,
   TxnDate: dayOf(po.created_at),
-  DueDate: dayOf(po.expected_delivery_date),
   // Finance was asked to type our order number into the Memo when
   // capturing by hand, and the file import links on it. Kept here so
   // an order sent this way is found by the same number.
   PrivateNote: po.po_number,
-  Memo: [po.po_number, po.notes].filter(Boolean).join(' · ').slice(0, 4000),
+  // QuickBooks keeps no delivery date on a purchase order: ShipDate is
+  // refused and DueDate is accepted and silently dropped (checked against
+  // a sandbox company). The Memo, the message to the supplier, is kept, so
+  // the date travels there, after the number the file import looks for.
+  Memo: [po.po_number, readable(po.expected_delivery_date) && `Expected delivery ${readable(po.expected_delivery_date)}`, po.notes]
+    .filter(Boolean).join(' · ').slice(0, 4000),
   VendorRef: { value: String(vendor.Id), name: vendor.DisplayName },
   ...(payables ? { APAccountRef: { value: String(payables.Id), name: payables.Name } } : {}),
   Line: po.items.map((line) => {
@@ -201,7 +233,7 @@ export const buildPurchaseOrder = (po, { vendor, items, payables }) => ({
     const price = line.unit_price === null || line.unit_price === undefined ? 0 : Number(line.unit_price);
     return {
       DetailType: 'ItemBasedExpenseLineDetail',
-      Amount: money(qty * price),
+      Amount: lineAmount(qty, price),
       Description: [line.product_name, line.default_unit ? `(${line.default_unit})` : null].filter(Boolean).join(' '),
       ItemBasedExpenseLineDetail: { ItemRef: { value: String(item.Id), name: item.Name }, Qty: qty, UnitPrice: price },
     };
@@ -221,6 +253,8 @@ const describeMissing = ({ supplier, products }) => {
  *   { state: 'off' }                         not set up or not connected
  *   { state: 'synced', quickbooksPoId }      created, or found already there
  *   { state: 'needs_match', missing, message }   nothing was created
+ *   { state: 'refused', message, items }     QuickBooks will not take it as it is;
+ *                                            a person fixes it, then sends again
  *   { state: 'failed', message }             worth another try later
  *   { state: 'sending' }                     another send of this order is running
  */
@@ -242,16 +276,24 @@ const pushPurchaseOrder = async (rawId) => {
     const s = await session();
 
     // Already there? An earlier attempt may have got through before a
-    // timeout, or Finance captured it by hand under our number.
+    // timeout, or Finance captured it by hand.
     const existing = await qbo.findPurchaseOrder(s, po.po_number);
     if (existing) return await link(poId, existing);
+    const byMemo = await findByMemo(s, po);
+    if (byMemo.state) return await hold(poId, byMemo);
+    if (byMemo.found) return await link(poId, byMemo.found);
 
     const vendor = await qbo.findVendor(s, po.supplier_name);
     const items = new Map();
     const missingProducts = [];
+    const noAccount = [];
     for (const line of po.items) {
       const item = await qbo.findItem(s, line.product_name);
-      if (item) items.set(line.id, item); else missingProducts.push(line.product_name);
+      if (!item) { missingProducts.push(line.product_name); continue; }
+      items.set(line.id, item);
+      // QuickBooks refuses a line whose item has no expense account, and
+      // says only "Select an account for this transaction", not which.
+      if (!item.ExpenseAccountRef) noAccount.push(line.product_name);
     }
     if (!vendor || missingProducts.length) {
       const missing = { supplier: vendor ? null : po.supplier_name, products: missingProducts };
@@ -259,12 +301,21 @@ const pushPurchaseOrder = async (rawId) => {
       await repo.recordSync(poId, { state: 'needs_match', error: message, detail: { missing } });
       return { state: 'needs_match', missing, message };
     }
+    if (noAccount.length) return await refuse(poId, describeNoAccount(noAccount), noAccount);
 
     const payables = await qbo.findPayablesAccount(s);
     const made = await qbo.createPurchaseOrder(s, buildPurchaseOrder(po, { vendor, items, payables }));
     return await link(poId, made);
   } catch (err) {
     if (err.quickbooks === 'off') return { state: 'off' };
+    // QuickBooks understood the order and said no. Trying again tomorrow
+    // would only be told no again: it waits for a person, like a name that
+    // does not match. It cannot say which line, so every product on the
+    // order is listed.
+    if (err.quickbooks === 'refused') {
+      const names = (await purchaseOrderRepo.getPurchaseOrderById(poId).catch(() => null))?.items?.map((l) => l.product_name) ?? [];
+      return await refuse(poId, describeRefusal(err, names), names);
+    }
     const message = err.quickbooks ? err.message : 'Could not send this order to QuickBooks.';
     if (!err.quickbooks) console.error('[quickbooks] push failed:', err.message);
     await repo.recordSync(poId, { state: 'failed', error: message, detail: { kind: err.quickbooks ?? 'error' } }).catch(() => {});
@@ -272,6 +323,56 @@ const pushPurchaseOrder = async (rawId) => {
   } finally {
     sending.delete(poId);
   }
+};
+
+// ── Finding an order Finance already captured ───────────────
+// Finance types our number into the QuickBooks PO's private memo (the
+// field the Open Purchase Order List calls Memo), under a number of
+// QuickBooks' own. A memo is read exactly as the file import reads it, so
+// the two paths agree on what counts: our number once in the memo and no
+// other PO number. PrivateNote cannot be searched in a query, so the orders
+// since a few days before ours was raised are read and filtered here.
+const MEMO_LOOKBACK_MS = 3 * 24 * 60 * 60 * 1000;
+
+const findByMemo = async (s, po) => {
+  const since = dayOf(new Date(new Date(po.created_at).getTime() - MEMO_LOOKBACK_MS)) ?? dayOf(new Date());
+  const ours = String(po.po_number).trim().toUpperCase();
+  const rows = await qbo.listPurchaseOrdersSince(s, since);
+  const matches = rows.filter((r) => {
+    const numbers = findPoNumbers(r.PrivateNote);
+    return numbers.length === 1 && numbers[0] === ours;
+  });
+  if (matches.length === 1) return { found: matches[0] };
+  if (matches.length > 1) {
+    const numbers = matches.map((m) => m.DocNumber || m.Id).join(', ');
+    return {
+      state: 'needs_match',
+      message: `More than one QuickBooks purchase order has ${po.po_number} in its memo (${numbers}). Nothing was created. Delete or correct the extra one in QuickBooks, then send this order again.`,
+      detail: { duplicates: matches.map((m) => String(m.DocNumber || m.Id)) },
+    };
+  }
+  return {};
+};
+
+const hold = async (poId, { state, message, detail }) => {
+  await repo.recordSync(poId, { state, error: message, detail });
+  return { state, message };
+};
+
+const quoted = (names) => names.map((n) => `"${n}"`).join(', ');
+
+const describeNoAccount = (names) => {
+  const one = names.length === 1;
+  return `QuickBooks needs an expense account on ${one ? 'this item' : 'these items'} before ${one ? 'it' : 'they'} can go on a purchase order: ${quoted(names)}. `
+    + `In QuickBooks, open ${one ? 'it' : 'each'} under Products and services and set its Expense account, then send this order again.`;
+};
+
+const describeRefusal = (err, names) =>
+  `${err.message}${names.length ? ` Check the items on this order in QuickBooks: ${quoted(names)}.` : ''} Then send this order again.`;
+
+const refuse = async (poId, message, items) => {
+  await repo.recordSync(poId, { state: 'refused', error: message, detail: { items } });
+  return { state: 'refused', message, items };
 };
 
 const link = async (poId, remote) => {
@@ -288,14 +389,27 @@ const link = async (poId, remote) => {
 
 // After an approval: sent in the background, never awaited by the
 // request that approved the order, and never allowed to throw into it.
+// Resolves with what happened (see pushPurchaseOrder) so the Finance email
+// that follows can say so, and never rejects. The approval itself does not
+// wait for it.
 const pushInBackground = (poId) => {
-  if (!isConfigured()) return;
-  Promise.resolve()
+  if (!isConfigured()) return Promise.resolve(null);
+  return Promise.resolve()
     .then(() => pushPurchaseOrder(poId))
-    .catch((err) => console.error('[quickbooks] background send failed:', err.message));
+    .catch((err) => {
+      console.error('[quickbooks] background send failed:', err.message);
+      return null;
+    });
 };
 
-// Orders that were approved while QuickBooks could not take them.
+/** Set up on this server AND a company connected: orders go across by themselves. */
+const isConnected = async () => {
+  if (!isConfigured()) return false;
+  try { return Boolean(await repo.getConnection()); } catch { return false; }
+};
+
+// Orders whose automatic send failed, to try again (see listUnsent): only
+// ones approved while QuickBooks was connected, never an older backlog.
 const pushUnsent = async () => {
   if (!isConfigured() || !(await repo.getConnection())) return { tried: 0, synced: 0 };
   const ids = await repo.listUnsent(20);
@@ -330,5 +444,5 @@ const syncState = async (rawId) => {
 
 export default {
   startConnect, handleCallback, disconnect, status, warehouseForState,
-  pushPurchaseOrder, pushInBackground, pushUnsent, syncState, buildPurchaseOrder,
+  pushPurchaseOrder, pushInBackground, pushUnsent, syncState, buildPurchaseOrder, isConnected,
 };
