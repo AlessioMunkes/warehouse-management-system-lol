@@ -413,9 +413,17 @@ const isRecipeIngredient = async (productId) => {
 
 /**
  * Searches active products by (partial, case-insensitive) name or SKU for
- * the staff intake "match to stock item" combobox. Wildcard metacharacters
- * in the term are escaped so a literal "%" or "_" in what staff typed is
- * matched literally, not as a pattern. Returns at most `limit` rows.
+ * the "match to stock item" combobox: staff intake, and a manager matching
+ * a flagged donation line in the classification queue. Wildcard
+ * metacharacters in the term are escaped so a literal "%" or "_" in what
+ * staff typed is matched literally, not as a pattern. Returns at most
+ * `limit` rows.
+ *
+ * The placeholder products made for unrecognised intake items are left out
+ * by being inactive with a PENDING- code. This used to also leave out every
+ * product with an open review flag, which hid the real product a flag is
+ * about: a donation line of Soya mince, flagged for review, made Soya mince
+ * itself unsearchable in the very queue that resolves it.
  */
 const searchProductsByName = async (term, { limit = 10 } = {}) => {
   const trimmed = String(term ?? '').trim();
@@ -427,12 +435,6 @@ const searchProductsByName = async (term, { limit = 10 } = {}) => {
     FROM products
     WHERE is_active = true
       AND stock_keeping_unit NOT ILIKE 'PENDING-%'
-      AND NOT EXISTS (
-        SELECT 1
-        FROM warehouse_manager_flags wmf
-        WHERE wmf.product_id = products.id
-          AND wmf.status IN ('pending', 'pending_classification')
-      )
       AND (name ILIKE $1 OR stock_keeping_unit ILIKE $1)
     ORDER BY name ASC
     LIMIT $2;
@@ -445,12 +447,6 @@ const searchProductsByName = async (term, { limit = 10 } = {}) => {
      FROM products
      WHERE is_active = true
        AND stock_keeping_unit NOT ILIKE 'PENDING-%'
-       AND NOT EXISTS (
-         SELECT 1
-         FROM warehouse_manager_flags wmf
-         WHERE wmf.product_id = products.id
-           AND wmf.status IN ('pending', 'pending_classification')
-       )
      ORDER BY name ASC
      LIMIT 250;`
   );
