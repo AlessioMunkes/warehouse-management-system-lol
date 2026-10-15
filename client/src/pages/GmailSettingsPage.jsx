@@ -213,7 +213,7 @@ export default function GmailSettingsPage({ embedded = false } = {}) {
   const connected = Boolean(status?.connected);
 
   return (
-    <div className={embedded ? '' : 'min-h-screen bg-canvas'}>
+    <div className={embedded ? '' : 'min-h-screen bg-page'}>
       <div className={embedded ? 'space-y-6' : 'mx-auto max-w-3xl space-y-6 p-6'}>
         {displayFeedback && (
           <div

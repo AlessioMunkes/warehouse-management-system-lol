@@ -158,7 +158,7 @@ export default function InviteAcceptPage() {
 
   if (statusReason) {
     return (
-      <main className="min-h-screen bg-canvas px-4 py-8 text-ink">
+      <main className="min-h-screen bg-page px-4 py-8 text-ink">
         <StatusScreen reason={statusReason} />
       </main>
     );
@@ -166,7 +166,7 @@ export default function InviteAcceptPage() {
 
   if (done) {
     return (
-      <main className="min-h-screen bg-canvas px-4 py-8 text-ink">
+      <main className="min-h-screen bg-page px-4 py-8 text-ink">
         <Card className="mx-auto max-w-md rounded-[12px] border border-line">
           <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
             <CheckCircle className="size-10 text-good" />
@@ -182,7 +182,7 @@ export default function InviteAcceptPage() {
   }
 
   return (
-    <main className="min-h-screen bg-canvas px-4 py-8 text-ink">
+    <main className="min-h-screen bg-page px-4 py-8 text-ink">
       <Card className="mx-auto max-w-md rounded-[12px] border border-line">
         <CardHeader>
           <CardTitle>Set up your account</CardTitle>

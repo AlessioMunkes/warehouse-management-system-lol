@@ -35,6 +35,7 @@ import useFlaggedItems from './useFlaggedItems';
 import { fmtQty } from '@/lib/quantity';
 import { isUnresolvedFlag } from './flagStatus';
 import ErrorBanner from '@/components/ui/error-banner';
+import ListToolbar from '@/components/ui/list-toolbar';
 
 const formatCategoryLabel = (category = '') =>
   category.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -406,21 +407,17 @@ export default function FlaggedItemsTab() {
 
   return (
     <div className="mt-6 space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          {filteredItems.length} of {unresolvedItems.length} product review item{unresolvedItems.length === 1 ? '' : 's'} awaiting review.
-        </p>
-        <div className="flex items-center gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={refresh} disabled={isLoading}>
-            <RefreshCw className={`mr-1 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
-          </Button>
-        </div>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Input type="search" aria-label="Search product review by donor name" placeholder="Search donor name" value={donorSearch} onChange={(e) => setDonorSearch(e.target.value)} />
-        <Input type="date" aria-label="Product review date from" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-        <Input type="date" aria-label="Product review date to" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-      </div>
+      <ListToolbar
+        search={{ value: donorSearch, onChange: setDonorSearch, placeholder: 'Search donor name', label: 'Search product review by donor name' }}
+        onClearAll={() => { setDonorSearch(''); setDateFrom(''); setDateTo(''); }}
+      >
+        <Input type="date" aria-label="Product review date from" title="From" className="h-8 w-auto" value={dateFrom} max={dateTo || undefined} onChange={(e) => setDateFrom(e.target.value)} />
+        <span className="text-sm text-muted-foreground">to</span>
+        <Input type="date" aria-label="Product review date to" title="To" className="h-8 w-auto" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)} />
+        <Button type="button" variant="outline" size="sm" onClick={refresh} disabled={isLoading}>
+          <RefreshCw className={isLoading ? 'animate-spin' : ''} /> Refresh
+        </Button>
+      </ListToolbar>
 
       {error ? <ErrorBanner message={error} onRetry={refresh} /> : null}
 

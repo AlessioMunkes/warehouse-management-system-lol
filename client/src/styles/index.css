@@ -582,6 +582,7 @@
    ══════════════════════════════════════════════════════════════════ */
 @theme inline {
     --color-canvas: var(--canvas);
+    --color-page: var(--page);
     --color-surface: var(--surface);
     --color-surface-2: var(--surface-2);
     --color-ink: var(--ink);
@@ -616,6 +617,9 @@
     --canvas:      #f4efe8;
     /* Cards: a warm, wide, faint shadow instead of a grey ring. */
     --card-shadow: 0 1px 2px rgb(43 51 54 / 0.04), 0 8px 24px rgb(43 51 54 / 0.06);
+    /* The page behind everything: white, asked for across the system.
+       --canvas is still the tint for fields, chips and row hovers. */
+    --page:        #ffffff;
     --surface:     #ffffff;   /* was bg-white */
     --surface-2:   #f3efe9;   /* was bg-[#f3efe9] / #eef2f4 / #e9e3dd */
     --ink:         #2b3336;   /* was text-[#2b3336] — the brand ink, 82 sites */
@@ -677,6 +681,7 @@
     --canvas:      #14191a;
     /* No shadow reads on a dark page; the card's lighter surface does the work. */
     --card-shadow: none;
+    --page:        #14191a;
     --surface:     #1c2325;
     --surface-2:   #232b2e;
     --ink:         #eceeee;
@@ -2077,7 +2082,7 @@ color:white;
   flex-direction: column;
   min-height: 100dvh;
   padding-bottom: calc(var(--stf-tabbar-h) + env(safe-area-inset-bottom));
-  background: var(--stf-sand);
+  background: var(--page);
   font-family: var(--stf-font-sans);
   color: var(--stf-text);
   line-height: 1.6;

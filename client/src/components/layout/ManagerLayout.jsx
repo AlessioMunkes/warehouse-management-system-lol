@@ -172,7 +172,7 @@ function ManagerLayoutShell({ children }) {
         children below (flex items refuse to shrink under their content by
         default), is what makes only <main> scroll while the sidebar and
         top bar hold still. */}
-    <div className="flex h-screen overflow-hidden bg-canvas">
+    <div className="flex h-screen overflow-hidden bg-page">
       {/* ── Sidebar ─────────────────────────────────────────── */}
       <aside
         className={`hidden shrink-0 flex-col border-r border-line bg-surface py-4 sm:flex ${

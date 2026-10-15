@@ -34,8 +34,8 @@ import TablePager from '@/components/ui/table-pager';
 import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/usePaged';
 
 const TABS = [
-  { id: 'certificates', label: 'Certificate Queue', icon: FileText, description: 'View and manage Section 18A tax certificates for donations.' },
-  { id: 'emails', label: 'Email history', icon: Mail, description: 'Track and resend Section 18A certificate emails.' },
+  { id: 'certificates', label: 'Certificate Queue', icon: FileText },
+  { id: 'emails', label: 'Email history', icon: Mail },
 ];
 
 // How each email status reads. The colour and icon come from
@@ -132,7 +132,6 @@ export default function Section18AManagementPage() {
     }
   };
 
-  const activeTab = TABS.find((item) => item.id === tab) || TABS[0];
   const normaliseStatusKey = (status) => String(status || '').toLowerCase();
   // The server has sent these in upper case at times; an unknown one
   // reads as Pending, as it always has.
@@ -204,7 +203,6 @@ export default function Section18AManagementPage() {
         onChange={setTab}
         tabs={TABS.map((t) => ({ id: t.id, label: t.label, count: t.id === 'certificates' && !loading ? certificateQueue.length : null }))}
       />
-      <p className="mt-4 text-sm text-muted-foreground">{activeTab.description}</p>
 
       {feedback && (
         feedback.type === 'success'

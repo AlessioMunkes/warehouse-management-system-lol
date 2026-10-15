@@ -31,7 +31,8 @@ describe('Activity log: Volunteers view', () => {
   it('lists visits with tabs counting who is on site', async () => {
     renderPage();
     expect(await screen.findByText('Thandi Mokoena')).toBeInTheDocument();
-    expect(screen.getByText(/1 person is on site now/)).toBeInTheDocument();
+    // Who is on site is the On site tab's count, not a line repeating it.
+    expect(screen.queryByText(/on site now/)).not.toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'On site 1' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Signed out 1' })).toBeInTheDocument();
   });
@@ -101,7 +102,6 @@ describe('Activity log: Volunteers view range, search and batches', () => {
       .mockResolvedValueOnce({ visits: [MORE], hasMore: false });
     renderPage();
     await screen.findByText('Thandi Mokoena');
-    expect(screen.getByText(/Showing the latest 2\. Use Next to load more, or narrow the dates\./)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Next/ }));
     expect(await screen.findByText('Lerato Dlamini')).toBeInTheDocument();
     expect(api.getGuestLogPage).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 2 }));

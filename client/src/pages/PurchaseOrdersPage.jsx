@@ -342,7 +342,10 @@ export default function PurchaseOrdersPage() {
         actions={canManage && mode === 'list' ? (
           <>
             {qbConnected ? (
-              <Button type="button" variant="ghost" size="sm" onClick={() => setImportOpen(true)}>
+              <Button
+                type="button" variant="ghost" size="sm" onClick={() => setImportOpen(true)}
+                title="New orders go to QuickBooks automatically when approved. Use this only for orders Finance captured there by hand."
+              >
                 <Link2 /> Link existing QuickBooks POs
               </Button>
             ) : (
@@ -359,13 +362,6 @@ export default function PurchaseOrdersPage() {
           </>
         ) : null}
       />
-
-      {qbConnected && canManage && mode === 'list' ? (
-        <p className="mt-2 text-sm text-muted-foreground">
-          QuickBooks is connected: new purchase orders are sent to it automatically when they are approved.
-          Use “Link existing QuickBooks POs” only for orders Finance captured there by hand.
-        </p>
-      ) : null}
 
       {mode === 'create' || mode === 'edit' ? (
         <div className="mt-6">

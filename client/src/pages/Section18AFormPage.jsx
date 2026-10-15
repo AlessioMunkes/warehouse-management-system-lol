@@ -141,7 +141,7 @@ export default function Section18AFormPage() {
   }
 
   return (
-    <main className="min-h-screen bg-canvas px-4 py-8 text-ink">
+    <main className="min-h-screen bg-page px-4 py-8 text-ink">
       <Card className="mx-auto max-w-3xl rounded-[12px] border border-line">
         <CardHeader>
           <CardTitle>Section 18A Donor Details</CardTitle>

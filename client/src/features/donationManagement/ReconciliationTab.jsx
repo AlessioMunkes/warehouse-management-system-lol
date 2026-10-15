@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import useReconciliationQueue from './useReconciliation';
 import ErrorBanner from '@/components/ui/error-banner';
+import ListToolbar from '@/components/ui/list-toolbar';
 
 const fmtValue = (value) => {
   if (value === null || value === undefined || value === '') return '-';
@@ -94,7 +95,6 @@ const ReconciliationRow = ({ donation, busy, rowError, onRetry, actionLabel = 'R
 
 export default function ReconciliationTab({
   statuses,
-  summaryText,
   emptyText = 'Nothing needs reconciling right now.',
   actionLabel = 'Retry',
 }) {
@@ -117,23 +117,19 @@ export default function ReconciliationTab({
     if (donorSearch.trim() && !donor.includes(donorSearch.trim().toLowerCase())) return false;
     return inDateRange(failureTimestamp(donation), dateFrom, dateTo);
   });
-  const summary = summaryText || `${items.length} donation${items.length === 1 ? '' : 's'} stuck in a commit failure state.`;
-
   return (
     <div className="mt-6 space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {summary}
-        </p>
+      <ListToolbar
+        search={{ value: donorSearch, onChange: setDonorSearch, placeholder: 'Search donor name', label: `${actionLabel} queue donor search` }}
+        onClearAll={() => { setDonorSearch(''); setDateFrom(''); setDateTo(''); }}
+      >
+        <Input type="date" aria-label={`${actionLabel} queue date from`} title="From" className="h-8 w-auto" value={dateFrom} max={dateTo || undefined} onChange={(e) => setDateFrom(e.target.value)} />
+        <span className="text-sm text-muted-foreground">to</span>
+        <Input type="date" aria-label={`${actionLabel} queue date to`} title="To" className="h-8 w-auto" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)} />
         <Button type="button" variant="outline" size="sm" onClick={refresh} disabled={isLoading}>
-          <RefreshCw className={`mr-1 ${isLoading ? 'animate-spin' : ''}`} /> Refresh
+          <RefreshCw className={isLoading ? 'animate-spin' : ''} /> Refresh
         </Button>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Input type="search" aria-label={`${actionLabel} queue donor search`} placeholder="Search donor name" value={donorSearch} onChange={(e) => setDonorSearch(e.target.value)} />
-        <Input type="date" aria-label={`${actionLabel} queue date from`} value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-        <Input type="date" aria-label={`${actionLabel} queue date to`} value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-      </div>
+      </ListToolbar>
 
       {error ? <ErrorBanner message={error} onRetry={refresh} /> : null}
 

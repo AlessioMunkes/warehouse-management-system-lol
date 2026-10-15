@@ -319,12 +319,13 @@ describe('the Purchase orders header', () => {
       expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
     });
 
-    it('makes it secondary once connected, with a note that new orders sync by themselves', async () => {
+    it('makes it secondary once connected, explaining itself on the button rather than in a line under the heading', async () => {
       quickbooksStatus.mockResolvedValue({ connected: true, working: true });
       render(<PurchaseOrdersPage />);
       const secondary = await screen.findByRole('button', { name: 'Link existing QuickBooks POs' });
       expect(screen.queryByRole('button', { name: 'Import QuickBooks links' })).not.toBeInTheDocument();
-      expect(screen.getByText(NOTE)).toBeInTheDocument();
+      expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+      expect(secondary).toHaveAttribute('title', expect.stringMatching(/automatically when approved/));
       // Quieter than the New purchase order button beside it, and still opens the same dialog.
       expect(secondary.className).not.toBe(screen.getByRole('button', { name: 'New purchase order' }).className);
       await userEvent.click(secondary);

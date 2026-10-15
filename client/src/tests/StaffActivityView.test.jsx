@@ -26,10 +26,10 @@ beforeEach(() => {
 });
 
 describe('Activity log: Staff view', () => {
-  it('lists activity with a summary in the header', async () => {
+  it('lists activity with no summary line repeating the page heading', async () => {
     renderPage();
     expect(await screen.findByText('approved PO-2026-0007')).toBeInTheDocument();
-    expect(screen.getByText(/3 actions by 2 people/)).toBeInTheDocument();
+    expect(screen.queryByText(/3 actions by 2 people/)).not.toBeInTheDocument();
   });
 
   it('narrows to an area from the Filter menu', async () => {
@@ -51,11 +51,14 @@ describe('Activity log: Staff view', () => {
     expect(within(panel).getByText('approved')).toBeInTheDocument();
   });
 
-  it('asks the server for one person from the Most active strip', async () => {
+  // One person is chosen from the Person picker only: the "Most active"
+  // strip beside it did the same thing twice and was removed.
+  it('asks the server for one person chosen in the Person picker', async () => {
     const user = userEvent.setup();
     renderPage();
     await screen.findByText('approved PO-2026-0007');
-    await user.click(screen.getByRole('button', { name: 'Mo Manager · 1' }));
+    expect(screen.queryByText('Most active:')).toBeNull();
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Person' }), '2');
     await waitFor(() => expect(adminAPI.getActivity).toHaveBeenLastCalledWith(expect.objectContaining({ user: '2' })));
     expect(screen.getByRole('button', { name: 'Remove filter: Mo Manager' })).toBeInTheDocument();
   });
@@ -78,7 +81,6 @@ describe('Activity log: Staff view batches', () => {
       .mockResolvedValueOnce({ entries: [MORE], hasMore: false, from: '2026-09-03', to: '2026-10-02' });
     renderPage();
     await screen.findByText('approved PO-2026-0007');
-    expect(screen.getByText(/Showing the latest 3\. Use Next to load more, or narrow the dates\./)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Next/ }));
     expect(await screen.findByText('raised PO-2026-0001')).toBeInTheDocument();
     expect(adminAPI.getActivity).toHaveBeenLastCalledWith(expect.objectContaining({ offset: 3 }));

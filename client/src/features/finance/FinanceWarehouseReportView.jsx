@@ -636,7 +636,6 @@ export default function FinanceWarehouseReportView({ loadReport, showReset = tru
         description="Review stock received and issued for a period."
         actions={loading ? <Badge variant="secondary">Loading</Badge> : null}
       />
-      <p className="mt-2 text-sm font-medium text-muted-foreground">For the Finance team</p>
 
       <ErrorBanner message={error} className="mt-5" />
 

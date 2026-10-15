@@ -179,14 +179,14 @@ export default function ResetPasswordPage() {
 
   if (statusReason) {
     return (
-      <main className="min-h-screen bg-canvas px-4 py-8 text-ink" style={{ fontFamily: PAGE_FONT }}>
+      <main className="min-h-screen bg-page px-4 py-8 text-ink" style={{ fontFamily: PAGE_FONT }}>
         <StatusScreen reason={statusReason} />
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-canvas px-4 py-8 text-ink" style={{ fontFamily: PAGE_FONT }}>
+    <main className="min-h-screen bg-page px-4 py-8 text-ink" style={{ fontFamily: PAGE_FONT }}>
       <Card className={`mx-auto max-w-md ${CURRENT_RADIUS} border border-line`}>
         <CardHeader>
           <CardTitle>Choose a new password</CardTitle>

@@ -21,17 +21,14 @@ const TABS = [
   {
     id: 'awaiting-classification',
     label: 'Pending Product Review',
-    description: 'These donations have entered products that need a manager decision.',
   },
   {
     id: 'reconciliation',
     label: 'Reconciliation',
-    description: "These donations need to be checked because something doesn't match.",
   },
   {
     id: 'processing-failed',
     label: 'Processing Failed',
-    description: "These donations couldn't be completed because of a system problem. Try processing them again.",
   },
 ];
 
@@ -81,7 +78,6 @@ export default function DonationManagementPage() {
     };
   }, []);
 
-  const activeTab = TABS.find((item) => item.id === tab) || TABS[0];
 
   return (
     <PageShell>
@@ -100,21 +96,18 @@ export default function DonationManagementPage() {
         tabs={TABS.map((t) => ({ id: t.id, label: t.label, count: counts[t.id], alert: true }))}
       />
 
-      <p className="mt-4 text-sm text-muted-foreground">{activeTab.description}</p>
 
       {tab === 'awaiting-classification' ? (
         <FlaggedItemsTab />
       ) : tab === 'reconciliation' ? (
         <ReconciliationTab
           statuses={RECONCILIATION_ONLY_STATUSES}
-          summaryText={`${counts.reconciliation} donation${counts.reconciliation === 1 ? '' : 's'} need checking.`}
           emptyText="Nothing needs checking right now."
           actionLabel="Resolve"
         />
       ) : (
         <ReconciliationTab
           statuses={COMMIT_FAILED_STATUSES}
-          summaryText={`${counts['processing-failed']} donation${counts['processing-failed'] === 1 ? '' : 's'} couldn't be completed.`}
           emptyText="No processing failures need retrying right now."
           actionLabel="Retry"
         />

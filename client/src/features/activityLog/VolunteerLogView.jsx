@@ -146,7 +146,6 @@ export default function VolunteerLogView() {
     () => Object.fromEntries(VIEWS.map((v) => [v.id, visits.filter(v.test).length])),
     [visits],
   );
-  const onSiteCount = counts.open;
 
   const loadVisits = useCallback(async () => {
     setError(null);
@@ -202,12 +201,6 @@ export default function VolunteerLogView() {
 
   return (
     <>
-      <p className="mt-4 text-sm text-muted-foreground">
-        {`See who signed in at the door, and sign out open visits.${onSiteCount > 0
-          ? ` ${onSiteCount} ${onSiteCount === 1 ? 'person is' : 'people are'} on site now.`
-          : ''}${hasMore ? ` Showing the latest ${visits.length}. Use Next to load more, or narrow the dates.` : ''}`}
-      </p>
-
       <ErrorBanner className="mt-4" message={error} onRetry={loadVisits} />
 
       <ViewTabs

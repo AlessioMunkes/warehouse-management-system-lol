@@ -196,17 +196,12 @@ export default function StaffActivityView() {
 
   return (
     <>
-      <p className="mt-4 text-sm text-muted-foreground">
-        {`Review what people did in the system, newest first.${data ? ` ${entries.length} ${entries.length === 1 ? 'action' : 'actions'} by ${people.length} ${people.length === 1 ? 'person' : 'people'}, ${data.from} to ${data.to}.` : ''}${data?.hasMore ? ` Showing the latest ${entries.length}. Use Next to load more, or narrow the dates.` : ''}`}
-      </p>
-
       <ErrorBanner className="mt-4" message={error} onRetry={load} />
 
       <div className="mt-6">
         <ListCard
           header={
-            <div className="space-y-2">
-              <ListToolbar
+            <ListToolbar
                 search={{ value: search, onChange: setSearch, placeholder: 'Search people, actions or records' }}
                 // The areas present this period, one at a time.
                 filters={areaOptions.length > 1 ? areaOptions.map((o) => ({
@@ -240,20 +235,6 @@ export default function StaffActivityView() {
                 <span className="text-sm text-muted-foreground">to</span>
                 <Input type="date" aria-label="To" title="To" className="h-8 w-auto" value={to} min={from} onChange={(e) => setTo(e.target.value)} />
               </ListToolbar>
-
-              {/* The busiest people this period, one tap to see just theirs. */}
-              {!person && people.length > 1 ? (
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="text-muted-foreground">Most active:</span>
-                  {people.slice(0, 6).map((p) => (
-                    <button key={p.id} type="button" onClick={() => filterPerson(String(p.id))}
-                      className="rounded-full border px-2.5 py-1 hover:bg-muted">
-                      {p.name} · {p.count}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
           }
         >
           {isLoading ? (
