@@ -45,6 +45,40 @@ import PageHeader, { PageShell } from '@/components/ui/page-header';
 import ViewTabs from '@/components/ui/view-tabs';
 import ListCard from '@/components/ui/list-card';
 import ListToolbar from '@/components/ui/list-toolbar';
+import useTableView from '@/features/masterdata/useTableView';
+import useListFilters from '@/features/masterdata/useListFilters';
+
+// Columns menu: every column but the kit code can be hidden.
+const KIT_COLUMNS = [
+  { key: 'kit', label: 'Kit', alwaysOn: true },
+  { key: 'owner', label: 'Owner' },
+  { key: 'suburb', label: 'Suburb' },
+  { key: 'status', label: 'Status' },
+  { key: 'lastLogged', label: 'Last logged' },
+  { key: 'assigned', label: 'Assigned' },
+];
+const RECORD_COLUMNS = [
+  { key: 'kit', label: 'Kit', alwaysOn: true },
+  { key: 'owner', label: 'Owner' },
+  { key: 'logged', label: 'Logged' },
+  { key: 'weight', label: 'Weight' },
+  { key: 'sentTo', label: 'Sent to' },
+  { key: 'status', label: 'Status' },
+];
+const STATUS_WORD = { assigned: 'Assigned', logged: 'Logged', dispatched: 'Dispatched' };
+const KIT_FILTERS = [
+  { key: 'status', label: 'Status', valueOf: (k) => k.status, labelOf: (v) => STATUS_WORD[v] ?? v },
+  { key: 'suburb', label: 'Suburb', valueOf: (k) => k.suburb },
+];
+const RECORD_FILTERS = [
+  { key: 'status', label: 'Status', valueOf: (r) => r.status, labelOf: (v) => STATUS_WORD[v] ?? v },
+  { key: 'suburb', label: 'Suburb', valueOf: (r) => r.suburb },
+  { key: 'sentTo', label: 'Sent to', valueOf: (r) => r.dispatched_to },
+];
+const columnsProp = (idPrefix, view) => ({
+  idPrefix, columns: view.availableColumns, hidden: view.hidden,
+  onToggle: view.toggleColumn, onReset: view.resetColumns,
+});
 import EmptyState from '@/components/ui/empty-state';
 import ErrorBanner from '@/components/ui/error-banner';
 
@@ -529,12 +563,19 @@ export default function FeedTheSoilManagerView() {
 
   // Kits, fifteen to a page.
   const idleKits = kits.filter((k) => k.is_idle);
-  const shownKits = tab === 'idle' ? idleKits : kits;
+  const kitView = useTableView('fts-kits', KIT_COLUMNS);
+  const recordView = useTableView('fts-records', RECORD_COLUMNS);
+  const kShow = kitView.isVisible;
+  const rShow = recordView.isVisible;
+  const kitFilters = useListFilters(KIT_FILTERS, kits);
+  const recordFilters = useListFilters(RECORD_FILTERS, records);
+  const shownKits = kitFilters.apply(tab === 'idle' ? idleKits : kits);
+  const filteredRecords = recordFilters.apply(records);
   const kitSort = useSortable(shownKits, KIT_SORT);
   const kitPage = usePaged(kitSort.rows, TABLE_PAGE_SIZE, `${tab}|${kitSearch}|${shownKits.length}|${kitSort.sort?.key}|${kitSort.sort?.dir}`);
   // Records, fifteen to a page.
-  const recordSort = useSortable(records, RECORD_SORT);
-  const recordPage = usePaged(recordSort.rows, TABLE_PAGE_SIZE, `${recordSearch}|${records.length}|${recordSort.sort?.key}|${recordSort.sort?.dir}`);
+  const recordSort = useSortable(filteredRecords, RECORD_SORT);
+  const recordPage = usePaged(recordSort.rows, TABLE_PAGE_SIZE, `${recordSearch}|${filteredRecords.length}|${recordSort.sort?.key}|${recordSort.sort?.dir}`);
   // The page's main action follows the tab, and only on the list itself.
   const onList = view === 'list' && !selectedKit && !selectedRecord;
   const headerAction = !onList ? null : kitsTab ? (
@@ -600,7 +641,14 @@ export default function FeedTheSoilManagerView() {
           />
         ) : kitsTab ? (
           <ListCard
-            header={<ListToolbar search={{ value: kitSearch, onChange: setKitSearch, placeholder: 'Search by owner or suburb' }} />}
+            header={(
+              <ListToolbar
+                search={{ value: kitSearch, onChange: setKitSearch, placeholder: 'Search by owner or suburb' }}
+                filters={kitFilters.filters}
+                onClearAll={() => { setKitSearch(''); kitFilters.clear(); }}
+                columns={columnsProp('fts-kits', kitView)}
+              />
+            )}
             footer={!isLoading && shownKits.length ? <TablePager {...kitPage} noun="kits" alwaysShow /> : null}
           >
             {isLoading ? (
@@ -610,8 +658,8 @@ export default function FeedTheSoilManagerView() {
             ) : shownKits.length === 0 ? (
               <EmptyState
                 icon={Sprout}
-                title={kitSearch ? 'No kits match' : tab === 'idle' ? 'No idle kits' : 'No kits assigned yet'}
-                description={kitSearch ? 'Nothing matches the search.' : tab === 'idle'
+                title={kitSearch || kitFilters.active ? 'No kits match' : tab === 'idle' ? 'No idle kits' : 'No kits assigned yet'}
+                description={kitSearch || kitFilters.active ? 'Nothing matches the search or filters.' : tab === 'idle'
                   ? 'Every kit has had compost logged, or was given out less than three months ago.'
                   : 'Assign a kit to a community member to start.'}
               />
@@ -620,22 +668,22 @@ export default function FeedTheSoilManagerView() {
             <TableHeader>
               <TableRow>
                 <SortableHead label="Kit" sortKey="kit" sort={kitSort.sort} onSort={kitSort.toggle} />
-                <SortableHead label="Owner" sortKey="owner" sort={kitSort.sort} onSort={kitSort.toggle} />
-                <SortableHead label="Suburb" sortKey="suburb" sort={kitSort.sort} onSort={kitSort.toggle} />
-                <SortableHead label="Status" sortKey="status" sort={kitSort.sort} onSort={kitSort.toggle} />
-                <SortableHead label="Last logged" sortKey="lastLogged" sort={kitSort.sort} onSort={kitSort.toggle} />
-                <SortableHead label="Assigned" sortKey="assigned" sort={kitSort.sort} onSort={kitSort.toggle} />
+                {kShow('owner') ? <SortableHead label="Owner" sortKey="owner" sort={kitSort.sort} onSort={kitSort.toggle} /> : null}
+                {kShow('suburb') ? <SortableHead label="Suburb" sortKey="suburb" sort={kitSort.sort} onSort={kitSort.toggle} /> : null}
+                {kShow('status') ? <SortableHead label="Status" sortKey="status" sort={kitSort.sort} onSort={kitSort.toggle} /> : null}
+                {kShow('lastLogged') ? <SortableHead label="Last logged" sortKey="lastLogged" sort={kitSort.sort} onSort={kitSort.toggle} /> : null}
+                {kShow('assigned') ? <SortableHead label="Assigned" sortKey="assigned" sort={kitSort.sort} onSort={kitSort.toggle} /> : null}
               </TableRow>
             </TableHeader>
             <TableBody>
               {kitPage.slice.map((k) => (
                 <TableRow key={k.id} className="cursor-pointer" onClick={() => openKit(k.id)}>
                   <TableCell className="font-medium">{formatKitCode(k.id)}</TableCell>
-                  <TableCell>{k.owner_name}</TableCell>
-                  <TableCell className="text-muted-foreground">{k.suburb || '-'}</TableCell>
-                  <TableCell><KitStatus status={k.status} /></TableCell>
-                  <TableCell className="text-muted-foreground">{fmtDate(k.last_logged_at)}</TableCell>
-                  <TableCell className="text-muted-foreground">{fmtDate(k.assigned_at)}</TableCell>
+                  {kShow('owner') ? <TableCell>{k.owner_name}</TableCell> : null}
+                  {kShow('suburb') ? <TableCell className="text-muted-foreground">{k.suburb || '-'}</TableCell> : null}
+                  {kShow('status') ? <TableCell><KitStatus status={k.status} /></TableCell> : null}
+                  {kShow('lastLogged') ? <TableCell className="text-muted-foreground">{fmtDate(k.last_logged_at)}</TableCell> : null}
+                  {kShow('assigned') ? <TableCell className="text-muted-foreground">{fmtDate(k.assigned_at)}</TableCell> : null}
                 </TableRow>
               ))}
             </TableBody>
@@ -644,34 +692,47 @@ export default function FeedTheSoilManagerView() {
           </ListCard>
         ) : (
           <ListCard
-            header={<ListToolbar search={{ value: recordSearch, onChange: setRecordSearch, placeholder: 'Search by owner or suburb' }} />}
-            footer={!isLoading && records.length ? <TablePager {...recordPage} noun="records" alwaysShow /> : null}
+            header={(
+              <ListToolbar
+                search={{ value: recordSearch, onChange: setRecordSearch, placeholder: 'Search by owner or suburb' }}
+                filters={recordFilters.filters}
+                onClearAll={() => { setRecordSearch(''); recordFilters.clear(); }}
+                columns={columnsProp('fts-records', recordView)}
+              />
+            )}
+            footer={!isLoading && filteredRecords.length ? <TablePager {...recordPage} noun="records" alwaysShow /> : null}
           >
             {isLoading ? (
               <div className="space-y-2 p-4" aria-busy="true">
                 {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
               </div>
-            ) : records.length === 0 ? (
+            ) : filteredRecords.length === 0 ? (
               <EmptyState
                 icon={Sprout}
-                title={recordSearch ? 'No records match' : 'No compost logged yet'}
-                description={recordSearch ? 'Nothing matches the search.' : 'Log a collection against a kit when compost comes in.'}
+                title={recordSearch || recordFilters.active ? 'No records match' : 'No compost logged yet'}
+                description={recordSearch || recordFilters.active ? 'Nothing matches the search or filters.' : 'Log a collection against a kit when compost comes in.'}
               />
             ) : (
           <Table>
             <TableHeader>
               <TableRow>
                 <SortableHead label="Kit" sortKey="kit" sort={recordSort.sort} onSort={recordSort.toggle} />
-                <SortableHead label="Owner" sortKey="owner" sort={recordSort.sort} onSort={recordSort.toggle} />
-                <SortableHead label="Status" sortKey="status" sort={recordSort.sort} onSort={recordSort.toggle} />
+                {rShow('owner') ? <SortableHead label="Owner" sortKey="owner" sort={recordSort.sort} onSort={recordSort.toggle} /> : null}
+                {rShow('logged') ? <TableHead>Logged</TableHead> : null}
+                {rShow('weight') ? <TableHead className="text-right">Weight</TableHead> : null}
+                {rShow('sentTo') ? <TableHead>Sent to</TableHead> : null}
+                {rShow('status') ? <SortableHead label="Status" sortKey="status" sort={recordSort.sort} onSort={recordSort.toggle} /> : null}
               </TableRow>
             </TableHeader>
             <TableBody>
               {recordPage.slice.map((r) => (
                 <TableRow key={r.id} className="cursor-pointer" onClick={() => openRecord(r.id)}>
                   <TableCell className="font-medium">{formatKitCode(r.kit_id)}</TableCell>
-                  <TableCell className="text-muted-foreground">{r.owner_name}{r.suburb ? ` · ${r.suburb}` : ''}</TableCell>
-                  <TableCell><KitStatus status={r.status} /></TableCell>
+                  {rShow('owner') ? <TableCell className="text-muted-foreground">{r.owner_name}{r.suburb ? ` · ${r.suburb}` : ''}</TableCell> : null}
+                  {rShow('logged') ? <TableCell className="text-muted-foreground">{fmtDate(r.logged_at)}</TableCell> : null}
+                  {rShow('weight') ? <TableCell className="text-right tabular-nums">{fmtKg(r.kg_compost)}</TableCell> : null}
+                  {rShow('sentTo') ? <TableCell className="text-muted-foreground">{r.dispatched_to || '-'}</TableCell> : null}
+                  {rShow('status') ? <TableCell><KitStatus status={r.status} /></TableCell> : null}
                 </TableRow>
               ))}
             </TableBody>

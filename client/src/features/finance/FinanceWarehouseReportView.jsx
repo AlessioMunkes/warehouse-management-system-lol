@@ -6,6 +6,9 @@ import ErrorBanner from '@/components/ui/error-banner';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import ListCard from '@/components/ui/list-card';
+import ListToolbar from '@/components/ui/list-toolbar';
+import useTableView from '@/features/masterdata/useTableView';
+import useListFilters from '@/features/masterdata/useListFilters';
 import PageHeader, { PageShell } from '@/components/ui/page-header';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -851,89 +854,86 @@ function LegendItem({ color, label }) {
   );
 }
 
+// The movement list under the report: the same toolbar as every other
+// list (search, + Filter, Columns, export), the reference number always
+// on, every other column hideable.
+const financeColumns = (type) => [
+  { key: 'ref', label: 'Reference', alwaysOn: true },
+  { key: 'date', label: 'Date' },
+  { key: 'source', label: type === 'dispatched' ? 'Destination' : type === 'received' ? 'Supplier' : 'Donor' },
+  { key: 'product', label: 'Product' },
+  { key: 'qty', label: 'Quantity' },
+  { key: 'unit', label: 'Unit' },
+  ...(type !== 'dispatched' ? [{ key: 'value', label: type === 'received' ? 'Value' : 'Estimated value' }] : []),
+];
+const financeFilters = (type) => [
+  { key: 'source', label: type === 'dispatched' ? 'Destination' : type === 'received' ? 'Supplier' : 'Donor', valueOf: sourceDestination },
+  { key: 'product', label: 'Product', valueOf: productName },
+  { key: 'unit', label: 'Unit', valueOf: unit },
+];
+
 function FinanceList({ rows, type, search, onSearchChange, onExportCsv, onExportExcel }) {
+  const columns = useMemo(() => financeColumns(type), [type]);
+  const filterDefs = useMemo(() => financeFilters(type), [type]);
+  const view = useTableView(`finance-${type}`, columns);
+  const show = view.isVisible;
+  const listFilters = useListFilters(filterDefs, rows);
+  const shown = listFilters.apply(rows);
   // Movements, fifteen to a page.
-  const rowPage = usePaged(rows, TABLE_PAGE_SIZE, `${type}|${search}|${rows.length}`);
+  const rowPage = usePaged(shown, TABLE_PAGE_SIZE, `${type}|${search}|${shown.length}`);
   return (
     <ListCard
       className="mt-4"
       header={(
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle>{LIST_TYPES[type]}</CardTitle>
-          <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="outline" onClick={onExportCsv}>
-            Export CSV
-          </Button>
-          <Button type="button" variant="outline" onClick={onExportExcel}>
-            Export Excel
-          </Button>
-          </div>
-        </div>
+        <ListToolbar
+          search={{ value: search, onChange: onSearchChange, placeholder: `Search ${LIST_TYPES[type].toLowerCase()}` }}
+          filters={listFilters.filters}
+          onClearAll={() => { onSearchChange(''); listFilters.clear(); }}
+          columns={{
+            idPrefix: `finance-${type}`,
+            columns: view.availableColumns,
+            hidden: view.hidden,
+            onToggle: view.toggleColumn,
+            onReset: view.resetColumns,
+          }}
+        >
+          <Button type="button" variant="outline" size="sm" onClick={onExportCsv}>Export CSV</Button>
+          <Button type="button" variant="outline" size="sm" onClick={onExportExcel}>Export Excel</Button>
+        </ListToolbar>
       )}
+      footer={shown.length ? <TablePager {...rowPage} noun="movements" alwaysShow /> : null}
     >
-      <div className="space-y-4 p-4 sm:p-5">
-        <div className="max-w-sm space-y-2">
-          <Label htmlFor="finance-list-search">Search list</Label>
-          <Input
-            id="finance-list-search"
-            type="search"
-            value={search}
-            onChange={(event) => onSearchChange(event.target.value)}
-            placeholder={`Search ${LIST_TYPES[type].toLowerCase()}`}
-          />
-        </div>
-        <Table>
-          <ListHeader type={type} />
-          <TableBody>
-            {rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={type === 'dispatched' ? 6 : 7} className="text-muted-foreground">
-                  No matching movements.
-                </TableCell>
-              </TableRow>
-            ) : rowPage.slice.map((row) => (
-              <ListRow key={`${type}-${referenceId(row)}-${productName(row)}-${movementDate(row)}`} row={row} type={type} />
+      <Table>
+        <TableHeader>
+          <TableRow>
+            {view.visibleColumns.map((c) => (
+              <TableHead key={c.key} className={['qty', 'value'].includes(c.key) ? 'text-right' : ''}>{c.label}</TableHead>
             ))}
-          </TableBody>
-        </Table>
-        <TablePager {...rowPage} noun="movements" />
-      </div>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {shown.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={view.visibleColumns.length} className="text-muted-foreground">
+                No matching movements.
+              </TableCell>
+            </TableRow>
+          ) : rowPage.slice.map((row) => (
+            <TableRow key={`${type}-${referenceId(row)}-${productName(row)}-${movementDate(row)}`}>
+              <TableCell className="font-medium">{referenceId(row)}</TableCell>
+              {show('date') ? <TableCell>{formatDate(movementDate(row))}</TableCell> : null}
+              {show('source') ? <TableCell>{sourceDestination(row)}</TableCell> : null}
+              {show('product') ? <TableCell>{productName(row)}</TableCell> : null}
+              {show('qty') ? <TableCell className="text-right tabular-nums">{quantity(row)}</TableCell> : null}
+              {show('unit') ? <TableCell>{unit(row)}</TableCell> : null}
+              {type !== 'dispatched' && show('value') ? (
+                <TableCell className="text-right tabular-nums">{formatMoney(monetaryValue(row))}</TableCell>
+              ) : null}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </ListCard>
-  );
-}
-
-function ListHeader({ type }) {
-  const sourceLabel = type === 'dispatched' ? 'ECD/destination' : type === 'received' ? 'supplier' : 'donor';
-  return (
-    <TableHeader>
-      <TableRow>
-        <TableHead>date</TableHead>
-        <TableHead>ref</TableHead>
-        <TableHead>{sourceLabel}</TableHead>
-        <TableHead>product</TableHead>
-        <TableHead className="text-center">qty</TableHead>
-        <TableHead>unit</TableHead>
-        {type !== 'dispatched' && (
-          <TableHead className="text-center">{type === 'received' ? 'value' : 'estimated value'}</TableHead>
-        )}
-      </TableRow>
-    </TableHeader>
-  );
-}
-
-function ListRow({ row, type }) {
-  return (
-    <TableRow>
-      <TableCell>{formatDate(movementDate(row))}</TableCell>
-      <TableCell>{referenceId(row)}</TableCell>
-      <TableCell>{sourceDestination(row)}</TableCell>
-      <TableCell>{productName(row)}</TableCell>
-      <TableCell className="text-center">{quantity(row)}</TableCell>
-      <TableCell>{unit(row)}</TableCell>
-      {type !== 'dispatched' && (
-        <TableCell className="text-center">{formatMoney(monetaryValue(row))}</TableCell>
-      )}
-    </TableRow>
   );
 }
 

@@ -95,7 +95,7 @@ const COLUMNS = [
   { key: 'role',     label: 'Role', weight: 1.6, minWidth: 'md',
     sort: (u) => (ROLE_LABELS[u.role] ?? u.role ?? '').toLowerCase(),
     cell: (u) => ROLE_LABELS[u.role] ?? u.role },
-  { key: 'status',   label: '', sort: null, alwaysOn: true, weight: 1.8,
+  { key: 'status',   label: 'Status', sort: null, weight: 1.8,
     cell: (u) => (!u.isActive ? <StatusBadge kind="record" status="inactive">Inactive</StatusBadge> : null) },
 ];
 

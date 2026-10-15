@@ -25,6 +25,17 @@ import { useSearchParams } from 'react-router-dom';
 import { Inbox } from 'lucide-react';
 import ViewTabs from '@/components/ui/view-tabs';
 import ListToolbar from '@/components/ui/list-toolbar';
+import useTableView from '@/features/masterdata/useTableView';
+
+// Every column but When can be hidden from the Columns menu.
+const COLUMNS = [
+  { key: 'when', label: 'When', alwaysOn: true },
+  { key: 'message', label: 'Message' },
+  { key: 'to', label: 'To' },
+  { key: 'outcome', label: 'Outcome' },
+  { key: 'about', label: 'About' },
+  { key: 'sentBy', label: 'Sent by' },
+];
 import StatusBadge from '@/components/ui/status-badge';
 import EmptyState from '@/components/ui/empty-state';
 import TablePager from '@/components/ui/table-pager';
@@ -105,6 +116,9 @@ export default function MessageHistoryPage() {
   const [openId, setOpenId] = useState(null);
   // A record docked beside the list: keep when, what and the outcome.
   const docked = useDockWidth() > 0;
+  const tableView = useTableView('messageHistory', COLUMNS);
+  // Docked beside a record, the list also drops To, About and Sent by.
+  const show = (key) => tableView.isVisible(key) && !(docked && ['to', 'about', 'sentBy'].includes(key));
   const view = viewById(searchParams.get('status'));
   const [type, setType] = useState('');
 
@@ -184,6 +198,13 @@ export default function MessageHistoryPage() {
         header={
           <ListToolbar
             chips={type ? [{ key: 'type', label: typeLabel[type] ?? type, onRemove: () => changeType('any') }] : []}
+            columns={{
+              idPrefix: 'messages',
+              columns: tableView.availableColumns,
+              hidden: tableView.hidden,
+              onToggle: tableView.toggleColumn,
+              onReset: tableView.resetColumns,
+            }}
           >
             <Select value={type || 'any'} onValueChange={changeType}>
               <SelectTrigger aria-label="Message type" className="w-60"><SelectValue /></SelectTrigger>
@@ -215,11 +236,11 @@ export default function MessageHistoryPage() {
           <TableHeader>
             <TableRow>
               <TableHead className="w-[150px] pl-4 sm:pl-5">When</TableHead>
-              <TableHead>Message</TableHead>
-              {docked ? null : <TableHead>To</TableHead>}
-              <TableHead>Outcome</TableHead>
-              {docked ? null : <TableHead>About</TableHead>}
-              {docked ? null : <TableHead>Sent by</TableHead>}
+              {show('message') ? <TableHead>Message</TableHead> : null}
+              {show('to') ? <TableHead>To</TableHead> : null}
+              {show('outcome') ? <TableHead>Outcome</TableHead> : null}
+              {show('about') ? <TableHead>About</TableHead> : null}
+              {show('sentBy') ? <TableHead>Sent by</TableHead> : null}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -231,22 +252,26 @@ export default function MessageHistoryPage() {
                 onClick={() => setOpenId(m.id)}
               >
                 <TableCell className="whitespace-nowrap pl-4 sm:pl-5 text-xs text-muted-foreground">{fmtWhen(m.attemptedAt)}</TableCell>
-                <TableCell className="max-w-[260px] whitespace-normal">
-                  <span className="block font-medium">{typeLabel[m.type] ?? m.type}</span>
-                  <span className="block break-words text-xs text-muted-foreground">{m.subject || '-'}</span>
-                </TableCell>
-                {docked ? null : (
+                {show('message') ? (
+                  <TableCell className="max-w-[260px] whitespace-normal">
+                    <span className="block font-medium">{typeLabel[m.type] ?? m.type}</span>
+                    <span className="block break-words text-xs text-muted-foreground">{m.subject || '-'}</span>
+                  </TableCell>
+                ) : null}
+                {show('to') ? (
                   <TableCell className="max-w-[200px] break-words whitespace-normal text-sm">{m.recipient || '-'}</TableCell>
-                )}
-                <TableCell className="whitespace-normal">
-                  <StatusBadge kind="message" status={m.status}>{STATUS_LABEL[m.status] ?? m.status}</StatusBadge>
-                  {m.error ? <span className="mt-1 block break-words text-xs text-danger">{m.error}</span> : null}
-                </TableCell>
-                {docked ? null : (
+                ) : null}
+                {show('outcome') ? (
+                  <TableCell className="whitespace-normal">
+                    <StatusBadge kind="message" status={m.status}>{STATUS_LABEL[m.status] ?? m.status}</StatusBadge>
+                    {m.error ? <span className="mt-1 block break-words text-xs text-danger">{m.error}</span> : null}
+                  </TableCell>
+                ) : null}
+                {show('about') ? (
                   // The link goes to the order; it should not also open the message.
                   <TableCell className="text-sm" onClick={(e) => e.stopPropagation()}><About m={m} /></TableCell>
-                )}
-                {docked ? null : <TableCell className="text-xs">{m.sentByName || 'The system'}</TableCell>}
+                ) : null}
+                {show('sentBy') ? <TableCell className="text-xs">{m.sentByName || 'The system'}</TableCell> : null}
               </TableRow>
             ))}
           </TableBody>

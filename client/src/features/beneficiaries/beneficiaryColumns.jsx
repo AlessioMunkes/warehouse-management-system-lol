@@ -54,7 +54,7 @@ export const BENEFICIARY_COLUMNS = [
 
   // Two badges can land here at once, so it carries more width than a
   // one-badge status column would.
-  { key: 'status', label: '', sort: null, alwaysOn: true, weight: 2.4,
+  { key: 'status', label: 'Status', sort: null, weight: 2.4,
     cell: (b) => (
       <span className="flex flex-wrap justify-end gap-1">
         {!b.approvedAt ? <StatusBadge kind="record" status="unapproved">Unapproved</StatusBadge> : null}

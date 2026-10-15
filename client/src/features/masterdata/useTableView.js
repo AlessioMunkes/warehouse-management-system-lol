@@ -158,10 +158,15 @@ export default function useTableView(table, columns) {
     );
   }, [sort, columns]);
 
+  // For a table that draws its own cells rather than through
+  // MasterDataTable: whether one column is on screen.
+  const visibleKeys = useMemo(() => new Set(visibleColumns.map((c) => c.key)), [visibleColumns]);
+  const isVisible = useCallback((key) => visibleKeys.has(key), [visibleKeys]);
+
   return {
     sort, toggleSort,
     hidden, toggleColumn, resetColumns,
-    availableColumns, visibleColumns,
+    availableColumns, visibleColumns, isVisible,
     sortRows,
   };
 }

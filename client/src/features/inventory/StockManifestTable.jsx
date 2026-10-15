@@ -61,7 +61,7 @@ const COLUMNS = [
     sort: (p) => p.onHand },
   { key: 'committed', label: 'Committed',       numeric: true, align: 'right', minWidth: 'lg',
     sort: (p) => p.committed },
-  { key: 'available', label: 'Available',       numeric: true, align: 'right', alwaysOn: true,
+  { key: 'available', label: 'Available',       numeric: true, align: 'right',
     sort: (p) => p.available },
   { key: 'reorderAt', label: 'Reorder at',      numeric: true, align: 'right', minWidth: 'lg',
     sort: (p) => p.reorderAt },

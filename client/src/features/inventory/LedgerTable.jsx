@@ -70,7 +70,8 @@ const Reference = ({ m }) => {
   );
 };
 
-export default function LedgerTable({ rows, isLoading, sort = null, onSort = () => {} }) {
+// `show(key)`: whether a column is on (useTableView's isVisible).
+export default function LedgerTable({ rows, isLoading, sort = null, onSort = () => {}, show = () => true }) {
   if (isLoading && rows.length === 0) {
     return (
       <div className="space-y-2 p-4" aria-busy="true">
@@ -97,12 +98,12 @@ export default function LedgerTable({ rows, isLoading, sort = null, onSort = () 
       <TableHeader>
         <TableRow>
           <SortableHead label="When" sortKey="when" sort={sort} onSort={onSort} className="w-[150px] pl-4" />
-          <SortableHead label="Product" sortKey="product" sort={sort} onSort={onSort} />
-          <SortableHead label="Type" sortKey="type" sort={sort} onSort={onSort} className="w-[150px]" />
-          <SortableHead label="Change" sortKey="change" sort={sort} onSort={onSort} align="right" className="w-[110px]" />
-          <SortableHead label="Balance after" sortKey="balance" sort={sort} onSort={onSort} align="right" className="w-[120px]" />
-          <SortableHead label="Reference" sortKey="reference" sort={sort} onSort={onSort} />
-          <SortableHead label="By" sortKey="by" sort={sort} onSort={onSort} className="w-[110px]" />
+          {show('product') ? <SortableHead label="Product" sortKey="product" sort={sort} onSort={onSort} /> : null}
+          {show('type') ? <SortableHead label="Type" sortKey="type" sort={sort} onSort={onSort} className="w-[150px]" /> : null}
+          {show('change') ? <SortableHead label="Change" sortKey="change" sort={sort} onSort={onSort} align="right" className="w-[110px]" /> : null}
+          {show('balance') ? <SortableHead label="Balance after" sortKey="balance" sort={sort} onSort={onSort} align="right" className="w-[120px]" /> : null}
+          {show('reference') ? <SortableHead label="Reference" sortKey="reference" sort={sort} onSort={onSort} /> : null}
+          {show('by') ? <SortableHead label="By" sortKey="by" sort={sort} onSort={onSort} className="w-[110px]" /> : null}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -111,25 +112,37 @@ export default function LedgerTable({ rows, isLoading, sort = null, onSort = () 
             <TableCell className="whitespace-nowrap pl-4 text-xs text-muted-foreground">
               {fmtWhen(m.createdAt)}
             </TableCell>
-            <TableCell className="max-w-[240px] whitespace-normal">
-              <span className="block break-words font-medium">{m.productName}</span>
-              <span className="block text-xs text-muted-foreground">{m.sku}</span>
-              {/* The reason a person typed, where there was one. */}
-              {m.reason ? <span className="block break-words text-xs text-muted-foreground">{m.reason}</span> : null}
-            </TableCell>
-            <TableCell>
-              <StatusBadge kind="ledger" status={m.movementType}>
-                {TYPE_LABEL[m.movementType] ?? m.movementType}
-              </StatusBadge>
-            </TableCell>
-            <TableCell className={`text-right tabular-nums ${m.quantity < 0 ? "text-danger" : ""}`}>
-              {fmtQty(m.quantity)} {m.unit}
-            </TableCell>
-            <TableCell className="text-right tabular-nums text-muted-foreground">
-              {(Math.round(m.balanceAfter * 1000) / 1000).toLocaleString("en-ZA")}
-            </TableCell>
-            <TableCell className="max-w-[220px] whitespace-normal"><Reference m={m} /></TableCell>
-            <TableCell className="text-xs">{m.performedByName}</TableCell>
+            {show('product') ? (
+              <TableCell className="max-w-[240px] whitespace-normal">
+                <span className="block break-words font-medium">{m.productName}</span>
+                <span className="block text-xs text-muted-foreground">{m.sku}</span>
+                {/* The reason a person typed, where there was one. */}
+                {m.reason ? <span className="block break-words text-xs text-muted-foreground">{m.reason}</span> : null}
+              </TableCell>
+            ) : null}
+            {show('type') ? (
+              <TableCell>
+                <StatusBadge kind="ledger" status={m.movementType}>
+                  {TYPE_LABEL[m.movementType] ?? m.movementType}
+                </StatusBadge>
+              </TableCell>
+            ) : null}
+            {show('change') ? (
+              <TableCell className={`text-right tabular-nums ${m.quantity < 0 ? "text-danger" : ""}`}>
+                {fmtQty(m.quantity)} {m.unit}
+              </TableCell>
+            ) : null}
+            {show('balance') ? (
+              <TableCell className="text-right tabular-nums text-muted-foreground">
+                {(Math.round(m.balanceAfter * 1000) / 1000).toLocaleString("en-ZA")}
+              </TableCell>
+            ) : null}
+            {show('reference') ? (
+              <TableCell className="max-w-[220px] whitespace-normal"><Reference m={m} /></TableCell>
+            ) : null}
+            {show('by') ? (
+              <TableCell className="text-xs">{m.performedByName}</TableCell>
+            ) : null}
           </TableRow>
         ))}
       </TableBody>

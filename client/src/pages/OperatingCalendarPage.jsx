@@ -31,6 +31,9 @@ import DetailPanel from '@/components/ui/detail-panel';
 import EmptyState from '@/components/ui/empty-state';
 import ErrorBanner from '@/components/ui/error-banner';
 import Notice from '@/components/ui/notice';
+import ListToolbar from '@/components/ui/list-toolbar';
+import useTableView from '@/features/masterdata/useTableView';
+import useListFilters from '@/features/masterdata/useListFilters';
 
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const COHORTS = [
@@ -38,6 +41,15 @@ const COHORTS = [
   { id: 'thursday', label: 'Thursday cohort' },
 ];
 const KIND_LABEL = { public_holiday: 'Public holiday', closure: 'Closure' };
+
+// Every column but the date can be hidden; Remove always shows.
+const COLUMNS = [
+  { key: 'date', label: 'Date', alwaysOn: true },
+  { key: 'reason', label: 'Reason' },
+  { key: 'type', label: 'Type' },
+  { key: 'affected', label: 'Collection affected' },
+  { key: 'remove', label: '', alwaysOn: true },
+];
 
 const todaySast = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Johannesburg' }).format(new Date());
 // 1 = Monday … 7 = Sunday, as the server counts.
@@ -201,8 +213,23 @@ export default function OperatingCalendarPage() {
     [closures, today],
   );
   const view = VIEWS.find((v) => v.id === tab) ?? VIEWS[0];
-  const rows = closures.filter((c) => view.test(c, today));
   const cohortOn = (iso) => COHORTS.find((c) => calendar?.cohorts?.[c.id] === isoWeekday(iso));
+  const tableView = useTableView('closedDays', COLUMNS);
+  const show = tableView.isVisible;
+  const [search, setSearch] = useState('');
+  // Built here, not at module level: "which collection" depends on the
+  // collection days just loaded.
+  const closureFilters = useMemo(() => [
+    { key: 'type', label: 'Type', valueOf: (c) => c.kind, labelOf: (v) => KIND_LABEL[v] ?? v },
+    { key: 'affected', label: 'Collection affected', valueOf: (c) => {
+      const cohort = COHORTS.find((h) => calendar?.cohorts?.[h.id] === isoWeekday(c.date));
+      return cohort ? cohort.label : 'None';
+    } },
+  ], [calendar]);
+  const listFilters = useListFilters(closureFilters, closures);
+  const q = search.trim().toLowerCase();
+  const rows = listFilters.apply(closures.filter((c) => view.test(c, today)))
+    .filter((c) => !q || String(c.label ?? '').toLowerCase().includes(q));
 
   const run = async (work, done) => {
     setBusy(true); setPanelError(null); setError(null);
@@ -258,7 +285,22 @@ export default function OperatingCalendarPage() {
         tabs={VIEWS.map((v) => ({ id: v.id, label: v.label, count: calendar ? counts[v.id] : null }))}
       />
       <div className="mt-6">
-        <ListCard>
+        <ListCard
+          header={
+            <ListToolbar
+              search={{ value: search, onChange: setSearch, placeholder: 'Search by reason' }}
+              filters={listFilters.filters}
+              onClearAll={() => { setSearch(''); listFilters.clear(); }}
+              columns={{
+                idPrefix: 'closed-days',
+                columns: tableView.availableColumns,
+                hidden: tableView.hidden,
+                onToggle: tableView.toggleColumn,
+                onReset: tableView.resetColumns,
+              }}
+            />
+          }
+        >
           {!calendar ? (
             <div className="space-y-2 p-4" aria-busy="true">
               {[0, 1, 2].map((i) => <Skeleton key={i} className="h-10 w-full" />)}
@@ -266,7 +308,7 @@ export default function OperatingCalendarPage() {
           ) : rows.length === 0 ? (
             <EmptyState
               icon={CalendarOff}
-              title={tab === 'past' ? 'No past closed days' : 'No closed days coming up'}
+              title={q || listFilters.active ? 'No closed days match' : tab === 'past' ? 'No past closed days' : 'No closed days coming up'}
               description="Add public holidays and other closed days."
               action={tab === 'past' ? undefined : { label: 'Add public holidays', onClick: () => setPanel('holidays') }}
             />
@@ -275,9 +317,9 @@ export default function OperatingCalendarPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
-                  <TableHead>Reason</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Collection affected</TableHead>
+                  {show('reason') ? <TableHead>Reason</TableHead> : null}
+                  {show('type') ? <TableHead>Type</TableHead> : null}
+                  {show('affected') ? <TableHead>Collection affected</TableHead> : null}
                   <TableHead><span className="sr-only">Remove</span></TableHead>
                 </TableRow>
               </TableHeader>
@@ -287,9 +329,9 @@ export default function OperatingCalendarPage() {
                   return (
                     <TableRow key={c.id}>
                       <TableCell className="whitespace-nowrap tabular-nums">{fmtDay(c.date)}</TableCell>
-                      <TableCell className="whitespace-normal font-medium">{c.label}</TableCell>
-                      <TableCell><StatusBadge kind="closure" status={c.kind}>{KIND_LABEL[c.kind] ?? c.kind}</StatusBadge></TableCell>
-                      <TableCell className="text-muted-foreground">{cohort ? `${cohort.label} misses its collection` : '-'}</TableCell>
+                      {show('reason') ? <TableCell className="whitespace-normal font-medium">{c.label}</TableCell> : null}
+                      {show('type') ? <TableCell><StatusBadge kind="closure" status={c.kind}>{KIND_LABEL[c.kind] ?? c.kind}</StatusBadge></TableCell> : null}
+                      {show('affected') ? <TableCell className="text-muted-foreground">{cohort ? `${cohort.label} misses its collection` : '-'}</TableCell> : null}
                       <TableCell className="text-right">
                         <Button type="button" variant="ghost" size="icon-sm" aria-label={`Remove ${c.label} on ${fmtDay(c.date)}`}
                           onClick={() => setRemoving(c)}>

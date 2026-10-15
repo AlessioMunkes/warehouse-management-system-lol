@@ -16,6 +16,16 @@ import productAPI   from '../services/productAPI';
 import ConfirmRemoveDialog from '../features/masterdata/ConfirmRemoveDialog';
 import useOpenFromQuery    from '../features/masterdata/useOpenFromQuery';
 import useTableView        from '../features/masterdata/useTableView';
+import useListFilters from '../features/masterdata/useListFilters';
+
+// "+ Filter" beyond the Dry / Cold tabs: what the product is and how it
+// is handled.
+const PRODUCT_FILTERS = [
+  { key: 'category', label: 'Category', valueOf: (p) => p.category },
+  { key: 'unit', label: 'Unit', valueOf: (p) => p.defaultUnit },
+  { key: 'perishable', label: 'Perishable', valueOf: (p) => (p.isPerishable ? 'yes' : 'no'), labelOf: (v) => (v === 'yes' ? 'Perishable' : 'Not perishable') },
+  { key: 'decantable', label: 'Decantable', valueOf: (p) => (p.isDecantable ? 'yes' : 'no'), labelOf: (v) => (v === 'yes' ? 'Decantable' : 'Not decantable') },
+];
 import MasterDataTable     from '../features/masterdata/MasterDataTable';
 
 import { Button }    from '@/components/ui/button';
@@ -83,7 +93,7 @@ const COLUMNS = [
   { key: 'decantable', label: 'Decantable', weight: 1.7, minWidth: 'lg',
     sort: (p) => (p.isDecantable ? 'yes' : 'no'),
     cell: (p) => (p.isDecantable ? 'Yes' : 'No') },
-  { key: 'status',   label: '', sort: null, alwaysOn: true, weight: 1.8,
+  { key: 'status',   label: 'Status', sort: null, weight: 1.8,
     cell: (p) => (!p.isActive ? <StatusBadge kind="record" status="inactive">Inactive</StatusBadge> : null) },
 ];
 
@@ -159,9 +169,11 @@ export default function ProductManagementPage() {
   const current = VIEWS.find((v) => v.id === tab) ?? VIEWS[0];
 
   // Narrow first, then order — same composition as the user directory.
+  const listFilters = useListFilters(PRODUCT_FILTERS, products);
+  const { apply: applyFilters } = listFilters;
   const visibleProducts = useMemo(
-    () => view.sortRows(products.filter(current.test)),
-    [products, current, view],
+    () => view.sortRows(applyFilters(products.filter(current.test))),
+    [products, current, view, applyFilters],
   );
   const counts = useMemo(
     () => Object.fromEntries(VIEWS.map((v) => [v.id, products.filter(v.test).length])),
@@ -304,7 +316,7 @@ export default function ProductManagementPage() {
               filters={[{
                 key: 'inactive', label: 'Show inactive', active: includeInactive,
                 onToggle: () => { setIsLoading(true); setIncludeInactive((v) => !v); },
-              }]}
+              }, ...listFilters.filters]}
               columns={{
                 idPrefix: 'products',
                 columns: view.availableColumns,

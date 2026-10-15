@@ -37,6 +37,16 @@ import {
   SLIP_STATE_LABEL, canAssign, canRelease, dayLabel, filterSlips, packers, slipState,
 } from './slipViews';
 import { rowIntent } from '@/lib/recordCache';
+import useListFilters from '@/features/masterdata/useListFilters';
+
+const KIND_LABEL = { ecd: 'ECD centre', soup_kitchen: 'Soup kitchen', dignity_kitchen: 'Dignity Kitchen', community: 'Community' };
+// "+ Filter": the tabs narrow by where a slip has got to; these by who it
+// is for, which cohort, and who is packing it.
+const SLIP_FILTERS = [
+  { key: 'kind', label: 'Beneficiary type', valueOf: (s) => s.beneficiary_kind, labelOf: (v) => KIND_LABEL[v] ?? v },
+  { key: 'cohort', label: 'Cohort', valueOf: (s) => s.cohort, labelOf: (v) => v.charAt(0).toUpperCase() + v.slice(1) },
+  { key: 'packer', label: 'Packer', valueOf: (s) => packers(s) || 'Not claimed' },
+];
 
 // Problems first when sorting by status.
 const STATE_RANK = {
@@ -46,7 +56,7 @@ const STATE_RANK = {
 const COLUMNS = [
   { key: 'name',   label: 'Beneficiary', alwaysOn: true, sort: (s) => (s.ecd_name ?? '').toLowerCase() },
   { key: 'day',    label: 'Dispatch',    minWidth: 'sm', sort: (s) => s.dispatch_date_iso ?? '' },
-  { key: 'status', label: 'Status',      alwaysOn: true, numeric: true, sort: (s) => STATE_RANK[slipState(s)] ?? 0 },
+  { key: 'status', label: 'Status', numeric: true, sort: (s) => STATE_RANK[slipState(s)] ?? 0 },
   { key: 'packer', label: 'Packer',      minWidth: 'md', sort: (s) => (packers(s) || '').toLowerCase() },
   { key: 'items',  label: 'Packed',      minWidth: 'md', numeric: true, align: 'right',
     sort: (s) => (Number(s.total_items) ? Number(s.confirmed_items) / Number(s.total_items) : 0) },
@@ -117,7 +127,9 @@ export default function SlipList({
   const tableView = useTableView('pickingSlips', COLUMNS);
   const { sortRows, visibleColumns: columns } = tableView;
 
-  const rows = useMemo(() => sortRows(filterSlips(slips, { view, search })), [slips, view, search, sortRows]);
+  const listFilters = useListFilters(SLIP_FILTERS, slips);
+  const { apply: applyFilters } = listFilters;
+  const rows = useMemo(() => sortRows(applyFilters(filterSlips(slips, { view, search }))), [slips, view, search, sortRows, applyFilters]);
   const page = usePaged(rows, TABLE_PAGE_SIZE, `${listKey}|${search}|${tableView.sort?.key}|${tableView.sort?.direction}|${slips.length}`);
 
   const selectedSlips = useMemo(() => slips.filter((s) => selected.has(s.id)), [slips, selected]);
@@ -150,6 +162,8 @@ export default function SlipList({
   ) : (
     <ListToolbar
       search={{ value: search, onChange: setSearch, placeholder: 'Search by beneficiary name' }}
+      filters={listFilters.filters}
+      onClearAll={() => { setSearch(''); listFilters.clear(); }}
       columns={{
         idPrefix: 'slips',
         columns: tableView.availableColumns,

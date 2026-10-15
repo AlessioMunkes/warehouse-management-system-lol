@@ -199,20 +199,20 @@ describe('FinanceWarehouseReportPage', () => {
     await user.click(screen.getByRole('button', { name: 'Donations' }));
 
     const table = screen.getByRole('table');
-    expect(within(table).getByRole('columnheader', { name: 'date' })).toBeInTheDocument();
-    expect(within(table).getByRole('columnheader', { name: 'ref' })).toBeInTheDocument();
-    expect(within(table).getByRole('columnheader', { name: 'donor' })).toBeInTheDocument();
-    expect(within(table).getByRole('columnheader', { name: 'product' })).toBeInTheDocument();
-    expect(within(table).getByRole('columnheader', { name: 'qty' })).toBeInTheDocument();
-    expect(within(table).getByRole('columnheader', { name: 'unit' })).toBeInTheDocument();
-    expect(within(table).getByRole('columnheader', { name: 'estimated value' })).toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'Date' })).toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'Reference' })).toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'Donor' })).toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'Product' })).toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'Quantity' })).toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'Unit' })).toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'Estimated value' })).toBeInTheDocument();
     expect(within(table).getByText('Nandi Trust')).toBeInTheDocument();
     expect(within(table).getByText('R 500,00')).toBeInTheDocument();
     expect(within(table).getByText('Ubuntu Foods')).toBeInTheDocument();
     expect(within(table).getByText('R 300,00')).toBeInTheDocument();
     expect(within(table).queryByText('Meridian Foods')).not.toBeInTheDocument();
 
-    await user.type(screen.getByLabelText('Search list'), 'rice');
+    await user.type(screen.getByRole('searchbox'), 'rice');
     expect(within(table).getByText('No matching movements.')).toBeInTheDocument();
   });
 
@@ -226,8 +226,8 @@ describe('FinanceWarehouseReportPage', () => {
     await user.click(screen.getByRole('button', { name: 'Purchase Orders' }));
 
     let table = screen.getByRole('table');
-    expect(within(table).getByRole('columnheader', { name: 'supplier' })).toBeInTheDocument();
-    expect(within(table).getByRole('columnheader', { name: 'value' })).toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'Supplier' })).toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'Value' })).toBeInTheDocument();
     expect(within(table).getByText('Meridian Foods')).toBeInTheDocument();
     expect(within(table).getByText('Cape Foods')).toBeInTheDocument();
     expect(within(table).queryByText('Little Stars ECD')).not.toBeInTheDocument();
@@ -236,9 +236,9 @@ describe('FinanceWarehouseReportPage', () => {
     await user.click(screen.getByRole('button', { name: 'Dispatches' }));
 
     table = screen.getByRole('table');
-    expect(within(table).getByRole('columnheader', { name: 'ECD/destination' })).toBeInTheDocument();
-    expect(within(table).queryByRole('columnheader', { name: 'value' })).not.toBeInTheDocument();
-    expect(within(table).queryByRole('columnheader', { name: 'estimated value' })).not.toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'Destination' })).toBeInTheDocument();
+    expect(within(table).queryByRole('columnheader', { name: 'Value' })).not.toBeInTheDocument();
+    expect(within(table).queryByRole('columnheader', { name: 'Estimated value' })).not.toBeInTheDocument();
     expect(within(table).getByText('Little Stars ECD')).toBeInTheDocument();
     expect(within(table).getByText('8')).toBeInTheDocument();
     expect(within(table).getByText('kg')).toBeInTheDocument();
@@ -293,7 +293,7 @@ describe('FinanceWarehouseReportPage', () => {
     await screen.findByText('Movement Trends');
     await user.click(screen.getByRole('button', { name: 'View List' }));
     await user.click(screen.getByRole('button', { name: 'Purchase Orders' }));
-    await user.type(screen.getByLabelText('Search list'), 'Cape');
+    await user.type(screen.getByRole('searchbox'), 'Cape');
 
     await user.click(screen.getByRole('button', { name: 'Export CSV' }));
 

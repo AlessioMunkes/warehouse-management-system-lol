@@ -54,6 +54,15 @@ import useOpenFromQuery from '../features/masterdata/useOpenFromQuery';
 import { PO_COLUMNS } from '../features/purchaseOrders/poColumns';
 import { exportExcel } from '../lib/excelExport';
 import { useRecordCache } from '@/lib/recordCache';
+import useListFilters from '../features/masterdata/useListFilters';
+
+// "+ Filter" on the order list (module level, so the hook's memo holds).
+const PO_FILTERS = [
+  { key: 'supplier', label: 'Supplier', valueOf: (po) => po.supplierName },
+  { key: 'raisedBy', label: 'Raised by', valueOf: (po) => po.createdByName },
+  { key: 'quickbooks', label: 'QuickBooks', valueOf: (po) => (po.quickbooksPoId ? 'linked' : 'not_linked'),
+    labelOf: (v) => (v === 'linked' ? 'Has a QuickBooks PO' : 'No QuickBooks PO') },
+];
 
 const CAN_MANAGE = ['manager', 'admin'];
 const LIST_LIMIT = 500;
@@ -318,13 +327,17 @@ export default function PurchaseOrdersPage() {
     [purchaseOrders],
   );
   const { sortRows } = tableView;
+  // The tabs narrow by status; these narrow by who the order is with,
+  // who raised it and whether it has a QuickBooks number.
+  const listFilters = useListFilters(PO_FILTERS, purchaseOrders);
+  const { apply: applyFilters } = listFilters;
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const inView = purchaseOrders.filter(viewById(view).test).filter((po) => !q
+    const inView = applyFilters(purchaseOrders.filter(viewById(view).test)).filter((po) => !q
       || po.poNumber?.toLowerCase().includes(q)
       || po.supplierName?.toLowerCase().includes(q));
     return sortRows(inView);
-  }, [purchaseOrders, view, search, sortRows]);
+  }, [purchaseOrders, view, search, sortRows, applyFilters]);
 
   const exportRows = () => exportExcel({
     filename: `purchase-orders-${view}`,
@@ -406,6 +419,8 @@ export default function PurchaseOrdersPage() {
             header={
               <ListToolbar
                 search={{ value: search, onChange: setSearch, placeholder: 'Search PO number or supplier' }}
+                filters={listFilters.filters}
+                onClearAll={() => { setSearch(''); listFilters.clear(); }}
                 columns={{
                   idPrefix: 'po',
                   columns: tableView.availableColumns,

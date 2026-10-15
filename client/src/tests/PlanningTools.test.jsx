@@ -73,7 +73,7 @@ describe('the reorder planner', () => {
     await screen.findByRole('button', { name: 'Rice 2 kg' });
     await userEvent.click(screen.getByRole('button', { name: /^All products/ }));
     expect(screen.getAllByRole('row')).toHaveLength(4);
-    await userEvent.type(screen.getByLabelText('Search'), 'oil');
+    await userEvent.type(screen.getByLabelText('Search product or supplier'), 'oil');
     expect(screen.getAllByRole('row')).toHaveLength(2);
     expect(screen.getByRole('button', { name: 'Oil 750 ml' })).toBeInTheDocument();
   });

@@ -16,6 +16,29 @@
 // ─────────────────────────────────────────────────────────────
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import NativeSelect from '@/components/ui/native-select';
+import ListToolbar from '@/components/ui/list-toolbar';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import useTableView from '@/features/masterdata/useTableView';
+import useListFilters from '@/features/masterdata/useListFilters';
+
+// Every column but the product can be hidden from Columns.
+const PLAN_COLUMNS = [
+  { key: 'product', label: 'Product', alwaysOn: true },
+  { key: 'status', label: 'Status' },
+  { key: 'available', label: 'Available', right: true },
+  { key: 'demand', label: 'Weekly demand', right: true },
+  { key: 'cover', label: 'Days of cover', right: true },
+  { key: 'runsOut', label: 'Runs out' },
+  { key: 'onOrder', label: 'On order', right: true },
+  { key: 'lead', label: 'Lead time', right: true },
+  { key: 'orderBy', label: 'Order by' },
+  { key: 'suggested', label: 'Suggested order', right: true },
+];
+// The chips narrow by status; these by who supplies it and how it is counted.
+const PLAN_FILTERS = [
+  { key: 'supplier', label: 'Supplier', valueOf: (i) => i.supplier },
+  { key: 'unit', label: 'Unit', valueOf: (i) => i.unit },
+];
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorBanner from '@/components/ui/error-banner';
 import { getReorderPlan } from '../../services/reportingAPI';
@@ -130,12 +153,16 @@ export default function ReorderPlanner() {
   }, [weeks]);
 
   const action = useMemo(() => new Set(['out_of_stock', 'order_now', 'order_soon']), []);
+  const view = useTableView('reorderPlan', PLAN_COLUMNS);
+  const show = view.isVisible;
+  const listFilters = useListFilters(PLAN_FILTERS, data?.items ?? []);
+  const { apply: applyFilters } = listFilters;
   const items = useMemo(() => {
     if (!data) return [];
     const q = query.trim().toLowerCase();
-    return data.items.filter((i) => (status === 'all' ? true : status === 'action' ? action.has(i.status) : i.status === status)
+    return applyFilters(data.items).filter((i) => (status === 'all' ? true : status === 'action' ? action.has(i.status) : i.status === status)
       && (!q || i.name.toLowerCase().includes(q) || (i.supplier ?? '').toLowerCase().includes(q)));
-  }, [data, status, query, action]);
+  }, [data, status, query, action, applyFilters]);
   const actionCount = data ? data.items.filter((i) => action.has(i.status)).length : 0;
 
   const exportSheet = async () => {
@@ -186,24 +213,24 @@ export default function ReorderPlanner() {
       <h2 id="reorder-heading" className="text-sm font-bold tracking-tight">Reorder planner</h2>
       <p className="mt-1 text-sm text-ink">Projected run-out and order-by dates for each product. Select a product to view its projection.</p>
 
-      <div className="mt-3 flex flex-wrap items-end gap-3">
-        <label className="flex flex-col gap-1 text-xs font-semibold text-ink">
-          Planning horizon
-          <NativeSelect className="w-36" value={weeks} onChange={(e) => setWeeks(Number(e.target.value))}>
-            {HORIZONS.map((w) => <option key={w} value={w}>{w} weeks</option>)}
+      <div className="mt-3">
+        <ListToolbar
+          search={{ value: query, onChange: setQuery, placeholder: 'Search product or supplier' }}
+          filters={listFilters.filters}
+          onClearAll={() => { setQuery(''); listFilters.clear(); }}
+          columns={{
+            idPrefix: 'reorder',
+            columns: view.availableColumns,
+            hidden: view.hidden,
+            onToggle: view.toggleColumn,
+            onReset: view.resetColumns,
+          }}
+          onExport={data && items.length > 0 && !exporting ? exportSheet : undefined}
+        >
+          <NativeSelect aria-label="Planning horizon" size="sm" className="w-36" value={weeks} onChange={(e) => setWeeks(Number(e.target.value))}>
+            {HORIZONS.map((w) => <option key={w} value={w}>{w}-week horizon</option>)}
           </NativeSelect>
-        </label>
-        <label className="flex flex-col gap-1 text-xs font-semibold text-ink">
-          Search
-          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Product or supplier"
-            className="h-9 w-52 rounded-3xl border border-transparent bg-input/50 px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30" />
-        </label>
-        {data && items.length > 0 ? (
-          <button type="button" onClick={exportSheet} disabled={exporting}
-            className="ml-auto text-xs font-semibold text-ink underline underline-offset-2 disabled:opacity-60">
-            {exporting ? 'Preparing' : 'Export to Excel'}
-          </button>
-        ) : null}
+        </ListToolbar>
       </div>
 
       <ErrorBanner className="mt-3" message={error} />
@@ -225,21 +252,21 @@ export default function ReorderPlanner() {
             </p>
           ) : (
             <div className="mt-3 overflow-x-auto rounded-2xl border border-line">
-              <table className="w-full min-w-[56rem] border-collapse text-xs">
-                <thead className="bg-surface-2 text-left">
-                  <tr>
-                    {['Product', 'Status', 'Available', 'Weekly demand', 'Days of cover', 'Runs out', 'On order', 'Lead time', 'Order by', 'Suggested order'].map((h, i) => (
-                      <th key={h} scope="col" className={`whitespace-nowrap px-3 py-2 font-semibold text-ink ${i >= 2 && ![5, 8].includes(i) ? 'text-right' : ''}`}>{h}</th>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    {view.visibleColumns.map((c) => (
+                      <TableHead key={c.key} className={c.right ? 'text-right' : ''}>{c.label}</TableHead>
                     ))}
-                  </tr>
-                </thead>
-                <tbody>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {items.map((i) => {
                     const isOpen = open === i.productId;
                     return (
                       <Fragment key={i.productId}>
-                        <tr className="border-t border-line">
-                          <th scope="row" className="min-w-[11rem] px-3 py-2 text-left font-semibold">
+                        <TableRow>
+                          <TableCell className="min-w-[11rem] whitespace-normal font-semibold">
                             <button type="button" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : i.productId)}
                               className="text-left text-ink underline decoration-line-strong underline-offset-2 hover:decoration-ink">
                               {i.name}
@@ -249,42 +276,50 @@ export default function ReorderPlanner() {
                                 {i.limits.length === 1 ? i.limits[0] : `${i.limits.length} gaps in the data, open for detail`}
                               </span>
                             ) : null}
-                          </th>
-                          <td className="px-3 py-2">
-                            <span className={`whitespace-nowrap rounded-full px-2 py-0.5 font-semibold ${STATUS[i.status].tone}`}>{STATUS[i.status].label}</span>
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">{fmtQtyUnit(i.available, i.unit)}</td>
-                          <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                            {i.weeklyDemand > 0 ? weeklyUseText(i.weeklyDemand, i.unit) : '-'}
-                            <span className="block text-[11px] text-muted-foreground">{i.demandLabel}</span>
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums">{i.coverDays === null || i.coverDays === undefined ? '-' : i.coverDays}</td>
-                          <td className="whitespace-nowrap px-3 py-2">{day(i.runsOutOn)}</td>
-                          <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums">
-                            {i.incoming > 0 ? qty(i.incoming) : '-'}
-                            {i.overdue > 0 ? <span className="block text-[11px] font-semibold text-warn">{qty(i.overdue)} overdue</span> : null}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums" title={i.leadLabel}>
-                            {i.status === 'no_demand' ? '-' : (
-                              <>
-                                {`${i.leadDays} d${i.leadSource === 'assumed' ? '*' : ''}`}
-                                <span className="block text-[11px] text-muted-foreground">{LEAD[i.leadSource]}</span>
-                              </>
-                            )}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-2 font-semibold">{day(i.orderBy)}</td>
-                          <td className="whitespace-nowrap px-3 py-2 text-right font-bold tabular-nums">{i.suggestedQuantity > 0 ? fmtQtyUnit(i.suggestedQuantity, i.unit) : '-'}</td>
-                        </tr>
+                          </TableCell>
+                          {show('status') ? (
+                            <TableCell>
+                              <span className={`whitespace-nowrap rounded-full px-2 py-0.5 font-semibold ${STATUS[i.status].tone}`}>{STATUS[i.status].label}</span>
+                            </TableCell>
+                          ) : null}
+                          {show('available') ? <TableCell className="text-right tabular-nums">{fmtQtyUnit(i.available, i.unit)}</TableCell> : null}
+                          {show('demand') ? (
+                            <TableCell className="text-right tabular-nums">
+                              {i.weeklyDemand > 0 ? weeklyUseText(i.weeklyDemand, i.unit) : '-'}
+                              <span className="block text-[11px] text-muted-foreground">{i.demandLabel}</span>
+                            </TableCell>
+                          ) : null}
+                          {show('cover') ? <TableCell className="text-right tabular-nums">{i.coverDays === null || i.coverDays === undefined ? '-' : i.coverDays}</TableCell> : null}
+                          {show('runsOut') ? <TableCell>{day(i.runsOutOn)}</TableCell> : null}
+                          {show('onOrder') ? (
+                            <TableCell className="text-right tabular-nums">
+                              {i.incoming > 0 ? qty(i.incoming) : '-'}
+                              {i.overdue > 0 ? <span className="block text-[11px] font-semibold text-warn">{qty(i.overdue)} overdue</span> : null}
+                            </TableCell>
+                          ) : null}
+                          {show('lead') ? (
+                            <TableCell className="text-right tabular-nums" title={i.leadLabel}>
+                              {i.status === 'no_demand' ? '-' : (
+                                <>
+                                  {`${i.leadDays} d${i.leadSource === 'assumed' ? '*' : ''}`}
+                                  <span className="block text-[11px] text-muted-foreground">{LEAD[i.leadSource]}</span>
+                                </>
+                              )}
+                            </TableCell>
+                          ) : null}
+                          {show('orderBy') ? <TableCell className="font-semibold">{day(i.orderBy)}</TableCell> : null}
+                          {show('suggested') ? <TableCell className="text-right font-bold tabular-nums">{i.suggestedQuantity > 0 ? fmtQtyUnit(i.suggestedQuantity, i.unit) : '-'}</TableCell> : null}
+                        </TableRow>
                         {isOpen ? (
-                          <tr className="border-t border-line bg-surface">
-                            <td colSpan={10}><Detail item={i} horizonWeeks={data.horizonWeeks} historyWeeks={data.historyWeeks} /></td>
-                          </tr>
+                          <TableRow className="bg-surface hover:bg-surface">
+                            <TableCell colSpan={view.visibleColumns.length} className="whitespace-normal"><Detail item={i} horizonWeeks={data.horizonWeeks} historyWeeks={data.historyWeeks} /></TableCell>
+                          </TableRow>
                         ) : null}
                       </Fragment>
                     );
                   })}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           )}
 

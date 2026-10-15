@@ -10,12 +10,16 @@
 // and money is written in rand; the Excel export (lib/excelExport.js)
 // writes the same columns as real dates, numbers and amounts.
 // ─────────────────────────────────────────────────────────────
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorBanner from '@/components/ui/error-banner';
 import { listRecords } from '../../services/reportingAPI';
 import { formatLabel } from './chartFormat';
 import { exportExcel } from '../../lib/excelExport';
+import ListToolbar from '@/components/ui/list-toolbar';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import useTableView from '@/features/masterdata/useTableView';
+import useListFilters from '@/features/masterdata/useListFilters';
 
 const NUMERIC = new Set(['number', 'money']);
 
@@ -46,6 +50,27 @@ export default function RecordsPanel({ spec, label = null, onClose }) {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
+
+  // The server decides the columns, so the Columns menu and the filters
+  // are built from them: the first column always on, and a filter for
+  // each text column with a short list of values (area, supplier, status).
+  const columns = useMemo(
+    () => (data?.columns ?? []).map((c, i) => ({ ...c, alwaysOn: i === 0 })),
+    [data],
+  );
+  const view = useTableView('reportRecords', columns);
+  const filterDefs = useMemo(() => (data?.columns ?? [])
+    .filter((c, i) => i > 0 && c.kind === 'text')
+    .filter((c) => {
+      const values = new Set((data?.rows ?? []).map((r) => r[c.key]).filter((v) => v !== null && v !== undefined && v !== ''));
+      return values.size >= 2 && values.size <= 15;
+    })
+    .map((c) => ({ key: c.key, label: c.label, valueOf: (r) => r[c.key] })), [data]);
+  const listFilters = useListFilters(filterDefs, data?.rows ?? []);
+  const [search, setSearch] = useState('');
+  const q = search.trim().toLowerCase();
+  const rows = listFilters.apply(data?.rows ?? [])
+    .filter((r) => !q || columns.some((c) => String(r[c.key] ?? '').toLowerCase().includes(q)));
 
   const [exporting, setExporting] = useState(false);
   const exportSheet = async () => {
@@ -101,30 +126,46 @@ export default function RecordsPanel({ spec, label = null, onClose }) {
       ) : null}
 
       {data && data.rows.length > 0 ? (
-        <div className="mt-3 max-h-[28rem] overflow-auto rounded-xl border border-line">
-          <table className="w-full min-w-max border-collapse text-xs">
-            <thead className="sticky top-0 bg-surface-2 text-left">
-              <tr>
-                {data.columns.map((c) => (
-                  <th key={c.key} scope="col" className={`whitespace-nowrap px-3 py-2 font-semibold text-ink ${NUMERIC.has(c.kind) ? 'text-right' : ''}`}>
-                    {c.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {/* Keyed by position: two lines of one delivery can be identical in every column shown. */}
-              {data.rows.map((row, i) => (
-                <tr key={i} className="border-t border-line">
-                  {data.columns.map((c) => (
-                    <td key={c.key} className={`px-3 py-1.5 align-top ${NUMERIC.has(c.kind) ? 'text-right tabular-nums' : ''} ${c.kind === 'text' ? 'max-w-[22rem]' : 'whitespace-nowrap'}`}>
-                      {show(row[c.key], c.kind)}
-                    </td>
+        <div className="mt-3 space-y-3">
+          <ListToolbar
+            search={{ value: search, onChange: setSearch, placeholder: `Search these ${data.noun ?? 'records'}` }}
+            filters={listFilters.filters}
+            onClearAll={() => { setSearch(''); listFilters.clear(); }}
+            columns={{
+              idPrefix: 'report-records',
+              columns: view.availableColumns,
+              hidden: view.hidden,
+              onToggle: view.toggleColumn,
+              onReset: view.resetColumns,
+            }}
+          />
+          <div className="max-h-[28rem] overflow-auto rounded-xl border border-line">
+            <Table>
+              <TableHeader className="sticky top-0 bg-surface">
+                <TableRow>
+                  {view.visibleColumns.map((c) => (
+                    <TableHead key={c.key} className={NUMERIC.has(c.kind) ? 'text-right' : ''}>{c.label}</TableHead>
                   ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={view.visibleColumns.length} className="text-muted-foreground">No records match.</TableCell>
+                  </TableRow>
+                ) : rows.map((row, i) => (
+                  // Keyed by position: two lines of one delivery can be identical in every column shown.
+                  <TableRow key={i}>
+                    {view.visibleColumns.map((c) => (
+                      <TableCell key={c.key} className={`align-top ${NUMERIC.has(c.kind) ? 'text-right tabular-nums' : ''} ${c.kind === 'text' ? 'max-w-[22rem] whitespace-normal' : ''}`}>
+                        {show(row[c.key], c.kind)}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </div>
       ) : null}
     </section>

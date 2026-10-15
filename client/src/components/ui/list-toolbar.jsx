@@ -37,7 +37,7 @@ export default function ListToolbar({
   const idBase = useId();
   const active = filters.filter((f) => f.active);
   const shown = [
-    ...active.map((f) => ({ key: f.key, label: f.label, onRemove: f.onToggle })),
+    ...active.map((f) => ({ key: f.key, label: f.chipLabel ?? f.label, onRemove: f.onToggle })),
     ...chips,
   ];
   const showClearAll = onClearAll && (shown.length > 1 || (shown.length > 0 && search?.value));
@@ -67,14 +67,21 @@ export default function ListToolbar({
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-64" align="start">
-            <div className="space-y-2">
+            <div className="max-h-80 space-y-2 overflow-y-auto">
               <p className="text-sm font-medium">Show only</p>
               {filters.map((f, i) => {
                 const id = `${idBase}-filter-${i}`;
+                // Filters with a `group` (useListFilters) sit under its name.
+                const heading = f.group && f.group !== filters[i - 1]?.group ? (
+                  <p className="pt-1 text-xs font-semibold text-muted-foreground">{f.group}</p>
+                ) : null;
                 return (
-                  <div key={f.key} className="flex items-center gap-2">
-                    <Checkbox id={id} checked={f.active} onCheckedChange={() => f.onToggle()} />
-                    <label htmlFor={id} className="text-sm font-normal">{f.label}</label>
+                  <div key={f.key}>
+                    {heading}
+                    <div className="flex items-center gap-2">
+                      <Checkbox id={id} checked={f.active} onCheckedChange={() => f.onToggle()} />
+                      <label htmlFor={id} className="text-sm font-normal">{f.label}</label>
+                    </div>
                   </div>
                 );
               })}

@@ -15,6 +15,25 @@ import {
 } from '@/components/ui/table';
 import TablePager from '@/components/ui/table-pager';
 import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/usePaged';
+import useTableView from '@/features/masterdata/useTableView';
+import useListFilters from '@/features/masterdata/useListFilters';
+
+// Every column but the centre can be hidden. Actions is the row's
+// buttons, not data, so it always shows.
+const COLUMNS = [
+  { key: 'ecd', label: 'ECD', alwaysOn: true },
+  { key: 'contact', label: 'Contact' },
+  { key: 'collection', label: 'Collection' },
+  { key: 'email', label: 'Email' },
+  { key: 'whatsapp', label: 'WhatsApp' },
+  { key: 'mobile', label: 'Mobile' },
+  { key: 'actions', label: '', alwaysOn: true },
+];
+const STATUS_WORD = (v) => (v ? v.charAt(0).toUpperCase() + v.slice(1).replace(/_/g, ' ') : v);
+const REMINDER_FILTERS = [
+  { key: 'email', label: 'Email', valueOf: (r) => r.emailStatus, labelOf: STATUS_WORD },
+  { key: 'whatsapp', label: 'WhatsApp', valueOf: (r) => r.whatsappStatus, labelOf: STATUS_WORD },
+];
 
 const STATUS_LABELS = {
   pending: 'Pending',
@@ -105,12 +124,16 @@ export default function EcdCollectionRemindersPage() {
     () => Object.fromEntries(VIEWS.map((v) => [v.id, reminders.filter(v.test).length])),
     [reminders],
   );
+  const tableView = useTableView('collectionReminders', COLUMNS);
+  const show = tableView.isVisible;
+  const listFilters = useListFilters(REMINDER_FILTERS, reminders);
+  const { apply: applyFilters } = listFilters;
   const visible = useMemo(() => {
     const view = VIEWS.find((v) => v.id === tab) ?? VIEWS[0];
     const q = search.trim().toLowerCase();
-    return reminders.filter((r) => view.test(r)
+    return applyFilters(reminders).filter((r) => view.test(r)
       && (!q || `${r.ecdName ?? ''} ${r.contactName ?? ''}`.toLowerCase().includes(q)));
-  }, [reminders, search, tab]);
+  }, [reminders, search, tab, applyFilters]);
 
   const markSent = async (reminder) => {
     setBusyId(reminder.id);
@@ -174,7 +197,18 @@ export default function EcdCollectionRemindersPage() {
         <ListCard
           header={
             <div className="space-y-2">
-              <ListToolbar search={{ value: search, onChange: setSearch, placeholder: 'Search by ECD or contact' }} />
+              <ListToolbar
+                search={{ value: search, onChange: setSearch, placeholder: 'Search by ECD or contact' }}
+                filters={listFilters.filters}
+                onClearAll={() => { setSearch(''); listFilters.clear(); }}
+                columns={{
+                  idPrefix: 'reminders',
+                  columns: tableView.availableColumns,
+                  hidden: tableView.hidden,
+                  onToggle: tableView.toggleColumn,
+                  onReset: tableView.resetColumns,
+                }}
+              />
               <p className="flex items-start gap-2 text-xs text-muted-foreground">
                 <MessageCircle aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
                 Open WhatsApp fills in the centre’s number and message. Send it from the WhatsApp account on this
@@ -208,11 +242,11 @@ export default function EcdCollectionRemindersPage() {
             <TableHeader>
               <TableRow>
                 <TableHead className="pl-4 sm:pl-5">ECD</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Collection</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>WhatsApp</TableHead>
-                <TableHead>Mobile</TableHead>
+                {show('contact') ? <TableHead>Contact</TableHead> : null}
+                {show('collection') ? <TableHead>Collection</TableHead> : null}
+                {show('email') ? <TableHead>Email</TableHead> : null}
+                {show('whatsapp') ? <TableHead>WhatsApp</TableHead> : null}
+                {show('mobile') ? <TableHead>Mobile</TableHead> : null}
                 <TableHead className="pr-4 text-right sm:pr-5">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -220,21 +254,25 @@ export default function EcdCollectionRemindersPage() {
               {reminderPage.slice.map((reminder) => (
                 <TableRow key={reminder.id}>
                   <TableCell className="pl-4 font-medium sm:pl-5">{reminder.ecdName}</TableCell>
-                  <TableCell>{reminder.contactName || 'Not recorded'}</TableCell>
-                  <TableCell>{collectionWhen(reminder, collectionDate)}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Mail className="size-4 text-muted-foreground" />
-                      <StatusBadge status={reminder.emailStatus} />
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <MessageCircle className="size-4 text-muted-foreground" />
-                      <StatusBadge status={reminder.whatsappStatus} />
-                    </div>
-                  </TableCell>
-                  <TableCell>{reminder.mobileNumber || 'Not recorded'}</TableCell>
+                  {show('contact') ? <TableCell>{reminder.contactName || 'Not recorded'}</TableCell> : null}
+                  {show('collection') ? <TableCell>{collectionWhen(reminder, collectionDate)}</TableCell> : null}
+                  {show('email') ? (
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Mail className="size-4 text-muted-foreground" />
+                        <StatusBadge status={reminder.emailStatus} />
+                      </div>
+                    </TableCell>
+                  ) : null}
+                  {show('whatsapp') ? (
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <MessageCircle className="size-4 text-muted-foreground" />
+                        <StatusBadge status={reminder.whatsappStatus} />
+                      </div>
+                    </TableCell>
+                  ) : null}
+                  {show('mobile') ? <TableCell>{reminder.mobileNumber || 'Not recorded'}</TableCell> : null}
                   <TableCell>
                     <div className="flex justify-end gap-2">
                       <Button

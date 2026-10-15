@@ -251,7 +251,7 @@ const COLUMNS = [
   { key: 'leadTime', label: 'Lead time', numeric: true, weight: 1.6, minWidth: 'lg',
     sort: (s) => (s.expectedLeadTimeDays ?? null),
     cell: (s) => (s.expectedLeadTimeDays === null ? '-' : `${s.expectedLeadTimeDays} days`) },
-  { key: 'status',   label: '', sort: null, alwaysOn: true, weight: 1.8,
+  { key: 'status',   label: 'Status', sort: null, weight: 1.8,
     cell: (s) => (!s.isActive ? <StatusBadge kind="record" status="inactive">Inactive</StatusBadge> : null) },
 ];
 

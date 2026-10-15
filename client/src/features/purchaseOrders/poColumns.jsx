@@ -43,7 +43,7 @@ export const PO_COLUMNS = [
 
   // Sorted by the label the manager reads, not the raw enum — the
   // on-screen order looks wrong otherwise.
-  { key: 'status', label: 'Status', alwaysOn: true, weight: 2.6,
+  { key: 'status', label: 'Status', weight: 2.6,
     sort: (po) => (po.statusLabel ?? po.status ?? '').toLowerCase(),
     cellClass: '',
     cell: (po) => (

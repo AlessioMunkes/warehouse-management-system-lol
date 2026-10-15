@@ -28,6 +28,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import LedgerTable from "../features/inventory/LedgerTable";
+import { LEDGER_COLUMNS } from "../features/inventory/ledgerColumns";
+import useTableView from "../features/masterdata/useTableView";
 import TablePager from "@/components/ui/table-pager";
 import useSortable from "@/lib/useSortable";
 import { LEDGER_SORT } from "../features/inventory/ledgerSort";
@@ -206,6 +208,7 @@ export default function StockLedgerPage() {
   // fetches the rest of the movements for the current filters (a
   // period's worth, not the whole history), then sorts all of them.
   const ledgerSort = useSortable(rows, LEDGER_SORT);
+  const ledgerView = useTableView("stockLedger", LEDGER_COLUMNS);
   const [loadingAll, setLoadingAll] = useState(false);
   const sortLedger = async (key) => {
     ledgerSort.toggle(key);
@@ -300,7 +303,17 @@ export default function StockLedgerPage() {
           <ListCard
             header={
               <div className="space-y-2">
-                <ListToolbar chips={chips} onClearAll={resetFilters}>
+                <ListToolbar
+                  chips={chips}
+                  onClearAll={resetFilters}
+                  columns={{
+                    idPrefix: "ledger",
+                    columns: ledgerView.availableColumns,
+                    hidden: ledgerView.hidden,
+                    onToggle: ledgerView.toggleColumn,
+                    onReset: ledgerView.resetColumns,
+                  }}
+                >
                   <Select value={range} onValueChange={(v) => { setIsLoading(true); setRange(v); }}>
                     <SelectTrigger aria-label="Period" className="w-40"><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -352,7 +365,7 @@ export default function StockLedgerPage() {
               />
             }
           >
-            <LedgerTable rows={ledgerPage.slice} isLoading={isLoading || loadingAll} sort={ledgerSort.sort} onSort={sortLedger} />
+            <LedgerTable rows={ledgerPage.slice} isLoading={isLoading || loadingAll} sort={ledgerSort.sort} onSort={sortLedger} show={ledgerView.isVisible} />
           </ListCard>
         </div>
       )}

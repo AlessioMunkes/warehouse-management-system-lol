@@ -16,10 +16,34 @@ import { VARIANCE_STYLE } from '@/lib/statusStyles';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import { useState } from "react";
+import ListToolbar from "@/components/ui/list-toolbar";
+import useTableView from "@/features/masterdata/useTableView";
+import useListFilters from "@/features/masterdata/useListFilters";
+
+// Every column but the product can be hidden from Columns.
+const COLUMNS = [
+  { key: "product", label: "Product", alwaysOn: true },
+  { key: "sku", label: "SKU" },
+  { key: "onHand", label: "On hand" },
+  { key: "ledger", label: "Ledger sum" },
+  { key: "variance", label: "Variance" },
+  { key: "movements", label: "Movements" },
+];
+const FILTERS = [
+  { key: "unit", label: "Unit", valueOf: (r) => r.unit },
+  { key: "direction", label: "Variance", valueOf: (r) => (r.variance > 0 ? "over" : "under"),
+    labelOf: (v) => (v === "over" ? "More on hand than the ledger" : "Less on hand than the ledger") },
+];
 
 const fmt = (n) => (Math.round(Number(n) * 1000) / 1000).toLocaleString("en-ZA");
 
 export default function ReconciliationPanel({ data, isLoading }) {
+  const view = useTableView("stockReconciliation", COLUMNS);
+  const show = view.isVisible;
+  const [search, setSearch] = useState("");
+  const listFilters = useListFilters(FILTERS, data?.variances ?? []);
+
   if (isLoading) {
     return (
       <div className="space-y-2 p-4" aria-busy="true">
@@ -61,35 +85,54 @@ export default function ReconciliationPanel({ data, isLoading }) {
         </p>
       </div>
 
+      <ListToolbar
+        search={{ value: search, onChange: setSearch, placeholder: "Search by product or SKU" }}
+        filters={listFilters.filters}
+        onClearAll={() => { setSearch(""); listFilters.clear(); }}
+        columns={{
+          idPrefix: "reconciliation",
+          columns: view.availableColumns,
+          hidden: view.hidden,
+          onToggle: view.toggleColumn,
+          onReset: view.resetColumns,
+        }}
+      />
+
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Product</TableHead>
-              <TableHead className="w-[110px]">SKU</TableHead>
-              <TableHead className="w-[120px] text-center">On hand</TableHead>
-              <TableHead className="w-[120px] text-center">Ledger sum</TableHead>
-              <TableHead className="w-[120px] text-center">Variance</TableHead>
-              <TableHead className="w-[110px] text-center">Movements</TableHead>
+              {show("sku") ? <TableHead className="w-[110px]">SKU</TableHead> : null}
+              {show("onHand") ? <TableHead className="w-[120px] text-center">On hand</TableHead> : null}
+              {show("ledger") ? <TableHead className="w-[120px] text-center">Ledger sum</TableHead> : null}
+              {show("variance") ? <TableHead className="w-[120px] text-center">Variance</TableHead> : null}
+              {show("movements") ? <TableHead className="w-[110px] text-center">Movements</TableHead> : null}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {variances.map((r) => (
+            {listFilters.apply(variances)
+              .filter((r) => !search.trim() || `${r.name} ${r.sku}`.toLowerCase().includes(search.trim().toLowerCase()))
+              .map((r) => (
               <TableRow key={r.id}>
                 <TableCell className="max-w-[240px] truncate font-medium" title={r.name}>
                   {r.name}
                 </TableCell>
-                <TableCell className="text-xs text-muted-foreground">{r.sku}</TableCell>
-                <TableCell className="text-center font-mono text-sm">{fmt(r.balance)} {r.unit}</TableCell>
-                <TableCell className="text-center font-mono text-sm">{fmt(r.ledgerSum)}</TableCell>
-                <TableCell className="text-center">
-                  <StatusBadge {...VARIANCE_STYLE} className="font-mono">
-                    {r.variance > 0 ? "+" : ""}{fmt(r.variance)}
-                  </StatusBadge>
-                </TableCell>
-                <TableCell className="text-center text-xs text-muted-foreground">
-                  {r.movementCount}
-                </TableCell>
+                {show("sku") ? <TableCell className="text-xs text-muted-foreground">{r.sku}</TableCell> : null}
+                {show("onHand") ? <TableCell className="text-center font-mono text-sm">{fmt(r.balance)} {r.unit}</TableCell> : null}
+                {show("ledger") ? <TableCell className="text-center font-mono text-sm">{fmt(r.ledgerSum)}</TableCell> : null}
+                {show("variance") ? (
+                  <TableCell className="text-center">
+                    <StatusBadge {...VARIANCE_STYLE} className="font-mono">
+                      {r.variance > 0 ? "+" : ""}{fmt(r.variance)}
+                    </StatusBadge>
+                  </TableCell>
+                ) : null}
+                {show("movements") ? (
+                  <TableCell className="text-center text-xs text-muted-foreground">
+                    {r.movementCount}
+                  </TableCell>
+                ) : null}
               </TableRow>
             ))}
           </TableBody>

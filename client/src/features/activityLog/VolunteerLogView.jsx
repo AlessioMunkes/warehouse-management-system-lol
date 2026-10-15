@@ -83,7 +83,7 @@ const COLUMNS = [
   { key: 'source',    label: 'Source', weight: 1.8, minWidth: 'lg',
     sort: (v) => (v.source ?? '').toLowerCase(),
     cell: (v) => v.source || '-' },
-  { key: 'status',    label: '', sort: null, alwaysOn: true, weight: 1.8,
+  { key: 'status',    label: 'Status', sort: null, weight: 1.8,
     cell: (v) => (v.signedOutAt ? null : <StatusBadge kind="visit" status="on_site">On site</StatusBadge>) },
 ];
 

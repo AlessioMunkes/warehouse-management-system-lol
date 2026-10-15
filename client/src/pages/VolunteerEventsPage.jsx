@@ -26,6 +26,19 @@ import PageHeader, { PageShell } from '@/components/ui/page-header';
 import ViewTabs from '@/components/ui/view-tabs';
 import ListCard from '@/components/ui/list-card';
 import ListToolbar from '@/components/ui/list-toolbar';
+import useTableView from '@/features/masterdata/useTableView';
+import useListFilters from '@/features/masterdata/useListFilters';
+
+// Every column but the event can be hidden; Actions always shows.
+const COLUMNS = [
+  { key: 'event', label: 'Event', alwaysOn: true },
+  { key: 'date', label: 'Date' },
+  { key: 'status', label: 'Status' },
+  { key: 'actions', label: '', alwaysOn: true },
+];
+const EVENT_FILTERS = [
+  { key: 'venue', label: 'Venue', valueOf: (e) => e.venueName },
+];
 import EmptyState from '@/components/ui/empty-state';
 import ErrorBanner from '@/components/ui/error-banner';
 import {
@@ -123,15 +136,19 @@ export default function VolunteerEventsPage() {
     [narrowedEvents],
   );
 
+  const tableView = useTableView('volunteerEvents', COLUMNS);
+  const show = tableView.isVisible;
+  const listFilters = useListFilters(EVENT_FILTERS, events);
+  const { apply: applyFilters } = listFilters;
   const visibleEvents = useMemo(() => {
-    return narrowedEvents
+    return applyFilters(narrowedEvents)
       .filter(view.test)
       .sort((a, b) => {
         const by = EVENT_SORT[sortKey] ?? EVENT_SORT.date;
         const c = compareValues(by(a), by(b));
         return sortDirection === 'asc' ? c : -c;
       });
-  }, [narrowedEvents, sortDirection, sortKey, view]);
+  }, [narrowedEvents, sortDirection, sortKey, view, applyFilters]);
 
   // Click a column name: sort by it, again to flip the order, a third
   // time to go back to how the page opened (earliest date first).
@@ -295,8 +312,16 @@ export default function VolunteerEventsPage() {
             <ListToolbar
               search={{ value: search, onChange: setSearch, placeholder: 'Search events' }}
               chips={dateChips}
-              onClearAll={clearFilters}
+              filters={listFilters.filters}
+              onClearAll={() => { clearFilters(); listFilters.clear(); }}
               note={sortNote}
+              columns={{
+                idPrefix: 'events',
+                columns: tableView.availableColumns,
+                hidden: tableView.hidden,
+                onToggle: tableView.toggleColumn,
+                onReset: tableView.resetColumns,
+              }}
             >
               <Input
                 type="date" aria-label="From date" title="From date" className="h-8 w-auto"
@@ -334,8 +359,8 @@ export default function VolunteerEventsPage() {
               <TableHeader>
                 <TableRow>
                   <SortableHead label="Event" sortKey="name" sort={tableSort} onSort={toggleSort} />
-                  <SortableHead label="Date" sortKey="date" sort={tableSort} onSort={toggleSort} />
-                  <SortableHead label="Status" sortKey="status" sort={tableSort} onSort={toggleSort} />
+                  {show('date') ? <SortableHead label="Date" sortKey="date" sort={tableSort} onSort={toggleSort} /> : null}
+                  {show('status') ? <SortableHead label="Status" sortKey="status" sort={tableSort} onSort={toggleSort} /> : null}
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -352,8 +377,8 @@ export default function VolunteerEventsPage() {
                           <p className="text-xs text-muted-foreground">{event.venueName}{event.address ? ` (${event.address})` : ''}</p>
                         )}
                       </TableCell>
-                      <TableCell className="tabular-nums">{displayDate(event.eventDate)}</TableCell>
-                      <TableCell><StatusBadge kind="volunteerEvent" status={event.status}>{event.statusLabel}</StatusBadge></TableCell>
+                      {show('date') ? <TableCell className="tabular-nums">{displayDate(event.eventDate)}</TableCell> : null}
+                      {show('status') ? <TableCell><StatusBadge kind="volunteerEvent" status={event.status}>{event.statusLabel}</StatusBadge></TableCell> : null}
                       <TableCell>
                         <div className="flex justify-end gap-1">
                           <Link to={VOLUNTEERS.event(event.id)} className={buttonVariants({ variant: 'outline', size: 'sm' })}>Open</Link>

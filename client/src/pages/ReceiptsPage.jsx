@@ -53,6 +53,11 @@ import {
   formatDateShort, DISPATCH_STATUS_LABEL, DELIVERY_STATUS_LABEL,
 } from '../features/receipts/noteFormat';
 import receivingAPI from '../services/receivingAPI';
+import useTableView from '../features/masterdata/useTableView';
+
+// For the Columns menu: each column's header is its name there, and the
+// record number (the first column) cannot be hidden.
+const forColumnsMenu = (cols) => cols.map((c, i) => ({ ...c, label: c.header, alwaysOn: i === 0 }));
 import dispatchAPI from '../services/dispatchAPI';
 
 const PAGE_SIZE = 15;
@@ -378,6 +383,10 @@ export default function ReceiptsPage() {
     next: () => setOffset(offset + PAGE_SIZE),
   };
 
+  const deliveryView = useTableView('receiptsIn', forColumnsMenu(deliveryColumns));
+  const dispatchView = useTableView('receiptsOut', forColumnsMenu(dispatchColumns));
+  const receiptsView = tab === 'in' ? deliveryView : dispatchView;
+
   return (
     <PageShell>
       <PageHeader
@@ -415,6 +424,13 @@ export default function ReceiptsPage() {
               }))}
               chips={chips}
               onClearAll={clearAll}
+              columns={{
+                idPrefix: tab === 'in' ? 'receipts-in' : 'receipts-out',
+                columns: receiptsView.availableColumns,
+                hidden: receiptsView.hidden,
+                onToggle: receiptsView.toggleColumn,
+                onReset: receiptsView.resetColumns,
+              }}
             >
               <NativeSelect
                 aria-label={entityLabel}
@@ -454,7 +470,7 @@ export default function ReceiptsPage() {
             : null}
         >
           <ReceiptsTable
-            columns={tab === 'in' ? deliveryColumns : dispatchColumns}
+            columns={receiptsView.visibleColumns}
             rows={rows}
             rowKey={(r) => (tab === 'in' ? `d-${r.id}` : `x-${r.dispatch_event_id}`)}
             onOpen={openRow}

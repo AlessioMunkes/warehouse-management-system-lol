@@ -20,6 +20,29 @@ import PageHeader, { PageShell } from '@/components/ui/page-header';
 import ViewTabs from '@/components/ui/view-tabs';
 import ListCard from '@/components/ui/list-card';
 import ListToolbar from '@/components/ui/list-toolbar';
+import useTableView from '@/features/masterdata/useTableView';
+
+// Every column but the identifying one can be hidden from Columns.
+const QUEUE_COLUMNS = [
+  { key: 'donation', label: 'Donation', alwaysOn: true },
+  { key: 'donor', label: 'Donor' },
+  { key: 'date', label: 'Date' },
+  { key: 'amount', label: 'Amount' },
+];
+const EMAIL_COLUMNS = [
+  { key: 'recipient', label: 'Recipient', alwaysOn: true },
+  { key: 'donor', label: 'Donor' },
+  { key: 'donation', label: 'Donation' },
+  { key: 'type', label: 'Type' },
+  { key: 'subject', label: 'Subject' },
+  { key: 'status', label: 'Status' },
+  { key: 'sentAt', label: 'Sent at' },
+  { key: 'actions', label: '', alwaysOn: true },
+];
+const columnsProp = (idPrefix, view) => ({
+  idPrefix, columns: view.availableColumns, hidden: view.hidden,
+  onToggle: view.toggleColumn, onReset: view.resetColumns,
+});
 import EmptyState from '@/components/ui/empty-state';
 import ErrorBanner from '@/components/ui/error-banner';
 import Notice from '@/components/ui/notice';
@@ -157,6 +180,10 @@ export default function Section18AManagementPage() {
     const time = raw ? new Date(raw).getTime() : NaN;
     return Number.isFinite(time) ? time : 0;
   };
+  const queueView = useTableView('s18aQueue', QUEUE_COLUMNS);
+  const emailView = useTableView('s18aEmails', EMAIL_COLUMNS);
+  const qShow = queueView.isVisible;
+  const eShow = emailView.isVisible;
   const filteredCertificateQueue = certificateQueue
     .filter((item) => {
       const donor = queueDonorOf(item).toLowerCase();
@@ -185,12 +212,6 @@ export default function Section18AManagementPage() {
   const certPage = usePaged(filteredCertificateQueue, TABLE_PAGE_SIZE, `${donorSearch}|${filteredCertificateQueue.length}`);
   // Emails, fifteen to a page.
   const emailPage = usePaged(emailHistory, TABLE_PAGE_SIZE, emailHistory.length);
-  // The figures the four tiles used to show, now one line above the table.
-  const emailCounts = {
-    sent: emailHistory.filter((e) => ['sent', 'delivered', 'SENT', 'DELIVERED'].includes(e.status)).length,
-    failed: emailHistory.filter((e) => ['failed', 'bounced', 'FAILED', 'BOUNCED'].includes(e.status)).length,
-    pending: emailHistory.filter((e) => ['pending', 'PENDING'].includes(e.status)).length,
-  };
 
   return (
     <PageShell>
@@ -218,6 +239,7 @@ export default function Section18AManagementPage() {
             <ListToolbar
               search={{ value: donorSearch, onChange: setDonorSearch, placeholder: 'Search donor name', label: 'Search by donor name' }}
               note={`${filteredCertificateQueue.length} of ${certificateQueue.length}`}
+              columns={columnsProp('s18a-queue', queueView)}
             >
               <Input type="number" aria-label="Minimum amount" placeholder="Min R" value={amountMin} onChange={(e) => setAmountMin(e.target.value)} className="h-8 w-24" />
               <Input type="number" aria-label="Maximum amount" placeholder="Max R" value={amountMax} onChange={(e) => setAmountMax(e.target.value)} className="h-8 w-24" />
@@ -246,9 +268,9 @@ export default function Section18AManagementPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Donation</TableHead>
-                  <TableHead>Donor</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
+                  {qShow('donor') ? <TableHead>Donor</TableHead> : null}
+                  {qShow('date') ? <TableHead>Date</TableHead> : null}
+                  {qShow('amount') ? <TableHead className="text-right">Amount</TableHead> : null}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -267,9 +289,9 @@ export default function Section18AManagementPage() {
                   return (
                     <TableRow key={item.id}>
                       <TableCell className="font-medium">{item.reference || item.id}</TableCell>
-                      <TableCell>{item.donorName || item.donor_name || '-'}</TableCell>
-                      <TableCell className="text-muted-foreground">{formattedDate}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formattedAmount}</TableCell>
+                      {qShow('donor') ? <TableCell>{item.donorName || item.donor_name || '-'}</TableCell> : null}
+                      {qShow('date') ? <TableCell className="text-muted-foreground">{formattedDate}</TableCell> : null}
+                      {qShow('amount') ? <TableCell className="text-right tabular-nums">{formattedAmount}</TableCell> : null}
                     </TableRow>
                   );
                 })}
@@ -283,9 +305,9 @@ export default function Section18AManagementPage() {
         <ListCard
           className="mt-6"
           header={
-            <div className="space-y-2">
               <ListToolbar
                 search={{ value: emailSearch, onChange: setEmailSearch, placeholder: 'Recipient, donor, donation, subject', label: 'Search email history' }}
+                columns={columnsProp('s18a-emails', emailView)}
               >
                 <NativeSelect aria-label="Filter by email type" value={emailTypeFilter} onChange={(e) => setEmailTypeFilter(e.target.value)} size="sm">
                   <option value="">All types</option>
@@ -304,13 +326,6 @@ export default function Section18AManagementPage() {
                   </Button>
                 )}
               </ListToolbar>
-              <p className="text-sm text-muted-foreground tabular-nums">
-                {emailHistory.length} email{emailHistory.length === 1 ? '' : 's'}
-                {' · '}<span className="text-good">{emailCounts.sent} sent</span>
-                {' · '}<span className="text-danger">{emailCounts.failed} failed</span>
-                {' · '}<span className="text-warn">{emailCounts.pending} pending</span>
-              </p>
-            </div>
           }
           footer={!emailLoading && emailHistory.length ? <TablePager {...emailPage} noun="emails" alwaysShow /> : null}
         >
@@ -324,8 +339,14 @@ export default function Section18AManagementPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Recipient</TableHead><TableHead>Donor</TableHead><TableHead>Donation</TableHead><TableHead>Type</TableHead>
-                  <TableHead>Subject</TableHead><TableHead>Status</TableHead><TableHead>Sent At</TableHead><TableHead className="text-right">Actions</TableHead>
+                  <TableHead>Recipient</TableHead>
+                  {eShow('donor') ? <TableHead>Donor</TableHead> : null}
+                  {eShow('donation') ? <TableHead>Donation</TableHead> : null}
+                  {eShow('type') ? <TableHead>Type</TableHead> : null}
+                  {eShow('subject') ? <TableHead>Subject</TableHead> : null}
+                  {eShow('status') ? <TableHead>Status</TableHead> : null}
+                  {eShow('sentAt') ? <TableHead>Sent at</TableHead> : null}
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -335,12 +356,12 @@ export default function Section18AManagementPage() {
                   return (
                     <TableRow key={email.id}>
                       <TableCell className="font-medium">{emailRecipientOf(email)}</TableCell>
-                      <TableCell>{email.donor_name || email.donorName || email.recipient_name || email.recipientName || '-'}</TableCell>
-                      <TableCell>{emailDonationRefOf(email)}</TableCell>
-                      <TableCell><Badge variant="outline">{normaliseTypeLabel(email.email_type || email.emailType)}</Badge></TableCell>
-                      <TableCell className="max-w-[200px] truncate">{email.subject || '-'}</TableCell>
-                      <TableCell><StatusBadge kind="message" status={statusKey}>{EMAIL_STATUS_LABEL[statusKey]}</StatusBadge></TableCell>
-                      <TableCell className="text-muted-foreground">{sentAt ? new Date(sentAt).toLocaleString() : '-'}</TableCell>
+                      {eShow('donor') ? <TableCell>{email.donor_name || email.donorName || email.recipient_name || email.recipientName || '-'}</TableCell> : null}
+                      {eShow('donation') ? <TableCell>{emailDonationRefOf(email)}</TableCell> : null}
+                      {eShow('type') ? <TableCell><Badge variant="outline">{normaliseTypeLabel(email.email_type || email.emailType)}</Badge></TableCell> : null}
+                      {eShow('subject') ? <TableCell className="max-w-[200px] truncate">{email.subject || '-'}</TableCell> : null}
+                      {eShow('status') ? <TableCell><StatusBadge kind="message" status={statusKey}>{EMAIL_STATUS_LABEL[statusKey]}</StatusBadge></TableCell> : null}
+                      {eShow('sentAt') ? <TableCell className="text-muted-foreground">{sentAt ? new Date(sentAt).toLocaleString() : '-'}</TableCell> : null}
                       <TableCell className="text-right">
                         <Button variant="ghost" size="sm" onClick={() => setConfirmResend(email)} disabled={actionLoading === `resend-${email.id}`}>
                           {actionLoading === `resend-${email.id}` ? <Loader2 className="animate-spin" /> : <Send />}Resend

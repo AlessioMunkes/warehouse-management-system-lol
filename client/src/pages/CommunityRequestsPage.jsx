@@ -46,6 +46,25 @@ import {
 } from '@/components/ui/table';
 import TablePager from '@/components/ui/table-pager';
 import usePaged, { TABLE_PAGE_SIZE } from '@/features/staff/usePaged';
+import useTableView from '@/features/masterdata/useTableView';
+import useListFilters from '@/features/masterdata/useListFilters';
+
+// Every column but when it was requested can be hidden; the last column
+// is the row's buttons and always shows.
+const COLUMNS = [
+  { key: 'requested', label: 'Requested', alwaysOn: true },
+  { key: 'items', label: 'Items' },
+  { key: 'notes', label: 'Quantity and collection notes' },
+  { key: 'caller', label: 'Caller' },
+  { key: 'status', label: 'Status' },
+  { key: 'actions', label: '', alwaysOn: true },
+];
+// The tabs narrow by where a request has got to; these by who handled it.
+const REQUEST_FILTERS = [
+  { key: 'loggedBy', label: 'Logged by', valueOf: (r) => r.loggedByName },
+  { key: 'packer', label: 'Packer', valueOf: (r) => r.assignedToName },
+  { key: 'handledBy', label: 'Handled by', valueOf: (r) => r.handledByName },
+];
 import PageHeader, { PageShell } from '@/components/ui/page-header';
 import ViewTabs from '@/components/ui/view-tabs';
 import ListCard from '@/components/ui/list-card';
@@ -191,7 +210,11 @@ export default function CommunityRequestsPage() {
     () => Object.fromEntries(VIEWS.map((v) => [v.id, requests.filter(v.test).length])),
     [requests],
   );
-  const visible = useMemo(() => rowsForView(requests, view), [requests, view]);
+  const tableView = useTableView('communityRequests', COLUMNS);
+  const show = tableView.isVisible;
+  const listFilters = useListFilters(REQUEST_FILTERS, requests);
+  const { apply: applyFilters } = listFilters;
+  const visible = useMemo(() => applyFilters(rowsForView(requests, view)), [requests, view, applyFilters]);
   const requestPage = usePaged(visible, TABLE_PAGE_SIZE, `${search}|${view.id}|${visible.length}`);
 
   return (
@@ -228,6 +251,15 @@ export default function CommunityRequestsPage() {
                 onChange: (value) => { setIsLoading(true); setSearch(value); },
                 placeholder: 'Search by item or caller name',
               }}
+              filters={listFilters.filters}
+              onClearAll={() => { setIsLoading(true); setSearch(''); listFilters.clear(); }}
+              columns={{
+                idPrefix: 'requests',
+                columns: tableView.availableColumns,
+                hidden: tableView.hidden,
+                onToggle: tableView.toggleColumn,
+                onReset: tableView.resetColumns,
+              }}
             />
           }
           footer={!isLoading && visible.length ? <TablePager {...requestPage} noun="requests" alwaysShow /> : null}
@@ -248,10 +280,10 @@ export default function CommunityRequestsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead className="pl-4 sm:pl-5">Requested</TableHead>
-                <TableHead>Items</TableHead>
-                <TableHead>Quantity and collection notes</TableHead>
-                <TableHead>Caller</TableHead>
-                <TableHead>Status</TableHead>
+                {show('items') ? <TableHead>Items</TableHead> : null}
+                {show('notes') ? <TableHead>Quantity and collection notes</TableHead> : null}
+                {show('caller') ? <TableHead>Caller</TableHead> : null}
+                {show('status') ? <TableHead>Status</TableHead> : null}
                 {/* Sticky so the actions stay visible at laptop widths. */}
                 <TableHead className="sticky right-0 bg-card" />
               </TableRow>
@@ -267,57 +299,65 @@ export default function CommunityRequestsPage() {
                     <TableCell className="whitespace-nowrap pl-4 text-muted-foreground sm:pl-5">
                       {fmtDateTime(r.requestedAt)}
                     </TableCell>
-                    <TableCell className="min-w-40 max-w-xs whitespace-pre-line">
-                      {r.itemsRequested}
-                      {r.items.length > 0 ? (
-                        <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground" aria-label="Items chosen">
-                          {r.items.map((i) => (
-                            <li key={i.id} className={i.shortAt ? 'text-warn' : undefined}>
-                              {i.productName} · {fmtQty(i.quantityApproved, i.unit)}{i.shortAt ? ' (short)' : ''}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : null}
-                    </TableCell>
-                    <TableCell className="min-w-32 max-w-48 whitespace-pre-line text-muted-foreground">
-                      {r.quantityNote || '-'}
-                    </TableCell>
-                    <TableCell className="min-w-36 whitespace-normal text-muted-foreground">
-                      <button
-                        type="button"
-                        onClick={() => setPanel({ type: 'detail', request: r })}
-                        className="text-left text-foreground underline-offset-2 hover:underline focus-visible:underline"
-                      >
-                        {r.callerName || 'Not given'}
-                      </button>
-                      {r.callerContact ? (
-                        <span className="block text-xs">{r.callerContact}</span>
-                      ) : null}
-                    </TableCell>
-                    <TableCell className="whitespace-normal">
-                      <StatusBadge kind="communityRequest" status={status}>
-                        {DISPLAY_LABELS[status] ?? status}
-                      </StatusBadge>
-                      {flagged ? (
-                        <span className="mt-1 block max-w-xs text-xs text-warn">
-                          Needs new items · flagged {timeAgo(r.itemsShortAt)}
-                          {shortProductNames(r).length ? `. ${shortProductNames(r).join(', ')} ran short.` : ''}
-                        </span>
-                      ) : null}
-                      {resolved && r.outcomeNote ? (
-                        <span className="mt-1 block max-w-xs text-xs text-muted-foreground whitespace-pre-line">
-                          {r.outcomeNote}
-                        </span>
-                      ) : null}
-                      {resolved && r.handledByName ? (
-                        <span className="mt-1 block text-xs text-muted-foreground">
-                          Handled by {r.handledByName}
-                        </span>
-                      ) : null}
-                      {!resolved && packer ? (
-                        <span className="mt-1 block text-xs text-muted-foreground">{packer}</span>
-                      ) : null}
-                    </TableCell>
+                    {show('items') ? (
+                      <TableCell className="min-w-40 max-w-xs whitespace-pre-line">
+                        {r.itemsRequested}
+                        {r.items.length > 0 ? (
+                          <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground" aria-label="Items chosen">
+                            {r.items.map((i) => (
+                              <li key={i.id} className={i.shortAt ? 'text-warn' : undefined}>
+                                {i.productName} · {fmtQty(i.quantityApproved, i.unit)}{i.shortAt ? ' (short)' : ''}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </TableCell>
+                    ) : null}
+                    {show('notes') ? (
+                      <TableCell className="min-w-32 max-w-48 whitespace-pre-line text-muted-foreground">
+                        {r.quantityNote || '-'}
+                      </TableCell>
+                    ) : null}
+                    {show('caller') ? (
+                      <TableCell className="min-w-36 whitespace-normal text-muted-foreground">
+                        <button
+                          type="button"
+                          onClick={() => setPanel({ type: 'detail', request: r })}
+                          className="text-left text-foreground underline-offset-2 hover:underline focus-visible:underline"
+                        >
+                          {r.callerName || 'Not given'}
+                        </button>
+                        {r.callerContact ? (
+                          <span className="block text-xs">{r.callerContact}</span>
+                        ) : null}
+                      </TableCell>
+                    ) : null}
+                    {show('status') ? (
+                      <TableCell className="whitespace-normal">
+                        <StatusBadge kind="communityRequest" status={status}>
+                          {DISPLAY_LABELS[status] ?? status}
+                        </StatusBadge>
+                        {flagged ? (
+                          <span className="mt-1 block max-w-xs text-xs text-warn">
+                            Needs new items · flagged {timeAgo(r.itemsShortAt)}
+                            {shortProductNames(r).length ? `. ${shortProductNames(r).join(', ')} ran short.` : ''}
+                          </span>
+                        ) : null}
+                        {resolved && r.outcomeNote ? (
+                          <span className="mt-1 block max-w-xs text-xs text-muted-foreground whitespace-pre-line">
+                            {r.outcomeNote}
+                          </span>
+                        ) : null}
+                        {resolved && r.handledByName ? (
+                          <span className="mt-1 block text-xs text-muted-foreground">
+                            Handled by {r.handledByName}
+                          </span>
+                        ) : null}
+                        {!resolved && packer ? (
+                          <span className="mt-1 block text-xs text-muted-foreground">{packer}</span>
+                        ) : null}
+                      </TableCell>
+                    ) : null}
                     <TableCell className="sticky right-0 whitespace-nowrap bg-card pr-4 text-right shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.15)] sm:pr-5">
                       {resolved ? (
                         <span className="text-xs text-muted-foreground">
