@@ -223,6 +223,8 @@
   "session.route.js GET /": "no role check",
   "session.route.js GET /language": "no role check",
   "session.route.js PATCH /language": "no role check",
+  "session.route.js PATCH /password": "no role check",
+  "session.route.js PATCH /email": "no role check",
   "photo.routes.js GET /": "admin,manager,warehouse_worker",
   "photo.routes.js POST /": "warehouse_worker",
   "photo.routes.js GET /:id/image": "admin,manager,warehouse_worker",

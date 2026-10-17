@@ -10,6 +10,11 @@ import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 
 vi.mock('../services/api', () => ({ apiPatch: vi.fn(async () => ({ success: true })), apiGet: vi.fn(async () => ({})) }));
+const refreshFromClaim = vi.fn();
+vi.mock('../context/AuthContext', () => ({
+  useAuth: () => ({ user: { id: 3, firstName: 'Mcebisi', role: 'warehouse_worker', email: 'mcebisi@example.org' }, refreshFromClaim }),
+}));
+const { apiPatch } = await import('../services/api');
 
 const { default: AccountMenu } = await import('../components/layout/AccountMenu');
 const { helpFor } = await import('../components/layout/helpContent');
@@ -49,7 +54,7 @@ describe('AccountMenu', () => {
     expect(screen.queryByRole('button', { name: 'Change language…' })).toBeNull();
   });
 
-  it('shows the profile read only: name, username, email and role, and who can change them', () => {
+  it('shows the profile: name, username, email and role, and what can be changed here', () => {
     mount(WORKER);
     openMenu();
     fireEvent.click(screen.getByRole('button', { name: 'Profile' }));
@@ -58,8 +63,44 @@ describe('AccountMenu', () => {
     expect(within(dialog).getByText('worker001')).toBeTruthy();
     expect(within(dialog).getByText('mcebisi@example.org')).toBeTruthy();
     expect(within(dialog).getByText('Warehouse staff')).toBeTruthy();
-    expect(within(dialog).getByText(/can only be changed by an admin/)).toBeTruthy();
-    expect(dialog.querySelector('input, textarea, select')).toBeNull();
+    expect(within(dialog).getByText(/An admin changes your name and role/)).toBeTruthy();
+    // Nothing to type into until Change is chosen.
+    expect(dialog.querySelector('input')).toBeNull();
+    expect(within(dialog).getAllByRole('button', { name: 'Change' })).toHaveLength(2);
+  });
+
+  it('changes the password behind the current one, and checks the new one twice', async () => {
+    mount(WORKER);
+    openMenu();
+    fireEvent.click(screen.getByRole('button', { name: 'Profile' }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.click(within(dialog).getAllByRole('button', { name: 'Change' })[1]);
+    fireEvent.change(within(dialog).getByLabelText('Current password'), { target: { value: 'old-password' } });
+    fireEvent.change(within(dialog).getByLabelText('New password'), { target: { value: 'short' } });
+    expect(within(dialog).getByText('Use at least 8 characters.')).toBeTruthy();
+    fireEvent.change(within(dialog).getByLabelText('New password'), { target: { value: 'new-password-1' } });
+    fireEvent.change(within(dialog).getByLabelText('New password again'), { target: { value: 'new-password-2' } });
+    expect(within(dialog).getByText('The two new passwords do not match.')).toBeTruthy();
+    expect(within(dialog).getByRole('button', { name: 'Save password' })).toBeDisabled();
+    fireEvent.change(within(dialog).getByLabelText('New password again'), { target: { value: 'new-password-1' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save password' }));
+    expect(await within(dialog).findByText(/Password changed/)).toBeTruthy();
+    expect(apiPatch).toHaveBeenCalledWith('/api/me/password', { currentPassword: 'old-password', newPassword: 'new-password-1' });
+  });
+
+  it('changes the email and shows the new one', async () => {
+    apiPatch.mockResolvedValueOnce({ success: true, data: { email: 'new@example.org' } });
+    mount(WORKER);
+    openMenu();
+    fireEvent.click(screen.getByRole('button', { name: 'Profile' }));
+    const dialog = screen.getByRole('dialog');
+    fireEvent.click(within(dialog).getAllByRole('button', { name: 'Change' })[0]);
+    fireEvent.change(within(dialog).getByLabelText('New email'), { target: { value: 'new@example.org' } });
+    fireEvent.change(within(dialog).getByLabelText('Current password'), { target: { value: 'old-password' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save email' }));
+    expect(await within(dialog).findByText('Email changed.')).toBeTruthy();
+    expect(apiPatch).toHaveBeenCalledWith('/api/me/email', { currentPassword: 'old-password', email: 'new@example.org' });
+    expect(refreshFromClaim).toHaveBeenCalledWith(expect.objectContaining({ email: 'new@example.org' }));
   });
 
   it('says so when no email is on record', () => {

@@ -13,7 +13,7 @@
 // ─────────────────────────────────────────────────────────────
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu } from 'lucide-react';
+import { ChevronDown, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet, SheetContent, SheetTitle, SheetTrigger,
@@ -110,6 +110,17 @@ const NavLink = ({ to, label, icon: Icon, active, collapsed, onNavigate, count, 
 // and render exactly what they rendered before. A drawer is already a
 // full-width panel someone deliberately opened — an icon rail inside
 // one would be a smaller target for no gain.
+// Which sections a person has folded, per role, on this device. A view
+// preference, not data: losing it costs a click, so storage failing
+// (a private window) is ignored.
+const foldKey = (role) => `wms.sidebar.folded:${role ?? 'none'}`;
+const readFolded = (role) => {
+  try { return JSON.parse(localStorage.getItem(foldKey(role)) ?? '[]'); } catch { return []; }
+};
+const writeFolded = (role, list) => {
+  try { localStorage.setItem(foldKey(role), JSON.stringify(list)); } catch { /* no storage */ }
+};
+
 export const SidebarNav = ({ sections, pathname, homeTo, collapsed = false, onNavigate }) => {
   // Counts only for the manager's menu — the only one whose items say
   // how to read them (navSections.js `count`).
@@ -123,6 +134,27 @@ export const SidebarNav = ({ sections, pathname, homeTo, collapsed = false, onNa
     .flatMap((section) => section.items.map((item) => item.to))
     .filter((to) => pathname === to || pathname?.startsWith(`${to}/`))
     .sort((x, y) => y.length - x.length)[0];
+
+  // Sections fold by their heading (Overview, Inbound, ...). The one
+  // holding the page you are on opens again when you arrive at it, so
+  // the open item is never hidden inside a folded section.
+  const activeSection = sections.find((sec) => sec.items.some((item) => item.to === activeTo))?.label ?? null;
+  const [folded, setFolded] = useState(() => readFolded(user?.role).filter((l) => l !== activeSection));
+  const [openedFor, setOpenedFor] = useState(activeSection);
+  if (activeSection !== openedFor) {
+    setOpenedFor(activeSection);
+    if (activeSection && folded.includes(activeSection)) {
+      const next = folded.filter((l) => l !== activeSection);
+      setFolded(next);
+      writeFolded(user?.role, next);
+    }
+  }
+  const toggleSection = (label) => {
+    const next = folded.includes(label) ? folded.filter((l) => l !== label) : [...folded, label];
+    setFolded(next);
+    writeFolded(user?.role, next);
+  };
+
   const body = (
     <>
       <Link
@@ -140,8 +172,15 @@ export const SidebarNav = ({ sections, pathname, homeTo, collapsed = false, onNa
         )}
       </Link>
 
-      <nav className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto">
-        {sections.map((section, index) => (
+      <nav className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+        {sections.map((section, index) => {
+          // The icon rail has no headings to fold by, so it shows everything.
+          const isFolded = !collapsed && folded.includes(section.label);
+          const listId = `nav-section-${index}`;
+          const waiting = attention
+            ? section.items.reduce((sum, item) => sum + (item.count ? item.count(attention) : 0), 0)
+            : 0;
+          return (
           <div key={section.label}>
             {collapsed ? (
               // The heading is what grouped these. With no room to say
@@ -153,13 +192,27 @@ export const SidebarNav = ({ sections, pathname, homeTo, collapsed = false, onNa
             ) : (
               // A plain word after a short red rule. Not grey capitals
               // with wide letter spacing, which is the stock dashboard
-              // label.
-              <p className="mb-1.5 flex items-center gap-2 px-3 text-xs font-semibold text-ink">
+              // label. The heading folds and unfolds its section; folded,
+              // it still shows how much inside needs dealing with.
+              <button
+                type="button"
+                onClick={() => toggleSection(section.label)}
+                aria-expanded={!isFolded}
+                aria-controls={listId}
+                className="mb-1.5 flex w-full items-center gap-2 rounded-md px-3 py-0.5 text-left text-xs font-semibold text-ink hover:bg-surface-2/70"
+              >
                 <span aria-hidden="true" className="h-0.5 w-3 rounded-full bg-brand" />
-                {section.label}
-              </p>
+                <span className="flex-1">{section.label}</span>
+                {isFolded && waiting > 0 ? (
+                  <span className="rounded-full bg-danger-soft px-1.5 text-[11px] font-medium tabular-nums text-danger">
+                    {waiting > 99 ? '99+' : waiting}
+                    <span className="sr-only"> need attention</span>
+                  </span>
+                ) : null}
+                <ChevronDown aria-hidden="true" className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${isFolded ? '-rotate-90' : ''}`} />
+              </button>
             )}
-            <div className="flex flex-col gap-0.5">
+            <div id={listId} hidden={isFolded} className="flex flex-col gap-0.5">
               {section.items.map((item) => (
                 <NavLink
                   key={item.to}
@@ -173,7 +226,8 @@ export const SidebarNav = ({ sections, pathname, homeTo, collapsed = false, onNa
               ))}
             </div>
           </div>
-        ))}
+          );
+        })}
       </nav>
     </>
   );

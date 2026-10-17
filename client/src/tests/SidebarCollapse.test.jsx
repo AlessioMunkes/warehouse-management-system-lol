@@ -126,3 +126,39 @@ describe('sidebar attention counts', () => {
     expect(screen.getByRole('link', { name: 'Picking slips' })).toBeTruthy();
   });
 });
+
+// Each section folds by its heading, remembered on the device, and still
+// says how much inside needs attention while folded.
+describe('folding a section', () => {
+  it('hides and shows a section from its heading, and remembers it', async () => {
+    renderShell();
+    const heading = screen.getByRole('button', { name: /^Outbound/ });
+    expect(heading).toHaveAttribute('aria-expanded', 'true');
+    await userEvent.click(heading);
+    expect(heading).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.getByText('Beneficiaries')).not.toBeVisible();
+    expect(JSON.parse(localStorage.getItem('wms.sidebar.folded:manager'))).toEqual(['Outbound']);
+    await userEvent.click(heading);
+    expect(screen.getByText('Beneficiaries')).toBeVisible();
+  });
+
+  it('keeps the attention count on a folded heading', async () => {
+    renderShell();
+    const heading = screen.getByRole('button', { name: /^Inbound/ });
+    await userEvent.click(heading);
+    // Purchase orders: 7 awaiting approval and 4 needing follow-up.
+    expect(await within(heading).findByText(/^11/)).toBeTruthy();
+  });
+
+  it('opens a folded section when its page is the one you are on', () => {
+    localStorage.setItem('wms.sidebar.folded:manager', JSON.stringify(['Outbound']));
+    useAuth.mockReturnValue({ user: { id: 1, firstName: 'T', lastName: 'U', role: 'manager' }, logout: vi.fn(), isLoading: false });
+    render(
+      <MemoryRouter initialEntries={['/noc/beneficiaries']}>
+        <ManagerLayout><p>PAGE</p></ManagerLayout>
+      </MemoryRouter>
+    );
+    expect(screen.getByRole('button', { name: /^Outbound/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('Beneficiaries')).toBeTruthy();
+  });
+});

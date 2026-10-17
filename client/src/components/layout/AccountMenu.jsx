@@ -3,15 +3,16 @@
 //
 // The menu behind a person's name in the top bar:
 //
-//   Profile            who you are signed in as (read only)
+//   Profile            who you are signed in as; change your email or password
 //   Help               how to do each job your role does
 //   Shortcuts          the keyboard shortcuts
 //   Change language…   warehouse staff only: the floor is what is translated
 //   Refresh cache      clear what this device has saved and load it again
 //   Log out
 //
-// Profile is read only on purpose. A name, email or role is changed by
-// an admin on the Users screen, and the window says so.
+// Profile (ProfileDialog.jsx) lets a person change their own email and
+// password, each behind their current password. A name or role is still
+// changed by an admin on the Users screen, and the window says so.
 //
 // On a phone the name does not fit in the bar, so the button is the
 // person's initials; the menu's first line says the name in full.
@@ -27,6 +28,7 @@ import { helpFor } from './helpContent';
 import { shortcutGroups } from './shortcuts';
 import useKeyboardShortcuts from './useKeyboardShortcuts';
 import { refreshCache } from '../../lib/refreshCache';
+import ProfileDialog from './ProfileDialog';
 
 const ROLE_LABELS = {
   warehouse_worker: 'Warehouse staff',
@@ -36,14 +38,6 @@ const ROLE_LABELS = {
 
 const initialsOf = (user) =>
   `${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}`.toUpperCase() || '?';
-
-const Row = ({ label, value }) => (
-  <div className="flex flex-col gap-0.5 border-b border-line py-2.5 last:border-b-0">
-    <dt className="text-xs text-muted-foreground">{label}</dt>
-    {/* A person's own details are data, never translated. */}
-    <dd className="text-sm font-medium break-words" translate="no">{value}</dd>
-  </div>
-);
 
 const Key = ({ children }) => (
   <kbd className="inline-flex min-w-7 items-center justify-center rounded-md border border-line bg-muted px-1.5 py-0.5 font-mono text-xs font-medium">
@@ -146,25 +140,7 @@ export default function AccountMenu({ user, onLogout }) {
       </Popover>
 
       {/* ── Profile ─────────────────────────────────────────── */}
-      <Dialog open={view === 'profile'} onOpenChange={close}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Profile</DialogTitle>
-            <DialogDescription>
-              These details can only be changed by an admin. Ask an admin if your name or email is wrong.
-            </DialogDescription>
-          </DialogHeader>
-          <dl>
-            <Row label="Name" value={fullName || 'Not recorded'} />
-            <Row label="Username" value={user.username || 'Not recorded'} />
-            <Row label="Registered email" value={user.email || 'No email on record'} />
-            <div className="flex flex-col gap-0.5 py-2.5">
-              <dt className="text-xs text-muted-foreground">Role</dt>
-              <dd className="text-sm font-medium">{roleLabel}</dd>
-            </div>
-          </dl>
-        </DialogContent>
-      </Dialog>
+      <ProfileDialog open={view === 'profile'} onOpenChange={close} user={user} roleLabel={roleLabel} />
 
       {/* ── Help ────────────────────────────────────────────── */}
       <Dialog open={view === 'help'} onOpenChange={close}>

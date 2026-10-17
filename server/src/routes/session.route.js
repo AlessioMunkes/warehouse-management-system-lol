@@ -26,6 +26,8 @@ import auth, { authIdentity } from '../middleware/auth.middleware.js';
 import pool    from '../config/db.js';
 import { AUTH_COOKIE, authCookieOptions } from '../config/cookie.js';
 import { warehouseName, isMultiWarehouse } from '../config/warehouses.js';
+import { accountChangeRateLimiter } from '../middleware/rateLimiter.middleware.js';
+import accountService from '../services/account.service.js';
 
 const router = express.Router();
 
@@ -103,6 +105,27 @@ router.patch('/language', auth, async (req, res) => {
     return res.status(500).json({ success: false, message: 'Could not save your language.' });
   }
 });
+
+// ── PATCH /api/me/password and /api/me/email ──────────────────
+// A staff member changing their own sign-in details from Profile. Both
+// need the current password (account.service.js). Guests have no
+// account to change.
+const ownAccount = (change, label) => async (req, res) => {
+  if (req.user.role === 'guest') {
+    return res.status(403).json({ success: false, message: 'Only a staff account can be changed.' });
+  }
+  try {
+    const data = await change(req.user.id, req.body ?? {});
+    return res.json({ success: true, data });
+  } catch (error) {
+    if (error.status) return res.status(error.status).json({ success: false, message: error.message });
+    console.error(`[session] ${label} not changed:`, error.message);
+    return res.status(500).json({ success: false, message: `Could not change your ${label}.` });
+  }
+};
+
+router.patch('/password', auth, accountChangeRateLimiter, ownAccount(accountService.changePassword, 'password'));
+router.patch('/email', auth, accountChangeRateLimiter, ownAccount(accountService.changeEmail, 'email'));
 
 router.get('/', auth, async (req, res) => {
   try {
