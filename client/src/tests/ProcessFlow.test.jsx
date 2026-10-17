@@ -206,3 +206,28 @@ describe('the flow map on screen', () => {
     expect(document.body.textContent).not.toMatch(/—/);
   });
 });
+
+// Each step's circle shows the icon for that activity. The map's nodes
+// are numbered by position, so the icon has to be looked up by the
+// activity's own id, not the node's: it once drew every step as the
+// fallback plain circle.
+describe('step icons', () => {
+  const REAL = {
+    id: 'pallets', label: 'Pallets', caseNoun: 'pallets', total: 2, truncated: false,
+    activities: [
+      { id: 'generated', label: 'Slip generated' }, { id: 'claimed', label: 'Assigned' },
+      { id: 'packed', label: 'Packing complete' }, { id: 'collected', label: 'Dispatched' },
+    ],
+    expected: [0, 1, 2, 3],
+    cases: [c(1, [0, 1, 2, 3]), c(2, [0, 1, 2, 3])],
+  };
+
+  it('draws the icon of each activity, not a plain circle', () => {
+    render(<ProcessFlow flow={{ processes: [REAL] }} range={RANGE} />);
+    const iconOf = (name) => screen.getByRole('button', { name: new RegExp(`^${name}: `) }).querySelector('svg.lucide');
+    expect(iconOf('Slip generated')).toHaveClass('lucide-file-text');
+    expect(iconOf('Assigned')).toHaveClass('lucide-user-check');
+    expect(iconOf('Packing complete')).toHaveClass('lucide-package-check');
+    expect(iconOf('Dispatched')).toHaveClass('lucide-truck');
+  });
+});

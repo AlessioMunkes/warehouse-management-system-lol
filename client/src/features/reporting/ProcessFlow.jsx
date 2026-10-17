@@ -323,7 +323,10 @@ export default function ProcessFlow({ flow, range }) {
                           means (processActivityLook.js). The traffic through
                           it is the count under the label. */}
                       {(() => {
-                        const lookOf = activityLook(n.id, n.expected);
+                        // A node's id is the activity's position in the
+                        // process; the look is keyed by the activity's own
+                        // id ('raised', 'dispatched'), which sits there.
+                        const lookOf = activityLook(process.activities[n.id]?.id ?? n.id, n.expected);
                         const Icon = lookOf.icon;
                         const cx = p.x - NODE_W / 2 + 22;
                         return (
