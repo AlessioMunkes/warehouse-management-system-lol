@@ -24,11 +24,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
-
-const COHORT_OPTIONS = [
-  { value: 'tuesday', label: 'Tuesday' },
-  { value: 'thursday', label: 'Thursday' },
-];
+import { COHORT_OPTIONS } from '@/lib/cohorts';
 
 const BLANK = { name: '', cohort: '', contactName: '', contactEmail: '', mobileNumber: '', childCount: '' };
 

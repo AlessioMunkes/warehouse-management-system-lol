@@ -18,6 +18,7 @@
 import { jsPDF } from 'jspdf';
 import { drawQr, shortCodeOf, slipUrlFor } from '../packing/palletLabelPdf';
 import { takeFirstDay } from '../packing/takeFirst';
+import { COHORT_LABELS } from '@/lib/cohorts';
 
 export const SLIP_LOGO_URL = '/images/pdf_logo.png';
 export const DEFAULT_WAREHOUSE_NAME = 'LoL Cape Town';
@@ -57,12 +58,10 @@ const dayOf = (slip) => {
   return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(`${iso}T00:00:00Z`) : null;
 };
 
-const COHORT_DAY = { tuesday: 'Tuesday', thursday: 'Thursday' };
-
 export const pickupDayOf = (slip) => {
   const day = dayOf(slip);
   if (day) return day.toLocaleDateString('en-ZA', { weekday: 'long', timeZone: 'UTC' });
-  return COHORT_DAY[slip.cohort] ?? '';
+  return COHORT_LABELS[slip.cohort] ?? '';
 };
 
 // ISO 8601 week number: the week with the year's first Thursday is week 1.

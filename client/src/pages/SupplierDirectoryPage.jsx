@@ -48,6 +48,7 @@ import EmptyState    from '@/components/ui/empty-state';
 import ErrorBanner   from '@/components/ui/error-banner';
 import { Plus, Pencil, Power, AlertTriangle, Trash2, Truck } from 'lucide-react';
 import { useRecordCache } from '@/lib/recordCache';
+import { formatShortDate as fmtDate } from '@/lib/dates';
 
 // Admin only, matching supplier.routes.js. The prospect pad is the
 // exception and stays open to managers — see the note on PROSPECTS
@@ -58,11 +59,6 @@ const TABS = [
   { id: 'suppliers', label: 'Suppliers' },
   { id: 'prospects', label: 'Prospects' },
 ];
-
-const fmtDate = (value) =>
-  value
-    ? new Date(value).toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' })
-    : '-';
 
 // Same markup as the global fetch error banner in
 // InventoryManagementPage. One error style per app.

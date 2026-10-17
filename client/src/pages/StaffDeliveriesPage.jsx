@@ -25,6 +25,7 @@ import HistoryScreen, { HistoryRow } from '../features/staff/HistoryScreen';
 import { byNewest, byOldest, byText } from '../features/staff/historyView';
 import StatusBadge from '@/components/ui/status-badge';
 import { workerStatus } from '../features/staff/workerStatus';
+import { formatShortDate as formatDate } from '@/lib/dates';
 
 // The badge people actually want to read here is "did the order this
 // delivery belongs to get fully delivered" — not "recorded", which is
@@ -40,9 +41,6 @@ const badgeFor = (delivery) => (
     ? { status: 'completed', label: 'Completed' }
     : { status: 'partial', label: 'Partially delivered' }
 );
-
-const formatDate = (value) =>
-  value ? new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
 
 const dateOf = (d) => d.delivery_date ?? d.created_at;
 

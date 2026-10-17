@@ -74,9 +74,13 @@ import { calculateDecantingPlan, recordDecanting } from '../../services/decantin
 // appears in both, or in neither.
 import { STANDARD_SIZES, sizesToKg } from './BagSizes';
 import BagSizeToggle from './BagSizeToggle';
-import DecantingSheetPDF from './DecantingSheetPDF';
+import DecantingSheetPDF from './DecantingSheetPDF';
 import SuccessDialog from '../staff/SuccessDialog';
 import { OFFLINE_TITLE, offlineLine } from '../staff/successText';
+import { Panel, PlanResult } from './DecantingParts';
+import {
+  mondayOfThisWeek, longDate, parseKgInput, planLabels, stockMessage,
+} from './decantingText';
 
 // Name and SKU: two sacks of maize meal are told apart by the code on
 // the bag as often as by the name on it. Module level for a stable
@@ -106,92 +110,8 @@ const STEP_META = {
 
 const ALL_SUPPORTED_SIZES_KG = sizesToKg(STANDARD_SIZES);
 
-// Monday of the current week, which is what weekOf means server-side.
-const mondayOfThisWeek = () => {
-  const now = new Date();
-  const day = now.getDay();               // 0 Sunday .. 6 Saturday
-  const diff = day === 0 ? -6 : 1 - day;
-  now.setDate(now.getDate() + diff);
-  return now.toISOString().slice(0, 10);
-};
-
-const longDate = (iso) =>
-  new Date(iso).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long' });
-
-// "500g" and "2kg" are the labels decanting.service.js returns as the
-// keys of the bags object; this turns one into a sentence.
-const bagPhrase = (label, count) => `${Number(count) === 1 ? 'bag' : 'bags'} of ${label}`;
-
-const grams = (kg) => `${Math.round(Number(kg || 0) * 1000)}g`;
-const readableKg = (kg) => {
-  const value = Number(kg || 0);
-  if (value >= 1) return `${Number(value.toFixed(2))}kg`;
-  return grams(value);
-};
-
-const partialBagText = (partialBag) => {
-  if (!partialBag?.isPartial) return null;
-  return `Actual contents: ${grams(partialBag.actualWeightKg)}`;
-};
-
-// The margin, said the way someone standing at a scale would say it.
-// A percentage on screen is a number nobody can act on.
-const leftoverSentence = (plan) => {
-  const left = Number(plan.surplusKg ?? 0);
-  if (left <= 0) return 'That uses the whole bulk amount.';
-  if (left < 1) return 'That leaves a little under a kilo of the bulk amount.';
-  return `That leaves about ${Math.round(left)} kg of the bulk amount.`;
-};
-
-const parseKgInput = (raw) => {
-  const text = String(raw ?? '').trim();
-  if (text === '') return { blank: true, value: null };
-  if (!/^-?\d+(?:[.,]\d{1,3})?$/.test(text)) return { invalid: true, value: null };
-  const value = Number(text.replace(',', '.'));
-  return Number.isFinite(value) ? { value } : { invalid: true, value: null };
-};
-
-// ── Panel ──────────────────────────────────────────────────────
-// One part of the job. In Guided the head is a button and only one is
-// open; in Form they are all open and the head is a plain label, so
-// there is no control that looks tappable and does nothing.
-function Panel({ n, title, summary, open, done, locked, onOpen, children }) {
-  const clickable = Boolean(onOpen) && !locked;
-  const Head = clickable ? 'button' : 'div';
-
-  return (
-    <section
-      className={[
-        'stf-panel',
-        open ? 'is-open' : '',
-        done && !open ? 'is-done' : '',
-        locked ? 'is-locked' : '',
-      ].filter(Boolean).join(' ')}
-    >
-      <Head
-        className="stf-panel-head"
-        {...(clickable ? { type: 'button', onClick: onOpen, 'aria-expanded': open } : {})}
-      >
-        <span className="stf-panel-n" aria-hidden="true">{n}</span>
-        <span className="stf-panel-text">
-          <span className="stf-panel-title">{title}</span>
-          {/* The summary is what makes a closed panel worth having:
-              closed and blank is just a hidden field. */}
-          {!open && summary ? <span className="stf-panel-sum">{summary}</span> : null}
-        </span>
-      </Head>
-      {open ? <div className="stf-panel-body">{children}</div> : null}
-    </section>
-  );
-}
-
 // products comes from the page above, which fetches it once for both
 // this flow and the week planner.
-// The server refuses a bulk weight above what is in stock, and says how
-// much there is. That is shown as it stands; anything else gets the
-// screen's own wording.
-const stockMessage = (err) => (/in stock\./.test(err?.message ?? '') ? err.message : null);
-
 export default function DecantingFlow({ products = [], onCrumbChange }) {
   const [phase, setPhase] = useState('which');
 
@@ -291,15 +211,6 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
 
   const selectedSizesKg = sizesToKg(selectedSizes);
 
-  // Bag labels, largest first, as the plan returned them.
-  const planLabels = (line) => line
-    ? Object.keys(line.bags)
-        .filter((label) => Number(line.bags[label]) > 0)
-        .sort((a, b) => {
-          const kg = (l) => (l.endsWith('kg') ? parseFloat(l) : parseFloat(l) / 1000);
-          return kg(b) - kg(a);
-    })
-    : [];
   const recommendedBagLabels = planLabels(recommendedPlan);
   const activeBagLabels = planLabels(plan);
 
@@ -617,62 +528,6 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
     </Actions>
   );
 
-  const renderPlanResult = ({ title, line, labels, showUseRecommended = false }) => {
-    if (!line) return null;
-    const shortfallKg = Number(line.shortfallKg || 0);
-    const surplusKg = Number(line.surplusKg || 0);
-
-    return (
-      <>
-        <p className="stf-field-label">{title}</p>
-        {labels.map((label) => (
-          <div key={`${title}-${label}`} className="stf-instruction">
-            <span className="stf-instruction-n">{line.bags[label]}</span>
-            <span className="stf-instruction-l">{bagPhrase(label, line.bags[label])}</span>
-          </div>
-        ))}
-
-        {line.partialBag ? (
-          <div className="stf-instruction">
-            <span className="stf-instruction-n">1</span>
-            <span className="stf-instruction-l">Partial 500g bag</span>
-            <span className="stf-field-hint">{partialBagText(line.partialBag)}</span>
-          </div>
-        ) : null}
-
-        <p className="stf-field-hint">Packed: {readableKg(line.packedKg)}</p>
-        <p className="stf-field-hint">{leftoverSentence(line)}</p>
-
-        {shortfallKg > 0 ? (
-          <Notice tone="warn">
-            {readableKg(shortfallKg)} still needs to be packed. Choose another bag size if you want
-            to cover the remaining amount.
-          </Notice>
-        ) : null}
-
-        {!shortfallKg && surplusKg >= 0.5 ? (
-          <Notice tone="warn">
-            {grams(surplusKg)} cannot be packed using the selected bag sizes. Choose another
-            bag size or review the remaining amount.
-          </Notice>
-        ) : null}
-
-        {line.isBulkLimited ? (
-          <Notice tone="warn">
-            This bulk amount does not cover everything the centres need this week. Pack what is here
-            and tell your manager, so they can order more.
-          </Notice>
-        ) : null}
-
-        {showUseRecommended ? (
-          <Actions>
-            <Button onClick={useRecommendedPlan}>Use recommended plan</Button>
-          </Actions>
-        ) : null}
-      </>
-    );
-  };
-
   // Same as ReceivingFlow's own toggleControl — see that file's note.
   const toggleControl = showToggle ? (
     <>
@@ -795,12 +650,14 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
               onChange={changeInput(setRequiredKg)}
             />
             {recommendedError ? <Notice tone="warn">{recommendedError}</Notice> : null}
-            {recommendedPlan ? renderPlanResult({
-              title: 'Recommended bag plan',
-              line: recommendedPlan,
-              labels: recommendedBagLabels,
-              showUseRecommended: activePlanType !== 'recommended',
-            }) : null}
+            {recommendedPlan ? (
+              <PlanResult
+                title="Recommended bag plan"
+                line={recommendedPlan}
+                labels={recommendedBagLabels}
+                onUseRecommended={activePlanType !== 'recommended' ? useRecommendedPlan : null}
+              />
+            ) : null}
 
             {recommendedPlan || recommendedError ? (
               <Actions>
@@ -857,18 +714,20 @@ export default function DecantingFlow({ products = [], onCrumbChange }) {
                 {/* Nothing to type here, which is exactly why the
                     numbers can be 34px and read with both hands
                     full. */}
-                {renderPlanResult({
-                  title: activePlanType === 'custom' ? 'Custom plan' : 'Recommended bag plan',
-                  line: plan,
-                  labels: activeBagLabels,
-                })}
+                <PlanResult
+                  title={activePlanType === 'custom' ? 'Custom plan' : 'Recommended bag plan'}
+                  line={plan}
+                  labels={activeBagLabels}
+                />
 
-                {activePlanType === 'custom' && recommendedPlan ? renderPlanResult({
-                  title: 'Recommended bag plan',
-                  line: recommendedPlan,
-                  labels: recommendedBagLabels,
-                  showUseRecommended: true,
-                }) : null}
+                {activePlanType === 'custom' && recommendedPlan ? (
+                  <PlanResult
+                    title="Recommended bag plan"
+                    line={recommendedPlan}
+                    labels={recommendedBagLabels}
+                    onUseRecommended={useRecommendedPlan}
+                  />
+                ) : null}
 
                 {plan && mode === 'guided' ? (
                   <Actions>

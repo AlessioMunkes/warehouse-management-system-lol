@@ -11,20 +11,8 @@
 // opening the row one at a time.
 // ─────────────────────────────────────────────────────────────
 import StatusBadge from '@/components/ui/status-badge';
-
-export const COHORT_LABELS = { tuesday: 'Tuesday', thursday: 'Thursday' };
-
-// The two values beneficiaries.cohort actually holds. A pill per value,
-// so the filter cannot offer something the column will never match.
-export const COHORT_FILTERS = [
-  { value: 'tuesday', label: 'Tuesday' },
-  { value: 'thursday', label: 'Thursday' },
-];
-
-const fmtDate = (value) =>
-  value
-    ? new Date(value).toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' })
-    : '-';
+import { COHORT_LABELS } from '@/lib/cohorts';
+import { formatShortDate as fmtDate } from '@/lib/dates';
 
 export const BENEFICIARY_COLUMNS = [
   { key: 'name', label: 'Beneficiary', alwaysOn: true, weight: 3,

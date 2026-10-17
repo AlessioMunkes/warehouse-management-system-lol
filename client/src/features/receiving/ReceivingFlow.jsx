@@ -35,12 +35,16 @@
 // of the numbers, so a tablet that sleeps does not lose the count —
 // see lib/useDraft.js. That refills the form; it never submits.
 // ─────────────────────────────────────────────────────────────
-import PhotoButton from '../staff/PhotoButton';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { takeUrlParam } from '../staff/resumeParam';
 import {
-  StepScreen, Actions, Button, SelectField, DateField,
-  ChoiceList, Notice, KeyValues, ViewToggle, Coachmark,
+  StepScreen,
+  Actions,
+  Button,
+  SelectField,
+  Notice,
+  ViewToggle,
+  Coachmark,
 } from '../staff/StepPrimitives';
 import TaskPage from '../staff/TaskPage';
 import WorkList from '../staff/WorkList';
@@ -53,104 +57,21 @@ import ListTools, { NoMatches } from '../staff/ListTools';
 import receivingAPI from '../../services/receivingAPI';
 import { newIdempotencyKey } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import SignaturePad from './SignaturePad';
 import DeliveryNotePDF from './DeliveryNotePDF';
-import formatPoCode from './poCode';
 import SuccessDialog from '../staff/SuccessDialog';
 import { OFFLINE_TITLE, offlineLine } from '../staff/successText';
-
-// Shared by both modes, right before the submit button. SignaturePad
-// is the manager side's own component — canvasClassName /
-// clearButtonClassName are what let it look native here instead of
-// carrying the manager page's plain-link styling.
-const SignatureField = ({ value, onChange }) => (
-  <div className="stf-signature-field">
-    <span className="stf-field-label">Driver&rsquo;s signature</span>
-    <SignaturePad
-      onChange={onChange}
-      canvasClassName="stf-sign-canvas"
-      clearButtonClassName="stf-signature-clear"
-    />
-    {!value ? (
-      <p className="stf-field-hint">Ask the driver to sign above before you finish.</p>
-    ) : null}
-  </div>
-);
-
-const MODE_KEY = 'stf_receiving_view_mode';
-const MODES = [
-  { value: 'guided', label: 'Guided', hint: 'One line at a time' },
-  { value: 'full',   label: 'Form',   hint: 'Every line at once' },
-];
-const readStoredMode = () => {
-  try {
-    return localStorage.getItem(MODE_KEY) === 'full' ? 'full' : 'guided';
-  } catch {
-    return 'guided';
-  }
-};
-
-const TOTAL_STEPS = 2;
-const STEP_META = {
-  which: { n: 1, label: 'Which delivery' },
-  work:  { n: 2, label: 'Count and put away' },
-  done:  { n: 2, label: 'Finished' },
-};
-
-// Where a line can go. Two options, because two is how many places the
-// warehouse has (warehouse visit: cold room and dry store).
-const LOCATIONS = [
-  { value: 'dry_store', label: 'Dry store', meta: 'Shelves at the back' },
-  { value: 'cold_room', label: 'Cold room', meta: 'For fresh food only' },
-];
-
-// Fresh lines need a use-by date (BR-06); dry goods may carry a
-// best-before and it is asked for, but never required. Reads
-// products.is_perishable; the name heuristic stays only as a fallback
-// for a database without that column, so a missing column degrades
-// this to a guess rather than breaking the screen.
-const FRESH_HINTS = [
-  'spinach', 'butternut', 'cabbage', 'carrot', 'tomato', 'onion',
-  'apple', 'banana', 'potato', 'lettuce', 'fresh', 'milk',
-];
-const isFreshProduct = (item) =>
-  typeof item.is_perishable === 'boolean'
-    ? item.is_perishable
-    : FRESH_HINTS.some((hint) => (item.product_name || '').toLowerCase().includes(hint));
-
-// NOT toISOString().slice(0, 10). That formats in UTC and Cape Town is
-// UTC+2, so between midnight and 02:00 SAST it returns YESTERDAY and
-// the note is dated to the wrong day.
-const todayISO = () => {
-  const d   = new Date();
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-};
-const longDate = (value) =>
-  new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'long' });
-
-// What an order search matches on. Module level so its identity is
-// stable and useListSearch's memo is not defeated by a new function
-// on every render.
-//
-// Both date forms are in the haystack deliberately: a worker reading
-// a driver's note types "16 august", and a worker reading this screen
-// types "2026-08-16". "order" is in there so that "order 86" works as
-// typed, rather than only the bare number.
-const orderText = (order) => [
-  'order',
-  order.id,
-  order.po_number,
-  order.supplier_name,
-  order.status,
-  order.expected_delivery_date,
-  order.expected_delivery_date ? longDate(order.expected_delivery_date) : '',
-].filter(Boolean).join(' ');
-
-// The order's own number, the one the manager's screen and the
-// supplier's paperwork carry. poCode's id-based code is only for an
-// order that somehow has none.
-const orderCode = (order) => order?.po_number || formatPoCode(order?.id);
+import { SignInPanel, LineDetail } from './ReceivingParts';
+import {
+  MODE_KEY,
+  MODES,
+  readStoredMode,
+  TOTAL_STEPS,
+  STEP_META,
+  isFreshProduct,
+  todayISO,
+  orderText,
+  orderCode,
+} from './receivingText';
 
 export default function ReceivingFlow({ onCrumbChange }) {
   const { user } = useAuth();
@@ -238,7 +159,6 @@ export default function ReceivingFlow({ onCrumbChange }) {
     if (found?.supplier_id) setSupplierId(found.supplier_id);
   };
 
-
   // One entry per order line: what was expected, what was counted,
   // where it went, and the use-by date if it is fresh.
   const [lines, setLines] = useState([]);
@@ -299,7 +219,6 @@ export default function ReceivingFlow({ onCrumbChange }) {
       window.removeEventListener('focus', refresh);
     };
   }, [phase, loadOrders]);
-
 
   // step/total omitted on the done screen — no progress bar makes sense
   // once the task is finished (StepRail used to be hidden the same way,
@@ -670,28 +589,14 @@ export default function ReceivingFlow({ onCrumbChange }) {
             </Actions>
           }
           side={
-            <div className="stf-summary">
-              <p className="stf-summary-title">Sign it in</p>
-              <DateField
-                id="stf-full-date"
-                label="Delivery date"
-                value={deliveryDate}
-                onChange={setDeliveryDate}
-              />
-              {/* A picture of the delivery as it arrived, kept against its
-                  order. Optional, and saved the moment it is taken. */}
-              {orderId ? (
-                <PhotoButton entityType="purchase_order" entityId={orderId} hintKey="photo.hintDelivery" />
-              ) : null}
-              {shortLines.length > 0 ? (
-                <Notice tone="warn">
-                  {shortLines.length} {shortLines.length === 1 ? 'line is' : 'lines are'} short.
-                  Saving still records the delivery, and your manager gets the difference to
-                  follow up.
-                </Notice>
-              ) : null}
-              <SignatureField value={signature} onChange={setSignature} />
-            </div>
+            <SignInPanel
+              deliveryDate={deliveryDate}
+              onDeliveryDate={setDeliveryDate}
+              orderId={orderId}
+              shortCount={shortLines.length}
+              signature={signature}
+              onSignature={setSignature}
+            />
           }
         >
           {hasLines ? (
@@ -726,68 +631,7 @@ export default function ReceivingFlow({ onCrumbChange }) {
               renderDetail={(row) => {
                 const line = lines.find((l) => l.purchaseOrderItemId === row.id);
                 if (!line) return null;
-                const counted = line.counted;
-                const short = counted !== '' && Number(counted) < line.expected;
-                const over  = counted !== '' && Number(counted) > line.expected;
-                return (
-                  <>
-                    <KeyValues
-                      pairs={[
-                        ['Code', line.sku],
-                        ['Ordered', `${line.ordered}${line.expectedKg ? ` (${line.expectedKg} kg)` : ''}`],
-                        line.alreadyReceived > 0 ? ['Already received', line.alreadyReceived] : null,
-                        line.alreadyReceived > 0 ? ['Still to come', line.expected] : null,
-                        ['Type', line.fresh ? 'Fresh, needs a use-by date' : 'Dry'],
-                      ]}
-                    />
-
-                    <ChoiceList
-                      legend={`Where the ${line.name} is going`}
-                      options={LOCATIONS}
-                      value={line.location}
-                      onChange={(value) => patchLine(line.purchaseOrderItemId, { location: value })}
-                    />
-
-                    {/* Every line, in both views. Fresh food must have
-                        one; tins and packets usually carry a best-before
-                        too, and that date is what the expiry warnings
-                        run on, so it is asked for and may be left
-                        empty. */}
-                    <div className="stf-field">
-                      <label
-                        className="stf-field-label"
-                        htmlFor={`stf-useby-${line.purchaseOrderItemId}`}
-                      >
-                        What is the date on the box?
-                      </label>
-                      <input
-                        id={`stf-useby-${line.purchaseOrderItemId}`}
-                        className="stf-input is-text"
-                        type="date"
-                        value={line.useBy}
-                        onChange={(e) => patchLine(line.purchaseOrderItemId, { useBy: e.target.value })}
-                      />
-                      <p className="stf-field-hint">
-                        {line.fresh
-                          ? 'Fresh food is packed by date, so this is what decides which box goes out first.'
-                          : 'Leave it empty if there is no date.'}
-                      </p>
-                    </div>
-
-                    {short ? (
-                      <Notice tone="warn">
-                        {line.expected - Number(counted)} fewer than the note says. Your manager
-                        will be told, and this delivery stays open until it is sorted out.
-                      </Notice>
-                    ) : null}
-                    {over ? (
-                      <Notice tone="warn">
-                        That is more than the note says. Count again, and if it is right your
-                        manager will check it against the order.
-                      </Notice>
-                    ) : null}
-                  </>
-                );
+                return <LineDetail line={line} onPatch={patchLine} />;
               }}
             />
           ) : (

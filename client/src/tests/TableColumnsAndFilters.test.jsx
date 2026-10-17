@@ -48,7 +48,7 @@ const TABLES = {
   'features/activityLog/StaffActivityView.jsx': 1,
   'features/activityLog/VolunteerLogView.jsx': 1,
   'features/beneficiaries/beneficiaryColumns.jsx': 1,
-  'features/feedTheSoil/FeedTheSoilManagerView.jsx': 2,
+  'features/feedTheSoil/feedTheSoilLists.js': 2,
   'features/inventory/ledgerColumns.js': 1,
   'features/inventory/ReconciliationPanel.jsx': 1,
   'features/inventory/StockManifestTable.jsx': 1,

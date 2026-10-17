@@ -15,16 +15,14 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { RANGE_PRESETS } from './dateRanges';
+import { COHORT_OPTIONS } from '@/lib/cohorts';
 
 const ALL = '__all__';
 
 // Mirrors the database enums. Kept alongside the labels a manager
 // would recognise rather than the raw values.
 const FILTER_OPTIONS = {
-  cohort: [
-    { value: 'tuesday', label: 'Tuesday' },
-    { value: 'thursday', label: 'Thursday' },
-  ],
+  cohort: COHORT_OPTIONS,
   // dignity_kitchen and community are selectable for operational
   // reports but excluded server-side from impact metrics under
   // NFR-20, so a stale option here cannot leak them into an impact

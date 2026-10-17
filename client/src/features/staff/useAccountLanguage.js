@@ -9,15 +9,15 @@
 // kept on this phone stands.
 // ─────────────────────────────────────────────────────────────
 import { useEffect } from 'react';
-import { apiGet } from '../../services/api';
+import accountAPI from '../../services/accountAPI';
 import { setLanguage } from '../../translations';
 
 export default function useAccountLanguage(userId) {
   useEffect(() => {
     if (!userId) return undefined;
     let cancelled = false;
-    apiGet('/api/me/language')
-      .then((res) => { if (!cancelled && res?.data?.language) setLanguage(res.data.language); })
+    accountAPI.getLanguage()
+      .then((language) => { if (!cancelled && language) setLanguage(language); })
       .catch(() => {});
     return () => { cancelled = true; };
   }, [userId]);

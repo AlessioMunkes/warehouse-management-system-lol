@@ -119,10 +119,15 @@ export const BENEFICIARY_LABEL = {
 };
 
 // ── Shared by every note ──────────────────────────────────────
-// Hardcoded to the one warehouse this app currently prints for.
+// The letterhead on every printed note. The Cape Town warehouse unless
+// the build sets VITE_WAREHOUSE_NAME and VITE_WAREHOUSE_ADDRESS (address
+// lines separated by |), for a deployment that prints for another site.
+const DEFAULT_ADDRESS = ['Unit 4, Hewett Park', '17 Hewett Ave, Epping', 'Cape Town, 7460'];
+const addressFromEnv = (import.meta.env.VITE_WAREHOUSE_ADDRESS ?? '')
+  .split('|').map((line) => line.trim()).filter(Boolean);
 export const WAREHOUSE = {
-  name: 'Ladles of Love, Cape Town Warehouse',
-  addressLines: ['Unit 4, Hewett Park', '17 Hewett Ave, Epping', 'Cape Town, 7460'],
+  name: import.meta.env.VITE_WAREHOUSE_NAME || 'Ladles of Love, Cape Town Warehouse',
+  addressLines: addressFromEnv.length ? addressFromEnv : DEFAULT_ADDRESS,
 };
 
 // "#0087": every note numbers itself the same way.

@@ -14,7 +14,7 @@
 // floor it asks the account which language this person chose.
 // ─────────────────────────────────────────────────────────────
 import { useId, useState } from 'react';
-import { apiPatch } from '../../services/api';
+import accountAPI from '../../services/accountAPI';
 import { LANGUAGES, setLanguage, useLanguage, useT } from '../../translations';
 
 export default function LanguagePicker() {
@@ -28,7 +28,7 @@ export default function LanguagePicker() {
     setLanguage(code);
     setNote(null);
     try {
-      await apiPatch('/api/me/language', { language: code });
+      await accountAPI.setLanguage(code);
     } catch {
       setNote('language.savedHere');
     }

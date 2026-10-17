@@ -14,13 +14,7 @@
 // behind it, not invented to fill out a shape.
 // ─────────────────────────────────────────────────────────────
 import { PackagePlus, Truck, CheckCircle2, AlertTriangle, RotateCcw } from 'lucide-react';
-
-const fmtDateTime = (value) =>
-  value
-    ? new Date(value).toLocaleString('en-ZA', {
-        year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-      })
-    : '-';
+import { formatShortDateTime as fmtDateTime } from '@/lib/dates';
 
 const STATUS_ICON = {
   completed:          CheckCircle2,

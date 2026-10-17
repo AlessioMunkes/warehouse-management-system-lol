@@ -19,9 +19,8 @@ import beneficiaryAPI  from '../services/beneficiaryAPI';
 import useTableView    from '../features/masterdata/useTableView';
 import useOpenFromQuery from '../features/masterdata/useOpenFromQuery';
 import MasterDataTable from '../features/masterdata/MasterDataTable';
-import {
-  BENEFICIARY_COLUMNS, COHORT_LABELS,
-} from '../features/beneficiaries/beneficiaryColumns';
+import { BENEFICIARY_COLUMNS } from '../features/beneficiaries/beneficiaryColumns';
+import { COHORT_LABELS } from '@/lib/cohorts';
 
 import { Button }    from '@/components/ui/button';
 import { Skeleton }  from '@/components/ui/skeleton';
@@ -35,6 +34,7 @@ import EmptyState    from '@/components/ui/empty-state';
 import ErrorBanner   from '@/components/ui/error-banner';
 import { Plus, Pencil, Power, ShieldCheck, RotateCcw, Building2 } from 'lucide-react';
 import { useRecordCache } from '@/lib/recordCache';
+import { formatShortDate as fmtDate } from '@/lib/dates';
 
 const CAN_MANAGE = ['manager', 'admin'];
 const OTHER_COHORT = { tuesday: 'thursday', thursday: 'tuesday' };
@@ -47,11 +47,6 @@ const VIEWS = [
   { id: 'thursday', label: 'Thursday',          test: (b) => b.cohort === 'thursday' },
   { id: 'pending',  label: 'Awaiting approval', alert: true, test: (b) => !b.approvedAt },
 ];
-
-const fmtDate = (value) =>
-  value
-    ? new Date(value).toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' })
-    : '-';
 
 const BeneficiaryDetail = ({ beneficiary, canManage, onEdit, onToggleActive, onApprove, onRollbackCohort, onClose }) => (
   <DetailPanel

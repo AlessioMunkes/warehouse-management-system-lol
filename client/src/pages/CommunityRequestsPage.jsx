@@ -72,14 +72,7 @@ import ListToolbar from '@/components/ui/list-toolbar';
 import DetailPanel from '@/components/ui/detail-panel';
 import EmptyState from '@/components/ui/empty-state';
 import ErrorBanner from '@/components/ui/error-banner';
-
-const fmtDateTime = (value) =>
-  value
-    ? new Date(value).toLocaleString('en-ZA', {
-        year: 'numeric', month: 'short', day: 'numeric',
-        hour: '2-digit', minute: '2-digit',
-      })
-    : '-';
+import { formatShortDateTime as fmtDateTime } from '@/lib/dates';
 
 const EMPTY = {
   pending:       'Nothing is waiting for approval.',

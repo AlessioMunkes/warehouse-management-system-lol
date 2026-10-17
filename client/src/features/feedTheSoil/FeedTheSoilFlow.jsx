@@ -58,16 +58,7 @@ import { OFFLINE_TITLE, offlineLine } from '../staff/successText';
 import { todayISO } from '../packing/spareSlips';
 import StatusBadge from '@/components/ui/status-badge';
 import { workerStatus } from '../staff/workerStatus';
-
-const fmtDate = (value) =>
-  value ? new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
-
-const fmtDateTime = (value) =>
-  value
-    ? new Date(value).toLocaleString('en-ZA', {
-        day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
-      })
-    : '-';
+import { formatShortDate as fmtDate, formatShortDateTime as fmtDateTime } from '@/lib/dates';
 
 const fmtKg = (value) => (value === null || value === undefined ? '-' : `${Number(value).toLocaleString('en-ZA')} kg`);
 

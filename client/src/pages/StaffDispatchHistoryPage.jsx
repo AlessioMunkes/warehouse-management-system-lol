@@ -29,9 +29,7 @@ import HistoryScreen, { HistoryRow } from '../features/staff/HistoryScreen';
 import { byNewest, byOldest, byText } from '../features/staff/historyView';
 import StatusBadge from '@/components/ui/status-badge';
 import { workerStatus } from '../features/staff/workerStatus';
-
-const formatDate = (value) =>
-  value ? new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
+import { formatShortDate as formatDate } from '@/lib/dates';
 
 // One entry per terminal dispatch_events.status. `note` is whether a
 // dispatch note exists to open: nothing was loaded for the two that

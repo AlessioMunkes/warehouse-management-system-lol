@@ -150,7 +150,9 @@ the classification queue and Section 18A.
 ### `services/`
 
 One file per part of the API (`pickingAPI.js`, `purchaseOrderAPI.js`, and so on), all built
-on `api.js`. Three files are the offline machinery:
+on `api.js`. Components never call `fetch` or `api.js` themselves; they call one of these.
+`addressSearchAPI.js` is the one that goes to an outside service (Mapbox) rather than ours.
+Three files are the offline machinery:
 
 | File | What it does |
 |---|---|
@@ -186,9 +188,10 @@ isiXhosa are drafts and have not been checked by a fluent speaker.
 
 ### `lib/`
 
-Helpers with no home in one feature: `quantity.js` (formatting amounts), `statusStyles.js`
-(the colour and icon for every status), `recordCache.js`, `theme.js`, `clipboard.js`,
-`utils.js`, and three hooks (`useSortable`, `useDebouncedValue`, `useOutbox`).
+Helpers with no home in one feature: `quantity.js` (formatting amounts), `dates.js` (the
+date formats lists and panels share), `cohorts.js` (the collection days and their labels),
+`statusStyles.js` (the colour and icon for every status), `recordCache.js`, `theme.js`,
+`clipboard.js`, `utils.js`, and three hooks (`useSortable`, `useDebouncedValue`, `useOutbox`).
 `donationValidation.js` is the donation form's rules as shown while typing; the server's copy is the one that decides.
 
 ## Server
@@ -205,6 +208,29 @@ Helpers with no home in one feature: `quantity.js` (formatting amounts), `status
 To follow a feature, open the same name in each folder. Every `*.controller.js` is in
 `controllers/`, every `*.service.js` in `services/`, every `*.repository.js` in
 `repositories/`. None live anywhere else.
+
+Each layer only calls the one below it:
+
+- **SQL is only in repositories.** Routes, controllers, middleware, services and
+  `src/features/` do not write SQL. A service may open a transaction (`BEGIN`, `COMMIT`,
+  `ROLLBACK`) and pass its client to the repositories it calls, so several writes land
+  together; the statements themselves are in the repository.
+- **Controllers call services**, never a repository.
+- Three places are allowed to break this, on purpose: `features/reporting/customQuery.js`
+  builds the SQL for a custom report from a fixed list of tables and columns and runs it
+  through `reportingAdhoc.repository.js`; `features/communications/notices.js` writes a
+  notification on the caller's transaction (it is passed to repositories as `beforeCommit`);
+  and `features/reporting/operationalInsights.js` is a catalogue whose entries name the
+  `reportingInsight.repository.js` query they run.
+
+A large area is split by what changes together, and the original file still exports
+everything, so callers import one name:
+
+| Area | Files |
+|---|---|
+| Donations | `donation.service.js` (recording one), `donationEmail.service.js` (its emails and the Section 18A certificate), `donationEmailContent.js` (what those emails say) |
+| Picking | `picking.repository.js` (claim to close), `pickingSlipSetup.repository.js` (making and editing slips), `pickingActor.js` (staff or guest, and what each may touch), `pickingEvents.repository.js` (a slip's history) |
+| Pending donations | `pendingDonation.service.js` (writes), `pendingDonationRead.service.js` (reads) |
 
 ### `src/features/`
 
@@ -231,13 +257,22 @@ wording. One flat folder per area, with no folders inside.
 - **Stock** changes go through `stock.repository.js`, which writes the ledger line with each
   one. Stock comes off at dispatch, not at packing.
 - **Purchase-order statuses** and the moves allowed between them are in
-  `constants/purchaseOrderStatus.js`.
+  `constants/purchaseOrderStatus.js`. The donation categories are in
+  `constants/donationCategories.js` and the storage areas in `constants/storageAreas.js`;
+  import them rather than writing the list out.
 - **Notifications** are written inside the same database transaction as the change they
   announce (`features/communications/notices.js`).
 - **Repeat requests** from a phone that lost signal are recognised by
   `middleware/idempotency.middleware.js` and answered without doing the work twice.
 - **Approving a purchase order emails Finance.** Tests that approve one through the API send a
   real email if Gmail is connected. (Creating one sends nothing.)
+
+### Configuration
+
+Every setting the server reads from its environment is listed, with its default, in
+`server/env.example`; the client's are in `client/env.local.example`. Values an admin can
+change while the app runs (expiry warnings, reminder times, unit sizes) are in Settings
+instead, defined in `features/settings/settingsDefinitions.js`.
 
 ### Database
 
@@ -254,7 +289,7 @@ and is short enough to read in a sitting. Open these in order:
 |---|---|---|
 | 1. The address | `client/src/routes/routeTable.js` | The `receiving` line: its path, and that only warehouse staff may open it |
 | 2. The screen | `client/src/pages/ReceivingPage.jsx` | It is thin: a shell and one feature component |
-| 3. The steps | `client/src/features/receiving/ReceivingFlow.jsx` | Choosing the order, counting each line, the signature, the done screen |
+| 3. The steps | `client/src/features/receiving/ReceivingFlow.jsx` | Choosing the order, counting each line, the signature, the done screen. `ReceivingParts.jsx` draws one line's detail and the sign-in panel |
 | 4. The call | `client/src/services/receivingAPI.js` | `recordDelivery`: the one place the screen talks to the server, and how it queues with no signal |
 | 5. The door | `server/src/routes/delivery.routes.js` | The address, `auth`, and `requireRole` on the same line |
 | 6. The request | `server/src/controllers/delivery.controller.js` | Reads the body, calls the service, shapes the answer |
@@ -292,3 +327,14 @@ client and runs the server's tests on every push.
   `workflow` permission.
 - `server/__tests__/helpers/buildDonationAdminApp.js` imports a route file by a path that
   does not exist. Only the integration tests use it, and they need a real database to run.
+- Some numbers are fixed in code rather than set in Settings, and changing any of them
+  changes what the app does, so each needs a decision first:
+  - Receiving offers two places to put a line (dry store, cold room) of the five storage
+    areas in `constants/storageAreas.js` (`LOCATIONS` in `features/receiving/receivingText.js`).
+  - "Stock near expiry" means 14 days in the manager's action lists
+    (`features/reporting/operationalInsights.js`) and 30 days in the expiring-stock report
+    (`reportingOps.repository.js`). Neither reads the expiry warning windows in Settings.
+  - The decanting bag sizes are a fixed list, kept once on each side
+    (`features/decanting/BagSizes.jsx`, `decanting.service.js`).
+  - The donation categories are listed once in `constants/donationCategories.js` and once
+    more in the report catalogue (`features/reporting/reportCatalog.js`).

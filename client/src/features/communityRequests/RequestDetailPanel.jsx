@@ -16,13 +16,7 @@ import {
 import { fmtQty } from '@/lib/quantity';
 import { timeAgo } from '../notifications/notificationMatrix';
 import { DISPLAY_LABELS, displayStatus, isFlagged, packerLabel, shortProductNames } from './requestViews';
-
-const fmtDateTime = (value) =>
-  value
-    ? new Date(value).toLocaleString('en-ZA', {
-      year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
-    })
-    : '-';
+import { formatShortDateTime as fmtDateTime } from '@/lib/dates';
 
 const Fact = ({ label, children }) => (
   <div>

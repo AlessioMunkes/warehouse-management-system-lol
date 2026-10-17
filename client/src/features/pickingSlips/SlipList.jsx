@@ -38,6 +38,7 @@ import {
 } from './slipViews';
 import { rowIntent } from '@/lib/recordCache';
 import useListFilters from '@/features/masterdata/useListFilters';
+import { COHORT_LABELS } from '@/lib/cohorts';
 
 const KIND_LABEL = { ecd: 'ECD centre', soup_kitchen: 'Soup kitchen', dignity_kitchen: 'Dignity Kitchen', community: 'Community' };
 // "+ Filter": the tabs narrow by where a slip has got to; these by who it
@@ -245,7 +246,7 @@ export default function SlipList({
                         <span className="block text-xs text-muted-foreground">
                           {slip.beneficiary_kind === 'soup_kitchen' ? 'Soup kitchen'
                             : slip.beneficiary_kind === 'dignity_kitchen' ? 'Dignity Kitchen'
-                              : `${slip.cohort === 'thursday' ? 'Thursday' : 'Tuesday'} cohort`}
+                              : `${COHORT_LABELS[slip.cohort] ?? COHORT_LABELS.tuesday} cohort`}
                         </span>
                       </TableCell>
                     );

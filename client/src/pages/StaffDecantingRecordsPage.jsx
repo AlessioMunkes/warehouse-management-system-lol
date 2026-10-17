@@ -23,9 +23,7 @@ import HistoryScreen, { HistoryRow } from '../features/staff/HistoryScreen';
 import { byNewest, byOldest, byNumber } from '../features/staff/historyView';
 import StatusBadge from '@/components/ui/status-badge';
 import { workerStatus } from '../features/staff/workerStatus';
-
-const formatDate = (value) =>
-  value ? new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
+import { formatShortDate as formatDate } from '@/lib/dates';
 
 const dateOf = (r) => r.created_at ?? r.week_of;
 

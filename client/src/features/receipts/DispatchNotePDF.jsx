@@ -15,8 +15,7 @@
 // ─────────────────────────────────────────────────────────────
 import NoteSheet, { NoteSignatures } from './NoteSheet';
 import { formatDate, fmtQty, variance, noteNumber } from './noteFormat';
-
-const COHORT = { tuesday: 'Tuesday', thursday: 'Thursday' };
+import { COHORT_LABELS } from '@/lib/cohorts';
 
 const STATUS = {
   collected:      { label: 'Collected',        tone: 'complete' },
@@ -76,7 +75,7 @@ const DispatchNotePDF = ({ note, onClose }) => {
           ? { label: 'Collected', value: formatDate(note.collected_at) }
           : { label: 'Booked for', value: formatDate(note.dispatch_date) },
         { label: 'Pallet ref', value: note.pallet_ref || '-' },
-        { label: 'Cohort', value: COHORT[note.cohort] || '-' },
+        { label: 'Cohort', value: COHORT_LABELS[note.cohort] || '-' },
         { label: 'Status', value: status.label, tone: status.tone },
       ]}
       info={infoFor(note, variedCount)}

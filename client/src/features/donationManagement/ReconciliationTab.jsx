@@ -23,16 +23,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import useReconciliationQueue from './useReconciliation';
 import ErrorBanner from '@/components/ui/error-banner';
 import ListToolbar from '@/components/ui/list-toolbar';
+import { formatShortDateTime as fmtDate } from '@/lib/dates';
 
 const fmtValue = (value) => {
   if (value === null || value === undefined || value === '') return '-';
   return `R ${Number(value).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
-
-const fmtDate = (value) =>
-  value
-    ? new Date(value).toLocaleString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-    : '-';
 
 const STATUS_META = {
   commit_failed: { label: 'Commit failed' },

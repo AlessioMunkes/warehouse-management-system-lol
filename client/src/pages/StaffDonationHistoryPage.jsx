@@ -28,6 +28,7 @@ import { workerStatus } from '../features/staff/workerStatus';
 import { getMyDonations, getMyDonation } from '../services/donationAPI';
 import { fmtQty } from '../lib/quantity';
 import { STAFF } from '../routes/paths';
+import { formatShortDate as formatDate } from '@/lib/dates';
 
 const STATUS_LABEL = {
   committed: 'Recorded',
@@ -46,8 +47,6 @@ const ITEM_LABEL = {
   cancelled: 'Cancelled',
 };
 
-const formatDate = (value) =>
-  value ? new Date(value).toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : '-';
 const formatRand = (value) =>
   value === null || value === undefined || value === ''
     ? null

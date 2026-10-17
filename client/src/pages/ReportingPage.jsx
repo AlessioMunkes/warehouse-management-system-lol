@@ -22,7 +22,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import AskBox        from '../features/reporting/AskBox';
 import ReportBuilder from '../features/reporting/ReportBuilder';
 import OperationalChart from '../features/reporting/OperationalChart';
-import ComparisonChart  from '../features/reporting/ComparisonChart';
 import ComparisonInsight from '../features/reporting/ComparisonInsight';
 import OverviewCards from '../features/reporting/OverviewCards';
 import { useAuth } from '../context/AuthContext';
@@ -31,7 +30,7 @@ import ReportBrowser from '../features/reporting/ReportBrowser';
 import OperationalInsight from '../features/reporting/OperationalInsight';
 import CustomReportBuilder from '../features/reporting/CustomReportBuilder';
 import { defaultCustom } from '../features/reporting/customSpec';
-import { formatLabel, shapeOf, yearEarlier } from '../features/reporting/chartFormat';
+import { shapeOf, yearEarlier } from '../features/reporting/chartFormat';
 import { resolvePreset, DEFAULT_PRESET, todaySAST } from '../features/reporting/dateRanges';
 import { getCatalog, runReport, getComparisons, runComparison, saveTarget, drillDown, getSaved, getFilterOptions } from '../services/reportingAPI';
 import RecordsPanel from '../features/reporting/RecordsPanel';
@@ -40,10 +39,9 @@ import ReorderPlanner from '../features/reporting/ReorderPlanner';
 import ExceptionAlerts from '../features/reporting/ExceptionAlerts';
 import { SavedReportsBar, SaveReport } from '../features/reporting/SavedReports';
 import ChartNote from '../features/reporting/ChartNote';
-
-const CHARCOAL = 'var(--ink)';
-const MUTED    = 'var(--ink-soft)';
-const BORDER   = 'var(--line)';
+import {
+  CHARCOAL, BORDER, Alternatives, ReportDrill, ReportNotes, ComparisonCard,
+} from '../features/reporting/ReportResultParts';
 
 // The page in seven parts, switched with the tabs under the title the
 // way Receipts switches goods in and goods out. Anything that produces
@@ -56,28 +54,6 @@ const TABS = [
   { id: 'alerts',   label: 'Exception alerts' },
   { id: 'upload',   label: 'Chart a spreadsheet' },
 ];
-
-// "Not what you meant? Try:" — the next closest answers the server
-// offered with an AI answer. One tap runs that one instead.
-function Alternatives({ items, onPick, closest }) {
-  if (!items?.length) return null;
-  return (
-    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs" style={{ color: MUTED }}>
-      <span>{closest ? 'Closest match. Or try:' : 'Not what you meant? Try:'}</span>
-      {items.map((a) => (
-        <button
-          key={`${a.kind}:${a.id}`}
-          type="button"
-          onClick={() => onPick(a)}
-          className="rounded-full border px-3 py-1 font-medium text-ink hover:bg-muted/60"
-          style={{ borderColor: BORDER }}
-        >
-          {a.label}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 export default function ReportingPage() {
   const { user } = useAuth();
@@ -534,42 +510,13 @@ export default function ReportingPage() {
             </p>
             <ChartNote note={report.meta?.caveat} />
           </div>
-          {report.meta?.drillable && (
-            <p className="mt-1 text-xs" style={{ color: MUTED }}>
-              {highlight
-                ? (
-                  // One button per way this bar can be opened: over
-                  // time, or split by another breakdown the report has.
-                  <span className="flex flex-wrap items-center gap-1.5">
-                    <span>{drillBusy ? 'Opening…' : `Drill into ${formatLabel(highlight)}:`}</span>
-                    {(report.meta.drillOptions ?? [{ id: undefined, label: 'Open' }]).map((o, i) => (
-                      <button key={o.id ?? 'open'} type="button" disabled={drillBusy} onClick={() => drillInto(highlight, o.id)}
-                        className={`rounded-lg px-2 py-1 font-bold disabled:opacity-50 ${i === 0 ? 'bg-ink text-on-ink' : 'border border-line text-ink hover:bg-muted/60'}`}>
-                        {o.label}
-                      </button>
-                    ))}
-                  </span>
-                )
-                : 'Click a bar or point to pick it, then drill into the report behind it.'}
-            </p>
-          )}
-
-          {/* The last level: the rows that were counted. */}
-          {report.meta?.records && (
-            <p className="mt-2 flex flex-wrap items-center gap-1.5 text-xs" style={{ color: MUTED }}>
-              <span>See what this is made of:</span>
-              <button type="button" onClick={() => setRecordsFor({ spec: report.spec, label: null })}
-                className="rounded-lg border border-line px-2 py-1 font-bold text-ink hover:bg-muted/60">
-                All the records
-              </button>
-              {highlight && report.meta?.drillable && (
-                <button type="button" onClick={() => setRecordsFor({ spec: report.spec, label: highlight })}
-                  className="rounded-lg border border-line px-2 py-1 font-bold text-ink hover:bg-muted/60">
-                  Records behind {formatLabel(highlight)}
-                </button>
-              )}
-            </p>
-          )}
+          <ReportDrill
+            report={report}
+            highlight={highlight}
+            drillBusy={drillBusy}
+            onDrill={drillInto}
+            onRecords={setRecordsFor}
+          />
           {recordsFor && (
             <RecordsPanel spec={recordsFor.spec} label={recordsFor.label} onClose={() => setRecordsFor(null)} />
           )}
@@ -609,42 +556,7 @@ export default function ReportingPage() {
               preset={preset === 'custom' ? 'last_3m' : preset} onSaved={loadSaved} />
           </div>
 
-          <footer className="mt-5 space-y-1 border-t pt-3 text-xs empty:hidden"
-                  style={{ borderColor: BORDER, color: MUTED }}>
-            {/* A filter the chosen report cannot apply means the
-                answer is broader than the question. Say so. */}
-            {report.meta?.droppedFilters && (
-              <p>
-                This report cannot be filtered by {report.meta.droppedFilters.join(', ')},
-                so those were ignored.
-              </p>
-            )}
-
-            {report.meta?.excludedLines > 0 && (
-              <p>
-                {report.meta.excludedLines} {report.meta.excludedKind === 'delivery' ? 'delivery' : 'dispatch'} line
-                {report.meta.excludedLines === 1 ? '' : 's'} left out, not measured in kilograms.
-              </p>
-            )}
-
-            {report.meta?.factor && (
-              <p>
-                Converted at {report.meta.factor.value} per kg.
-                {report.meta.factor.note ? ` ${report.meta.factor.note}` : ''}
-              </p>
-            )}
-
-            {report.meta?.cached && <p>Showing a recently cached result.</p>}
-
-            {/* Every AI model was busy or out of quota, so the
-                server matched the question by its keywords. */}
-            {report.meta?.matchedBy === 'keyword' && (
-              <p>
-                Closest match: the AI assistant was busy, so this report was picked from the
-                words in your question. Check it answers what you asked, or adjust it above.
-              </p>
-            )}
-          </footer>
+          <ReportNotes meta={report.meta} />
         </section>
       )}
 
@@ -665,25 +577,7 @@ export default function ReportingPage() {
       )}
 
       {comparison && (
-        <section className="mt-5 rounded-4xl bg-card shadow-md ring-1 ring-foreground/5 p-4 sm:p-5" style={{ borderColor: BORDER }}>
-          <p className="text-sm font-medium">{comparison.description}</p>
-          <p className="mt-1 text-xs" style={{ color: MUTED }}>{comparison.about}</p>
-          {comparison.matchedBy === 'keyword' && (
-            <p className="mt-1 text-xs" style={{ color: MUTED }}>
-              Closest match: the AI assistant was busy, so this was picked from the words in your question.
-            </p>
-          )}
-          <div className="mt-4">
-            <ComparisonChart key={comparison.description} data={comparison} />
-          </div>
-          {comparison.caveat && (
-            <p className="mt-3 border-t pt-3 text-xs" style={{ borderColor: BORDER, color: MUTED }}>{comparison.caveat}</p>
-          )}
-          <div className="mt-3">
-            <SaveReport key={comparison.id} kind="comparison" spec={{ comparison: comparison.id }}
-              defaultTitle={comparison.label ?? comparison.description} preset={preset} onSaved={loadSaved} />
-          </div>
-        </section>
+        <ComparisonCard comparison={comparison} preset={preset} onSaved={loadSaved} />
       )}
       {/* Keyed like the chart, so a new comparison starts without the
           last one's report. */}

@@ -2,12 +2,13 @@
 // Keep this limited to deployed backend contracts; frontend-only placeholder
 // tabs should not call future Section 18A endpoints before they exist.
 
+import { API_BASE } from './api';
+
 export { PRODUCT_CLASSIFICATION_CATEGORIES } from './donationClassificationAPI';
 
 export const PENDING_DONATION_STATUSES = ['awaiting_resolution', 'committing', 'commit_failed', 'commit_incomplete'];
 export const RECONCILIATION_STATUSES = ['commit_failed', 'commit_incomplete'];
 
-const API_BASE = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? '' : '');
 
 const parseResponse = async (response) => {
   let payload;

@@ -47,11 +47,7 @@ import {
 } from '@/services/purchaseOrderAPI';
 import PurchaseOrderTimeline from './PurchaseOrderTimeline';
 import PhotoStrip from '@/components/ui/photo-strip';
-
-const fmtDate = (value) =>
-  value
-    ? new Date(value).toLocaleDateString('en-ZA', { year: 'numeric', month: 'short', day: 'numeric' })
-    : '-';
+import { formatShortDate as fmtDate } from '@/lib/dates';
 
 const fmtDateTime = (value) =>
   value

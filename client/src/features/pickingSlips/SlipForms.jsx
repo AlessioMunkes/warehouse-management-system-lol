@@ -25,11 +25,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { generateSlips, createSlip, editSlip } from '../../services/pickingAPI';
 import { todaySast } from './slipViews';
 import ErrorBanner from '@/components/ui/error-banner';
-
-const COHORT_OPTIONS = [
-  { value: 'tuesday', label: 'Tuesday' },
-  { value: 'thursday', label: 'Thursday' },
-];
+import { COHORT_OPTIONS } from '@/lib/cohorts';
 
 const SuccessBanner = ({ message }) => (
   <div className="p-4 rounded-[4px] bg-good-soft border-2 border-good text-ink text-sm">{message}</div>

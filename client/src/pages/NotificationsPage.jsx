@@ -32,12 +32,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import MasterDataTable from '../features/masterdata/MasterDataTable';
 import useTableView from '../features/masterdata/useTableView';
 import useListFilters from '../features/masterdata/useListFilters';
+import { formatShortDateTime as fmtWhen } from '@/lib/dates';
 
 const BATCH = 100;
-
-const fmtWhen = (iso) => (iso
-  ? new Date(iso).toLocaleString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-  : '-');
 
 const COLUMNS = [
   { key: 'notification', label: 'Notification', alwaysOn: true, weight: 5,

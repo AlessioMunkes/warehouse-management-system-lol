@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { apiGet } from '../services/api';
+import { listPublicWarehouses } from '../services/publicWarehouseAPI';
 import logo from '../assets/Batches_Logo.jpeg';
 import Log_In_Background from '../assets/Log_In_Background.jpg';
 import { LANDING, LEGAL } from '../routes/paths';
@@ -53,7 +53,7 @@ const GuestLoginPage = () => {
 
   useEffect(() => {
     let cancelled = false;
-    apiGet('/api/public/warehouses')
+    listPublicWarehouses()
       .then((data) => {
         if (cancelled || !data?.multiWarehouse) return;
         const list = data.warehouses || [];

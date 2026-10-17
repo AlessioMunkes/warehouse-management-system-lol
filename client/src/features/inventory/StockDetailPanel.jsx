@@ -45,6 +45,7 @@ import { ADMIN } from '../../routes/paths';
 import {
   EXPIRY_ESTIMATE_HINT, STOCK_STATUS_LABEL, expiryLabel, expiryState, isExpiringSoon, stockStatus,
 } from './inventoryViews';
+import { formatCalendarDay as fmtDay } from '@/lib/dates';
 
 // Keys are the values the database stores — the movement_type CHECK
 // constraint, mirrored in reportCatalog.js's MOVEMENT_TYPES.
@@ -60,12 +61,6 @@ const TYPE_LABEL = {
 
 // Enough to answer "what happened lately"; the rest is one click.
 const RECENT = 8;
-
-const fmtDay = (day) => (day
-  ? new Date(`${day}T00:00:00Z`).toLocaleDateString('en-ZA', {
-      day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
-    })
-  : '-');
 
 const fmtWhen = (iso) => {
   if (!iso) return '-';

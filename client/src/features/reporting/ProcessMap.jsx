@@ -37,9 +37,10 @@ import { getProcessMap } from '../../services/reportingAPI';
 import { RANGE_PRESETS, resolvePreset } from './dateRanges';
 import { exportExcel } from '../../lib/excelExport';
 import { duration, sheetRows, SHEET_COLUMNS } from './processFormat';
+import { COHORT_OPTIONS } from '@/lib/cohorts';
 
 const PRESETS = RANGE_PRESETS.filter((p) => p.id !== 'custom' && p.id !== 'today' && p.id !== 'yesterday');
-const COHORTS = [['tuesday', 'Tuesday'], ['thursday', 'Thursday']];
+const COHORTS = COHORT_OPTIONS.map((o) => [o.value, o.label]);
 const KINDS = [['ecd', 'ECD centres'], ['soup_kitchen', 'Soup kitchens'], ['dignity_kitchen', 'Dignity Kitchen'], ['community', 'Community']];
 
 const count = (n) => Number(n ?? 0).toLocaleString('en-ZA');

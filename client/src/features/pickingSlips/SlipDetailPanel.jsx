@@ -30,6 +30,7 @@ import { fmtQty } from '../../lib/quantity';
 import {
   SLIP_STATE_LABEL, canAssign, canRelease, dayLabel, packers, slipState,
 } from './slipViews';
+import { COHORT_LABELS } from '@/lib/cohorts';
 
 const ITEM_STATUS = { pending: 'To pack', confirmed: 'Packed', flagged: 'Flagged' };
 
@@ -76,7 +77,7 @@ export default function SlipDetailPanel({
     <DetailPanel
       open
       onClose={onClose}
-      eyebrow={`${dayLabel(day)} · ${slip.cohort === 'thursday' ? 'Thursday' : 'Tuesday'} cohort`}
+      eyebrow={`${dayLabel(day)} · ${COHORT_LABELS[slip.cohort] ?? COHORT_LABELS.tuesday} cohort`}
       title={slip.ecd_name}
       badges={<StatusBadge kind="pickingSlip" status={state}>{SLIP_STATE_LABEL[state] ?? state}</StatusBadge>}
       actions={(

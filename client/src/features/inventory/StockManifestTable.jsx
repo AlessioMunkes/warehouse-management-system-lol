@@ -43,6 +43,7 @@ import {
   FILTERS, EXPORT_COLUMNS, STOCK_STATUS_LABEL, STOCK_STATUS_RANK,
   EXPIRY_ESTIMATE_HINT, countdownLabel, expiryState, exportRows, filterProducts, isExpiringSoon, rowTone, stockStatus, todaySast,
 } from './inventoryViews';
+import { formatCalendarDay as fmtDay } from '@/lib/dates';
 
 // ── Columns ──────────────────────────────────────────────────
 // One definition drives the header, the body and the Columns menu, so
@@ -73,12 +74,6 @@ const COLUMNS = [
   { key: 'status',    label: 'Status',          numeric: true, minWidth: 'sm',
     sort: (p) => STOCK_STATUS_RANK[stockStatus(p)] },
 ];
-
-const fmtDay = (day) => (day
-  ? new Date(`${day}T00:00:00Z`).toLocaleDateString('en-ZA', {
-      day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
-    })
-  : '-');
 
 // The rows on screen (or the ticked ones) as a formatted Excel sheet.
 const exportInventory = (label, rows) => exportExcel({
