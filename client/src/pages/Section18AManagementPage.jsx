@@ -242,9 +242,11 @@ export default function Section18AManagementPage() {
               columns={columnsProp('s18a-queue', queueView)}
             >
               <Input type="number" aria-label="Minimum amount" placeholder="Min R" value={amountMin} onChange={(e) => setAmountMin(e.target.value)} className="h-8 w-24" />
+              <span className="text-sm text-muted-foreground">to</span>
               <Input type="number" aria-label="Maximum amount" placeholder="Max R" value={amountMax} onChange={(e) => setAmountMax(e.target.value)} className="h-8 w-24" />
-              <Input type="date" aria-label="Date from" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-8 w-auto" />
-              <Input type="date" aria-label="Date to" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-8 w-auto" />
+              <Input type="date" aria-label="Date from" title="From" value={dateFrom} max={dateTo || undefined} onChange={(e) => setDateFrom(e.target.value)} className="h-8 w-auto" />
+              <span className="text-sm text-muted-foreground">to</span>
+              <Input type="date" aria-label="Date to" title="To" value={dateTo} min={dateFrom || undefined} onChange={(e) => setDateTo(e.target.value)} className="h-8 w-auto" />
               <NativeSelect aria-label="Sort certificate queue" value={queueSort} onChange={(e) => setQueueSort(e.target.value)} size="sm">
                 <option value="date-asc">Date: oldest first</option>
                 <option value="date-desc">Date: newest first</option>

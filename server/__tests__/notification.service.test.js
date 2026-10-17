@@ -29,12 +29,12 @@ beforeEach(() => {
 describe('listNotifications', () => {
   it('scopes the read to the calling user\'s id', async () => {
     await notificationService.listNotifications(USER, {});
-    expect(repoMock.listForUser).toHaveBeenCalledWith(USER.id, USER.role, { unreadOnly: false });
+    expect(repoMock.listForUser).toHaveBeenCalledWith(USER.id, USER.role, { unreadOnly: false, limit: 50, offset: 0 });
   });
 
   it('treats the string "true" from a query param as true', async () => {
     await notificationService.listNotifications(USER, { unreadOnly: 'true' });
-    expect(repoMock.listForUser).toHaveBeenCalledWith(USER.id, USER.role, { unreadOnly: true });
+    expect(repoMock.listForUser).toHaveBeenCalledWith(USER.id, USER.role, { unreadOnly: true, limit: 50, offset: 0 });
   });
 });
 
@@ -73,9 +73,24 @@ describe('listFloorNotifications', () => {
   it('scopes the read to floor types only', async () => {
     await notificationService.listFloorNotifications(USER, {});
     expect(repoMock.listForUser).toHaveBeenCalledWith(USER.id, null, {
-      unreadOnly: false, types: FLOOR_TYPES,
+      unreadOnly: false, types: FLOOR_TYPES, limit: 50, offset: 0,
     });
   });
+});
+
+// The notifications page loads older ones in batches.
+describe('paging the feed', () => {
+  it('passes a page through from the query', async () => {
+    await notificationService.listNotifications(USER, { limit: '100', offset: '200' });
+    expect(repoMock.listForUser).toHaveBeenLastCalledWith(USER.id, USER.role, { unreadOnly: false, limit: 100, offset: 200 });
+  });
+
+  it.each([['0', '0'], ['201', '0'], ['abc', '0'], ['50', '-1'], ['50', '1.5']])(
+    'refuses limit %s, offset %s', async (limit, offset) => {
+      await expect(notificationService.listNotifications(USER, { limit, offset }))
+        .rejects.toMatchObject({ status: 400 });
+    },
+  );
 });
 
 describe('getFloorUnreadCount', () => {

@@ -61,6 +61,7 @@ const TABLES = {
   'pages/EcdCollectionRemindersPage.jsx': 1,
   'pages/MessageHistoryPage.jsx': 1,
   'pages/OperatingCalendarPage.jsx': 1,
+  'pages/NotificationsPage.jsx': 1,
   'pages/ProductManagementPage.jsx': 1,
   'pages/Section18AManagementPage.jsx': 2,
   'pages/SupplierDirectoryPage.jsx': 1,

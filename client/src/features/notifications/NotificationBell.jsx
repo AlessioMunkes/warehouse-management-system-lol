@@ -8,7 +8,8 @@
 // notificationMatrix.js). Warehouse workers get StaffNotificationBell.
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { notificationsPathFor } from '../../routes/paths';
 import notificationAPI from '../../services/notificationAPI';
 import {
   notificationDestination, NOTIFICATIONS_CHANGED, announceNotificationsChanged,
@@ -128,6 +129,14 @@ export default function NotificationBell() {
         <div className="max-h-[26rem] overflow-y-auto">
           <NotificationList items={items} role={user?.role} onOpen={openNotification} loading={loading} error={error} />
         </div>
+        {/* The bell shows the latest few; everything is on its own page. */}
+        <Link
+          to={notificationsPathFor(user?.role)}
+          onClick={() => setOpen(false)}
+          className="block border-t px-4 py-2.5 text-center text-sm font-medium text-foreground hover:bg-muted/50"
+        >
+          See all notifications
+        </Link>
       </PopoverContent>
     </Popover>
   );

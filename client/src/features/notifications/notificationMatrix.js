@@ -102,6 +102,28 @@ NOTIFICATION_MATRIX.stock_expiry_2_weeks = NOTIFICATION_MATRIX.stock_expiry_warn
 NOTIFICATION_MATRIX.stock_expiry_1_week = NOTIFICATION_MATRIX.stock_expiry_warning_1w;
 NOTIFICATION_MATRIX.section18a_handoff_failed = NOTIFICATION_MATRIX.section18a_email_failed;
 
+// What each kind is called where a person picks or reads it (the
+// notifications page's Type column and filter).
+const TYPE_LABEL = {
+  low_stock: 'Low stock',
+  picking_slips_generated: 'Slips generated',
+  picking_slip_created: 'New slip',
+  picking_slip_released: 'Slip released',
+  dispatch_day_complete: 'Dispatch day complete',
+  non_collections_flagged: 'Missed collections',
+  purchase_order_needs_attention: 'Purchase order',
+  community_request_items_short: 'Benevolent request short',
+  vms_sync_failed: 'Volunteer sync failed',
+  stock_expiry_warning_2w: 'Expiring in two weeks',
+  stock_expiry_warning_1w: 'Expiring in a week',
+  collection_kit_idle: 'Idle compost kit',
+  donation_review: 'Donation to review',
+  section18a_email_failed: 'Section 18A email failed',
+};
+
+export const notificationTypeLabel = (type) =>
+  TYPE_LABEL[type] ?? String(type ?? '').replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+
 export const notificationSeverity = (notification) => (
   NOTIFICATION_MATRIX[notification?.type]?.severity ?? 'info'
 );

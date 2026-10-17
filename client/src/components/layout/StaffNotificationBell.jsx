@@ -9,7 +9,8 @@
 // worker turns on alerts for their phone (PhoneAlerts).
 // ─────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { NOTIFICATIONS } from '../../routes/paths';
 import { Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -128,6 +129,14 @@ export default function StaffNotificationBell() {
         <div className="flex-1 overflow-y-auto">
           <NotificationList items={items} role={ROLE} onOpen={openNotification} loading={loading} error={error} />
         </div>
+        {/* The sheet shows the latest few; everything is on its own page. */}
+        <Link
+          to={NOTIFICATIONS.floor}
+          onClick={() => setOpen(false)}
+          className="block border-t px-4 py-3 text-center text-sm font-medium text-foreground hover:bg-muted/50"
+        >
+          See all notifications
+        </Link>
       </SheetContent>
     </Sheet>
   );

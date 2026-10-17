@@ -43,7 +43,7 @@ import {
   Pulse, Receipt, Scroll, ShoppingCart, SquaresFour, Storefront, Tray, TrayArrowDown,
   Truck, UsersThree, Warehouse,
 } from '@phosphor-icons/react';
-import { STAFF, ADMIN, VOLUNTEERS, PACKING, DONATIONS, LEGAL } from './paths';
+import { STAFF, ADMIN, VOLUNTEERS, PACKING, DONATIONS, LEGAL, NOTIFICATIONS } from './paths';
 import {
   MANAGERS_UP, MANAGER_ONLY, ADMIN_ONLY, GUEST_ONLY, WORKERS_ONLY,
 } from './permissions';
@@ -165,6 +165,10 @@ export const ROUTES = [
     nav: [nav('admin', 'Logs', 'Archive', Archive)] },
   { id: 'messageHistory', path: ADMIN.messageHistory, roles: ADMIN_ONLY, shell: true,
     nav: [nav('admin', 'Logs', 'Message history', Tray)] },
+  // Reached from the bell, so no nav entry.
+  { id: 'notifications', path: NOTIFICATIONS.manager, roles: MANAGER_ONLY, shell: true },
+  { id: 'adminNotifications', path: NOTIFICATIONS.admin, roles: ADMIN_ONLY, shell: true },
+  { id: 'floorNotifications', path: NOTIFICATIONS.floor, roles: WORKERS_ONLY },
   // The queue is run by managers and admins together, so it is in both menus.
   { id: 'donationManagement', path: ADMIN.donationManagement, roles: MANAGERS_UP, shell: true,
     nav: [

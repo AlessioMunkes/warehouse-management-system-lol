@@ -68,6 +68,19 @@ export const STAFF = {
   floorFeedTheSoil: '/staff/feed-the-soil',
 };
 
+// Every notification a person has received. Not in any menu: opened
+// from "See all notifications" at the foot of the bell. One route per
+// side, as every screen has (managers and admins never share one).
+export const NOTIFICATIONS = {
+  manager: '/noc/notifications',
+  admin:   '/admin/notifications',
+  floor:   '/staff/notifications',
+};
+export const notificationsPathFor = (role) =>
+  role === 'admin' ? NOTIFICATIONS.admin
+  : role === 'warehouse_worker' ? NOTIFICATIONS.floor
+  : NOTIFICATIONS.manager;
+
 export const DONATIONS = {
   new:    DONATIONS_NEW,
   review: `${DONATIONS_NEW}/review`,

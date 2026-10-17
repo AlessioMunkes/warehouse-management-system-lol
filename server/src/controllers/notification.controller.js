@@ -16,7 +16,7 @@ const respondError = (res, err, label, fallback) => {
 const list = async (req, res) => {
   try {
     const data = await notificationService.listNotifications(req.user, {
-      unreadOnly: req.query.unreadOnly,
+      unreadOnly: req.query.unreadOnly, limit: req.query.limit, offset: req.query.offset,
     });
     res.status(200).json({ success: true, data });
   } catch (err) {
@@ -58,7 +58,7 @@ const markAllRead = async (req, res) => {
 const listFloor = async (req, res) => {
   try {
     const data = await notificationService.listFloorNotifications(req.user, {
-      unreadOnly: req.query.unreadOnly,
+      unreadOnly: req.query.unreadOnly, limit: req.query.limit, offset: req.query.offset,
     });
     res.status(200).json({ success: true, data });
   } catch (err) {

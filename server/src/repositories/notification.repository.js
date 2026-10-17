@@ -128,10 +128,10 @@ const filtersFor = (role, types, params, base = []) => {
   return conditions;
 };
 
-const listForUser = async (userId, role, { limit = 50, unreadOnly = false, types = null } = {}) => {
+const listForUser = async (userId, role, { limit = 50, offset = 0, unreadOnly = false, types = null } = {}) => {
   const params = [userId];
   const conditions = filtersFor(role, types, params, unreadOnly ? ['nr.read_at IS NULL'] : []);
-  params.push(limit);
+  params.push(limit, offset);
   const { rows } = await pool.query(
     `SELECT n.id, n.type, n.title, n.body, n.entity_type, n.entity_id,
             n.created_at, nr.read_at
@@ -139,8 +139,8 @@ const listForUser = async (userId, role, { limit = 50, unreadOnly = false, types
        LEFT JOIN notification_reads nr
               ON nr.notification_id = n.id AND nr.user_id = $1
       ${conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''}
-      ORDER BY n.created_at DESC
-      LIMIT $${params.length}`,
+      ORDER BY n.created_at DESC, n.id DESC
+      LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params
   );
   return rows;
