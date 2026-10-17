@@ -18,6 +18,7 @@
 import pool from '../config/db.js';
 import { assertDecantable } from '../features/units/wholeItems.js';
 import decantingModel from '../repositories/decanting.repository.js';
+import stockRepository from '../repositories/stock.repository.js';
 
 // ── Constants ─────────────────────────────────────────────────
 // Supported normal bag weights for the Decanting calculator.
@@ -466,14 +467,7 @@ const assertBulkInStock = async (items, db = pool) => {
 
   let rows;
   try {
-    ({ rows } = await db.query(
-      `SELECT p.id, p.name, COALESCE(sl.quantity_on_hand, 0)::numeric AS on_hand, sl.unit
-         FROM products p
-         LEFT JOIN stock_levels sl ON sl.product_id = p.id
-        WHERE p.id = ANY($1::int[])
-        ORDER BY p.name ASC`,
-      [[...weighed.keys()]]
-    ));
+    rows = await stockRepository.getOnHandForProducts([...weighed.keys()], db);
   } catch (err) {
     console.error('[decanting] bulk weight not checked against stock, carrying on:', err.message);
     return;

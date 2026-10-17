@@ -17,7 +17,7 @@
 // checks read configuration and recent history, and for Gmail refresh
 // the token, which is what proves Google still accepts it.
 // ─────────────────────────────────────────────────────────────
-import pool from '../config/db.js';
+import healthRepository from '../repositories/health.repository.js';
 import gmailService from './gmail.service.js';
 import quickbooksService from './quickbooks.service.js';
 import pushService from './push.service.js';
@@ -39,7 +39,7 @@ const withTimeLimit = (promise) => Promise.race([
 
 const database = async () => {
   const started = Date.now();
-  await pool.query('SELECT 1');
+  await healthRepository.ping();
   const ms = Date.now() - started;
   return {
     status: ms > 2000 ? 'warning' : 'ok',
@@ -50,11 +50,7 @@ const database = async () => {
 
 const failedEmailsLastDay = async () => {
   try {
-    const { rows } = await pool.query(
-      `SELECT COUNT(*)::int AS n FROM outbound_messages
-        WHERE status = 'failed' AND attempted_at > NOW() - INTERVAL '24 hours'`,
-    );
-    return rows[0]?.n ?? 0;
+    return await healthRepository.countFailedEmailsLastDay();
   } catch {
     return 0;   // message history not set up yet: nothing to report
   }

@@ -28,7 +28,7 @@
 // ─────────────────────────────────────────────────────────────
 import crypto from 'node:crypto';
 import { rateLimit } from 'express-rate-limit';
-import pool from '../config/db.js';
+import publicLinkRepository from '../repositories/publicLink.repository.js';
 import { runInWarehouse, isValidWarehouseCode } from '../config/warehouseContext.js';
 import { isMultiWarehouse, warehouseCodes } from '../config/warehouses.js';
 import gmailService from '../services/gmail.service.js';
@@ -40,7 +40,7 @@ const safeDecode = (value) => { try { return decodeURIComponent(value); } catch 
 const UUID = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
 
 // Each rule: which requests it covers, and how to find their warehouse.
-//   probe(match, req)  SQL run in every warehouse; a row back = "it's here"
+//   probe(match, req)  a lookup run in every warehouse; true = "it's here"
 //   hintOnly           no token to look up; the hint decides
 //   resolve(req)       the warehouse is known some other way
 export const RULES = [
@@ -48,14 +48,14 @@ export const RULES = [
     name: 'slip short code',
     methods: ['GET', 'POST'],
     path: /^\/api\/slip\/code\/([0-9a-fA-F]{6})(?:\/claim)?\/?$/,
-    probe: (m) => ['SELECT 1 FROM picking_slips WHERE RIGHT(public_token::text, 6) = LOWER($1) LIMIT 1', [m[1]]],
+    probe: (m) => () => publicLinkRepository.slipShortCodeExists(m[1]),
     ambiguous: 'This code matches pallets at more than one warehouse. Scan the QR code on the pallet instead.',
   },
   {
     name: 'slip token',
     methods: ['GET', 'POST'],
     path: new RegExp(`^/api/slip/(${UUID})(?:/claim)?/?$`),
-    probe: (m) => ['SELECT 1 FROM picking_slips WHERE public_token = $1::uuid', [m[1]]],
+    probe: (m) => () => publicLinkRepository.slipTokenExists(m[1]),
   },
   {
     name: 'invite',
@@ -63,13 +63,13 @@ export const RULES = [
     path: /^\/api\/invites\/([A-Za-z0-9_-]{20,})(\/accept)?\/?$/,
     // GET resolves, POST only to /accept; other POSTs are staff routes.
     when: (m, req) => req.method === 'GET' ? !m[2] : Boolean(m[2]),
-    probe: (m) => ['SELECT 1 FROM user_invites WHERE token_hash = $1', [sha256(m[1].trim())]],
+    probe: (m) => () => publicLinkRepository.inviteExists(sha256(m[1].trim())),
   },
   {
     name: 'section 18A form',
     methods: ['GET', 'POST'],
     path: /^\/api\/donations\/section-18a\/form\/([^/]+)\/?$/,
-    probe: (m) => ['SELECT 1 FROM donations WHERE section_18a_form_token_hash = $1', [sha256(safeDecode(m[1]))]],
+    probe: (m) => () => publicLinkRepository.section18aFormExists(sha256(safeDecode(m[1]))),
   },
   {
     name: 'volunteer sign-in',
@@ -121,10 +121,10 @@ const probeLimiter = rateLimit({
 });
 
 /** Warehouses where the probe finds the token. Throws if every lookup failed. */
-export const findWarehouses = async (sql, params) => {
+export const findWarehouses = async (lookup) => {
   const codes = warehouseCodes();
   const outcomes = await Promise.allSettled(
-    codes.map((code) => runInWarehouse(code, () => pool.query(sql, params)))
+    codes.map((code) => runInWarehouse(code, lookup))
   );
   if (outcomes.every((o) => o.status === 'rejected')) {
     throw new Error(outcomes[0].reason?.message || 'Every warehouse lookup failed.');
@@ -134,7 +134,7 @@ export const findWarehouses = async (sql, params) => {
       console.error(`[publicWarehouse] lookup failed in "${codes[i]}":`, o.reason?.message);
     }
   });
-  return codes.filter((_, i) => outcomes[i].status === 'fulfilled' && outcomes[i].value.rows.length > 0);
+  return codes.filter((_, i) => outcomes[i].status === 'fulfilled' && outcomes[i].value === true);
 };
 
 const choose = async ({ rule, m }, req) => {
@@ -156,8 +156,7 @@ const choose = async ({ rule, m }, req) => {
     };
   }
 
-  const [sql, params] = rule.probe(m, req);
-  const found = await findWarehouses(sql, params);
+  const found = await findWarehouses(rule.probe(m, req));
   if (found.length === 1) return { code: found[0] };
   if (found.length === 0) {
     return { status: 404, body: { success: false, message: 'This link was not found. It may have been typed incorrectly.' } };

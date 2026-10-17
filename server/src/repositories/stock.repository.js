@@ -275,6 +275,20 @@ const manualAdjust = async ({ productId, quantityDelta, unit, reason, performedB
 //                      left, in the stock unit.
 // last_movement_at is grouped once and joined, not correlated per
 // product row.
+// What is on hand for some products, in each one's stock unit. A product
+// with no stock row yet comes back with 0 and a null unit.
+const getOnHandForProducts = async (productIds, db = pool) => {
+  const { rows } = await db.query(
+    `SELECT p.id, p.name, COALESCE(sl.quantity_on_hand, 0)::numeric AS on_hand, sl.unit
+       FROM products p
+       LEFT JOIN stock_levels sl ON sl.product_id = p.id
+      WHERE p.id = ANY($1::int[])
+      ORDER BY p.name ASC`,
+    [productIds]
+  );
+  return rows;
+};
+
 const getManifest = async () => {
   const [result, shelf] = await Promise.all([pool.query(
     `SELECT
@@ -693,4 +707,4 @@ const getStockTrends = async ({ days = 30 } = {}) => {
 export default {
   getStockTrends,
   getLedger, getLedgerSummary, getReconciliation, getLedgerActors,
-  adjustStock, manualAdjust, getManifest, getMovements, getExpiryBatches, setStockMeta };
+  adjustStock, manualAdjust, getOnHandForProducts, getManifest, getMovements, getExpiryBatches, setStockMeta };

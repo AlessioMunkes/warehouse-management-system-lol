@@ -4,6 +4,7 @@
 // ─────────────────────────────────────────────────────────────
 import donationAdminService from '../services/donationAdmin.service.js';
 import { MANAGERS_UP } from '../constants/permissions.js';
+import { DONATION_CATEGORIES } from '../constants/donationCategories.js';
 
 /**
  * Authorization Helper for Administrative Endpoints
@@ -283,7 +284,7 @@ export const evaluateRouting = async (req, res, next) => {
     }
 
     // Strict Whitelist Validation for category strings
-    const allowedCategories = ['recipe_food', 'add_on_food', 'non_recipe_food', 'non_food'];
+    const allowedCategories = DONATION_CATEGORIES;
     const sanitizedCategory = category ? String(category).trim() : null;
     if (sanitizedCategory && !allowedCategories.includes(sanitizedCategory)) {
       return res.status(400).json({

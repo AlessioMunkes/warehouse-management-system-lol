@@ -19,6 +19,7 @@ import express from 'express';
 import jwt     from 'jsonwebtoken';
 import bcrypt  from 'bcrypt';
 import pool    from '../config/db.js';
+import accountRepository from '../repositories/account.repository.js';
 import { AUTH_COOKIE, authCookieOptions, sessionMaxAge } from '../config/cookie.js';
 import { runInWarehouse } from '../config/warehouseContext.js';
 import { parseWarehouseNames, warehouseName } from '../config/warehouses.js';
@@ -26,11 +27,6 @@ import { parseWarehouseNames, warehouseName } from '../config/warehouses.js';
 const router = express.Router();
 
 const SESSION_HOURS = 8;
-
-const USER_SQL =
-  `SELECT id, username, first_name, last_name, role, password_hash, is_active, email
-   FROM users
-   WHERE LOWER(username) = LOWER($1)`;
 
 // A bad WAREHOUSE_NAMES should stop the deploy, not the first login.
 if (pool.isMultiWarehouse) {
@@ -56,14 +52,13 @@ const setSessionCookie = (res, claims) => {
 
 // ── Single warehouse: unchanged behaviour ─────────────────────
 const loginSingle = async (req, res, username, password) => {
-  const result = await pool.query(USER_SQL, [username]);
+  const user = await accountRepository.findForLogin(username);
 
   // Same message for wrong username OR wrong password — never reveal which
-  if (result.rows.length === 0) {
+  if (!user) {
     return res.status(401).json({ message: 'Invalid username or password.' });
   }
 
-  const user = result.rows[0];
   const passwordMatch = await bcrypt.compare(password, user.password_hash);
 
   if (!passwordMatch) {
@@ -103,7 +98,7 @@ const loginMulti = async (req, res, username, password) => {
   // it a server error.
   const codes = pool.warehouseCodes;
   const lookups = await Promise.allSettled(
-    codes.map((code) => runInWarehouse(code, () => pool.query(USER_SQL, [username])))
+    codes.map((code) => runInWarehouse(code, () => accountRepository.findForLogin(username)))
   );
 
   const found = [];
@@ -112,7 +107,7 @@ const loginMulti = async (req, res, username, password) => {
       console.error(`[login] Lookup failed in warehouse "${codes[i]}":`, outcome.reason?.message);
       return;
     }
-    if (outcome.value.rows[0]) found.push({ code: codes[i], user: outcome.value.rows[0] });
+    if (outcome.value) found.push({ code: codes[i], user: outcome.value });
   });
 
   if (lookups.every((o) => o.status === 'rejected')) {

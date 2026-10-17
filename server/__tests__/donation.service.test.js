@@ -1015,3 +1015,30 @@ describe('Persistent Email History — donation emails', () => {
     }));
   });
 });
+
+// A certificate email that cannot be prepared is logged as failed and a
+// manager is told. The alert used to throw instead (pool was never
+// imported where it was raised), so the resend failed and nobody heard.
+describe('Section 18A certificate email failure', () => {
+  it('logs the failure and alerts managers when the certificate cannot be prepared', async () => {
+    const { createNotification } = await import('../src/repositories/notification.repository.js');
+    const donation = {
+      id: 42, donor_name: 'Thandi', donor_contact: 'thandi@example.org',
+      section_18a_status: 'queued', donor_consent_given: true, donor_tax_reference: '123',
+    };
+    repoMock.getEmailLogById.mockResolvedValue({ id: 9, donation_id: 42, email_type: 'SECTION_18A' });
+    repoMock.getDonationById.mockResolvedValue(donation);
+    repoMock.getSection18ACertificateByDonationId.mockRejectedValue(new Error('PDF failed'));
+    repoMock.logDonationEmail.mockResolvedValue({ id: 10, status: 'FAILED' });
+
+    const result = await donationService.resendDonationEmail(9, USER_ID);
+
+    expect(result).toMatchObject({ status: 'FAILED', emailType: 'SECTION_18A' });
+    expect(repoMock.logDonationEmail).toHaveBeenCalledWith(expect.objectContaining({
+      emailType: 'SECTION_18A', status: 'FAILED', errorMessage: 'PDF failed',
+    }));
+    expect(createNotification).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      type: 'section18a_email_failed', entityId: 42,
+    }));
+  });
+});

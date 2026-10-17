@@ -25,7 +25,7 @@
 // else removes the key, so the same submission can be tried again once
 // whatever was wrong is fixed.
 // ─────────────────────────────────────────────────────────────
-import pool from '../config/db.js';
+import idempotencyRepository from '../repositories/idempotency.repository.js';
 
 const KEY = /^[A-Za-z0-9_-]{8,100}$/;
 const KEEP_DAYS = 7;
@@ -46,21 +46,10 @@ export const idempotent = (scope) => async (req, res, next) => {
   const userId = req.user?.id ?? null;
 
   try {
-    const claim = await pool.query(
-      `INSERT INTO idempotency_keys (key, scope, user_id) VALUES ($1, $2, $3)
-       ON CONFLICT (key) DO NOTHING
-       RETURNING key`,
-      [key, scope, userId]
-    );
+    const claimed = await idempotencyRepository.claim(key, scope, userId);
 
-    if (claim.rows.length === 0) {
-      const { rows } = await pool.query(
-        `SELECT scope, user_id, status_code, response,
-                (created_at < NOW() - INTERVAL '${ABANDONED_AFTER_SECONDS} seconds') AS abandoned
-           FROM idempotency_keys WHERE key = $1`,
-        [key]
-      );
-      const prior = rows[0];
+    if (!claimed) {
+      const prior = await idempotencyRepository.findPrior(key, ABANDONED_AFTER_SECONDS);
       // Removed between the two statements: the first attempt failed
       // and cleared itself. Carry on as a first attempt, unrecorded.
       if (!prior) return next();
@@ -78,14 +67,8 @@ export const idempotent = (scope) => async (req, res, next) => {
         // this the key answered "already being saved" for a week and
         // the work could never be sent. This attempt takes the key
         // over; the routes that use it check their own records too.
-        const taken = await pool.query(
-          `UPDATE idempotency_keys SET created_at = NOW()
-            WHERE key = $1 AND status_code IS NULL
-              AND created_at < NOW() - INTERVAL '${ABANDONED_AFTER_SECONDS} seconds'
-          RETURNING key`,
-          [key]
-        );
-        if (taken.rows.length === 0) {
+        const taken = await idempotencyRepository.takeOverAbandoned(key, ABANDONED_AFTER_SECONDS);
+        if (!taken) {
           return refuse(res, 409, 'This is already being saved. Check that it is recorded before trying again.', { retryable: true });
         }
       } else {
@@ -106,9 +89,8 @@ export const idempotent = (scope) => async (req, res, next) => {
   res.json = (body) => {
     const ok = res.statusCode >= 200 && res.statusCode < 300;
     const settle = ok
-      ? pool.query(`UPDATE idempotency_keys SET status_code = $2, response = $3::jsonb WHERE key = $1`,
-        [key, res.statusCode, JSON.stringify(body ?? null)])
-      : pool.query(`DELETE FROM idempotency_keys WHERE key = $1`, [key]);
+      ? idempotencyRepository.storeAnswer(key, res.statusCode, body)
+      : idempotencyRepository.forget(key);
     settle
       .catch((err) => console.error(`[idempotency] ${scope}: answer not stored:`, err.message))
       .finally(() => send(body));
@@ -119,7 +101,7 @@ export const idempotent = (scope) => async (req, res, next) => {
   // submission (the outbox gives up after twelve hours). Cleared now
   // and then rather than on a schedule of their own.
   if (Math.random() < 0.02) {
-    pool.query(`DELETE FROM idempotency_keys WHERE created_at < NOW() - INTERVAL '${KEEP_DAYS} days'`).catch(() => {});
+    idempotencyRepository.purgeOlderThan(KEEP_DAYS).catch(() => {});
   }
 
   return next();

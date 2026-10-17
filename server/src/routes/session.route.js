@@ -23,7 +23,8 @@
 // ─────────────────────────────────────────────────────────────
 import express from 'express';
 import auth, { authIdentity } from '../middleware/auth.middleware.js';
-import pool    from '../config/db.js';
+import accountRepository from '../repositories/account.repository.js';
+import volunteerRepository from '../repositories/volunteer.repository.js';
 import { AUTH_COOKIE, authCookieOptions } from '../config/cookie.js';
 import { warehouseName, isMultiWarehouse } from '../config/warehouses.js';
 import { accountChangeRateLimiter } from '../middleware/rateLimiter.middleware.js';
@@ -80,8 +81,8 @@ const LANGUAGES = ['en', 'af', 'xh'];
 router.get('/language', auth, async (req, res) => {
   if (req.user.role === 'guest') return res.json({ success: true, data: { language: 'en' } });
   try {
-    const { rows } = await pool.query(`SELECT language FROM users WHERE id = $1`, [req.user.id]);
-    const language = LANGUAGES.includes(rows[0]?.language) ? rows[0].language : 'en';
+    const saved = await accountRepository.getLanguage(req.user.id);
+    const language = LANGUAGES.includes(saved) ? saved : 'en';
     return res.json({ success: true, data: { language } });
   } catch (error) {
     console.error('[session] language not read, using English:', error.message);
@@ -98,7 +99,7 @@ router.patch('/language', auth, async (req, res) => {
     return res.status(403).json({ success: false, message: 'A language can only be saved on a staff account.' });
   }
   try {
-    await pool.query(`UPDATE users SET language = $2 WHERE id = $1`, [req.user.id, language]);
+    await accountRepository.setLanguage(req.user.id, language);
     return res.json({ success: true, data: { language } });
   } catch (error) {
     console.error('[session] language not saved:', error.message);
@@ -134,11 +135,7 @@ router.get('/', auth, async (req, res) => {
     // so there is no users row to look up — querying `users` with a
     // volunteer id would match an unrelated staff member.
     if (req.user.role === 'guest') {
-      const result = await pool.query(
-        `SELECT id, full_name, signed_out_at FROM volunteers WHERE id = $1`,
-        [req.user.id]
-      );
-      const volunteer = result.rows[0];
+      const volunteer = await volunteerRepository.getGuestSession(req.user.id);
 
       if (!volunteer)             return rejectSession(res, 'Session expired. Please sign in again.');
       if (volunteer.signed_out_at) return rejectSession(res, 'This visit has been signed out.');
@@ -150,13 +147,7 @@ router.get('/', auth, async (req, res) => {
     }
 
     // ── Staff ──────────────────────────────────────────────────
-    const result = await pool.query(
-      `SELECT id, username, first_name, last_name, role, is_active, email
-       FROM users
-       WHERE id = $1`,
-      [req.user.id]
-    );
-    const user = result.rows[0];
+    const user = await accountRepository.findForSession(req.user.id);
 
     if (!user)           return rejectSession(res, 'Session expired. Please log in again.');
     if (!user.is_active) return rejectSession(res, 'This account has been deactivated.');

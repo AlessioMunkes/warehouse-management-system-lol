@@ -16,21 +16,17 @@
 // admin saves.
 // ─────────────────────────────────────────────────────────────
 import pool from '../config/db.js';
+import settingsRepository from '../repositories/settings.repository.js';
 import {
   SETTINGS, SETTING_KEYS, defaults, isSettingKey, validateValue,
 } from '../features/settings/settingsDefinitions.js';
 
 const fail = (status, message) => Object.assign(new Error(message), { status });
 
-const readStored = async () => {
-  const { rows } = await pool.query('SELECT key, value, updated_at FROM app_settings');
-  return rows;
-};
-
 export const getAll = async () => {
   const values = defaults();
   try {
-    for (const row of await readStored()) {
+    for (const row of await settingsRepository.readAll()) {
       if (isSettingKey(row.key) && validateValue(row.key, row.value) === null) values[row.key] = row.value;
     }
   } catch (err) {
@@ -82,15 +78,9 @@ export const update = async (changes, userId) => {
     await client.query('BEGIN');
     for (const key of keys) {
       if (changes[key] === SETTINGS[key].default) {
-        await client.query('DELETE FROM app_settings WHERE key = $1', [key]);
+        await settingsRepository.remove(client, key);
       } else {
-        await client.query(
-          `INSERT INTO app_settings (key, value, updated_by, updated_at)
-           VALUES ($1, $2::jsonb, $3, NOW())
-           ON CONFLICT (key) DO UPDATE
-             SET value = EXCLUDED.value, updated_by = EXCLUDED.updated_by, updated_at = NOW()`,
-          [key, JSON.stringify(changes[key]), userId ?? null],
-        );
+        await settingsRepository.save(client, key, changes[key], userId);
       }
     }
     await client.query('COMMIT');

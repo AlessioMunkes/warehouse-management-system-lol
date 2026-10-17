@@ -18,6 +18,7 @@
 // a nuisance, food held up by a missing column is worse.
 // ─────────────────────────────────────────────────────────────
 import pool from '../../config/db.js';
+import productUnits from '../../repositories/productUnits.repository.js';
 
 // Whole to six places, so 3.0000000000000004 from an honest sum counts
 // as 3.
@@ -34,44 +35,42 @@ const refuse = (name) => { throw Object.assign(new Error(wholeUnitsMessage(name)
 const fractions = (lines) => (lines ?? []).filter((l) => l && l.quantity !== null && l.quantity !== undefined
   && Number.isFinite(Number(l.quantity)) && !isWholeNumber(l.quantity));
 
-const check = async (sql, ids, db) => {
+const check = async (lookup, ids, db) => {
   if (ids.length === 0) return;
-  let rows;
+  let name;
   try {
-    ({ rows } = await db.query(sql, [ids]));
+    name = await lookup(db, ids);
   } catch (err) {
     console.error('[wholeItems] not checked, carrying on:', err.message);
     return;
   }
-  if (rows[0]) refuse(rows[0].name);
+  if (name) refuse(name);
 };
 
 /** lines: [{ productId, quantity }] */
 export const assertWholeByProduct = async (lines, db = pool) => check(
-  `SELECT name FROM products WHERE id = ANY($1::int[]) AND NOT is_decantable ORDER BY name LIMIT 1`,
+  productUnits.firstWholeUnitProduct,
   fractions(lines).map((l) => Number(l.productId)).filter(Number.isInteger), db);
 
 /** lines: [{ itemId, quantity }] — picking_slip_items.id */
 export const assertWholeBySlipItem = async (lines, db = pool) => check(
-  `SELECT p.name FROM picking_slip_items i JOIN products p ON p.id = i.product_id
-    WHERE i.id = ANY($1::int[]) AND NOT p.is_decantable ORDER BY p.name LIMIT 1`,
+  productUnits.firstWholeUnitSlipItem,
   fractions(lines).map((l) => Number(l.itemId)).filter(Number.isInteger), db);
 
 /** What may be decanted: every one of these products must be decantable. */
 export const assertDecantable = async (productIds, db = pool) => {
   const ids = [...new Set((productIds ?? []).map(Number).filter((n) => Number.isInteger(n) && n > 0))];
   if (ids.length === 0) return;
-  let rows;
+  let name;
   try {
-    ({ rows } = await db.query(
-      `SELECT name FROM products WHERE id = ANY($1::int[]) AND NOT is_decantable ORDER BY name LIMIT 1`, [ids]));
+    name = await productUnits.firstWholeUnitProduct(db, ids);
   } catch (err) {
     console.error('[wholeItems] decantable not checked, carrying on:', err.message);
     return;
   }
-  if (rows[0]) {
+  if (name) {
     throw Object.assign(
-      new Error(`${rows[0].name} is not marked as decantable. An admin can change that on the Products screen.`),
+      new Error(`${name} is not marked as decantable. An admin can change that on the Products screen.`),
       { status: 400 });
   }
 };

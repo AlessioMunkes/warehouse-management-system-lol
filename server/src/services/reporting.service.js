@@ -13,7 +13,7 @@ import factorRepo       from '../repositories/reportingFactor.repository.js';
 import cache            from '../features/reporting/reportCache.js';
 import { validateSpec } from '../features/reporting/specValidator.js';
 import aiProvider       from '../features/reporting/provider.js';
-import pool             from '../config/db.js';
+import adhocRepo        from '../repositories/reportingAdhoc.repository.js';
 import { validateCustom, runCustom, describeDatasets } from '../features/reporting/customQuery.js';
 import { drillOptions, planDrill } from '../features/reporting/drillDown.js';
 import recordsRepo from '../repositories/reportingRecords.repository.js';
@@ -92,7 +92,7 @@ const runCustomReport = async (input) => {
   const key = `custom:${JSON.stringify([spec.custom, spec.dateRange ?? null])}`;
   const hit = cache.get(key);
   if (hit) return { ...hit, meta: { ...hit.meta, cached: true } };
-  const payload = await runCustom(spec, (sql, params) => pool.query(sql, params));
+  const payload = await runCustom(spec, adhocRepo.runQuery);
   cache.set(key, payload, spec.dateRange ? cache.ttlFor(spec, todayISO()) : CACHE_TTL.SNAPSHOT);
   return payload;
 };
@@ -248,11 +248,11 @@ const getFactorHistory = (factorKey) => factorRepo.listFactorHistory(factorKey);
 // list, never from the request.
 const resolveLookup = async (plan, label) => {
   if (plan.lookup) {
-    const { rows } = await pool.query(`SELECT id FROM ${plan.lookup.table} WHERE name = $1 ORDER BY id LIMIT 1`, [plan.lookup.name]);
+    const id = await adhocRepo.findIdByName(plan.lookup.table, plan.lookup.name);
     // "Unassigned", "Unknown": the bar for records with nothing set.
     // There is no id to filter by, so there is no report behind it.
-    if (!rows.length) throw fail(404, `"${label}" is not a single record, so there is nothing more to open behind this bar.`);
-    plan.spec.filters[plan.filter] = rows[0].id;
+    if (id === null) throw fail(404, `"${label}" is not a single record, so there is nothing more to open behind this bar.`);
+    plan.spec.filters[plan.filter] = id;
   }
 };
 

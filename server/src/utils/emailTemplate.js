@@ -1,4 +1,7 @@
-export const LADLES_LOGO_URL = 'https://wms-lol.onrender.com/images/pdf_logo.png';
+// The logo at the top of every email. Email clients will not load an
+// image from the app itself, so it is a full public address; set
+// EMAIL_LOGO_URL to move it (another deployment, a CDN).
+export const LADLES_LOGO_URL = process.env.EMAIL_LOGO_URL || 'https://wms-lol.onrender.com/images/pdf_logo.png';
 
 export const escapeHtml = (value) => String(value ?? '')
   .replace(/&/g, '&amp;')

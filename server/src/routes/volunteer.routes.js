@@ -10,7 +10,6 @@
 // ─────────────────────────────────────────────────────────────
 import express from 'express';
 import jwt     from 'jsonwebtoken';
-import pool    from '../config/db.js';
 import { AUTH_COOKIE, authCookieOptions, sessionMaxAge } from '../config/cookie.js';
 import { guestWarehouseClaim } from '../config/warehouses.js';
 import auth, { requireRole } from '../middleware/auth.middleware.js';
@@ -47,14 +46,7 @@ router.post('/sign-in', async (req, res) => {
     }
 
     // signed_in_at comes from the DB default — never from the client
-    const result = await pool.query(
-      `INSERT INTO volunteers (full_name, source)
-       VALUES ($1, 'guest_login')
-       RETURNING id, full_name, signed_in_at`,
-      [name.trim()]
-    );
-
-    const volunteer = result.rows[0];
+    const volunteer = await volunteerRepo.createGuestVisit(name.trim());
 
     const token = jwt.sign(
       { id: volunteer.id, role: 'guest', ...guestWarehouseClaim() },

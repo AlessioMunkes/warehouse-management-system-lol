@@ -12,6 +12,41 @@
 import pool from '../config/db.js';
 import { logAudit } from './auditLog.repository.js';
 
+/**
+ * Login: the account with this username (any case), hash included for
+ * the password check. Never sent to a client. Runs on whichever
+ * warehouse database the caller has selected.
+ */
+const findForLogin = async (username) => {
+  const { rows } = await pool.query(
+    `SELECT id, username, first_name, last_name, role, password_hash, is_active, email
+     FROM users
+     WHERE LOWER(username) = LOWER($1)`,
+    [username],
+  );
+  return rows[0] ?? null;
+};
+
+/** GET /api/me: the account as it is now, without the hash. */
+const findForSession = async (userId) => {
+  const { rows } = await pool.query(
+    `SELECT id, username, first_name, last_name, role, is_active, email
+       FROM users
+       WHERE id = $1`,
+    [userId],
+  );
+  return rows[0] ?? null;
+};
+
+/** The language this person reads the floor screens in (migration 042). */
+const getLanguage = async (userId) => {
+  const { rows } = await pool.query(`SELECT language FROM users WHERE id = $1`, [userId]);
+  return rows[0]?.language ?? null;
+};
+
+const setLanguage = (userId, language) =>
+  pool.query(`UPDATE users SET language = $2 WHERE id = $1`, [userId, language]);
+
 /** The account's hash and email, for checking the current password. Never sent to a client. */
 const getCredentials = async (userId) => {
   const { rows } = await pool.query(
@@ -66,4 +101,7 @@ const setEmail = async (userId, before, email) => {
   }
 };
 
-export default { getCredentials, findOtherUserWithEmail, setPasswordHash, setEmail };
+export default {
+  findForLogin, findForSession, getLanguage, setLanguage,
+  getCredentials, findOtherUserWithEmail, setPasswordHash, setEmail,
+};

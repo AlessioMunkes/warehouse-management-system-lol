@@ -3,10 +3,12 @@ import { determineRouting } from '../utils/donationRouting.js';
 import { logAudit } from '../repositories/auditLog.repository.js';
 import { createNotification } from '../repositories/notification.repository.js';
 import pendingDonationRepository from '../repositories/pendingDonation.repository.js';
+import managerFlagRepository from '../repositories/managerFlag.repository.js';
 import productRepository from '../repositories/product.repository.js';
 import donationAdminService from './donationAdmin.service.js';
 import donationService from './donation.service.js';
 import { validateEmail } from '../utils/donationValidation.js';
+import { FOOD_CATEGORIES } from '../constants/donationCategories.js';
 
 const fail = (status, message) => {
   const err = new Error(message);
@@ -41,7 +43,7 @@ const normalisePendingItem = (raw = {}, index = 0) => {
 };
 
 const REVIEW_DECISIONS = new Set(['match_existing_product', 'create_product', 'move_to_non_food']);
-const REVIEW_ROUTE_CATEGORIES = new Set(['recipe_food', 'add_on_food', 'non_recipe_food']);
+const REVIEW_ROUTE_CATEGORIES = new Set(FOOD_CATEGORIES);
 
 const normalizeReviewDecision = (value) => String(value || '').trim().toLowerCase();
 
@@ -424,21 +426,11 @@ export const createPendingDonationFromIntake = async (payload = {}) => {
         if (!flagProductId) {
           const ts = Date.now();
           const safeName = `[Unclassified] ${item.description || `Pending donation line ${item.lineNo}`} (${ts})`;
-          const placeholderRes = await client.query(
-            `INSERT INTO products (
-               name,
-               stock_keeping_unit,
-               storage_type,
-               is_active,
-               is_decantable,
-               code_type,
-               default_unit,
-               is_perishable
-             ) VALUES ($1, $2, 'dry', false, false, 'fixed', 'kg', false)
-             RETURNING id;`,
-            [safeName, `PENDING-${pendingDonation.id}-L${item.lineNo}-${ts}`]
-          );
-          flagProductId = placeholderRes.rows[0].id;
+          const placeholder = await managerFlagRepository.createPlaceholderProduct(client, {
+            name: safeName,
+            sku: `PENDING-${pendingDonation.id}-L${item.lineNo}-${ts}`,
+          });
+          flagProductId = placeholder.id;
         }
 
         const flag = await pendingDonationRepository.createWarehouseManagerFlag(

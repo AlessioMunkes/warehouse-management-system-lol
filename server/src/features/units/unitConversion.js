@@ -20,6 +20,7 @@
 // The same sum exists twice on purpose: convertQuantity for a movement
 // being written, and toStockUnitSql for totals Postgres adds up.
 // ─────────────────────────────────────────────────────────────
+import settingsRepository from '../../repositories/settings.repository.js';
 
 // The setting behind each unit an admin sizes, and how many kilograms
 // one of that setting's own unit is (a punnet is entered in grams).
@@ -62,10 +63,7 @@ export const readUnitSizes = async (client) => {
   const sizes = {};
   await client.query('SAVEPOINT unit_sizes');
   try {
-    const { rows } = await client.query(
-      `SELECT key, value FROM app_settings WHERE key = ANY($1::text[])`,
-      [Object.values(UNIT_SIZE_SETTINGS).map((s) => s.key)]
-    );
+    const rows = await settingsRepository.readKeys(client, Object.values(UNIT_SIZE_SETTINGS).map((s) => s.key));
     await client.query('RELEASE SAVEPOINT unit_sizes');
     for (const [unit, { key }] of Object.entries(UNIT_SIZE_SETTINGS)) {
       const saved = Number((rows ?? []).find((r) => r.key === key)?.value);

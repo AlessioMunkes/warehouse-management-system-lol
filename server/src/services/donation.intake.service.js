@@ -10,6 +10,9 @@
 import pool              from '../config/db.js';
 import donationRepository from '../repositories/donation.intake.repository.js';
 import stockModel         from '../repositories/stock.repository.js';
+import managerFlagRepository from '../repositories/managerFlag.repository.js';
+import productRepo        from '../repositories/product.repository.js';
+import { ECD_STOCK_CATEGORIES } from '../constants/donationCategories.js';
 
 export const processDonationIntake = async ({
   productId,
@@ -43,7 +46,7 @@ export const processDonationIntake = async ({
     let resolvedStorageArea = routingRule.storage_area;
     let managerFlagCreated = false;
 
-    const isEcdInventoryItem = ['recipe_food', 'add_on_food'].includes(finalCategory);
+    const isEcdInventoryItem = ECD_STOCK_CATEGORIES.includes(finalCategory);
 
     if (isEcdInventoryItem) {
       resolvedStorageArea = product.storage_type === 'cold'
@@ -80,20 +83,15 @@ export const processDonationIntake = async ({
       // warehouse_manager_flags so a manager has something to review.
       resolvedStorageArea = routingRule.storage_area || 'Mezzanine or Boardroom storage';
 
-      const flagResult = await client.query(
-        `INSERT INTO warehouse_manager_flags
-           (product_id, quantity_kg, reason, target_location, created_by, status)
-         VALUES ($1, $2, $3, $4, $5, 'pending')
-         RETURNING id`,
-        [
-          productId,
-          quantityKg,
-          'Non-food donation received: requires manual review and storage placement.',
-          resolvedStorageArea,
-          receivedByUserId,
-        ]
-      );
-      managerFlagCreated = Boolean(flagResult.rows[0]);
+      const flag = await managerFlagRepository.createIntakeFlag(client, {
+        productId,
+        quantityKg,
+        reason: 'Non-food donation received: requires manual review and storage placement.',
+        targetLocation: resolvedStorageArea,
+        createdBy: receivedByUserId,
+        status: 'pending',
+      });
+      managerFlagCreated = Boolean(flag);
     }
 
     await client.query('COMMIT');
@@ -148,35 +146,19 @@ export const processUnrecognizedDonationIntake = async ({
     const timestamp = Date.now();
     const safeName = `[Unclassified] ${trimmedDescription} (${timestamp})`;
     const placeholderSku = `PENDING-${timestamp}`;
-    const productResult = await client.query(
-      `INSERT INTO products (
-        name,
-        stock_keeping_unit,
-        storage_type,
-        is_active,
-        is_decantable,
-        code_type,
-        default_unit,
-        is_perishable
-      ) VALUES ($1, $2, 'dry', false, false, 'fixed', 'kg', false)
-      RETURNING id, name, stock_keeping_unit AS sku, storage_type, is_active;`,
-      [safeName, placeholderSku]
-    );
-
-    const product = productResult.rows[0];
+    const product = await managerFlagRepository.createPlaceholderProduct(client, {
+      name: safeName,
+      sku: placeholderSku,
+    });
     const flagReason = (reason && String(reason).trim()) || 'Unrecognized donation item requires manager classification.';
-    const flagResult = await client.query(
-      `INSERT INTO warehouse_manager_flags (
-        product_id,
-        quantity_kg,
-        reason,
-        target_location,
-        created_by,
-        status
-      ) VALUES ($1, $2, $3, $4, $5, 'pending_classification')
-      RETURNING id, status;`,
-      [product.id, parsedQuantity, flagReason, 'Intake Holding Area', receivedByUserId]
-    );
+    const flag = await managerFlagRepository.createIntakeFlag(client, {
+      productId: product.id,
+      quantityKg: parsedQuantity,
+      reason: flagReason,
+      targetLocation: 'Intake Holding Area',
+      createdBy: receivedByUserId,
+      status: 'pending_classification',
+    });
 
     await client.query('COMMIT');
 
@@ -187,8 +169,8 @@ export const processUnrecognizedDonationIntake = async ({
       sku: product.sku,
       storageType: product.storage_type,
       quantityKg: parsedQuantity,
-      flagId: flagResult.rows[0].id,
-      status: flagResult.rows[0].status,
+      flagId: flag.id,
+      status: flag.status,
       message: 'Unrecognized item logged for admin review.',
     };
   } catch (error) {
@@ -200,7 +182,11 @@ export const processUnrecognizedDonationIntake = async ({
   }
 };
 
+// The intake form's "Match to stock item" search. Read only.
+export const searchProducts = (term) => productRepo.searchProductsByName(term);
+
 export default {
   processDonationIntake,
   processUnrecognizedDonationIntake,
+  searchProducts,
 };

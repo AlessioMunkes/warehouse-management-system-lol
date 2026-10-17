@@ -102,4 +102,25 @@ const getVolunteerById = async (id) => {
   return rows[0] ?? null;
 };
 
-export default { listGuestLog, signOutVolunteer, getVolunteerById };
+// A guest signing themselves in at the door. signed_in_at comes from
+// the column default, never from the request.
+const createGuestVisit = async (fullName) => {
+  const { rows } = await pool.query(
+    `INSERT INTO volunteers (full_name, source)
+       VALUES ($1, 'guest_login')
+       RETURNING id, full_name, signed_in_at`,
+    [fullName]
+  );
+  return rows[0];
+};
+
+// GET /api/me for a guest: still signed in?
+const getGuestSession = async (id) => {
+  const { rows } = await pool.query(
+    `SELECT id, full_name, signed_out_at FROM volunteers WHERE id = $1`,
+    [id]
+  );
+  return rows[0] ?? null;
+};
+
+export default { listGuestLog, signOutVolunteer, getVolunteerById, createGuestVisit, getGuestSession };

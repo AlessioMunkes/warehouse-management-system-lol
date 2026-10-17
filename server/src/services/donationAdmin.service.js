@@ -5,6 +5,9 @@ import pool from '../config/db.js';
 import { determineRouting } from '../utils/donationRouting.js';
 import classificationRepo from '../repositories/donation.classification.js';
 import productRepo        from '../repositories/product.repository.js';
+import managerFlagRepo    from '../repositories/managerFlag.repository.js';
+import { DONATION_CATEGORIES } from '../constants/donationCategories.js';
+import { STORAGE_AREAS } from '../constants/storageAreas.js';
 
 // Standard helper to throw HTTP-friendly errors that our controllers can map easily
 const fail = (status, message) => {
@@ -59,64 +62,34 @@ class DonationAdminService {
       ? String(storageType).trim()
       : 'dry';
 
-    const allowedCategories = ['recipe_food', 'add_on_food', 'non_recipe_food', 'non_food'];
+    const allowedCategories = DONATION_CATEGORIES;
     if (category && !allowedCategories.includes(category)) {
       fail(400, 'Category must be one of: ' + allowedCategories.join(', '));
     }
 
-    const flagRes = await client.query(
-      `SELECT id, product_id, quantity_kg, reason, target_location, status
-       FROM warehouse_manager_flags
-       WHERE id = $1 AND status = 'pending_classification';`,
-      [normalizedFlagId]
-    );
+    const pendingFlag = await managerFlagRepo.findPendingClassificationFlag(client, normalizedFlagId);
 
-    if (!flagRes.rows[0]) {
+    if (!pendingFlag) {
       fail(404, `No pending classification found for flag ${normalizedFlagId}.`);
     }
 
-    const placeholderProductId = Number(flagRes.rows[0].product_id);
+    const placeholderProductId = Number(pendingFlag.product_id);
 
-    const existingProductResult = await client.query(
-      `SELECT id, name, stock_keeping_unit AS sku, storage_type, default_unit, is_active
-       FROM products
-       WHERE LOWER(name) = LOWER($1)
-         AND id <> $2
-       LIMIT 1;`,
-      [trimmedName, placeholderProductId]
-    );
-
-    const existingProduct = existingProductResult.rows[0] || null;
+    const existingProduct = await managerFlagRepo.findProductByNameExcept(client, trimmedName, placeholderProductId);
     const productId = existingProduct ? Number(existingProduct.id) : placeholderProductId;
 
     if (existingProduct) {
-      await client.query(
-        `UPDATE warehouse_manager_flags
-         SET product_id = $1
-         WHERE id = $2;`,
-        [productId, normalizedFlagId]
-      );
+      await managerFlagRepo.setFlagProduct(client, normalizedFlagId, productId);
     }
 
-    const productResult = existingProduct ? { rows: [existingProduct] } : await client.query(
-      `UPDATE products
-       SET name = $1,
-           stock_keeping_unit = $2,
-           storage_type = $3,
-           default_unit = $4,
-           is_active = true
-       WHERE id = $5
-       RETURNING id, name, stock_keeping_unit AS sku, storage_type, default_unit, is_active;`,
-      [trimmedName, normalizedSku, normalizedStorageType, normalizedDefaultUnit, placeholderProductId]
-    );
+    const product = existingProduct ?? await managerFlagRepo.promotePlaceholderProduct(client, placeholderProductId, {
+      name: trimmedName,
+      sku: normalizedSku,
+      storageType: normalizedStorageType,
+      defaultUnit: normalizedDefaultUnit,
+    });
 
-    const result = await client.query(
-      `UPDATE warehouse_manager_flags
-      SET status = 'resolved', updated_at = NOW()
-       WHERE id = $1 AND status = 'pending_classification'
-       RETURNING id, product_id, status;`,
-      [normalizedFlagId]
-    );
+    const resolvedFlag = await managerFlagRepo.markClassificationFlagResolved(client, normalizedFlagId);
 
     if (category) {
       await productRepo.upsertProductRoutingDefault({
@@ -127,8 +100,8 @@ class DonationAdminService {
     }
 
     return {
-      product: productResult.rows[0],
-      flag: result.rows[0],
+      product,
+      flag: resolvedFlag,
       message: 'Unrecognized item finalized and marked as resolved.',
     };
   }
@@ -137,7 +110,7 @@ class DonationAdminService {
   if (!Number.isInteger(Number(productId)) || Number(productId) <= 0) {
     fail(400, 'Product ID must be a valid positive integer.');
   }
-  const allowedCategories = ['recipe_food', 'add_on_food', 'non_recipe_food', 'non_food'];
+  const allowedCategories = DONATION_CATEGORIES;
   if (!allowedCategories.includes(category)) {
     fail(400, 'Category must be one of: ' + allowedCategories.join(', '));
   }
@@ -159,17 +132,15 @@ async removeProductClassification(productId) {
   return result;
 }
 async updateCategoryRule({ category, routingOutcome, storageArea, description, updatedBy }) {
-  const allowedCategories = ['recipe_food', 'add_on_food', 'non_recipe_food', 'non_food'];
+  const allowedCategories = DONATION_CATEGORIES;
   if (!allowedCategories.includes(category)) {
     fail(400, 'Category must be one of: ' + allowedCategories.join(', '));
   }
 
+  // The five areas, plus the two older free-text names some routing
+  // rules still hold.
   const allowedStorageAreas = [
-    'cold_room',
-    'dry_store',
-    'fts_section',
-    'mezzanine',
-    'boardroom',
+    ...STORAGE_AREAS,
     'Soup Kitchen Prep',
     'Mezzanine or Boardroom storage',
   ];
